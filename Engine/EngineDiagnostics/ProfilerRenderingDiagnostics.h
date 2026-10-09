@@ -11,7 +11,7 @@
 // scene, RHI, editor, or ImGui dependency and contains no process-local handles.
 namespace ce::profiler_viewer::diagnostics
 {
-    inline constexpr std::uint32_t rendering_schema_version = 1;
+    inline constexpr std::uint32_t rendering_schema_version = 3;
     inline constexpr std::size_t maximum_rendering_bytes = 256 * 1024;
     inline constexpr std::size_t maximum_rendering_passes = 512;
     inline constexpr std::size_t maximum_rendering_messages = 128;
@@ -71,6 +71,23 @@ namespace ce::profiler_viewer::diagnostics
         bool ready{};
     };
 
+    // Numeric values are the versioned wire contract: kind 0 unknown/1 real/2
+    // generated, resolution 0 unknown/1 native/2 reconstructed/3 native fallback/
+    // 4 spatial-scaled; spatial mode 0 off/1 NIS scale/2 NIS sharpen.
+    struct rendering_temporal_provenance
+    {
+        std::uint8_t frameKind{}, resolutionState{}, upscaler{}, frameGenerator{};
+        std::uint64_t realFrameId{}, viewId{}, sceneEpoch{};
+        std::uint32_t generatedOrdinal{}, renderWidth{}, renderHeight{}, displayWidth{}, displayHeight{};
+        bool nativeGateActive{};
+        std::uint64_t publicationFrameId{};
+        // v1/v2 never recorded applied spatial effects. Keep them unknown when
+        // reading or re-encoding those payloads, rather than inventing "off".
+        bool spatialProvenanceAvailable{};
+        std::uint8_t spatialMode{};
+        bool deepDvcApplied{};
+    };
+
     struct rendering_snapshot
     {
         rendering_backend backend{};
@@ -101,6 +118,7 @@ namespace ce::profiler_viewer::diagnostics
         std::array<rendering_display, rendering_view_count> views{};
         double cpuMs{};
         double gpuMs{};
+        rendering_temporal_provenance temporalProvenance, gpuTemporalProvenance;
         std::uint64_t gpuCollects{};
         std::uint64_t gpuCollectMismatches{};
         std::uint64_t gpuQueryOverflowPasses{};
@@ -118,7 +136,8 @@ namespace ce::profiler_viewer::diagnostics
     };
 
     // Explicit little-endian fields, bounded strings/counts, finite floats, exact
-    // consumption, and schema validation. Failed decode never changes output.
+    // consumption, and schema validation. Reads v1/v2/v3; writes v3. Failed
+    // decode never changes output. Old payloads cannot prove spatial exclusion.
     std::vector<std::byte> encode_rendering(const rendering_snapshot& snapshot);
     bool decode_rendering(std::span<const std::byte> bytes, rendering_snapshot& snapshot);
 }

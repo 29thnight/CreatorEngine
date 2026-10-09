@@ -1,5 +1,29 @@
 # PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation
 
+## 2026-10-09 제품 설정·히스토리·profiler 소스 보완
+
+Editor `editorRenderFeatures` / Player `build.renderFeatures`의 portable 기본값과 cook 후 `renderFeatures`·device 생성 전 소비, 저장값→명시적 환경 override→세션 CLI 우선순위, 요청/지원/설정/활성 MFG count 분리를 소스로 연결했다. 명시적 camera cut·unjittered projection 변경은 마지막 제출 history와 비교한다. CPU profiler frame owner와 render publication/real-frame/submission 신원을 분리하고, CPU render-submit/GPU-pass provenance sidecar를 `.ceprof` snapshot v6·stream v7 (기존 v4/v5 읽기 유지) 및 viewer/summary로 운반한다. live PLRD는 v3이며 legacy 기록의 provenance는 unknown으로 남긴다. development-only TU/FG fault와 결함 활성 측정의 fail-closed, CPU presenter-return 연속 기록도 소스 범위다. QPC 반환 관측은 물리 표시 시각이 아니다.
+
+Presenter observation은 정확한 source identity를 가진 CPU Present 결과이며 물리 display timestamp·개별 generated identity·GPU/SDK 최종 소비 증거가 아니다. 외부 latency/pacing 수집·분석 소스는 작성되었으나 실행 수용은 전부 남는다. development-only 전체 7-route 씬 생성/제출 sequencing·probe pixel 소유권 driver와 strict v2 oracle을 소스로 작성했다. 실제 자산·제출 predecessor·입력 hash·positive/disabled-control GPU 픽셀·indexed/meshlet 실행 경로가 모두 일치해야 향후 PASS할 수 있다. 기존 analytic fixture 및 증거 누락은 여전히 INCOMPLETE다. 새 driver·checker도 실행하지 않았으며 TR1 수용 완료를 뜻하지 않는다.
+
+FG capability/configure/prepare/Present 및 실제 drain 이후 host acknowledgement fault, FSR 전용 evaluate callback fault/staging은 소스로 작성했다. DLSS/XeSS의 별도 evaluate 주입은 명시적으로 미지원이며 실제 device-loss·소비 지연·물리 표시 행렬 수용을 대신하지 않는다. 상세 범위는 [통합 기록](TemporalVendorIntegration20261009.md#product-defaults-history-and-profiler-gap-closure--source-only-checkpoint)에 둔다. W9는 temporal/render-feature 설정 부분만 보완했으며 전체 설정/품질/제품 수용 완료가 아니다. 빌드·테스트·스크립트·native 실행 없이 정적 검토만 했고 **16행/71일·기성 0 및 모든 DX12 Debug/Release 실행 수용 미완료**를 유지한다.
+
+## 2026-10-09 실제 입력·렌더 그래프·Player 배선 확장
+
+벤더 중립 계약/SDK 어댑터에 이어 실제 LX 이전 오브젝트·스키닝 입력, per-view history/jitter와 렌더/표시 크기 분리, PostChain 전 TU, DX12 Player의 전체 GPU temporal packet·proxy·최종 소비 lease와 게임 루프 지연 마커를 연결하는 소스 구현을 진행한다. TR0는 캡처 강제 native 범위와 실/생성·양쪽 해상도 provenance를 실제 capture/profiler/gate에 전달한다.
+
+단계별 관측/요청 커맨드와 실행 드라이버는 [Temporal validation](../../Tools/temporal-validation/README.md)에 둔다. 요청 접수와 renderer/Player 관측 세대를 나누며, SDK query·선택·실제 dispatch/present·완료점을 섞지 않는다. **빌드·컴파일러·셰이더·테스트·제품·성능 실행은 하지 않았으므로 아래 16행 완료선/71인일 수용을 완료로 바꾸지 않는다.**
+
+Vulkan Player FG의 현 CPU 표시 브리지는 GPU temporal 입력/전용 present queue 배선이 없으므로 `NativePresentationInteropUnavailable`로 fail-closed한다. 이는 FSR Vulkan SDK 또는 GPU 지원 부재 판정이 아니다. Vulkan SR/native 어댑터 경계는 유지하고, Vulkan 실행 비교는 PHASE 4.9가 소유한다. 상세 소스 범위·외부 SDK 설정·미실행 검증은 [벤더 통합 기록](TemporalVendorIntegration20261009.md)을 참조한다.
+
+## 2026-10-09 벤더 구현 착수
+
+사용자 결정에 따라 업스케일러/FG의 **벤더 구현과 중립 공통 계약부터** 만들고, 실제 렌더 입력·그래프·Player 실행 경로는 뒤에 연결한다. 첫 구현의 SDK 정본과 제한은 [벤더 통합 기록](TemporalVendorIntegration20261009.md)에 둔다. FSR은 사용자 최종 선택인 **3.1.4 / FidelityFX SDK 1.1.4**, DLSS는 Streamline 2.14.1, XeSS는 3.0.2를 기준으로 한다.
+
+소스 구현·정적 검토만으로 아래 TR/TU/FG 행을 완료 처리하지 않는다. 모션 입력, 렌더/표시 크기 분리와 FG 입력 수명·present 통합에는 실제 소스 경로가 있으며, 구현 누락 감사와 DX12 Debug/Release 실행 수용을 구분한다. 공개 공통 계약에는 native API 타입을 올리지 않으며, FSR의 두 API 구현은 SDK 정적 라이브러리 심볼 충돌 때문에 한 바이너리에서 하나만 링크한다.
+
+아래 2026-09-14 지원 행렬은 당시 조사 기록이다. XeSS FG의 Arc 전용 설명은 현재 SDK에 적용되지 않는다: XeSS 2.1 이후 지원되는 타사 GPU에서도 FG가 가능하고, 3.x 추가 보간 수는 런타임 기능 질의로 판정한다. 라이브 기능 활성화나 현재 하드웨어 지원은 벤더 ID/표의 추정으로 결정하지 않는다.
+
 ## 2026-10-07 최근 병합 반영
 
 PR #118/#120은 consumer lease를 GPU 완료까지 유지하는 표시 수명, 최신 packet/Host GPU 진입 제한과 Player native Present 기반을 적용했다. 이 변경은 FG provider/SDK·생성 프레임 구현 또는 PHASE 4.5 완료 공수가 아니다. 16행 71인일 및 TR/TU/FG 미완료 판정을 유지한다.
@@ -11,7 +35,7 @@ FG는 shell/RHI Present·pacing와 게임 루프가 소유하고 Editor viewport
 **2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
 
-**신설 2026-09-14 · `BASE-0` 이관 2026-09-15 · 활성 16행 71일 · 미착수**
+**신설 2026-09-14 · `BASE-0` 이관 2026-09-15 · 활성 16행 71일 · 2026-10-09 벤더 소스 구현 착수, 실행 수용 미완료**
 
 PHASE 4.75의 GPU 설계 게이트에 `4-5 DLSS 구상` 1일이 한 줄로 있었다. 이 문서는 그 한 줄을
 독립 페이즈로 분리하고, 벤더 이름 대신 **계층**으로 다시 세운다.
@@ -35,8 +59,8 @@ PHASE 4.75의 GPU 설계 게이트에 `4-5 DLSS 구상` 1일이 한 줄로 있�
 `4-5 DLSS 구상`은 두 가지를 동시에 틀렸다.
 
 **첫째, 벤더 이름을 기능 이름으로 썼다.** DLSS는 구현이지 기능이 아니다. NVIDIA가 아닌
-하드웨어에서 무엇을 하는지 계획서가 답하지 못했다. 실제로 `FSR`·`XeSS`·`FidelityFX`·`TSR`은
-저장소 전체에 **0건**이다. [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) §10.4에
+하드웨어에서 무엇을 하는지 계획서가 답하지 못했다. 당시(2026-09-14) 조사에서는 `FSR`·`XeSS`·`FidelityFX`·`TSR` 구현이
+저장소 전체에 **0건**이었다. 현재 PR #169의 SDK/제품 배선 소스와 혼동하지 않는다. [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) §10.4에
 *"DXR/DLSS 같은 조건부 Pass는 모든 지원 행렬에 fallback 또는 명시적 pipeline invalid 사유를
 가져야 한다"*는 규칙은 이미 서 있었지만, 행렬의 나머지 칸이 비어 있었다.
 
@@ -44,7 +68,7 @@ PHASE 4.75의 GPU 설계 게이트에 `4-5 DLSS 구상` 1일이 한 줄로 있�
 프레임 생성은 Pass가 아니라 **swapchain/present 계층을 가져간다.** 소유 계층이 다르고,
 완료선이 다르고, 계측에 끼치는 해가 다르다. 한 항목 1일에 둘을 넣으면 둘 다 설계되지 않는다.
 
-그리고 셋째로, 둘 다 같은 선행을 요구하는데 **그 선행이 이 엔진에 하나도 없다.**
+그리고 셋째로, 당시에는 둘 다 같은 선행을 요구하는데 **그 선행이 이 엔진에 없었다.** 현재의 구현/미구현/실행 미검증 상태는 문서 상단의 최신 기록을 따른다.
 
 ---
 

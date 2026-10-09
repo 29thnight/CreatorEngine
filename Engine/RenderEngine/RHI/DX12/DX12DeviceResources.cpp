@@ -2,6 +2,8 @@
 #include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
 #include "DX12Format.h"
+#include "../Temporal/TemporalDeviceDX12.h"
+#include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include "../RHIRecordedBatch.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
@@ -274,7 +276,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 곧 테스트 하네스다 — 메시지 0건이 통과 조건.
     // CREATOR_DX12_VALIDATION=off|basic|gpu로 선택한다. Debug 기본은 basic이고,
     // Release 기본은 off라 배포 실행의 성능을 바꾸지 않는다.
-    if (debugLayerEnabled)
+    if (debugLayerEnabled && !HasTemporalDeviceDX12())
     {
         Microsoft::WRL::ComPtr<ID3D12Debug> debug;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
@@ -300,7 +302,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     // DRED 설정 역시 디바이스 생성 전에 해야 한다. 장치 제거 뒤에 켜려 하면 이미
     // 필요한 breadcrumb와 page-fault 기록이 사라진 뒤다.
-    if (dredEnabled)
+    if (dredEnabled && !HasTemporalDeviceDX12())
     {
         Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings))))
@@ -318,7 +320,19 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         breakOnError ? "on" : "off");
 
     const UINT factoryFlags = debugLayerEnabled ? DXGI_CREATE_FACTORY_DEBUG : 0;
-    HRESULT hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&m_factory));
+    TemporalResult temporalBootstrap;
+    m_temporalDevice = AcquireTemporalDeviceDX12(factoryFlags, matchAdapterLuid, temporalBootstrap);
+    m_temporalBootstrapResult = temporalBootstrap;
+    HRESULT hr = S_OK;
+    if (m_temporalDevice)
+    {
+        m_factory = m_temporalDevice->factory;
+        m_adapter = m_temporalDevice->adapter;
+        m_device = m_temporalDevice->device;
+    }
+    else
+    {
+    hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&m_factory));
     if (FAILED(hr)) { outError = "DXGI 팩토리 생성 실패 " + HrToString(hr); return false; }
 
     // 어댑터 선택.
@@ -344,6 +358,13 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }
+        if (temporalBootstrap.status != TemporalStatus::NotQueried)
+            TemporalRuntimeControl::Get().PublishDiagnostic([&](auto& snapshot)
+            {
+                snapshot.lastUpscaleResult = temporalBootstrap;
+                snapshot.diagnostic = "Streamline pre-device initialization failed; native device remains usable";
+            });
+    }
     char samplingPath[32768]{};
     const DWORD samplingLength = GetEnvironmentVariableA("CREATOR_GPU_MEMORY_SAMPLES",
         samplingPath, static_cast<DWORD>(sizeof(samplingPath)));
@@ -702,6 +723,7 @@ void DX12DeviceResources::Shutdown()
     m_memorySampling.reset();
     m_adapter.Reset();
     m_factory.Reset();
+    m_temporalDevice.reset();
     m_width = 0;
     m_height = 0;
 }
@@ -1991,7 +2013,16 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
 
 bool DX12DeviceResources::Present(std::string& outError)
 {
+    return Present(outError, nullptr);
+}
+
+bool DX12DeviceResources::Present(std::string& outError, HRESULT* nativeResult)
+{
     ce::profile_scope profile{ce::marker<"DX12PresentWait">()};
+    if (nativeResult)
+    {
+        *nativeResult = E_PENDING;
+    }
     if (!m_swapChain)
     {
         outError = "스왑체인이 없다";
@@ -2016,6 +2047,10 @@ bool DX12DeviceResources::Present(std::string& outError)
     const UINT flags = windowed && (m_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
         ? DXGI_PRESENT_ALLOW_TEARING : 0;
     const HRESULT result = m_swapChain->Present(0, flags);
+    if (nativeResult)
+    {
+        *nativeResult = result;
+    }
     if (FAILED(result))
     {
         outError = "DX12 Present 실패 " + HrToString(result);
@@ -2976,3 +3011,32 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
     return true;
 }
 
+
+std::shared_ptr<DlssTemporalAdapter> DX12DeviceResources::GetTemporalDlssSession() const
+{
+    return m_temporalDevice ? m_temporalDevice->session : nullptr;
+}
+
+bool DX12DeviceResources::DetachSwapChain(std::string& outError)
+{
+    if (!m_swapChain) return true;
+    if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError) ||
+        GetLastLifecycleResult().command == RHILifecycleCommand::UnrecoverableDeviceError ||
+        !GetLastLifecycleResult().IsClean() || !m_device || FAILED(m_device->GetDeviceRemovedReason()))
+    {
+        if (outError.empty()) outError = "Swapchain detach requires verified GPU retirement on a live device";
+        return false;
+    }
+    for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
+    m_backBufferRtvHeap.Reset();
+    m_swapChain.Reset();
+    if (m_frameLatencyWaitableObject)
+    {
+        CloseHandle(m_frameLatencyWaitableObject);
+        m_frameLatencyWaitableObject = nullptr;
+    }
+    m_frameLatencyReady = false;
+    m_hostSubmissionTicket = {};
+    m_hostFenceValue = 0;
+    return true;
+}

@@ -25,6 +25,7 @@
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
+#include "TemporalMotionFixture.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Player와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
 #include "ClrHost.h"
@@ -648,6 +649,7 @@ void Editor::EditorMain::Finalize()
 	// Asset and scene teardown may release proxies still referenced by a queued
 	// render frame. Drain the consumer before either owner starts shutting down.
 	EnhancedSceneRenderer::StopLiveRenderThread();
+    TemporalMotionFixture::ShutdownAfterRenderJoin();
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 	Editor::ModelPlacement::Get().Shutdown();
 	EditorScriptAuthoring::Shutdown();

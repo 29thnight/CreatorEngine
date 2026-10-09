@@ -53,6 +53,7 @@ namespace CreatorBuildTool
             Directory.CreateDirectory(candidate);
             try
             {
+                var renderFeatures = RenderFeatureSettings.FromProject(Path.Combine(project, "ProjectSetting/EngineSettings.asset"));
                 var copied = PackageInputs.CopyBootstrapProject(project, source, context.Cancellation, selected);
                 var sourceEntries = Metadata.Entries(source);
                 var cooker = Paths.Child(engine.BinaryRoot, "Tools/AssetCooker/AssetCooker.exe");
@@ -77,7 +78,7 @@ namespace CreatorBuildTool
                 Paths.CopyTree(generated, Path.Combine(candidate, "Assets"), context.Cancellation);
                 var template = Paths.Child(engine.Root, "Tools/packaging/templates/EngineSettings.runtime.yml");
                 var settings = Paths.Child(candidate, "ProjectSetting/EngineSettings.asset");
-                PackageInputs.Materialize(template, settings, options.Get("startup-scene"), options.Get("render-backend"));
+                PackageInputs.Materialize(template, settings, options.Get("startup-scene"), options.Get("render-backend"), renderFeatures);
                 var preflight = PackageInputs.Validate(candidate, settings);
                 PackageInputs.RemoveGeometrySources(candidate);
                 PackageInputs.RemoveAudioSources(candidate);

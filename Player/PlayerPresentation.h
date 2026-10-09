@@ -24,6 +24,10 @@ namespace Player
         virtual bool BeginFrame(std::string& outError) = 0;
         virtual bool Present(uint64_t textureId, std::string& outError) = 0;
         virtual void Shutdown() = 0;
+        // GT calls this before input sampling. A serial SDK owner may wait for
+        // the preceding real frame; it never derives markers from generated IDs.
+        virtual bool BeginSimulationFrame(uint64_t, std::string&) { return true; }
+        virtual void StopSimulationFrames() {}
 
         bool HasShutdownFailure() const { return m_shutdownFailed; }
 

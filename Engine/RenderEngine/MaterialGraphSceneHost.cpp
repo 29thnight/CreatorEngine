@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <set>
 #include <atomic>
+#include <bit>
 #include <cstring>
 #include <cstdio>
 #include <stdexcept>
@@ -59,8 +60,10 @@ namespace material_graph
             math::matrix4x4 shadowProjection[3];
             math::vector4 shadowSplits, shadowBias, cameraForward;
             EnhancedLight lights[64];
+            math::matrix4x4 temporalCurrentProjection, temporalPreviousProjection;
+            std::uint32_t temporalHistoryValid{}, temporalPadding[3]{};
         };
-        static_assert(sizeof(SceneConstants) == 4464);
+        static_assert(sizeof(SceneConstants) == 4608);
         static_assert(offsetof(SceneConstants, lights) == 368);
 
         struct SceneShadowConstants
@@ -85,7 +88,7 @@ namespace material_graph
         PassLayout layout;
         PassLayout shadowLayout;
         LX::Runtime::GraphicsPipeline shadow;
-        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, depth, color, blendedColor;
+        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, depth, color, blendedColor, temporal;
         std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> lookup, blendedLookup;
         std::array<LX::Runtime::GraphicsPipeline, 2> subsurface;
         std::array<LX::Runtime::GraphicsPipeline, 2> refraction;
@@ -94,7 +97,7 @@ namespace material_graph
         LX::Runtime::ComputePipeline volume;
         RHIShaderBlob meshShader, shadowMeshShader;
         std::map<uint64_t, RHIPipelineHandle> meshPipelines;
-        uint32_t meshletRoot{}, shadowMeshletRoot{2};
+        uint32_t meshletRoot{}, temporalPreviousRoot{}, shadowMeshletRoot{2};
         bool meshEnabled{};
         bool hasSurface{}, hasVolume{};
         bool hasSubsurface{}, hasTransmission{}, hasSpecial{};
@@ -107,7 +110,7 @@ namespace material_graph
             own::shared_owner<const Program> program;
             own::shared_owner<const RenderBindings> bindings;
             bool shadowEnabled{};
-            std::shared_ptr<const MeshSurfaceBatch> geometry;
+            std::shared_ptr<const MeshSurfaceBatch> geometry, previousGeometry;
             RHIBufferSlice indices, constants, referenceConstants;
             RHIBufferSlice visibleOwner;
             std::uint32_t visibilityBin{UINT32_MAX}, visibleIdOffset{};
@@ -119,6 +122,7 @@ namespace material_graph
             std::size_t inputIndex{};
         };
         IRenderDeviceServices* device{};
+        bool allowMeshlets{ true };
         std::uint64_t recording{}, descriptors{};
         own::shared_owner<const SceneViewInput> input;
         std::vector<Draw> draws;
@@ -142,6 +146,10 @@ namespace material_graph
         RHITextureHandle environment;
         bool shadow{};
         mutable std::atomic<uint32_t> shadowDrawCount{};
+        // One writer: LX.Scene.GBuffer recording. Consumers read after the
+        // graph's recording join and native submission, never while recording.
+        mutable std::vector<SceneGeometryRouteAudit::Draw> recordedGeometryRoutes;
+        mutable bool geometryRouteAuditEnabled{};
         std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
         std::shared_ptr<const SceneRuntimeEffectsFrame> runtimeEffects;
         mutable bool alphaInputsDeclared{};
@@ -295,7 +303,7 @@ namespace material_graph
 
         bool UsesMeshlets(const Draw& draw) const
         {
-            return draw.program->meshEnabled && !draw.blended && draw.geometry->MeshletCount() > 0 &&
+            return allowMeshlets && draw.program->meshEnabled && !draw.blended && draw.geometry->MeshletCount() > 0 &&
                 device->GetMeshShaderCapabilities().SupportsDispatch(draw.geometry->MeshletCount(), 1, 1);
         }
 
@@ -700,6 +708,8 @@ namespace material_graph
                     }
                     candidate->meshletRoot = static_cast<uint32_t>(host.size());
                     host.push_back(RHILayout::Srv(155));
+                    candidate->temporalPreviousRoot = static_cast<uint32_t>(host.size());
+                    host.push_back(RHILayout::Srv(156, RHIShaderVisibility::All));
                     const RHIStaticSamplerDesc samplers[]{
                         {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
                         {RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
@@ -778,6 +788,17 @@ namespace material_graph
                         {
                             return false;
                         }
+                        auto temporalDesc = desc;
+                        temporalDesc.vsBytecode = compiled->temporalVertex.bytecode.Data();
+                        temporalDesc.vsSize = compiled->temporalVertex.bytecode.Size();
+                        temporalDesc.psBytecode = compiled->temporal.bytecode.Data();
+                        temporalDesc.psSize = compiled->temporal.bytecode.Size();
+                        temporalDesc.numRenderTargets = 4;
+                        temporalDesc.depthFunc = RHICompareOp::LessEqual;
+                        std::fill(std::begin(temporalDesc.rtvFormats), std::end(temporalDesc.rtvFormats), RHIFormat::Unknown);
+                        temporalDesc.rtvFormats[0] = RHIFormat::RG16Float;
+                        std::fill_n(std::begin(temporalDesc.rtvFormats) + 1, 3, RHIFormat::R16Float);
+                        if (!prepare(candidate->temporal[side], temporalDesc, "LXSceneTemporalVS", "LXSceneTemporalPS")) return false;
                         auto depthDesc = desc;
                         depthDesc.numRenderTargets = 0;
                         depthDesc.psBytecode = compiled->depth.bytecode.Data();
@@ -890,6 +911,7 @@ namespace material_graph
             }
             auto& program = *preparation->program;
             std::vector<LX::Runtime::GraphicsPipeline*> requests{
+                &program.temporal[0], &program.temporal[1],
                 &program.depth[0], &program.depth[1],
                 &program.gbuffer[0],   &program.gbuffer[1],   &program.color[0],     &program.color[1],
                 &program.lookup[0][0], &program.lookup[0][1], &program.lookup[1][0], &program.lookup[1][1]};
@@ -946,6 +968,7 @@ namespace material_graph
                 {
                     for (const auto* request : requests)
                     {
+                        if (request == &program.temporal[0] || request == &program.temporal[1]) continue;
                         const auto indexed = request->GetHandle();
                         if (program.meshPipelines.contains(indexed.id))
                         {
@@ -985,7 +1008,7 @@ namespace material_graph
                         break;
                     }
                     if (!preparation->program || !std::ranges::all_of(requests, [&](const auto* request)
-                        { return program.meshPipelines.contains(request->GetHandle().id); }))
+                        { return request == &program.temporal[0] || request == &program.temporal[1] || program.meshPipelines.contains(request->GetHandle().id); }))
                     {
                         continue;
                     }
@@ -1228,7 +1251,7 @@ namespace material_graph
                             RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                             const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
                             std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance,
-                            RHITextureHandle source)
+                            RHITextureHandle source, bool allowMeshlets)
     {
         ce::profile_scope profile{ce::marker<"MaterialGraphScenePrepare">()};
         lookup_.ResetPreparationStatus();
@@ -1266,6 +1289,7 @@ namespace material_graph
         }
         auto candidate = own::make_shared<Frame>();
         candidate->device = device_;
+        candidate->allowMeshlets = allowMeshlets;
         candidate->recording = device_->GetCurrentUploadRecordingId();
         candidate->descriptors = device_->GetDescriptorVersionToken();
         candidate->input = std::move(input);
@@ -1403,6 +1427,14 @@ namespace material_graph
             constants.owner = ++owner;
             constants.width = context.width;
             constants.height = context.height;
+            const auto& temporal = candidate->input->View().temporalFrame;
+            const auto currentView = std::bit_cast<math::matrix4x4>(temporal.camera.viewMatrix);
+            const auto currentProjection = std::bit_cast<math::matrix4x4>(temporal.camera.projectionMatrix);
+            const auto currentToPrevious = std::bit_cast<math::matrix4x4>(temporal.camera.clipToPreviousClip);
+            const auto currentVP = temporal.camera.valid ? currentView * currentProjection : candidate->input->ViewProjection();
+            constants.temporalCurrentProjection = math::transpose(currentVP);
+            constants.temporalPreviousProjection = math::transpose(temporal.camera.valid ? currentVP * currentToPrevious : currentVP);
+            constants.temporalHistoryValid = draw.temporalHistoryValid && !temporal.reset;
             constants.coverage = draw.coverage.flags;
             const bool ordered =
                 program->hasSurface && (draw.queue == SceneCoverage::Blended || program->hasTransmission);
@@ -1504,6 +1536,13 @@ namespace material_graph
                 {
                     return false;
                 }
+                const auto chunkIndex = static_cast<std::size_t>(&chunk - draw.geometry->Chunks().data());
+                if (draw.previousGeometry && draw.previousGeometry != draw.geometry && chunkIndex < draw.previousGeometry->Chunks().size())
+                {
+                    if (!geometry_.Prepare(*device_, draw.previousGeometry->Chunks()[chunkIndex].input,
+                        item.previousGeometry, error, true)) return false;
+                }
+                else item.previousGeometry = item.geometry;
                 const auto& source = chunk.input->Geometry();
                 // Per-draw transformed geometry and material constants still
                 // define CPU bins for every surface, including ordered/special
@@ -1580,6 +1619,8 @@ namespace material_graph
                     {
                         return false;
                     }
+                    // Shadow-only LOD0 geometry is never consumed by the motion
+                    // pass and does not share the visible LOD's chunk indexing.
                     const auto& source = chunk.input->Geometry();
                     if (indexedIndirect)
                     {
@@ -1693,6 +1734,8 @@ namespace material_graph
             {
                 throw std::runtime_error(error);
             }
+            if (draw.previousGeometry && declaredGeometry.insert(draw.previousGeometry.get()).second &&
+                !draw.previousGeometry->Declare(graph, error)) throw std::runtime_error(error);
             for (const auto& texture : draw.bindings->resources.textures)
             {
                 auto handle = graph.FindImportedTexture(texture.resource);
@@ -1727,6 +1770,27 @@ namespace material_graph
         }
         return static_cast<uint32_t>(std::ranges::count_if(frame_->draws,
             [&](const auto& draw) { return frame_->UsesMeshlets(draw); }));
+    }
+
+    void SceneHost::EnableGeometryRouteAudit(bool enabled) const
+    {
+        if (frame_)
+        {
+            frame_->geometryRouteAuditEnabled = enabled;
+        }
+    }
+
+    SceneGeometryRouteAudit SceneHost::RecordedGeometryRoutes() const
+    {
+        SceneGeometryRouteAudit result;
+        if (frame_ && frame_->input)
+        {
+            result.sourceFrameId = frame_->input->View().frameId;
+            result.sceneEpoch = frame_->input->View().sceneEpoch;
+            result.viewId = frame_->input->View().viewId;
+            result.draws = frame_->recordedGeometryRoutes;
+        }
+        return result;
     }
 
     uint32_t SceneHost::ShadowDrawCount() const
@@ -1914,6 +1978,64 @@ namespace material_graph
         return shadowMap;
     }
 
+    std::array<RGHandle, 5> SceneHost::DeclareTemporal(EnhancedRenderGraph& graph,
+        std::array<RGHandle, 5> targets) const
+    {
+        const auto frame = frame_;
+        if (!frame || frame->draws.empty()) return targets;
+        DeclareGeometry(graph);
+        const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+        const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+        const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
+        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        for (unsigned i = 0; i < targets.size(); ++i)
+        {
+            if (versioned) targets[i] = graph.Modify(targets[i]);
+            uses.push_back({targets[i], i == 4 ? RHIResourceState::DepthWrite : RHIResourceState::RenderTarget, modify});
+        }
+        for (const auto& draw : frame->draws)
+        {
+            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, read});
+            if (draw.previousGeometry != draw.geometry)
+                uses.push_back({draw.previousGeometry->GraphOutput(graph), RHIResourceState::ShaderResource, read});
+            for (const auto& texture : draw.bindings->resources.textures)
+                uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, read});
+        }
+        NormalizeSceneReads(graph, uses);
+        graph.AddPass("Temporal.ObjectMotion", uses, [frame, targets](const auto& execution) {
+            frame->CheckCurrent(execution.graph);
+            auto& encoder = *execution.encoder;
+            std::array<RHITextureHandle, 4> colors;
+            for (unsigned i = 0; i < colors.size(); ++i) colors[i] = execution.ResolveHandle(targets[i]);
+            const auto depth = RHIDepthTargetDesc::Depth(execution.ResolveHandle(targets[4]), RHIFormat::D32Float);
+            const auto bindings = frame->device->CreateRenderTargets(colors, &depth);
+            if (!bindings.IsValid()) throw std::runtime_error("Temporal motion render targets unavailable.");
+            encoder.BindRenderTargets(bindings);
+            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            for (const auto& draw : frame->draws)
+            {
+                if (!draw.program->hasSurface) continue;
+                encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->temporal[draw.doubleSided].GetHandle());
+                std::string error;
+                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                    throw std::runtime_error(error);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->temporalPreviousRoot,
+                    RHIBufferSlice::Whole(draw.previousGeometry->Buffer()));
+                const unsigned ownerRoot = 15 + (draw.program->hasSpecial ? 2 : 0) + (draw.program->hasTransmission ? 1 : 0);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, ownerRoot, draw.visibleOwner);
+                encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
+                // Dedicated indexed replay keeps vertex correspondence independent
+                // of meshlet/indirect compaction and preserves every alpha surface.
+                encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
+            }
+        }, true);
+        return targets;
+    }
+
     EnhancedGBufferPass::Outputs SceneHost::DeclareGBuffer(EnhancedRenderGraph& graph,
                                                            const EnhancedGBufferPass::Outputs& incoming,
                                                            bool hasOccluderDepth) const
@@ -2057,6 +2179,7 @@ namespace material_graph
         NormalizeSceneReads(graph, uses);
         graph.AddPass("LX.Scene.GBuffer", uses, [frame, inputs](const auto& execution) {
             frame->CheckCurrent(execution.graph);
+            frame->recordedGeometryRoutes.clear();
             auto& encoder = *execution.encoder;
             std::array<RHITextureHandle, 5> colors;
             const auto handles = Colors(inputs);
@@ -2084,7 +2207,9 @@ namespace material_graph
                 {
                     continue;
                 }
-                encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->gbuffer[draw.doubleSided].GetHandle()));
+                const auto sourcePipeline = draw.program->gbuffer[draw.doubleSided].GetHandle();
+                const auto recordedPipeline = frame->RasterPipeline(draw, sourcePipeline);
+                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
                 std::string error;
                 if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
                 {
@@ -2093,6 +2218,15 @@ namespace material_graph
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
                 frame->BindGeometry(encoder, draw);
                 frame->DrawGeometry(encoder, draw);
+                if (frame->geometryRouteAuditEnabled)
+                {
+                    const auto& source = frame->input->Draws()[draw.inputIndex];
+                    const bool meshShader = frame->UsesMeshlets(draw);
+                    frame->recordedGeometryRoutes.push_back({source.geometryKey,
+                        source.temporalObjectId, source.temporalInstanceId,
+                        sourcePipeline.id, recordedPipeline.id,
+                        meshShader ? draw.geometry->MeshletCount() : 0u, meshShader, indirect});
+                }
             }
         });
         frame->gbufferDeclared = true;
@@ -3061,6 +3195,8 @@ namespace material_graph
         for (const auto& draw : frame_->draws)
         {
             draw.geometry->MarkSubmitted(completion);
+            if (draw.previousGeometry && draw.previousGeometry != draw.geometry)
+                draw.previousGeometry->MarkSubmitted(completion);
         }
         for (const auto& draw : frame_->shadowDraws)
         {

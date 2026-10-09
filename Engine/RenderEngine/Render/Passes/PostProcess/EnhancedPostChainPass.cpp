@@ -164,6 +164,10 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     m_toneMapped = RGHandle{};
     m_bloomChainValid = false;
     m_bloomMips = {};
+    if (m_inputs.fxaaRecorded)
+    {
+        *m_inputs.fxaaRecorded = false;
+    }
 
     if (!m_inputs.color.IsValid() || !m_uberPSO.IsValid() || !m_fxaaPSO.IsValid() ||
         0 == m_width || 0 == m_height)
@@ -206,7 +210,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         const char* name, RHIPipelineHandle pso,
         RGHandle srcA, RGHandle srcB, RGHandle& dst,
         const PostParams& params, uint32_t dispatchW, uint32_t dispatchH,
-        bool accumulate)
+        bool accumulate, bool* dispatchRecorded = nullptr)
     {
         // 업샘플은 기존 밉에 더한다. 다음 단계에는 덮어쓴 최신 버전을 넘긴다.
         if (versioned)
@@ -224,7 +228,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         usages.push_back({ dst, RHIResourceState::UnorderedAccess, outputAccess });
 
         const auto stagePass = graph.AddPass(name, usages,
-            [&context, pso, srcA, srcB, dst, params, dispatchW, dispatchH]
+            [&context, pso, srcA, srcB, dst, params, dispatchW, dispatchH, dispatchRecorded]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 // device를 더 들지 않는다 — 뷰 생성이 CreateBindings로 넘어가면서
@@ -276,9 +280,14 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
                 encoder.Dispatch((dispatchW + 7) / 8, (dispatchH + 7) / 8, 1);
+                if (dispatchRecorded)
+                {
+                    *dispatchRecorded = true;
+                }
             });
-        // Includes the bloom accumulation ReadWrite UAV: no graphics commands
-        // or shared pass-state mutation are hidden behind this dispatch helper.
+        // Includes the bloom accumulation ReadWrite UAV. The optional recording
+        // observation has one writer and is read only after all callbacks join;
+        // it does not choose or synchronize another pass.
         graph.DeclareComputeCompatible(stagePass);
     };
 
@@ -434,8 +443,11 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
 
     // ── FXAA ──
     //
-    // 톤맵 뒤(LDR)다. 끄면 Uber 결과가 그대로 최종이 된다.
-    if (!m_tuning.fxaaEnabled)
+    // The temporal input producer fails closed: an SDK recording failure
+    // discards the entire graph, rather than publishing this FXAA-free branch.
+    // This immutable per-declaration choice also works with parallel recording;
+    // a previous result or mutable success flag cannot safely choose the graph.
+    if (!m_tuning.fxaaEnabled || m_inputs.requiresTemporalResolve)
     {
         m_output = m_toneMapped;
         return;
@@ -448,7 +460,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     declareStage("PostChain.FXAA", m_fxaaPSO,
         m_toneMapped, RGHandle{}, m_output,
         makeParams(m_width, m_height, m_width, m_height),
-        m_width, m_height, false);
+        m_width, m_height, false, m_inputs.fxaaRecorded);
 }
 
 void EnhancedPostChainPass::Shutdown()

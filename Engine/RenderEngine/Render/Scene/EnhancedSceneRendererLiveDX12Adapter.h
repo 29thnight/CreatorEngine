@@ -2,6 +2,7 @@
 
 #include "EnhancedSceneRenderer.h"
 #include "../../RHI/RHIHandle.h"
+#include "../../RHI/RHIDisplayFrame.h"
 // GpuFrameToken 은 값으로 오가므로 전방 선언으로는 부족하다.
 #include "../../RHI/IRHIGpuProfiler.h"
 
@@ -15,6 +16,7 @@ struct IDisplayPresentationSink;
 class IRHIParallelCommandPool;
 class IRHIGpuProfiler;
 class IRenderDeviceServices;
+class IRHIDeviceResources;
 class IRenderMeshCache;
 class IRenderPipelineCache;
 class IRenderRootSignatureCache;
@@ -65,6 +67,7 @@ public:
     bool BeginFrame(std::string& outError);
     void AbortFrame();
     bool EndFrame(std::string& outError);
+    bool WaitForLastFrameSubmission(std::string& outError);
     bool UsesOwnedQueueExecution() const;
     uint32_t GetQueueExecutionMode() const;
     // Producer-thread override, applied by the next BeginFrame without rebuilding
@@ -86,6 +89,7 @@ public:
     bool ConsumeSubmissionFailure(std::string& outError);
 
     IRenderDeviceServices& Resources();
+    IRHIDeviceResources& DeviceResources();
     IRenderPipelineCache& Pipelines();
     IRenderRootSignatureCache& RootSignatures();
     IRenderMeshCache& MeshCache();
@@ -95,6 +99,15 @@ public:
     bool CreateDisplayTexture(uint32_t width, uint32_t height,
         RHITextureHandle& outTexture, DisplayToken& outToken,
         std::string& outError);
+    // Allocate once per display slot/generation, before recording graph copies.
+    // Caller imports destinations as COPY_DEST and leaves that state after copy.
+    bool CreateTemporalDisplayTextures(DisplayToken token, TemporalExtent renderExtent,
+        TemporalExtent displayExtent, RHITemporalDisplayResources& output, std::string& outError);
+    // Seal after successful recording; OpenDisplayTexture only publishes once
+    // the existing producer completion/promotion boundary makes the slot visible.
+    void SealTemporalDisplayFrame(DisplayToken token, const TemporalFrame& frame,
+        const TemporalMeasurementProvenance& provenance,
+        std::shared_ptr<const void> lifetimeToken = {}, bool nativeGateActive = false);
     void RetireDisplayTexture(DisplayToken token);
     // Caller holds displayLifetimeMutex, as for retire/open/reuse.
     void CollectRetiredDisplays();

@@ -2,6 +2,8 @@
 #include <cstdio>
 #include "../Graph/ShadowCasterBounds.h"
 #include "EnhancedSceneRenderer.h"
+#include "EnhancedTemporalViewState.h"
+#include "../Passes/PostProcess/EnhancedTemporalInputsPass.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 #include "EnhancedPbrCapture.h"
 #include "RuntimeSettings.h"
@@ -82,6 +84,7 @@
 #include <string_view>
 #include <type_traits>
 #include <exception>
+#include <stdexcept>
 #include <utility>
 #include <unordered_map>
 #include <set>
@@ -103,9 +106,113 @@ namespace EnhancedSceneRenderer
 {
     using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;
 
+    struct TemporalFixtureExchange
+    {
+        std::mutex mutex;
+        EnhancedTemporalFixtureStamp published;
+        std::array<EnhancedTemporalFixtureSubmission,
+            static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> previous;
+        std::array<EnhancedTemporalFixtureSubmission,
+            static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> acknowledged;
+    };
+
+    TemporalFixtureExchange& FixtureExchange()
+    {
+        static TemporalFixtureExchange exchange;
+        return exchange;
+    }
+
+    EnhancedTemporalFixtureStamp SnapshotTemporalFixtureStep()
+    {
+        auto& exchange = FixtureExchange();
+        std::lock_guard<std::mutex> lock(exchange.mutex);
+        return exchange.published;
+    }
+
+    EnhancedTemporalFixtureSubmission PreviousTemporalFixtureSubmission(
+        EnhancedLiveDisplayTarget target)
+    {
+        if (target >= EnhancedLiveDisplayTarget::Count)
+        {
+            return {};
+        }
+        auto& exchange = FixtureExchange();
+        std::lock_guard<std::mutex> lock(exchange.mutex);
+        return exchange.previous[static_cast<size_t>(target)];
+    }
+
+    bool MatchesTemporalFixturePredecessor(
+        const EnhancedTemporalFixtureSubmission& previous,
+        const EnhancedLiveFramePacket& frame, const EnhancedLiveViewKey& key,
+        const EnhancedTemporalViewState& temporal, uint64_t previousRealFrameId)
+    {
+        return previous.sourceVerified && !previous.historyReset && !previous.coalesced &&
+            previous.stamp.sessionId == frame.temporalFixture.sessionId &&
+            previous.stamp.stepId == frame.temporalFixture.predecessorStepId &&
+            previous.stamp.inputSha256 == frame.temporalFixture.predecessorInputSha256 &&
+            previous.stamp.allowMeshlets == frame.temporalFixture.allowMeshlets &&
+            previous.viewId == key.viewId && previous.sceneEpoch == frame.sceneEpoch &&
+            previous.historyRevision == key.historyRevision &&
+            previous.historyGeneration == temporal.frame.historyRevision &&
+            previous.sourceFrameId < frame.frameId &&
+            previous.realFrameId == previousRealFrameId &&
+            previous.realFrameId < temporal.frame.realFrameId;
+    }
+
+    EnhancedTemporalFixtureSubmission PublishTemporalFixtureSubmission(
+        const EnhancedLiveFramePacket& frame, const EnhancedLiveViewKey& key,
+        EnhancedLiveDisplayTarget target, const EnhancedTemporalViewState& temporal,
+        uint64_t previousRealFrameId)
+    {
+        if (target >= EnhancedLiveDisplayTarget::Count)
+        {
+            return {};
+        }
+        auto& exchange = FixtureExchange();
+        std::lock_guard<std::mutex> lock(exchange.mutex);
+        const size_t index = static_cast<size_t>(target);
+        const auto& previous = exchange.previous[index];
+        EnhancedTemporalFixtureSubmission submitted;
+        submitted.stamp = frame.temporalFixture;
+        submitted.viewId = key.viewId;
+        submitted.sceneEpoch = frame.sceneEpoch;
+        submitted.historyRevision = key.historyRevision;
+        submitted.historyGeneration = temporal.frame.historyRevision;
+        submitted.sourceFrameId = frame.frameId;
+        submitted.realFrameId = temporal.frame.realFrameId;
+        submitted.historyReset = temporal.frame.reset;
+        submitted.coalesced = frame.temporalFixtureCoalesced;
+        submitted.predecessorSourceFrameId = previous.sourceFrameId;
+        submitted.predecessorRealFrameId = previousRealFrameId;
+        submitted.predecessorStepId = previous.stamp.sessionId == submitted.stamp.sessionId
+            ? previous.stamp.stepId : 0;
+        submitted.predecessorInputSha256 = previous.stamp.inputSha256;
+        submitted.sourceVerified = submitted.stamp.IsValid() && !submitted.historyReset &&
+            submitted.stamp.sessionId == exchange.published.sessionId &&
+            !submitted.coalesced && temporal.provenance.IsGoldenEligible() &&
+            temporal.submittedFrame == submitted.realFrameId &&
+            temporal.provenance.publicationFrameId == frame.frameId;
+        submitted.valid = submitted.sourceVerified &&
+            (submitted.stamp.predecessorStepId == 0 ||
+                MatchesTemporalFixturePredecessor(previous, frame, key, temporal, previousRealFrameId));
+        // Always track the true prior submission, including untagged or invalid
+        // inputs. An old acknowledged baseline cannot conceal an intervening draw.
+        exchange.previous[index] = submitted;
+        auto& acknowledged = exchange.acknowledged[index];
+        if (submitted.stamp.sessionId == exchange.published.sessionId &&
+            (acknowledged.stamp != submitted.stamp || !acknowledged.valid ||
+                submitted.stamp.predecessorStepId == 0))
+        {
+            acknowledged = submitted;
+        }
+        // Keep the first eligible measured pair observable while the GT holds
+        // its pose waiting for readback; later same-step draws are not that pair.
+        return submitted;
+    }
+
     LiveGraphSnapshot CaptureLiveGraphSnapshot(const EnhancedRenderGraph& graph,
         uint64_t viewId, uint64_t historyRevision, uint64_t frameId, uint64_t sceneEpoch,
-        uint32_t width, uint32_t height)
+        uint32_t width, uint32_t height, const TemporalMeasurementProvenance& temporalProvenance)
     {
         const auto started = std::chrono::steady_clock::now();
         auto snapshot = std::make_shared<EnhancedRenderGraph::DiagnosticSnapshot>();
@@ -119,6 +226,7 @@ namespace EnhancedSceneRenderer
         snapshot->frameId = frameId;
         snapshot->width = width;
         snapshot->height = height;
+        snapshot->temporalProvenance = temporalProvenance;
         snapshot->copyNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - started).count();
         return snapshot;
@@ -201,7 +309,7 @@ namespace
         const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
         if (generation != 0 && sink.on_finish_capture)
         {
-            sink.on_finish_capture(generation, static_cast<uint32_t>(token.engineFrameId), complete, reason);
+            sink.on_finish_capture(generation, token.sourceEngineFrame, complete, reason);
         }
     }
 
@@ -351,6 +459,9 @@ namespace
     }
     using EnhancedSceneRenderer::LiveGraphSnapshot;
     using EnhancedSceneRenderer::CaptureLiveGraphSnapshot;
+    using EnhancedSceneRenderer::MatchesTemporalFixturePredecessor;
+    using EnhancedSceneRenderer::PreviousTemporalFixtureSubmission;
+    using EnhancedSceneRenderer::PublishTemporalFixtureSubmission;
     using EnhancedSceneRenderer::RenderPhase;
     using EnhancedSceneRenderer::RenderThreadPhaseScope;
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
@@ -443,6 +554,34 @@ namespace
         }
     };
 
+    uint64_t ProfileCpuTick()
+    {
+        LARGE_INTEGER tick{};
+        ::QueryPerformanceCounter(&tick);
+        return static_cast<uint64_t>(tick.QuadPart);
+    }
+
+    void PublishCpuRenderMeasurement(uint64_t begin, uint32_t engineFrame,
+        uint64_t generation, uint64_t submissionId, const TemporalMeasurementProvenance& provenance)
+    {
+        const auto& sink = GpuSpanSink();
+        if (generation == 0 || !sink.on_cpu_render)
+        {
+            return;
+        }
+        EnhancedLiveGpuSpanOrigin origin;
+        origin.captureGeneration = generation;
+        origin.fullSubmissionId = submissionId;
+        origin.submissionId = static_cast<uint32_t>(submissionId);
+        origin.renderViewId = static_cast<uint16_t>(provenance.viewId);
+        origin.temporalProvenance = provenance;
+        sink.on_cpu_render(begin, ProfileCpuTick(), engineFrame, origin);
+        if (sink.on_flush)
+        {
+            sink.on_flush();
+        }
+    }
+
     // 뷰 하나를 준비한 직후의 그림자 수치. 그림자 패스와 재질 그래프 호스트가
     // 모두 그 뷰의 Prepare 를 마친 뒤에 불러야 같은 뷰의 값이 모인다.
     template <typename PipelineT>
@@ -504,6 +643,8 @@ namespace
         EnhancedSkyBoxPass    skyBox;
         EnhancedIBLGenerator  ibl;
         EnhancedPostChainPass postChain;
+        EnhancedTemporalInputsPass temporalInputs;
+        EnhancedUIPass temporalUi;
         bool                  iblGenerated{ false };
         RHITextureHandle      fogCloudNeutralHandle;
         RHITextureHandle      fogBlueNoiseHandle;
@@ -515,6 +656,7 @@ namespace
 
         AnimationPaletteFrame animationPalettes{};
         EnhancedFrameContext frameContext{};
+        EnhancedFrameContext displayFrameContext{};
 
         // 이 파이프라인의 조립 기술. 파이프라인이 설 때 한 번 짜이고, 노드의
         // 접착 람다가 이 LivePipeline과 LiveState를 캡처한다 — 그래서 수명이
@@ -542,6 +684,8 @@ namespace
             EnhancedLiveViewKey key{};
             uint64_t sceneEpoch{ 0 };
             FrameCameraSnapshot camera{};
+            TemporalMeasurementProvenance temporalProvenance;
+            RHITemporalDisplayResources temporalResources;
 
             // 이 제출의 GPU 프로파일 표. 부른 자리에서 받아 보관했다가 펜스가
             // 끝났을 때 그대로 Collect 에 넘긴다.
@@ -598,6 +742,7 @@ namespace
             //   늘어도 컴파일은 한 번이다. 추가 비용은 히스토리 텍스처뿐 —
             //   GI가 절반 해상도라 1920x1080 기준 뷰당 약 12MB.
             EnhancedSSGIPass ssgi;
+            EnhancedTemporalViewState temporal;
 
             // 포그도 같은 이유로 뷰마다 든다 — 프록셀 격자(m_voxelTemp 둘 +
             // m_voxelFinal)가 프레임을 넘겨 살고, m_readIndex 핑퐁과
@@ -625,7 +770,7 @@ namespace
     template <typename PipelineT, typename CommandPoolT>
     bool PrepareSceneRecording(PipelineT& pipeline, EnhancedRenderGraph& graph,
         CommandPoolT& commandPool, RHIShaderBinary output, bool& preparationDeferred,
-        EnhancedPbrCapture* capture, std::string& error,
+        bool allowMeshlets, EnhancedPbrCapture* capture, std::string& error,
         const std::function<bool(std::string&)>& prepareBoundary = {})
     {
         RHIShaderCompiler::ScopedOutput outputScope(output);
@@ -653,7 +798,7 @@ namespace
                 pipeline.ibl.GetPrefilteredMap(), pipeline.shadow.GetShadowData(),
                 material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate,
                     .lookupRuntimeEvaluation = true}, error, pipeline.ibl.GetGeneration(),
-                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap()))
+                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap(), allowMeshlets))
         {
             preparationDeferred = pipeline.graphMaterials.PreparationDeferred();
             return false;
@@ -662,6 +807,7 @@ namespace
         {
             capture->RecordLatticeInput(pipeline.graphInput);
         }
+        pipeline.graphMaterials.EnableGeometryRouteAudit(capture != nullptr);
         // Owned queues preserve the recording reservation, so defer queue-frame
         // admission until asynchronous material preparation has succeeded.
         if (prepareBoundary && !prepareBoundary(error))
@@ -727,6 +873,8 @@ namespace
         EnhancedSkyBoxPass skyBox;
         EnhancedIBLGenerator ibl;
         EnhancedPostChainPass postChain;
+        EnhancedTemporalInputsPass temporalInputs;
+        EnhancedUIPass temporalUi;
         // 기즈모 체인은 Host 기여 노드가 소유한다(E4-2) — DX12 쪽과 같다.
         EnhancedUIPass ui;
         bool iblGenerated{ false };
@@ -735,6 +883,7 @@ namespace
         bool fogInputsReady{ false };
         AnimationPaletteFrame animationPalettes{};
         EnhancedFrameContext frameContext{};
+        EnhancedFrameContext displayFrameContext{};
         LivePipelineDesc desc;
         LiveBlackboard blackboard;
         RGTransientPool transientPool;
@@ -753,6 +902,7 @@ namespace
             // temporal GI는 카메라별 히스토리·이전 행렬을 가진다. 공용
             // 인스턴스를 쓰면 여러 씬 뷰가 서로의 화면 공간 GI를 섞는다.
             EnhancedSSGIPass ssgi;
+            EnhancedTemporalViewState temporal;
             EnhancedVolumetricFogPass fog;
             bool fogReady{ false };
             uint64_t promotionCount{ 0 };
@@ -763,6 +913,7 @@ namespace
             double completedAgeMs{ 0.0 };
             uint64_t completedResizeGeneration{ 0 };
             FrameCameraSnapshot completedCamera{};
+            TemporalMeasurementProvenance completedTemporalProvenance;
         };
         mutable std::mutex viewMutex;
         View views[EnhancedSceneRenderer::kMaxLiveCameraViews];
@@ -780,6 +931,8 @@ namespace
             uint64_t sceneEpoch{ 0 };
             uint64_t resizeGeneration{ 0 };
             FrameCameraSnapshot camera{};
+            TemporalMeasurementProvenance temporalProvenance;
+            RHITemporalDisplayResources temporalResources;
             bool pending{ false };
         };
         Slot slots[kSlotCount];
@@ -866,6 +1019,8 @@ namespace
             // 기여 노드(기즈모 체인)의 같은 규약은 Contribute가
             // RenderFeatureContext.ldrFormat으로 받는다(E4-2).
             ui.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            temporalUi.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            temporalUi.SetSeparateLayer(true);
             sss.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSS", false));
             ssr.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSR", false));
 
@@ -927,6 +1082,12 @@ namespace
                     outError = "Vulkan pipeline retained: GPU idle or device loss was not established: " + lifecycleError;
                     return false;
                 }
+            }
+            for (auto& view : views)
+            {
+                if (!view.temporal.spatialPost.Shutdown().IsSuccess() || !view.temporal.upscaler.Shutdown().IsSuccess())
+                { outError="Vulkan pipeline retained: temporal SDK final consumption is not proven.";return false; }
+                view.temporal.Invalidate();
             }
             if (retainedCaptureProfiler)
             {
@@ -1045,6 +1206,7 @@ namespace
                                 slot.sourceCaptureNanoseconds, capture_steady_nanoseconds());
                             view.completedResizeGeneration = slot.resizeGeneration;
                             view.completedCamera = slot.camera;
+                            view.completedTemporalProvenance = slot.temporalProvenance;
                             view.previewComplete = slot.previewComplete;
                         }
                     }
@@ -1096,12 +1258,15 @@ namespace
         }
 
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
+            const EnhancedLiveFramePacket& sourceFrame,
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint32_t sourceEngineFrame, bool sourceEngineFrameAvailable,
             uint64_t resizeGeneration, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            const uint64_t profileCpuBegin = GpuSpanSink().on_cpu_render ? ProfileCpuTick() : 0;
             preparationDeferred = false;
             if (retainedCaptureProfiler)
             {
@@ -1182,15 +1347,29 @@ namespace
             // Account for this admitted submission explicitly instead of claiming
             // a complete GPU capture with an empty lane.
             const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-            if (sink.on_begin_capture && sink.on_finish_capture)
+            uint64_t profileCaptureGeneration = 0;
+            if (sourceEngineFrameAvailable && sink.on_begin_capture && sink.on_finish_capture)
             {
-                const uint64_t generation = sink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
-                if (generation != 0)
-                {
-                    sink.on_finish_capture(generation, static_cast<uint32_t>(sourceFrameId), false,
-                        "Vulkan live GPU timestamps are unavailable");
-                }
+                profileCaptureGeneration = sink.on_begin_capture(sourceEngineFrame);
             }
+            struct VulkanProfileCompletion
+            {
+                const EnhancedLiveGpuSpanSink& sink;
+                uint64_t generation;
+                uint32_t frame;
+                ~VulkanProfileCompletion()
+                {
+                    if (generation != 0)
+                    {
+                        if (sink.on_flush)
+                        {
+                            sink.on_flush();
+                        }
+                        sink.on_finish_capture(generation, frame, false,
+                            "Vulkan live GPU timestamps are unavailable");
+                    }
+                }
+            } profileCompletion{ sink, profileCaptureGeneration, sourceEngineFrame };
 
             // Keep the diagnostic reset guard alive through recording/submission,
             // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
@@ -1220,7 +1399,8 @@ namespace
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
             if (!PrepareSceneRecording(*this, graph, commandPool, RHIShaderBinary::SpirV,
-                    preparationDeferred, capture, outError))
+                    preparationDeferred, !sourceFrame.temporalFixture.IsValid() ||
+                        sourceFrame.temporalFixture.allowMeshlets, capture, outError))
             {
                 return false;
             }
@@ -1238,6 +1418,7 @@ namespace
                     ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
                 if (HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::HideSkyBox))
                     binding.viewFlags |= LiveViewFlags::kHideSkyBox;
+                if (capture) capture->RecordTemporalProvenance(views[viewIndex].temporal.provenance);
                 bool stageCaptureOk = true;
                 desc.DeclareAll(blackboard, graph, frameContext, binding,
                     [&](const LivePassNode& node, const LiveBlackboard& board) {
@@ -1257,12 +1438,6 @@ namespace
                 compileWatch.Start();
                 if (!graph.Compile(outError)) return false;
                 compileMs = compileWatch.ElapsedMs();
-            }
-
-            if (diagnosticOutput)
-            {
-                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
-                    viewPacket.key.historyRevision, sourceFrameId, frameContext.sceneEpoch, width, height);
             }
 
             // The pipeline retains a query owner if a capture cannot prove idle.
@@ -1326,6 +1501,58 @@ namespace
                 }
             }
             committed = true;
+            if (sourceFrame.temporalFixture.IsValid() &&
+                (!GetRHISubmissionThread().Wait(batchTicket, outError) ||
+                    !GetRHISubmissionThread().DrainSubmissions(&resources, outError)))
+            {
+                return false;
+            }
+            const uint64_t previousRealFrameId = views[viewIndex].temporal.submittedFrame;
+            views[viewIndex].temporal.Commit(graphInput);
+            const auto fixtureSubmission = PublishTemporalFixtureSubmission(sourceFrame,
+                viewPacket.key, viewPacket.displayTarget, views[viewIndex].temporal, previousRealFrameId);
+            if (capture)
+            {
+                capture->RecordFixtureSubmission(fixtureSubmission);
+                capture->RecordTemporalProvenance(views[viewIndex].temporal.provenance);
+            }
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
+                    viewPacket.key.historyRevision, sourceFrameId, frameContext.sceneEpoch, width, height,
+                    views[viewIndex].temporal.provenance);
+            }
+            slot->temporalProvenance = views[viewIndex].temporal.provenance;
+            PublishCpuRenderMeasurement(profileCpuBegin, sourceEngineFrame, profileCaptureGeneration,
+                resources.GetLastSignaledFenceValue(), slot->temporalProvenance);
+            TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
+                const auto& view = views[viewIndex];
+                if (view.displayTarget != EnhancedLiveDisplayTarget::Game && snapshot.rendererObserved &&
+                    snapshot.viewId != view.key.viewId)
+                {
+                    return;
+                }
+                snapshot.presentationTarget = TemporalPresentationTarget::EditorViewport;
+                view.temporal.PublishSubmitted(snapshot);
+                snapshot.motionVectorsValid = true;
+                snapshot.motionStaticValid = snapshot.motionSkinnedValid = snapshot.motionInstancedValid = false;
+                snapshot.motionAlphaValid = false;
+                if (graphInput)
+                {
+                    for (const auto& draw : graphInput->Draws())
+                    {
+                        if (!draw.temporalHistoryValid)
+                        {
+                            continue;
+                        }
+                        snapshot.motionStaticValid |= draw.geometry->Source()->Bones().empty();
+                        snapshot.motionSkinnedValid |= !draw.geometry->Source()->Bones().empty();
+                        snapshot.motionInstancedValid |= draw.temporalInstanceId != 0;
+                        snapshot.motionAlphaValid |= draw.queue != material_graph::SceneCoverage::Opaque;
+                    }
+                }
+                snapshot.motionDecalValid = decal.HasPreparedDecals() && !view.temporal.frame.reset;
+            });
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
@@ -1359,6 +1586,7 @@ namespace
                     gbuffer.GetSamplerIdentity(), forward.GetSealLedger(),
                     forward.GetSamplerIdentity(), stashedEncoderDrops,
                     stashedLastEncoderDrop, textureCache.GetUploadFailureCount());
+                capture->RecordGeometryRoutes(graphMaterials);
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
                     EnhancedIBLGenerator::kSceneReflectionSampleCount,
                     resources.DescribeTexture(ibl.GetImportanceMaps()[2]));
@@ -1788,11 +2016,45 @@ namespace
             if (!pbrCapture || pbrCapture->result.state != EnhancedPbrCaptureState::Pending
                 || pbrCapture->target != view.displayTarget
                 || frame.frameId <= pbrCapture->afterFrameId) return nullptr;
+            if (pbrCapture->motionValidation && pbrCapture->expectedFixture.IsValid())
+            {
+                const auto& expected = pbrCapture->expectedFixture;
+                // Baseline holds may still be queued when the driver arms the
+                // measured step. Only that exact step can consume this request.
+                if (frame.temporalFixture.sessionId == expected.sessionId &&
+                    frame.temporalFixture.stepId == expected.predecessorStepId)
+                {
+                    return nullptr;
+                }
+                if (frame.temporalFixture != expected || frame.temporalFixtureCoalesced)
+                {
+                    pbrCapture->Fail("motion fixture current step was mismatched or coalesced");
+                    return nullptr;
+                }
+                const auto previous = PreviousTemporalFixtureSubmission(view.displayTarget);
+                if (!activeTemporal || activeTemporal->frame.reset ||
+                    !MatchesTemporalFixturePredecessor(previous, frame, view.key,
+                        *activeTemporal, activeTemporal->submittedFrame))
+                {
+                    pbrCapture->Fail("motion fixture requires its exact non-reset submitted predecessor");
+                    return nullptr;
+                }
+                pbrCapture->previousFixtureSubmission = previous;
+            }
+            else if (pbrCapture->motionValidation && (!activeTemporal || activeTemporal->frame.reset))
+            {
+                // Untagged captures remain raw observations, never fixture proof.
+                return nullptr;
+            }
             try { pbrCapture->Begin(frame, view, backend, emptyReferenceDraws, emptyReferenceDraws, lights, skyBoxPath); }
             catch (const std::exception& error)
             {
                 pbrCapture->Fail(error.what());
                 return nullptr;
+            }
+            if (activeTemporal)
+            {
+                pbrCapture->RecordTemporalInputs(activeTemporal->frame, activeTemporal->submittedFrame);
             }
             return pbrCapture.get();
         }
@@ -2237,6 +2499,12 @@ namespace
                     view.completedSceneEpoch, view.completedCamera,
                     view.completedResizeGeneration, view.previewComplete,
                     view.completedCaptureNanoseconds, view.completedAgeMs);
+                temporalProvenance = view.completedTemporalProvenance;
+                TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
+                    const auto& provenance = view.completedTemporalProvenance;
+                    if (snapshot.viewId == provenance.viewId && snapshot.sceneEpoch == provenance.sceneEpoch)
+                        snapshot.renderGpuCompletedFrameId = provenance.realFrameId;
+                });
             }
             return published;
         }
@@ -2282,6 +2550,7 @@ namespace
 
         struct PooledSprite
         {
+            uint64_t temporalObjectId{},temporalIncarnation{};
             math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
             std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
             BillboardType billboardType{ BillboardType::None };
@@ -2535,6 +2804,8 @@ namespace
         {
             std::lock_guard<std::mutex> lock(debugMutex);
 
+            debugSnapshot.temporalProvenance = temporalProvenance;
+            debugSnapshot.gpuTemporalProvenance = gpuTemporalProvenance;
             debugSnapshot.backend = backend;
             debugSnapshot.enabled = enabled;
             debugSnapshot.pipelineReady = (EnhancedLiveBackend::DX12 == backend)
@@ -2774,6 +3045,8 @@ namespace
             // 기여 노드(기즈모 체인)의 같은 규약은 Contribute가
             // RenderFeatureContext.ldrFormat으로 받는다(E4-2).
             p.ui.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.temporalUi.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.temporalUi.SetSeparateLayer(true);
 
             // 조립 기술을 먼저 짜고, 그 목록으로 초기화한다. 슬라이스 1에서는
             // 패스를 다 세운 뒤에 짰는데 순서가 뒤집혔다 — 노드가 패스를
@@ -3006,6 +3279,12 @@ namespace
                     enabled = false;
                     return false;
                 }
+            }
+            for (auto& view : p.views)
+            {
+                if (!view.temporal.spatialPost.Shutdown().IsSuccess() || !view.temporal.upscaler.Shutdown().IsSuccess())
+                {lastError="DX12 pipeline retained: temporal SDK final consumption is not proven.";enabled=false;return false;}
+                view.temporal.Invalidate();
             }
             if (pbrCapture && pbrCapture->resourceBackend == EnhancedLiveBackend::DX12)
             {
@@ -3279,6 +3558,24 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
+            // Shared TR inputs are produced at render resolution, before GI/TU.
+            {
+                LivePassNode node; node.name="Temporal.Inputs";
+                node.instance=[&p](uint32_t)->EnhancedRenderPass* {return &p.temporalInputs;};
+                node.reads={LiveSlots::kGBufferDepth};
+                node.writes={LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
+                    LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
+                node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding&) {
+                    p.temporalInputs.SetDepth(bb.Get(LiveSlots::kGBufferDepth));p.temporalInputs.Declare(graph,ctx);
+                    auto targets=p.graphMaterials.DeclareTemporal(graph,p.temporalInputs.Outputs());
+                    targets=p.decal.DeclareTemporal(graph,ctx,targets);
+                    const char* names[]{LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
+                        LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
+                    for(unsigned i=0;i<5;++i)bb.Set(names[i],targets[i]);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
             // ── SSAO ──
             {
                 LivePassNode node;
@@ -3396,7 +3693,7 @@ namespace
                 node.reads = {
                     LiveSlots::kGBufferDepth, LiveSlots::kGBufferNormal,
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
-                    LiveSlots::kAmbientOcclusion,
+                    LiveSlots::kAmbientOcclusion, LiveSlots::kTemporalMotion, LiveSlots::kTemporalResponsive,LiveSlots::kTemporalReactive,
                 };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3410,6 +3707,9 @@ namespace
                     inputs.diffuse = bb.Get(LiveSlots::kGBufferDiffuse);
                     inputs.metalRough = bb.Get(LiveSlots::kGBufferMetalRough);
                     inputs.lighting = bb.Get(LiveSlots::kLitColor);
+                    inputs.motionVectors = bb.Get(LiveSlots::kTemporalMotion);
+                    inputs.responsiveMask = bb.Get(LiveSlots::kTemporalResponsive);
+                    inputs.reactiveMask = bb.Get(LiveSlots::kTemporalReactive);
                     inputs.ambientOcclusion = bb.Get(LiveSlots::kAmbientOcclusion);
                     view.ssgi.SetInputs(inputs);
                     view.ssgi.Declare(graph, ctx);
@@ -3671,21 +3971,177 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
+            {
+                LivePassNode node;node.name="Temporal.SpriteMotion";
+                node.reads={LiveSlots::kLitColor,LiveSlots::kGBufferDepth};
+                node.modifies={LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
+                    LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
+                node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding&) {
+                    const char* slots[]{LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
+                        LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
+                    std::array<RGHandle,5> targets;for(unsigned i=0;i<5;++i)targets[i]=bb.Get(slots[i]);
+                    targets=p.sprite.DeclareTemporal(graph,ctx,targets);
+                    for(unsigned i=0;i<5;++i)bb.Set(slots[i],targets[i]);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // TU is one neutral graph operation on linear HDR, after scene
+            // composition and before tone mapping. Native means equal extents.
+            {
+                LivePassNode node;
+                node.name = "Temporal.Upscale";
+                node.reads = { LiveSlots::kTemporalMotion, LiveSlots::kTemporalDepth, LiveSlots::kTemporalReactive,
+                    LiveSlots::kTemporalTransparency, LiveSlots::kTemporalResponsive };
+                node.modifies = { LiveSlots::kLitColor };
+
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                {
+                    auto& temporal = p.views[binding.viewIndex].temporal;
+                    auto& host = temporal.upscaler;
+                    if (host.Provider() == TemporalProvider::None)
+                    {
+                        if (!temporal.spatialPost.Scales() && (ctx.width != ctx.displayWidth || ctx.height != ctx.displayHeight))
+                        {
+                            throw std::runtime_error("Native temporal fallback must render at display resolution.");
+                        }
+                        return;
+                    }
+                    RGTextureDesc desc;
+                    desc.width = ctx.displayWidth;
+                    desc.height = ctx.displayHeight;
+                    desc.format = RHIFormat::RGBA16Float;
+                    desc.allowUnorderedAccess = true;
+                    desc.allowRenderTarget = true;
+                    desc.name = "Temporal.ReconstructedHDR";
+                    auto output = graph.CreateTexture(desc);
+                    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+                    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+                    {
+                        output = graph.Write(output);
+                    }
+                    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+                    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+                    const std::array<RGHandle, 6> inputs{ bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kTemporalDepth),
+                        bb.Get(LiveSlots::kTemporalMotion), bb.Get(LiveSlots::kTemporalReactive),
+                        bb.Get(LiveSlots::kTemporalTransparency), bb.Get(LiveSlots::kTemporalResponsive) };
+                    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                    for (auto input : inputs)
+                    {
+                        uses.push_back({ input, RHIResourceState::ShaderResource, read });
+                    }
+                    uses.push_back({ output, RHIResourceState::UnorderedAccess, write });
+                    const auto frame = ctx.temporalFrame;
+                    graph.AddPass("Temporal.Upscale", uses, [&temporal, inputs, output, frame](const auto& execute)
+                    {
+                        TemporalUpscaleInputs packet;
+                        packet.frame = frame;
+                        packet.color = execute.ResolveHandle(inputs[0]);
+                        packet.depth = execute.ResolveHandle(inputs[1]);
+                        packet.motionVectors = execute.ResolveHandle(inputs[2]);
+                        packet.reactiveMask = execute.ResolveHandle(inputs[3]);
+                        packet.transparencyMask = execute.ResolveHandle(inputs[4]);
+                        packet.responsiveMask = execute.ResolveHandle(inputs[5]);
+                        packet.output = execute.ResolveHandle(output);
+                        const auto result = temporal.upscaler.Evaluate(packet, *execute.encoder);
+                        if (!result.IsSuccess())
+                        {
+                            throw std::runtime_error("Temporal upscale recording failed; discard this frame and rebuild at fallback extent.");
+                        }
+                        temporal.temporalAaApplied = true;
+                    });
+                    bb.Set(LiveSlots::kLitColor, output);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
             // ── 포스트 체인 (LDR의 최초 발행자) ──
             {
                 LivePassNode node;
                 node.name = "PostChain";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.postChain; };
+                node.prepare = [&p](const EnhancedFrameContext& ctx,std::string& error,uint32_t viewIndex) {
+                    p.displayFrameContext=ctx;p.displayFrameContext.width=ctx.displayWidth?ctx.displayWidth:ctx.width;
+                    p.displayFrameContext.height=ctx.displayHeight?ctx.displayHeight:ctx.height;
+                    auto postContext = p.displayFrameContext;
+                    if (p.views[viewIndex].temporal.spatialPost.Scales())
+                    {
+                        postContext.width = ctx.width;
+                        postContext.height = ctx.height;
+                    }
+                    return p.postChain.PrepareFrame(postContext,error);
+                };
                 node.reads = { LiveSlots::kLitColor };
                 node.writes = { LiveSlots::kDisplayLdr };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    auto& temporal = p.views[binding.viewIndex].temporal;
                     EnhancedPostChainPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kLitColor);
+                    // The current view's effective producer is authoritative.
+                    // Requested/previous-frame providers cannot suppress FXAA.
+                    // Evaluate failure above aborts every submission path, so a
+                    // graph using this reconstructed color never publishes an
+                    // unresolved frame. Native fallback keeps the saved tuning.
+                    inputs.requiresTemporalResolve = temporal.upscaler.Provider() != TemporalProvider::None;
+                    temporal.fxaaRequested = p.postChain.GetTuning().fxaaEnabled;
+                    inputs.fxaaRecorded = &temporal.fxaaApplied;
                     p.postChain.SetInputs(inputs);
-                    p.postChain.Declare(graph, ctx);
+                    auto postContext = p.displayFrameContext;
+                    if (temporal.spatialPost.Scales())
+                    {
+                        postContext.width = ctx.width;
+                        postContext.height = ctx.height;
+                    }
+                    p.postChain.Declare(graph, postContext);
                     bb.Set(LiveSlots::kDisplayLdr, p.postChain.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // Optional spatial scaling/sharpening, then SDR-only RTX Dynamic
+            // Vibrance. PostChain has finished tone mapping and its eligible AA;
+            // UI and FG hudless extraction consume the final-resolution result.
+            {
+                LivePassNode node;
+                node.name = "SpatialPost";
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                {
+                    auto& spatial = p.views[binding.viewIndex].temporal.spatialPost;
+                    bb.Set(LiveSlots::kDisplayLdr, spatial.Declare(graph, ctx, bb.Get(LiveSlots::kDisplayLdr)));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // Preserve tone-mapped scene before UI modifies its physical resource.
+            // A separate premultiplied layer is transported to the Player provider.
+            {
+                LivePassNode node;node.name="Temporal.DisplayInputs";
+                node.instance=[&p](uint32_t)->EnhancedRenderPass* {return &p.temporalUi;};
+                node.prepare=[&p](const EnhancedFrameContext& ctx,std::string& error,uint32_t) {
+                    if((ctx.viewFlags&LiveViewFlags::kScreenSpaceUI)==0)p.temporalUi.SetRects(nullptr);
+                    return p.temporalUi.PrepareFrame(p.displayFrameContext,error);
+                };
+                node.reads={LiveSlots::kDisplayLdr};node.writes={LiveSlots::kHudlessLdr,LiveSlots::kUiLayer};
+                node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding& binding) {
+                    const auto source=bb.Get(LiveSlots::kDisplayLdr);
+                    RGTextureDesc desc;desc.width=ctx.displayWidth;desc.height=ctx.displayHeight;
+                    desc.format=EnhancedPostChainPass::kLDRFormat;desc.name="Temporal.HudlessLDR";
+                    auto hudless=graph.CreateTexture(desc);
+                    const bool explicitAccess=graph.GetSchedulingMode()!=RGSchedulingMode::DeclarationOrder;
+                    if(graph.GetSchedulingMode()==RGSchedulingMode::ExplicitVersioned)hudless=graph.Write(hudless);
+                    graph.AddPass("Temporal.HudlessCopy",{{source,RHIResourceState::CopySource,explicitAccess?RGAccessMode::Read:RGAccessMode::LegacyState},
+                        {hudless,RHIResourceState::CopyDest,explicitAccess?RGAccessMode::Write:RGAccessMode::LegacyState}},
+                        [source,hudless](const auto& execute){execute.encoder->CopyTexture(execute.ResolveHandle(hudless),execute.ResolveHandle(source));});
+                    bb.Set(LiveSlots::kHudlessLdr,hudless);
+                    p.temporalUi.SetInputs({});
+                    // Non-UI views still export a cleared layer, never stale pixels.
+                    p.temporalUi.Declare(graph,p.displayFrameContext);
+                    bb.Set(LiveSlots::kUiLayer,p.temporalUi.GetOutput());
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3696,6 +4152,7 @@ namespace
                 LivePassNode node;
                 node.name = "UI";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.ui; };
+                node.prepare = [&p](const EnhancedFrameContext&,std::string& error,uint32_t) { return p.ui.PrepareFrame(p.displayFrameContext,error); };
                 node.modifies = { LiveSlots::kDisplayLdr };
                 node.declare = [this, &p](LiveBlackboard& bb,
                     EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
@@ -3706,7 +4163,7 @@ namespace
                     EnhancedUIPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kDisplayLdr);
                     p.ui.SetInputs(inputs);
-                    p.ui.Declare(graph, ctx);
+                    p.ui.Declare(graph, p.displayFrameContext);
                     if (p.ui.GetOutput().IsValid())
                         bb.Set(LiveSlots::kDisplayLdr, p.ui.GetOutput());
                 };
@@ -3743,7 +4200,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "live_present";
-                node.reads = { LiveSlots::kDisplayLdr };
+                node.reads = { LiveSlots::kDisplayLdr,LiveSlots::kHudlessLdr,LiveSlots::kUiLayer,LiveSlots::kTemporalDepth,LiveSlots::kTemporalMotion };
                 node.declare = [](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding& binding)
                 {
@@ -3752,6 +4209,20 @@ namespace
 
                     const RGHandle finalHandle = bb.Get(LiveSlots::kDisplayLdr);
                     if (!finalHandle.IsValid()) return;
+                    const char* temporalSlots[]{LiveSlots::kHudlessLdr,LiveSlots::kUiLayer,LiveSlots::kTemporalDepth,LiveSlots::kTemporalMotion};
+                    for(unsigned i=0;i<4;++i)
+                    {
+                        if(!binding.temporalTargets[i].IsValid())continue;
+                        const auto source=bb.Get(temporalSlots[i]);
+                        auto target=graph.ImportTexture(binding.temporalTargets[i],RHIResourceState::CopyDest,temporalSlots[i]);
+                        const bool explicitAccess=graph.GetSchedulingMode()!=RGSchedulingMode::DeclarationOrder;
+                        if(graph.GetSchedulingMode()==RGSchedulingMode::ExplicitVersioned)target=graph.Write(target);
+                        graph.RequireImportedFinalState(target,RHIResourceState::CopyDest);
+                        graph.AddPass(std::string("Temporal.Export.")+std::to_string(i),
+                            {{source,RHIResourceState::CopySource,explicitAccess?RGAccessMode::Read:RGAccessMode::LegacyState},
+                             {target,RHIResourceState::CopyDest,explicitAccess?RGAccessMode::Write:RGAccessMode::LegacyState}},
+                            [source,target](const auto& execute){execute.encoder->CopyTexture(execute.ResolveHandle(target),execute.ResolveHandle(source));},true);
+                    }
 
                     if (binding.sharedTarget.IsValid())
                     {
@@ -4388,6 +4859,10 @@ namespace
             geometryFramePins.entries.clear();
         }
 
+        uint64_t temporalSubmittedRealFrame{};
+        EnhancedTemporalViewState* activeTemporal{};
+        TemporalMeasurementProvenance temporalProvenance, gpuTemporalProvenance;
+
         void BuildDrawPool()
         {
             drawPool.clear();
@@ -4482,6 +4957,10 @@ namespace
 
             const auto poolDecal = [this](const DecalRenderProxy* proxy)
             {
+                if (!proxy->m_isEnabled)
+                {
+                    return;
+                }
                 // 셋 다 없으면 그릴 것이 없다 — DX11 RenderPassData의
                 // 데칼 큐 적재 조건과 같다(RenderPassData.cpp:232).
                 if (nullptr == proxy->m_diffuseTexture &&
@@ -4493,6 +4972,8 @@ namespace
 
                 EnhancedDecalPass::Item item{};
                 item.worldMatrix = proxy->m_worldMatrix;
+                item.temporalObjectId = static_cast<uint64_t>(proxy->m_instancedID);
+                item.temporalIncarnation = proxy->m_temporalIncarnation;
                 item.texturePinIndices = {textureFramePins->Retain(proxy->m_diffuseTexture),
                     textureFramePins->Retain(proxy->m_normalTexture),
                     textureFramePins->Retain(proxy->m_occluroughmetalTexture)};
@@ -4555,6 +5036,8 @@ namespace
                     bounds = generation->Meshes()[proxy->m_modelMeshIndex].bounds;
                 }
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
+                pooled.item.temporalObjectId = static_cast<uint64_t>(proxy->m_instancedID);
+                pooled.item.temporalIncarnation = proxy->m_temporalIncarnation;
                 pooled.item.modelMeshView = std::move(modelView);
                 pooled.item.geometryKey = MakeGeometryKey(pooled.item);
                 pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
@@ -4636,6 +5119,9 @@ namespace
                         bounds = generation->Meshes()[type.m_modelMeshIndex].bounds;
                     }
                     pooled.item.worldMatrix = source.worldMatrix;
+                    pooled.item.temporalObjectId = static_cast<uint64_t>(proxy->m_instancedID);
+                    pooled.item.temporalIncarnation = proxy->m_temporalIncarnation;
+                    pooled.item.temporalInstanceId = source.temporalIdentity;
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
                     pooled.item.modelMeshView = std::move(modelView);
@@ -4659,6 +5145,8 @@ namespace
                 if (!proxy->m_isEnabled || nullptr == proxy->m_spriteTexture) return;
                 PooledSprite pooled{};
                 pooled.worldMatrix = proxy->m_worldMatrix;
+                pooled.temporalObjectId=static_cast<uint64_t>(proxy->m_instancedID);
+                pooled.temporalIncarnation=proxy->m_temporalIncarnation;
                 pooled.texturePinIndex = textureFramePins->Retain(proxy->m_spriteTexture);
                 pooled.billboardType = proxy->m_billboardType;
                 pooled.billboardAxis = proxy->m_billboardAxis;
@@ -5290,6 +5778,45 @@ namespace
             });
         }
 
+        template <typename PipelineT>
+        bool PrepareTemporalView(PipelineT& p, uint32_t index, const EnhancedLiveFramePacket& packet,
+            const EnhancedLiveViewPacket& viewPacket)
+        {
+            auto& view = p.views[index];
+            activeTemporal = &view.temporal;
+            const auto control = TemporalRuntimeControl::Get().Snapshot();
+            const bool nativeOnly = control.nativeCaptureExclusionActive || controlledCaptureFrame ||
+                viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
+            const uint64_t realFrame = viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
+                packet.temporalRealFrameId ? packet.temporalRealFrameId : packet.frameId;
+            const auto configure = [&](IRHIDeviceResources& resources, TemporalBackend backend) {
+                return view.temporal.Begin(resources, backend, control, viewPacket.camera, realFrame,
+                    viewPacket.key.viewId, packet.sceneEpoch, viewPacket.key.historyRevision,
+                    {packet.width,packet.height}, packet.deltaSeconds, packet.totalSeconds, nativeOnly,
+                    p.postChain.GetTuning().toneMapEnabled && EnhancedPostChainPass::kLDRFormat == RHIFormat::RGBA8Unorm);
+            };
+            TemporalResult result;
+            if constexpr (std::is_same_v<PipelineT,LivePipeline>) result=configure(dx12.DeviceResources(),TemporalBackend::DX12);
+            else result=configure(p.resources,TemporalBackend::Vulkan);
+            if (!result.IsSuccess()) { lastError="Temporal view configuration failed"; return false; }
+            view.temporal.provenance.publicationFrameId = packet.frameId;
+            p.frameContext.width=view.temporal.frame.renderExtent.width;
+            p.frameContext.height=view.temporal.frame.renderExtent.height;
+            p.frameContext.displayWidth=packet.width;p.frameContext.displayHeight=packet.height;
+            p.frameContext.temporalFrame=view.temporal.frame;
+            if (view.temporal.frame.reset) { view.ssgi.ResetHistory();view.fog.ResetHistory(); }
+            view.temporal.pendingDecals.clear();
+            for (auto& decal:decals)
+            {
+                const EnhancedTemporalViewState::DecalKey key{decal.temporalObjectId,decal.temporalIncarnation};
+                const auto previous=view.temporal.previousDecals.find(key);
+                decal.temporalHistoryValid=!view.temporal.frame.reset && previous!=view.temporal.previousDecals.end();
+                decal.previousWorldMatrix=decal.temporalHistoryValid?previous->second:decal.worldMatrix;
+                view.temporal.pendingDecals.emplace(key,decal.worldMatrix);
+            }
+            return true;
+        }
+
         // ── 렌더 입력 소비: 이 뷰의 몫 ──
         /// Camera/Scene을 다시 읽지 않고 게임 스레드가 밀봉한 값만 소비한다.
         bool CaptureFromView(const EnhancedLiveFramePacket& frame,
@@ -5309,7 +5836,7 @@ namespace
                 graphFramePins = own::make_shared<material_graph::InstanceFramePins>();
             }
             imageAdmissionView = { frame.sceneEpoch, viewPacket.key.viewId };
-            cameraSnapshot = viewPacket.camera;
+            cameraSnapshot = activeTemporal ? activeTemporal->rasterCamera : viewPacket.camera;
             materialPreviewView = viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             totalSeconds = frame.totalSeconds;
 
@@ -5342,8 +5869,9 @@ namespace
                 inputView.sceneEpoch = frame.sceneEpoch;
                 inputView.viewId = viewPacket.key.viewId;
                 inputView.historyRevision = viewPacket.key.historyRevision;
-                inputView.width = frame.width;
-                inputView.height = frame.height;
+                inputView.width = activeTemporal ? activeTemporal->frame.renderExtent.width : frame.width;
+                inputView.height = activeTemporal ? activeTemporal->frame.renderExtent.height : frame.height;
+                if (activeTemporal) inputView.temporalFrame = activeTemporal->frame;
                 inputView.camera = cameraSnapshot;
                 std::string error;
                 static const std::array<MaterialPreviewFloor, 2> floor{MaterialPreviewFloor{0}, MaterialPreviewFloor{1}};
@@ -5417,6 +5945,7 @@ namespace
 
                 EnhancedSpritePass::Item item{};
                 item.world = MakeSpriteMatrix(right, down, center);
+                item.temporalObjectId=sprite.temporalObjectId;item.temporalIncarnation=sprite.temporalIncarnation;
                 item.texturePinIndex = sprite.texturePinIndex;
                 item.texture = textureFramePins->Borrow(item.texturePinIndex);
                 item.layerOrder = sprite.orderInLayer;
@@ -5462,12 +5991,26 @@ namespace
                         continue;
                     }
                     const CanvasPlane plane = ResolveCanvasPlane(*text, gameCamera);
+                    const auto textBegin=worldSprites.size();
                     AppendTextToPlane(*text, plane, CanvasRenderMode::WorldSpace == text->renderMode,
                         worldSprites, *textureFramePins);
+                    for(size_t i=textBegin;i<worldSprites.size();++i)
+                    {
+                        worldSprites[i].temporalObjectId=static_cast<uint64_t>(proxy->GetInstanceID());
+                        worldSprites[i].temporalIncarnation=proxy->GetTemporalIncarnation();
+                        worldSprites[i].temporalSubId=(1ull<<63)|(i-textBegin+1);
+                    }
                     if (HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::CanvasPreview)
                         && outlinedCanvases.insert(text->canvasId.m_ID_Data).second)
                     {
+                        const auto outlineBegin=worldSprites.size();
                         AppendCanvasOutline(*text, plane, worldSprites);
+                        for(size_t i=outlineBegin;i<worldSprites.size();++i)
+                        {
+                            worldSprites[i].temporalObjectId=static_cast<uint64_t>(proxy->GetInstanceID());
+                            worldSprites[i].temporalIncarnation=proxy->GetTemporalIncarnation();
+                            worldSprites[i].temporalSubId=(3ull<<62)|(i-outlineBegin+1);
+                        }
                     }
                     continue;
                 }
@@ -5481,14 +6024,52 @@ namespace
 
                 const CanvasPlane plane = ResolveCanvasPlane(*image, gameCamera);
                 const bool depth = CanvasRenderMode::WorldSpace == image->renderMode;
+                const auto imageBegin=worldSprites.size();
                 AppendImageToPlane(*image, plane, depth, worldSprites, *textureFramePins);
+                for(size_t i=imageBegin;i<worldSprites.size();++i)
+                {
+                    worldSprites[i].temporalObjectId=static_cast<uint64_t>(proxy->GetInstanceID());
+                    worldSprites[i].temporalIncarnation=proxy->GetTemporalIncarnation();
+                    worldSprites[i].temporalSubId=(1ull<<63)|(i-imageBegin+1);
+                }
 
                 if (HasViewFlag(viewPacket.viewFlags,
                     EnhancedLiveViewFlags::CanvasPreview))
                 {
                     const size_t canvasKey = image->canvasId.m_ID_Data;
                     if (outlinedCanvases.insert(canvasKey).second)
+                    {
+                        const auto outlineBegin=worldSprites.size();
                         AppendCanvasOutline(*image, plane, worldSprites);
+                        for(size_t i=outlineBegin;i<worldSprites.size();++i)
+                        {
+                            worldSprites[i].temporalObjectId=static_cast<uint64_t>(proxy->GetInstanceID());
+                            worldSprites[i].temporalIncarnation=proxy->GetTemporalIncarnation();
+                            worldSprites[i].temporalSubId=(3ull<<62)|(i-outlineBegin+1);
+                        }
+                    }
+                }
+            }
+
+            if(activeTemporal)
+            {
+                activeTemporal->pendingSprites.clear();
+                for(auto& item:worldSprites)
+                {
+                    const EnhancedTemporalViewState::SpriteKey key{item.temporalObjectId,item.temporalIncarnation,item.temporalSubId};
+                    const auto old=activeTemporal->previousSprites.find(key);
+                    item.previousWorldValid=!activeTemporal->frame.reset && item.temporalObjectId && old!=activeTemporal->previousSprites.end() &&
+                        std::memcmp(&old->second.uv,&item.uv,sizeof(item.uv))==0;
+                    item.previousWorld=item.previousWorldValid?old->second.world:item.world;
+                    const auto textureIdentity=TextureFramePins::Identity(item.texture);
+                    item.previousAppearanceValid=item.previousWorldValid && old->second.textureIdentity==textureIdentity &&
+                        std::memcmp(&old->second.uv,&item.uv,sizeof(item.uv))==0 &&
+                        std::memcmp(&old->second.color,&item.color,sizeof(item.color))==0 &&
+                        old->second.signedDistance==item.signedDistance && old->second.enableDepth==item.enableDepth &&
+                        old->second.canvasOrder==item.canvasOrder && old->second.layerOrder==item.layerOrder;
+                    if(item.temporalObjectId && !activeTemporal->pendingSprites.emplace(key,EnhancedTemporalViewState::SpriteHistory{
+                        item.world,item.uv,item.color,textureIdentity,item.signedDistance,item.enableDepth,item.canvasOrder,item.layerOrder}).second)
+                    {lastError="Duplicate temporal sprite identity.";return false;}
                 }
             }
 
@@ -5664,8 +6245,9 @@ namespace
                 inputView.sceneEpoch = frame.sceneEpoch;
                 inputView.viewId = viewPacket.key.viewId;
                 inputView.historyRevision = viewPacket.key.historyRevision;
-                inputView.width = frame.width;
-                inputView.height = frame.height;
+                inputView.width = activeTemporal ? activeTemporal->frame.renderExtent.width : frame.width;
+                inputView.height = activeTemporal ? activeTemporal->frame.renderExtent.height : frame.height;
+                if (activeTemporal) inputView.temporalFrame = activeTemporal->frame;
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
                 // Replay may return new producer owners. Publish each exact
@@ -5685,7 +6267,8 @@ namespace
                     }
                 }
                 bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
+                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins,
+                    activeTemporal && activeTemporal->previousInput ? &*activeTemporal->previousInput : nullptr);
                 if (!sealed && hasOptionalGraphCandidates)
                 {
                     // Aggregate geometry budgets can be tighter than the draw
@@ -5711,7 +6294,8 @@ namespace
                     graphShadowEligible.resize(retained);
                     graphViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
+                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins,
+                    activeTemporal && activeTemporal->previousInput ? &*activeTemporal->previousInput : nullptr);
                 }
                 if (!sealed)
                 {
@@ -5851,6 +6435,7 @@ namespace
             // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
             p.sprite.SetItems(&worldSprites, textureFramePins);
             p.ui.SetRects(&uiRects, textureFramePins);
+            p.temporalUi.SetRects(&uiRects, textureFramePins);
 
             if (!p.animationPalettes.Prepare(*p.frameContext.resources,
                     p.frameContext.shadowDraws, p.frameContext.forwardDraws, p.frameContext.draws))
@@ -5868,10 +6453,13 @@ namespace
         // 공유 텍스처로 복사한다. 그 소비 선언이 있어야 그래프가 체인을
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
-            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds, uint32_t profilingEngineFrame,
+            const EnhancedLiveFramePacket& sourceFrame,
+            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint32_t sourceEngineFrame, bool sourceEngineFrameAvailable,
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            const uint64_t profileCpuBegin = GpuSpanSink().on_cpu_render ? ProfileCpuTick() : 0;
             static const bool queueEvidence = []
             {
                 const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
@@ -5959,7 +6547,6 @@ namespace
                 }
             } frameGuard{ dx12, frameCommitted, profilerToken, capture, outError };
 
-
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -5994,6 +6581,11 @@ namespace
             viewSpriteCounts[targetIndex] = lastSpriteCount;
             viewUICounts[targetIndex] = lastUIRectCount;
 
+            slot.temporalResources = {};
+            const auto temporalSink=CopyPresentationSink();
+            if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink && temporalSink->AcceptsTemporalFrames() &&
+                !dx12.CreateTemporalDisplayTextures(slot.interopToken,view.temporal.frame.renderExtent,
+                    view.temporal.frame.displayExtent,slot.temporalResources,outError)) return false;
             slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
                 kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot.graph;
@@ -6018,20 +6610,25 @@ namespace
                 ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
                 : std::function<bool(std::string&)>{};
             if (!PrepareSceneRecording(p, graph, dx12.CommandPool(), RHIShaderBinary::Dxil,
-                    preparationDeferred, capture, outError, queueBoundary))
+                    preparationDeferred, !sourceFrame.temporalFixture.IsValid() ||
+                        sourceFrame.temporalFixture.allowMeshlets, capture, outError, queueBoundary))
             {
                 return false;
             }
             // Deferred resource preparation has no GPU submission to admit.
             // Telemetry uses the host frame; sourceFrameId remains render identity.
             const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
-            profilerToken.engineFrameId = profilingEngineFrame;
-            if (captureSink.on_begin_capture && captureSink.on_finish_capture)
+            profilerToken.engineFrameId = sourceFrameId;
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
+            if (sourceEngineFrameAvailable && captureSink.on_begin_capture && captureSink.on_finish_capture)
             {
-                profilerToken.captureGeneration = captureSink.on_begin_capture(profilingEngineFrame);
+                profilerToken.captureGeneration = captureSink.on_begin_capture(sourceEngineFrame);
             }
-            profilerToken = dx12.BeginProfilerFrame(profilingEngineFrame, frameCounter++,
+            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
                 view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -6050,12 +6647,15 @@ namespace
                 LiveFrameBinding binding{};
                 binding.viewIndex = viewIndex;
                 binding.sharedTarget = slot.rhiTexture;
+                binding.temporalTargets = {slot.temporalResources.hudlessColor,slot.temporalResources.uiColor,
+                    slot.temporalResources.depth,slot.temporalResources.motionVectors};
                 binding.viewFlags = HasViewFlag(view.viewFlags,
                     EnhancedLiveViewFlags::SceneOverlay)
                     ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
 
                 if (HasViewFlag(view.viewFlags, EnhancedLiveViewFlags::HideSkyBox))
                     binding.viewFlags |= LiveViewFlags::kHideSkyBox;
+                if (capture) capture->RecordTemporalProvenance(view.temporal.provenance);
                 bool stageCaptureOk = true;
                 p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding,
                     [&](const LivePassNode& node, const LiveBlackboard& board) {
@@ -6098,6 +6698,8 @@ namespace
                 RenderThreadPhaseScope record(RenderPhase::command_record);
                 if (ownedQueueExecution)
                 {
+                    if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink)
+                        temporalSink->MarkTemporalLatency(view.temporal.frame.realFrameId,RHITemporalLatencyMarker::RenderSubmitStart);
                     if (!dx12.SubmitOwnedGraph(slot.graph, pipeline, ownedRecordingMilliseconds, outError))
                     {
                         return false;
@@ -6109,15 +6711,6 @@ namespace
                 }
             }
             p.lastNativeRecordMs = ownedQueueExecution ? ownedRecordingMilliseconds : recordWatch.ElapsedMs();
-            // SubmitOwnedGraph specializes order, lifetimes and barriers. Copy
-            // that final plan, never the pre-specialization Compile snapshot.
-            // Failed submissions still return false above; publication clears a
-            // failed frame rather than labeling an unsubmitted plan as displayed.
-            if (diagnosticOutput)
-            {
-                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
-                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
-            }
             viewShadowStats[targetIndex] = CaptureShadowStats(p);
             if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
             { outError = "capture graph is not compiled"; return false; }
@@ -6144,6 +6737,8 @@ namespace
                 }
                 else
                 {
+                    if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink)
+                        temporalSink->MarkTemporalLatency(view.temporal.frame.realFrameId,RHITemporalLatencyMarker::RenderSubmitStart);
                     if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket, outError))
                     {
                         return false;
@@ -6161,6 +6756,71 @@ namespace
                 }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
+            if (sourceFrame.temporalFixture.IsValid() &&
+                ((!ownedQueueExecution && !GetRHISubmissionThread().Wait(batchTicket, outError)) ||
+                    !dx12.WaitForLastFrameSubmission(outError)))
+            {
+                return false;
+            }
+            if (view.displayTarget==EnhancedLiveDisplayTarget::Game)
+            {
+                if (temporalSink && (temporalSink->AcceptsTemporalFrames() ||
+                        temporalSink->RequiresTemporalLatencyMarkers()) && !dx12.WaitForLastFrameSubmission(outError))
+                {
+                    return false;
+                }
+                temporalSubmittedRealFrame=view.temporal.frame.realFrameId;
+                if(temporalSink)temporalSink->MarkTemporalLatency(view.temporal.frame.realFrameId,RHITemporalLatencyMarker::RenderSubmitEnd);
+            }
+            const uint64_t previousRealFrameId = view.temporal.submittedFrame;
+            view.temporal.Commit(p.graphInput);
+            const auto fixtureSubmission = PublishTemporalFixtureSubmission(sourceFrame,
+                view.key, view.displayTarget, view.temporal, previousRealFrameId);
+            if (capture)
+            {
+                capture->RecordFixtureSubmission(fixtureSubmission);
+                capture->RecordTemporalProvenance(view.temporal.provenance);
+            }
+            // Copy the specialized graph with the submitted frame's effects,
+            // never a requested/pre-recording or failed-submission label.
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
+                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height,
+                    view.temporal.provenance);
+            }
+            slot.temporalProvenance = view.temporal.provenance;
+            PublishCpuRenderMeasurement(profileCpuBegin, sourceEngineFrame, profilerToken.captureGeneration,
+                profilerToken.submissionId, slot.temporalProvenance);
+            temporalProvenance = slot.temporalProvenance;
+            if (view.displayTarget == EnhancedLiveDisplayTarget::Game)
+            {
+                // Native presentation also needs the original simulation ID
+                // for independent low-latency markers, without FG resources.
+                dx12.SealTemporalDisplayFrame(slot.interopToken, view.temporal.frame, view.temporal.provenance,
+                    slot.temporalResources.hudlessColor.IsValid() ? slot.graph : nullptr,
+                    view.temporal.provenance.nativeGateActive);
+            }
+            TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
+                if(view.displayTarget!=EnhancedLiveDisplayTarget::Game && snapshot.rendererObserved && snapshot.viewId!=view.key.viewId)return;
+                snapshot.presentationTarget=temporalSink && temporalSink->AcceptsTemporalFrames() &&
+                    view.displayTarget==EnhancedLiveDisplayTarget::Game?TemporalPresentationTarget::PlayerSwapchain:TemporalPresentationTarget::EditorViewport;
+                view.temporal.PublishSubmitted(snapshot);
+                snapshot.motionVectorsValid=true;
+                snapshot.motionStaticValid=false;snapshot.motionSkinnedValid=false;snapshot.motionInstancedValid=false;
+                snapshot.motionAlphaValid=false;
+                if(p.graphInput)for(const auto& draw:p.graphInput->Draws())
+                {
+                    if(!draw.temporalHistoryValid)continue;
+                    snapshot.motionStaticValid|=draw.geometry->Source()->Bones().empty();
+                    snapshot.motionSkinnedValid|=!draw.geometry->Source()->Bones().empty();
+                    snapshot.motionInstancedValid|=draw.temporalInstanceId!=0;
+                    snapshot.motionAlphaValid|=draw.queue!=material_graph::SceneCoverage::Opaque;
+                }
+                snapshot.motionDecalValid=p.decal.HasPreparedDecals() && !view.temporal.frame.reset;
+                snapshot.motionAlphaValid|=p.sprite.GetLastTemporalRecordedItemCount()!=0 &&
+                    std::any_of(worldSprites.begin(),worldSprites.end(),[](const auto& item){return item.previousWorldValid;});
+            });
             if (queueModeRequest.requestId != 0)
             {
                 std::lock_guard<std::mutex> lock(debugMutex);
@@ -6246,6 +6906,7 @@ namespace
                     p.gbuffer.GetSamplerIdentity(), p.forward.GetSealLedger(),
                     p.forward.GetSamplerIdentity(), encoderDrops, lastEncoderDrop,
                     dx12.TextureCache().GetUploadFailureCount());
+                capture->RecordGeometryRoutes(p.graphMaterials);
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
                     EnhancedIBLGenerator::kSceneReflectionSampleCount,
                     dx12.Resources().DescribeTexture(p.ibl.GetImportanceMaps()[2]));
@@ -6732,6 +7393,12 @@ namespace
                             // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
                             // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
                             state.lastPassTimings = std::move(timings);
+                            state.gpuTemporalProvenance = view.slots[slotIndex].temporalProvenance;
+                            TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot){
+                                const auto& provenance=view.slots[slotIndex].temporalProvenance;
+                                if(snapshot.viewId==provenance.viewId && snapshot.sceneEpoch==provenance.sceneEpoch)
+                                    snapshot.renderGpuCompletedFrameId=provenance.realFrameId;
+                            });
                             state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
                             state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
                             state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
@@ -6742,8 +7409,7 @@ namespace
                                 const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
                                 if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
                                 {
-                                    sink.on_issue(static_cast<uint32_t>(
-                                        view.slots[slotIndex].profilerToken.engineFrameId),
+                                    sink.on_issue(view.slots[slotIndex].profilerToken.sourceEngineFrame,
                                         span.queryOverflowPasses, false, "GPU query slots exhausted",
                                         view.slots[slotIndex].profilerToken.captureGeneration);
                                 }
@@ -6799,8 +7465,8 @@ namespace
                                 if (sink.on_span && view.slots[slotIndex].profilerToken.captureGeneration != 0 &&
                                     span.submitToGpuBeginMs >= 0.0 && span.gpuEndToCollectMs >= 0.0)
                                 {
-                                    const uint32_t frameLabel = static_cast<uint32_t>(
-                                        view.slots[slotIndex].profilerToken.engineFrameId);
+                                    const uint32_t frameLabel =
+                                        view.slots[slotIndex].profilerToken.sourceEngineFrame;
 
                                     // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
                                     // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
@@ -6811,6 +7477,8 @@ namespace
                                         view.slots[slotIndex].profilerToken.renderViewId);
                                     origin.queueId = view.slots[slotIndex].profilerToken.queueId;
                                     origin.captureGeneration = view.slots[slotIndex].profilerToken.captureGeneration;
+                                    origin.fullSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
+                                    origin.temporalProvenance = view.slots[slotIndex].temporalProvenance;
 
                                     for (const EnhancedLiveGpuSlice& slice : slices)
                                     {
@@ -6851,8 +7519,7 @@ namespace
                             const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
                             if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
                             {
-                                sink.on_issue(static_cast<uint32_t>(
-                                    view.slots[slotIndex].profilerToken.engineFrameId),
+                                sink.on_issue(view.slots[slotIndex].profilerToken.sourceEngineFrame,
                                     0, true, collectError.c_str(),
                                     view.slots[slotIndex].profilerToken.captureGeneration);
                             }
@@ -7260,7 +7927,8 @@ namespace
                         try
                         {
 							const auto& hooks = EnhancedSceneRenderer::MutableRenderThreadHooks();
-							const bool sampleCounters = hooks.OnCounters && hooks.ShouldSampleCounters &&
+							const bool sampleCounters = submission.frame.sourceEngineFrameAvailable &&
+								hooks.OnCounters && hooks.ShouldSampleCounters &&
 								hooks.ShouldSampleCounters();
 							std::chrono::steady_clock::duration counterQueryTime{};
 							const auto beforeQueryStarted = std::chrono::steady_clock::now();
@@ -7315,12 +7983,13 @@ namespace
 									afterDescriptorOverflows >= beforeDescriptorOverflows ? afterDescriptorOverflows - beforeDescriptorOverflows : 0,
 									profileFrameDrawCount, profileFrameBatchCount,
 									std::chrono::duration<double, std::micro>(counterQueryTime).count() };
-								hooks.OnCounters(submission.frame.profilingEngineFrame, sample);
+								hooks.OnCounters(submission.frame.sourceEngineFrame, sample);
 							}
 							// Query on the resource-owning thread at 4 Hz. No Editor/UI
 							// path touches the renderer's state or its lock for this graph.
 							const auto sampleTime = std::chrono::steady_clock::now();
-							if (hooks.OnVideoMemory && sampleTime >= nextVideoMemorySample)
+							if (submission.frame.sourceEngineFrameAvailable && hooks.OnVideoMemory &&
+								sampleTime >= nextVideoMemorySample)
 							{
 								nextVideoMemorySample = sampleTime + std::chrono::milliseconds(250);
 								std::uint64_t usedMB = 0;
@@ -7334,9 +8003,13 @@ namespace
 									budgetMB = memory.budgetMB;
 								}
 								else if (backend == EnhancedLiveBackend::DX12 && pipeline)
+								{
 									available = dx12.QueryVideoMemory(usedMB, budgetMB);
+								}
 								if (available)
-									hooks.OnVideoMemory(submission.frame.profilingEngineFrame, usedMB, budgetMB);
+								{
+									hooks.OnVideoMemory(submission.frame.sourceEngineFrame, usedMB, budgetMB);
+								}
 							}
                         }
                         catch (const std::exception& exception)
@@ -7516,6 +8189,7 @@ namespace
                         }
                     }
                 }
+                submission.frame.temporalFixtureCoalesced = true;
                 newest = std::move(submission);
                 ++renderCoalescedFrames;
             }
@@ -7891,6 +8565,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         "BuildLiveFramePacket must stay on the game-thread producer");
 
     EnhancedLiveFramePacket frame{};
+    frame.temporalFixture = SnapshotTemporalFixtureStep();
     frame.sourceCaptureNanoseconds = capture_steady_nanoseconds();
     std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
     {
@@ -8010,8 +8685,31 @@ EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
 bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     EnhancedLiveDisplayTarget target, std::string& outError, bool controlled,
     const std::string& cameraReplayPath, const std::string& drawReplayPath, const std::string& latticeReplayPath,
-    bool replayExtensions, bool latticeReplayExtension)
+    bool replayExtensions, bool latticeReplayExtension, bool motionValidation,
+    const EnhancedTemporalFixtureStamp& expectedFixture, bool* busy)
 {
+    if (busy)
+    {
+        *busy = false;
+    }
+    if (motionValidation && (controlled || target == EnhancedLiveDisplayTarget::MaterialPreview ||
+        !cameraReplayPath.empty() || !drawReplayPath.empty() || !latticeReplayPath.empty()))
+    {
+        outError = "motion capture requires an observed editor/game view without controlled replay";
+        return false;
+    }
+    const bool hasFixtureExpectation = expectedFixture != EnhancedTemporalFixtureStamp{};
+    if (motionValidation && hasFixtureExpectation &&
+        (!expectedFixture.IsValid() || expectedFixture.predecessorStepId == 0))
+    {
+        outError = "motion capture requires an exact fixture session, step and predecessor";
+        return false;
+    }
+    if (!motionValidation && hasFixtureExpectation)
+    {
+        outError = "fixture capture expectations require motion validation";
+        return false;
+    }
     std::optional<EnhancedCameraReplayInput> replay;
     if (!cameraReplayPath.empty())
     {
@@ -8050,7 +8748,20 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
         latticeReplay = std::move(candidate);
     }
     LiveState& state = GetLiveState();
-    std::lock_guard<std::mutex> lock(state.renderStateMutex);
+    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::defer_lock);
+    if (busy)
+    {
+        if (!lock.try_lock())
+        {
+            *busy = true;
+            outError.clear();
+            return false;
+        }
+    }
+    else
+    {
+        lock.lock();
+    }
     if (target >= EnhancedLiveDisplayTarget::Count || !state.enabled)
     { outError = "capture requires an enabled live renderer and valid display target"; return false; }
     if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
@@ -8061,13 +8772,27 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
         outError = "Previous capture resources are retained until GPU idle or device-loss cleanup.";
         return false;
     }
+    if (motionValidation && expectedFixture.IsValid())
+    {
+        const auto previous = PreviousTemporalFixtureSubmission(target);
+        if (!previous.sourceVerified || previous.stamp.sessionId != expectedFixture.sessionId ||
+            previous.stamp.stepId != expectedFixture.predecessorStepId ||
+            previous.stamp.allowMeshlets != expectedFixture.allowMeshlets ||
+            previous.stamp.inputSha256 != expectedFixture.predecessorInputSha256)
+        {
+            outError = "motion capture must be armed after its predecessor submits and before its current step";
+            return false;
+        }
+    }
     std::error_code error;
-    const std::filesystem::path path(directory);
+    const auto path = std::filesystem::u8path(directory);
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
     { outError = "capture requires a new absolute directory: " + directory; return false; }
     state.pbrCapture = std::make_unique<EnhancedPbrCapture>();
     state.pbrCapture->target = target;
     state.pbrCapture->controlled = controlled;
+    state.pbrCapture->motionValidation = motionValidation;
+    state.pbrCapture->expectedFixture = expectedFixture;
     state.pbrCapture->replayExtensions = replayExtensions || latticeReplayExtension
         || !drawReplayPath.empty() || !latticeReplayPath.empty();
     state.pbrCapture->latticeReplayExtension = latticeReplayExtension || !latticeReplayPath.empty();
@@ -8076,6 +8801,7 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     state.pbrCapture->latticeReplay = std::move(latticeReplay);
     state.pbrCapture->afterFrameId = state.publishedFrameId.load();
     state.pbrCapture->result.directory = directory;
+    state.pbrCapture->result.fixture = expectedFixture;
     state.pbrCapture->result.state = EnhancedPbrCaptureState::Pending;
     outError.clear();
     return true;
@@ -8088,12 +8814,94 @@ EnhancedLivePbrCaptureStatus EnhancedSceneRenderer::GetLivePbrCaptureStatus()
     return state.pbrCapture ? state.pbrCapture->result : EnhancedLivePbrCaptureStatus{};
 }
 
-void EnhancedSceneRenderer::CancelLivePbrCapture()
+bool EnhancedSceneRenderer::TryGetLivePbrCaptureStatus(EnhancedLivePbrCaptureStatus& status,
+    const EnhancedTemporalFixtureStamp& expectedFixture)
+{
+    LiveState& state = GetLiveState();
+    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::try_to_lock);
+    if (!lock.owns_lock())
+    {
+        return false;
+    }
+    status = state.pbrCapture ? state.pbrCapture->result : EnhancedLivePbrCaptureStatus{};
+    if (expectedFixture != EnhancedTemporalFixtureStamp{} &&
+        (!state.pbrCapture || state.pbrCapture->expectedFixture != expectedFixture))
+    {
+        status.state = EnhancedPbrCaptureState::Failed;
+        status.error = "fixture capture ownership changed before its result was observed";
+    }
+    return true;
+}
+
+void EnhancedSceneRenderer::CancelLivePbrCapture(const EnhancedTemporalFixtureStamp& expectedFixture)
 {
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.renderStateMutex);
+    if (expectedFixture != EnhancedTemporalFixtureStamp{} &&
+        (!state.pbrCapture || state.pbrCapture->expectedFixture != expectedFixture))
+    {
+        return;
+    }
     if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending)
+    {
         state.pbrCapture->Fail("capture timed out before a matching live view was rendered");
+    }
+}
+
+bool EnhancedSceneRenderer::TryCancelLivePbrCapture(const EnhancedTemporalFixtureStamp& expectedFixture)
+{
+    LiveState& state = GetLiveState();
+    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::try_to_lock);
+    if (!lock.owns_lock())
+    {
+        return false;
+    }
+    if (expectedFixture != EnhancedTemporalFixtureStamp{} &&
+        (!state.pbrCapture || state.pbrCapture->expectedFixture != expectedFixture))
+    {
+        return true;
+    }
+    if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending)
+    {
+        state.pbrCapture->Fail("capture cancelled before a matching live view was rendered");
+    }
+    return true;
+}
+
+void EnhancedSceneRenderer::PublishTemporalFixtureStep(const EnhancedTemporalFixtureStamp& stamp)
+{
+    auto& exchange = FixtureExchange();
+    std::lock_guard<std::mutex> lock(exchange.mutex);
+    if (exchange.published.sessionId != stamp.sessionId)
+    {
+        exchange.previous = {};
+        exchange.acknowledged = {};
+    }
+    exchange.published = stamp;
+}
+
+void EnhancedSceneRenderer::ClearTemporalFixtureSession(uint64_t sessionId)
+{
+    auto& exchange = FixtureExchange();
+    std::lock_guard<std::mutex> lock(exchange.mutex);
+    if (exchange.published.sessionId == sessionId)
+    {
+        exchange.published = {};
+        exchange.previous = {};
+        exchange.acknowledged = {};
+    }
+}
+
+EnhancedTemporalFixtureSubmission EnhancedSceneRenderer::GetTemporalFixtureSubmission(
+    EnhancedLiveDisplayTarget target)
+{
+    if (target >= EnhancedLiveDisplayTarget::Count)
+    {
+        return {};
+    }
+    auto& exchange = FixtureExchange();
+    std::lock_guard<std::mutex> lock(exchange.mutex);
+    return exchange.acknowledged[static_cast<size_t>(target)];
 }
 
 bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMilliseconds)
@@ -8111,6 +8919,15 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         RenderThreadPhaseScope lockWait(RenderPhase::state_lock_wait);
         stateLock.lock();
     }
+    struct TemporalDiscardGuard
+    {
+        LiveState& state;uint64_t realFrame;
+        ~TemporalDiscardGuard()
+        {
+            if(realFrame && state.temporalSubmittedRealFrame!=realFrame)
+                if(const auto sink=state.CopyPresentationSink())sink->DiscardTemporalFrame(realFrame);
+        }
+    } temporalDiscard{state,inputFrame.temporalRealFrameId};
     state.ApplyPreparedEnvironment(retiredEnvironment);
 	state.profileFrameDrawCount = 0;
 	state.profileFrameBatchCount = 0;
@@ -8414,7 +9231,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             bool captured = false;
             {
                 RenderThreadPhaseScope capture(RenderPhase::view_capture);
-                captured = state.CaptureFromView(frame, viewPacket);
+                captured = state.PrepareTemporalView(p, static_cast<uint32_t>(viewIndex), frame, viewPacket) &&
+                    state.CaptureFromView(frame, viewPacket);
             }
             if (!captured)
             {
@@ -8470,8 +9288,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             {
                 ImageReleaseGuard imageRelease{ state, p.textureCache };
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
-                rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
-                    frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
+                rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket, frame,
+                    frame.frameId, frame.sourceCaptureNanoseconds,
+                    frame.sourceEngineFrame, frame.sourceEngineFrameAvailable, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
                     prepareFrame,
                     error, state.BeginPbrCapture(frame, viewPacket),
@@ -8796,7 +9615,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         bool captured = false;
         {
             RenderThreadPhaseScope capture(RenderPhase::view_capture);
-            captured = state.CaptureFromView(frame, viewPacket);
+            captured = state.PrepareTemporalView(p, static_cast<uint32_t>(view - &p.views[0]), frame, viewPacket) &&
+                state.CaptureFromView(frame, viewPacket);
         }
         if (!captured)
         {
@@ -8847,7 +9667,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         {
             ImageReleaseGuard imageRelease{ state, state.dx12.TextureCache() };
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
-            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, frame.profilingEngineFrame, error,
+            rendered = state.RenderOnce(*view, renderSlot, frame, frame.frameId, frame.sourceCaptureNanoseconds,
+                frame.sourceEngineFrame, frame.sourceEngineFrameAvailable, error,
                 state.BeginPbrCapture(frame, viewPacket),
                 captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
         }

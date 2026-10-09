@@ -391,9 +391,11 @@ namespace
         // Append-only v35: concrete-view selection never changes serialized links.
         int (__stdcall* Asset_RequestTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
         int (__stdcall* Asset_TryAcquireTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
-
+        // Preserve the v40 physics entries before appending new slots.
         int (__stdcall* Body_Remove)(ScriptObjectHandle owner, std::uint64_t instance);
         int (__stdcall* Body_ShapeRole)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, const char* role);
+        // Append-only v41: explicit same-camera discontinuities.
+        void (__stdcall* Camera_NotifyCameraCut)(ScriptObjectHandle handle);
 
 	};
 
@@ -401,6 +403,14 @@ namespace
         == offsetof(ScriptApiTable, Asset_ListRoots) + sizeof(decltype(ScriptApiTable::Asset_ListRoots)));
     static_assert(offsetof(ScriptApiTable, Asset_TryAcquireTyped)
         == offsetof(ScriptApiTable, Asset_RequestTyped) + sizeof(decltype(ScriptApiTable::Asset_RequestTyped)));
+    static_assert(offsetof(ScriptApiTable, Body_Remove)
+        == offsetof(ScriptApiTable, Asset_TryAcquireTyped) + sizeof(decltype(ScriptApiTable::Asset_TryAcquireTyped)));
+    static_assert(offsetof(ScriptApiTable, Body_ShapeRole)
+        == offsetof(ScriptApiTable, Body_Remove) + sizeof(decltype(ScriptApiTable::Body_Remove)));
+    static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
+        == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(decltype(ScriptApiTable::Body_ShapeRole)));
+    static_assert(sizeof(ScriptApiTable)
+        == offsetof(ScriptApiTable, Camera_NotifyCameraCut) + sizeof(decltype(ScriptApiTable::Camera_NotifyCameraCut)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -1797,6 +1807,14 @@ namespace
 		if (nullptr != camera) camera->SetPrimary(0 != primary);
 	}
 
+    void __stdcall Api_Camera_NotifyCameraCut(ScriptObjectHandle handle)
+    {
+        if (CameraComponent* camera = ResolveCameraComponent(handle))
+        {
+            camera->NotifyCameraCut();
+        }
+    }
+
 	// 주 카메라의 소유 오브젝트 핸들. 없으면 무효 핸들이라 C# 쪽에서 IsAlive로 걸린다.
 	ScriptObjectHandle __stdcall Api_Camera_GetPrimaryHandle()
 	{
@@ -2325,9 +2343,15 @@ namespace
 
     int __stdcall Api_Body_Remove(ScriptObjectHandle owner, std::uint64_t instance)
     {
-        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (!PhysicsApiEntered())
+        {
+            return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        }
         auto* body = ResolveScriptBody(owner, instance);
-        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        if (!body)
+        {
+            return PhysicsFailure(ce::physics::error_code::stale_handle);
+        }
 
         body->Destroy(); // Mark now; lifecycle teardown owns SDK retirement at the frame boundary.
         return 0;
@@ -2335,10 +2359,19 @@ namespace
 
     int __stdcall Api_Body_ShapeRole(ScriptObjectHandle owner, std::uint64_t instance, unsigned int id, const char* role)
     {
-        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
-        if (!role) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        if (!PhysicsApiEntered())
+        {
+            return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        }
+        if (!role)
+        {
+            return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        }
         auto* body = ResolveScriptBody(owner, instance);
-        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        if (!body)
+        {
+            return PhysicsFailure(ce::physics::error_code::stale_handle);
+        }
 
         try
         {
@@ -2347,13 +2380,21 @@ namespace
             {
                 Uuid::Uuid16 parsed;
                 if (value.size() != 36 || !Uuid::TryParse(value, parsed) || parsed.IsNil() || Uuid::ToString(parsed) != value)
+                {
                     return PhysicsFailure(ce::physics::error_code::invalid_argument);
+                }
             }
 
             std::vector<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
             const auto shape = std::ranges::find(shapes, id, &PhysicsShapeDefinition::shapeId);
-            if (shape == shapes.end()) return PhysicsFailure(ce::physics::error_code::stale_handle);
-            if (shape->contactRole == value) return 0;
+            if (shape == shapes.end())
+            {
+                return PhysicsFailure(ce::physics::error_code::stale_handle);
+            }
+            if (shape->contactRole == value)
+            {
+                return 0;
+            }
 
             shape->contactRole = std::move(value);
             auto changed = body->ReplaceShapes(std::move(shapes));
@@ -2962,6 +3003,7 @@ namespace
 		g_apiTable.Camera_IsPrimary            = &Api_Camera_IsPrimary;
 		g_apiTable.Camera_SetPrimary           = &Api_Camera_SetPrimary;
 		g_apiTable.Camera_GetPrimaryHandle     = &Api_Camera_GetPrimaryHandle;
+        g_apiTable.Camera_NotifyCameraCut      = &Api_Camera_NotifyCameraCut;
 
 		g_apiTable.Light_Exists                = &Api_Light_Exists;
 		g_apiTable.Light_GetColor              = &Api_Light_GetColor;

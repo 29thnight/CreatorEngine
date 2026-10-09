@@ -133,6 +133,11 @@ struct AnimInstance final
     std::uint32_t slot{};
     std::vector<math::matrix4x4> localTransforms{};
     std::vector<math::matrix4x4> finalTransforms{};
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    // Transient diagnostic owner; never serialized or set by ordinary playback.
+    // The fixture publishes its palette on GT after the animation batch joins.
+    bool diagnosticPoseOverride{};
+#endif
     Animation::LocalPose pose{};
     std::uint32_t selectedClipIndex{};
     // Editor-only clip preview bypasses the controller graph without changing it.

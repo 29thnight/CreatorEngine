@@ -511,6 +511,7 @@ namespace ce
         m_lastFrameEvents = 0;
         m_peakFrameEvents = 0;
         m_deferredSpans.clear();
+        m_deferredRenderMeasurements.clear();
         m_lateSpansPlaced = 0;
         m_lateSpansDropped = 0;
         m_staleChunksDropped = 0;
@@ -536,10 +537,12 @@ namespace ce
                 });
             if (page->magic != kProfilePageMagic || page->version != kProfilePageVersion
                 || page->event_bytes != sizeof(profile_event)
-                || page->count > kEventsPerChunk)
+                || page->count > kEventsPerChunk
+                || page->render_measurement_count > kRenderMeasurementsPerChunk)
             {
                 ++m_malformedPages;
                 note_dropped((std::min)(page->count, kEventsPerChunk));
+                note_dropped((std::min)(page->render_measurement_count, kRenderMeasurementsPerChunk));
                 sealed_list = next;
                 continue;
             }
@@ -547,11 +550,15 @@ namespace ce
             //   것을 들고 깨어나면, 그것은 이미 없어진 녹화의 자료다.
             if (page->generation != generation)
             {
-                m_staleChunksDropped += page->count;
+                m_staleChunksDropped += page->count + page->render_measurement_count;
                 sealed_list = next;
                 continue;
             }
             ++m_ingestedPages;
+            for (std::uint32_t index = 0; index < page->render_measurement_count; ++index)
+            {
+                place_render_measurement(page->render_measurements[index]);
+            }
 
             if (page->late_ingest)
             {
@@ -727,8 +734,10 @@ namespace ce
             else if (it->frame < engine_frame)
             {
                 if (counter_loss_trace_enabled())
+                {
                     std::fprintf(stderr, "[profile.counter.skipped-frame] counterFrame=%u closedFrame=%u id=%u\n",
                         it->frame, engine_frame, static_cast<unsigned>(it->sample.id));
+                }
                 ++m_droppedCounters;
                 it = m_deferredCounters.erase(it);
             }
@@ -741,8 +750,47 @@ namespace ce
         // 방금 프레임 하나가 닫혔다. 그 프레임을 기다리던 구간이 있으면
         // 지금 들어간다 — 닫히기 **전에** 온 것들의 자리가 여기다.
         drain_deferred_spans();
+        drain_render_measurements();
 
         trim();
+    }
+
+    void capture_ring::place_render_measurement(const profile_render_measurement& sample)
+    {
+        if (!sample.valid())
+        {
+            note_dropped(1);
+            return;
+        }
+        for (auto it = m_frames.rbegin(); it != m_frames.rend(); ++it)
+        {
+            if (it->engine_frame == sample.engine_frame)
+            {
+                const std::size_t before = it->memory_bytes();
+                it->render_measurements.push_back(sample);
+                m_memoryBytes += it->memory_bytes() - before;
+                return;
+            }
+        }
+        if ((!m_frames.empty() && sample.engine_frame <= m_frames.back().engine_frame) ||
+            m_deferredRenderMeasurements.size() >= kMaxDeferredSpans)
+        {
+            // A missing/retired CPU frame is never replaced by the latest one.
+            ++m_lateSpansDropped;
+            note_dropped(1);
+            return;
+        }
+        m_deferredRenderMeasurements.push_back(sample);
+    }
+
+    void capture_ring::drain_render_measurements()
+    {
+        std::vector<profile_render_measurement> pending;
+        pending.swap(m_deferredRenderMeasurements);
+        for (const auto& sample : pending)
+        {
+            place_render_measurement(sample);
+        }
     }
 
     void capture_ring::record_counter(std::uint32_t engine_frame, profile_counter_sample sample)
@@ -851,13 +899,18 @@ namespace ce
         m_pending.events.resize(0);
         m_lateSpansDropped += m_deferredSpans.size();
         m_deferredSpans.clear();
+        note_dropped(m_deferredRenderMeasurements.size());
+        m_lateSpansDropped += m_deferredRenderMeasurements.size();
+        m_deferredRenderMeasurements.clear();
         if (counter_loss_trace_enabled())
         {
             std::fprintf(stderr, "[profile.counter.pending-loss] count=%zu lastFrame=%u\n",
                 m_deferredCounters.size(), m_frames.empty() ? 0 : m_frames.back().engine_frame);
             for (std::size_t i = 0; i < std::min<std::size_t>(8, m_deferredCounters.size()); ++i)
+            {
                 std::fprintf(stderr, "[profile.counter.pending-loss] frame=%u id=%u\n",
                     m_deferredCounters[i].frame, static_cast<unsigned>(m_deferredCounters[i].sample.id));
+            }
         }
 
         m_droppedCounters += m_deferredCounters.size();

@@ -146,6 +146,24 @@ public:
         ClearUnimplemented();
     }
 
+    // External SDK dispatch changes pipeline/descriptor bindings but must restore
+    // resource layouts promised to the graph. Preserve recorded image layouts,
+    // command ownership and diagnostic counters; only binding caches are stale.
+    void InvalidateExternalBindings()
+    {
+        for (size_t i = 0; i < 2; ++i)
+        {
+            m_boundPipeline[i] = {};
+            m_pending[i].clear();
+            m_descriptorsDirty[i] = false;
+            m_boundSetLayout[i] = VK_NULL_HANDLE;
+            m_boundLayoutHandle[i] = {};
+            m_boundLayout[i] = VK_NULL_HANDLE;
+        }
+    }
+
+    bool UsesResources(const VulkanResourceTable* resources) const { return m_resources == resources; }
+
     void ClearUnimplemented()
     {
         m_unimplemented = 0;

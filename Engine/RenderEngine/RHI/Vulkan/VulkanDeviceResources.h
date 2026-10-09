@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
+#include "../../Render/Temporal/TemporalReconstruction.h"
 #include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
 #include "../IRenderTextureCache.h"
 #include "../RHIAssetEvictionPolicy.h"
@@ -20,6 +21,7 @@
 #include <vector>
 
 class VulkanPipelineCache;
+class XeSSUpscalerVulkan;
 class Texture;
 class Mesh;
 
@@ -283,6 +285,8 @@ public:
     //
     //   ImGui Vulkan 렌더러는 이 백엔드 전용 네이티브 문맥을 소비한다. 공통
     //   RHI 계약에는 Vulkan 타입을 올리지 않고, Vulkan 폴더 안에서만 노출한다.
+    bool SupportsTemporalXeSS(const std::wstring& directory) const;
+    TemporalResult GetTemporalXeSSBootstrapResult() const { return m_temporalXeSSResult; }
     VkInstance      GetInstance() const { return m_instance; }
     VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
     VkDevice        GetDevice() const { return m_device; }
@@ -360,6 +364,11 @@ private:
     bool PresentAcquiredImage(std::string& outError);
     void AccumulateEncoderDiagnostics();
 
+    // Layout is identical in every consuming project, including SDK-off Editor.
+    // shared_ptr permits an incomplete optional-SDK type in disabled builds.
+    TemporalResult m_temporalXeSSResult;
+    std::shared_ptr<XeSSUpscalerVulkan> m_temporalXeSSBootstrap;
+    std::wstring m_temporalXeSSDirectory;
     VkInstance       m_instance{ VK_NULL_HANDLE };
     VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
     VkDevice         m_device{ VK_NULL_HANDLE };

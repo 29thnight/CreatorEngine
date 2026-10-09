@@ -14,6 +14,7 @@ namespace
 
 #if CE_DEVELOPMENT
 #include "PlayerCommandService.h"
+#include "CommandCore/TemporalCommands.h"
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandSession.h"
 #include <Windows.h>
@@ -745,6 +746,11 @@ namespace PlayerCmd
 
 		// ── 표 ──────────────────────────────────────────────────────────
 
+        CommandCore::CommandResult Cmd_temporal(const std::vector<std::string>& parts)
+        {
+            return CommandCore::ExecuteTemporalCommand(parts, TemporalPresentationTarget::PlayerSwapchain);
+        }
+
 		struct Registration
 		{
 			const char* name;
@@ -752,6 +758,22 @@ namespace PlayerCmd
 		};
 
 		constexpr Registration kPlayerCommands[] = {
+            { "temporal.deepdvc", &Cmd_temporal },
+            { "temporal.fallback", &Cmd_temporal },
+#if CE_DEVELOPMENT && !CE_SHIPPING
+            { "temporal.fault", &Cmd_temporal },
+#endif
+            { "temporal.fg", &Cmd_temporal },
+            { "temporal.latency", &Cmd_temporal },
+            { "temporal.metadata", &Cmd_temporal },
+            { "temporal.motion", &Cmd_temporal },
+            { "temporal.nis", &Cmd_temporal },
+            { "temporal.reflex", &Cmd_temporal },
+            { "temporal.reset", &Cmd_temporal },
+            { "temporal.runtime", &Cmd_temporal },
+            { "temporal.status", &Cmd_temporal },
+            { "temporal.support", &Cmd_temporal },
+            { "temporal.upscale", &Cmd_temporal },
 			#if !CE_SHIPPING
             { "render.status", &Cmd_render_status },
             { "profile.record", &Cmd_profile_record },

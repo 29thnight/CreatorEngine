@@ -1,6 +1,7 @@
 #pragma once
 #include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
+#include "../../Render/Temporal/TemporalReconstruction.h"
 #include "DX12QueueService.h"
 #include <cstdint>
 #include <string>
@@ -22,6 +23,8 @@
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
 class DX12Encoder;
+class DlssTemporalAdapter;
+struct TemporalDeviceDX12;
 class DX12MemorySamplingSession;
 
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
@@ -202,6 +205,9 @@ public:
     // 직렬 표시 소유자가 EndFrame 뒤에 호출한다. 리사이즈는 프레임 사이에
     // 처리하며, 호출자는 종료·파괴 전에 그 소유자를 join해야 한다.
     bool Present(std::string& outError) override;
+    // Optional raw Present return for evidence. E_PENDING means no native call
+    // was reached; the bool retains the existing occlusion/deferred semantics.
+    bool Present(std::string& outError, HRESULT* nativeResult);
     bool HasSwapChain() const override { return nullptr != m_swapChain.Get(); }
     uint32_t GetBackBufferIndex() const override;
     ID3D12Resource* GetBackBuffer(uint32_t index) const
@@ -236,6 +242,11 @@ public:
     /// operationResult가 일반 실패이고 장치는 살아 있으면 아무것도 추가하지 않는다.
     void AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const;
 
+    bool DetachSwapChain(std::string& outError);
+    IDXGIFactory6* GetFactory() const { return m_factory.Get(); }
+    std::shared_ptr<DlssTemporalAdapter> GetTemporalDlssSession() const;
+    TemporalResult GetTemporalBootstrapResult() const { return m_temporalBootstrapResult; }
+    bool HasTemporalSharedDevice() const { return static_cast<bool>(m_temporalDevice); }
     ID3D12Device* GetDevice() const {  return m_device.Get(); }
     IDXGIAdapter1* GetAdapter() const { return m_adapter.Get(); }
     RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator()
@@ -549,6 +560,8 @@ private:
     // 한쪽만 고쳐 두 경로가 갈린다.
     bool CreateSizeDependentResources(uint32_t width, uint32_t height, std::string& outError);
 
+    TemporalResult m_temporalBootstrapResult;
+    std::shared_ptr<TemporalDeviceDX12> m_temporalDevice;
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
     std::unique_ptr<DX12MemorySamplingSession> m_memorySampling;

@@ -34,6 +34,10 @@ public:
 	bool IsPrimary() const noexcept { return m_isPrimary; }
 	void SetPrimary(bool primary) noexcept { m_isPrimary = primary; }
 
+    // Pair a discontinuous owner Transform change with this call before the
+    // next frame is captured. Identity replacement remains a separate reset.
+    void NotifyCameraCut() noexcept { m_Camera.NotifyCameraCut(); }
+
 	FrameCameraSnapshot CaptureFrameSnapshot(float aspectRatio = 0.f) const
 	{
 		return ResolveCamera().CaptureFrameSnapshot(aspectRatio);

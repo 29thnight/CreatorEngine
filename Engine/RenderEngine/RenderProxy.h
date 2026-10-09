@@ -4,6 +4,8 @@
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <type_traits>
+#include <atomic>
+#include <cstdint>
 
 // 보유층(RenderScene)에 등록되는 모든 프록시의 공통 조각.
 //
@@ -28,6 +30,9 @@ public:
 	RenderProxy& operator=(RenderProxy&&) = default;
 
 public:
+	// Copies preserve incarnation; replacement proxies cannot inherit stale motion.
+    inline static std::atomic<std::uint64_t> s_temporalIncarnation{1};
+    std::uint64_t m_temporalIncarnation{s_temporalIncarnation.fetch_add(1, std::memory_order_relaxed)};
 	HashedGuid						m_instancedID{};
 	math::vector3					m_worldPosition{};
 	math::matrix4x4				m_worldMatrix{ math::matrix4x4::identity() };

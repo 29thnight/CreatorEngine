@@ -156,6 +156,34 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="RHI\Temporal\DlssTemporalAdapter.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\XeSSUpscaler.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\XeSSFrameGeneration.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackend.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackendDX12.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackendVulkan.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\Temporal\TemporalReconstruction.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ShaderMetadataRuntime.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -873,6 +901,16 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />
+    <ClInclude Include="RHI\Temporal\DlssTemporalAdapter.h" />
+    <ClInclude Include="RHI\Temporal\XeSSSdkPrivate.h" />
+    <ClInclude Include="RHI\Temporal\XeSSUpscaler.h" />
+    <ClInclude Include="RHI\Temporal\XeSSFrameGeneration.h" />
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackend.h" />
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackendDX12.h" />
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackendVulkan.h" />
+    <ClInclude Include="Render\Temporal\TemporalReconstruction.h" />
+    <ClInclude Include="Render\Temporal\ITemporalUpscaler.h" />
+    <ClInclude Include="Render\Temporal\ITemporalFrameGenerator.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
@@ -896,7 +934,28 @@
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup><None Include="RHI\Temporal\TemporalSdk.props" /></ItemGroup>
+  <Import Project="RHI\Temporal\TemporalSdk.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ClCompile Include="Render\Temporal\TemporalRuntimeControl.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Render\Temporal\TemporalUpscalerHost.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Render\Temporal\SpatialPostEffectsHost.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="RHI\Temporal\TemporalDeviceDX12.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="Render\Temporal\TemporalRuntimeControl.h" />
+    <ClInclude Include="Render\Temporal\TemporalUpscalerHost.h" />
+    <ClInclude Include="Render\Temporal\SpatialPostEffects.h" />
+    <ClInclude Include="Render\Temporal\SpatialPostEffectsHost.h" />
+    <ClInclude Include="RHI\Temporal\TemporalDeviceDX12.h" />
+    <ClInclude Include="Render\Temporal\TemporalMeasurementProvenance.h" />
+    <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.h" />
+    <ClInclude Include="Render\Scene\EnhancedTemporalViewState.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RHI\Temporal\AntiLag2DX12Adapter.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="RHI\Temporal\AntiLag2DX12Adapter.h" />
+  </ItemGroup>
 </Project>

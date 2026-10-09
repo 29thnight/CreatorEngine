@@ -91,6 +91,7 @@ public:
 
 	struct TerrainUpdate
 	{
+		bool isEnabled{ false };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
 		std::shared_ptr<TerrainMesh> terrainMesh{};
@@ -99,6 +100,7 @@ public:
 
 	struct FoliageUpdate
 	{
+		bool isEnabled{ false };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
 		std::vector<FoliageType> foliageTypes{};
@@ -107,6 +109,7 @@ public:
 
 	struct DecalUpdate
 	{
+		bool isEnabled{ false };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		own::shared_owner<const Texture> diffuse{};
 		own::shared_owner<const Texture> normal{};

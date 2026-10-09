@@ -4,6 +4,8 @@
 #include "EnhancedCameraReplayInput.h"
 #include "EnhancedDrawReplayInput.h"
 #include "EnhancedLatticeReplayInput.h"
+#include "../Temporal/TemporalRuntimeControl.h"
+#include "../Temporal/TemporalMeasurementProvenance.h"
 #include <optional>
 #include <stdexcept>
 #include "../Core/EnhancedLivePipelineDesc.h"
@@ -12,6 +14,7 @@
 #include "../../Texture.h"
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../MaterialGraphSceneInput.h"
+#include "../../MaterialGraphSceneHost.h"
 #include <AuthoringRymlErrorPolicy.h>
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
@@ -26,11 +29,21 @@
 // readbacks. Release must run after submission completion (or frame abort).
 struct EnhancedPbrCapture
 {
+    // Acquired when the request is created, before the next frame is configured.
+    std::optional<TemporalNativeCaptureExclusion> nativeExclusion{ std::in_place };
+    TemporalMeasurementProvenance temporalProvenance;
+    uint64_t capturedViewId{}, capturedSceneEpoch{}, capturedRealFrameId{};
     EnhancedLivePbrCaptureStatus result;
     EnhancedLiveBackend resourceBackend{ EnhancedLiveBackend::DX12 };
     EnhancedLiveDisplayTarget target{ EnhancedLiveDisplayTarget::Game };
     uint64_t afterFrameId{};
     bool controlled{ false }; // Static scene repeatability; not a simulation clock.
+    bool motionValidation{ false }; // Native, non-reset motion input observation.
+    EnhancedTemporalFixtureStamp expectedFixture;
+    EnhancedTemporalFixtureSubmission previousFixtureSubmission;
+    EnhancedTemporalFixtureSubmission fixtureSubmission;
+    TemporalFrame capturedTemporalFrame;
+    uint64_t capturedPreviousSubmittedFrame{};
     bool replayExtensions{ false }; // Optional archive/replay diagnostics, not BASE-0 acceptance.
     bool latticeReplayExtension{ false }; // Independent material archive opt-in.
     std::optional<EnhancedCameraReplayInput> cameraReplay;
@@ -40,7 +53,7 @@ struct EnhancedPbrCapture
     std::optional<EnhancedLatticeReplayInput> latticeReplay;
     std::vector<uint8_t> latticeInputBytes;
     ryml::Tree manifest;
-    std::array<RHIReadback, 7> readbacks{};
+    std::array<RHIReadback, 12> readbacks{};
     struct StageReadback
     {
         std::string name;
@@ -140,6 +153,10 @@ struct EnhancedPbrCapture
         result.state = EnhancedPbrCaptureState::Recording;
         resourceBackend = backend;
         result.frameId = frame.frameId;
+        capturedViewId = view.key.viewId;
+        capturedSceneEpoch = frame.sceneEpoch;
+        capturedRealFrameId = view.displayTarget == EnhancedLiveDisplayTarget::Game && frame.temporalRealFrameId
+            ? frame.temporalRealFrameId : frame.frameId;
         Authoring::EnsureRymlErrorPolicy();
         auto root = manifest.rootref();
         root |= ryml::MAP;
@@ -147,7 +164,21 @@ struct EnhancedPbrCapture
         root["source"] << "product-live";
         root["backend"] << (backend == EnhancedLiveBackend::DX12 ? "dx12" : "vulkan");
         root["frameId"] << frame.frameId;
+        root["sourceRealFrameId"] << capturedRealFrameId;
         root["requestedAfterFrameId"] << afterFrameId;
+        if (motionValidation)
+        {
+            root["fixtureBindingRequired"] << expectedFixture.IsValid();
+            root["motionEvidence"] << (expectedFixture.IsValid()
+                ? "exact-tagged-fixture" : "unbound-motion-observation");
+            root["fixtureSessionId"] << frame.temporalFixture.sessionId;
+            root["fixtureStepId"] << frame.temporalFixture.stepId;
+            root["fixturePredecessorStepId"] << frame.temporalFixture.predecessorStepId;
+            root["fixtureInputSha256"] << frame.temporalFixture.inputSha256;
+            root["fixturePredecessorInputSha256"] << frame.temporalFixture.predecessorInputSha256;
+            root["fixtureAllowMeshlets"] << frame.temporalFixture.allowMeshlets;
+            root["fixtureCoalesced"] << frame.temporalFixtureCoalesced;
+        }
         root["sceneEpoch"] << frame.sceneEpoch;
         root["viewId"] << view.key.viewId;
         root["historyRevision"] << view.key.historyRevision;
@@ -155,14 +186,9 @@ struct EnhancedPbrCapture
         root["height"] << frame.height;
         root["totalSeconds"] << frame.totalSeconds;
         root["deltaSeconds"] << frame.deltaSeconds;
-        root["captureMode"] << (controlled
+        root["captureMode"] << (motionValidation ? "temporal-motion-v1" : controlled
             ? (cameraReplay && (frame.totalSeconds != 0.f || frame.deltaSeconds != 0.f)
                 ? "camera-clock-replay-v1" : "static-repeatability-v1") : "observation");
-        root["frameKind"] << "real";
-        root["renderWidth"] << frame.width;
-        root["renderHeight"] << frame.height;
-        root["displayWidth"] << frame.width;
-        root["displayHeight"] << frame.height;
         root["skyBoxEnabled"] << frame.skyBoxEnabled;
         root["viewFlags"] << static_cast<uint32_t>(view.viewFlags);
         root["cameraInputContract"] << "camera-clock-v1";
@@ -276,6 +302,118 @@ struct EnhancedPbrCapture
         root["sealLedger"]["recorded"] << false;
     }
 
+    void WriteTemporalProvenance(ryml::NodeRef node) const
+    {
+        const auto& provenance = temporalProvenance;
+        node["temporalProvenanceSchemaVersion"] << 2;
+        node["frameKind"] << TemporalMeasuredFrameKindName(provenance.frameKind);
+        node["realFrameId"] << provenance.realFrameId;
+        node["generatedOrdinal"] << provenance.generatedOrdinal;
+        node["renderWidth"] << provenance.renderExtent.width;
+        node["renderHeight"] << provenance.renderExtent.height;
+        node["displayWidth"] << provenance.displayExtent.width;
+        node["displayHeight"] << provenance.displayExtent.height;
+        node["upscaler"] << TemporalMeasuredProviderName(provenance.upscaler);
+        node["frameGenerator"] << TemporalMeasuredProviderName(provenance.frameGenerator);
+        node["resolutionState"] << TemporalResolutionStateName(provenance.resolutionState);
+        node["spatialMode"] << SpatialScalingModeName(provenance.spatialMode);
+        node["deepDvcApplied"] << provenance.deepDvcApplied;
+        node["temporalNativeGateActive"] << provenance.nativeGateActive;
+    }
+
+    void RecordTemporalProvenance(const TemporalMeasurementProvenance& provenance)
+    {
+        temporalProvenance = provenance;
+        auto root = manifest.rootref();
+        WriteTemporalProvenance(root);
+        root["goldenEligible"] << provenance.IsGoldenEligible();
+        // Graph timing is collected before submission. Refresh its frame/effect
+        // labels when Commit supplies the successfully submitted provenance.
+        if (root.has_child("measurement"))
+        {
+            WriteTemporalProvenance(root["measurement"]);
+        }
+    }
+
+    void RecordTemporalInputs(const TemporalFrame& frame, uint64_t previousSubmittedFrame)
+    {
+        capturedTemporalFrame = frame;
+        capturedPreviousSubmittedFrame = previousSubmittedFrame;
+        if (!motionValidation)
+        {
+            return;
+        }
+        auto node = manifest.rootref()["temporalMotion"];
+        node |= ryml::MAP;
+        node["schemaVersion"] << 2;
+        node["source"] << "final-production-temporal-inputs";
+        node["direction"] << "current-to-previous";
+        node["units"] << "render-pixels";
+        node["origin"] << "top-left";
+        node["jitterIncluded"] << false;
+        node["historyReset"] << frame.reset;
+        node["historyGeneration"] << frame.historyRevision;
+        node["realFrameId"] << frame.realFrameId;
+        // Read before this frame commits; do not infer adjacency from realFrameId.
+        // Published packets may be skipped without advancing temporal history.
+        node["previousSubmittedRealFrameId"] << previousSubmittedFrame;
+        node["fixtureSessionId"] << expectedFixture.sessionId;
+        node["fixtureStepId"] << expectedFixture.stepId;
+        node["fixturePredecessorStepId"] << expectedFixture.predecessorStepId;
+        node["fixtureInputSha256"] << expectedFixture.inputSha256;
+        node["fixturePredecessorInputSha256"] << expectedFixture.predecessorInputSha256;
+        node["fixtureAllowMeshlets"] << expectedFixture.allowMeshlets;
+        node["previousSubmittedFixtureSessionId"] << previousFixtureSubmission.stamp.sessionId;
+        node["previousSubmittedFixtureStepId"] << previousFixtureSubmission.stamp.stepId;
+        node["previousSubmittedFixtureInputSha256"] << previousFixtureSubmission.stamp.inputSha256;
+        node["previousSubmittedFixtureAllowMeshlets"] << previousFixtureSubmission.stamp.allowMeshlets;
+        node["previousSubmittedFixtureSourceVerified"] << previousFixtureSubmission.sourceVerified;
+        node["previousSubmittedSourceFrameId"] << previousFixtureSubmission.sourceFrameId;
+        node["previousSubmittedViewId"] << previousFixtureSubmission.viewId;
+        node["previousSubmittedSceneEpoch"] << previousFixtureSubmission.sceneEpoch;
+        node["previousSubmittedHistoryRevision"] << previousFixtureSubmission.historyRevision;
+        node["previousSubmittedHistoryGeneration"] << previousFixtureSubmission.historyGeneration;
+        node["renderWidth"] << frame.renderExtent.width;
+        node["renderHeight"] << frame.renderExtent.height;
+        node["jitterX"] << frame.jitterX;
+        node["jitterY"] << frame.jitterY;
+        node["previousJitterX"] << frame.previousJitterX;
+        node["previousJitterY"] << frame.previousJitterY;
+        node["pixelAcceptance"] << "requires-independent-fixture-comparison";
+    }
+
+    void RecordFixtureSubmission(const EnhancedTemporalFixtureSubmission& submitted)
+    {
+        fixtureSubmission = submitted;
+        if (!motionValidation)
+        {
+            return;
+        }
+        auto node = manifest.rootref()["fixtureSubmission"];
+        node |= ryml::MAP;
+        node["valid"] << submitted.valid;
+        node["sourceVerified"] << submitted.sourceVerified;
+        node["sessionId"] << submitted.stamp.sessionId;
+        node["stepId"] << submitted.stamp.stepId;
+        node["requestedPredecessorStepId"] << submitted.stamp.predecessorStepId;
+        node["predecessorStepId"] << submitted.predecessorStepId;
+        node["inputSha256"] << submitted.stamp.inputSha256;
+        node["requestedPredecessorInputSha256"] << submitted.stamp.predecessorInputSha256;
+        node["allowMeshlets"] << submitted.stamp.allowMeshlets;
+        node["predecessorInputSha256"] << submitted.predecessorInputSha256;
+        node["viewId"] << submitted.viewId;
+        node["sceneEpoch"] << submitted.sceneEpoch;
+        node["historyRevision"] << submitted.historyRevision;
+        node["historyGeneration"] << submitted.historyGeneration;
+        node["sourceFrameId"] << submitted.sourceFrameId;
+        node["realFrameId"] << submitted.realFrameId;
+        node["predecessorSourceFrameId"] << submitted.predecessorSourceFrameId;
+        node["predecessorRealFrameId"] << submitted.predecessorRealFrameId;
+        node["historyReset"] << submitted.historyReset;
+        node["coalesced"] << submitted.coalesced;
+        node["submissionProof"] << "native-submit-succeeded-and-temporal-history-committed";
+    }
+
     void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
     {
         if (!input)
@@ -383,6 +521,47 @@ struct EnhancedPbrCapture
         };
         appendPass("gbuffer", gbuffer, gbufferSampler);
         appendPass("forward", forward, forwardSampler);
+    }
+
+    // Called after the submitted graph has completed. A selected PSO alone is
+    // insufficient: entries are appended only after successful draw/dispatch
+    // recording, then joined before native submission is acknowledged.
+    void RecordGeometryRoutes(const material_graph::SceneHost& sceneHost)
+    {
+        const auto audit = sceneHost.RecordedGeometryRoutes();
+        if (audit.sourceFrameId != 0 && (audit.sourceFrameId != result.frameId ||
+            audit.sceneEpoch != capturedSceneEpoch || audit.viewId != capturedViewId))
+        {
+            throw std::runtime_error("recorded geometry route audit belongs to a different capture frame");
+        }
+        auto node = manifest.rootref()["geometryRoutes"];
+        node |= ryml::MAP;
+        node["source"] << "joined-command-recording-after-native-submission";
+        node["pass"] << "LX.Scene.GBuffer";
+        node["sourceFrameId"] << result.frameId;
+        node["sceneEpoch"] << capturedSceneEpoch;
+        node["viewId"] << capturedViewId;
+        node["emptyScene"] << (audit.sourceFrameId == 0);
+        const auto meshletCount = static_cast<uint32_t>(std::count_if(audit.draws.begin(), audit.draws.end(),
+            [](const auto& draw) { return draw.meshShader; }));
+        node["recordedMeshletBatchCount"] << meshletCount;
+        node["recordedMeshletDispatchCount"] << meshletCount;
+        node["gpuVisibleCountAvailable"] << false;
+        auto selected = node["selected"];
+        selected |= ryml::SEQ;
+        for (const auto& route : audit.draws)
+        {
+            auto entry = selected.append_child();
+            entry |= ryml::MAP;
+            entry["geometryKey"] << route.geometryKey;
+            entry["temporalObjectId"] << route.temporalObjectId;
+            entry["temporalInstanceId"] << route.temporalInstanceId;
+            entry["sourcePipeline"] << route.sourcePipeline;
+            entry["recordedPipeline"] << route.recordedPipeline;
+            entry["meshletCount"] << route.meshletCount;
+            entry["meshShader"] << route.meshShader;
+            entry["indirect"] << route.indirect;
+        }
     }
 
     bool RecordCompiledGraph(const EnhancedRenderGraph& graph, double recordMs, double compileMs)
@@ -614,6 +793,9 @@ struct EnhancedPbrCapture
             }
         }
         root["measurement"] |= ryml::MAP;
+        // All timing/memory values below belong to this submitted real frame,
+        // never to a generated presentation or a newer status snapshot.
+        WriteTemporalProvenance(root["measurement"]);
         root["measurement"]["cpuRecordMs"] << recordMs;
         root["measurement"]["cpuGraphCompileMs"] << compileMs;
         root["measurement"]["cpuTransientPrepareMs"] << graph.GetStats().transientPrepareCpuMs;
@@ -708,14 +890,19 @@ struct EnhancedPbrCapture
         constexpr const char* slots[] = { LiveSlots::kGBufferDiffuse,
             LiveSlots::kGBufferMetalRough, LiveSlots::kGBufferNormal,
             LiveSlots::kGBufferEmissive, LiveSlots::kGBufferDepth,
-            LiveSlots::kLitColor, LiveSlots::kDisplayLdr };
-        for (uint32_t i = 0; i < readbacks.size(); ++i)
+            LiveSlots::kLitColor, LiveSlots::kDisplayLdr,
+            LiveSlots::kTemporalMotion, LiveSlots::kTemporalReactive,
+            LiveSlots::kTemporalTransparency, LiveSlots::kTemporalResponsive, LiveSlots::kTemporalDepth };
+        const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
+        for (uint32_t i = 0; i < count; ++i)
         {
             const auto handle = blackboard.Get(slots[i]);
             if (!handle.IsValid()) { error = std::string("missing capture output: ") + slots[i]; return false; }
             const auto format = i < 4 ? EnhancedGBufferPass::GetRenderTargetFormat(i)
-                : i == 4 ? RHIFormat::D32Float
-                : i == 5 ? RHIFormat::RGBA16Float : RHIFormat::RGBA8Unorm;
+                : i == 4 || i == 11 ? RHIFormat::D32Float
+                : i == 5 ? RHIFormat::RGBA16Float
+                : i == 6 ? RHIFormat::RGBA8Unorm
+                : i == 7 ? RHIFormat::RG16Float : RHIFormat::R16Float;
             if (!resources.CreateReadback(width, height, format, 1, readbacks[i], error))
                 return false;
             const auto readback = readbacks[i];
@@ -732,21 +919,77 @@ struct EnhancedPbrCapture
     bool Save(IRenderDeviceServices& resources, const EnhancedRenderGraph::Stats& stats,
         std::string& error, uint32_t validationCount, const std::string& validation)
     {
+        if (motionValidation && (capturedTemporalFrame.reset ||
+            capturedPreviousSubmittedFrame == 0 ||
+            capturedPreviousSubmittedFrame >= capturedRealFrameId ||
+            capturedTemporalFrame.realFrameId != capturedRealFrameId))
+        {
+            error = "motion observation requires a matching non-reset real frame with submitted history";
+            Fail(error);
+            return false;
+        }
+        if (motionValidation && expectedFixture.IsValid() && (capturedTemporalFrame.reset ||
+            expectedFixture.predecessorStepId == 0 ||
+            !fixtureSubmission.valid || fixtureSubmission.historyReset || fixtureSubmission.coalesced ||
+            fixtureSubmission.stamp != expectedFixture ||
+            fixtureSubmission.sourceFrameId != result.frameId ||
+            fixtureSubmission.realFrameId != capturedRealFrameId ||
+            fixtureSubmission.viewId != capturedViewId ||
+            fixtureSubmission.sceneEpoch != capturedSceneEpoch ||
+            !previousFixtureSubmission.sourceVerified ||
+            previousFixtureSubmission.stamp.sessionId != expectedFixture.sessionId ||
+            previousFixtureSubmission.stamp.stepId != expectedFixture.predecessorStepId ||
+            previousFixtureSubmission.stamp.inputSha256 != expectedFixture.predecessorInputSha256 ||
+            previousFixtureSubmission.stamp.allowMeshlets != expectedFixture.allowMeshlets ||
+            fixtureSubmission.predecessorStepId != expectedFixture.predecessorStepId ||
+            fixtureSubmission.predecessorSourceFrameId != previousFixtureSubmission.sourceFrameId ||
+            fixtureSubmission.predecessorInputSha256 != previousFixtureSubmission.stamp.inputSha256 ||
+            fixtureSubmission.predecessorRealFrameId != previousFixtureSubmission.realFrameId ||
+            capturedPreviousSubmittedFrame != previousFixtureSubmission.realFrameId ||
+            capturedTemporalFrame.realFrameId != capturedRealFrameId ||
+            fixtureSubmission.historyGeneration != capturedTemporalFrame.historyRevision ||
+            previousFixtureSubmission.historyGeneration != capturedTemporalFrame.historyRevision ||
+            previousFixtureSubmission.historyRevision != fixtureSubmission.historyRevision))
+        {
+            error = "motion capture requires the exact submitted fixture session/step/predecessor pair";
+            Fail(error);
+            return false;
+        }
+        if (!temporalProvenance.IsGoldenEligible() || temporalProvenance.realFrameId != capturedRealFrameId ||
+            temporalProvenance.publicationFrameId != result.frameId ||
+            temporalProvenance.viewId != capturedViewId || temporalProvenance.sceneEpoch != capturedSceneEpoch)
+        {
+            error = "capture requires observed native-only real-frame provenance for this frame";
+            Fail(error);
+            return false;
+        }
         try
         {
-            const std::filesystem::path root(result.directory);
+            const auto root = std::filesystem::u8path(result.directory);
             constexpr const char* names[] = { "baseColor", "metalRough", "normal",
-                "emissive", "depth", "preToneHdr", "display" };
+                "emissive", "depth", "preToneHdr", "display", "temporalMotionRG",
+                "temporalReactive", "temporalTransparency", "temporalResponsive", "temporalDepth" };
             auto rootNode = manifest.rootref();
             rootNode["validationCount"] << validationCount;
             rootNode["validation"] << validation;
             rootNode["attachments"] |= ryml::SEQ;
             bool finite = true;
-            for (uint32_t i = 0; i < readbacks.size(); ++i)
+            const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
+            for (uint32_t i = 0; i < count; ++i)
             {
                 RHIReadbackImage image;
                 if (!resources.MapReadback(readbacks[i], image, error)) return false;
-                const uint32_t channels = i == 4 ? 1 : 4;
+                if (motionValidation && (!image.IsValid() ||
+                    image.width != capturedTemporalFrame.renderExtent.width ||
+                    image.height != capturedTemporalFrame.renderExtent.height ||
+                    (i == 7 && image.format != RHIFormat::RG16Float) ||
+                    (i >= 8 && i <= 10 && image.format != RHIFormat::R16Float) ||
+                    (i == 11 && image.format != RHIFormat::D32Float)))
+                {
+                    error = "motion capture readback extent or format mismatch";
+                    return false;
+                }
+                const uint32_t channels = i == 7 ? 2 : i == 4 || i >= 8 ? 1 : 4;
                 std::vector<float> pixels;
                 pixels.reserve(static_cast<size_t>(image.width) * image.height * channels);
                 float minimum = std::numeric_limits<float>::max();
@@ -778,6 +1021,12 @@ struct EnhancedPbrCapture
                 attachment["channels"] << channels;
                 attachment["width"] << image.width;
                 attachment["height"] << image.height;
+                attachment["frameKind"] << TemporalMeasuredFrameKindName(temporalProvenance.frameKind);
+                attachment["realFrameId"] << temporalProvenance.realFrameId;
+                attachment["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
+                attachment["temporalProvenanceSchemaVersion"] << 2;
+                attachment["spatialMode"] << SpatialScalingModeName(temporalProvenance.spatialMode);
+                attachment["deepDvcApplied"] << temporalProvenance.deepDvcApplied;
                 attachment["nonfinite"] << nonfinite;
                 attachment["min"] << minimum;
                 attachment["max"] << maximum;
@@ -889,6 +1138,7 @@ struct EnhancedPbrCapture
                 if (!packet) { error = "Lattice replay input write failed"; return false; }
             }
             result.state = EnhancedPbrCaptureState::Complete;
+            nativeExclusion.reset();
             return true;
         }
         catch (const std::exception& exception) { error = exception.what(); return false; }
@@ -923,5 +1173,6 @@ struct EnhancedPbrCapture
     {
         result.state = EnhancedPbrCaptureState::Failed;
         result.error = error;
+        nativeExclusion.reset();
     }
 };

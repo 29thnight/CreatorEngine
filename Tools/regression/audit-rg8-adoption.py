@@ -16,6 +16,7 @@ import re
 import statistics
 from pathlib import Path
 import numpy as np
+from base0_artifacts import audit_temporal_capture_provenance
 
 
 def check(condition, message):
@@ -334,6 +335,7 @@ def load_run(directory, mode):
 
 
 def verify_capture(manifest, mode):
+    audit_temporal_capture_provenance(manifest)
     measurement = manifest["measurement"]
     check(measurement["domain"] == "capture" and measurement["normalFrameComparable"] is False,
           "Capture readback graph was labeled ordinary performance evidence")

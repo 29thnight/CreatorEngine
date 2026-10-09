@@ -493,10 +493,34 @@ void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
     if (found == m_foliageInstances.end())
     {
         FoliageInstance sealed = instance;
+        // Insertion creates a new instance, even when a caller reuses a copied
+        // template. Snapshot copies and later edits preserve this fresh identity.
+        sealed.m_temporalIdentity = FoliageInstance::s_nextTemporalIdentity.fetch_add(
+            1, std::memory_order_relaxed);
         sealed.RebuildWorldMatrix();
         m_foliageInstances.push_back(std::move(sealed));
 		PublishRenderProxyDirty(ProxyDirty::Payload);
     }
+}
+
+bool FoliageComponent::UpdateFoliageInstance(std::uint64_t identity,
+    const math::vector3& position, const math::vector3& rotation, const math::vector3& scale)
+{
+    const auto found = std::ranges::find_if(m_foliageInstances,
+        [identity](const FoliageInstance& instance)
+        {
+            return identity != 0 && instance.m_temporalIdentity == identity;
+        });
+    if (found == m_foliageInstances.end())
+    {
+        return false;
+    }
+    found->m_position = position;
+    found->m_rotation = rotation;
+    found->m_scale = scale;
+    found->RebuildWorldMatrix();
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+    return true;
 }
 
 void FoliageComponent::RemoveFoliageInstance(size_t index)

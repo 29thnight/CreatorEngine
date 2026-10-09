@@ -319,14 +319,30 @@ def logical_backend_graph(graph, backend):
     return audit_graph(g)
 
 
+def audit_temporal_capture_provenance(m):
+    require(m["temporalProvenanceSchemaVersion"] == 2, "missing/current temporal effect provenance schema")
+    require(m["frameKind"] == "real", "generated/unknown frame")
+    require(m["realFrameId"] == m["sourceRealFrameId"] > 0 and m["frameId"] > 0 and m["generatedOrdinal"] == 0,
+            "real-frame identity/ordinal mismatch")
+    require(truth(m["temporalNativeGateActive"]) and truth(m["goldenEligible"]) and
+            m["upscaler"] == m["frameGenerator"] == "none" and m["resolutionState"] == "native" and
+            m["spatialMode"] == "off" and not truth(m["deepDvcApplied"]),
+            "golden capture did not observe forced native TU/FG/NIS/DeepDVC-off runtime")
+    require(m["width"] == m["renderWidth"] == m["displayWidth"] > 0 and
+            m["height"] == m["renderHeight"] == m["displayHeight"] > 0, "resolution provenance")
+    measure = m["measurement"]
+    require(all(measure[key] == m[key] for key in ("temporalProvenanceSchemaVersion", "frameKind", "realFrameId", "generatedOrdinal",
+            "renderWidth", "renderHeight", "displayWidth", "displayHeight", "upscaler", "frameGenerator",
+            "resolutionState", "spatialMode", "deepDvcApplied", "temporalNativeGateActive")),
+            "measurement provenance differs from captured frame")
+
+
 def audit_manifest(m):
     require(m["source"] == "product-live" and m["captureMode"] == "static-repeatability-v1",
             "not a controlled product capture")
     require(m["historyPolicy"] == "restart-ssgi-fog" and m["totalSeconds"] == m["deltaSeconds"] == 0
             and m["sampleIndex"] == 0, "uncontrolled render clock/history")
-    require(m["frameKind"] == "real", "generated/unknown frame")
-    require(m["width"] == m["renderWidth"] == m["displayWidth"] > 0 and
-            m["height"] == m["renderHeight"] == m["displayHeight"] > 0, "resolution provenance")
+    audit_temporal_capture_provenance(m)
     require(m["validationCount"] == 0 and truth(m["finite"]), "validation/nonfinite failure")
     require(truth(m["sealLedger"]["recorded"]), "missing binding ledger")
     require(m["ibl"] == dict(baseSamples=1024, reflectionSamples=4096,
@@ -369,6 +385,9 @@ def load_capture(directory):
     expected = {"baseColor", "metalRough", "normal", "emissive", "depth", "preToneHdr", "display"}
     for a in m["attachments"]:
         require(a["name"] in expected and a["name"] not in images, "attachment set")
+        require(all(a[key] == m[key] for key in ("temporalProvenanceSchemaVersion", "frameKind", "realFrameId",
+                "generatedOrdinal", "spatialMode", "deepDvcApplied")),
+                "attachment temporal identity")
         require(a["width"] == m["width"] and a["height"] == m["height"] and a["nonfinite"] == 0,
                 "attachment extent/finite")
         require(a["channels"] == (1 if a["name"] == "depth" else 4), "attachment channels")
@@ -500,6 +519,21 @@ def mutations(directory, output):
     c = copy.deepcopy(m); c["camera"]["view"][0] += .25; reject("input-identity", c, identity)
     c = copy.deepcopy(m); del c["renderWidth"]; reject("missing-resolution", c)
     c = copy.deepcopy(m); c["frameKind"] = "generated"; reject("generated-frame", c)
+    c = copy.deepcopy(m); c["generatedOrdinal"] = 1; reject("generated-counted-as-real", c)
+    c = copy.deepcopy(m); c["realFrameId"] += 1; reject("stale-frame-provenance", c)
+    c = copy.deepcopy(m); c["temporalNativeGateActive"] = False; reject("missing-native-gate", c)
+    c = copy.deepcopy(m); c["upscaler"] = "fsr"; reject("reconstructed-golden", c)
+    c = copy.deepcopy(m); c["frameGenerator"] = "dlss"; reject("frame-generation-golden", c)
+    c = copy.deepcopy(m); del c["temporalProvenanceSchemaVersion"]; reject("legacy-effects-unknown", c)
+    c = copy.deepcopy(m); del c["spatialMode"]; reject("missing-spatial-provenance", c)
+    c = copy.deepcopy(m); c["spatialMode"] = "scale"; reject("spatial-scaling-golden", c)
+    c = copy.deepcopy(m); c["spatialMode"] = "sharpen"; reject("same-extent-sharpening-golden", c)
+    c = copy.deepcopy(m); del c["deepDvcApplied"]; reject("missing-dvc-provenance", c)
+    c = copy.deepcopy(m); c["deepDvcApplied"] = True; reject("same-extent-dvc-golden", c)
+    c = copy.deepcopy(m); c["measurement"]["spatialMode"] = "sharpen"; reject("measurement-spatial-mismatch", c)
+    c = copy.deepcopy(m); c["measurement"]["deepDvcApplied"] = True; reject("measurement-dvc-mismatch", c)
+    c = copy.deepcopy(m); del c["measurement"]["displayWidth"]; reject("measurement-missing-resolution", c)
+    c = copy.deepcopy(m); c["measurement"]["generatedOrdinal"] = 1; reject("generated-measurement-as-real", c)
     c = copy.deepcopy(m); c["compiledGraph"]["executeOrder"].reverse(); reject("reversed-order", c)
     c = copy.deepcopy(m)
     require(c["compiledGraph"]["reachabilityEdges"], "edge mutation requires nonempty graph")

@@ -2,12 +2,19 @@
 #include <mathematics/vector3.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include <cstdint>
+#include <atomic>
 #include <mathematics/transform.hpp>
 #include <type_traits>
 
 struct [[reflgen::reflect]] FoliageInstance
 {
    public:
+    // Runtime identity survives copies, sorting and transform edits. New/deserialized
+    // instances get fresh identities rather than reusing an array index.
+    [[reflgen::ignore]]
+    inline static std::atomic<std::uint64_t> s_nextTemporalIdentity{1};
+    [[reflgen::ignore]]
+    std::uint64_t m_temporalIdentity{s_nextTemporalIdentity.fetch_add(1, std::memory_order_relaxed)};
     math::vector3 m_position{};
     math::vector3 m_rotation{}; // Euler angles
     math::vector3 m_scale{ 1.f,1.f,1.f };

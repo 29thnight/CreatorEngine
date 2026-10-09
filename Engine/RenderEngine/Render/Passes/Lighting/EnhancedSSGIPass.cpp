@@ -8,6 +8,7 @@
 #include "EnhancedSSGIShaders.h"
 
 #include <algorithm>
+#include <bit>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // 남은 단계(순서대로 채운다):
@@ -70,6 +71,8 @@ namespace
         float         depthTolerance{ 0.f };
         float         pad0{ 0.f };
         float         pad1[2]{};
+        uint32_t hasMotion{}, renderWidth{}, renderHeight{}, motionPadding{};
+        float jitterDeltaX{}, jitterDeltaY{}, temporalPadding[2]{};
     };
 
     struct FilterParams
@@ -322,6 +325,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
 bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     (void)outError;
+    if (context.temporalFrame.realFrameId && context.temporalFrame.reset) ResetHistory();
 
     // GI 해상도는 화면의 1/2. 0이 되지 않게 하한을 둔다 — 창을 아주 작게
     // 줄이면 Dispatch가 0이 되고, 그러면 조용히 아무것도 안 그린다.
@@ -762,9 +766,20 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             params.inverseView = math::transpose(context.camera->inverseView);
         }
         params.previousViewProjection = math::transpose(m_previousViewProjection);
+        if (context.temporalFrame.camera.valid)
+        {
+            const auto view=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.viewMatrix);
+            const auto projection=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.projectionMatrix);
+            const auto previous=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.clipToPreviousClip);
+            params.previousViewProjection=math::transpose(view*projection*previous);
+        }
+        params.hasMotion=m_inputs.motionVectors.IsValid() && m_inputs.responsiveMask.IsValid() && m_inputs.reactiveMask.IsValid();
+        params.renderWidth=context.width;params.renderHeight=context.height;
+        params.jitterDeltaX=context.temporalFrame.previousJitterX-context.temporalFrame.jitterX;
+        params.jitterDeltaY=context.temporalFrame.previousJitterY-context.temporalFrame.jitterY;
         params.width = m_giWidth;
         params.height = m_giHeight;
-        params.hasHistory = (m_historyValid && m_hasPreviousFrame) ? 1u : 0u;
+        params.hasHistory = (m_historyValid && m_hasPreviousFrame && (!context.temporalFrame.realFrameId || !context.temporalFrame.reset)) ? 1u : 0u;
         params.maxAccum = kMaxAccumFrames;
         // 실측으로 조일 값이다. 너무 크면 다른 표면을 같은 것으로 보고,
         // 너무 작으면 정지 상태에서도 히스토리를 버린다.
@@ -782,6 +797,12 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         if (m_inputs.normal.IsValid())
         {
             usages.push_back({m_inputs.normal, RHIResourceState::ShaderResource, readAccess});
+        }
+        if (params.hasMotion)
+        {
+            usages.push_back({m_inputs.motionVectors,RHIResourceState::ShaderResource,readAccess});
+            usages.push_back({m_inputs.responsiveMask,RHIResourceState::ShaderResource,readAccess});
+            usages.push_back({m_inputs.reactiveMask,RHIResourceState::ShaderResource,readAccess});
         }
         usages.push_back({m_resolved, RHIResourceState::UnorderedAccess, writeAccess});
 
@@ -806,6 +827,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         // 없는 것만 대체물로 채운다.
         std::vector<RGHandle> ordered{m_traceResult, m_hiZMips[0]};
         ordered.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
+        ordered.push_back(params.hasMotion ? m_inputs.motionVectors : m_hiZMips[0]);
+        ordered.push_back(params.hasMotion ? m_inputs.responsiveMask : m_hiZMips[0]);
+        ordered.push_back(params.hasMotion ? m_inputs.reactiveMask : m_hiZMips[0]);
 
         std::vector<RHITextureHandle> orderedExternal{m_history[readIndex], m_historyDepth[readIndex]};
 

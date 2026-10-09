@@ -26,6 +26,20 @@ struct IDisplayPresentationSink
     virtual uint64_t OpenSharedTexture(void* sharedHandle,
         std::shared_ptr<RHIDisplayConsumerLease> consumerLease) = 0;
 
+    // Editor implementations deliberately keep the default false. The native
+    // Player consumer opens all resources on its own device; producer RHI handles
+    // never cross a device/resource-table boundary.
+    virtual bool AcceptsTemporalFrames() const { return false; }
+    virtual void OpenTemporalFrame(const RHITemporalDisplayPacket&) {}
+    // Immutable source identity and controls of the opened native game image.
+    // Unlike the FG packet, this requires no depth/motion/UI exports or upscaler.
+    virtual void OpenTemporalRealFrame(const TemporalMeasurementProvenance&) {}
+    // Actual real-frame producer submission boundaries, never reconstructed on
+    // the presentation thread from a late completed-frame notification.
+    virtual void MarkTemporalLatency(uint64_t, RHITemporalLatencyMarker) {}
+    virtual bool RequiresTemporalLatencyMarkers() const { return false; }
+    virtual void DiscardTemporalFrame(uint64_t) {}
+
     /// 리드백 프레임(CPU RGBA — Vulkan 표시 브리지)을 키로 게시한다.
     /// RenderThread에서 불린다 — 구현은 그 스레드에서 안전해야 한다
     /// (기존 ImGui 셸의 SubmitCpuRgbaFrame과 같은 계약).

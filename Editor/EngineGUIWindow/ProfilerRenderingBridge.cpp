@@ -99,6 +99,25 @@ namespace editor
         }
         result.cpuMs = source.cpuMs;
         result.gpuMs = source.gpuMs;
+        const auto provenance = [](const auto& p) {
+            rendering_temporal_provenance value;
+            value.frameKind = static_cast<std::uint8_t>(p.frameKind);
+            value.resolutionState = static_cast<std::uint8_t>(p.resolutionState);
+            value.upscaler = static_cast<std::uint8_t>(p.upscaler);
+            value.frameGenerator = static_cast<std::uint8_t>(p.frameGenerator);
+            value.realFrameId = p.realFrameId; value.viewId = p.viewId; value.sceneEpoch = p.sceneEpoch;
+            value.generatedOrdinal = p.generatedOrdinal;
+            value.renderWidth = p.renderExtent.width; value.renderHeight = p.renderExtent.height;
+            value.displayWidth = p.displayExtent.width; value.displayHeight = p.displayExtent.height;
+            value.nativeGateActive = p.IsValid() && p.nativeGateActive;
+            value.publicationFrameId = p.publicationFrameId;
+            value.spatialProvenanceAvailable = p.IsValid();
+            value.spatialMode = static_cast<std::uint8_t>(p.spatialMode);
+            value.deepDvcApplied = p.deepDvcApplied;
+            return value;
+        };
+        result.temporalProvenance = provenance(source.temporalProvenance);
+        result.gpuTemporalProvenance = provenance(source.gpuTemporalProvenance);
         result.gpuCollects = source.gpuCollects;
         result.gpuCollectMismatches = source.gpuCollectMismatches;
         result.gpuQueryOverflowPasses = source.gpuQueryOverflowPasses;

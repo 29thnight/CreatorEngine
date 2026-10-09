@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Optional external SDK inputs only: never download, install or copy runtimes. -->
+  <PropertyGroup>
+    <CreatorEnableAntiLag2 Condition="'$(CreatorEnableAntiLag2)' == ''">false</CreatorEnableAntiLag2>
+    <_CreatorAntiLag2>0</_CreatorAntiLag2>
+    <_CreatorAntiLag2 Condition="'$(CreatorEnableAntiLag2)' == 'true'">1</_CreatorAntiLag2>
+    <CreatorEnableFsrDx12 Condition="'$(CreatorEnableFsrDx12)' == ''">false</CreatorEnableFsrDx12>
+    <CreatorEnableFsrVulkan Condition="'$(CreatorEnableFsrVulkan)' == ''">false</CreatorEnableFsrVulkan>
+    <CreatorEnableDlssStreamline Condition="'$(CreatorEnableDlssStreamline)' == ''">false</CreatorEnableDlssStreamline>
+    <CreatorEnableXeSS Condition="'$(CreatorEnableXeSS)' == ''">false</CreatorEnableXeSS>
+    <CreatorEnableXeSSVulkan Condition="'$(CreatorEnableXeSSVulkan)' == ''">false</CreatorEnableXeSSVulkan>
+    <_CreatorFsr>0</_CreatorFsr>
+    <_CreatorFsrDx12>0</_CreatorFsrDx12>
+    <_CreatorFsrVulkan>0</_CreatorFsrVulkan>
+    <_CreatorDlss>0</_CreatorDlss>
+    <_CreatorXeSS>0</_CreatorXeSS>
+    <_CreatorXeSSVulkan>0</_CreatorXeSSVulkan>
+    <_CreatorFsr Condition="'$(CreatorEnableFsrDx12)' == 'true' Or '$(CreatorEnableFsrVulkan)' == 'true'">1</_CreatorFsr>
+    <_CreatorFsrDx12 Condition="'$(CreatorEnableFsrDx12)' == 'true'">1</_CreatorFsrDx12>
+    <_CreatorFsrVulkan Condition="'$(CreatorEnableFsrVulkan)' == 'true'">1</_CreatorFsrVulkan>
+    <_CreatorDlss Condition="'$(CreatorEnableDlssStreamline)' == 'true'">1</_CreatorDlss>
+    <_CreatorXeSS Condition="'$(CreatorEnableXeSS)' == 'true'">1</_CreatorXeSS>
+    <_CreatorXeSSVulkan Condition="'$(CreatorEnableXeSSVulkan)' == 'true'">1</_CreatorXeSSVulkan>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>CREATOR_ENABLE_ANTILAG2_SDK=$(_CreatorAntiLag2);CREATOR_ENABLE_FSR_SDK=$(_CreatorFsr);CREATOR_ENABLE_FSR_DX12_SDK=$(_CreatorFsrDx12);CREATOR_ENABLE_FSR_VULKAN_SDK=$(_CreatorFsrVulkan);CREATOR_ENABLE_DLSS_STREAMLINE=$(_CreatorDlss);CREATOR_ENABLE_XESS_SDK=$(_CreatorXeSS);CREATOR_ENABLE_XESS_VULKAN_SDK=$(_CreatorXeSSVulkan);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(_CreatorFsr)' == '1'">
+    <ClCompile><AdditionalIncludeDirectories>$(CreatorFsrRoot)\sdk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+    <!-- Explicit full paths include the selected backend and its PIX imports.
+         LIB combines members; no guessed SDK build or runtime deployment path. -->
+    <Lib><AdditionalDependencies>$(CreatorFsrLibraries);%(AdditionalDependencies)</AdditionalDependencies></Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(_CreatorDlss)' == '1'">
+    <ClCompile><AdditionalIncludeDirectories>$(CreatorStreamlineRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(_CreatorXeSS)' == '1' Or '$(_CreatorXeSSVulkan)' == '1'">
+    <ClCompile><AdditionalIncludeDirectories>$(CreatorXeSSRoot)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(_CreatorAntiLag2)' == '1'">
+    <ClCompile><AdditionalIncludeDirectories>$(CreatorAntiLag2Root);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
+  <Target Name="ValidateCreatorTemporalSdkInputs" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(_CreatorAntiLag2)' == '1' And (!Exists('$(CreatorAntiLag2Root)\ffx_antilag2_dx12.h') Or '$(Platform)' != 'x64')"
+           Text="CreatorAntiLag2Root must name the external official Anti-Lag2 v2.0.0a source root; x64 is required." />
+    <Error Condition="('$(_CreatorFsr)' == '1' Or '$(_CreatorDlss)' == '1' Or '$(_CreatorXeSS)' == '1' Or '$(_CreatorXeSSVulkan)' == '1') And '$(Platform)' != 'x64'"
+           Text="Temporal vendor SDK adapters require an x64 configuration." />
+    <Error Condition="'$(_CreatorFsrDx12)' == '1' And '$(_CreatorFsrVulkan)' == '1'"
+           Text="FSR SDK 1.1.4 static DX12/Vulkan backends export colliding symbols. Select exactly one FSR backend in this binary." />
+    <Error Condition="'$(_CreatorFsr)' == '1' And !Exists('$(CreatorFsrRoot)\sdk\include\FidelityFX\host\ffx_fsr3upscaler.h')"
+           Text="CreatorFsrRoot must name the external pinned FidelityFX SDK 1.1.4 source root (FSR 3.1.4)." />
+    <Error Condition="'$(_CreatorFsr)' == '1' And '$(CreatorFsrLibraries)' == ''"
+           Text="Set CreatorFsrLibraries to full paths of the matching source-built FSR upscaler, optical flow, frame interpolation, selected backend and its external import dependencies. No SDK is built automatically." />
+    <ItemGroup Condition="'$(_CreatorFsr)' == '1'"><_CreatorFsrLibrary Include="$(CreatorFsrLibraries)" /></ItemGroup>
+    <Error Condition="'$(_CreatorFsr)' == '1' And !Exists('%(_CreatorFsrLibrary.Identity)')"
+           Text="External FSR library does not exist: %(_CreatorFsrLibrary.Identity)" />
+    <Error Condition="'$(_CreatorDlss)' == '1' And !Exists('$(CreatorStreamlineRoot)\include\sl_version.h')"
+           Text="CreatorStreamlineRoot must name the external pinned Streamline 2.14.1 source root, including header symlink targets." />
+    <Error Condition="'$(_CreatorDlss)' == '1' And (!Exists('$(CreatorStreamlineRoot)\include\sl_nis.h') Or !Exists('$(CreatorStreamlineRoot)\include\sl_deepdvc.h'))"
+           Text="Optional NIS and RTX Dynamic Vibrance adapters require the matching external Streamline 2.14.1 sl_nis.h and sl_deepdvc.h headers. No runtime is downloaded or deployed automatically." />
+    <Error Condition="('$(_CreatorXeSS)' == '1' Or '$(_CreatorXeSSVulkan)' == '1') And !Exists('$(CreatorXeSSRoot)\inc\xess\xess.h')"
+           Text="CreatorXeSSRoot must name the external pinned XeSS SDK 3.0.2 source root." />
+  </Target>
+</Project>

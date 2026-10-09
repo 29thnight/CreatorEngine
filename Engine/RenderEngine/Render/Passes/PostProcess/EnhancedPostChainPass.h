@@ -164,6 +164,8 @@ public:
         float contrast{ 1.f };
 
         // ── FXAA ──
+        // Saved native/fallback preference. Temporal reconstruction suppresses
+        // the pass per input frame without changing this value.
         bool  fxaaEnabled{ true };
         float fxaaBias{ 0.688f };
         float fxaaBiasMin{ 0.021f };
@@ -183,6 +185,14 @@ public:
     struct Inputs
     {
         RGHandle color;   // 라이팅(+SSGI) 결과 — HDR
+        // This color is the output of a temporal resolve that MUST abort graph
+        // recording on failure. Its consumers can only be submitted after a
+        // successful resolve, including native-resolution AA. Never set this
+        // from a requested provider or a previous frame's result.
+        bool requiresTemporalResolve{ false };
+        // Optional per-recording observation; the caller owns it until all
+        // callbacks join and reads it only then. No pass branches on this value.
+        bool* fxaaRecorded{ nullptr };
     };
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
@@ -197,7 +207,7 @@ public:
     void SetUseSeparatePasses(bool use) { m_useSeparatePasses = use; }
     bool IsUsingSeparatePasses() const { return m_useSeparatePasses; }
 
-    /// 최종 LDR. FXAA까지 끝난 것이다.
+    /// 최종 LDR. 필요하면 FXAA까지 적용한 결과다.
     RGHandle GetOutput() const { return m_output; }
 
     /// FXAA 전의 톤맵 결과. FXAA가 실제로 무언가 했는지 대조하는 데 쓴다 —

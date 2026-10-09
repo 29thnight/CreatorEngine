@@ -7,7 +7,9 @@
 #include "EnhancedGBufferPass.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstring>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -17,11 +19,14 @@ namespace
     struct WorldSpriteConstants
     {
         math::matrix4x4 viewProjection{};
+        math::matrix4x4 currentUnjittered{};
+        math::matrix4x4 previousUnjittered{};
+        float screenDimensions[2]{};
+        uint32_t reset{};
         uint32_t instanceBase{};
-        uint32_t padding[3]{};
     };
-    static_assert(sizeof(WorldSpriteConstants) == 80);
-    static_assert(offsetof(WorldSpriteConstants, instanceBase) == 64);
+    static_assert(sizeof(WorldSpriteConstants) == 208);
+    static_assert(offsetof(WorldSpriteConstants, instanceBase) == 204);
 
     bool CompileWorldSpriteShader(const char *entry, const char *target, RHIShaderBlob &outBlob, std::string &outError)
     {
@@ -93,7 +98,41 @@ bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext &context, st
     desc.depthWriteMask = RHIDepthWrite::Zero;
     desc.depthFunc = RHICompareOp::LessEqual;
     m_depthPso = context.psoManager->GetOrCreate(desc, outError);
-    return m_depthPso.IsValid();
+    if (!m_depthPso.IsValid()) return false;
+
+    const RHIPipelineLayoutParam temporalParams[] = {
+        RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::SrvTable(1, 1), RHILayout::SrvTable(1, 2),
+    };
+    layoutDesc.params = temporalParams;
+    const auto temporalLayout = context.rootSignatures->GetOrCreate(layoutDesc, outError);
+    if (!temporalLayout.IsValid()) return false;
+    RHIShaderBlob temporalVs, temporalPs;
+    if (!CompileWorldSpriteShader("TemporalVS", "vs_5_0", temporalVs, outError) ||
+        !CompileWorldSpriteShader("TemporalPS", "ps_5_0", temporalPs, outError)) return false;
+    desc.layout = temporalLayout;
+    desc.vsBytecode = temporalVs.Data(); desc.vsSize = temporalVs.Size();
+    desc.psBytecode = temporalPs.Data(); desc.psSize = temporalPs.Size();
+    desc.numRenderTargets = 4;
+    desc.rtvFormats[0] = RHIFormat::RG16Float;
+    desc.rtvFormats[1] = desc.rtvFormats[2] = desc.rtvFormats[3] = RHIFormat::R16Float;
+    // Color sprites depth-test against the original opaque scene and never
+    // against one another. TemporalPS performs that identical source test;
+    // the dedicated temporal depth follows the last visible painted sprite.
+    desc.depthFunc = RHICompareOp::Always;
+    desc.depthWriteMask = RHIDepthWrite::All;
+    desc.blendEnable = false;
+    desc.independentBlend = true;
+    desc.renderTargetBlend[0].writeMask = 0x3;
+    for (unsigned i = 1; i < 4; ++i)
+    {
+        auto& blend = desc.renderTargetBlend[i];
+        blend.enable = true;
+        blend.srcColor = RHIBlendFactor::One;
+        blend.dstColor = RHIBlendFactor::InvSrcAlpha;
+        blend.writeMask = 0x1;
+    }
+    m_temporalPso = context.psoManager->GetOrCreate(desc, outError);
+    return m_temporalPso.IsValid();
 }
 
 bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::string &outError)
@@ -108,6 +147,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
     m_gpuVisibilityEnabled = context.resources && context.resources->GetIndirectDrawCapabilities().nonIndexedDraw;
     m_lastItemCount = 0;
     m_lastBatchCount = 0;
+    m_lastTemporalRecordedItemCount = 0;
     if (nullptr == m_items || m_items->empty())
     {
         return true;
@@ -140,9 +180,13 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         const Item &item = (*m_items)[index];
         Instance instance{};
         instance.world = math::transpose(item.world);
+        instance.previousWorld = math::transpose(item.previousWorldValid ? item.previousWorld : item.world);
         instance.uv = item.uv;
         instance.color = item.color;
         instance.sampling.x = item.signedDistance ? 1.f : 0.f;
+        instance.sampling.y = item.previousWorldValid ? 1.f : 0.f;
+        instance.sampling.z = item.previousAppearanceValid ? 1.f : 0.f;
+        instance.sampling.w = item.enableDepth ? 1.f : 0.f;
         m_instances.push_back(instance);
         EnhancedDrawItem bounds{};
         bounds.worldMatrix = item.world;
@@ -340,11 +384,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
             }
             if (!targets.IsValid())
             {
-                if (visibility)
-                {
-                    throw std::runtime_error("Sprite render-target binding failed on the prepared GPU route.");
-                }
-                return;
+                throw std::runtime_error("Sprite render-target binding failed.");
             }
 
             RHIEncoder &encoder = *ec.encoder;
@@ -363,11 +403,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
                 RHIUploadRequest{bytes, RHIUploadUsage::BufferCopy, 256});
             if (!upload.IsValid())
             {
-                if (visibility)
-                {
-                    throw std::runtime_error("Sprite instance upload failed on the prepared GPU route.");
-                }
-                return;
+                throw std::runtime_error("Sprite instance upload failed.");
             }
             memcpy(upload.cpuAddress, m_instances.data(), static_cast<size_t>(bytes));
 
@@ -377,7 +413,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
                 const Batch& batch = m_batches[batchIndex];
                 if (!batch.uploaded.IsValid())
                 {
-                    continue;
+                    throw std::runtime_error("Sprite texture upload is unavailable.");
                 }
                 const RHIBindingDesc texture[] = {
                     RHIBindingDesc::Srv2D(batch.uploaded.handle, batch.uploaded.format, 0, batch.uploaded.mipLevels),
@@ -385,11 +421,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
                 const auto table = context.resources->CreateBindings(texture);
                 if (!table.IsValid())
                 {
-                    if (visibility)
-                    {
-                        throw std::runtime_error("Sprite texture bindings failed on the prepared GPU route.");
-                    }
-                    break;
+                    throw std::runtime_error("Sprite texture bindings failed.");
                 }
 
                 const RHIPipelineHandle pso = batch.enableDepth && depth.IsValid() ? m_depthPso : m_overlayPso;
@@ -420,6 +452,112 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
         });
 }
 
+std::array<RGHandle, 5> EnhancedSpritePass::DeclareTemporal(EnhancedRenderGraph& graph,
+    const EnhancedFrameContext& context, std::array<RGHandle, 5> outputs)
+{
+    if (m_instances.empty()) return outputs;
+    if (!m_temporalPso.IsValid() || !m_width || !m_height || !m_output.IsValid() || !m_inputs.depth.IsValid() ||
+        std::any_of(outputs.begin(), outputs.end(), [](RGHandle handle) { return !handle.IsValid(); }))
+        throw std::runtime_error("Temporal sprite inputs or pipeline unavailable.");
+    const auto visibility = m_visibilityFrame;
+    if (m_gpuVisibilityEnabled && !visibility)
+        throw std::runtime_error("Temporal sprites require the prepared color visibility frame.");
+
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
+    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    for (unsigned i = 0; i < outputs.size(); ++i)
+    {
+        if (versioned) outputs[i] = graph.Modify(outputs[i]);
+        uses.push_back({outputs[i], i == 4 ? RHIResourceState::DepthWrite : RHIResourceState::RenderTarget, modify});
+    }
+    const auto sourceDepth = m_inputs.depth;
+    uses.push_back({sourceDepth, RHIResourceState::PixelShaderResource, read});
+    // Retain the exact Sprite color producer and its ordering even with TU off.
+    // Reading this version is a sidecar dependency, not a shader color sample.
+    uses.push_back({m_output, RHIResourceState::PixelShaderResource, read});
+    for (const auto& batch : m_batches)
+    {
+        if (!batch.uploaded.IsValid())
+            throw std::runtime_error("Temporal sprite texture was not uploaded for the color route.");
+        if (!explicitAccess) continue;
+        auto texture = graph.FindImportedTexture(batch.uploaded.handle);
+        if (!texture.IsValid())
+            texture = graph.ImportTexture(batch.uploaded.handle, RHIResourceState::PixelShaderResource, "Temporal.SpriteImage");
+        if (std::none_of(uses.begin(), uses.end(), [texture](const auto& use) {
+            return use.handle.index == texture.index && use.handle.version == texture.version &&
+                use.handle.kind == texture.kind && use.handle.epoch == texture.epoch;
+        })) uses.push_back({texture, RHIResourceState::PixelShaderResource, read});
+    }
+    if (visibility) visibility->AddReadUsages(graph, uses);
+
+    WorldSpriteConstants camera{};
+    camera.viewProjection = math::transpose(m_viewProjection);
+    const auto& temporal = context.temporalFrame;
+    const auto current = temporal.camera.valid ?
+        std::bit_cast<math::matrix4x4>(temporal.camera.viewMatrix) *
+            std::bit_cast<math::matrix4x4>(temporal.camera.projectionMatrix) : m_viewProjection;
+    camera.currentUnjittered = math::transpose(current);
+    camera.previousUnjittered = math::transpose(temporal.camera.valid ?
+        current * std::bit_cast<math::matrix4x4>(temporal.camera.clipToPreviousClip) : current);
+    camera.screenDimensions[0] = static_cast<float>(m_width);
+    camera.screenDimensions[1] = static_cast<float>(m_height);
+    camera.reset = temporal.reset || !temporal.camera.valid;
+
+    graph.AddPass("Temporal.SpriteMotion", uses,
+        [this, &context, outputs, sourceDepth, visibility, camera](const auto& execute) mutable {
+            m_lastTemporalRecordedItemCount = 0;
+            uint32_t recordedItemCount = 0;
+            std::array<RHITextureHandle, 4> colors;
+            for (unsigned i = 0; i < colors.size(); ++i) colors[i] = execute.ResolveHandle(outputs[i]);
+            const auto depth = RHIDepthTargetDesc::Depth(
+                execute.ResolveHandle(outputs[4]), EnhancedGBufferPass::kDepthFormat);
+            const auto targets = context.resources->CreateRenderTargets(colors, &depth);
+            if (!targets.IsValid()) throw std::runtime_error("Temporal sprite render targets unavailable.");
+            const uint64_t bytes = sizeof(Instance) * static_cast<uint64_t>(m_instances.size());
+            const auto upload = context.resources->AllocateUpload({bytes, RHIUploadUsage::BufferCopy, 256});
+            const RHIBindingDesc sceneDepth[]{RHIBindingDesc::SrvDepth(execute.ResolveHandle(sourceDepth))};
+            const auto depthTable = context.resources->CreateBindings(sceneDepth);
+            if (!upload.IsValid() || !depthTable.IsValid())
+                throw std::runtime_error("Temporal sprite instance/depth bindings failed.");
+            memcpy(upload.cpuAddress, m_instances.data(), static_cast<size_t>(bytes));
+
+            auto& encoder = *execute.encoder;
+            encoder.BindRenderTargets(targets);
+            encoder.SetViewportAndScissor(m_width, m_height);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_temporalPso);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, upload);
+            encoder.SetBindings(RHIBindPoint::Graphics, 3, depthTable);
+            for (uint32_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
+            {
+                const auto& batch = m_batches[batchIndex];
+                const RHIBindingDesc image[]{RHIBindingDesc::Srv2D(
+                    batch.uploaded.handle, batch.uploaded.format, 0, batch.uploaded.mipLevels)};
+                const auto table = context.resources->CreateBindings(image);
+                camera.instanceBase = batch.first;
+                const auto constants = context.resources->UploadConstants(&camera, sizeof(camera));
+                if (!table.IsValid() || !constants.IsValid())
+                    throw std::runtime_error("Temporal sprite image/constant bindings failed.");
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, constants);
+                encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
+                if (visibility)
+                {
+                    if (!encoder.DrawIndirect(visibility->Arguments(), visibility->ArgsOffset(batchIndex)))
+                        throw std::runtime_error("Temporal sprite indirect recording failed.");
+                }
+                else encoder.Draw(4, batch.count);
+                // This is recording evidence only. An indirect visibility draw
+                // can produce zero pixels; no GPU completion is inferred here.
+                recordedItemCount += batch.count;
+            }
+            m_lastTemporalRecordedItemCount = recordedItemCount;
+        }, true);
+    return outputs;
+}
+
 void EnhancedSpritePass::Shutdown()
 {
     m_visibilityFrame.reset();
@@ -433,6 +571,8 @@ void EnhancedSpritePass::Shutdown()
     m_height = 0;
     m_lastItemCount = 0;
     m_lastBatchCount = 0;
+    m_lastTemporalRecordedItemCount = 0;
     m_depthPso = {};
     m_overlayPso = {};
+    m_temporalPso = {};
 }

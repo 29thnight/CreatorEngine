@@ -44,6 +44,10 @@ cbuffer LXSceneConstants : register(b0)
     float4 lx_cameraForward;
     // Flat host ABI: each light has position, direction, color, attenuation.
     float4 lx_lights[256];
+    float4x4 lx_temporalCurrentProjection;
+    float4x4 lx_temporalPreviousProjection;
+    uint lx_temporalHistoryValid;
+    uint3 lx_temporalPadding;
 };
 
 StructuredBuffer<LXSurfacePoint> lx_vertices : register(t0);
@@ -571,6 +575,61 @@ LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFront
     output.normal = float4(surface.normal * 0.5 + 0.5, 1);
     output.emissive = float4(surface.emission, 1);
     output.owner = input.owner;
+    return output;
+}
+
+// Paired transformed streams use the same current topology. Previous skin and
+// object transforms are evaluated by the existing surface-geometry compute stage.
+StructuredBuffer<LXSurfacePoint> lx_previousVertices : register(t156);
+struct LXTemporalVertex
+{
+    LXSceneVertex surface;
+    float4 currentClip : TEXCOORD6;
+    float4 previousClip : TEXCOORD7;
+};
+[shader("vertex")]
+LXTemporalVertex LXSceneTemporalVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    LXTemporalVertex output;
+    output.surface = LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection);
+    output.currentClip = mul(float4(lx_vertices[index].position.xyz, 1), lx_temporalCurrentProjection);
+    output.previousClip = mul(float4(lx_previousVertices[index].position.xyz, 1), lx_temporalPreviousProjection);
+    return output;
+}
+struct LXTemporalOutput
+{
+    float2 motion : SV_Target0;
+    float reactive : SV_Target1;
+    float transparency : SV_Target2;
+    float responsive : SV_Target3;
+};
+[shader("fragment")]
+LXTemporalOutput LXSceneTemporalPS(LXTemporalVertex input, bool frontFace : SV_IsFrontFace)
+{
+    // Match the material host's true-pixel-center correction in BOTH time samples.
+    // Derivatives precede material coverage/discard, including alpha/SDF edges.
+    const float3 dx=ddx_fine(input.surface.position), dy=ddy_fine(input.surface.position);
+    const float4 previousDx=ddx_fine(input.previousClip), previousDy=ddy_fine(input.previousClip);
+    const LXSceneVertex centered=LXScenePixelCenter(input.surface);
+    const float3 delta=centered.position-input.surface.position;
+    const float xx=dot(dx,dx), xy=dot(dx,dy), yy=dot(dy,dy), determinant=xx*yy-xy*xy;
+    if (isfinite(determinant) && abs(determinant)>1e-20)
+    {
+        const float2 step=float2(dot(delta,dx)*yy-dot(delta,dy)*xy,
+            dot(delta,dy)*xx-dot(delta,dx)*xy)/determinant;
+        if(all(isfinite(step)))input.previousClip+=previousDx*step.x+previousDy*step.y;
+    }
+    input.currentClip=mul(float4(centered.position,1),lx_temporalCurrentProjection);
+    const PrincipledSurface surface = LXSceneUndecaledMaterial(centered, frontFace);
+    if (lx_blended == 1u && surface.alpha <= 0.01) discard;
+    LXTemporalOutput output;
+    const bool valid = lx_temporalHistoryValid != 0u && input.currentClip.w > 0.000001 &&
+        input.previousClip.w > 0.000001 && all(isfinite(input.previousClip));
+    output.motion = valid ? (input.previousClip.xy / input.previousClip.w -
+        input.currentClip.xy / input.currentClip.w) * float2(0.5 * lx_width, -0.5 * lx_height) : float2(0);
+    output.transparency = lx_blended != 0u ? saturate(surface.alpha) : 0;
+    output.reactive = lx_blended != 0u ? 1 : 0;
+    output.responsive = valid ? 0 : 1;
     return output;
 }
 

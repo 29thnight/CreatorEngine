@@ -723,6 +723,50 @@ namespace ce
         stream->publish_frame();
     }
 
+    void profiler_service::submit_render_measurement(const profile_render_measurement& sample,
+                                                      std::uint64_t generation)
+    {
+        const recorder_state state = m_state.load(std::memory_order_acquire);
+        if (!m_initialized.load(std::memory_order_acquire) || generation == 0 ||
+            (state != recorder_state::recording && state != recorder_state::pausing) ||
+            generation != m_gpuAcceptGeneration.load(std::memory_order_acquire))
+        {
+            return;
+        }
+        if (thread_stream* stream = gpu_stream())
+        {
+            stream->write_render_measurement(sample, generation);
+        }
+    }
+
+    void profiler_service::publish_presenter_return(const profile_presenter_return& observation,
+                                                  std::uint64_t expected_generation)
+    {
+        if (!m_initialized.load(std::memory_order_acquire))
+        {
+            return;
+        }
+        // Register before sampling admission. Stop enumerates registered
+        // streams under m_streamLock; registering afterward could leave a new
+        // owner's pending page outside its freeze requests and loss accounting.
+        auto* stream = current_stream();
+        if (!stream)
+        {
+            return;
+        }
+        const auto generation = m_generation.load(std::memory_order_acquire);
+        if (expected_generation == 0 || expected_generation != generation ||
+            m_state.load(std::memory_order_acquire) != recorder_state::recording)
+        {
+            return;
+        }
+        profile_render_measurement sample;
+        sample.engine_frame = current_frame();
+        sample.axis = profile_render_axis::cpu_presenter_return;
+        sample.presenter = observation;
+        stream->write_presenter_return(sample, generation);
+    }
+
     void profiler_service::retire_gpu_lane()
     {
         thread_stream* stream = m_gpuStream.load(std::memory_order_acquire);
@@ -925,7 +969,7 @@ namespace ce
             std::uint64_t lost = 0;
             for (event_chunk* chunk = sealed; chunk; chunk = chunk->next)
             {
-                lost += chunk->count;
+                lost += chunk->count + chunk->render_measurement_count;
             }
             m_queueDroppedEvents.fetch_add(lost, std::memory_order_relaxed);
             m_droppedFrameBoundaries.fetch_add(1, std::memory_order_relaxed);

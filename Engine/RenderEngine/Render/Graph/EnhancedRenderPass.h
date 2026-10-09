@@ -33,6 +33,7 @@ namespace material_graph
     class SceneViewInput;
 }
 #include "PackedBoneMatrix.h"
+#include "../Temporal/TemporalReconstruction.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/IRenderPipelineCache.h"
@@ -252,6 +253,8 @@ struct EnhancedDrawItem
     // legacy Mesh보다 먼저 소비한다(MBC9: 모델은 이 뷰만 탄다).
     RHIModelMeshView modelMeshView{};
 
+    // Object incarnation and persistent instance ID, never mesh/material/order identity.
+    uint64_t temporalObjectId{}, temporalIncarnation{}, temporalInstanceId{};
     math::matrix4x4 worldMatrix{};
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —
@@ -562,6 +565,8 @@ struct EnhancedFrameContext
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };
+    uint32_t displayWidth{ 0 }, displayHeight{ 0 };
+    TemporalFrame temporalFrame;
 
     // W8: 이 프레임의 신원. 패스가 draw snapshot의 seal과 대조해 지난 프레임의
     // 밀봉이 섞여 들어왔는지 판정한다. 0은 "제품 프레임이 아니다"(격리 fixture)

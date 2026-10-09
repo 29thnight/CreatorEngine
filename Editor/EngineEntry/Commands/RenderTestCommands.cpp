@@ -66,6 +66,7 @@
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
 #include "FoliageComponent.h"      // I5: Foliage 게이트
+#include "TemporalMotionFixture.h"
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
 #include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
@@ -809,24 +810,59 @@ namespace ConsoleCmd
             : CommandCore::Fail("render.pbr.mip.failed", "PBR verification failed", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_temporal_motion_fixture(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2)
+        {
+            return InvalidArguments("render.temporal.motion.fixture <new-absolute-directory>");
+        }
+        std::string error;
+        if (!TemporalMotionFixture::Begin(ctx.parts[1], error))
+        {
+            return Fail("render.temporal.motion.fixture.rejected", error);
+        }
+        ctx.system.WaitForResult([]() -> std::optional<CommandResult>
+        {
+            const auto status = TemporalMotionFixture::GetStatus();
+            if (status.state == TemporalMotionFixtureState::Preparing || status.state == TemporalMotionFixtureState::Running)
+            {
+                return std::nullopt;
+            }
+            auto data = CommandData::Object();
+            data.Set("directory", CommandData::String(status.directory));
+            data.Set("acceptance", CommandData::String("unverified-requires-independent-oracle"));
+            if (status.state != TemporalMotionFixtureState::Complete)
+            {
+                return Fail("render.temporal.motion.fixture.failed", status.error, std::move(data));
+            }
+            return Ok("Recorded seven route/control pairs; run the independent motion oracle", std::move(data));
+        });
+        return Ok();
+    }
+
     static CommandCore::CommandResult Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
         if (ctx.parts.size() < 2 || ctx.parts.size() > 7
             || (ctx.parts.size() >= 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor" && ctx.parts[2] != "material")
             || (ctx.parts.size() >= 4 && ctx.parts[3] != "controlled" && ctx.parts[3] != "controlled-replay"
-                && ctx.parts[3] != "controlled-lattice-replay"))
-            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]");
+                && ctx.parts[3] != "controlled-lattice-replay" && ctx.parts[3] != "motion")
+            || (ctx.parts.size() >= 4 && ctx.parts[3] == "motion" && ctx.parts.size() != 4))
+        {
+            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [motion|controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]");
+        }
         std::string error;
         const auto target = ctx.parts.size() >= 3 && ctx.parts[2] == "editor"
             ? EnhancedLiveDisplayTarget::Editor : ctx.parts.size() >= 3 && ctx.parts[2] == "material"
             ? EnhancedLiveDisplayTarget::MaterialPreview : EnhancedLiveDisplayTarget::Game;
         if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error,
-                ctx.parts.size() >= 4, ctx.parts.size() >= 5 ? ctx.parts[4] : std::string{},
+                ctx.parts.size() >= 4 && ctx.parts[3] != "motion", ctx.parts.size() >= 5 ? ctx.parts[4] : std::string{},
                 ctx.parts.size() >= 6 ? ctx.parts[5] : std::string{},
                 ctx.parts.size() == 7 ? ctx.parts[6] : std::string{},
                 ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-replay",
-                ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-lattice-replay"))
+                ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-lattice-replay",
+                ctx.parts.size() >= 4 && ctx.parts[3] == "motion"))
             return Fail("render.pbr.capture.rejected", error);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
         ctx.system.WaitForResult([deadline]() -> std::optional<CommandResult>
@@ -1355,6 +1391,7 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
         reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
         reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
+        reg.Result({ "render.temporal.motion.fixture" }, &Cmd_render_temporal_motion_fixture, SceneAccess::BorrowLiveState);
         reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
         reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);

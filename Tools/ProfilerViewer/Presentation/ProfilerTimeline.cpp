@@ -727,6 +727,36 @@ namespace editor::profiler_view
                             static_cast<unsigned>(hoveredSpan->view),
                             static_cast<unsigned>(hoveredSpan->queue));
                 ImGui::TextDisabled("펜스가 끝난 뒤에야 읽힌다 - 제 프레임 칸으로 돌려보낸 것이다");
+                const auto* recordedFrame = capture->find_frame(hoveredSpan->frame);
+                const auto* measurement = recordedFrame ? recordedFrame->render_measurement_for(*hoveredSpan) : nullptr;
+                if (measurement)
+                {
+                    const auto& p = measurement->provenance;
+                    ImGui::Text("Recorded %s / real %llu / publication %llu / generated ordinal %u",
+                        p.frame_kind == 1 ? "real" : p.frame_kind == 2 ? "generated" : "unknown",
+                        static_cast<unsigned long long>(p.real_frame_id),
+                        static_cast<unsigned long long>(p.publication_frame_id), p.generated_ordinal);
+                    ImGui::Text("Render %u x %u -> display %u x %u", p.render_width, p.render_height,
+                        p.display_width, p.display_height);
+                    ImGui::Text("Full view %llu / submission %llu / scene %llu",
+                        static_cast<unsigned long long>(p.view_id),
+                        static_cast<unsigned long long>(measurement->submission_id),
+                        static_cast<unsigned long long>(p.scene_epoch));
+                    if (p.spatial_provenance_available)
+                    {
+                        constexpr const char* modes[]{ "off", "scale", "sharpen" };
+                        ImGui::Text("NIS %s / DeepDVC %s", p.spatial_mode < 3 ? modes[p.spatial_mode] : "unknown",
+                            p.deep_dvc_applied ? "applied" : "off");
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Applied spatial effects unknown (not recorded)");
+                    }
+                }
+                else
+                {
+                    ImGui::TextDisabled("Render provenance unknown (not recorded or ambiguous)");
+                }
             }
             else
             {
