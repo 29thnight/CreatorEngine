@@ -17,6 +17,7 @@
 #include "EditorAssetDatabase.h"
 #include "EditorIcons.h"
 #include "EditorAssetDragPayload.h"
+#include "SoundGraphEditor.h"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -135,7 +136,7 @@ namespace
 
     // Draw inside the tree item's hit rectangle, keeping its ID and interaction
     // state intact for navigation, context menus and prefab drop targets.
-    void browser_tree_label(const std::string& name, Texture* texture, const char* fallbackIcon)
+    void browser_tree_label(const std::string& name, const Texture* texture, const char* fallbackIcon)
     {
         const auto minimum = ImGui::GetItemRectMin();
         const auto maximum = ImGui::GetItemRectMax();
@@ -184,7 +185,7 @@ namespace
     // W7 썸네일: `badgeIcon` 은 그림 오른쪽 아래의 **작은 유형 기호**다. 썸네일이
     // 붙은 타일에서만 준다 — 계약이 *"실제 에셋 썸네일 + 작은 유형 배지"* 로
     // 적었고, 그림만 남으면 그 파일이 무엇인지가 사라지기 때문이다.
-    void browser_item_artwork(Texture* texture, const char* fallbackIcon,
+    void browser_item_artwork(const Texture* texture, const char* fallbackIcon,
         const std::string& name, bool listView, float tileIconSize = 40.f,
         const char* badgeIcon = nullptr)
     {
@@ -230,7 +231,7 @@ namespace
         draw->PopClipRect();
     }
 
-    bool browser_icon_button(const char* icon, const char* tip, bool enabled = true, Texture* texture = nullptr)
+    bool browser_icon_button(const char* icon, const char* tip, bool enabled = true, const Texture* texture = nullptr)
     {
         ImGui::BeginDisabled(!enabled);
         const std::string label = texture ? std::string("###") + icon : icon;
@@ -720,7 +721,17 @@ void ContentsBrowserWindow::PublishSnapshot()
 void ContentsBrowserWindow::DrawFolderMenu(const file::path& directory)
 {
     if (ImGui::MenuItem("New Folder..."))
+    {
         OpenCreateDialog(CreateKind::folder, directory);
+    }
+    if (ImGui::MenuItem("Create Sound Graph..."))
+    {
+        OpenCreateDialog(CreateKind::SoundGraph, directory);
+    }
+    if (ImGui::MenuItem("Create Sound Preset..."))
+    {
+        OpenCreateDialog(CreateKind::SoundPreset, directory);
+    }
     // ★ W7-5 가 지나가다 잡았다 — 여기 중괄호가 없어서 `browser_cache_invalidate()`
     //   가 `if` **밖**에 있었다(W7-1, e790b678). 들여쓰기는 안에 있는 것처럼 보이고
     //   컴파일러는 /W0 라 아무 말도 하지 않는다. 그래서 이 메뉴가 그려지는 **모든
@@ -769,6 +780,21 @@ bool ContentsBrowserWindow::CreateNamedAsset(CreateKind kind, const file::path& 
         Navigate(created);
         return true;
     }
+    if (kind == CreateKind::SoundGraph || kind == CreateKind::SoundPreset)
+    {
+        if (!editor::sound_graph_editing::CreateAsset(directory, name,
+            kind == CreateKind::SoundPreset, created, m_error))
+        {
+            return false;
+        }
+        if (!browser_same_path(m_currentDirectory, directory))
+        {
+            Navigate(directory);
+        }
+        SelectAsset(created);
+        m_error.clear();
+        return true;
+    }
     if (!CanCreateSceneRenderProfileIn(directory))
     {
         m_error = "Scene render profiles are created in the SceneRenderProfile folder.";
@@ -789,8 +815,10 @@ void ContentsBrowserWindow::DrawFolderDialog()
         ImGui::OpenPopup("###BrowserCreateAsset");
         m_openFolderDialog = false;
     }
-    const char* const title = CreateKind::folder == m_createKind
-        ? "New Folder###BrowserCreateAsset" : "New Scene Render Profile###BrowserCreateAsset";
+    const char* const title = CreateKind::folder == m_createKind ? "New Folder###BrowserCreateAsset"
+        : m_createKind == CreateKind::SoundGraph ? "New Sound Graph###BrowserCreateAsset"
+        : m_createKind == CreateKind::SoundPreset ? "New Sound Preset###BrowserCreateAsset"
+        : "New Scene Render Profile###BrowserCreateAsset";
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ImGui::TextUnformatted(browser_utf8(m_folderTarget).c_str());
@@ -1104,7 +1132,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	// W7 썸네일: 준비된 것이 있으면 그것을, 아니면 nullptr 이라 유형 아이콘이
 	// 그대로 간다. 조회는 디스크를 만지지 않는다 — `revision` 은 목록 스캔이
 	// 담아 둔 값이고, 캐시는 표 하나를 볼 뿐이다.
-	Texture* thumbnail = nullptr;
+	const Texture* thumbnail = nullptr;
 	if (0 != revision)
 	{
 		thumbnail = editor::thumbnail_acquire(
@@ -1138,7 +1166,17 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 	{
 		// 열기에 **성공한** 것만 최근 항목이다(계약 5).
-		if (EditorPlatform::Get().OpenFile(directory)) RecordRecent(directory);
+        if (editor::sound_graph_editing::CanOpen(directory))
+        {
+            if (editor::sound_graph_editing::OpenAsset(directory, m_error))
+            {
+                RecordRecent(directory);
+            }
+        }
+        else if (EditorPlatform::Get().OpenFile(directory))
+        {
+            RecordRecent(directory);
+        }
 	}
 	else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 	{
@@ -1149,6 +1187,13 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	// 집을 수 있었다. 호스트별로 갈랐다(PHASE 21 M1).
 	if (ImGui::BeginPopup("ContentAssetTileMenu"))
 	{
+        if (editor::sound_graph_editing::CanOpen(directory) && ImGui::MenuItem("Edit Sound Asset"))
+        {
+            if (editor::sound_graph_editing::OpenAsset(directory, m_error))
+            {
+                RecordRecent(directory);
+            }
+        }
 		// Delete 인라인 구현이 여기 있었다 — 트리 쪽과 **같은 코드의 복제**였고,
 		// 둘 다 확인도 Undo 도 없이 file::remove 를 불렀다. 선언 하나
 		// (editor_core_menus 의 delete_asset, confirm 붙음)가 둘을 대체한다.

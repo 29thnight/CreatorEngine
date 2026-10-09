@@ -258,6 +258,9 @@ void ScriptComponent::CaptureFields()
 			value = std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z);
 			break;
 		}
+		case ClrHost::ScriptFieldType::AssetLink:
+		// Generated string accessors encode version/kind/stable IDs only.
+		// Reading/restoring this field never requests a resident asset.
 		case ClrHost::ScriptFieldType::String:
 		{
 			// 값 안의 개행·구분자가 항목 경계를 깨지 않도록 이스케이프한다.
@@ -364,6 +367,14 @@ void ScriptComponent::ApplyFields()
 			clr.SetFieldFloat3(m_instanceId, index, v);
 			break;
 		}
+		case ClrHost::ScriptFieldType::AssetLink:
+        {
+            if (!clr.SetFieldAssetLink(m_instanceId, index, UnescapeValue(value)))
+            {
+                Debug::PrintLog(spdlog::level::warn, "[ScriptCore] Invalid serialized AssetLink field: " + name);
+            }
+            break;
+        }
 		case ClrHost::ScriptFieldType::String:
 			clr.SetFieldString(m_instanceId, index, UnescapeValue(value));
 			break;

@@ -13,6 +13,7 @@
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
 #include "EditorAssetPresentation.h"
+#include "EditorImGuiTexture.h"
 #include "EditorSettingsStore.h"
 #include "PathFinder.h"
 #include "EditorWindowNames.h"
@@ -27,6 +28,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -84,11 +86,13 @@ EditorRenderer::~EditorRenderer()
 {
     if (m_workspace) m_workspace->SaveOnShutdown();
     m_workspace.reset();
+    EditorImGuiTexture::Shutdown();
     m_host->Shutdown();
 }
 
 void EditorRenderer::AddEditorFonts()
 {
+    ::editor::fonts::set_resource_root(PathFinder::EngineResourcePath());
     // 폰트 자원은 `editor::fonts` 한 자리가 든다(PHASE 21 W1). 경로를 손으로
     // 적던 넷을 거기로 모았고, 파일이 없을 때 죽던 자리도 거기서 막는다.
     // 왜 죽었는지는 `EditorFontResources.h` 머리에 실측과 함께 적었다 —
@@ -130,7 +134,9 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     const ImVec2 nodePos{ posX, posY };
 
     ImGui::DockBuilderRemoveNode(id);
-    ImGui::DockBuilderAddNode(id);
+    // Persist this root as a dockspace, not a floating dock node. Restoring a
+    // floating root before its host exists can expose a zero-size ancestor.
+    ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(id, size);
     ImGui::DockBuilderSetNodePos(id, nodePos);
 
@@ -266,7 +272,7 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     m_selectContentBrowserOnBuild = true;
 }
 
-void EditorRenderer::BeginRender()
+void EditorRenderer::BeginRender(std::unique_lock<std::mutex>& sceneLock)
 {
     m_uiFrameBegan = std::chrono::steady_clock::now();
     ::editor::windows::begin_shell_cost(
@@ -285,8 +291,13 @@ void EditorRenderer::BeginRender()
         const ::editor::windows::shell_cost_scope cost{
             ::editor::windows::shell_cost_section::host_beginframe };
         const ::editor::TabStyleScope tabs;
+        // 스왑체인 획득과 호스트 GPU 여유 대기가 씬 구조를 붙들면 안 된다.
+        // 위의 환경설정·작업공간과 아래의 라이브 패널은 계속 잠금으로 보호한다.
+        sceneLock.unlock();
         m_host->BeginFrame();
+        sceneLock.lock();
     }
+    EditorImGuiTexture::BeginFrame();
 
     // 복원된 Game 모드나 접힌 도크에서도 예열이 끝나야 한다. 텍스처를 여는
     // 작업은 PT의 열린 Host 프레임에서만 하고, GT에는 원자 이정표만 전달한다.
@@ -451,7 +462,7 @@ void EditorRenderer::Render()
     }
 }
 
-void EditorRenderer::EndRender()
+void EditorRenderer::EndRender(std::function<void()> onRecorded)
 {
     ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_endrender);
     // PHASE 21 W0 전반(계획서 §1.9): 밖에서 배치를 볼 수단.
@@ -503,8 +514,9 @@ void EditorRenderer::EndRender()
     {
         const ::editor::windows::shell_cost_scope cost{
             ::editor::windows::shell_cost_section::present };
-        m_host->EndFrame();
+        m_host->EndFrame(std::move(onRecorded));
     }
+    EditorImGuiTexture::EndFrame();
 
     // draw data 는 `EndFrame` 안의 `ImGui::Render()` 뒤라야 유효하다
     // (`ImDrawData::Valid`). 그래서 배치·스타일과 자리가 다르고, 뜬 프레임에만

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.Minimal.h"
+#include "Ownership.h"
 #include "concurrent_queue.h"
 #include "Windows/EditorWindowBody.h"
 #include "EditorEntityIcons.h"
@@ -44,7 +45,7 @@ public:
 	{
 		FileType type{ FileType::Unknown };
 		const char* type_icon{};
-		Texture* type_image{}; // Borrowed from this presentation service.
+		const Texture* type_image{}; // Borrowed from this presentation service.
 	};
 
 	static EditorAssetPresentation& Get() noexcept;
@@ -55,21 +56,28 @@ public:
 	void QueueTextureImport(const file::path& source);
 	void OpenPendingTextureImportSelector();
 	void OpenMaterialPicker();
-	std::shared_ptr<Material> TakeSelectedMaterial() noexcept;
+	own::shared_owner<const Material> TakeSelectedMaterial() noexcept;
 
 	FilePresentation ResolveFilePresentation(std::string_view extension) const;
 	ImFont* GetSmallFont() const noexcept { return m_smallFont; }
 	ImFont* GetExtraSmallFont() const noexcept { return m_extraSmallFont; }
-    Texture* GetDirectoryIcon(bool expanded) const noexcept
-    { return m_directoryIcons[expanded ? 1 : 0].get(); }
-    Texture* GetEngineIcon() const noexcept { return m_engineIcon.get(); }
-    Texture* GetEntityIcon(std::string_view preset) const noexcept
-    { return m_entityIcons[editor::EntityIconIndex(preset)].get(); }
-    Texture* GetProjectIcon() const noexcept { return m_projectIcon.get(); }
-    Texture* GetFileIcon(FileType type) const noexcept
+    const Texture* GetDirectoryIcon(bool expanded) const noexcept
+    {
+        const auto& icon = m_directoryIcons[expanded ? 1 : 0];
+        return icon ? &*icon.borrow() : nullptr;
+    }
+    const Texture* GetEngineIcon() const noexcept { return m_engineIcon ? &*m_engineIcon.borrow() : nullptr; }
+    const Texture* GetEntityIcon(std::string_view preset) const noexcept
+    {
+        const auto& icon = m_entityIcons[editor::EntityIconIndex(preset)];
+        return icon ? &*icon.borrow() : nullptr;
+    }
+    const Texture* GetProjectIcon() const noexcept { return m_projectIcon ? &*m_projectIcon.borrow() : nullptr; }
+    const Texture* GetFileIcon(FileType type) const noexcept
     {
         const auto index = static_cast<size_t>(type);
-        return m_fileIcons[index < m_fileIcons.size() ? index : 0].get();
+        const auto& icon = m_fileIcons[index < m_fileIcons.size() ? index : 0];
+        return icon ? &*icon.borrow() : nullptr;
     }
 
 private:
@@ -88,13 +96,13 @@ private:
 
 	std::unordered_map<std::string, FileType> m_extensionTypes;
 	std::shared_ptr<const EnhancedGizmoIconTextures> m_gizmoIconTextures;
-    std::array<std::shared_ptr<Texture>, 2> m_directoryIcons;
-    std::shared_ptr<Texture> m_engineIcon;
-    std::array<std::shared_ptr<Texture>, editor::EntityIconPresets.size()> m_entityIcons;
-    std::shared_ptr<Texture> m_projectIcon;
-    std::array<std::shared_ptr<Texture>, static_cast<size_t>(FileType::End)> m_fileIcons;
-	std::shared_ptr<Material> m_previewedMaterial;
-	std::shared_ptr<Material> m_selectedMaterial;
+    std::array<own::shared_owner<const Texture>, 2> m_directoryIcons;
+    own::shared_owner<const Texture> m_engineIcon;
+    std::array<own::shared_owner<const Texture>, editor::EntityIconPresets.size()> m_entityIcons;
+    own::shared_owner<const Texture> m_projectIcon;
+    std::array<own::shared_owner<const Texture>, static_cast<size_t>(FileType::End)> m_fileIcons;
+	own::shared_owner<const Material> m_previewedMaterial;
+	own::shared_owner<const Material> m_selectedMaterial;
 	ImFont* m_smallFont{};
 	ImFont* m_extraSmallFont{};
 	bool m_initialized{};

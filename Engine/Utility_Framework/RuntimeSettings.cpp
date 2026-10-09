@@ -18,12 +18,18 @@ namespace
     std::unique_ptr<RuntimeSettings> g_runtimeSettings;
 }
 
-bool RuntimeSettings::Initialize() noexcept
+bool RuntimeSettings::Initialize(RuntimeRenderBackendPolicy backendPolicy) noexcept
 {
-    if (g_runtimeSettings) return true;
+    if (g_runtimeSettings)
+    {
+        return true;
+    }
 
-    std::unique_ptr<RuntimeSettings> candidate(new RuntimeSettings());
-    if (!candidate->Load()) return false;
+    std::unique_ptr<RuntimeSettings> candidate(new RuntimeSettings(backendPolicy));
+    if (!candidate->Load())
+    {
+        return false;
+    }
     g_runtimeSettings = std::move(candidate);
     return true;
 }
@@ -79,45 +85,54 @@ bool RuntimeSettings::Load() noexcept
         }
 
         RenderBackend renderBackend = RenderBackend::DX12;
-        bool hasCanonicalBackend = false;
-        const Authoring::ReadNode renderNode = root["render"];
-        if (renderNode)
+        // Editor의 고정 정책에서는 render 맵과 레거시 선택자에 접근하지 않는다.
+        // Player만 패키지에 투영된 백엔드 설정을 읽고 검증한다.
+        if (m_backendPolicy == RuntimeRenderBackendPolicy::ProjectSettings)
         {
-            if (!renderNode.IsMap())
+            bool hasCanonicalBackend = false;
+            const Authoring::ReadNode renderNode = root["render"];
+            if (renderNode)
             {
-                Debug::PrintLog(spdlog::level::err, "EngineSettings render must be a map.");
-                return false;
-            }
-
-            const Authoring::ReadNode backendNode = renderNode["backend"];
-            if (backendNode)
-            {
-                if (!backendNode.IsScalar())
+                if (!renderNode.IsMap())
                 {
-                    Debug::PrintLog(spdlog::level::err, "EngineSettings render.backend must be dx12 or vulkan.");
+                    Debug::PrintLog(spdlog::level::err, "EngineSettings render must be a map.");
                     return false;
                 }
 
-                const std::string backendName = backendNode.AsString();
-                if (!TryParseRenderBackend(backendName, renderBackend))
+                const Authoring::ReadNode backendNode = renderNode["backend"];
+                if (backendNode)
                 {
-                    const std::string message = "Unsupported EngineSettings render.backend '" +
-                        backendName + "' (expected dx12 or vulkan).";
-                    std::fprintf(stderr, "[RenderBackend] %s\n", message.c_str());
-                    Debug::PrintLog(spdlog::level::err, message);
-                    return false;
+                    if (!backendNode.IsScalar())
+                    {
+                        Debug::PrintLog(spdlog::level::err, "EngineSettings render.backend must be dx12 or vulkan.");
+                        return false;
+                    }
+
+                    const std::string backendName = backendNode.AsString();
+                    if (!TryParseRenderBackend(backendName, renderBackend))
+                    {
+                        const std::string message = "Unsupported EngineSettings render.backend '" +
+                            backendName + "' (expected dx12 or vulkan).";
+                        std::fprintf(stderr, "[RenderBackend] %s\n", message.c_str());
+                        Debug::PrintLog(spdlog::level::err, message);
+                        return false;
+                    }
+                    hasCanonicalBackend = true;
                 }
-                hasCanonicalBackend = true;
             }
-        }
-        if (!hasCanonicalBackend)
-        {
-            bool legacyDx12 = true;
-            if (root["renderBackendDx12"])
-                legacyDx12 = root["renderBackendDx12"].As<bool>();
-            if (root["imguiBackendDx12"])
-                legacyDx12 = legacyDx12 && root["imguiBackendDx12"].As<bool>();
-            renderBackend = legacyDx12 ? RenderBackend::DX12 : RenderBackend::Vulkan;
+            if (!hasCanonicalBackend)
+            {
+                bool legacyDx12 = true;
+                if (root["renderBackendDx12"])
+                {
+                    legacyDx12 = root["renderBackendDx12"].As<bool>();
+                }
+                if (root["imguiBackendDx12"])
+                {
+                    legacyDx12 = legacyDx12 && root["imguiBackendDx12"].As<bool>();
+                }
+                renderBackend = legacyDx12 ? RenderBackend::DX12 : RenderBackend::Vulkan;
+            }
         }
 
         const Authoring::ReadNode startupSceneNode = root["startupSceneName"];
@@ -154,8 +169,9 @@ bool RuntimeSettings::Load() noexcept
         m_startupSceneName = startupScene.wstring();
         m_animationBudgetSettings = animationBudget;
 
-        Debug::PrintLog(spdlog::level::debug, std::string("[RenderBackend] runtime=") +
-            RenderBackendName(m_renderBackend));
+        Debug::PrintLog(spdlog::level::debug, std::string("[RenderBackend] active=") +
+            RenderBackendName(m_renderBackend) + " policy=" +
+            (m_backendPolicy == RuntimeRenderBackendPolicy::FixedDX12 ? "host-fixed-dx12" : "project-settings"));
         return true;
     }
     catch (const std::exception& exception)

@@ -190,6 +190,56 @@ struct RHIGraphicsPipelineDesc
     uint32_t        sampleCount{ 1 };
 };
 
+/// Mesh-only graphics front-end: no vertex shader, input assembler or task stage.
+/// The caller owns bytecode until GetOrCreateMesh returns. Native objects use
+/// the same generation handles and completion retirement as indexed pipelines.
+struct RHIMeshPipelineDesc
+{
+    const void* msBytecode{ nullptr };
+    size_t msSize{ 0 };
+    const void* psBytecode{ nullptr };
+    size_t psSize{ 0 };
+    RHIPipelineLayoutHandle layout;
+    RHIFillMode fillMode{ RHIFillMode::Solid };
+    RHICullMode cullMode{ RHICullMode::None };
+    bool depthEnable{ false };
+    bool blendEnable{ false };
+    RHIDepthWrite depthWriteMask{ RHIDepthWrite::All };
+    RHICompareOp depthFunc{ RHICompareOp::Less };
+    bool independentBlend{ false };
+    RHIRenderTargetBlend renderTargetBlend[8]{};
+    uint32_t numRenderTargets{ 1 };
+    RHIFormat rtvFormats[8]{ RHIFormat::RGBA8Unorm };
+    RHIFormat dsvFormat{ RHIFormat::Unknown };
+    uint32_t sampleCount{ 1 };
+
+    // Internal common raster-state translation/hash input. This does not turn
+    // the mesh pipeline into an indexed pipeline: shader stages remain separate.
+    RHIGraphicsPipelineDesc RasterState() const
+    {
+        RHIGraphicsPipelineDesc result{};
+        result.psBytecode = psBytecode;
+        result.psSize = psSize;
+        result.layout = layout;
+        result.fillMode = fillMode;
+        result.cullMode = cullMode;
+        result.depthEnable = depthEnable;
+        result.blendEnable = blendEnable;
+        result.depthWriteMask = depthWriteMask;
+        result.depthFunc = depthFunc;
+        result.independentBlend = independentBlend;
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            result.renderTargetBlend[i] = renderTargetBlend[i];
+            result.rtvFormats[i] = rtvFormats[i];
+        }
+        result.numRenderTargets = numRenderTargets;
+        result.dsvFormat = dsvFormat;
+        result.sampleCount = sampleCount;
+        return result;
+    }
+};
+
 /// 컴퓨트 파이프라인. 그래픽과 같은 해시 공간을 쓰되 백엔드가 태그로 구분해,
 /// 우연히 같은 바이트 배열이 나와도 두 종류가 섞이지 않게 한다.
 struct RHIComputePipelineDesc

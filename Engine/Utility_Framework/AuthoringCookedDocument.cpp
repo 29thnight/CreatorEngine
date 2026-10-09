@@ -280,7 +280,9 @@ namespace Authoring
 					error = "scalar cooked node에 자식이 있다";
 					return false;
 				}
-				target.SetScalar(value);
+				// CEDO already distinguishes Null from Scalar. Quoting preserves
+                // a literal "null"/"~" scalar while numeric readers still use As<T>.
+                target.SetString(value);
 				break;
 			case NodeKind::Map:
 			case NodeKind::Sequence:

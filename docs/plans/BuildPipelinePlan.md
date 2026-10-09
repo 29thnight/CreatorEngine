@@ -1,5 +1,20 @@
 # 빌드 파이프라인 신설과 엔진 계층 전면 개편 (BuildPipelinePlan)
 
+## 2026-10-07 최근 병합 반영
+
+PR #120은 `EngineShipping` 축을 이용한 Development Build 체크박스/설정·배포본 모드 일치 검사·package/runtime metadata·Development PDB 및 Player 명령 진입점을 연결했다. Debug/Release × Development/Shipping 빌드와 native Present/입력/resize·패키지 smoke·Shipping 명령/소켓 격리가 후속 수용이다.
+
+PR #121의 FMOD 제거·금지 DLL 재유입 gate는 cloud 정적 증거가 있으나 Windows PE import/실제 package와 CLR 수용은 남는다. PR #127의 ProfilerViewer 배포 및 선택적 DxCaptureHelper는 기본 프로파일링과 심층 SDK opt-in을 구분한다. SDK 자동 설치/복원이나 빌드 CI 통과를 전제하지 않는다. GPU #122/#123에 따른 재질 Scene host ABI 16과 CEMC v11-only 변경은 해당 cooked 재질/모델 재생성·package 로드를 함께 확인한다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
+2026-10-08 후속: PHASE22 AU0~AU9의 Windows 수용을 완료했다. 최종 clean source
+`3b64ea96`의 VS18 Release Editor/Player 전체 빌드·PE 53 images·FMOD-free publication,
+배포본 도구로 실제 Dynamic_CPP 선택 씬 package 및 Player 종료 100/100회가 통과했다.
+B5의 FMOD 공급 선행 차단은 해제됐다. 이 로컬 검증을 원격 CI 게임 레그 실행·아티팩트
+게시 완료로 세지 않는다. 전체 원본 콘텐츠 미해결 GUID 12개 및 Tracked 입력·B2~B4
+잔여는 각 항목에서 정리한다. [최종 오디오 수용](AudioBackendModernizationPlan.md#1213-phase22-최종-종료--2026-10-08)을 따른다.
+
 작성: 2026-08-09 · 계기: "언리얼·유니티는 게임을 어떻게 빌드하나"라는 질문에
 답하다가 드러난 구멍들. 답을 적고 보니 우리에게 없는 것이 단계 하나(쿡)가
 아니라 심판 전체였다.

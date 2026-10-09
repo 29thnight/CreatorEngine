@@ -30,7 +30,8 @@ namespace editor
         static constexpr float IconBaselineOffset = 0.f;
         static constexpr float SmallFontSize = 12.f;
         static constexpr float ExtraSmallFontSize = 10.f;
-        static constexpr float TitleBarHeight = 20.f;
+        // Minimum title-row height in final framebuffer pixels, after scaling.
+        static constexpr float TitleBarHeight = 45.f;
         static constexpr float TitleBarFontSize = 12.f;
         static constexpr float MenuGapX = 10.f;
         static constexpr float MenuGapY = 6.f;
@@ -117,6 +118,10 @@ namespace editor
 
     // 창 본문에서 지정하는 geometry도 style과 같은 두 축을 한 번만 적용한다.
     float ThemePixels(float logicalPixels) noexcept;
+
+    // Font and safe-area padding already include user/monitor scale. The 45px
+    // floor is physical; framebufferScaleY only converts it to ImGui coordinates.
+    float TitleBarFramePaddingY(float fontHeight, float safePaddingY, float framebufferScaleY = 1.f) noexcept;
 
     // 이전 배율이 적용된 style을 재사용하지 않고 기준값부터 다시 세운다.
     // 폰트는 FontScaleMain(user), FontScaleDpi(monitor)가 각각 소유한다.

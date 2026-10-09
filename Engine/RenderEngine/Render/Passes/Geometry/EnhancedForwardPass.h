@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Core/PassResourceRetirement.h"
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <cstddef>
@@ -9,6 +10,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include <wrl/client.h>
 
@@ -17,6 +19,7 @@
 #include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
 #include "../../../LXMaterialPipeline.h"
+#include "../../../GpuGeometryVisibility.h"
 #include "../../Graph/EnhancedForwardLighting.h"
 namespace material_graph { class SceneHost; }
 
@@ -118,6 +121,7 @@ public:
     const char* GetName() const override { return "Forward+"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    bool InitializeGraphLighting(const EnhancedFrameContext& context, std::string& outError);
     /// frame packet의 primary Forward ShaderMeta generation을 일반/Reference
     /// graphics request 쌍으로 전환한다. 두 후보가 모두 준비된 뒤에만 현재
     /// generation을 바꾸므로 한쪽 compile 실패가 기존 대조 쌍을 끊지 않는다.
@@ -141,6 +145,9 @@ public:
         std::span<const ShaderMetaHandle> activeHandles,
         RHICompletionPoint retireAfter);
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Preflight under the backend shader-output scope after the upload prefix.
+    // Ordered ranges are finalized in Declare after merging Code and Graph.
+    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
 
@@ -158,13 +165,11 @@ public:
 
     RGHandle GetOutput() const { return m_output; }
 
-    /// 컬링 통계. 타일 목록이 실제로 채워지는지 밖에서 본다 —
-    /// SSGI의 누적 카운터와 같은 역할이다. 늘 0이면 컬링이 죽은 것이다.
-    uint32_t GetLastCulledLightCount() const { return m_lastCulledLights; }
-    uint32_t GetLastOverflowTileCount() const { return m_lastOverflowTiles; }
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
     uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
+    // CPU-prepared route accounting, never a GPU-visible/readback count.
+    GpuGeometryVisibility::PreparedStats GetGpuVisibilityStats() const { return m_visibilityStats; }
 
     /// W8 — 이번 프레임 draw의 세대 신원 장부. GBuffer와 같은 뜻이다.
     const EnhancedDrawSealLedger& GetSealLedger() const { return m_sealLedger; }
@@ -179,13 +184,11 @@ public:
     /// ★ 핸들을 돌려준다(V2-a). 읽는 쪽은 디바이스에 물어 실제 리소스를 얻는다 —
     ///   패스가 백엔드 리소스를 들고 다니지 않는다는 것이 이 변경의 뜻이다.
     RHIBufferHandle GetTileCountBuffer() const { return m_tileCountBuffer; }
-    RHIBufferHandle GetTileListBuffer() const { return m_tileListBuffer; }
 
     /// Declare가 그래프에 들인 타일 버퍼의 핸들. 자가 검증의 리드백 패스가
     /// 자기 usage를 선언하는 데 쓴다 — 예전처럼 손 배리어로 before=UAV를
     /// 단정하면 셰이딩이 SRV로 바꾼 프레임에서 어긋난다(실제로 그렇게 잡혔다).
     RGHandle GetTileCountHandle() const { return m_tileCountHandle; }
-    RGHandle GetTileListHandle() const { return m_tileListHandle; }
 
     /// 셰이딩 파이프라인. 자가 검증이 컬링 경로와 참조 경로를 같은 기하로
     /// 그려 픽셀을 대조한다 — 둘이 다르면 컬링이 광원을 잘못 떨어뜨린 것이다.
@@ -242,15 +245,15 @@ public:
     }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
-    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+    PassResourceRetirement m_resourceRetirement;
+    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError, bool nativeMaterials = true);
     bool BuildShadePipelineDesc(const EnhancedFrameContext& context,
         const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
         const ShaderRenderState* renderState,
         const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
-        RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr);
+        RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr,
+        const LX::Runtime::CompiledGraphics* prepared = nullptr);
     // modelVertexMask가 0이 아니면 동일 mask에서 입력 레이아웃과 shader 축을
     // 유도한다. color/skin 조합을 bool로 축약하지 않는다.
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
@@ -273,16 +276,20 @@ private:
     /// 인코더만 받는다. R4-1b에서 함께 받던 커맨드 리스트는 디스크립터 힙
     /// 바인딩 하나에만 쓰였고, R4-1c가 그것을 인코더의 지연 바인딩으로
     /// 옮기면서 마지막 쓰임이 사라졌다.
+    struct OrderedVisibility
+    {
+        std::shared_ptr<const GpuGeometryVisibility::Frame> frame;
+        std::map<std::pair<std::size_t, std::size_t>, std::uint32_t> bins;
+    };
+
     bool RecordShading(class RHIEncoder& encoder,
         const EnhancedFrameContext& context, uint32_t lightCount,
         RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting,
-        std::size_t first, std::size_t end);
+        std::size_t first, std::size_t end, const OrderedVisibility& visibility);
 
     material_graph::SceneHost* m_graphMaterials{};
     Inputs   m_inputs{};
     RGHandle m_output;
-    RGHandle m_tileList;     // 타일별 광원 인덱스 (고정 슬롯)
-    RGHandle m_tileCount;    // 타일별 광원 수
 
     uint32_t m_tileCountX{ 0 };
     uint32_t m_tileCountY{ 0 };
@@ -316,8 +323,6 @@ private:
     // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
     // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).
 
-    uint32_t m_lastCulledLights{ 0 };
-    uint32_t m_lastOverflowTiles{ 0 };
     uint32_t m_lastDrawCount{ 0 };
     uint32_t m_lastMaterialCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };
@@ -400,13 +405,14 @@ private:
     // 두 번 그릴 때 두 번째가 첫 번째의 텍스처로 그려지지 않는다.
     struct MaterialKey
     {
-        std::vector<Texture*> textures{};
+        std::vector<const Texture*> textures{};
+        std::vector<std::uint64_t> textureIds{};
         std::vector<assets::TextureCoordinates> coordinates{}; // reflected register order
         // W7 — 배치가 샘플러로도 갈려야 draw 마다 자기 것을 걸 수 있다.
         assets::TextureSampler sampler{};
         std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> snapshot{};
 
-        Texture* operator[](std::size_t i) const { return textures[i]; }
+        const Texture* operator[](std::size_t i) const { return textures[i]; }
         bool operator==(const MaterialKey& other) const;
         bool operator<(const MaterialKey& other) const;
     };
@@ -454,6 +460,8 @@ private:
     };
 
     std::vector<DrawBatch> m_batches;
+    GpuGeometryVisibility m_visibility;
+    GpuGeometryVisibility::PreparedStats m_visibilityStats{};
 
     // 해시맵 대신 정렬 맵. 재질 종류는 프레임당 많아야 수십이고, 배열 키에
     // 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다(GBuffer와 같은 판단).

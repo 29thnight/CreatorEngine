@@ -9,6 +9,7 @@
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "RenderScene.h"
+#include "Scene.h"
 #include "ProxyCommandQueue.h"
 #include "Material.h"
 #include "MaterialGraphSceneInput.h"
@@ -20,6 +21,23 @@
 #include "RectTransformComponent.h"
 #include <algorithm>
 #include <array>
+
+own::shared_owner<TextureFramePins> RenderScene::TakePreparedTextureImagePins()
+{
+    if (auto* scene = GetScene())
+    {
+        return scene->TakePreparedTextureImagePins();
+    }
+    return {};
+}
+
+void RenderScene::RestorePreparedTextureImagePins(own::shared_owner<TextureFramePins> pins)
+{
+    if (auto* scene = GetScene())
+    {
+        scene->SetPreparedTextureImagePins(std::move(pins));
+    }
+}
 
 namespace
 {
@@ -35,7 +53,16 @@ Animator* FindEnabledAnimator(MeshRenderer* component)
 		if (nullptr == owner) break;
 
 		Animator* animator = owner->GetComponent<Animator>();
-		if (nullptr != animator && animator->IsEnabled()) return animator;
+        if (nullptr != animator && animator->IsEnabled())
+        {
+            // The nearest enabled Animator is the binding target. An incompatible
+            // v3 skeleton must not fall through to a different ancestor's palette.
+            const bool compatible = component->m_meshDescriptor
+                ? animator->IsSkinBindingCompatible(*component->m_meshDescriptor)
+                : component->m_modelGeneration
+                    && animator->IsSkinBindingCompatible(*component->m_modelGeneration);
+            return compatible ? animator : nullptr;
+        }
 
 		ownerIndex = owner->GetParentIndex();
 	}
@@ -53,7 +80,12 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 
 	auto material = component->m_Material;
 
+    component->EnsureMeshBinding();
 	MeshUpdate update{};
+    update.modelGeneration = component->m_modelGeneration;
+    update.meshDescriptor = component->m_meshDescriptor;
+    update.modelMeshIndex = component->m_modelMeshIndex;
+    update.skinned = component->IsSkinnedMesh();
 	update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();
 	update.worldPosition = owner->Transform_().GetRenderWorldPosition();
 	update.hasWorldBounds = !component->IsSkinnedMesh() && component->HasRenderableMesh();
@@ -70,7 +102,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	// 합성하는 비용을 피하면서 편집이 화면에 닿게 한다.
 	if (experiment::MaterialInstance* instance = component->GetMaterialInstance())
 	{
-		auto effective = std::make_shared<experiment::Material>();
+		auto effective = own::make_shared<experiment::Material>();
 		std::string error;
 		if (instance->BuildEffectiveMaterial(*effective, error))
 		{
@@ -452,6 +484,10 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<MeshRenderProxy>())
 			{
+                proxy->m_modelGeneration = update->modelGeneration;
+                proxy->m_meshDescriptor = update->meshDescriptor;
+                proxy->m_modelMeshIndex = update->modelMeshIndex;
+                proxy->m_isSkinnedMesh = update->skinned;
 				proxy->m_worldMatrix = update->worldMatrix;
 				proxy->m_worldPosition = update->worldPosition;
 				proxy->m_worldBounds = update->worldBounds;
@@ -469,23 +505,16 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 					proxy->m_LightMapping = update->lightMapping;
 				}
 
-				if (proxy->m_Material != update->material
-					|| proxy->m_materialGuid != update->materialGuid)
-				{
-					proxy->m_Material = update->material;
-					proxy->m_materialGuid = update->materialGuid;
-				}
+				// Owner replacement is publication, never owner-address identity.
+				proxy->m_Material = update->material;
+				proxy->m_materialGuid = update->materialGuid;
                 // Instance replacement is independent of the legacy owner/GUID.
                 proxy->m_graphMaterialSource = update->graphMaterialSource;
 				// I5-D5c3 — 저작 스냅샷은 **세대**로 갱신한다. 재질 GUID가
 				// 그대로여도 property 편집이면 세대가 오르므로, 같은 재질의
 				// 값 편집이 여기서 화면까지 닿는다(위 GUID 조건과 별개 축).
-				if (proxy->m_authoredMaterial != update->authoredMaterial
-					|| proxy->m_authoredRevision != update->authoredRevision)
-				{
-					proxy->m_authoredMaterial = update->authoredMaterial;
-					proxy->m_authoredRevision = update->authoredRevision;
-				}
+				proxy->m_authoredMaterial = update->authoredMaterial;
+				proxy->m_authoredRevision = update->authoredRevision;
 
 				proxy->m_isAnimationEnabled = update->hasAnimator;
 				proxy->m_animatorGuid = update->animatorGuid;

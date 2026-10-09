@@ -67,6 +67,15 @@ class VulkanSamplerTable;
 //   **베낀 것이 지워지는 것이 이동의 값이다** — 폴더가 바뀐 것이 아니라
 //   같은 어휘를 두 벌 들고 있던 상태가 끝났다.
 
+/// 장치가 보고한 값만 허용한다. 기본값은 미설정이므로 viewport-only 요청을 거절한다.
+struct VulkanViewportLimits
+{
+    uint32_t maxWidth{ 0 };
+    uint32_t maxHeight{ 0 };
+    float lowerBound{ 0.f };
+    float upperBound{ 0.f };
+};
+
 /// 커맨드 버퍼 하나를 감싼다. 수명은 한 번의 기록이다 — `DX12Encoder` 와 같다.
 class VulkanEncoder final : public RHIEncoder
 {
@@ -92,13 +101,56 @@ public:
         VkDevice device = VK_NULL_HANDLE,
         VulkanDescriptorPoolRecycler* descriptors = nullptr,
         const VulkanBindingTable* bindingTables = nullptr,
-        const VulkanSamplerTable* samplerTables = nullptr)
+        const VulkanSamplerTable* samplerTables = nullptr,
+        RHIIndirectDrawCapabilities indirectDrawCapabilities = {},
+        VulkanViewportLimits viewportLimits = {},
+        RHIMeshShaderCapabilities meshShaderCapabilities = {})
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
         , m_resources(resources), m_renderTargets(renderTargets)
         , m_device(device), m_descriptors(descriptors)
-        , m_bindingTables(bindingTables), m_samplerTables(samplerTables) {}
+        , m_bindingTables(bindingTables), m_samplerTables(samplerTables)
+        , m_indirectDrawCapabilities(indirectDrawCapabilities), m_viewportLimits(viewportLimits)
+        , m_meshShaderCapabilities(meshShaderCapabilities) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
+
+    void Rebind(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
+        VulkanResourceTable* resources, const VulkanRenderTargetTable* renderTargets,
+        VkDevice device, VulkanDescriptorPoolRecycler* descriptors,
+        const VulkanBindingTable* bindingTables, const VulkanSamplerTable* samplerTables,
+        RHIIndirectDrawCapabilities indirectDrawCapabilities, VulkanViewportLimits viewportLimits,
+        RHIMeshShaderCapabilities meshShaderCapabilities)
+    {
+        EndRenderTargets();
+        m_commandBuffer = commandBuffer;
+        m_pipelines = pipelines;
+        m_resources = resources;
+        m_renderTargets = renderTargets;
+        m_device = device;
+        m_descriptors = descriptors;
+        m_bindingTables = bindingTables;
+        m_samplerTables = samplerTables;
+        m_indirectDrawCapabilities = indirectDrawCapabilities;
+        m_viewportLimits = viewportLimits;
+        m_meshShaderCapabilities = meshShaderCapabilities;
+        for (size_t i = 0; i < 2; ++i)
+        {
+            m_boundPipeline[i] = {};
+            m_pending[i].clear();
+            m_descriptorsDirty[i] = false;
+            m_boundSetLayout[i] = VK_NULL_HANDLE;
+            m_boundLayoutHandle[i] = {};
+            m_boundLayout[i] = VK_NULL_HANDLE;
+        }
+        m_recordedImageLayouts.clear();
+        ClearUnimplemented();
+    }
+
+    void ClearUnimplemented()
+    {
+        m_unimplemented = 0;
+        m_lastUnimplemented = nullptr;
+    }
 
     VulkanEncoder(const VulkanEncoder&) = delete;
     VulkanEncoder& operator=(const VulkanEncoder&) = delete;
@@ -109,6 +161,8 @@ public:
     ///   향한다. 높이를 음수로 주어 백엔드가 맞춘다 — 어느 층이 좌표계를
     ///   맞추는지가 계약의 문제라서 셰이더에 숨기지 않는다.
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
+    bool SetViewport(float x, float y, uint32_t width, uint32_t height) override;
+    bool SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
 
     /// ★ 인자 둘은 `RHIEncoder::SetPipeline` 과 같은데 **근거가 반대다.**
     ///   `RHIEncoder.h` ③은 "Vulkan 은 레이아웃이 파이프라인에 구워지므로
@@ -134,6 +188,10 @@ public:
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
     void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+    bool DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
+    bool DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
+    bool DispatchMesh(uint32_t x, uint32_t y, uint32_t z) override;
+    bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
     /// 불투명 값을 표의 슬롯으로 읽어 백엔드 실물로 푼다 (5c-4c).
@@ -218,6 +276,8 @@ public:
     void EndRenderTargets();
 
 private:
+    std::vector<VkImageMemoryBarrier2> m_imageBarrierScratch;
+    std::vector<VkBufferMemoryBarrier2> m_bufferBarrierScratch;
     // ★ 여기 "백엔드 전용 경로 (계약 밖)" 공개 구간이 있었다 — 렌더 타깃
     //   셋(`VulkanRenderTargetBinding` 오버로드)과 `SetConstantBuffer
     //   (VkDescriptorSet)`. `VulkanTrianglePass` 가 유일한 소비자였고 5 가
@@ -240,7 +300,8 @@ private:
     ///
     /// ★ 바뀐 것이 없으면 아무것도 안 한다 — 이미 걸린 셋이 그대로 산다.
     ///   같은 바인딩으로 여러 번 그리는 흔한 경우에 셋을 다시 자르지 않는다.
-    void FlushDescriptors(RHIBindPoint bindPoint);
+    bool FlushDescriptors(RHIBindPoint bindPoint);
+    bool IsPipelineBound(RHIBindPoint bindPoint, bool mesh = false) const;
 
     /// 현재 셋에 들어갈 디스크립터 하나.
     ///
@@ -280,6 +341,10 @@ private:
     VulkanDescriptorPoolRecycler*  m_descriptors{ nullptr };
     const VulkanBindingTable*      m_bindingTables{ nullptr };
     const VulkanSamplerTable*      m_samplerTables{ nullptr };
+    RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
+    VulkanViewportLimits m_viewportLimits;
+    RHIMeshShaderCapabilities m_meshShaderCapabilities;
+    RHIPipelineHandle m_boundPipeline[2];
 
     std::vector<PendingBinding> m_pending[2];
     bool m_descriptorsDirty[2]{ false, false };
@@ -308,4 +373,3 @@ private:
     uint32_t    m_unimplemented{ 0 };
     const char* m_lastUnimplemented{ nullptr };
 };
-

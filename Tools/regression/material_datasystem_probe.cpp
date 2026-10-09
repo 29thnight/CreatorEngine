@@ -9,12 +9,26 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 
 namespace reflgen::generated
 {
-void register_RenderEngine(reflgen::registry& target);
+    void register_RenderEngine(reflgen::registry& target);
+}
+
+namespace
+{
+    template<class T>
+    bool SameGraphOwner(const own::shared_owner<T>& left, const own::shared_owner<T>& right)
+    {
+        if (left && right)
+        {
+            return std::addressof(*left) == std::addressof(*right);
+        }
+        return !left && !right;
+    }
 }
 
 struct ComApartment
@@ -60,10 +74,10 @@ int main(int argc, char** argv)
         material.m_name = "DataSystem LX instance";
         check(data->ConfigureMaterialGraph(material, description, error), "Actual instance/Texture load: " + error);
         const auto original = material.GetMaterialGraphInstance();
-        check(original && original->generation == generation && original->textures.size() == 1 &&
-                  original->textures[0].owner && original->textures[0].owner->GetImageView().Width() == 1,
+        check(original && SameGraphOwner(original->generation, generation) && original->textures.size() == 1 &&
+                  original->textures[0].owner && original->textures[0].owner->GetImageDescription().Width() == 1,
               "Actual decoded texture is owned by the graph instance");
-        const auto format = original->textures[0].owner->GetImageView().Format();
+        const auto format = original->textures[0].owner->GetImageDescription().Format();
         check(format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb,
               "Actual CPU texture storage preserves graph SRGB intent");
         const auto* generated = material.GetGeneratedShaderMeta();
@@ -79,27 +93,27 @@ int main(int argc, char** argv)
                   material.GetTextureMapShared(textureProperty->name) == original->textures[0].owner,
               "Common texture value and owner agree with the accepted LX instance");
         check(material.TrySetTextureGuid(textureProperty->name, textureGuid) &&
-                  material.GetMaterialGraphInstance() != original &&
-                  material.GetMaterialGraphInstance()->generation == generation,
+                  !SameGraphOwner(material.GetMaterialGraphInstance(), original) &&
+                  SameGraphOwner(material.GetMaterialGraphInstance()->generation, generation),
               "Common texture setter publishes a stable-ID owning snapshot");
         const auto textureAccepted = material.GetMaterialGraphInstance();
         FileGuid unavailableTexture;
         check(Uuid::TryParse("44444444-4444-4444-8444-444444444444", unavailableTexture.m_guid) &&
                   !material.TrySetTextureGuid(textureProperty->name, unavailableTexture) &&
-                  material.GetMaterialGraphInstance() == textureAccepted,
+                  SameGraphOwner(material.GetMaterialGraphInstance(), textureAccepted),
               "Common texture setter preserves the snapshot when an owner cannot load");
         check(material.TrySetMaterialGraphParameter(900, .47, error) &&
-                  material.GetMaterialGraphInstance() != original &&
+                  !SameGraphOwner(material.GetMaterialGraphInstance(), original) &&
                   material.GetMaterialGraphInstance()->uniforms != original->uniforms,
               "Public numeric setter publishes a new owning instance snapshot");
         Material clone(material);
         const auto sharedInstance = clone.GetMaterialGraphInstance();
         data->FinalizeMaterialRuntime(clone);
-        check(clone.GetMaterialGraphInstance() == sharedInstance,
+        check(SameGraphOwner(clone.GetMaterialGraphInstance(), sharedInstance),
               "Legacy scene clone finalization preserves the accepted LX snapshot");
         check(clone.TrySetMaterialGraphParameter(900, .82, error) &&
-                  clone.GetMaterialGraphInstance()->generation == generation &&
-                  material.GetMaterialGraphInstance() == sharedInstance,
+                  SameGraphOwner(clone.GetMaterialGraphInstance()->generation, generation) &&
+                  SameGraphOwner(material.GetMaterialGraphInstance(), sharedInstance),
               "Material clone overrides do not mutate the original");
         Authoring::WriteDocument saved;
         check(data->SerializeMaterialPayload(material, saved.Root()), "Actual DataSystem authoring save");
@@ -123,7 +137,7 @@ int main(int argc, char** argv)
         saved.Root().Child("lattice_material").SetScalar(99);
         const auto malformedRoot = saved.Root().Read();
         check(!data->DeserializeMaterialPayload(restored, Authoring::NodeViewAccess::Make(malformedRoot)) &&
-                  restored.GetMaterialGraphInstance() == accepted,
+                  SameGraphOwner(restored.GetMaterialGraphInstance(), accepted),
               "Bad authoring document preserves the accepted Material snapshot");
         auto missingTexture = description;
         experiment::AssetId absent;
@@ -131,13 +145,13 @@ int main(int argc, char** argv)
               "Absent texture GUID");
         missingTexture.textures = {{905, absent}};
         check(!data->ConfigureMaterialGraph(restored, missingTexture, error) &&
-                  restored.GetMaterialGraphInstance() == accepted,
+                  SameGraphOwner(restored.GetMaterialGraphInstance(), accepted),
               "Packaged texture override outside CEMF fails without losing accepted owners");
         auto badBinary = binary.str();
         badBinary.resize(15);
         std::istringstream truncated(badBinary, std::ios::binary);
         check(!data->DeserializeMaterialBinaryPayload(restored, truncated) &&
-                  restored.GetMaterialGraphInstance() == accepted,
+                  SameGraphOwner(restored.GetMaterialGraphInstance(), accepted),
               "Truncated CEMT/CEDO preserves the complete previous instance");
         Material legacy;
         legacy.m_name = "Legacy material";
@@ -161,17 +175,17 @@ int main(int argc, char** argv)
         const RuntimeAssetChange change{RuntimeAssetChangeKind::ContentReload, RuntimeAssetType::Auto, graph,
                                         sourcePath};
         const bool rejected =
-            !data->ApplyAssetChange(change) && data->ResolveMaterialGraphGeneration(graph) == generation;
+            !data->ApplyAssetChange(change) && SameGraphOwner(data->ResolveMaterialGraphGeneration(graph), generation);
         const bool sourceRestored = source->Save(sourcePath, &error);
-        check(rejected && sourceRestored && restored.GetMaterialGraphInstance() == accepted,
+        check(rejected && sourceRestored && SameGraphOwner(restored.GetMaterialGraphInstance(), accepted),
               "Actual Auto asset-change reload rejects stale graph and preserves cache/Material");
-        check(data->ApplyAssetChange(change) && data->ResolveMaterialGraphGeneration(graph) == generation,
+        check(data->ApplyAssetChange(change) && SameGraphOwner(data->ResolveMaterialGraphGeneration(graph), generation),
               "Restored identical source reload retains its existing generation");
         check(data->ApplyAssetChange({RuntimeAssetChangeKind::Removed, RuntimeAssetType::Auto, graph, sourcePath}) &&
-                  !data->ResolveMaterialGraphGeneration(graph) && accepted->generation == generation,
+                  !data->ResolveMaterialGraphGeneration(graph) && SameGraphOwner(accepted->generation, generation),
               "Actual removal retires GUID lookup while retained instances own the program");
         data->Finalize();
-        check(accepted->textures[0].owner && accepted->textures[0].owner->GetImageView().Width() == 1,
+        check(accepted->textures[0].owner && accepted->textures[0].owner->GetImageDescription().Width() == 1,
               "DataSystem finalization does not destroy externally owned instance textures");
         std::cout << "LX_MATERIAL_DATASYSTEM_OK checks=" << checks << "\n";
         return 0;

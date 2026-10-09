@@ -27,6 +27,30 @@ namespace
         return oss.str();
     }
 
+    // Each enum/value pair must have native-word alignment. Aligning the enum
+    // alone would insert the wrong padding for scalar stream subobjects.
+    template<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE Kind, class T>
+    struct alignas(void*) MeshPipelineSubobject
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE kind{ Kind };
+        T value{};
+    };
+
+    struct MeshPipelineStream
+    {
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*> root;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, D3D12_SHADER_BYTECODE> mesh;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, D3D12_SHADER_BYTECODE> pixel;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, D3D12_BLEND_DESC> blend;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK, UINT> sampleMask;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, D3D12_RASTERIZER_DESC> raster;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, D3D12_DEPTH_STENCIL_DESC> depth;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY, D3D12_PRIMITIVE_TOPOLOGY_TYPE> topology;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, D3D12_RT_FORMAT_ARRAY> targets;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, DXGI_FORMAT> depthFormat;
+        MeshPipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC, DXGI_SAMPLE_DESC> samples;
+    };
+
     // FNV-1a 64. 암호학적 강도는 필요 없고, 셰이더 바이트코드까지 훑을 만큼
     // 빠르며 충돌이 실질적으로 없으면 된다.
     constexpr uint64_t kFnvOffset = 1469598103934665603ull;
@@ -545,7 +569,118 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateCompute(const RHIComputePipelineDes
     if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    return Publish(hash, pso, ResolveSignature(desc.layout), outError);
+    return Publish(hash, pso, ResolveSignature(desc.layout), outError, false, true);
+}
+
+RHIPipelineHandle DX12PSOManager::GetOrCreateMesh(const RHIMeshPipelineDesc& desc,
+    std::string& outError)
+{
+    outError.clear();
+    if (!m_resources || !m_device || !m_resources->GetMeshShaderCapabilities().meshShader)
+    {
+        outError = "DX12 mesh shaders are not supported by this device.";
+        return {};
+    }
+    const auto layout = m_resources->Resolve(desc.layout);
+    if (!layout.IsValid() || layout.allowInputAssembler || !desc.msBytecode || !desc.msSize ||
+        ((desc.psBytecode != nullptr) != (desc.psSize != 0)) || desc.numRenderTargets > 8 || !desc.sampleCount)
+    {
+        outError = "Invalid DX12 mesh pipeline bytecode, raster state, or mesh-only layout.";
+        return {};
+    }
+    constexpr uint64_t kMeshTag = 0x4d45534850534f31ull; // MESHPSO1
+    uint64_t hash = HashValue(kMeshTag, ComputeHash(desc.RasterState()));
+    hash = HashValue(desc.msSize, hash);
+    hash = HashPsoBytes(desc.msBytecode, desc.msSize, hash);
+    hash = HashValue(desc.psSize, hash);
+    {
+        std::lock_guard guard(m_mutex);
+        if (!m_acceptingRequests)
+        {
+            outError = "DX12 pipeline cache is not accepting requests.";
+            return {};
+        }
+        if (const auto found = m_cache.find(hash); found != m_cache.end())
+        {
+            ++m_stats.memoryHits;
+            return found->second.handle;
+        }
+    }
+
+    MeshPipelineStream stream;
+    stream.root.value = layout.signature;
+    stream.mesh.value = { desc.msBytecode, desc.msSize };
+    stream.pixel.value = { desc.psBytecode, desc.psSize };
+    stream.sampleMask.value = UINT_MAX;
+    stream.raster.value.FillMode = DX12Translate::ToD3D12(desc.fillMode);
+    stream.raster.value.CullMode = DX12Translate::ToD3D12(desc.cullMode);
+    stream.raster.value.DepthClipEnable = TRUE;
+    stream.blend.value.IndependentBlendEnable = desc.independentBlend ? TRUE : FALSE;
+    if (desc.independentBlend)
+    {
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            stream.blend.value.RenderTarget[i] = DX12Translate::ToD3D12(desc.renderTargetBlend[i]);
+        }
+    }
+    else
+    {
+        auto& target = stream.blend.value.RenderTarget[0];
+        target.BlendEnable = desc.blendEnable ? TRUE : FALSE;
+        target.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        target.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        target.BlendOp = D3D12_BLEND_OP_ADD;
+        target.SrcBlendAlpha = D3D12_BLEND_ZERO;
+        target.DestBlendAlpha = D3D12_BLEND_ONE;
+        target.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        target.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    }
+    stream.depth.value.DepthEnable = desc.depthEnable ? TRUE : FALSE;
+    stream.depth.value.DepthWriteMask = DX12Translate::ToD3D12(desc.depthWriteMask);
+    stream.depth.value.DepthFunc = DX12Translate::ToD3D12Depth(desc.depthFunc);
+    stream.topology.value = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    stream.targets.value.NumRenderTargets = desc.numRenderTargets;
+    for (uint32_t i = 0; i < desc.numRenderTargets; ++i)
+    {
+        stream.targets.value.RTFormats[i] = ToDXGI(desc.rtvFormats[i]);
+    }
+    stream.depthFormat.value = ToDXGI(desc.dsvFormat);
+    stream.samples.value = { desc.sampleCount, 0 };
+
+    D3D12_PIPELINE_STATE_STREAM_DESC nativeDesc{ sizeof(stream), &stream };
+    const auto name = MakeLibraryName(hash);
+    ComPtr<ID3D12PipelineState> pipeline;
+    ComPtr<ID3D12PipelineLibrary1> meshLibrary;
+    if (m_library && SUCCEEDED(m_library.As(&meshLibrary)) &&
+        SUCCEEDED(meshLibrary->LoadPipeline(name.c_str(), &nativeDesc, IID_PPV_ARGS(&pipeline))))
+    {
+        std::lock_guard guard(m_mutex);
+        ++m_stats.libraryHits;
+    }
+    else
+    {
+        ComPtr<ID3D12Device2> meshDevice;
+        const HRESULT query = m_device.As(&meshDevice);
+        const HRESULT created = SUCCEEDED(query)
+            ? meshDevice->CreatePipelineState(&nativeDesc, IID_PPV_ARGS(&pipeline)) : query;
+        if (FAILED(created))
+        {
+            outError = "DX12 mesh pipeline creation failed: " + PsoHrToString(created);
+            std::lock_guard guard(m_mutex);
+            ++m_stats.failures;
+            return {};
+        }
+        {
+            std::lock_guard guard(m_mutex);
+            ++m_stats.compiles;
+        }
+        if (m_library)
+        {
+            m_library->StorePipeline(name.c_str(), pipeline.Get());
+        }
+    }
+    std::lock_guard guard(m_mutex);
+    return Publish(hash, std::move(pipeline), layout.signature, outError, true);
 }
 
 bool DX12PSOManager::SetFallback(const RHIGraphicsPipelineDesc& desc, std::string& outError)
@@ -679,14 +814,14 @@ RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& des
 ///   안에서, 즉 부르는 스레드에서만 한다 — 컴파일은 백그라운드로 가도
 ///   등록은 여기로 모인다.
 RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
-    ID3D12RootSignature* signature, std::string& outError)
+    ID3D12RootSignature* signature, std::string& outError, bool meshPipeline, bool computePipeline)
 {
     const auto found = m_cache.find(hash);
     if (found != m_cache.end()) return found->second.handle;
 
     CacheEntry entry{};
     entry.pso = pso;
-    entry.handle = m_resources->RegisterPipeline(pso.Get(), signature);
+    entry.handle = m_resources->RegisterPipeline(pso.Get(), signature, meshPipeline, computePipeline);
     if (!entry.handle.IsValid())
     {
         ++m_stats.failures;

@@ -12,6 +12,8 @@ SamplerState                     gSampler : register(s0);
 cbuffer SpriteCamera : register(b0)
 {
     float4x4 gViewProjection;
+    uint gInstanceBase;
+    uint3 gCameraPadding;
 };
 
 struct VSOut
@@ -23,7 +25,7 @@ struct VSOut
 
 VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-    const SpriteInstance sprite = gSprites[instanceId];
+    const SpriteInstance sprite = gSprites[gInstanceBase + instanceId];
     const float2 corner = float2(float(vertexId & 1u),
         float((vertexId >> 1u) & 1u));
     const float3 local = float3(corner - 0.5f, 0.0f);

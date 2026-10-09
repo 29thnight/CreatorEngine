@@ -23,8 +23,20 @@ public:
 
 	~ManagedAniBehavior() override
 	{
-		if (HasInstance()) ClrHost::Get().DestroyAniBehavior(m_instanceId);
+        ReleaseInstance();
 	}
+
+    void ReleaseInstance()
+    {
+        if (!HasInstance())
+        {
+            return;
+        }
+        const int instance = m_instanceId;
+        m_instanceId = -1;
+        m_ownerController = nullptr;
+        ClrHost::Get().DestroyAniBehavior(instance);
+    }
 
 	ManagedAniBehavior(const ManagedAniBehavior&) = delete;
 	ManagedAniBehavior& operator=(const ManagedAniBehavior&) = delete;

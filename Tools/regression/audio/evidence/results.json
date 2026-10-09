@@ -1,0 +1,423 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-10-05",
+  "status": "passed",
+  "branch": "phase22-fmod-retirement-20261005",
+  "base_commit": "86f7efd30314de4dd19e3dbb30da9f820506e3dd",
+  "tested_tree_identity": "source-sha256.json; working-tree implementation before publication",
+  "host": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+    "cpp_standard": "C++23"
+  },
+  "production_source_adapters": false,
+  "unique_assertions": 3825,
+  "unique_assertions_passed": 3825,
+  "unique_assertion_failures": 0,
+  "counting_note": "Assertions include hostile/truncated-prefix checks. Repeating configurations does not multiply unique coverage or imply independent end-to-end scenarios.",
+  "source_ledger_entries": 576,
+  "source_ledger_equal_across_configurations": true,
+  "source_drift_after_tests": false,
+  "sanitizers": {
+    "address": true,
+    "undefined_behavior": true,
+    "rapidyaml_c4core_instrumented": true,
+    "findings": 0,
+    "leak": false,
+    "leak_exclusion": "LeakSanitizer disabled under ptrace; leak freedom not verified"
+  },
+  "config_flags": {
+    "debug": [
+      "-O0",
+      "-g"
+    ],
+    "release": [
+      "-O2",
+      "-DNDEBUG"
+    ],
+    "sanitize": [
+      "-O1",
+      "-g",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer"
+    ],
+    "authoring_dependency_note": "Authoring and dependency TUs additionally use -DNDEBUG to match the pinned dependency build; runtime Debug TUs do not."
+  },
+  "dependencies": {
+    "vcpkg_baseline": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+    "rapidyaml": {
+      "version": "0.16.0",
+      "commit": "f8ac8dd50f4f7916579d55a05ebf9c6488e52670",
+      "repository": "https://github.com/biojppm/rapidyaml"
+    },
+    "c4core": {
+      "version": "0.6.0",
+      "commit": "1885dca396de5aea84f176eccb92a00c8b85c5ff",
+      "repository": "https://github.com/biojppm/c4core"
+    }
+  },
+  "commands": [
+    "python3 Tools/regression/audio/run_portable.py --config debug --ryml-prefix $RYML_RELEASE_PREFIX --output Build/Validation/Phase22Final",
+    "python3 Tools/regression/audio/run_portable.py --config release --ryml-prefix $RYML_RELEASE_PREFIX --output Build/Validation/Phase22Final",
+    "python3 Tools/regression/audio/run_portable.py --config sanitize --ryml-prefix $RYML_SANITIZE_PREFIX --output Build/Validation/Phase22Final",
+    "python3 Tools/regression/audio/run_failure_canaries.py --build Build/Validation/Phase22Final/debug",
+    "python3 Tools/regression/audio/verify_fixture_determinism.py --probe Build/Validation/Phase22Final/debug/audio_voice_contract_probe --output Build/Validation/Phase22Final",
+    "python3 Tools/regression/audio/recheck_sound_cook.py --build Build/Validation/Phase22Final"
+  ],
+  "pcm_observations": {
+    "pause_last_nonzero_frame": 2,
+    "pause_bound_frames": 256,
+    "next_paused_block_energy": 0,
+    "reverb_dry_tail_energy": 0.0,
+    "hall_tail_energy": 0.186364799,
+    "blend_near_2d_energy": 23.019774,
+    "blend_near_3d_energy": 23.019774,
+    "blend_near_midpoint_energy": 46.039544,
+    "blend_far_2d_energy": 23.019774,
+    "blend_far_3d_energy": 0.0,
+    "blend_far_midpoint_energy": 11.509886,
+    "plus_x_left_energy": 0.818481,
+    "plus_x_right_energy": 20.46202,
+    "minus_x_left_energy": 20.46202,
+    "minus_x_right_energy": 0.818481,
+    "rotated_listener_left_energy": 0.818481,
+    "rotated_listener_right_energy": 20.46202
+  },
+  "bounded_lifetime_checks": {
+    "per_play_recycles": 1000,
+    "known_length_null_one_shots": 128,
+    "host_failed_device_restarts": 100,
+    "software_device_restarts_same_handle": 20,
+    "concurrent_command_producers": 4,
+    "mailbox_capacity": 1024
+  },
+  "excluded": [
+    "physical audio output / WASAPI / listening / hardware loopback",
+    "hardware latency / underrun certification / 30-minute hardware soak",
+    "Windows MSVC wrapper execution / Editor and Player full builds / package and PE checks",
+    "native Windows cache/CNG paths",
+    "real Pak mount / encryption / mount immutability",
+    "C# product execution / real product scene integration",
+    "LeakSanitizer and leak freedom",
+    "Windows ACP execution for Korean/emoji alias tests; Linux tests validate UTF-8 contract only"
+  ],
+  "suites": [
+    {
+      "config": "debug",
+      "suite": "core",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "debug/core.log",
+      "assertions": 133,
+      "passed": 133,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "decode",
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "debug/decode.log",
+      "assertions": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "render",
+      "exit_code": 0,
+      "seconds": 0.064,
+      "log": "debug/render.log",
+      "assertions": 34,
+      "passed": 34,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "software-device",
+      "exit_code": 0,
+      "seconds": 1.268,
+      "log": "debug/software-device.log",
+      "assertions": 62,
+      "passed": 62,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "cooked-contract",
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "debug/cooked-contract.log",
+      "assertions": 670,
+      "passed": 670,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "cooked-playback",
+      "exit_code": 0,
+      "seconds": 1.067,
+      "log": "debug/cooked-playback.log",
+      "assertions": 114,
+      "passed": 114,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "cook-decoder",
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "debug/cook-decoder.log",
+      "assertions": 20,
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "cold-device",
+      "exit_code": 0,
+      "seconds": 1.318,
+      "log": "debug/cold-device.log",
+      "assertions": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "sound-assets",
+      "exit_code": 0,
+      "seconds": 0.064,
+      "log": "debug/sound-assets.log",
+      "assertions": 2733,
+      "passed": 2733,
+      "failed": 0
+    },
+    {
+      "config": "debug",
+      "suite": "sound-cook",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "debug/sound-cook.log",
+      "assertions": 38,
+      "passed": 38,
+      "failed": 0,
+      "verification": "targeted UTF-8 recompile; other suites retain clean baseline"
+    },
+    {
+      "config": "release",
+      "suite": "core",
+      "exit_code": 0,
+      "seconds": 0.008,
+      "log": "release/core.log",
+      "assertions": 133,
+      "passed": 133,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "decode",
+      "exit_code": 0,
+      "seconds": 0.004,
+      "log": "release/decode.log",
+      "assertions": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "render",
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "release/render.log",
+      "assertions": 34,
+      "passed": 34,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "software-device",
+      "exit_code": 0,
+      "seconds": 1.268,
+      "log": "release/software-device.log",
+      "assertions": 62,
+      "passed": 62,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "cooked-contract",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "release/cooked-contract.log",
+      "assertions": 670,
+      "passed": 670,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "cooked-playback",
+      "exit_code": 0,
+      "seconds": 0.816,
+      "log": "release/cooked-playback.log",
+      "assertions": 114,
+      "passed": 114,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "cook-decoder",
+      "exit_code": 0,
+      "seconds": 0.008,
+      "log": "release/cook-decoder.log",
+      "assertions": 20,
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "cold-device",
+      "exit_code": 0,
+      "seconds": 1.318,
+      "log": "release/cold-device.log",
+      "assertions": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "sound-assets",
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "release/sound-assets.log",
+      "assertions": 2733,
+      "passed": 2733,
+      "failed": 0
+    },
+    {
+      "config": "release",
+      "suite": "sound-cook",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "release/sound-cook.log",
+      "assertions": 38,
+      "passed": 38,
+      "failed": 0,
+      "verification": "targeted UTF-8 recompile; other suites retain clean baseline"
+    },
+    {
+      "config": "sanitize",
+      "suite": "core",
+      "exit_code": 0,
+      "seconds": 0.064,
+      "log": "sanitize/core.log",
+      "assertions": 133,
+      "passed": 133,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "decode",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "sanitize/decode.log",
+      "assertions": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "render",
+      "exit_code": 0,
+      "seconds": 0.115,
+      "log": "sanitize/render.log",
+      "assertions": 34,
+      "passed": 34,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "software-device",
+      "exit_code": 0,
+      "seconds": 1.317,
+      "log": "sanitize/software-device.log",
+      "assertions": 62,
+      "passed": 62,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "cooked-contract",
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "sanitize/cooked-contract.log",
+      "assertions": 670,
+      "passed": 670,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "cooked-playback",
+      "exit_code": 0,
+      "seconds": 1.067,
+      "log": "sanitize/cooked-playback.log",
+      "assertions": 114,
+      "passed": 114,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "cook-decoder",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "sanitize/cook-decoder.log",
+      "assertions": 20,
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "cold-device",
+      "exit_code": 0,
+      "seconds": 1.318,
+      "log": "sanitize/cold-device.log",
+      "assertions": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "sound-assets",
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "sanitize/sound-assets.log",
+      "assertions": 2733,
+      "passed": 2733,
+      "failed": 0
+    },
+    {
+      "config": "sanitize",
+      "suite": "sound-cook",
+      "exit_code": 0,
+      "seconds": 0.064,
+      "log": "sanitize/sound-cook.log",
+      "assertions": 38,
+      "passed": 38,
+      "failed": 0,
+      "verification": "targeted UTF-8 recompile; other suites retain clean baseline"
+    }
+  ],
+  "clean_baseline": true,
+  "clean_baseline_assertions_per_configuration": 3817,
+  "cache_reuse": false,
+  "final_targeted_recompile": true,
+  "unchanged_clean_objects_per_configuration": 25,
+  "verification_strategy": "Clean 10-suite baseline in three configurations; compiler-proven final UTF-8 cook-only change rebuilt and rerun in each configuration",
+  "test_driver_sha256": {
+    "Tools/regression/audio/build_test_dependencies.py": "66e2bff480d3adf1787191deb341b1960966942cbac44c0d28f05bf6dd63116d",
+    "Tools/regression/audio/recheck_sound_cook.py": "2b98ebd71324e0a10ed4f028c5b20ab04527bdf968731e786ea6d5332e8cfc28",
+    "Tools/regression/audio/run_failure_canaries.py": "f0f0626239eb76fb709be35664b09e0487749aec86b6b0543d0046e7c18f6f5b",
+    "Tools/regression/audio/run_portable.py": "8445291f8eef0dfdf4d1b6d2984ce27c67c4fd92a0139caed668e3e23ecd993b",
+    "Tools/regression/audio/verify_fixture_determinism.py": "b6dcde583220010444eea0f1238c43e49978a4800ae16666b12e427a713ae725"
+  }
+}

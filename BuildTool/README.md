@@ -100,3 +100,214 @@ dotnet run --project BuildTool/Tests/CreatorBuildTool.Tests.csproj -c Debug -- -
 관련 정본: [BuildPipelinePlan](../docs/plans/BuildPipelinePlan.md),
 [EngineDistributionAndLauncherPlan](../docs/plans/EngineDistributionAndLauncherPlan.md),
 [EngineVersionPolicy](../docs/design/EngineVersionPolicy.md).
+
+## Player Development Build
+
+Development/Shipping is the existing `EngineShipping` axis, independent of compiler
+`Debug`/`Release`. `publish-engine --config Release` publishes an optimized Development
+Player; add `--shipping` to publish Shipping. `package-game` and `Tools/build.ps1`
+select the same mode using `--shipping` / `-Shipping`. Packaging requires a matching
+published distribution and project engine pin, and does not enable diagnostics by
+changing a runtime settings file.
+
+Editor Build Settings persists `build.development` (Development Build, default true).
+Export checks that choice against the selected distribution and reports a mismatch;
+select/publish the matching engine before exporting. `engine.runtime.json`, the
+package manifest and current pointer record `shipping` and `developmentBuild` alongside
+compiler configuration.
+
+Development bundles the matching `Player.runtime.pdb` through the native runtime
+manifest. Attach the existing native debugger to Player.exe; optimized Release code
+retains its optimization, and engine-module symbol coverage follows each module's
+existing compiler policy. Existing logs and profiler markers remain available.
+This does not add a remote debugger protocol or a managed/C# debugger integration.
+
+Local Development Player inputs use the same role-filtered registry as HTTP:
+
+- `Player.exe --exec "player.status" --exec quit`
+- `Player.exe --exec-args player.object "Big Boss" -- --exec quit`
+- `Player.exe --script commands.txt` (UTF-8, one command per line, `#`/`//` comment lines)
+- `Player.exe --commandlet player.status` (run one registered Player command and exit)
+- `Player.exe --commandlet-script commands.txt --fail-fast --result-file results.jsonl`
+
+Structured `--exec-args` and `--commandlet` arguments run until `--` or argv end.
+`--exec`/`--script` remain live until an explicit `quit`; commandlets exit after the
+batch. Command results use the existing schema-v1 JSONL envelope, with optional
+`--result-format jsonl` and `--result-file`. Stdout also contains engine logs; use the
+result file for a pure JSONL stream. Session exit codes aggregate failures
+(0 success, 2 arguments, 3 precondition, 4 failed/cancelled/timeout, 5 internal error).
+Local batches cannot be mixed with smoke or HTTP service execution. These are
+Player runtime commands, not Editor authoring/test commandlets.
+
+HTTP still requires explicit `--command-service`; Development does not open a
+listener automatically. Existing loopback binding, token authentication and user-code
+policy are unchanged. Shipping compile-excludes the registry, CLI execution, profiler
+command handlers and HTTP implementation, and rejects local developer switches.
+
+## Independent source AssetSets
+
+`CreatorBuildTool build-asset-set --engine-distribution C:\Engine\Distribution --project C:\Game --asset-set C:\Game\Content\textures.assetset.yml --output C:\Game\Build\Textures-r1`
+
+This command invokes the verified distribution's AssetCooker independently. It does not build Player, native code, shaders, or managed game scripts. Existing `package-game` retains its legacy CEMF v2 path; it does not silently combine v3 AssetSets with an old package. The distribution must contain the new AssetCooker command.
+
+Supported kinds are Texture (canonical UUIDv4), and source-authored Model descriptors, Mesh, Skeleton and AnimationClip (canonical UUIDv8 from the schema-v2 model sidecar). Each declaration uses that independently addressable identity as `assetId`; a nested `subassetId` YAML field is not supported. Texture output is a source image (`.png`, `.jpg`, `.hdr`, `.dds`); the other kinds use independent bounded descriptor (`.cemd`), geometry (`.cege`), skeleton (`.cesl`) and clip (`.cean`) formats. Material/scene/audio kinds, external manifest edges, transcoding and mip-generation settings still fail explicitly. Runtime support is a separate per-kind contract; a successful cook alone does not establish full animated geometry/render integration.
+
+Every invocation reads authoring source and canonical identity data, including cache reuse. Model import uses immutable captured root and external dependency bytes (including glTF buffers/images and FBX side inputs); each consumed file contributes to the source-import fingerprint. Source sidecars and the identity epoch are validated without issuing IDs or advancing canonical generation state. Old `generation.asset`, `model.cemc` and CEMF v2 packages are never the source of a v3 recook. A missing or changed stable identity requires the authoring workflow to reconcile it first.
+
+Model/mesh/skeleton/clip selections share one source import. Only selected meshes are packed and receive meshlet/LOD generation; persisted `importSettings.buildMeshlets` and `importSettings.lodLevels` are read from the captured canonical sidecar. A static Mesh has no dependencies; a skinned Mesh has exactly one Hard Skeleton edge. Geometry contains only shareable packed layout/vertex/index/bounds/meshlet/LOD data plus its required bone count and full skin-binding digest. It contains no mesh/model/material IDs, names, source paths or authoring generation. The full binding digest includes ordered bone names/parents/root and all bind/root transforms. A clip still uses the distinct pose-independent ordered bone-layout digest. The build validates each Mesh and clip against the actual selected Skeleton artifact, including packed bone indices 0–254 (255 is unused). Model descriptors list skeleton, all clips and all meshes as Loadable references, and retain ordered small node/mesh/material summaries without geometry arrays. The definition must declare those exact typed edges, rather than importing old untyped dependencies. Selecting only a clip root includes that clip and its skeleton; selecting a Mesh root includes only that Mesh and its required Skeleton, if skinned. Unrelated sibling artifacts are not emitted. This source import can inspect the entire authoring model, but runtime readers consume independent selected artifacts, not the monolithic CEMC.
+
+Descriptor wire schema is now 2 (representation remains 2). Schema-1 `.cemd` artifacts must be recooked; they are rejected rather than treated as empty geometry descriptors. Independent geometry is representation 1/schema 1. Material summaries are a bridge, not a Material producer or prepared runtime material. General source-free authored-model boot, material graphs and embedded model textures remain a separate integration requirement; an explicitly prepared material is needed for the initial geometry consumer.
+
+A source definition is strict YAML. Unknown or duplicate fields fail. Every source declares its typed dependencies explicitly, even when empty. Roots and both Hard/Loadable edge kinds form the included closure; only hard ownership SCCs are rejected. A loadable-only cycle is allowed. These edges are authored v3 source declarations; legacy CEMF v2 dependency lists are never reinterpreted or converted.
+
+```yaml
+schemaVersion: 1
+assetSetId: 11111111-1111-4111-8111-111111111111
+revision: 1
+inclusion: HardAndLoadable
+target:
+  platform: win-x64
+  abi: creator-texture-v1
+settings:
+  textureEncoding: Source
+roots:
+  - assetId: 22222222-2222-4222-8222-222222222222
+    kind: Texture
+assets:
+  - assetId: 22222222-2222-4222-8222-222222222222
+    kind: Texture
+    source: Textures/Root.png
+    dependencies:
+      - assetId: 33333333-3333-4333-8333-333333333333
+        kind: Texture
+        dependency: Hard
+      - assetId: 44444444-4444-4444-8444-444444444444
+        kind: Texture
+        dependency: Loadable
+  - assetId: 33333333-3333-4333-8333-333333333333
+    kind: Texture
+    source: Textures/Hard.png
+    dependencies: []
+  - assetId: 44444444-4444-4444-8444-444444444444
+    kind: Texture
+    source: Textures/Later.png
+    dependencies: []
+```
+
+A selected clip definition can name the already-authored skeleton and clip from one source. Replace these sample UUIDv8 values with the canonical sidecar IDs:
+
+```yaml
+schemaVersion: 1
+assetSetId: 11111111-1111-4111-8111-111111111111
+revision: 1
+inclusion: HardAndLoadable
+target:
+  platform: win-x64
+  abi: creator-animation-v1
+settings:
+  textureEncoding: Source
+roots:
+  - assetId: 22222222-2222-8222-8222-222222222222
+    kind: AnimationClip
+assets:
+  - assetId: 22222222-2222-8222-8222-222222222222
+    kind: AnimationClip
+    source: Models/Character.glb
+    dependencies:
+      - assetId: 33333333-3333-8333-8333-333333333333
+        kind: Skeleton
+        dependency: Hard
+  - assetId: 33333333-3333-8333-8333-333333333333
+    kind: Skeleton
+    source: Models/Character.glb
+    dependencies: []
+```
+
+A static selected-Mesh definition has no Skeleton edge. The IDs must be copied from that model's canonical sidecar (the example values are placeholders):
+
+```yaml
+schemaVersion: 1
+assetSetId: 11111111-1111-4111-8111-111111111111
+revision: 1
+inclusion: HardAndLoadable
+target:
+  platform: win-x64
+  abi: creator-geometry-v1
+settings:
+  textureEncoding: Source
+roots:
+  - assetId: 55555555-5555-8555-8555-555555555555
+    kind: Mesh
+assets:
+  - assetId: 55555555-5555-8555-8555-555555555555
+    kind: Mesh
+    source: Models/Prop.glb
+    dependencies: []
+```
+
+For a skinned Mesh, replace `dependencies: []` with exactly one `kind: Skeleton`, `dependency: Hard` entry and declare that Skeleton source with `dependencies: []`, as in the clip example. For a Model root, declare `dependency: Loadable` edges to every source Mesh, clip and the Skeleton if present; the producer checks the complete edge inventory and source-order summary metadata. Material identities stay in descriptor summaries and are not geometry ownership edges.
+
+`target.abi` is an explicit compatibility token which the mount caller must agree with. The sample token is illustrative, not a claim that every existing Player accepts this ABI. Encoded texture representation is `TextureSourceImage = 1`, with schema `kTextureArtifactVersion = 1`. Source container extension and decoder signature must agree.
+
+Outputs are new immutable directories containing `Derived/asset-set-manifest.cemf`, `Derived/AssetBlobs/<compatibility-sha256>/<content-sha256>.<extension>`, `build-keys.txt`, and `build-report.txt`. Native manifest serialization/readback and payload hash/size/format validation complete before the candidate is renamed to the requested output. BuildTool verifies the completion hashes and source-free file boundary. Existing output paths are rejected; no current-release pointer is changed. No Player/source files are copied into the result.
+
+The default CAS is `<project>/Library/AssetSetArtifacts`; override with `--artifact-cache PATH`. Source root, output, cache, and the verified engine distribution must not overlap as enforced by the command. Same compatible encoded bytes use one blob record and file per output. Outputs copy verified CAS blobs so cache cleanup cannot remove a published output's backing. The cache never overwrites existing blobs or build-key records; corruption fails rather than quietly repairing an immutable address. Builds sharing the same cache acquire a Windows exclusive file handle on `.asset-set-build.guard`. The file may remain, but only the live handle owns exclusion; forced cancellation, timeout, or process death releases it automatically. A leftover prototype `.asset-set-build.lock` directory is ignored and is not automatically deleted. Normal failures clean only the current invocation's private work directories. Forced termination can leave uniquely named `.asset-set-work-<nonce>.incomplete` cache work directories or `.asset-set-<nonce>.candidate` output siblings. Later builds neither enumerate these as reusable results nor resume or delete them. Only exact final hash-addressed blob/build-key paths are eligible for verified reuse. The requested immutable output path is published by the final rename and is never automatically deleted, including when cancellation races with publication.
+
+Build keys include source SHA256, sidecar SHA256, importer/build version pins, verified toolchain payload digest, build-tool implementation digest, normalized settings, container extension, representation/schema and target platform/ABI. Roots, revision, and dependency hashes do not perturb texture payload keys because source-image bytes contain no dependency hashes. Their typed declarations still update the new manifest. Texture passthrough revalidates captured source and metadata on every invocation. Granular model builds separately record a source-import key and a selected typed artifact build key; unrelated sibling or sidecar-generation changes do not perturb unchanged selected mesh/clip artifact records. Immutable import receipts are checked before source production. An exact hit validates complete captured inputs and typed CAS products, then bypasses that importer/converter. Source/hash/schema validation still runs; `reusedImports`/`recookedImports` are separate from `reusedBlobs` and are not measured performance claims. See docs/design/AssetSetImportReceipts.md for bounded lookup and invalidation contracts.
+
+Source/static implementation only until explicitly validated on Windows: no build, executable test, or source-free runtime result is implied by the presence of this command.
+
+### Attach prebuilt AssetSets to a game package
+
+`package-game --asset-set-list <directories.txt> --asset-set-abi <host-token>` attaches
+1–64 already-built immutable AssetSet outputs. Each nonempty UTF-8 list line is a
+source output directory (relative entries resolve beside the list file). The ABI is
+an optional assertion of the verified installed host content ABI; it cannot select
+or self-assert compatibility. Omit it to use the installed Player/AssetCooker identity.
+
+The packager verifies receipts and every CAS byte hash before and after copying.
+Its native `--copy-asset-set` step holds a shared source-store lease for enrolled
+sources throughout traversal and identity revalidation; unmanaged sources remain
+noncollectible. Cancellation/process exit releases the acquired OS lease.
+The output is always a new directory in the host-owned private package candidate,
+never a mutation of a managed release. It records exact manifest identities under `Assets/AssetSets/<sha256>`, and emits a
+bounded `Assets/Derived/asset-set-activation.ceas` policy. Native preflight validates
+schema, ABI, duplicate definitions and the complete cross-set hard graph before the
+existing final package transaction can publish. The Player mounts the whole group
+atomically during DataSystem initialization; it reads policy/manifests, not root
+payloads. A cyclic set-level ordering is legal if the actual hard asset graph is a DAG.
+
+The default Legacy content mode overlays the existing package closure. The explicit
+PrebuiltAssetSets mode instead consumes an independently built document bootstrap
+and skips project source staging and the legacy package cook. Scene/audio identity
+boot remains the existing CEMF v2 document bridge; this does not claim new v3 loaders. Runtime async startup separately prepares cold
+mesh/image/material work before scene activation. Copied/extracted store roots are
+unenrolled and noncollectible until freshly published under the storage lease protocol.
+
+AssetSet source dependencies may also specify `scope: External`; omitted scope means
+`Internal`. External targets are not included or imported by this build and need not
+have a source record here. Exact type and Hard/Loadable declarations still match each
+producer recipe. Internal missing targets/cycles remain errors; the final mounted
+union validates external missing/type/hard-cycle and cross-artifact binding rules.
+
+Lattice Material sources use `.asset`; MaterialProgram sources name both their current
+`.lxmaterial` graph and an explicit `verifiedProgram` input. The producer checks source
+and carried backend agreement; it does not silently use a previous package or compile
+shaders during runtime. Model descriptor schema3 adds Loadable Material references;
+selected model materials and embedded textures produce independent artifacts.
+
+### Source-free package composition
+
+Use `build-runtime-bootstrap` to prepare the existing scene/prefab/audio/settings
+documents independently, then `package-game --content-mode PrebuiltAssetSets
+--bootstrap-root <output> --asset-set-list <directories.txt>
+--game-scripts-assembly <prebuilt.dll>`. This path does not stage model/texture/material
+sources or run generations, legacy cook, CEDO compile, shaders, managed compilation
+or native builds. It verifies/copies a prebuilt script assembly and installed Player.
+Startup/backend settings are frozen in the bootstrap. The exact bootstrap/AssetSet
+group and installed content ABI are validated before the existing package transaction.
+
+See [SourceFreeAssetSetPackaging](../docs/design/SourceFreeAssetSetPackaging.md) for
+commands, strict boundaries, the CEBR1 typed document-reference receipt, independent
+ABI provenance, and unrun verification fixtures. Scene/Prefab/Audio/Font typed loaders
+remain future extensions. No runtime validation is implied by these source changes.

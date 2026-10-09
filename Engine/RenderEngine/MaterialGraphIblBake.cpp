@@ -1,3 +1,4 @@
+#include "Texture.h"
 #include "MaterialGraphIblBake.h"
 #include "MaterialGraphSurfaceBatch.h"
 
@@ -56,7 +57,8 @@ bool IblBakeResult::Matches(const IRenderDeviceServices& device, const IblEnviro
     const auto& a = environment_.cube;
     const auto& b = environment.cube;
     return device_ == &device && environment_.generation == environment.generation &&
-           environment_.owner == environment.owner && a.handle == b.handle && a.format == b.format &&
+           environment_.owner && environment.owner &&
+           environment_.owner->m_assetId == environment.owner->m_assetId && a.handle == b.handle && a.format == b.format &&
            a.width == b.width && a.height == b.height && a.mipLevels == b.mipLevels && a.arraySize == b.arraySize &&
            a.isCube == b.isCube && !gpuPoints_ && points_.size() == points.size() &&
            std::memcmp(points_.data(), points.data(), points.size_bytes()) == 0;
@@ -68,7 +70,8 @@ bool IblBakeResult::MatchesGpu(const IRenderDeviceServices& device, const IblEnv
     const auto& a = environment_.cube;
     const auto& b = environment.cube;
     return device_ == &device && gpuPoints_.get() == &points && environment_.generation == environment.generation &&
-           environment_.owner == environment.owner && a.handle == b.handle && a.format == b.format &&
+           environment_.owner && environment.owner &&
+           environment_.owner->m_assetId == environment.owner->m_assetId && a.handle == b.handle && a.format == b.format &&
            a.width == b.width && a.height == b.height && a.mipLevels == b.mipLevels && a.arraySize == b.arraySize &&
            a.isCube == b.isCube;
 }
@@ -300,10 +303,17 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
     graph_ = &graph;
     graphEpoch_ = graph.ResourceEpoch();
     graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.IBL.Result");
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        graphOutput_ = graph.Write(graphOutput_);
+    }
     graph.AddPass("LX.BakePhysicalIBL",
-                  {{input, RHIResourceState::ShaderResource},
-                   {environment, RHIResourceState::ShaderResource},
-                   {graphOutput_, RHIResourceState::UnorderedAccess}},
+                  {{input, RHIResourceState::ShaderResource, read},
+                   {environment, RHIResourceState::ShaderResource, read},
+                   {graphOutput_, RHIResourceState::UnorderedAccess, write}},
                   [owner](const auto& context) {
                       std::string error;
                       if (!context.graph || !context.encoder || !owner->GraphOutput(*context.graph).IsValid() ||
@@ -314,7 +324,7 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
                       }
                   });
     graph.AddPass(
-        "LX.PhysicalIBLReady", {{graphOutput_, RHIResourceState::ShaderResource}},
+        "LX.PhysicalIBLReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
         [owner](const auto&) {
             if (!owner->IsCurrent())
             {

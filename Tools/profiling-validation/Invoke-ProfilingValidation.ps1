@@ -28,8 +28,7 @@
               [GameThread]/[RenderThread]/[PresentationThread]/[Worker 1] 귀속
     Workers   fixture 씬으로 애니메이션 잡을 돌려 워커 레인의 구간 계측과
               SceneActivated(길이 없는 사건)
-    Window    프로파일러 창이 실제로 그려지는지(본문 마커가 캡처에 나타나는지),
-              창을 닫아도 녹화가 계속되는지
+    Window    별도 viewer의 인증된 Present 계수, close/reopen과 엔진 녹화 독립성
     Gpu       Scene/Game/동시 뷰·리사이즈·2-inflight·DX12 검증과 GPU 수집 장부
     GpuLoss   Debug 질의 슬롯을 16개로 좁혀 누락이 Collector에 기록되는지 검증
     Providers Resource 모듈 mask와 관리 GC/스크립트 마커의 동일 프레임 귀속
@@ -259,134 +258,92 @@ function Invoke-Workers {
     return 1
 }
 
-# 프로파일러 창이 실제로 **그려지는지** 잰다.
-#
-# ★ 창이 열린 것과 본문이 도는 것은 다르다. 도크 탭으로 겹친 창은 선택돼야
-#   본문이 돌고, 그러지 않으면 `editor.window ... open` 이 성공해도 DrawProfilerHUD
-#   까지 오지 않는다. 그래서 창 본문에 마커를 하나 걸고 **그 마커가 캡처에
-#   나타나는지**로 판정한다 — 프로파일러가 자기 창을 증언한다.
-#
-# ⚠ 이 축이 재는 것은 "본문이 돌았다" 까지다. 표의 숫자가 맞는지는 코어가
-#   판정한다(verify-profile-core.ps1 의 aggregate/ · reader/ 검사). 화면이
-#   숫자를 만들지 않으므로 그 둘을 나눌 수 있다.
+# Standalone viewer process boundary. This gate is source-only/UNEXECUTED in
+# this change. Authenticated presented-frame counters replace engine-local UI
+# markers; neither a queued launch nor a process name alone proves presentation.
 function Invoke-Window {
-    # 창을 열고 → 닫고 → 다시 연다. 중간의 profile.stats 가 완료조건
-    # "창을 닫아도 recording 상태가 유지된다" 를 재는 자리다 — 녹화는 서비스가
-    # 들고 창은 reader 일 뿐이라는 것이 설계이고, 그 설계가 실제로 그런지 본다.
-    # ★ 여기도 `profile.record` 를 명시한다. 이 축의 단정 하나가 "창을 닫아도
-    #   state == recording" 인데, 켠 적이 없으면 그 단정은 켜지지 않은 것을
-    #   "멈췄다" 로 읽는다.
+    $settleFrames = [Math]::Max($WarmupFrames, 600)
     $result = Invoke-EngineScript -Label "profile-window" -Commands @(
         "profile.record"
         "editor.window ###Editor.FrameProfiler open"
-        "wait $WarmupFrames"
+        "wait $settleFrames"
+        "profile.stats"
         "editor.window ###Editor.FrameProfiler close"
-        "wait 30"
+        "wait $settleFrames"
         "profile.stats"
         "editor.window ###Editor.FrameProfiler open"
-        "wait 30"
-        # ★ 타임라인을 자극하는 두 줄이다.
-        #
-        #   타임라인은 얼린 캡처가 있어야 그려지는데, 얼린 채로는 마커가 찍히지
-        #   않아 그렸다는 증거가 남지 않는다. 얼렸다가 바로 다시 열어야 둘이 동시에 선다.
-        #
-        # ★ 사이에 wait 를 두지 **않는다.** 얼린 순간을 창이 볼 수 있게 두면,
-        #   상태를 보고 집는 낡은 관문도 우연히 통과한다 — 그러면 이 축은 "찰나를
-        #   놓쳐도 집는다" 를 재지 못하고 날마다 다른 답을 낸다. 붙여 두면
-        #   얼린 구간이 한 프레임보다 짧아지므로 자극이 결정적이 된다.
-        "profile.pause"
-        "profile.record"
-        "wait 30"
+        "wait $settleFrames"
         "profile.frame"
+        "profile.stats"
+        "editor.window ###Editor.FrameProfiler close"
+        "wait $settleFrames"
         "profile.stats"
         "quit"
     )
-
-    $body = $result.Combined -split "`n"
-    $openLine  = $body | Where-Object { $_ -match '"command"\s*:\s*"editor\.window"' } | Select-Object -First 1
-    $frameLine = $body | Where-Object { $_ -match '"command"\s*:\s*"profile\.frame"' } | Select-Object -First 1
-    $statsLines = @($body | Where-Object { $_ -match '"command"\s*:\s*"profile\.stats"' })
-    $closedLine = $statsLines | Select-Object -First 1   # 창을 닫은 뒤
-    $statsLine  = $statsLines | Select-Object -Last 1    # 다시 연 뒤
-    if (-not $openLine -or -not $frameLine -or -not $statsLine -or -not $closedLine) {
-        Write-Host "응답을 찾지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
-        return 1
-    }
-
     try {
-        $open  = $openLine.Trim()  | ConvertFrom-Json
-        $frame = $frameLine.Trim() | ConvertFrom-Json
-        $stats = $statsLine.Trim() | ConvertFrom-Json
-        $closed = $closedLine.Trim() | ConvertFrom-Json
+        $responses = @($result.Combined -split "`n" | Where-Object {
+            $_ -match '"command"\s*:\s*"(profile\.stats|profile\.frame)"'
+        } | ForEach-Object { $_.Trim() | ConvertFrom-Json })
+        $stats = @($responses | Where-Object { $_.command -eq 'profile.stats' })
+        $frame = $responses | Where-Object { $_.command -eq 'profile.frame' } | Select-Object -Last 1
+        if ($stats.Count -ne 4 -or -not $frame) {
+            throw "Expected four viewer status observations and one capture response."
+        }
     }
     catch {
-        Write-Host "응답을 JSON 으로 읽지 못했다: $_" -ForegroundColor Red
+        Write-Host "Window gate response failed: $_ ($($result.OutFile))" -ForegroundColor Red
         return 1
     }
-
-    # 창 마커가 어느 스레드에 몇 건이나 붙었는지 센다. 창은 프레젠테이션
-    # 스레드가 그리므로 귀속까지 봐야 "그 스레드가 실제로 그렸다" 가 된다.
-    $windowEvents = 0
-    $onPresentation = 0
-    $timelineEvents = 0
+    $failures = [Collections.Generic.List[string]]::new()
+    foreach ($index in @(0, 2)) {
+        $viewer = $stats[$index].data.viewer
+        if ($stats[$index].status -ne 'succeeded' -or -not $viewer.running -or
+            -not $viewer.connected -or $viewer.pid -eq 0 -or $viewer.presentedFrames -eq 0) {
+            $failures.Add("Viewer launch $index did not authenticate and present: $($viewer.message)")
+        }
+    }
+    foreach ($index in @(1, 3)) {
+        $closed = $stats[$index]
+        if ($closed.status -ne 'succeeded' -or $closed.data.viewer.running -or
+            $closed.data.viewer.connected) {
+            $failures.Add("Explicit viewer Close did not finish at observation $index")
+        }
+        if ($closed.data.state -ne 'recording') {
+            $failures.Add("Closing the viewer changed engine recording to $($closed.data.state)")
+        }
+    }
+    if ($stats[3].data.viewer.failureRevision -ne $stats[0].data.viewer.failureRevision) {
+        $failures.Add('Normal close/reopen was incorrectly reported as a launch or protocol failure')
+    }
+    if ($stats[2].data.malformedScopes -ne 0) {
+        $failures.Add('Engine scope integrity changed while the separate viewer was running')
+    }
+    if ($frame.status -ne 'succeeded' -or -not $frame.data.hasCapture -or
+        @($frame.data.frames).Count -eq 0) {
+        $failures.Add('Successful nonempty engine capture is required before asserting viewer markers are absent')
+    }
     foreach ($f in $frame.data.frames) {
-        foreach ($t in $f.threads) {
-            foreach ($e in $t.events) {
-                if ($e.name -eq 'ProfilerTimeline' -and $t.name -eq '[PresentationThread]') {
-                    $timelineEvents++
+        foreach ($thread in $f.threads) {
+            foreach ($event in $thread.events) {
+                if ($event.name -in @('ProfilerWindow', 'ProfilerTimeline', 'ProfilerTelemetry')) {
+                    $failures.Add("Viewer analysis/presentation still ran inside engine capture: $($event.name)")
                 }
-                if ($e.name -ne 'ProfilerWindow') { continue }
-                $windowEvents++
-                if ($t.name -eq '[PresentationThread]') { $onPresentation++ }
             }
         }
     }
-
-    Write-Host ""
-    Write-Host "[profile.window] 프로파일러 창 (###Editor.FrameProfiler)"
-    Write-Host ("  창 열기 요청    {0}" -f $open.status)
-    Write-Host ("  최근 {0}프레임의 ProfilerWindow  {1}건 (그중 프레젠테이션 스레드 {2})" -f
-        $frame.data.frames.Count, $windowEvents, $onPresentation)
-    Write-Host ("  같은 구간의 ProfilerTimeline  {0}건 (프레젠테이션 스레드)" -f $timelineEvents)
-    $renderThread = $closed.data.threads | Where-Object { $_.name -eq '[RenderThread]' } | Select-Object -First 1
-    Write-Host ("  창을 닫은 뒤 RenderThread 이벤트  {0}건" -f $(if ($renderThread) { $renderThread.capturedEvents } else { 0 }))
-    Write-Host ("  등록 마커       {0}" -f $stats.data.registeredMarkers)
-    Write-Host ("  창을 닫은 뒤 상태  {0}" -f $closed.data.state)
-
-    $failures = New-Object System.Collections.Generic.List[string]
-    if ($open.status -ne 'succeeded')  { $failures.Add("창 열기 실패: $($open.status)") }
-    if ($stats.status -ne 'succeeded') { $failures.Add("profile.stats status=$($stats.status)") }
-    if ($stats.data.malformedScopes -ne 0) {
-        $failures.Add("불균형 스코프 $($stats.data.malformedScopes) - 창이 스코프 짝을 깨뜨렸다")
+    if ($result.ExitCode -ne 0) {
+        $failures.Add("Engine exit code $($result.ExitCode)")
     }
-    # ★ 완료조건: 창을 닫아도 녹화가 멈추지 않는다.
-    if ($closed.data.state -ne 'recording') {
-        $failures.Add("창을 닫았더니 녹화가 '$($closed.data.state)' 가 됐다 - 창이 녹화를 소유하면 안 된다")
+    if ($failures.Count -ne 0) {
+        foreach ($failure in $failures) {
+            Write-Host "Window gate failed: $failure" -ForegroundColor Red
+        }
+        Write-Host "Output: $($result.OutFile). Increase WarmupFrames if startup exceeded the observation interval."
+        return 1
     }
-    if ($windowEvents -le 0) {
-        $failures.Add("ProfilerWindow 가 캡처에 없다 - 창이 열렸다고 했는데 본문이 돌지 않았다")
-    }
-    if ($onPresentation -le 0) {
-        $failures.Add("ProfilerWindow 가 프레젠테이션 스레드에 붙지 않았다")
-    }
-    # ★ 창이 돌았다는 것과 **타임라인이 그려졌다** 는 것은 다르다. 타임라인은
-    #   얼린 캡처가 없으면 한 줄짜리 안내문만 내고 빠져나간다 — 그래도 창은
-    #   열려 있고 ProfilerWindow 는 찍힌다. 두 마커를 갈라 세는 이유가 그것이다.
-    if ($timelineEvents -le 0) {
-        $failures.Add("ProfilerTimeline 이 캡처에 없다 - 창은 돌았으나 타임라인 본문은 돌지 않았다")
-    }
-    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
-
-    Write-Host ""
-    Write-Host "── 판정 ─────────────────────────────"
-    if ($failures.Count -eq 0) {
-        Write-Host "  결과           통과" -ForegroundColor Green
-        return 0
-    }
-    foreach ($f in $failures) { Write-Host "  실패           $f" -ForegroundColor Red }
-    Write-Host ("  전체 출력      {0}" -f $result.OutFile)
-    Write-Host "  결과           실패" -ForegroundColor Red
-    return 1
+    Write-Host 'Window process gate passed: authenticated presentation, close/reopen, engine recording independence' -ForegroundColor Green
+    Write-Host 'This does not validate pixels, every tab, target-exit recovery or adversarial IPC; see Tools/ProfilerViewer/README.md.'
+    return 0
 }
 
 # ── Gpu ── GPU 수집이 **그 제출의** 기록을 읽는가(P4).

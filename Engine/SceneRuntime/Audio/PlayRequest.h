@@ -1,5 +1,6 @@
 #pragma once
 #include <mathematics/vector3.hpp>
+#include <vector>
 
 #include "AudioValues.h"
 
@@ -17,7 +18,11 @@ namespace wave
     struct PlayRequest final
     {
         ClipKey clip;
-        BusId bus{};
+        BusId bus{ Buses::SFX };
+        ConcurrencyGroupId concurrencyGroup{};
+        bool preemptSameClip{ false };
+        bool persistent{ false };
+        bool allowVirtualization{ true };
 
         float volume{ 1.0f };
         float pitch{ 1.0f };
@@ -35,6 +40,12 @@ namespace wave
         float minimumDistance{ 1.0f };
         float maximumDistance{ 50.0f };
         RolloffKind rolloff{ RolloffKind::Inverse };
+        // Distances are world units. Stable sorting keeps the last duplicate point.
+        std::vector<RolloffPoint> customRolloff;
+        // Runtime projection: applied to the spatial branch only.
+        float attenuationGain{ 1.0f };
+        // Shared Doppler projection keeps both source branches phase-aligned.
+        float dopplerPitch{ 1.0f };
 
         // ★ 리버브를 요청에 싣는 이유. 옛 배선에서 리버브는 Inspector 람다만이
         //   채널에 썼고 `SoundComponent::Play()` 는 그 값을 읽지 않아, **재생할
@@ -42,6 +53,7 @@ namespace wave
         //   생길 수 없다.
         bool useReverbSend{ false };
         float reverbSendDecibels{ 0.0f };
+        BusId reverbBus{ Buses::Room };
 
         // 누가 낸 소리인지. 컴포넌트 파괴·씬 전환에서 자기 것만 골라 멈추는 데 쓴다.
         //

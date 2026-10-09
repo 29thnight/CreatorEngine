@@ -1,0 +1,32 @@
+{
+  "identical": true,
+  "files": 25,
+  "sha256": {
+    "Assets/Sounds/BGM/probe_tone.wav": "e3fa8d3994eea081996c6af3f6b9e29c3d09c84b7a5ad99bb6bdd19c6c401aac",
+    "Assets/Sounds/probe_blip.wav": "852a610f7458cdb8009867b0ccdf4bf0ae89bf78c61848cf961c7c6d10e0308a",
+    "Assets/Sounds/probe_broken.wav": "8aa6ca357fb96eb9fc4e7a46e800f24d35dabc1b5a1cb5db9348359c5b72e854",
+    "Assets/Sounds/probe_ignored.ogg": "2d59e467453ffda04c7fd1e61a580dfee430d945d99f38f205348c6ed7e3dd6c",
+    "Assets/Sounds/probe_tone.wav": "9b9d6eec71c9d0efdcc08394a43f3e90608559e3caf300416fc5a59aab8d44d6",
+    "Formats/corrupt.flac": "1d5c55f525b53be1c843b38722ba585c938c41073c2af4256028fef2642170ce",
+    "Formats/corrupt.mp3": "4cc7e6272db6b1ad7581f76c63c694e926e20698e9b02223d5041a55960463f2",
+    "Formats/corrupt.wav": "85759b3811ff7dc47b03792ac85317be51431a3f9e01dcafce317ed736a391b0",
+    "Formats/impulse.wav": "0afb087efa63a2eacdb76cd22c880704ddc0285dcd42d018d0d32e181092d5ec",
+    "Formats/loop.flac": "ff572f148bcb3ea8a5f0d5ed7cb43f12f874d161219b4e5c3e24a7a4372c3883",
+    "Formats/loop.mp3": "f1e017b73fab452098c8de760b591ec1d85433f1acf8fca4dda3b64787ba737a",
+    "Formats/loop.wav": "f6f8aebaca86684d6438c0017653cc289ba7aacc3ddf55063e9b191731f0c50f",
+    "Formats/oversized.flac": "aa7a3287906ecf5844062fe7e0620f60fb461319fc8e58273a6d5284055d6a4f",
+    "Formats/oversized.mp3": "6708cebfe151a679fdf4e4d8953986af3e1c5f0934a8b81afb4bb4eb7cbe8b16",
+    "Formats/oversized.wav": "f3c40f5b35ad88b820c80b21e7d820d37d4ac468e441e5fbe783ec29bfe59b02",
+    "Formats/silence.wav": "639dad0ac2923f5fe9e9ccfb99aa9b3084048e2e53317d1903e6e899a4f6296a",
+    "Formats/silent.flac": "92ea8ce4eacc7ec9ed588a7186124c7c37eb919be76c5eb1b841b1c47e53e5e6",
+    "Formats/silent.mp3": "71f30fa309320c4f9746075710aac156e0ebcf45d04e29d3965189a5f07c0631",
+    "Formats/sine.wav": "7eb0d1a33a3756cca4a1a9990ceb10bcfea0b4a601d37040d1fa8a2941018ef0",
+    "Formats/tail.flac": "a2b75eadc917f39618f98e0af4bba9a1241ef9e40b217f7f9f34014998d82413",
+    "Formats/tail.mp3": "4f0e81216d30063b1afeaf88a311d886c6154887d7acd64d1aea3cd4fc9be3aa",
+    "Formats/tail.wav": "e1c6fc0b300d01e11917f9f3901e5204bda9f57a2ee0c5c1b6769fb1006a878e",
+    "Formats/truncated.flac": "48fca203ea4d843589ef2bbe44de9d65639cf01adc26900e3a1d1655606a4ede",
+    "Formats/truncated.mp3": "dee4a2139a1b27b5bd87da1c6a3107bac5191075677f2df6d67051094e9d8af3",
+    "Formats/truncated.wav": "8180d387e668bb75caf33ad3d9d2ca2e3ccec951d3ec2629a2a5bb76e03f2047"
+  },
+  "generated_runs": 2
+}

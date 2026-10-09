@@ -5,6 +5,7 @@
 #include "../../../RHI/RHIShaderCompiler.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -235,6 +236,15 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& context,
     std::string& outError)
 {
+    if (!context.resources || !m_resourceRetirement.Attach(*context.resources))
+    {
+        outError = "Fog volumes require their owning device.";
+        return false;
+    }
+    if (m_voxelTemp[0].IsValid() && m_voxelTemp[1].IsValid() && m_voxelFinal.IsValid())
+    {
+        return true;
+    }
     RHITextureDesc desc{};
     desc.dim = RHITextureDesc::Dim::Texture3D;
     desc.width = kVolumeWidth;
@@ -254,14 +264,32 @@ bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& contex
         return true;
     };
 
-    if (!makeVolume(m_voxelTemp[0], L"Fog.VoxelTemp0")) return false;
-    if (!makeVolume(m_voxelTemp[1], L"Fog.VoxelTemp1")) return false;
-    if (!makeVolume(m_voxelFinal, L"Fog.VoxelFinal")) return false;
+    std::array<RHITextureHandle, 3> candidate{};
+    if (!makeVolume(candidate[0], L"Fog.VoxelTemp0")
+        || !makeVolume(candidate[1], L"Fog.VoxelTemp1")
+        || !makeVolume(candidate[2], L"Fog.VoxelFinal"))
+    {
+        for (const auto texture : candidate)
+        {
+            if (texture.IsValid())
+            {
+                context.resources->ReleaseTexture(texture);
+            }
+        }
+        return false;
+    }
+    m_resourceRetirement.Retire(m_voxelTemp[0]);
+    m_resourceRetirement.Retire(m_voxelTemp[1]);
+    m_resourceRetirement.Retire(m_voxelFinal);
+    m_voxelTemp[0] = candidate[0];
+    m_voxelTemp[1] = candidate[1];
+    m_voxelFinal = candidate[2];
 
     m_voxelTempState[0] = RHIResourceState::Common;
     m_voxelTempState[1] = RHIResourceState::Common;
     m_voxelFinalState = RHIResourceState::Common;
     m_volumesCleared = false;
+    ResetHistory();
     m_readIndex = 0;
     return true;
 }
@@ -291,8 +319,6 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         m_useHistoryThisFrame = m_historyValid;
         m_previousViewProjectionSealed = m_historyValid
             ? m_previousViewProjection : m_viewProjection;
-        m_historyValid = true;
-        m_previousViewProjection = m_viewProjection;
     }
 
     m_lastLightCount = (nullptr != context.lights)
@@ -307,6 +333,16 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
     // 0을 주는 것이 보통이라 결과는 같고, '보통'에 기대지 않게 된다.
     if (!m_volumesCleared)
     {
+        const std::array previousStates{m_voxelTempState[0], m_voxelTempState[1]};
+        const auto previousFinalState = m_voxelFinalState;
+        m_resourceRetirement.WatchRecording([this, previousStates, previousFinalState]
+        {
+            m_voxelTempState[0] = previousStates[0];
+            m_voxelTempState[1] = previousStates[1];
+            m_voxelFinalState = previousFinalState;
+            m_volumesCleared = false;
+            ResetHistory();
+        });
         // A-3. 그래프 밖이라 executeContext 가 없다 — 예전에는 그래서 원시
         // 커맨드 리스트를 꺼내 서비스에 도로 넘겼는데, 받는 쪽이 이미 아는
         // 값을 인자로 넘기는 동어반복이었다. 즉시 인코더가 그 자리를 덮는다.
@@ -318,7 +354,7 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         for (uint32_t i = 0; i < 3; ++i)
         {
             toUav[i].texture = volumes[i];
-            toUav[i].before = RHIResourceState::Common;
+            toUav[i].before = i < 2 ? m_voxelTempState[i] : m_voxelFinalState;
             toUav[i].after = RHIResourceState::UnorderedAccess;
         }
         // ★ 이 전이는 인코더로 옮기지 않는다. 인코더에는 UavBarrier만 있고
@@ -377,6 +413,13 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
 
     const uint32_t readIndex = m_readIndex;
     const uint32_t writeIndex = 1u - m_readIndex;
+    const auto viewProjection = m_viewProjection;
+    m_resourceRetirement.WatchRecording([this] { ResetHistory(); }, [this, writeIndex, viewProjection]
+    {
+        m_readIndex = writeIndex;
+        m_previousViewProjection = viewProjection;
+        m_historyValid = true;
+    });
 
     // 격자 셋을 그래프에 들인다. 패스가 들고 있는 것이라 상태를 알려 줘야
     // 첫 전이를 맞게 만든다.
@@ -386,7 +429,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // 그 값이 어긋나고, 다음 프레임의 첫 배리어가 틀린 before로 나간다.
     const RGHandle readHandle = graph.ImportTexture(m_voxelTemp[readIndex],
         m_voxelTempState[readIndex], "Fog.VoxelRead", &m_voxelTempState[readIndex]);
-    const RGHandle writeHandle = graph.ImportTexture(m_voxelTemp[writeIndex],
+    RGHandle writeHandle = graph.ImportTexture(m_voxelTemp[writeIndex],
         m_voxelTempState[writeIndex], "Fog.VoxelWrite", &m_voxelTempState[writeIndex]);
     m_finalHandle = graph.ImportTexture(m_voxelFinal, m_voxelFinalState,
         "Fog.VoxelFinal", &m_voxelFinalState);
@@ -398,6 +441,19 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     outputDesc.allowRenderTarget = true;
     outputDesc.name = "Fog.Output";
     m_output = graph.CreateTexture(outputDesc);
+
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        writeHandle = graph.Write(writeHandle);
+        m_finalHandle = graph.Write(m_finalHandle);
+        m_output = graph.Write(m_output);
+    }
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+    const auto inputs = m_inputs;
+    const auto finalHandle = m_finalHandle;
+    const auto output = m_output;
 
     // 산란·누적이 함께 쓰는 상수를 만든다. 두 패스가 같은 값을 읽는다.
     const auto fillFogConstants = [this]() -> FogConstants
@@ -426,21 +482,21 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     //   시그니처만** 걸고 테이블을 붙였고, 호출부가 뒤에서 진짜 PSO 를 걸었다.
     //   핸들이 짝을 들면서 "파이프라인 없이 레이아웃만"이 표현 불가능해졌으므로
     //   순서를 바로잡는다 — 걸 파이프라인을 아는 쪽이 함께 넘긴다.
-    const auto bindCompute = [this, &context](
+    const auto bindCompute = [&context, inputs](
         const EnhancedRenderGraph::ExecuteContext& executeContext,
         RHIPipelineHandle pipeline, RGHandle voxelRead, RGHandle voxelWrite) -> bool
     {
 
         const RHIBindingDesc srvs[] = {
             // t0 — 캐스케이드 그림자맵(배열). 깊이 리소스라 포맷을 명시한다.
-            RHIBindingDesc::SrvArray(executeContext.ResolveHandle(m_inputs.shadowMap),
+            RHIBindingDesc::SrvArray(executeContext.ResolveHandle(inputs.shadowMap),
                 RHIFormat::R32Float, kShadowCascadeCount),
             // t1 — 블루 노이즈.
-            RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.blueNoise)),
+            RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.blueNoise)),
             // t2 — 읽을 격자(3D).
             RHIBindingDesc::Srv3D(executeContext.ResolveHandle(voxelRead), kVoxelFormat),
             // t3 — 구름 그림자.
-            RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.cloudShadow)),
+            RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.cloudShadow)),
         };
         // u0 — 쓸 격자(3D).
         const RHIBindingDesc uavs[] = {
@@ -461,11 +517,11 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // ── ① 산란 ──
     graph.AddPass("Fog.Scatter",
         {
-            { m_inputs.shadowMap,   RHIResourceState::ShaderResource },
-            { m_inputs.blueNoise,   RHIResourceState::ShaderResource },
-            { m_inputs.cloudShadow, RHIResourceState::ShaderResource },
-            { readHandle,           RHIResourceState::ShaderResource },
-            { writeHandle,          RHIResourceState::UnorderedAccess },
+            { inputs.shadowMap,   RHIResourceState::ShaderResource, readAccess },
+            { inputs.blueNoise,   RHIResourceState::ShaderResource, readAccess },
+            { inputs.cloudShadow, RHIResourceState::ShaderResource, readAccess },
+            { readHandle,         RHIResourceState::ShaderResource, readAccess },
+            { writeHandle,        RHIResourceState::UnorderedAccess, writeAccess },
         },
         [this, &context, fillFogConstants, bindCompute, readHandle, writeHandle](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -538,13 +594,13 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // 것과 같다 — 결국 '산란이 쓴 것'을 읽는다.
     graph.AddPass("Fog.Accumulate",
         {
-            { m_inputs.shadowMap,   RHIResourceState::ShaderResource },
-            { m_inputs.blueNoise,   RHIResourceState::ShaderResource },
-            { m_inputs.cloudShadow, RHIResourceState::ShaderResource },
-            { writeHandle,          RHIResourceState::ShaderResource },
-            { m_finalHandle,        RHIResourceState::UnorderedAccess },
+            { inputs.shadowMap,   RHIResourceState::ShaderResource, readAccess },
+            { inputs.blueNoise,   RHIResourceState::ShaderResource, readAccess },
+            { inputs.cloudShadow, RHIResourceState::ShaderResource, readAccess },
+            { writeHandle,        RHIResourceState::ShaderResource, readAccess },
+            { finalHandle,        RHIResourceState::UnorderedAccess, writeAccess },
         },
-        [this, &context, fillFogConstants, bindCompute, writeHandle](
+        [this, &context, fillFogConstants, bindCompute, writeHandle, finalHandle](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
 
@@ -552,7 +608,10 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             const auto fogCb = context.resources->UploadConstants(
                 &constants, sizeof(FogConstants));
             if (!fogCb.IsValid()) return;
-            if (!bindCompute(executeContext, m_accumulatePSO, writeHandle, m_finalHandle)) return;
+            if (!bindCompute(executeContext, m_accumulatePSO, writeHandle, finalHandle))
+            {
+                return;
+            }
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb);
@@ -564,16 +623,16 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // ── ③ 합성 ──
     graph.AddPass("Fog.Composite",
         {
-            { m_inputs.color, RHIResourceState::ShaderResource },
-            { m_inputs.depth, RHIResourceState::ShaderResource },
-            { m_finalHandle,  RHIResourceState::ShaderResource },
-            { m_output,       RHIResourceState::RenderTarget },
+            { inputs.color, RHIResourceState::ShaderResource, readAccess },
+            { inputs.depth, RHIResourceState::ShaderResource, readAccess },
+            { finalHandle,  RHIResourceState::ShaderResource, readAccess },
+            { output,       RHIResourceState::RenderTarget, writeAccess },
         },
-        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        [this, &context, inputs, finalHandle, output](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 
@@ -581,9 +640,9 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             encoder.BindRenderTargets(targets);
 
             const RHIBindingDesc srvs[] = {
-                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.color)),
-                RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
-                RHIBindingDesc::Srv3D(executeContext.ResolveHandle(m_finalHandle), kVoxelFormat),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.color)),
+                RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(inputs.depth)),
+                RHIBindingDesc::Srv3D(executeContext.ResolveHandle(finalHandle), kVoxelFormat),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             if (!srvTable.IsValid()) return;
@@ -611,11 +670,21 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         m_keepAlive);
 
     // 다음 프레임은 이번에 쓴 것을 읽는다 — 그것이 시간축 히스토리다.
-    m_readIndex = writeIndex;
 }
 
 void EnhancedVolumetricFogPass::Shutdown()
 {
+    if (auto* device = m_resourceRetirement.Device())
+    {
+        for (const auto texture : {m_voxelTemp[0], m_voxelTemp[1], m_voxelFinal})
+        {
+            if (texture.IsValid())
+            {
+                device->ReleaseTexture(texture);
+            }
+        }
+    }
+    m_resourceRetirement.ClearAfterIdle();
     m_width = 0;
     m_height = 0;
     m_voxelTemp[0] = {};

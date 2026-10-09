@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../GpuGeometryVisibility.h"
 
 class Texture;
 
@@ -21,10 +22,11 @@ public:
         math::matrix4x4 world{ math::matrix4x4::identity() };
         math::vector4 uv{ 0.f, 0.f, 1.f, 1.f };
         math::color   color{ 1.f, 1.f, 1.f, 1.f };
-        Texture* texture{ nullptr };
+        const Texture* texture{ nullptr };
         int canvasOrder{ 0 };
         int layerOrder{ 0 };
         bool enableDepth{ false };
+        std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
     };
 
     static_assert(std::is_same_v<decltype(Item::world), math::matrix4x4>);
@@ -38,17 +40,34 @@ public:
     const char* GetName() const override { return "Sprite"; }
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Called after the upload prefix, under the backend shader-output scope.
+    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
+    GpuGeometryVisibility::PreparedStats GetGpuVisibilityStats() const
+    {
+        return m_visibilityFrame ? m_visibilityFrame->GetPreparedStats() : GpuGeometryVisibility::PreparedStats{};
+    }
+
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
 
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
-    void SetItems(const std::vector<Item>* items) { m_items = items; }
+    void SetItems(const std::vector<Item>* items,
+        own::shared_owner<TextureFramePins> texturePins = {})
+    {
+        m_items = items;
+        m_texturePins = std::move(texturePins);
+    }
     RGHandle GetOutput() const { return m_output; }
     uint32_t GetLastItemCount() const { return m_lastItemCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
 private:
+    GpuGeometryVisibility m_visibility;
+    std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibilityFrame;
+    bool m_gpuVisibilityEnabled{ false };
+    std::vector<math::vector4> m_visibilitySpheres;
+
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     struct Instance
@@ -67,8 +86,10 @@ private:
     {
         uint32_t first{ 0 };
         uint32_t count{ 0 };
-        Texture* texture{ nullptr };
+        const Texture* texture{ nullptr };
         bool enableDepth{ false };
+        std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
+        std::uint64_t textureId{};
         RHITextureEntry uploaded;
     };
 
@@ -76,6 +97,7 @@ private:
     RHIFormat m_outputFormat{ kOutputFormat };
     RGHandle m_output;
     const std::vector<Item>* m_items{ nullptr };
+    own::shared_owner<TextureFramePins> m_texturePins;
     std::vector<Instance> m_instances;
     std::vector<Batch> m_batches;
     math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };

@@ -1,4 +1,6 @@
 #pragma once
+#include "Ownership.h"
+#include "../../TextureFramePins.h"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -22,7 +24,14 @@
 #include "EnhancedMaterialSealIdentity.h"
 #include "../../LXMaterialRuntime.h"
 
-namespace LX::Runtime { struct GraphicsGeneration; }
+namespace LX::Runtime
+{
+    struct GraphicsGeneration;
+}
+namespace material_graph
+{
+    class SceneViewInput;
+}
 #include "PackedBoneMatrix.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
@@ -39,10 +48,10 @@ class Mesh;
 class Texture;
 namespace material_graph
 {
-struct Instance;
+    struct Instance;
 }
 
-// M6-P1b2a: Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
+// M6-P1b2a: const Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
 // ShaderMeta reflection이 해석한 논리 property/GUID/register와 CPU generation owner를
 // 한 레코드로 밀봉한다. 실제 backend binding은 register를 검증한 뒤 owner의 view를 쓴다.
 struct EnhancedMaterialTextureBinding
@@ -51,7 +60,7 @@ struct EnhancedMaterialTextureBinding
     FileGuid textureGuid{};
     std::uint32_t registerIndex{};
     std::uint32_t registerSpace{};
-    std::shared_ptr<Texture> textureOwner{};
+    own::shared_owner<const Texture> textureOwner{};
     assets::TextureCoordinates coordinates{};
     // W7 — coordinates 와 같은 출처(저작 TextureReference)에서 온다. 이 값이
     // 여기 없던 동안 패스는 Initialize 에서 만든 샘플러 하나를 모든 재질에
@@ -118,7 +127,7 @@ struct EnhancedMaterialCoverage
 
 struct EnhancedForwardMaterialDrawSnapshot
 {
-    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
     std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
     // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
@@ -155,7 +164,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 // 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
 struct EnhancedMaterialDrawSnapshot
 {
-    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
     std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
     EnhancedMaterialSealIdentity seal{};
@@ -247,10 +256,10 @@ struct EnhancedDrawItem
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —
     // 렌더가 게임 자료구조를 들고 다니면 수명과 스레드 규약이 다시 얽힌다.
-    Texture*       baseColor{ nullptr };
-    Texture*       normalMap{ nullptr };
-    Texture*       occRoughMetal{ nullptr };
-    Texture*       emissive{ nullptr };
+    const Texture*       baseColor{ nullptr };
+    const Texture*       normalMap{ nullptr };
+    const Texture*       occRoughMetal{ nullptr };
+    const Texture*       emissive{ nullptr };
 
     math::color    baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
     float          metallic{ 0.f };
@@ -268,9 +277,15 @@ struct EnhancedDrawItem
     std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>
         forwardMaterialSnapshot{};
 
-    // Scene input sealing retains the exact typed LX generation/instance.
-    // A graph draw is selected separately from the ShaderMeta queues.
-    std::shared_ptr<const material_graph::Instance> materialGraphInstance{};
+    // Fixture/producer transfer slot. Product frame records empty this owner
+    // into a deduplicated InstanceFramePins table before copying draw records.
+    own::shared_owner<const material_graph::Instance> materialGraphInstance{};
+    own::local_view<const material_graph::Instance> materialGraphView;
+    std::size_t materialGraphPinIndex{ (std::numeric_limits<std::size_t>::max)() };
+    own::local_view<const material_graph::Instance> GraphInstance() const
+    {
+        return materialGraphInstance ? materialGraphInstance.borrow() : materialGraphView;
+    }
     // Runtime Material identity, stable across instance/generation replacement.
     std::uint64_t materialGraphSlot{};
 
@@ -398,62 +413,152 @@ class AnimationPaletteFrame final
 public:
     bool Prepare(IRenderDeviceServices& resources,
         const std::vector<EnhancedDrawItem>* opaque,
-        const std::vector<EnhancedDrawItem>* forward)
+        const std::vector<EnhancedDrawItem>* forward,
+        const std::vector<EnhancedDrawItem>* geometryCandidates = nullptr)
     {
         m_matrices.clear();
         m_offsets.clear();
         m_upload = {};
-        auto collect = [this](const std::vector<EnhancedDrawItem>* draws)
+        m_uploadDevice = nullptr;
+        m_uploadRecording = 0;
+        std::unordered_map<std::uint64_t, std::uint32_t> paletteCounts;
+        auto collect = [this, &paletteCounts](const std::vector<EnhancedDrawItem>* draws)
         {
-            if (!draws) return;
+            if (!draws)
+            {
+                return true;
+            }
             for (const auto& draw : *draws)
             {
-                if (!draw.bonePalette || !draw.boneCount
-                    || m_offsets.contains(draw.animatorKey)) continue;
+                if (draw.boneCount != 0 && !draw.bonePalette)
+                {
+                    return false;
+                }
+                if (draw.boneCount == 0)
+                {
+                    continue;
+                }
+                if (const auto prior = m_offsets.find(draw.animatorKey); prior != m_offsets.end())
+                {
+                    // One animator key must mean one exact pose for every pass.
+                    // Falling back to direct draws would still fetch the wrong
+                    // shared palette, possibly beyond the first pose's range.
+                    if (paletteCounts.at(draw.animatorKey) != draw.boneCount)
+                    {
+                        return false;
+                    }
+                    for (std::uint32_t bone = 0; bone < draw.boneCount; ++bone)
+                    {
+                        const auto packed = PackedBoneMatrix::From(draw.bonePalette[bone]);
+                        if (std::memcmp(&m_matrices[prior->second + bone], &packed, sizeof(packed)) != 0)
+                        {
+                            return false;
+                        }
+                    }
+                    continue;
+                }
                 if (draw.boneCount > (std::numeric_limits<std::uint32_t>::max)()
                     - m_matrices.size())
+                {
                     throw std::length_error("animation palette upload overflow");
+                }
                 const auto offset = static_cast<std::uint32_t>(m_matrices.size());
                 m_matrices.resize(m_matrices.size() + draw.boneCount);
                 for (std::uint32_t bone = 0; bone < draw.boneCount; ++bone)
+                {
                     m_matrices[offset + bone] = PackedBoneMatrix::From(draw.bonePalette[bone]);
+                }
                 m_offsets.emplace(draw.animatorKey, offset);
+                paletteCounts.emplace(draw.animatorKey, draw.boneCount);
             }
+            return true;
         };
-        collect(opaque);
-        collect(forward);
+        // GPU visibility may admit offscreen skin geometry that is not a shadow
+        // caster. Upload its pose without expanding the independent caster set.
+        if (!collect(opaque) || !collect(forward) || !collect(geometryCandidates))
+        {
+            return false;
+        }
+        return UploadForCurrentRecording(resources);
+    }
+
+    // Parallel preparation submits the upload prefix and begins a new recording.
+    // Re-upload the already sealed pose for that recording; never reread a live
+    // animator/palette pointer or let a completed prefix fence recycle draw input.
+    bool UploadForCurrentRecording(IRenderDeviceServices& resources)
+    {
+        const auto recording = resources.GetCurrentUploadRecordingId();
+        if (!recording)
+        {
+            return false;
+        }
+        if (m_uploadDevice == &resources && m_uploadRecording == recording &&
+            m_upload.IsValid() && m_upload.IsWritable())
+        {
+            return true;
+        }
+        m_upload = {};
+        m_uploadDevice = nullptr;
+        m_uploadRecording = 0;
         const auto bytes = sizeof(PackedBoneMatrix)
             * (m_matrices.empty() ? std::size_t{ 1 } : m_matrices.size());
-        m_upload = resources.AllocateUpload(RHIUploadRequest{
+        const auto uploaded = resources.AllocateUpload(RHIUploadRequest{
             bytes, RHIUploadUsage::BufferCopy, sizeof(PackedBoneMatrix) });
-        if (!m_upload.IsValid()) return false;
+        if (!uploaded.IsValid() || !uploaded.IsWritable() ||
+            recording != resources.GetCurrentUploadRecordingId())
+        {
+            return false;
+        }
         if (m_matrices.empty())
         {
             const auto identity = PackedBoneMatrix::Identity();
-            std::memcpy(m_upload.cpuAddress, &identity, sizeof(identity));
+            std::memcpy(uploaded.cpuAddress, &identity, sizeof(identity));
         }
-        else std::memcpy(m_upload.cpuAddress, m_matrices.data(), bytes);
+        else
+        {
+            std::memcpy(uploaded.cpuAddress, m_matrices.data(), bytes);
+        }
+        m_upload = uploaded;
+        m_uploadDevice = &resources;
+        m_uploadRecording = recording;
         return true;
     }
 
     [[nodiscard]] const auto& Offsets() const noexcept { return m_offsets; }
     [[nodiscard]] RHIBufferSlice Upload() const noexcept { return m_upload; }
+    // Actual sealed matrices, excluding any placeholder or allocation padding.
+    [[nodiscard]] std::uint32_t MatrixCount() const noexcept
+    {
+        return static_cast<std::uint32_t>(m_matrices.size());
+    }
 
 private:
     std::vector<PackedBoneMatrix> m_matrices{};
     std::unordered_map<std::uint64_t, std::uint32_t> m_offsets{};
     RHIBufferSlice m_upload{};
+    IRenderDeviceServices* m_uploadDevice{};
+    std::uint64_t m_uploadRecording{};
 };
 
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
 {
+    uint32_t viewFlags{};
+    bool forwardLightingConsumer{true}; // Isolated cull/readback fixtures remain explicit consumers.
+    own::shared_owner<const material_graph::SceneViewInput> graphSceneInput;
     IRenderDeviceServices*     resources{ nullptr };
     IRenderPipelineCache*      psoManager{ nullptr };
     IRenderRootSignatureCache* rootSignatures{ nullptr };
     IRenderMeshCache*          meshCache{ nullptr };
     IRenderTextureCache*       textureCache{ nullptr };
+    own::shared_owner<TextureFramePins> textureFramePins;
+
+    own::shared_owner<const Texture::CodecImage> TextureImage(const Texture* texture) const
+    {
+        return textureFramePins ? textureFramePins->Image(texture)
+            : (texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{});
+    }
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };

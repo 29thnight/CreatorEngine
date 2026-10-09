@@ -1,4 +1,5 @@
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
+#include "../../../Tools/regression/gcce_probe_cleanup.h"
 
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AuthoringParsedDocument.h"
@@ -423,7 +424,10 @@ namespace RenderTest
                 "      float: 0.125\n"
                 "  keywords: []\n"
                 "  keywordSelections: []\n";
-            MeshRenderer renderer;
+            gc::domain rendererDomain;
+            auto rendererRoot = Component::CreateManaged<MeshRenderer>(rendererDomain);
+            auto& renderer = *rendererRoot;
+            gcce_probe::cleanup rendererCleanup(renderer);
             // D3-a-4: 훅 인자가 뷰가 됐다. 자가 검사도 같은 창구로 부른다.
             std::string parseError;
             Authoring::ParsedDocument componentDocument =
@@ -453,10 +457,13 @@ namespace RenderTest
             }
 
             // legacy 노드에서는 typed가 채운 인스턴스를 보존해야 한다.
-            MeshRenderer legacyRenderer;
-            legacyRenderer.m_Material = std::make_shared<Material>();
+            gc::domain legacyRendererDomain;
+            auto legacyRendererRoot = Component::CreateManaged<MeshRenderer>(legacyRendererDomain);
+            auto& legacyRenderer = *legacyRendererRoot;
+            gcce_probe::cleanup legacyRendererCleanup(legacyRenderer);
+            legacyRenderer.m_Material = own::make_shared<Material>();
             legacyRenderer.m_Material->m_name = "TypedFilled";
-            const std::shared_ptr<Material> before = legacyRenderer.m_Material;
+            const own::shared_owner<Material> before = legacyRenderer.m_Material;
             Authoring::ParsedDocument legacyDocument =
                 Authoring::ParsedDocument::ParseText(
                     "m_Material:\n  m_name: TypedFilled\n", parseError);
@@ -464,7 +471,8 @@ namespace RenderTest
             if (legacyDocument)
                 legacyRenderer.OnDeserialized(
                     Authoring::NodeViewAccess::Make(legacyNode));
-            check.Check(legacyRenderer.m_Material == before
+            check.Check(legacyRenderer.m_Material && before
+                && legacyRenderer.m_Material->m_materialGuid == before->m_materialGuid
                 && legacyRenderer.m_Material->m_name == "TypedFilled",
                 "legacy 노드는 typed 인스턴스를 보존한다");
         }
@@ -563,21 +571,22 @@ namespace RenderTest
 
             // MeshRenderer embed — OnAfterSerialize가 m_Material 서브트리를
             // 정본 writer 출력으로 교체한다(씬·프리팹 저장의 실제 경로).
-            MeshRenderer writerRenderer;
+            gc::domain writerRendererDomain;
+            auto writerRendererRoot = Component::CreateManaged<MeshRenderer>(writerRendererDomain);
+            auto& writerRenderer = *writerRendererRoot;
+            gcce_probe::cleanup writerRendererCleanup(writerRenderer);
             {
                 experiment::Material authoredForEmbed;
                 std::string error;
-                const ShaderMetaHandle handle =
-                    DataSystems->LoadShaderMetaHandle(fixtureGuid, error);
-                const std::shared_ptr<const ShaderMeta> fixtureMeta =
-                    DataSystems->ResolveShaderMeta(handle);
-                auto owned = std::make_shared<Material>();
+                ShaderMetaHandle handle;
+                const auto fixtureMeta = DataSystems->LoadShaderMetaOwner(fixtureGuid, handle, error);
+                auto owned = own::make_shared<Material>();
                 if (fixtureMeta
                     && experiment::DeserializeMaterialAuthoring(
                         authoredNode,
                         authoredForEmbed, error)
                     && ExperimentMaterialMigration::ConvertToLegacyMaterial(
-                        authoredForEmbed, fixtureMeta.get(), *owned, error))
+                        authoredForEmbed, &*fixtureMeta.borrow(), *owned, error))
                 {
                     DataSystems->FinalizeMaterialRuntime(*owned);
                     writerRenderer.m_Material = std::move(owned);
@@ -639,7 +648,10 @@ namespace RenderTest
             // MBC9: v4 model identity was retired. A v8 carrier still migrates even
             // if its generation is absent; a v4 carrier must never regain validity.
             const FileGuid modelProbe("01234567-89ab-8cde-8123-456789abcdef");
-            MeshRenderer migrating;
+            gc::domain migratingDomain;
+            auto migratingRoot = Component::CreateManaged<MeshRenderer>(migratingDomain);
+            auto& migrating = *migratingRoot;
+            gcce_probe::cleanup migratingCleanup(migrating);
             std::string parseError;
             Authoring::ParsedDocument carrierDocument =
                 Authoring::ParsedDocument::ParseText(
@@ -656,7 +668,10 @@ namespace RenderTest
             check.Check(migrating.m_modelGuid == modelProbe,
                 "v8 carrier migrates to m_modelGuid");
 
-            MeshRenderer retired;
+            gc::domain retiredDomain;
+            auto retiredRoot = Component::CreateManaged<MeshRenderer>(retiredDomain);
+            auto& retired = *retiredRoot;
+            gcce_probe::cleanup retiredCleanup(retired);
             Authoring::ParsedDocument retiredDocument = Authoring::ParsedDocument::ParseText(
                 "m_Material:\n  m_name: RetiredCarrier\n  m_fileGuid: "
                     + FileGuid::CreateRandomV4().ToString() + "\n", parseError);
@@ -665,7 +680,10 @@ namespace RenderTest
             check.Check(retiredDocument && retired.m_modelGuid == FileGuid{},
                 "retired v4 carrier is not adopted as model identity");
 
-            MeshRenderer owning;
+            gc::domain owningDomain;
+            auto owningRoot = Component::CreateManaged<MeshRenderer>(owningDomain);
+            auto& owning = *owningRoot;
+            gcce_probe::cleanup owningCleanup(owning);
             owning.m_modelGuid = modelProbe;
             Authoring::WriteDocument savedDocument =
                 Meta::SerializeDocument(&owning);
@@ -678,14 +696,17 @@ namespace RenderTest
 
         // ── S2c-2a: base 참조+diff — 자산 링크가 저장을 살아넘는다 ────────
         {
-            const std::shared_ptr<Material> base =
+            const own::shared_owner<const Material> base =
                 DataSystems->LoadMaterialShared("ForwardWater");
             check.Check(nullptr != base && FileGuid{} != base->m_fileGuid,
                 "base 재질 자산 로드");
             if (base)
             {
-                MeshRenderer linked;
-                linked.m_Material = std::make_shared<Material>(*base);
+                gc::domain linkedDomain;
+                auto linkedRoot = Component::CreateManaged<MeshRenderer>(linkedDomain);
+                auto& linked = *linkedRoot;
+                gcce_probe::cleanup linkedCleanup(linked);
+                linked.m_Material = own::make_shared<Material>(*base);
                 linked.m_materialBaseGuid = base->m_fileGuid;
                 experiment::MaterialProperty edit;
                 edit.name = "roughness";
@@ -725,7 +746,10 @@ namespace RenderTest
                 const Meta::Typed::TypeOps* ops = Meta::Typed::FindTypeOps(
                     TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>()
                         .m_ID_Data);
-                MeshRenderer reloaded;
+                gc::domain reloadedDomain;
+                auto reloadedRoot = Component::CreateManaged<MeshRenderer>(reloadedDomain);
+                auto& reloaded = *reloadedRoot;
+                gcce_probe::cleanup reloadedCleanup(reloaded);
                 Meta::Deserialize(&reloaded, saved);
                 if (ops && ops->postLoad)
                 {
@@ -757,8 +781,11 @@ namespace RenderTest
                     && resaved["m_Material"].Dump() == materialNode.Dump(),
                     "참조 표기 재저장 고정점");
 
-                MeshRenderer clean;
-                clean.m_Material = std::make_shared<Material>(*base);
+                gc::domain cleanDomain;
+                auto cleanRoot = Component::CreateManaged<MeshRenderer>(cleanDomain);
+                auto& clean = *cleanRoot;
+                gcce_probe::cleanup cleanCleanup(clean);
+                clean.m_Material = own::make_shared<Material>(*base);
                 clean.m_materialBaseGuid = base->m_fileGuid;
                 Authoring::WriteDocument cleanDocument =
                     Meta::SerializeDocument(&clean);

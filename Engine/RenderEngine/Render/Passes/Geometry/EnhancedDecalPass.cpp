@@ -4,25 +4,17 @@
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../../RHI/DX12/DX12TextureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
+#include "../../Graph/ShadowCasterBounds.h"
 #include "../../../RHI/RHIEncoder.h"
 
 #include <algorithm>
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string DecalHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 Decal.vs.hlsl + Decal.ps.hlsl의 이식.
     //
     // 좌표 복원·상자 판정·아틀라스 계산·채널 마스크를 전부 그대로 옮겼다.
@@ -45,10 +37,11 @@ namespace
         math::matrix4x4 viewProjection{};
         float screenDimensions[2]{};
         uint32_t hasOwners{};
-        float padding{};
+        uint32_t instanceBase{};
     };
 
     static_assert(sizeof(DecalFrameConstants) == 208);
+    static_assert(offsetof(DecalFrameConstants, instanceBase) == 204);
     static_assert(std::is_trivially_copyable_v<DecalFrameConstants>);
 
     bool CompileDecalShader(const char* entry, const char* target, RHIShaderBlob& outBlob, std::string& outError)
@@ -185,6 +178,9 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     m_height = context.height;
     m_instances.clear();
     m_batches.clear();
+    m_visibilityFrame.reset();
+    m_visibilitySpheres.clear();
+    m_gpuVisibilityEnabled = context.resources && context.resources->GetIndirectDrawCapabilities().nonIndexedDraw;
     m_lastDecalCount = 0;
     m_lastBatchCount = 0;
 
@@ -208,6 +204,13 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         return true;
     }
 
+    if (m_decals.size() > (std::numeric_limits<uint32_t>::max)())
+    {
+        outError = "Decal instance count exceeds 32-bit addressing.";
+        return false;
+    }
+    m_visibilitySpheres.reserve(m_decals.size());
+
     // 텍스처 하나를 올리고 배치가 쓸 형태로 돌려준다. 없는 슬롯은 null이
     // 그대로 남고, Record가 그 자리에 null 디스크립터를 만든다 — 셰이더가
     // useFlags로 그 슬롯을 읽지 않으므로 값은 상관없지만, 테이블에 빈 칸을
@@ -215,16 +218,20 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     //
     // 캐시가 없으면 올리지 않고 넘어간다. 배칭은 원본 포인터로 판단하므로
     // 그래도 성립하고, 그리지 않고 묶음만 확인하는 검증이 이 경로를 쓴다.
-    const auto upload = [&](Texture* texture, RHITextureHandle& outResource, RHIFormat& outFormat,
+    const auto upload = [&](const Texture* texture, RHITextureHandle& outResource, RHIFormat& outFormat,
                             uint32_t& outMips) -> bool {
-        if (nullptr == texture || nullptr == context.textureCache)
+        if (nullptr == texture)
         {
             return true;
         }
+        if (nullptr == context.textureCache)
+        {
+            return false;
+        }
 
         std::string textureError;
-        const auto entry = context.textureCache->GetOrUpload(texture, textureError);
-        if (!entry.IsValid())
+        const auto entry = context.textureCache->GetOrUpload(texture, context.TextureImage(texture), textureError);
+        if (!entry.IsValid() || !textureError.empty())
         {
             return false;
         }
@@ -251,9 +258,10 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
 
         Batch candidate{};
         candidate.channel = channel;
-        candidate.sources[0] = decal.diffuse;
-        candidate.sources[1] = decal.normal;
-        candidate.sources[2] = decal.occRoughMetal;
+        candidate.texturePinIndices = decal.texturePinIndices;
+        candidate.textureIds[0] = TextureFramePins::Identity(decal.diffuse);
+        candidate.textureIds[1] = TextureFramePins::Identity(decal.normal);
+        candidate.textureIds[2] = TextureFramePins::Identity(decal.occRoughMetal);
         if (!upload(decal.diffuse, candidate.textures[0], candidate.formats[0], candidate.mipLevels[0]) ||
             !upload(decal.normal, candidate.textures[1], candidate.formats[1], candidate.mipLevels[1]) ||
             !upload(decal.occRoughMetal, candidate.textures[2], candidate.formats[2], candidate.mipLevels[2]))
@@ -268,9 +276,9 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         // 배치를 키우려고 큐를 정렬하면 그림이 바뀌는데, 그 차이는 겹치는
         // 데칼에서만 나타나 '가끔 다르다'로만 드러난다. 순서를 지킨다.
         const bool sameAsPrevious = !m_batches.empty() && m_batches.back().channel == candidate.channel &&
-                                    m_batches.back().sources[0] == candidate.sources[0] &&
-                                    m_batches.back().sources[1] == candidate.sources[1] &&
-                                    m_batches.back().sources[2] == candidate.sources[2];
+                                    m_batches.back().textureIds[0] == candidate.textureIds[0] &&
+                                    m_batches.back().textureIds[1] == candidate.textureIds[1] &&
+                                    m_batches.back().textureIds[2] == candidate.textureIds[2];
 
         if (!sameAsPrevious)
         {
@@ -288,10 +296,77 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         instance.sliceY = (std::max)(1u, decal.sliceY);
         instance.sliceNum = decal.sliceNum;
         m_instances.push_back(instance);
+        EnhancedDrawItem bounds{};
+        bounds.worldMatrix = decal.worldMatrix;
+        // Encloses [-.5,.5]^3, rounded upward. WorldBounds includes shear,
+        // float arithmetic error and unknown/nonaffine keep-visible handling.
+        bounds.boundRadius = 0.866026f;
+        const auto sphere = shadow_math::WorldBounds(bounds);
+        m_visibilitySpheres.push_back({sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius});
     }
 
     m_lastDecalCount = static_cast<uint32_t>(m_instances.size());
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
+    return true;
+}
+
+bool EnhancedDecalPass::PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError)
+{
+    m_visibilityFrame.reset();
+    if (!m_gpuVisibilityEnabled || m_batches.empty())
+    {
+        outError.clear();
+        return true;
+    }
+    if (!context.resources || !context.resources->GetIndirectDrawCapabilities().nonIndexedDraw ||
+        m_visibilitySpheres.size() != m_instances.size())
+    {
+        outError = "Decal GPU visibility lost its prepared geometry contract.";
+        return false;
+    }
+    if (!m_visibility.PreparePipelines(context, outError))
+    {
+        return false;
+    }
+    std::vector<GpuGeometryVisibility::Candidate> candidates;
+    std::vector<GpuGeometryVisibility::Bin> bins;
+    candidates.reserve(m_instances.size());
+    bins.reserve(m_batches.size());
+    uint64_t outputOffset = 0;
+    for (const auto& batch : m_batches)
+    {
+        const uint64_t count = batch.instanceCount;
+        if (!count || uint64_t(batch.firstInstance) + count > m_instances.size() ||
+            outputOffset + count > (std::numeric_limits<uint32_t>::max)())
+        {
+            outError = "Decal GPU visibility exceeds valid instance/output ranges.";
+            return false;
+        }
+        const uint32_t bin = static_cast<uint32_t>(bins.size());
+        // Deliberate 16B nonindexed prefix of a 20B GPU-produced indexed record.
+        // firstIndex and baseVertex MUST both remain zero (RHI ABI assertions).
+        // Preserve the entire contiguous batch if any instance is visible; GPU
+        // compaction may not reorder blending or change original instance IDs.
+        bins.push_back({36u, 0u, 0, batch.instanceCount});
+        for (uint32_t local = 0; local < batch.instanceCount; ++local)
+        {
+            const auto sphere = m_visibilitySpheres[batch.firstInstance + local];
+            const uint32_t flags = sphere.w > 0.f ? 0u : GpuGeometryVisibility::kConservative;
+            candidates.push_back({sphere, bin, local, static_cast<uint32_t>(outputOffset), flags});
+        }
+        outputOffset += count;
+        outputOffset = (outputOffset + GpuGeometryVisibility::kOutputAlignment - 1u) &
+            ~(uint64_t(GpuGeometryVisibility::kOutputAlignment) - 1u);
+    }
+    if (!m_visibility.Prepare(context, m_viewProjection, candidates, bins, m_visibilityFrame, outError))
+    {
+        return false;
+    }
+    if (!m_visibilityFrame)
+    {
+        outError = "Decal GPU visibility did not produce a supported indirect frame.";
+        return false;
+    }
     return true;
 }
 
@@ -322,6 +397,16 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
     if (m_batches.empty())
     {
         return;
+    }
+
+    const auto visibility = m_visibilityFrame;
+    if (m_gpuVisibilityEnabled && !visibility)
+    {
+        throw std::runtime_error("Decal GPU visibility must be prepared before graph declaration.");
+    }
+    if (visibility)
+    {
+        visibility->Declare(graph);
     }
 
     RGTextureDesc desc{};
@@ -407,7 +492,11 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 {
                     continue;
                 }
-                const auto handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "Decal.Texture");
+                auto handle = graph.FindImportedTexture(texture);
+                if (!handle.IsValid())
+                {
+                    handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "Decal.Texture");
+                }
                 if (std::none_of(applyUses.begin(), applyUses.end(), [handle](const auto& use) {
                         return use.handle.index == handle.index && use.handle.version == handle.version;
                     }))
@@ -417,9 +506,13 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             }
         }
     }
+    if (visibility)
+    {
+        visibility->AddReadUsages(graph, applyUses);
+    }
     graph.AddPass(
         "Decal.Apply", applyUses,
-        [this, outputs, baseline, &context](const EnhancedRenderGraph::ExecuteContext& executeContext) {
+        [this, outputs, baseline, visibility, &context](const EnhancedRenderGraph::ExecuteContext& executeContext) {
             RHIEncoder& encoder = *executeContext.encoder;
 
             // 타깃 순서는 셰이더 출력 순서다(확산·노멀·ORM). GBuffer의
@@ -438,6 +531,10 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Decal render-target binding failed on the prepared GPU route.");
+                }
                 return;
             }
 
@@ -453,16 +550,15 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             constants.screenDimensions[1] = static_cast<float>(m_height);
             constants.hasOwners = outputs.bitmask.IsValid();
 
-            const auto frameCb = context.resources->UploadConstants(&constants, sizeof(DecalFrameConstants));
-            if (!frameCb.IsValid())
-            {
-                return;
-            }
             // 데칼 배열 — 데칼마다 상수 버퍼를 갱신하던 것을 한 번의 업로드로.
             const auto instanceBuffer = context.resources->AllocateUpload(RHIUploadRequest{
-                sizeof(InstanceData) * m_instances.size(), RHIUploadUsage::BufferCopy, sizeof(InstanceData)});
+                sizeof(InstanceData) * m_instances.size(), RHIUploadUsage::BufferCopy, 256});
             if (!instanceBuffer.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Decal instance upload failed on the prepared GPU route.");
+                }
                 return;
             }
             memcpy(instanceBuffer.cpuAddress, m_instances.data(), sizeof(InstanceData) * m_instances.size());
@@ -477,6 +573,10 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const RHIBindingTable gbufferSrv = context.resources->CreateBindings(gbufferSrvs);
             if (!gbufferSrv.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Decal GBuffer bindings failed on the prepared GPU route.");
+                }
                 return;
             }
             const RHIBindingDesc ownerDesc =
@@ -487,6 +587,10 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const auto owners = context.resources->CreateBindings({&ownerDesc, 1});
             if (!owners.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Decal owner bindings failed on the prepared GPU route.");
+                }
                 return;
             }
 
@@ -514,20 +618,28 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             }
             if (!rootBinder.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Decal graphics binding failed on the prepared GPU route.");
+                }
                 return; // 그릴 수 있는 배치가 없다
             }
 
             encoder.SetPipeline(RHIBindPoint::Graphics, rootBinder);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb);
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, instanceBuffer);
             encoder.SetBindings(RHIBindPoint::Graphics, 2, gbufferSrv);
             encoder.SetBindings(RHIBindPoint::Graphics, 4, owners);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-            for (const auto& batch : m_batches)
+            for (uint32_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
             {
+                const auto& batch = m_batches[batchIndex];
                 if (!m_pipelines[batch.channel].IsValid())
                 {
+                    if (visibility)
+                    {
+                        throw std::runtime_error("Decal lost a prepared graphics pipeline.");
+                    }
                     continue;
                 }
 
@@ -543,14 +655,36 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 const RHIBindingTable decalSrv = context.resources->CreateBindings(decalSrvs);
                 if (!decalSrv.IsValid())
                 {
+                    if (visibility)
+                    {
+                        throw std::runtime_error("Decal texture bindings failed on the prepared GPU route.");
+                    }
                     break; // 링이 찼다 — 남은 배치도 마찬가지다
                 }
 
                 encoder.SetPipeline(RHIBindPoint::Graphics, m_pipelines[batch.channel]);
                 encoder.SetBindings(RHIBindPoint::Graphics, 3, decalSrv);
 
-                // 상자 하나가 36정점이다. 정점·인덱스 버퍼 없이 SV_VertexID로 짚는다.
-                encoder.Draw(36, batch.instanceCount, 0, batch.firstInstance);
+                constants.instanceBase = batch.firstInstance;
+                const auto frameCb = context.resources->UploadConstants(&constants, sizeof(constants));
+                if (!frameCb.IsValid())
+                {
+                    throw std::runtime_error("Decal batch constant upload failed.");
+                }
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb);
+                // Preserve procedural vertices 0..35 and original instance order.
+                // GPU firstInstance is zero; the shader explicitly adds the base.
+                if (visibility)
+                {
+                    if (!encoder.DrawIndirect(visibility->Arguments(), visibility->ArgsOffset(batchIndex)))
+                    {
+                        throw std::runtime_error("Decal nonindexed indirect submission failed.");
+                    }
+                }
+                else
+                {
+                    encoder.Draw(36, batch.instanceCount);
+                }
             }
         },
         m_keepAlive);
@@ -558,11 +692,16 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
 
 void EnhancedDecalPass::Shutdown()
 {
+    m_visibilityFrame.reset();
+    m_visibility.ShutdownAfterIdle();
+    m_gpuVisibilityEnabled = false;
+    m_visibilitySpheres.clear();
     m_width = 0;
     m_height = 0;
     m_decals.clear();
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     for (auto& pipeline : m_pipelines)
     {
         pipeline = {};

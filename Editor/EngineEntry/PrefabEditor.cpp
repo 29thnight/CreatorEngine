@@ -1,6 +1,23 @@
 #include "PrefabEditor.h"
 #include "Scene.h"
 #include "ClrHost.h"
+#include "ConsoleCommandSystem.h"
+#include <algorithm>
+
+namespace
+{
+    Scene* ResolvePrefabEditorScene(std::uint32_t sceneId)
+    {
+        for (auto* scene : SceneManagers->GetScenes())
+        {
+            if (scene && scene->GetSceneId() == sceneId)
+            {
+                return scene;
+            }
+        }
+        return nullptr;
+    }
+}
 
 PrefabEditor::PrefabEditor()
 {
@@ -8,64 +25,97 @@ PrefabEditor::PrefabEditor()
 
 void PrefabEditor::Open(const std::string& path)
 {
-    if (m_isOpened)
-        Close(false);
-
-    m_prefab = PrefabUtilitys->LoadPrefabFullPath(path);
-    if (!m_prefab)
+    if (!ConsoleCommandSystem::Get().IsGameThread())
+    {
+        ConsoleCommandSystem::Get().EnqueueEditorMutation([path]
+        {
+            PrefabEditors->Open(path);
+            return CommandCore::Ok();
+        });
         return;
+    }
+    if (m_isOpened)
+    {
+        Close(false);
+    }
+
+    auto* prefab = PrefabUtilitys->LoadPrefabFullPath(path);
+    if (!prefab)
+    {
+        return;
+    }
 
     m_path = path;
-    m_prevScene = SceneManagers->GetActiveScene();
-    m_prevSceneIndex = SceneManagers->GetActiveSceneIndex();
+    m_prefabGuid = prefab->GetFileGuid();
+    auto* previous = SceneManagers->GetActiveScene();
+    m_previousSceneId = previous ? previous->GetSceneId() : 0;
 
-    m_editScene = Scene::CreateNewScene("PrefabEditor");
-    SceneManagers->GetScenes().push_back(m_editScene);
-    SceneManagers->SetActiveScene(m_editScene);
+    auto* editScene = SceneManagers->AdoptScene(
+        Scene::CreateNewScene(SceneManagers->ManagedDomain(), "PrefabEditor"));
+    m_editSceneId = editScene->GetSceneId();
+    SceneManagers->SetActiveScene(editScene);
     SceneManagers->SetActiveSceneIndex(SceneManagers->GetScenes().size() - 1);
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();
 
-    PrefabUtilitys->InstantiatePrefab(m_prefab);
+    PrefabUtilitys->InstantiatePrefab(prefab);
 
     m_isOpened = true;
 }
 
 void PrefabEditor::Close(bool apply)
 {
-    if (!m_isOpened)
-        return;
-
-    if (apply && m_editScene && m_editScene->m_Entities.size() > 1)
+    if (!ConsoleCommandSystem::Get().IsGameThread())
     {
-        auto rootObj = m_editScene->m_Entities[1].get();
-        Prefab* newPrefab = PrefabUtilitys->CreatePrefab(rootObj);
-        newPrefab->SetFileGuid(m_prefab->GetFileGuid());
-        // SavePrefab이 같은 경로 키의 캐시 항목(=m_prefab)을 내부에서 지울 수 있다 —
-        // 여기서 다시 만지거나 delete하면 이중 해제다. newPrefab도 PrefabUtility가
-        // 소유하므로(m_createdPrefabs) 그냥 놓는다.
-        PrefabUtilitys->SavePrefab(newPrefab, m_path.string());
-        PrefabUtilitys->UpdateInstances(newPrefab);
-        m_prefab = nullptr;
+        ConsoleCommandSystem::Get().EnqueueEditorMutation([apply]
+        {
+            PrefabEditors->Close(apply);
+            return CommandCore::Ok();
+        });
+        return;
+    }
+    if (!m_isOpened)
+    {
+        return;
+    }
+
+    auto* editScene = ResolvePrefabEditorScene(m_editSceneId);
+    if (!editScene)
+    {
+        // A normal scene reload may already have retired the prefab scene.
+        // Do not dereference an old borrow or replace the new active scene.
+        m_isOpened = false;
+        m_previousSceneId = 0;
+        m_editSceneId = 0;
+        m_prefabGuid = {};
+        return;
+    }
+    if (apply && editScene->m_Entities.size() > 1)
+    {
+        auto* root = editScene->m_Entities[1].get();
+        auto* prefab = root ? PrefabUtilitys->CreatePrefab(root) : nullptr;
+        if (prefab)
+        {
+            prefab->SetFileGuid(m_prefabGuid);
+            // Save may replace cache-owned assets. Retain only their GUID.
+            PrefabUtilitys->SavePrefab(prefab, m_path.string());
+            PrefabUtilitys->UpdateInstances(prefab);
+        }
     }
 
     sceneUnloadedEvent.Broadcast();
-    if (m_editScene)
-    {
-        m_editScene->AllDestroyMark();
-        m_editScene->EndFramePass();
+    SceneManagers->RetireScene(editScene);
+    ClrHost::Get().NotifySceneUnload();
 
-        // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
-        ClrHost::Get().NotifySceneUnload();
-        auto& scenes = SceneManagers->GetScenes();
-        std::erase_if(scenes, [&](auto* s) { return s == m_editScene; });
-        delete m_editScene;
-        m_editScene = nullptr;
-    }
-
-    SceneManagers->SetActiveSceneIndex(m_prevSceneIndex);
-    SceneManagers->SetActiveScene(m_prevScene);
+    auto* previous = ResolvePrefabEditorScene(m_previousSceneId);
+    SceneManagers->SetActiveScene(previous);
+    const auto& scenes = SceneManagers->GetScenes();
+    const auto position = std::ranges::find(scenes, previous);
+    SceneManagers->SetActiveSceneIndex(position == scenes.end() ? 0 : static_cast<std::size_t>(position - scenes.begin()));
     activeSceneChangedEvent.Broadcast();
 
     m_isOpened = false;
+    m_previousSceneId = 0;
+    m_editSceneId = 0;
+    m_prefabGuid = {};
 }

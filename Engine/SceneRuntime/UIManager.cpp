@@ -117,7 +117,7 @@ void UIManager::AddCanvas(Entity* canvas)
 	needSort = true;
 }
 
-Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, Entity* canvas, math::vector2 Pos)
+Entity* UIManager::MakeImage(std::string_view name, const own::shared_owner<const Texture>& texture, Entity* canvas, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -167,7 +167,7 @@ Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Textur
 	return newImage;
 }
 
-Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, math::vector2 Pos)
+Entity* UIManager::MakeImage(std::string_view name, const own::shared_owner<const Texture>& texture, std::string_view canvasname, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -185,7 +185,7 @@ Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Textur
     return MakeImage(name, texture, canvas, Pos);
 }
 
-Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, math::vector2 Pos, Entity* canvas)
+Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, math::vector2 Pos, Entity* canvas)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -245,7 +245,7 @@ Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Textu
     return newButton;
 }
 
-Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  math::vector2 Pos)
+Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;

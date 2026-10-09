@@ -1,6 +1,7 @@
 #include "EditorModelPlacement.h"
 #include "EditorTheme.h"
 #include "EditorObjectOperations.h"
+#include "ConsoleCommandSystem.h"
 #include "SceneViewWindow.h"
 #include "EditorAssetDragPayload.h"
 #include "ReflectionUndo.h"
@@ -280,7 +281,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
-			static std::unordered_map<Entity*, math::vector2> startWorldPivots;
+			static std::unordered_map<std::string, math::vector2> startWorldPivots;
             static std::vector<EditorObjectOperations::PropertyEdit> edits;
 			static math::vector2 startWorldPos{};
 
@@ -295,7 +296,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 				{
 					if (auto* rt = target->GetComponent<RectTransformComponent>())
                     {
-                        startWorldPivots[target] = rt->GetWorldPivotPosition();
+                        startWorldPivots[EditorObjectOperations::ObjectId(scene->HandleOf(target->m_index))] = rt->GetWorldPivotPosition();
                         edits.push_back(EditorObjectOperations::CapturePropertyEdit(*rt, {"m_anchoredPosition"}));
                     }
 				}
@@ -324,7 +325,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 				{
 					for (auto* target : selectedObjects)
 					{
-						auto it = startWorldPivots.find(target);
+						auto it = startWorldPivots.find(EditorObjectOperations::ObjectId(scene->HandleOf(target->m_index)));
 						if (it == startWorldPivots.end()) continue;
 						if (auto* rt = target->GetComponent<RectTransformComponent>())
 						{
@@ -345,7 +346,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 		}
 		else
 		{
-			static std::unordered_map<Entity*, math::matrix4x4> startWorldMatrices;
+			static std::unordered_map<std::string, math::matrix4x4> startWorldMatrices;
             static std::vector<EditorObjectOperations::PropertyEdit> edits;
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -357,7 +358,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 				startWorldMatrices.clear(); edits.clear();
 				for (auto* target : selectedObjects)
 				{
-					startWorldMatrices[target] =
+					startWorldMatrices[EditorObjectOperations::ObjectId(scene->HandleOf(target->m_index))] =
 						target->Transform_().GetWorldMatrix();
                     edits.push_back(EditorObjectOperations::CapturePropertyEdit(target->Transform_(), {"position", "rotation", "scale"}));
 				}
@@ -381,7 +382,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 				newLocalMatrix, TransformWriteReason::Gizmo);
 				const math::matrix4x4 newWorld =
 					obj->Transform_().GetWorldMatrix();
-				auto itSelf = startWorldMatrices.find(obj);
+				auto itSelf = startWorldMatrices.find(EditorObjectOperations::ObjectId(scene->HandleOf(obj->m_index)));
 				if (itSelf != startWorldMatrices.end())
 				{
 					const math::vector3 offset =
@@ -393,7 +394,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 						for (auto* target : selectedObjects)
 						{
 							if (target == obj) continue;
-							auto itStart = startWorldMatrices.find(target);
+							auto itStart = startWorldMatrices.find(EditorObjectOperations::ObjectId(scene->HandleOf(target->m_index)));
 							if (itStart == startWorldMatrices.end()) continue;
 							const math::matrix4x4 targetWorld = itStart->second *
 								math::translation_matrix(offset);
@@ -542,20 +543,22 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 				{
 					Debug::PrintLog(spdlog::level::err, "SkyBox 변경 실패: " + skyError);
 				}
-				else
-				{
-					editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
-				}
 			}
 
 			if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
 			{
 				const file::path filepath = editor::asset_drag::path_of(*prefabPayload);
-				auto prefab = PrefabUtilitys->LoadPrefabFullPath(filepath.string().c_str());
-				if (prefab)
-				{
-					EditorObjectOperations::InstantiatePrefab(prefab, filepath.stem().string());
-				}
+                const auto sceneId = scene ? scene->GetSceneId() : 0;
+                ConsoleCommandSystem::Get().EnqueueEditorMutation([filepath, sceneId]
+                {
+                    auto* current = SceneManagers->GetActiveScene();
+                    if (!current || current->GetSceneId() != sceneId)
+                    {
+                        return CommandCore::PreconditionFailed("scene.stale", "Prefab destination changed");
+                    }
+                    auto* prefab = PrefabUtilitys->LoadPrefabFullPath(filepath.string());
+                    return EditorObjectOperations::InstantiatePrefab(prefab, filepath.stem().string());
+                });
 			}
 
 			ImGui::EndDragDropTarget();
@@ -564,7 +567,29 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 	}
 	//====================
 	// 선택 아이템 있을시 처리
-	static TerrainComponent* prevTerrain = nullptr;
+    static EntityHandle previousTerrainOwner;
+    static std::uint64_t previousTerrainComponent{};
+    const auto clearPreviousTerrain = [&]
+    {
+        // Re-resolve under this frame's scene borrow fence. A raw component
+        // cached across frames may already have been reclaimed at the GT stop.
+        for (auto* candidate : SceneManagers->GetScenes())
+        {
+            if (!candidate || candidate->GetSceneId() != previousTerrainOwner.sceneId)
+            {
+                continue;
+            }
+            auto* owner = candidate->Resolve(previousTerrainOwner);
+            auto* terrain = owner && !owner->IsDestroyMark() ? owner->GetComponent<TerrainComponent>() : nullptr;
+            if (terrain && !terrain->IsDestroyMark() && terrain->GetInstanceID() == previousTerrainComponent)
+            {
+                terrain->SetTerrainBrush(nullptr);
+            }
+            break;
+        }
+        previousTerrainOwner = {};
+        previousTerrainComponent = 0;
+    };
 	if (sceneSelectedObj && sceneSelectedObj->HasComponent<TerrainComponent>())
 	{
 		if (editorTerrainBrush == nullptr)
@@ -575,6 +600,11 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 		TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
 		if (terrainComponent)
 		{
+            const auto owner = sceneSelectedObj->GetScene()->HandleOf(sceneSelectedObj->m_index);
+            if (previousTerrainOwner != owner || previousTerrainComponent != terrainComponent->GetInstanceID())
+            {
+                clearPreviousTerrain();
+            }
 			if (editorTerrainBrush->m_isEditMode)
 			{
 				terrainComponent->SetTerrainBrush(editorTerrainBrush);
@@ -639,14 +669,14 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 			{
 				terrainComponent->SetTerrainBrush(nullptr);
 			}
-			prevTerrain = terrainComponent;
+            previousTerrainOwner = owner;
+            previousTerrainComponent = terrainComponent->GetInstanceID();
 		}
 	}
-	else if (prevTerrain)
-	{
-		prevTerrain->SetTerrainBrush(nullptr);
-		prevTerrain = nullptr;
-	}
+    else if (previousTerrainOwner.IsValid())
+    {
+        clearPreviousTerrain();
+    }
 
 	//=========================
 
@@ -685,11 +715,11 @@ namespace editor::picking
 {
 
 std::vector<Entity*> CollectOccupants(
-	const std::vector<std::unique_ptr<Entity>>& slots)
+	const std::vector<gc::trace_ref<Entity>>& slots)
 {
 	std::vector<Entity*> occupants;
 	occupants.reserve(slots.size());
-	for (const std::unique_ptr<Entity>& slot : slots)
+	for (const gc::trace_ref<Entity>& slot : slots)
 	{
 		// 구멍은 여기서만 걷어낸다. 이 한 줄이 없어서 2026-09-14 에 씬뷰
 		// 클릭 한 번이 프로세스를 죽였다(덤프: 읽기 주소 0x150 — null this
@@ -702,7 +732,7 @@ std::vector<Entity*> CollectOccupants(
 }
 
 std::vector<RayHitResult> GatherRayHits(
-	const Ray& ray, const std::vector<std::unique_ptr<Entity>>& slots)
+	const Ray& ray, const std::vector<gc::trace_ref<Entity>>& slots)
 {
 	std::vector<RayHitResult> hits;
 	const math::ray pickRay{ ray.origin, ray.direction };

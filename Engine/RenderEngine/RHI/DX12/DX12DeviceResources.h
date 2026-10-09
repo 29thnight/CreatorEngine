@@ -1,6 +1,7 @@
 #pragma once
-#include "RenderFrameServices.h"
+#include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
+#include "DX12QueueService.h"
 #include <cstdint>
 #include <string>
 #include <array>
@@ -21,6 +22,7 @@
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
 class DX12Encoder;
+class DX12MemorySamplingSession;
 
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
 //
@@ -42,9 +44,20 @@ class DX12Encoder;
 //
 // 한 클래스가 둘을 겸하는 것은 지금 이 객체가 실제로 둘 다이기 때문이다.
 // 쪼갤 근거가 생기면(예: 서비스만 가짜로 바꿔 패스를 검증할 때) 그때 나눈다.
-class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
+class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices, public IRHICommandQueueFactory
 {
 public:
+    RHIQueueCapabilities QueryQueueCapabilities() const override;
+    bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue,
+        std::string& error) override;
+    bool SupportsTransientAliasing() const override { return true; }
+    bool DescribeTransientAllocation(const RHITransientResourceDesc& desc,
+        RHITransientAllocationInfo& info, std::string& error) const override;
+    bool CreateTransientHeap(const RHITransientAllocationInfo& info,
+        std::shared_ptr<RHITransientHeap>& heap, std::string& error) override;
+    bool CreatePlacedTransient(const RHITransientResourceDesc& desc,
+        RHITransientHeap& heap, RHITextureHandle& texture, RHIBufferHandle& buffer,
+        std::string& error) override;
     /// 정의는 둘 다 .cpp 에 있다 — 즉시 인코더를 불완전 타입으로 들기
     /// 때문이다(A-3).
     ///
@@ -56,6 +69,19 @@ public:
     ~DX12DeviceResources();
 
     static constexpr uint32_t kFrameCount = 3;
+
+#if !CE_SHIPPING
+    // 시험 전용 장치 제거 주입. 해당 종류 장치의 다음 BeginFrame 이
+    // ID3D12Device5::RemoveDevice 를 불러 실제 제거 경로를 태운다.
+    // 씬은 스왑체인이 없는 장치, 호스트는 스왑체인을 붙인 장치다.
+    enum class TestDeviceRemovalTarget : uint32_t { Scene = 1u << 0, Host = 1u << 1 };
+    static void RequestTestDeviceRemoval(TestDeviceRemovalTarget target);
+    bool EnqueueQueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue,
+        ID3D12Fence* fence, uint64_t value, std::string& error)
+    {
+        return m_queueService && m_queueService->EnqueueTestGate(queue, fence, value, error);
+    }
+#endif
 
     // 렌더 타깃의 최적화 클리어 값. 생성 힌트와 실제 클리어가 일치해야 검증
     // 레이어가 조용하다 — 힌트를 안 주는 쪽도, 다른 값으로 지우는 쪽도 경고를 쌓는다
@@ -118,10 +144,21 @@ public:
     /// 얼로케이터는 되돌리지 않는다 — GPU가 아직 그 메모리를 읽는 중이다.
     /// 리스트만 다시 여는 것은 제출 직후에도 허용된다.
     bool FlushCommandList(std::string& outError) override;
+    // Upload prefix -> owned graph queues -> primary frame retirement.
+    // EndFrame requires JoinQueueFrame; AbortFrame drains and revokes the queue
+    // service. Queue execution then needs backend reinitialization; legacy frames
+    // remain usable. Prefix reservations retire with EndFrame, never prefix alone.
+    bool BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError);
+    bool GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue, std::string& outError);
+    bool JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError);
+    bool WaitForLastFrameSubmission(std::string& outError);
+    bool ShutdownQueueService(std::string& outError);
     /// 이미 닫힌 backend command list 묶음을 제출하고 같은 queue fence로
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
     bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    void AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket);
+    void RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion);
     bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
         RHICompletionPoint completion, std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
@@ -132,13 +169,22 @@ public:
         return m_lastLifecycleResult;
     }
 
-    /// 마지막으로 EndFrame이 서명한 펜스 값. 상시 러너의 비동기 표시가
-    /// '이 프레임이 끝났는가'를 논블로킹으로 물을 때 GetCompletedFenceValue와
+    /// 큐 admission이 확인된 마지막 완료 예약. CPU 제출 성공은 ticket이,
+    /// GPU 완료는 GetCompletedFenceValue가 따로 증명한다. 거절된 예약은 제외한다.
+    /// 상시 러너의 비동기 표시가 GetCompletedFenceValue와
     /// 짝으로 쓴다 — 완료 확인이 CPU 대기 없이 되므로 WaitForGpu가 필요 없다.
-    uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
+    uint64_t GetLastSignaledFenceValue() const override { return m_lastAdmittedFenceValue; }
     uint64_t GetCompletedFenceValue() const override
     {
-        return m_fence ? m_fence->GetCompletedValue() : 0;
+        const uint64_t completed = m_fence ? m_fence->GetCompletedValue() : 0;
+        // UINT64_MAX는 장치 제거를 뜻한다. 모든 GPU 소비자의 완료가 아니다.
+        return UINT64_MAX == completed ? 0 : completed;
+    }
+    /// 펜스가 value 에 닿으면 event 를 신호한다(이미 지났으면 즉시). 완료를
+    /// 시간 조회로 엿보면 타이머 눈금(15.6 ms)에 묶이므로 이 신호로 깨어난다.
+    bool SignalEventOnFenceValue(uint64_t value, HANDLE event) const
+    {
+        return m_fence && SUCCEEDED(m_fence->SetEventOnCompletion(value, event));
     }
 
     // ── 스왑체인 (3-9 교체 — ImGui/셸이 DX12로 출력하는 경로) ──
@@ -153,6 +199,8 @@ public:
     bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) override;
     bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError) override;
+    // 직렬 표시 소유자가 EndFrame 뒤에 호출한다. 리사이즈는 프레임 사이에
+    // 처리하며, 호출자는 종료·파괴 전에 그 소유자를 join해야 한다.
     bool Present(std::string& outError) override;
     bool HasSwapChain() const override { return nullptr != m_swapChain.Get(); }
     uint32_t GetBackBufferIndex() const override;
@@ -398,6 +446,33 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
+    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
+    {
+        return m_resourceTable.DescribeBuffer(handle);
+    }
+
+    RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
+    {
+        const bool available = nullptr != m_drawIndexedIndirectSignature.Get();
+        return { available, available || nullptr != m_drawIndirectSignature.Get(),
+            nullptr != m_drawIndirectSignature.Get() };
+    }
+    RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override
+    {
+        return m_meshShaderCapabilities;
+    }
+    ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const
+    {
+        return m_dispatchMeshIndirectSignature.Get();
+    }
+    ID3D12CommandSignature* GetDrawIndirectSignature() const
+    {
+        return m_drawIndirectSignature.Get();
+    }
+    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const
+    {
+        return m_drawIndexedIndirectSignature.Get();
+    }
 
     /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
@@ -416,14 +491,14 @@ public:
     //   모양이다 — 캐시가 만들어 오래 들고, 표는 소비처에 핸들을 주려고 든다.
     //   그 주석이 "이쪽은 과도기가 아니다"라고 적어 둔 부류다.
     RHIPipelineHandle RegisterPipeline(ID3D12PipelineState* pipeline,
-        ID3D12RootSignature* signature)
+        ID3D12RootSignature* signature, bool meshPipeline = false, bool computePipeline = false)
     {
-        return m_resourceTable.AddPipeline(pipeline, signature);
+        return m_resourceTable.AddPipeline(pipeline, signature, meshPipeline, computePipeline);
     }
     RHIPipelineLayoutHandle RegisterPipelineLayout(ID3D12RootSignature* signature,
-        uint64_t stableHash)
+        uint64_t stableHash, bool allowInputAssembler = true)
     {
-        return m_resourceTable.AddPipelineLayout(signature, stableHash);
+        return m_resourceTable.AddPipelineLayout(signature, stableHash, allowInputAssembler);
     }
 
     DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
@@ -464,6 +539,7 @@ private:
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
     void RefreshUploadBudget();
     void RefreshPersistentMemoryBudget();
+    bool WaitForFenceValue(uint64_t value, std::string& outError);
 
     // 핸들 → 리소스. 등록 경로는 둘뿐이다 — Create* 가 만들면서, 그래프가
     // transient 를 만들면서(V2-c).
@@ -475,7 +551,17 @@ private:
 
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
+    std::unique_ptr<DX12MemorySamplingSession> m_memorySampling;
     ComPtr<ID3D12Device>               m_device;
+    std::unique_ptr<DX12QueueService> m_queueService;
+    bool m_queueFrameActive{false};
+    bool m_queueFrameJoined{false};
+    void DrainAbortedQueueFrame();
+    bool FlushCommandListImpl(bool preserveRecording, std::string& outError);
+    ComPtr<ID3D12CommandSignature>     m_drawIndirectSignature;
+    ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
+    ComPtr<ID3D12CommandSignature>     m_dispatchMeshIndirectSignature;
+    RHIMeshShaderCapabilities          m_meshShaderCapabilities;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.
@@ -496,6 +582,7 @@ private:
     ComPtr<ID3D12Fence>                m_fence;
     HANDLE                             m_fenceEvent{ nullptr };
     uint64_t                           m_nextFenceValue{ 1 };
+    uint64_t                           m_lastAdmittedFenceValue{ 0 };
     uint32_t                           m_frameIndex{ 0 };
     bool                               m_submissionClient{ false };
     RHILifecycleResult                 m_lastLifecycleResult{};
@@ -508,6 +595,11 @@ private:
     // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
     ComPtr<IDXGISwapChain3>            m_swapChain;
     UINT                             m_swapChainFlags{ 0 };
+    HANDLE                           m_frameLatencyWaitableObject{ nullptr };
+    bool                             m_frameLatencyReady{ false };
+    // allocator·백버퍼 링과 별개로 미완료 호스트 프레임은 하나만 허용한다.
+    RHISubmissionTicket              m_hostSubmissionTicket;
+    uint64_t                         m_hostFenceValue{ 0 };
     std::array<ComPtr<ID3D12Resource>, kFrameCount> m_backBuffers;
     ComPtr<ID3D12DescriptorHeap>       m_backBufferRtvHeap;
     uint32_t                           m_backBufferRtvSize{ 0 };

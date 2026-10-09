@@ -10,6 +10,7 @@ enum class RHIShaderStage : std::uint8_t
     Vertex,
     Pixel,
     Compute,
+    Mesh,
 };
 
 enum class RHIShaderResourceKind : std::uint8_t

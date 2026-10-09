@@ -3,19 +3,14 @@
 #include "Windows/EditorStandardWindows.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "EditorIcons.h"
-#include "EditorTheme.h"
-#include "TimeSystem.h"
-#include "RHI/ScreenSizedResource.h"
-#include "ProfilerView.h"
+#include "ProfilerHUD.h"
 #include "EditorWindowRegistry.h"
 #include "EditorSettingsStore.h"
 #include "RuntimeSettings.h"
 #include "Windows/EditorToolboxWindows.h"
 
-#include <algorithm>
-#include <cfloat>
-#include <cstdio>
-#include <vector>
+#include <iterator>
+#include <atomic>
 
 // 익명 네임스페이스가 아니라 이름을 준다. 이 프로젝트는 유니티 빌드라
 // (EnableUnitySupport) 여러 .cpp가 한 TU로 합쳐지는데, ResourceCounterWindow.cpp도
@@ -27,22 +22,8 @@ namespace EnhancedRenderDebugUi
 	// 갱신하면 숫자가 읽히지 않는다. 눈이 따라갈 수 있는 주기를 둔다.
 	constexpr double kRefreshIntervalSeconds = 0.25;
 
-	constexpr ImVec4 kOkColor{ 0.49f, 0.88f, 0.72f, 1.0f };
 	constexpr ImVec4 kWarnColor{ 0.96f, 0.78f, 0.36f, 1.0f };
-	constexpr ImVec4 kErrorColor{ 0.94f, 0.44f, 0.47f, 1.0f };
 	constexpr ImVec4 kDimColor{ 0.55f, 0.58f, 0.65f, 1.0f };
-
-	void LabeledValue(const char* label, const char* value, const ImVec4& color)
-	{
-		ImGui::TextColored(kDimColor, "%s", label);
-		ImGui::SameLine(editor::ThemePixels(125.f));
-		ImGui::TextColored(color, "%s", value);
-	}
-
-	void LabeledValue(const char* label, const char* value)
-	{
-		LabeledValue(label, value, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-	}
 
 	// EnhancedShadowDebugView 순서 그대로다(셰이더의 CASCADED_SHADOW_DEBUG_* 와도 같다).
 	constexpr const char* kShadowDebugViews[]{
@@ -87,6 +68,14 @@ namespace EnhancedRenderDebugUi
 		ImGui::Text("Distance %.2f  slope scale %.2f  non-graph casters %u",
 			stats.shadowDistance, stats.slopeScale, stats.casterCandidates);
 
+        if (stats.gpuVisibilityActive)
+        {
+            ImGui::Text("GPU shadow visibility: %llu submitted candidates / %llu bins",
+                static_cast<unsigned long long>(stats.gpuSubmittedCandidates),
+                static_cast<unsigned long long>(stats.gpuSubmittedBins));
+            ImGui::TextColored(kDimColor, "Visible/culled counts are not read back from the GPU.");
+        }
+
 		constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg
 			| ImGuiTableFlags_SizingFixedFit;
 		if (!ImGui::BeginTable("ShadowCascades", 8, flags)) return;
@@ -117,6 +106,220 @@ namespace EnhancedRenderDebugUi
 		ImGui::EndTable();
 		ImGui::TextColored(kDimColor, "Lengths are world units. Bias is along the light; steep = slope term at its cap.");
 	}
+
+    const char* GraphStateName(RHIResourceState state)
+    {
+        switch (state)
+        {
+        case RHIResourceState::Common: return "Common";
+        case RHIResourceState::RenderTarget: return "RenderTarget";
+        case RHIResourceState::DepthWrite: return "DepthWrite";
+        case RHIResourceState::DepthRead: return "DepthRead";
+        case RHIResourceState::ShaderResource: return "ShaderResource";
+        case RHIResourceState::PixelShaderResource: return "PixelShaderResource";
+        case RHIResourceState::DepthReadShaderResource: return "DepthReadShaderResource";
+        case RHIResourceState::UnorderedAccess: return "UnorderedAccess";
+        case RHIResourceState::CopySource: return "CopySource";
+        case RHIResourceState::CopyDest: return "CopyDest";
+        case RHIResourceState::IndexBuffer: return "IndexBuffer";
+        case RHIResourceState::IndirectArgument: return "IndirectArgument";
+        case RHIResourceState::VertexAndShaderResource: return "VertexAndShaderResource";
+        default: return "Unknown";
+        }
+    }
+
+    const char* GraphAccessName(RGAccessMode access)
+    {
+        switch (access)
+        {
+        case RGAccessMode::Read: return "Read";
+        case RGAccessMode::Write: return "Write";
+        case RGAccessMode::ReadWrite: return "Modify";
+        default: return "LegacyState";
+        }
+    }
+
+    const char* GraphEdgeReason(EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason reason)
+    {
+        using Reason = EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason;
+        switch (reason)
+        {
+        case Reason::RAW: return "RAW";
+        case Reason::WAR: return "WAR";
+        case Reason::WAW: return "WAW";
+        default: return "Unknown";
+        }
+    }
+
+    void DrawCompiledGraph(const EnhancedRenderGraph::DiagnosticSnapshot& snapshot,
+        const ImGuiTextFilter& filter)
+    {
+        const auto resourceName = [&snapshot](uint32_t index)
+        {
+            return index < snapshot.resources.size() ? snapshot.resources[index].name.c_str() : "Invalid resource";
+        };
+        if (!ImGui::BeginTabBar("CompiledGraphDetails"))
+        {
+            return;
+        }
+        if (ImGui::BeginTabItem("Passes"))
+        {
+            for (const auto& pass : snapshot.passes)
+            {
+                if (!filter.PassFilter(pass.name.c_str()))
+                {
+                    continue;
+                }
+                ImGui::PushID(static_cast<int>(pass.authoredIndex));
+                const int wave = pass.authoredIndex < snapshot.dependencyWaves.size()
+                    ? snapshot.dependencyWaves[pass.authoredIndex] : -1;
+                if (ImGui::TreeNode("Pass", "#%u %s | compiled %d | wave %d%s",
+                    pass.authoredIndex, pass.name.c_str(), pass.compiledIndex, wave,
+                    pass.culled ? " | culled" : ""))
+                {
+                    ImGui::Text("Side effect: %s | record cost %u | max slices %u",
+                        pass.sideEffect ? "yes" : "no", pass.recordCost, pass.maxSlices);
+                    for (const auto& usage : pass.usages)
+                    {
+                        ImGui::BulletText("%s r%u v%u %s | %s", GraphAccessName(usage.access),
+                            usage.resource, static_cast<unsigned int>(usage.version),
+                            resourceName(usage.resource), GraphStateName(usage.state));
+                    }
+                    if (!pass.barriers.empty())
+                    {
+                        ImGui::TextUnformatted("Pass barriers");
+                        for (const auto& barrier : pass.barriers)
+                        {
+                            ImGui::BulletText("%s r%u %s: %s -> %s%s",
+                                barrier.afterPass ? "After" : "Before", barrier.resource,
+                                resourceName(barrier.resource), GraphStateName(barrier.before),
+                                GraphStateName(barrier.after), barrier.aliasing ? " (heap activation)" :
+                                (barrier.uav ? " (UAV ordering)" : ""));
+                        }
+                    }
+                    if (!pass.phases.empty())
+                    {
+                        ImGui::Text("%u serial iterations / %zu phases / one unsplit recording unit",
+                            pass.repeatCount, pass.phases.size());
+                        for (uint32_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
+                        {
+                            const auto& phase = pass.phases[phaseIndex];
+                            ImGui::PushID(static_cast<int>(phaseIndex));
+                            if (ImGui::TreeNode("Phase", "Phase %u: %s", phaseIndex, phase.name.c_str()))
+                            {
+                                for (const auto& usage : phase.usages)
+                                {
+                                    ImGui::BulletText("%s r%u v%u %s | %s", GraphAccessName(usage.access),
+                                        usage.resource, static_cast<unsigned int>(usage.version),
+                                        resourceName(usage.resource), GraphStateName(usage.state));
+                                }
+                                for (uint32_t iterationTemplate = 0; iterationTemplate < 2; ++iterationTemplate)
+                                {
+                                    ImGui::TextUnformatted(iterationTemplate == 0
+                                        ? "First iteration barriers" : "Subsequent iteration barriers");
+                                    const auto& barriers = iterationTemplate == 0
+                                        ? phase.firstBarriers : phase.repeatBarriers;
+                                    for (const auto& barrier : barriers)
+                                    {
+                                        ImGui::BulletText("r%u %s: %s -> %s%s", barrier.resource,
+                                            resourceName(barrier.resource), GraphStateName(barrier.before),
+                                            GraphStateName(barrier.after), barrier.uav ? " (UAV ordering)" : "");
+                                    }
+                                }
+                                ImGui::TreePop();
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Resources"))
+        {
+            for (uint32_t index = 0; index < snapshot.resources.size(); ++index)
+            {
+                const auto& resource = snapshot.resources[index];
+                if (!filter.PassFilter(resource.name.c_str()))
+                {
+                    continue;
+                }
+                ImGui::PushID(static_cast<int>(index));
+                if (ImGui::TreeNode("Resource", "r%u %s | %s | %s%s", index, resource.name.c_str(),
+                    resource.buffer ? "buffer" : "texture", resource.imported ? "imported" : "transient",
+                    resource.used ? "" : " | unused"))
+                {
+                    ImGui::Text("Versions: %u | state %s -> %s", resource.versionCount,
+                        GraphStateName(resource.initialState), GraphStateName(resource.finalState));
+                    if (resource.used)
+                    {
+                        ImGui::Text("Compiled lifetime: %u to %u", resource.firstUse, resource.lastUse);
+                    }
+                    for (const auto& pass : snapshot.passes)
+                    {
+                        for (const auto& usage : pass.usages)
+                        {
+                            if (usage.resource == index)
+                            {
+                                ImGui::BulletText("v%u %s: #%u %s%s", static_cast<unsigned int>(usage.version),
+                                    GraphAccessName(usage.access), pass.authoredIndex, pass.name.c_str(),
+                                    pass.culled ? " (culled)" : "");
+                            }
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Dependencies"))
+        {
+            ImGui::TextUnformatted("Compiled submission order");
+            for (uint32_t index = 0; index < snapshot.executeOrder.size(); ++index)
+            {
+                const auto authored = snapshot.executeOrder[index];
+                if (authored < snapshot.passes.size())
+                {
+                    ImGui::Text("%u: #%u %s", index, static_cast<unsigned int>(authored),
+                        snapshot.passes[authored].name.c_str());
+                }
+            }
+            ImGui::Separator();
+            ImGui::TextUnformatted("Retained version edges");
+            for (const auto& edge : snapshot.versionEdges)
+            {
+                if (edge.producer >= snapshot.passes.size() || edge.consumer >= snapshot.passes.size())
+                {
+                    continue;
+                }
+                const auto& producer = snapshot.passes[edge.producer];
+                const auto& consumer = snapshot.passes[edge.consumer];
+                if (!filter.PassFilter(producer.name.c_str()) && !filter.PassFilter(consumer.name.c_str()) &&
+                    !filter.PassFilter(resourceName(edge.resource)))
+                {
+                    continue;
+                }
+                ImGui::BulletText("#%u %s -> r%u v%u %s [%s] -> #%u %s",
+                    edge.producer, producer.name.c_str(), edge.resource, static_cast<unsigned int>(edge.version),
+                    resourceName(edge.resource), GraphEdgeReason(edge.reason), edge.consumer, consumer.name.c_str());
+            }
+            ImGui::Separator();
+            ImGui::TextUnformatted("Critical path (pass count, not GPU duration)");
+            for (const auto authored : snapshot.criticalPath)
+            {
+                if (authored < snapshot.passes.size())
+                {
+                    ImGui::BulletText("#%u %s", static_cast<unsigned int>(authored),
+                        snapshot.passes[authored].name.c_str());
+                }
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
 }
 
 using namespace EnhancedRenderDebugUi;
@@ -363,67 +566,102 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		"so there is nothing to drive from here.");
 }
 
-void editor::DrawRenderRuntime(const EnhancedLiveDebugSnapshot& displayed)
-{
-		const char* backendName = EnhancedLiveBackend::Vulkan == displayed.backend
-			? "Vulkan" : "DX12";
-		char backendLabel[64]{};
-		std::snprintf(backendLabel, sizeof(backendLabel),
-			"EnhancedRenderer / %s", backendName);
-		LabeledValue("Backend", backendLabel, kOkColor);
-		LabeledValue("Live runner", displayed.enabled ? "on" : "off",
-			displayed.enabled ? kOkColor : kErrorColor);
-		LabeledValue("Pipeline", displayed.pipelineReady ? "ready" : "none",
-			displayed.pipelineReady ? kOkColor : kErrorColor);
-
-		char buffer[128]{};
-		std::snprintf(buffer, sizeof(buffer), "%u x %u", displayed.width, displayed.height);
-		LabeledValue("Render target", buffer);
-
-		// 드로우 0은 파이프라인이 멀쩡해도 화면이 비는 유일한 조건이라
-		// 따로 색을 준다 — 여기서 멈춰야 할 신호다.
-		std::snprintf(buffer, sizeof(buffer), "%u draws / %u batches",
-			displayed.drawCount, displayed.batchCount);
-		LabeledValue("GBuffer", buffer, 0u == displayed.drawCount ? kWarnColor : kOkColor);
-
-		// 데칼은 없는 씬이 정상이라 0을 경고로 칠하지 않는다. 볼 것은
-		// 둘의 관계다 — 데칼이 있는데 배치가 0이면 텍스처 운반이 실패한
-		// 것이고, 그건 화면만 봐서는 '데칼이 원래 없나'와 구분되지 않는다.
-		std::snprintf(buffer, sizeof(buffer), "%u decals / %u batches",
-			displayed.decalCount, displayed.decalBatchCount);
-		LabeledValue("Decal", buffer,
-			(0u != displayed.decalCount && 0u == displayed.decalBatchCount)
-				? kWarnColor : kDimColor);
-
-		std::snprintf(buffer, sizeof(buffer), "%llu rendered / %llu idle / %llu in-flight skip",
-			static_cast<unsigned long long>(displayed.framesRendered),
-			static_cast<unsigned long long>(displayed.framesIdle),
-			static_cast<unsigned long long>(displayed.framesInFlight));
-		LabeledValue("Frames", buffer);
-
-		// 묘지가 자라기만 하면 DisableLive가 놓은 공유 객체를 아무도
-		// 회수하지 않고 있다는 뜻이다(ShutdownLive까지 남는다).
-		std::snprintf(buffer, sizeof(buffer), "%zu", displayed.graveyardCount);
-		LabeledValue("Graveyard", buffer,
-			0u == displayed.graveyardCount ? kDimColor : kWarnColor);
-}
-
 void editor::OpenRenderLiveDiagnostics()
 {
-    profiler_view::select_rendering_live();
-    queue_window_request(EditorWindowName::kFrameProfiler, window_request::focus);
+    request_profiler_viewer(true);
+}
+
+namespace
+{
+    std::atomic<uint64_t> graphViewerFrames{}, graphViewerMatchingFrames{}, graphViewerStaleFrames{};
+    std::atomic<int> graphViewerRequestedTarget{-1};
+    std::atomic<uint32_t> graphViewerTarget{};
+}
+
+editor::CompiledGraphViewerStats editor::ReadCompiledGraphViewerStats()
+{
+    return {graphViewerFrames.load(), graphViewerMatchingFrames.load(), graphViewerStaleFrames.load(),
+        graphViewerTarget.load()};
+}
+
+void editor::RequestCompiledGraphViewerTarget(EnhancedLiveDisplayTarget target)
+{
+    graphViewerRequestedTarget.store(static_cast<int>(target));
 }
 
 void EnhancedRenderDebugWindow::Draw()
 {
-    ImGui::TextUnformatted("RenderPass - pipeline structure");
-    ImGui::TextWrapped("Compiled graph visualization is not available yet. Active pipeline declarations are shown below.");
-    if (ImGui::Button("Graphics settings")) editor::open_window(EditorWindowName::kProjectSettings);
+    ++graphViewerFrames;
+    const int requested = graphViewerRequestedTarget.exchange(-1);
+    if (requested >= 0 && requested < static_cast<int>(kEnhancedLiveDisplayTargetCount) && requested != m_graphTarget)
+    {
+        m_graphTarget = requested;
+        m_graphSnapshot.reset();
+        m_graphLastRefresh = -1.0;
+    }
+    ImGui::TextUnformatted("RenderPass - compiled graph");
+    constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
+    if (ImGui::Combo("View", &m_graphTarget, targets, 3))
+    {
+        m_graphSnapshot.reset();
+        m_graphLastRefresh = -1.0;
+    }
+    graphViewerTarget.store(static_cast<uint32_t>(m_graphTarget));
+    const double now = ImGui::GetTime();
+    if (m_graphLastRefresh < 0.0 || now - m_graphLastRefresh >= kRefreshIntervalSeconds)
+    {
+        m_graphSnapshot = EnhancedSceneRenderer::GetLiveGraphSnapshot(
+            static_cast<EnhancedLiveDisplayTarget>(m_graphTarget));
+        m_graphLastRefresh = now;
+    }
+    if (ImGui::Button("Graphics settings"))
+    {
+        editor::open_window(EditorWindowName::kProjectSettings);
+    }
     ImGui::SameLine();
-    if (ImGui::Button("Rendering - Live")) editor::OpenRenderLiveDiagnostics();
-    const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+    if (ImGui::Button("Rendering - Live"))
+    {
+        editor::OpenRenderLiveDiagnostics();
+    }
     ImGui::Separator();
-    ImGui::TextUnformatted(snapshot.pipelineDescription.empty() ? "No pipeline description available." : snapshot.pipelineDescription.c_str());
+    if (!m_graphSnapshot)
+    {
+        ImGui::TextDisabled("Waiting for a compiled frame for this view.");
+        const auto debug = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        if (!debug.lastError.empty())
+        {
+            ImGui::TextWrapped("Latest renderer error: %s", debug.lastError.c_str());
+        }
+        return;
+    }
+    const auto& snapshot = *m_graphSnapshot;
+    const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+    if (!EnhancedGraphSnapshotMatchesView(snapshot,
+        display.Get(static_cast<EnhancedLiveDisplayTarget>(m_graphTarget))))
+    {
+        ++graphViewerStaleFrames;
+        ImGui::TextDisabled("Previous graph belongs to an inactive or changed view. Waiting for a matching compiled frame.");
+        m_graphSnapshot.reset();
+        m_graphLastRefresh = -1.0;
+        return;
+    }
+    ++graphViewerMatchingFrames;
+    ImGui::Text("Generation %llu | epoch %llu | frame %llu | view %llu | %u x %u",
+        static_cast<unsigned long long>(snapshot.generation), static_cast<unsigned long long>(snapshot.graphEpoch),
+        static_cast<unsigned long long>(snapshot.frameId), static_cast<unsigned long long>(snapshot.viewId),
+        snapshot.width, snapshot.height);
+    ImGui::Text("Scene epoch %llu | view history %llu",
+        static_cast<unsigned long long>(snapshot.sceneEpoch),
+        static_cast<unsigned long long>(snapshot.historyRevision));
+    ImGui::Text("Dependency hash %016llx | %zu declared / %zu executed / %zu resources",
+        static_cast<unsigned long long>(snapshot.dependencyHash), snapshot.passes.size(),
+        snapshot.executeOrder.size(), snapshot.resources.size());
+    ImGui::TextDisabled("Native C++ source | %s | %s | read-only compiled snapshot",
+        snapshot.scheduling == RGSchedulingMode::ExplicitVersioned ? "versioned" : "legacy/single writer",
+        snapshot.orderPolicy == RGOrderPolicy::DependencyOrder ? "dependency order" : "authored order");
+    ImGui::TextDisabled("Sampled submitted frame | alias / queue / subresource ranges: not implemented");
+    m_graphFilter.Draw("Filter passes/resources");
+    DrawCompiledGraph(snapshot, m_graphFilter);
 }
 
 void editor::windows::draw_preferences()
@@ -436,6 +674,25 @@ void editor::windows::draw_preferences()
     float width = preferences.GetContentTreeWidth();
     if (ImGui::SliderFloat("Content Browser tree width", &width, 120.f, 600.f))
     { preferences.SetContentTreeWidth(width); changed = true; }
+
+    ImGui::SeparatorText("Frame rate");
+    int mode = static_cast<int>(preferences.GetFrameRateMode());
+    if (ImGui::Combo("Editor frame rate", &mode, "Display refresh\0Unlimited\0Custom\0"))
+    { preferences.SetFrameRateMode(static_cast<EditorFrameRateMode>(mode)); changed = true; }
+    if (EditorFrameRateMode::Custom == preferences.GetFrameRateMode())
+    {
+        int rate = static_cast<int>(preferences.GetCustomFrameRate());
+        if (ImGui::SliderInt("Custom fps", &rate,
+                static_cast<int>(EditorPreferences::kMinCustomFrameRate),
+                static_cast<int>(EditorPreferences::kMaxCustomFrameRate), "%d", ImGuiSliderFlags_AlwaysClamp))
+        { preferences.SetCustomFrameRate(static_cast<std::uint32_t>(rate)); changed = true; }
+    }
+    int background = static_cast<int>(preferences.GetBackgroundFrameRate());
+    if (ImGui::SliderInt("Background fps (0 = off)", &background, 0,
+            static_cast<int>(EditorPreferences::kMaxBackgroundFrameRate), "%d", ImGuiSliderFlags_AlwaysClamp))
+    { preferences.SetBackgroundFrameRate(static_cast<std::uint32_t>(background)); changed = true; }
+    ImGui::TextDisabled("Play mode is uncapped. Background limit pauses while loading or compiling shaders.");
+
     if (changed) EditorSettingsStore::Get().Save();
     ImGui::TextWrapped("Manage workspace layouts from Window > Workspace.");
 }
@@ -463,177 +720,4 @@ void editor::windows::draw_project_settings()
         }
         ImGui::EndTabBar();
     }
-}
-
-// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
-void editor::DrawRenderLiveDiagnostics()
-{
-	static bool m_sortByDuration = false;
-	static int selectedTarget = 0;
-	static EnhancedLiveDebugSnapshot displayed{};
-	static double lastRefreshTime = -1.0;
-
-	const double now = ImGui::GetTime();
-	if (lastRefreshTime < 0.0 || (now - lastRefreshTime) >= kRefreshIntervalSeconds)
-	{
-		displayed = EnhancedSceneRenderer::GetLiveDebugSnapshot();
-		lastRefreshTime = now;
-	}
-
-    ImGui::TextDisabled("Live renderer state - independent of Record and .ceprof selection");
-    constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
-    ImGui::Combo("View", &selectedTarget, targets, 3);
-    const auto displays = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-    const auto& view = displays.Get(static_cast<EnhancedLiveDisplayTarget>(selectedTarget));
-    const bool gpuMatches = view.ready && view.key.viewId == displayed.lastGpuViewId &&
-        displayed.lastGpuSubmissionId && !displayed.passTimings.empty();
-    ImGui::Text("Completed frame %llu / view %llu / %u x %u / %s",
-        static_cast<unsigned long long>(view.completedFrameId), static_cast<unsigned long long>(view.key.viewId),
-        view.completedWidth, view.completedHeight, view.ready ? "ready" : "unavailable");
-    ImGui::Text("Latest GPU sample: frame %llu / submission %llu / view %llu",
-        static_cast<unsigned long long>(displayed.lastGpuFrameId),
-        static_cast<unsigned long long>(displayed.lastGpuSubmissionId),
-        static_cast<unsigned long long>(displayed.lastGpuViewId));
-    if (displayed.lastGpuFrameId && displayed.consumedFrameId >= displayed.lastGpuFrameId)
-        ImGui::Text("Sample age: %llu engine frames", static_cast<unsigned long long>(displayed.consumedFrameId - displayed.lastGpuFrameId));
-
-	// ── 러너 상태 ──
-	//
-	// 화면이 비었을 때 원인이 여기서 갈린다: 러너가 꺼졌는가,
-	// 파이프라인이 못 섰는가, 서긴 했는데 드로우가 0인가.
-	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Runtime, " Runtime">, ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		editor::DrawRenderRuntime(displayed);
-	}
-
-    if (ImGui::Button("Open RenderPass structure")) open_window(EditorWindowName::kRenderPass);
-
-	// ── 그림자 캐스케이드 ── 위 View 에서 고른 뷰의 값이다.
-	if (ImGui::CollapsingHeader("Shadow cascades"))
-	{
-		DrawShadowStats(displayed.shadow[static_cast<uint32_t>(selectedTarget)]);
-	}
-
-	// ── 프레임 비용 ──
-	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Timing, " Frame cost">, ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		char buffer[64]{};
-		std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.cpuMs);
-		LabeledValue("CPU (all views)", buffer);
-		std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.gpuMs);
-		LabeledValue("GPU (selected view)", gpuMatches ? buffer : "unavailable");
-		ImGui::Text("GPU samples: %llu, rejected: %llu, query overflow: %llu",
-			static_cast<unsigned long long>(displayed.gpuCollects),
-			static_cast<unsigned long long>(displayed.gpuCollectMismatches),
-			static_cast<unsigned long long>(displayed.gpuQueryOverflowPasses));
-		if (!displayed.lastGpuCollectError.empty())
-			ImGui::TextWrapped("Last GPU collect error: %s", displayed.lastGpuCollectError.c_str());
-	}
-
-	// ── 패스별 GPU 시간 ──
-	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Layers, " Pass timings">, ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::Checkbox("Sort by duration", &m_sortByDuration);
-		ImGui::SameLine();
-		ImGui::TextColored(kDimColor, "(%zu passes)", gpuMatches ? displayed.passTimings.size() : 0u);
-
-		if (!gpuMatches)
-		{
-			ImGui::TextColored(kDimColor,
-				"No completed GPU sample for the selected view.");
-			ImGui::TextColored(kDimColor,
-				"Samples from another view are never shown as this view.");
-		}
-		else
-		{
-			std::vector<EnhancedLivePassTiming> ordered = displayed.passTimings;
-			if (m_sortByDuration)
-			{
-				std::stable_sort(ordered.begin(), ordered.end(),
-					[](const EnhancedLivePassTiming& lhs, const EnhancedLivePassTiming& rhs)
-					{
-						return lhs.milliseconds > rhs.milliseconds;
-					});
-			}
-
-			// 막대는 합계가 아니라 최대 패스를 기준으로 정규화한다.
-			// 합계 기준이면 패스가 늘수록 전부 납작해져 비교가 안 된다.
-			double slowest = 0.0;
-			for (const EnhancedLivePassTiming& timing : ordered)
-			{
-				slowest = (std::max)(slowest, timing.milliseconds);
-			}
-			if (slowest <= 0.0) slowest = 1.0;
-
-			if (ImGui::BeginTable("PassTimings", 3,
-				ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
-				ImGuiTableFlags_SizingStretchProp))
-			{
-				ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 0.45f);
-				ImGui::TableSetupColumn("ms", ImGuiTableColumnFlags_WidthStretch, 0.15f);
-				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 0.40f);
-				ImGui::TableHeadersRow();
-
-				for (const EnhancedLivePassTiming& timing : ordered)
-				{
-					ImGui::TableNextRow();
-					ImGui::TableSetColumnIndex(0);
-					ImGui::TextUnformatted(timing.name.c_str());
-
-					ImGui::TableSetColumnIndex(1);
-					ImGui::Text("%.3f", timing.milliseconds);
-
-					ImGui::TableSetColumnIndex(2);
-					const float fraction =
-						static_cast<float>(timing.milliseconds / slowest);
-					ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0.0f), "");
-				}
-				ImGui::EndTable();
-			}
-
-			// 큐 시간이라는 사실을 창에 남긴다 — 이 수치를 순수 GPU 작업
-			// 시간으로 읽으면 앞 패스의 대기를 이 패스 비용으로 오해한다.
-			ImGui::TextColored(kDimColor,
-				"Timestamps are queue time: a preceding pass's wait is included.");
-			ImGui::TextColored(kDimColor,
-				"Read relative change under identical conditions, not absolutes.");
-		}
-	}
-
-	// ── 검증 레이어 ──
-	//
-	// 콘솔에 한 번 찍히고 흘러가 버리던 것을 창에 모은다. 이 목록이
-	// 비어 있지 않으면 화면이 멀쩡해 보여도 배선이 틀린 것이다.
-	const char* validationBackendName =
-		EnhancedLiveBackend::Vulkan == displayed.backend ? "Vulkan" : "D3D12";
-	char validationHeader[64]{};
-	std::snprintf(validationHeader, sizeof(validationHeader),
-		EditorIcon::Label<EditorIcon::Warning, " %s validation">, validationBackendName);
-	if (ImGui::CollapsingHeader(validationHeader,
-		ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		if (displayed.validationMessages.empty())
-		{
-			ImGui::TextColored(kOkColor, "No messages observed");
-		}
-		else
-		{
-			ImGui::TextColored(kErrorColor, "%zu (first occurrence only)",
-				displayed.validationMessages.size());
-			ImGui::BeginChild("ValidationMessages", ImVec2(0, 140.0f), true);
-			for (const std::string& message : displayed.validationMessages)
-			{
-				ImGui::TextWrapped("%s", message.c_str());
-				ImGui::Separator();
-			}
-			ImGui::EndChild();
-		}
-	}
-
-	if (!displayed.lastError.empty())
-	{
-		ImGui::Separator();
-		ImGui::TextColored(kErrorColor, EditorIcon::Label<EditorIcon::Error, " Last error">);
-		ImGui::TextWrapped("%s", displayed.lastError.c_str());
-	}
 }

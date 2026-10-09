@@ -200,12 +200,15 @@ uint64_t DX12GpuProfiler::GpuTickToCpuTick(uint64_t gpuTick) const
 }
 
 GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
-    uint64_t submissionId, uint64_t renderViewId)
+    uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration)
 {
-    if (0 == m_frameCount) return GpuFrameToken{};
-
     GpuFrameToken token;
     token.engineFrameId = engineFrameId;
+    token.captureGeneration = captureGeneration;
+    if (0 == m_frameCount)
+    {
+        return token;
+    }
     token.submissionId = submissionId;
     token.renderViewId = renderViewId;
     token.ringSlot = static_cast<uint32_t>(submissionId % m_frameCount);
@@ -233,6 +236,7 @@ GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
     for (uint32_t i = 0; i < m_maxPassesPerFrame; ++i)
     {
         m_records[base + i].used = false;
+        m_records[base + i].identity = {};
     }
     return token;
 }
@@ -243,11 +247,12 @@ GpuFrameToken DX12GpuProfiler::SlotToken(uint32_t ringSlot) const
     return m_slotTokens[ringSlot];
 }
 
-uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name)
+uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name,
+    const GpuPassTimingIdentity& identity)
 {
     auto* const dx12Encoder = dynamic_cast<DX12Encoder*>(&encoder);
     return (nullptr != dx12Encoder)
-        ? BeginPass(dx12Encoder->GetCommandList(), name) : kInvalidSlot;
+        ? BeginPass(dx12Encoder->GetCommandList(), name, identity) : kInvalidSlot;
 }
 
 void DX12GpuProfiler::EndPass(RHIEncoder& encoder, uint32_t slot)
@@ -256,7 +261,8 @@ void DX12GpuProfiler::EndPass(RHIEncoder& encoder, uint32_t slot)
     if (nullptr != dx12Encoder) EndPass(dx12Encoder->GetCommandList(), slot);
 }
 
-uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name)
+uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name,
+    const GpuPassTimingIdentity& identity)
 {
     if (!m_queryHeap || nullptr == commandList) return kInvalidSlot;
 
@@ -274,6 +280,7 @@ uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, cons
 
     PassRecord& record = m_records[RecordIndex(m_recordingSlot, slot)];
     record.name = name;
+    record.identity = identity;
     record.beginQuery = base;
     record.endQuery = base + 1;
     record.used = true;
@@ -341,7 +348,8 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     }
 
     const GpuFrameToken& held = m_slotTokens[token.ringSlot];
-    if (held.submissionId != token.submissionId)
+    if (held.submissionId != token.submissionId ||
+        (token.captureGeneration != 0 && held.captureGeneration != token.captureGeneration))
     {
         return fail(outError, "GPU 수집 표가 낡았다 — 슬롯 " +
             std::to_string(token.ringSlot) + " 은 제출 " +
@@ -349,7 +357,9 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
             std::to_string(token.submissionId) + " 이다");
     }
 
-    outTimings.token = token;
+    // The caller may have transferred/reset capture admission. Origin belongs
+    // to the query slot that produced these timestamps, never that later copy.
+    outTimings.token = held;
     outTimings.ticksPerSecond = m_ticksPerSecond;
     outTimings.queueBeginTicks = 0;
     outTimings.queueEndTicks = 0;
@@ -436,6 +446,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
 
         PassSlice& slice = outTimings.slices[sliceCount++];
         slice.name.assign(record.name);
+        slice.identity = record.identity;
         slice.beginTicks = begin;
         slice.endTicks = end;
     }

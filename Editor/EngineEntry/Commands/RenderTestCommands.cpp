@@ -537,22 +537,15 @@ namespace ConsoleCmd
             ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[2].c_str())))
             : ScreenResizeBus::Get().GetHeight();
 
-		const RenderBackend configured = RuntimeSettings::Get().GetRenderBackend();
         const EnhancedLiveBackend scene = EnhancedSceneRenderer::GetLiveBackend();
-        const bool backendMatch =
-            ((RenderBackend::DX12 == configured && EnhancedLiveBackend::DX12 == scene) ||
-             (RenderBackend::Vulkan == configured && EnhancedLiveBackend::Vulkan == scene)) &&
-            ((RenderBackend::DX12 == configured &&
-                0 == std::strcmp(GetImGuiHost().GetBackendName(), "DX12")) ||
-             (RenderBackend::Vulkan == configured &&
-                0 == std::strcmp(GetImGuiHost().GetBackendName(), "Vulkan")));
+        const bool backendMatch = EnhancedLiveBackend::DX12 == scene &&
+            0 == std::strcmp(GetImGuiHost().GetBackendName(), "DX12");
 
         std::string log;
         const bool displayPassed = EnhancedSceneRenderer::RunLiveDisplayRegression(
             expectedWidth, expectedHeight, log);
         const bool passed = backendMatch && displayPassed;
-        std::printf("[render.livecheck] backend configured=%s scene=%s imgui=%s — %s\n",
-            RenderBackendName(configured),
+        std::printf("[render.livecheck] backend policy=editor-build-fixed-dx12 scene=%s imgui=%s — %s\n",
             EnhancedLiveBackend::Vulkan == scene ? "vulkan" : "dx12",
             GetImGuiHost().GetBackendName(), backendMatch ? "일치" : "불일치");
         std::printf("%s", log.c_str());
@@ -1193,11 +1186,24 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
-        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions"))
-            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions]");
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions" && ctx.parts[1] != "transient" && ctx.parts[1] != "queue-contract" && ctx.parts[1] != "queue-native" && ctx.parts[1] != "queue-ownership" && ctx.parts[1] != "queue-schedule" && ctx.parts[1] != "queue-execution"))
+        {
+            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions|transient|queue-contract|queue-native|queue-ownership|queue-schedule|queue-execution]");
+        }
         // 렌더 그래프 자가 검증(PHASE 3-5).
         std::string log;
-        const bool passed = DX12Test::RunRenderGraphTest(log, ctx.parts.size() == 2);
+        const bool passed = ctx.parts.size() == 2 && ctx.parts[1] == "queue-execution"
+            ? DX12Test::RunQueueExecutionTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-schedule"
+            ? DX12Test::RunQueueScheduleTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-ownership"
+            ? DX12Test::RunQueueOwnershipTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-native"
+            ? DX12Test::RunQueueNativeTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-contract"
+            ? DX12Test::RunQueueContractTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "transient"
+                ? DX12Test::RunTransientAliasingTest(log) : DX12Test::RunRenderGraphTest(log, ctx.parts.size() == 2);
 
         std::printf("%s", log.c_str());
         Debug::PrintLog(spdlog::level::warn, std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -1348,8 +1354,8 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.transform" }, &Cmd_render_pbr_transform);
         reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
         reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
-        reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture);
-        reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture);
+        reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
+        reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
         reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);
         reg.Result({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);

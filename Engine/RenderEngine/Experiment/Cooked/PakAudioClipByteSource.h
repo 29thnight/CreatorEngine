@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CookedAudioClipSource.h"
+#include "ArtifactByteSource.h"
 #include "../../../Utility_Framework/Paklib.hpp"
 
 #include <memory>
@@ -10,8 +10,11 @@
 
 namespace experiment::cooked
 {
-    // Audio and LX material programs use the same immutable mounted archive.
+    // Retains its historical name for callers, but addresses any normalized
+    // cooked artifact (including AssetSet CAS paths) in the immutable archive.
     // The pak owns its index and is kept alive by every opened byte source.
+    // Default CaptureArtifact retains this immutable source: the archive is
+    // the physical backing file, so entry capture need not create a new owner.
     // Pak::Archive::readRange decompresses only intersecting chunks.
     class PakAudioClipByteSource final : public ArtifactByteSource
     {
@@ -22,7 +25,7 @@ namespace experiment::cooked
         [[nodiscard]] bool Size(std::string_view path,
             std::uint64_t& out, std::string& failure) const override
         {
-            if (!archive_ || (!IsAudioArtifactVirtualPath(path) && !IsMaterialProgramArtifactVirtualPath(path) && !IsCollisionGeometryArtifactVirtualPath(path)))
+            if (!archive_ || !IsArtifactVirtualPath(path))
             {
                 failure = "pak artifact virtual path is invalid";
                 return false;
@@ -43,7 +46,10 @@ namespace experiment::cooked
             std::string& failure) const override
         {
             std::uint64_t size = 0u;
-            if (!Size(path, size, failure)) return false;
+            if (!Size(path, size, failure))
+            {
+                return false;
+            }
             if (offset > size || out.size() > size - offset)
             {
                 failure = "pak artifact read exceeds entry extent";

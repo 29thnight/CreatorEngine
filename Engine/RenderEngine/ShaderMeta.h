@@ -2,6 +2,7 @@
 
 #include "RHI/RHIPipelineState.h"
 #include "TypeTrait.h"
+#include "Ownership.h"
 
 #include <array>
 #include <cstddef>
@@ -17,6 +18,16 @@
 namespace Authoring
 {
     class ReadNode;
+}
+
+namespace experiment::cooked
+{
+    struct CodeProgram;
+}
+
+namespace AssetDepot
+{
+    struct ShaderMetaAssetOrigin;
 }
 
 enum class ShaderPropertyType : std::uint8_t
@@ -123,6 +134,20 @@ struct ShaderRenderState
     bool operator==(const ShaderRenderState&) const = default;
 };
 
+// Explicit author promise, checked in addition to reflected binding shape.
+// IndexedInstanceV1 resolves gVisibleInstanceIds[SV_InstanceID] at t6/space0
+// BEFORE all t4 instance and t5 palette reads. firstInstance is always zero.
+// Position may use only the sealed affine world and nonnegative, normalized
+// four-weight linear blend skinning (sum tolerance 1e-5, zero = bind pose).
+// Wind, morph, displacement and other shader-side position changes are excluded;
+// the source sphere expanded by the sealed pose must enclose every emitted vertex.
+// Omitting the contract retains direct submission, even with the same root layout.
+enum class ShaderGeometryVisibility : std::uint8_t
+{
+    Direct,
+    IndexedInstanceV1,
+};
+
 struct ShaderPassDesc
 {
     std::string name;
@@ -131,6 +156,7 @@ struct ShaderPassDesc
     std::optional<ShaderStageEntry> compute;
     ShaderRenderState state;
     ShaderPassQueue queue{ ShaderPassQueue::Opaque };
+    ShaderGeometryVisibility geometryVisibility{ ShaderGeometryVisibility::Direct };
 
     bool IsCompute() const { return compute.has_value(); }
     bool operator==(const ShaderPassDesc&) const = default;
@@ -153,7 +179,21 @@ struct ShaderMeta
     std::vector<ShaderPassDesc> passes;
     // Present only on derived Graph outputs. Graph/Blackboard owns authoring.
     std::optional<ShaderGeneratedMaterial> generatedMaterial;
-    bool operator==(const ShaderMeta&) const = default;
+    // Exact immutable artifact source pin. It holds no bulk image or GPU data.
+    own::shared_owner<const AssetDepot::ShaderMetaAssetOrigin> assetOrigin{};
+    // Non-null only for a verified source-free code generation. Descriptor
+    // readiness alone never fills this field or authorizes shader compilation.
+    own::shared_owner<const experiment::cooked::CodeProgram> codeProgram{};
+    std::string codeProgramIdentity; // Exact immutable blob SHA-256, runtime only.
+
+    bool operator==(const ShaderMeta& other) const
+    {
+        // Ownership handles have no value equality. Preserve metadata comparison
+        // semantics without turning a runtime backing pin into resource identity.
+        return guid == other.guid && schemaVersion == other.schemaVersion && name == other.name &&
+            source == other.source && originPath == other.originPath && properties == other.properties &&
+            keywords == other.keywords && passes == other.passes && generatedMaterial == other.generatedMaterial;
+    }
 
     std::filesystem::path ResolveSource(
         const std::filesystem::path& metaPath) const;
@@ -169,9 +209,12 @@ namespace ShaderMetaLoader
     // Cooked D5 document는 GUID-addressed Derived 경로에 있지만 `source`는 여전히
     // authoring .shadermeta 기준 상대 HLSL이다(B3 전 계약). documentPath에서
     // payload를 읽되 sourceOriginPath를 상대 경로 기준과 runtime origin으로 쓴다.
+    // Optional digest covers this parsed document and its normalized source origin;
+    // cache rehydration uses it to reject changed input without reusing an old identity.
     bool LoadFile(const std::filesystem::path& documentPath,
         const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
-        ShaderMeta& outMeta, std::string& outError);
+        ShaderMeta& outMeta, std::string& outError,
+        std::array<std::uint8_t, 32>* outDocumentDigest = nullptr);
 
     // Editor importer와 자가 검증이 디스크 게시 전에 같은 검증기를 쓸 수 있는 경계.
     // originPath는 source 상대 경로의 기준이며 .shadermeta 파일명을 포함한다.
@@ -183,6 +226,12 @@ namespace ShaderMetaLoader
     bool ParseDocument(const Authoring::ReadNode& root,
         const std::filesystem::path& originPath, const FileGuid& guid,
         ShaderMeta& outMeta, std::string& outError);
+
+    // Source-free CPU metadata decode. The source token is schema-validated but
+    // never opened, compiled or treated as a ready GPU program. Generated graph
+    // metadata must use ParseGeneratedCooked with its verified source instead.
+    bool ParseCookedMetadata(std::span<const std::byte> bytes,
+        const FileGuid& guid, ShaderMeta& outMeta, std::string& outError);
 
     // A verified cooked generation supplies the exact source bytes. Reuses the
     // authoring schema and source digest checks without reading source files.

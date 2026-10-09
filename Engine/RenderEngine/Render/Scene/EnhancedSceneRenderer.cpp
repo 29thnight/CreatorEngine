@@ -39,8 +39,8 @@
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
-#include "ExperimentMaterialSealing.h"
 #include "../../DataSystem.h"
+#include "../../Assets/ModelGeometryPayload.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h"
 
@@ -48,6 +48,7 @@
 #include "../../Material.h"
 #include "../../MaterialGraphSceneInput.h"
 #include "../../MaterialGraphSceneHost.h"
+#include "../../MaterialGraphSceneCompiler.h"
 #include "../../RenderScene.h"
 #include "../Core/EnhancedLightPacking.h"
 #include "../../Texture.h"
@@ -58,6 +59,7 @@
 #include "../../Mesh.h"
 #include "../../RenderState.h"
 #include "../../../Utility_Framework/PathFinder.h"
+#include "../../../Utility_Framework/JobScheduler.h"
 
 // ★ <d3d11_1.h> include가 여기 있었다 (E, 2026-08-09).
 //   공유 텍스처를 DX11에서 열어 SRV를 만들던 자리를 D4에서 걷은 뒤로 이
@@ -70,14 +72,23 @@
 #include <unordered_set>
 #include <mutex>
 #include <array>
+#include <limits>
+#include <map>
 #include <cassert>
 #include <thread>
 #include <deque>
 #include <condition_variable>
 #include <chrono>
 #include <string_view>
+#include <type_traits>
+#include <exception>
+#include <utility>
 #include <unordered_map>
 #include <set>
+#include <fstream>
+#include <wrl/wrappers/corewrappers.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
 #include <mathematics/transform.hpp>
 #include <mathematics/scalar.hpp>
 
@@ -90,6 +101,29 @@
 // 명칭 체계가 흐려진다(실제로 그렇게 만들었다가 물렸다).
 namespace EnhancedSceneRenderer
 {
+    using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;
+
+    LiveGraphSnapshot CaptureLiveGraphSnapshot(const EnhancedRenderGraph& graph,
+        uint64_t viewId, uint64_t historyRevision, uint64_t frameId, uint64_t sceneEpoch,
+        uint32_t width, uint32_t height)
+    {
+        const auto started = std::chrono::steady_clock::now();
+        auto snapshot = std::make_shared<EnhancedRenderGraph::DiagnosticSnapshot>();
+        if (!graph.CaptureDiagnosticSnapshot(*snapshot))
+        {
+            return {};
+        }
+        snapshot->viewId = viewId;
+        snapshot->sceneEpoch = sceneEpoch;
+        snapshot->historyRevision = historyRevision;
+        snapshot->frameId = frameId;
+        snapshot->width = width;
+        snapshot->height = height;
+        snapshot->copyNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - started).count();
+        return snapshot;
+    }
+
     // PHASE 14 P2 — 받아 둔 수명 훅. 익명 네임스페이스에 두지 않는다: 유니티
     // 빌드의 격리 단위는 파일이 아니라 blob 이라, 같은 blob 에 든 다른 파일의
     // 같은 이름과 조용히 한 덩어리가 된다. 여기 이름은 링커가 본다.
@@ -154,6 +188,41 @@ namespace
 {
     const EnhancedLiveGpuSpanSink& GpuSpanSink() { return g_gpuSpanSink; }
 
+    // Diagnostic A/B build only. Ordinary builds contain no runtime rollback switch.
+#if defined(CE_RG6_REFERENCE_DECLARATION_ORDER)
+    constexpr auto kLiveGraphScheduling = RGSchedulingMode::DeclarationOrder;
+#else
+    constexpr auto kLiveGraphScheduling = RGSchedulingMode::ExplicitVersioned;
+#endif
+
+    void finish_gpu_capture(GpuFrameToken& token, bool complete, const char* reason)
+    {
+        const uint64_t generation = std::exchange(token.captureGeneration, 0);
+        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+        if (generation != 0 && sink.on_finish_capture)
+        {
+            sink.on_finish_capture(generation, static_cast<uint32_t>(token.engineFrameId), complete, reason);
+        }
+    }
+
+    struct GpuCaptureCompletion
+    {
+        GpuFrameToken& token;
+        bool complete{ false };
+        const char* reason{ "GPU query collection did not complete" };
+
+        ~GpuCaptureCompletion()
+        {
+            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+            if (token.captureGeneration != 0 && sink.on_flush)
+            {
+                // Also publish any partial result if collection exits by exception.
+                sink.on_flush();
+            }
+            finish_gpu_capture(token, complete, reason);
+        }
+    };
+
     // 살아 있는 화면의 재질 IBL 룩업은 바뀐 픽셀을 split-sum 근사로 굽고 끝낸다.
     // 기준 적분(1024/4096 표본)은 한 화소 45~75 us 라 카메라 회전에서 화면 전체가
     // 다시 구워지면 프레임당 1.5 s 까지 GPU 를 막았다(10-04 캡처). 기준값 수렴은
@@ -163,6 +232,17 @@ namespace
 
 namespace
 {
+    uint64_t capture_steady_nanoseconds()
+    {
+        return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
+
+    double capture_age_milliseconds(uint64_t captured, uint64_t now)
+    {
+        return captured != 0 && now >= captured ? static_cast<double>(now - captured) / 1.0e6 : 0.0;
+    }
+
     // Built-in preview geometry has a reserved, stable identity and immutable
     // storage. SceneViewInput copies/seals it before any GPU submission.
     struct MaterialPreviewSphere
@@ -269,6 +349,8 @@ namespace
         camera.inverseProjection = math::inverse(camera.projection);
         return camera;
     }
+    using EnhancedSceneRenderer::LiveGraphSnapshot;
+    using EnhancedSceneRenderer::CaptureLiveGraphSnapshot;
     using EnhancedSceneRenderer::RenderPhase;
     using EnhancedSceneRenderer::RenderThreadPhaseScope;
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
@@ -332,7 +414,6 @@ namespace
         return fallback;
     }
 
-    // P2d-c texture 밀봉의 정본은 ExperimentMaterialSealing::SealCore로 이전됐다
     // (I5-M4). legacy Material을 읽던 SealMaterialTextureBindings는 그 치환으로
     // 소비자가 0이 되어 제거됐다.
 
@@ -377,6 +458,10 @@ namespace
         stats.shadowDistance = source.shadowDistance;
         stats.slopeScale = source.slopeScale;
         stats.casterCandidates = source.casterCandidates;
+        stats.gpuVisibilityActive = source.gpuVisibilityActive;
+        stats.visibilityCountsExact = source.visibilityCountsExact;
+        stats.gpuSubmittedCandidates = source.gpuSubmittedCandidates;
+        stats.gpuSubmittedBins = source.gpuSubmittedBins;
         for (uint32_t index = 0; index < kShadowCascadeCount; ++index)
         {
             const EnhancedShadowPass::CascadeStats& cascade = source.cascades[index];
@@ -407,7 +492,7 @@ namespace
         //   카메라가 둘이어도 한 인스턴스로 충분하다.
         EnhancedGBufferPass   gbuffer;
         material_graph::SceneHost graphMaterials;
-        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedShadowPass    shadow;
         EnhancedDecalPass     decal;
         EnhancedDeferredPass  deferred;
@@ -441,9 +526,9 @@ namespace
         // 한 프레임의 한 뷰를 그리는 동안에만 살아 있는 값이다.
         LiveBlackboard blackboard;
 
-        // 표시 슬롯은 생산자 GPU 펜스가 완료된 뒤에만 승격한다. CPU 조회는
-        // displayLifetimeMutex로 보호하지만, 조회 뒤 Host GPU sampling 종료까지
-        // 지키는 lease는 아직 없다. 링의 슬롯 수만으로 재사용 안전을 증명하지 않는다.
+        // 생산자 완료는 게시 조건일 뿐 재사용 조건이 아니다. 슬롯 선택과 Host 조회는
+        // displayLifetimeMutex로 직렬화하고, 소비자 lease도 없어야 덮어쓸 수 있다.
+        // 링 슬롯 수만으로 GPU 소유권을 대신하지 않는다.
         struct DisplaySlot
         {
             bool previewComplete{false};
@@ -452,6 +537,8 @@ namespace
                 EnhancedSceneRendererLiveDX12Adapter::kInvalidDisplayToken };
             uint64_t fenceValue{ 0 };
             uint64_t frameId{ 0 };
+            uint64_t sourceCaptureNanoseconds{ 0 };
+            double completedAgeMs{ 0.0 };
             EnhancedLiveViewKey key{};
             uint64_t sceneEpoch{ 0 };
             FrameCameraSnapshot camera{};
@@ -533,6 +620,57 @@ namespace
         RGTransientPool transientPool;
     };
 
+    // Residency precedes the recording boundary. Recording-owned palettes,
+    // visibility and material packets must all be allocated after that boundary.
+    template <typename PipelineT, typename CommandPoolT>
+    bool PrepareSceneRecording(PipelineT& pipeline, EnhancedRenderGraph& graph,
+        CommandPoolT& commandPool, RHIShaderBinary output, bool& preparationDeferred,
+        EnhancedPbrCapture* capture, std::string& error,
+        const std::function<bool(std::string&)>& prepareBoundary = {})
+    {
+        RHIShaderCompiler::ScopedOutput outputScope(output);
+        auto& context = pipeline.frameContext;
+        if (!pipeline.graphMaterials.PrepareResidency(context, pipeline.graphInput, error))
+        {
+            return false;
+        }
+        if (!prepareBoundary && !graph.PrepareParallel(commandPool, error))
+        {
+            return false;
+        }
+        if (!pipeline.animationPalettes.UploadForCurrentRecording(*context.resources))
+        {
+            error = "Sealed animation palette upload failed after the upload-prefix boundary.";
+            return false;
+        }
+        if (!pipeline.decal.PrepareGpuVisibility(context, error)
+            || !pipeline.sprite.PrepareGpuVisibility(context, error))
+        {
+            return false;
+        }
+        if (!pipeline.graphMaterials.Prepare(context, pipeline.graphInput,
+                pipeline.ibl.GetCubeMap(), pipeline.ibl.GetIrradianceMap(),
+                pipeline.ibl.GetPrefilteredMap(), pipeline.shadow.GetShadowData(),
+                material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate,
+                    .lookupRuntimeEvaluation = true}, error, pipeline.ibl.GetGeneration(),
+                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap()))
+        {
+            preparationDeferred = pipeline.graphMaterials.PreparationDeferred();
+            return false;
+        }
+        if (capture)
+        {
+            capture->RecordLatticeInput(pipeline.graphInput);
+        }
+        // Owned queues preserve the recording reservation, so defer queue-frame
+        // admission until asynchronous material preparation has succeeded.
+        if (prepareBoundary && !prepareBoundary(error))
+        {
+            return false;
+        }
+        return true;
+    }
+
     // Vulkan 공용 scene graph 라이브 경로. 에디터 창 자체는 아직 DX12 ImGui
     // 셸이므로 최종 LDR를 비동기 리드백한 뒤 셸에 넘긴다.
     // 그래프와 리드백 슬롯은 timeline completion까지 살아 있어 D3D12 경로의
@@ -540,6 +678,21 @@ namespace
     // external-memory 직접 공유는 별도 성능 단계다.
     struct VulkanLivePipeline
     {
+        bool shutdownComplete{ false };
+
+        ~VulkanLivePipeline()
+        {
+            if (!shutdownComplete && resources.IsInitialized())
+            {
+                std::string error;
+                if (!Shutdown(error))
+                {
+                    OutputDebugStringA("[Vulkan live] Forced destruction cannot prove GPU idle or device loss; refusing unsafe member destruction.\n");
+                    std::terminate();
+                }
+            }
+        }
+
         static constexpr uint32_t kSlotCount = 3;
         static constexpr uint64_t kDisplayKeyBase = 0x564B4C4956450000ull; // "VKLIVE"
 
@@ -548,6 +701,7 @@ namespace
         uint64_t frameCounter{ 0 };
 
         VulkanDeviceResources resources;
+        std::shared_ptr<VulkanCaptureGpuProfiler> retainedCaptureProfiler;
         VulkanPipelineCache pipelines;
         VulkanMeshCache meshCache;
         VulkanTextureCache textureCache;
@@ -562,7 +716,7 @@ namespace
         EnhancedShadowPass shadow;
         EnhancedGBufferPass gbuffer;
         material_graph::SceneHost graphMaterials;
-        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedDecalPass decal;
         EnhancedSSAOPass ssao;
         EnhancedDeferredPass deferred;
@@ -605,6 +759,8 @@ namespace
             uint32_t promotedSlotMask{ 0 };
             uint64_t completedFrameId{ 0 };
             uint64_t completedSceneEpoch{ 0 };
+            uint64_t completedCaptureNanoseconds{ 0 };
+            double completedAgeMs{ 0.0 };
             uint64_t completedResizeGeneration{ 0 };
             FrameCameraSnapshot completedCamera{};
         };
@@ -620,6 +776,7 @@ namespace
             uint32_t viewIndex{ 0 };
             EnhancedLiveViewKey key{};
             uint64_t frameId{ 0 };
+            uint64_t sourceCaptureNanoseconds{ 0 };
             uint64_t sceneEpoch{ 0 };
             uint64_t resizeGeneration{ 0 };
             FrameCameraSnapshot camera{};
@@ -671,8 +828,8 @@ namespace
         }
 
         bool Initialize(uint32_t newWidth, uint32_t newHeight,
-            FrameCameraSnapshot& camera, std::vector<EnhancedDrawItem>& draws,
-            std::vector<EnhancedDrawItem>& forwardDraws,
+            FrameCameraSnapshot& camera, const std::vector<EnhancedDrawItem>& draws,
+            const std::vector<EnhancedDrawItem>& forwardDraws,
             std::vector<EnhancedLight>& lights, std::string& outError)
         {
             if (!VulkanApi::LoadLoader(outError)) return false;
@@ -747,21 +904,38 @@ namespace
             return true;
         }
 
-        void Shutdown()
+        bool Shutdown(std::string& outError, EnhancedPbrCapture* capture = nullptr)
         {
+            if (shutdownComplete)
+            {
+                return true;
+            }
             if (resources.IsInitialized())
             {
                 std::string lifecycleError;
-                if (!resources.DrainForLifecycle(
-                        RHILifecycleCommand::BackendShutdown, lifecycleError))
+                bool drained = resources.DrainForLifecycle(
+                    RHILifecycleCommand::BackendShutdown, lifecycleError);
+                if (!drained && GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    drained = resources.DrainForLifecycle(
+                        RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+                }
+                if (!drained)
                 {
                     OutputDebugStringA(("[Vulkan live] backend shutdown drain 실패: " +
                         lifecycleError + "\n").c_str());
-                    std::string abandonError;
-                    resources.DrainForLifecycle(
-                        RHILifecycleCommand::UnrecoverableDeviceError,
-                        abandonError);
+                    outError = "Vulkan pipeline retained: GPU idle or device loss was not established: " + lifecycleError;
+                    return false;
                 }
+            }
+            if (retainedCaptureProfiler)
+            {
+                retainedCaptureProfiler->ReleaseAfterIdle();
+                retainedCaptureProfiler.reset();
+            }
+            if (capture && capture->resourceBackend == EnhancedLiveBackend::Vulkan)
+            {
+                capture->Release(resources);
             }
             for (Slot& slot : slots)
             {
@@ -779,6 +953,8 @@ namespace
             meshCache.Shutdown();
             pipelines.Shutdown();
             resources.Shutdown();
+            shutdownComplete = true;
+            return true;
         }
 
         int FindOrAssignView(const EnhancedLiveViewPacket& requested,
@@ -864,6 +1040,9 @@ namespace
                             view.promotedSlotMask |= (1u << slotIndex);
                             view.completedFrameId = slot.frameId;
                             view.completedSceneEpoch = slot.sceneEpoch;
+                            view.completedCaptureNanoseconds = slot.sourceCaptureNanoseconds;
+                            view.completedAgeMs = capture_age_milliseconds(
+                                slot.sourceCaptureNanoseconds, capture_steady_nanoseconds());
                             view.completedResizeGeneration = slot.resizeGeneration;
                             view.completedCamera = slot.camera;
                             view.previewComplete = slot.previewComplete;
@@ -882,7 +1061,7 @@ namespace
                                 image.width * 4u,
                                 RHIDisplayFrameMetadata{slot.frameId, slot.sceneEpoch,
                                     slot.resizeGeneration, slot.key.viewId,
-                                    slot.key.historyRevision, slot.camera});
+                                    slot.key.historyRevision, slot.camera, slot.sourceCaptureNanoseconds});
                         }
                         ++outPromoted;
                     }
@@ -902,11 +1081,43 @@ namespace
 #endif
         }
 
-        bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
-            uint64_t sourceFrameId, uint64_t resizeGeneration, uint64_t backendGeneration,
-            const std::function<bool(std::string&)>& prepareFrame,
-            std::string& outError, EnhancedPbrCapture* capture)
+        void MaintainAssetCaches()
         {
+            textureCache.BeginFrame(frameCounter);
+            meshCache.BeginFrame(frameCounter);
+            const RHIDeviceMemoryPressureInfo pressureInfo = resources
+                .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+            RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+                pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+            textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                &evictionPass);
+            meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                &evictionPass);
+        }
+
+        bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
+            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint64_t resizeGeneration, uint64_t backendGeneration,
+            const std::function<bool(std::string&)>& prepareFrame,
+            std::string& outError, EnhancedPbrCapture* capture,
+            LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
+        {
+            preparationDeferred = false;
+            if (retainedCaptureProfiler)
+            {
+                if (!resources.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError))
+                {
+                    return false;
+                }
+                retainedCaptureProfiler->ReleaseAfterIdle();
+                retainedCaptureProfiler.reset();
+                backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&resources);
+                if (GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    outError = "Vulkan capture cleanup observed device loss.";
+                    return false;
+                }
+            }
             Slot* slot = nullptr;
             for (Slot& candidate : slots)
             {
@@ -933,18 +1144,53 @@ namespace
                 const bool& committed;
                 EnhancedPbrCapture* capture;
                 std::string& error;
+                std::shared_ptr<VulkanCaptureGpuProfiler>& profiler;
                 ~FrameGuard()
                 {
                     if (!committed) resources.AbortFrame();
                     if (capture)
                     {
-                        resources.WaitForGpu();
-                        capture->Release(resources);
+                        std::string releaseError;
+                        bool safe = resources.DrainForLifecycle(
+                            RHILifecycleCommand::OfflineReadbackCapture, releaseError);
+                        if (!safe && GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                        {
+                            safe = resources.DrainForLifecycle(
+                                RHILifecycleCommand::UnrecoverableDeviceError, releaseError);
+                        }
+                        if (safe)
+                        {
+                            capture->Release(resources);
+                            if (profiler)
+                            {
+                                profiler->ReleaseAfterIdle();
+                                profiler.reset();
+                            }
+                        }
+                        else
+                        {
+                            capture->Fail("Capture resources retained until GPU idle: " + releaseError);
+                        }
                         if (capture->result.state == EnhancedPbrCaptureState::Recording)
                             capture->Fail(error);
                     }
                 }
-            } frameGuard{ resources, committed, capture, outError };
+            } frameGuard{ resources, committed, capture, outError, retainedCaptureProfiler };
+
+            // The live Vulkan path has no calibrated timestamp producer. Its
+            // offline capture profiler cannot be drained here without a GPU wait.
+            // Account for this admitted submission explicitly instead of claiming
+            // a complete GPU capture with an empty lane.
+            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+            if (sink.on_begin_capture && sink.on_finish_capture)
+            {
+                const uint64_t generation = sink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
+                if (generation != 0)
+                {
+                    sink.on_finish_capture(generation, static_cast<uint32_t>(sourceFrameId), false,
+                        "Vulkan live GPU timestamps are unavailable");
+                }
+            }
 
             // Keep the diagnostic reset guard alive through recording/submission,
             // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
@@ -957,37 +1203,26 @@ namespace
                 ~CaptureHistoryGuard() { if (active) Reset(); }
             } historyGuard{ views[viewIndex], capture && capture->controlled };
             if (historyGuard.active) historyGuard.Reset();
-            const uint32_t frameIndex = static_cast<uint32_t>(frameCounter++);
+            ++frameCounter;
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
                 commandPool.BeginFrame(commandPoolFrame);
-                textureCache.BeginFrame(frameIndex);
-                meshCache.BeginFrame(frameIndex);
-                const RHIDeviceMemoryPressureInfo pressureInfo = resources
-                    .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
-                RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
-                    pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
-                textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
-                    &evictionPass);
-                meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
-                    &evictionPass);
-                if (!prepareFrame(outError)) return false;
+                if (!prepareFrame(outError))
+                {
+                    preparationDeferred = graphMaterials.SelectionDeferred();
+                    return false;
+                }
             }
 
             slot->graph = std::make_shared<EnhancedRenderGraph>(
-                static_cast<IRenderDeviceServices&>(resources));
+                static_cast<IRenderDeviceServices&>(resources),
+                kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
+            if (!PrepareSceneRecording(*this, graph, commandPool, RHIShaderBinary::SpirV,
+                    preparationDeferred, capture, outError))
             {
-                RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::SpirV);
-                if (!graphMaterials.PrepareResidency(frameContext, graphInput, outError)) return false;
-                if (graphInput && !graphInput->Draws().empty() &&
-                    !graph.PrepareParallel(commandPool, outError)) return false;
-                if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
-                        ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
-                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate},
-                        outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
-                if (capture) capture->RecordLatticeInput(graphInput);
+                return false;
             }
             double compileMs = 0.0;
             LiveStopwatch compileWatch;
@@ -1024,7 +1259,18 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
-            VulkanCaptureGpuProfiler captureProfiler(resources);
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
+                    viewPacket.key.historyRevision, sourceFrameId, frameContext.sceneEpoch, width, height);
+            }
+
+            // The pipeline retains a query owner if a capture cannot prove idle.
+            // A stack destructor must not free queries still referenced by the GPU.
+            if (capture)
+            {
+                retainedCaptureProfiler = std::make_shared<VulkanCaptureGpuProfiler>(resources);
+            }
             // Graph slots persist across frames; never retain this stack-owned
             // diagnostic profiler when the slot returns to ordinary rendering.
             struct CaptureProfilerReset
@@ -1035,14 +1281,17 @@ namespace
             graph.SetProfiler(nullptr);
             if (capture)
             {
-                if (!captureProfiler.Initialize(outError)) return false;
-                graph.SetProfiler(&captureProfiler);
+                if (!retainedCaptureProfiler->Initialize(outError)) return false;
+                graph.SetProfiler(retainedCaptureProfiler.get());
             }
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = backendGeneration;
             batchDesc.displayToken = kDisplayKeyBase + viewIndex + 1u;
             batchDesc.lifetimeToken = slot->graph;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+            batchDesc.captureContext = { sourceFrameId, 0, viewPacket.key.viewId, false };
+#endif
             RHIRecordedBatch batch;
             RHISubmissionTicket batchTicket;
             LiveStopwatch recordWatch;
@@ -1058,31 +1307,47 @@ namespace
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
-                        resources, std::move(batch), batchTicket, outError)) return false;
+                        resources, std::move(batch), batchTicket, outError))
+                {
+                    return false;
+                }
+                // Queue admission already transferred graph ownership. Attach its
+                // completion before a separate immediate tail submission can fail.
+                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        graphCompletion, outError, batchTicket))
+                {
+                    return false;
+                }
                 lastGraphStats = graph.GetStats();
-                if (!resources.EndFrame(outError)) return false;
+                if (!resources.EndFrame(outError))
+                {
+                    return false;
+                }
             }
             committed = true;
-            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-            if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
-                    graphCompletion, outError, batchTicket)) return false;
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
-            ibl.MarkCookedCaptureSubmitted(slot->fenceValue);
             slot->viewIndex = viewIndex;
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
+            slot->sourceCaptureNanoseconds = sourceCaptureNanoseconds;
             slot->sceneEpoch = frameContext.sceneEpoch;
             slot->resizeGeneration = resizeGeneration;
             // 최신 요청이 아니라 실제 패스가 소비한 카메라를 완료 슬롯에 붙인다.
             slot->camera = *frameContext.camera;
             slot->previewComplete = graphInput && !graphInput->Draws().empty() &&
-                (!viewPacket.materialPreview || graphInput->Draws()[0].material == viewPacket.materialPreview->instance);
+                (!viewPacket.materialPreview || graphInput->Draws()[0].material->representationId == viewPacket.materialPreview->instance->representationId);
             slot->pending = true;
             if (capture)
             {
-                resources.WaitForGpu();
+                if (!resources.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError)
+                    || GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    capture->Fail(outError.empty() ? "Vulkan capture cannot read data after device loss." : outError);
+                    return false;
+                }
                 std::string validation;
                 const uint32_t validationCount = resources.DrainDebugMessages(validation);
                 // W8: 패스가 배치를 확정한 뒤라야 알 수 있는 축을 여기서 싣는다.
@@ -1099,13 +1364,18 @@ namespace
                     resources.DescribeTexture(ibl.GetImportanceMaps()[2]));
                 capture->manifest.rootref()["measurement"]["validationLayerEnabled"] << resources.IsValidationEnabled();
                 const auto memory = resources.QueryVideoMemory();
-                capture->RecordMemory(memory.usedMB, memory.budgetMB, memory.budgetMB > 0);
+                capture->RecordMemory(memory);
                 std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
                 EnhancedLiveGpuSpan captureSpan;
                 std::string timingError;
-                captureProfiler.Collect(nativeTimings, captureSpan.queueSpanMs,
-                    captureSpan.busyMs, timingError);
-                captureSpan.sliceCount = captureProfiler.SliceCount();
+                if (!retainedCaptureProfiler->Collect(nativeTimings, captureSpan.queueSpanMs,
+                        captureSpan.busyMs, timingError))
+                {
+                    outError = timingError;
+                    capture->Fail(outError);
+                    return false;
+                }
+                captureSpan.sliceCount = retainedCaptureProfiler->SliceCount();
                 std::vector<EnhancedLivePassTiming> captureTimings;
                 for (const auto& timing : nativeTimings)
                     captureTimings.push_back({timing.name, timing.milliseconds, timing.milliseconds});
@@ -1117,8 +1387,382 @@ namespace
         }
     };
 
+    struct EnvironmentPreparationRequest
+    {
+        uint64_t id{ 0 };
+        uint64_t generation{ 0 };
+        std::string selection;
+        file::path source;
+        file::path shaders;
+        file::path cache;
+        file::path project;
+        bool updateSelection{ true };
+    };
+
+    struct PreparedEnvironment
+    {
+        EnvironmentPreparationRequest request;
+        own::shared_owner<const EnhancedIBLGenerator::PreparedCookedEnvironment> cooked;
+        own::shared_owner<const Texture> equirect;
+        own::shared_owner<const Texture::CodecImage> equirectImage;
+        std::optional<assets::EnvironmentIdentity> identity;
+        file::path cachePath;
+    };
+
+    // Workers own only this CPU mailbox, never LiveState, settings, or an RHI
+    // object. At most one job runs and one newer request waits to replace it.
+    struct EnvironmentPreparationState
+    {
+        std::mutex mutex;
+        bool accepting{ false };
+        bool running{ false };
+        uint64_t generation{ 1 };
+        uint64_t nextRequest{ 0 };
+        std::optional<EnvironmentPreparationRequest> pending;
+        own::unique_owner<PreparedEnvironment> ready;
+        EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
+        std::string selection;
+        std::string cpuError;
+    };
+
+    bool SetEnvironmentPreparationPhase(EnvironmentPreparationState& state,
+        const EnvironmentPreparationRequest& request, const char* phase)
+    {
+        std::lock_guard<std::mutex> lock(state.mutex);
+        if (!state.accepting || state.generation != request.generation
+            || state.progress.requestId != request.id)
+        {
+            return false;
+        }
+        state.progress.phase = phase;
+        return true;
+    }
+
+    bool PrepareEnvironmentCpu(EnvironmentPreparationState& state,
+        PreparedEnvironment& result, std::string& error)
+    {
+        const auto& request = result.request;
+        if (!SetEnvironmentPreparationPhase(state, request, "Reading environment"))
+        {
+            return false;
+        }
+        std::error_code fileError;
+        if (!file::is_regular_file(request.source, fileError))
+        {
+            error = "Select an existing HDR or cooked .ceibl environment";
+            return false;
+        }
+        assets::CookedEnvironment cooked;
+        if (request.source.extension() == ".ceibl")
+        {
+            if (!assets::ReadCookedEnvironment(request.source, cooked, error))
+            {
+                return false;
+            }
+            if (!SetEnvironmentPreparationPhase(state, request, "Validating environment"))
+            {
+                return false;
+            }
+            Hash::Sha256Digest recipe;
+            if (!assets::EnvironmentRecipeIdentity(request.shaders,
+                    cooked.cubeSize, cooked.brdfSize, recipe, error))
+            {
+                return false;
+            }
+            if (cooked.identity.recipe != recipe)
+            {
+                error = "Cooked environment recipe changed; recook the selected environment";
+                return false;
+            }
+            result.cooked = EnhancedIBLGenerator::PrepareCooked(std::move(cooked), error);
+            return bool(result.cooked);
+        }
+
+        assets::EnvironmentIdentity identity;
+        if (!assets::EnvironmentSourceIdentity(request.source, identity.source, error)
+            || !assets::EnvironmentRecipeIdentity(request.shaders, 512, 512, identity.recipe, error))
+        {
+            return false;
+        }
+        if (!SetEnvironmentPreparationPhase(state, request, "Reading environment cache"))
+        {
+            return false;
+        }
+        result.identity = identity;
+        result.cachePath = request.cache / assets::EnvironmentCacheName(identity);
+        std::string cacheError;
+        if (assets::ReadCookedEnvironment(result.cachePath, cooked, cacheError, &identity))
+        {
+            result.cooked = EnhancedIBLGenerator::PrepareCooked(std::move(cooked), error);
+            return bool(result.cooked);
+        }
+        if (!SetEnvironmentPreparationPhase(state, request, "Decoding HDR environment"))
+        {
+            return false;
+        }
+        // Decode owned bytes rather than consulting mutable PathFinder/settings
+        // from a worker. The second digest rejects a source changed after lookup.
+        std::ifstream input(request.source, std::ios::binary | std::ios::ate);
+        if (!input || input.tellg() <= 0)
+        {
+            error = "HDR source could not be read";
+            return false;
+        }
+        const auto length = static_cast<std::streamsize>(input.tellg());
+        std::vector<std::byte> bytes(static_cast<size_t>(length));
+        input.seekg(0);
+        if (!input.read(reinterpret_cast<char*>(bytes.data()), length))
+        {
+            error = "HDR source read failed";
+            return false;
+        }
+        Hash::Sha256 hash;
+        hash.Update(bytes.data(), bytes.size());
+        if (hash.Finish() != identity.source)
+        {
+            error = "HDR source changed during preparation; select it again";
+            return false;
+        }
+        const std::string_view encoded(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        if (!encoded.starts_with("#?RADIANCE") && !encoded.starts_with("#?RGBE"))
+        {
+            error = "Selected .hdr source is not a Radiance HDR image";
+            return false;
+        }
+        result.equirect = Texture::LoadSharedFromMemory(bytes);
+        if (!result.equirect)
+        {
+            error = "HDR decode failed";
+            return false;
+        }
+        result.equirectImage = result.equirect->NonRehydratableImage();
+        const auto image = result.equirect->GetImageDescription();
+        if (image.IsEmpty() || image.IsCube() || image.ArraySize() != 1
+            || image.MipLevels() != 1 || image.Format() != RHIFormat::RGBA32Float)
+        {
+            error = "HDR environment must decode to one 2D linear float image";
+            return false;
+        }
+        return true;
+    }
+
+    void RunEnvironmentPreparation(const own::shared_owner<EnvironmentPreparationState>& state)
+    {
+        for (;;)
+        {
+            EnvironmentPreparationRequest request;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                if (!state->accepting || !state->pending)
+                {
+                    state->running = false;
+                    return;
+                }
+                request = std::move(*state->pending);
+                state->pending.reset();
+            }
+            const uint64_t requestId = request.id;
+            const uint64_t generation = request.generation;
+            own::unique_owner<PreparedEnvironment> result;
+            std::string error;
+            bool prepared = false;
+            try
+            {
+                result = own::make_unique<PreparedEnvironment>();
+                result->request = std::move(request);
+                prepared = PrepareEnvironmentCpu(*state, *result, error);
+            }
+            catch (const std::exception& exception)
+            {
+                error = exception.what();
+            }
+            catch (...)
+            {
+                error = "Environment preparation failed";
+            }
+            own::unique_owner<PreparedEnvironment> retired;
+            bool failed = false;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                if (state->accepting && state->generation == generation
+                    && state->progress.requestId == requestId)
+                {
+                    if (prepared)
+                    {
+                        retired = std::move(state->ready);
+                        state->ready = std::move(result);
+                        state->progress.phase = "Waiting for render thread";
+                    }
+                    else
+                    {
+                        state->progress.activeRequests = 0;
+                        state->progress.phase = "Failed";
+                        state->progress.error = error;
+                        state->cpuError = error;
+                        failed = true;
+                    }
+                }
+            }
+            if (failed)
+            {
+                Debug::PrintLog(spdlog::level::err, "[EnvironmentPreparation] " + error);
+            }
+            // Large stale payloads are destroyed without either renderer lock.
+        }
+    }
+
+    bool QueueEnvironmentPreparation(const own::shared_owner<EnvironmentPreparationState>& preparation,
+        const std::string& selection, std::string& error, bool updateSelection = true)
+    {
+        EnvironmentPreparationRequest request;
+        request.updateSelection = updateSelection;
+        request.selection = selection;
+        request.source = file::absolute(file::path(selection));
+        request.shaders = PathFinder::ShaderPath() / "DefaultPassShader";
+        request.cache = PathFinder::CachePath() / "Environment";
+        request.project = PathFinder::BaseProjectPath();
+        EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
+        progress.activeRequests = 1;
+        progress.phase = "Queued";
+        progress.name = request.source.filename().string();
+        bool launch = false;
+        own::unique_owner<PreparedEnvironment> retired;
+        {
+            std::lock_guard lock(preparation->mutex);
+            if (!preparation->accepting)
+            {
+                error = "EnhancedRenderer environment preparation is not running";
+                return false;
+            }
+            request.id = ++preparation->nextRequest;
+            request.generation = preparation->generation;
+            progress.requestId = request.id;
+            progress.appliedRequestId = preparation->progress.appliedRequestId;
+            preparation->pending = std::move(request);
+            retired = std::move(preparation->ready);
+            preparation->progress = std::move(progress);
+            preparation->selection = selection;
+            preparation->cpuError.clear();
+            launch = !preparation->running;
+            preparation->running = true;
+        }
+        if (launch)
+        {
+            const auto fail = [preparation](std::exception_ptr failure)
+            {
+                if (!failure)
+                {
+                    return;
+                }
+                std::string reason = "Environment preparation dispatch failed";
+                try
+                {
+                    std::rethrow_exception(failure);
+                }
+                catch (const std::exception& exception)
+                {
+                    reason = exception.what();
+                }
+                catch (...)
+                {
+                }
+                own::unique_owner<PreparedEnvironment> retired;
+                std::lock_guard lock(preparation->mutex);
+                preparation->running = false;
+                preparation->pending.reset();
+                retired = std::move(preparation->ready);
+                preparation->progress.activeRequests = 0;
+                preparation->progress.phase = "Failed";
+                preparation->cpuError = reason;
+                preparation->progress.error = std::move(reason);
+            };
+            try
+            {
+                job_group work;
+                work.add([preparation] { RunEnvironmentPreparation(preparation); });
+                work.on_complete(fail);
+                ce::get_job_scheduler().submit(std::move(work));
+            }
+            catch (...)
+            {
+                fail(std::current_exception());
+                std::lock_guard lock(preparation->mutex);
+                error = preparation->progress.error;
+                return false;
+            }
+        }
+        error.clear();
+        return true;
+    }
+
+    struct FogImagePreparation
+    {
+        std::mutex mutex;
+        own::shared_owner<const Texture> texture;
+        std::string error;
+        bool started{};
+        bool complete{};
+    };
+
+    void InvalidateEnvironmentPreparation(EnvironmentPreparationState& state, bool stop)
+    {
+        own::unique_owner<PreparedEnvironment> retired;
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            ++state.generation;
+            if (stop)
+            {
+                state.accepting = false;
+                state.progress.appliedRequestId = 0;
+            }
+            state.pending.reset();
+            retired = std::move(state.ready);
+            state.progress.activeRequests = 0;
+            state.progress.applied = false;
+            state.progress.phase = "Cancelled";
+            state.progress.error.clear();
+            state.cpuError.clear();
+        }
+    }
+
+    own::unique_owner<PreparedEnvironment> FailEnvironmentPreparation(
+        EnvironmentPreparationState& state, const std::string& error)
+    {
+        own::unique_owner<PreparedEnvironment> retired;
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            if (state.progress.activeRequests == 0)
+            {
+                return {};
+            }
+            ++state.generation;
+            state.pending.reset();
+            retired = std::move(state.ready);
+            state.progress.activeRequests = 0;
+            state.progress.applied = false;
+            state.progress.phase = "Failed";
+            state.progress.error = error.empty() ? "Renderer is unavailable" : error;
+        }
+        return retired;
+    }
+
     struct LiveState
     {
+        ~LiveState()
+        {
+            InvalidateEnvironmentPreparation(*environmentPreparation, true);
+            // The submission service intentionally has process lifetime. Drain
+            // while every pass/cache member is still alive, before member teardown.
+            StopRenderThread();
+            const bool dx12Released = TeardownPipeline();
+            const bool vulkanReleased = TeardownVulkanPipeline();
+            if (!dx12Released || !vulkanReleased)
+            {
+                OutputDebugStringA("[EnhancedRenderer] Forced destruction cannot prove GPU idle or device loss; retaining GPU owners is no longer possible.\n");
+                std::terminate();
+            }
+        }
+
         std::unique_ptr<EnhancedPbrCapture> pbrCapture;
 
         EnhancedPbrCapture* BeginPbrCapture(const EnhancedLiveFramePacket& frame,
@@ -1127,7 +1771,7 @@ namespace
             if (!pbrCapture || pbrCapture->result.state != EnhancedPbrCaptureState::Pending
                 || pbrCapture->target != view.displayTarget
                 || frame.frameId <= pbrCapture->afterFrameId) return nullptr;
-            try { pbrCapture->Begin(frame, view, backend, draws, forwardDraws, lights, skyBoxPath); }
+            try { pbrCapture->Begin(frame, view, backend, emptyReferenceDraws, emptyReferenceDraws, lights, skyBoxPath); }
             catch (const std::exception& error)
             {
                 pbrCapture->Fail(error.what());
@@ -1187,7 +1831,15 @@ namespace
             ProxyCommandQueueController::Batch deltas;
         };
 
-        static constexpr uint32_t kRenderQueueCapacity = 2;
+        // 교체 가능한 대기 입력 하나와 TickLive가 이미 소비 중인 불변 입력 하나.
+        // lifecycle delta는 순서대로 보존하고, 적재 상한에서는 생산자에 역압을 건다.
+        static constexpr uint32_t kRenderQueueCapacity = 1;
+        static constexpr double kSceneSoftAgeBudgetMs = 50.0;
+        static constexpr uint64_t kSceneProgressNanoseconds = 250000000;
+        static constexpr uint32_t kSceneCompletionPollMs = 2;
+        // GT 는 앞 packet 이 소비될 때까지 이만큼만 기다린다. 넘으면 기존처럼 병합한다.
+        // 렌더 스레드가 셰이더 준비로 오래 멈춰도 GT 가 이 주기로는 계속 돈다.
+        static constexpr uint32_t kProducerPacingMs = 50;
         static constexpr size_t kMaxDeltasPerSubmission = 65536;
         mutable std::mutex renderQueueMutex;
         std::condition_variable renderQueueWake;
@@ -1210,12 +1862,79 @@ namespace
         uint64_t renderBackPressureWaits{ 0 };
         uint64_t renderShutdownDrains{ 0 };
         uint64_t renderShutdownDiscardedDeltas{ 0 };
+        uint64_t renderGpuAdmissionWaits{ 0 };
+        uint64_t renderStalePixelSkips{ 0 };
+        uint64_t renderOverBudgetAdmissions{ 0 };
+        uint64_t renderDisplayLeaseSkips{ 0 };
+        uint64_t renderProducerPacingWaits{ 0 };
+        uint64_t renderDisplayLeaseWaits{ 0 };
+        // RT 전용. 직전 프레임에서 고려한 뷰가 모두 표시 lease 때문에 건너뛰어졌다.
+        bool renderDisplayLeaseBlocked{ false };
+        uint64_t renderAdmittedFrameId{ 0 };
+        uint64_t renderLastAdmissionNanoseconds{ 0 };
+        double renderLastAdmissionAgeMs{ 0.0 };
+        double renderMaxAdmissionAgeMs{ 0.0 };
+        uint64_t renderDisplayPacingWaits{ 0 };
+
+        // ── RT 깨움과 화면 주기 맞춤 ──
+        //
+        // RT 는 시간 조회로 깨지 않는다. 2 ms 로 적은 wait_for 가 이 기계에서
+        // 실제로는 15.6 ms 타이머 눈금으로 자서, 눈금마다 두 장만 그리고
+        // 나머지 시간을 잤다(초당 129장, 10-06 실측). 대신 GT 발행·정지는
+        // renderWakeEvent 로, GPU 완료는 가장 오래된 진행 중 제출의 펜스 값에
+        // 건 gpuCompletionEvent 로 깨운다. 둘 다 자동 재설정이라, 잠금을 놓은 뒤
+        // 신호가 와도 다음 대기가 바로 돌아온다.
+        //
+        // 깨움만 바꾸면 RT 가 화면이 실을 수 없는 프레임을 초당 500장 넘게 그린다.
+        // 표시 쪽은 수직 동기 없이 완성본마다 출력하므로 화면 주기의 기준점은
+        // 합성기 시계뿐이다. 진입은 시계 한 번에 한 번이다.
+        //
+        // ★ 합성기 프레임 번호(DCompositionGetFrameId)로 세면 안 된다. 수직 동기
+        //   없는 출력마다 합성 프레임이 생겨 에디터가 돌면 초당 250 가까이 오른다
+        //   (60 Hz 화면, 10-06 실측). 시계 대기의 반환값만이 화면 주기를 센다.
+        static constexpr DWORD kRenderWakeBackstopMs = 100;
+        // 시계 대기의 상한. 시계가 멈추면(화면 꺼짐 등) 이 간격으로 깨어 아래
+        // 경과 시간 규칙으로 진입한다.
+        static constexpr DWORD kCompositorStallMs = 50;
+        // RT 가 바빠 시계를 놓쳤으면 한 주기에서 이만큼 모자라도 진입한다.
+        static constexpr uint64_t kMissedTickSlackNanoseconds = 2000000;
+        Microsoft::WRL::Wrappers::Event renderWakeEvent{
+            CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS) };
+        Microsoft::WRL::Wrappers::Event gpuCompletionEvent{
+            CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS) };
+        // FixedRate 의 다음 진입 시각. 시간 대기는 타이머 눈금에 묶이므로
+        // 고해상도 대기 타이머를 같은 대기 목록에 넣는다.
+        Microsoft::WRL::Wrappers::HandleT<Microsoft::WRL::Wrappers::HandleTraits::HANDLENullTraits> pacingTimer{
+            CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS) };
+        std::atomic<EnhancedLivePacing> livePacing{};
+        std::atomic<bool> hasPendingQueueMode{false};
+        EnhancedLiveQueueExecutionStatus queueExecutionStatus; // debugMutex
+
+        uint64_t armedGpuFenceValue{ 0 };          // RT 전용
+        bool compositorTickSinceAdmission{ true };  // RT 전용
+        uint64_t pacedAdmissionNanoseconds{ 0 };    // RT 전용
+        // 윈도우 11 의 dcomp 함수. 없으면 Display 진입을 제한하지 않는다.
+        using CompositorWaitFn = DWORD(WINAPI*)(UINT, const HANDLE*, DWORD);
+        CompositorWaitFn compositorWait{ nullptr };
 
         // status/검증/PIX wait가 RT의 pipeline 포인터와 통계를 직접 읽을 때만
         // 잡는다. 일반 CE display 조회는 더 좁은 displayLifetimeMutex를 쓴다.
         mutable std::mutex renderStateMutex;
         ProxyCommandQueueController::Batch activeDeltaBatch; // RT 전용
+        bool activeFrameDrainOnly{ false }; // 종료는 delta만 순서대로 소비하고 새 GPU 작업은 제출하지 않는다
 
+        // RT가 renderStateMutex 아래에서만 호출한다. 상태 조회의 잠금 순서와
+        // 맞추기 위해 renderQueueMutex를 잡은 채 renderStateMutex를 잡지 않는다.
+        void CollectCompletedDisplays();
+        void FailPendingGpuCaptures(const char* reason);
+        uint32_t PendingGpuSubmissions() const;
+        // RT 전용. Arm 은 renderStateMutex 아래에서, 나머지는 잠금 없이 부른다.
+        void ArmGpuCompletionEvent(uint32_t pendingGpu);
+        bool PacingAllowsAdmission() const;
+        void MarkPacedAdmission();
+        void WaitForRenderWork(bool untilPacingSlot, DWORD timeoutMs);
+        bool ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame);
+        void RecordSceneAdmission(const EnhancedLiveFramePacket& frame);
         bool StartRenderThread(std::string& outError);
         bool PublishFrame(FrameSubmission submission);
         void StopRenderThread();
@@ -1225,12 +1944,81 @@ namespace
         // Cooked data is loaded before decode/generation. A raw HDR cache miss
         // generates the four maps once and publishes their pixels asynchronously.
         std::string                 skyBoxPath;
-        std::unique_ptr<Texture> skyEquirect;
-        std::optional<assets::CookedEnvironment> skyCooked;
+        own::shared_owner<const Texture> skyEquirect;
+        own::shared_owner<const Texture::CodecImage> skyEquirectImage;
+        own::shared_owner<const EnhancedIBLGenerator::PreparedCookedEnvironment> skyCooked;
         std::optional<assets::EnvironmentIdentity> skyCookIdentity;
         std::filesystem::path skyCookCachePath;
         bool                        skyBoxDirty{ true };
         bool                        skyBoxEnabled{ true };
+        own::shared_owner<EnvironmentPreparationState> environmentPreparation{
+            own::make_shared<EnvironmentPreparationState>() };
+        uint64_t skyPreparationRequest{ 0 };
+        uint64_t skyPreparationGeneration{ 0 };
+
+        void ApplyPreparedEnvironment(own::unique_owner<PreparedEnvironment>& retired)
+        {
+            auto& preparation = *environmentPreparation;
+            std::lock_guard<std::mutex> lock(preparation.mutex);
+            if (!preparation.ready)
+            {
+                return;
+            }
+            retired = std::move(preparation.ready);
+            const auto& request = retired->request;
+            if (!preparation.accepting || preparation.generation != request.generation
+                || preparation.progress.requestId != request.id
+                || request.project != PathFinder::BaseProjectPath())
+            {
+                preparation.progress.activeRequests = 0;
+                preparation.progress.phase = "Cancelled";
+                return;
+            }
+            skyBoxPath = request.selection;
+            skyEquirect.swap(retired->equirect);
+            skyEquirectImage.swap(retired->equirectImage);
+            skyCooked.swap(retired->cooked);
+            skyCookIdentity.swap(retired->identity);
+            skyCookCachePath.swap(retired->cachePath);
+            skyPreparationRequest = request.id;
+            skyPreparationGeneration = request.generation;
+            skyBoxDirty = true;
+            preparation.progress.phase = "Applying environment on render thread";
+            if (request.updateSelection)
+            {
+                if (auto* settings = RuntimeSettings::TryGet())
+                {
+                    settings->SetEnvironmentSelection(skyBoxPath, true);
+                }
+            }
+            lastError.clear();
+        }
+
+        void FinishEnvironmentPreparation(const std::string& error)
+        {
+            auto& preparation = *environmentPreparation;
+            std::lock_guard<std::mutex> lock(preparation.mutex);
+            if (skyPreparationRequest != 0 && preparation.generation == skyPreparationGeneration)
+            {
+                if (error.empty())
+                {
+                    // A newer request may arrive while this upload is recorded.
+                    // Keep the actual installation event independently of it.
+                    preparation.progress.appliedRequestId = skyPreparationRequest;
+                }
+                if (preparation.progress.requestId == skyPreparationRequest)
+                {
+                    preparation.progress.activeRequests = error.empty() ? 0 : 1;
+                    preparation.progress.applied = error.empty();
+                    preparation.progress.phase = error.empty() ? "Upload recorded" : "Upload retry pending";
+                    preparation.progress.error = error;
+                }
+            }
+            if (error.empty())
+            {
+                skyPreparationRequest = 0;
+            }
+        }
 
         // ── 볼류메트릭 포그 입력 ──
         //
@@ -1246,7 +2034,8 @@ namespace
         //   PIXEL 전용 값이 없어 ShaderResource가 곧 ALL인데, textureCache는
         //   업로드를 PIXEL로 끝내므로 그대로 임포트하면 배리어의 before가
         //   실제와 어긋난다(검증 레이어가 잡는다).
-        std::unique_ptr<Texture> fogBlueNoise;
+        own::shared_owner<const Texture> fogBlueNoise;
+        own::shared_owner<FogImagePreparation> fogImagePreparation{ own::make_shared<FogImagePreparation>() };
 
         // ★ 핸들을 옆에 든다(V3). 예전에는 프레임마다 ImportTexture 의 포인터
         //   오버로드를 타서 표에 등록하고 그래프가 죽을 때 놓기를 반복했다 —
@@ -1259,7 +2048,6 @@ namespace
         // 새로 올라가므로 다시 넓혀야 한다). 포그를 껐다 켜는 것으로는
         // 리셋하지 않는다 — 이미 넓힌 리소스에 또 배리어를 걸면 before가
         // 실제와 어긋나 검증 레이어가 잡는다.
-        bool                        fogNoiseStateWidened{ false };
 
         // 창이 넣은 켬/끔. 꺼져 있으면 포그 패스를 아예 세우지 않는다.
         bool                        fogEnabled{ false };
@@ -1270,7 +2058,7 @@ namespace
 
         // 렌더 backend가 소유하는 카메라별 뷰. CE/UI는 이 파이프라인을 직접
         // 순회하지 않고 아래 display snapshot의 Editor/Game 대상만 소비한다.
-        std::unique_ptr<LivePipeline> pipeline;
+        std::shared_ptr<LivePipeline> pipeline;
         std::unique_ptr<VulkanLivePipeline> vulkanPipeline;
 
         // RenderThread는 완료된 슬롯을 아래 값 스냅샷으로 승격하고, CE는 그
@@ -1317,6 +2105,7 @@ namespace
                 entry.key = view.key;
                 entry.active = true;
                 entry.sourceFrameId = frame.frameId;
+                entry.sourceCaptureNanoseconds = frame.sourceCaptureNanoseconds;
                 entry.sourceInputSequence = view.camera.editorInputSequence;
                 entry.sourceCameraRevision = view.camera.editorCameraRevision;
             }
@@ -1335,6 +2124,10 @@ namespace
 
         void InvalidateDisplayResultsLocked()
         {
+            {
+                std::lock_guard<std::mutex> lock(debugMutex);
+                graphSnapshots.fill({});
+            }
             for (uint32_t i = 0; i < kEnhancedLiveDisplayTargetCount; ++i)
             {
                 EnhancedLiveDisplayEntrySnapshot& entry = displaySnapshot.targets[i];
@@ -1342,6 +2135,8 @@ namespace
                 entry.completedFrameId = 0;
                 entry.completedSceneEpoch = 0;
                 entry.completedCamera = {};
+                entry.completedCaptureNanoseconds = 0;
+                entry.completedAgeMs = 0.0;
                 entry.completedResizeGeneration = 0;
                 entry.completedWidth = entry.completedHeight = 0;
                 entry.promotionCount = 0;
@@ -1362,25 +2157,28 @@ namespace
             displayMissingSince.fill({});
         }
 
-        void PublishDisplayResultLocked(EnhancedLiveDisplayTarget displayTarget,
+        bool PublishDisplayResultLocked(EnhancedLiveDisplayTarget displayTarget,
             const EnhancedLiveViewKey& key, uint64_t presentationKey,
             uint64_t completedFrameId, uint64_t promotionCount,
             uint32_t promotedSlotMask, uint32_t width, uint32_t height,
             uint64_t completedSceneEpoch, const FrameCameraSnapshot& completedCamera,
-            uint64_t resultResizeGeneration = 0, bool previewComplete = false)
+            uint64_t resultResizeGeneration = 0, bool previewComplete = false,
+            uint64_t completedCaptureNanoseconds = 0, double completedAgeMs = 0.0)
         {
             const uint32_t targetIndex = DisplayTargetIndex(displayTarget);
             EnhancedLiveDisplayEntrySnapshot& entry =
                 displaySnapshot.targets[targetIndex];
             if (!entry.active || entry.key != key || completedSceneEpoch != sceneEpoch.load())
             {
-                return;
+                return false;
             }
             entry.ready = 0 != presentationKey;
             entry.previewComplete = previewComplete;
             entry.completedFrameId = completedFrameId;
             entry.completedSceneEpoch = completedSceneEpoch;
             entry.completedCamera = completedCamera;
+            entry.completedCaptureNanoseconds = completedCaptureNanoseconds;
+            entry.completedAgeMs = completedAgeMs;
             entry.completedWidth = width;
             entry.completedHeight = height;
             entry.completedResizeGeneration = resultResizeGeneration != 0
@@ -1389,24 +2187,41 @@ namespace
             entry.promotedSlotMask = promotedSlotMask;
             displayPresentationKeys[targetIndex] = presentationKey;
             ++displaySnapshot.revision;
+            return true;
         }
 
-        void PublishVulkanDisplayResults()
+        bool PublishVulkanDisplayResults()
         {
-            if (!vulkanPipeline) return;
+            if (!vulkanPipeline)
+            {
+                return false;
+            }
+            bool published = false;
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             std::lock_guard<std::mutex> viewLock(vulkanPipeline->viewMutex);
             for (uint32_t i = 0; i < EnhancedSceneRenderer::kMaxLiveCameraViews; ++i)
             {
                 const VulkanLivePipeline::View& view = vulkanPipeline->views[i];
-                if (!view.ready || !view.key.IsValid()) continue;
-                PublishDisplayResultLocked(view.displayTarget, view.key,
+                if (!view.ready || !view.key.IsValid())
+                {
+                    continue;
+                }
+                const auto& entry = displaySnapshot.targets[DisplayTargetIndex(view.displayTarget)];
+                if (entry.ready && entry.key == view.key && entry.completedFrameId == view.completedFrameId &&
+                    entry.completedSceneEpoch == view.completedSceneEpoch &&
+                    entry.completedResizeGeneration == view.completedResizeGeneration)
+                {
+                    continue;
+                }
+                published |= PublishDisplayResultLocked(view.displayTarget, view.key,
                     VulkanLivePipeline::kDisplayKeyBase + i + 1u,
                     view.completedFrameId, view.promotionCount,
                     view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height,
                     view.completedSceneEpoch, view.completedCamera,
-                    view.completedResizeGeneration, view.previewComplete);
+                    view.completedResizeGeneration, view.previewComplete,
+                    view.completedCaptureNanoseconds, view.completedAgeMs);
             }
+            return published;
         }
 
         // 프레임 입력. frameContext가 이들의 주소를 들므로 파이프라인과 무관한
@@ -1414,7 +2229,7 @@ namespace
         FrameCameraSnapshot           cameraSnapshot{};
 
         // 카메라와 무관한 수집 결과(BuildDrawPool). 뷰는 여기서 골라
-        // draws/forwardDraws로 옮긴다 — 재질·본 팔레트 해석을 뷰마다
+        // graphDraws/shadowDraws로 옮긴다 — 재질·본 팔레트 해석을 뷰마다
         // 반복하지 않기 위해서다.
         struct PooledDraw
         {
@@ -1422,36 +2237,67 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             std::shared_ptr<Mesh> meshSource{};
-            // MBC7 — item.modelMeshView의 정점·인덱스 저장소를 소유하는 immutable
-            // generation. sealing은 이것으로 재질의 embedded texture를 closure에서 푼다.
-            std::shared_ptr<const assets::ModelAssetGeneration> generationSource{};
-            // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
-            // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
-            // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
-            std::shared_ptr<const Material> materialSource{};
-            std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
-            // I5-D5c2-2 — 재질 저작 정본의 값 스냅샷. 있으면 sealing이
-            // properties·keywords·blendMode를 이것으로 덮는다(부속은 legacy).
-            std::shared_ptr<const experiment::Material> authoredMaterialSource{};
-            // W8 — 그 값 스냅샷을 만든 MaterialInstance의 Revision. 프록시까지만
-            // 오고 렌더 스냅샷에는 없어서, 인스턴스 편집이 화면에 닿았는지를
-            // 밖에서 물을 수 없었다. seal 신원의 일부로 운반한다.
-            std::uint64_t        authoredRevision{};
+            // Borrowed mesh bytes are covered by the frame's single model pin
+            // table. Copies of this draw carry only the stable table index.
+            std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
+            // Source identity/coverage is copied once. The immutable instance
+            // itself is retained by the frame pin table, never per draw.
+            bool hasGraphMaterialSource{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
-            bool                 isTransparent{ false };
         };
         std::vector<PooledDraw>       drawPool;
+        own::shared_owner<const assets::ModelAssetGenerationPins> modelFramePins{};
+        assets::ModelGeometryPreparationPins geometryFramePins{};
+        struct GeometryDemand final
+        {
+            own::shared_owner<const assets::ModelMeshDescriptor> descriptor{};
+            AssetDepot::AssetRequest<assets::ModelGeometryPayload> request{};
+            own::shared_owner<const assets::ModelGeometryPayload> ready{};
+            bool requested{};
+            std::uint64_t seenFrame{};
+            // A preparation cohort survives deferred cameras. Marking a view
+            // consumed performs no allocation after native queue acceptance.
+            std::map<std::pair<uint64_t, uint64_t>, bool> views;
+        };
+        std::map<assets::ModelMeshHandle, GeometryDemand> geometryDemands{};
+        std::set<std::pair<uint64_t, uint64_t>> geometryDemandViews{};
 
         struct PooledSprite
         {
             math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
-            std::shared_ptr<Texture> texture;
+            std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
             BillboardType billboardType{ BillboardType::None };
             math::vector3 billboardAxis{ 0.f, 1.f, 0.f };
             int orderInLayer{ 0 };
             bool enableDepth{ false };
         };
+        own::shared_owner<TextureFramePins> textureFramePins;
+        enum class ImageAdmission { Ready, Pending, Failed };
+        struct ImageDemand
+        {
+            own::shared_owner<const Texture> texture;
+            AssetDepot::AssetRequest<Texture::CodecImage> request;
+            own::shared_owner<const Texture::CodecImage> ready;
+            bool requested{};
+            bool replayNeeded{};
+            bool bootstrap{};
+            uint64_t bootstrapSceneEpoch{};
+            std::set<std::pair<uint64_t, uint64_t>> views;
+        };
+        // Retain both pending requests and ready results until staging consumes
+        // them. Another view/resource can remain Pending at a zero CPU budget.
+        std::unordered_map<std::uint64_t, ImageDemand> imageDemands;
+        std::pair<uint64_t, uint64_t> imageAdmissionView{};
+        struct ImageBootstrapViews
+        {
+            uint64_t sceneEpoch{};
+            std::set<uint64_t> pending;
+            std::set<uint64_t> admitted;
+        };
+        std::optional<ImageBootstrapViews> imageBootstrapViews;
+
+        own::shared_owner<material_graph::InstanceFramePins> graphFramePins;
         std::vector<PooledSprite> spritePool;
         RenderScene::UIProxySnapshot uiProxySnapshot;
         std::vector<UIRenderProxy*> uiProxyPointers;
@@ -1462,14 +2308,18 @@ namespace
         uint32_t                      lastPoolDraws{ 0 };
         uint32_t                      lastCulledDraws{ 0 };
 
-        std::vector<EnhancedDrawItem> draws;
+        // Empty live native lists retained for the standalone capture/replay
+        // and common pass-input contracts. Scene materials use graphViewInput.
+        // Legacy reference and capture APIs receive an explicitly empty stream.
+        const std::vector<EnhancedDrawItem> emptyReferenceDraws;
         std::vector<EnhancedDrawItem> shadowDraws;
-        std::vector<EnhancedDrawItem> forwardDraws;
+
         std::vector<EnhancedDrawItem> graphDraws;
-        // Same ordering as graphDraws/SceneDrawInput::sourceIndex. These sealed
-        // legacy draws keep the entire model visible during a cold graph compile.
-        std::vector<EnhancedDrawItem> graphFallbackDraws;
-        std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
+        // Same ordering as graphDraws/SceneDrawInput::sourceIndex. Eligibility
+        // remains aligned when optional graph candidates are removed.
+        std::vector<bool> graphShadowEligible;
+        std::vector<bool> graphViewRequired;
+        own::shared_owner<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
         // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —
@@ -1571,35 +2421,6 @@ namespace
         uint64_t nativeRecordSamples{ 0 };
         std::string lastError;
 
-        // GBuffer는 현재 제품에서 ShaderMeta→PSO를 잇는 첫 representative pass다.
-        // 이 값들은 RT만 쓰며 status가 renderStateMutex 아래 읽는다.
-        ShaderMetaHandle gbufferShaderMetaHandle{};
-        ShaderMetaHandle rejectedGBufferShaderMetaHandle{};
-        RHIPipelineHandle gbufferPipelineHandle{};
-        uint64_t gbufferShaderMetaApplies{ 0 };
-        uint64_t gbufferShaderMetaTargetedReplaces{ 0 };
-        uint64_t gbufferShaderMetaFailures{ 0 };
-        std::string gbufferShaderMetaError;
-
-        // M6-P2b: Forward도 GBuffer와 독립된 primary generation과 normal/reference
-        // PSO pair를 가진다. 한쪽만 교체된 상태는 pass가 게시하지 않는다.
-        ShaderMetaHandle forwardShaderMetaHandle{};
-        ShaderMetaHandle rejectedForwardShaderMetaHandle{};
-        RHIPipelineHandle forwardShadePipelineHandle{};
-        RHIPipelineHandle forwardReferencePipelineHandle{};
-        // Apply가 새 generation을 거부해도 기존 pass가 material property block을
-        // 계속 밀봉할 수 있도록 마지막으로 게시한 immutable Meta owner를 잡는다.
-        // incoming candidate와 섞지 않고 active pass handle과 같은 owner만 쓴다.
-        EnhancedShaderMetaFrameSnapshot activeForwardShaderMeta{};
-        // P2c: material별 Forward generation도 pass variant만 남겨 두고 Meta value를
-        // 놓으면 다음 reload 실패 때 직전 accepted variant를 다시 밀봉할 수 없다.
-        // 이번 frame에서 실제 사용한 secondary owner만 Commit 뒤 이 배열에 남긴다.
-        std::vector<EnhancedShaderMetaFrameSnapshot> activeForwardMaterialShaderMetas;
-        uint64_t forwardShaderMetaApplies{ 0 };
-        uint64_t forwardShaderMetaTargetedReplaces{ 0 };
-        uint64_t forwardShaderMetaFailures{ 0 };
-        std::string forwardShaderMetaError;
-
         void AddNativeRecordSample(double milliseconds)
         {
             lastNativeRecordMs = milliseconds;
@@ -1615,173 +2436,14 @@ namespace
                 : 0.0;
         }
 
-        bool ApplyGBufferShaderMeta(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& snapshots,
-            EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
+        void AppendGBufferMaterialStatus(std::string& status) const
         {
-            const auto recordFailure = [this](const std::string& error)
-            {
-                if (gbufferShaderMetaError != error)
-                {
-                    ++gbufferShaderMetaFailures;
-                    Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] GBuffer ShaderMeta 적용 실패: " + error);
-                }
-                gbufferShaderMetaError = error;
-            };
-
-            if (snapshots.empty())
-            {
-                outError = "GBuffer ShaderMeta frame snapshot 집합이 비었다";
-                recordFailure(outError);
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-            const EnhancedShaderMetaFrameSnapshot& snapshot = snapshots.front();
-
-            if (!snapshot.IsValid())
-            {
-                outError = snapshot.error.empty()
-                    ? "GBuffer ShaderMeta frame snapshot이 비었다" : snapshot.error;
-                recordFailure(outError);
-                // reload 중 잘못 게시된 파일은 현재 request를 끊지 않는다. 다만
-                // 최초 제품 generation조차 적용되지 않았다면 static bootstrap PSO로
-                // 조용히 그리지 않고 fail-closed한다.
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-
-            if (snapshot.handle == pass.GetShaderMetaHandle())
-            {
-                gbufferShaderMetaError.clear();
-                return true;
-            }
-            if (snapshot.handle == rejectedGBufferShaderMetaHandle)
-            {
-                outError = gbufferShaderMetaError;
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-
-            const RHIPipelineHandle previousPipeline = pass.GetPipelineHandle();
-            const bool hadProductGeneration = pass.GetShaderMetaHandle().IsValid();
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-            std::string applyError;
-            if (!pass.ApplyShaderMeta(context, snapshot.handle, *snapshot.value,
-                    retireAfter, applyError))
-            {
-                rejectedGBufferShaderMetaHandle = snapshot.handle;
-                outError = applyError;
-                recordFailure(applyError);
-                return hadProductGeneration;
-            }
-
-            const RHIPipelineHandle currentPipeline = pass.GetPipelineHandle();
-            gbufferShaderMetaHandle = snapshot.handle;
-            gbufferPipelineHandle = currentPipeline;
-            rejectedGBufferShaderMetaHandle = {};
-            gbufferShaderMetaError.clear();
-            ++gbufferShaderMetaApplies;
-            if (hadProductGeneration && previousPipeline != currentPipeline)
-                ++gbufferShaderMetaTargetedReplaces;
-            return true;
+            status += "\n  GBuffer material route — Graph only";
         }
 
-        void AppendGBufferShaderMetaStatus(std::string& status) const
+        void AppendForwardMaterialStatus(std::string& status) const
         {
-            status += "\n  GBuffer ShaderMeta — handle " +
-                std::to_string(gbufferShaderMetaHandle.slot) + ":" +
-                std::to_string(gbufferShaderMetaHandle.generation) +
-                " · apply " + std::to_string(gbufferShaderMetaApplies) +
-                " · targeted replace " +
-                std::to_string(gbufferShaderMetaTargetedReplaces) +
-                " · failure " + std::to_string(gbufferShaderMetaFailures);
-            if (!gbufferShaderMetaError.empty())
-                status += " · last " + gbufferShaderMetaError;
-        }
-
-        bool ApplyForwardShaderMeta(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& snapshots,
-            EnhancedForwardPass& pass, const EnhancedFrameContext& context,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
-        {
-            const auto recordFailure = [this](const std::string& error)
-            {
-                if (forwardShaderMetaError != error)
-                {
-                    ++forwardShaderMetaFailures;
-                    Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] Forward ShaderMeta 적용 실패: " + error);
-                }
-                forwardShaderMetaError = error;
-            };
-
-            if (snapshots.empty())
-            {
-                outError = "Forward ShaderMeta frame snapshot 집합이 비었다";
-                recordFailure(outError);
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-            const EnhancedShaderMetaFrameSnapshot& snapshot = snapshots.front();
-            if (!snapshot.IsValid())
-            {
-                outError = snapshot.error.empty()
-                    ? "Forward ShaderMeta frame snapshot이 비었다" : snapshot.error;
-                recordFailure(outError);
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-            if (snapshot.handle == pass.GetShaderMetaHandle())
-            {
-                activeForwardShaderMeta = snapshot;
-                forwardShaderMetaError.clear();
-                return true;
-            }
-            if (snapshot.handle == rejectedForwardShaderMetaHandle
-                && pass.GetShaderMetaHandle().IsValid())
-            {
-                outError = forwardShaderMetaError;
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-
-            const RHIPipelineHandle previousShade = pass.GetShadePSO();
-            const RHIPipelineHandle previousReference = pass.GetReferencePSO();
-            const bool hadProductGeneration = pass.GetShaderMetaHandle().IsValid();
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-            std::string applyError;
-            if (!pass.ApplyShaderMeta(context, snapshot.handle, *snapshot.value,
-                    retireAfter, applyError))
-            {
-                rejectedForwardShaderMetaHandle = snapshot.handle;
-                outError = applyError;
-                recordFailure(applyError);
-                return hadProductGeneration;
-            }
-
-            forwardShaderMetaHandle = snapshot.handle;
-            forwardShadePipelineHandle = pass.GetShadePSO();
-            forwardReferencePipelineHandle = pass.GetReferencePSO();
-            activeForwardShaderMeta = snapshot;
-            rejectedForwardShaderMetaHandle = {};
-            forwardShaderMetaError.clear();
-            ++forwardShaderMetaApplies;
-            if (hadProductGeneration &&
-                (previousShade != forwardShadePipelineHandle
-                    || previousReference != forwardReferencePipelineHandle))
-            {
-                ++forwardShaderMetaTargetedReplaces;
-            }
-            return true;
-        }
-
-        void AppendForwardShaderMetaStatus(std::string& status) const
-        {
-            status += "\n  Forward ShaderMeta — handle " +
-                std::to_string(forwardShaderMetaHandle.slot) + ":" +
-                std::to_string(forwardShaderMetaHandle.generation) +
-                " · apply " + std::to_string(forwardShaderMetaApplies) +
-                " · targeted replace " +
-                std::to_string(forwardShaderMetaTargetedReplaces) +
-                " · failure " + std::to_string(forwardShaderMetaFailures);
-            if (!forwardShaderMetaError.empty())
-                status += " · last " + forwardShaderMetaError;
+            status += "\n  Forward material route — Graph only";
         }
 
         // 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 수집은 매
@@ -1795,6 +2457,29 @@ namespace
         // 창은 락을 잡아 복사만 한다.
         std::mutex                debugMutex;
         EnhancedLiveDebugSnapshot debugSnapshot;
+        std::array<LiveGraphSnapshot, kEnhancedLiveDisplayTargetCount> graphSnapshots{};
+        std::array<bool, kEnhancedLiveDisplayTargetCount> graphSnapshotRequests{};
+
+        bool HasGraphSnapshotRequest(EnhancedLiveDisplayTarget target)
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+            return graphSnapshotRequests[DisplayTargetIndex(target)];
+        }
+
+        bool ConsumeGraphSnapshotRequest(EnhancedLiveDisplayTarget target)
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+            const uint32_t index = DisplayTargetIndex(target);
+            const bool requested = graphSnapshotRequests[index];
+            graphSnapshotRequests[index] = false;
+            return requested;
+        }
+
+        void PublishGraphSnapshot(EnhancedLiveDisplayTarget target, LiveGraphSnapshot snapshot)
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+            graphSnapshots[DisplayTargetIndex(target)] = std::move(snapshot);
+        }
 
         // LivePipelineDesc 덤프는 구조가 다시 서거나 active 조건이 바뀔 때만
         // 만든다. 프레임마다 문자열을 조립하지 않고 기존 debug snapshot에
@@ -1863,6 +2548,53 @@ namespace
             debugSnapshot.resizeGeneration = resizeGeneration;
             debugSnapshot.drawCount = lastDrawCount;
             debugSnapshot.batchCount = lastBatchCount;
+            const auto* geometryPass = pipeline ? &pipeline->gbuffer
+                : (vulkanPipeline ? &vulkanPipeline->gbuffer : nullptr);
+            debugSnapshot.preparedMeshletBatchCount = geometryPass
+                ? geometryPass->GetLastMeshletBatchCount() : 0u;
+            debugSnapshot.meshletFallback = geometryPass
+                ? geometryPass->GetLastMeshletFallback() : std::string{};
+            debugSnapshot.currentFrameOcclusion = geometryPass && geometryPass->HasCurrentFrameOcclusion();
+            debugSnapshot.occlusionFallback = geometryPass
+                ? geometryPass->GetLastOcclusionFallback() : std::string{};
+            debugSnapshot.skinningFallback = geometryPass
+                ? geometryPass->GetLastSkinningFallback() : std::string{};
+            debugSnapshot.indexedIndirectSupported = false;
+            debugSnapshot.nonIndexedIndirectSupported = false;
+            debugSnapshot.preparedGpuCandidates = 0;
+            debugSnapshot.preparedGpuCompactedBins = 0;
+            debugSnapshot.preparedGpuPreservedBins = 0;
+            debugSnapshot.preparedGpuConservativeCandidates = 0;
+            const auto addVisibility = [&](GpuGeometryVisibility::PreparedStats stats)
+            {
+                debugSnapshot.preparedGpuCandidates += stats.candidateCount;
+                debugSnapshot.preparedGpuCompactedBins += stats.compactedBins;
+                debugSnapshot.preparedGpuPreservedBins += stats.preservedBins;
+                debugSnapshot.preparedGpuConservativeCandidates += stats.conservativeCandidates;
+            };
+            const auto addPipelineVisibility = [&](const auto& source)
+            {
+                if (source.frameContext.resources)
+                {
+                    const auto capabilities = source.frameContext.resources->GetIndirectDrawCapabilities();
+                    debugSnapshot.indexedIndirectSupported = capabilities.indexedDraw;
+                    debugSnapshot.nonIndexedIndirectSupported = capabilities.nonIndexedDraw;
+                }
+                addVisibility(source.gbuffer.GetGpuVisibilityStats());
+                addVisibility(source.forward.GetGpuVisibilityStats());
+                addVisibility(source.decal.GetGpuVisibilityStats());
+                addVisibility(source.sprite.GetGpuVisibilityStats());
+                addVisibility(source.graphMaterials.CameraVisibilityStats());
+                debugSnapshot.preparedMeshletBatchCount += source.graphMaterials.PreparedMeshletDrawCount();
+            };
+            if (pipeline)
+            {
+                addPipelineVisibility(*pipeline);
+            }
+            else if (vulkanPipeline)
+            {
+                addPipelineVisibility(*vulkanPipeline);
+            }
             debugSnapshot.decalCount = lastDecalCount;
             debugSnapshot.decalBatchCount = lastDecalBatchCount;
             debugSnapshot.spriteCount = lastSpriteCount;
@@ -1930,6 +2662,11 @@ namespace
 
         bool BuildPipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
         {
+            if (pipeline)
+            {
+                outError = "DX12 pipeline is still retained; complete its safe teardown before rebuilding.";
+                return false;
+            }
             const auto traceBuild = [](const char* phase) {
                 const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE");
                 if (value && std::string_view(value) == "1")
@@ -1958,7 +2695,7 @@ namespace
             {
                 std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
                 InvalidateDisplayResultsLocked();
-                pipeline = std::make_unique<LivePipeline>();
+                pipeline = std::make_shared<LivePipeline>();
                 pipeline->resizeGeneration = displaySnapshot.resizeGeneration;
             }
             LivePipeline& p = *pipeline;
@@ -1997,8 +2734,8 @@ namespace
             p.frameContext.width = p.width;
             p.frameContext.height = p.height;
             p.frameContext.camera = &cameraSnapshot;
-            p.frameContext.draws = &draws;
-            p.frameContext.forwardDraws = &forwardDraws;
+            p.frameContext.draws = &emptyReferenceDraws;
+            p.frameContext.forwardDraws = &emptyReferenceDraws;
             p.frameContext.animationPalettes = &p.animationPalettes;
             p.frameContext.lights = &lights;
 
@@ -2116,7 +2853,12 @@ namespace
             for (LivePipeline::CameraView& view : p.views)
             {
                 // Graph destruction returns its transient textures to the pool.
-                for (LivePipeline::DisplaySlot& slot : view.slots) slot.graph.reset();
+                for (LivePipeline::DisplaySlot& slot : view.slots)
+                {
+                    finish_gpu_capture(slot.profilerToken, false,
+                        "DX12 display resources retired before GPU query collection");
+                    slot.graph.reset();
+                }
                 view.pendingQueue.clear();
                 view.displaySlot = -1;
                 view.promotionCount = 0;
@@ -2141,6 +2883,7 @@ namespace
                 }
             }
             p.transientPool.freeList.clear();
+            p.transientPool.ClearAliasingCache();
         }
 
         bool ResizePipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
@@ -2170,6 +2913,11 @@ namespace
         bool BuildVulkanPipeline(uint32_t newWidth, uint32_t newHeight,
             std::string& outError)
         {
+            if (vulkanPipeline)
+            {
+                outError = "Vulkan pipeline is still retained; complete its safe teardown before rebuilding.";
+                return false;
+            }
             // 락 범위는 DX12 쪽 BuildPipeline과 같은 규약이다 — 무효화만 잡고
             // 구축은 밖에서 한다. 두 백엔드에 같은 규약을 적어 두지 않으면
             // 한쪽만 고쳐진 채로 남는다.
@@ -2184,63 +2932,67 @@ namespace
                 return false;
             }
             if (!vulkanPipeline->Initialize(newWidth, newHeight, cameraSnapshot,
-                draws, forwardDraws, lights, outError))
+                emptyReferenceDraws, emptyReferenceDraws, lights, outError))
             {
-                vulkanPipeline->Shutdown();
+                std::string shutdownError;
+                if (!vulkanPipeline->Shutdown(shutdownError))
+                {
+                    outError += "\n" + shutdownError;
+                    return false;
+                }
                 vulkanPipeline.reset();
                 return false;
             }
             return true;
         }
 
-        void ReleaseForwardShaderMetaOwnerIfUnused()
-        {
-            if (pipeline || vulkanPipeline) return;
-            activeForwardShaderMeta = {};
-            activeForwardMaterialShaderMetas.clear();
-            forwardShaderMetaHandle = {};
-            rejectedForwardShaderMetaHandle = {};
-            forwardShadePipelineHandle = {};
-            forwardReferencePipelineHandle = {};
-            forwardShaderMetaError.clear();
-        }
-
-        void TeardownVulkanPipeline()
+        bool TeardownVulkanPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (!vulkanPipeline)
             {
-                ReleaseForwardShaderMetaOwnerIfUnused();
-                return;
+                return true;
             }
             InvalidateDisplayResultsLocked();
-            vulkanPipeline->Shutdown();
+            std::string error;
+            if (!vulkanPipeline->Shutdown(error, pbrCapture.get()))
+            {
+                lastError = error;
+                enabled = false;
+                return false;
+            }
             vulkanPipeline.reset();
-            ReleaseForwardShaderMetaOwnerIfUnused();
+            return true;
         }
 
         /// 파이프라인 해체. DX11에 보이는 것은 묘지로 보낸다(수명 규약).
-        void TeardownPipeline()
+        bool TeardownPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (nullptr == pipeline)
             {
-                ReleaseForwardShaderMetaOwnerIfUnused();
-                return;
+                return true;
             }
             InvalidateDisplayResultsLocked();
             LivePipeline& p = *pipeline;
 
             {
                 std::string lifecycleError;
-                if (!dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError))
+                bool drained = dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError);
+                if (!drained && dx12.HasDeviceLossProof())
+                {
+                    drained = dx12.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+                }
+                if (!drained)
                 {
                     lastError = "DX12 lifecycle drain 실패: " + lifecycleError;
-                    std::string abandonError;
-                    dx12.DrainForLifecycle(
-                        RHILifecycleCommand::UnrecoverableDeviceError,
-                        abandonError);
+                    enabled = false;
+                    return false;
                 }
+            }
+            if (pbrCapture && pbrCapture->resourceBackend == EnhancedLiveBackend::DX12)
+            {
+                pbrCapture->Release(dx12.Resources());
             }
             ReleaseSizeResources(p);
 
@@ -2262,14 +3014,13 @@ namespace
             }
             p.fogBlueNoiseHandle = {};
             fogInputsReady = false;
-            fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
             fogTeardownPending = false;
             fogRetireFence = 0;
 
             dx12.ShutdownPipeline();
 
             pipeline.reset();
-            ReleaseForwardShaderMetaOwnerIfUnused();
+            return true;
         }
 
         /// 포그가 처음 켜질 때 부른다. 프레임이 열려 있어야 한다(업로드 링과
@@ -2284,26 +3035,13 @@ namespace
             // ── 블루 노이즈 — 프록셀 지터의 씨앗 ──
             if (!fogBlueNoise)
             {
-                const file::path path =
-                    PathFinder::Relative("VolumetricFog\\blueNoise.dds");
-                try
-                {
-                    fogBlueNoise = Texture::LoadManagedFromPath(path);
-                }
-                catch (const std::exception& exception)
-                {
-                    outError = "블루 노이즈 로드 실패: " + std::string(exception.what());
-                    return false;
-                }
-            }
-            if (!fogBlueNoise)
-            {
                 outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
                 return false;
             }
 
             const RHITextureEntry noiseEntry =
-                dx12.TextureCache().GetOrUpload(fogBlueNoise.get(), outError);
+                dx12.TextureCache().GetOrUpload((fogBlueNoise ? &*fogBlueNoise.borrow() : nullptr),
+                    p.frameContext.TextureImage(fogBlueNoise ? &*fogBlueNoise : nullptr), outError);
             if (!noiseEntry.IsValid())
             {
                 outError = "블루 노이즈 운반 실패" +
@@ -2323,19 +3061,8 @@ namespace
                     p.fogCloudNeutralHandle, outError)) return false;
             }
 
-            // 블루 노이즈는 캐시가 PIXEL로 끝내 두었다. 그래프가 ShaderResource
-            // (=ALL)로 임포트하므로 여기서 한 번 넓혀 둔다 — ALL은 PIXEL의
-            // 상위집합이라 이 리소스를 픽셀로 읽는 쪽이 생겨도 그대로 맞다.
-            // 두 번 걸면 before가 실제와 어긋나므로 캐시 수명당 한 번만 건다.
-            if (!fogNoiseStateWidened)
-            {
-                const RHITransition widen[] = {
-                    { noiseEntry.handle,
-                      RHIResourceState::PixelShaderResource,
-                      RHIResourceState::ShaderResource } };
-                dx12.Resources().TransitionResources(widen);
-                fogNoiseStateWidened = true;
-            }
+            // The graph imports the cache-owned Pixel state and restores it
+            // after the last consumer. Do not widen a shared asset out of graph.
 
             fogInputsReady = true;
             return true;
@@ -2347,28 +3074,14 @@ namespace
 
             if (!fogBlueNoise)
             {
-                const file::path path =
-                    PathFinder::Relative("VolumetricFog\\blueNoise.dds");
-                try
-                {
-                    fogBlueNoise = Texture::LoadManagedFromPath(path);
-                }
-                catch (const std::exception& exception)
-                {
-                    outError = "블루 노이즈 로드 실패: " +
-                        std::string(exception.what());
-                    return false;
-                }
-            }
-            if (!fogBlueNoise)
-            {
                 outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
                 return false;
             }
 
             std::string noiseError;
             const RHITextureEntry noise =
-                p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
+                p.textureCache.GetOrUpload((fogBlueNoise ? &*fogBlueNoise.borrow() : nullptr),
+                    p.frameContext.TextureImage(fogBlueNoise ? &*fogBlueNoise : nullptr), noiseError);
             if (!noise.IsValid())
             {
                 outError = "Vulkan 블루 노이즈 운반 실패" +
@@ -2378,7 +3091,7 @@ namespace
 
             std::string neutralError;
             const RHITextureEntry neutral =
-                p.textureCache.GetOrUpload(nullptr, neutralError);
+                p.textureCache.GetOrUpload(nullptr, {}, neutralError);
             if (!neutral.IsValid())
             {
                 outError = "Vulkan 포그 중립 구름 텍스처 생성 실패" +
@@ -2419,9 +3132,9 @@ namespace
         // 예전에는 그 사실이 RenderOnce 안에 200줄로 흩어져 있었고, 패스를
         // 하나 이으려면 그중 순서를 지켜야 하는 자리 넷을 사람이 찾아 고쳤다.
         //
-        // 노드 순서 = 실행 순서다(3-5 계약을 위층에서 잇는다). 노드를 옮기는
-        // 것이 곧 파이프라인을 바꾸는 것이고, 그것 말고 순서를 정하는 곳은
-        // 없다.
+        // 노드 목록은 저작 슬롯의 버전 배선을 정한다. 실제 실행 순서는
+        // 같은 EnhancedRenderGraph의 명시적 리소스 의존성에서 컴파일한다.
+        // 독립 패스의 안정 tie-break에만 저작 순서를 사용한다.
         //
         // ★ 람다가 `p`(자기 소유자)와 `this`(LiveState 싱글턴)를 캡처한다.
         //   파이프라인을 헐 때 desc도 함께 사라지므로 대롱거리는 참조가
@@ -2442,11 +3155,16 @@ namespace
                 LivePassNode node;
                 node.name = "Shadow";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
+                node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
+                node.prepare = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
+                {
+                    return p.shadow.PrepareGraphFrame(ctx, error);
+                };
                 node.writes = { LiveSlots::kShadowMap };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.shadow.Declare(graph, ctx);
+                    p.shadow.DeclareGraphTargets(graph, ctx);
                     bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadow(graph, p.shadow.GetShadowMap()));
                 };
                 p.desc.AddNode(std::move(node));
@@ -2457,6 +3175,8 @@ namespace
                 LivePassNode node;
                 node.name = "GBuffer";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gbuffer; };
+                node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
+                node.prepare = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
                 node.writes = {
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
@@ -2465,7 +3185,7 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.gbuffer.Declare(graph, ctx);
+                    p.gbuffer.DeclareGraphTargets(graph, ctx);
                     const auto outputs = p.gbuffer.GetOutputs();
                     bb.Set(LiveSlots::kGBufferDiffuse,    outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
@@ -2488,7 +3208,9 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb));
+                    // Graph-only GBuffer owns no native occluder raster. LX
+                    // builds its current-frame depth before HZB and main color.
+                    const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb), false);
                     bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
                     bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
@@ -2514,7 +3236,7 @@ namespace
                 node.prepare = [this, &p](const EnhancedFrameContext& ctx,
                     std::string& err, uint32_t) -> bool
                 {
-                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals);
+                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
                     return p.decal.PrepareFrame(ctx, err);
                 };
                 node.reads = { LiveSlots::kGBufferDepth };
@@ -2582,8 +3304,8 @@ namespace
                 {
                     p.deferred.SetInputs(GatherGBufferOutputs(bb));
                     p.deferred.SetAmbientOcclusion(bb.Get(LiveSlots::kAmbientOcclusion));
-                    p.deferred.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
-                    p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
+                    p.deferred.SetShadow(bb.Get(LiveSlots::kShadowMap), p.shadow.GetShadowData());
+                    p.forward.SetShadow(bb.Get(LiveSlots::kShadowMap), p.shadow.GetShadowData());
                     p.deferred.Declare(graph, ctx);
                     bb.Set(LiveSlots::kLitColor, p.deferred.GetOutput());
                 };
@@ -2691,6 +3413,10 @@ namespace
                 LivePassNode node;
                 node.name = "Forward+";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.forward; };
+                node.initialize = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
+                {
+                    return p.forward.InitializeGraphLighting(ctx, error);
+                };
                 node.reads = { LiveSlots::kGBufferDepth };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -2896,10 +3622,22 @@ namespace
                     inputs.color = bb.Get(LiveSlots::kLitColor);
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.shadowMap = bb.Get(LiveSlots::kShadowMap);
-                    inputs.cloudShadow = graph.ImportTexture(p.fogCloudNeutralHandle,
-                        RHIResourceState::ShaderResource, "Fog.CloudNeutral");
-                    inputs.blueNoise = graph.ImportTexture(p.fogBlueNoiseHandle,
-                        RHIResourceState::ShaderResource, "Fog.BlueNoise");
+                    inputs.cloudShadow = graph.FindImportedTexture(p.fogCloudNeutralHandle);
+                    if (!inputs.cloudShadow.IsValid())
+                    {
+                        inputs.cloudShadow = graph.ImportTexture(p.fogCloudNeutralHandle,
+                            RHIResourceState::ShaderResource, "Fog.CloudNeutral");
+                    }
+                    constexpr auto fogNoiseState = std::is_same_v<PipelineT, LivePipeline>
+                        ? RHIResourceState::PixelShaderResource : RHIResourceState::ShaderResource;
+                    inputs.blueNoise = graph.FindImportedTexture(p.fogBlueNoiseHandle);
+                    if (!inputs.blueNoise.IsValid())
+                    {
+                        inputs.blueNoise = graph.ImportTexture(p.fogBlueNoiseHandle,
+                            fogNoiseState, "Fog.BlueNoise");
+                    }
+                    graph.RequireImportedFinalState(inputs.blueNoise, fogNoiseState);
+                    graph.RequireImportedFinalState(inputs.cloudShadow, RHIResourceState::ShaderResource);
                     view.fog.SetInputs(inputs);
                     // 셰이더가 캐스케이드 슬라이스 2를 짚는다 — DX11이 마지막
                     // 캐스케이드 행렬을 넘기는 것과 짝이다.
@@ -3000,12 +3738,19 @@ namespace
 
                     if (binding.sharedTarget.IsValid())
                     {
-                        const RGHandle sharedHandleRG = graph.ImportTexture(
+                        const RGHandle sharedInitial = graph.ImportTexture(
                             binding.sharedTarget, RHIResourceState::CopyDest, "Live.Shared");
+                        const bool explicitAccess = graph.GetSchedulingMode()
+                            != RGSchedulingMode::DeclarationOrder;
+                        const RGHandle sharedHandleRG = graph.GetSchedulingMode()
+                            == RGSchedulingMode::ExplicitVersioned
+                            ? graph.Write(sharedInitial) : sharedInitial;
 
                         graph.AddPass("live_present",
-                            { { finalHandle, RHIResourceState::CopySource },
-                              { sharedHandleRG, RHIResourceState::CopyDest } },
+                            { { finalHandle, RHIResourceState::CopySource,
+                                explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState },
+                              { sharedHandleRG, RHIResourceState::CopyDest,
+                                explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState } },
                             [sharedHandleRG, finalHandle](
                                 const EnhancedRenderGraph::ExecuteContext& executeContext)
                             {
@@ -3020,7 +3765,9 @@ namespace
 
                     const RHIReadback readback = binding.readbackTarget;
                     graph.AddPass("live_present",
-                        { { finalHandle, RHIResourceState::CopySource } },
+                        { { finalHandle, RHIResourceState::CopySource,
+                            graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
+                                ? RGAccessMode::Read : RGAccessMode::LegacyState } },
                         [readback, finalHandle](
                             const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
@@ -3224,7 +3971,7 @@ namespace
 
         static bool AppendImageToPlane(const UIRenderProxy::ImageData& image,
             const CanvasPlane& plane, bool enableDepth,
-            std::vector<EnhancedSpritePass::Item>& output)
+            std::vector<EnhancedSpritePass::Item>& output, TextureFramePins& texturePins)
         {
             if (!plane.valid) return false;
 
@@ -3258,7 +4005,8 @@ namespace
             item.world = MakeSpriteMatrix(right, down, center);
             item.uv = uv;
             item.color = image.color;
-            item.texture = image.texture.get();
+            item.texturePinIndex = texturePins.Retain(image.texture);
+            item.texture = texturePins.Borrow(item.texturePinIndex);
             item.canvasOrder = image.canvasOrder;
             item.layerOrder = image.layerOrder;
             item.enableDepth = enableDepth;
@@ -3296,18 +4044,352 @@ namespace
             add(plane.center + plane.right * 0.5f, rightUnit * thickness, plane.down);
         }
 
+        void RetainGraphImages(const own::shared_owner<const material_graph::Instance>& instance)
+        {
+            if (instance)
+            {
+                for (const auto& texture : instance->textures)
+                {
+                    textureFramePins->Retain(texture.owner);
+                }
+            }
+        }
+
+        void PinGraphInstance(EnhancedDrawItem& draw,
+            const own::shared_owner<const material_graph::Instance>& instance)
+        {
+            RetainGraphImages(instance);
+            draw.materialGraphPinIndex = graphFramePins->Retain(instance);
+            draw.materialGraphView = graphFramePins->Borrow(draw.materialGraphPinIndex);
+            draw.materialGraphInstance.reset();
+        }
+
+        // Runs before either backend begins an upload recording. Exact requests
+        // survive Pending across packets; cache-zero ready results are handed to
+        // the CPU-use table before the request owner is released.
+        bool PrepareGeometry(std::uint64_t frameId, bool& pending, std::string& error)
+        {
+            pending = false;
+            error.clear();
+            geometryFramePins.entries.clear();
+            const auto admit = [&](const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor,
+                bool cpuConsumer)
+            {
+                const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                if (!handle.IsValid())
+                {
+                    error = "Invalid granular mesh descriptor identity.";
+                    return false;
+                }
+                const bool resident = backend == EnhancedLiveBackend::DX12
+                    ? pipeline && dx12.MeshCache().FindModel(handle).IsValid()
+                    : vulkanPipeline && vulkanPipeline->meshCache.FindModel(handle).IsValid();
+                // Graph sealing is a distinct CPU user, even with a resident GPU buffer.
+                if (resident && !cpuConsumer)
+                {
+                    return true;
+                }
+                auto& demand = geometryDemands[handle];
+                demand.seenFrame = frameId;
+                for (const auto& view : geometryDemandViews)
+                {
+                    demand.views.try_emplace(view, false);
+                }
+                if (!demand.descriptor)
+                {
+                    demand.descriptor = descriptor;
+                }
+                if (!demand.ready)
+                {
+                    demand.ready = DataSystems->TryAcquire(demand.descriptor);
+                }
+                if (!demand.ready)
+                {
+                    if (!demand.requested)
+                    {
+                        demand.request = DataSystems->RequestAsync(demand.descriptor);
+                        demand.requested = true;
+                    }
+                    const auto result = demand.request.Snapshot();
+                    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+                    {
+                        pending = true;
+                        return true;
+                    }
+                    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+                    {
+                        error = "Exact mesh geometry preparation failed: " + result.message;
+                        return false;
+                    }
+                    demand.ready = result.asset;
+                }
+                if (!demand.ready->Matches(*demand.descriptor))
+                {
+                    error = "Prepared mesh geometry does not match its exact descriptor.";
+                    return false;
+                }
+                return true;
+            };
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                if (!primitive || !primitive->m_isEnabled)
+                {
+                    continue;
+                }
+                if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
+                {
+                    if (!admit(mesh->m_meshDescriptor, mesh->m_graphMaterialSource || mesh->m_isAnimationEnabled))
+                    {
+                        return false;
+                    }
+                }
+                else if (const auto* foliage = primitive->As<FoliageRenderProxy>(); foliage && !foliage->m_isCulled)
+                {
+                    // One demand per actual selected type, never a model root
+                    // closure or an unrelated mesh/material in the descriptor.
+                    for (std::size_t index = 0u; index < foliage->m_foliageTypes.size(); ++index)
+                    {
+                        const auto& type = foliage->m_foliageTypes[index];
+                        const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
+                        if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty()
+                            && !admit(type.m_meshDescriptor, static_cast<bool>(type.m_graphMaterialSource)))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
+            {
+                if (position->second.seenFrame != frameId)
+                {
+                    position->second.request.Cancel();
+                    position = geometryDemands.erase(position);
+                }
+                else
+                {
+                    ++position;
+                }
+            }
+            if (pending)
+            {
+                return false;
+            }
+            geometryFramePins.entries.reserve(geometryDemands.size());
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                geometryFramePins.entries.push_back({ handle, demand.ready });
+                demand.request = {};
+                demand.requested = false;
+            }
+            return true;
+        }
+
+        void CancelGeometryDemands()
+        {
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                demand.request.Cancel();
+            }
+            geometryDemands.clear();
+        }
+
+        void CompleteGeometryView(uint64_t epoch, uint64_t viewId)
+        {
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                const auto view = demand.views.find({ epoch, viewId });
+                if (view != demand.views.end())
+                {
+                    view->second = true;
+                }
+                if (!demand.views.empty() && std::ranges::all_of(demand.views,
+                    [](const auto& entry) { return entry.second; }))
+                {
+                    // Frame-local raw views still have geometryFramePins until
+                    // their final CPU use. Future cold demand may rehydrate.
+                    demand.ready.reset();
+                    demand.request = {};
+                    demand.requested = false;
+                    demand.views.clear();
+                }
+            }
+        }
+
+        void ReconcileGeometryDemands(bool hasSceneGeometryView)
+        {
+            if (geometryDemands.empty())
+            {
+                return;
+            }
+            if (!hasSceneGeometryView || !runtimeInitialized || !renderScene)
+            {
+                CancelGeometryDemands();
+                return;
+            }
+            // Reconcile after proxy deltas even when pixel work will be skipped.
+            // A ready request owns its CPU result independently of cache budgets.
+            // Keep relevant requests across active Pending frames, but never let
+            // a removed/disabled/rebound proxy leave that result pinned forever.
+            std::set<assets::ModelMeshHandle> activeMeshes;
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                if (!primitive || !primitive->m_isEnabled)
+                {
+                    continue;
+                }
+                if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
+                {
+                    activeMeshes.insert(assets::MakeModelMeshHandle(*mesh->m_meshDescriptor));
+                }
+                else if (const auto* foliage = primitive->As<FoliageRenderProxy>(); foliage && !foliage->m_isCulled)
+                {
+                    for (std::size_t index = 0u; index < foliage->m_foliageTypes.size(); ++index)
+                    {
+                        const auto& type = foliage->m_foliageTypes[index];
+                        const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
+                        if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty())
+                        {
+                            activeMeshes.insert(assets::MakeModelMeshHandle(*type.m_meshDescriptor));
+                        }
+                    }
+                }
+            }
+            for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
+            {
+                if (!activeMeshes.contains(position->first))
+                {
+                    position->second.request.Cancel();
+                    position = geometryDemands.erase(position);
+                }
+                else
+                {
+                    std::erase_if(position->second.views,
+                        [this](const auto& view) { return !geometryDemandViews.contains(view.first); });
+                    ++position;
+                }
+            }
+        }
+
+        void ReleaseGeometrySources()
+        {
+            const auto release = [](EnhancedDrawItem& draw)
+            {
+                if (draw.modelMeshView.sourceDescriptor)
+                {
+                    draw.modelMeshView.sourcePayload = nullptr;
+                    draw.modelMeshView.vertexData = nullptr;
+                    draw.modelMeshView.indexData = nullptr;
+                }
+            };
+            for (auto& draw : drawPool)
+            {
+                release(draw.item);
+            }
+            for (auto& draw : shadowDraws)
+            {
+                release(draw);
+            }
+            for (auto& draw : graphDraws)
+            {
+                release(draw);
+            }
+            geometryFramePins.entries.clear();
+        }
+
         void BuildDrawPool()
         {
             drawPool.clear();
+            shadowDraws.clear();
             graphDraws.clear();
-            graphFallbackDraws.clear();
+            graphShadowEligible.clear();
+            graphViewRequired.clear();
             graphViewInput.reset();
             decals.clear();
             spritePool.clear();
+            worldSprites.clear();
+            uiRects.clear();
+            textureFramePins = own::make_shared<TextureFramePins>();
+            graphFramePins = own::make_shared<material_graph::InstanceFramePins>();
             uiProxySnapshot.clear();
             uiProxyPointers.clear();
+            modelFramePins.reset();
 
-            if (nullptr == renderScene) return;
+            if (nullptr == renderScene)
+            {
+                return;
+            }
+
+            assets::ModelAssetGenerationPins modelPins;
+            std::map<assets::ModelAssetGenerationHandle, std::size_t> modelPinIndices;
+            std::map<assets::ModelMeshHandle, std::size_t> meshPinIndices;
+            struct BuildGuard final
+            {
+                LiveState& state;
+                bool published{};
+                ~BuildGuard()
+                {
+                    if (!published)
+                    {
+                        // Clear every current-input borrow before local owners
+                        // unwind, including failures partway through collection.
+                        // Accepted frames have independent table owners.
+                        state.drawPool.clear();
+                        state.shadowDraws.clear();
+                        state.graphDraws.clear();
+                        state.graphShadowEligible.clear();
+                        state.graphViewRequired.clear();
+                        state.graphViewInput.reset();
+                        state.decals.clear();
+                        state.spritePool.clear();
+                        state.worldSprites.clear();
+                        state.uiRects.clear();
+                        state.uiProxyPointers.clear();
+                        state.uiProxySnapshot.clear();
+                        state.modelFramePins.reset();
+                        state.graphFramePins.reset();
+                        state.textureFramePins.reset();
+                    }
+                }
+            };
+            BuildGuard buildGuard{ *this };
+            const auto pinModel = [&modelPins, &modelPinIndices](
+                const assets::ModelAssetGeneration::Shared& generation)
+            {
+                const auto handle = generation->Handle();
+                const auto [position, inserted] = modelPinIndices.emplace(
+                    handle, modelPins.generations.size());
+                if (inserted)
+                {
+                    modelPins.generations.push_back(generation);
+                }
+                else
+                {
+                    const auto& identity = generation->Identity();
+                    const auto& pinned = modelPins.generations[position->second]->Identity();
+                    if (identity.sourceFingerprint != pinned.sourceFingerprint
+                        || identity.identityProfile != pinned.identityProfile
+                        || identity.identityEpoch != pinned.identityEpoch)
+                    {
+                        return (std::numeric_limits<std::size_t>::max)();
+                    }
+                }
+                return position->second;
+            };
+
+            const auto pinMesh = [&modelPins, &meshPinIndices](
+                const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor)
+            {
+                const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                const auto [position, inserted] = meshPinIndices.emplace(handle, modelPins.meshes.size());
+                if (inserted)
+                {
+                    modelPins.meshes.push_back(descriptor);
+                }
+                return position->second;
+            };
 
             const auto poolDecal = [this](const DecalRenderProxy* proxy)
             {
@@ -3322,45 +4404,72 @@ namespace
 
                 EnhancedDecalPass::Item item{};
                 item.worldMatrix = proxy->m_worldMatrix;
-                item.diffuse = proxy->m_diffuseTexture.get();
-                item.normal = proxy->m_normalTexture.get();
-                item.occRoughMetal = proxy->m_occluroughmetalTexture.get();
+                item.texturePinIndices = {textureFramePins->Retain(proxy->m_diffuseTexture),
+                    textureFramePins->Retain(proxy->m_normalTexture),
+                    textureFramePins->Retain(proxy->m_occluroughmetalTexture)};
+                item.diffuse = textureFramePins->Borrow(item.texturePinIndices[0]);
+                item.normal = textureFramePins->Borrow(item.texturePinIndices[1]);
+                item.occRoughMetal = textureFramePins->Borrow(item.texturePinIndices[2]);
                 item.sliceX = proxy->m_sliceX;
                 item.sliceY = proxy->m_sliceY;
                 item.sliceNum = proxy->m_sliceNum;
                 decals.push_back(item);
             };
 
-            const auto poolMesh = [this](const MeshRenderProxy* proxy)
+            const auto poolMesh = [this, &pinModel, &pinMesh, &modelPins](const MeshRenderProxy* proxy)
             {
                 // Visibility is published by Scene even when the Animator is disabled.
                 // Exclude the mesh before building draws for any render pass.
                 if (!proxy->m_isEnabled) return;
-
-                // PHASE 3.75 MBC7 — typed generation 뷰가 정본이다. generation
-                // descriptor와 immutable 저장소를 대조해 뷰를 짓고(BuildRHIModelMeshView),
-                // 실패·부재면 experiment 핸들 → legacy Mesh 순으로 내려간다(MBC9 은퇴).
-                RHIModelMeshView modelView{};
-                if (!proxy->m_modelGeneration
-                    || !BuildRHIModelMeshView(*proxy->m_modelGeneration,
-                        proxy->m_modelMeshIndex, modelView))
+                if (proxy->m_graphMaterialSource)
                 {
-                    return;
+                    RetainGraphImages(proxy->m_graphMaterialSource->instance);
                 }
 
                 PooledDraw pooled{};
-                pooled.item.worldMatrix = proxy->m_worldMatrix;
-                pooled.item.modelMeshView = modelView;
-                pooled.generationSource = proxy->m_modelGeneration;
-                // I6-C — 신원 키와 반경을 값으로 싣는다.
-                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                RHIModelMeshView modelView{};
+                math::aabb bounds{};
+                if (proxy->m_meshDescriptor)
                 {
-                    const math::aabb& bounds = proxy->m_modelGeneration
-                        ->Meshes()[proxy->m_modelMeshIndex].bounds;
-                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
-                    pooled.item.boundRadius = bounds.is_empty()
-                        ? 0.f : math::length(bounds.extents);
+                    const auto pinIndex = pinMesh(proxy->m_meshDescriptor);
+                    const auto& descriptor = modelPins.meshes[pinIndex];
+                    const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                    const auto payload = std::ranges::find_if(geometryFramePins.entries,
+                        [&](const auto& entry) { return entry.handle == handle; });
+                    const bool valid = payload != geometryFramePins.entries.end()
+                        ? payload->payload && BuildRHIModelMeshView(*descriptor, *payload->payload, modelView)
+                        : BuildRHIModelMeshView(*descriptor, modelView);
+                    if (!valid)
+                    {
+                        return;
+                    }
+                    pooled.modelPinIndex = pinIndex;
+                    bounds = descriptor->bounds;
                 }
+                else
+                {
+                    if (!proxy->m_modelGeneration)
+                    {
+                        return;
+                    }
+                    const auto pinIndex = pinModel(proxy->m_modelGeneration);
+                    if (pinIndex == (std::numeric_limits<std::size_t>::max)())
+                    {
+                        return;
+                    }
+                    const auto& generation = modelPins.generations[pinIndex];
+                    if (!BuildRHIModelMeshView(*generation, proxy->m_modelMeshIndex, modelView))
+                    {
+                        return;
+                    }
+                    pooled.modelPinIndex = pinIndex;
+                    bounds = generation->Meshes()[proxy->m_modelMeshIndex].bounds;
+                }
+                pooled.item.worldMatrix = proxy->m_worldMatrix;
+                pooled.item.modelMeshView = std::move(modelView);
+                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                pooled.item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
 
                 const math::matrix4x4* palette = proxy->m_paletteArena
                     ? proxy->m_paletteArena->resolve(proxy->m_paletteOffset,
@@ -3376,23 +4485,11 @@ namespace
 
                 if (proxy->m_graphMaterialSource)
                 {
-                    pooled.graphMaterialSource = proxy->m_graphMaterialSource;
-                    pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
-                    pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
-                    pooled.item.coverage = pooled.graphMaterialSource->coverage;
-                    pooled.materialSource = proxy->m_Material;
-                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
-                    pooled.authoredRevision = proxy->m_authoredRevision;
-                    pooled.isTransparent =
-                        (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
-                }
-                else if (const auto* material = proxy->m_Material.get())
-                {
-                    pooled.materialSource = proxy->m_Material;
-                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
-                    pooled.authoredRevision = proxy->m_authoredRevision;
-                    pooled.isTransparent =
-                        (MaterialRenderingMode::Transparent == material->m_renderingMode);
+                    const auto& source = *proxy->m_graphMaterialSource;
+                    pooled.hasGraphMaterialSource = true;
+                    PinGraphInstance(pooled.item, source.instance);
+                    pooled.item.materialGraphSlot = source.materialSlot;
+                    pooled.item.coverage = source.coverage;
                 }
 
                 pooled.worldBounds = proxy->m_worldBounds;
@@ -3401,63 +4498,69 @@ namespace
                 drawPool.push_back(pooled);
             };
 
-            const auto poolFoliage = [this](const FoliageRenderProxy* proxy)
+            const auto poolFoliage = [this, &pinModel, &pinMesh, &modelPins](const FoliageRenderProxy* proxy)
             {
                 if (!proxy->m_isEnabled || proxy->m_isCulled) return;
 
-                for (FoliageRenderProxy::DrawSource source :
-                    proxy->CaptureDrawSources())
+                // CaptureDrawSources returns only instance values and type
+                // indices. Owners stay on the live proxy, then in frame tables.
+                for (const auto& source : proxy->CaptureDrawSources())
                 {
-                    // PHASE 3.75 MBC8 — poolMesh와 같은 typed 축이 첫째다.
-                    RHIModelMeshView modelView{};
-                    if (!source.modelGeneration
-                        || !BuildRHIModelMeshView(*source.modelGeneration,
-                            source.modelMeshIndex, modelView))
-                    {
-                        continue;
-                    }
-
+                    const auto& type = proxy->m_foliageTypes[source.foliageTypeID];
                     PooledDraw pooled{};
+                    RHIModelMeshView modelView{};
+                    math::aabb bounds{};
+                    if (type.m_meshDescriptor)
+                    {
+                        const auto pinIndex = pinMesh(type.m_meshDescriptor);
+                        const auto& descriptor = modelPins.meshes[pinIndex];
+                        const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                        const auto payload = std::ranges::find_if(geometryFramePins.entries,
+                            [&](const auto& entry) { return entry.handle == handle; });
+                        const bool valid = payload != geometryFramePins.entries.end()
+                            ? payload->payload && BuildRHIModelMeshView(*descriptor, *payload->payload, modelView)
+                            : BuildRHIModelMeshView(*descriptor, modelView);
+                        if (!valid)
+                        {
+                            continue;
+                        }
+                        pooled.modelPinIndex = pinIndex;
+                        bounds = descriptor->bounds;
+                    }
+                    else
+                    {
+                        if (!type.m_modelGeneration)
+                        {
+                            continue;
+                        }
+                        const auto pinIndex = pinModel(type.m_modelGeneration);
+                        if (pinIndex == (std::numeric_limits<std::size_t>::max)())
+                        {
+                            continue;
+                        }
+                        const auto& generation = modelPins.generations[pinIndex];
+                        if (!BuildRHIModelMeshView(*generation, type.m_modelMeshIndex, modelView))
+                        {
+                            continue;
+                        }
+                        pooled.modelPinIndex = pinIndex;
+                        bounds = generation->Meshes()[type.m_modelMeshIndex].bounds;
+                    }
                     pooled.item.worldMatrix = source.worldMatrix;
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
-                    pooled.item.modelMeshView = modelView;
-                    pooled.generationSource = source.modelGeneration;
-
-                    if (source.graphMaterialSource)
+                    pooled.item.modelMeshView = std::move(modelView);
+                    if (type.m_graphMaterialSource)
                     {
-                        pooled.graphMaterialSource = std::move(source.graphMaterialSource);
-                        pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
-                        pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
-                        pooled.item.coverage = pooled.graphMaterialSource->coverage;
-                        pooled.materialSource = std::move(source.material);
-                        pooled.authoredMaterialSource = std::move(source.authoredMaterial);
-                        pooled.isTransparent =
-                            (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
+                        const auto& material = *type.m_graphMaterialSource;
+                        pooled.hasGraphMaterialSource = true;
+                        PinGraphInstance(pooled.item, material.instance);
+                        pooled.item.materialGraphSlot = material.materialSlot;
+                        pooled.item.coverage = material.coverage;
                     }
-                    else if (source.material)
-                    {
-                        pooled.materialSource = std::move(source.material);
-                        // I5-D5c4 — Foliage도 저작 정본을 나른다(poolMesh와 같은
-                        // 규약). sealing 직행·texture 해석에 그대로 합류한다.
-                        pooled.authoredMaterialSource =
-                            std::move(source.authoredMaterial);
-                        const Material* material = pooled.materialSource.get();
-                        pooled.isTransparent =
-                            MaterialRenderingMode::Transparent == material->m_renderingMode;
-                    }
-
-                    // I6-C — poolMesh와 같은 규약: 신원 키와 반경을 값으로
-                    //   싣는다(패스가 Mesh를 역참조하지 않게).
                     pooled.item.geometryKey = MakeGeometryKey(pooled.item);
-                    {
-                        const math::aabb& bounds = source.modelGeneration
-                            ->Meshes()[source.modelMeshIndex].bounds;
-                        pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
-                    pooled.item.boundRadius = bounds.is_empty()
-                            ? 0.f : math::length(bounds.extents);
-                    }
-
+                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                    pooled.item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
                     drawPool.push_back(std::move(pooled));
                 }
             };
@@ -3467,7 +4570,7 @@ namespace
                 if (!proxy->m_isEnabled || nullptr == proxy->m_spriteTexture) return;
                 PooledSprite pooled{};
                 pooled.worldMatrix = proxy->m_worldMatrix;
-                pooled.texture = proxy->m_spriteTexture;
+                pooled.texturePinIndex = textureFramePins->Retain(proxy->m_spriteTexture);
                 pooled.billboardType = proxy->m_billboardType;
                 pooled.billboardAxis = proxy->m_billboardAxis;
                 pooled.orderInLayer = proxy->m_orderInLayer;
@@ -3512,490 +4615,566 @@ namespace
                 }
             }
 
+            // Publish only after every raw draw view has an owning table slot.
+            // No mutable table alias survives this conversion.
+            modelFramePins = own::make_shared<const assets::ModelAssetGenerationPins>(
+                std::move(modelPins));
             uiProxySnapshot = renderScene->GetUIProxySnapshot();
             uiProxyPointers.reserve(uiProxySnapshot.size());
             for (const auto& proxy : uiProxySnapshot)
             {
                 if (proxy) uiProxyPointers.push_back(proxy.get());
             }
+            buildGuard.published = true;
         }
 
-        bool SealForwardMaterials(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
-            float frameTotalSeconds, float frameDeltaSeconds,
-            EnhancedForwardPass& pass, const EnhancedFrameContext& context,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
+        void ImportPreparedImages(const EnhancedLiveFramePacket& frame)
         {
-            const EnhancedShaderMetaFrameSnapshot* effective = nullptr;
-            if (activeForwardShaderMeta.IsValid()
-                && activeForwardShaderMeta.handle == pass.GetShaderMetaHandle())
+            if (!frame.preparedTextureImages)
             {
-                effective = &activeForwardShaderMeta;
+                return;
             }
-            else if (!shaders.empty() && shaders.front().IsValid()
-                && shaders.front().handle == pass.GetShaderMetaHandle())
+            imageBootstrapViews.emplace();
+            imageBootstrapViews->sceneEpoch = frame.sceneEpoch;
+            for (uint32_t index = 0; index < frame.viewCount; ++index)
             {
-                effective = &shaders.front();
-            }
-            if (nullptr == effective)
-            {
-                outError = "Forward material sealing의 ShaderMeta generation이 active pass와 다르다";
-                return false;
-            }
-            const EnhancedShaderMetaFrameSnapshot& primary = *effective;
-            std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
-            // Commit 전까지 직전 accepted owner를 유지한다. 새 candidate가 실패하면
-            // pass 안에 남은 variant와 immutable Meta value로 다시 밀봉하고,
-            // Commit 뒤 이번 frame에서 안 쓴 secondary owner만 놓는다.
-            std::vector<EnhancedShaderMetaFrameSnapshot> nextActiveMaterialOwners;
-            // W8: GBuffer와 같은 이유로 주소가 아니라 값으로 합친다.
-            std::unordered_map<std::uint64_t,
-                std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>> sealed;
-            sealed.reserve(drawPool.size());
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-
-            for (PooledDraw& pooled : drawPool)
-            {
-                if (pooled.graphMaterialSource) continue;
-                const size_t shadowIndex = shadowDraws.size();
-                if (pooled.graphMaterialSource || !pooled.isTransparent) continue;
-                if (!pooled.materialSource)
+                const auto& view = frame.views[index];
+                if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
                 {
-                    outError = "Forward transparent draw에 owning Material source가 없다";
-                    return false;
+                    imageBootstrapViews->pending.insert(view.key.viewId);
                 }
-
-                const Material* source = pooled.materialSource.get();
-                const std::uint64_t authoredDigest = pooled.authoredMaterialSource
-                    ? EnhancedAuthoredMaterialDigest::Compute(
-                        *pooled.authoredMaterialSource) : 0ull;
-                const std::uint64_t modelGeneration = pooled.generationSource
-                    ? pooled.generationSource->Identity().generation : 0ull;
-                EnhancedSealDigest keyDigest;
-                keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
-                keyDigest.U64(authoredDigest);
-                keyDigest.U64(modelGeneration);
-                const std::uint64_t sealKey = keyDigest.Value();
-
-                const auto found = sealed.find(sealKey);
-                if (found != sealed.end())
+            }
+            for (const auto& texture : frame.preparedTextureImages->Owners())
+            {
+                const auto image = frame.preparedTextureImages->Image(&*texture);
+                if (!image)
                 {
-                    pooled.item.forwardMaterialSnapshot = found->second;
-                    pooled.materialSource.reset();
                     continue;
                 }
+                auto& demand = imageDemands[TextureFramePins::Identity(&*texture)];
+                demand.texture = texture;
+                demand.ready = image;
+                demand.request.Cancel();
+                demand.request = {};
+                demand.bootstrap = true;
+                demand.bootstrapSceneEpoch = frame.sceneEpoch;
+            }
+            // The result has moved into exact-generation demands. Other packets
+            // may still share this table, but must not retain duplicate bulk pins.
+            frame.preparedTextureImages->ReleaseImages();
+        }
 
-                const FileGuid materialShaderGuid =
-                    FileGuid{} == source->m_shaderMetaGuid
-                    ? primary.guid : source->m_shaderMetaGuid;
-                const EnhancedShaderMetaFrameSnapshot* incoming = nullptr;
-                if (materialShaderGuid == primary.guid)
+        void CompleteImageBootstrap(uint64_t epoch, uint64_t admittedView)
+        {
+            if (!imageBootstrapViews || imageBootstrapViews->sceneEpoch != epoch)
+            {
+                return;
+            }
+            if (admittedView != 0)
+            {
+                imageBootstrapViews->admitted.insert(admittedView);
+                imageBootstrapViews->pending.erase(admittedView);
+            }
+            if (!imageBootstrapViews->pending.empty())
+            {
+                return;
+            }
+            // Every current scene camera registered its exact demand. Unused
+            // preload may now be dropped without racing an unvisited camera.
+            imageBootstrapViews.reset();
+            for (auto& [identity, demand] : imageDemands)
+            {
+                if (demand.bootstrapSceneEpoch == epoch)
                 {
-                    incoming = &primary;
+                    demand.bootstrap = false;
                 }
-                else
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                const auto& demand = item.second;
+                if (demand.bootstrapSceneEpoch == epoch && demand.views.empty())
                 {
-                    const auto shaderIt = std::find_if(shaders.begin(), shaders.end(),
-                        [&materialShaderGuid](const auto& candidate)
-                        {
-                            return candidate.guid == materialShaderGuid;
-                        });
-                    if (shaderIt != shaders.end()) incoming = &*shaderIt;
-                }
-
-                std::vector<const EnhancedShaderMetaFrameSnapshot*> candidates;
-                if (nullptr != incoming) candidates.push_back(incoming);
-                if (materialShaderGuid != primary.guid)
-                {
-                    for (const EnhancedShaderMetaFrameSnapshot& accepted :
-                        activeForwardMaterialShaderMetas)
-                    {
-                        if (accepted.guid != materialShaderGuid) continue;
-                        const bool duplicate = std::any_of(candidates.begin(),
-                            candidates.end(), [&accepted](const auto* candidate)
-                            {
-                                // resolve가 실패한 incoming은 같은 handle처럼 보여도
-                                // accepted immutable owner를 가리면 안 된다.
-                                return candidate->IsValid()
-                                    && candidate->handle == accepted.handle;
-                            });
-                        if (!duplicate) candidates.push_back(&accepted);
-                    }
-                }
-
-                const auto trySeal = [&](const EnhancedShaderMetaFrameSnapshot& materialShader,
-                    std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>& outSnapshot,
-                    std::string& error)
-                {
-                    if (!materialShader.IsValid())
-                    {
-                        error = materialShader.error.empty()
-                            ? "Forward material ShaderMeta generation이 invalid다: "
-                                + materialShaderGuid.ToString()
-                            : materialShader.error;
-                        return false;
-                    }
-
-                    // I5-D5c5 — 저작 정본이 있으면 legacy Material을 **아예
-                    // 읽지 않는다**. c2-2/c3-2는 legacy로 시공한 뒤 덮어썼는데,
-                    // 그 시공(ConvertLegacyMaterial + 이름 맵 순회)은 결과가
-                    // 통째로 버려지는 왕복이었다. 실패만 legacy로 내려간다.
-                    ExperimentMaterialSealing::SealSource sealSource;
-                    bool sealBuilt = false;
-                    if (pooled.authoredMaterialSource)
-                    {
-                        std::string authoredError;
-                        sealBuilt = ExperimentMaterialSealing::
-                            BuildSealSourceFromAuthored(
-                                *pooled.authoredMaterialSource,
-                                *materialShader.value, sealSource,
-                                authoredError, pooled.generationSource.get());
-                        if (!sealBuilt)
-                        {
-                            Debug::PrintLog(spdlog::level::warn, "Forward 저작 seal 시공 실패 —"
-                                " legacy 폴백: " + authoredError);
-                        }
-                    }
-                    // I5-M4: legacy Material은 seal source 변환에서 **한 번만**
-                    // 읽는다. 이후 keyword 정규화·propertyBytes·textureBindings는
-                    // experiment 정본(M1 packer·M2 정규화)을 탄다.
-                    if (!sealBuilt)
-                    {
-                        if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
-                                *source, *materialShader.value, sealSource, error))
-                        {
-                            return false;
-                        }
-                        // 폴백이라도 저작 값은 지킨다 — c2-2의 의미론이다. 실패한 것은
-                        // texture 해석뿐이고 legacy 맵이 그 자리를 받는다. 여기서 저작
-                        // properties까지 버리면 폴백이 c2-2 이전으로 되돌아간다.
-                        if (pooled.authoredMaterialSource)
-                        {
-                            ExperimentMaterialSealing::ApplyAuthoredMaterial(
-                                sealSource, *pooled.authoredMaterialSource);
-                        }
-                    }
-
-                    auto snapshot =
-                        std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
-                    snapshot->shaderMetaHandle = materialShader.handle;
-                    if (!experiment::NormalizeMaterialKeywordSelections(
-                            sealSource.material, materialShader.value->keywords,
-                            snapshot->keywordSelections, error))
-                    {
-                        if (!sealSource.debugName.empty())
-                            error += " (material " + sealSource.debugName + ")";
-                        return false;
-                    }
-
-                    std::shared_ptr<const ShaderMetaBindingLayout> layout;
-                    if (!pass.EnsureShaderMetaVariant(context, materialShader.handle,
-                            *materialShader.value, snapshot->keywordSelections,
-                            snapshot->permutationKey, layout, error)
-                        || !layout)
-                    {
-                        return false;
-                    }
-                    snapshot->bindingLayout = *layout;
-                    if (!pass.CaptureShaderVariant(*snapshot))
-                    { error = "Forward LX graphics generation capture failed."; return false; }
-                    snapshot->flow = sealSource.flow;
-                    snapshot->flow.totalSeconds = frameTotalSeconds;
-                    snapshot->flow.deltaSeconds = frameDeltaSeconds;
-                    snapshot->baseColorFactor = sealSource.baseColorFactor;
-                    snapshot->metallic = sealSource.metallic;
-                    snapshot->roughness = sealSource.roughness;
-                    snapshot->useNormalMap = sealSource.useNormalMap;
-
-                    if (!ExperimentMaterialSealing::SealCore(sealSource,
-                            *materialShader.value, *layout,
-                            snapshot->propertyBytes, snapshot->textureBindings,
-                            error, &snapshot->runtimeInstance, materialShader.handle))
-                    {
-                        if (!sealSource.debugName.empty())
-                            error += " (material " + sealSource.debugName + ")";
-                        return false;
-                    }
-
-                    if (!ExperimentMaterialSealing::SealCoverage(sealSource, *layout,
-                            snapshot->propertyBytes, snapshot->coverage, error)) return false;
-                    if (!snapshot->IsValid())
-                    {
-                        error = "Forward material snapshot sealing 결과가 invalid다";
-                        return false;
-                    }
-                    // W8: immutable로 넘기기 직전에 값 digest와 프레임 도장.
-                    EnhancedMaterialSeal::Stamp(*snapshot, authoredDigest,
-                        pooled.authoredRevision, modelGeneration,
-                        context.sceneEpoch, context.frameId);
-
-                    outSnapshot = std::move(snapshot);
+                    demand.request.Cancel();
                     return true;
-                };
-
-                const EnhancedShaderMetaFrameSnapshot* selectedShader = nullptr;
-                std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> immutable;
-                std::string firstCandidateError;
-                for (const EnhancedShaderMetaFrameSnapshot* candidate : candidates)
-                {
-                    std::string candidateError;
-                    if (trySeal(*candidate, immutable, candidateError))
-                    {
-                        selectedShader = candidate;
-                        break;
-                    }
-                    if (firstCandidateError.empty())
-                        firstCandidateError = std::move(candidateError);
                 }
-
-                if (nullptr == selectedShader || !immutable)
-                {
-                    outError = firstCandidateError.empty()
-                        ? "Forward material ShaderMeta generation이 frame packet에 없고 accepted fallback도 없다: "
-                            + materialShaderGuid.ToString()
-                        : std::move(firstCandidateError);
-                    if (!source->m_name.empty())
-                        outError += " (material " + source->m_name + ")";
-                    return false;
-                }
-
-                if (std::find(activeHandles.begin(), activeHandles.end(),
-                        selectedShader->handle) == activeHandles.end())
-                    activeHandles.push_back(selectedShader->handle);
-                if (selectedShader->guid != primary.guid)
-                {
-                    const bool alreadyOwned = std::any_of(
-                        nextActiveMaterialOwners.begin(), nextActiveMaterialOwners.end(),
-                        [selectedShader](const auto& owner)
-                        {
-                            return owner.handle == selectedShader->handle;
-                        });
-                    if (!alreadyOwned)
-                        nextActiveMaterialOwners.push_back(*selectedShader);
-                }
-
-                sealed.emplace(sealKey, immutable);
-                pooled.item.forwardMaterialSnapshot = std::move(immutable);
-                pooled.materialSource.reset();
-            }
-            pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
-            activeForwardMaterialShaderMetas = std::move(nextActiveMaterialOwners);
-            return true;
+                return false;
+            });
         }
 
-        bool SealGBufferMaterials(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
-            EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
-            material_graph::SceneHost& graphMaterials,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
+        void ReconcileImageDemands(const EnhancedLiveFramePacket& frame, bool renderable)
         {
-            if (shaders.empty() || !shaders.front().IsValid()
-                || shaders.front().handle != pass.GetShaderMetaHandle())
+            std::set<std::pair<uint64_t, uint64_t>> currentViews;
+            std::set<uint64_t> currentSceneViews;
+            if (renderable)
             {
-                outError = "GBuffer material sealing의 ShaderMeta generation이 active pass와 다르다";
+                for (uint32_t index = 0; index < (std::min)(frame.viewCount,
+                    static_cast<uint32_t>(EnhancedSceneRenderer::kMaxLiveCameraViews)); ++index)
+                {
+                    const auto& view = frame.views[index];
+                    if (!view.key.IsValid())
+                    {
+                        continue;
+                    }
+                    currentViews.emplace(frame.sceneEpoch, view.key.viewId);
+                    if (view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+                    {
+                        currentSceneViews.insert(view.key.viewId);
+                    }
+                }
+            }
+            if (!currentSceneViews.empty())
+            {
+                ImportPreparedImages(frame);
+            }
+            else if (frame.preparedTextureImages)
+            {
+                frame.preparedTextureImages->ReleaseImages();
+            }
+            if (imageBootstrapViews && imageBootstrapViews->sceneEpoch == frame.sceneEpoch)
+            {
+                std::erase_if(imageBootstrapViews->pending,
+                    [&](uint64_t view) { return !currentSceneViews.contains(view); });
+                for (const auto view : currentSceneViews)
+                {
+                    if (!imageBootstrapViews->admitted.contains(view))
+                    {
+                        imageBootstrapViews->pending.insert(view);
+                    }
+                }
+                CompleteImageBootstrap(frame.sceneEpoch, 0);
+            }
+            else
+            {
+                imageBootstrapViews.reset();
+            }
+            for (auto& [identity, demand] : imageDemands)
+            {
+                std::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                const auto& demand = item.second;
+                if (!demand.views.empty() || (demand.bootstrap
+                    && demand.bootstrapSceneEpoch == frame.sceneEpoch && !currentSceneViews.empty()))
+                {
+                    return false;
+                }
+                demand.request.Cancel();
+                return true;
+            });
+            if (currentViews.empty() && textureFramePins)
+            {
+                textureFramePins->ReleaseImages();
+            }
+        }
+
+        void PruneImageDemands(const EnhancedLiveFramePacket& frame)
+        {
+            if (!textureFramePins)
+            {
+                textureFramePins = own::make_shared<TextureFramePins>();
+            }
+            const auto retainMaterial = [this](const auto& source)
+            {
+                if (source && source->instance)
+                {
+                    for (const auto& texture : source->instance->textures)
+                    {
+                        textureFramePins->Retain(texture.owner);
+                    }
+                }
+            };
+            for (const auto& proxy : uiProxySnapshot)
+            {
+                if (proxy)
+                {
+                    if (const auto* image = std::get_if<UIRenderProxy::ImageData>(&proxy->GetData()))
+                    {
+                        textureFramePins->Retain(image->texture);
+                    }
+                }
+            }
+            std::set<std::pair<uint64_t, uint64_t>> currentViews;
+            std::set<uint64_t> currentSceneViews;
+            for (uint32_t index = 0; index < frame.viewCount; ++index)
+            {
+                const auto& view = frame.views[index];
+                currentViews.emplace(frame.sceneEpoch, view.key.viewId);
+                if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+                {
+                    currentSceneViews.insert(view.key.viewId);
+                }
+                retainMaterial(view.materialPreview);
+                for (const auto& ground : view.materialPreviewFloor)
+                {
+                    retainMaterial(ground);
+                }
+                if (view.gizmos && view.gizmos->iconTextures)
+                {
+                    const auto& icons = *view.gizmos->iconTextures;
+                    textureFramePins->Retain(icons.camera);
+                    textureFramePins->Retain(icons.mainLight);
+                    textureFramePins->Retain(icons.directionalLight);
+                    textureFramePins->Retain(icons.pointLight);
+                    textureFramePins->Retain(icons.spotLight);
+                }
+            }
+            if (imageBootstrapViews && imageBootstrapViews->sceneEpoch == frame.sceneEpoch)
+            {
+                std::erase_if(imageBootstrapViews->pending,
+                    [&](uint64_t view) { return !currentSceneViews.contains(view); });
+                for (const auto view : currentSceneViews)
+                {
+                    if (!imageBootstrapViews->admitted.contains(view))
+                    {
+                        imageBootstrapViews->pending.insert(view);
+                    }
+                }
+                CompleteImageBootstrap(frame.sceneEpoch, 0);
+            }
+            else
+            {
+                imageBootstrapViews.reset();
+            }
+            textureFramePins->Retain(skyEquirect);
+            if (fogEnabled)
+            {
+                textureFramePins->Retain(fogBlueNoise);
+            }
+            std::unordered_set<std::uint64_t> current;
+            for (const auto& texture : textureFramePins->Owners())
+            {
+                current.insert(TextureFramePins::Identity(&*texture));
+            }
+            for (auto& [identity, demand] : imageDemands)
+            {
+                std::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                const auto& demand = item.second;
+                if ((current.contains(item.first) && !demand.views.empty())
+                    || (demand.bootstrap && demand.bootstrapSceneEpoch == frame.sceneEpoch))
+                {
+                    return false;
+                }
+                // Cancels only this demand, never the tracked shared decode job.
+                demand.request.Cancel();
+                return true;
+            });
+        }
+
+        ImageAdmission AdmitEnvironment(bool required, std::string& error)
+        {
+            error.clear();
+            if (!required || skyCooked || skyEquirect)
+            {
+                return ImageAdmission::Ready;
+            }
+            {
+                std::lock_guard lock(environmentPreparation->mutex);
+                if (environmentPreparation->progress.activeRequests != 0)
+                {
+                    return ImageAdmission::Pending;
+                }
+                if (environmentPreparation->selection == skyBoxPath
+                    && !environmentPreparation->cpuError.empty())
+                {
+                    error = environmentPreparation->cpuError;
+                    return ImageAdmission::Failed;
+                }
+            }
+            return QueueEnvironmentPreparation(environmentPreparation, skyBoxPath, error, false)
+                ? ImageAdmission::Pending : ImageAdmission::Failed;
+        }
+
+        ImageAdmission AdmitFogImage(std::string& error)
+        {
+            error.clear();
+            if (!fogEnabled || fogBlueNoise)
+            {
+                return ImageAdmission::Ready;
+            }
+            const auto preparation = fogImagePreparation;
+            {
+                std::lock_guard lock(preparation->mutex);
+                if (preparation->complete)
+                {
+                    if (!preparation->texture)
+                    {
+                        error = preparation->error;
+                        return ImageAdmission::Failed;
+                    }
+                    fogBlueNoise = preparation->texture;
+                    return ImageAdmission::Ready;
+                }
+                if (preparation->started)
+                {
+                    return ImageAdmission::Pending;
+                }
+                preparation->started = true;
+            }
+            // Capture the source path on RT; all opening/decoding is worker-only.
+            const auto path = PathFinder::Relative("VolumetricFog\\blueNoise.dds");
+            const auto finish = [preparation](std::exception_ptr failure)
+            {
+                std::lock_guard lock(preparation->mutex);
+                if (failure)
+                {
+                    try
+                    {
+                        std::rethrow_exception(failure);
+                    }
+                    catch (const std::exception& exception)
+                    {
+                        preparation->error = exception.what();
+                    }
+                    catch (...)
+                    {
+                        preparation->error = "Blue noise preparation failed";
+                    }
+                }
+                if (!preparation->texture && preparation->error.empty())
+                {
+                    preparation->error = "Blue noise image is unavailable";
+                }
+                preparation->complete = true;
+            };
+            try
+            {
+                job_group work;
+                work.add([preparation, path]
+                {
+                    auto texture = Texture::LoadSharedFromPath(path);
+                    std::lock_guard lock(preparation->mutex);
+                    preparation->texture = std::move(texture);
+                });
+                work.on_complete(finish);
+                ce::get_job_scheduler().submit(std::move(work));
+            }
+            catch (...)
+            {
+                finish(std::current_exception());
+            }
+            return ImageAdmission::Pending;
+        }
+
+        ImageAdmission AdmitViewImages(IRenderTextureCache& cache, bool environmentRequired,
+            std::string& error)
+        {
+            const auto environment = AdmitEnvironment(environmentRequired, error);
+            if (environment == ImageAdmission::Failed)
+            {
+                return environment;
+            }
+            std::string fogError;
+            const auto fog = AdmitFogImage(fogError);
+            if (fog == ImageAdmission::Failed)
+            {
+                // Preserve the existing optional-fog failure policy.
+                lastError = "Volumetric fog disabled: " + fogError;
+                fogEnabled = false;
+                fogTeardownPending = true;
+            }
+            const auto images = AdmitImagePayloads(cache, false, error);
+            if (images == ImageAdmission::Failed)
+            {
+                return images;
+            }
+            return environment == ImageAdmission::Pending || fog == ImageAdmission::Pending
+                || images == ImageAdmission::Pending ? ImageAdmission::Pending : ImageAdmission::Ready;
+        }
+
+        ImageAdmission AdmitImagePayloads(IRenderTextureCache& cache, bool replayPixels,
+            std::string& error)
+        {
+            error.clear();
+            std::unordered_set<std::uint64_t> needed;
+            const auto requireTexture = [&](const Texture* texture)
+            {
+                if (texture)
+                {
+                    needed.insert(TextureFramePins::Identity(texture));
+                }
+            };
+            const auto requireMaterial = [&](const auto& material)
+            {
+                if (material)
+                {
+                    for (const auto& texture : material->textures)
+                    {
+                        textureFramePins->Retain(texture.owner);
+                        requireTexture(texture.owner ? &*texture.owner : nullptr);
+                    }
+                }
+            };
+            if (graphViewInput)
+            {
+                for (const auto& draw : graphViewInput->Draws())
+                {
+                    requireMaterial(draw.material);
+                }
+            }
+            else
+            {
+                // The controlled replay hashes rows before it seals the view.
+                for (const auto& draw : graphDraws)
+                {
+                    requireMaterial(draw.GraphInstance());
+                }
+            }
+            for (const auto& draw : shadowDraws)
+            {
+                requireMaterial(draw.GraphInstance());
+                if (draw.materialSnapshot)
+                {
+                    for (const auto& texture : draw.materialSnapshot->textureBindings)
+                    {
+                        textureFramePins->Retain(texture.textureOwner);
+                        requireTexture(texture.textureOwner ? &*texture.textureOwner : nullptr);
+                    }
+                }
+                if (draw.forwardMaterialSnapshot)
+                {
+                    for (const auto& texture : draw.forwardMaterialSnapshot->textureBindings)
+                    {
+                        textureFramePins->Retain(texture.textureOwner);
+                        requireTexture(texture.textureOwner ? &*texture.textureOwner : nullptr);
+                    }
+                }
+                requireTexture(draw.baseColor);
+                requireTexture(draw.normalMap);
+                requireTexture(draw.occRoughMetal);
+                requireTexture(draw.emissive);
+            }
+            for (const auto& sprite : worldSprites)
+            {
+                requireTexture(sprite.texture);
+            }
+            for (const auto& rect : uiRects)
+            {
+                requireTexture(rect.texture);
+            }
+            if (!materialPreviewView)
+            {
+                for (const auto& decal : decals)
+                {
+                    requireTexture(decal.diffuse);
+                    requireTexture(decal.normal);
+                    requireTexture(decal.occRoughMetal);
+                }
+            }
+            for (const auto& icon : gizmoData.icons)
+            {
+                requireTexture(icon.texture);
+            }
+            if (skyEquirect)
+            {
+                textureFramePins->Retain(skyEquirect);
+                requireTexture(&*skyEquirect);
+                textureFramePins->RetainImage(skyEquirect, skyEquirectImage);
+            }
+            if (fogEnabled && fogBlueNoise)
+            {
+                textureFramePins->Retain(fogBlueNoise);
+                requireTexture(&*fogBlueNoise);
+            }
+            for (auto& [identity, demand] : imageDemands)
+            {
+                if (!needed.contains(identity))
+                {
+                    demand.views.erase(imageAdmissionView);
+                }
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                if (!item.second.bootstrap && item.second.views.empty() && !needed.contains(item.first))
+                {
+                    item.second.request.Cancel();
+                    return true;
+                }
                 return false;
-            }
-            const EnhancedShaderMetaFrameSnapshot& primary = shaders.front();
-            std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
-            Material defaultMaterial;
-            // W8: 중복 제거 키가 legacy `Material*` 하나였다. DataSystem이 이름으로
-            // 캐시한 같은 객체를 여러 MeshRenderer가 공유하는데 인스턴스 override는
-            // 렌더러마다 다르므로, 주소가 같다는 이유로 먼저 밀봉된 스냅샷을 뒤의
-            // draw가 받아 override가 통째로 사라졌다. 키를 값으로 바꾼다.
-            std::unordered_map<std::uint64_t,
-                std::shared_ptr<const EnhancedMaterialDrawSnapshot>> sealed;
-            sealed.reserve(drawPool.size());
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-            std::set<assets::ModelAssetGenerationHandle> pendingGraphModels;
-            for (const PooledDraw& pooled : drawPool)
+            });
+            bool pending = false;
+            auto unresolved = needed;
+            for (const auto& texture : textureFramePins->Owners())
             {
-                if (!pooled.graphMaterialSource || pooled.isTransparent) continue;
-                const auto& instance = pooled.graphMaterialSource->instance;
-                if (!instance || !graphMaterials.IsProgramReady(instance->generation, output))
-                {
-                    const auto& handle = pooled.item.modelMeshView.handle;
-                    pendingGraphModels.insert({handle.modelId, handle.generation});
-                }
-            }
-            std::vector<std::pair<Uuid::Uuid16, std::uint64_t>> drawnGenerations;
-            drawnGenerations.reserve(drawPool.size());
-
-            for (PooledDraw& pooled : drawPool)
-            {
-                if (pooled.graphMaterialSource)
-                {
-                    const auto& handle = pooled.item.modelMeshView.handle;
-                    if (!pendingGraphModels.contains({handle.modelId, handle.generation})) continue;
-                }
-                // P2a Forward snapshot은 앞의 SealForwardMaterials가 별도로
-                // 밀봉했다. GBuffer ShaderMeta 계약을 투명 draw에 섞지 않는다.
-                if (pooled.isTransparent)
+                const auto* descriptor = &*texture;
+                const auto id = TextureFramePins::Identity(descriptor);
+                if (!needed.contains(id))
                 {
                     continue;
                 }
-
-                const Material* source = pooled.materialSource
-                    ? pooled.materialSource.get() : &defaultMaterial;
-                const FileGuid materialShaderGuid =
-                    FileGuid{} == source->m_shaderMetaGuid
-                    ? primary.guid : source->m_shaderMetaGuid;
-                const auto shaderIt = std::find_if(shaders.begin(), shaders.end(),
-                    [&materialShaderGuid](const auto& candidate)
+                unresolved.erase(id);
+                if (!replayPixels && cache.IsResident(descriptor))
+                {
+                    const auto found = imageDemands.find(id);
+                    if (found != imageDemands.end() && !found->second.replayNeeded)
                     {
-                        return candidate.guid == materialShaderGuid;
-                    });
-                if (shaderIt == shaders.end() || !shaderIt->IsValid())
-                {
-                    outError = "GBuffer material ShaderMeta generation이 frame packet에 없거나 invalid다: "
-                        + materialShaderGuid.ToString();
-                    if (shaderIt != shaders.end() && !shaderIt->error.empty())
-                        outError += " (" + shaderIt->error + ")";
-                    if (!source->m_name.empty()) outError += " (material "
-                        + source->m_name + ")";
-                    return false;
-                }
-                const EnhancedShaderMetaFrameSnapshot& materialShader = *shaderIt;
-                if (std::find(activeHandles.begin(), activeHandles.end(),
-                        materialShader.handle) == activeHandles.end())
-                    activeHandles.push_back(materialShader.handle);
-
-                // 저작 정본이 있으면 그 값이 신원이고, 없으면 legacy 객체가
-                // 값의 출처이므로 주소를 쓴다. 둘을 한 키에 함께 접어 어느
-                // 쪽이든 다른 값이 같은 스냅샷을 받지 않게 한다.
-                const std::uint64_t authoredDigest = pooled.authoredMaterialSource
-                    ? EnhancedAuthoredMaterialDigest::Compute(
-                        *pooled.authoredMaterialSource) : 0ull;
-                const std::uint64_t modelGeneration = pooled.generationSource
-                    ? pooled.generationSource->Identity().generation : 0ull;
-                if (pooled.generationSource)
-                    drawnGenerations.emplace_back(
-                        pooled.generationSource->Identity().modelId, modelGeneration);
-                EnhancedSealDigest keyDigest;
-                keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
-                keyDigest.U64(authoredDigest);
-                keyDigest.U64(modelGeneration);
-                keyDigest.U32(materialShader.handle.slot);
-                keyDigest.U32(materialShader.handle.generation);
-                const std::uint64_t sealKey = keyDigest.Value();
-
-                const auto found = sealed.find(sealKey);
-                if (found != sealed.end())
-                {
-                    pooled.item.materialSnapshot = found->second;
-                    pooled.materialSource.reset();
+                        imageDemands.erase(found);
+                    }
                     continue;
                 }
-
-                // I5-D5c5 — Forward와 같은 처방: 저작 정본이 있으면 legacy를
-                // 읽지 않고 저작본만으로 시공한다. 실패만 legacy로 내려간다.
-                ExperimentMaterialSealing::SealSource sealSource;
-                bool sealBuilt = false;
-                if (pooled.authoredMaterialSource)
+                auto& demand = imageDemands[id];
+                demand.texture = texture;
+                demand.views.insert(imageAdmissionView);
+                demand.replayNeeded |= replayPixels;
+                if (!demand.ready)
                 {
-                    std::string authoredError;
-                    sealBuilt = ExperimentMaterialSealing::
-                        BuildSealSourceFromAuthored(
-                            *pooled.authoredMaterialSource,
-                            *materialShader.value, sealSource, authoredError,
-                            pooled.generationSource.get());
-                    if (!sealBuilt)
+                    demand.ready = textureFramePins->Image(descriptor);
+                }
+                if (!demand.ready)
+                {
+                    demand.ready = DataSystems->TryAcquire<Texture::CodecImage>(texture);
+                }
+                if (!demand.ready && !demand.requested)
+                {
+                    demand.request = DataSystems->RequestAsync<Texture::CodecImage>(texture);
+                    demand.requested = true;
+                }
+                if (!demand.ready)
+                {
+                    const auto result = demand.request.Snapshot();
+                    if (result.status == AssetDepot::AssetRequestStatus::Pending)
                     {
-                        Debug::PrintLog(spdlog::level::warn, "GBuffer 저작 seal 시공 실패 —"
-                            " legacy 폴백: " + authoredError);
+                        pending = true;
+                        continue;
                     }
-                }
-                // I5-M4: legacy 읽기는 변환 한 번, 이후는 experiment 정본이다.
-                if (!sealBuilt)
-                {
-                    if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
-                            *source, *materialShader.value, sealSource, outError))
+                    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
                     {
-                        return false;
+                        error = result.message.empty() ? "Exact texture image preparation failed" : result.message;
+                        return ImageAdmission::Failed;
                     }
-                    // 폴백이라도 저작 값은 지킨다 — c2-2의 의미론이다. 실패한 것은
-                    // texture 해석뿐이고 legacy 맵이 그 자리를 받는다. 여기서 저작
-                    // properties까지 버리면 폴백이 c2-2 이전으로 되돌아간다.
-                    if (pooled.authoredMaterialSource)
-                    {
-                        ExperimentMaterialSealing::ApplyAuthoredMaterial(
-                            sealSource, *pooled.authoredMaterialSource);
-                    }
+                    demand.ready = result.asset;
+                    demand.request = {};
                 }
-
-                auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();
-                snapshot->shaderMetaHandle = materialShader.handle;
-                if (!experiment::NormalizeMaterialKeywordSelections(
-                        sealSource.material, materialShader.value->keywords,
-                        snapshot->keywordSelections, outError))
-                {
-                    if (!sealSource.debugName.empty())
-                        outError += " (material " + sealSource.debugName + ")";
-                    return false;
-                }
-
-                std::shared_ptr<const ShaderMetaBindingLayout> layout;
-                if (!pass.EnsureShaderMetaVariant(context, materialShader.handle,
-                        *materialShader.value,
-                        snapshot->keywordSelections, snapshot->permutationKey,
-                        layout, outError))
-                {
-                    if (!sealSource.debugName.empty())
-                        outError += " (material " + sealSource.debugName + ")";
-                    return false;
-                }
-                snapshot->bindingLayout = *layout;
-                if (!pass.CaptureShaderVariant(*snapshot))
-                { outError = "GBuffer LX graphics generation capture failed."; return false; }
-                snapshot->useNormalMap = sealSource.useNormalMap;
-                if (!ExperimentMaterialSealing::SealCore(sealSource,
-                        *materialShader.value, *layout, snapshot->propertyBytes,
-                        snapshot->textureBindings, outError, &snapshot->runtimeInstance, materialShader.handle))
-                {
-                    if (!sealSource.debugName.empty())
-                        outError += " (material " + sealSource.debugName + ")";
-                    return false;
-                }
-                if (!ExperimentMaterialSealing::SealCoverage(sealSource, *layout,
-                        snapshot->propertyBytes, snapshot->coverage, outError)) return false;
-                if (!snapshot->IsValid())
-                {
-                    outError = "GBuffer material snapshot sealing 결과가 invalid다";
-                    return false;
-                }
-                // W8: 값 digest와 프레임 도장은 immutable로 넘기기 직전에 찍는다.
-                // 이 뒤로는 아무도 값을 바꾸지 않으므로 digest가 계약이 된다.
-                EnhancedMaterialSeal::Stamp(*snapshot, authoredDigest,
-                    pooled.authoredRevision, modelGeneration,
-                    context.sceneEpoch, context.frameId);
-
-                std::shared_ptr<const EnhancedMaterialDrawSnapshot> immutable = snapshot;
-                sealed.emplace(sealKey, immutable);
-                pooled.item.materialSnapshot = std::move(immutable);
-                pooled.materialSource.reset();
+                textureFramePins->RetainImage(texture, demand.ready);
             }
-
-            std::sort(drawnGenerations.begin(), drawnGenerations.end());
-            drawnGenerations.erase(
-                std::unique(drawnGenerations.begin(), drawnGenerations.end()),
-                drawnGenerations.end());
-            uint32_t mixedModels = 0;
-            uint64_t mixedNewest = 0;
-            for (std::size_t i = 1; i < drawnGenerations.size(); ++i)
+            if (!unresolved.empty())
             {
-                if (drawnGenerations[i].first != drawnGenerations[i - 1].first) continue;
-                // 정렬돼 있으므로 같은 modelId 의 둘째 원소에서만 모델 하나를 센다.
-                if (i < 2 || drawnGenerations[i - 2].first != drawnGenerations[i].first)
-                    ++mixedModels;
-                mixedNewest = (std::max)(mixedNewest, drawnGenerations[i].second);
+                error = "Texture upload demand has no pinned exact descriptor";
+                return ImageAdmission::Failed;
             }
-            lastModelGenerationPairs = static_cast<uint32_t>(drawnGenerations.size());
-            lastMixedGenerationModels = mixedModels;
-            lastMixedNewestGeneration = mixedNewest;
+            return pending ? ImageAdmission::Pending : ImageAdmission::Ready;
+        }
 
-            pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
-            return true;
+        void ReleaseStagedImages(IRenderTextureCache& cache)
+        {
+            if (textureFramePins)
+            {
+                textureFramePins->ReleaseImages();
+            }
+            // Upload calls synchronously copied every source row. GPU staging
+            // and native allocation retirement retain their own completion pins.
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                if (item.second.replayNeeded && pbrCapture
+                    && pbrCapture->result.state == EnhancedPbrCaptureState::Pending)
+                {
+                    return false;
+                }
+                return cache.IsResident(&*item.second.texture);
+            });
         }
 
         // ── 렌더 입력 소비: 이 뷰의 몫 ──
@@ -4006,6 +5185,17 @@ namespace
             if (!viewPacket.key.IsValid() || nullptr == renderScene ||
                 0 == frame.width || 0 == frame.height) return false;
 
+            // A preview can resume after a scene-loading packet discarded its
+            // previous current-input roots. Build fresh empty append-only tables.
+            if (!textureFramePins)
+            {
+                textureFramePins = own::make_shared<TextureFramePins>();
+            }
+            if (!graphFramePins)
+            {
+                graphFramePins = own::make_shared<material_graph::InstanceFramePins>();
+            }
+            imageAdmissionView = { frame.sceneEpoch, viewPacket.key.viewId };
             cameraSnapshot = viewPacket.camera;
             materialPreviewView = viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             totalSeconds = frame.totalSeconds;
@@ -4013,11 +5203,10 @@ namespace
             gizmoData = viewPacket.gizmos
                 ? *viewPacket.gizmos : EnhancedGizmoSceneData{};
 
-            draws.clear();
             shadowDraws.clear();
-            forwardDraws.clear();
             graphDraws.clear();
-            graphFallbackDraws.clear();
+            graphShadowEligible.clear();
+            graphViewRequired.clear();
             graphViewInput.reset();
             lights.clear();
             worldSprites.clear();
@@ -4033,7 +5222,7 @@ namespace
                 draw.worldMatrix = math::matrix4x4::identity();
                 draw.boundRadius = 1.f;
                 draw.coverage = source->coverage;
-                draw.materialGraphInstance = source->instance;
+                PinGraphInstance(draw, source->instance);
                 draw.materialGraphSlot = source->materialSlot ? source->materialSlot : 1;
                 material_graph::SceneInputView inputView;
                 inputView.frameId = frame.frameId;
@@ -4056,11 +5245,11 @@ namespace
                     tile.worldMatrix = math::matrix4x4::identity();
                     tile.boundRadius = 8.f;
                     tile.coverage = ground->coverage;
-                    tile.materialGraphInstance = ground->instance;
+                    PinGraphInstance(tile, ground->instance);
                     tile.materialGraphSlot = ground->materialSlot;
                     previewDraws.push_back(std::move(tile));
                 }
-                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error))
+                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error, {}, graphFramePins))
                 {
                     lastError = "Material preview: " + error;
                     return false;
@@ -4115,7 +5304,8 @@ namespace
 
                 EnhancedSpritePass::Item item{};
                 item.world = MakeSpriteMatrix(right, down, center);
-                item.texture = sprite.texture.get();
+                item.texturePinIndex = sprite.texturePinIndex;
+                item.texture = textureFramePins->Borrow(item.texturePinIndex);
                 item.layerOrder = sprite.orderInLayer;
                 item.enableDepth = sprite.enableDepth;
                 worldSprites.push_back(item);
@@ -4138,7 +5328,8 @@ namespace
             {
                 EnhancedUIPass::BuildRectsFromQueue(uiProxyPointers.data(),
                     uiProxyPointers.size(), uiRects,
-                    static_cast<float>(frame.width), static_cast<float>(frame.height));
+                    static_cast<float>(frame.width), static_cast<float>(frame.height),
+                    &*textureFramePins.borrow());
             }
 
             // Scene View에서는 Overlay도 Canvas Transform 평면으로 미리 본다.
@@ -4157,7 +5348,7 @@ namespace
 
                 const CanvasPlane plane = ResolveCanvasPlane(*image, gameCamera);
                 const bool depth = CanvasRenderMode::WorldSpace == image->renderMode;
-                AppendImageToPlane(*image, plane, depth, worldSprites);
+                AppendImageToPlane(*image, plane, depth, worldSprites, *textureFramePins);
 
                 if (HasViewFlag(viewPacket.viewFlags,
                     EnhancedLiveViewFlags::CanvasPreview))
@@ -4199,46 +5390,81 @@ namespace
             const auto receivers = shadow_math::ReceiverCascades(cameraSnapshot, shadowDirection,
                 shadowPass ? shadowPass->GetShadowDistance() : shadow_math::kDefaultDistance,
                 shadowPass ? shadowPass->GetCascadeBlendBand() : .15f);
-            std::vector<size_t> opaqueShadowIndices, graphShadowIndices;
+            const bool gpuVisibility = backend == EnhancedLiveBackend::DX12
+                ? dx12.Resources().GetIndirectDrawCapabilities().indexedDraw
+                : (vulkanPipeline && vulkanPipeline->resources.GetIndirectDrawCapabilities().indexedDraw);
+            std::vector<size_t> graphShadowIndices;
             uint32_t culled = 0;
+            const material_graph::SceneInputBudget sceneInputBudget;
+            uint32_t optionalGpuCandidates = 0;
+            bool hasOptionalGraphCandidates = false;
             for (const PooledDraw& pooled : drawPool)
             {
                 // Select the visible/caster union before the bounded Graph seal.
-                // Unknown or posed bounds remain conservative, never camera-only.
-                const bool visible = !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
+                // Binding shape does not prove custom vertex position semantics.
+                // Resolve the exact already-sealed generation before CPU rejection,
+                // including on devices without indirect support and before the
+                // optional offscreen candidate budget can discard a custom draw.
+                bool knownPositionContract = bool(pooled.hasGraphMaterialSource);
+                const bool conservative = !knownPositionContract || !shadow_math::FinitePose(pooled.item);
+                const bool sourceVisible = conservative || !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
                     || math::intersects(frustum, pooled.worldBounds);
-                if (!shadow_math::RelevantToView(visible, shadow_math::WorldBounds(pooled.item),
-                        receivers, shadowDirection, hasShadowLight))
+                // Skin weights/current uploaded pose are validated later. Admit
+                // every skinned CAMERA candidate before CPU rejection/budgeting;
+                // a bind-pose/proxy box is not a proof for arbitrary current skin.
+                const bool visible = pooled.item.boneCount != 0 || sourceVisible;
+                if (!pooled.hasGraphMaterialSource || !pooled.item.GraphInstance())
+                {
+                    lastError = "Live scene draw requires a prepared material graph source.";
+                    ++frameFailures;
+                    return false;
+                }
+                // Shadow relevance is independent from camera admission. Weight
+                // normalization is not proven here, so skin geometry cannot use
+                // the convex-hull pose bound as an upstream rejection proof.
+                // Unknown bounds conservatively retain eligible shadow casters.
+                const auto casterBounds = pooled.item.boneCount != 0
+                    ? shadow_math::Sphere{} : shadow_math::WorldBounds(pooled.item);
+                const bool relevantToShadow = shadow_math::RelevantToView(sourceVisible,
+                    casterBounds, receivers, shadowDirection, hasShadowLight);
+                // Static and skinned candidates reach the GPU even outside the camera.
+                // Shadow selection remains independent; it must not expand with
+                // the geometry visibility working set.
+                // Material effects and ordering do not choose the submission
+                // mechanism. Native/Graph geometry retains its original command
+                // order while GPU-generated counts gate accepted candidates.
+                // Unknown position semantics above are always conservative.
+                const bool gpuCandidate = gpuVisibility;
+                if (!visible && !relevantToShadow && !gpuCandidate)
                 {
                     ++culled;
                     continue;
                 }
-                const size_t shadowIndex = shadowDraws.size();
-                if (pooled.graphMaterialSource || !pooled.isTransparent)
+                // Optional offscreen work must not grow CPU staging without a
+                // bound or displace the original visible/caster working set.
+                if (!visible && !relevantToShadow)
+                {
+                    if (optionalGpuCandidates >= sceneInputBudget.draws)
+                    {
+                        ++culled;
+                        continue;
+                    }
+                    ++optionalGpuCandidates;
+                    hasOptionalGraphCandidates |= bool(pooled.hasGraphMaterialSource);
+                }
+                size_t shadowIndex = static_cast<size_t>(-1);
+                if (relevantToShadow)
+                {
+                    shadowIndex = shadowDraws.size();
                     shadowDraws.push_back(pooled.item);
-                if (!pooled.graphMaterialSource && !visible)
-                {
-                    ++culled;
-                    continue;
                 }
-                if (pooled.graphMaterialSource)
-                {
-                    auto graphDraw = pooled.item;
-                    graphDraw.materialSnapshot.reset();
-                    graphDraw.forwardMaterialSnapshot.reset();
-                    graphDraws.push_back(std::move(graphDraw));
-                    graphShadowIndices.push_back(shadowIndex);
-                    auto fallback = pooled.item;
-                    fallback.materialGraphInstance.reset();
-                    fallback.materialGraphSlot = 0;
-                    graphFallbackDraws.push_back(std::move(fallback));
-                }
-                else if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
-                else
-                {
-                    draws.push_back(pooled.item);
-                    opaqueShadowIndices.push_back(shadowIndex);
-                }
+                auto graphDraw = pooled.item;
+                graphDraw.materialSnapshot.reset();
+                graphDraw.forwardMaterialSnapshot.reset();
+                graphDraws.push_back(std::move(graphDraw));
+                graphShadowIndices.push_back(shadowIndex);
+                graphShadowEligible.push_back(relevantToShadow);
+                graphViewRequired.push_back(visible);
             }
 
             lastPoolDraws = static_cast<uint32_t>(drawPool.size());
@@ -4249,18 +5475,32 @@ namespace
                 && pbrCapture->target == viewPacket.displayTarget && frame.frameId > pbrCapture->afterFrameId)
             {
                 std::string replayError;
+                if (pbrCapture->latticeReplayExtension)
+                {
+                    auto& textures = backend == EnhancedLiveBackend::DX12
+                        ? dx12.TextureCache() : static_cast<IRenderTextureCache&>(vulkanPipeline->textureCache);
+                    const auto admission = AdmitImagePayloads(textures, true, replayError);
+                    if (admission == ImageAdmission::Pending)
+                    {
+                        return false;
+                    }
+                    if (admission == ImageAdmission::Failed)
+                    {
+                        pbrCapture->Fail(replayError);
+                        return false;
+                    }
+                }
                 EnhancedDrawReplayInput selected;
                 EnhancedLatticeReplayInput selectedMaterials;
                 // Stage both slices: a material rejection must not leave an
                 // otherwise valid world/pose replay partly applied to live draws.
-                auto stagedOpaque=draws, stagedForward=forwardDraws;
-                auto stagedGraph=graphDraws, stagedFallback=graphFallbackDraws;
+                auto stagedGraph=graphDraws;
                 bool passed = pbrCapture->drawReplay
-                    ? pbrCapture->drawReplay->Apply(stagedOpaque, stagedForward, stagedGraph, stagedFallback, replayError)
-                    : EnhancedDrawReplayInput::Seal(draws, forwardDraws, graphDraws, selected, replayError);
+                    ? pbrCapture->drawReplay->Apply({}, {}, stagedGraph, replayError)
+                    : EnhancedDrawReplayInput::Seal({}, {}, graphDraws, selected, replayError);
                 if (passed && pbrCapture->latticeReplayExtension) passed = pbrCapture->latticeReplay
-                    ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError)
-                    : EnhancedLatticeReplayInput::Seal(graphDraws, selectedMaterials, replayError);
+                    ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError, &*textureFramePins)
+                    : EnhancedLatticeReplayInput::Seal(graphDraws, selectedMaterials, replayError, &*textureFramePins);
                 if (!passed)
                 {
                     // Apply validates all identities first: the normal live view
@@ -4269,12 +5509,14 @@ namespace
                 }
                 else
                 {
-                    draws.swap(stagedOpaque); forwardDraws.swap(stagedForward);
-                    graphDraws.swap(stagedGraph); graphFallbackDraws.swap(stagedFallback);
-                    for (size_t i = 0; i < draws.size(); ++i)
-                        shadowDraws[opaqueShadowIndices[i]] = draws[i];
+                    graphDraws.swap(stagedGraph);
                     for (size_t i = 0; i < graphDraws.size(); ++i)
-                        shadowDraws[graphShadowIndices[i]] = graphDraws[i];
+                    {
+                        if (graphShadowIndices[i] < shadowDraws.size())
+                        {
+                            shadowDraws[graphShadowIndices[i]] = graphDraws[i];
+                        }
+                    }
                     pbrCapture->drawInputBytes = pbrCapture->drawReplay
                         ? pbrCapture->drawReplay->Encode() : selected.Encode();
                     if (pbrCapture->latticeReplayExtension)
@@ -4293,7 +5535,52 @@ namespace
                 inputView.height = frame.height;
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
-                if (!material_graph::SceneViewInput::Seal(inputView, graphDraws, {}, graphViewInput, inputError))
+                // Replay may return new producer owners. Publish each exact
+                // representation once, then leave only frame-table borrows.
+                for (auto& draw : graphDraws)
+                {
+                    if (draw.materialGraphInstance)
+                    {
+                        PinGraphInstance(draw, draw.materialGraphInstance);
+                    }
+                }
+                for (auto& draw : shadowDraws)
+                {
+                    if (draw.materialGraphInstance)
+                    {
+                        PinGraphInstance(draw, draw.materialGraphInstance);
+                    }
+                }
+                bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
+                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
+                if (!sealed && hasOptionalGraphCandidates)
+                {
+                    // Aggregate geometry budgets can be tighter than the draw
+                    // limit. Retry the original selection, keeping source-index
+                    // aligned view and shadow eligibility together.
+                    size_t retained = 0;
+                    for (size_t i = 0; i < graphDraws.size(); ++i)
+                    {
+                        if (!graphShadowEligible[i] && !graphViewRequired[i])
+                        {
+                            ++lastCulledDraws;
+                            continue;
+                        }
+                        if (retained != i)
+                        {
+                            graphDraws[retained] = std::move(graphDraws[i]);
+                            graphShadowEligible[retained] = graphShadowEligible[i];
+                            graphViewRequired[retained] = graphViewRequired[i];
+                        }
+                        ++retained;
+                    }
+                    graphDraws.resize(retained);
+                    graphShadowEligible.resize(retained);
+                    graphViewRequired.resize(retained);
+                    sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
+                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
+                }
+                if (!sealed)
                 {
                     lastError = "LX Scene input sealing failed: " + inputError;
                     ++frameFailures;
@@ -4302,44 +5589,6 @@ namespace
                 // The sealed view owns geometry and pose bytes. No proxy palette
                 // pointers need to survive into GPU packet preparation.
                 graphDraws.clear();
-            }
-
-            // ── 투명은 먼 것부터 ──
-            //
-            // 알파 블렌딩은 순서 의존이라 정렬하지 않으면 겹친 투명면이
-            // 수집 순서에 따라 달라진다(프록시 순회 순서 = 임의). 카메라를
-            // 아는 이 단계에서 정렬하므로 패스는 받은 순서대로 그리기만
-            // 하면 되고, 그래서 패스의 자가 검증이 결정적으로 남는다.
-            //
-            // 기준은 오브젝트 원점의 카메라 전방 거리다. 물체 단위 근사라
-            // 서로 관통하는 투명면은 여전히 어긋날 수 있는데, 그것을 고치려면
-            // 삼각형 단위 정렬이나 OIT가 필요하다 — 여기서 할 일이 아니다.
-            if (forwardDraws.size() > 1)
-            {
-                const math::vector3 eye = cameraSnapshot.eyePosition;
-                const math::vector3 forward = cameraSnapshot.forward;
-
-                // 월드 행렬의 translation row가 오브젝트 원점이다.
-                const auto viewDepth = [eye, forward](const EnhancedDrawItem& item)
-                {
-                    const math::vector3 delta = item.worldMatrix.translation() - eye;
-                    return math::dot(delta, forward);
-                };
-                // ★ 깊이가 같을 때를 메시 포인터로 가른다.
-                //
-                //   같은 원점을 쓰는 투명면(십자 빌보드, 같은 피벗의 유리
-                //   여러 장)은 깊이가 정확히 같다. 그때 비교자가 false만
-                //   돌려주면 순서가 미정이라, 프록시 스냅샷 순서가 바뀔
-                //   때마다 앞뒤가 뒤집혀 깜빡인다 — 정렬을 넣은 이유가
-                //   '순서를 고정한다'인데 그 자리에서 새는 셈이다.
-                std::stable_sort(forwardDraws.begin(), forwardDraws.end(),
-                    [&viewDepth](const EnhancedDrawItem& a, const EnhancedDrawItem& b)
-                    {
-                        const float depthA = viewDepth(a);
-                        const float depthB = viewDepth(b);
-                        if (depthA != depthB) return depthA > depthB;
-                        return a.mesh < b.mesh;
-                    });
             }
 
             // 광원도 프리미티브와 같은 규약으로 밀봉한다 — 맵을 직접 훑지
@@ -4364,126 +5613,97 @@ namespace
         {
             RHIShaderCompiler::ScopedOutput environmentOutput(output);
             p.frameContext.shadowDraws = &shadowDraws;
+            p.frameContext.textureFramePins = textureFramePins;
             p.graphInput = graphViewInput;
+            p.frameContext.viewFlags = HasViewFlag(p.views[viewIndex].viewFlags,
+                EnhancedLiveViewFlags::SceneOverlay) ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
             {
                 RHIShaderCompiler::ScopedOutput outputScope(output);
                 if (!p.graphMaterials.SelectReadyInput(p.frameContext, p.graphInput, p.graphInput, outError))
-                    return false;
-            }
-            if (pbrCapture && pbrCapture->latticeReplay
-                && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
-            {
-                const auto requested = graphViewInput->Draws();
-                if (!p.graphInput || p.graphInput->Draws().size() != requested.size())
-                { outError = "Lattice replay program is not ready; diagnostic fallback is forbidden"; return false; }
-                for (const auto& draw : p.graphInput->Draws())
-                    if (draw.sourceIndex >= requested.size()
-                        || draw.material != requested[draw.sourceIndex].material)
-                    { outError = "Lattice replay selected a stale material instance"; return false; }
-            }
-            // The graph selection is a subsequence of the sealed source view.
-            // Draw the missing opaque slots through the existing PBR pass until
-            // every graph program for their model generation is ready.
-            std::vector<bool> graphSelected(graphFallbackDraws.size());
-            if (p.graphInput)
-                for (const auto& draw : p.graphInput->Draws())
-                    if (draw.sourceIndex < graphSelected.size()) graphSelected[draw.sourceIndex] = true;
-            for (std::size_t i = 0; i < graphFallbackDraws.size(); ++i)
-                if (!graphSelected[i] && graphFallbackDraws[i].materialSnapshot)
                 {
-                    draws.push_back(graphFallbackDraws[i]);
-                    shadowDraws.push_back(graphFallbackDraws[i]);
-                    if (pbrCapture && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
-                        pbrCapture->RecordPendingLatticeFallback(graphFallbackDraws[i]);
+                    return false;
                 }
+            }
+            p.frameContext.graphSceneInput = p.graphInput;
+            p.frameContext.forwardLightingConsumer = p.graphInput && std::ranges::any_of(p.graphInput->Draws(), [](const auto& draw)
+            {
+                const auto& program = draw.material->generation->cooked.product.program;
+                return program.surface && (draw.queue == material_graph::SceneCoverage::Blended || (program.features & 0x0800u));
+            });
             if (!p.iblGenerated || skyBoxDirty)
             {
-                // Default CPU data was checked during InitializeLive. Other
-                // selections check a content+recipe cache once, before decode.
-                if (!skyCooked)
+                const auto prepareIbl = [&]() -> bool
                 {
-                    assets::CookedEnvironment cached;
-                    if (file::path(skyBoxPath).extension() == ".ceibl")
+                    // Startup, selection and rebuild source work all arrives
+                    // through the CPU mailbox before this recording opens.
+                    if (!skyCooked && !skyEquirect)
                     {
-                        if (!assets::ReadCookedEnvironment(skyBoxPath,cached,outError)) return false;
-                        Hash::Sha256Digest recipe;
-                        if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                                cached.cubeSize,cached.brdfSize,recipe,outError)) return false;
-                        if (cached.identity.recipe != recipe)
-                        { outError="Cooked environment recipe changed; recook the selected environment"; return false; }
-                        skyCooked = std::move(cached);
+                        outError = "Environment image preparation is pending";
+                        return false;
+                    }
+                    if (skyCooked)
+                    {
+                        // Keep the exact worker-prepared source across both
+                        // immediate upload failure and later recording rejection.
+                        if (!p.ibl.InstallCooked(p.frameContext, *skyCooked, outError))
+                        {
+                            return false;
+                        }
+                        Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] uploaded cooked maps " + skyBoxPath);
                     }
                     else
                     {
-                        if (!skyCookIdentity)
+                        std::string skyUploadError;
+                        const RHITextureEntry skyEntry = p.frameContext.textureCache->GetOrUpload(
+                            (skyEquirect ? &*skyEquirect.borrow() : nullptr),
+                            p.frameContext.TextureImage(&*skyEquirect), skyUploadError);
+                        if (!skyEntry.IsValid() || skyEntry.isCube || !skyUploadError.empty())
                         {
-                            assets::EnvironmentIdentity identity;
-                            if (!assets::EnvironmentSourceIdentity(skyBoxPath,identity.source,outError) ||
-                                !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                                    512,512,identity.recipe,outError)) return false;
-                            skyCookIdentity=identity;
-                            skyCookCachePath=PathFinder::CachePath()/"Environment"/assets::EnvironmentCacheName(identity);
+                            outError = "equirect HDR 운반 실패";
+                            if (!skyUploadError.empty())
+                            {
+                                outError += ": " + skyUploadError;
+                            }
+                            return false;
                         }
-                        std::string cacheError;
-                        if (assets::ReadCookedEnvironment(skyCookCachePath,cached,cacheError,&*skyCookIdentity))
+
+                        if (!p.ibl.Generate(p.frameContext, skyEntry.handle, skyEntry.format, 512, 512, outError))
                         {
-                            skyCooked=std::move(cached);
-                            Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] hit " + skyCookCachePath.string());
+                            outError = "HDR→Cube/IBL 생성 실패: " + outError;
+                            return false;
                         }
+                        if (!p.ibl.QueueCookedCapture(skyCookCachePath, *skyCookIdentity, outError))
+                        {
+                            return false;
+                        }
+                        Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] generated; queued " + skyCookCachePath.string());
                     }
-                }
-                if (skyCooked)
-                {
-                    if (!p.ibl.InstallCooked(p.frameContext,std::move(*skyCooked),outError)) return false;
-                    skyCooked.reset();
-                    Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] uploaded cooked maps " + skyBoxPath);
-                }
-                else
-                {
-                if (!skyEquirect)
-                {
-                    try
+
+                    const bool previouslyGenerated = p.iblGenerated;
+                    const bool previouslyDirty = skyBoxDirty;
+                    const auto preparedRequest = skyPreparationRequest;
+                    const auto preparedGeneration = skyPreparationGeneration;
+                    p.ibl.WatchPreparationRejected([this, &p, previouslyGenerated, previouslyDirty,
+                        preparedRequest, preparedGeneration]
                     {
-                        skyEquirect = Texture::LoadManagedFromPath(file::path(skyBoxPath));
-                    }
-                    catch (const std::exception& exception)
-                    {
-                        outError = "HDR 로드 실패: " + std::string(exception.what());
-                        return false;
-                    }
-                }
-
-                if (!skyEquirect)
+                        p.iblGenerated = previouslyGenerated;
+                        skyBoxDirty = previouslyDirty;
+                        skyPreparationRequest = preparedRequest;
+                        skyPreparationGeneration = preparedGeneration;
+                        FinishEnvironmentPreparation("Environment recording rejected; retrying the prepared source");
+                    });
+                    p.iblGenerated = true;
+                    skyBoxDirty = false;
+                    std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
+                    ++displaySnapshot.iblGenerationCount;
+                    return true;
+                };
+                if (!prepareIbl())
                 {
-                    outError = "HDR 로드 실패: " + skyBoxPath;
+                    FinishEnvironmentPreparation(outError);
                     return false;
                 }
-
-                std::string skyUploadError;
-                const RHITextureEntry skyEntry =
-                    p.frameContext.textureCache->GetOrUpload(
-                        skyEquirect.get(), skyUploadError);
-                if (!skyEntry.IsValid() || skyEntry.isCube)
-                {
-                    outError = "equirect HDR 운반 실패";
-                    if (!skyUploadError.empty()) outError += ": " + skyUploadError;
-                    return false;
-                }
-
-                if (!p.ibl.Generate(p.frameContext, skyEntry.handle, skyEntry.format,
-                    512, 512, outError))
-                {
-                    outError = "HDR→Cube/IBL 생성 실패: " + outError;
-                    return false;
-                }
-                if (!p.ibl.QueueCookedCapture(skyCookCachePath,*skyCookIdentity,outError)) return false;
-                Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] generated; queued " + skyCookCachePath.string());
-                }
-
-                p.iblGenerated = true;
-                skyBoxDirty = false;
-                std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
-                ++displaySnapshot.iblGenerationCount;
+                FinishEnvironmentPreparation({});
             }
 
             if (!p.ibl.TouchCooked(p.frameContext,outError)) return false;
@@ -4496,13 +5716,13 @@ namespace
 
             // 기즈모 데이터(gizmoData)의 프레임별 feed는 기여 노드의 prepare가
             // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
-            p.sprite.SetItems(&worldSprites);
-            p.ui.SetRects(&uiRects);
+            p.sprite.SetItems(&worldSprites, textureFramePins);
+            p.ui.SetRects(&uiRects, textureFramePins);
 
             if (!p.animationPalettes.Prepare(*p.frameContext.resources,
-                    p.frameContext.shadowDraws, p.frameContext.forwardDraws))
+                    p.frameContext.shadowDraws, p.frameContext.forwardDraws, p.frameContext.draws))
             {
-                outError = "공용 애니메이션 팔레트 업로드 실패";
+                outError = "공용 애니메이션 팔레트 업로드 실패 또는 동일 animator key의 pose 불일치";
                 return false;
             }
             return p.desc.PrepareAll(p.frameContext, viewIndex, outError);
@@ -4515,9 +5735,22 @@ namespace
         // 공유 텍스처로 복사한다. 그 소비 선언이 있어야 그래프가 체인을
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
-            uint64_t sourceFrameId,
-            std::string& outError, EnhancedPbrCapture* capture)
+            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            std::string& outError, EnhancedPbrCapture* capture,
+            LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            static const bool queueEvidence = []
+            {
+                const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
+                return value && std::string_view(value) == "1";
+            }();
+            std::optional<LiveStopwatch> renderOnceWatch;
+            if (queueEvidence)
+            {
+                renderOnceWatch.emplace();
+                renderOnceWatch->Start();
+            }
+            preparationDeferred = false;
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
 
@@ -4525,6 +5758,18 @@ namespace
             if (!p.ibl.FinishCookedCapture(dx12.GetCompletedFenceValue(),environmentCacheError))
                 Debug::PrintLog(spdlog::level::warn,"[EnvironmentCache] " + environmentCacheError);
 
+            EnhancedLiveQueueExecutionStatus queueModeRequest;
+            if (hasPendingQueueMode.load(std::memory_order_acquire))
+            {
+                {
+                    std::lock_guard<std::mutex> lock(debugMutex);
+                    queueModeRequest = queueExecutionStatus;
+                }
+                if (!dx12.SetQueueExecutionMode(queueModeRequest.requestedMode, outError))
+                {
+                    return false;
+                }
+            }
             {
                 RenderThreadPhaseScope begin(RenderPhase::begin_frame);
                 if (!dx12.BeginFrame(outError))
@@ -4539,27 +5784,56 @@ namespace
             // BeginFrame의 얼로케이터 Reset이 E_FAIL로 죽고, 원래 사유가
             // 그 2차 오류로 덮인다. 반환 지점이 스무 곳이 넘어 가드로 건다.
             bool frameCommitted = false;
+            GpuFrameToken profilerToken{};
             struct FrameGuard
             {
                 EnhancedSceneRendererLiveDX12Adapter& backend;
                 const bool& committed;
+                GpuFrameToken& profilerToken;
                 EnhancedPbrCapture* capture;
                 std::string& error;
                 ~FrameGuard()
                 {
-                    if (!committed) backend.AbortFrame();
+                    if (!committed)
+                    {
+                        backend.AbortFrame();
+                    }
+                    // A committed frame still owns admission until it transfers
+                    // the token into its retained display slot.
+                    finish_gpu_capture(profilerToken, false,
+                        "DX12 frame ended before GPU query collection ownership was retained");
                     if (capture)
                     {
-                        backend.WaitForGpu();
-                        capture->Release(backend.Resources());
+                        std::string releaseError;
+                        bool safe = backend.DrainForLifecycle(
+                            RHILifecycleCommand::OfflineReadbackCapture, releaseError);
+                        if (!safe && backend.HasDeviceLossProof())
+                        {
+                            safe = backend.DrainForLifecycle(
+                                RHILifecycleCommand::UnrecoverableDeviceError, releaseError);
+                        }
+                        if (safe)
+                        {
+                            capture->Release(backend.Resources());
+                        }
+                        else
+                        {
+                            capture->Fail("Capture resources retained until GPU idle: " + releaseError);
+                        }
                         if (capture->result.state == EnhancedPbrCaptureState::Recording)
                             capture->Fail(error);
                     }
                 }
-            } frameGuard{ dx12, frameCommitted, capture, outError };
+            } frameGuard{ dx12, frameCommitted, profilerToken, capture, outError };
 
-            const GpuFrameToken profilerToken =
-                dx12.BeginProfilerFrame(sourceFrameId, frameCounter++, view.key.viewId);
+            const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
+            profilerToken.engineFrameId = sourceFrameId;
+            if (captureSink.on_begin_capture && captureSink.on_finish_capture)
+            {
+                profilerToken.captureGeneration = captureSink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
+            }
+            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -4573,7 +5847,11 @@ namespace
             if (historyGuard.active) historyGuard.Reset();
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
-                if (!PreparePipelineFrame(p, viewIndex, RHIShaderBinary::Dxil, outError)) return false;
+                if (!PreparePipelineFrame(p, viewIndex, RHIShaderBinary::Dxil, outError))
+                {
+                    preparationDeferred = p.graphMaterials.SelectionDeferred();
+                    return false;
+                }
             }
 
             lastDrawCount = p.gbuffer.GetLastDrawCount();
@@ -4590,22 +5868,34 @@ namespace
             viewSpriteCounts[targetIndex] = lastSpriteCount;
             viewUICounts[targetIndex] = lastUIRectCount;
 
-            slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources());
+            slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
+                kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot.graph;
+            graph.SetQueueExecutionMode(dx12.GetQueueExecutionMode());
+            graph.SetMeasurementDomain(capture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal);
+            const bool ownedQueueExecution = dx12.UsesOwnedQueueExecution();
+            if (ownedQueueExecution && ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false))
+            {
+                outError = "Owned queue execution requires transient aliasing OFF.";
+                return false;
+            }
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
+            graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
+                ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
+            // Owned queues use compute only when measured independent graphics work
+            // can hide it. Cost constants are uncalibrated estimates (QueueCostModel).
+            EnhancedRenderGraph::QueueCostModel queueCosts;
+            queueCosts.placement = RGQueuePlacement::Overlap;
+            graph.SetQueueCostModel(queueCosts);
+            const std::function<bool(std::string&)> queueBoundary = ownedQueueExecution
+                ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
+                : std::function<bool(std::string&)>{};
+            if (!PrepareSceneRecording(p, graph, dx12.CommandPool(), RHIShaderBinary::Dxil,
+                    preparationDeferred, capture, outError, queueBoundary))
             {
-                RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::Dxil);
-                if (!p.graphMaterials.PrepareResidency(p.frameContext, p.graphInput, outError)) return false;
-                if (p.graphInput && !p.graphInput->Draws().empty() &&
-                    !graph.PrepareParallel(dx12.CommandPool(), outError)) return false;
-                if (!p.graphMaterials.Prepare(p.frameContext, p.graphInput, p.ibl.GetCubeMap(),
-                        p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                        p.shadow.GetShadowData(), {}, outError, p.ibl.GetGeneration(),p.ibl.GetImportanceMaps(),p.ibl.GetSourceMap())) return false;
-                if (capture) capture->RecordLatticeInput(p.graphInput);
+                return false;
             }
-            viewShadowStats[targetIndex] = CaptureShadowStats(p);
-
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -4657,32 +5947,119 @@ namespace
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
             batchDesc.displayToken = slot.interopToken;
             batchDesc.lifetimeToken = slot.graph;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+            batchDesc.captureContext = profilerToken.IsValid()
+                ? ce::dx_capture::submission_context{ profilerToken.engineFrameId,
+                    profilerToken.submissionId, profilerToken.renderViewId, true }
+                : ce::dx_capture::submission_context{ sourceFrameId, 0, view.key.viewId, false };
+#endif
             RHIRecordedBatch batch;
             RHISubmissionTicket batchTicket;
+            double ownedRecordingMilliseconds = 0.0;
             LiveStopwatch recordWatch;
             recordWatch.Start();
             {
                 RenderThreadPhaseScope record(RenderPhase::command_record);
-                if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc,
-                    batch, outError)) return false;
+                if (ownedQueueExecution)
+                {
+                    if (!dx12.SubmitOwnedGraph(slot.graph, pipeline, ownedRecordingMilliseconds, outError))
+                    {
+                        return false;
+                    }
+                }
+                else if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc, batch, outError))
+                {
+                    return false;
+                }
             }
-            p.lastNativeRecordMs = recordWatch.ElapsedMs();
+            p.lastNativeRecordMs = ownedQueueExecution ? ownedRecordingMilliseconds : recordWatch.ElapsedMs();
+            // SubmitOwnedGraph specializes order, lifetimes and barriers. Copy
+            // that final plan, never the pre-specialization Compile snapshot.
+            // Failed submissions still return false above; publication clears a
+            // failed frame rather than labeling an unsubmitted plan as displayed.
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
+                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
+            }
+            viewShadowStats[targetIndex] = CaptureShadowStats(p);
             if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
             { outError = "capture graph is not compiled"; return false; }
             p.lastGraphStats = graph.GetStats();
+            LiveStopwatch submitWatch;
+            submitWatch.Start();
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
-                if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
-                    outError)) return false;
-
-                dx12.ResolveProfilerFrame(profilerToken);
-
-                if (!dx12.EndFrame(outError)) return false;
+                if (ownedQueueExecution)
+                {
+                    dx12.ResolveProfilerFrame(profilerToken);
+                    if (!dx12.EndFrame(outError))
+                    {
+                        return false;
+                    }
+                    frameCommitted = true;
+                    // EndFrame's CPU ticket has succeeded and its primary fence
+                    // includes the owned graph join. Publish the same upload transaction.
+                    if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        RHICompletionPoint{dx12.GetLastSignaledFenceValue()}, outError))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket, outError))
+                    {
+                        return false;
+                    }
+                    const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                    if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId, graphCompletion, outError, batchTicket))
+                    {
+                        return false;
+                    }
+                    dx12.ResolveProfilerFrame(profilerToken);
+                    if (!dx12.EndFrame(outError))
+                    {
+                        return false;
+                    }
+                }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
-            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-            if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
-                    graphCompletion, outError, batchTicket)) return false;
+            if (queueModeRequest.requestId != 0)
+            {
+                std::lock_guard<std::mutex> lock(debugMutex);
+                queueExecutionStatus.appliedRequestId = queueModeRequest.requestId;
+                queueExecutionStatus.appliedMode = dx12.GetQueueExecutionMode();
+                queueExecutionStatus.appliedFrame = sourceFrameId;
+                if (queueExecutionStatus.requestId == queueModeRequest.requestId)
+                {
+                    hasPendingQueueMode.store(false, std::memory_order_release);
+                }
+            }
+            const double submissionMilliseconds = submitWatch.ElapsedMs() +
+                (ownedQueueExecution ? graph.GetQueueDiagnostics().execution.submissionMilliseconds : 0.0);
+            const double recordSubmitMilliseconds = recordWatch.ElapsedMs();
+            if (capture)
+            {
+                capture->RecordSubmissionCpu(recordSubmitMilliseconds, submissionMilliseconds);
+            }
+            if (queueEvidence)
+            {
+                const std::string line = "[rg8.cpu] {\"schemaVersion\":2,\"mode\":" +
+                    std::to_string(dx12.GetQueueExecutionMode()) + ",\"measurementDomain\":\"" +
+                    RGMeasurementDomainName(graph.GetMeasurementDomain()) +
+                    "\",\"scope\":\"record-schedule-submit-frame-retirement-enqueue\",\"backendGeneration\":" +
+                    std::to_string(dx12.GetBackendGeneration()) + ",\"frameId\":" +
+                    std::to_string(sourceFrameId) + ",\"viewId\":" + std::to_string(view.key.viewId) +
+                    ",\"submissionId\":" + std::to_string(profilerToken.submissionId) +
+                    ",\"captureGeneration\":" + std::to_string(profilerToken.captureGeneration) +
+                    ",\"renderOnceMilliseconds\":" + std::to_string(renderOnceWatch->ElapsedMs()) +
+                    ",\"compileMilliseconds\":" + std::to_string(compileMs) +
+                    ",\"frameScope\":\"view-prepare-build-compile-record-schedule-submit-retirement-enqueue\"" +
+                    ",\"totalMilliseconds\":" + std::to_string(recordSubmitMilliseconds) +
+                    ",\"submissionMilliseconds\":" + std::to_string(submissionMilliseconds) + "}";
+                std::printf("%s\n", line.c_str());
+            }
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -4691,16 +6068,19 @@ namespace
             // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
             // 여기서 없앤다.
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
-            p.ibl.MarkCookedCaptureSubmitted(slot.fenceValue);
             slot.frameId = sourceFrameId;
+            slot.sourceCaptureNanoseconds = sourceCaptureNanoseconds;
             slot.sceneEpoch = p.frameContext.sceneEpoch;
             // cameraSnapshot은 다음 뷰에서 덮이므로 제출 슬롯에 값으로 봉인한다.
             slot.camera = *p.frameContext.camera;
             slot.previewComplete = p.graphInput && !p.graphInput->Draws().empty() &&
                 (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
-                    p.graphInput->Draws()[0].material == graphViewInput->Draws()[0].material));
+                    p.graphInput->Draws()[0].material->representationId == graphViewInput->Draws()[0].material->representationId));
             slot.key = view.key;
+            finish_gpu_capture(slot.profilerToken, false,
+                "DX12 display slot reused before GPU query collection");
             slot.profilerToken = profilerToken;
+            profilerToken.captureGeneration = 0;
 
             // W8: 기록이 끝난 자리에서 인코더가 버린 명령을 비우며 모은다.
             // Vulkan 경로와 같은 뜻이고 같은 수를 센다.
@@ -4717,7 +6097,12 @@ namespace
             view.pendingQueue.push_back(slotIndex);
             if (capture)
             {
-                dx12.WaitForGpu();
+                if (!dx12.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError)
+                    || dx12.HasDeviceLossProof())
+                {
+                    capture->Fail(outError.empty() ? "DX12 capture cannot read data after device loss." : outError);
+                    return false;
+                }
                 std::string validation;
                 const uint32_t validationCount = dx12.DrainDebugMessages(validation);
                 // W8: Vulkan 경로와 같은 자리에 같은 기록을 남긴다.
@@ -4728,15 +6113,13 @@ namespace
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
                     EnhancedIBLGenerator::kSceneReflectionSampleCount,
                     dx12.Resources().DescribeTexture(p.ibl.GetImportanceMaps()[2]));
-                uint64_t usedMB = 0, budgetMB = 0;
-                const bool memoryAvailable = dx12.QueryVideoMemory(usedMB, budgetMB);
-                capture->RecordMemory(usedMB, budgetMB, memoryAvailable);
+                capture->RecordMemory(dx12.QueryVideoMemory());
                 std::vector<EnhancedLivePassTiming> captureTimings;
                 std::vector<EnhancedLiveGpuSlice> captureSlices;
                 EnhancedLiveGpuSpan captureSpan;
                 double captureTotalMs = 0.0;
                 std::string timingError;
-                if (!dx12.CollectProfiler(profilerToken, captureTimings, captureSlices,
+                if (!dx12.CollectProfiler(slot.profilerToken, captureTimings, captureSlices,
                         captureSpan, captureTotalMs, timingError) && timingError.empty())
                     timingError = "capture submission timestamps unavailable";
                 capture->RecordGpuTiming(captureTimings, captureSpan, captureTotalMs, timingError);
@@ -5046,6 +6429,484 @@ namespace
         return superseded;
     }
 
+    void LiveState::FailPendingGpuCaptures(const char* reason)
+    {
+        if (!pipeline)
+        {
+            return;
+        }
+        for (LivePipeline::CameraView& view : pipeline->views)
+        {
+            for (LivePipeline::DisplaySlot& slot : view.slots)
+            {
+                finish_gpu_capture(slot.profilerToken, false, reason);
+            }
+        }
+    }
+
+    void LiveState::CollectCompletedDisplays()
+    {
+        LiveState& state = *this;
+        const uint64_t previousRendered = framesRendered;
+        bool displayPromoted = false;
+        if (EnhancedLiveBackend::Vulkan == backend)
+        {
+            if (state.vulkanPipeline)
+            {
+                RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
+                uint64_t promoted = 0;
+                std::string validation;
+                state.vulkanPipeline->PromoteCompleted(
+                    state.CopyPresentationSink(), promoted, validation);
+                displayPromoted = state.PublishVulkanDisplayResults();
+                state.framesRendered += promoted;
+                if (0 != promoted && !state.vulkanFirstFrameReported)
+                {
+                    state.vulkanFirstFrameReported = true;
+                    const VulkanMeshCache::Stats meshStats =
+                        state.vulkanPipeline->meshCache.GetStats();
+                    Debug::PrintLog(spdlog::level::warn, "[vulkan.live] editor TickLive 첫 프레임 완성"
+                        " · 공통 LivePipelineDesc→live_present"
+                        " · draw " + std::to_string(state.lastDrawCount) +
+                        " / batch " + std::to_string(state.lastBatchCount) +
+                        " · mesh resident " + std::to_string(meshStats.residentCount) +
+                        " / upload " + std::to_string(meshStats.uploads) +
+                        " / failure " + std::to_string(meshStats.failures) +
+                        " · parallel workers " +
+                        std::to_string(state.vulkanPipeline->lastGraphStats.recordWorkers) +
+                        " / batch " +
+                        std::to_string(state.vulkanPipeline->lastGraphStats.recordedLists) +
+                        " · persistent segment " +
+                        std::to_string(meshStats.persistentHeap.activeSegments));
+                }
+                if (!validation.empty() && state.reportedValidation.insert(validation).second)
+                {
+                    std::printf("[vulkan.live 검증] %s\n", validation.c_str());
+                    Debug::PrintLog(spdlog::level::err, "[vulkan.live 검증] " + validation);
+                }
+            }
+        }
+        else
+        {
+            // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
+            // 완료된 것을 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가
+            // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
+            if (nullptr != state.pipeline)
+            {
+                if (state.dx12.HasDeviceLossProof())
+                {
+                    state.FailPendingGpuCaptures("DX12 device lost before GPU query collection");
+                    return;
+                }
+                RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
+                LivePipeline& p = *state.pipeline;
+
+                // ── 자산 상주 관리 (②-b · ③) ──
+                //
+                // 셋 다 같은 규약이다: 펜스가 지나야 놓는다. 슬롯 승격이 바로 아래에서
+                // 같은 판정을 하고 있고, 그 옆에 두는 것이 규약을 하나로 유지하는
+                // 방법이다 — "GPU 유휴 시점에 부르라"를 주석에만 적어 두었더니
+                // 아무도 안 불러 128MB가 종료까지 잡혀 있었다(실측).
+                // 프레임 번호 통지, pressure 은퇴, 펜스 완료 묘지 sweep은 backend가
+                // 자기 캐시 구현을 아는 한 경계에서 수행한다.
+                state.dx12.MaintainAssetCaches(state.frameCounter);
+                {
+                    std::lock_guard displayLock(state.displayLifetimeMutex);
+                    state.dx12.CollectRetiredDisplays();
+                }
+
+                for (LivePipeline::CameraView& view : p.views)
+                {
+                    while (!view.pendingQueue.empty())
+                    {
+                        const int slotIndex = view.pendingQueue.front();
+                        if (state.dx12.GetCompletedFenceValue() <
+                            view.slots[slotIndex].fenceValue)
+                        {
+                            break;
+                        }
+
+                        const bool belongsToView =
+                            view.slots[slotIndex].key == view.key;
+                        if (belongsToView)
+                        {
+                            std::lock_guard<std::mutex> displayLock(
+                                state.displayLifetimeMutex);
+                            view.displaySlot = slotIndex;
+                            ++view.promotionCount;
+                            view.promotedSlotMask |=
+                                (1u << static_cast<uint32_t>(slotIndex));
+                            view.slots[slotIndex].completedAgeMs = capture_age_milliseconds(
+                                view.slots[slotIndex].sourceCaptureNanoseconds, capture_steady_nanoseconds());
+                            displayPromoted |= state.PublishDisplayResultLocked(view.displayTarget, view.key,
+                                view.slots[slotIndex].interopToken,
+                                view.slots[slotIndex].frameId, view.promotionCount,
+                                view.promotedSlotMask, p.width, p.height,
+                                view.slots[slotIndex].sceneEpoch, view.slots[slotIndex].camera,
+                                p.resizeGeneration, view.slots[slotIndex].previewComplete,
+                                view.slots[slotIndex].sourceCaptureNanoseconds,
+                                view.slots[slotIndex].completedAgeMs);
+                        }
+                        view.pendingQueue.erase(view.pendingQueue.begin());
+                        view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
+                        view.slots[slotIndex].key = {};
+
+                        // ★ 검증 레이어를 읽는다. 배선 오류(포맷·상태·디스크립터)는 여기에만
+                        //   남는데 아무도 안 읽으면 증상만 보고 추측하게 된다 — 실제로 그
+                        //   상태로 며칠을 쫓았다.
+                        //
+                        //   W8-3: 그 가드가 `_DEBUG` 였다. 그래서 출하 구성에서는 레이어를
+                        //   켜도 이 자리가 닫혀 있었고, 계획서 W8 이 판정하라는 "검증 오류 0"
+                        //   을 잴 수단이 없었다. 꺼진 실행의 비용은 포인터 하나 검사다.
+                        {
+                            std::string validation;
+                            if (0 != state.dx12.DrainDebugMessages(validation) &&
+                                !validation.empty())
+                            {
+                                if (state.reportedValidation.insert(validation).second)
+                                {
+                                    std::printf("[dx12.live 검증] %s\n", validation.c_str());
+                                }
+                            }
+                        }
+
+                        // ★ 수집은 **그 제출의 표로** 한다.
+                        //
+                        //   예전에는 Collect() 가 token 을 받지 않아 "지금 기록 중인 슬롯" 을
+                        //   읽었다. BeginProfilerFrame 은 **뷰마다** 불리고 제출은 인플라이트로
+                        //   겈리므로, 펜스가 끝난 제출의 기록을 뒤에 온 제출이 이미 덮어썼을 수
+                        //   있었고, 실측에서 수집의 83% 가 그러고 있었다(§0.5.10).
+                        //
+                        //   이제는 표가 낡았으면 Collect 가 **실패한다.** 그럴듯한 숫자를 내는
+                        //   대신 세서 드러낸다 — mismatches 가 0 이 아니면 링이 모자란다는 뜻이고,
+                        //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
+                        ++state.gpuCollects;
+
+                        std::vector<EnhancedLiveGpuSlice> slices;
+                        std::vector<EnhancedLivePassTiming> timings;
+                        EnhancedLiveGpuSpan span{};
+                        std::string collectError;
+                        GpuCaptureCompletion captureCompletion{ view.slots[slotIndex].profilerToken };
+                        double totalMilliseconds = 0.0;
+                        if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
+                            timings, slices, span, totalMilliseconds, collectError))
+                        {
+                            state.lastGpuMs = totalMilliseconds;
+                            // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
+                            // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
+                            // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
+                            state.lastPassTimings = std::move(timings);
+                            state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
+                            state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
+                            state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
+                            state.lastGpuSpan = span;
+                            state.gpuQueryOverflowPasses += span.queryOverflowPasses;
+                            if (span.queryOverflowPasses > 0)
+                            {
+                                const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                                if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
+                                {
+                                    sink.on_issue(static_cast<uint32_t>(
+                                        view.slots[slotIndex].profilerToken.engineFrameId),
+                                        span.queryOverflowPasses, false, "GPU query slots exhausted",
+                                        view.slots[slotIndex].profilerToken.captureGeneration);
+                                }
+                            }
+
+                            // 길이 셋의 관계를 여기서 묻는다. 둘 다 손에 있는 자리가
+                            // 여기뿐이고, 여기서 세야 모든 뷰의 모든 수집이 검사를 받는다.
+                            state.gpuDroppedSlices += span.droppedSlices;
+                            state.gpuZeroLengthSlices += span.zeroLengthSlices;
+                            if (span.busyMs > span.queueSpanMs + 1e-9)
+                            {
+                                ++state.gpuSpanViolations;
+                            }
+                            // ── 통합 축의 검산(§5.1) ─────────────────────────────────
+                            //
+                            // 변환한 GPU 구간은 **제출을 연 뒤에 시작해서 수집하기 전에**
+                            // 끝나야 한다. 그 바깥으로 나가면 두 시계가 맞지 않는 것이고,
+                            // 그때 GPU 트랙은 그럴듯한 거짓말이 된다. 임계값이 아니라
+                            // 인과라서 하드웨어가 달라도 그대로 선다.
+                            if (!span.cpuAligned)
+                            {
+                                ++state.gpuUnalignedCollects;
+                            }
+                            else
+                            {
+                                if (span.submitToGpuBeginMs < 0.0 || span.gpuEndToCollectMs < 0.0)
+                                {
+                                    ++state.gpuAlignmentViolations;
+                                }
+                                // 여유의 **최솟값**을 든다. 평균은 한 번의 큰 어긋남을 가린다.
+                                if (0 == state.gpuAlignedCollects)
+                                {
+                                    state.gpuMinSubmitToBeginMs = span.submitToGpuBeginMs;
+                                    state.gpuMinEndToCollectMs = span.gpuEndToCollectMs;
+                                }
+                                else
+                                {
+                                    state.gpuMinSubmitToBeginMs = (std::min)(
+                                        state.gpuMinSubmitToBeginMs, span.submitToGpuBeginMs);
+                                    state.gpuMinEndToCollectMs = (std::min)(
+                                        state.gpuMinEndToCollectMs, span.gpuEndToCollectMs);
+                                }
+                                state.gpuMaxSubmitToCollectMs = (std::max)(
+                                    state.gpuMaxSubmitToCollectMs, span.submitToCollectMs);
+                                ++state.gpuAlignedCollects;
+
+                                // ── EngineDiagnostics 로 귀속(§7.3) ──────────
+                                //
+                                // ★ 여기서만 흘린다. 통합 축이 살아 있고 정렬도
+                                //   맞은 수집만 내보낸다 — 맞지 않는 구간을 레인에
+                                //   얹으면 그럴듯한 자리에 거짓이 그려진다.
+                                const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                                if (sink.on_span && view.slots[slotIndex].profilerToken.captureGeneration != 0 &&
+                                    span.submitToGpuBeginMs >= 0.0 && span.gpuEndToCollectMs >= 0.0)
+                                {
+                                    const uint32_t frameLabel = static_cast<uint32_t>(
+                                        view.slots[slotIndex].profilerToken.engineFrameId);
+
+                                    // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
+                                    // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
+                                    EnhancedLiveGpuSpanOrigin origin{};
+                                    origin.submissionId = static_cast<uint32_t>(
+                                        view.slots[slotIndex].profilerToken.submissionId);
+                                    origin.renderViewId = static_cast<uint16_t>(
+                                        view.slots[slotIndex].profilerToken.renderViewId);
+                                    origin.queueId = view.slots[slotIndex].profilerToken.queueId;
+                                    origin.captureGeneration = view.slots[slotIndex].profilerToken.captureGeneration;
+
+                                    for (const EnhancedLiveGpuSlice& slice : slices)
+                                    {
+                                        origin.queueId = slice.queueId;
+                                        sink.on_span(slice.name.c_str(), slice.beginCpuTick,
+                                                     slice.endCpuTick, frameLabel, origin);
+                                        ++state.gpuSpansEmitted;
+                                    }
+                                }
+                            }
+
+                            if (span.sliceCount < state.lastPassTimings.size())
+                            {
+                                ++state.gpuSliceUnderflows;
+                            }
+
+                            // Completion follows every span and the owner-side
+                            // flush, so Stop cannot freeze before the final chunk.
+                            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                            const bool timestampsPublished = span.sliceCount == 0 ||
+                                (span.cpuAligned && span.submitToGpuBeginMs >= 0.0 &&
+                                    span.gpuEndToCollectMs >= 0.0 && sink.on_span && sink.on_flush &&
+                                    slices.size() == span.sliceCount);
+                            captureCompletion.complete = timestampsPublished &&
+                                span.queryOverflowPasses == 0 && span.droppedSlices == 0;
+                            if (!captureCompletion.complete)
+                            {
+                                captureCompletion.reason = timestampsPublished
+                                    ? "DX12 GPU query coverage was incomplete"
+                                    : "DX12 GPU timestamps could not be published on the CPU timeline";
+                            }
+                        }
+                        else
+                        {
+                            ++state.gpuCollectMismatches;
+                            state.lastGpuCollectError = collectError;
+                            captureCompletion.reason = collectError.c_str();
+                            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                            if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
+                            {
+                                sink.on_issue(static_cast<uint32_t>(
+                                    view.slots[slotIndex].profilerToken.engineFrameId),
+                                    0, true, collectError.c_str(),
+                                    view.slots[slotIndex].profilerToken.captureGeneration);
+                            }
+                        }
+                        ++state.framesRendered;
+                    }
+                }
+            }
+        }
+        if (framesRendered != previousRendered)
+        {
+            PublishDebugSnapshot();
+            // 장면 생산자 GPU의 완료 알림이다. sink는 표시 작업만 깨우며,
+            // Host CPU 제출이나 실제 화면 출력의 완료로 해석하지 않는다.
+            const auto sink = CopyPresentationSink();
+            if (sink && displayPromoted)
+            {
+                sink->NotifyDisplayAvailable();
+            }
+        }
+    }
+
+    uint32_t LiveState::PendingGpuSubmissions() const
+    {
+        if (EnhancedLiveBackend::Vulkan == backend)
+        {
+            return vulkanPipeline ? vulkanPipeline->PendingCount() : 0;
+        }
+        uint32_t pending = 0;
+        if (pipeline)
+        {
+            for (const LivePipeline::CameraView& view : pipeline->views)
+            {
+                pending += static_cast<uint32_t>(view.pendingQueue.size());
+            }
+        }
+        return pending;
+    }
+
+    void LiveState::ArmGpuCompletionEvent(uint32_t pendingGpu)
+    {
+        // Vulkan 은 이벤트를 걸지 않는다. 걸지 못하면 armedGpuFenceValue 가 0 이고,
+        // 대기 쪽이 kSceneCompletionPollMs 조회로 물러선다.
+        if (0 == pendingGpu || EnhancedLiveBackend::DX12 != backend || !pipeline)
+        {
+            armedGpuFenceValue = 0;
+            return;
+        }
+        uint64_t oldest = UINT64_MAX;
+        for (const LivePipeline::CameraView& view : pipeline->views)
+        {
+            if (!view.pendingQueue.empty())
+                oldest = (std::min)(oldest, view.slots[view.pendingQueue.front()].fenceValue);
+        }
+        // 같은 값에 다시 걸면 펜스의 대기 목록만 쌓인다.
+        if (UINT64_MAX == oldest || oldest == armedGpuFenceValue) return;
+        armedGpuFenceValue = dx12.SignalEventOnFenceValue(oldest, gpuCompletionEvent.Get()) ? oldest : 0;
+    }
+
+    bool LiveState::PacingAllowsAdmission() const
+    {
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        const uint64_t elapsed = capture_steady_nanoseconds() - pacedAdmissionNanoseconds;
+        switch (pacing.mode)
+        {
+        case EnhancedLivePacingMode::Unlimited:
+            return true;
+        case EnhancedLivePacingMode::FixedRate:
+            return 0 == pacing.framesPerSecond || elapsed >= 1000000000ull / pacing.framesPerSecond;
+        case EnhancedLivePacingMode::Display:
+            break;
+        }
+        if (!compositorWait || compositorTickSinceAdmission) return true;
+        // 시계를 대기 밖에서 놓쳤거나 시계가 멈췄다. 주기는 모니터를 옮기면
+        // 바뀌므로 그때그때 묻는다(1 us 남짓).
+        DWM_TIMING_INFO timing{};
+        timing.cbSize = sizeof(timing);
+        LARGE_INTEGER frequency{};
+        if (FAILED(DwmGetCompositionTimingInfo(nullptr, &timing)) || 0 == timing.qpcRefreshPeriod ||
+            !QueryPerformanceFrequency(&frequency) || 0 == frequency.QuadPart)
+        {
+            return true;
+        }
+        const uint64_t periodNanoseconds =
+            timing.qpcRefreshPeriod * 1000000000ull / static_cast<uint64_t>(frequency.QuadPart);
+        return elapsed + kMissedTickSlackNanoseconds >= periodNanoseconds;
+    }
+
+    void LiveState::MarkPacedAdmission()
+    {
+        compositorTickSinceAdmission = false;
+        const uint64_t now = capture_steady_nanoseconds();
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        if (EnhancedLivePacingMode::FixedRate == pacing.mode && 0 != pacing.framesPerSecond)
+        {
+            // 타이머 깨어남 지연(~0.5 ms)이 주기마다 쌓이면 초당 144 가 133 이 된다.
+            // 이상적인 격자에 붙이고, 두 주기 넘게 밀렸으면 격자를 지금으로 옮긴다.
+            const uint64_t interval = 1000000000ull / pacing.framesPerSecond;
+            pacedAdmissionNanoseconds = now - pacedAdmissionNanoseconds < 2 * interval
+                ? pacedAdmissionNanoseconds + interval : now;
+            return;
+        }
+        pacedAdmissionNanoseconds = now;
+    }
+
+    void LiveState::WaitForRenderWork(bool untilPacingSlot, DWORD timeoutMs)
+    {
+        // 진입 시점을 기다리는 동안에도 같은 두 이벤트로 깬다. 끝난 GPU 제출을
+        // 바로 회수해야 표시가 늦지 않는다.
+        const HANDLE handles[] = { renderWakeEvent.Get(), gpuCompletionEvent.Get(), pacingTimer.Get() };
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        if (untilPacingSlot && EnhancedLivePacingMode::Display == pacing.mode && compositorWait)
+        {
+            // 시계가 울려 돌아오면 WAIT_OBJECT_0 + 핸들 수를 돌려준다.
+            if (WAIT_OBJECT_0 + 2 == compositorWait(2, handles, timeoutMs))
+                compositorTickSinceAdmission = true;
+            return;
+        }
+        if (untilPacingSlot && EnhancedLivePacingMode::FixedRate == pacing.mode &&
+            0 != pacing.framesPerSecond && pacingTimer.IsValid())
+        {
+            const uint64_t interval = 1000000000ull / pacing.framesPerSecond;
+            const uint64_t elapsed = capture_steady_nanoseconds() - pacedAdmissionNanoseconds;
+            // 음수는 상대 시각이고 단위는 100 ns 다.
+            LARGE_INTEGER due{};
+            due.QuadPart = -static_cast<LONGLONG>(elapsed < interval ? (interval - elapsed) / 100 + 1 : 1);
+            if (SetWaitableTimer(pacingTimer.Get(), &due, 0, nullptr, nullptr, FALSE))
+            {
+                WaitForMultipleObjects(3, handles, FALSE, timeoutMs);
+                return;
+            }
+        }
+        // 기다릴 진입 시점이 없으면(Unlimited, 시계 없음) 짧게 조회로 물러선다.
+        WaitForMultipleObjects(2, handles, FALSE,
+            untilPacingSlot ? (std::min)(timeoutMs, DWORD{ kSceneCompletionPollMs }) : timeoutMs);
+    }
+
+    bool LiveState::ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame)
+    {
+        if (controlledCaptureFrame)
+        {
+            return false;
+        }
+        const uint64_t now = capture_steady_nanoseconds();
+        // 고정 속도로 일부러 늦출 때는 나이가 늘 기준을 넘는다 — GT 가 찍은 뒤
+        // 생산자 대기(최대 kProducerPacingMs)를 치르고, RT 가 다시 한 주기를 기다려
+        // 집기 때문이다. 그 몫을 빼지 않으면 늦춘 그림을 "밀렸다"며 버린다
+        // (초당 10 에서 그림 3~4장으로 실측).
+        double budgetMs = kSceneSoftAgeBudgetMs;
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        if (EnhancedLivePacingMode::FixedRate == pacing.mode && 0 != pacing.framesPerSecond)
+        {
+            budgetMs += 2.0 * (std::min)(1000.0 / pacing.framesPerSecond, double{ kProducerPacingMs });
+        }
+        if (capture_age_milliseconds(frame.sourceCaptureNanoseconds, now) <= budgetMs)
+        {
+            return false;
+        }
+        std::lock_guard<std::mutex> queueLock(renderQueueMutex);
+        // 마지막 입력은 나이가 많다는 이유로 버리지 않는다. 다만 뷰별 credit/lease
+        // 부족으로 일부 뷰가 생략될 수 있고, TickLive를 재실행하지는 않는다.
+        // CPU 준비가 목표 시간을 넘겨도 주기적인 진행 허용으로 기아를 막는다.
+        // 이미 제출한 GPU 작업의 취소나 절대적인 표시 지연 상한은 보장하지 않는다.
+        if (renderQueue.empty() || renderThreadStopRequested || renderLastAdmissionNanoseconds == 0 ||
+            now - renderLastAdmissionNanoseconds >= kSceneProgressNanoseconds)
+        {
+            return false;
+        }
+        ++renderStalePixelSkips;
+        return true;
+    }
+
+    void LiveState::RecordSceneAdmission(const EnhancedLiveFramePacket& frame)
+    {
+        std::lock_guard<std::mutex> queueLock(renderQueueMutex);
+        if (renderAdmittedFrameId == frame.frameId)
+        {
+            return;
+        }
+        renderAdmittedFrameId = frame.frameId;
+        renderLastAdmissionNanoseconds = capture_steady_nanoseconds();
+        renderLastAdmissionAgeMs = capture_age_milliseconds(
+            frame.sourceCaptureNanoseconds, renderLastAdmissionNanoseconds);
+        renderMaxAdmissionAgeMs = (std::max)(renderMaxAdmissionAgeMs, renderLastAdmissionAgeMs);
+        if (renderLastAdmissionAgeMs > kSceneSoftAgeBudgetMs)
+        {
+            ++renderOverBudgetAdmissions;
+        }
+    }
+
     bool LiveState::StartRenderThread(std::string& outError)
     {
         std::unique_lock<std::mutex> lock(renderQueueMutex);
@@ -5065,6 +6926,21 @@ namespace
             renderThreadTestDelayMs = static_cast<uint32_t>((std::min)(250,
                 (std::max)(0, std::atoi(delay))));
             std::free(delay);
+        }
+
+        // 윈도우 11 합성기 시계. 정적 연결하면 윈도우 10 에서 엔진 DLL 적재가 실패한다.
+        if (!compositorWait)
+        {
+            if (const HMODULE dcomp = LoadLibraryExW(L"dcomp.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32))
+            {
+                compositorWait = reinterpret_cast<CompositorWaitFn>(
+                    GetProcAddress(dcomp, "DCompositionWaitForCompositorClock"));
+            }
+            if (!compositorWait)
+            {
+                Debug::PrintLog(spdlog::level::warn,
+                    "[RenderThread] 합성기 시계가 없어 화면 주기 맞춤을 건너뛴다");
+            }
         }
 
         try
@@ -5094,42 +6970,151 @@ namespace
                 }
 
                 auto nextVideoMemorySample = std::chrono::steady_clock::now();
+                // 펜스 이벤트를 걸지 못했으면(Vulkan) 예전처럼 완료를 조회한다.
+                const auto wakeTimeout = [this](uint32_t pendingGpu) -> DWORD
+                {
+                    return pendingGpu != 0 && 0 == armedGpuFenceValue
+                        ? kSceneCompletionPollMs : kRenderWakeBackstopMs;
+                };
                 for (;;)
                 {
+                    // GT 발행이 멈춰도 마지막 생산자 GPU 결과를 수집한다.
+                    // 전용 RT만 기다리며 작업 스케줄러의 worker는 점유하지 않는다.
+                    uint32_t pendingGpu = 0;
+                    own::unique_owner<PreparedEnvironment> failedEnvironment;
+                    {
+                        std::lock_guard<std::mutex> stateLock(renderStateMutex);
+                        try
+                        {
+                            std::string submissionError;
+                            const bool failed = enabled && (backend == EnhancedLiveBackend::DX12
+                                ? (pipeline && dx12.ConsumeSubmissionFailure(submissionError))
+                                : (vulkanPipeline &&
+                                    vulkanPipeline->resources.ConsumeSubmissionFailure(submissionError)));
+                            if (failed)
+                            {
+                                lastError = "Scene submission failed: " + submissionError;
+                                FailPendingGpuCaptures(lastError.c_str());
+                                ++frameFailures;
+                                enabled = false;
+                                Debug::PrintLog(spdlog::level::err, lastError);
+                            }
+                            CollectCompletedDisplays();
+                            pendingGpu = enabled ? PendingGpuSubmissions() : 0;
+                            ArmGpuCompletionEvent(pendingGpu);
+                        }
+                        catch (const std::exception& exception)
+                        {
+                            lastError = std::string("RenderThread completion exception: ") + exception.what();
+                            FailPendingGpuCaptures(lastError.c_str());
+                            ++frameFailures;
+                            enabled = false;
+                            Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                        catch (...)
+                        {
+                            lastError = "RenderThread completion unknown exception";
+                            FailPendingGpuCaptures(lastError.c_str());
+                            ++frameFailures;
+                            enabled = false;
+                            Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                        if (!enabled)
+                        {
+                            // Fail pending/applying work even if no more frames
+                            // are admitted; release its pixels outside this lock.
+                            failedEnvironment = FailEnvironmentPreparation(*environmentPreparation, lastError);
+                        }
+                    }
+
                     FrameSubmission submission;
                     {
                         std::unique_lock<std::mutex> queueLock(renderQueueMutex);
-                        {
-                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
-                                EnhancedSceneRenderer::RenderPhase::queue_idle);
-                            // A render thread can stay asleep for the entire capture
-                            // when no live frame is consumed. Close bounded idle
-                            // scopes so the profiler records that idle time and the
-                            // lane does not disappear from a live recording.
-                            renderQueueWake.wait_for(queueLock, std::chrono::milliseconds(100), [this]
-                            {
-                                return renderThreadStopRequested || !renderQueue.empty();
-                            });
-                        }
                         if (renderQueue.empty())
                         {
-                            if (renderThreadStopRequested) break;
+                            if (renderThreadStopRequested)
+                            {
+                                break;
+                            }
+                            // 새 발행·정지·GPU 완료 중 하나로 깬다. 깨어난 뒤 완료를
+                            // 다시 수집하고 최신 입력을 고른다.
+                            queueLock.unlock();
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            WaitForRenderWork(false, wakeTimeout(pendingGpu));
                             continue;
                         }
-
+                        if (renderThreadTestDelayMs != 0 && !renderThreadStopRequested)
+                        {
+                            EnhancedSceneRenderer::RenderThreadPhaseScope delay(
+                                EnhancedSceneRenderer::RenderPhase::test_delay);
+                            renderQueueWake.wait_for(queueLock,
+                                std::chrono::milliseconds(renderThreadTestDelayMs), [this]
+                                {
+                                    return renderThreadStopRequested;
+                                });
+                        }
+                        // 보통의 Editor + Game 두 뷰가 쓸 공용 credit을 먼저 확보한 뒤
+                        // 같은 입력을 확정한다. 이 보수적인 묶음 승인은 GPU 작업의
+                        // 겹침을 줄일 수 있고, 모든 뷰의 표시 슬롯 확보를 보장하지 않는다.
+                        const auto& waitingFrame = renderQueue.front().frame;
+                        uint32_t requiredCredits = 0;
+                        if (!waitingFrame.sceneLoading && waitingFrame.width != 0 && waitingFrame.height != 0)
+                        {
+                            const uint32_t viewCount = (std::min)(waitingFrame.viewCount, kEnhancedMaxLiveCameraViews);
+                            for (uint32_t i = 0; i < viewCount && requiredCredits < 2; ++i)
+                            {
+                                if (waitingFrame.views[i].key.IsValid())
+                                {
+                                    ++requiredCredits;
+                                }
+                            }
+                        }
+                        if (requiredCredits != 0 && pendingGpu + requiredCredits > 2 && !renderThreadStopRequested)
+                        {
+                            ++renderGpuAdmissionWaits;
+                            // 가장 오래된 제출의 펜스 완료가 깨운다. 새 발행이 깨워도
+                            // credit 이 그대로면 다시 여기로 와서 잔다.
+                            queueLock.unlock();
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            WaitForRenderWork(false, wakeTimeout(pendingGpu));
+                            continue;
+                        }
+                        if (renderDisplayLeaseBlocked && !renderThreadStopRequested)
+                        {
+                            // 표시 슬롯이 하나도 비지 않았는데 바로 다음 packet 을 집으면
+                            // 그릴 것 없이 packet 만 소비하며 돈다. 슬롯을 놓는 표시 쪽은
+                            // 알림이 없으므로 다음 합성 주기에 다시 본다.
+                            renderDisplayLeaseBlocked = false;
+                            ++renderDisplayLeaseWaits;
+                            MarkPacedAdmission();
+                            queueLock.unlock();
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            WaitForRenderWork(true, kCompositorStallMs);
+                            continue;
+                        }
+                        // 진입 속도 맞춤(livePacing). 종료 중에는 delta 를 순서대로
+                        // 흘려야 하므로 기다리지 않는다.
+                        if (!renderThreadStopRequested && !PacingAllowsAdmission())
+                        {
+                            ++renderDisplayPacingWaits;
+                            queueLock.unlock();
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            WaitForRenderWork(true, kCompositorStallMs);
+                            continue;
+                        }
+                        // 이 시점에만 입력을 확정한다. 기다리는 동안에도 대기 입력은
+                        // 교체 가능했고 lifecycle delta의 순서는 보존되었다.
                         submission = std::move(renderQueue.front());
                         renderQueue.pop_front();
                         renderInProgress = 1;
+                        activeFrameDrainOnly = renderThreadStopRequested;
+                        MarkPacedAdmission();
                     }
                     renderQueueWake.notify_all();
-
-                    if (0 != renderThreadTestDelayMs)
-                    {
-                        EnhancedSceneRenderer::RenderThreadPhaseScope delay(
-                            EnhancedSceneRenderer::RenderPhase::test_delay);
-                        std::this_thread::sleep_for(
-                            std::chrono::milliseconds(renderThreadTestDelayMs));
-                    }
 
                     activeDeltaBatch = std::move(submission.deltas);
                     {
@@ -5223,6 +7208,8 @@ namespace
                             std::lock_guard<std::mutex> stateLock(renderStateMutex);
                             lastError = std::string("RenderThread frame exception: ") +
                                 exception.what();
+                            FailPendingGpuCaptures(lastError.c_str());
+                            FinishEnvironmentPreparation(lastError);
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
                         }
@@ -5230,10 +7217,15 @@ namespace
                         {
                             std::lock_guard<std::mutex> stateLock(renderStateMutex);
                             lastError = "RenderThread frame unknown exception";
+                            FailPendingGpuCaptures(lastError.c_str());
+                            FinishEnvironmentPreparation(lastError);
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
                         }
-                        activeDeltaBatch.clear();
+                        if (activeDeltaBatch.size() != 0)
+                        {
+                            ProxyCommandQueue->DeferBatch(std::move(activeDeltaBatch));
+                        }
                     }
 
                     {
@@ -5256,6 +7248,10 @@ namespace
                     renderQueueWake.notify_all();
                 }
 
+                {
+                    std::lock_guard<std::mutex> stateLock(renderStateMutex);
+                    FailPendingGpuCaptures("DX12 collection owner stopped before GPU query completion");
+                }
                 {
                     std::lock_guard<std::mutex> queueLock(renderQueueMutex);
                     renderThreadRunning = false;
@@ -5311,7 +7307,24 @@ namespace
             return false;
         }
 
-        ++renderPublished;
+        // 씬 잠금 밖의 GT 에는 다른 속도 제한이 없다. 앞 packet 이 아직 대기 중이면
+        // RT 가 가져갈 때까지 기다려 GT 를 RT 소비 속도에 맞춘다(최신 입력 정책은 그대로).
+        if (renderQueue.size() >= kRenderQueueCapacity)
+        {
+            ++renderProducerPacingWaits;
+            renderQueueWake.wait_for(lock, std::chrono::milliseconds(kProducerPacingMs), [this]
+            {
+                return !renderThreadAccepting || renderQueue.size() < kRenderQueueCapacity;
+            });
+            if (!renderThreadAccepting)
+            {
+                renderShutdownDiscardedDeltas += submission.deltas.size();
+                ProxyCommandQueue->MarkShutdownDiscarded(
+                    static_cast<uint64_t>(submission.deltas.size()));
+                return false;
+            }
+        }
+
         if (renderQueue.size() < kRenderQueueCapacity)
         {
             renderQueue.push_back(std::move(submission));
@@ -5331,7 +7344,13 @@ namespace
                 {
                     return !renderThreadAccepting || renderQueue.size() < kRenderQueueCapacity;
                 });
-                if (!renderThreadAccepting) return false;
+                if (!renderThreadAccepting)
+                {
+                    renderShutdownDiscardedDeltas += submission.deltas.size();
+                    ProxyCommandQueue->MarkShutdownDiscarded(
+                        static_cast<uint64_t>(submission.deltas.size()));
+                    return false;
+                }
                 renderQueue.push_back(std::move(submission));
             }
             else
@@ -5345,15 +7364,33 @@ namespace
                 renderCoalescedDeltas += mergedSuperseded;
                 ProxyCommandQueue->MarkSuperseded(mergedSuperseded);
                 submission.deltas = std::move(merged);
+                if (newest.frame.sceneEpoch == submission.frame.sceneEpoch
+                    && newest.frame.preparedTextureImages)
+                {
+                    if (!submission.frame.preparedTextureImages)
+                    {
+                        submission.frame.preparedTextureImages = std::move(newest.frame.preparedTextureImages);
+                    }
+                    else
+                    {
+                        for (const auto& texture : newest.frame.preparedTextureImages->Owners())
+                        {
+                            submission.frame.preparedTextureImages->RetainImage(texture,
+                                newest.frame.preparedTextureImages->Image(&*texture));
+                        }
+                    }
+                }
                 newest = std::move(submission);
                 ++renderCoalescedFrames;
             }
         }
 
+        ++renderPublished;
         renderQueueHighWatermark = (std::max)(renderQueueHighWatermark,
             static_cast<uint32_t>(renderQueue.size()));
         lock.unlock();
         renderQueueWake.notify_one();
+        SetEvent(renderWakeEvent.Get());
         return true;
     }
 
@@ -5370,11 +7407,29 @@ namespace
             }
         }
         renderQueueWake.notify_all();
+        SetEvent(renderWakeEvent.Get());
         if (shouldJoin)
         {
             renderThread.join();
             std::lock_guard<std::mutex> lock(renderQueueMutex);
             ++renderShutdownDrains;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(renderStateMutex);
+            ReleaseGeometrySources();
+            CancelGeometryDemands();
+            geometryDemandViews.clear();
+            for (auto& [identity, demand] : imageDemands)
+            {
+                demand.request.Cancel();
+            }
+            imageDemands.clear();
+            imageBootstrapViews.reset();
+            if (textureFramePins)
+            {
+                textureFramePins->ReleaseImages();
+            }
         }
 
         const uint64_t discarded = ProxyCommandQueue->DiscardPendingForShutdown();
@@ -5419,6 +7474,19 @@ namespace
         stats.backPressureWaits = renderBackPressureWaits;
         stats.shutdownDrains = renderShutdownDrains;
         stats.shutdownDiscardedDeltas = renderShutdownDiscardedDeltas;
+        stats.gpuAdmissionWaits = renderGpuAdmissionWaits;
+        stats.stalePixelSkips = renderStalePixelSkips;
+        stats.overBudgetAdmissions = renderOverBudgetAdmissions;
+        stats.displayLeaseSkips = renderDisplayLeaseSkips;
+        stats.producerPacingWaits = renderProducerPacingWaits;
+        stats.displayLeaseWaits = renderDisplayLeaseWaits;
+        stats.displayPacingWaits = renderDisplayPacingWaits;
+        stats.admittedFrameId = renderAdmittedFrameId;
+        stats.lastAdmissionAgeMs = renderLastAdmissionAgeMs;
+        stats.maxAdmissionAgeMs = renderMaxAdmissionAgeMs;
+        stats.pendingAgeMs = renderQueue.empty() ? 0.0 : capture_age_milliseconds(
+            renderQueue.front().frame.sourceCaptureNanoseconds, capture_steady_nanoseconds());
+        stats.softAgeBudgetMs = kSceneSoftAgeBudgetMs;
         stats.pending = static_cast<uint32_t>(renderQueue.size());
         stats.inProgress = renderInProgress;
         stats.highWatermark = renderQueueHighWatermark;
@@ -5474,6 +7542,9 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         // backend는 어떤 장치·pipeline·공유 표시 리소스도 만들기 전에 한 번만
         // 기록한다. 이 뒤에는 변경 API가 없다(Slice 8-c).
         state.backend = backend;
+        // 에디터 재질 저작은 이 백엔드 하나만 컴파일한다.
+        material_graph::SetAuthoringSceneBackend(backend == EnhancedLiveBackend::Vulkan
+            ? RHIShaderBinary::SpirV : RHIShaderBinary::Dxil);
         state.ResetDisplaySnapshot();
         state.renderScene = std::make_shared<RenderScene>();
         state.renderScene->Initialize();
@@ -5483,18 +7554,8 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
 
         state.skyBoxPath =
             PathFinder::EngineResourcePath("Environment/forest.ceibl").string();
-        assets::CookedEnvironment defaultEnvironment;
-        if (!assets::ReadCookedEnvironment(state.skyBoxPath,defaultEnvironment,outError)) return false;
-        Hash::Sha256Digest recipe;
-        if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                defaultEnvironment.cubeSize,defaultEnvironment.brdfSize,recipe,outError)) return false;
-        if (recipe != defaultEnvironment.identity.recipe)
-        {
-            outError="Default forest environment cook recipe is stale; recook engine resources";
-            return false;
-        }
-        state.skyCooked=std::move(defaultEnvironment);
         state.skyEquirect.reset();
+        state.skyEquirectImage.reset();
         state.skyBoxDirty = true;
         // Bootstrap actually installs the bundled forest, not the legacy saved path.
         // Keep the reported selection consistent and hide only its background.
@@ -5515,6 +7576,18 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
             state.runtimeInitialized = false;
             state.enabled = false;
             state.lastError = outError;
+            return false;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state.environmentPreparation->mutex);
+            state.environmentPreparation->accepting = true;
+        }
+        if (!QueueEnvironmentPreparation(state.environmentPreparation, state.skyBoxPath, outError, false))
+        {
+            state.StopRenderThread();
+            state.runtimeInitialized = false;
+            state.enabled = false;
             return false;
         }
 
@@ -5540,7 +7613,11 @@ void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
     LiveState& state = GetLiveState();
     if (state.renderScene)
     {
-        if (state.renderScene->GetScene() != scene) ++state.sceneEpoch;
+        if (state.renderScene->GetScene() != scene)
+        {
+            InvalidateEnvironmentPreparation(*state.environmentPreparation, false);
+            ++state.sceneEpoch;
+        }
         state.renderScene->SetScene(scene, state.sceneEpoch);
     }
 }
@@ -5572,10 +7649,9 @@ void EnhancedSceneRenderer::SetDisplayPresentationSink(
 bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& outError)
 {
     LiveState& state = GetLiveState();
-    std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
-    if (!state.runtimeInitialized)
+    if (!state.enabled)
     {
-        outError = "EnhancedRenderer 런타임이 초기화되지 않았다";
+        outError = "EnhancedRenderer is not enabled";
         return false;
     }
     if (path.empty())
@@ -5583,35 +7659,25 @@ bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& 
         outError = "HDR 경로가 비어 있다";
         return false;
     }
-    std::error_code fileError;
     const file::path source(path);
-    if (!std::filesystem::is_regular_file(source,fileError) ||
-        (source.extension()!=".hdr" && source.extension()!=".ceibl"))
-    { outError="Select an existing HDR or cooked .ceibl environment"; return false; }
-    std::optional<assets::CookedEnvironment> cooked;
-    if (source.extension()==".ceibl")
+    if (source.extension() != ".hdr" && source.extension() != ".ceibl")
     {
-        assets::CookedEnvironment candidate;
-        Hash::Sha256Digest recipe;
-        if (!assets::ReadCookedEnvironment(source,candidate,outError) ||
-            !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                candidate.cubeSize,candidate.brdfSize,recipe,outError)) return false;
-        if (candidate.identity.recipe!=recipe)
-        { outError="Cooked environment recipe changed; recook the selected environment"; return false; }
-        cooked=std::move(candidate);
+        outError = "Select an HDR or cooked .ceibl environment";
+        return false;
     }
-    state.skyBoxPath = path;
-    state.skyEquirect.reset();
-    state.skyCooked=std::move(cooked);
-    state.skyCookIdentity.reset();
-    state.skyCookCachePath.clear();
-    state.skyBoxDirty = true;
-    if (state.pipeline) state.pipeline->iblGenerated = false;
-    if (auto* settings = RuntimeSettings::TryGet())
-        settings->SetEnvironmentSelection(path, true);
-    state.lastError.clear();
-    outError.clear();
-    return true;
+    return QueueEnvironmentPreparation(state.environmentPreparation, path, outError);
+}
+
+EnhancedSceneRenderer::EnvironmentPreparationProgress EnhancedSceneRenderer::GetEnvironmentPreparationProgress()
+{
+    const auto preparation = GetLiveState().environmentPreparation;
+    std::lock_guard<std::mutex> lock(preparation->mutex);
+    return preparation->progress;
+}
+
+void EnhancedSceneRenderer::CancelEnvironmentPreparation()
+{
+    InvalidateEnvironmentPreparation(*GetLiveState().environmentPreparation, false);
 }
 
 void EnhancedSceneRenderer::EnableLive()
@@ -5661,10 +7727,10 @@ void EnhancedSceneRenderer::WaitForLiveGpu()
 }
 
 EnhancedRequiredAssetPacket EnhancedSceneRenderer::BuildRequiredAssetPacket(
-    std::span<const std::shared_ptr<Material>> materials)
+    std::span<const own::shared_owner<const Material>> materials)
 {
     EnhancedRequiredAssetPacket packet{};
-    for (const std::shared_ptr<Material>& material : materials)
+    for (const own::shared_owner<const Material>& material : materials)
     {
         if (!material) continue;
         const EnhancedShaderMetaDomain domain =
@@ -5689,6 +7755,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         "BuildLiveFramePacket must stay on the game-thread producer");
 
     EnhancedLiveFramePacket frame{};
+    frame.sourceCaptureNanoseconds = capture_steady_nanoseconds();
     std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
     {
         std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
@@ -5706,115 +7773,6 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     frame.height = screenSize.height;
     frame.requiredAssets = requiredAssets;
     frame.requiredAssets.Canonicalize();
-
-    // M6-P2d-d/e: watcher 변경은 App 프레임 시작의
-    // DrainQueuedAssetChanges에서 이미 DataSystem generation을 전진시켰다. GT가
-    // primary GBuffer와 Host가 required-asset packet에 선언한 ShaderMeta의 현재
-    // generation/value만 밀봉한다. cache 전체 스캔은 활성 Scene과 무관한 재질까지
-    // frame 수명에 붙들었으므로 P2d-e에서 은퇴했고, RT는 catalog/file/DataSystem을
-    // 다시 읽지 않는다.
-    {
-        const std::filesystem::path metaPath =
-            RHIShaderSource::Resolve("GBuffer.shadermeta");
-        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
-        std::vector<FileGuid> guids;
-        guids.push_back(guid);
-
-        for (const EnhancedRequiredShaderMetaAsset& required :
-            frame.requiredAssets.shaderMetas)
-        {
-            if (EnhancedShaderMetaDomain::GBuffer != required.domain
-                || std::find(guids.begin(), guids.end(), required.guid)
-                    != guids.end())
-            {
-                continue;
-            }
-            guids.push_back(required.guid);
-        }
-
-        if (guids.size() > 1)
-            std::sort(guids.begin() + 1, guids.end());
-
-        frame.gbufferShaderMetas.reserve(guids.size());
-        for (std::size_t index = 0; index < guids.size(); ++index)
-        {
-            EnhancedShaderMetaFrameSnapshot snapshot{};
-            snapshot.guid = guids[index];
-            if (FileGuid{} == snapshot.guid)
-            {
-                snapshot.error = "GBuffer.shadermeta catalog GUID를 찾지 못했다: "
-                    + metaPath.string();
-                frame.gbufferShaderMetas.push_back(std::move(snapshot));
-                continue;
-            }
-            std::string loadError;
-            snapshot.handle = DataSystems->LoadShaderMetaHandle(
-                snapshot.guid, loadError);
-            snapshot.value = DataSystems->ResolveShaderMeta(snapshot.handle);
-            if (!snapshot.IsValid())
-            {
-                snapshot.error = loadError.empty()
-                    ? "GBuffer ShaderMeta generation을 resolve하지 못했다: "
-                        + snapshot.guid.ToString()
-                    : loadError;
-            }
-            frame.gbufferShaderMetas.push_back(std::move(snapshot));
-        }
-    }
-
-    // M6-P2d-d: Forward는 GBuffer와 다른 primary catalog slot을 소유한다. 첫
-    // 항목은 항상 Standard primary이고, 뒤에는 Host required-asset packet이
-    // 선택한 ShaderMeta generation/value를 GUID 순서로 함께 밀봉한다. RT는
-    // catalog나 DataSystem을 다시 읽지 않는다.
-    {
-        const std::filesystem::path metaPath =
-            RHIShaderSource::Resolve("Forward.shadermeta");
-        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
-        std::vector<FileGuid> guids;
-        guids.push_back(guid);
-
-        for (const EnhancedRequiredShaderMetaAsset& required :
-            frame.requiredAssets.shaderMetas)
-        {
-            if (EnhancedShaderMetaDomain::Forward != required.domain
-                || std::find(guids.begin(), guids.end(), required.guid)
-                    != guids.end())
-            {
-                continue;
-            }
-            guids.push_back(required.guid);
-        }
-        if (guids.size() > 1)
-            std::sort(guids.begin() + 1, guids.end());
-
-        frame.forwardShaderMetas.reserve(guids.size());
-        for (std::size_t index = 0; index < guids.size(); ++index)
-        {
-            EnhancedShaderMetaFrameSnapshot snapshot{};
-            snapshot.guid = guids[index];
-            if (FileGuid{} == snapshot.guid)
-            {
-                snapshot.error = 0 == index
-                    ? "Forward.shadermeta catalog GUID를 찾지 못했다: "
-                        + metaPath.string()
-                    : "Forward material ShaderMeta GUID가 비었다";
-                frame.forwardShaderMetas.push_back(std::move(snapshot));
-                continue;
-            }
-            std::string loadError;
-            snapshot.handle = DataSystems->LoadShaderMetaHandle(
-                snapshot.guid, loadError);
-            snapshot.value = DataSystems->ResolveShaderMeta(snapshot.handle);
-            if (!snapshot.IsValid())
-            {
-                snapshot.error = loadError.empty()
-                    ? "Forward ShaderMeta generation을 resolve하지 못했다: "
-                        + snapshot.guid.ToString()
-                    : loadError;
-            }
-            frame.forwardShaderMetas.push_back(std::move(snapshot));
-        }
-    }
 
     if (frame.width != state.publishedWidth ||
         frame.height != state.publishedHeight)
@@ -5845,22 +7803,55 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
             continue;
         }
 
+        if (!HasViewFlag(view.viewFlags, EnhancedLiveViewFlags::SceneOverlay))
+        {
+            continue;
+        }
         auto gizmos = std::make_shared<EnhancedGizmoSceneData>();
         CaptureEnhancedGizmoSceneData(view.camera, collectColliders,
             gizmoIconTextures, *gizmos);
         view.gizmos = std::move(gizmos);
     }
 
+    bool hasSceneView = false;
+    for (uint32_t index = 0; index < frame.viewCount; ++index)
+    {
+        hasSceneView |= frame.views[index].displayTarget != EnhancedLiveDisplayTarget::MaterialPreview;
+    }
+    if (!sceneLoading && hasSceneView && state.renderScene)
+    {
+        frame.preparedTextureImages = state.renderScene->TakePreparedTextureImagePins();
+    }
     return frame;
 }
 
 bool EnhancedSceneRenderer::PublishLiveFrame(EnhancedLiveFramePacket frame)
 {
     LiveState& state = GetLiveState();
+    const auto preparedImages = frame.preparedTextureImages;
+    const auto sceneEpoch = frame.sceneEpoch;
     LiveState::FrameSubmission submission{};
     submission.frame = std::move(frame);
     submission.deltas = ProxyCommandQueue->CapturePending();
-    return state.PublishFrame(std::move(submission));
+    const bool accepted = state.PublishFrame(std::move(submission));
+    if (!accepted && preparedImages && state.sceneEpoch == sceneEpoch && state.renderScene)
+    {
+        state.renderScene->RestorePreparedTextureImagePins(preparedImages);
+    }
+    return accepted;
+}
+
+void EnhancedSceneRenderer::SetLivePacing(EnhancedLivePacing pacing)
+{
+    LiveState& state = GetLiveState();
+    // 호스트는 매 프레임 부른다. 바뀐 때만 RT 를 깨워 느린 주기의 대기를 끊는다.
+    if (state.livePacing.exchange(pacing, std::memory_order_relaxed) != pacing)
+        SetEvent(state.renderWakeEvent.Get());
+}
+
+EnhancedLivePacing EnhancedSceneRenderer::GetLivePacing()
+{
+    return GetLiveState().livePacing.load(std::memory_order_relaxed);
 }
 
 void EnhancedSceneRenderer::SetRenderThreadHooks(const RenderThreadHooks& hooks)
@@ -5870,7 +7861,9 @@ void EnhancedSceneRenderer::SetRenderThreadHooks(const RenderThreadHooks& hooks)
 
 void EnhancedSceneRenderer::StopLiveRenderThread()
 {
-    GetLiveState().StopRenderThread();
+    LiveState& state = GetLiveState();
+    InvalidateEnvironmentPreparation(*state.environmentPreparation, true);
+    state.StopRenderThread();
 }
 
 EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
@@ -5927,6 +7920,11 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
         || state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording))
     { outError = "a PBR capture is already pending"; return false; }
+    if (state.pbrCapture && state.pbrCapture->HasResources())
+    {
+        outError = "Previous capture resources are retained until GPU idle or device-loss cleanup.";
+        return false;
+    }
     std::error_code error;
     const std::filesystem::path path(directory);
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
@@ -5970,11 +7968,14 @@ bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMillisec
 void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 {
     LiveState& state = GetLiveState();
+    // Declared before the lock so old CPU pixels are freed after it is released.
+    own::unique_owner<PreparedEnvironment> retiredEnvironment;
     std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::defer_lock);
     {
         RenderThreadPhaseScope lockWait(RenderPhase::state_lock_wait);
         stateLock.lock();
     }
+    state.ApplyPreparedEnvironment(retiredEnvironment);
 	state.profileFrameDrawCount = 0;
 	state.profileFrameBatchCount = 0;
     state.controlledCaptureFrame = state.pbrCapture && state.pbrCapture->controlled
@@ -6059,6 +8060,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 
     if (!state.enabled)
     {
+        state.ReleaseGeometrySources();
+        state.CancelGeometryDemands();
+        state.geometryDemandViews.clear();
+        state.ReconcileImageDemands(frame, false);
         ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
         return;
     }
@@ -6077,32 +8082,110 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
         if (state.runtimeInitialized && state.renderScene && !sceneLoading)
         {
-			if (state.renderScene->BeginProxyFrame(frame.sceneEpoch))
-				ProxyCommandQueue->ExecuteBatch(*state.renderScene, frame.sceneEpoch,
-					std::move(state.activeDeltaBatch));
-			else
-				ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
-            state.BuildDrawPool();
+            if (state.renderScene->BeginProxyFrame(frame.sceneEpoch))
+            {
+                ProxyCommandQueue->ExecuteBatch(*state.renderScene, frame.sceneEpoch,
+                    std::move(state.activeDeltaBatch));
+            }
+            else
+            {
+                ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
+            }
         }
         else
         {
-        // 로딩 중에는 frame은 건너뛰어도 delta를 잃으면 안 된다. consumer 보류
-        // 큐에 두었다가 다음 renderable packet에서 epoch 규칙과 함께 적용한다.
-        ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
-        // 이번 프레임에 갱신하지 않았다면 풀을 비운다.
-        //
-        // ★ 풀은 값 snapshot과 shared owner를 함께 들지만, 갱신을 건너뛴
-        //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
-        //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
-        state.drawPool.clear();
-        state.graphDraws.clear();
-        state.graphFallbackDraws.clear();
-        state.graphViewInput.reset();
+            // 로딩 중에는 frame은 건너뛰어도 delta를 잃으면 안 된다. consumer 보류
+            // 큐에 두었다가 다음 renderable packet에서 epoch 규칙과 함께 적용한다.
+            ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
+            // 이번 프레임에 갱신하지 않았다면 풀을 비운다.
+            //
+            // ★ 풀은 값 snapshot과 shared owner를 함께 들지만, 갱신을 건너뛴
+            //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
+            //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
+            state.drawPool.clear();
+            state.shadowDraws.clear();
+            state.graphDraws.clear();
+            state.graphShadowEligible.clear();
+            state.graphViewRequired.clear();
+            state.graphViewInput.reset();
             state.decals.clear();
+            state.spritePool.clear();
+            state.worldSprites.clear();
+            state.uiRects.clear();
+            state.uiProxyPointers.clear();
+            state.uiProxySnapshot.clear();
+            // Accepted frames own independent copies of their pin tables.
+            // Drop only obsolete current-input roots after every borrow above.
+            state.modelFramePins.reset();
+            state.geometryFramePins.entries.clear();
+            state.CancelGeometryDemands();
+            state.graphFramePins.reset();
+            state.textureFramePins.reset();
         }
     }
 
     traceProgress("proxy.end");
+    bool hasSceneGeometryView = false;
+    state.geometryDemandViews.clear();
+    if (!sceneLoading && !state.activeFrameDrainOnly && frame.width != 0u && frame.height != 0u)
+    {
+        for (uint32_t index = 0u; index < cameraCount; ++index)
+        {
+            const auto& view = frame.views[index];
+            if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview
+                && (!state.controlledCaptureFrame || view.displayTarget == state.pbrCapture->target))
+            {
+                hasSceneGeometryView = true;
+                state.geometryDemandViews.emplace(frame.sceneEpoch, view.key.viewId);
+            }
+        }
+    }
+    // This precedes every idle/drain/age/size exit below. Preview-only views use
+    // their own geometry and do not justify retaining scene payload requests.
+    state.ReconcileGeometryDemands(hasSceneGeometryView);
+    state.ReconcileImageDemands(frame, !sceneLoading && !state.activeFrameDrainOnly
+        && state.runtimeInitialized && state.renderScene && frame.width != 0u && frame.height != 0u);
+    traceProgress("collect.begin");
+    state.CollectCompletedDisplays();
+    if (state.activeFrameDrainOnly || state.ShouldSkipScenePixels(frame))
+    {
+        return;
+    }
+    struct GeometrySourceGuard final
+    {
+        LiveState& state;
+        ~GeometrySourceGuard() { state.ReleaseGeometrySources(); }
+    } geometrySourceGuard{ state };
+    const auto prepareSceneGeometry = [&]()
+    {
+        if (!state.runtimeInitialized || !state.renderScene || !hasSceneGeometryView)
+        {
+            state.PruneImageDemands(frame);
+            return true;
+        }
+        RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
+        bool preparationDeferred = false;
+        std::string geometryError;
+        if (!state.PrepareGeometry(frame.frameId, preparationDeferred, geometryError))
+        {
+            // No BeginFrame/recording has started. Keep the completed display
+            // and exact request owners until a future packet admits all bytes.
+            ++state.framesIdle;
+            if (!preparationDeferred)
+            {
+                state.CancelGeometryDemands();
+            }
+            if (!preparationDeferred && state.lastError != geometryError)
+            {
+                state.lastError = std::move(geometryError);
+                Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+            }
+            return false;
+        }
+        state.BuildDrawPool();
+        state.PruneImageDemands(frame);
+        return true;
+    };
 
     // ── Vulkan editor TickLive 공통 scene graph 경로 ──
     //
@@ -6112,41 +8195,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // 브리지로 승격한다.
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
-        if (state.vulkanPipeline)
-        {
-            RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
-            uint64_t promoted = 0;
-            std::string validation;
-            state.vulkanPipeline->PromoteCompleted(
-                state.CopyPresentationSink(), promoted, validation);
-            state.PublishVulkanDisplayResults();
-            state.framesRendered += promoted;
-            if (0 != promoted && !state.vulkanFirstFrameReported)
-            {
-                state.vulkanFirstFrameReported = true;
-                const VulkanMeshCache::Stats meshStats =
-                    state.vulkanPipeline->meshCache.GetStats();
-                Debug::PrintLog(spdlog::level::warn, "[vulkan.live] editor TickLive 첫 프레임 완성"
-                    " · 공통 LivePipelineDesc→live_present"
-                    " · draw " + std::to_string(state.lastDrawCount) +
-                    " / batch " + std::to_string(state.lastBatchCount) +
-                    " · mesh resident " + std::to_string(meshStats.residentCount) +
-                    " / upload " + std::to_string(meshStats.uploads) +
-                    " / failure " + std::to_string(meshStats.failures) +
-                    " · parallel workers " +
-                    std::to_string(state.vulkanPipeline->lastGraphStats.recordWorkers) +
-                    " / batch " +
-                std::to_string(state.vulkanPipeline->lastGraphStats.recordedLists) +
-                    " · persistent segment " +
-                    std::to_string(meshStats.persistentHeap.activeSegments));
-            }
-            if (!validation.empty() && state.reportedValidation.insert(validation).second)
-            {
-                std::printf("[vulkan.live 검증] %s\n", validation.c_str());
-                Debug::PrintLog(spdlog::level::err, "[vulkan.live 검증] " + validation);
-            }
-        }
-
         if (sceneLoading || 0 == cameraCount)
         {
             ++state.framesIdle;
@@ -6164,7 +8212,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         if (state.vulkanPipeline &&
             (rtWidth != state.vulkanPipeline->width || rtHeight != state.vulkanPipeline->height))
         {
-            state.TeardownVulkanPipeline();
+            if (!state.TeardownVulkanPipeline())
+            {
+                return;
+            }
         }
         if (!state.vulkanPipeline)
         {
@@ -6178,53 +8229,19 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
         }
 
-        VulkanLivePipeline& p = *state.vulkanPipeline;
+        // Retire before either CPU or image residency admission. No second
+        // eviction pass may invalidate a successful descriptor-only probe.
+        state.vulkanPipeline->MaintainAssetCaches();
+        if (!prepareSceneGeometry())
         {
-            // W8: DX12 경로와 같은 자리에 같은 도장을 찍는다. 한쪽만 찍으면
-            // backend마다 신원 축이 달라진다.
-            p.frameContext.frameId = frame.frameId;
-            p.frameContext.sceneEpoch = frame.sceneEpoch;
-            std::string shaderError;
-            if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
-                    p.frameContext,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV, shaderError))
-            {
-                state.lastError = "Vulkan GBuffer ShaderMeta 초기 적용 실패: " + shaderError;
-                state.TeardownVulkanPipeline();
-                state.enabled = false;
-                return;
-            }
-            if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
-                    p.frameContext,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV, shaderError))
-            {
-                state.lastError = "Vulkan Forward ShaderMeta 초기 적용 실패: " + shaderError;
-                state.TeardownVulkanPipeline();
-                state.enabled = false;
-                return;
-            }
-            if (!state.SealForwardMaterials(frame.forwardShaderMetas,
-                    frame.totalSeconds, frame.deltaSeconds,
-                    p.forward, p.frameContext,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV, shaderError))
-            {
-                state.lastError = "Vulkan Forward Material snapshot 실패: " + shaderError;
-                ++state.frameFailures;
-                return;
-            }
-            if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
-                    p.gbuffer, p.frameContext, p.graphMaterials,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV,
-                    shaderError))
-            {
-                state.lastError = "Vulkan GBuffer Material snapshot 실패: " + shaderError;
-                ++state.frameFailures;
-                return;
-            }
+            return;
+        }
+        VulkanLivePipeline& p = *state.vulkanPipeline;
+        p.frameContext.frameId = frame.frameId;
+        p.frameContext.sceneEpoch = frame.sceneEpoch;
+        if (state.ShouldSkipScenePixels(frame))
+        {
+            return;
         }
         uint32_t totalPending = p.PendingCount();
         LiveStopwatch watch;
@@ -6253,7 +8270,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
             if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
                 p.views[viewIndex].ready && p.views[viewIndex].previewComplete &&
-                p.views[viewIndex].completedSceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame)
+                p.views[viewIndex].completedSceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame &&
+                !state.HasGraphSnapshotRequest(viewPacket.displayTarget))
             {
                 continue;
             }
@@ -6268,19 +8286,65 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 continue;
             }
 
+            if (state.ShouldSkipScenePixels(frame))
+            {
+                return;
+            }
             std::string error;
+            const auto admission = state.AdmitViewImages(p.textureCache,
+                !p.iblGenerated || state.skyBoxDirty, error);
+            if (admission != LiveState::ImageAdmission::Ready)
+            {
+                ++state.framesIdle;
+                if (admission == LiveState::ImageAdmission::Failed)
+                {
+                    state.lastError = "Vulkan image preparation failed: " + error;
+                    if (state.reportedValidation.insert(state.lastError).second)
+                    {
+                        ++state.frameFailures;
+                        Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+                    }
+                }
+                else
+                {
+                    state.consecutiveFrameFailures = 0;
+                }
+                state.ReleaseStagedImages(p.textureCache);
+                continue;
+            }
+            if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+            {
+                state.CompleteImageBootstrap(frame.sceneEpoch, viewPacket.key.viewId);
+            }
+            struct ImageReleaseGuard
+            {
+                LiveState& state;
+                IRenderTextureCache& cache;
+                ~ImageReleaseGuard() { state.ReleaseStagedImages(cache); }
+            };
             const auto prepareFrame = [&state, &p, viewIndex](std::string& prepareError)
             {
                 return state.PreparePipelineFrame(
                     p, static_cast<uint32_t>(viewIndex), RHIShaderBinary::SpirV, prepareError);
             };
             bool rendered = false;
+            bool preparationDeferred = false;
+            LiveGraphSnapshot diagnosticSnapshot;
+            const bool captureDiagnostics = state.ConsumeGraphSnapshotRequest(viewPacket.displayTarget);
             {
+                ImageReleaseGuard imageRelease{ state, p.textureCache };
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
-                    frame.frameId, frame.resizeGeneration,
+                    frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
-                    prepareFrame, error, state.BeginPbrCapture(frame, viewPacket));
+                    prepareFrame,
+                    error, state.BeginPbrCapture(frame, viewPacket),
+                    captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
+            }
+            if (captureDiagnostics || !rendered)
+            {
+                state.PublishGraphSnapshot(viewPacket.displayTarget,
+                    rendered ? std::move(diagnosticSnapshot) : LiveGraphSnapshot{});
             }
             if (!rendered)
             {
@@ -6299,7 +8363,16 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 state.lastError = "Vulkan 프레임 실패: " + error;
                 std::printf("[vulkan.live 실패] %s\n", state.lastError.c_str());
                 ++state.frameFailures;
-                ++state.consecutiveFrameFailures;
+                if (!preparationDeferred || !validation.empty() || 0 != unimplemented)
+                {
+                    ++state.consecutiveFrameFailures;
+                }
+                else
+                {
+                    // Keep the last completed display while this feature retries
+                    // bounded admission; budget pressure is not renderer corruption.
+                    state.consecutiveFrameFailures = 0;
+                }
                 if (state.reportedValidation.insert(state.lastError).second)
                     Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
                 if (LiveState::kMaxConsecutiveFrameFailures <= state.consecutiveFrameFailures)
@@ -6311,7 +8384,12 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 continue;
             }
 
+            if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+            {
+                state.CompleteGeometryView(frame.sceneEpoch, viewPacket.key.viewId);
+            }
             state.consecutiveFrameFailures = 0;
+            state.RecordSceneAdmission(frame);
             // W8: 인코더가 버린 명령을 프레임마다 비우며 모은다. 성공한 프레임에
             // 쌓이는 것이 특히 중요하다 — 실패 경로는 이미 소리를 내지만 이쪽은
             // "그려졌다"고 보고되면서 물체가 빠진 경우다.
@@ -6367,204 +8445,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         return;
     }
 
-    traceProgress("collect.begin");
-
-    // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
-    // 완료된 것을 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가
-    // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
-    if (nullptr != state.pipeline)
-    {
-        RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
-        LivePipeline& p = *state.pipeline;
-
-        // ── 자산 상주 관리 (②-b · ③) ──
-        //
-        // 셋 다 같은 규약이다: 펜스가 지나야 놓는다. 슬롯 승격이 바로 아래에서
-        // 같은 판정을 하고 있고, 그 옆에 두는 것이 규약을 하나로 유지하는
-        // 방법이다 — "GPU 유휴 시점에 부르라"를 주석에만 적어 두었더니
-        // 아무도 안 불러 128MB가 종료까지 잡혀 있었다(실측).
-        // 프레임 번호 통지, pressure 은퇴, 펜스 완료 묘지 sweep은 backend가
-        // 자기 캐시 구현을 아는 한 경계에서 수행한다.
-        state.dx12.MaintainAssetCaches(state.frameCounter);
-
-        for (LivePipeline::CameraView& view : p.views)
-        {
-            while (!view.pendingQueue.empty())
-            {
-                const int slotIndex = view.pendingQueue.front();
-                if (state.dx12.GetCompletedFenceValue() <
-                    view.slots[slotIndex].fenceValue)
-                {
-                    break;
-                }
-
-                const bool belongsToView =
-                    view.slots[slotIndex].key == view.key;
-                if (belongsToView)
-                {
-                    std::lock_guard<std::mutex> displayLock(
-                        state.displayLifetimeMutex);
-                    view.displaySlot = slotIndex;
-                    ++view.promotionCount;
-                    view.promotedSlotMask |=
-                        (1u << static_cast<uint32_t>(slotIndex));
-                    state.PublishDisplayResultLocked(view.displayTarget, view.key,
-                        view.slots[slotIndex].interopToken,
-                        view.slots[slotIndex].frameId, view.promotionCount,
-                        view.promotedSlotMask, p.width, p.height,
-                        view.slots[slotIndex].sceneEpoch, view.slots[slotIndex].camera,
-                        p.resizeGeneration, view.slots[slotIndex].previewComplete);
-                }
-                view.pendingQueue.erase(view.pendingQueue.begin());
-                view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
-                view.slots[slotIndex].key = {};
-
-                // ★ 검증 레이어를 읽는다. 배선 오류(포맷·상태·디스크립터)는 여기에만
-                //   남는데 아무도 안 읽으면 증상만 보고 추측하게 된다 — 실제로 그
-                //   상태로 며칠을 쫓았다.
-                //
-                //   W8-3: 그 가드가 `_DEBUG` 였다. 그래서 출하 구성에서는 레이어를
-                //   켜도 이 자리가 닫혀 있었고, 계획서 W8 이 판정하라는 "검증 오류 0"
-                //   을 잴 수단이 없었다. 꺼진 실행의 비용은 포인터 하나 검사다.
-                {
-                    std::string validation;
-                    if (0 != state.dx12.DrainDebugMessages(validation) &&
-                        !validation.empty())
-                    {
-                        if (state.reportedValidation.insert(validation).second)
-                        {
-                            std::printf("[dx12.live 검증] %s\n", validation.c_str());
-                        }
-                    }
-                }
-
-                // ★ 수집은 **그 제출의 표로** 한다.
-                //
-                //   예전에는 Collect() 가 token 을 받지 않아 "지금 기록 중인 슬롯" 을
-                //   읽었다. BeginProfilerFrame 은 **뷰마다** 불리고 제출은 인플라이트로
-                //   겈리므로, 펜스가 끝난 제출의 기록을 뒤에 온 제출이 이미 덮어썼을 수
-                //   있었고, 실측에서 수집의 83% 가 그러고 있었다(§0.5.10).
-                //
-                //   이제는 표가 낡았으면 Collect 가 **실패한다.** 그럴듯한 숫자를 내는
-                //   대신 세서 드러낸다 — mismatches 가 0 이 아니면 링이 모자란다는 뜻이고,
-                //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
-                ++state.gpuCollects;
-
-                std::vector<EnhancedLiveGpuSlice> slices;
-                std::vector<EnhancedLivePassTiming> timings;
-                EnhancedLiveGpuSpan span{};
-                std::string collectError;
-                double totalMilliseconds = 0.0;
-                if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
-                    timings, slices, span, totalMilliseconds, collectError))
-                {
-                    state.lastGpuMs = totalMilliseconds;
-                    // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
-                    // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
-                    // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
-                    state.lastPassTimings = std::move(timings);
-                    state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
-                    state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
-                    state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
-                    state.lastGpuSpan = span;
-                    state.gpuQueryOverflowPasses += span.queryOverflowPasses;
-                    if (span.queryOverflowPasses > 0)
-                    {
-                        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                        if (sink.on_issue)
-                            sink.on_issue(static_cast<uint32_t>(
-                                view.slots[slotIndex].profilerToken.engineFrameId),
-                                span.queryOverflowPasses, false, "GPU query slots exhausted");
-                    }
-
-                    // 길이 셋의 관계를 여기서 묻는다. 둘 다 손에 있는 자리가
-                    // 여기뿐이고, 여기서 세야 모든 뷰의 모든 수집이 검사를 받는다.
-                    state.gpuDroppedSlices += span.droppedSlices;
-                    state.gpuZeroLengthSlices += span.zeroLengthSlices;
-                    if (span.busyMs > span.queueSpanMs + 1e-9) ++state.gpuSpanViolations;
-                    // ── 통합 축의 검산(§5.1) ─────────────────────────────────
-                    //
-                    // 변환한 GPU 구간은 **제출을 연 뒤에 시작해서 수집하기 전에**
-                    // 끝나야 한다. 그 바깥으로 나가면 두 시계가 맞지 않는 것이고,
-                    // 그때 GPU 트랙은 그럴듯한 거짓말이 된다. 임계값이 아니라
-                    // 인과라서 하드웨어가 달라도 그대로 선다.
-                    if (!span.cpuAligned)
-                    {
-                        ++state.gpuUnalignedCollects;
-                    }
-                    else
-                    {
-                        if (span.submitToGpuBeginMs < 0.0 || span.gpuEndToCollectMs < 0.0)
-                        {
-                            ++state.gpuAlignmentViolations;
-                        }
-                        // 여유의 **최솟값**을 든다. 평균은 한 번의 큰 어긋남을 가린다.
-                        if (0 == state.gpuAlignedCollects)
-                        {
-                            state.gpuMinSubmitToBeginMs = span.submitToGpuBeginMs;
-                            state.gpuMinEndToCollectMs = span.gpuEndToCollectMs;
-                        }
-                        else
-                        {
-                            state.gpuMinSubmitToBeginMs = (std::min)(
-                                state.gpuMinSubmitToBeginMs, span.submitToGpuBeginMs);
-                            state.gpuMinEndToCollectMs = (std::min)(
-                                state.gpuMinEndToCollectMs, span.gpuEndToCollectMs);
-                        }
-                        state.gpuMaxSubmitToCollectMs = (std::max)(
-                            state.gpuMaxSubmitToCollectMs, span.submitToCollectMs);
-                        ++state.gpuAlignedCollects;
-
-                        // ── EngineDiagnostics 로 귀속(§7.3) ──────────
-                        //
-                        // ★ 여기서만 흘린다. 통합 축이 살아 있고 정렬도
-                        //   맞은 수집만 내보낸다 — 맞지 않는 구간을 레인에
-                        //   얹으면 그럴듯한 자리에 거짓이 그려진다.
-                        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                        if (sink.on_span && span.submitToGpuBeginMs >= 0.0 &&
-                            span.gpuEndToCollectMs >= 0.0)
-                        {
-                            const uint32_t frameLabel = static_cast<uint32_t>(
-                                view.slots[slotIndex].profilerToken.engineFrameId);
-
-                            // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
-                            // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
-                            EnhancedLiveGpuSpanOrigin origin{};
-                            origin.submissionId = static_cast<uint32_t>(
-                                view.slots[slotIndex].profilerToken.submissionId);
-                            origin.renderViewId = static_cast<uint16_t>(
-                                view.slots[slotIndex].profilerToken.renderViewId);
-                            origin.queueId = view.slots[slotIndex].profilerToken.queueId;
-
-                            for (const EnhancedLiveGpuSlice& slice : slices)
-                            {
-                                sink.on_span(slice.name.c_str(), slice.beginCpuTick,
-                                             slice.endCpuTick, frameLabel, origin);
-                                ++state.gpuSpansEmitted;
-                            }
-                            if (sink.on_flush && !slices.empty()) sink.on_flush();
-                        }
-                    }
-
-                    if (span.sliceCount < state.lastPassTimings.size())
-                    {
-                        ++state.gpuSliceUnderflows;
-                    }
-                }
-                else
-                {
-                    ++state.gpuCollectMismatches;
-                    state.lastGpuCollectError = collectError;
-                    const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                    if (sink.on_issue)
-                        sink.on_issue(static_cast<uint32_t>(
-                            view.slots[slotIndex].profilerToken.engineFrameId),
-                            0, true, collectError.c_str());
-                }
-                ++state.framesRendered;
-            }
-        }
-    }
 
     if (sceneLoading || 0 == cameraCount)
     {
@@ -6614,6 +8494,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     traceProgress("pipeline.end");
+    if (!prepareSceneGeometry())
+    {
+        return;
+    }
     LivePipeline& p = *state.pipeline;
     {
         traceProgress("seal.begin");
@@ -6623,52 +8507,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // staleness를 못 잰다.
         p.frameContext.frameId = frame.frameId;
         p.frameContext.sceneEpoch = frame.sceneEpoch;
-        std::string shaderError;
-        if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
-                p.frameContext,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil, shaderError))
-        {
-            state.lastError = "DX12 GBuffer ShaderMeta 초기 적용 실패: " + shaderError;
-            state.TeardownPipeline();
-            state.enabled = false;
-            return;
-        }
-        // 예열 장부: 셰이더 반영·재질 밀봉이 끝난 때(실측 9.36s 구간의 끝).
-        engine::warmup::mark(engine::warmup::stage::shader_meta);
-        if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
-                p.frameContext,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil, shaderError))
-        {
-            state.lastError = "DX12 Forward ShaderMeta 초기 적용 실패: " + shaderError;
-            state.TeardownPipeline();
-            state.enabled = false;
-            return;
-        }
-        if (!state.SealForwardMaterials(frame.forwardShaderMetas,
-                frame.totalSeconds, frame.deltaSeconds,
-                p.forward, p.frameContext,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil, shaderError))
-        {
-            state.lastError = "DX12 Forward Material snapshot 실패: " + shaderError;
-            ++state.frameFailures;
-            return;
-        }
-        if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
-                p.gbuffer, p.frameContext, p.graphMaterials,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil,
-                shaderError))
-        {
-            state.lastError = "DX12 GBuffer Material snapshot 실패: " + shaderError;
-            ++state.frameFailures;
-            return;
-        }
     }
 
     traceProgress("seal.end");
+    if (state.ShouldSkipScenePixels(frame))
+    {
+        return;
+    }
 
     // 뷰 합산 인플라이트. '인플라이트 2 = 링(kFrameCount=3)의 안전 거리'는
     // 제출 총량 기준의 실측이다 — 뷰당 2씩 총 4를 들면 BeginFrame이
@@ -6688,6 +8533,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // frameContext가 draws/lights 벡터의 주소를 들므로 '뷰1 제출 완료 →
     // 뷰2 밀봉'의 순차 흐름만 성립한다. 밀봉을 몰아서 하고 렌더를 몰아서
     // 하면 뷰1의 기록 입력이 뷰2 밀봉으로 재구성되어 무효가 된다.
+    uint32_t consideredViews = 0;
+    uint32_t leaseSkippedViews = 0;
     const uint32_t startIndex = state.viewRotation++ % cameraCount;
     for (uint32_t step = 0; step < cameraCount; ++step)
     {
@@ -6697,6 +8544,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // The diagnostic clock must not enter another camera's temporal history.
         if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
             continue;
+        ++consideredViews;
 
         if (totalPending >= 2)
         {
@@ -6764,7 +8612,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
         if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
             view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete &&
-            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame)
+            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame &&
+            !state.HasGraphSnapshotRequest(viewPacket.displayTarget))
         {
             // Reopening a hidden preview reuses its completed image. The public
             // demand snapshot was cleared while hidden, so publish it again.
@@ -6772,23 +8621,39 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             const auto& cached = view->slots[view->displaySlot];
             state.PublishDisplayResultLocked(view->displayTarget, view->key, cached.interopToken,
                 cached.frameId, view->promotionCount, view->promotedSlotMask, p.width, p.height,
-                cached.sceneEpoch, cached.camera, p.resizeGeneration, true);
+                cached.sceneEpoch, cached.camera, p.resizeGeneration, true,
+                cached.sourceCaptureNanoseconds, cached.completedAgeMs);
             continue;
         }
         int renderSlot = -1;
-        for (int i = 0; i < LivePipeline::kSlotsPerView; ++i)
         {
-            if (i == view->displaySlot) continue;
-            bool pending = false;
-            for (const int pendingIndex : view->pendingQueue)
+            // OpenDisplayTexture도 같은 잠금 아래 소비자 lease를 등록한다.
+            // 선택할 token은 게시 목록에서도 빠져 있어야 잠금을 푼 뒤 새 Host
+            // 조회와 이 슬롯의 기록이 경합하지 않는다.
+            std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
+            for (int i = 0; i < LivePipeline::kSlotsPerView; ++i)
             {
-                if (pendingIndex == i) { pending = true; break; }
+                const auto token = view->slots[i].interopToken;
+                if (i == view->displaySlot ||
+                    std::find(view->pendingQueue.begin(), view->pendingQueue.end(), i) != view->pendingQueue.end() ||
+                    std::find(state.displayPresentationKeys.begin(), state.displayPresentationKeys.end(), token) !=
+                        state.displayPresentationKeys.end())
+                {
+                    continue;
+                }
+                if (state.dx12.CanReuseDisplayTexture(token))
+                {
+                    renderSlot = i;
+                    break;
+                }
             }
-            if (!pending) { renderSlot = i; break; }
         }
         if (renderSlot < 0)
         {
             ++state.framesInFlight;
+            std::lock_guard<std::mutex> queueLock(state.renderQueueMutex);
+            ++state.renderDisplayLeaseSkips;
+            ++leaseSkippedViews;
             continue;
         }
 
@@ -6803,12 +8668,57 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             continue;
         }
 
-        std::string error;
-        bool rendered = false;
+        if (state.ShouldSkipScenePixels(frame))
         {
+            return;
+        }
+        std::string error;
+        const auto admission = state.AdmitViewImages(state.dx12.TextureCache(),
+            !state.pipeline->iblGenerated || state.skyBoxDirty, error);
+        if (admission != LiveState::ImageAdmission::Ready)
+        {
+            ++state.framesIdle;
+            if (admission == LiveState::ImageAdmission::Failed)
+            {
+                state.lastError = "Image preparation failed: " + error;
+                if (state.reportedValidation.insert(state.lastError).second)
+                {
+                    ++state.frameFailures;
+                    Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+                }
+            }
+            else
+            {
+                state.consecutiveFrameFailures = 0;
+            }
+            state.ReleaseStagedImages(state.dx12.TextureCache());
+            continue;
+        }
+        if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+        {
+            state.CompleteImageBootstrap(frame.sceneEpoch, viewPacket.key.viewId);
+        }
+        struct ImageReleaseGuard
+        {
+            LiveState& state;
+            IRenderTextureCache& cache;
+            ~ImageReleaseGuard() { state.ReleaseStagedImages(cache); }
+        };
+        bool rendered = false;
+        bool preparationDeferred = false;
+        LiveGraphSnapshot diagnosticSnapshot;
+        const bool captureDiagnostics = state.ConsumeGraphSnapshotRequest(viewPacket.displayTarget);
+        {
+            ImageReleaseGuard imageRelease{ state, state.dx12.TextureCache() };
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
-            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, error,
-                state.BeginPbrCapture(frame, viewPacket));
+            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, error,
+                state.BeginPbrCapture(frame, viewPacket),
+                captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
+        }
+        if (captureDiagnostics || !rendered)
+        {
+            state.PublishGraphSnapshot(viewPacket.displayTarget,
+                rendered ? std::move(diagnosticSnapshot) : LiveGraphSnapshot{});
         }
         if (!rendered)
         {
@@ -6827,7 +8737,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             // 해 본다 — 링이 되감기므로 대개 그때는 통과한다.
             state.lastError = "프레임 실패: " + error;
             ++state.frameFailures;
-            ++state.consecutiveFrameFailures;
+            if (preparationDeferred)
+            {
+                state.consecutiveFrameFailures = 0;
+            }
+            else
+            {
+                ++state.consecutiveFrameFailures;
+            }
 
             // 같은 문장이 매 프레임 반복되므로 처음 본 것만 찍는다
             // (검증 레이어 메시지와 같은 규약 — 안 그러면 콘솔이 도배돼
@@ -6848,7 +8765,12 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
             continue;
         }
+        if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+        {
+            state.CompleteGeometryView(frame.sceneEpoch, viewPacket.key.viewId);
+        }
         state.consecutiveFrameFailures = 0;
+        state.RecordSceneAdmission(frame);
         ++totalPending;
         state.gpuMaxPendingSubmissions = (std::max)(
             state.gpuMaxPendingSubmissions, static_cast<uint32_t>(totalPending));
@@ -6857,6 +8779,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     if (renderedAny) state.lastCpuMs = watch.ElapsedMs();
+    state.renderDisplayLeaseBlocked = consideredViews != 0 && leaseSkippedViews == consideredViews;
 }
 
 
@@ -6865,12 +8788,6 @@ EnhancedLiveDisplaySnapshot EnhancedSceneRenderer::GetLiveDisplaySnapshot()
     const LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
     return state.displaySnapshot;
-}
-
-uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(
-    EnhancedLiveDisplayTarget target)
-{
-    return GetLiveDisplayTexture(target).textureId;
 }
 
 EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
@@ -6924,6 +8841,9 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
         {
             entry.lastTextureFrameId = acquiredFrame.completedFrameId;
             entry.lastTextureResizeGeneration = acquiredFrame.completedResizeGeneration;
+            entry.lastTextureAgeMs = capture_age_milliseconds(
+                acquiredFrame.completedCaptureNanoseconds, capture_steady_nanoseconds());
+            acquiredFrame.lastTextureAgeMs = entry.lastTextureAgeMs;
         }
         acquiredFrame.ready = textureId != 0;
         return EnhancedLiveDisplayTexture{textureId, textureId ? acquiredFrame.completedWidth : 0,
@@ -6980,10 +8900,17 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
             return observe(0, "cpu_frame_stale");
         }
         // RT 완료와 Host 업로드는 다른 시점이다. 실제 업로드한 픽셀의 카메라만 돌려준다.
+        if (acquiredFrame.completedFrameId != uploaded.m_frame.m_frameId)
+        {
+            // 업로드 메타데이터에는 원본 캡처 시각만 있고 이전 생산자 완료
+            // 관측 시각은 없다. 새 결과의 완료 시간을 옛 픽셀에 붙이지 않는다.
+            acquiredFrame.completedAgeMs = 0.0;
+        }
         acquiredFrame.completedFrameId = uploaded.m_frame.m_frameId;
         acquiredFrame.completedSceneEpoch = uploaded.m_frame.m_sceneEpoch;
         acquiredFrame.completedResizeGeneration = uploaded.m_frame.m_resizeGeneration;
         acquiredFrame.completedCamera = uploaded.m_frame.m_camera;
+        acquiredFrame.completedCaptureNanoseconds = uploaded.m_frame.m_sourceCaptureNanoseconds;
         acquiredFrame.completedWidth = uploaded.m_width;
         acquiredFrame.completedHeight = uploaded.m_height;
         return observe(uploaded.m_textureId, "cpu_frame_missing");
@@ -7228,7 +9155,13 @@ EnhancedSceneRenderer::WarmupStatus EnhancedSceneRenderer::GetWarmupStatus()
 std::string EnhancedSceneRenderer::GetLiveStatus()
 {
     const LiveState& state = GetLiveState();
-    std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
+    // The UI also queries status while the render thread creates driver pipelines.
+    // Never wait for that work, or read mutable pipeline state without the lock.
+    std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::try_to_lock);
+    if (!stateLock.owns_lock())
+    {
+        return "EnhancedRenderer — busy (render state is being updated; retry status shortly)";
+    }
 
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
@@ -7419,8 +9352,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             static_cast<double>(rhiStats.producerWaitNanoseconds) / 1.0e6,
             static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
         status += producerWaitLine;
-        state.AppendGBufferShaderMetaStatus(status);
-        state.AppendForwardShaderMetaStatus(status);
+        state.AppendGBufferMaterialStatus(status);
+        state.AppendForwardMaterialStatus(status);
         if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
         return status;
     }
@@ -7673,8 +9606,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
     status += producerWaitLine;
     if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
-        state.AppendGBufferShaderMetaStatus(status);
-        state.AppendForwardShaderMetaStatus(status);
+        state.AppendGBufferMaterialStatus(status);
+        state.AppendForwardMaterialStatus(status);
     return status;
 }
 
@@ -7685,6 +9618,27 @@ EnhancedLiveDebugSnapshot EnhancedSceneRenderer::GetLiveDebugSnapshot()
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.debugMutex);
     return state.debugSnapshot;
+}
+
+std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>
+EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target)
+{
+    LiveState& state = GetLiveState();
+    const uint32_t index = static_cast<uint32_t>(target);
+    if (index >= kEnhancedLiveDisplayTargetCount)
+    {
+        return {};
+    }
+    const auto display = GetLiveDisplaySnapshot();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    // Completed previews reuse their image. Sample once when the retained graph
+    // is absent or stale, then preserve both the image and its CPU snapshot.
+    if (target != EnhancedLiveDisplayTarget::MaterialPreview || !state.graphSnapshots[index] ||
+        !EnhancedGraphSnapshotMatchesView(*state.graphSnapshots[index], display.Get(target)))
+    {
+        state.graphSnapshotRequests[index] = true;
+    }
+    return state.graphSnapshots[index];
 }
 
 EnhancedLiveTuning EnhancedSceneRenderer::GetLiveTuning()
@@ -7702,14 +9656,53 @@ void EnhancedSceneRenderer::SetLiveTuning(const EnhancedLiveTuning& tuning)
     state.hasPendingTuning = true;
 }
 
+bool EnhancedSceneRenderer::RequestLiveQueueExecutionMode(uint32_t mode,
+    uint64_t& requestId, std::string& error)
+{
+    requestId = 0;
+    error.clear();
+    if (mode > 2)
+    {
+        error = "Queue execution mode must be 0, 1 or 2";
+        return false;
+    }
+    LiveState& state = GetLiveState();
+    {
+        std::lock_guard<std::mutex> lock(state.debugMutex);
+        if (state.queueExecutionStatus.requestId == UINT64_MAX)
+        {
+            error = "Queue execution request range is exhausted";
+            return false;
+        }
+        requestId = ++state.queueExecutionStatus.requestId;
+        state.queueExecutionStatus.requestedMode = mode;
+        state.hasPendingQueueMode.store(true, std::memory_order_release);
+    }
+    SetEvent(state.renderWakeEvent.Get());
+    return true;
+}
+
+EnhancedLiveQueueExecutionStatus EnhancedSceneRenderer::GetLiveQueueExecutionStatus()
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    return state.queueExecutionStatus;
+}
+
 void EnhancedSceneRenderer::ShutdownLive()
 {
     LiveState& state = GetLiveState();
+    InvalidateEnvironmentPreparation(*state.environmentPreparation, true);
     state.StopRenderThread();
     std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
     state.enabled = false;
-    state.TeardownPipeline();
-    state.TeardownVulkanPipeline();
+    const bool dx12Released = state.TeardownPipeline();
+    const bool vulkanReleased = state.TeardownVulkanPipeline();
+    if (!dx12Released || !vulkanReleased)
+    {
+        // Keep scene/interop owners alive for a later proven-idle recovery.
+        return;
+    }
     state.ResetDisplaySnapshot();
 
     state.dx12.ShutdownInterop();
@@ -7717,9 +9710,18 @@ void EnhancedSceneRenderer::ShutdownLive()
     if (state.runtimeInitialized)
     {
         state.skyEquirect.reset();
+        state.skyEquirectImage.reset();
         state.skyCooked.reset();
         state.skyCookIdentity.reset();
         state.skyCookCachePath.clear();
+        state.imageDemands.clear();
+        state.imageBootstrapViews.reset();
+        if (state.textureFramePins)
+        {
+            state.textureFramePins->ReleaseImages();
+        }
+        state.fogBlueNoise.reset();
+        state.fogImagePreparation = own::make_shared<FogImagePreparation>();
         if (state.renderScene)
         {
             // SceneManager::Decommissioning이 활성 RenderScene을 먼저 Finalize한다.

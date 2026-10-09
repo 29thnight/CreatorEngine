@@ -112,7 +112,7 @@ foreach ($file in $sources) {
 $itemAddNames = @($itemAddFiles | Sort-Object)
 Write-Host ("  ItemAdd 를 부르는 파일 " + $itemAddNames.Count + " 개: " + ($itemAddNames -join ', '))
 
-# 계약 대상 — 계획서 §7.1 의 네 family 와 W2-I4 가 더한 패널.
+# 계약 대상 — 계획서 §7.1 의 네 family, W2-I4 패널, 하단 상태 탭.
 #
 # ★ 이 목록은 **허용 목록이기도 하다.** 계획서 §7.1 은 custom draw surface 를
 #   넷으로 제한하는데 실물은 다섯이다(W2-I4 의 `EditorInspectorPanel`). 그
@@ -122,11 +122,11 @@ $contracted = @(
     'EditorModeButton.cpp'
     'EditorPropertyRow.cpp'
     'EditorSectionHeader.cpp'
+    'MenuBarWindow.cpp'
 )
 # 면제 — 계약을 요구하지 않는 자리. **이름으로** 적고 수를 찍는다. 면제가
 # 대상을 통째로 비우면 이 게이트는 아무것도 안 보는 것이다.
 $exempt = @{
-    'ProfilerWindow.cpp' = 'PHASE 14 프로파일러의 타임라인. W2 의 custom draw family 가 아니며 계획서 §7.1 의 허용 목록 밖이다'
 }
 
 $expected = @(($contracted + $exempt.Keys) | Sort-Object)

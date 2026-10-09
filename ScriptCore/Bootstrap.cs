@@ -30,11 +30,13 @@ public static class Bootstrap
             GameThreadSynchronizationContext.Install();
 
             ScriptFactory.Initialize();
+            AssetReleaseQueue.Drain();
             Native.Log(1, "[ScriptCore] 초기화 완료");
             return 0;
         }
         catch
         {
+            Native.Unbind();
             return -2;
         }
     }
@@ -48,6 +50,12 @@ public static class Bootstrap
             return 0;
         }
         catch { return -1; }
+        finally
+        {
+            try { AssetReleaseQueue.Drain(); }
+            catch { /* Native shutdown still invalidates all owner slots. */ }
+            Native.Unbind();
+        }
     }
 
     // ── 틱 진입점 ──
@@ -72,7 +80,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int PrePhysicsTick(float dt)
     {
-        try { using var scope = PrePhysicsProfile.Auto(); ScriptRegistry.PrePhysicsTick(dt); return ScriptRegistry.ActiveCount; }
+        try { AssetReleaseQueue.Drain(); using var scope = PrePhysicsProfile.Auto(); ScriptRegistry.PrePhysicsTick(dt); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(PrePhysicsTick)); return -1; }
     }
 
@@ -80,7 +88,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int PostPhysicsTick(float dt)
     {
-        try { using var scope = PostPhysicsProfile.Auto(); ScriptRegistry.PostPhysicsTick(dt); return ScriptRegistry.ActiveCount; }
+        try { AssetReleaseQueue.Drain(); using var scope = PostPhysicsProfile.Auto(); ScriptRegistry.PostPhysicsTick(dt); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(PostPhysicsTick)); return -1; }
     }
 

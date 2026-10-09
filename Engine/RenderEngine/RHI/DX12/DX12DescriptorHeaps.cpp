@@ -159,6 +159,11 @@ void DX12DescriptorRecycler::OnSubmitted(uint64_t recordingId,
     m_activeVersion = {};
 }
 
+void DX12DescriptorRecycler::RejectSubmission(uint64_t recordingId, RHICompletionPoint completion)
+{
+    m_versions.RejectSubmission(recordingId, completion);
+}
+
 void DX12DescriptorRecycler::AbortRecording(uint64_t recordingId)
 {
     if (!m_versions.AbortRecording(recordingId)) return;

@@ -1,8 +1,26 @@
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <string>
 
 class RHIEncoder;
+
+// 표시 이름은 합쳐질 수 있지만 스케줄 비용은 선언된 패스 한 개에 속한다.
+// 서명은 해시가 아닌 정규화한 선언 원문이다. 길이 접두 필드와 전체 비교로
+// 이름 구분자/해시 충돌을 피하고, 공유 소유권으로 지연 수집까지 원문을 보존한다.
+struct GpuPassTimingIdentity
+{
+    std::shared_ptr<const std::string> graphSignature;
+    uint32_t passIndex{UINT32_MAX};
+
+    bool IsValid() const { return graphSignature && passIndex != UINT32_MAX; }
+    bool operator==(const GpuPassTimingIdentity& other) const
+    {
+        return passIndex == other.passIndex &&
+            (graphSignature == other.graphSignature ||
+                (graphSignature && other.graphSignature && *graphSignature == *other.graphSignature));
+    }
+};
 
 /// 한 GPU 제출을 가리키는 표(§3.3).
 ///
@@ -32,6 +50,10 @@ struct GpuFrameToken
     uint32_t ringSlot{ kInvalidRingSlot };
     uint8_t  queueId{ 0 };
 
+    // Capture admission belongs to this submission, never the collection frame.
+    // Zero means diagnostic timing only; it must not enter a later capture.
+    uint64_t captureGeneration{ 0 };
+
     bool IsValid() const { return kInvalidRingSlot != ringSlot; }
 };
 
@@ -44,7 +66,8 @@ public:
 
     virtual ~IRHIGpuProfiler() = default;
 
-    virtual uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) = 0;
+    virtual uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
+        const GpuPassTimingIdentity& identity = {}) = 0;
     virtual void EndPass(RHIEncoder& encoder, uint32_t slot) = 0;
 };
 

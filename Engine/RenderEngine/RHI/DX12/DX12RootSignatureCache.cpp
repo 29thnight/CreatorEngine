@@ -233,7 +233,7 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
     //   (RHIPipelineState.h 의 ★). 그 안정성이 여기 이 인자 하나에 걸려 있다.
     CacheEntry entry{};
     entry.signature = signature;
-    entry.handle = m_resources->RegisterPipelineLayout(signature.Get(), hash);
+    entry.handle = m_resources->RegisterPipelineLayout(signature.Get(), hash, desc.allowInputAssembler);
     if (!entry.handle.IsValid())
     {
         ++m_stats.failures;

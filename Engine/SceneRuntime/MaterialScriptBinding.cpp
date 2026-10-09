@@ -43,13 +43,13 @@ bool SetGraphValue(Material& material, std::string_view name, LX::LXSocketValue 
     return parameter && material.TrySetMaterialGraphParameter(parameter->id, std::move(value), error);
 }
 
-[[nodiscard]] std::shared_ptr<const ShaderMeta> ResolveDeclaredMeta(const Material& material)
+[[nodiscard]] own::shared_owner<const ShaderMeta> ResolveDeclaredMeta(const Material& material)
 {
     if (FileGuid{} == material.m_shaderMetaGuid)
         return nullptr;
     std::string error;
-    const ShaderMetaHandle handle = DataSystems->LoadShaderMetaHandle(material.m_shaderMetaGuid, error);
-    return DataSystems->ResolveShaderMeta(handle);
+    ShaderMetaHandle handle;
+    return DataSystems->LoadShaderMetaOwner(material.m_shaderMetaGuid, handle, error);
 }
 
 [[nodiscard]] const ShaderPropertyDesc* FindDesc(const ShaderMeta& meta, std::string_view name)
@@ -257,7 +257,7 @@ bool SetFloat(Material& material, std::string_view name, float value, experiment
     {
         return SetGraphValue(material, name, double(value));
     }
-    const std::shared_ptr<const ShaderMeta> meta = ResolveDeclaredMeta(material);
+    const own::shared_owner<const ShaderMeta> meta = ResolveDeclaredMeta(material);
     return meta && SetFloat(material, *meta, name, value, instance);
 }
 
@@ -271,7 +271,7 @@ bool SetInt(Material& material, std::string_view name, std::int32_t value, exper
                              parameter->type == LX::PinType::Bool ? LX::LXSocketValue(value != 0)
                                                                   : LX::LXSocketValue(std::int64_t(value)));
     }
-    const std::shared_ptr<const ShaderMeta> meta = ResolveDeclaredMeta(material);
+    const own::shared_owner<const ShaderMeta> meta = ResolveDeclaredMeta(material);
     // Bool 선언에도 int를 받는 관용은 코어가 유지하고, 인스턴스에는 코어가
     // 선언 타입대로 싣는다 — packer가 fail-closed로 검증한다.
     return meta && SetInt(material, *meta, name, value, instance);
@@ -327,9 +327,9 @@ void SetBaseColor(Material& material, const math::color& color, experiment::Mate
                      math::vector4{color.r, color.g, color.b, color.a});
 }
 
-std::shared_ptr<Material> InstantiateOwned(const Material& origin, std::string_view newName)
+own::shared_owner<Material> InstantiateOwned(const Material& origin, std::string_view newName)
 {
-    auto clone = std::make_shared<Material>(origin);
+    auto clone = own::make_shared<Material>(origin);
     clone->m_name = newName.empty() ? origin.m_name + "_Instance" : std::string(newName);
     // S2c-1: m_fileGuid 비승계 — 클론은 자산이 아니라 씬 소유 인스턴스다.
     // 예전에는 MeshRenderer가 mesh 해석에 재질 fileGuid를 재사용하는

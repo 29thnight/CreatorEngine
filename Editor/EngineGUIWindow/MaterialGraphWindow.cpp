@@ -26,9 +26,11 @@
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include <imgui_stdlib.h>
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <mutex>
+#include <memory>
 #include <fstream>
 #include <limits>
 #include <chrono>
@@ -47,9 +49,19 @@ namespace editor::material_editing
             FileGuid graphGuid;
             std::filesystem::path shaderDirectory;
             std::filesystem::path cacheDirectory;
-            std::shared_ptr<const material_graph::Generation> generation;
+            own::shared_owner<const material_graph::Generation> generation;
             std::string error;
         };
+
+        bool SameMaterial(const own::shared_owner<const Material>& left,
+                          const own::shared_owner<const Material>& right)
+        {
+            if (!left || !right)
+            {
+                return !left && !right;
+            }
+            return std::addressof(*left) == std::addressof(*right);
+        }
 
         std::uint64_t previewSerial = 0;
 
@@ -93,9 +105,9 @@ namespace editor::material_editing
             FileGuid materialGuid;
             std::filesystem::path materialPath;
             std::string materialDiskPayload;
-            std::shared_ptr<Material> sourceMaterial;
-            std::shared_ptr<Material> acceptedMaterial;
-            std::shared_ptr<Material> preparedMaterial;
+            own::shared_owner<const Material> sourceMaterial;
+            own::shared_owner<const Material> acceptedMaterial;
+            own::shared_owner<Material> preparedMaterial;
             material_graph::InstanceDescription defaults;
             std::uint64_t settingsRevision = 0;
             std::uint64_t savedSettingsRevision = 0;
@@ -114,7 +126,7 @@ namespace editor::material_editing
             bool persistedGraph = false;
             bool previewPending = true;
             std::string previewError;
-            std::shared_ptr<PreviewWork> previewWork;
+            own::shared_owner<PreviewWork> previewWork;
             job_handle previewJob;
             std::filesystem::path path;
             LXMaterialAsset asset;
@@ -139,11 +151,11 @@ namespace editor::material_editing
             bool confirmReload = false;
             bool previewPinned = false;
             std::chrono::steady_clock::time_point previewVisible{};
-            std::shared_ptr<const material_graph::SceneMaterialSource> previewSource;
+            own::shared_owner<const material_graph::SceneMaterialSource> previewSource;
             std::uint64_t previewRevision = 0;
 
             Session(FileGuid identity, std::filesystem::path source, LXMaterialAsset material,
-                    std::shared_ptr<Material> base, bool graphOnDisk, bool materialOnDisk)
+                    own::shared_owner<const Material> base, bool graphOnDisk, bool materialOnDisk)
                 : guid(identity), materialGuid(base->m_fileGuid), sourceMaterial(base),
                     persistedMaterial(materialOnDisk),
                   persistedGraph(graphOnDisk), path(std::move(source)), asset(std::move(material)),
@@ -349,7 +361,7 @@ namespace editor::material_editing
                     message = "Apply the current draft first. Save persists the accepted material and graph.";
                     return false;
                 }
-                if (DataSystems->FindCachedMaterial(materialGuid) != acceptedMaterial)
+                if (!SameMaterial(DataSystems->FindCachedMaterial(materialGuid), acceptedMaterial))
                 {
                     message = "The accepted asset changed. Reload its saved draft before saving.";
                     return false;
@@ -397,8 +409,8 @@ namespace editor::material_editing
                               : "Apply failed; the accepted material is unchanged. " + previewError;
                     return false;
                 }
-                if (preparedMaterial == acceptedMaterial &&
-                    DataSystems->FindCachedMaterial(materialGuid) == acceptedMaterial)
+                if (acceptedMaterial && appliedDocument == document.DocumentId() && appliedRevision == Revision() &&
+                    SameMaterial(DataSystems->FindCachedMaterial(materialGuid), acceptedMaterial))
                 {
                     message = "This draft is already applied. Save to retain it on disk.";
                     return true;
@@ -411,7 +423,12 @@ namespace editor::material_editing
                 {
                     return false;
                 }
-                acceptedMaterial = preparedMaterial;
+                acceptedMaterial = DataSystems->FindCachedMaterial(materialGuid);
+                if (!acceptedMaterial)
+                {
+                    message = "The published material is no longer available. Reload before saving.";
+                    return false;
+                }
                 sourceMaterial = acceptedMaterial;
                 appliedRevision = Revision();
                 appliedDocument = document.DocumentId();
@@ -437,12 +454,12 @@ namespace editor::material_editing
                 const auto beforeGuid = renderer.m_materialBaseGuid;
                 const auto beforeBase = renderer.GetMaterialAssetBase();
                 const auto beforeState = renderer.GetMaterialAssetReferenceState();
-                const auto candidate = std::make_shared<Material>(*acceptedMaterial);
+                const auto candidate = own::make_shared<Material>(*acceptedMaterial);
                 const auto handle = owner->GetScene()->HandleOf(owner->m_index);
-                const auto apply = [handle,
-                    identity = renderer.GetInstanceID()](const std::shared_ptr<Material>& material,
-                                      FileGuid baseGuid, const std::shared_ptr<const Material>& base,
-                                      const std::shared_ptr<const MaterialAssetReferenceState>& state) {
+                const auto apply = [handle, identity = renderer.GetInstanceID()](
+                                       const own::shared_owner<Material>& material, FileGuid baseGuid,
+                                       const own::shared_owner<const Material>& base,
+                                       const own::shared_owner<const MaterialAssetReferenceState>& state) {
                     auto* scene = SceneManagers->GetActiveScene();
                     auto* object = scene ? scene->Resolve(handle) : nullptr;
                     auto* component = object ? object->GetComponent<MeshRenderer>() : nullptr;
@@ -488,7 +505,7 @@ namespace editor::material_editing
                     }
                     if (workDocument == document.DocumentId() && workRevision == revision)
                     {
-                        auto candidate = std::make_shared<Material>(*sourceMaterial);
+                        auto candidate = own::make_shared<Material>(*sourceMaterial);
                         candidate->m_name = name;
                         candidate->m_fileGuid = materialGuid;
                         candidate->m_doubleSided = doubleSided;
@@ -529,7 +546,7 @@ namespace editor::material_editing
                 {
                     return;
                 }
-                auto work = std::make_shared<PreviewWork>();
+                auto work = own::make_shared<PreviewWork>();
                 work->graph = Snapshot();
                 work->graphGuid = guid;
                 work->shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
@@ -670,7 +687,7 @@ namespace editor::material_editing
         std::mutex sessionMutex;
         std::vector<std::unique_ptr<Session>> sessions;
         Session* active = nullptr;
-        std::shared_ptr<const material_graph::SceneMaterialSource> inspectorPreview;
+        own::shared_owner<const material_graph::SceneMaterialSource> inspectorPreview;
         std::uint64_t inspectorPreviewRevision{};
         std::chrono::steady_clock::time_point inspectorPreviewVisible{};
         std::uint32_t observedSceneId{};
@@ -695,9 +712,9 @@ namespace editor::material_editing
             }
         }
 
-        std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> previewFloor;
+        std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> previewFloor;
         std::string previewFloorError;
-        std::shared_ptr<PreviewWork> previewFloorWork;
+        own::shared_owner<PreviewWork> previewFloorWork;
         job_handle previewFloorJob;
 
         bool PreparePreviewFloor()
@@ -769,7 +786,7 @@ namespace editor::material_editing
             asset.graph.Connect(pin(surface, "BSDF"), pin(asset.activeOutput, "Surface"));
             material_graph::InstanceDescription description;
             Uuid::TryParse("815d8195-c028-4819-8626-8d41f532fb42", description.graphId.value);
-            auto work = std::make_shared<PreviewWork>();
+            auto work = own::make_shared<PreviewWork>();
             work->graph = std::move(asset);
             work->graphGuid = FileGuid(description.graphId.value);
             work->shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
@@ -807,7 +824,7 @@ namespace editor::material_editing
             return asset;
         }
 
-        bool OpenAssetLocked(const std::shared_ptr<Material>& material, std::string& error, bool create = false,
+        bool OpenAssetLocked(const own::shared_owner<const Material>& material, std::string& error, bool create = false,
                              const LXMaterialAsset* draft = nullptr)
         {
             if (shuttingDown || !PathFinder::IsAssetAuthoringEnabled())
@@ -824,7 +841,7 @@ namespace editor::material_editing
                     return true;
                 }
             }
-            auto base = material ? material : std::make_shared<Material>();
+            auto base = material ? material : own::make_shared<Material>();
             LXMaterialAsset graph;
             const auto instance = base->GetMaterialGraphInstance();
             FileGuid graphGuid = instance ? FileGuid(instance->description.graphId.value) : FileGuid{};
@@ -850,16 +867,17 @@ namespace editor::material_editing
             }
             if (create)
             {
-                base = std::make_shared<Material>(*base);
-                base->m_fileGuid = FileGuid::CreateRandomV4();
-                if (base->m_name.empty())
+                auto created = own::make_shared<Material>(*base);
+                created->m_fileGuid = FileGuid::CreateRandomV4();
+                if (created->m_name.empty())
                 {
-                    base->m_name = "Material_" + base->m_fileGuid.ToString().substr(0, 8);
+                    created->m_name = "Material_" + created->m_fileGuid.ToString().substr(0, 8);
                 }
                 else
                 {
-                    base->m_name = std::filesystem::path(base->m_name).filename().string() + " Copy";
+                    created->m_name = std::filesystem::path(created->m_name).filename().string() + " Copy";
                 }
+                base = std::move(created);
                 graphGuid = FileGuid::CreateRandomV4();
                 graphPath = PathFinder::RelativeToMaterial("") / ("Material_" + graphGuid.ToString() + ".shadergraph");
             }
@@ -879,7 +897,7 @@ namespace editor::material_editing
         bool OpenLocked(MeshRenderer& renderer, std::string& error, bool create = false)
         {
             ReconcileSceneLocked();
-            std::shared_ptr<Material> material;
+            own::shared_owner<const Material> material;
             if (!create && renderer.m_materialBaseGuid != FileGuid{})
             {
                 material = DataSystems->LoadMaterialShared(renderer.m_materialBaseGuid);
@@ -1525,7 +1543,7 @@ namespace editor::material_editing
             }
             else if (action == MaterialBarAction::SaveAs)
             {
-                auto source = std::make_shared<Material>(*session.sourceMaterial);
+                auto source = own::make_shared<Material>(*session.sourceMaterial);
                 source->m_name = session.name;
                 const auto graph = session.Snapshot();
                 if (OpenAssetLocked(source, session.message, true, &graph))
@@ -1814,7 +1832,8 @@ namespace editor::material_editing
             ImGui::TextDisabled("Apply a Surface graph to preview this material.");
             return;
         }
-        if (!inspectorPreview || inspectorPreview->instance != source->instance ||
+        if (!inspectorPreview || !inspectorPreview->instance ||
+            std::addressof(*inspectorPreview->instance) != std::addressof(*source->instance) ||
             inspectorPreview->coverage.flags != source->coverage.flags)
         {
             inspectorPreview = std::move(source);
@@ -1868,7 +1887,10 @@ namespace editor::material_editing
             request.materialPreviewFloor = previewFloor;
             return true;
         }
-        if (inspectorPreview && now - inspectorPreviewVisible <= std::chrono::milliseconds(250) &&
+        // A pinned draft owns the preview view even when its coverage cannot be
+        // displayed; the Inspector must not silently replace that material.
+        if ((!active || !active->previewPinned) && inspectorPreview &&
+            now - inspectorPreviewVisible <= std::chrono::milliseconds(250) &&
             !(inspectorPreview->coverage.flags & EnhancedMaterialCoverage::Blended))
         {
             request = {};

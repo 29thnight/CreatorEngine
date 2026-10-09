@@ -2,6 +2,7 @@
 
 #include "ImGui.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -50,6 +51,18 @@ namespace editor
     {
         const ImGuiStyle& style = ImGui::GetStyle();
         return logicalPixels * style.FontScaleMain * style.FontScaleDpi;
+    }
+
+    float TitleBarFramePaddingY(float fontHeight, float safePaddingY, float framebufferScaleY) noexcept
+    {
+        // Win32 client coordinates already are physical pixels in our per-monitor
+        // aware hosts (framebuffer scale 1). Do not multiply this floor by DPI or
+        // user scale again. Larger scaled fonts/safe areas may still grow the row.
+        // ImGui truncates window sizes, so round the reserved coordinate upward.
+        const float paddedFontHeight = fontHeight + 2.f * std::max(0.f, safePaddingY);
+        const float physicalMinimum = EditorThemeTokens::TitleBarHeight / valid_scale(framebufferScaleY);
+        const float minimumHeight = std::ceil(std::max(physicalMinimum, paddedFontHeight));
+        return (minimumHeight - fontHeight) * .5f;
     }
 
     TabStyleScope::TabStyleScope()

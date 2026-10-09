@@ -12,6 +12,8 @@
 #include <system_error>
 #include <mutex>
 #include <stdexcept>
+#include <sstream>
+#include <cstdio>
 
 static_assert(IMGUI_VERSION_NUM == 19280, "Revalidate workspace docking adapter for the new ImGui version");
 namespace editor
@@ -251,6 +253,26 @@ namespace editor
         auto restored=document;
         if(restored.monitors.empty() || restored.monitors!=current_monitor_fingerprint())
             restored.ini=workspace::strip_viewport_positions(restored.ini);
+        // Older layouts saved our main dockspace as a floating DockNode.
+        // Promote only this exact root before NewFrame can attach its children;
+        // retain the user's split tree, positions, sizes and floating groups.
+        const ImGuiID mainDockspaceId = ImHashStr("MainWindowGroup", 0, ImHashStr("Debug##Default"));
+        char rootIdentity[32]{};
+        std::snprintf(rootIdentity, sizeof(rootIdentity), "ID=0x%08X", mainDockspaceId);
+        std::istringstream savedIni{restored.ini};
+        std::ostringstream migratedIni;
+        std::string line;
+        while (std::getline(savedIni, line))
+        {
+            const auto start = line.find_first_not_of(" \t");
+            if (start != std::string::npos && line.compare(start, 8, "DockNode") == 0 &&
+                line.find("Parent=") == std::string::npos && line.find(rootIdentity) != std::string::npos)
+            {
+                line.replace(start, 8, "DockSpace");
+            }
+            migratedIni << line << '\n';
+        }
+        restored.ini = migratedIni.str();
         ImGui::LoadIniSettingsFromMemory(restored.ini.data(),restored.ini.size());
         m_document=std::move(restored);
         // 파일이 든 preset 이 없는 이름이면(손으로 고쳤거나 옛 판) 기본으로 돌린다.

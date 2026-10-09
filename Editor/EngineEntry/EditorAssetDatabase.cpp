@@ -1,3 +1,5 @@
+#include <optional>
+#include <atomic>
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ProjectLayerSettingsCodec.h"
@@ -30,6 +32,7 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <map>
 #include <regex>
@@ -616,6 +619,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		m_watcher.reset();
 	}
 
+    std::uint64_t AudioRevision() const noexcept
+    {
+        return m_audioRevision.load(std::memory_order_acquire);
+    }
+
 	bool IsSupportExtension(std::string_view extension) const
 	{
 		return m_registeredFiles.contains(ToLower(std::string(extension)));
@@ -626,6 +634,46 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	{
 		std::lock_guard lock(m_authoringMutex);
 		return CreateMetaLocked(targetFile, preferredGuid);
+	}
+
+	bool SetModelMeshletsAndReimport(const file::path& requestedSource, bool enabled)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path source = file::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, file::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source))
+		{
+			return false;
+		}
+		file::path sidecar = source;
+		sidecar += ".meta";
+		const FileGuid existing = LoadGuidFromMeta(sidecar);
+		if (!assets::IsUuidV8(existing.m_guid))
+		{
+			return false;
+		}
+		return CreateMetaLocked(source, {}, existing, enabled) == existing;
+	}
+
+	bool SetModelLodsAndReimport(const file::path& requestedSource, std::uint32_t levels)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path source = file::weakly_canonical(requestedSource, error);
+		if (error || levels > 7u || !IsPathInside(source, file::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source))
+		{
+			return false;
+		}
+		file::path sidecar = source;
+		sidecar += ".meta";
+		const FileGuid existing = LoadGuidFromMeta(sidecar);
+		if (!assets::IsUuidV8(existing.m_guid))
+		{
+			return false;
+		}
+		return CreateMetaLocked(source, {}, existing, {}, levels) == existing;
 	}
 
 	bool RecoverModel(const file::path& requestedSource, FileGuid expectedId)
@@ -737,16 +785,18 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		return CreateMetaLocked(destination, preferredGuid);
 	}
 
-    bool SaveMaterialGraph(Material& material, const LX::LXMaterialAsset& graph,
+    bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
                            const file::path& requestedGraphPath, FileGuid graphGuid, std::string& error)
     {
         std::lock_guard lock(m_authoringMutex);
         error.clear();
         const auto accepted = DataSystems->FindCachedMaterial(material.m_fileGuid);
         const auto& instance = material.GetMaterialGraphInstance();
-        if (!PathFinder::IsAssetAuthoringEnabled() || accepted.get() != &material || !instance ||
+        const auto acceptedGeneration = DataSystems->ResolveMaterialGraphGeneration(graphGuid);
+        if (!PathFinder::IsAssetAuthoringEnabled() || !accepted || std::addressof(*accepted) != &material || !instance ||
             !material.m_fileGuid.IsRandomV4() || instance->description.graphId.value != graphGuid.m_guid ||
-            DataSystems->ResolveMaterialGraphGeneration(graphGuid) != instance->generation)
+            !acceptedGeneration || !instance->generation ||
+            std::addressof(*acceptedGeneration) != std::addressof(*instance->generation))
         {
             error = "Apply the current material draft before saving; its accepted asset changed.";
             return false;
@@ -788,7 +838,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
         };
         std::vector<SavedFile> files;
         Authoring::WriteDocument materialDocument;
-        if (!DataSystems->SerializeMaterialPayload(material, materialDocument.Root()))
+        Material serializedMaterial(material);
+        if (!DataSystems->SerializeMaterialPayload(serializedMaterial, materialDocument.Root()))
         {
             error = "The accepted material cannot be serialized.";
             return false;
@@ -1569,6 +1620,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			default:
 				break;
 			}
+            if (IsAudioAssetPath(filepath) || IsAudioAssetPath(directoryPath / oldFilename))
+            {
+                m_audioRevision.fetch_add(1u, std::memory_order_release);
+            }
 		}
 		catch (const std::exception& exception)
 		{
@@ -1739,6 +1794,16 @@ private:
 			lower.find("~$") != std::string::npos;
 	}
 
+    bool IsAudioAssetPath(file::path path) const
+    {
+        if (path.extension() == ".meta")
+        {
+            path.replace_extension();
+        }
+        const auto extension = ToLower(path.extension().string());
+        return assets::IsAudioClipSource(path) || extension == ".soundgraph" || extension == ".soundpreset";
+    }
+
     bool IsCookedArtifactPath(const file::path& path) const
     {
         const auto relative = path.lexically_normal().lexically_relative(m_root.lexically_normal());
@@ -1791,12 +1856,32 @@ private:
 		for (const auto& entry : file::recursive_directory_iterator(
 			m_root, file::directory_options::skip_permission_denied))
 		{
-			if (!entry.is_regular_file() || !IsTargetFile(entry.path())) continue;
+			if (!entry.is_regular_file() || !IsTargetFile(entry.path()))
+			{
+				continue;
+			}
 			const file::path metaPath = entry.path().string() + ".meta";
 			if (file::exists(metaPath))
+			{
+				// Existing GUID-only audio sidecars predate the import policy.
+				// Migrate them through the normal validated importer, preserving
+				// their identity; malformed/current policies still fail closed.
+				if (assets::IsAudioClipSource(entry.path()))
+				{
+					std::string parseError;
+					const auto prior = Authoring::WriteDocument::ParseFile(metaPath, &parseError);
+					if (prior && prior->Root().IsMap() && !prior->Root().HasChild("audioClip"))
+					{
+						CreateMeta(entry.path());
+						continue;
+					}
+				}
 				RegisterMetaFile(metaPath);
+			}
 			else
+			{
 				CreateMeta(entry.path());
+			}
 		}
 	}
 
@@ -1911,7 +1996,8 @@ private:
 	}
 
 	FileGuid CreateMetaLocked(const file::path& targetFile,
-		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {})
+		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {},
+		std::optional<bool> buildMeshlets = {}, std::optional<std::uint32_t> lodLevels = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
 		if (ToLower(targetFile.extension().string()) == ".cegeometry")
@@ -1944,6 +2030,8 @@ private:
 			request.generationRoot = m_root.parent_path()
 				/ "Library" / "ModelAssetGenerations";
 			request.expectedModelId = expectedModelId.m_guid;
+			request.buildMeshlets = buildMeshlets;
+			request.lodLevels = lodLevels;
 			const assets::ModelAssetAuthoringResult result =
 				assets::AuthorModelAsset(request);
 			if (!result.Succeeded())
@@ -1953,6 +2041,10 @@ private:
 						+ issue.message + " (" + targetFile.string() + ")");
 				return {};
 			}
+            for (const auto& warning : result.warnings)
+            {
+                Debug::PrintLog(spdlog::level::warn, "Model authoring [" + warning.stage + "]: " + warning.message);
+            }
 			const FileGuid guid(result.modelAssetId);
 			m_modelSourceImports[targetFile.lexically_normal()] = ReadModelSourceStamp(targetFile);
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
@@ -1995,9 +2087,22 @@ private:
 		std::string audioSpatialKind = "NonSpatial";
 		if (audioSource)
 		{
+            if (root.Read().HasChild("loopStartFrame") || root.Read().HasChild("loopEndFrame"))
+            {
+                Debug::PrintLog(spdlog::level::err,
+                    "Audio .meta loop markers are unsupported by CEAC v1: " + metaPath.string());
+                return {};
+            }
 			const Authoring::ReadNode prior = root.Read()["audioClip"];
 			if (prior)
 			{
+                if (prior.HasChild("loopStartFrame") || prior.HasChild("loopEndFrame")
+                    || root.Read().HasChild("loopStartFrame") || root.Read().HasChild("loopEndFrame"))
+                {
+                    Debug::PrintLog(spdlog::level::err,
+                        "Audio .meta loop markers require a newer CEAC schema; only whole-clip looping is supported: " + metaPath.string());
+                    return {};
+                }
 				if (!prior.IsMap() || prior["schemaVersion"].As(0u)
 					!= assets::kAudioClipMetaSchemaVersion
 					|| !prior["loadMode"].IsScalar()
@@ -2077,6 +2182,10 @@ private:
 
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
 			RuntimeAssetType::Auto, guid, targetFile });
+        if (IsAudioAssetPath(targetFile))
+        {
+            m_audioRevision.fetch_add(1u, std::memory_order_release);
+        }
 		return guid;
 	}
 
@@ -2287,6 +2396,13 @@ private:
 			ReloadChangedModel(filepath);
 			return;
 		}
+        if (assets::IsAudioClipSource(filepath))
+        {
+            // Reinspect import metadata through the existing watcher event.
+            // Playback reload itself is deferred to the host's game thread.
+            (void)CreateMeta(filepath);
+            return;
+        }
 		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
 		// dependency와 다른 asset cache의 reload 정책은 같은 이벤트라는 이유로
 		// 추측해 넓히지 않는다.
@@ -2309,6 +2425,7 @@ private:
         DataSystems->QueueAssetChange({RuntimeAssetChangeKind::ContentReload, type, guid, filepath});
 	}
 
+    std::atomic<std::uint64_t> m_audioRevision{ 1u };
 	file::path m_root;
 	std::mutex m_authoringMutex;
     std::map<file::path, std::optional<Hash::Sha256Digest>> m_materialAuthoringWrites;
@@ -2319,8 +2436,8 @@ private:
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
-		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
-		".wav", ".mp3", ".flac", ".spritefont",
+		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".cs",
+		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
 		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity
@@ -2547,7 +2664,7 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
     return true;
 }
 
-bool EditorAssetDatabase::SaveMaterialGraph(Material& material, const LX::LXMaterialAsset& graph,
+bool EditorAssetDatabase::SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
                                             const file::path& graphPath, FileGuid graphGuid, std::string& error)
 {
     if (!m_impl)
@@ -2709,4 +2826,20 @@ bool EditorAssetDatabase::ReplaceCollisionGeometry(const file::path& destination
     const ce::physics::CollisionGeometrySource& replacement)
 {
     return m_impl && m_impl->ReplaceCollisionGeometry(destination, expected, replacement);
+}
+
+std::uint64_t EditorAssetDatabase::AudioRevision() const noexcept
+{
+    return m_impl ? m_impl->AudioRevision() : 0u;
+}
+
+// Called through the game-thread command service by the Content Browser menu.
+bool EditorAssetDatabase::SetModelMeshletsAndReimport(const file::path& source, bool enabled)
+{
+	return m_impl && m_impl->SetModelMeshletsAndReimport(source, enabled);
+}
+
+bool EditorAssetDatabase::SetModelLodsAndReimport(const file::path& source, std::uint32_t levels)
+{
+	return m_impl && m_impl->SetModelLodsAndReimport(source, levels);
 }

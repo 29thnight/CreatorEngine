@@ -117,14 +117,13 @@ $contracted = @(
 )
 # 면제 — 이름으로 적고 이유를 남긴다.
 $exempt = @{
-    'ProfilerWindow.cpp'  = 'PHASE 14 프로파일러의 타임라인. 자기 클립 안에서만 그리고 W2 의 custom draw family 가 아니다'
     'HierarchyWindow.cpp' = '평탄 목록의 행. W7-3 의 clipper 와 자기 PushClipRect 로 이미 잘리고, 이름 전체는 행 자체가 보여 준다'
     'ContentsBrowserWindow.cpp' = 'W7-1 스냅샷의 타일·트리. 자기 PushClipRect 안에서만 그린다'
     'InspectorWindow.cpp' = '패널 바깥의 머리글. custom draw family 가 아니라 창 본문이다'
     'SceneViewWindow.cpp' = 'W4 의 캔버스 위 안내 문구. 캔버스 클립 안이다'
     'EditorWindowChrome.cpp' = '창 프레임의 제목. 겹칠 상황이면 자르는 대신 **아예 그리지 않는다** — 잘라 그리기와 다른 전략이고 그 조건이 소스에 그대로 있다'
     'GameViewWindow.cpp' = '카메라 없음 안내. 글자가 상수라 사용자 데이터로 늘어나지 않는다'
-    'MenuBarWindow.cpp' = '메뉴 아이콘과 BT 노드 편집기. ★ 노드 편집기 두 자리(node.Name·node.ScriptName)는 사용자 이름을 고정 폭 상자에 자르지 않고 그린다 — 같은 결함의 실제 사례이지만 계획서 §7.1 이 node editor 를 범위 밖으로 못 박았다. 별도 작업으로 남긴다'
+    'MenuBarWindow.cpp' = '하단 상태 탭은 clipping 계약을 직접 신고한다. 나머지 메뉴 아이콘과 BT 노드 편집기는 면제한다. ★ 노드 편집기 두 자리(node.Name·node.ScriptName)는 사용자 이름을 고정 폭 상자에 자르지 않고 그린다 — 같은 결함의 실제 사례이지만 계획서 §7.1 이 node editor 를 범위 밖으로 못 박았다. 별도 작업으로 남긴다'
 }
 
 $expected = @($contracted + @($exempt.Keys) | Sort-Object -Unique)

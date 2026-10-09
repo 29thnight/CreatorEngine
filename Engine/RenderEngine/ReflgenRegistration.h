@@ -13,4 +13,4 @@
 //   ② 반영 header 가 전방 선언만 하는 필드 타입의 정의 — 서술된 타입이 여기서 불완전하면 그 서술(생성된 describe())이
 //      실체화되며 컴파일이 멈춘다. 새로 생기면 그 타입의 header 를 여기에 더한다.
 #include "ReflectionTypedYml.h"
-#include "Material.h" // MeshRenderer::m_Material(std::shared_ptr<Material>) — MeshRenderer.h 는 전방 선언만 한다
+#include "Material.h" // MeshRenderer::m_Material(own::shared_owner<Material>) — MeshRenderer.h 는 전방 선언만 한다

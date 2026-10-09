@@ -25,7 +25,7 @@ $previousValidation = $env:CREATOR_DX12_VALIDATION
 $proc = $null
 try {
     $dependency = if ($Configuration -eq 'Debug') {'debug/bin'} else {'bin'}
-    $env:PATH = "$repo/vcpkg_installed/x64-windows/$dependency;$(Split-Path $exe);$previousPath"
+    $env:PATH = "$repo/vcpkg_installed/x64-windows/x64-windows/$dependency;$repo/vcpkg_installed/x64-windows/$dependency;$(Split-Path $exe);$previousPath"
     $env:CREATOR_DX12_VALIDATION = 'gpu'
     $proc = Start-Process $exe -ArgumentList @($repo, '--rg5-mixed') -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru -RedirectStandardOutput "$output/stdout.log" -RedirectStandardError "$output/stderr.log"
     $deadline = [DateTime]::UtcNow.AddMinutes(10)
@@ -51,7 +51,7 @@ try {
     if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -cne $exeHash) {
         throw 'Executable changed during acceptance'
     }
-    [ordered]@{configuration=$Configuration; passed=$true; exitCode=$proc.ExitCode; policies=3; frames=72; components=6804; maxError=[double]::Parse($marker.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture); validationProblems=0; executable=$exe; executableSha256=$exeHash; productDefault='DeclarationOrder'; rg5Complete=$false} |
+    [ordered]@{configuration=$Configuration; passed=$true; exitCode=$proc.ExitCode; policies=3; frames=72; components=6804; maxError=[double]::Parse($marker.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture); validationProblems=0; executable=$exe; executableSha256=$exeHash; productDefault='ExplicitVersioned/DependencyOrder'; rg5Complete=$false} |
         ConvertTo-Json -Depth 5 | Set-Content "$output/result.json" -Encoding utf8
     "RG5_MIXED_CONFIGURATION_OK $Configuration"
 } finally {

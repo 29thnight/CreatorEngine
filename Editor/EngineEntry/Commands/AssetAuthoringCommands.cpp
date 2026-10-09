@@ -1,3 +1,4 @@
+#include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "../EditorModelPlacement.h"
 #include <DirectXTex.h>
 #include <stb_image.h>
@@ -318,7 +319,7 @@ namespace ConsoleCmd
 		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
 		const std::string path = CommandCore::JoinFrom(parts, 1);
 		const std::string modelName = file::path(path).stem().string();
-		const std::shared_ptr<const assets::ModelAssetGeneration> previousGeneration =
+		const assets::ModelAssetGeneration::Shared previousGeneration =
 			DataSystems->FindModelAssetGenerationByStem(modelName);
 		const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
 			path, EditorAssetDatabase::ImportKind::Model);
@@ -327,7 +328,7 @@ namespace ConsoleCmd
 			std::printf("[CLI] 모델 임포트 실패: %s\n", path.c_str());
 			return Fail("model.import_failed", "Model import failed: " + path);
 		}
-		const std::shared_ptr<const assets::ModelAssetGeneration> loadedGeneration =
+		const assets::ModelAssetGeneration::Shared loadedGeneration =
 			DataSystems->LoadModelAssetGenerationByPath(imported.string());
 		if (!loadedGeneration)
 		{
@@ -335,7 +336,7 @@ namespace ConsoleCmd
 			return Fail("model.load_failed", "Model generation load failed: " + imported.string());
 		}
 		const char* cacheResult = previousGeneration &&
-			previousGeneration != loadedGeneration ? "reloaded" : "loaded";
+			previousGeneration->Handle() != loadedGeneration->Handle() ? "reloaded" : "loaded";
 		std::printf("[CLI] 모델 임포트 및 로드 요청: %s (runtime-cache=%s)\n",
 			imported.string().c_str(), cacheResult);
         auto data = CommandData::Object();
@@ -380,7 +381,10 @@ namespace ConsoleCmd
         std::size_t layers = 0;
         if (written)
         {
-            TerrainComponent restored;
+            gc::domain restoredDomain;
+            auto restoredRoot = Component::CreateManaged<TerrainComponent>(restoredDomain);
+            TerrainComponent& restored = *restoredRoot;
+            gcce_probe::cleanup restoredCleanup(restored);
             roundTrip = restored.Load(result.descriptorPath.wstring());
             layers = restored.GetLayerCount().size();
             const float* heights = restored.GetHeightMap();
@@ -1577,7 +1581,7 @@ namespace ConsoleCmd
 
             // ⑤ 지금의 런타임 로드 경로 전체(디코드 + 중립 이미지 감싸기).
             t0 = chrono::steady_clock::now();
-            std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(path);
+            own::shared_owner<const Texture> texture = Texture::LoadSharedFromPath(path);
             t1 = chrono::steady_clock::now();
             if (texture) legacyMs += chrono::duration<double, std::milli>(t1 - t0).count();
         }
@@ -1811,12 +1815,10 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_assets_texture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const auto describe = [](const std::shared_ptr<Texture>& texture)
+        const auto describe = [](const own::shared_owner<const Texture>& texture)
         {
             auto item = CommandData::Object();
-            char instance[32]{};
-            std::snprintf(instance, sizeof(instance), "%p", static_cast<void*>(texture.get()));
-            item.Set("instance", CommandData::String(instance));
+            item.Set("instance", CommandData::String(std::to_string(texture->m_assetId.m_ID_Data)));
             item.Set("name", CommandData::String(texture->m_name));
             item.Set("extension", CommandData::String(texture->m_extension));
             const math::vector2 size = texture->GetImageSize();
@@ -1835,7 +1837,7 @@ namespace ConsoleCmd
             else if (kind == "ui") type = Type::UITexture;
             else if (kind == "spritesheet") type = Type::SpriteSheet;
             else return InvalidArguments("assets.texture load <texture|ui|spritesheet> <경로>");
-            const std::shared_ptr<Texture> loaded = DataSystems->LoadSharedTexture(ctx.parts[3], type);
+            const own::shared_owner<const Texture> loaded = DataSystems->LoadSharedTexture(ctx.parts[3], type);
             if (!loaded) return Fail("texture.load_failed", "Texture load failed: " + ctx.parts[3]);
             data.Set("loaded", describe(loaded));
         }
@@ -1844,7 +1846,7 @@ namespace ConsoleCmd
             return InvalidArguments("assets.texture [load <texture|ui|spritesheet> <경로>]");
         }
 
-        const auto list = [&describe](DataContainer<Texture>& cache)
+        const auto list = [&describe](const auto& cache)
         {
             auto entries = CommandData::Array();
             for (const auto& [key, texture] : cache)
@@ -1856,12 +1858,10 @@ namespace ConsoleCmd
             }
             return entries;
         };
-        {
-            std::lock_guard<std::mutex> guard(DataSystems->m_textureMutex);
-            data.Set("textures", list(DataSystems->Textures));
-            data.Set("uiTextures", list(DataSystems->UITextures));
-            data.Set("spriteSheets", list(DataSystems->SpriteSheets));
-        }
+        using Type = DataSystem::TextureFileType;
+        data.Set("textures", list(DataSystems->SnapshotTextures(Type::Texture)));
+        data.Set("uiTextures", list(DataSystems->SnapshotTextures(Type::UITexture)));
+        data.Set("spriteSheets", list(DataSystems->SnapshotTextures(Type::SpriteSheet)));
         return Ok({}, std::move(data));
     }
 
@@ -1980,12 +1980,49 @@ namespace ConsoleCmd
             data.Set("passed", CommandData::Bool(passed));
             data.Set("log", CommandData::String(resultLog));
             return passed ? Ok(resultLog, std::move(data)) : Fail("scene.loadjobs.failed", resultLog, std::move(data));
-        });
+        }, true); // Completion performs owner-thread scene teardown, not only polling.
         return Ok(log);
+    }
+
+    static file::path ModelImportSourcePath(const std::string& utf8)
+    {
+        return file::path(std::u8string(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
+    }
+
+    static CommandCore::CommandResult Cmd_assets_model_meshlets(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3 || (ctx.parts[2] != "true" && ctx.parts[2] != "false"))
+        {
+            return CommandCore::InvalidArguments("assets.model.meshlets <source-path> true|false");
+        }
+        if (!EditorAssetDatabase::Get().SetModelMeshletsAndReimport(
+            ModelImportSourcePath(ctx.parts[1]), ctx.parts[2] == "true"))
+        {
+            return CommandCore::Fail("assets.model.meshlets.failed",
+                "Model reimport failed; the previous published generation remains unchanged.");
+        }
+        return CommandCore::Ok("Model meshlet setting saved and a new generation published.");
+    }
+
+    static CommandCore::CommandResult Cmd_assets_model_lods(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3 || ctx.parts[2].size() != 1u || ctx.parts[2][0] < '0' || ctx.parts[2][0] > '7')
+        {
+            return CommandCore::InvalidArguments("assets.model.lods <source-path> 0..7");
+        }
+        if (!EditorAssetDatabase::Get().SetModelLodsAndReimport(ModelImportSourcePath(ctx.parts[1]),
+            static_cast<std::uint32_t>(ctx.parts[2][0] - '0')))
+        {
+            return CommandCore::Fail("assets.model.lods.failed",
+                "Model LOD reimport failed; the previous published generation remains unchanged.");
+        }
+        return CommandCore::Ok("Model LOD setting saved and a new generation published; see authoring warnings for skipped meshes.");
     }
 
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "assets.model.meshlets" }, &Cmd_assets_model_meshlets);
+        reg.Result({ "assets.model.lods" }, &Cmd_assets_model_lods);
         reg.Result({ "scene.loadjobs" }, &Cmd_scene_loadjobs);
         reg.Result({ "worker.pool.probe" }, &Cmd_worker_pool_probe);
         reg.Result({ "assets.decodeab" }, &Cmd_assets_decodeab);

@@ -22,15 +22,12 @@
     <ClInclude Include="RHI\IImGuiHost.h" />
     <ClInclude Include="RHI\ImGuiWin32Cursor.h" />
     <ClInclude Include="RHI\ImGuiHostPresentationSink.h" />
-    <ClInclude Include="RHI\IImGuiRendererBackend.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
-    <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RHI\ImGuiHost.cpp" />
     <ClCompile Include="RHI\ImGuiWin32Cursor.cpp" />
     <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp" />
-    <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
@@ -136,7 +133,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -158,7 +155,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>

@@ -48,7 +48,7 @@ namespace Authoring
 		//   주석 모두 통과). D3-b-0 프로브가 정규화를 넣은 근거였던 "CRLF는 abort"는
 		//   과잉 일반화였다 — 실제 트리거는 **홀로 선 CR**이다.
 
-		// 홀로 선 CR(옛 Mac 개행) — `check failed: rem.find('') == npos`.
+		// 홀로 선 CR(옛 Mac 개행) — `check failed: rem.find('\r') == npos`.
 		bool threwOnLoneCr{ false };
 
 		// 탭 들여쓰기 — YAML이 금지하는 형태. parse 채널.

@@ -1,5 +1,13 @@
 # 엔진 레이어 분리 계획 — Runtime Core와 Editor의 물리적 분리
 
+## 2026-10-07 최근 병합 반영
+
+PR #118/#120의 현재 경계는 Player native DX12/Vulkan 출력, Editor concrete DX12 shell, 공용 RuntimeHost bootstrap/CommandCore다. Player의 Editor project/include 의존을 제거했으며 Development/Shipping은 Debug/Release와 독립 축이다. Vulkan Player는 CPU readback/upload bridge를 유지한다. ProjectReference 제거를 최종 바이너리의 모든 ImGui 심볼 제거 증거로 해석하지 않는다.
+
+PR #127~129의 viewer는 자체 Win32/D3D11 UI와 파일 분석을 소유하고 엔진의 수집/scene 진단을 인증 IPC로 소비한다. Editor가 연 viewer만 소유 job으로 닫고 독립 offline viewer는 별도 수명을 갖는다. Windows 구성별 빌드/link-symbol·배포·device loss·종료와 viewer 수명은 아직 별도 수용 대상이다. 기존 E축 완료 기록을 신규 host 경로 전체 검증으로 확장하지 않는다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 작성: 2026-08-08
 
 재분석: 2026-08-21
@@ -9,6 +17,11 @@
 이 문서는 CreatorEngine을 **Runtime Core**, **Editor**, **Host**, **Project**로
 분리하는 계획의 기준이다. 빌드·쿡·패키징 절차는 `BuildPipelinePlan.md`가 담당하고,
 이 문서는 소스 소유권, 프로젝트 경계, 의존 방향, 런타임 수명주기만 다룬다.
+
+2026-10-07 미래 메모리 정책은 [PHASE 25 네이티브 객체 GC 및 에셋 소유권 계획](NativeObjectMemoryPolicyPlan.md)으로 분리한다.
+Scene·Entity·Component의 네이티브 GC와 CoreCLR GC를 병행하되 수명 정책은 native Core가 소유한다.
+에셋은 현행 스마트 포인터 유지 또는 ownership_cpp 단계 적용 대상이다. 이 미래 계획의 구현·공수는
+현재 레이어 분리 완료 조건에 추가하지 않는다.
 
 핵심 목표는 Player의 파일 형식을 바꾸는 것이 아니다.
 
@@ -313,10 +326,14 @@ struct IRenderFeatureContributor
 `ImGui 사용 == Editor 전용`으로 일괄 분류하지 않는다.
 
 - Inspector, picker, Editor overlay: `EditorUI` 또는 `EditorRender`.
-- DX12/Vulkan ImGui backend: 과도기에는 `HostImGuiPresentation`.
+- Editor ImGui backend: DX12 concrete `HostImGuiPresentation`.
 - runtime 게임 UI: RenderCore의 `EnhancedUIPass` 계통.
-- Player가 ImGui presentation을 필요로 하지 않게 되면 `Player.vcxproj`의
-  `ImGuiHelper` 참조를 제거한다.
+- Player: ImGui 없는 native DX12/Vulkan 최종 합성·swapchain Present.
+  공용 bootstrap/CommandCore는 `Engine/RuntimeHost`에 두며 Editor 프로젝트를 참조하지 않는다.
+
+2026-10-05 소스 변경과 남은 빌드/실행 수용 범위는
+[PlayerNativePresentation.md](../design/PlayerNativePresentation.md)에 기록한다.
+과거 E4의 과도기 검증 기록은 당시 snapshot의 기록이며 현재 바이너리 검증으로 재사용하지 않는다.
 
 ---
 

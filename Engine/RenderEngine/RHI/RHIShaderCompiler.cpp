@@ -14,14 +14,19 @@
 #include <array>
 #include <atomic>
 #include <cctype>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <optional>
+#include <ranges>
 #include <sstream>
+#include <thread>
 #include <tuple>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -84,37 +89,133 @@ namespace
     std::unordered_map<std::string, RHIShaderCompiler::VerifiedShader> g_verifiedCache;
     std::mutex g_progressMutex;
     RHIShaderCompiler::Progress g_progress;
+    class CompileProgress;
+    CompileProgress* g_firstActiveCompile{};
+    CompileProgress* g_lastActiveCompile{};
+    std::uint64_t g_activeCompileCount{};
+
     class CompileProgress final
     {
     public:
-        CompileProgress(const RHIShaderCompileRequest& request, const std::string& error) : error_(error)
+        CompileProgress(const RHIShaderCompileRequest& request, const std::string& error)
+            : m_name(request.name), m_entryPoint(request.entryPoint), m_error(error)
         {
             std::lock_guard guard(g_progressMutex);
-            g_progress.active = true;
-            g_progress.recompiling = false;
-            g_progress.name = std::string(request.name);
-            g_progress.entryPoint = std::string(request.entryPoint);
-            g_progress.phase = "Resolving shader dependencies";
-            g_progress.lastError.clear();
-            ++g_progress.revision;
+            // Request views and intrusive links allocate nothing. Once linked,
+            // optional progress text cannot throw out of this constructor.
+            Append();
+            ++g_activeCompileCount;
+            RefreshSnapshot(*this, true);
         }
-        ~CompileProgress()
+
+        ~CompileProgress() noexcept
         {
             std::lock_guard guard(g_progressMutex);
-            g_progress.active = false;
-            g_progress.lastError = error_;
+            Detach();
+            --g_activeCompileCount;
             ++g_progress.completedRequests;
-            ++g_progress.revision;
+            RefreshSnapshot(*this, false, &m_error);
         }
+
+        CompileProgress(const CompileProgress&) = delete;
+        CompileProgress& operator=(const CompileProgress&) = delete;
+
         void Phase(const char* phase, bool recompiling = false)
         {
             std::lock_guard guard(g_progressMutex);
-            g_progress.phase = phase;
-            g_progress.recompiling |= recompiling;
-            ++g_progress.revision;
+            m_phase = phase;
+            m_recompiling |= recompiling;
+            // Keep a representative stage for each live request so completing
+            // the newest one can immediately reveal another request's stage.
+            Detach();
+            Append();
+            RefreshSnapshot(*this);
         }
+
     private:
-        const std::string& error_;
+        void Append() noexcept
+        {
+            m_previous = g_lastActiveCompile;
+            m_next = nullptr;
+            if (m_previous)
+            {
+                m_previous->m_next = this;
+            }
+            else
+            {
+                g_firstActiveCompile = this;
+            }
+            g_lastActiveCompile = this;
+        }
+
+        void Detach() noexcept
+        {
+            if (m_previous)
+            {
+                m_previous->m_next = m_next;
+            }
+            else
+            {
+                g_firstActiveCompile = m_next;
+            }
+            if (m_next)
+            {
+                m_next->m_previous = m_previous;
+            }
+            else
+            {
+                g_lastActiveCompile = m_previous;
+            }
+            m_previous = nullptr;
+            m_next = nullptr;
+        }
+
+        // All access to the active list and request stages holds g_progressMutex.
+        // Diagnostics are best effort: keep counts truthful even if a text copy
+        // cannot allocate, and never replace or throw over the compiler's error.
+        static void RefreshSnapshot(const CompileProgress& completed, bool clearError = false,
+                                    const std::string* error = nullptr) noexcept
+        {
+            g_progress.activeRequests = g_activeCompileCount;
+            g_progress.active = g_activeCompileCount != 0;
+            g_progress.recompiling = false;
+            for (const auto* request = g_firstActiveCompile; request; request = request->m_next)
+            {
+                g_progress.recompiling |= request->m_recompiling;
+            }
+            ++g_progress.revision;
+            const auto& representative = g_lastActiveCompile ? *g_lastActiveCompile : completed;
+            try
+            {
+                g_progress.name = representative.m_name;
+                g_progress.entryPoint = representative.m_entryPoint;
+                g_progress.phase = representative.m_phase;
+                if (error)
+                {
+                    g_progress.lastError = *error;
+                }
+                else if (clearError)
+                {
+                    g_progress.lastError.clear();
+                }
+            }
+            catch (...)
+            {
+                g_progress.name.clear();
+                g_progress.entryPoint.clear();
+                g_progress.phase.clear();
+                g_progress.lastError.clear();
+            }
+        }
+
+        // The request's text outlives its Process scope, including this tracker.
+        const std::string_view m_name;
+        const std::string_view m_entryPoint;
+        const std::string& m_error;
+        const char* m_phase = "Resolving shader dependencies";
+        bool m_recompiling{};
+        CompileProgress* m_previous{};
+        CompileProgress* m_next{};
     };
     std::atomic<std::uint64_t> g_memoryHits{};
     std::atomic<std::uint64_t> g_diskHits{};
@@ -149,6 +250,14 @@ namespace
         decltype(&spReflection_GetParameterByIndex) parameter{};
     };
 
+    // A Slang global session is not thread-safe, so each concurrent compile owns
+    // one. Slot 0 is the bootstrap session; more are made on demand up to the cap.
+    struct SlangSlot final
+    {
+        Slang::ComPtr<slang::IGlobalSession> globalSession;
+        bool busy{};
+    };
+
     struct SlangRuntime final
     {
         HMODULE module{};
@@ -161,12 +270,15 @@ namespace
         std::string identity;
         std::string loadError;
         std::once_flag loadOnce;
-        std::mutex compileMutex;
+        std::mutex slotsMutex;
+        std::condition_variable slotFreed;
+        std::vector<std::unique_ptr<SlangSlot>> slots;
 
         ~SlangRuntime()
         {
             // Slang COM 객체의 vtable은 DLL에 있으므로 모든 인터페이스를 먼저
             // 해제한 뒤 모듈을 내린다.
+            slots.clear();
             globalSession.setNull();
             if (nullptr != module) FreeLibrary(module);
             if (nullptr != dxcModule) FreeLibrary(dxcModule);
@@ -179,6 +291,95 @@ namespace
         static SlangRuntime runtime;
         return runtime;
     }
+
+    // Each slot holds a full Slang core module, so the cap trades memory for
+    // parallel material compiles.
+    constexpr std::size_t kMaxSlangSlots = 4;
+
+    class SlotLease final
+    {
+    public:
+        SlotLease() = default;
+        SlotLease(SlangRuntime& runtime, SlangSlot& slot) : m_runtime(&runtime), m_slot(&slot) {}
+        SlotLease(SlotLease&& other) noexcept
+            : m_runtime(std::exchange(other.m_runtime, nullptr)), m_slot(std::exchange(other.m_slot, nullptr)) {}
+        SlotLease& operator=(SlotLease&& other) noexcept
+        {
+            if (this != &other)
+            {
+                Release();
+                m_runtime = std::exchange(other.m_runtime, nullptr);
+                m_slot = std::exchange(other.m_slot, nullptr);
+            }
+            return *this;
+        }
+        SlotLease(const SlotLease&) = delete;
+        SlotLease& operator=(const SlotLease&) = delete;
+        ~SlotLease() { Release(); }
+
+        SlangSlot* Slot() const { return m_slot; }
+
+    private:
+        void Release()
+        {
+            if (nullptr == m_slot) return;
+            {
+                std::lock_guard<std::mutex> lock(m_runtime->slotsMutex);
+                m_slot->busy = false;
+            }
+            m_runtime->slotFreed.notify_one();
+            m_slot = nullptr;
+        }
+
+        SlangRuntime* m_runtime{};
+        SlangSlot* m_slot{};
+    };
+
+    SlotLease AcquireSlot(SlangRuntime& runtime, std::string& outError)
+    {
+        const std::size_t cap = RHIShaderCompiler::MaxParallelCompiles();
+        std::unique_lock<std::mutex> lock(runtime.slotsMutex);
+        for (;;)
+        {
+            for (const auto& slot : runtime.slots)
+            {
+                if (!slot->busy)
+                {
+                    slot->busy = true;
+                    return SlotLease(runtime, *slot);
+                }
+            }
+            if (runtime.slots.size() < cap)
+            {
+                auto created = std::make_unique<SlangSlot>();
+                created->busy = true;
+                SlangSlot& slot = *created;
+                runtime.slots.push_back(std::move(created));
+                lock.unlock();
+                // Creating a global session loads the core module (hundreds of ms);
+                // other threads keep using the existing slots meanwhile.
+                SlangGlobalSessionDesc desc{};
+                if (SLANG_FAILED(runtime.createGlobalSession(&desc, slot.globalSession.writeRef())))
+                {
+                    lock.lock();
+                    std::erase_if(runtime.slots, [&](const auto& item) { return item.get() == &slot; });
+                    lock.unlock();
+                    runtime.slotFreed.notify_one();
+                    outError = "Slang global session 추가 생성 실패";
+                    return {};
+                }
+                return SlotLease(runtime, slot);
+            }
+            runtime.slotFreed.wait(lock);
+        }
+    }
+
+    struct ReusedModule final
+    {
+        std::string key;
+        Slang::ComPtr<slang::ISession> session;
+        Slang::ComPtr<slang::IModule> module;
+    };
 
     template <typename Proc>
     bool LoadSlangProc(HMODULE module, const char* name, Proc& outProc)
@@ -363,6 +564,8 @@ namespace
             runtime.loadError = "Slang global session 생성 실패";
             return;
         }
+        runtime.slots.push_back(std::make_unique<SlangSlot>());
+        runtime.slots.back()->globalSession = runtime.globalSession;
 
         Hash128 slangHash;
         Hash128 dxcHash;
@@ -539,6 +742,10 @@ namespace
         if ("gs" == stage) return SLANG_STAGE_GEOMETRY;
         if ("ps" == stage) return SLANG_STAGE_FRAGMENT;
         if ("cs" == stage) return SLANG_STAGE_COMPUTE;
+        if ("ms" == stage)
+        {
+            return SLANG_STAGE_MESH;
+        }
         outError = "지원하지 않는 셰이더 스테이지다: " + std::string(profile);
         return SLANG_STAGE_NONE;
     }
@@ -799,6 +1006,10 @@ namespace
         hash.Add(request.name);
         hash.Add(request.entryPoint);
         hash.Add(request.targetProfile);
+        if (request.targetProfile.starts_with("ms_"))
+        {
+            hash.Add("mesh-v1.sm_6_5.spirv_1_5.spvMeshShadingEXT");
+        }
         hash.Add(&request.output, sizeof(request.output));
         if (request.output == RHIShaderBinary::SpirV)
         {
@@ -830,6 +1041,99 @@ namespace
         return hash.Hex();
     }
 
+    // 캐시 키에는 Slang 이 실제로 읽은 의존 파일이 들어간다. 그 목록을 알려면 Slang 이
+    // 소스를 구문·의미 분석까지 해야 해서, 캐시에 있어도 셰이더 하나에 수십~수백 ms 가 든다.
+    // 그래서 요청마다 지난번 목록을 따로 적어 두고, 다음에는 그 파일들의 지금 내용으로 키를
+    // 만들어 먼저 찾는다. 키가 내용을 담으므로 파일이 바뀌면 빗나가고 Slang 경로로 간다.
+    constexpr std::string_view kDependencyListMagic = "CreatorEngine.ShaderDependencies.v1";
+
+    std::filesystem::path DependencyListPath(const RHIShaderCompileRequest& request,
+        const std::filesystem::path& root, std::string_view compilerIdentity)
+    {
+        // 의존 목록 없이 루트 경로만 넣은 키다. 내용은 넣지 않아 원본을 고쳐도 같은 목록을 찾는다.
+        const std::string key = BuildCacheKey(request, { SourceUnit{ root } }, compilerIdentity);
+        return CacheDirectory() / (key + ".rsd");
+    }
+
+    std::optional<std::vector<std::filesystem::path>> ReadDependencyList(const std::filesystem::path& path)
+    {
+        std::ifstream file(path, std::ios::binary);
+        std::string line;
+        if (!std::getline(file, line) || line != kDependencyListMagic) return std::nullopt;
+        std::vector<std::filesystem::path> dependencies;
+        while (std::getline(file, line))
+        {
+            if (!line.empty()) dependencies.emplace_back(WidenUtf8(line));
+        }
+        return dependencies;
+    }
+
+    void WriteDependencyList(const std::filesystem::path& path, const std::vector<SourceUnit>& units)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (ec) return;
+        static std::atomic<std::uint64_t> serial{};
+        const auto temp = path.parent_path() / (path.filename().string() + "." + std::to_string(GetCurrentProcessId())
+            + "." + std::to_string(GetCurrentThreadId()) + "." + std::to_string(++serial) + ".tmp");
+        bool written = false;
+        {
+            std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+            if (file)
+            {
+                file << kDependencyListMagic << '\n';
+                for (std::size_t index = 1; index < units.size(); ++index)
+                    file << PathUtf8(units[index].path) << '\n';
+                file.flush();
+                written = static_cast<bool>(file);
+            }
+        }
+        // 목록은 힌트일 뿐이라 쓰기 실패는 컴파일 실패가 아니다.
+        if (!written || !MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING))
+            std::filesystem::remove(temp, ec);
+    }
+
+    // 기록한 의존 파일과 같은 이름의 파일이 다른 검색 위치에 생기면 Slang 은 그쪽을 읽을 수 있다.
+    // 기록한 파일만 보면 이 변화를 못 보므로, 그런 후보가 하나라도 있으면 빠른 길을 쓰지 않는다.
+    // 표기는 파일 이름과 폴더 하나를 붙인 이름("Includes/X.slang")까지 본다.
+    bool HasShadowCandidate(const std::vector<SourceUnit>& units, const RHIShaderCompileRequest& request)
+    {
+        std::vector<std::filesystem::path> locations;
+        const auto addLocation = [&locations](const std::filesystem::path& directory)
+        {
+            if (directory.empty() || std::ranges::find(locations, directory) != locations.end()) return;
+            locations.push_back(directory);
+        };
+        for (const SourceUnit& unit : units)
+        {
+            addLocation(unit.path.parent_path());
+            addLocation(unit.path.parent_path().parent_path()); // "../X.slang" 표기
+        }
+        for (const auto& directory : request.options.includeDirectories)
+        {
+            const std::filesystem::path normalized = NormalizePath(directory);
+            addLocation(normalized);
+            addLocation(normalized.parent_path());
+        }
+        for (std::size_t index = 1; index < units.size(); ++index)
+        {
+            const std::filesystem::path& path = units[index].path;
+            const std::filesystem::path spellings[] = {
+                path.filename(), path.parent_path().filename() / path.filename() };
+            for (const auto& location : locations)
+            {
+                for (const auto& spelling : spellings)
+                {
+                    const std::filesystem::path candidate = (location / spelling).lexically_normal();
+                    if (candidate == path) continue;
+                    std::error_code ec;
+                    if (std::filesystem::exists(candidate, ec) || ec) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     std::optional<RHIShaderStage> MapReflectionStage(SlangStage stage)
     {
         switch (stage)
@@ -837,6 +1141,7 @@ namespace
         case SLANG_STAGE_VERTEX: return RHIShaderStage::Vertex;
         case SLANG_STAGE_FRAGMENT: return RHIShaderStage::Pixel;
         case SLANG_STAGE_COMPUTE: return RHIShaderStage::Compute;
+        case SLANG_STAGE_MESH: return RHIShaderStage::Mesh;
         default: return std::nullopt;
         }
     }
@@ -1143,6 +1448,20 @@ namespace
         return true;
     }
 
+}
+
+// Members are destroyed in reverse order: modules go before the slot is released,
+// so no other thread touches that global session while they are freed.
+struct RHIShaderCompiler::ModuleReuseState final
+{
+    SlotLease lease;
+    std::vector<ReusedModule> modules;
+};
+
+namespace
+{
+    thread_local RHIShaderCompiler::ModuleReuseState* t_moduleReuse = nullptr;
+
     class SlangShaderCompiler final : public IRHIShaderCompiler
     {
     public:
@@ -1170,11 +1489,51 @@ namespace
         }
 
     private:
+        // 지난번 의존 목록으로 캐시를 찾는다. Slang 을 부르지 않으므로 컴파일 칸도 잡지 않는다.
+        // 빗나가거나 목록을 믿을 수 없으면 false 를 돌려 Slang 경로가 다시 해석하게 한다.
+        static bool ReadCachedWithoutSlang(const RHIShaderCompileRequest& request,
+            const std::filesystem::path& sourcePath, const std::string& sourceText, SlangStage stage,
+            const std::vector<std::filesystem::path>& recordedDependencies, std::string_view compilerIdentity,
+            RHIShaderBlob* outBlob, RHIShaderReflection* outReflection, std::string& outError,
+            std::string* outIdentity, std::vector<std::filesystem::path>* outDependencies, CompileProgress& progress)
+        {
+            std::vector<SourceUnit> units;
+            units.reserve(recordedDependencies.size() + 1);
+            units.push_back({ NormalizePath(sourcePath), sourceText });
+            for (const auto& path : recordedDependencies)
+            {
+                SourceUnit unit{ path };
+                std::string ignored;
+                if (!ReadSourceFile(path, unit.text, ignored)) return false;
+                units.push_back(std::move(unit));
+            }
+            if (HasShadowCandidate(units, request)) return false;
+
+            progress.Phase("Checking shader cache");
+            const std::string cacheKey = BuildCacheKey(request, units, compilerIdentity);
+            if (nullptr == outReflection)
+            {
+                if (!ReadCache(cacheKey, *outBlob)) return false;
+            }
+            else
+            {
+                const auto reflectionStage = MapReflectionStage(stage);
+                if (!reflectionStage || !ReadVerifiedCache(cacheKey, *reflectionStage, outBlob, *outReflection))
+                    return false;
+                if (outIdentity) *outIdentity = cacheKey;
+            }
+            if (outDependencies) *outDependencies = recordedDependencies;
+            outError.clear();
+            return true;
+        }
+
         bool Process(const RHIShaderCompileRequest& request,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection,
             std::string& outError, std::string* outIdentity = nullptr,
             std::vector<std::filesystem::path>* outDependencies = nullptr)
         {
+            outError.clear();
+            CompileProgress progress(request, outError);
             if (!EnsureSlang(outError)) return false;
 
             const std::filesystem::path sourcePath = RHIShaderSource::Resolve(request.name);
@@ -1184,8 +1543,29 @@ namespace
             if (SLANG_STAGE_NONE == stage) return false;
 
             SlangRuntime& runtime = GetSlangRuntime();
-            std::lock_guard<std::mutex> compileGuard(runtime.compileMutex);
-            CompileProgress progress(request, outError);
+            const std::filesystem::path dependencyListPath =
+                DependencyListPath(request, NormalizePath(sourcePath), runtime.identity);
+            const auto recordedDependencies = ReadDependencyList(dependencyListPath);
+            if (recordedDependencies &&
+                ReadCachedWithoutSlang(request, sourcePath, sourceText, stage, *recordedDependencies,
+                    runtime.identity, outBlob, outReflection, outError, outIdentity, outDependencies, progress))
+            {
+                return true;
+            }
+
+            RHIShaderCompiler::ModuleReuseState* const reuse = t_moduleReuse;
+            SlotLease ownLease;
+            progress.Phase("Waiting for shader compiler slot");
+            if (nullptr == reuse) ownLease = AcquireSlot(runtime, outError);
+            else if (nullptr == reuse->lease.Slot()) reuse->lease = AcquireSlot(runtime, outError);
+            SlangSlot* const slot = nullptr == reuse ? ownLease.Slot() : reuse->lease.Slot();
+            if (nullptr == slot)
+            {
+                ++g_failures;
+                return false;
+            }
+            slang::IGlobalSession& globalSession = *slot->globalSession;
+            progress.Phase("Resolving shader dependencies");
 
             std::vector<std::string> ownedArguments;
             ownedArguments.reserve(40);
@@ -1196,7 +1576,15 @@ namespace
             addArgument("-target");
             addArgument(RHIShaderBinary::Dxil == request.output ? "dxil" : "spirv");
             addArgument("-profile");
-            addArgument(RHIShaderBinary::Dxil == request.output ? "sm_6_0" : "spirv_1_3");
+            const bool meshStage = stage == SLANG_STAGE_MESH;
+            addArgument(RHIShaderBinary::Dxil == request.output
+                ? (meshStage ? "sm_6_5" : "sm_6_0")
+                : (meshStage ? "spirv_1_5" : "spirv_1_3"));
+            if (meshStage && request.output == RHIShaderBinary::SpirV)
+            {
+                addArgument("-capability");
+                addArgument("spvMeshShadingEXT");
+            }
             if (request.output == RHIShaderBinary::SpirV && request.options.fineDerivatives)
             {
                 addArgument("-capability");
@@ -1263,65 +1651,90 @@ namespace
             for (const std::string& argument : ownedArguments)
                 arguments.push_back(argument.c_str());
 
-            slang::SessionDesc sessionDesc{};
-            Slang::ComPtr<ISlangUnknown> auxiliary;
-            if (SLANG_FAILED(runtime.globalSession->parseCommandLineArguments(
-                static_cast<int>(arguments.size()), arguments.data(), &sessionDesc,
-                auxiliary.writeRef())))
+            // Session options carry no stage or entry, so a material's stages for one
+            // backend share both the session and the parsed module.
+            std::string reuseKey;
+            if (nullptr != reuse)
             {
-                ++g_failures;
-                outError = "Slang 세션 인자 매핑 실패: " + std::string(request.name);
-                return false;
+                for (const std::string& argument : ownedArguments)
+                    reuseKey.append(argument).push_back('\0');
+                reuseKey.append(PathUtf8(sourcePath)).push_back('\0');
+                reuseKey.append(sourceText);
             }
-
-            // Slang 2026.14의 command-line parser는 VulkanBindShift를
-            // SessionDesc와 TargetDesc 양쪽에 싣는다. 이 상태를 modern
-            // createSession API에 그대로 넘기면 shift가 중복 적용되어 리소스
-            // 종류 코드(0x01/0x02/0x03)가 binding 상위 바이트로 굽힌다.
-            // session 옵션 전체를 버리면 -D 매크로가 front-end에서 사라지므로,
-            // target에 이미 있는 VulkanBindShift 중복본만 session에서 제외한다.
-            // 전용 API probe와 동일 버전 slangc의 SPIR-V decoration을 대조해
-            // b0/t100/u200/s300을 확인했다.
-            std::vector<slang::CompilerOptionEntry> sessionOptions;
-            sessionOptions.reserve(sessionDesc.compilerOptionEntryCount);
-            for (std::uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
-            {
-                const slang::CompilerOptionEntry& option =
-                    sessionDesc.compilerOptionEntries[i];
-                if (slang::CompilerOptionName::VulkanBindShift == option.name) continue;
-                sessionOptions.push_back(option);
-            }
-            sessionDesc.compilerOptionEntries = sessionOptions.data();
-            sessionDesc.compilerOptionEntryCount =
-                static_cast<std::uint32_t>(sessionOptions.size());
-
             Slang::ComPtr<slang::ISession> session;
-            if (SLANG_FAILED(runtime.globalSession->createSession(
-                sessionDesc, session.writeRef())))
-            {
-                ++g_failures;
-                outError = "Slang session 생성 실패: " + std::string(request.name);
-                return false;
-            }
-
-            Hash128 moduleHash;
-            moduleHash.Add(PathUtf8(sourcePath));
-            moduleHash.Add(request.entryPoint);
-            moduleHash.Add(request.targetProfile);
-            const std::string moduleName = "CreatorEngine_" + moduleHash.Hex();
-            const std::string sourceName = PathUtf8(sourcePath);
-
+            Slang::ComPtr<slang::IModule> shaderModule;
             Slang::ComPtr<slang::IBlob> diagnostics;
-            Slang::ComPtr<slang::IModule> shaderModule(
-                session->loadModuleFromSourceString(moduleName.c_str(), sourceName.c_str(),
-                    sourceText.c_str(), diagnostics.writeRef()));
-            if (!shaderModule)
+            const ReusedModule* reused = nullptr;
+            if (nullptr != reuse)
             {
-                ++g_failures;
-                const std::string detail = ReadSlangDiagnostics(diagnostics.get());
-                outError = std::string(request.name) + " Slang 모듈 로드 실패: "
-                    + (detail.empty() ? "원인 미상" : detail);
-                return false;
+                const auto found = std::ranges::find(reuse->modules, reuseKey, &ReusedModule::key);
+                if (found != reuse->modules.end()) reused = &*found;
+            }
+            if (nullptr != reused)
+            {
+                session = reused->session;
+                shaderModule = reused->module;
+            }
+            else
+            {
+                slang::SessionDesc sessionDesc{};
+                Slang::ComPtr<ISlangUnknown> auxiliary;
+                if (SLANG_FAILED(globalSession.parseCommandLineArguments(
+                    static_cast<int>(arguments.size()), arguments.data(), &sessionDesc,
+                    auxiliary.writeRef())))
+                {
+                    ++g_failures;
+                    outError = "Slang 세션 인자 매핑 실패: " + std::string(request.name);
+                    return false;
+                }
+
+                // Slang 2026.14의 command-line parser는 VulkanBindShift를
+                // SessionDesc와 TargetDesc 양쪽에 싣는다. 이 상태를 modern
+                // createSession API에 그대로 넘기면 shift가 중복 적용되어 리소스
+                // 종류 코드(0x01/0x02/0x03)가 binding 상위 바이트로 굽힌다.
+                // session 옵션 전체를 버리면 -D 매크로가 front-end에서 사라지므로,
+                // target에 이미 있는 VulkanBindShift 중복본만 session에서 제외한다.
+                // 전용 API probe와 동일 버전 slangc의 SPIR-V decoration을 대조해
+                // b0/t100/u200/s300을 확인했다.
+                std::vector<slang::CompilerOptionEntry> sessionOptions;
+                sessionOptions.reserve(sessionDesc.compilerOptionEntryCount);
+                for (std::uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
+                {
+                    const slang::CompilerOptionEntry& option =
+                        sessionDesc.compilerOptionEntries[i];
+                    if (slang::CompilerOptionName::VulkanBindShift == option.name) continue;
+                    sessionOptions.push_back(option);
+                }
+                sessionDesc.compilerOptionEntries = sessionOptions.data();
+                sessionDesc.compilerOptionEntryCount =
+                    static_cast<std::uint32_t>(sessionOptions.size());
+
+                if (SLANG_FAILED(globalSession.createSession(
+                    sessionDesc, session.writeRef())))
+                {
+                    ++g_failures;
+                    outError = "Slang session 생성 실패: " + std::string(request.name);
+                    return false;
+                }
+
+                Hash128 moduleHash;
+                moduleHash.Add(PathUtf8(sourcePath));
+                moduleHash.Add(request.entryPoint);
+                moduleHash.Add(request.targetProfile);
+                const std::string moduleName = "CreatorEngine_" + moduleHash.Hex();
+                const std::string sourceName = PathUtf8(sourcePath);
+
+                shaderModule = session->loadModuleFromSourceString(moduleName.c_str(), sourceName.c_str(),
+                    sourceText.c_str(), diagnostics.writeRef());
+                if (!shaderModule)
+                {
+                    ++g_failures;
+                    const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                    outError = std::string(request.name) + " Slang 모듈 로드 실패: "
+                        + (detail.empty() ? "원인 미상" : detail);
+                    return false;
+                }
+                if (nullptr != reuse) reuse->modules.push_back({std::move(reuseKey), session, shaderModule});
             }
 
             std::vector<SourceUnit> units;
@@ -1338,6 +1751,9 @@ namespace
                 for (std::size_t index = 1; index < units.size(); ++index)
                     outDependencies->push_back(units[index].path);
             }
+            if (!recordedDependencies ||
+                !std::ranges::equal(*recordedDependencies, units | std::views::drop(1), {}, {}, &SourceUnit::path))
+                WriteDependencyList(dependencyListPath, units);
             progress.Phase("Checking shader cache");
             const std::string cacheKey = BuildCacheKey(request, units, runtime.identity);
             if (nullptr == outReflection && ReadCache(cacheKey, *outBlob)) return true;
@@ -1447,6 +1863,23 @@ namespace
     }
 }
 
+std::size_t RHIShaderCompiler::MaxParallelCompiles()
+{
+    return std::clamp<std::size_t>(std::thread::hardware_concurrency() / 2, 1, kMaxSlangSlots);
+}
+
+RHIShaderCompiler::ModuleReuseScope::ModuleReuseScope()
+    : m_state(new ModuleReuseState), m_previous(t_moduleReuse)
+{
+    t_moduleReuse = m_state;
+}
+
+RHIShaderCompiler::ModuleReuseScope::~ModuleReuseScope()
+{
+    t_moduleReuse = m_previous;
+    delete m_state;
+}
+
 RHIShaderBinary RHIShaderCompiler::GetOutput()
 {
     return g_output;
@@ -1524,4 +1957,3 @@ void RHIShaderCompiler::ClearMemoryCache()
     g_memoryCache.clear();
     g_verifiedCache.clear();
 }
-

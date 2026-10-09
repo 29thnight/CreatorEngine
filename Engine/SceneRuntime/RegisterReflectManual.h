@@ -36,6 +36,7 @@
 #include "DeferredPassSetting.h"
 #include "FoliageInstance.h"
 #include "SoundComponent.h"
+#include "AudioListenerComponent.h"
 #include "Scene.h"
 #include "SceneRenderProfile.h"
 #include "FoliageType.h"
@@ -141,6 +142,7 @@
     X(Scene) \
     X(ScriptComponent) \
     X(SoundComponent) \
+    X(AudioListenerComponent) \
     X(SpriteRenderer) \
     X(SpriteSheetComponent) \
     X(StateMachineComponent) \

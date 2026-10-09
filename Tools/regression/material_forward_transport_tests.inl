@@ -1,6 +1,6 @@
 // Independent alpha recurrence, identity refraction, and Beer-Lambert transport
 // across the real shared Code/Graph Forward+ stream.
-std::shared_ptr<const Generation> ForwardTransportProduct(const std::filesystem::path& root, unsigned kind)
+own::shared_owner<const Generation> ForwardTransportProduct(const std::filesystem::path& root, unsigned kind)
 {
     LXMaterialAsset asset;
     const auto output = asset.CreateNode("ShaderNodeOutputMaterial", 400, 0);
@@ -75,21 +75,21 @@ std::shared_ptr<const Generation> ForwardTransportProduct(const std::filesystem:
     const bool restoredOk =
         WriteCookedProgram(product, {}, bytes, error) && ReadCookedProgram(bytes, {}, restored, error);
     Check(restoredOk, "Transport binary product round trip " + error);
-    auto generation = std::make_shared<Generation>();
-    Check(Uuid::TryParse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC", generation->assetId.value),
+    Generation generationValue;
+    Check(Uuid::TryParse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC", generationValue.assetId.value),
           "Transport graph identity");
-    generation->generation = kind + 1;
-    generation->cooked = std::move(restored);
-    return generation;
+    generationValue.generation = kind + 1;
+    generationValue.cooked = std::move(restored);
+    return own::make_shared<const Generation>(std::move(generationValue));
 }
 
 void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                          ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
-                         std::shared_ptr<Texture> image, std::shared_ptr<Texture> cube,
+                         own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
                          bool versionedAcceptance = false)
 {
     std::string error;
-    std::array<std::shared_ptr<const Generation>, 4> generations;
+    std::array<own::shared_owner<const Generation>, 4> generations;
     for (unsigned i = 0; i < generations.size(); ++i)
     {
         generations[i] = ForwardTransportProduct(root, i);
@@ -169,7 +169,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             const bool medium = fixture >= 15 && fixture < 23;
             context.lights = fixture == 23 ? &manyLights : &lights;
             const auto instance = [&](unsigned kind, double alpha, std::array<double, 4> color) {
-                std::shared_ptr<const Instance> value;
+                own::shared_owner<const Instance> value;
                 InstanceDescription description{generations[kind]->assetId, {}, {}};
                 if (kind != 3)
                 {
@@ -291,7 +291,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             context.forwardDraws = &code;
             const std::vector<EnhancedDrawItem> empty;
             context.draws = &empty;
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, {},
                                        input, error) &&
                       host.SelectReadyInput(context, input, input, error) && input->Draws().size() == graphDraws.size(),
@@ -299,7 +299,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             Check(device.BeginFrame(error), "Transport begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = textures.GetOrUpload(cube.get(), error);
+            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
                       host.PrepareResidency(context, input, error),
                   "Transport preparation");

@@ -8,8 +8,7 @@
 #include "PlayerCommands.h"
 
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include "RHI/IImGuiHost.h"
-#include "RHI/ImGuiHostPresentationSink.h"
+#include "PlayerPresentation.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ClrHost.h"
 #include "CoreWindow.h"
@@ -24,7 +23,13 @@
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
-#include "SoundManager.h"
+#include "Audio/AudioHost.h"
+#include "Audio/AudioProfileProvider.h"
+#include "Audio/MiniaudioBackend.h"
+#include "Audio/PlaybackService.h"
+#include "Audio/AudioCatalog.h"
+#include "Experiment/Cooked/CookedAssetCatalog.h"
+#include "Experiment/Cooked/CookedAudioClipSource.h"
 #include "TagManager.h"
 #include "TimeSystem.h"
 #include "UIManager.h"
@@ -34,7 +39,6 @@
 #if !CE_SHIPPING
 #include "ProfileService.h"
 #endif
-#include "imgui.h"
 
 #include <cstdio>
 #include <algorithm>
@@ -55,8 +59,6 @@ namespace
 		auto* window = CoreWindow::GetForCurrentInstance();
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
-
-	// 표시 sink 어댑터는 HostImGuiPresentation의 공용 타입을 쓴다(E4-6c).
 
 	// ── runtime text-parser 계수 (PHASE 14.5 LC8 에서 자리를 옮겼다) ──
 	//
@@ -120,7 +122,21 @@ Player::PlayerMain::PlayerMain()
 
 Player::PlayerMain::~PlayerMain()
 {
-	Core::TimeSystem::Destroy();
+    // InitializeTask can throw before App::Finalize is reached. Join both workers
+    // before destroying the callback target, including a failed native initialization.
+    StopPresentation();
+    if (!m_finalized && m_presentation)
+    {
+        EnhancedSceneRenderer::ShutdownLive();
+        SceneManagers->SetRenderScene(nullptr);
+    }
+    // Finalize already unbound audio before Decommissioning freed the scenes;
+    // a second unbind would walk those freed scenes.
+    if (!m_finalized)
+    {
+        SceneManagers->BindAudioPlayback(nullptr);
+    }
+    Core::TimeSystem::Destroy();
 }
 
 void Player::PlayerMain::Initialize()
@@ -152,14 +168,14 @@ void Player::PlayerMain::Initialize()
 
 	// (텔레메트리 출력은 EmitTextParseTelemetry 가 한 번만 찍는다 — 아래 정의)
 
-	// 표시 sink 설치(E4-6a) — 렌더러 초기화(렌더 스레드 기동) 전이어야
-	// RT의 첫 리드백 프레임 게시부터 실린다. Core는 ImGui 셸을 모른다.
-    EnhancedSceneRenderer::SetDisplayPresentationSink(std::make_shared<ImGuiHostPresentationSink>());
-
-	std::string enhancedError;
+    std::string enhancedError;
     const EnhancedLiveBackend startupBackend = RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
                                                    ? EnhancedLiveBackend::Vulkan
                                                    : EnhancedLiveBackend::DX12;
+    m_presentation = startupBackend == EnhancedLiveBackend::Vulkan
+        ? CreateVulkanPresentation() : CreateDX12Presentation();
+    m_presentation->SetDisplayAvailableCallback([this] { NotifyDisplayAvailable(); });
+    EnhancedSceneRenderer::SetDisplayPresentationSink(m_presentation);
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
 		// 렌더러 없이는 아무것도 못 한다 — 스모크가 이 실패를 종료 코드로
@@ -186,39 +202,72 @@ void Player::PlayerMain::Initialize()
     m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda(
         []() { EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene()); });
 
-	// DX12/Vulkan renderer backend 중 프로젝트 설정이 고른 표시 경로다.
-	//
-	// ★ IImGuiHost 경계만 소비한다 (EditorRenderer 재작성, 2026-08-10).
-	//   예전에는 ImGuiRenderer를 통째로 들었는데, 그 겸직 탓에 에디터
-	//   독스페이스 빌더와 ImGuiRegister 펌프가 플레이어에서도 매 프레임
-	//   돌았다. 이제 에디터 오케스트레이션은 링크조차 되지 않는다.
-	{
-		std::string hostError;
-		if (!GetImGuiHost().Initialize(PlayerWindowHandle(), hostError))
-		{
-			GetImGuiHost().Shutdown();
+    RECT presentationRect{};
+    GetClientRect(PlayerWindowHandle(), &presentationRect);
+    const uint32_t presentationWidth = static_cast<uint32_t>(presentationRect.right - presentationRect.left);
+    const uint32_t presentationHeight = static_cast<uint32_t>(presentationRect.bottom - presentationRect.top);
+    std::string presentationError;
+    if (!m_presentation->Initialize(PlayerWindowHandle(), presentationWidth, presentationHeight, presentationError))
+    {
+        m_presentation->Shutdown();
+        EnhancedSceneRenderer::SetDisplayPresentationSink({});
+        EngineBootstrap::SetExitCode(5);
+        throw std::runtime_error("Player native presentation initialization failed: " + presentationError);
+    }
+    std::printf("[RenderBackend] source=runtime.render.backend active=%s scene=%s presentation=%s transfer=%s\n",
+        RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
+        startupBackend == EnhancedLiveBackend::Vulkan ? "vulkan" : "dx12", m_presentation->GetName(),
+        startupBackend == EnhancedLiveBackend::Vulkan ? "cpu-readback-upload" : "shared-image");
 
-			EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
-			throw std::runtime_error("Player ImGui backend 초기화 실패: " + hostError);
-		}
-	}
-    const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan == GetImGuiHost().GetBackendKind();
-	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
-	{
-		EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
-		throw std::runtime_error("Player scene/ImGui backend 설정 불일치");
-	}
-	std::printf("[RenderBackend] source=runtime.render.backend active=%s scene=%s imgui=%s\n",
-		RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
-                EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12", GetImGuiHost().GetBackendName());
-
-	Sound->initialize(128);
+	#if CE_SHIPPING
+    constexpr bool profileAudioCallbacks = false;
+#else
+    constexpr bool profileAudioCallbacks = true;
+#endif
+    m_audioHost = std::make_unique<wave::AudioHost>(std::make_unique<wave::MiniaudioBackend>(profileAudioCallbacks), 128u);
+    if (!m_audioHost->Start({}))
+    {
+        throw std::runtime_error("Audio runtime initialization failed");
+    }
+    if (m_audioHost->Mode() == wave::AudioHostMode::Null)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.runtime.null] Audio graph initialization failed; silent logical runtime active");
+    }
+    else if (m_audioHost->Mode() == wave::AudioHostMode::DegradedDevice)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.device.degraded] Output device unavailable; graph retained and output recovery will retry");
+    }
+    m_audioPlayback = std::make_unique<wave::PlaybackService>(*m_audioHost->Service());
+    m_audioCatalog = std::make_unique<wave::AudioCatalog>(*m_audioHost->Service(), *m_audioPlayback);
+    SceneManagers->BindAudioPlayback(m_audioPlayback.get(), [this](std::string_view key)
+    {
+        std::string error;
+        const auto resolved = m_audioCatalog->ResolveLegacyClip(key, error);
+        Uuid::Uuid16 guid;
+        if (!Uuid::TryParse(resolved, guid))
+        {
+            if (!key.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "[audio.clip.resolve] " + error);
+            }
+            return wave::ClipKey{};
+        }
+        return wave::ClipKey::FromGuid(guid);
+    });
 	DataSystems->Initialize();
+    if (const auto catalog = DataSystems->GetCookedCatalog())
+    {
+        std::string error;
+        auto bytes = std::make_shared<experiment::cooked::LooseArtifactByteSource>(catalog->DerivedRoot());
+        if (!m_audioCatalog->LoadCookedAssets(*catalog, std::move(bytes), error))
+        {
+            throw std::runtime_error("Cooked audio catalog failed: " + error);
+        }
+    }
 	SceneManagers->CreateScene();
 
     m_inputEventHandle = InputEvent.AddLambda([](float) {
 		UIManagers->Update();
-		Sound->update();
 	});
 
 	SceneManagers->ManagerInitialize();
@@ -227,57 +276,92 @@ void Player::PlayerMain::Initialize()
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
 
-	// 시작 씬 — 로드에 성공하면 그 자리에서 재생을 켠다.
-	//
-	// 예전에는 SceneManager::LoadSceneImmediate가 EngineMode::IsPlayer()를 물어보고
-	// 스스로 켰다(E3-6에서 옮겨 왔다). "씬이 로드되는 순간이 곧 재생 시작"은
-	// 플레이어의 정책이지 씬 로더가 알아야 할 일이 아니다 — 로더가 실행 모드를
-	// 캐묻는 대신 정책을 가진 쪽이 런타임 primitive(SetGameStart)를 직접 부른다.
-	// 그래서 Core에서 마지막 Player mode 분기가 사라졌다.
-	{
-		// 스모크에서만 직렬화 단계 계측을 켠다 — 종료 시 `[runtime.serialization]`으로
-		// 찍힌다(EmitTextParseTelemetry). 평소 실행은 원자 플래그 읽기 하나만 남는다.
-		if (g_smoke.IsActive())
-			SerializationProfile::SetEnabled(true);
+    // Startup uses the same staged scene preparation as later transitions.
+    // Metadata/payload jobs progress without blocking the owner or render thread;
+    // simulation and command admission begin only after successful activation.
+    if (g_smoke.IsActive())
+    {
+        SerializationProfile::SetEnabled(true);
+    }
+    const auto sceneName = RuntimeSettings::Get().GetStartupSceneName();
+    m_startupScenePath = PathFinder::Relative("Scenes").append(sceneName).string();
+    m_startupScene = SceneManagers->LoadSceneAsync(m_startupScenePath);
 
-		const std::wstring sceneName = RuntimeSettings::Get().GetStartupSceneName();
-		const file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
-		Scene* loadedScene = SceneManagers->LoadSceneImmediate(scenePath.string());
-		if (nullptr == loadedScene)
-		{
-			// LoadSceneImmediate는 실패를 삼키고 nullptr를 돌려준다 —
-			// 여기서 종료 코드로 승격하지 않으면 스모크가 빈 화면을
-			// 성공으로 오판한다(§2.4의 1호 발견이 정확히 이 모양이었다).
-			Debug::PrintLog(spdlog::level::err, "[SMOKE] startup scene load FAILED: " + scenePath.string());
-			if (g_smoke.IsActive())
-			{
-				// §5.4 의 3 = precondition 불충족. LC8 이 표를 이관하며 다시 봤고
-				// **그대로 둔다** — 시작 씬이 없는 것은 부를 수 없는 상태이지
-				// infrastructure 고장이 아니다.
-				EngineBootstrap::SetExitCode(3);
-			}
-		}
-		else
-		{
-			SceneManagers->SetGameStart(true);
-
-			// 스모크(--smoke)의 판정 마커다 — Tools/build.ps1이
-			// 'Scene loaded:[^\r\n]*<시작 씬>'으로 찾는다. 문구와 인자를 바꾸면
-			// 게임 빌드 검증이 조용히 깨진다. 옛 코드가 찍던 것과 같은 문자열이다
-			// (Core는 이 함수에 넘어온 경로 문자열을 그대로 찍었다).
-			Debug::PrintLog(spdlog::level::info, "Scene loaded: {}", scenePath.string());
-		}
-	}
-
-	// ── 명령 서비스 (PHASE 14.5 LC8 · §11.2) ────────────────────────────
+	// ★ 컴파일 여부를 **항상** 찍는다.
 	//
-	// ★ **씬이 선 뒤에 연다.** 서비스가 먼저 열리면 첫 요청이 씬 없는 상태를
-	//   만나 `scene.none` 을 받는다 — 붙는 쪽은 "붙었다" 와 "붙었는데 아직
-	//   아무것도 없다" 를 구분할 수 없고, 그 구간은 프레임 몇 개가 아니라
-	//   씬 로드만큼(LC0 실측 2.4 초) 길다.
-	//
-	// ★★ 실패해도 게임은 계속 돈다. 서비스가 안 열린 것과 게임이 못 뜨는 것은
-	//    다른 사건이다.
+	//   플래그를 주지 않은 실행에서도 찍는다. 이 한 줄이 없으면 스모크 로그에서
+	//   "서비스를 안 켰다" 와 "이 빌드에는 서비스가 없다" 가 똑같이 침묵으로
+	//   보이고, Shipping 격리 게이트가 무엇을 확인했는지도 로그에 남지 않는다.
+    std::printf("[player.service] compiled=%s enabled=%s\n", PlayerCommandService::IsCompiledIn() ? "yes" : "no",
+		g_service.enabled ? "yes" : "no");
+
+    StartPresentationThread();
+}
+
+bool Player::PlayerMain::PollStartupScene()
+{
+    if (m_startupComplete)
+    {
+        return !m_startupFailed;
+    }
+    const auto fail = [this](std::string_view reason)
+    {
+        m_startupComplete = true;
+        m_startupFailed = true;
+        EngineBootstrap::SetExitCode(3);
+        Debug::PrintLog(spdlog::level::err, "[SMOKE] startup scene load FAILED: "
+            + m_startupScenePath + ": " + std::string(reason));
+#if CE_DEVELOPMENT
+        PlayerCmd::CommandHost::Get().StartBatch(false);
+#endif
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return false;
+    };
+    try
+    {
+        SceneManagers->PollSceneLoads();
+        if (!m_startupSceneToActivate)
+        {
+            if (!m_startupScene.valid())
+            {
+                return fail("startup preparation has no result ticket");
+            }
+            if (m_startupScene.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            {
+                return false;
+            }
+            m_startupSceneToActivate = m_startupScene.get();
+            if (!m_startupSceneToActivate)
+            {
+                return fail("preparation did not produce a scene");
+            }
+            // The SceneManager already owns the constructed scene. Startup has
+            // no separate raw asset lifetime and never retries a Stale ticket.
+            SceneManagers->ActivateScene(m_startupSceneToActivate, true);
+        }
+        SceneManagers->ApplyPendingSceneStructureChange();
+        if (SceneManagers->GetActiveScene() != m_startupSceneToActivate)
+        {
+            return fail("scene activation was rejected");
+        }
+        m_startupSceneToActivate = nullptr;
+        SceneManagers->SetGameStart(true);
+        SceneManagers->ApplyPendingSceneStructureChange();
+        if (!SceneManagers->IsPlayCommitted() || SceneManagers->PlayFailureCount() != 0)
+        {
+            return fail("play transaction was rejected: " + SceneManagers->LastPlayFailure());
+        }
+        Time->ResetElapsedTime();
+        m_startupComplete = true;
+        Debug::PrintLog(spdlog::level::info, "Scene loaded: {}", m_startupScenePath);
+    }
+    catch (const std::exception& exception)
+    {
+        return fail(exception.what());
+    }
+
+    // Keep the existing command-service contract: no requests are admitted
+    // while startup is still an empty scene or an incomplete payload ticket.
 	if (g_service.enabled)
 	{
 		std::string error;
@@ -293,15 +377,11 @@ void Player::PlayerMain::Initialize()
 		}
 	}
 
-	// ★ 컴파일 여부를 **항상** 찍는다.
-	//
-	//   플래그를 주지 않은 실행에서도 찍는다. 이 한 줄이 없으면 스모크 로그에서
-	//   "서비스를 안 켰다" 와 "이 빌드에는 서비스가 없다" 가 똑같이 침묵으로
-	//   보이고, Shipping 격리 게이트가 무엇을 확인했는지도 로그에 남지 않는다.
-    std::printf("[player.service] compiled=%s enabled=%s\n", PlayerCommandService::IsCompiledIn() ? "yes" : "no",
-		g_service.enabled ? "yes" : "no");
 
-	StartPresentationThread();
+#if CE_DEVELOPMENT
+    PlayerCmd::CommandHost::Get().StartBatch(EngineBootstrap::g_exitCode == 0);
+#endif
+    return true;
 }
 
 void Player::PlayerMain::StartPresentationThread()
@@ -320,6 +400,8 @@ void Player::PlayerMain::StartPresentationThread()
 		m_presentationThreadStarted = false;
 		m_presentationThreadStartFailed = false;
 		m_presentationStopRequested = false;
+        m_displayAvailable = false;
+        m_presentationFailed.store(false, std::memory_order_release);
 		m_requestedPresentationFrameId = 0;
 		m_consumedPresentationFrameId = 0;
 		m_presentationRequests = 0;
@@ -384,42 +466,76 @@ void Player::PlayerMain::PresentationThreadMain()
     if (FAILED(comResult))
         return;
 
-	SetThreadDescription(GetCurrentThread(), L"PresentationThread");
-	for (;;)
-	{
-		bool hasFrameRequest = false;
-		{
-			std::unique_lock<std::mutex> lock(m_presentationMutex);
-            m_presentationWake.wait(lock, [this] {
-                return m_presentationStopRequested || m_isInvokeResize.load(std::memory_order_acquire) ||
-					m_requestedPresentationFrameId > m_consumedPresentationFrameId;
-			});
-            if (m_presentationStopRequested)
-                break;
+    SetThreadDescription(GetCurrentThread(), L"PresentationThread");
+    try
+    {
+        for (;;)
+        {
+            bool hasFrameRequest = false;
+            {
+                std::unique_lock<std::mutex> lock(m_presentationMutex);
+                m_presentationWake.wait(lock, [this] {
+                    return m_presentationStopRequested || m_isInvokeResize.load(std::memory_order_acquire) ||
+                        m_displayAvailable || m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+                });
+                if (m_presentationStopRequested)
+                {
+                    break;
+                }
+                hasFrameRequest = m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+                if (hasFrameRequest)
+                {
+                    m_consumedPresentationFrameId = m_requestedPresentationFrameId;
+                }
+                m_displayAvailable = false;
+            }
 
-            hasFrameRequest = m_requestedPresentationFrameId > m_consumedPresentationFrameId;
-			if (hasFrameRequest)
-				m_consumedPresentationFrameId = m_requestedPresentationFrameId;
-		}
-
-		if (m_isInvokeResize.exchange(false, std::memory_order_acq_rel))
-			CreateWindowSizeDependentResources();
-
-		if (0 != m_presentationThreadTestDelayMs)
-		{
-            std::this_thread::sleep_for(std::chrono::milliseconds(m_presentationThreadTestDelayMs));
-		}
-
-		PresentFrame();
-
-		if (hasFrameRequest)
-		{
-			std::lock_guard<std::mutex> lock(m_presentationMutex);
-			++m_presentationFrames;
-		}
-	}
+            std::string error;
+            const bool resized = !m_isInvokeResize.exchange(false, std::memory_order_acq_rel) ||
+                CreateWindowSizeDependentResources(error);
+            if (m_presentationThreadTestDelayMs != 0)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(m_presentationThreadTestDelayMs));
+            }
+            const bool presented = resized && PresentFrame(error);
+            if (hasFrameRequest)
+            {
+                std::lock_guard<std::mutex> lock(m_presentationMutex);
+                ++m_presentationFrames;
+            }
+            if (!presented)
+            {
+                throw std::runtime_error(error);
+            }
+        }
+    }
+    catch (const std::exception& exception)
+    {
+        std::printf("[Player presentation] FAILED: %s\n", exception.what());
+        m_presentationFailed.store(true, std::memory_order_release);
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+    }
+    catch (...)
+    {
+        std::printf("[Player presentation] FAILED: unknown exception\n");
+        m_presentationFailed.store(true, std::memory_order_release);
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+    }
 
 	CoUninitialize();
+}
+
+void Player::PlayerMain::NotifyDisplayAvailable()
+{
+    {
+        std::lock_guard<std::mutex> lock(m_presentationMutex);
+        if (m_presentationStopRequested)
+        {
+            return;
+        }
+        m_displayAvailable = true;
+    }
+    m_presentationWake.notify_one();
 }
 
 void Player::PlayerMain::NotifyRenderFramePublished(uint64_t frameId)
@@ -437,8 +553,36 @@ void Player::PlayerMain::NotifyRenderFramePublished(uint64_t frameId)
 	m_presentationWake.notify_one();
 }
 
+void Player::PlayerMain::StopPresentation()
+{
+    if (m_presentationStopped)
+    {
+        return;
+    }
+    StopPresentationThread();
+    if (m_presentation)
+    {
+        EnhancedSceneRenderer::StopLiveRenderThread();
+        EnhancedSceneRenderer::SetDisplayPresentationSink({});
+        // No producer callback remains in flight after RT joins. Drain the native
+        // consumer before releasing any producer interop allocation.
+        m_presentation->SetDisplayAvailableCallback({});
+        m_presentation->Shutdown();
+        if (m_presentation->HasShutdownFailure())
+        {
+            m_presentationFailed.store(true, std::memory_order_release);
+            EngineBootstrap::SetExitCode(5);
+        }
+    }
+    m_presentationStopped = true;
+}
+
 void Player::PlayerMain::Finalize()
 {
+    if (m_finalized)
+    {
+        return;
+    }
 	// ★ 서비스를 **가장 먼저** 닫는다(LC8).
 	//
 	//   수신 스레드가 살아 있는 동안 아래 해체가 진행되면, 그 사이에 들어온
@@ -451,20 +595,25 @@ void Player::PlayerMain::Finalize()
 	// 그 호출까지 세어야 하고, 닫기 전에 찍으면 마지막 요청이 빠진다.
 	EmitTextParseTelemetry();
 
-	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 표시/렌더
-	// 소비자 join → 씬 해체 → 렌더러. 새 frame 발행은 메인 루프 종료와 함께 끝났다.
+	// Stop producers, join PT/RT, then run scene cleanup while CLR/audio
+	// are alive. The collector only reclaims already-cleaned objects.
 	SceneManagers->SetDecommissioning();
 	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
-	ClrHost::Get().Shutdown();
 
-	StopPresentationThread();
-	EnhancedSceneRenderer::StopLiveRenderThread();
-	// 표시 sink 해제(E4-6a) — 렌더 스레드가 멎어 더 이상 게시가 없다.
-	EnhancedSceneRenderer::SetDisplayPresentationSink({});
+    StopPresentation();
+    if (m_presentationFailed.load(std::memory_order_acquire))
+    {
+        EngineBootstrap::SetExitCode(5);
+    }
 
-	TagManagers->Finalize();
 	SceneManagers->Decommissioning();
+	ClrHost::Get().Shutdown();
+	TagManagers->Finalize();
+    SceneManagers->BindAudioPlayback(nullptr);
+    m_audioPlayback->Shutdown();
+    m_audioCatalog->Clear();
+    m_audioHost->Shutdown();
     m_projectLayers.reset();
 
 	// 에디터는 여기서 SaveSettings를 부른다 — 플레이어의 설정 루트는
@@ -473,10 +622,6 @@ void Player::PlayerMain::Finalize()
 	EnhancedSceneRenderer::ShutdownLive();
 	SceneManagers->SetRenderScene(nullptr);
 
-	// 표시 호스트 정리. 예전에는 m_imguiRenderer 멤버 소멸이 맡았는데,
-	// 멤버가 사라졌으므로 명시적으로 부른다 — 렌더 스레드는 위에서 이미
-	// 멈췄다(호스트 계약).
-	GetImGuiHost().Shutdown();
 
     const auto resources = ce::physics::read_resource_statistics();
     if (resources.enabled || Player::g_smoke.frameLimit > 0)
@@ -494,28 +639,36 @@ void Player::PlayerMain::Finalize()
         std::printf("]}\n");
         std::fflush(stdout); // The loader retains the runtime DLL until process termination.
     }
+    m_finalized = true;
 }
 
 void Player::PlayerMain::Update()
 {
-	// ── 명령 드레인 (PHASE 14.5 LC8) ────────────────────────────────────
-	//
-	// ★ **프레임 경계에서, 시뮬레이션 앞에서** 편다. 요청이 바꾼 상태가 같은
-	//   프레임의 시뮬레이션에 반영되게 하려는 것이다 — 뒤에 두면 `player.move`
-	//   가 옮긴 위치를 그 프레임의 물리·애니메이션이 못 보고, 한 프레임 늦게
-	//   반영되는 것이 "가끔 한 프레임 어긋난다" 로 나타난다.
-	//
-	// Shipping 에서도 이 줄은 돈다. 큐는 늘 비어 있다 — 넣을 수 있는 통로가
-	// 없기 때문이고, 그래서 여기에 `#if` 를 두지 않는다.
-	PlayerCmd::CommandHost::Get().Pump();
-
-	if (PlayerCmd::CommandHost::Get().IsQuitRequested())
-	{
-		// 창을 닫아 정상 종료 경로를 탄다. 여기서 곧장 죽으면 RenderThread 와
-		// presentation 스레드 회수가 통째로 건너뛰어진다.
-		PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
-		return;
-	}
+    if (m_presentationFailed.load(std::memory_order_acquire))
+    {
+        EngineBootstrap::SetExitCode(5);
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return;
+    }
+    if (!PollStartupScene())
+    {
+        // Keep native presentation responsive while preparation is Pending.
+        // No simulation/smoke frame is counted before startup is activated.
+        m_frameDeltaTime = 0.0;
+        m_audioHost->Update(0.f);
+        m_audioPlayback->Update();
+        return;
+    }
+#if CE_DEVELOPMENT
+    // Local CLI batches and the optional HTTP service share the game-thread host.
+    // Shipping has no command host instance or registered command surface.
+    PlayerCmd::CommandHost::Get().Pump();
+    if (PlayerCmd::CommandHost::Get().IsQuitRequested())
+    {
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return;
+    }
+#endif
 
     Time->Tick([&] {
 		m_frameDeltaTime = Runtime::ResolveFrameDelta();
@@ -535,6 +688,10 @@ void Player::PlayerMain::Update()
 	CoroutineManagers->yield_OnRender();
 	SceneManagers->DisableOrEnable();
 	SceneManagers->EndOfFrame();
+	SceneManagers->CollectManagedAtFrameBoundary();
+    m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
+    m_audioPlayback->Update();
+    wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);
 
 #if !CE_SHIPPING
     // Close the same engine frame used by runtime counter and CPU span producers.
@@ -633,7 +790,8 @@ void Player::PlayerMain::Update()
             m_smokeProgressReport = progressNow + std::chrono::seconds(10);
             std::printf("[player.smoke.progress] {\"gtFrame\":%llu,\"rendered\":%llu,\"inFlight\":%llu,"
                         "\"published\":%llu,\"consumed\":%llu,\"completed\":%llu,\"promotions\":%llu,"
-                        "\"requiredPromotions\":%llu,\"slotMask\":%u,\"ready\":%s}\n",
+                        "\"requiredPromotions\":%llu,\"slotMask\":%u,\"ready\":%s,"
+                        "\"submittedGameFrames\":%llu}\n",
                         static_cast<unsigned long long>(Time->GetFrameCount()),
                         static_cast<unsigned long long>(renderState.framesRendered),
                         static_cast<unsigned long long>(renderState.framesInFlight),
@@ -642,7 +800,8 @@ void Player::PlayerMain::Update()
                         static_cast<unsigned long long>(gameDisplay.completedFrameId),
                         static_cast<unsigned long long>(gameDisplay.promotionCount),
                         static_cast<unsigned long long>(g_smoke.minimumPromotions),
-                        gameDisplay.promotedSlotMask, gameDisplay.ready ? "true" : "false");
+                        gameDisplay.promotedSlotMask, gameDisplay.ready ? "true" : "false",
+                        static_cast<unsigned long long>(m_presentation->GetSubmittedGameFrames()));
             std::printf("[player.smoke.render.state] enabled=%s idle=%llu error=%s\n",
                         renderState.enabled ? "true" : "false",
                         static_cast<unsigned long long>(renderState.framesIdle), renderState.lastError.c_str());
@@ -667,11 +826,13 @@ void Player::PlayerMain::Update()
             std::fflush(stdout);
         }
 
-        if (!displayRotated)
+        if (!displayRotated || m_submittedGameFrameId.load(std::memory_order_acquire) == 0)
+        {
             return;
+        }
 
         // Optional packaged-host regression: prepare through engine jobs, activate
-        // at the normal owner boundary, then require a displayed post-load frame.
+        // at the normal owner boundary, then require a submitted native post-load composition.
         if (g_smoke.reloadScene)
         {
             if (!m_smokeReloadStarted)
@@ -772,9 +933,12 @@ void Player::PlayerMain::Update()
                 }
             }
 
-            if (gameDisplay.completedFrameId <= m_smokeReloadPublishedFrame)
+            if (gameDisplay.completedFrameId <= m_smokeReloadPublishedFrame ||
+                m_submittedGameFrameId.load(std::memory_order_acquire) <= m_smokeReloadPublishedFrame)
+            {
                 return;
-            std::printf("[player.smoke.reload] activated=true gameStart=%s pending=%s displayedAfterActivation=true\n",
+            }
+            std::printf("[player.smoke.reload] activated=true gameStart=%s pending=%s compositionSubmittedAfterActivation=true\n",
                 SceneManagers->IsGameStart() ? "true" : "false",
                 SceneManagers->IsSceneLoading() ? "true" : "false");
         }
@@ -811,10 +975,14 @@ void Player::PlayerMain::Update()
                                                   std::to_string(gameDisplay.promotionCount) + ")");
         std::printf("[player.smoke] "
                     "{\"schemaVersion\":1,\"ready\":%s,\"registeredScriptTypes\":%zu,\"frames\":%llu,"
-                    "\"displayPromotions\":%llu}\n",
+                    "\"displayPromotions\":%llu,\"submittedGameFrames\":%llu,\"submittedGameFrameId\":%llu}\n",
             ClrHost::Get().IsReady() ? "true" : "false", ClrHost::Get().GetComponentTypeNames().size(),
                     static_cast<unsigned long long>(Time->GetFrameCount()),
-                    static_cast<unsigned long long>(gameDisplay.promotionCount));
+                    static_cast<unsigned long long>(gameDisplay.promotionCount),
+                    static_cast<unsigned long long>(m_presentation->GetSubmittedGameFrames()),
+                    static_cast<unsigned long long>(m_submittedGameFrameId.load(std::memory_order_acquire)));
+        // Hidden/occluded windows can submit game composition without compositor acceptance.
+        // Normal Finalize still requires the native consumer GPU drain before exit 0.
 		EmitTextParseTelemetry();
 		PostMessage(handle, WM_CLOSE, 0, 0);
 		return;
@@ -826,67 +994,63 @@ void Player::PlayerMain::Update()
 	}
 }
 
-void Player::PlayerMain::PresentFrame()
+bool Player::PlayerMain::PresentFrame(std::string& outError)
 {
-	// GPU scene은 전용 RenderThread가 그리고, 여기서는 완료 display snapshot을
-	// 전체 화면 ImGui 셸에 표시한다.
-	OnGui();
+    RECT rect{};
+    if (!GetClientRect(PlayerWindowHandle(), &rect))
+    {
+        outError = "Player could not read the presentation window size";
+        return false;
+    }
+    // A hidden smoke window is still a real swapchain. Only minimization/zero
+    // extent suspends presentation; visibility is deliberately not a gate.
+    if (IsIconic(PlayerWindowHandle()) || rect.right <= rect.left || rect.bottom <= rect.top)
+    {
+        return true;
+    }
+    if (!m_presentation->BeginFrame(outError))
+    {
+        return false;
+    }
+    const EnhancedLiveDisplayTexture display =
+        EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Game);
+    const uint64_t before = m_presentation->GetSubmittedGameFrames();
+    if (!m_presentation->Present(display.textureId, outError))
+    {
+        return false;
+    }
+    if (m_presentation->GetSubmittedGameFrames() != before)
+    {
+        m_submittedGameFrameId.store(display.frame.completedFrameId, std::memory_order_release);
+    }
+    return true;
 }
 
-void Player::PlayerMain::OnGui()
+bool Player::PlayerMain::CreateWindowSizeDependentResources(std::string& outError)
 {
-	// ImGui는 위젯이 아니라 표시 경로다 — 게임 카메라의 표시 슬롯을
-	// 전체 화면으로 블릿한다(GameViewWindow가 창 안에서 하는 것과 같은
-	// GetLiveDisplayImTextureId 경로, 창 장식만 없다).
-	GetImGuiHost().BeginFrame();
-
-	const ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos);
-	ImGui::SetNextWindowSize(viewport->Size);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings |
-		ImGuiWindowFlags_NoBringToFrontOnFocus;
-	if (ImGui::Begin("##PlayerGameView", nullptr, kFlags))
-	{
-		if (const uint64_t textureId =
-                EnhancedSceneRenderer::GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget::Game))
-		{
-			ImGui::Image((ImTextureID)textureId, viewport->Size);
-		}
-	}
-	ImGui::End();
-	ImGui::PopStyleVar(2);
-
-	// 선언된 창의 프레임(editor::draw_declared_windows)은 부르지 않는다 — 그것은
-	// 에디터 몫이고, 애초에 Player는 그 계통을 링크하지 않는다. 또한
-	// EditorAssetPresentation이 등록하는 material/texture selector는
-	// 플레이어에 설치되지 않으므로 플레이어 화면에 섞일 수 없다.
-	//
-	// 셰이더 선택 창 둘은 여기 예로 적혀 있었는데, PHASE 4-3 슬라이스 5에서
-	// 에디터로 나갔다 — 플레이어는 이제 그 둘을 등록조차 하지 않는다.
-	GetImGuiHost().EndFrame();
-}
-
-void Player::PlayerMain::CreateWindowSizeDependentResources()
-{
-	// ★ DX11 스왝체인 해제와 SetLogicalSize가 여기 있었다 (2026-08-10).
-	//   플레이어는 애초에 DX11 스왝체인을 만든 적이 없어서
-	//   (SetPresentOwnedExternally(true)) 둘 다 무의미한 호출이었다.
-	//
-	//   남는 두 단계는 화면 크기를 따라가는 DX12 텍스처들의 규약이다:
-	//   놓게 하고(BroadcastRelease) → 새 크기로 다시 잡게 한다(BroadcastResize).
-	OnResizeReleaseEvent();
-	ScreenResizeBus::Get().BroadcastRelease();
-
-	RECT rect{};
-	GetClientRect(PlayerWindowHandle(), &rect);
-	const float width = static_cast<float>(rect.right - rect.left);
-	const float height = static_cast<float>(rect.bottom - rect.top);
-
-	OnResizeEvent(width, height);
-    ScreenResizeBus::Get().BroadcastResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    RECT rect{};
+    if (!GetClientRect(PlayerWindowHandle(), &rect))
+    {
+        outError = "Player could not read the resized window";
+        return false;
+    }
+    const uint32_t width = IsIconic(PlayerWindowHandle()) ? 0u :
+        static_cast<uint32_t>((std::max)(0L, rect.right - rect.left));
+    const uint32_t height = IsIconic(PlayerWindowHandle()) ? 0u :
+        static_cast<uint32_t>((std::max)(0L, rect.bottom - rect.top));
+    if (!m_presentation->Resize(width, height, outError))
+    {
+        return false;
+    }
+    if (width == 0 || height == 0)
+    {
+        return true;
+    }
+    OnResizeReleaseEvent();
+    ScreenResizeBus::Get().BroadcastRelease();
+    OnResizeEvent(static_cast<float>(width), static_cast<float>(height));
+    ScreenResizeBus::Get().BroadcastResize(width, height);
+    return true;
 }
 
 void Player::PlayerMain::InvokeResizeFlag()

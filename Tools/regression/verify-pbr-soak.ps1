@@ -41,6 +41,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Reject before creating artifacts or changing settings; never label a DX12 run Vulkan.
+if ($Backend -contains 'vulkan') {
+    throw 'CreatorEditor supports DX12 only; Vulkan Editor runs are unsupported. Use native Vulkan RHI probes or Player validation instead.'
+}
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 if (-not $PSBoundParameters.ContainsKey('Editor')) {
@@ -134,17 +138,13 @@ function New-SoakCommands([int]$Samples) {
 
 try {
     if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) {
-        throw 'Close the running Editor before this test; it temporarily selects the startup backend.'
+        throw 'Close the running Editor before this test; it uses the build-fixed DX12 host.'
     }
     New-Item -ItemType Directory -Path $run | Out-Null
     if (-not (Test-Path -LiteralPath $probeSource -PathType Leaf)) { throw "probe 원본이 없다: $probeSource" }
     Remove-Probe
     Copy-Item -LiteralPath $probeSource -Destination $probeAsset -Force
     $original = [IO.File]::ReadAllBytes($settings)
-    $text = $utf8.GetString($original)
-    $backendPattern = '(?m)(^render:\r?\n\s{2}backend: )\w+'
-    if ([regex]::Matches($text, $backendPattern).Count -ne 1) { throw 'Runtime backend setting is ambiguous.' }
-    [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, "`${1}$Backend"), $utf8)
 
     $samples = [int][math]::Max(10, [math]::Ceiling($Minutes * 60 / $secondsPerSample))
     $scenario = Join-Path $run 'soak.txt'

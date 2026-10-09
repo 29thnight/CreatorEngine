@@ -41,10 +41,14 @@ public:
         return RHITextureHandle{ Acquire(m_textures, m_textureFree, std::move(resource), nullptr, false) };
     }
 
-    RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
+    RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+        bool allowIndirectArguments = false)
     {
-        if (nullptr == resource.Get()) return {};
-        return RHIBufferHandle{ AcquireBuffer(std::move(resource), nullptr) };
+        if (nullptr == resource.Get())
+        {
+            return {};
+        }
+        return RHIBufferHandle{ AcquireBuffer(std::move(resource), nullptr, allowIndirectArguments) };
     }
 
     /// 소유하지 않고 등록한다 — 임포트(스왑체인 백버퍼·자가 검증이 만든 텍스처).
@@ -68,6 +72,25 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveIn(m_textures, handle.id); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveBuffer(handle.id); }
+
+    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
+    {
+        if (0 == handle.id)
+        {
+            return {};
+        }
+        const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire))
+        {
+            return {};
+        }
+        const Slot& entry = m_buffers[slot];
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(handle.id))
+        {
+            return {};
+        }
+        return { entry.Get(), entry.bufferBytes, entry.allowIndirectArguments };
+    }
 
     /// 버퍼의 GPU 가상 주소. 등록할 때 한 번 물어 둔 값이다 (A-4).
     ///
@@ -109,18 +132,20 @@ public:
     //   "이미 놓인 핸들이 남의 파이프라인으로 풀리는" 사고가 성립한다.
     //   **모델이 그것을 허용해 두는 것**이 V8-a 가 요구한 것이다(§7.2.5).
 
-    RHIPipelineHandle AddPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature)
+    RHIPipelineHandle AddPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature,
+        bool meshPipeline = false, bool computePipeline = false)
     {
         if (nullptr == pipeline) return {};
         return RHIPipelineHandle{ AcquirePipeline(m_pipelines, m_pipelineFree,
-            DX12PipelineEntry{ pipeline, signature }) };
+            DX12PipelineEntry{ pipeline, signature, meshPipeline, computePipeline }) };
     }
 
-    RHIPipelineLayoutHandle AddPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash)
+    RHIPipelineLayoutHandle AddPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash,
+        bool allowInputAssembler = true)
     {
         if (nullptr == signature) return {};
         return RHIPipelineLayoutHandle{ AcquireLayout(m_layouts, m_layoutFree,
-            DX12PipelineLayoutEntry{ signature, stableHash }) };
+            DX12PipelineLayoutEntry{ signature, stableHash, allowInputAssembler }) };
     }
 
     DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
@@ -151,6 +176,8 @@ public:
                 entry.owned.Reset();
                 entry.external = nullptr;
                 entry.gpuAddress = 0;
+                entry.bufferBytes = 0;
+                entry.allowIndirectArguments = false;
                 entry.generation = 0;
                 entry.alive = false;
             }
@@ -189,6 +216,8 @@ private:
         /// 등록할 때 한 번 물어 둔 값 (A-4). 텍스처 칸에서는 0이다 —
         /// D3D12 는 버퍼가 아닌 리소스에 0을 돌려준다.
         D3D12_GPU_VIRTUAL_ADDRESS              gpuAddress{ 0 };
+        uint64_t bufferBytes{ 0 };
+        bool allowIndirectArguments{ false };
 
         ID3D12Resource* Get() const { return owned ? owned.Get() : external; }
     };
@@ -243,7 +272,7 @@ private:
     }
 
     uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned,
-        ID3D12Resource* external)
+        ID3D12Resource* external, bool allowIndirectArguments = false)
     {
         std::lock_guard lock(m_bufferRegistryMutex);
 
@@ -265,6 +294,10 @@ private:
         entry.external = external;
         entry.gpuAddress = nullptr != entry.Get()
             ? entry.Get()->GetGPUVirtualAddress() : 0;
+        const D3D12_RESOURCE_DESC description = entry.Get()->GetDesc();
+        entry.bufferBytes = D3D12_RESOURCE_DIMENSION_BUFFER == description.Dimension
+            ? description.Width : 0;
+        entry.allowIndirectArguments = allowIndirectArguments && entry.bufferBytes != 0;
         entry.alive = true;
 
         if (slot == m_bufferHighWater.load(std::memory_order_relaxed))
@@ -298,6 +331,8 @@ private:
         entry.owned.Reset();
         entry.external = nullptr;
         entry.gpuAddress = 0;
+        entry.bufferBytes = 0;
+        entry.allowIndirectArguments = false;
         ++entry.generation;
         m_bufferFree.push_back(slot);
         m_liveBuffers.fetch_sub(1, std::memory_order_relaxed);

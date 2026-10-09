@@ -1,12 +1,14 @@
 #include "ModelAssetAuthoringTransaction.h"
 
+#include "../Experiment/Import/MeshletBuilder.h"
+#include "../Experiment/Import/MeshLodBuilder.h"
+
 #include "ModelSidecarV2.h"
 #include "ModelMaterialGraph.h"
+#include "ModelSourcePreparation.h"
 #include "../Experiment/Cooked/CookSupport.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/Cooked/TextureCookProducer.h"
-#include "../Experiment/Import/FbxImporter.h"
-#include "../Experiment/Import/GltfImporter.h"
 #include "../Experiment/Import/SceneToModelDraft.h"
 
 #include "AuthoringParsedDocument.h"
@@ -20,7 +22,6 @@
 #include <fstream>
 #include <limits>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <process.h>
 #include <ranges>
@@ -290,32 +291,6 @@ namespace assets
                 text.remove_prefix(newline + 1u);
             }
             return false;
-        }
-
-        [[nodiscard]] std::unique_ptr<im::IAssetImporter> Mbc3CreateImporter(
-            const std::filesystem::path& source)
-        {
-            auto gltf = std::make_unique<im::GltfImporter>();
-            if (gltf->CanImport(source)) return gltf;
-            auto fbx = std::make_unique<im::FbxImporter>();
-            if (fbx->CanImport(source)) return fbx;
-            return {};
-        }
-
-        [[nodiscard]] bool Mbc3NormalizeStableInputs(
-            std::vector<StableKeyElement>& elements, std::string& failure)
-        {
-            for (StableKeyElement& element : elements)
-            {
-                for (std::string* value : { &element.persistentId, &element.name })
-                {
-                    if (value->empty()) continue;
-                    std::string normalized;
-                    if (!NormalizeUtf8Nfc(*value, normalized, failure)) return false;
-                    *value = std::move(normalized);
-                }
-            }
-            return true;
         }
 
         [[nodiscard]] bool Mbc3ReadExternalAssetId(
@@ -870,6 +845,51 @@ namespace assets
             return result;
         }
 
+        ModelGeometryImportSettings geometrySettings;
+        if (hadSidecar)
+        {
+            std::string settingsError;
+            if (!ReadModelGeometryImportSettings(originalSidecar, geometrySettings, settingsError))
+            {
+                Mbc3AddIssue(result, "importSettings", std::move(settingsError));
+                return result;
+            }
+        }
+        bool buildMeshlets = geometrySettings.buildMeshlets;
+        std::uint32_t lodLevels = geometrySettings.lodLevels;
+        if (request.buildMeshlets.has_value())
+        {
+            buildMeshlets = *request.buildMeshlets;
+        }
+
+        if (request.lodLevels.has_value())
+        {
+            if (*request.lodLevels > experiment::kMeshLodMaxLevels
+                || (*request.lodLevels != 0u && request.buildMeshlets == false))
+            {
+                Mbc3AddIssue(result, "importSettings.lodLevels", "LOD levels require meshlets and a range of 0..7.");
+                return result;
+            }
+            lodLevels = *request.lodLevels;
+            if (lodLevels != 0u)
+            {
+                buildMeshlets = true;
+            }
+        }
+        if (!buildMeshlets && lodLevels != 0u)
+        {
+            if (request.buildMeshlets.has_value() && !*request.buildMeshlets)
+            {
+                lodLevels = 0u;
+            }
+            else
+            {
+                Mbc3AddIssue(result, "importSettings.lodLevels",
+                    "Persisted coarse LODs require buildMeshlets=true; enable meshlets or explicitly disable LODs.");
+                return result;
+            }
+        }
+
         ModelSidecarV2 prior;
         bool hasPriorV2 = false;
         if (hadSidecar)
@@ -921,7 +941,7 @@ namespace assets
             : std::filesystem::last_write_time(source, sourceStat);
         const bool sourceStamped = !sourceStat;
 
-        std::unique_ptr<im::IAssetImporter> importer = Mbc3CreateImporter(source);
+        auto importer = CreateModelSourceImporter(source);
         if (!importer)
         {
             Mbc3AddIssue(result, "source.decode",
@@ -931,6 +951,8 @@ namespace assets
         }
         im::ImportRequest importRequest;
         importRequest.sourcePath = source;
+        importRequest.options.buildMeshlets = buildMeshlets;
+        importRequest.options.lodLevels = lodLevels;
         const im::ImportResult imported = importer->Import(importRequest);
         if (!imported.Succeeded())
         {
@@ -944,7 +966,7 @@ namespace assets
 
         std::vector<StableKeyElement> elements =
             CollectStableKeyElements(*imported.scene);
-        if (!Mbc3NormalizeStableInputs(elements, failure))
+        if (!NormalizeModelStableInputs(elements, failure))
         {
             Mbc3AddIssue(result, "identity.normalize", std::move(failure));
             return result;
@@ -1005,6 +1027,24 @@ namespace assets
             return result;
         }
 
+        std::string settingsWriteError;
+        auto settingsDocument = Authoring::WriteDocument::ParseText(sidecarText, &settingsWriteError);
+        if (!settingsDocument)
+        {
+            Mbc3AddIssue(result, "importSettings.write", settingsWriteError);
+            return result;
+        }
+        const auto settings = settingsDocument->Root().Child("importSettings");
+        settings.SetMap();
+        settings.Child("buildMeshlets").SetScalar(buildMeshlets);
+        settings.Child("lodLevels").SetScalar(lodLevels);
+        sidecarText = settingsDocument->Dump();
+        if (sidecarText.empty())
+        {
+            Mbc3AddIssue(result, "importSettings.write", "Could not serialize model import settings.");
+            return result;
+        }
+
         error.clear();
         const std::filesystem::path logicalSource =
             std::filesystem::relative(source, assetRoot, error).lexically_normal();
@@ -1024,6 +1064,30 @@ namespace assets
             return result;
         }
         markPhase("sidecar+draft");
+        for (experiment::Mesh& mesh : draft.meshes)
+        {
+            if (buildMeshlets && !experiment::importer::BuildMeshlets(mesh, mesh.meshlets, failure))
+            {
+                Mbc3AddIssue(result, "cooked.meshlets", mesh.name + ": " + failure);
+                return result;
+            }
+        }
+        experiment::MeshLodBuildSettings lodSettings;
+        lodSettings.levelCount = lodLevels;
+        for (experiment::Mesh& mesh : draft.meshes)
+        {
+            std::string lodDiagnostic;
+            if (!experiment::importer::BuildMeshLods(mesh, mesh.coarseLods, lodDiagnostic, lodSettings))
+            {
+                Mbc3AddIssue(result, "cooked.lods", mesh.name + ": " + lodDiagnostic);
+                return result;
+            }
+            if (lodLevels != 0u && !lodDiagnostic.empty())
+            {
+                result.warnings.push_back({ "cooked.lods", mesh.name + ": " + lodDiagnostic });
+            }
+        }
+        markPhase("meshlets");
         const ck::CookedWriteResult cooked = ck::Write(draft);
         if (!cooked.Succeeded())
         {
@@ -1134,6 +1198,7 @@ namespace assets
         if (!Mbc3ReadBytes(cleanup.stage / "model.cemc", stagedModel)
             || Mbc3Fingerprint(stagedModel) != modelFingerprint
             || !ck::Read(stagedModel, restoredDraft, modelIssues)
+            || !modelIssues.empty()
             || restoredDraft.metadata.assetId.value != sidecar.assetId
             || restoredDraft.meshes.size() != draft.meshes.size()
             || restoredDraft.materials.size() != draft.materials.size()

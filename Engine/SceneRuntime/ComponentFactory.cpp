@@ -21,10 +21,44 @@
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
 #include "SoundComponent.h"
+#include "AudioListenerComponent.h"
 #include "PlayerInput.h"
 #include "Canvas.h"
 #include "UIManager.h"
+#include "RegisterReflectManual.h"
 	
+namespace
+{
+    template<class T>
+    gc::root_ref<Component> TryCreateManagedComponent(gc::domain& domain,
+        const reflgen::type_descriptor& requested)
+    {
+        if constexpr (std::is_base_of_v<Component, T>)
+        {
+            if (requested.id() == Meta::ToTypeID(TypeTrait::GUIDCreator::GetTypeID<T>()))
+            {
+                return Component::CreateManaged<T>(domain);
+            }
+        }
+        return {};
+    }
+}
+
+gc::root_ref<Component> ComponentFactory::CreateManaged(gc::domain& domain,
+    const reflgen::type_descriptor& type)
+{
+    // Same closed native type list and IDs as serialization/CLR dispatch.
+    // A reflgen descriptor is never allowed to allocate a managed object.
+#define CREATE_MANAGED_COMPONENT(T) \
+    if (auto component = TryCreateManagedComponent<T>(domain, type)) \
+    { \
+        return component; \
+    }
+    REFLECT_TYPE_LIST(CREATE_MANAGED_COMPONENT)
+#undef CREATE_MANAGED_COMPONENT
+    throw std::logic_error("Component type is not in the managed factory: " + std::string(type.name()));
+}
+
 void ComponentFactory::Initialize()
 {
    // 생명주기 마스크 표를 먼저 세운다(PHASE 9-1).

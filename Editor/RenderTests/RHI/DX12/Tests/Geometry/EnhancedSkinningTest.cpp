@@ -1,3 +1,4 @@
+#include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"

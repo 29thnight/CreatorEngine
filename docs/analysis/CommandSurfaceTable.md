@@ -103,7 +103,7 @@ flowchart LR
 
 | 명령 | 별칭 | 인자 | 비용 | Undo | JSON parameters | 동작 |
 |---|---|---|---|:-:|---|---|
-| `dx12.live` | - | `on\|status` | Immediate | — | `action=status` | EnhancedRenderer 메인 런타임 상태 |
+| `dx12.live` | - | `on\|status\|remove-device scene\|host` | Immediate | — | `action=status` | EnhancedRenderer 메인 런타임 상태 |
 
 ### game — 1
 
@@ -228,7 +228,7 @@ flowchart LR
 
 | 명령 | 별칭 | 인자 | 비용 | Undo | JSON parameters | 동작 |
 |---|---|---|---|:-:|---|---|
-| `render.backend` | - | `status` | Immediate | — | `action=status` | 부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings) |
+| `render.backend` | - | `status` | Immediate | — | `action=status` | Editor scene/ImGui DX12 고정 상태 조회(Player 백엔드는 Build Settings) |
 | `render.matmode` | - | `<오브젝트> <opaque\|transparent>` | Immediate | ● | `target,mode` | 오브젝트 재질의 렌더링 모드를 바꾼다 |
 | `render.rtinfo` | - | — | Immediate | — | `()` | 창·뷰포트·추종 텍스처 크기를 나란히 찍는다 |
 | `render.shadowinfo` | - | — | Immediate | — | `()` | 그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용) |

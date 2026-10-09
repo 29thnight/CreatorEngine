@@ -21,6 +21,11 @@
   <ItemGroup>
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueContractTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueNativeTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueOwnershipTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RenderQueueScheduleRg8Tests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RenderQueueExecutionRg8Tests.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
     <ClInclude Include="RHI\DX12\Tests\EnhancedScreenRg5Tests.h" />
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h" />
@@ -30,6 +35,7 @@
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
     <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
     <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h" />
+    <ClInclude Include="Tasks\SceneGCSelfTest.h" />
     <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
     <ClInclude Include="Animation\AnimationBaselineProbe.h" />
     <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
@@ -45,6 +51,12 @@
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -62,6 +74,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Tasks\SceneGCSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp">
@@ -245,7 +260,7 @@
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>

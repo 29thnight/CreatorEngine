@@ -1,23 +1,15 @@
 #pragma once
-// PHASE 14.5 LC8 — Player registry(축소)와 그 실행 계층.
-//
-// ── Editor 의 ConsoleCommandSystem 을 왜 쓰지 않는가 ────────────────────
-//
-// 그 파일은 배치 프론트엔드(`--exec`·`--script`·stdin)와 세션 판정, 그리고 190 개
-// 저작 명령의 등록을 함께 들고 있고, 그 전부가 Editor.lib 에 매여 있다. Player 가
-// 그것을 링크하면 에디터 창·자산 저작·렌더 테스트가 통째로 따라 들어온다.
-//
-// Player 가 실제로 필요한 것은 셋뿐이다: ① 이름→핸들러 표 ② 게임 스레드
-// 프레임 경계에서 하나씩 꺼내 실행하는 큐 ③ 결과를 기다리는 사람 깨우기.
-// 그 셋만 여기 있다. 배치 입력도, 세션 누적도, exit code 판정도 없다 —
-// Player 의 판정은 HTTP 응답으로 가고, 프로세스 종료 코드는 스모크의 것이다.
-//
-// ── 무엇을 공유하는가 ───────────────────────────────────────────────────
-//
-// `CommandCore`(descriptor·registry·result)는 role 중립이라 그대로 쓴다
-// (§12 의 "role 중립 실행 코어"). seed 표도 공유한다 — schema 의 단일 정본을
-// 호스트마다 복제하면 LC3 이 없앤 drift 가 호스트 수만큼 돌아온다.
+// Development Player reuses the role-neutral parser, registry, and batch session.
+// Shipping retains only the argument rejection surface below.
+#include <string>
 
+namespace PlayerCmd
+{
+    bool ParseCommandLineArgument(int argc, wchar_t* const* argv, int& index, std::string& error);
+    bool ValidateCommandLine(bool commandService, bool smoke, std::string& error);
+}
+
+#if CE_DEVELOPMENT
 #include "CommandCore/CommandResult.h"
 
 #include <atomic>
@@ -49,6 +41,10 @@ namespace PlayerCmd
 	public:
 		static CommandHost& Get();
 
+        // Starts the configured local batch after runtime/scene initialization.
+        // With no input this does nothing and does not populate the registry.
+        void StartBatch(bool runtimeReady);
+
 		/// 표를 채운다. 서비스를 열기 **전에** 불러야 한다.
 		///
 		/// ★ Editor 가 같은 자리에서 겪은 실측을 그대로 피한다
@@ -60,7 +56,7 @@ namespace PlayerCmd
 		/// 결과를 기다리는 사람이 있는 적재. 상한을 넘으면 넣지 않고 false.
 		///
 		/// `arguments[0]` 이 명령 이름이다. 라인 문법을 거치지 않는다 —
-		/// Player 에는 애초에 라인 입력이 없다.
+        /// Local line input is tokenized before it reaches this queue.
 		bool Enqueue(std::vector<std::string> arguments, Completion completion,
 		             std::size_t queueCap);
 
@@ -121,3 +117,5 @@ namespace PlayerCmd
 		std::string          m_currentCommand;
 	};
 }
+
+#endif // CE_DEVELOPMENT

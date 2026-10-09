@@ -47,6 +47,7 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
+#include "EnhancedRenderDebugWindow.h"
 #include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
 #include "CommandSupport.h"
@@ -58,6 +59,7 @@
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
+#include "EditorSettingsStore.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
@@ -129,6 +131,7 @@
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
@@ -306,27 +309,102 @@ namespace ConsoleCmd
             data.Set("background", CommandData::Bool(settings.m_isSkyboxEnabled));
             data.Set("path", CommandData::String(settings.skyboxTextureName));
             data.Set("iblGenerations", CommandData::Int(EnhancedSceneRenderer::GetLiveDisplaySnapshot().iblGenerationCount));
+            const auto preparation = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+            data.Set("requestId", CommandData::Int(preparation.requestId));
+            data.Set("activeRequests", CommandData::Int(preparation.activeRequests));
+            data.Set("applied", CommandData::Bool(preparation.applied));
+            data.Set("appliedRequestId", CommandData::Int(preparation.appliedRequestId));
+            data.Set("phase", CommandData::String(preparation.phase));
+            data.Set("error", CommandData::String(preparation.error));
             return Ok({}, std::move(data));
         }
         if (ctx.parts.size()!=2) return InvalidArguments("render.environment <HDR-or-ceibl-path> | status | background on|off");
         std::string error;
         if (!EnhancedSceneRenderer::SetSkyBoxPath(ctx.parts[1],error)) return Fail("render.environment_failed",error);
-        editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
         auto data=CommandData::Object(); data.Set("path",CommandData::String(ctx.parts[1]));
-        return Ok("Environment selection queued; render.live.fence waits for publication",std::move(data));
+        const auto preparation = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+        data.Set("requestId", CommandData::Int(preparation.requestId));
+        data.Set("activeRequests", CommandData::Int(preparation.activeRequests));
+        data.Set("applied", CommandData::Bool(preparation.applied));
+        data.Set("appliedRequestId", CommandData::Int(preparation.appliedRequestId));
+        data.Set("phase", CommandData::String(preparation.phase));
+        data.Set("error", CommandData::String(preparation.error));
+        return Ok("Environment preparation accepted; poll render.environment status before requesting a render fence",
+            std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_render_backend(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() > 2) return InvalidArguments("render.backend [status]");
+        if (ctx.parts.size() > 2)
+        {
+            return InvalidArguments("render.backend [status]");
+        }
         if (ctx.parts.size() == 2 && ctx.parts[1] != "status")
-            return InvalidArguments("Backend is fixed at startup; configure Settings and restart", "render.backend_fixed");
+        {
+            return InvalidArguments(
+                "Editor Scene/Game/material preview and ImGui are DX12-only; "
+                "Settings > Build Settings selects the Player backend", "render.backend_fixed");
+        }
         auto data = CommandData::Object();
-        data.Set("configured", CommandData::String(RenderBackendName(RuntimeSettings::Get().GetRenderBackend())));
+        data.Set("policy", CommandData::String("editor-build-fixed-dx12"));
+        data.Set("buildBackend", CommandData::String("dx12"));
         data.Set("scene", CommandData::String(EnhancedLiveBackend::Vulkan == EnhancedSceneRenderer::GetLiveBackend() ? "vulkan" : "dx12"));
         data.Set("imgui", CommandData::String(GetImGuiHost().GetBackendName()));
         data.Set("status", CommandData::String(EnhancedSceneRenderer::GetLiveStatus()));
+        return Ok({}, std::move(data));
+    }
+
+    // Preferences 화면과 같은 값을 바꾸고 같이 저장한다. 메모리에만 두면 다른
+    // 경로의 Save() 가 결국 써 버려, "세션 한정" 은 거짓이 된다(실측).
+    // 적용은 다음 발행 프레임의 App::ResolveLivePacing 이 한다.
+    static CommandCore::CommandResult Cmd_render_pacing(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        constexpr const char* kUsage = "render.pacing [status | display | unlimited | <fps> | background <fps>]";
+        EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+        const auto parseRate = [](const std::string& text, int& rate) {
+            try { size_t used = 0; rate = std::stoi(text, &used); return used == text.size(); }
+            catch (...) { return false; }
+        };
+        if (ctx.parts.size() == 3 && ctx.parts[1] == "background")
+        {
+            int rate = 0;
+            if (!parseRate(ctx.parts[2], rate) || rate < 0
+                || rate > static_cast<int>(EditorPreferences::kMaxBackgroundFrameRate))
+                return InvalidArguments("background fps must be 0..60 (0 = off)");
+            preferences.SetBackgroundFrameRate(static_cast<std::uint32_t>(rate));
+        }
+        else if (ctx.parts.size() == 2 && ctx.parts[1] == "display")
+            preferences.SetFrameRateMode(EditorFrameRateMode::Display);
+        else if (ctx.parts.size() == 2 && ctx.parts[1] == "unlimited")
+            preferences.SetFrameRateMode(EditorFrameRateMode::Unlimited);
+        else if (ctx.parts.size() == 2 && ctx.parts[1] != "status")
+        {
+            int rate = 0;
+            if (!parseRate(ctx.parts[1], rate)
+                || rate < static_cast<int>(EditorPreferences::kMinCustomFrameRate)
+                || rate > static_cast<int>(EditorPreferences::kMaxCustomFrameRate))
+                return InvalidArguments(kUsage);
+            preferences.SetCustomFrameRate(static_cast<std::uint32_t>(rate));
+            preferences.SetFrameRateMode(EditorFrameRateMode::Custom);
+        }
+        else if (ctx.parts.size() > 2)
+            return InvalidArguments(kUsage);
+        if (ctx.parts.size() > 1 && ctx.parts[1] != "status" && !EditorSettingsStore::Get().Save())
+            return Fail("render.pacing_save_failed", "Pacing changed for this session but EngineSettings.asset was not written");
+
+        const EditorFrameRateMode mode = preferences.GetFrameRateMode();
+        const EnhancedLivePacing applied = EnhancedSceneRenderer::GetLivePacing();
+        auto data = CommandData::Object();
+        data.Set("mode", CommandData::String(EditorFrameRateMode::Unlimited == mode ? "unlimited"
+            : EditorFrameRateMode::Custom == mode ? "custom" : "display"));
+        data.Set("customFps", CommandData::Int(preferences.GetCustomFrameRate()));
+        data.Set("backgroundFps", CommandData::Int(preferences.GetBackgroundFrameRate()));
+        // 지금 렌더 스레드에 걸린 값. 바꾼 직후에는 다음 프레임 발행 전이라 이전 값일 수 있다.
+        data.Set("appliedMode", CommandData::String(EnhancedLivePacingMode::Unlimited == applied.mode ? "unlimited"
+            : EnhancedLivePacingMode::FixedRate == applied.mode ? "fixed" : "display"));
+        data.Set("appliedFps", CommandData::Int(applied.framesPerSecond));
         return Ok({}, std::move(data));
     }
 
@@ -334,6 +412,19 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         const std::string mode = ctx.parts.size() >= 2 ? ctx.parts[1] : "status";
+#if !CE_SHIPPING
+        if (mode == "remove-device")
+        {
+            if (ctx.parts.size() != 3 || (ctx.parts[2] != "scene" && ctx.parts[2] != "host"))
+                return InvalidArguments("dx12.live remove-device scene|host");
+            DX12DeviceResources::RequestTestDeviceRemoval(ctx.parts[2] == "scene"
+                ? DX12DeviceResources::TestDeviceRemovalTarget::Scene
+                : DX12DeviceResources::TestDeviceRemovalTarget::Host);
+            auto data = CommandData::Object();
+            data.Set("target", CommandData::String(ctx.parts[2]));
+            return Ok("Device removal queued for the next frame of that device", std::move(data));
+        }
+#endif
         if (ctx.parts.size() > 2 || (mode != "on" && mode != "status"))
             return InvalidArguments("dx12.live [on|status]; the main renderer cannot be disabled");
         if (mode == "on") EnhancedSceneRenderer::EnableLive();
@@ -349,6 +440,33 @@ namespace ConsoleCmd
         data.Set("framesRendered", CommandData::Int(snapshot.framesRendered));
         data.Set("framesIdle", CommandData::Int(snapshot.framesIdle));
         data.Set("framesInFlight", CommandData::Int(snapshot.framesInFlight));
+
+        // 진입 나이는 실프레임 packet 캡처 이후 시간이며 입력-광자 지연이 아니다.
+        // 픽셀 제출 없이 CPU 소비만 진행할 수 있으므로 세 신원을 나누어 낸다.
+        const auto renderThread = EnhancedSceneRenderer::GetLiveRenderThreadStats();
+        auto admission = CommandData::Object();
+        admission.Set("capacity", CommandData::Int(renderThread.capacity));
+        admission.Set("pending", CommandData::Int(renderThread.pending));
+        admission.Set("inProgress", CommandData::Int(renderThread.inProgress));
+        admission.Set("highWatermark", CommandData::Int(renderThread.highWatermark));
+        admission.Set("publishedFrame", CommandData::Int(renderThread.publishedFrameId));
+        admission.Set("cpuCompletedFrame", CommandData::Int(renderThread.completedFrameId));
+        admission.Set("admittedFrame", CommandData::Int(renderThread.admittedFrameId));
+        admission.Set("coalescedFrames", CommandData::Int(renderThread.coalescedFrames));
+        admission.Set("coalescedDeltas", CommandData::Int(renderThread.coalescedDeltas));
+        admission.Set("backPressureWaits", CommandData::Int(renderThread.backPressureWaits));
+        admission.Set("gpuAdmissionWaits", CommandData::Int(renderThread.gpuAdmissionWaits));
+        admission.Set("stalePixelSkips", CommandData::Int(renderThread.stalePixelSkips));
+        admission.Set("overBudgetAdmissions", CommandData::Int(renderThread.overBudgetAdmissions));
+        admission.Set("displayLeaseSkips", CommandData::Int(renderThread.displayLeaseSkips));
+        admission.Set("producerPacingWaits", CommandData::Int(renderThread.producerPacingWaits));
+        admission.Set("displayLeaseWaits", CommandData::Int(renderThread.displayLeaseWaits));
+        admission.Set("displayPacingWaits", CommandData::Int(renderThread.displayPacingWaits));
+        admission.Set("lastAdmissionAgeMs", CommandData::Double(renderThread.lastAdmissionAgeMs));
+        admission.Set("maxAdmissionAgeMs", CommandData::Double(renderThread.maxAdmissionAgeMs));
+        admission.Set("pendingAgeMs", CommandData::Double(renderThread.pendingAgeMs));
+        admission.Set("softAgeBudgetMs", CommandData::Double(renderThread.softAgeBudgetMs));
+        data.Set("admission", std::move(admission));
 
         // ★ GPU 수집 장부를 내는 이유는 P4 기준선 때문이다. 패스별 GPU
         //   시간은 지금까지 렌더 디버그 창에만 있었고, 그래서 그 숫자가 올바른
@@ -446,6 +564,13 @@ namespace ConsoleCmd
             target.Set("active", CommandData::Bool(entry.active));
             target.Set("ready", CommandData::Bool(entry.ready));
             target.Set("completedFrame", CommandData::Int(entry.completedFrameId));
+            target.Set("completedCaptureAgeMs", CommandData::Double(entry.completedAgeMs));
+            target.Set("lastTextureCaptureAgeMs", CommandData::Double(entry.lastTextureAgeMs));
+            target.Set("sourceFrame", CommandData::Int(entry.sourceFrameId));
+            target.Set("sourceInputSequence", CommandData::Int(entry.sourceInputSequence));
+            target.Set("sourceCameraRevision", CommandData::Int(entry.sourceCameraRevision));
+            target.Set("completedInputSequence", CommandData::Int(entry.completedCamera.editorInputSequence));
+            target.Set("completedCameraRevision", CommandData::Int(entry.completedCamera.editorCameraRevision));
             target.Set("completedResizeGeneration", CommandData::Int(entry.completedResizeGeneration));
             target.Set("textureQueries", CommandData::Int(entry.textureQueries));
             target.Set("missingTextureQueries", CommandData::Int(entry.missingTextureQueries));
@@ -479,6 +604,63 @@ namespace ConsoleCmd
     //
     // ★ 판정 값은 `completedFrameId`(TickLive 를 끝낸 id)다. 디버그 스냅샷의
     //   `consumedFrameId` 는 TickLive 시작에 적혀, 긴 첫 프레임 도중에도 이미 넘어간다.
+    // Queue-mode control for normal, same-process warm A/B. Submission admission
+    // is acknowledged; GPU completion and actual overlap are measured separately.
+    static CommandCore::CommandResult Cmd_render_queue_mode(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        uint32_t mode = 0;
+        if (ctx.parts.size() != 2 || !ParseNumber(ctx.parts[1], mode) || mode > 2)
+        {
+            return InvalidArguments("render.queue.mode 0|1|2");
+        }
+        const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        const auto start = EnhancedSceneRenderer::GetLiveRenderThreadStats();
+        if (!start.running || snapshot.backend != EnhancedLiveBackend::DX12)
+        {
+            return PreconditionFailed("render.queue.mode.unavailable", "A running DX12 renderer is required");
+        }
+        uint64_t requestId = 0;
+        std::string error;
+        if (!EnhancedSceneRenderer::RequestLiveQueueExecutionMode(mode, requestId, error))
+        {
+            return Fail("render.queue.mode.rejected", error);
+        }
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
+        ctx.system.WaitForResult([requestId, mode, afterFrame = start.publishedFrameId, deadline]()
+            -> std::optional<CommandResult>
+        {
+            const auto status = EnhancedSceneRenderer::GetLiveQueueExecutionStatus();
+            if (status.requestId != requestId)
+            {
+                return Fail("render.queue.mode.superseded", "A newer queue-mode request replaced this request");
+            }
+            if (status.appliedRequestId == requestId && status.appliedMode == mode)
+            {
+                auto data = CommandData::Object();
+                data.Set("requestedMode", CommandData::Int(mode));
+                data.Set("appliedMode", CommandData::Int(status.appliedMode));
+                data.Set("afterFrame", CommandData::Int(static_cast<int64_t>(afterFrame)));
+                data.Set("appliedFrame", CommandData::Int(static_cast<int64_t>(status.appliedFrame)));
+                data.Set("requestId", CommandData::Int(static_cast<int64_t>(requestId)));
+                return Ok("Queue mode applied to a submitted frame; GPU completion and overlap remain unverified",
+                    std::move(data));
+            }
+            if (!EnhancedSceneRenderer::GetLiveRenderThreadStats().running)
+            {
+                return Fail("render.queue.mode.stopped", "Render thread stopped before applying queue mode");
+            }
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                return CommandResult{CommandStatus::TimedOut, "render.queue.mode.timeout",
+                    "Queue-mode request did not reach a submitted frame within 120 seconds"};
+            }
+            return std::nullopt;
+        });
+        return Ok(); // The command system publishes only the eventual result.
+    }
+
+    // CPU packet consumption only, not GPU completion or host presentation.
     static CommandCore::CommandResult Cmd_render_live_wait(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -509,6 +691,7 @@ namespace ConsoleCmd
                 std::chrono::steady_clock::now() - began).count();
             auto data = CommandData::Object();
             data.Set("afterFrame", CommandData::Int(static_cast<int64_t>(afterFrame)));
+            data.Set("completionKind", CommandData::String("cpu_packet_consumed"));
             data.Set("completedFrame", CommandData::Int(static_cast<int64_t>(stats.completedFrameId)));
             data.Set("publishedFrame", CommandData::Int(static_cast<int64_t>(stats.publishedFrameId)));
             data.Set("waitedMs", CommandData::Double(waitedMs));
@@ -517,7 +700,7 @@ namespace ConsoleCmd
                 std::printf("[CLI] render.live.wait 완료 — frame %llu > %llu · %.0f ms\n",
                     static_cast<unsigned long long>(stats.completedFrameId),
                     static_cast<unsigned long long>(afterFrame), waitedMs);
-                return Ok("Live RenderThread completed a frame published after the wait began", std::move(data));
+                return Ok("Live RenderThread consumed a CPU frame packet published after the wait began", std::move(data));
             }
             if (!stats.running)
                 return Fail("render.live.not_running", "Live RenderThread stopped while waiting", std::move(data));
@@ -624,6 +807,142 @@ namespace ConsoleCmd
     //   DX12 계측이 붙으면 그때 명령을 새로 만든다. 그때까지 "있는데 아무것도
     //   안 하는 것" 보다 "없는 것" 이 정직하다 — 앞서 같은 이유로 지운
     //   `render.post` 와 같은 처분이다.
+
+    static CommandCore::CommandResult Cmd_render_graph(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        const bool selectViewer = args.size() == 3 && args[1] == "view";
+        if (args.size() > 2 && !selectViewer)
+        {
+            return InvalidArguments("render.graph [scene|game|preview]");
+        }
+        const std::string target = selectViewer ? args[2] : args.size() == 2 ? args[1] : "scene";
+        const auto view = target == "scene" ? EnhancedLiveDisplayTarget::Editor :
+            target == "game" ? EnhancedLiveDisplayTarget::Game : EnhancedLiveDisplayTarget::MaterialPreview;
+        if (target != "scene" && target != "game" && target != "preview")
+        {
+            return InvalidArguments("render.graph [scene|game|preview]");
+        }
+        if (selectViewer)
+        {
+            editor::RequestCompiledGraphViewerTarget(view);
+            return Ok("Graph viewer target queued for the next UI frame");
+        }
+        const auto snapshot = EnhancedSceneRenderer::GetLiveGraphSnapshot(view);
+        auto data = CommandData::Object();
+        const auto viewer = editor::ReadCompiledGraphViewerStats();
+        data.Set("uiFrames", CommandData::Int(viewer.frames));
+        data.Set("uiMatchingFrames", CommandData::Int(viewer.matchingFrames));
+        data.Set("uiStaleFrames", CommandData::Int(viewer.staleFrames));
+        data.Set("uiTarget", CommandData::Int(viewer.target));
+        const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+        data.Set("ready", CommandData::Bool(snapshot && EnhancedGraphSnapshotMatchesView(*snapshot, display.Get(view))));
+        if (!snapshot)
+        {
+            return Ok("Compiled graph requested; poll on a later frame", std::move(data));
+        }
+        data.Set("generation", CommandData::Int(snapshot->generation));
+        const auto& heapMemory = snapshot->aliasHeapMemory;
+        auto heaps = CommandData::Object();
+        heaps.Set("domainId", CommandData::Int(heapMemory.domainId));
+        heaps.Set("retainedBytes", CommandData::Int(heapMemory.retainedBytes));
+        heaps.Set("cachedBytes", CommandData::Int(heapMemory.cachedBytes));
+        heaps.Set("leasedBytes", CommandData::Int(heapMemory.leasedBytes));
+        heaps.Set("peakRetainedBytes", CommandData::Int(heapMemory.peakRetainedBytes));
+        heaps.Set("scope", CommandData::String("unique-group-owned-native-heaps-not-resident"));
+        data.Set("aliasHeapMemory", std::move(heaps));
+        data.Set("epoch", CommandData::Int(snapshot->graphEpoch));
+        data.Set("frame", CommandData::Int(snapshot->frameId));
+        data.Set("sceneEpoch", CommandData::Int(snapshot->sceneEpoch));
+        data.Set("view", CommandData::Int(snapshot->viewId));
+        data.Set("historyRevision", CommandData::Int(snapshot->historyRevision));
+        data.Set("width", CommandData::Int(snapshot->width));
+        data.Set("height", CommandData::Int(snapshot->height));
+        data.Set("dependencyHash", CommandData::String(std::to_string(snapshot->dependencyHash)));
+        data.Set("copyMs", CommandData::Double(snapshot->copyNanoseconds / 1000000.0));
+        data.Set("storageBytes", CommandData::Int(snapshot->StorageBytes()));
+        const auto indices = [](const auto& source) {
+            auto array = CommandData::Array();
+            for (const auto value : source)
+            {
+                array.Append(CommandData::Int(value));
+            }
+            return array;
+        };
+        data.Set("executeOrder", indices(snapshot->executeOrder));
+        data.Set("waves", indices(snapshot->dependencyWaves));
+        data.Set("criticalPath", indices(snapshot->criticalPath));
+        auto passes = CommandData::Array();
+        for (const auto& pass : snapshot->passes)
+        {
+            auto row = CommandData::Object();
+            row.Set("name", CommandData::String(pass.name));
+            row.Set("authored", CommandData::Int(pass.authoredIndex));
+            row.Set("compiled", CommandData::Int(pass.compiledIndex));
+            row.Set("culled", CommandData::Bool(pass.culled));
+            row.Set("sideEffect", CommandData::Bool(pass.sideEffect));
+            auto usages = CommandData::Array();
+            for (const auto& usage : pass.usages)
+            {
+                auto item = CommandData::Object();
+                item.Set("resource", CommandData::Int(usage.resource));
+                item.Set("version", CommandData::Int(usage.version));
+                item.Set("access", CommandData::Int(static_cast<int>(usage.access)));
+                item.Set("state", CommandData::Int(static_cast<int>(usage.state)));
+                usages.Append(std::move(item));
+            }
+            row.Set("usages", std::move(usages));
+            auto barriers = CommandData::Array();
+            for (const auto& barrier : pass.barriers)
+            {
+                auto item = CommandData::Object();
+                item.Set("resource", CommandData::Int(barrier.resource));
+                item.Set("before", CommandData::Int(static_cast<int>(barrier.before)));
+                item.Set("after", CommandData::Int(static_cast<int>(barrier.after)));
+                item.Set("uav", CommandData::Bool(barrier.uav));
+                item.Set("afterPass", CommandData::Bool(barrier.afterPass));
+                item.Set("aliasing", CommandData::Bool(barrier.aliasing));
+                barriers.Append(std::move(item));
+            }
+            row.Set("barriers", std::move(barriers));
+            passes.Append(std::move(row));
+        }
+        data.Set("passes", std::move(passes));
+        auto resources = CommandData::Array();
+        for (const auto& resource : snapshot->resources)
+        {
+            auto row = CommandData::Object();
+            row.Set("name", CommandData::String(resource.name));
+            row.Set("imported", CommandData::Bool(resource.imported));
+            row.Set("buffer", CommandData::Bool(resource.buffer));
+            row.Set("used", CommandData::Bool(resource.used));
+            row.Set("versions", CommandData::Int(resource.versionCount));
+            row.Set("firstUse", CommandData::Int(resource.firstUse));
+            row.Set("lastUse", CommandData::Int(resource.lastUse));
+            row.Set("initialState", CommandData::Int(static_cast<int>(resource.initialState)));
+            row.Set("finalState", CommandData::Int(static_cast<int>(resource.finalState)));
+            row.Set("aliasGroup", CommandData::Int(resource.aliasGroup == UINT32_MAX ? int64_t(-1) : int64_t(resource.aliasGroup)));
+            row.Set("allocationBytes", CommandData::Int(resource.allocationBytes));
+            resources.Append(std::move(row));
+        }
+        data.Set("resources", std::move(resources));
+        auto edges = CommandData::Array();
+        for (const auto& edge : snapshot->versionEdges)
+        {
+            auto row = CommandData::Object();
+            row.Set("producer", CommandData::Int(edge.producer));
+            row.Set("consumer", CommandData::Int(edge.consumer));
+            row.Set("resource", CommandData::Int(edge.resource));
+            row.Set("version", CommandData::Int(edge.version));
+            row.Set("reason", CommandData::Int(static_cast<int>(edge.reason)));
+            edges.Append(std::move(row));
+        }
+        data.Set("edges", std::move(edges));
+        data.Set("aliasQueueRangesSupported", CommandData::Bool(false));
+        data.Set("aliasMetadataSupported", CommandData::Bool(true));
+        return Ok("Immutable compiled graph; sampled submitted frame", std::move(data));
+    }
 
     static CommandCore::CommandResult Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
     {
@@ -796,12 +1115,15 @@ namespace ConsoleCmd
         reg.Result({ "render.matmode" }, &Cmd_render_matmode);
         reg.Result({ "render.environment" }, &Cmd_render_environment);
         reg.Result({ "render.backend" }, &Cmd_render_backend);
+        reg.Result({ "render.pacing" }, &Cmd_render_pacing);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
-        reg.Result({ "render.live.wait" }, &Cmd_render_live_wait);
-        reg.Result({ "render.live.fence" }, &Cmd_render_live_wait);
+        reg.Result({ "render.queue.mode" }, &Cmd_render_queue_mode, SceneAccess::OwnedState);
+        reg.Result({ "render.live.wait" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
+        reg.Result({ "render.live.fence" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
+        reg.Result({ "render.graph" }, &Cmd_render_graph);
         reg.Result({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
     }
 }

@@ -4,6 +4,7 @@
 #include "../../EngineDiagnostics/ProfileScope.h"
 #include <algorithm>
 #include <fstream>
+#include <iterator>
 #include <set>
 #include <vector>
 #include <cmath>
@@ -180,6 +181,23 @@ bool EnvironmentSourceIdentity(const std::filesystem::path& source, Hash::Sha256
     result = hash.Finish(); error.clear(); return true;
 }
 
+// 셰이더는 텍스트다. Git 의 core.autocrlf 체크아웃처럼 줄바꿈만 다른 사본이 같은
+// 조리법으로 판정되도록 CRLF 를 LF 로 맞춰 해시한다. LF 파일의 지문은 바뀌지 않는다.
+static bool EnvironmentShaderTextIdentity(const std::filesystem::path& source, Hash::Sha256Digest& result, std::string& error)
+{
+    std::ifstream input(source, std::ios::binary);
+    if (!input) return EnvironmentError(error, "Environment shader missing: " + source.string());
+    const std::string text{ std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>() };
+    if (input.bad()) return EnvironmentError(error, "Environment shader read failed: " + source.string());
+    std::string normalized;
+    normalized.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i)
+        if (!('\r' == text[i] && i + 1 < text.size() && '\n' == text[i + 1])) normalized.push_back(text[i]);
+    Hash::Sha256 hash;
+    hash.Update(normalized.data(), normalized.size());
+    result = hash.Finish(); error.clear(); return true;
+}
+
 bool EnvironmentRecipeIdentity(const std::filesystem::path& shaders, uint32_t cubeSize,
     uint32_t brdfSize, Hash::Sha256Digest& result, std::string& error)
 {
@@ -199,7 +217,7 @@ bool EnvironmentRecipeIdentity(const std::filesystem::path& shaders, uint32_t cu
     {
         const auto relative = file.lexically_relative(shaders).generic_string();
         Hash::Sha256Digest digest;
-        if (!EnvironmentSourceIdentity(file, digest, error)) return false;
+        if (!EnvironmentShaderTextIdentity(file, digest, error)) return false;
         hash.Update(relative.data(), relative.size()); hash.Update(digest.data(), digest.size());
     }
     result = hash.Finish(); error.clear(); return true;

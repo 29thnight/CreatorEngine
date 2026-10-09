@@ -1,5 +1,6 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphMeshSurface.h"
-#include "MaterialGraphScenePacket.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -136,7 +137,7 @@ constexpr std::array<Texel, 8> kTexels{{{64, 128, 192, 0},
                                         {192, 192, 128, 0}}};
 constexpr std::array<Texel, 2> kMip{{{96, 160, 224, 96}, {224, 96, 160, 160}}};
 
-std::shared_ptr<Texture> Image()
+own::shared_owner<const Texture> Image()
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
@@ -144,7 +145,7 @@ std::shared_ptr<Texture> Image()
     return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
 }
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -500,6 +501,11 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
                   sceneNext->Source()->View().eye == nextView.eye &&
                   !sceneNext->Matches(*sceneFirst),
               "Scene reuse retains immutable bytes while sealing current world and camera");
+        for (size_t chunk = 0; chunk < sceneFirst->Chunks().size(); ++chunk)
+        {
+            Check(sceneNext->Chunks()[chunk].sourceVertices.data() == sceneFirst->Chunks()[chunk].sourceVertices.data(),
+                  "Scene cache hits share immutable remap storage");
+        }
         std::shared_ptr<const MeshSurfacePlan> rasterPlan;
         Check(MeshSurfacePlan::BuildForScene(movedDraw, nextView, {}, rasterPlan, error) &&
                   rasterPlan->Matches(*sceneNext),
@@ -687,6 +693,66 @@ void VerifyPartitionGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evalu
     }
 }
 
+void VerifyCacheAdmissionGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evaluator, SurfaceView view)
+{
+    auto geometry = GeometryFixture(assets::kCoreVertexAttributes, 0);
+    const auto baseline = evaluator.CacheStats();
+    std::shared_ptr<const MeshSurfaceBatch> retained;
+    std::string error;
+    for (unsigned entry = 0; entry < 260; ++entry)
+    {
+        geometry.draw.modelMeshView.handle.generation = 10000 + entry;
+        std::shared_ptr<const MeshSurfaceInput> input;
+        Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, input, error), "Cache admission seal");
+        Check(device.BeginFrame(error), "Cache admission begin");
+        EnhancedRenderGraph graph(device);
+        std::shared_ptr<const MeshSurfaceBatch> batch;
+        Check(evaluator.Prepare(device, input, batch, error, true), "Cache admission prepare " + error);
+        Check(batch->Indices().IsValid() && !batch->Indices().IsWritable(), "Cache admission stays resident");
+        Check(batch->Declare(graph, error), "Cache admission declaration");
+        const auto output = batch->GraphOutput(graph);
+        graph.AddPass("Test.CacheAdmission.Read", {{output, RHIResourceState::ShaderResource}}, [](const auto&) {}, true);
+        Check(graph.Compile(error) && graph.Execute(error), "Cache admission graph " + error);
+        Check(device.EndFrame(error), "Cache admission submit");
+        Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Cache admission drain");
+        device.WaitForGpu();
+        batch->MarkSubmitted({device.GetLastSignaledFenceValue()});
+        evaluator.NotifyCompleted(device.GetCompletedFenceValue());
+        if (entry == 0)
+        {
+            retained = batch;
+        }
+    }
+    Check(evaluator.CacheStats().uploads == baseline.uploads + 260, "Completed outputs cannot pin static cache admission");
+    Check(evaluator.CacheStats().entries <= 256, "Static cache remains bounded");
+    Check(retained->Indices().IsValid() && retained->Buffer().IsValid(), "Externally retained geometry survives eviction");
+    RHIReadback readback;
+    Check(device.CreateBufferReadback(retained->Count() * sizeof(SurfacePoint), readback, error), "Retained cache readback");
+    Check(device.BeginFrame(error), "Retained cache begin");
+    EnhancedRenderGraph graph(device);
+    const auto output = graph.ImportBuffer(retained->Buffer(), RHIResourceState::ShaderResource, "Test.RetainedCache");
+    graph.AddPass("Test.RetainedCache.Read", {{output, RHIResourceState::CopySource}}, [&](const auto& context)
+    {
+        context.encoder->CopyBufferToReadback(readback, retained->Buffer());
+    }, true);
+    Check(graph.Compile(error) && graph.Execute(error), "Retained cache graph " + error);
+    Check(device.EndFrame(error), "Retained cache submit");
+    Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Retained cache drain");
+    device.WaitForGpu();
+    RHIReadbackImage mapped;
+    Check(device.MapReadback(readback, mapped, error), "Retained cache map");
+    const auto actual = std::bit_cast<std::array<float, 20>>(mapped.Elements<SurfacePoint>()[0]);
+    const auto expected = std::bit_cast<std::array<float, 20>>(WorldReference(geometry, 0));
+    for (unsigned component = 0; component < actual.size(); ++component)
+    {
+        Near(actual[component], expected[component], "Retained cache remains readable after eviction");
+    }
+    device.ReleaseReadback(readback);
+    std::string messages;
+    Check(device.DrainDebugMessages(messages) == 0, "Cache admission GPU validation: " + messages);
+    std::cout << "ISSUE_CACHE_ADMISSION_OK completed=260 retained=1 validation=0\n";
+}
+
 void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evaluator, SurfaceView view)
 {
     DX12GpuProfiler profiler;
@@ -811,7 +877,7 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
 
 void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, RenderBindingCache& bindings,
                       MeshSurfaceEvaluator& meshEvaluator, SurfaceEvaluator& evaluator, IblBaker& baker,
-                      const std::shared_ptr<const Instance>& instance, const std::shared_ptr<Texture>& cube,
+                      const own::shared_owner<const Instance>& instance, const own::shared_owner<const Texture>& cube,
                       const Environment& environmentColors, const SheenTable& table, const SurfaceView& view,
                       unsigned tier, unsigned& frames)
 {
@@ -841,9 +907,9 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     Check(device.CreateBufferReadback(kSamples * sizeof(IblBakeSample), readbacks[3], error), "Sample bake readback");
     Check(device.BeginFrame(error), "Sample begin");
     textures.BeginFrame(++frames);
-    std::shared_ptr<const RenderBindings> materialBindings;
+    own::shared_owner<const RenderBindings> materialBindings;
     Check(bindings.Prepare(device, textures, instance, evaluator.Layout(), materialBindings, error), "Sample bindings");
-    const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     std::shared_ptr<const MeshSurfaceBatch> vertices, sampled;
     std::shared_ptr<const SurfaceBatch> surface;
     std::shared_ptr<const IblBakeResult> bake;
@@ -900,7 +966,7 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     Check(surface->ValidateReadback({actualMaterial, kSamples}, error), "Sample material accepted " + error);
     SceneSurfaceEvaluation evaluation;
     Check(BuildSceneSurfaceEvaluation(surface, evaluation, error) && evaluation.gpu->Count() == kSamples &&
-              evaluation.instance == instance && evaluation.sceneEpoch == view.sceneEpoch &&
+              material_graph_test::SamePinnedObject(evaluation.instance, instance) && evaluation.sceneEpoch == view.sceneEpoch &&
               evaluation.viewRevision == view.viewRevision && evaluation.geometryRevision == view.geometryRevision,
           "Sampled batch retains its exact count and view/material identity at the Scene boundary");
     double endpointInterpolationError = 0;
@@ -1026,7 +1092,7 @@ void Run(const std::filesystem::path& root)
     experiment::AssetId graph;
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
     std::string error;
-    std::array<std::shared_ptr<const Instance>, 2> instances;
+    std::array<own::shared_owner<const Instance>, 2> instances;
     for (unsigned i = 0; i < 2; ++i)
     {
         const auto generation = store.Load(
@@ -1148,6 +1214,7 @@ void Run(const std::filesystem::path& root)
               "Large raster mesh prepares one draw");
         VerifyPartitionGpu(device, meshEvaluator, *rasterPlan, true);
         VerifyResidentInputsGpu(device, meshEvaluator, view);
+        VerifyCacheAdmissionGpu(device, meshEvaluator, view);
         for (unsigned mask : assets::kModelVertexMasks)
         {
             for (unsigned pose = 0; pose < 3; ++pose)
@@ -1219,15 +1286,15 @@ void Run(const std::filesystem::path& root)
                 }
                 Check(device.BeginFrame(error), "Begin");
                 textures.BeginFrame(frames);
-                std::shared_ptr<const RenderBindings> materialBindings;
+                own::shared_owner<const RenderBindings> materialBindings;
                 Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings,
                                        error),
                       "Material bind prepare");
-                const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+                const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
                 auto& encoder = device.GetImmediateEncoder();
                 if (frames == 0)
                 {
-                    const auto texture = textures.GetOrUpload(image.get(), error);
+                    const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
                     const RHITransition transitions[]{
                         {texture.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource},
                         {environment.cube.handle, RHIResourceState::PixelShaderResource,
@@ -1425,7 +1492,7 @@ void Run(const std::filesystem::path& root)
         device.AbortFrame();
         Check(device.BeginFrame(error), "Mesh abort reuse begin");
         textures.BeginFrame(++frames);
-        std::shared_ptr<const RenderBindings> materialBindings;
+        own::shared_owner<const RenderBindings> materialBindings;
         Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
               "Abort material bindings");
         std::shared_ptr<const SurfaceBatch> rejected;
@@ -1452,7 +1519,7 @@ void Run(const std::filesystem::path& root)
               "Record invalid frame graph candidate");
         SceneSurfaceEvaluation invalidEvaluation;
         Check(BuildSceneSurfaceEvaluation(rejected, invalidEvaluation, error), "Invalid GPU candidate ownership");
-        const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         EnhancedMaterialCoverage coverage;
         coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::DoubleSided;
         RHIGraphicsPipelineDesc invalidPipeline;

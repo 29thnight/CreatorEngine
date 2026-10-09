@@ -1,10 +1,16 @@
 # 셰이더 교차 탐색의 DXR 전환 가설·채택 실험
 
+## 2026-10-08 제품 페이즈 연결
+
+전체 제품 목표는 [PHASE 4.85 Path Tracing·Hybrid RT](PathTracingHybridPipelinePlan.md)다. 이 문서는 Hybrid RTP-5의 효과별 탐색·품질·비용 판정 입력이며 기본 PT나 ReSTIR PT Enhanced, tetrahedral cages의 전체 계획을 대신하지 않는다. RT 공통 기반은 RTP-1/2를 소비하고 재구현/중복 산정하지 않는다. EXP-2V 우선은 이 실험 가지에 적용하며 Hybrid hard shadow와 기본 PT 착수를 막지 않는다. EXP-4 결과는 RTP-5/13과 GPU-3/9에 함께 반환한다.
+
+2026-10-08 공수 산정: EXP-0/1 효과 baseline은 RTP-0/5, EXP-2/3 효과 prototype·AS 비용은 RTP-5, EXP-4 판정은 RTP-5/13에 포함한다. 공통 기반 RTP-1/2와 제품 수명 RTP-12를 재계상하지 않는다. 전체 RTP 208인일 중 효과 확장 RTP-5는 28인일이며 EXP 별도 공수를 추가하지 않는다. 아래 10월 1일의 null 표기는 당시 미산정 이력이다.
+
 **2026-10-01 · 계획만 작성 · 실험 미착수 · 공수 미산정(`days: null`).**
 GPU-3의 효과 선정 근거와 GPU-9의 설계 채택 판정을 위한 실험 계획이다.
 DXR 전환은 아직 확정하지 않는다. 기존 상세 배선의 첫 기능인 directional hard shadow는
 유지하며, 아래 후보는 결과가 나온 뒤 별도 변경 결정으로 반영한다.
-현재 GPU 설계 4행 5.5일에 prototype/실측 공수를 포함하지 않는다.
+현재 GPU 설계 4행 9일에 prototype/실측 공수를 포함하지 않는다. 5.5일은 이전 산정이다.
 
 ## 1. 현재 근거와 검증 가능한 가설
 

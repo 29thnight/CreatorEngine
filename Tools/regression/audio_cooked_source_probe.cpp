@@ -280,18 +280,43 @@ int wmain(int argc, wchar_t** argv)
         {
             std::fstream changed(changedArtifact,
                 std::ios::binary | std::ios::in | std::ios::out);
+#if defined(_WIN32)
+            Require(!changed.is_open(), "validated loose mount allowed a concurrent writer");
+#else
             changed.seekp(-1, std::ios::end);
             const char flipped = static_cast<char>(
                 std::to_integer<unsigned char>(artifactBytes.back() ^ std::byte{ 1 }));
             changed.write(&flipped, 1);
+#endif
         }
         wave::MiniaudioBackend changedBackend;
         if (changedBackend.Start({}))
         {
+#if defined(_WIN32)
+            Require(changedBackend.LoadCookedClip(wave::ClipKey::FromGuid(clipId.value),
+                changedAfterOpen), "pinned unchanged payload was rejected");
+#else
             Require(!changedBackend.LoadCookedClip(wave::ClipKey::FromGuid(clipId.value),
                 changedAfterOpen), "changed-after-open payload was accepted");
+#endif
             changedBackend.Stop();
         }
+#if defined(_WIN32)
+        changedAfterOpen = {};
+        {
+            std::fstream released(changedArtifact,
+                std::ios::binary | std::ios::in | std::ios::out);
+            Require(released.is_open(), "loose mount write lock survived last source release");
+            released.seekp(-1, std::ios::end);
+            const char flipped = static_cast<char>(
+                std::to_integer<unsigned char>(artifactBytes.back() ^ std::byte{ 1 }));
+            released.write(&flipped, 1);
+            Require(released.good(), "released artifact mutation failed");
+        }
+        Require(!catalog.OpenAudioClip(clipId,
+            std::make_shared<ck::LooseArtifactByteSource>(changedRoot),
+            rejected, failure), "reopened changed payload was accepted");
+#endif
 
         const fs::path streamRoot = cookedRoot.parent_path() / "AudioCookStreamMode";
         const fs::path streamArtifact = streamRoot / fs::path(virtualWide);
@@ -311,15 +336,31 @@ int wmain(int argc, wchar_t** argv)
             std::make_shared<ck::LooseArtifactByteSource>(streamRoot),
             streamSource, failure), "Stream mode fixture did not open");
         wave::NullAudioBackend streamNull;
-        Require(streamNull.Start({}), "Stream rejection Null backend did not start");
-        Require(!streamNull.LoadCookedClip(wave::ClipKey::FromGuid(clipId.value),
-            streamSource), "Stream mode silently loaded as resident");
+        Require(streamNull.Start({}), "Stream Null backend did not start");
+        Require(streamNull.LoadCookedClip(wave::ClipKey::FromGuid(clipId.value),
+            streamSource), "logical Null backend rejected Stream metadata");
         streamNull.Stop();
         wave::MiniaudioBackend streamDevice;
         if (streamDevice.Start({}))
         {
-            Require(!streamDevice.LoadCookedClip(wave::ClipKey::FromGuid(clipId.value),
-                streamSource), "device silently loaded Stream mode as resident");
+            const auto streamKey = wave::ClipKey::FromGuid(clipId.value);
+            Require(streamDevice.LoadCookedClip(streamKey,
+                streamSource), "device rejected cooked Stream source");
+            wave::PlayRequest streamRequest{};
+            streamRequest.clip = streamKey;
+            streamRequest.loop = true;
+            streamRequest.volume = 0.0f;
+            const auto streamVoice = streamDevice.StartVoice(streamRequest);
+            Require(streamVoice.IsValid(), "cooked Stream voice was not created");
+            for (int tick = 0; tick < 50; ++tick)
+            {
+                streamDevice.Update();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            Require(streamDevice.StreamBytesRead() > 0,
+                "cooked Stream did not perform VFS payload reads");
+            Require(streamDevice.StreamReadFailures() == 0,
+                "cooked Stream had VFS read failures");
             streamDevice.Stop();
         }
         Require(!catalog.OpenAudioClip(experiment::AssetId{},

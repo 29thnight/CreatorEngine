@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ArtifactByteSource.h"
 #include "CookedAssetManifest.h"
 #include "CookedAudioClipFormat.h"
 #include "../../Assets/AssetIdentityProfile.h"
@@ -8,9 +9,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -18,19 +16,6 @@
 
 namespace experiment::cooked
 {
-    // Paths are normalized virtual paths under Derived/. Implementations may
-    // address a loose cooked tree or an entry inside a mounted pak.
-    class ArtifactByteSource
-    {
-    public:
-        virtual ~ArtifactByteSource() = default;
-        [[nodiscard]] virtual bool Size(std::string_view path,
-            std::uint64_t& out, std::string& failure) const = 0;
-        [[nodiscard]] virtual bool ReadAt(std::string_view path,
-            std::uint64_t offset, std::span<std::byte> out,
-            std::string& failure) const = 0;
-    };
-
     [[nodiscard]] inline bool IsAudioArtifactVirtualPath(
         std::string_view path) noexcept
     {
@@ -73,109 +58,20 @@ namespace experiment::cooked
                path.substr(prefix.size(), 2) == uuid.substr(0, 2);
     }
 
-    class LooseArtifactByteSource final : public ArtifactByteSource
+    [[nodiscard]] inline bool IsSoundAssetArtifactVirtualPath(std::string_view path)
     {
-    public:
-        explicit LooseArtifactByteSource(std::filesystem::path root)
-            : root_(std::move(root)) {}
-
-        [[nodiscard]] bool Size(std::string_view path,
-            std::uint64_t& out, std::string& failure) const override
+        const auto slash = path.rfind('/');
+        if (slash == std::string_view::npos || path.size() - slash != 42u)
         {
-            std::filesystem::path file;
-            if (!Resolve(path, file, failure)) return false;
-            std::error_code error;
-            if (!std::filesystem::is_regular_file(file, error) || error)
-            {
-                failure = "cooked artifact file is missing";
-                return false;
-            }
-            out = std::filesystem::file_size(file, error);
-            if (error)
-            {
-                failure = "cooked artifact size cannot be read";
-                return false;
-            }
-            return true;
+            return false;
         }
-
-        [[nodiscard]] bool ReadAt(std::string_view path,
-            std::uint64_t offset, std::span<std::byte> out,
-            std::string& failure) const override
+        AssetId id;
+        if (!TryParseCanonicalAssetId(path.substr(slash + 1u, 36u), id))
         {
-            std::uint64_t size = 0u;
-            if (!Size(path, size, failure)) return false;
-            if (offset > size || out.size() > size - offset
-                || offset > static_cast<std::uint64_t>(
-                    (std::numeric_limits<std::streamoff>::max)())
-                || out.size() > static_cast<std::size_t>(
-                    (std::numeric_limits<std::streamsize>::max)()))
-            {
-                failure = "cooked artifact read exceeds file extent";
-                return false;
-            }
-            if (out.empty()) return true;
-            std::filesystem::path file;
-            if (!Resolve(path, file, failure)) return false;
-            std::ifstream input(file, std::ios::binary);
-            input.seekg(static_cast<std::streamoff>(offset));
-            input.read(reinterpret_cast<char*>(out.data()),
-                static_cast<std::streamsize>(out.size()));
-            if (!input || input.gcount() != static_cast<std::streamsize>(out.size()))
-            {
-                failure = "cooked artifact range cannot be read";
-                return false;
-            }
-            return true;
+            return false;
         }
-
-    private:
-        [[nodiscard]] bool Resolve(std::string_view virtualPath,
-            std::filesystem::path& out, std::string& failure) const
-        {
-            if (!IsAudioArtifactVirtualPath(virtualPath) && !IsMaterialProgramArtifactVirtualPath(virtualPath) && !IsCollisionGeometryArtifactVirtualPath(virtualPath))
-            {
-                failure = "cooked artifact virtual path is invalid";
-                return false;
-            }
-            std::error_code error;
-            const std::filesystem::path root =
-                std::filesystem::weakly_canonical(root_, error);
-            if (error || root.empty())
-            {
-                failure = "cooked root cannot be resolved";
-                return false;
-            }
-            const auto* first = reinterpret_cast<const char8_t*>(virtualPath.data());
-            const std::filesystem::path relative = std::filesystem::path(
-                std::u8string(first, first + virtualPath.size()));
-            const std::filesystem::path candidate =
-                std::filesystem::weakly_canonical(root / relative, error);
-            if (error || candidate.empty())
-            {
-                failure = "cooked artifact path cannot be resolved";
-                return false;
-            }
-            const std::filesystem::path under = candidate.lexically_relative(root);
-            if (under.empty() || under.is_absolute())
-            {
-                failure = "cooked artifact escapes root";
-                return false;
-            }
-            for (const auto& segment : under)
-            {
-                if (segment == "..")
-                {
-                    failure = "cooked artifact escapes root";
-                    return false;
-                }
-            }
-            out = candidate;
-            return true;
-        }
-
-        std::filesystem::path root_{};
-    };
+        return path == MakeDerivedSoundGraphArtifactPath(id) || path == MakeDerivedSoundPresetArtifactPath(id);
+    }
 
     class CookedAudioClipSource final
     {
@@ -192,14 +88,14 @@ namespace experiment::cooked
         [[nodiscard]] bool ReadPayload(std::uint64_t offset,
             std::span<std::byte> out, std::string& failure) const
         {
-            if (!bytes_ || offset > metadata_.payloadBytes
+            if ((!exactBytes_ && !bytes_) || offset > metadata_.payloadBytes
                 || out.size() > metadata_.payloadBytes - offset)
             {
                 failure = "audio payload read exceeds bounded range";
                 return false;
             }
-            return bytes_->ReadAt(path_, metadata_.payloadOffset + offset,
-                out, failure);
+            const auto& source = exactBytes_ ? *exactBytes_ : *bytes_;
+            return source.ReadAt(path_, metadata_.payloadOffset + offset, out, failure);
         }
 
         friend bool OpenCookedAudioClipEntry(const CookedAssetManifestEntry&,
@@ -208,15 +104,20 @@ namespace experiment::cooked
 
     private:
         AssetId id_{};
+        // Keep the legacy std owner only for already-immutable sources. Loose
+        // clips retain exactly one narrowed own source, never the entire mount.
         std::shared_ptr<const ArtifactByteSource> bytes_{};
+        own::shared_owner<const ArtifactByteSource> exactBytes_{};
         std::string path_{};
         CookedAudioClipHeader metadata_{};
     };
 
     // Opening streams through the artifact once to verify both the CEMF
     // digest and CEAC payload digest. Later reads remain bounded by CEAC.
-    // The caller must keep the mounted bytes immutable for the clip lifetime;
-    // these path-based readers do not pin an OS file identity across reads.
+    // The caller must keep the mounted bytes immutable for the clip lifetime.
+    // Each loose clip pins its exact opened file, independently of sibling
+    // clips or the mount. Windows also denies writes; POSIX in-place mutations
+    // remain a caller immutability violation. Pak/memory retain their contract.
     [[nodiscard]] inline bool OpenCookedAudioClipEntry(
         const CookedAssetManifestEntry& entry,
         std::shared_ptr<const ArtifactByteSource> bytes,
@@ -230,15 +131,27 @@ namespace experiment::cooked
             failure = "manifest entry is not a supported audio clip";
             return false;
         }
+        own::shared_owner<const ArtifactByteSource> exactBytes;
+        if (!bytes->CaptureArtifact(entry.artifactPath, exactBytes, failure))
+        {
+            return false;
+        }
+        const auto& source = exactBytes ? *exactBytes : *bytes;
         std::uint64_t fileSize = 0u;
-        if (!bytes->Size(entry.artifactPath, fileSize, failure)) return false;
+        if (!source.Size(entry.artifactPath, fileSize, failure))
+        {
+            return false;
+        }
         if (fileSize != entry.byteSize || fileSize < kAudioClipHeaderBytes)
         {
             failure = "audio artifact size differs from manifest";
             return false;
         }
         std::array<std::byte, kAudioClipHeaderBytes> headerBytes{};
-        if (!bytes->ReadAt(entry.artifactPath, 0u, headerBytes, failure)) return false;
+        if (!source.ReadAt(entry.artifactPath, 0u, headerBytes, failure))
+        {
+            return false;
+        }
         CookedAudioClipHeader metadata{};
         if (!ReadAudioClipHeader(headerBytes, fileSize, metadata))
         {
@@ -255,7 +168,7 @@ namespace experiment::cooked
         {
             const std::size_t count = static_cast<std::size_t>(
                 std::min<std::uint64_t>(block.size(), metadata.payloadBytes - position));
-            if (!bytes->ReadAt(entry.artifactPath,
+            if (!source.ReadAt(entry.artifactPath,
                 metadata.payloadOffset + position,
                 std::span(block.data(), count), failure)) return false;
             artifactHash.Update(block.data(), count);
@@ -271,7 +184,11 @@ namespace experiment::cooked
 
         CookedAudioClipSource candidate;
         candidate.id_ = entry.assetId;
-        candidate.bytes_ = std::move(bytes);
+        candidate.exactBytes_ = std::move(exactBytes);
+        if (!candidate.exactBytes_)
+        {
+            candidate.bytes_ = std::move(bytes);
+        }
         candidate.path_ = entry.artifactPath;
         candidate.metadata_ = metadata;
         out = std::move(candidate);

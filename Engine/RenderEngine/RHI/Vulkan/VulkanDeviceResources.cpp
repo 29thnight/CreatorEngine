@@ -1,9 +1,11 @@
 #include "VulkanDeviceResources.h"
+#include "../RHIRecordedBatch.h"
 #include "VulkanPipelineCache.h"
 
 #include <Windows.h>
 #include <algorithm>
 #include <cstdio>
+#include <exception>
 #include <cstring>
 
 using namespace VulkanApi;
@@ -69,6 +71,7 @@ void VulkanDeviceResources::AccumulateEncoderDiagnostics()
     const uint32_t count = m_encoder->GetUnimplementedCount();
     m_encoderUnimplementedTotal += count;
     if (0 != count) m_encoderLastUnimplemented = m_encoder->GetLastUnimplemented();
+    m_encoder->ClearUnimplemented();
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDeviceResources::DebugCallback(
@@ -428,6 +431,8 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     m_physicalDevice = best;
     m_adapterName = bestProps.deviceName;
     m_apiVersion = bestProps.apiVersion;
+    m_viewportLimits = { bestProps.limits.maxViewportDimensions[0], bestProps.limits.maxViewportDimensions[1],
+        bestProps.limits.viewportBoundsRange[0], bestProps.limits.viewportBoundsRange[1] };
 
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount, nullptr);
@@ -439,6 +444,8 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     }
     m_memoryBudgetSupported = VkHasExtension(extensions,
         VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    m_meshShaderExtensionSupported = VkHasExtension(extensions,
+        VK_EXT_MESH_SHADER_EXTENSION_NAME);
     const bool hasRobustness2 = VkHasExtension(extensions,
         VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     if (hasRobustness2)
@@ -456,6 +463,34 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
 bool VulkanDeviceResources::CreateDevice(std::string& outError)
 {
+    m_indirectDrawCapabilities = {};
+    m_meshShaderCapabilities = {};
+    VkPhysicalDeviceMeshShaderFeaturesEXT availableMesh{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+    VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    if (m_meshShaderExtensionSupported)
+    {
+        availableFeatures.pNext = &availableMesh;
+    }
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &availableFeatures);
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT meshProperties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT };
+    if (m_meshShaderExtensionSupported && VK_TRUE == availableMesh.meshShader)
+    {
+        VkPhysicalDeviceProperties2 properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+        properties.pNext = &meshProperties;
+        vkGetPhysicalDeviceProperties2(m_physicalDevice, &properties);
+    }
+    // Publish no partial capability: the mesh-only path needs all dispatch/output limits.
+    const bool enableMesh = m_meshShaderExtensionSupported && VK_TRUE == availableMesh.meshShader &&
+        meshProperties.maxMeshWorkGroupTotalCount && meshProperties.maxMeshWorkGroupCount[0] &&
+        meshProperties.maxMeshWorkGroupCount[1] && meshProperties.maxMeshWorkGroupCount[2] &&
+        meshProperties.maxMeshWorkGroupInvocations && meshProperties.maxMeshWorkGroupSize[0] &&
+        meshProperties.maxMeshWorkGroupSize[1] && meshProperties.maxMeshWorkGroupSize[2] &&
+        meshProperties.maxMeshOutputVertices && meshProperties.maxMeshOutputPrimitives &&
+        meshProperties.maxMeshOutputMemorySize;
+
     const float priority = 1.f;
     VkDeviceQueueCreateInfo queueInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
     queueInfo.queueFamilyIndex = m_queueFamily;
@@ -464,9 +499,17 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
 
     std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     if (m_memoryBudgetSupported)
+    {
         deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    }
     if (m_nullDescriptorSupported)
+    {
         deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    }
+    if (enableMesh)
+    {
+        deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    }
 
     // 세 기능을 명시적으로 켠다. 켜지 않고 쓰면 검증 레이어가 잡아 주지만,
     // 여기서 요구를 적어 두면 드라이버가 못 주는 경우 생성 단계에서 실패한다.
@@ -487,6 +530,15 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     {
         robustness.nullDescriptor = VK_TRUE;
         features13.pNext = &robustness;
+    }
+    VkPhysicalDeviceMeshShaderFeaturesEXT meshFeatures{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+    if (enableMesh)
+    {
+        // Task shaders, multiview, primitive shading rate and mesh queries stay disabled.
+        meshFeatures.meshShader = VK_TRUE;
+        meshFeatures.pNext = features13.pNext;
+        features13.pNext = &meshFeatures;
     }
 
     VkPhysicalDeviceVulkan12Features features12{
@@ -510,6 +562,8 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     // EnhancedWireFramePass의 RHIFillMode::Wireframe은
     // VkPipelineRasterizationStateCreateInfo::polygonMode=LINE으로 번역된다.
     features2.features.fillModeNonSolid = VK_TRUE;
+    // 선택 기능이 없는 장치도 firstInstance=0인 단건 경로는 사용할 수 있다.
+    features2.features.drawIndirectFirstInstance = availableFeatures.features.drawIndirectFirstInstance;
     features2.pNext = &features11;
 
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
@@ -526,10 +580,45 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
         return false;
     }
 
-    if (!LoadDevice(m_device, outError)) return false;
+    if (!LoadDevice(m_device, outError))
+    {
+        return false;
+    }
+
+    m_indirectDrawCapabilities.indexedDraw = nullptr != vkCmdDrawIndexedIndirect;
+    m_indirectDrawCapabilities.nonIndexedDraw = nullptr != vkCmdDrawIndirect;
+    m_indirectDrawCapabilities.nonZeroFirstInstance =
+        (m_indirectDrawCapabilities.indexedDraw || m_indirectDrawCapabilities.nonIndexedDraw) &&
+        VK_TRUE == features2.features.drawIndirectFirstInstance;
+    if (enableMesh && nullptr != vkCmdDrawMeshTasksEXT)
+    {
+        auto& caps = m_meshShaderCapabilities;
+        caps.meshShader = true;
+        caps.meshIndirect = nullptr != vkCmdDrawMeshTasksIndirectEXT;
+        caps.maxGroupCountX = meshProperties.maxMeshWorkGroupCount[0];
+        caps.maxGroupCountY = meshProperties.maxMeshWorkGroupCount[1];
+        caps.maxGroupCountZ = meshProperties.maxMeshWorkGroupCount[2];
+        caps.maxTotalGroupCount = meshProperties.maxMeshWorkGroupTotalCount;
+        caps.maxOutputVertices = meshProperties.maxMeshOutputVertices;
+        caps.maxOutputPrimitives = meshProperties.maxMeshOutputPrimitives;
+        caps.maxThreadsPerGroup = meshProperties.maxMeshWorkGroupInvocations;
+        caps.maxThreadGroupSizeX = meshProperties.maxMeshWorkGroupSize[0];
+        caps.maxThreadGroupSizeY = meshProperties.maxMeshWorkGroupSize[1];
+        caps.maxThreadGroupSizeZ = meshProperties.maxMeshWorkGroupSize[2];
+        caps.maxOutputMemoryBytes = meshProperties.maxMeshOutputMemorySize;
+    }
 
     vkGetDeviceQueue(m_device, m_queueFamily, 0, &m_queue);
     return true;
+}
+
+void VulkanDeviceResources::SetPipelineCache(VulkanPipelineCache* cache)
+{
+    m_pipelineCache = cache;
+    if (cache)
+    {
+        cache->SetMeshShaderCapabilities(m_meshShaderCapabilities);
+    }
 }
 
 bool VulkanDeviceResources::CreateFrameResources(std::string& outError)
@@ -572,11 +661,19 @@ void VulkanDeviceResources::Shutdown()
             const RHILifecycleCommand command = owner.faulted
                 ? RHILifecycleCommand::UnrecoverableDeviceError
                 : RHILifecycleCommand::BackendShutdown;
-            if (!DrainForLifecycle(command, lifecycleError) &&
-                !lifecycleError.empty())
+            bool drained = DrainForLifecycle(command, lifecycleError);
+            if (!drained && GetRHISubmissionThread().GetOwnerStats(this).faulted)
             {
-                OutputDebugStringA(("[Vulkan] lifecycle shutdown 실패: " +
+                drained = DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+            }
+            if (!drained)
+            {
+                OutputDebugStringA(("[Vulkan] Fatal: forced destruction without verified GPU idle or device loss: " +
                     lifecycleError + "\n").c_str());
+                std::fprintf(stderr, "Fatal Vulkan teardown invariant: GPU idle/device loss unproven: %s\n",
+                    lifecycleError.c_str());
+                std::fflush(stderr);
+                std::terminate();
             }
         }
         else vkDeviceWaitIdle(m_device);
@@ -585,6 +682,13 @@ void VulkanDeviceResources::Shutdown()
             GetRHISubmissionThread().ReleaseClient(this);
             m_submissionClient = false;
         }
+
+        // 이전 native device의 실패 ticket/완료값을 새 프레임 슬롯에 가져가지 않는다.
+        m_frameSubmissionTickets = {};
+        m_frameFenceValues = {};
+        m_hostSubmissionTicket = {};
+        m_hostFenceValue = 0;
+        m_currentRecordingId = 0;
 
         // ★ 표를 디바이스보다 먼저 비운다 (5c-4c). 칸이 vkDestroy 를 들고
         //   있으므로 순서가 뒤집히면 죽은 디바이스로 부른다 — 표가 순서를
@@ -633,11 +737,20 @@ void VulkanDeviceResources::Shutdown()
     m_queueFamily = UINT32_MAX;
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
+    m_meshShaderExtensionSupported = false;
+    m_indirectDrawCapabilities = {};
+    m_meshShaderCapabilities = {};
+    m_viewportLimits = {};
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_pipelineCache = nullptr;
+    m_uploadTransactionListeners.clear();
     m_frameOpen = false;
     m_nextFenceValue = 1;
+    m_lastAdmittedFenceValue = 0;
+    m_frameIndex = 0;
+    m_hostSubmissionTicket = {};
+    m_hostFenceValue = 0;
 }
 
 bool VulkanDeviceResources::Resize(uint32_t width, uint32_t height, std::string& outError)
@@ -659,15 +772,40 @@ bool VulkanDeviceResources::Resize(uint32_t width, uint32_t height, std::string&
 
 bool VulkanDeviceResources::BeginFrame(std::string& outError)
 {
+    GetRHISubmissionThread().CollectCompletedLifetimes(this);
     if (!IsInitialized()) { outError = "디바이스가 없다"; return false; }
     if (m_frameOpen)      { outError = "프레임이 이미 열려 있다"; return false; }
 
     RHISubmissionThread& submission = GetRHISubmissionThread();
-    if (submission.ConsumeFailure(this, outError)) return false;
+    if (ConsumeSubmissionFailure(outError))
+    {
+        return false;
+    }
     if (m_frameSubmissionTickets[m_frameIndex].IsValid() &&
         !submission.Wait(m_frameSubmissionTickets[m_frameIndex], outError))
     {
         return false;
+    }
+
+    if (HasSwapChain())
+    {
+        if (VK_SUCCESS != m_swapChainError)
+        {
+            outError = "Vulkan presentation recovery required — " + ResultToString(m_swapChainError);
+            return false;
+        }
+        if (m_imageAcquired)
+        {
+            outError = "The previous Vulkan image still requires presentation or swapchain recreation";
+            return false;
+        }
+        // 커맨드 슬롯 세 개는 저장 공간이지 호스트 지연 예산이 아니다.
+        // 커맨드 기록과 WSI 획득 전에 미완료 GPU 프레임을 하나로 제한한다.
+        if ((m_hostSubmissionTicket.IsValid() && !submission.Wait(m_hostSubmissionTicket, outError)) ||
+            !WaitForFenceValue(m_hostFenceValue, outError))
+        {
+            return false;
+        }
     }
 
     // 이 슬롯이 마지막으로 제출한 작업이 끝나기를 기다린다.
@@ -677,6 +815,7 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
 
     m_frameOpen = true;
     m_acquireConsumed = false;
+    RHIRecordingAdmissionGuard beginGuard([this] { AbortFrame(); });
 
     // ★ 렌더 타깃 표는 프레임 수명이다 (5c-4c). 위에서 이 슬롯의 펜스를 이미
     //   기다렸으므로 표가 만든 부분 뷰를 여기서 놓아도 GPU 가 쓰는 중이 아니다
@@ -698,7 +837,6 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     if (!m_descriptorRecycler.BeginRecording(
         m_device, m_currentRecordingId, outError))
     {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
         return false;
     }
     AccumulateEncoderDiagnostics();
@@ -712,16 +850,30 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     if (HasSwapChain())
     {
         const uint32_t slot = m_semaphoreIndex;
-        const VkResult acquired = vkAcquireNextImageKHR(m_device, m_swapChain, UINT64_MAX,
+        // The window can become minimized after the host's pre-acquire size check.
+        // A bounded admission wait lets the presentation owner service resize/stop.
+        constexpr uint64_t kHostAdmissionWaitNanoseconds = 100'000'000;
+        const VkResult acquired = vkAcquireNextImageKHR(m_device, m_swapChain, kHostAdmissionWaitNanoseconds,
             m_acquireSemaphores[slot], VK_NULL_HANDLE, &m_backBufferIndex);
+        if (VK_TIMEOUT == acquired || VK_NOT_READY == acquired)
+        {
+            outError = "Vulkan host frame admission timed out";
+            return false;
+        }
         if (VK_SUCCESS != acquired && VK_SUBOPTIMAL_KHR != acquired)
         {
+            m_swapChainError = acquired;
             outError = "백버퍼 획득 실패 — " + ResultToString(acquired);
+            if (VK_ERROR_DEVICE_LOST == acquired)
+            {
+                submission.MarkUnrecoverableDeviceError(this, outError);
+            }
             return false;
         }
         m_imageAcquired = true;
     }
 
+    beginGuard.Accept();
     return true;
 }
 
@@ -749,6 +901,11 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     const VkSemaphore presentSemaphore = signalPresent
         ? m_presentSemaphores[m_backBufferIndex] : VK_NULL_HANDLE;
     const uint64_t fenceValue = m_nextFenceValue++;
+    const uint64_t recordingId = m_currentRecordingId;
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
+    {
+        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+    });
 
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
@@ -757,13 +914,8 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
             m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    RetireCurrentCommandContext(fenceValue);
     m_currentRecordingId = 0;
     const uint32_t frameSlot = m_frameIndex;
-    m_frameFenceValues[frameSlot] = fenceValue;
-    if (waitForAcquire) m_acquireConsumed = true;
-    m_frameOpen = false;
-    m_frameIndex = (m_frameIndex + 1) % kFrameCount;
 
     RHISubmissionTicket ticket;
     if (!GetRHISubmissionThread().Enqueue(this, "Vulkan EndFrame",
@@ -810,7 +962,26 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     {
         return false;
     }
+    admission.Accept();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
+    RetireCurrentCommandContext(fenceValue);
     m_frameSubmissionTickets[frameSlot] = ticket;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    m_lastAdmittedFenceValue = fenceValue;
+    if (waitForAcquire)
+    {
+        m_acquireConsumed = true;
+    }
+    m_frameOpen = false;
+    m_frameIndex = (m_frameIndex + 1) % kFrameCount;
+    if (HasSwapChain())
+    {
+        m_hostSubmissionTicket = ticket;
+        m_hostFenceValue = fenceValue;
+    }
     return true;
 }
 
@@ -980,14 +1151,14 @@ void VulkanDeviceResources::AbortFrame()
             submit.signalSemaphoreInfoCount = 2;
             submit.pSignalSemaphoreInfos = signals;
             std::string abortSubmissionError;
+            RHISubmissionTicket ticket;
+            bool admitted = false;
+            bool submitted = false;
             if (VK_SUCCESS == result)
             {
-                const VkQueue queue = m_queue;
-                const VkSwapchainKHR swapChain = m_swapChain;
-                const uint32_t imageIndex = m_backBufferIndex;
-                result = GetRHISubmissionThread().ExecuteAndWait(this,
-                    "Vulkan AbortFrame submit/present",
-                    [queue, submit, command, wait, signals, swapChain, imageIndex](
+                RHISubmissionThread& submission = GetRHISubmissionThread();
+                admitted = submission.Enqueue(this, "Vulkan AbortFrame submit",
+                    [owner = this, queue = m_queue, submit, command, wait, signals](
                         std::string& error) mutable
                     {
                         if (!GetRHISubmissionThread().IsCurrentThread())
@@ -998,43 +1169,37 @@ void VulkanDeviceResources::AbortFrame()
                         submit.pCommandBufferInfos = &command;
                         submit.pWaitSemaphoreInfos = &wait;
                         submit.pSignalSemaphoreInfos = signals;
-                        VkResult queueResult = vkQueueSubmit2(queue, 1, &submit,
-                            VK_NULL_HANDLE);
+                        const VkResult queueResult = vkQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
                         if (VK_SUCCESS != queueResult)
                         {
-                            error = "Vulkan AbortFrame 제출 실패 — " +
-                                ResultToString(queueResult);
-                            return false;
-                        }
-                        VkPresentInfoKHR present{
-                            VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-                        present.waitSemaphoreCount = 1;
-                        present.pWaitSemaphores = &signals[1].semaphore;
-                        present.swapchainCount = 1;
-                        present.pSwapchains = &swapChain;
-                        present.pImageIndices = &imageIndex;
-                        queueResult = vkQueuePresentKHR(queue, &present);
-                        if (VK_SUCCESS != queueResult &&
-                            VK_SUBOPTIMAL_KHR != queueResult)
-                        {
-                            error = "Vulkan AbortFrame 표시 실패 — " +
-                                ResultToString(queueResult);
+                            error = "Vulkan AbortFrame 제출 실패 — " + ResultToString(queueResult);
+                            if (VK_ERROR_DEVICE_LOST == queueResult)
+                            {
+                                GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                            }
                             return false;
                         }
                         return true;
-                    }, abortSubmissionError) ? VK_SUCCESS : VK_ERROR_DEVICE_LOST;
+                    }, ticket, abortSubmissionError);
+                submitted = admitted && submission.Wait(ticket, abortSubmissionError);
             }
 
-            if (VK_SUCCESS == result)
+            if (admitted)
             {
-                RetireCurrentCommandContext(m_nextFenceValue);
-                m_frameFenceValues[m_frameIndex] = m_nextFenceValue++;
-
-                m_semaphoreIndex = (m_semaphoreIndex + 1)
-                    % static_cast<uint32_t>(m_acquireSemaphores.size());
-                m_imageAcquired = false;
-                m_acquireConsumed = false;
+                const uint64_t fenceValue = m_nextFenceValue++;
+                m_frameSubmissionTickets[m_frameIndex] = ticket;
+                m_frameFenceValues[m_frameIndex] = fenceValue;
+                m_lastAdmittedFenceValue = fenceValue;
+                m_hostSubmissionTicket = ticket;
+                m_hostFenceValue = fenceValue;
+                RetireCurrentCommandContext(fenceValue);
+                m_acquireConsumed = true;
                 m_frameIndex = (m_frameIndex + 1) % kFrameCount;
+                if (submitted && !PresentAcquiredImage(abortSubmissionError))
+                {
+                    OutputDebugStringA(("[Vulkan] AbortFrame present failed: " +
+                        abortSubmissionError + "\n").c_str());
+                }
             }
             else
             {
@@ -1082,6 +1247,11 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     const VkSemaphore acquireSemaphore = waitForAcquire
         ? m_acquireSemaphores[m_semaphoreIndex] : VK_NULL_HANDLE;
     const uint64_t fenceValue = m_nextFenceValue++;
+    const uint64_t recordingId = m_currentRecordingId;
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
+    {
+        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+    });
 
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
@@ -1090,10 +1260,8 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
             m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    RetireCurrentCommandContext(fenceValue);
-    if (waitForAcquire) m_acquireConsumed = true;
+    m_currentRecordingId = 0;
     const uint32_t frameSlot = m_frameIndex;
-    m_frameFenceValues[frameSlot] = fenceValue;
 
     RHISubmissionTicket ticket;
     if (!GetRHISubmissionThread().Enqueue(this, "Vulkan immediate flush",
@@ -1135,7 +1303,24 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     {
         return false;
     }
+    admission.Accept();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
+    RetireCurrentCommandContext(fenceValue);
     m_frameSubmissionTickets[frameSlot] = ticket;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    m_lastAdmittedFenceValue = fenceValue;
+    if (waitForAcquire)
+    {
+        m_acquireConsumed = true;
+    }
+    if (HasSwapChain())
+    {
+        m_hostSubmissionTicket = ticket;
+        m_hostFenceValue = fenceValue;
+    }
 
     // 제출한 pool은 Pending으로 남기고 완료된 다른 pool을 즉시 얻는다.
     // available이 없으면 현재 요청에서 하나를 만든다. CPU wait는 없다.
@@ -1164,12 +1349,11 @@ bool VulkanDeviceResources::PrepareParallelSubmission(
         return false;
     }
     const RHICompletionPoint completion{ m_nextFenceValue++ };
+    outCompletion = completion;
     m_uploadAllocator.OnSubmitted(m_currentRecordingId, completion);
     m_descriptorRecycler.OnSubmitted(m_currentRecordingId, completion);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, completion);
-    m_frameFenceValues[m_frameIndex] = completion.value;
-    outCompletion = completion;
 
     // immediate command context는 Prepare 뒤 열린 빈 buffer 그대로 이어 쓴다.
     // 다만 descriptor version이 바뀌었으므로 encoder의 binding 기억은 버린다.
@@ -1184,6 +1368,34 @@ bool VulkanDeviceResources::PrepareParallelSubmission(
         return false;
     }
     return true;
+}
+
+void VulkanDeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
+{
+    if (const auto batch = ticket.GetRecordedBatch())
+    {
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadAccepted(batch->GetRecordingId(), completion);
+        }
+    }
+    m_frameFenceValues[m_frameIndex] = completion.value;
+    m_frameSubmissionTickets[m_frameIndex] = ticket;
+    m_lastAdmittedFenceValue = completion.value;
+}
+
+void VulkanDeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion)
+{
+    m_uploadAllocator.RejectSubmission(recordingId, completion);
+    m_descriptorRecycler.RejectSubmission(recordingId, completion);
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadSubmissionRejected(recordingId, completion);
+    }
+    if (m_currentRecordingId == recordingId)
+    {
+        m_currentRecordingId = 0;
+    }
 }
 
 bool VulkanDeviceResources::SubmitParallelCommandBuffers(
@@ -1260,13 +1472,22 @@ void VulkanDeviceResources::WaitForGpu()
 bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
     std::string& outError)
 {
+    const auto releaseCompletedTickets = [this]
+    {
+        GetRHISubmissionThread().CollectCompletedLifetimes(this);
+        m_frameSubmissionTickets = {};
+        m_hostSubmissionTicket = {};
+        m_frameFenceValues = {};
+        m_hostFenceValue = 0;
+    };
     if (!IsInitialized() || !m_submissionClient) return true;
     RHISubmissionThread& submission = GetRHISubmissionThread();
     const RHISubmissionOwnerStats before = submission.GetOwnerStats(this);
+    // 리사이즈가 연속돼도 GPU·WSI를 다시 비워야 한다. CPU FIFO가 비었다고
+    // 직전 리사이즈 이후 표시한 이미지의 사용이 끝났다고 볼 수는 없다.
     if (before.IsIdle() &&
         ((before.lastCommand == command &&
-            (RHILifecycleCommand::BackendShutdown == command ||
-             RHILifecycleCommand::SwapChainResize == command)) ||
+            (RHILifecycleCommand::BackendShutdown == command)) ||
          (before.faulted && RHILifecycleCommand::UnrecoverableDeviceError ==
             before.lastCommand)))
     {
@@ -1275,12 +1496,17 @@ bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
         m_lastLifecycleResult.previousGeneration = before.generation - 1u;
         m_lastLifecycleResult.generation = before.generation;
         m_lastLifecycleResult.drained = true;
+        releaseCompletedTickets();
         return true;
     }
     if (RHILifecycleCommand::UnrecoverableDeviceError == command || before.faulted)
     {
-        return submission.AbandonForDeviceError(this,
-            m_lastLifecycleResult, outError);
+        const bool abandoned = submission.AbandonForDeviceError(this, m_lastLifecycleResult, outError);
+        if (abandoned)
+        {
+            releaseCompletedTickets();
+        }
+        return abandoned;
     }
 
     if (!submission.ExecuteLifecycleDrain(this, command,
@@ -1308,6 +1534,7 @@ bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
 
     const uint64_t completed = GetCompletedFenceValue();
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    releaseCompletedTickets();
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completed);
     std::printf("[RHI lifecycle][Vulkan] %s generation %llu->%llu"
@@ -1319,6 +1546,35 @@ bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
         m_lastLifecycleResult.pendingBatches,
         m_lastLifecycleResult.pendingRetirements);
     return m_lastLifecycleResult.IsClean();
+}
+
+bool VulkanDeviceResources::ConsumeSubmissionFailure(std::string& outError)
+{
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    if (submission.ConsumeFailure(this, outError))
+    {
+        return true;
+    }
+    if (VK_NULL_HANDLE == m_timeline)
+    {
+        return false;
+    }
+
+    // 새 제출이 없어도 GPU 완료를 기다리는 소유자가 장치 손실을 발견해야 한다.
+    // retirement 콜백은 RHI 잠금 안에서 호출되므로 이 별도 소유자 경로에서만
+    // 오류를 게시한다. 카운터를 다시 묻지만 GPU 대기는 하지 않는다.
+    uint64_t completed = 0;
+    const VkResult result = vkGetSemaphoreCounterValue(m_device, m_timeline, &completed);
+    if (VK_SUCCESS == result)
+    {
+        return false;
+    }
+    outError = "Vulkan 완료 상태 조회 실패 — " + ResultToString(result);
+    if (VK_ERROR_DEVICE_LOST == result)
+    {
+        submission.MarkUnrecoverableDeviceError(this, outError);
+    }
+    return true;
 }
 
 uint64_t VulkanDeviceResources::GetCompletedFenceValue() const
@@ -1406,7 +1662,10 @@ bool VulkanDeviceResources::CreateSwapChainInternal(uint32_t width, uint32_t hei
     //   이 리포는 NOMINMAX 를 세우지 않는다. #define NOMINMAX 를 이 파일에 넣어도
     //   유니티 빌드에서는 옆 파일이 이미 Windows.h 를 끌어온 뒤라 듣지 않는다 —
     //   괄호는 그 두 경우 모두에서 매크로 확장을 막는다.
-    uint32_t imageCount = (std::max)(caps.minImageCount, kFrameCount);
+    // FIFO 이미지는 적게 요청하되 surface·드라이버가 더 요구할 수 있다.
+    // GPU timeline 완료는 합성기의 소비나 실제 화면 출력을 증명하지 않는다.
+    constexpr uint32_t kPreferredPresentImageCount = 2;
+    uint32_t imageCount = (std::max)(caps.minImageCount, kPreferredPresentImageCount);
     if (0 != caps.maxImageCount) imageCount = (std::min)(imageCount, caps.maxImageCount);
 
     VkExtent2D extent{ width, height };
@@ -1434,6 +1693,7 @@ bool VulkanDeviceResources::CreateSwapChainInternal(uint32_t width, uint32_t hei
     }
 
     m_swapChainFormat = chosen.format;
+    m_swapChainExtent = extent;
 
     uint32_t actualCount = 0;
     vkGetSwapchainImagesKHR(m_device, m_swapChain, &actualCount, nullptr);
@@ -1456,6 +1716,7 @@ bool VulkanDeviceResources::CreateSwapChainInternal(uint32_t width, uint32_t hei
     m_semaphoreIndex = 0;
     m_backBufferIndex = 0;
     m_imageAcquired = false;
+    m_swapChainError = VK_SUCCESS;
     return true;
 }
 
@@ -1474,6 +1735,7 @@ void VulkanDeviceResources::DestroySwapChain()
     m_acquireSemaphores.clear();
     m_presentSemaphores.clear();
     m_backBuffers.clear();
+    m_swapChainExtent = {};
 
     if (VK_NULL_HANDLE != m_swapChain)
     {
@@ -1486,6 +1748,7 @@ void VulkanDeviceResources::DestroySwapChain()
         m_surface = VK_NULL_HANDLE;
     }
     m_imageAcquired = false;
+    m_swapChainError = VK_SUCCESS;
 }
 
 bool VulkanDeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
@@ -1509,6 +1772,7 @@ bool VulkanDeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
     m_backBuffers.clear();
     vkDestroySwapchainKHR(m_device, m_swapChain, nullptr);
     m_swapChain = VK_NULL_HANDLE;
+    m_swapChainExtent = {};
 
     if (!CreateSwapChainInternal(width, height, outError)) return false;
 
@@ -1519,43 +1783,69 @@ bool VulkanDeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
 
 bool VulkanDeviceResources::Present(std::string& outError)
 {
-    if (!HasSwapChain()) { outError = "스왑체인이 없다"; return false; }
-    if (!m_imageAcquired) { outError = "획득한 백버퍼가 없다"; return false; }
-
-    const VkSemaphore waitSemaphore = m_presentSemaphores[m_backBufferIndex];
-    const VkSwapchainKHR swapChain = m_swapChain;
-    const uint32_t imageIndex = m_backBufferIndex;
-    if (!GetRHISubmissionThread().ExecuteAndWait(this, "Vulkan Present",
-        [owner = this, queue = m_queue, waitSemaphore, swapChain, imageIndex](
-            std::string& error)
-        {
-            if (!GetRHISubmissionThread().IsCurrentThread())
-            {
-                error = "vkQueuePresentKHR가 RHI thread 밖에서 호출됐다";
-                return false;
-            }
-            VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-            present.waitSemaphoreCount = 1;
-            present.pWaitSemaphores = &waitSemaphore;
-            present.swapchainCount = 1;
-            present.pSwapchains = &swapChain;
-            present.pImageIndices = &imageIndex;
-            const VkResult result = vkQueuePresentKHR(queue, &present);
-            if (VK_SUCCESS != result && VK_SUBOPTIMAL_KHR != result)
-            {
-                error = "Vulkan 표시 실패 — " + ResultToString(result);
-                if (VK_ERROR_DEVICE_LOST == result)
-                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
-                return false;
-            }
-            return true;
-        }, outError))
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    if (ConsumeSubmissionFailure(outError) ||
+        (m_hostSubmissionTicket.IsValid() && !submission.Wait(m_hostSubmissionTicket, outError)))
     {
+        return false;
+    }
+    return PresentAcquiredImage(outError);
+}
+
+bool VulkanDeviceResources::PresentAcquiredImage(std::string& outError)
+{
+    if (!HasSwapChain())
+    {
+        outError = "스왑체인이 없다";
+        return false;
+    }
+    if (VK_SUCCESS != m_swapChainError && VK_ERROR_OUT_OF_HOST_MEMORY != m_swapChainError &&
+        VK_ERROR_OUT_OF_DEVICE_MEMORY != m_swapChainError)
+    {
+        outError = "Vulkan presentation recovery required — " + ResultToString(m_swapChainError);
+        return false;
+    }
+    if (!m_imageAcquired)
+    {
+        outError = "획득한 백버퍼가 없다";
+        return false;
+    }
+
+    // 표시 소유자가 직전 CPU 제출의 반환을 확인한 뒤 동기 호출한다. 반환 전에는
+    // ImGui 플랫폼 창을 포함한 후속 큐 작업이 없어 새 잠금 없이 Vulkan의 외부
+    // 동기화를 충족한다. 리사이즈는 프레임 사이에, 자원 파괴는 소유자 join 뒤에 한다.
+    // 네이티브 Present·이미지 획득의 대기는 공용 씬 FIFO 밖에 남는다.
+    // PHASE 4.5의 FG proxy·pacing·수명 관리는 이 네이티브 셸 경계만 소유한다.
+    // 에디터 뷰포트의 오프스크린 live_present 복사에는 FG를 넣지 않는다.
+    const VkSemaphore waitSemaphore = m_presentSemaphores[m_backBufferIndex];
+    VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &waitSemaphore;
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapChain;
+    present.pImageIndices = &m_backBufferIndex;
+    const VkResult result = vkQueuePresentKHR(m_queue, &present);
+    if (VK_SUCCESS != result && VK_SUBOPTIMAL_KHR != result)
+    {
+        outError = "Vulkan 표시 실패 — " + ResultToString(result);
+        // out-of-date·surface-lost도 세마포어 대기를 큐에 넣고 이미지를 반납한다.
+        // 그 이미지에 Present를 재시도하면 안 된다. 메모리 오류만 재시도에 필요한
+        // 표시 상태를 보존하며, 나머지 오류는 소유자가 해당 자원을 다시 만들어야 한다.
+        m_swapChainError = result;
+        if (VK_ERROR_OUT_OF_DATE_KHR == result || VK_ERROR_SURFACE_LOST_KHR == result)
+        {
+            m_imageAcquired = false;
+        }
+        if (VK_ERROR_DEVICE_LOST == result)
+        {
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
+        }
         return false;
     }
 
     m_semaphoreIndex = (m_semaphoreIndex + 1) % static_cast<uint32_t>(m_acquireSemaphores.size());
     m_imageAcquired = false;
+    m_swapChainError = VK_SUCCESS;
     return true;
 }
 
@@ -1602,11 +1892,17 @@ RHIVideoMemoryInfo VulkanDeviceResources::QueryVideoMemory() const
             const uint64_t budgetBytes = m_memoryBudgetSupported &&
                 0 != budget.heapBudget[i]
                 ? budget.heapBudget[i] : props.memoryHeaps[i].size;
-            info.budgetMB += budgetBytes / (1024ull * 1024ull);
+            info.budgetBytes += budgetBytes;
             if (m_memoryBudgetSupported)
-                info.usedMB += budget.heapUsage[i] / (1024ull * 1024ull);
+            {
+                info.usedBytes += budget.heapUsage[i];
+            }
         }
     }
+    info.usageAvailable = m_memoryBudgetSupported;
+    info.budgetAvailable = info.budgetBytes > 0;
+    info.usedMB = info.usedBytes / (1024ull * 1024ull);
+    info.budgetMB = info.budgetBytes / (1024ull * 1024ull);
     return info;
 }
 
@@ -1647,4 +1943,3 @@ uint32_t VulkanDeviceResources::FindMemoryType(uint32_t typeBits,
     }
     return UINT32_MAX;
 }
-

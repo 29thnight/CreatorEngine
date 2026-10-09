@@ -40,7 +40,7 @@ namespace wave
     //
     // ★ `.ogg` 는 **일부러 뺐다.** miniaudio 를 `MA_NO_ENCODING` 으로 들이면서
     //   내장 디코더는 WAV·FLAC·MP3 셋이다. 옛 배선은 `.ogg` 를 목록에 넣어 두고
-    //   FMOD 가 실패하면 로그만 남겼다 — 저작자는 "넣었는데 안 난다" 를 보고
+    //   옛 백엔드가 실패하면 로그만 남겼다 — 저작자는 "넣었는데 안 난다" 를 보고
     //   원인을 알 수 없었다. 목록에서 빼면 `unsupported` 로 세어 보고된다.
     [[nodiscard]] bool IsSupportedClipExtension(const std::filesystem::path& path);
 

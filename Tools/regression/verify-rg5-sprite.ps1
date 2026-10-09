@@ -26,7 +26,7 @@ $previousPath = $env:PATH
 $previousValidation = $env:CREATOR_DX12_VALIDATION
 try {
     $dep = if ($Configuration -eq 'Debug') {'debug/bin'} else {'bin'}
-    $env:PATH = "$repo/vcpkg_installed/x64-windows/$dep;$(Split-Path $exe);$previousPath"
+    $env:PATH = "$repo/vcpkg_installed/x64-windows/x64-windows/$dep;$repo/vcpkg_installed/x64-windows/$dep;$(Split-Path $exe);$previousPath"
     $env:CREATOR_DX12_VALIDATION = 'gpu'
     $proc = Start-Process $exe -ArgumentList @('--development-project', "$repo/Build/Obj/RenderRG4/current-fixture/Project", '--commandlet-script', $commands, '--result-file', "$root/results.jsonl") -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/stdout.log" -RedirectStandardError "$root/stderr.log"
     if (!$proc.WaitForExit(600000)) {
@@ -55,7 +55,7 @@ try {
         throw 'Editor runtime changed during the test'
     }
     @{runtime=$runtime; runtimeSha256=$runtimeHash; executable=$exe; configuration=$Configuration; passed=$true; policies=3; frames=18; maxError=0; validationProblems=$validation.problems;
-        executableSha256=$exeHash; exitCode=$proc.ExitCode; productDefault='DeclarationOrder'; rg5Complete=$false} |
+        executableSha256=$exeHash; exitCode=$proc.ExitCode; productDefault='ExplicitVersioned/DependencyOrder'; rg5Complete=$false} |
         ConvertTo-Json -Depth 5 | Set-Content "$root/result.json" -Encoding utf8
     "RG5_SPRITE_GPU_OK $Configuration"
 }

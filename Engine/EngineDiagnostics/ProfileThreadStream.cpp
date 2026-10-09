@@ -214,382 +214,557 @@ namespace ce
 	// thread_stream
 	//-------------------------------------------------------------------------
 
-	thread_stream::thread_stream(chunk_pool& pool, thread_info info)
-		: m_pool(pool)
-		, m_info(std::move(info))
-	{
-	}
+    thread_stream::thread_stream(chunk_pool& pool, thread_info info)
+        : m_pool(pool), m_info(std::move(info))
+    {
+        static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
+                      "scope publication requires lock-free 64-bit atomics");
+    }
 
-	thread_stream::~thread_stream()
-	{
-		// ★ 주인이 아니면 **아무것도 만지지 않는다.** 남의 finish() 를 피해도
-		//   소멸자가 소유 검사 없이 seal_current() 를 부르면 같은 일이다 —
-		//   주인이 m_writer 로 쓰는 동안 그 포인터를 비우고 청크를 되돌린다.
-		//   여기까지 온 것은 호출자가 파괴해도 된다고 판단한 것이지만, 그
-		//   판단이 틀렸을 때 죽는 대신 청크 하나를 잃는 쪽을 고른다.
-		if (!owned_by_caller())
-		{
-			return;
-		}
+    thread_stream::~thread_stream()
+    {
+        // 남의 writer는 봉인하거나 회수할 수 없다. 서비스가 수명을 보장한다.
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        seal_current();
+    }
 
-		// 남은 청크를 잃지 않는다. 열린 스코프는 finish() 가 닫았어야 하지만,
-		// 안 불렸더라도 여기서 청크는 넘어간다.
-		seal_current();
-	}
+    bool thread_stream::owned_by_caller() const
+    {
+        static thread_local const std::thread::id self = std::this_thread::get_id();
+        if (m_ownerThread == self)
+        {
+            return true;
+        }
+        m_foreignTouches.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
 
-	bool thread_stream::ensure_chunk()
-	{
-		if (m_writer && !m_writer->full())
-		{
-			return true;
-		}
+    bool thread_stream::ensure_chunk(std::uint64_t generation)
+    {
+        // 요청과 세대 갱신 사이에 기록자가 끼어들어도 서로 다른 세대는
+        // 한 청크에 섞이지 않는다. 청크의 세대는 이벤트를 받아들인 때의 것이다.
+        if (m_writer && (m_writer->full() || m_writer->generation != generation))
+        {
+            seal_current(true);
+        }
+        if (m_writer)
+        {
+            return true;
+        }
+        m_pendingState.fetch_or(kPendingWork, std::memory_order_release);
+        m_writer = m_pool.acquire();
+        if (!m_writer)
+        {
+            return false;
+        }
+        m_writer->reset(m_info.slot, m_sequence);
+        m_writer->generation = generation;
+        return true;
+    }
 
-		if (m_writer)
-		{
-			seal_current();
-		}
+    void thread_stream::request_freeze(profile_tick freeze_tick)
+    {
+        // 제어 호출은 직렬화되어 있다. 홀수 버전은 아직 요청을 쓰는 중이다.
+        m_freezeVersion.fetch_add(1, std::memory_order_acq_rel);
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        m_freezeTick.store(freeze_tick, std::memory_order_release);
+        m_freezeGeneration.store(generation, std::memory_order_release);
+        m_frozenTick.store(freeze_tick, std::memory_order_release);
+        m_frozenGeneration.store(generation, std::memory_order_seq_cst);
+        m_freezeRequest.fetch_add(1, std::memory_order_release);
+        m_freezeVersion.fetch_add(1, std::memory_order_release);
+        request_seal();
+    }
 
-		m_writer = m_pool.acquire();
-		if (!m_writer)
-		{
-			return false;
-		}
+    void thread_stream::honor_seal_request()
+    {
+        if (m_inHonor)
+        {
+            return;
+        }
 
-		m_writer->reset(m_info.slot, m_sequence);
-		m_writer->generation = m_generation.load(std::memory_order_acquire);
-		m_pendingWork.store(true, std::memory_order_release);
-		return true;
-	}
+        const std::uint64_t sealRequested = m_sealRequest.load(std::memory_order_acquire);
+        const std::uint64_t version = m_freezeVersion.load(std::memory_order_acquire);
+        const std::uint64_t freezeRequested = m_freezeRequest.load(std::memory_order_acquire);
+        const profile_tick freezeTick = m_freezeTick.load(std::memory_order_acquire);
+        const std::uint64_t freezeGeneration = m_freezeGeneration.load(std::memory_order_acquire);
+        const bool freezePending = (version & 1) == 0
+            && version == m_freezeVersion.load(std::memory_order_acquire)
+            && freezeRequested != m_freezeAck.load(std::memory_order_relaxed);
+        const bool staleWriter = m_writer
+            && m_writer->generation != m_generation.load(std::memory_order_acquire);
+        if (!freezePending && !staleWriter
+            && sealRequested == m_sealAck.load(std::memory_order_relaxed))
+        {
+            return;
+        }
 
-	void thread_stream::honor_seal_request()
-	{
-		// ★ 자르는 동안 write() 가 다시 여기로 들어온다. 그 안쪽 호출이 먼저
-		//   ack 를 올리면, 아직 청크에 들어가지도 않은 잘린 구간을 두고 수집기가
-		//   "다 봉인됐다" 로 읽고 거둬 가 버린다 — 실측에서 pause-worker/present
-		//   가 간헐로 붉었던 이유다. ack 는 **다 끝난 뒤** 한 번만 올린다.
-		if (m_inHonor)
-		{
-			return;
-		}
+        m_inHonor = true;
+        if (freezePending)
+        {
+            truncate_open_scopes(freezeTick, freezeGeneration);
+        }
+        seal_current();
+        m_sealAck.store(sealRequested, std::memory_order_release);
+        if (freezePending)
+        {
+            // 나중에 들어온 요청까지 응답하지 않는다. seal 응답과 별개로
+            // 확인하므로 프레임 봉인이 freeze를 영원히 가릴 수도 없다.
+            m_freezeAck.store(freezeRequested, std::memory_order_release);
+        }
+        m_inHonor = false;
+    }
 
-		const std::uint64_t requested = m_sealRequest.load(std::memory_order_acquire);
-		if (requested == m_sealAck.load(std::memory_order_relaxed))
-		{
-			return;
-		}
+    void thread_stream::write(const profile_event& value, std::uint64_t generation, bool late_ingest)
+    {
+        if (generation != m_generation.load(std::memory_order_acquire))
+        {
+            // 이전 회차의 늦은 종료는 새 캡처의 용량 손실이 아니다.
+            m_staleEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        if (m_writer && m_writer->late_ingest != late_ingest)
+        {
+            seal_current(true);
+        }
+        if (!ensure_chunk(generation))
+        {
+            m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        m_writer->late_ingest = late_ingest;
+        m_writer->events[m_writer->count] = value;
+        m_writer->events[m_writer->count].thread_slot = static_cast<std::uint16_t>(m_info.slot);
+        ++m_writer->count;
+        ++m_sequence;
+    }
 
-		m_inHonor = true;
+    void thread_stream::seal_current(bool writing)
+    {
+        if (m_writer)
+        {
+            event_chunk* chunk = m_writer;
+            m_writer = nullptr;
+            if (chunk->count == 0)
+            {
+                m_pool.release(chunk);
+            }
+            else
+            {
+                m_pool.seal(chunk);
+            }
+        }
+        // false가 보이면 그 전에 청크의 소유권도 이미 넘어갔다. 봉인보다
+        // 먼저 내리면 Stop이 빈 스트림으로 판단하고 마지막 청크를 놓친다.
+        // 다음 이벤트를 쓰기 위해 청크를 바꾸는 중이면 빈 구간이 아니다.
+        // 새 페이지 확보가 지연되어도 Stop은 아직 넘어오지 않은 꼬리를 센다.
+        if (writing || recording_depth(m_generation.load(std::memory_order_acquire)) != 0)
+        {
+            m_pendingState.fetch_or(kPendingWork, std::memory_order_release);
+        }
+        else
+        {
+            m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingWork), std::memory_order_release);
+        }
+    }
 
-		// ★ 얼림 요청이면 열린 구간을 그 시각에서 잘라 **남긴다.** 평범한
-		//   프레임 경계에서는 건드리지 않는다 — 그것이 프레임을 넘는 구간이다.
-		const profile_tick freeze = m_freezeTick.exchange(0, std::memory_order_acq_rel);
-		if (freeze != 0)
-		{
-			truncate_open_scopes(freeze);
-		}
+    std::uint16_t thread_stream::recording_depth(std::uint64_t generation) const
+    {
+        std::uint16_t depth = 0;
+        for (std::uint32_t i = 0; i < m_depth; ++i)
+        {
+            const open_scope& scope = m_stack[i];
+            if (scope.token != 0 && scope.generation == generation
+                && m_publishedScopes[i].token.load(std::memory_order_acquire) == scope.token)
+            {
+                ++depth;
+            }
+        }
+        return depth;
+    }
 
-		seal_current();
-		m_sealAck.store(requested, std::memory_order_release);
-		if (freeze != 0)
-		{
-			m_freezeAck.store(m_freezeRequest.load(std::memory_order_acquire),
-			                  std::memory_order_release);
-		}
-		m_inHonor = false;
-	}
+    void thread_stream::push_skipped_scope()
+    {
+        if (m_depth == kMaxScopeDepth)
+        {
+            ++m_overflowDepth;
+            return;
+        }
+        m_stack[m_depth] = {};
+        m_publishedScopes[m_depth].token.store(0, std::memory_order_release);
+        ++m_depth;
+        m_publishedDepth.store(m_depth, std::memory_order_release);
+    }
 
-	void thread_stream::write(const profile_event& value)
-	{
-		if (!owned_by_caller()) return;
+    void thread_stream::skip_scope()
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        honor_seal_request();
+        push_skipped_scope();
+    }
 
-		// 수집기가 봉인을 청했으면 **여기서** 들어준다. 청크를 만지기 전이
-		// 유일하게 안전한 자리다 — 그리고 이 스레드만 여기를 지난다.
-		honor_seal_request();
+    void thread_stream::publish_open_scope(std::uint32_t index)
+    {
+        const open_scope& scope = m_stack[index];
+        published_scope& published = m_publishedScopes[index];
+        published.token.store(0, std::memory_order_release);
+        // 필드도 release/acquire로 짝짓는다. 재사용된 필드를 하나라도 읽으면
+        // 마지막 token 검사보다 무효화가 앞서므로, 옛 token으로 통과하지 못한다.
+        published.generation.store(scope.generation, std::memory_order_release);
+        published.tick_begin.store(scope.tick_begin, std::memory_order_release);
+        published.marker.store(scope.marker, std::memory_order_release);
+        published.frame.store(scope.frame, std::memory_order_release);
+        published.depth.store(scope.depth, std::memory_order_release);
+        published.flags.store(scope.flags, std::memory_order_release);
+        published.session.store(scope.cpu.session, std::memory_order_release);
+        published.tick.store(scope.cpu.tick, std::memory_order_release);
+        published.task.store(scope.cpu.task, std::memory_order_release);
+        published.token.store(scope.token, std::memory_order_release);
+    }
 
-		if (!ensure_chunk())
-		{
-			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
-			return;
-		}
+    void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
+                                    const cpu_span_context& cpu)
+    {
+        begin_scope(id, now, frame, cpu, m_generation.load(std::memory_order_acquire));
+    }
 
-		m_writer->events[m_writer->count] = value;
-		m_writer->events[m_writer->count].thread_slot =
-			static_cast<std::uint16_t>(m_info.slot);
-		++m_writer->count;
-		++m_sequence;
-	}
+    void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
+                                    const cpu_span_context& cpu, std::uint64_t generation)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        m_pendingState.fetch_or(kPendingAdmission, std::memory_order_seq_cst);
+        honor_seal_request();
+        if (generation != m_generation.load(std::memory_order_acquire)
+            || generation == m_frozenGeneration.load(std::memory_order_seq_cst))
+        {
+            push_skipped_scope();
+            m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+            return;
+        }
+        if (m_depth == kMaxScopeDepth || m_nextScopeToken == UINT64_MAX)
+        {
+            push_skipped_scope();
+            m_droppedScopes.fetch_add(1, std::memory_order_relaxed);
+            m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+            return;
+        }
 
-	bool thread_stream::owned_by_caller() const
-	{
-		// thread_local 에 한 번 담아 두고 비교한다. 소유 검사가 hot path 에
-		// 걸리므로 매번 물어보지 않는다.
-		static thread_local const std::thread::id self = std::this_thread::get_id();
-		if (m_ownerThread == self)
-		{
-			return true;
-		}
-		m_foreignTouches.fetch_add(1, std::memory_order_relaxed);
-		return false;
-	}
+        open_scope& scope = m_stack[m_depth];
+        scope.tick_begin = now;
+        scope.marker = id;
+        scope.frame = frame;
+        scope.cpu = cpu;
+        scope.flags = event_flags::none;
+        scope.generation = generation;
+        scope.depth = recording_depth(generation);
+        scope.token = m_nextScopeToken;
+        m_nextScopeToken += 2;
+        m_pendingState.fetch_or(kPendingWork, std::memory_order_release);
+        publish_open_scope(m_depth);
+        ++m_depth;
+        m_publishedDepth.store(m_depth, std::memory_order_release);
+        // 처음 확인한 뒤 들어온 Stop도 놓치지 않는다. 여기서 멈춘 producer는
+        // pending admission과 공개된 시작점으로 미완료 상태를 드러낸다.
+        honor_seal_request();
+        m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+    }
 
-	void thread_stream::seal_current()
-	{
-		// 넘길 것이 남았는가를 여기서 다시 센다. 열린 구간이 없고 쓰던 청크도
-		// 없으면 이 스트림은 얼림에 응답할 것이 없다.
-		m_pendingWork.store(m_depth > 0, std::memory_order_release);
+    bool thread_stream::claim_scope(std::uint32_t index)
+    {
+        std::uint64_t expected = m_stack[index].token;
+        if (expected == 0)
+        {
+            return false;
+        }
+        return m_publishedScopes[index].token.compare_exchange_strong(
+            expected, expected & ~std::uint64_t{ 1 }, std::memory_order_acq_rel);
+    }
 
-		if (!m_writer)
-		{
-			return;
-		}
+    void thread_stream::end_scope(profile_tick now)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        honor_seal_request();
+        if (m_overflowDepth != 0)
+        {
+            --m_overflowDepth;
+            return;
+        }
+        if (m_depth == 0)
+        {
+            m_unbalancedScopes.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
 
-		event_chunk* chunk = m_writer;
-		m_writer = nullptr;
+        --m_depth;
+        m_publishedDepth.store(m_depth, std::memory_order_release);
+        const open_scope& scope = m_stack[m_depth];
+        const bool claimed = claim_scope(m_depth);
+        m_publishedScopes[m_depth].token.store(0, std::memory_order_release);
+        if (!claimed)
+        {
+            return;
+        }
+        if (scope.generation != m_generation.load(std::memory_order_acquire))
+        {
+            m_staleScopes.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
 
-		if (chunk->count == 0)
-		{
-			// 빈 청크는 수집기에 보내지 않는다 — 봉인 목록에 빈 것이 섞이면
-			// "이 프레임에 아무 일도 없었다" 와 "아직 안 왔다" 가 구분되지 않는다.
-			m_pool.release(chunk);
-			return;
-		}
+        profile_event value;
+        value.tick_begin = scope.tick_begin;
+        value.tick_end = (std::max)(now, scope.tick_begin);
+        value.marker = scope.marker;
+        value.frame = scope.frame;
+        value.cpu = scope.cpu;
+        value.depth = scope.depth;
+        value.flags = scope.flags;
+        // 요청의 마지막 버전이 아직 공개되지 않은 짧은 구간에도, 이미 닫힌
+        // 세대의 실제 end가 Stop 뒤로 늘어난 완성 이벤트가 되지 않게 한다.
+        if (scope.generation == m_frozenGeneration.load(std::memory_order_acquire))
+        {
+            const profile_tick cutoff = m_frozenTick.load(std::memory_order_acquire);
+            if (scope.tick_begin > cutoff)
+            {
+                return;
+            }
+            value.tick_end = (std::min)(value.tick_end, cutoff);
+            value.flags = value.flags | event_flags::truncated_end;
+        }
+        write(value, scope.generation);
+        honor_seal_request();
+    }
 
-		m_pool.seal(chunk);
-	}
+    bool thread_stream::read_open_scope(std::uint32_t index, std::uint64_t generation,
+                                       profile_tick end_tick, profile_event& value,
+                                       std::uint64_t& token) const
+    {
+        const published_scope& published = m_publishedScopes[index];
+        token = published.token.load(std::memory_order_acquire);
+        if ((token & 1) == 0 || published.generation.load(std::memory_order_acquire) != generation)
+        {
+            return false;
+        }
+        value = {};
+        value.tick_begin = published.tick_begin.load(std::memory_order_acquire);
+        value.tick_end = end_tick;
+        value.marker = published.marker.load(std::memory_order_acquire);
+        value.frame = published.frame.load(std::memory_order_acquire);
+        value.depth = published.depth.load(std::memory_order_acquire);
+        value.flags = published.flags.load(std::memory_order_acquire) | event_flags::truncated_end;
+        value.cpu.session = published.session.load(std::memory_order_acquire);
+        value.cpu.tick = published.tick.load(std::memory_order_acquire);
+        value.cpu.task = published.task.load(std::memory_order_acquire);
+        value.thread_slot = static_cast<std::uint16_t>(m_info.slot);
+        return value.tick_begin <= end_tick
+            && token == published.token.load(std::memory_order_acquire);
+    }
 
-	void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame, const cpu_span_context& cpu)
-	{
-		if (!owned_by_caller()) return;
-		honor_seal_request();
+    std::uint32_t thread_stream::snapshot_open_scopes(std::uint64_t generation, profile_tick end_tick,
+                                                     profile_event* output, std::uint32_t capacity) const
+    {
+        if (!output)
+        {
+            return 0;
+        }
+        std::uint32_t count = 0;
+        for (std::uint32_t i = 0; i < kMaxScopeDepth && count < capacity; ++i)
+        {
+            profile_event value;
+            std::uint64_t token = 0;
+            if (read_open_scope(i, generation, end_tick, value, token))
+            {
+                output[count++] = value;
+            }
+        }
+        return count;
+    }
 
-		if (m_depth >= kMaxScopeDepth)
-		{
-			// 버리고 센다. 옛 코어는 이 자리에서 스택 밖에 썼다.
-			//
-			// ★ 못 연 것을 따로 세어 두는 것이 핵심이다. 이 스코프도 언젠가
-			//   닫히는데, 그때 스택에서 하나 꺼내면 **남의 구간을 닫는다** —
-			//   RAII 표기라도 짝이 어긋난다. 스코프는 LIFO 이므로 못 연 것이
-			//   언제나 가장 안쪽이고, 따라서 end_scope 가 이 수를 먼저 소비하면
-			//   정확히 제 짝을 만난다.
-			++m_skippedDepth;
-			m_droppedScopes.fetch_add(1, std::memory_order_relaxed);
-			return;
-		}
+    std::uint32_t thread_stream::claim_open_scopes(std::uint64_t generation, profile_tick end_tick,
+                                                  profile_event* output, std::uint32_t capacity)
+    {
+        if (!output)
+        {
+            return 0;
+        }
+        std::uint32_t count = 0;
+        for (std::uint32_t i = 0; i < kMaxScopeDepth && count < capacity; ++i)
+        {
+            profile_event value;
+            std::uint64_t token = 0;
+            if (read_open_scope(i, generation, end_tick, value, token)
+                && m_publishedScopes[i].token.compare_exchange_strong(
+                    token, token & ~std::uint64_t{ 1 }, std::memory_order_acq_rel))
+            {
+                output[count++] = value;
+            }
+        }
+        return count;
+    }
 
-		m_pendingWork.store(true, std::memory_order_release);
+    void thread_stream::write_span(marker_id id, profile_tick begin, profile_tick end,
+                                   std::uint32_t frame, std::uint16_t depth, const gpu_span_context& gpu)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        honor_seal_request();
+        const std::uint64_t generation = gpu.generation != 0
+            ? gpu.generation : m_generation.load(std::memory_order_acquire);
+        if (generation != m_generation.load(std::memory_order_acquire))
+        {
+            m_staleEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        if (end < begin)
+        {
+            m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        profile_event value;
+        value.tick_begin = begin;
+        value.tick_end = end;
+        value.marker = id;
+        value.frame = frame;
+        value.depth = depth;
+        value.flags = event_flags::gpu_span;
+        value.submission = gpu.submission;
+        value.view = gpu.view;
+        value.queue = gpu.queue;
+        // GPU는 Stop의 제출 cutoff까지 늦게 도착한다. CPU의 admission cutoff를
+        // 적용하지 않고, 제출할 때 잡은 세대를 그대로 청크에 싣는다.
+        write(value, generation, true);
+    }
 
-		open_scope& scope = m_stack[m_depth];
-		scope.tick_begin = now;
-		scope.marker = id;
-		scope.frame = frame;
-		scope.cpu = cpu;
-		scope.flags = event_flags::none;
-		scope.generation = m_generation.load(std::memory_order_acquire);
-		scope.emitted = false;
-		++m_depth;
-	}
+    void thread_stream::write_instant(marker_id id, profile_tick tick, std::uint32_t frame,
+                                      const cpu_span_context& cpu)
+    {
+        write_instant(id, tick, frame, cpu, m_generation.load(std::memory_order_acquire));
+    }
 
-	void thread_stream::end_scope(profile_tick now)
-	{
-		if (!owned_by_caller()) return;
+    void thread_stream::write_instant(marker_id id, profile_tick tick, std::uint32_t frame,
+                                      const cpu_span_context& cpu, std::uint64_t generation)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        m_pendingState.fetch_or(kPendingAdmission, std::memory_order_seq_cst);
+        honor_seal_request();
+        if (generation != m_generation.load(std::memory_order_acquire)
+            || generation == m_frozenGeneration.load(std::memory_order_seq_cst))
+        {
+            m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+            return;
+        }
+        profile_event value;
+        value.tick_begin = tick;
+        value.tick_end = tick;
+        value.marker = id;
+        value.frame = frame;
+        value.depth = recording_depth(generation);
+        value.flags = event_flags::instant;
+        value.cpu = cpu;
+        write(value, generation);
+        honor_seal_request();
+        m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+    }
 
-		// ★ 짝을 보기 **전에** 요청을 들어준다. 얼림이면 지금 닫으려는 구간도
-		//   잘려 나가고 짝이 예약되므로, 바로 아래에서 그 예약을 소비한다 —
-		//   한 구간이 두 번 적히지 않는다.
-		honor_seal_request();
+    void thread_stream::publish_frame()
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        // freeze를 처리하지 않은 채 seal만 응답하면 다음 안전 지점에서도
+        // 요청이 없는 것으로 보였던 경로다. 응답은 honor 한 곳에서만 쓴다.
+        honor_seal_request();
+        seal_current();
+    }
 
-		// 깊이 상한을 넘겨 못 연 스코프의 짝이 먼저다(begin_scope 의 주석).
-		// 이것을 스택보다 먼저 보지 않으면 남의 구간을 닫는다.
-		if (m_skippedDepth > 0)
-		{
-			--m_skippedDepth;
-			return;
-		}
+    void thread_stream::freeze_self(profile_tick freeze_tick)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        m_frozenTick.store(freeze_tick, std::memory_order_release);
+        m_frozenGeneration.store(generation, std::memory_order_seq_cst);
+        honor_seal_request();
+        truncate_open_scopes(freeze_tick, generation);
+        seal_current();
+    }
 
-		if (m_depth == 0)
-		{
-			// 열지 않고 닫았다. RAII 표기에서는 나올 수 없는 경로다 —
-			// 남는다면 손으로 짝을 맞춘 코드가 어딘가 있다는 뜻이므로 센다.
-			m_unbalancedScopes.fetch_add(1, std::memory_order_relaxed);
-			return;
-		}
+    void thread_stream::truncate_open_scopes(profile_tick freeze_tick)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        honor_seal_request();
+        truncate_open_scopes(freeze_tick, m_generation.load(std::memory_order_acquire));
+    }
 
-		--m_depth;
-		const open_scope& scope = m_stack[m_depth];
+    void thread_stream::truncate_open_scopes(profile_tick freeze_tick, std::uint64_t generation)
+    {
+        if (generation != m_generation.load(std::memory_order_acquire))
+        {
+            return;
+        }
+        for (std::uint32_t i = m_depth; i > 0; --i)
+        {
+            const open_scope& scope = m_stack[i - 1];
+            if (scope.generation != generation || scope.tick_begin > freeze_tick || !claim_scope(i - 1))
+            {
+                continue;
+            }
+            profile_event value;
+            value.tick_begin = scope.tick_begin;
+            value.tick_end = freeze_tick;
+            value.marker = scope.marker;
+            value.frame = scope.frame;
+            value.cpu = scope.cpu;
+            value.depth = scope.depth;
+            value.flags = scope.flags | event_flags::truncated_end;
+            write(value, scope.generation);
+        }
+    }
 
-		// 얼림에서 이미 잘려 나갔다. 여기서 또 적으면 한 구간이 두 번 남는다.
-		if (scope.emitted)
-		{
-			return;
-		}
-
-		// 지운 세대에서 연 구간이다. 지금 캡처의 것이 아니므로 적지 않고 센다 —
-		// 조용히 섞으면 지운 것이 돌아온 것처럼 보인다.
-		if (scope.generation != m_generation.load(std::memory_order_acquire))
-		{
-			m_staleScopes.fetch_add(1, std::memory_order_relaxed);
-			return;
-		}
-
-		profile_event value;
-		value.tick_begin = scope.tick_begin;
-		value.tick_end = now;
-		value.marker = scope.marker;
-		value.frame = scope.frame;
-		value.cpu = scope.cpu;
-		value.depth = static_cast<std::uint16_t>(m_depth);
-		value.flags = scope.flags;
-		write(value);
-	}
-
-	void thread_stream::write_span(marker_id id, profile_tick begin, profile_tick end,
-	                               std::uint32_t frame, std::uint16_t depth,
-	                               const gpu_span_context& gpu)
-	{
-		if (!owned_by_caller()) return;
-
-		if (!ensure_chunk())
-		{
-			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
-			return;
-		}
-
-		// 이 청크는 늦은 귀속을 거친다. 첫 이벤트를 쓸 때 세워 두면 청크가
-		// 재사용되어도 다음 acquire 에서 reset 이 다시 내린다.
-		m_writer->late_ingest = true;
-
-		profile_event value;
-		value.tick_begin = begin;
-		value.tick_end = end;
-		value.marker = id;
-		value.frame = frame;
-		value.depth = depth;
-		value.flags = event_flags::gpu_span;
-		value.submission = gpu.submission;
-		value.view = gpu.view;
-		value.queue = gpu.queue;
-		write(value);
-	}
-
-	void thread_stream::write_instant(marker_id id, profile_tick tick,
-	                                  std::uint32_t frame, const cpu_span_context& cpu)
-	{
-		if (!owned_by_caller()) return;
-
-		// 얼림·봉인 요청을 여기서도 본다. 드물게 오는 사건이라 이 자리가
-		// 한 스레드의 유일한 안전한 자리일 수 있다.
-		honor_seal_request();
-
-		if (!ensure_chunk())
-		{
-			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
-			return;
-		}
-
-		profile_event value;
-		value.tick_begin = tick;
-		value.tick_end = tick;
-		value.marker = id;
-		value.frame = frame;
-		value.depth = static_cast<std::uint16_t>(m_depth);
-		value.flags = event_flags::instant;
-		value.cpu = cpu;
-		write(value);
-	}
-
-	void thread_stream::publish_frame()
-	{
-		// ★ 남이 부르면 아무것도 하지 않는다. 예전에는 수집기가 여기로 들어와
-		//   남의 m_writer 를 비웠고, 그 포인터로 쓰고 있던 주인과 겹쳐 죽었다.
-		if (!owned_by_caller()) return;
-
-		// ★ 열린 스코프를 닫지 않는다. 프레임을 넘는 구간은 닫히는 프레임에
-		//   기록되고, 시작 프레임 번호를 들고 있으므로 분석기가 어느 프레임에
-		//   걸쳐 있었는지 복원할 수 있다. 옛 코어는 여기서 스택 맨 위를 무조건
-		//   닫았고(그래서 "CPU Frame" 대신 남의 구간을 닫았다) 그것이
-		//   cross-frame/preserve 가 기지 결함으로 남아 있던 이유다.
-		seal_current();
-
-		// 주인이 직접 봉인했으니 대기 중인 요청도 함께 풀린 것이다.
-		m_sealAck.store(m_sealRequest.load(std::memory_order_acquire),
-		                std::memory_order_release);
-	}
-
-	void thread_stream::freeze_self(profile_tick freeze_tick)
-	{
-		if (!owned_by_caller()) return;
-
-		truncate_open_scopes(freeze_tick);
-		seal_current();
-		m_sealAck.store(m_sealRequest.load(std::memory_order_acquire),
-		                std::memory_order_release);
-		m_freezeAck.store(m_freezeRequest.load(std::memory_order_acquire),
-		                  std::memory_order_release);
-	}
-
-	void thread_stream::truncate_open_scopes(profile_tick freeze_tick)
-	{
-		if (!owned_by_caller()) return;
-
-		// ★ 스택에서 **꺼내지 않는다.** 그 구간은 아직 열려 있고, 여기서 자리를
-		//   비우면 다시 녹화한 뒤의 새 구간이 그 자리를 차지해 짝이 뒤집힌다.
-		//   대신 '이미 적었다' 고 표시해 두고, 진짜 종료가 올 때 그 자리에서
-		//   확인한다 — 짝은 개수가 아니라 자리로 맞춘다.
-		const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
-
-		for (std::uint32_t i = m_depth; i > 0; --i)
-		{
-			open_scope& scope = m_stack[i - 1];
-			if (scope.emitted) continue;
-			if (scope.generation != generation) continue;
-
-			profile_event value;
-			value.tick_begin = scope.tick_begin;
-			value.tick_end = freeze_tick;
-			value.marker = scope.marker;
-			value.frame = scope.frame;
-		value.cpu = scope.cpu;
-			value.depth = static_cast<std::uint16_t>(i - 1);
-			value.flags = scope.flags | event_flags::truncated_end;
-			write(value);
-
-			scope.emitted = true;
-		}
-	}
-
-	void thread_stream::finish(profile_tick now)
-	{
-		if (!owned_by_caller()) return;
-
-		// 아직 열려 있는 것을 잃지 않고 닫는다 — 끝을 못 본 구간이라고 표시해서.
-		const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
-
-		while (m_depth > 0)
-		{
-			--m_depth;
-			const open_scope& scope = m_stack[m_depth];
-
-			// 얼림에서 이미 적었거나 지운 세대의 것이면 다시 적지 않는다.
-			if (scope.emitted) continue;
-			if (scope.generation != generation)
-			{
-				m_staleScopes.fetch_add(1, std::memory_order_relaxed);
-				continue;
-			}
-
-			profile_event value;
-			value.tick_begin = scope.tick_begin;
-			value.tick_end = now;
-			value.marker = scope.marker;
-			value.frame = scope.frame;
-		value.cpu = scope.cpu;
-			value.depth = static_cast<std::uint16_t>(m_depth);
-			value.flags = scope.flags | event_flags::truncated_end;
-			write(value);
-
-			m_unbalancedScopes.fetch_add(1, std::memory_order_relaxed);
-		}
-
-		seal_current();
-	}
+    void thread_stream::finish(profile_tick now)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        honor_seal_request();
+        m_overflowDepth = 0;
+        while (m_depth != 0)
+        {
+            const open_scope& scope = m_stack[m_depth - 1];
+            const bool open = scope.token != 0
+                && m_publishedScopes[m_depth - 1].token.load(std::memory_order_acquire) == scope.token;
+            if (open && scope.generation == m_generation.load(std::memory_order_acquire))
+            {
+                // end_scope의 선점/세대/Stop cutoff를 그대로 사용한다.
+                m_unbalancedScopes.fetch_add(1, std::memory_order_relaxed);
+                m_stack[m_depth - 1].flags = scope.flags | event_flags::truncated_end;
+            }
+            end_scope(now);
+        }
+        honor_seal_request();
+        seal_current();
+    }
 }

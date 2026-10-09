@@ -16,6 +16,7 @@
 namespace editor::windows
 {
     void draw_material_graph();
+    void draw_sound_graph();
     void draw_behavior_tree();       bool has_behavior_tree();
     void draw_black_board();         bool has_black_board();
     void draw_input_action_maps();   bool has_input_action_maps();
@@ -45,6 +46,10 @@ struct editor_authoring_windows
     {
         using namespace editor;
         return window_set(
+            panel<&windows::draw_sound_graph>("###Editor.SoundGraph", "Sound Graph / Preset")
+                .initial_size(820.0f, 700.0f)
+                .min_size(440.0f, 300.0f)
+                .open_by_default(false),
             panel<&windows::draw_material_graph>(EditorWindowName::kMaterialGraph, EditorWindowName::kMaterialGraphLabel)
                 .dock(dock_slot::center)
                 .initial_size(1100.0f, 720.0f)
@@ -80,13 +85,13 @@ struct editor_diagnostic_windows
     {
         using namespace editor;
         return window_set(
-            // 프레임 프로파일러만 앞으로 끌어올린다. 본문 첫 줄이
-            // BringWindowToFocusFront + BringWindowToDisplayFront 를 부르던 것이
-            // 표시 순서 선언으로 왔다.
+            // Keep the legacy ID for CLI/workspace compatibility, without a
+            // bound embedded body. Restoring a workspace must not open a process.
             panel<&windows::draw_frame_profiler>(
                 EditorWindowName::kFrameProfiler, EditorWindowName::kFrameProfilerLabel)
                 .stacking(window_stacking::focus_front)
                 .open_by_default(false)
+                .persist_open(false)
                 .available(&windows::has_frame_profiler),
 
             // 첫 크기를 싣지 않으면 ImGui 가 **내용에 맞춰** 접는다. 로그 창은

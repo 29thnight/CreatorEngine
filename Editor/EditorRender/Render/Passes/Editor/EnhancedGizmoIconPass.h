@@ -1,5 +1,6 @@
 #pragma once
 #include "RHI/RHIFormat.h"
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <wrl/client.h>
@@ -78,8 +79,6 @@ public:
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     /// 인스턴스 자료. 셰이더의 구조체와 정확히 같아야 한다.
@@ -95,7 +94,7 @@ private:
     {
         uint32_t first{ 0 };
         uint32_t count{ 0 };
-        Texture* texture{ nullptr };
+        std::size_t textureId{};
         RHITextureEntry uploaded;
     };
 

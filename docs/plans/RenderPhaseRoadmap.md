@@ -1,5 +1,30 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
+2026-10-09 LX 후속: posed 메시렛별 프러스텀 검사, CPU 기하 LOD 선택·실제 제출과 그림자 LOD0 분리, 별도 현재 깊이→draw HZB, 생성 전 cache 예산 검사를 연결했다. D/R 8조합·192프레임·GPU validation 0, 실제 Release TestShadow 32출력 비트 동일을 확인했다. GPU LOD·메시렛 압축/개별 HZB·성능/VRAM·Vulkan 수용은 별도이며 기존 기성/상태를 변경하지 않는다. [구현·검증 경계](../analysis/LatticeGeometryIntegration20261009.md).
+
+2026-10-09 구조 수정 2: 단일 큐는 기존 compiled barrier 계획을 그대로 사용하고, 다중 큐는 공통 계획기로 배치 내부 상태를 유지한다. D/R 최종 실행 150검사·계획 24검사·전체 RG 회귀 통과. 제품 검증은 [배리어 수정 기록](../analysis/RenderRg8Barriers20261009.md)을 따른다. RG8 progress·기성 0·기본 OFF 및 기존 공수 집계 유지.
+
+2026-10-09 구조 수정 1: 패스별 제출을 의존 경계별 batch로 합치고 queue endpoint 소유 allocator/list 풀을 추가했다. D/R 실행 147검사·계획 24검사·전체 RenderGraph 회귀 통과. COMMON 전이 단일화·overlap 후보 선택·RG7 조합은 잔여이며 RG8 progress·기성 0·기본 OFF를 유지한다. [수정과 제품 검증](../analysis/RenderRg8Batching20261009.md).
+
+2026-10-09 구조 재감사: RG8 제품 완료 판정을 철회한다. 패스별 allocator/list 생성·제출/Signal, 중복 COMMON 전이, TestShadow의 overlap 없는 큐 배치 및 RG7 조합 거부를 확인했다. RG8 progress·기성 0, PHASE 4.3 기성 74/잔여 26(RG8 16 + RG9 10), 전체 기성 126/잔여 437로 정정한다. RG7의 제한된 aliasing 구현/실험 종료와 기본 OFF는 유지한다. [상세 감사](../analysis/RenderRg7Rg8StructuralAudit20261009.md). 아래 종료 문구는 재감사 전 이력이다.
+
+2026-10-09 RG8 종료: D/R 큐 실행·수명·SSAO compute 수용 후 Release TestShadow 1496×692의 336출력 오차 0·일반 GPU 192프레임·메모리 1846표본과 최신 Release 전체 RG 회귀를 확인했다. 두 순서 모두 GPU span 증가·메모리 절감 일관성 미확보로 기본 OFF를 유지한다. [종료·채택 판정](../analysis/RenderRg8Closure20261009.md). RG8 done·기성 16, 총계 142/421, PHASE 4.3 기성 90/잔여 10(RG9). RG7·Q0 완료 유지.
+
+
+## 2026-10-07 최근 병합 반영
+
+**같은 날 후속 — 재질 fallback 제거:** live Shadow/GBuffer/Forward의 native 재질 대체와 SceneHost의 이전 graph instance 대체를 제거했다. 그래프 준비 중에는 프레임을 대기시키고 실패한 요청은 거부한다. 타깃 clear와 graph 재질 기록을 분리했으며, CSM depth-content cache는 별도 미구현이다. 아래 RG5/RG6 수용은 해당 보고서에 보관된 소스 해시의 증거다. 후속 변경의 빌드·실행·capture 증거는 [graph-only 재질 패스 기록](../analysis/GraphOnlyMaterialPasses20261007.md)이 소유한다.
+
+**같은 날 후속 — 그래프 오류 복구·RG-V 수용 완료:** 실패한 원본을 보존하고 별도 Principled→Output 기본 graph로 메시를 유지한다. D/R 빌드·편집/배치/저장·재로드·5개 graph draw·7개 원본 hash 보존을 수용했다. RG-V는 24개 변이/retention·실제 3 view·늦은 preview reader·scene epoch/resize·UI off/on 비용·GPU validation 0·exit 0을 통과해 기본 native viewer 4인일을 회수한다. C# 연결·alias/queue/range 확장·Vulkan runtime은 각 후속 페이즈에 남는다. [수용 기록](../analysis/GraphRecoveryRgV20261007.md).
+
+PR #122/#123의 versioned 제품 graph·compiled viewer·GPU indirect/meshlet/static LOD/HZB와 재질 보존 경로가 master에 적용됐다. **RG5·RG6·RG-V 기본 native viewer는 후속 최종 수용으로 완료**이다. GD/HY 전체 제품 수용은 미완료다. 기존 로컬 병합 후 기록의 codec 466/466·단일 DX12 장면 비교를 보존한다. decal/rendergraph 예외는 [2026-10-07 검사](../analysis/RenderRg5Closure20261007.md)에서 fixture 수정 후 D/R 정상 종료·validation 0으로 해소했다.
+
+MAT-9는 live split-sum·타일 SSS/투과의 품질/성능 수용을 계속 소유한다. GPU LOD는 적격 mesh-shader 자산/장치 범위이며 indexed 경로는 LOD0, skinned mesh-shader LOD·DXR은 미완료다. #118/#120의 표시 수명/native Present는 FG 기반일 뿐 FG 완료가 아니다. 총 355인일은 유지하고 RG5 10·RG6 4·RG-V 4인일 회수로 기성 106/잔여 249(+미산정)이다.
+
+IBL/Surface/Raster reference API는 D/R 각각 3정책·일반 63 frames·공유 depth 72 frames·GPU validation 0으로 수용했다. [reference 이관 기록](../analysis/RenderRg5ReferenceMigration20261007.md). 최종 Fog/PostChain/UI/Editor도 D/R 각각 129 frames·9단계 오차 0, 실제 Editor 독립 4프로세스/8캡처·구성 간 16개 이미지 오차 0·현재 해시 계약·14개 변이 거부로 RG5를 종결했다. [최종 수용 기록](../analysis/RenderRg5FinalAcceptance20261007.md). RG6도 동일 현재 소스의 진단 legacy/기본 제품 D/R 독립 8프로세스·408캡처·각 100회 graph 결정성, final 색상 오차 0·깊이 기존 오차 기준 통과·CPU/GPU 산출물·validation 0·exit 0으로 수용했다. [RG6 수용 기록](../analysis/RenderRg6Acceptance20261007.md). Geometry Occlusion/명시 icon read 차이를 기록했으며 순수 스케줄러 비용이나 MAT-9 성능 완료로 확대하지 않는다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 **정본 2026-10-03 · Material 구현 기반 보존 · MAT-7 공통 재질 통합 완료 · LX 마감/MAT-9 품질·성능 수용 잔여 · RND-ENV/GPU 상태 유지.**
 이 문서는 PHASE 4 계열의 현재 소유권·표시 순서·공수 원장이다. 이전 Asset-first SRP
 분할의 근거·이력은 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)에 보존했다.
@@ -8,32 +33,40 @@
 
 ## 1. 페이즈와 회계
 
+**2026-10-08 RG7 종료:** [측정·기본 OFF 채택 판정](../analysis/RenderRg7Closure20261008.md) 완료로 기성 14인일을 회수했다. 당시 총 추정 563·기성 120·잔여 443(+미산정), PHASE 4.3 기성 68·잔여 32였으며, 후속 하드닝/확장 수용을 RG7 완료로 간주하지 않는다.
+
+**2026-10-08 Q0 종료:** 중립 계약·DX12 큐 서비스·큐별 제출/수명 고정 3단계를 D/R에서 수용했다. [검증 기록](../analysis/RhiQueueContractQ0_20261008.md). 총 추정 563·기성 126·잔여 437(+미산정), PHASE 4.3 기성 74·잔여 26. RG7 기본 OFF 유지, RG8/RG9·L4 소비는 미완료다.
+
+**2026-10-08 범위 확장:** PHASE 4.85 [Path Tracing·Hybrid RT 파이프라인](PathTracingHybridPipelinePlan.md)을 신설한다. 공통 RT 기반, 두 제품 파이프라인, ReSTIR PT Enhanced·AMD tetrahedral cages 연구 구현/평가를 14행으로 분리했다. 구현/실험은 미착수이며 중앙 추정 208인일·기성 0이다. 4.8 설계 9인일·기성 106은 유지하며 산정 총계 563·잔여 457인일(+별도 미산정)로 갱신한다. 기본 환경 116·효과 확장/연구 92, 관리 범위 약 130~290인일이다. GPU-9는 prototype 뒤 변경 추정을 검토한다.
+
 | 표시 순서 | 단일 완료선 | 활성 행 | 재산정 인일 | 완료 | 잔여 인일 |
 |---|---|---:|---:|---:|---:|
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | 0 |
 | **4.25** | Graph→ShaderMeta/Slang·공통 재질·Blender 수용 | 11 | 40 + 미산정 | 32 | 8 + 미산정 |
-| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 36 | 64 |
+| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 74 | 26 |
 | **4.5** | 모션/히스토리·업스케일·프레임 생성, DX12 수용 | 16 | 71 | 0 | 71 |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 32 | 0 | 32 |
 | **4.7** | UV1·BVH·DX12 백그라운드 라이트맵 | 8 | 35 | 2 | 33 |
 | **4.75** | probe/AO·shadow·display/post·Environment | 4 | 28 | 0 | 28 |
 | **4.8** | GPU-driven·확률 조명·DXR 설계·구현 공수 확정 | 4 | 9 | 0 | 9 |
+| **4.85** | 공통 RT·Path Tracing·Hybrid·ReSTIR PT Enhanced·tetrahedral cages | 14 | 208 | 0 | 208 |
 | **4.9** | RenderDoc DX12/Vulkan 캡처 → 리소스 확인 → 픽셀별 비교 | 6 | 22 | 0 | 22 |
-| **현재 합계** | | **78** | **355 + 미산정** | **88** | **267 + 미산정** |
+| **현재 합계** | | **92** | **563 + 미산정** | **126** | **437 + 미산정** |
 
 **2026-10-01 사용자 지시 반영:** Vulkan 실행 비교·교차 동등성·픽셀 수용은 4.9가 단독 소유한다.
-4~4.8은 RHI 중립 구현을 유지하면서 **DX12 Debug/Release의 변경 전후 회귀**로 닫는다.
+4~4.85는 RHI 중립 구현을 유지하면서 **DX12 Debug/Release의 변경 전후 회귀**로 닫는다.
 4.9의 착수/완료나 기존 교차 오차를 앞선 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
 1인 전담 엔지니어의 계획 추정치이며 완료 기성 52일은 보존했다. 부분 구현 행은 임의로 완료
 공수를 늘리지 않고 남은 완료 조건을 산정했다. 기존 317.5일은 미산정 범위가 빠진 부분 합계였다.
-현재 355일은 Q0·RG-V·CSRP·RND-ENV·BP의 신규 산정 74일과 기존 범위 재산정 -36.5일을 반영한다.
+기존 355일은 Q0·RG-V·CSRP·RND-ENV·BP의 신규 산정 74일과 기존 범위 재산정 -36.5일을 반영한다.
+2026-10-08 RTP 208인일을 추가해 현재 중앙 추정은 563인일이다.
 숫자가 늘어난 것은 Vulkan 비교를 앞 페이즈에 유지해서가 아니다. 상세 ID별 변경·근거·중복 제외는
 [RenderPhaseEffortEstimate.md](RenderPhaseEffortEstimate.md)가 공수 정본이다.
 
 횡단 Lattice 8행(LX-0~6/LX-3H)은 Material 자체의 완료선이 아니므로 기존처럼 별도 미산정이며
-이 77행/355일에 합산하지 않는다. GPU 기능의 실제 구현(GD/RT/HY), 셰이더 탐색 전환 실험,
-새 하드웨어/미확인 결함 확대분도 미산정이다. **303일을 미산정 범위까지 포함한 전체 잔여로 읽지 않는다.**
+현재 92행/563일에 합산하지 않는다. RT/PT/Hybrid와 효과별 EXP는 4.85의 208일에 포함한다.
+GD 전체 잔여·Vulkan RT 신규 구현·새 하드웨어/미확인 결함 확대분은 별도 산정이다. **457일은 산정 범위의 잔여이며 별도 미산정까지 포함한 전체 잔여가 아니다.**
 기존 Asset-first 35일의 역사 원장은 재도입하지 않는다.
 
 MAT-3 완료는 공용 core 의미와 독립 GPU 8,280개 대조, 현행 Standard 제품 회귀 판정이다.
@@ -85,9 +118,13 @@ PHASE 4.3 BASE-0 → RG1(단일 writer DAG) → RG2(version/Modify DAG) → RG3~
                     ├─ PHASE 4.7 L1/L2→L3→L4(Q0 소비)→L5/L6→L7
                     ├─ PHASE 4.75 RND-1 / RND-2 / RND-3 (각각 독립 품질 gate)
                     └─ PHASE 4.8 GPU-1/2/3 → GPU-9 (구상·공수 확정)
+                       PHASE 4.85 RTP-0→RTP-1/2 (공통 RT)
+                         ├→ RTP-4/5 Hybrid · RTP-6/7 PathTracing→RTP-8 ReSTIR PT Enhanced
+                         ├→ RTP-3 RT history/denoise · RTP-9/10 tetrahedral cages
+                         └→ RTP-11/12 제품 구성/수용→RTP-13 판정 (필요 계약만 선행)
 PHASE 4.9 BP-0→BP-1→BP-2→BP-3→BP-4→BP-5
   동일 입력 → RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교 → 수정/재캡처 → 회귀 패키지
-  각 기능의 DX12 기준선을 입력으로 받는다. 4~4.8로 돌아가는 선행 edge는 없다.
+  각 기능의 DX12 기준선을 입력으로 받는다. 4~4.85로 돌아가는 선행 edge는 없다.
 ```
 
 **2026-10-01 선행 조정:** BASE-0과 후속 구조 정리는 구현·검증된 MAT-0~MAT-8의 Material/Scene/cook 계약을 소비한다. MAT-9 최종 완료를 일괄 선행으로 받지 않는다. 현재 1024/4096 IBL 품질 설정과 이미지 수용 상한을 고정하고, 미달 항목은 baseline에 명시한다. BASE-0의 통과는 같은 입력의 재현·계측·회귀 검출 판정이며 MAT-9 품질/성능 수용을 뜻하지 않는다. GPU-driven 실제 구현과 측정 뒤 동일 장면의 이미지 오차·Debug/Release CPU/GPU 시간·근접 이동 끊김을 MAT-9에서 다시 판정한다. SSS·투과 품질 오차는 성능과 별도 완료 조건으로 남긴다.
@@ -131,8 +168,9 @@ Pass/graph에 얹을 때의 `RG6`, `Q0`, `MAT-9`, 시간축 입력은 **항목�
 | 라이트맵 | [`LightmapBakerPlan.md`](LightmapBakerPlan.md) |
 | renderer probe/AO·shadow·display/post·Environment | [`RendererQualityPlan.md`](RendererQualityPlan.md) |
 | GPU-driven·확률 조명·DXR 설계 | [`GpuFeaturePlanningPlan.md`](GpuFeaturePlanningPlan.md) |
-| Meshlet/Mesh Shader raster + DXR 상세 배선 계약 | [`GpuDrivenMeshletDxrWiring.md`](../design/GpuDrivenMeshletDxrWiring.md) — GPU-1/GPU-3 설계 작성·진행, 구현/실측 미검증 |
-| 셰이더 탐색 DXR 전환의 가설·채택 실험 | [`DxrShaderTraversalExperimentPlan.md`](DxrShaderTraversalExperimentPlan.md) — GPU-3/GPU-9 판정 입력, 실험 미착수·공수 미산정 |
+| Meshlet/Mesh Shader raster + DXR 상세 배선 계약 | [`GpuDrivenMeshletDxrWiring.md`](../design/GpuDrivenMeshletDxrWiring.md) — GPU-1/GPU-3 설계 작성·진행. GD0~GD3 소스는 PR #123 으로 병합, 실행 증거는 DX12 한 장면뿐([구현 계획](GpuDrivenGeometryImplementationPlan.md)) |
+| 셰이더 탐색 DXR 전환의 가설·채택 실험 | [`DxrShaderTraversalExperimentPlan.md`](DxrShaderTraversalExperimentPlan.md) — GPU-3/GPU-9 판정 입력, 실험 미착수·RTP-0/5/13 예산에 포함 |
+| Path Tracing·Hybrid RT 제품 환경과 연구 적용 | [`PathTracingHybridPipelinePlan.md`](PathTracingHybridPipelinePlan.md) — PHASE 4.85, RTP-0~13 미착수·중앙 추정 208인일 |
 | 백엔드 패리티 | [`BackendParityPlan.md`](BackendParityPlan.md) |
 | 분리 전 4.75 항목 감사 | [`Phase475AxisClassification.md`](../analysis/Phase475AxisClassification.md) |
 
@@ -149,6 +187,7 @@ Pass/graph에 얹을 때의 `RG6`, `Q0`, `MAT-9`, 시간축 입력은 **항목�
   Material parity와 별도 golden·성능 결과로 닫는다.
 - **4.8:** `GPU-1~3`은 세 기능의 설계, `GPU-9`는 공통 자원·지원/폴백·최소 수직
   슬라이스·기능별 구현 공수를 확정한다. 아직 기능 구현 완료선은 아니다.
+- **4.85:** 공통 RT 기반과 Hybrid/PathTracing 두 제품 환경의 DX12 수용, ReSTIR PT Enhanced·tetrahedral cages의 구현/평가·채택 기록을 소유한다. 첫 hard shadow만으로 닫지 않고 연구 결과와 기본 환경 완료를 구분한다. 기존 RT0/RT1/HY0 및 EXP는 새 행과 대응해 중복 산정하지 않는다.
 
 문서 재배치와 공수 추정은 빌드·GPU 런타임·픽셀 동등성의 새 증거가 아니다.
 C#·4.9도 위의 계획 추정치를 사용하며 착수 시 실제 소비 표면·지원 장치 차이를 반영해 갱신한다.

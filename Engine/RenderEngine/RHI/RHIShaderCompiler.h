@@ -88,6 +88,30 @@ namespace RHIShaderCompiler
         RHIShaderBinary m_previous;
     };
 
+    // How many compiles may run at once (one Slang session slot each). Callers
+    // that fan out compiles size their worker count with this.
+    std::size_t MaxParallelCompiles();
+
+    struct ModuleReuseState;
+
+    // Inside this scope, compiles on the current thread that share source text and
+    // options reuse one parsed Slang module (a material's stages per backend do).
+    // The scope also pins one compiler session slot, so other threads compile in
+    // parallel on other slots. Keep it short: nothing is re-read while it is open.
+    class ModuleReuseScope final
+    {
+    public:
+        ModuleReuseScope();
+        ~ModuleReuseScope();
+
+        ModuleReuseScope(const ModuleReuseScope&) = delete;
+        ModuleReuseScope& operator=(const ModuleReuseScope&) = delete;
+
+    private:
+        ModuleReuseState* m_state;
+        ModuleReuseState* m_previous;
+    };
+
     // targetProfile은 기존 HLSL 프로필(vs_5_0 등)을 받는다. DXC가 요구하는
     // SM6 프로필로 서비스 내부에서 올리므로 호출부가 백엔드별 문자열을 모른다.
     bool CompileFile(std::string_view name, std::string_view entryPoint,
@@ -135,6 +159,9 @@ namespace RHIShaderCompiler
         bool recompiling{};
         std::uint64_t revision{};
         std::uint64_t completedRequests{};
+        std::uint64_t activeRequests{};
+        // Name/entry/phase belong to the most recently updated active request.
+        // Completing another parallel request cannot hide the remaining work.
         std::string name, entryPoint, phase, lastError;
     };
     Progress GetProgress();
@@ -143,4 +170,3 @@ namespace RHIShaderCompiler
     void ResetStats();
     void ClearMemoryCache();
 }
-

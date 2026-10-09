@@ -17,11 +17,12 @@
 #pragma pop_macro("max")
 #pragma pop_macro("min")
 
-#include "RenderFrameServices.h"
+#include "../IRenderDeviceServices.h"
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIAssetEvictionPolicy.h"
 #include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
+#include <array>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -48,7 +49,7 @@ class DX12MeshCache : public IRenderMeshCache, public IRHIUploadTransactionListe
 {
 public:
     /// A-4. `DX12MeshEntry`(D3D12 뷰 둘)를 대신한다 — 정의는
-    /// RenderFrameServices.h 에 있고 인코더의 중립 서명이 그대로 받는다.
+    /// RHIResourceTypes.h 에 있고 인코더의 중립 서명이 그대로 받는다.
     using Entry = RHIMeshBinding;
 
     struct Stats
@@ -57,6 +58,10 @@ public:
         uint32_t uploads{ 0 };
         // MBC6/MBC9: 그중 typed generation 진입점(GetOrUploadModel)으로 올라간 수.
         uint32_t modelGenerationUploads{ 0 };
+        uint32_t meshletUploads{ 0 };
+        uint32_t meshletFallbacks{ 0 };
+        uint32_t coarseLodUploads{ 0 };
+        uint32_t coarseLodFallbacks{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
 
@@ -96,6 +101,7 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
+    Entry FindModel(const assets::ModelMeshHandle& handle) const override;
     Entry GetOrUploadModel(
         const RHIModelMeshView& view, std::string& outError) override;
     uint32_t GetModelGenerationUploadCount() const override
@@ -106,6 +112,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
     //
@@ -135,6 +142,9 @@ private:
     {
         DX12PersistentHeap::Allocation vertexBuffer;
         DX12PersistentHeap::Allocation indexBuffer;
+        DX12PersistentHeap::Allocation meshletBuffer;
+        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseIndexBuffers;
+        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseMeshletBuffers;
         Entry entry;
 
         /// 정점+인덱스 합계. ③(미사용 은퇴)이 뺄 때 쓴다 — 은퇴 시점에
@@ -146,9 +156,14 @@ private:
         RHIUploadTransactionState uploadState{ RHIUploadTransactionState::Recording };
     };
 
-    bool RecordBufferUpload(const void* data, uint64_t bytes,
+    void ReleaseCoarseHandles(const Entry& entry);
+    void ReleaseCoarseAllocations(
+        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& indices,
+        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& meshlets);
+
+    void RecordBufferUpload(const void* data, uint64_t bytes,
         const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
-        DX12PersistentHeap::Allocation& destination, std::string& outError);
+        DX12PersistentHeap::Allocation& destination);
 
     /// 업로드 정본. 두 진입점(GetOrUpload/GetOrUploadModel)이 키와 데이터
     /// 소스만 다르게 이 하나를 부른다. 키 조회(히트)도 여기서 한다.
@@ -156,7 +171,7 @@ private:
         const assets::ModelMeshHandle* modelKey,
         const void* vertexData, uint64_t vertexBytes, uint32_t vertexStride,
         uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
-        std::string& outError);
+        std::string& outError, const RHIModelMeshView* modelView = nullptr);
 
     DX12DeviceResources* m_resources{ nullptr };
     // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
@@ -173,6 +188,9 @@ private:
     {
         DX12PersistentHeap::Allocation vertexBuffer;
         DX12PersistentHeap::Allocation indexBuffer;
+        DX12PersistentHeap::Allocation meshletBuffer;
+        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseIndexBuffers;
+        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseMeshletBuffers;
     };
     RHICompletionRetireQueue<RetiredBuffers> m_retireQueue;
     DX12PersistentHeap m_persistentHeap;

@@ -240,6 +240,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ShaderMetadataRuntime.cpp" />
+    <ClCompile Include="Assets\ModelSourcePreparation.cpp" />
+    <ClCompile Include="Experiment\Cooked\CookedModelSubAssetCodec.cpp" />
+    <ClCompile Include="Experiment\Cooked\MaterialAssetSetCodec.cpp" />
+    <ClCompile Include="Experiment\Cooked\CookedCodeMaterial.cpp" />
+    <ClCompile Include="Experiment\Cooked\MaterialAssetSetProducer.cpp" />
+    <ClCompile Include="Experiment\Cooked\CookedShaderMeta.cpp" />
+    <ClCompile Include="AssetDepot\MaterialAssetRuntime.cpp" />
+    <ClCompile Include="Experiment\Cooked\ModelAssetSetProducer.cpp" />
+    <ClCompile Include="AssetDepot\ModelAssetRuntime.cpp" />
+    <ClCompile Include="AssetDepot\AssetSetActivation.cpp" />
+    <ClCompile Include="AssetDepot\AssetDepot.cpp" />
+    <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
     <ClCompile Include="AssetAuthoringPort.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -348,6 +361,14 @@
     <ClCompile Include="Experiment\Import\VertexWelding.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
+    <ClCompile Include="GpuMeshletVisibility.cpp" />
+    <ClCompile Include="GpuGeometryOcclusion.cpp" />
+    <ClCompile Include="Experiment\Import\MeshLodBuilder.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\MeshletBuilder.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\VertexCacheOptimization.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -433,6 +454,9 @@
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="GpuGeometryVisibility.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp">
@@ -575,6 +599,31 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Assets\ModelSourcePreparation.h" />
+    <ClInclude Include="Experiment\Cooked\CookedModelSubAssetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialAssetSetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\CookedCodeMaterial.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialAssetSetProducer.h" />
+    <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
+    <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
+    <ClInclude Include="Experiment\Cooked\ModelAssetSetProducer.h" />
+    <ClInclude Include="Assets\ModelSkeletonPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationPayload.h" />
+    <ClInclude Include="Assets\ModelMeshDescriptor.h" />
+    <ClInclude Include="Assets\ModelSceneAssetInputs.h" />
+    <ClInclude Include="Assets\ModelGeometryPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationDescriptor.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCache.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCharges.h" />
+    <ClInclude Include="TextureFramePins.h" />
+    <ClInclude Include="MaterialGraphInstancePins.h" />
+    <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetSetActivation.h" />
+    <ClInclude Include="AssetDepot\AssetLink.h" />
+    <ClInclude Include="AssetDepot\AssetRequest.h" />
+    <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetMountId.h" />
+    <ClInclude Include="Experiment\Cooked\ArtifactByteSource.h" />
     <ClInclude Include="AssetBundle.h">
       <Filter>Resources\AssetBundle</Filter>
     </ClInclude>
@@ -732,6 +781,21 @@
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexWelding.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuMeshletVisibility.h" />
+    <ClInclude Include="GpuGeometryOcclusion.h" />
+    <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
+    <ClInclude Include="Experiment\MeshLodData.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\MeshLodBuilder.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\MeshletData.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\MeshletBuilder.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexCacheOptimization.h">
@@ -896,6 +960,9 @@
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
@@ -909,6 +976,9 @@
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuGeometryVisibility.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h">
@@ -1013,7 +1083,7 @@
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h">
       <Filter>RHI\DX12\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\RenderFrameServices.h">
+    <ClInclude Include="Render\Core\PassResourceRetirement.h">
       <Filter>RHI\DX12\Compatibility</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IDisplayPresentationSink.h">
@@ -1054,6 +1124,9 @@
     </ClInclude>
     <ClInclude Include="RHI\RHIParallelCommandPool.h">
       <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHICommandRecordingJobs.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIPersistentHeapPolicy.h">
       <Filter>RHI\Core</Filter>
@@ -1153,6 +1226,12 @@
     <ClCompile Include="MaterialGraphSceneCompiler.cpp">
       <Filter>Resources</Filter>
     </ClCompile>
+    <ClCompile Include="MaterialGraphSceneRuntimeEffects.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneRuntimeEffects.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
     <ClCompile Include="MaterialGraphShaderMeta.cpp">
       <Filter>Resources</Filter>
     </ClCompile>

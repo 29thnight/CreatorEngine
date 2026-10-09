@@ -1,9 +1,18 @@
 #pragma once
 
-// 프로파일러 HUD 표시 계약. 수집 코어(EngineDiagnostics/Profiler.h)에서
-// 분리했다(P1a) — ImGui는 수집 데이터의 reader일 뿐이고, 코어는 표시를
-// 모른다. 구현은 ProfilerWindow.cpp.
-#include <mutex>
+#include <string>
 
-// 불변 capture 표시는 씬을 붙들지 않고, live 페이지는 같은 수명 잠금을 잠깐 취한다.
-void DrawProfilerHUD(std::mutex& sceneStructureMutex);
+namespace editor
+{
+    // Menu and command threads only enqueue a request. The presentation owner
+    // launches/focuses the ordinary-privilege viewer at its existing boundary.
+    // Call only for an explicit user open/focus action, never from panel draw,
+    // workspace restoration or layout presets. Initialization does not launch.
+    void request_profiler_viewer(bool rendering_live = false);
+    void request_profiler_viewer_close();
+    void initialize_profiler_viewer();
+    void pump_profiler_viewer();
+    void shutdown_profiler_viewer();
+    bool profiler_viewer_running();
+    std::string take_profiler_viewer_error();
+}

@@ -1,9 +1,41 @@
 #pragma once
+#include "Ownership.h"
 #include "Core.Minimal.h"
 #include <vector>
 #include <mutex>
+#include <thread>
+#include <variant>
+#include "../RenderEngine/AssetDepot/AssetLink.h"
+#include "../RenderEngine/AssetDepot/AssetRequest.h"
 
 class Entity;
+class Texture;
+class DataSystem;
+namespace material_graph
+{
+    struct Generation;
+}
+namespace LX::Runtime
+{
+    struct ShaderGeneration;
+}
+
+// Closed concrete-type registration for this ABI adapter, not manifest kinds.
+// Several native types share a manifest kind (for example ::Material and
+// experiment::Material); a kind alone never proves which C++ owner a slot holds.
+// Zero is deliberately unregistered. Preserve Texture's existing v34 token ID.
+template<class T> inline constexpr std::uint32_t kScriptAssetConcreteType = 0u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<Texture> = 3u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelAnimationDescriptor> = 0x00010001u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelMeshDescriptor> = 0x00010002u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelSkeletonPayload> = 0x00010003u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelAnimationPayload> = 0x00010004u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<ShaderMeta> = 0x00010005u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<material_graph::Generation> = 0x00010006u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<::Material> = 0x00010007u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<LX::Runtime::ShaderGeneration> = 0x00010008u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<experiment::Material> = 0x00010009u;
+inline constexpr std::uint32_t kScriptAssetRequestBit = 0x80000000u;
 
 // 관리 코드에 넘기는 객체 핸들.
 //
@@ -43,6 +75,73 @@ struct ScriptObjectHandle
 	bool IsValid() const { return generation != 0; }
 };
 
+// Flat AssetDepot ABI values. No C++ owner, string, job or resource pointer crosses CLR.
+struct ScriptAssetId
+{
+    std::uint64_t first{};
+    std::uint64_t second{};
+};
+
+struct ScriptAssetLink
+{
+    ScriptAssetId asset{};
+    ScriptAssetId subasset{};
+    std::uint32_t kind{};
+    std::uint32_t reserved{};
+};
+
+struct ScriptAssetToken
+{
+    std::uint32_t index{};
+    std::uint32_t generation{};
+    // Concrete native type proof, independent of ScriptAssetLink::kind. The high
+    // bit distinguishes consumer requests from strong owners of that exact type.
+    std::uint32_t type{};
+};
+
+struct ScriptTextureAssetVariant
+{
+    std::uint32_t colorSpace{};
+    std::uint32_t compress{};
+    std::uint32_t role{};
+};
+
+struct ScriptAssetRequestSnapshot
+{
+    std::int32_t status{};
+    std::int32_t error{};
+    std::int32_t workComplete{};
+    std::int32_t messageBytes{};
+};
+
+struct ScriptTextureDescriptor
+{
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::uint32_t mipLevels{};
+    std::uint32_t arraySize{};
+    std::uint32_t isCube{};
+};
+
+static_assert(sizeof(ScriptAssetLink) == 40);
+static_assert(sizeof(ScriptAssetToken) == 12);
+static_assert(sizeof(ScriptTextureAssetVariant) == 12);
+static_assert(sizeof(ScriptAssetRequestSnapshot) == 16);
+static_assert(sizeof(ScriptTextureDescriptor) == 20);
+
+enum class ScriptAssetResult : std::int32_t
+{
+    Success,
+    Unavailable,
+    InvalidToken,
+    InvalidLink,
+    UnsupportedType,
+    WrongThread,
+    InvalidArgument,
+    NotResident,
+    InternalError,
+};
+
 // 스크립트가 참조하는 GameObject만 담는 슬롯 테이블.
 //
 // 씬의 모든 오브젝트를 넣지 않는다 — 스크립트가 실제로 잡고 있는 것만 등록하므로
@@ -72,7 +171,72 @@ public:
 	void Clear();
 	size_t LiveCount() const;
 
+    // Minimal ownership adapter in the existing opaque registry. The host owns
+    // its GT session; shutdown invalidates tokens without touching DataSystem.
+    void BeginAssetSession(DataSystem* dataSystem);
+    void EndAssetSession();
+    ScriptAssetResult RequestAsset(const ScriptAssetLink& link, const ScriptTextureAssetVariant& variant,
+        bool residentOnly, ScriptAssetToken& token);
+    // ABI v35 selects the concrete runtime view separately from stable link data.
+    ScriptAssetResult RequestAssetTyped(const ScriptAssetLink& link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token);
+    ScriptAssetResult SnapshotAssetRequest(ScriptAssetToken token, ScriptAssetRequestSnapshot& snapshot,
+        char* message, int capacity);
+    ScriptAssetResult AcquireAssetResult(ScriptAssetToken request, ScriptAssetToken& owner);
+    ScriptAssetResult CancelAssetRequest(ScriptAssetToken request);
+    ScriptAssetResult ReleaseAsset(ScriptAssetToken token);
+    ScriptAssetResult ReadTexture(ScriptAssetToken token, ScriptTextureDescriptor& descriptor);
+    ScriptAssetResult ListAssetRoots(std::uint64_t mount, std::uint32_t kind,
+        ScriptAssetLink* links, int capacity, int& count);
+
 private:
+    // These are the actual native owners/consumer requests, never void owners,
+    // adopted pointers, a second AssetPtr wrapper or a polymorphic asset object.
+    using AssetStorage = std::variant<std::monostate,
+        own::shared_owner<const Texture>,
+        own::shared_owner<const assets::ModelAnimationDescriptor>,
+        own::shared_owner<const assets::ModelMeshDescriptor>,
+        own::shared_owner<const assets::ModelSkeletonPayload>,
+        own::shared_owner<const assets::ModelAnimationPayload>,
+        own::shared_owner<const ShaderMeta>,
+        own::shared_owner<const material_graph::Generation>,
+        own::shared_owner<const ::Material>,
+        AssetDepot::AssetRequest<Texture>,
+        AssetDepot::AssetRequest<assets::ModelAnimationDescriptor>,
+        AssetDepot::AssetRequest<assets::ModelMeshDescriptor>,
+        AssetDepot::AssetRequest<assets::ModelSkeletonPayload>,
+        AssetDepot::AssetRequest<assets::ModelAnimationPayload>,
+        AssetDepot::AssetRequest<ShaderMeta>,
+        AssetDepot::AssetRequest<material_graph::Generation>,
+        AssetDepot::AssetRequest<::Material>,
+        own::shared_owner<const LX::Runtime::ShaderGeneration>,
+        own::shared_owner<const experiment::Material>,
+        AssetDepot::AssetRequest<LX::Runtime::ShaderGeneration>,
+        AssetDepot::AssetRequest<experiment::Material>>;
+
+    struct AssetSlot
+    {
+        std::uint32_t generation{ 1u };
+        std::uint32_t type{};
+        AssetStorage value{};
+    };
+
+    [[nodiscard]] ScriptAssetResult CheckAssetSessionLocked() const;
+    [[nodiscard]] AssetSlot* FindAssetLocked(ScriptAssetToken token);
+    [[nodiscard]] ScriptAssetToken InsertAssetLocked(AssetStorage value);
+    template<class T>
+    ScriptAssetResult RequestTypedAssetLocked(const ScriptAssetLink& link,
+        const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token);
+    template<class T>
+    ScriptAssetResult ListTypedAssetRootsLocked(std::uint64_t mount,
+        ScriptAssetLink* links, int capacity, int& count);
+    void ReleaseAssetLocked(AssetSlot& slot);
+    std::mutex m_assetMutex;
+    std::vector<AssetSlot> m_assetSlots;
+    DataSystem* m_assetDataSystem{};
+    std::thread::id m_assetThread{};
+    bool m_assetsActive{};
+
 	struct Slot
 	{
 		Entity* object{ nullptr };

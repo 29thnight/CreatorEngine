@@ -29,7 +29,7 @@ cbuffer DecalFrame : register(b0)
     float4x4 gViewProjection;
     float2   gScreenDimensions;
     uint     gHasOwners;
-    float    gFramePadding;
+    uint     gInstanceBase;
 };
 
 #define USE_DIFFUSE (1 << 0)
@@ -71,13 +71,14 @@ struct VSOut
 
 VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-    const DecalInstance instance = gInstances[instanceId];
+    const uint sourceInstance = gInstanceBase + instanceId;
+    const DecalInstance instance = gInstances[sourceInstance];
     const float3 localPosition = kCubePositions[kCubeIndices[vertexId]];
     const float4 worldPosition = mul(float4(localPosition, 1.0f), instance.world);
 
     VSOut output;
     output.position = mul(worldPosition, gViewProjection);
-    output.instance = instanceId;
+    output.instance = sourceInstance;
     return output;
 }
 

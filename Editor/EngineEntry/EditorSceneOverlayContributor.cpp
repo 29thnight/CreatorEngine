@@ -90,12 +90,25 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
     {
         LivePassNode node;
         node.name = "WireFrame";
+        node.prepare = [bundle](const EnhancedFrameContext& ctx,
+            std::string& err, uint32_t) -> bool
+        {
+            auto input = ctx;
+            const auto* gizmoRenderer = GizmoRenderer::GetActive();
+            if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay)
+                || !gizmoRenderer || !gizmoRenderer->IsWireFrameEnabled())
+            {
+                input.graphSceneInput.reset();
+                input.draws = nullptr;
+                input.forwardDraws = nullptr;
+            }
+            return bundle->wireframe.PrepareFrame(input, err);
+        };
         node.instance = [bundle](uint32_t) -> EnhancedRenderPass*
         {
             return &bundle->wireframe;
         };
-        node.reads = { kGizmoDepthSlot };
-        node.modifies = { LiveSlots::kDisplayLdr };
+        node.modifies = { LiveSlots::kDisplayLdr, kGizmoDepthSlot };
         node.active = []()
         {
             const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
@@ -119,6 +132,10 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
             {
                 bb.Set(LiveSlots::kDisplayLdr, bundle->wireframe.GetOutput());
             }
+            if (bundle->wireframe.GetDepth().IsValid())
+            {
+                bb.Set(kGizmoDepthSlot, bundle->wireframe.GetDepth());
+            }
         };
         pipeline.AddNode(std::move(node));
     }
@@ -136,7 +153,11 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
         node.prepare = [bundle, gizmoScene](const EnhancedFrameContext& ctx,
             std::string& err, uint32_t) -> bool
         {
-            if (nullptr != gizmoScene)
+            if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay))
+            {
+                bundle->gizmoIcon.SetIcons(nullptr);
+            }
+            else if (nullptr != gizmoScene)
             {
                 bundle->gizmoIcon.SetIcons(&gizmoScene->icons);
             }
@@ -170,7 +191,11 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
         node.prepare = [bundle, gizmoScene](const EnhancedFrameContext& ctx,
             std::string& err, uint32_t) -> bool
         {
-            if (nullptr != gizmoScene)
+            if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay))
+            {
+                bundle->gizmoLine.SetVertices({});
+            }
+            else if (nullptr != gizmoScene)
             {
                 bundle->gizmoLine.SetVertices(gizmoScene->lineVertices);
             }

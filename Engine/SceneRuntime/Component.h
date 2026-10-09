@@ -1,5 +1,8 @@
 #pragma once
 #include "Object.h"
+#include "SceneGC.h"
+#include <type_traits>
+#include <utility>
 #include "TypeTrait.h"
 #include "Reflection.hpp"
 #include "MetaPolymorphic.h"
@@ -9,12 +12,39 @@
 class Entity;
 class Transform;
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
-class [[reflgen::reflect]] Component : public meta::identity<Component, Object>
+class [[reflgen::reflect]] Component : public meta::identity<Component, Object>, public gc::managed
 {
    friend struct reflgen::access;
    public:
 public:
 	Component() = default;
+
+    // Each concrete native component must explicitly describe its complete GC
+    // edges, including base/ignored/nonserialized fields. Inherited hooks are
+    // rejected so a new script type cannot silently inherit an empty trace.
+    template<class T, class... Args>
+    [[reflgen::ignore]]
+    static gc::root_ref<T> CreateManaged(gc::domain& domain, Args&&... args)
+    {
+        static_assert(std::is_base_of_v<Component, T>);
+        static_assert(std::is_same_v<decltype(&T::gc_trace), void (T::*)(gc::tracer&) const>,
+            "Every concrete component must declare gc_trace and trace its base and all strong fields");
+        auto component = gc::make<T>(domain, std::forward<Args>(args)...);
+        // Constructor-owned system records also need explicit retirement,
+        // even before a Scene publishes this component.
+        component->BeginManagedCleanup();
+        return component;
+    }
+    [[reflgen::ignore]]
+    virtual void gc_trace(gc::tracer& tracer) const;
+    void Destroy() override;
+    [[reflgen::ignore]]
+    void BeginManagedCleanup();
+    [[reflgen::ignore]]
+    void FinalizeManagedDestroy();
+    [[reflgen::ignore]]
+    const gc::weak_ref<Entity>& OwnerReference() const noexcept { return m_ownerReference; }
+
 
 	// ★ virtual인 이유 — S1-b(Transform 컴포넌트화)의 조용한 함정 차단.
 	//
@@ -138,11 +168,20 @@ public:
 	Component& GetComponent(HashedGuid typeof);
 
 protected:
+    // Idempotent native-resource release, called on the owner thread before
+    // destroyed is published. It is never called by the GC destructor.
+    [[reflgen::ignore]]
+    virtual void ReleaseManagedResources() {}
+
 	[[reflgen::ignore]]
 	uint8_t			m_lifecycleState{ 0 };
 
 	[[reflgen::ignore]]
+    // Fenced raw borrow for worker/read ABI. The weak identity is authoritative
+    // outside a joined scene frame; only the owner thread may promote it.
 	Entity*		m_pOwner{};
+    [[reflgen::ignore]]
+    gc::weak_ref<Entity> m_ownerReference{};
 
 	[[reflgen::ignore]]
 	Transform*		m_pTransform{ nullptr };

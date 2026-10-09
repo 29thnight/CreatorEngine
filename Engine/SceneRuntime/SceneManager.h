@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include "Ownership.h"
+#include "SceneGC.h"
 #include "Object.h"
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
@@ -11,6 +13,9 @@
 #include "DetachedEntityTransfer.h"
 #include "ScenePhase.h"
 #include "SimulationSessionPolicy.h"
+#include "SoundSystem.h"
+#include <array>
+#include <cstdint>
 #include <future>
 #include <memory>
 #include <thread>
@@ -27,12 +32,25 @@ class InputActionManager;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
+    // Declared first: every root, callback and graph object is released before
+    // the one shared GameThread domain is destroyed. DDOL never crosses domains.
+    gc::domain m_gcDomain;
+
     friend class Singleton<SceneManager>;
     SceneManager();
     ~SceneManager();
 
 public:
 	void ManagerInitialize();
+    gc::domain& ManagedDomain();
+    // Transfer an external root to the manager and expose a borrowed Scene*.
+    Scene* AdoptScene(gc::root_ref<Scene> scene);
+    // Owner thread and scene-structure barrier only; cleanup precedes root release.
+    void RetireScene(Scene* scene);
+    // Only the host's joined render/scene-structure boundary may drive collection.
+    void CollectManagedAtFrameBoundary();
+    gc::statistics ManagedStatistics() const;
+
     void Editor();
 
     // ── 씬 구조 변경 (렌더 정지 구간에서만 수행) ──
@@ -49,6 +67,12 @@ public:
 
     // Hosts configure this before requesting Play. Player skips authoring serialization/restoration.
     bool ConfigureSimulationSession(SimulationSessionPolicy::mode policy);
+    void BindAudioPlayback(wave::PlaybackService* playback, SoundSystem::AssetResolver resolver = {});
+    [[nodiscard]] wave::PlaybackService* AudioPlayback() const noexcept { return m_audioPlayback; }
+    [[nodiscard]] const SoundSystem::AssetResolver& AudioResolver() const noexcept { return m_audioResolver; }
+    [[nodiscard]] wave::PlaybackScope AudioSessionScope() const noexcept { return m_audioSession; }
+    void RefreshAudioClipKeys();
+    void SynchronizeAudioWorld();
     bool BindProjectLayerSettings(const std::shared_ptr<ProjectLayerSettings>& settings);
     std::shared_ptr<ProjectLayerSettings> ProjectLayers() const { return m_projectLayers.lock(); }
 
@@ -90,17 +114,36 @@ public:
 
 	void SaveSceneAsync(std::string_view name = "SampleScene");
     // Owner thread only. Parsing/assets use engine jobs; entities are constructed at
-    // ApplyPendingSceneStructureChange or WaitForSceneLoad (scene structure boundary).
+    // ApplyPendingSceneStructureChange or PollSceneLoads (scene structure boundary).
     // future is only a result channel: do not block the owner with get() before pumping.
     // SceneManager owns successful results, including an abandoned future. Failure or
     // cancellation yields nullptr. Callback requests replace earlier pending callbacks.
+    enum class SceneLoadRequestState : std::uint8_t
+    {
+        Unknown, Pending, Ready, Failed, Cancelled, Stale, Superseded,
+    };
+    struct SceneLoadRequestStatus final
+    {
+        std::uint64_t id{};
+        SceneLoadRequestState state{ SceneLoadRequestState::Unknown };
+        std::string path;
+        std::string message;
+        bool activationRequested{};
+    };
+    // Owner-thread admission/query only. Ready means Scene construction has
+    // completed; requested activation still commits at the existing frame boundary.
+    // The last 64 terminal value records are retained, with no resource/Scene pins.
+    [[nodiscard]] std::uint64_t QueueSceneLoad(std::string_view path, bool activate);
+    [[nodiscard]] SceneLoadRequestStatus QuerySceneLoad(std::uint64_t requestId) const;
 	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
     void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
     void ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete = true);
 	void BeforeAwakeSceneLoad();
 	bool IsSceneLoading() const;
-    // Blocks for preparation and constructs results; activation remains frame-boundary work.
-    void WaitForSceneLoad();
+    // Owner-thread, nonblocking completion pump. Returns true once every pending
+    // request has produced its result; activation remains frame-boundary work.
+    // Poll again while false. Never wait on an incomplete asset job on GT/RT.
+    bool PollSceneLoads();
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
@@ -109,9 +152,13 @@ public:
 	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
     
-	std::vector<Scene*>& GetScenes() { return m_scenes; }
+	const std::vector<Scene*>& GetScenes() const { return m_scenes; }
 	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
-	void SetActiveScene(Scene* scene) { m_activeScene = scene; }
+    void SetActiveScene(Scene* scene);
+    [[nodiscard]] std::uint64_t SceneContextEpoch() const noexcept
+    {
+        return m_sceneContextEpoch.load(std::memory_order_acquire);
+    }
 	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
 	bool IsGameStart() const { return m_isGameStart; }
@@ -149,7 +196,7 @@ public:
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
     // GT frame sealing용. 활성 Scene의 mesh/foliage가 실제 소유한 Material을
     // cache 소속 여부와 무관하게 owner snapshot으로 돌려준다.
-    std::vector<std::shared_ptr<Material>> CaptureRequiredRenderMaterials() const;
+    std::vector<own::shared_owner<const Material>> CaptureRequiredRenderMaterials() const;
 
 	void RequestRenderProfileApply();
 	bool IsRenderProfileApplyPending() const { return m_renderProfileApplyPending; }
@@ -209,15 +256,24 @@ public:
 
     InputActionManager*                 m_inputActionManager{ nullptr };
 private:
+    wave::PlaybackService* m_audioPlayback{};
+    SoundSystem::AssetResolver m_audioResolver;
+    wave::PlaybackScope m_audioSession;
     struct PendingSceneLoad;
-    std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate);
+    std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate,
+        std::uint64_t* requestId = nullptr);
+    void RecordSceneLoadResult(PendingSceneLoad& load, SceneLoadRequestState state, std::string message = {});
     void CompleteSceneLoads(bool wait);
     Scene* BuildPreparedScene(const PendingSceneLoad& load);
     bool PreparePhysicsSceneExit(Scene* scene);
     bool ResumePhysicsAfterSceneActivation();
     void RequireSceneLoadOwner() const;
+    void SetCommittedSimulation(bool committed);
+    void AdvanceSceneContextEpoch();
     std::thread::id m_sceneLoadOwner{std::this_thread::get_id()};
-    std::vector<std::shared_ptr<PendingSceneLoad>> m_pendingSceneLoads;
+    std::vector<own::shared_owner<PendingSceneLoad>> m_pendingSceneLoads;
+    std::array<SceneLoadRequestStatus, 64u> m_completedSceneLoads{};
+    std::uint64_t m_nextSceneLoadRequestId{ 1u };
     std::atomic_size_t m_pendingSceneLoadCount{0};
     size_t m_sceneLoadEpoch = 0;
     Scene* m_asyncSceneToActivate = nullptr;
@@ -265,8 +321,11 @@ private:
     // SceneManager.cpp의 각 호출부 주석 참고).
     void RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& batch);
 private:
+    std::atomic<std::uint64_t>          m_sceneContextEpoch{ 1u };
     std::atomic<Scene*>                 m_sceneToActivate{};
+    // Compatibility enumeration only, never a lifetime owner.
     std::vector<Scene*>                 m_scenes{};
+    std::vector<gc::root_ref<Scene>>     m_sceneRoots{};
 
     // 재생 시작 직전의 에디터 씬 스냅샷. 정지하면 이 노드로 같은 Scene 객체를
     // 되채운다(EnterPlayMode/ExitPlayMode 주석 참조).

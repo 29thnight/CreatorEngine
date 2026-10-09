@@ -1,5 +1,7 @@
 #pragma once
+#include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
+#include "../Graph/EnhancedRenderGraph.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -10,6 +12,7 @@
 
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/TypeTrait.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
@@ -17,6 +20,7 @@
 class RenderScene;
 class Scene;
 class Material;
+class TextureFramePins;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
@@ -26,7 +30,7 @@ namespace material_graph { struct SceneMaterialSource; }
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 3; // scene, game, cached material preview
 
-/// ImGui composition이 요청하는 논리 표시 대상. 카메라의 소유권이나 backend
+/// Host composition이 요청하는 논리 표시 대상. 카메라의 소유권이나 backend
 /// 슬롯과 무관하며 Host가 요청마다 명시한다.
 enum class EnhancedLiveDisplayTarget : uint8_t
 {
@@ -95,8 +99,8 @@ struct EnhancedLiveViewPacket
     std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -107,8 +111,8 @@ struct EnhancedLiveViewRequest
     FrameCameraSnapshot camera{};
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
@@ -118,7 +122,7 @@ struct EnhancedShaderMetaFrameSnapshot
 {
     FileGuid guid{};
     ShaderMetaHandle handle{};
-    std::shared_ptr<const ShaderMeta> value;
+    own::shared_owner<const ShaderMeta> value;
     std::string error;
 
     bool IsValid() const
@@ -195,6 +199,9 @@ struct EnhancedRequiredAssetPacket
 struct EnhancedLiveFramePacket
 {
     uint64_t frameId{ 0 };
+    // 같은 프로세스 steady_clock의 캡처 시각이며 시뮬레이션 시간이나 fence가 아니다.
+    // 0은 관측 불가다. 병합해도 교체된 입력의 실제 캡처 시각을 그대로 보존한다.
+    uint64_t sourceCaptureNanoseconds{ 0 };
     uint64_t sceneEpoch{ 0 };
     uint64_t resizeGeneration{ 0 };
     float    deltaSeconds{ 0.f };
@@ -206,6 +213,9 @@ struct EnhancedLiveFramePacket
     // M6-P2d-d: Host가 실제 Scene material에서 수집해 넘긴 추가 의존성.
     // 아래 ShaderMeta owner 배열은 이 선언과 primary/cache 입력을 resolve한 결과다.
     EnhancedRequiredAssetPacket requiredAssets;
+    // One-shot scene preparation result. The queue and RT preserve this owner
+    // until the first relevant staging copy, including coalesced/pending frames.
+    own::shared_owner<TextureFramePins> preparedTextureImages;
     // 첫 항목은 제품 GBuffer primary meta다. 뒤에는 GT가 DataSystem의 material
     // generation 집합에서 함께 밀봉한 material별 meta가 GUID 순서로 붙는다.
     std::vector<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;
@@ -248,6 +258,20 @@ struct EnhancedRenderThreadStats
     uint64_t backPressureWaits{ 0 };
     uint64_t shutdownDrains{ 0 };
     uint64_t shutdownDiscardedDeltas{ 0 };
+    // 전용 RT의 완료 조회 대기 횟수이며, 스케줄러 worker의 대기 횟수가 아니다.
+    uint64_t gpuAdmissionWaits{ 0 };
+    uint64_t stalePixelSkips{ 0 };
+    uint64_t overBudgetAdmissions{ 0 };
+    uint64_t displayLeaseSkips{ 0 };
+    uint64_t producerPacingWaits{ 0 };
+    uint64_t displayLeaseWaits{ 0 };
+    uint64_t displayPacingWaits{ 0 };
+    // 마지막 실제 장면 제출의 신원이다. 이 값이나 입력 나이가 GPU 완료를 뜻하지 않는다.
+    uint64_t admittedFrameId{ 0 };
+    double lastAdmissionAgeMs{ 0.0 };
+    double maxAdmissionAgeMs{ 0.0 };
+    double pendingAgeMs{ 0.0 };
+    double softAgeBudgetMs{ 0.0 };
     uint32_t pending{ 0 };
     uint32_t inProgress{ 0 };
     uint32_t highWatermark{ 0 };
@@ -257,11 +281,37 @@ struct EnhancedRenderThreadStats
     /// RenderThread 가 TickLive 를 **끝낸** 마지막 frame id.
     /// ★ EnhancedLiveDebugSnapshot::consumedFrameId 는 TickLive **시작**에 적힌다 —
     ///   첫 프레임의 ShaderMeta 반영처럼 긴 프레임 도중에도 이미 그 id 를 가리킨다.
-    ///   "이 시점 이후 발행된 프레임이 그려졌다"는 이 값으로만 판정한다.
+    ///   delta만 적용했거나 오래된 픽셀을 생략한 경우도 포함하는 CPU 완료다.
+    ///   장면 GPU 완료, Host 소비 완료, 실제 화면 출력의 증거는 아니다.
     uint64_t completedFrameId{ 0 };
     bool running{ false };
     bool accepting{ false };
     bool producerConsumerSeparated{ false };
+};
+
+/// RenderThread 가 새 프레임을 받아들이는 속도. 정하는 쪽은 호스트다 —
+/// 에디터는 포커스·실행 중 여부·설정으로, Player 는 기본값으로.
+enum class EnhancedLivePacingMode : uint8_t
+{
+    Display,    // 합성기 시계 한 번에 하나. 시계가 없으면(윈도우 10) 상한 없음.
+    Unlimited,  // 상한 없음. 성능 측정과 실행 중 게임용.
+    FixedRate,  // 초당 framesPerSecond 개. 0 이면 상한 없음.
+};
+
+struct EnhancedLivePacing
+{
+    EnhancedLivePacingMode mode{ EnhancedLivePacingMode::Display };
+    uint32_t framesPerSecond{ 0 };
+
+    bool operator==(const EnhancedLivePacing&) const = default;
+};
+
+// Runtime queue-mode requests cross to the render owner at a frame boundary.
+// Applied means submitted, not completed on the GPU or proof of compute overlap.
+struct EnhancedLiveQueueExecutionStatus
+{
+    uint64_t requestId{0}, appliedRequestId{0}, appliedFrame{0};
+    uint32_t requestedMode{0}, appliedMode{0};
 };
 
 /// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이
@@ -284,8 +334,14 @@ struct EnhancedLiveDisplayEntrySnapshot
     uint64_t completedFrameId{ 0 };
     uint64_t completedSceneEpoch{ 0 };
     FrameCameraSnapshot completedCamera{};
+    uint64_t completedCaptureNanoseconds{ 0 };
+    // 캡처부터 생산자 완료를 관측할 때까지의 시간. 관측 불가일 때는 0이다.
+    double completedAgeMs{ 0.0 };
+    // 캡처부터 마지막 성공한 Host 텍스처 조회까지의 시간이며 실제 화면 출력 시각은 아니다.
+    double lastTextureAgeMs{ 0.0 };
     // RT가 마지막으로 소비한 불변 뷰 입력. GPU 완료 결과와 구분한다.
     uint64_t sourceFrameId{ 0 };
+    uint64_t sourceCaptureNanoseconds{ 0 };
     uint64_t sourceInputSequence{ 0 };
     uint64_t sourceCameraRevision{ 0 };
     uint64_t promotionCount{ 0 };
@@ -305,7 +361,17 @@ struct EnhancedLiveDisplayEntrySnapshot
     bool ready{ false };
 };
 
-/// RenderThread -> CE ImGui의 불변 출력 경계. sourceFrameId의 입력 역할과
+// A sampled submitted graph can be older than the displayed frame, but never belong to another view/extent/history.
+inline bool EnhancedGraphSnapshotMatchesView(const EnhancedRenderGraph::DiagnosticSnapshot& graph,
+    const EnhancedLiveDisplayEntrySnapshot& view)
+{
+    return view.active && view.ready && graph.frameId != 0 && graph.viewId == view.key.viewId &&
+        graph.historyRevision == view.key.historyRevision && graph.sceneEpoch == view.completedSceneEpoch &&
+        graph.width == view.completedWidth &&
+        graph.height == view.completedHeight;
+}
+
+/// RenderThread -> Host presentation의 불변 출력 경계. sourceFrameId의 입력 역할과
 /// GPU 완료된 표시 결과를 함께 담되 Camera*, DX12/Vulkan 객체는 담지 않는다.
 struct EnhancedLiveDisplaySnapshot
 {
@@ -327,8 +393,9 @@ struct EnhancedLiveDisplaySnapshot
 };
 
 // 텍스처와 완료 프레임의 카메라·신원을 같은 수명 락 아래 한 번에 읽는다.
-// 이 값 복사는 CPU 조회의 정합성만 보장한다. Host GPU sampling이 끝날 때까지
-// 슬롯 재사용을 막는 lease는 아니다. CPU 브리지는 Host 업로드 기록의 신원을 돌려준다.
+// 이 값은 신원이며 소유권 자체는 아니다. DX12 조회는 같은 잠금을 풀기 전에
+// Host 소비자 lease도 등록하고, Host가 자신의 GPU 완료까지 그 소유권을 유지한다.
+// CPU 브리지는 Host 업로드 기록의 신원을 돌려준다.
 struct EnhancedLiveDisplayTexture
 {
     uint64_t textureId{ 0 };
@@ -354,6 +421,13 @@ struct EnhancedLiveGpuSpan
     double   queueSpanMs{ 0.0 };
     double   busyMs{ 0.0 };
     uint32_t sliceCount{ 0 };
+    uint32_t computeSliceCount{ 0 };
+    // Intersection of queue-local pass interval unions in calibrated QPC time.
+    // Compute submission alone is not evidence of concurrent GPU execution.
+    double measuredOverlapMilliseconds{ 0.0 };
+    double overlapClockErrorMilliseconds{ 0.0 };
+    uint64_t cpuTicksPerSecond{ 0 };
+    bool overlapClockValid{ false };
     uint32_t queryOverflowPasses{ 0 };
     uint32_t droppedSlices{ 0 };
 
@@ -401,6 +475,8 @@ struct EnhancedLiveGpuSlice
     std::string name;
     uint64_t    beginCpuTick{ 0 };
     uint64_t    endCpuTick{ 0 };
+    uint8_t     queueId{ 0 }; // 0 graphics, 1 compute; timestamps already in QPC domain.
+    uint32_t    passIndex{ UINT32_MAX }; // Authored graph index, never the display name.
 };
 
 /// GPU 구간을 밖으로 흘리는 자리(§7.3 의 GPU Graphics queue).
@@ -421,6 +497,7 @@ struct EnhancedLiveGpuSpanOrigin
     uint32_t submissionId = 0;
     uint16_t renderViewId = 0;
     uint8_t  queueId = 0;
+    uint64_t captureGeneration{ 0 };
 };
 
 struct EnhancedLiveGpuSpanSink
@@ -429,7 +506,13 @@ struct EnhancedLiveGpuSpanSink
                     uint32_t engineFrameId, const EnhancedLiveGpuSpanOrigin& origin) = nullptr;
     void (*on_flush)() = nullptr;
     void (*on_issue)(uint32_t engineFrameId, uint32_t lostPasses,
-                     bool collectFailed, const char* reason) = nullptr;
+                     bool collectFailed, const char* reason, uint64_t captureGeneration) = nullptr;
+
+    // Admission closes atomically with Stop in the sink. The RT retains the
+    // returned generation until it publishes this submission or reports failure.
+    uint64_t (*on_begin_capture)(uint32_t engineFrameId) = nullptr;
+    void (*on_finish_capture)(uint64_t captureGeneration, uint32_t engineFrameId,
+                              bool complete, const char* reason) = nullptr;
 };
 
 /// sink 를 건다. 렌더러가 서기 전에 걸어야 첫 수집부터 흐른다.
@@ -588,6 +671,10 @@ struct EnhancedLiveShadowStats
     float    shadowDistance{ 0.f };
     float    slopeScale{ 0.f };
     uint32_t casterCandidates{ 0 };     // 재질 그래프가 아닌 캐스터
+    bool gpuVisibilityActive{ false };
+    bool visibilityCountsExact{ true };
+    uint64_t gpuSubmittedCandidates{ 0 };
+    uint64_t gpuSubmittedBins{ 0 };
     std::array<EnhancedLiveShadowCascade, 3> cascades{};
 };
 
@@ -614,6 +701,18 @@ struct EnhancedLiveDebugSnapshot
     uint64_t resizeGeneration{ 0 };
     uint32_t drawCount{ 0 };
     uint32_t batchCount{ 0 };
+    // CPU-prepared route count, not GPU-visible meshlets or a readback measurement.
+    uint32_t preparedMeshletBatchCount{ 0 };
+    bool indexedIndirectSupported{ false };
+    bool nonIndexedIndirectSupported{ false };
+    uint64_t preparedGpuCandidates{ 0 };
+    uint64_t preparedGpuCompactedBins{ 0 };
+    uint64_t preparedGpuPreservedBins{ 0 };
+    uint64_t preparedGpuConservativeCandidates{ 0 };
+    std::string meshletFallback{};
+    bool currentFrameOcclusion{ false };
+    std::string occlusionFallback{};
+    std::string skinningFallback{};
 
     /// 이번 프레임에 그린 데칼 수와 실제 발행한 드로우 수. 데칼은 씬에
     /// 프록시가 없으면 패스가 통째로 빠지므로, 0이 고장인지 '데칼이 없는
@@ -772,16 +871,32 @@ namespace EnhancedSceneRenderer
         std::shared_ptr<IRenderFeatureContributor> contributor);
 
     /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
-    /// GetLiveDisplayImTextureId의 ID 해석이 이 sink를 소비한다 — Core는
+    /// GetLiveDisplayTexture의 ID 해석이 이 sink를 소비한다 — Core는
     /// ImGui 셸을 직접 부르지 않는다. 미설치면 표시 ID는 0이다.
     /// 렌더러 초기화(렌더 스레드 기동) 전에 설치하고, 렌더 스레드가 멎은
     /// 뒤에 해제({})한다.
     void SetDisplayPresentationSink(
         std::shared_ptr<IDisplayPresentationSink> sink);
 
-    /// Select a validated HDR/cooked environment and enable its background.
-    /// The next frame installs cached maps or regenerates IBL for the new source.
+    struct EnvironmentPreparationProgress
+    {
+        uint32_t activeRequests{ 0 };
+        uint64_t requestId{ 0 };
+        bool applied{ false }; // Upload commands recorded, not GPU-fence completion.
+        uint64_t appliedRequestId{ 0 }; // Retained across newer queued/failed requests.
+        std::string phase;
+        std::string name;
+        std::string error;
+    };
+
+    /// Queue CPU preparation; true means accepted, not GPU-ready. The latest
+    /// request wins. Validation failures preserve the installed environment.
+    /// Only the render thread installs prepared pixels and changes the selection.
+    /// Startup/rebuild reloads and GPU upload/generation retain their existing path.
     bool SetSkyBoxPath(const std::string& path, std::string& outError);
+    EnvironmentPreparationProgress GetEnvironmentPreparationProgress();
+    /// Invalidates pending publication; an in-flight read/decode drains safely.
+    void CancelEnvironmentPreparation();
 
     /// 켠다. Enhanced-only 런타임에서는 초기화가 이 상태를 유지한다.
     void EnableLive();
@@ -808,15 +923,16 @@ namespace EnhancedSceneRenderer
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
     inline constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
     EnhancedRequiredAssetPacket BuildRequiredAssetPacket(
-        std::span<const std::shared_ptr<Material>> materials);
+        std::span<const own::shared_owner<const Material>> materials);
 
     EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
         const EnhancedLiveViewRequest* views, uint32_t viewCount,
         bool sceneLoading, const EnhancedRequiredAssetPacket& requiredAssets);
 
     /// 게임 스레드가 packet과 그 시점까지의 proxy delta를 하나의 제출 단위로
-    /// 발행한다. queue가 찼으면 가장 최신 pending frame을 교체하되 lifecycle
-    /// delta는 보존하고 같은 대상의 update만 latest-wins로 접는다.
+    /// 발행한다. 소비 중인 불변 입력 뒤에는 교체 가능한 입력 하나만 대기한다.
+    /// lifecycle delta는 보존하고 같은 대상의 update만 latest-wins로 접는다.
+    /// GPU credit 확보 뒤 최신 입력을 선택하며, 입력 나이는 절대 상한이 아닌 목표다.
     bool PublishLiveFrame(EnhancedLiveFramePacket frame);
 
     /// 렌더 소비 상태는 전용 RenderThread만 만진다. 외부 호출은
@@ -827,6 +943,10 @@ namespace EnhancedSceneRenderer
     /// SceneManager가 RenderScene을 Finalize하기 전에 호출해야 한다.
     void StopLiveRenderThread();
     EnhancedRenderThreadStats GetLiveRenderThreadStats();
+
+    /// 어느 스레드에서나 부를 수 있다. 바뀌면 RenderThread 를 깨워 바로 따른다.
+    void SetLivePacing(EnhancedLivePacing pacing);
+    EnhancedLivePacing GetLivePacing();
 
     /// RenderThread 수명·프레임 구간 훅(PHASE 14 P2).
     ///
@@ -881,12 +1001,11 @@ namespace EnhancedSceneRenderer
     /// Camera 객체나 backend 파이프라인을 CE/UI가 다시 조회하지 않는다.
     EnhancedLiveDisplaySnapshot GetLiveDisplaySnapshot();
 
-    /// 스냅샷의 논리 표시 대상을 ImTextureID 호환 값으로 연다. DX12 공유
+    /// 스냅샷의 논리 표시 대상을 Host의 불투명 texture ID로 연다. DX12 공유
     /// 핸들과 Vulkan CPU upload key는 구현 안의 불투명 presentation key다.
     /// 셸이 없거나 해당 대상의 첫 표시 기록 전이면 0.
     /// PT의 열린 Host 프레임 안에서만 호출한다. 다른 스레드의 진단/예열은
     /// GetLiveDisplaySnapshot 또는 게시된 warmup 이정표를 읽어야 한다.
-    uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
     EnhancedLiveDisplayTexture GetLiveDisplayTexture(EnhancedLiveDisplayTarget target);
 
     /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
@@ -951,6 +1070,11 @@ namespace EnhancedSceneRenderer
     /// 있지만 디버그 HUD에는 문제되지 않는다.
     EnhancedLiveDebugSnapshot GetLiveDebugSnapshot();
 
+    /// Request a snapshot on the next submitted frame and read the last requested
+    /// immutable graph. No GPU resources are owned by this diagnostic value.
+    std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot> GetLiveGraphSnapshot(
+        EnhancedLiveDisplayTarget target);
+
     /// 현재 패스 파라미터. 파이프라인이 아직 없으면 기본값을 돌려준다.
     /// GetLiveDebugSnapshot과 같은 스레드 규약(락으로 복사)이다.
     EnhancedLiveTuning GetLiveTuning();
@@ -959,6 +1083,9 @@ namespace EnhancedSceneRenderer
     /// 게임 스레드가 수행한다 — 창이 패스를 직접 만지지 않는 이유는
     /// EnhancedLiveTuning 주석 참조.
     void SetLiveTuning(const EnhancedLiveTuning& tuning);
+
+    bool RequestLiveQueueExecutionMode(uint32_t mode, uint64_t& requestId, std::string& error);
+    EnhancedLiveQueueExecutionStatus GetLiveQueueExecutionStatus();
 
     /// 최종 정리. 렌더 스레드 join 이후에만 부른다.
     void ShutdownLive();

@@ -78,7 +78,7 @@ foreach ($mode in @('reload','normal-exit')) {
             Copy-Item -LiteralPath $tracePath -Destination (Join-Path $Work 'reload-shutdown.txt') -Force
             $trace = Get-Content -LiteralPath $tracePath -Raw
             if ($trace -notmatch 'ce::get_job_scheduler\(\).shutdown\(\)' -or $trace -notmatch 'FinalizeRuntime 완료') { throw 'Engine scheduler teardown did not complete' }
-            if ($output -notmatch '\[player.smoke.reload\] activated=true gameStart=true pending=false displayedAfterActivation=true') { throw 'Async reload did not reach a displayed frame' }
+            if ($output -notmatch '\[player.smoke.reload\] activated=true gameStart=true pending=false compositionSubmittedAfterActivation=true') { throw 'Async reload did not submit a destination composition' }
             if ([regex]::Matches($output, '\[SMOKE\] managed OnBeginSimulation: PackageSmokeProbe').Count -ne 2) { throw 'Managed simulation did not begin exactly once in each scene' }
             if ($output -notmatch '\[player.smoke\]') { throw 'Smoke completion missing' }
         } elseif (Test-Path -LiteralPath $runtimeRoot) { throw 'Normal exit left its process runtime directory' }

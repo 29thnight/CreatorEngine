@@ -2,8 +2,10 @@
 #include "MaterialGraphShaderMeta.h"
 
 #include <algorithm>
+#include <atomic>
 #include <fstream>
 #include <tuple>
+#include <Windows.h>
 
 namespace material_graph
 {
@@ -14,6 +16,45 @@ bool Fail(std::string& error, std::string message)
     error = std::move(message);
     return false;
 }
+
+    bool PublishSceneSource(const std::filesystem::path& path, std::string_view source, std::string& error)
+    {
+        const auto matches = [&]()
+        {
+            std::ifstream stream(path, std::ios::binary);
+            const std::string accepted{std::istreambuf_iterator<char>(stream), {}};
+            return stream && accepted == source;
+        };
+        if (matches())
+        {
+            return true;
+        }
+        auto staging = path;
+        staging += ".stage-" + FileGuid::CreateRandomV4().ToString();
+        {
+            std::ofstream stream(staging, std::ios::binary | std::ios::trunc);
+            stream.write(source.data(), static_cast<std::streamsize>(source.size()));
+            stream.close();
+            if (!stream)
+            {
+                std::error_code ignored;
+                std::filesystem::remove(staging, ignored);
+                return Fail(error, "LX Scene shader source write failed.");
+            }
+        }
+        // Same-content tickets can overlap after an explicit invalidation. Never
+        // truncate an input that another compiler may currently be reading.
+        if (!MoveFileExW(staging.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            std::error_code ignored;
+            std::filesystem::remove(staging, ignored);
+            if (!matches())
+            {
+                return Fail(error, "LX Scene shader source publication failed.");
+            }
+        }
+        return true;
+    }
 
 bool TargetLess(const CompileTarget& left, const CompileTarget& right)
 {
@@ -38,11 +79,17 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     // ShaderMeta describes generated entry contracts, including the installed
     // common Forward+ alpha consumer.
     graphics("GBuffer", "LXSceneVS", "LXSceneGBufferPS", ShaderPassQueue::Opaque, true);
+    graphics("LXSceneDepth", "LXSceneVS", "LXSceneDepthPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
     graphics("Forward", "LXSceneVS", "LXSceneColorPS", ShaderPassQueue::Transparent);
     passes.back().state.blendMode = ShaderBlendMode::Alpha;
     graphics("LXSceneLookup0", "LXSceneVS", "LXSceneLookup0PS");
     graphics("LXSceneLookup1", "LXSceneVS", "LXSceneLookup1PS");
+    if ((program.features & 0x1800u) != 0)
+    {
+        graphics("LXSceneRuntimeEffects0", "LXSceneVS", "LXSceneRuntimeEffects0PS");
+        graphics("LXSceneRuntimeEffects1", "LXSceneVS", "LXSceneRuntimeEffects1PS");
+    }
     if (program.surface) graphics("Shadow", "LXSceneShadowVS", "LXSceneShadowPS", ShaderPassQueue::Shadow, true);
     if ((program.features & 0x1000u) != 0) graphics("Subsurface", "LXSceneVS", "LXSceneSubsurfacePS");
     if ((program.features & 0x0800u) != 0) graphics("Refraction", "LXSceneVS", "LXSceneRefractionPS");
@@ -58,24 +105,33 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
 }
 } // namespace
 
-std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program)
+std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program,
+                                               std::optional<RHIShaderBinary> only)
 {
     std::vector<CompileTarget> targets;
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
+        if (only && *only != backend) continue;
         targets.push_back({backend, "LXSceneVS", "vs_6_0"});
-        for (const auto entry : {"LXSceneGBufferPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
+        targets.push_back({backend, "LXSceneMS", "ms_6_5"});
+        for (const auto entry : {"LXSceneGBufferPS", "LXSceneDepthPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
             targets.push_back({backend, entry, "ps_6_0"});
         }
         if (program.surface)
         {
             targets.push_back({backend, "LXSceneShadowVS", "vs_6_0"});
+            targets.push_back({backend, "LXSceneShadowMS", "ms_6_5"});
             targets.push_back({backend, "LXSceneShadowPS", "ps_6_0"});
         }
         if ((program.features & 0x1000u) != 0)
         {
             targets.push_back({backend, "LXSceneSubsurfacePS", "ps_6_0"});
+        }
+        if ((program.features & 0x1800u) != 0)
+        {
+            targets.push_back({backend, "LXSceneRuntimeEffects0PS", "ps_6_0"});
+            targets.push_back({backend, "LXSceneRuntimeEffects1PS", "ps_6_0"});
         }
         if ((program.features & 0x0800u) != 0)
         {
@@ -92,7 +148,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
 
 bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& shaderDirectory,
                          const std::filesystem::path& sourceFile, const Budget& budget, VerifiedProduct& result,
-                         std::string& error, FileGuid graphGuid)
+                         std::string& error, FileGuid graphGuid, std::optional<RHIShaderBinary> backend)
 {
     if (program.volume && program.slang.find("#define LX_MATERIAL_VOLUME_HOMOGENEOUS 1\n") == std::string::npos)
     {
@@ -113,13 +169,9 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     }
     std::string hostSource = BuildBoundSource(program) + suffix;
     if (program.volume) hostSource += "\n#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
+    if (!PublishSceneSource(sourceFile, hostSource, error))
     {
-        std::ofstream stream(sourceFile, std::ios::binary | std::ios::trunc);
-        stream << hostSource;
-        if (!stream)
-        {
-            return Fail(error, "LX Scene shader source write failed.");
-        }
+        return false;
     }
     RHIShaderPermutation permutation;
     if (!permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error) ||
@@ -137,7 +189,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     VerifiedProduct candidate;
     std::vector<RHIShaderReflection> reflections;
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    if (!VerifyProduct(program, sourceFile, SceneCompileTargets(program), permutation, options, capabilities, budget,
+    if (!VerifyProduct(program, sourceFile, SceneCompileTargets(program, backend), permutation, options, capabilities, budget,
                        candidate, diagnostics, &reflections))
     {
         error.clear();
@@ -164,7 +216,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
             if (error.empty()) error = "Generated Scene material source cannot be read.";
             return false;
         }
-        candidate.materialShader = std::make_shared<GeneratedMaterialShader>(std::move(generated));
+        candidate.materialShader = own::make_shared<const GeneratedMaterialShader>(std::move(generated));
     }
     result = std::move(candidate);
     error.clear();
@@ -174,7 +226,14 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
 bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, SceneShaderSet& result,
                       std::string& error)
 {
-    const auto expected = SceneCompileTargets(product.program);
+    // Every backend the product carries must be complete; the requested one must be carried.
+    std::vector<CompileTarget> expected;
+    for (const auto carried : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+    {
+        if (!HasSceneBackend(product, carried)) continue;
+        const auto stages = SceneCompileTargets(product.program, carried);
+        expected.insert(expected.end(), stages.begin(), stages.end());
+    }
     auto actual = product.targets;
     std::ranges::sort(actual, TargetLess);
     if (!product.program.semanticKey.ends_with(SceneHostIdentity) || actual.size() != expected.size() ||
@@ -182,6 +241,10 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV))
     {
         return Fail(error, "LX cooked Scene host identity or complete stage set is missing.");
+    }
+    if (!HasSceneBackend(product, backend))
+    {
+        return Fail(error, "LX cooked Scene product was compiled without the running backend.");
     }
     SceneShaderSet candidate;
     candidate.layout = product.layout;
@@ -208,6 +271,9 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         }
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
         const std::pair<std::string_view, Member> members[]{{"LXSceneVS", &SceneShaderSet::vertex},
+                                                            {"LXSceneDepthPS", &SceneShaderSet::depth},
+                                                            {"LXSceneMS", &SceneShaderSet::mesh},
+                                                            {"LXSceneShadowMS", &SceneShaderSet::shadowMesh},
                                                             {"LXSceneGBufferPS", &SceneShaderSet::gbuffer},
                                                             {"LXSceneColorPS", &SceneShaderSet::color},
                                                             {"LXSceneLookup0PS", &SceneShaderSet::lookup0},
@@ -216,6 +282,8 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
                                                             {"LXSceneShadowPS", &SceneShaderSet::shadow},
                                                             {"LXSceneSubsurfacePS", &SceneShaderSet::subsurface},
                                                             {"LXSceneRefractionPS", &SceneShaderSet::refraction},
+                                                            {"LXSceneRuntimeEffects0PS", &SceneShaderSet::runtimeEffects0},
+                                                            {"LXSceneRuntimeEffects1PS", &SceneShaderSet::runtimeEffects1},
                                                             {"LXSceneVolumeCoefficientCS", &SceneShaderSet::volume}};
         const auto member = std::ranges::find(members, target.entry, &std::pair<std::string_view, Member>::first);
         if (member == std::end(members))
@@ -227,5 +295,27 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
     result = std::move(candidate);
     error.clear();
     return true;
+}
+namespace
+{
+// 0 = unset, otherwise RHIShaderBinary + 1.
+std::atomic<int> authoringBackend{0};
+} // namespace
+
+void SetAuthoringSceneBackend(std::optional<RHIShaderBinary> backend)
+{
+    authoringBackend.store(backend ? static_cast<int>(*backend) + 1 : 0);
+}
+
+std::optional<RHIShaderBinary> AuthoringSceneBackend()
+{
+    const int value = authoringBackend.load();
+    if (value == 0) return std::nullopt;
+    return static_cast<RHIShaderBinary>(value - 1);
+}
+
+bool HasSceneBackend(const VerifiedProduct& product, RHIShaderBinary backend)
+{
+    return std::ranges::any_of(product.targets, [&](const auto& target) { return target.binary == backend; });
 }
 } // namespace material_graph

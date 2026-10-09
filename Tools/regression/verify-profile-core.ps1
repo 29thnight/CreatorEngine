@@ -8,7 +8,8 @@ param(
     # ★ 이름이 `$Mutation` 이면 안 된다. PowerShell 변수는 대소문자를 안 가려
     #   아래 foreach 의 `$mutation` 과 같은 변수가 되고, [string[]] 형 제약이
     #   변이 표를 문자열로 바꿔 버린다.
-    [string[]]$Only = @()
+    [string[]]$Only = @(),
+    [switch]$AggregateOnly
 )
 
 # PHASE 14 P1+P2 — 새 프로파일러 코어의 계약 검사.
@@ -35,18 +36,34 @@ $configs = if ($Configuration -eq 'All') { @('Debug','Release') } else { @($Conf
 # 이번 앵커 이관은 소스만 대조했다. 컴파일 성공과 각 변이의 검출 여부는 실행으로 확인해야 한다.
 $mutations = @(
     @{
+        Name   = 'gpu-admit-before-first-boundary'
+        File   = 'ProfileService.cpp'
+        Old    = '!m_gpuFrameRangeReady.load(std::memory_order_acquire) ||'
+        New    = 'false ||'
+        Expect = 'gpu-first-boundary/not-ready'
+        Why    = 'GPU admission must wait for the actual first collected frame'
+    },
+    @{
+        Name   = 'sparse-pages-retain-pool'
+        File   = 'ProfileCapture.cpp'
+        Old    = 'if (count < kEventsPerChunk / 2)'
+        New    = 'if (false)'
+        Expect = 'sparse-pages/reuse'
+        Why    = 'Sparse retained events must not exhaust the bounded producer page pool'
+    },
+    @{
         Name   = 'close-open-scopes'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tseal_current();`n`n`t`t// 주인이 직접 봉인했으니"
-        New    = "`t`twhile (m_depth > 0) { end_scope(0); }`n`t`tseal_current();`n`n`t`t// 주인이 직접 봉인했으니"
+        Old    = "        honor_seal_request();`n        seal_current();`n    }`n`n    void thread_stream::freeze_self"
+        New    = "        honor_seal_request();`n        while (m_depth > 0) { end_scope(0); }`n        seal_current();`n    }`n`n    void thread_stream::freeze_self"
         Expect = 'cross-frame/'
         Why    = '프레임 경계에서 열린 스코프를 닫으면(옛 코어가 그랬다) 프레임을 넘는 구간을 잃는다'
     },
     @{
         Name   = 'silent-drop'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tif (!ensure_chunk())`n`t`t{`n`t`t`tm_droppedEvents.fetch_add(1, std::memory_order_relaxed);`n`t`t`treturn;`n`t`t}`n`n`t`tm_writer->events[m_writer->count] = value;"
-        New    = "`t`tif (!ensure_chunk())`n`t`t{`n`t`t`treturn;`n`t`t}`n`n`t`tm_writer->events[m_writer->count] = value;"
+        Old    = "        if (!ensure_chunk(generation))`n        {`n            m_droppedEvents.fetch_add(1, std::memory_order_relaxed);`n            return;`n        }"
+        New    = "        if (!ensure_chunk(generation))`n        {`n            return;`n        }"
         Expect = 'overflow/'
         Why    = '잃은 이벤트를 세지 않으면 프레임이 정상인 척한다'
     },
@@ -75,7 +92,7 @@ $mutations = @(
         File   = 'ProfileAggregate.cpp'
         Old    = "`t`t`tconst node_key key{ stack.empty() ? 0u : stack.back(),"
         New    = "`t`t`tconst node_key key{ 0u,"
-        Expect = 'aggregate/'
+        Expect = 'aggregate-flat/hierarchy'
         Why    = '깊이를 무시하고 접으면 자식이 루트로 올라와 트리가 사라진다'
     },
     @{
@@ -98,6 +115,15 @@ $mutations = @(
         New    = "`t`tif (events.size() > 1000000) std::sort(events.begin(), events.end(), precedes);"
         Expect = 'aggregate/'
         Why    = '이벤트는 끝난 순서로 들어오므로 정렬 없이는 자식이 부모보다 먼저 나온다'
+    },
+
+    @{
+        Name   = 'aggregate-nested-range'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`t`tnextSibling.push_back(row);"
+        New    = "`t`t`t`tif (node.child_end > row + 2) { node.child_end = row + 2; }`n`t`t`t`tnextSibling.push_back(row);"
+        Expect = 'aggregate/nested-'
+        Why    = 'A subtree range must include grandchildren and cannot stop after the direct child'
     },
 
     # ── PHASE 14 P3 reader ──────────────────────────────────────────────────
@@ -207,8 +233,8 @@ $mutations = @(
         # 되고, 그러면 읽는 기계의 QPC 로 나누는 옛 길로 되돌아간다.
         Name   = 'capture-clock-dropped'
         File   = 'ProfileService.cpp'
-        Old    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);"
-        New    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{}, 0 == unacked, unacked);"
+        Old    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{ ticks_per_second() }, complete, unacked);"
+        New    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{}, complete, unacked);"
         Expect = 'clock/carried'
         Why    = '시계를 안 실으면 캡처가 제 구간 길이를 말하지 못한다'
     },
@@ -336,20 +362,16 @@ $mutations = @(
         Why    = '여는 쪽만 건너뛰면 그 짝이 스택에서 남의 구간을 닫는다'
     },
     @{
-        # 닫는 쪽에도 상태 관문을 다시 건다. 얼린 뒤에 닫힌 구간이 스택에 남아
-        # 그 뒤의 깊이가 한 칸씩 밀린다.
-        #
-        # ★ 이 변이는 **아무것도 실패시키지 않는다.** 불균형 계수기는 0 인
-        #   채로 깊이만 밀리므로, 계수기만 보는 단정은 이것을 못 잡는다. Expect 를
-        #   깊이 단정에 묶어 둔 것이 그 이유다.
+        # 닫는 쪽에도 상태 관문을 다시 건다. 이미 잘린 부모는 새 세대의
+        # 표시 깊이에 더해지지 않지만, 진짜 end가 없으면 논리 슬롯은 남는다.
+        # 깊이 상한까지 열고 frozen에서 전부 닫은 뒤 새 Record를 시작해
+        # 다음 구간을 받아들일 실제 용량이 돌아왔는지 묻는다.
         Name   = 'scope-end-gated'
         File   = 'ProfileService.cpp'
         Old    = "    void profiler_service::end_scope()`n    {"
         New    = "    void profiler_service::end_scope()`n    {`n        if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)`n        {`n            return;`n        }"
-        # pause 가 열린 구간을 잘라 짝을 예약하게 되면서(§0.5.16) 안쪽 깊이는
-        # 그 예약이 되살린다. 바깥쪽이 여전히 밀리므로 이빨은 그대로다.
-        Expect = 'state-change/outer-depth'
-        Why    = '닫는 쪽을 얼릴 수 있으면 스택에 칸이 남아 그 뒤의 깊이가 전부 밀린다'
+        Expect = 'resume-full-stack/reusable'
+        Why    = 'frozen에서 end를 건너뛰면 이미 끝난 논리 슬롯이 깊이 상한을 차지해 새 녹화의 구간을 버린다'
     },
 
     # ── 얼린 캡처의 꼬리 ──────────────────────────────────────────
@@ -357,8 +379,8 @@ $mutations = @(
         # pause 가 열린 구간을 자르지 않던 때로 되돌린다.
         Name   = 'pause-keeps-open-scope'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tif (freeze != 0)`n`t`t{`n`t`t`ttruncate_open_scopes(freeze);`n`t`t}"
-        New    = "`t`tif (false)`n`t`t{`n`t`t`ttruncate_open_scopes(freeze);`n`t`t}"
+        Old    = '            truncate_open_scopes(freezeTick, freezeGeneration);'
+        New    = '            (void)freezeTick; (void)freezeGeneration;'
         # pause 를 부른 스레드는 pause 가 직접 자르므로 이 가지를 안 탄다.
         # 계속 적는 워커만 여기를 지난다.
         Expect = 'pause-worker/present'
@@ -368,8 +390,8 @@ $mutations = @(
         # 잘린 구간의 자리를 비운다(옛 개수 예약 모델).
         Name   = 'truncate-pops-stack'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`t`tif (scope.emitted) continue;`n`t`t`tif (scope.generation != generation) continue;"
-        New    = "`t`t`tif (scope.emitted) continue;`n`t`t`tif (scope.generation != generation) continue;`n`t`t`t--m_depth;`n`t`t`t++m_skippedDepth;"
+        Old    = "            value.flags = scope.flags | event_flags::truncated_end;`n            write(value, scope.generation);"
+        New    = "            value.flags = scope.flags | event_flags::truncated_end;`n            write(value, scope.generation);`n            --m_depth;`n            ++m_overflowDepth;"
         Expect = 'resume-pair/closed-on-time'
         Why    = '자리를 비우면 다시 녹화한 뒤의 새 구간의 종료가 그 예약을 먼저 먹는다'
     },
@@ -389,7 +411,7 @@ $mutations = @(
         File   = 'ProfileService.cpp'
         # 라이브 스냅샷과 정지 스냅샷의 인자가 같으므로 frozen 선언까지
         # 포함해 정지 경로 한 곳만 바꾼다. 시계 변이도 같은 경로를 따로 바꾼다.
-        Old    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);"
+        Old    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{ ticks_per_second() }, complete, unacked);"
         New    = "        capture_session_ptr frozen = m_ring.freeze(`n            threads, capture_environment{ ticks_per_second() }, true, 0);"
         Expect = 'incomplete/flag'
         Why    = '세는 것과 판정하는 것은 다르다 - 미응답을 덮으면 빠진 꼬리가 조용해 보인다'
@@ -563,8 +585,8 @@ $mutations = @(
         # 게임뷰 제출을 가릴 수 없게 된다.
         Name   = 'gpu-origin-dropped'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tvalue.submission = gpu.submission;"
-        New    = "`t`tvalue.submission = 0;"
+        Old    = '        value.submission = gpu.submission;'
+        New    = '        value.submission = 0;'
         Expect = 'gpu-origin/submission'
         Why    = '귀속을 안 실으면 같은 이름의 두 제출이 구분되지 않는다'
     },
@@ -601,8 +623,8 @@ $mutations = @(
         # 비고, 그러면서 트리에는 들어간다.
         Name   = 'instant-unflagged'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tvalue.flags = event_flags::instant;"
-        New    = "`t`tvalue.flags = event_flags::none;"
+        Old    = '        value.flags = event_flags::instant;'
+        New    = '        value.flags = event_flags::none;'
         Expect = 'instant/present'
         Why    = '표식이 없으면 길이 0 인 스코프와 구분되지 않는다'
     },
@@ -889,6 +911,10 @@ $sources = @(
     (Join-Path $PSScriptRoot 'profile_core_probe.cpp')
 )
 
+if ($AggregateOnly -and @($mutations | Where-Object { $_.Name -notlike 'aggregate-*' }).Count -gt 0) {
+    throw '-AggregateOnly requires -Only aggregate-* or a specific aggregate mutation'
+}
+
 function Invoke-Probe {
     param(
         [string]   $Config,
@@ -913,8 +939,12 @@ function Invoke-Probe {
 
     $outFile = Join-Path $OutDir "$Name.out"
     $errFile = Join-Path $OutDir "$Name.err"
-    $proc = Start-Process -FilePath $exe -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $processOptions = @{
+        FilePath = $exe; WindowStyle = 'Hidden'; PassThru = $true
+        RedirectStandardOutput = $outFile; RedirectStandardError = $errFile
+    }
+    if ($AggregateOnly) { $processOptions.ArgumentList = @('--aggregate-only') }
+    $proc = Start-Process @processOptions
     if (-not $proc.WaitForExit(60000)) {
         $proc.Kill()
         $proc.WaitForExit()

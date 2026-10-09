@@ -34,6 +34,7 @@
     X(vkEnumeratePhysicalDevices)             \
     X(vkEnumerateDeviceExtensionProperties)   \
     X(vkGetPhysicalDeviceProperties)          \
+    X(vkGetPhysicalDeviceProperties2)         \
     X(vkGetPhysicalDeviceFeatures2)           \
     X(vkGetPhysicalDeviceMemoryProperties)    \
     X(vkGetPhysicalDeviceMemoryProperties2)   \
@@ -119,6 +120,8 @@
     X(vkCmdClearColorImage)             \
     X(vkCmdDraw)                        \
     X(vkCmdDrawIndexed)                 \
+    X(vkCmdDrawIndexedIndirect)         \
+    X(vkCmdDrawIndirect)                \
     X(vkCmdDispatch)                    \
     X(vkCmdBindVertexBuffers)           \
     X(vkCmdBindVertexBuffers2)          \
@@ -131,6 +134,11 @@
     X(vkAcquireNextImageKHR)            \
     X(vkQueuePresentKHR)
 
+// Optional device extensions must never become prerequisites for indexed rendering.
+#define VK_OPTIONAL_DEVICE_FUNCTIONS(X) \
+    X(vkCmdDrawMeshTasksEXT)            \
+    X(vkCmdDrawMeshTasksIndirectEXT)
+
 namespace VulkanApi
 {
     extern PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
@@ -139,6 +147,7 @@ namespace VulkanApi
     VK_GLOBAL_FUNCTIONS(VK_DECLARE_FN)
     VK_INSTANCE_FUNCTIONS(VK_DECLARE_FN)
     VK_DEVICE_FUNCTIONS(VK_DECLARE_FN)
+    VK_OPTIONAL_DEVICE_FUNCTIONS(VK_DECLARE_FN)
 #undef VK_DECLARE_FN
 
     /// vulkan-1.dll 을 열고 전역 진입점을 받는다.
@@ -158,4 +167,3 @@ namespace VulkanApi
     /// 원인 추적이 검색부터 시작된다.
     std::string ResultToString(VkResult result);
 }
-

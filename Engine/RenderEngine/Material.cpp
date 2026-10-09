@@ -7,6 +7,7 @@
 #include "StandardMaterialProperty.h"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstring>
 #include <type_traits>
 
@@ -46,7 +47,7 @@ Material::Material(const Material& material)
       m_renderingMode(material.m_renderingMode), m_doubleSided(material.m_doubleSided),
       m_cbufferValues(material.m_cbufferValues), m_runtimeInstance(material.m_runtimeInstance),
       m_shaderMetaHandle(material.m_shaderMetaHandle), m_textureOwners(material.m_textureOwners),
-      m_materialGraphInstance(material.m_materialGraphInstance)
+      m_materialGraphInstance(material.m_materialGraphInstance), m_assetOrigin(material.m_assetOrigin)
 {
 }
 
@@ -72,6 +73,7 @@ Material::Material(Material&& material) noexcept
     m_runtimeInstance = std::move(material.m_runtimeInstance);
     m_cbufferValues = std::move(material.m_cbufferValues);
     m_materialGraphInstance = std::move(material.m_materialGraphInstance);
+    m_assetOrigin = std::move(material.m_assetOrigin);
 }
 
 Material::~Material()
@@ -105,7 +107,7 @@ bool Material::TrySetMaterialGraphParameters(std::span<const material_graph::Par
         }
     }
     const auto textureLoader = [this](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
-                                      std::string&) -> std::shared_ptr<Texture> {
+                                      std::string&) -> own::shared_owner<const Texture> {
         for (const auto& texture : m_materialGraphInstance->textures)
             if (texture.assetId == id && texture.colorSpace == colorSpace)
                 return texture.owner;
@@ -115,65 +117,35 @@ bool Material::TrySetMaterialGraphParameters(std::span<const material_graph::Par
                                          m_materialGraphInstance, error);
 }
 
-std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
+own::shared_owner<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
 {
     if (!origin)
+    {
         return nullptr;
+    }
 
-    // Create a new Material instance
-	auto cloneMaterial = std::make_shared<Material>(*origin);
+    auto cloneMaterial = own::make_shared<Material>(*origin);
+    const std::string cloneSuffix = "_Clone";
+    std::string baseName = newName.empty() ? origin->m_name : std::string(newName);
+    if (newName.empty())
+    {
+        const auto suffix = baseName.rfind(cloneSuffix);
+        if (suffix != std::string::npos)
+        {
+            const auto digits = suffix + cloneSuffix.size();
+            if (digits == baseName.size() ||
+                std::all_of(baseName.begin() + digits, baseName.end(), [](unsigned char c) { return std::isdigit(c); }))
+            {
+                baseName.erase(suffix);
+            }
+        }
+        baseName += cloneSuffix;
+    }
+    cloneMaterial->m_name = std::move(baseName);
 
-	const std::string cloneSuffix = "_Clone";
-
-	// Determine the base name depending on whether a new name was provided
-	std::string baseName = newName.empty() ? std::string(origin->m_name) : std::string(newName);
-
-	auto stripCloneSuffix = [&](std::string& name)
-	{
-		auto pos = name.rfind(cloneSuffix);
-		if (pos != std::string::npos)
-		{
-			auto digitsPos = pos + cloneSuffix.size();
-			if (digitsPos == name.size() ||
-				std::all_of(name.begin() + digitsPos, name.end(), [](unsigned char c) { return std::isdigit(c); }))
-			{
-				name.erase(pos);
-			}
-		}
-	};
-
-	// If no name was provided, start with the base name plus the clone suffix
-	std::string finalName;
-	if (newName.empty())
-	{
-		stripCloneSuffix(baseName);
-		finalName = baseName + cloneSuffix;
-	}
-	else
-	{
-		finalName = baseName;
-	}
-
-	// Ensure the name is unique and avoid nested clone suffixes
-	std::lock_guard<std::mutex> materialCacheGuard(DataSystems->m_materialMutex);
-	if (DataSystems->Materials.contains(finalName))
-	{
-		stripCloneSuffix(baseName);
-		finalName = baseName + cloneSuffix;
-		int cloneIndex = 0;
-		while (DataSystems->Materials.contains(finalName))
-		{
-			finalName = baseName + cloneSuffix + std::to_string(++cloneIndex);
-		}
-	}
-
-	cloneMaterial->m_name = finalName;
-
-	// 캐시에도 등록해 에디터·직렬화가 이름으로 찾을 수 있게 한다.
-	// 캐시가 정리되더라도 호출자가 반환된 shared_ptr을 보관하는 한 클론은 살아 있다.
-	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
-
-	return cloneMaterial;
+    // Runtime clones are caller-owned values, not implicitly published assets.
+    // Their local display names do not reserve or probe DataSystem cache keys.
+    return cloneMaterial;
 }
 
 Material& Material::SetBaseColor(math::vector3 color)
@@ -225,38 +197,38 @@ Material& Material::SetUVScroll(const math::vector2& uvScroll)
 	return *this;
 }
 
-Material& Material::UseBaseColorMap(std::shared_ptr<Texture> texture)
+Material& Material::UseBaseColorMap(own::shared_owner<const Texture> texture)
 {
 	return UseTextureMap(standard_material::property::BaseColorMap,
 		std::move(texture));
 }
 
-Material& Material::UseNormalMap(std::shared_ptr<Texture> texture)
+Material& Material::UseNormalMap(own::shared_owner<const Texture> texture)
 {
 	return UseTextureMap(standard_material::property::NormalMap,
 		std::move(texture));
 }
 
-Material& Material::UseOccRoughMetalMap(std::shared_ptr<Texture> texture)
+Material& Material::UseOccRoughMetalMap(own::shared_owner<const Texture> texture)
 {
 	return UseTextureMap(standard_material::property::OrmMap,
 		std::move(texture));
 }
 
-Material& Material::UseAOMap(std::shared_ptr<Texture> texture)
+Material& Material::UseAOMap(own::shared_owner<const Texture> texture)
 {
 	return UseTextureMap(standard_material::property::AoMap,
 		std::move(texture));
 }
 
-Material& Material::UseEmissiveMap(std::shared_ptr<Texture> texture)
+Material& Material::UseEmissiveMap(own::shared_owner<const Texture> texture)
 {
 	return UseTextureMap(standard_material::property::EmissiveMap,
 		std::move(texture));
 }
 
 Material& Material::UseTextureMap(
-	std::string_view property, std::shared_ptr<Texture> texture)
+	std::string_view property, own::shared_owner<const Texture> texture)
 {
 	// Generated graph textures are changed by stable parameter GUID overrides,
     // so this legacy owner-only API cannot detach their accepted generation.
@@ -317,7 +289,7 @@ Material& Material::UseTextureMap(
 	return *this;
 }
 
-const std::shared_ptr<Texture>& Material::GetTextureMapShared(
+const own::shared_owner<const Texture>& Material::GetTextureMapShared(
 	std::string_view property) const noexcept
 {
 	const auto owners = GetTextureOwners();
@@ -327,31 +299,31 @@ const std::shared_ptr<Texture>& Material::GetTextureMapShared(
 			return candidate.propertyName == property;
 		});
 	if (found != owners.end()) return found->textureOwner;
-	static const std::shared_ptr<Texture> empty{};
+	static const own::shared_owner<const Texture> empty{};
 	return empty;
 }
 
-const std::shared_ptr<Texture>& Material::GetBaseColorMapShared() const noexcept
+const own::shared_owner<const Texture>& Material::GetBaseColorMapShared() const noexcept
 {
 	return GetTextureMapShared(standard_material::property::BaseColorMap);
 }
 
-const std::shared_ptr<Texture>& Material::GetNormalMapShared() const noexcept
+const own::shared_owner<const Texture>& Material::GetNormalMapShared() const noexcept
 {
 	return GetTextureMapShared(standard_material::property::NormalMap);
 }
 
-const std::shared_ptr<Texture>& Material::GetOccRoughMetalMapShared() const noexcept
+const own::shared_owner<const Texture>& Material::GetOccRoughMetalMapShared() const noexcept
 {
 	return GetTextureMapShared(standard_material::property::OrmMap);
 }
 
-const std::shared_ptr<Texture>& Material::GetAOMapShared() const noexcept
+const own::shared_owner<const Texture>& Material::GetAOMapShared() const noexcept
 {
 	return GetTextureMapShared(standard_material::property::AoMap);
 }
 
-const std::shared_ptr<Texture>& Material::GetEmissiveMapShared() const noexcept
+const own::shared_owner<const Texture>& Material::GetEmissiveMapShared() const noexcept
 {
 	return GetTextureMapShared(standard_material::property::EmissiveMap);
 }
@@ -423,8 +395,8 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
             selections[index] = m_keywordSelections[index];
     }
 
-    std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
-    std::shared_ptr<const LX::Runtime::Instance> instance;
+    own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
+    own::shared_owner<const LX::Runtime::Instance> instance;
     std::vector<MaterialTextureOwner> owners;
     for (const auto& owner : m_textureOwners)
     {

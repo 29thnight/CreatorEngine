@@ -9,6 +9,7 @@ using namespace concurrency;
 
 class Entity;
 class Scene;
+class TextureFramePins;
 class LightComponent;
 class HierarchyWindow;
 class InspectorWindow;
@@ -97,6 +98,8 @@ public:
 	LightProxySnapshot GetLightProxySnapshot();
 	UIProxySnapshot GetUIProxySnapshot();
 	Scene* GetScene() const { return m_currentScene.load(std::memory_order_acquire); }
+    own::shared_owner<TextureFramePins> TakePreparedTextureImagePins();
+    void RestorePreparedTextureImagePins(own::shared_owner<TextureFramePins> pins);
 
 	// 진단용 컨테이너 크기 스냅샷.
 	// 씬을 오갈 때 이 값들이 회수되지 않고 계속 늘어나면 프록시 해제 누락이다.

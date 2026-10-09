@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include <typeinfo>
 #include <typeindex>
 #include <string_view>
@@ -37,11 +38,27 @@ inline size_t ConvertGUIDToHash(const GUID& guid)
 	return guid.Data1 + guid.Data2 + guid.Data3;
 }
 
+namespace gc
+{
+    template<class T> class trace_ref;
+    template<class T> class root_ref;
+}
+
+template<class T>
+inline constexpr bool is_gc_strong_ref_v = false;
+template<class T>
+inline constexpr bool is_gc_strong_ref_v<gc::trace_ref<T>> = true;
+template<class T>
+inline constexpr bool is_gc_strong_ref_v<gc::root_ref<T>> = true;
+
 template<typename T>
 constexpr bool is_shared_ptr_v = false;
 
 template<typename T>
 constexpr bool is_shared_ptr_v<std::shared_ptr<T>> = true;
+
+template<typename T>
+constexpr bool is_shared_ptr_v<own::shared_owner<T>> = true;
 
 // K2 스테이지 A: m_components가 vector<std::unique_ptr<Component>>로
 // 바뀌며 is_shared_ptr_v 짝이 필요해졌다 — 리플렉션 포인터 분기(직렬화·
@@ -52,6 +69,9 @@ constexpr bool is_unique_ptr_v = false;
 
 template<typename T, typename D>
 constexpr bool is_unique_ptr_v<std::unique_ptr<T, D>> = true;
+
+template<typename T>
+constexpr bool is_unique_ptr_v<own::unique_owner<T>> = true;
 
 // 콘솔 세터(MakePropertyImpl)의 std::any_cast<T> 인스턴스화 가드 (K2 스테이지 A
 // 함정, 실측). std::is_copy_constructible_v<std::vector<std::unique_ptr<X>>>는
@@ -73,7 +93,12 @@ constexpr bool is_unique_ptr_v<std::unique_ptr<T, D>> = true;
 template<typename T>
 constexpr bool IsCopyableForProperty()
 {
-	if constexpr (requires { typename T::value_type; })
+	if constexpr (is_gc_strong_ref_v<T>)
+    {
+        // An authoring/undo snapshot is not a GC root or graph owner.
+        return false;
+    }
+    else if constexpr (requires { typename T::value_type; })
 	{
 		return IsCopyableForProperty<typename T::value_type>();
 	}
@@ -235,6 +260,11 @@ static std::set<HashedGuid> g_guids;
 
 namespace TypeTrait
 {
+    // Process-runtime cache identity for Texture and Material only. Never use
+    // this for Entity IDs, persisted UUIDs, type IDs or content fingerprints.
+    // One out-of-line allocator is shared by all producer threads.
+    HashedGuid MakeRuntimeResourceId() noexcept;
+
 	// 컴파일타임 타입 이름 (MSVC __FUNCSIG__ 기반) — MakeTypeID의 입력.
 	// 원래 참조만 있고 정의가 없어 MakeTypeID는 인스턴스화 불가능한 죽은
 	// 코드였다(CT4-b에서 구현). 선행 class/struct/enum 키워드는 벗긴다 —

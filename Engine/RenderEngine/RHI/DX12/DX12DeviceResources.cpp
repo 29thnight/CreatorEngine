@@ -1,18 +1,90 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
+#include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
+#include "DX12Format.h"
+#include "../RHIRecordedBatch.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cstdio>
+#include <exception>
 #include <sstream>
+#include <fstream>
+#include <thread>
+#include <chrono>
+#include <mutex>
 #include <dxgidebug.h>   // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
 #include "../RHIValidationLedger.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
+
+// Opt-in diagnostics: query an owned adapter independently of rendering stalls.
+// Each device stream is retained separately; process usage must not be summed.
+class DX12MemorySamplingSession
+{
+public:
+    DX12MemorySamplingSession(IDXGIAdapter1* adapter, const char* path)
+        : m_file(path, std::ios::app)
+    {
+        if (!m_file || FAILED(adapter->QueryInterface(IID_PPV_ARGS(&m_adapter))))
+        {
+            throw std::runtime_error("DX12 memory sampling initialization failed");
+        }
+        static std::atomic<uint64_t> next{1};
+        m_stream = next.fetch_add(1);
+        Record("start");
+        m_worker = std::jthread([this](std::stop_token stop)
+        {
+            while (!stop.stop_requested())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                if (!stop.stop_requested())
+                {
+                    Record("sample");
+                }
+            }
+        });
+    }
+    ~DX12MemorySamplingSession()
+    {
+        m_worker.request_stop();
+        if (m_worker.joinable())
+        {
+            m_worker.join();
+        }
+        Record("end");
+    }
+private:
+    void Record(const char* kind)
+    {
+        DXGI_QUERY_VIDEO_MEMORY_INFO info{};
+        const HRESULT hr = m_adapter->QueryVideoMemoryInfo(0,
+            DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+        const auto utcMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - m_began).count();
+        static std::mutex writerMutex;
+        std::lock_guard lock(writerMutex);
+        m_file << "{\"stream\":" << m_stream << ",\"kind\":\"" << kind
+            << "\",\"utcMs\":" << utcMs << ",\"elapsedMs\":" << elapsedMs
+            << ",\"valid\":" << (SUCCEEDED(hr) ? "true" : "false")
+            << ",\"hresult\":" << static_cast<int64_t>(hr)
+            << ",\"usedBytes\":" << info.CurrentUsage
+            << ",\"budgetBytes\":" << info.Budget << "}\n";
+        m_file.flush();
+    }
+    Microsoft::WRL::ComPtr<IDXGIAdapter3> m_adapter;
+    std::ofstream m_file;
+    uint64_t m_stream{0};
+    std::chrono::steady_clock::time_point m_began{std::chrono::steady_clock::now()};
+    std::jthread m_worker;
+};
 
 namespace
 {
@@ -186,6 +258,11 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 {
     m_width = width;
     m_height = height;
+    m_drawIndirectSignature.Reset();
+    m_drawIndexedIndirectSignature.Reset();
+    m_dispatchMeshIndirectSignature.Reset();
+    m_meshShaderCapabilities = {};
+    m_lastAdmittedFenceValue = 0;
 
     const ValidationMode validationMode = ReadValidationMode();
     const bool debugLayerEnabled = ValidationMode::Off != validationMode;
@@ -267,6 +344,21 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }
+    char samplingPath[32768]{};
+    const DWORD samplingLength = GetEnvironmentVariableA("CREATOR_GPU_MEMORY_SAMPLES",
+        samplingPath, static_cast<DWORD>(sizeof(samplingPath)));
+    if (samplingLength > 0 && samplingLength < sizeof(samplingPath))
+    {
+        try
+        {
+            m_memorySampling = std::make_unique<DX12MemorySamplingSession>(m_adapter.Get(), samplingPath);
+        }
+        catch (const std::exception& error)
+        {
+            outError = error.what();
+            return false;
+        }
+    }
 
     // 알려진 정상 경로 메시지를 억제한다.
     //
@@ -302,6 +394,38 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         ValidationMode::Gpu == validationMode ? "gpu" :
         ValidationMode::Basic == validationMode ? "basic" : "off");
 
+    // 바인딩은 기존 그래픽 경로가 유지하므로 루트 시그니처 없는 단건 draw만 굽는다.
+    // 준비 실패는 capability=false로 남겨 CPU 경로를 유지한다.
+    D3D12_INDIRECT_ARGUMENT_DESC indexedArgument{};
+    indexedArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+    D3D12_COMMAND_SIGNATURE_DESC indirectSignature{};
+    indirectSignature.ByteStride = sizeof(RHIDrawIndexedIndirectArguments);
+    indirectSignature.NumArgumentDescs = 1;
+    indirectSignature.pArgumentDescs = &indexedArgument;
+    const HRESULT indirectResult = m_device->CreateCommandSignature(
+        &indirectSignature, nullptr, IID_PPV_ARGS(&m_drawIndexedIndirectSignature));
+    if (FAILED(indirectResult))
+    {
+        m_drawIndexedIndirectSignature.Reset();
+        OutputDebugStringA(("[DX12] Indexed indirect unavailable: " +
+            HrToString(indirectResult) + "\n").c_str());
+    }
+
+    D3D12_INDIRECT_ARGUMENT_DESC drawArgument{};
+    drawArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+    D3D12_COMMAND_SIGNATURE_DESC drawSignature{};
+    drawSignature.ByteStride = sizeof(RHIDrawIndirectArguments);
+    drawSignature.NumArgumentDescs = 1;
+    drawSignature.pArgumentDescs = &drawArgument;
+    const HRESULT drawIndirectResult = m_device->CreateCommandSignature(
+        &drawSignature, nullptr, IID_PPV_ARGS(&m_drawIndirectSignature));
+    if (FAILED(drawIndirectResult))
+    {
+        m_drawIndirectSignature.Reset();
+        OutputDebugStringA(("[DX12] Nonindexed indirect unavailable: " +
+            HrToString(drawIndirectResult) + "\n").c_str());
+    }
+
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
@@ -317,6 +441,42 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
         m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
     if (FAILED(hr)) { outError = "커맨드 리스트 생성 실패 " + HrToString(hr); return false; }
+    // Mesh support is optional. Feature level alone is not sufficient: require
+    // shader model, hardware tier and the interfaces used by pipeline/dispatch.
+    D3D12_FEATURE_DATA_D3D12_OPTIONS7 meshOptions{};
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{ D3D_SHADER_MODEL_6_5 };
+    ComPtr<ID3D12Device2> meshDevice;
+    ComPtr<ID3D12GraphicsCommandList6> meshCommands;
+    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7,
+            &meshOptions, sizeof(meshOptions))) &&
+        meshOptions.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1 &&
+        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL,
+            &shaderModel, sizeof(shaderModel))) && shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5 &&
+        SUCCEEDED(m_device.As(&meshDevice)) && SUCCEEDED(m_commandList.As(&meshCommands)))
+    {
+        // Core mesh shader limits; optional increased-dispatch extensions are
+        // intentionally not required by the first mesh-only route.
+        m_meshShaderCapabilities.meshShader = true;
+        m_meshShaderCapabilities.maxGroupCountX = 65535;
+        m_meshShaderCapabilities.maxGroupCountY = 65535;
+        m_meshShaderCapabilities.maxGroupCountZ = 65535;
+        m_meshShaderCapabilities.maxTotalGroupCount = 4194303;
+        m_meshShaderCapabilities.maxOutputVertices = 256;
+        m_meshShaderCapabilities.maxOutputPrimitives = 256;
+        m_meshShaderCapabilities.maxThreadsPerGroup = 128;
+        m_meshShaderCapabilities.maxThreadGroupSizeX = 128;
+        m_meshShaderCapabilities.maxThreadGroupSizeY = 128;
+        m_meshShaderCapabilities.maxThreadGroupSizeZ = 128;
+        m_meshShaderCapabilities.maxOutputMemoryBytes = 32768;
+        D3D12_INDIRECT_ARGUMENT_DESC meshArgument{};
+        meshArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
+        D3D12_COMMAND_SIGNATURE_DESC meshSignature{};
+        meshSignature.ByteStride = sizeof(RHIDispatchMeshIndirectArguments);
+        meshSignature.NumArgumentDescs = 1;
+        meshSignature.pArgumentDescs = &meshArgument;
+        m_meshShaderCapabilities.meshIndirect = SUCCEEDED(m_device->CreateCommandSignature(
+            &meshSignature, nullptr, IID_PPV_ARGS(&m_dispatchMeshIndirectSignature)));
+    }
     m_commandList->Close(); // BeginFrame이 여는 것이 규약 — 생성 직후는 닫아 둔다
     m_immediateEncoder.reset();
 
@@ -417,11 +577,33 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     RefreshPersistentMemoryBudget();
     if (!GetRHISubmissionThread().AcquireClient(this, outError)) return false;
     m_submissionClient = true;
+    m_queueService = std::make_unique<DX12QueueService>(m_device.Get());
     return true;
+}
+
+RHIQueueCapabilities DX12DeviceResources::QueryQueueCapabilities() const
+{
+    return m_queueService ? m_queueService->QueryQueueCapabilities() : RHIQueueCapabilities{};
+}
+
+bool DX12DeviceResources::CreateQueue(RHIQueueKind kind,
+    std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+{
+    if (!m_queueService)
+    {
+        queue.reset();
+        error = "DX12 queue service is not initialized.";
+        return false;
+    }
+    return m_queueService->CreateQueue(kind, queue, error);
 }
 
 void DX12DeviceResources::Shutdown()
 {
+    // Separate primitive queues are not covered by the legacy frame queue drain.
+    m_queueService.reset();
+    m_queueFrameActive = false;
+    m_queueFrameJoined = false;
     // 구독을 먼저 끊는다. 해체 중에 리사이즈 콜백이 들어오면 이미 놓은 것을
     // 만진다.
     ScreenResizeBus::Get().Unsubscribe(m_resizeSubscription);
@@ -435,10 +617,19 @@ void DX12DeviceResources::Shutdown()
         const RHILifecycleCommand command = owner.faulted
             ? RHILifecycleCommand::UnrecoverableDeviceError
             : RHILifecycleCommand::BackendShutdown;
-        if (!DrainForLifecycle(command, lifecycleError) && !lifecycleError.empty())
+        bool drained = DrainForLifecycle(command, lifecycleError);
+        if (!drained && GetRHISubmissionThread().GetOwnerStats(this).faulted)
         {
-            OutputDebugStringA(("[DX12] lifecycle shutdown 실패: " +
+            drained = DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+        }
+        if (!drained)
+        {
+            OutputDebugStringA(("[DX12] Fatal: forced destruction without verified GPU idle or device loss: " +
                 lifecycleError + "\n").c_str());
+            std::fprintf(stderr, "Fatal DX12 teardown invariant: GPU idle/device loss unproven: %s\n",
+                lifecycleError.c_str());
+            std::fflush(stderr);
+            std::terminate();
         }
     }
     if (m_submissionClient)
@@ -447,10 +638,28 @@ void DX12DeviceResources::Shutdown()
         m_submissionClient = false;
     }
 
+    // ticket은 그래프 소유자도 잡는다. 안전한 drain 뒤, backend 표보다 먼저 놓는다.
+    m_frameSubmissionTickets = {};
+    m_frameFenceValues = {};
+    m_hostSubmissionTicket = {};
+    m_hostFenceValue = 0;
+    m_frameIndex = 0;
+    m_nextFenceValue = 1;
+    m_lastAdmittedFenceValue = 0;
+    m_currentRecordingId = 0;
+
     // 스왑체인은 백버퍼 참조를 먼저 놓아야 곱게 죽는다(GPU 완주는 위에서 확인).
     for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
     m_backBufferRtvHeap.Reset();
     m_swapChain.Reset();
+    if (nullptr != m_frameLatencyWaitableObject)
+    {
+        CloseHandle(m_frameLatencyWaitableObject);
+        m_frameLatencyWaitableObject = nullptr;
+    }
+    m_frameLatencyReady = false;
+    m_hostSubmissionTicket = {};
+    m_hostFenceValue = 0;
 
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadAllocator.Shutdown();
@@ -462,6 +671,10 @@ void DX12DeviceResources::Shutdown()
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_commandList.Reset();
+    m_drawIndirectSignature.Reset();
+    m_drawIndexedIndirectSignature.Reset();
+    m_dispatchMeshIndirectSignature.Reset();
+    m_meshShaderCapabilities = {};
     for (auto& lists : m_retiredCommandLists) lists.clear();
     m_immediateEncoder.reset();
 
@@ -470,7 +683,27 @@ void DX12DeviceResources::Shutdown()
         CloseHandle(m_fenceEvent);
         m_fenceEvent = nullptr;
     }
-    // ComPtr가 역순 해제를 처리한다. 멤버 선언 순서가 곧 해제 역순이다.
+    // 명시적 Shutdown도 새 native device로 다시 시작할 수 있어야 한다.
+    // adapter 밖의 interop 자원은 자기 ComPtr가 기존 장치 수명을 계속 보존한다.
+    m_uploadTransactionListeners.clear();
+    m_frameReadback = {};
+    m_resourceTable.Clear();
+    m_renderTarget.Reset();
+    m_rtvHeap.Reset();
+    m_rtvHandle = {};
+    for (auto& allocator : m_allocators)
+    {
+        allocator.Reset();
+    }
+    m_fence.Reset();
+    m_queue.Reset();
+    m_infoQueue.Reset();
+    m_device.Reset();
+    m_memorySampling.reset();
+    m_adapter.Reset();
+    m_factory.Reset();
+    m_width = 0;
+    m_height = 0;
 }
 
 // ── 즉시 인코더 (A-3) ──
@@ -526,8 +759,39 @@ RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
     return *m_immediateEncoder;
 }
 
+#if !CE_SHIPPING
+namespace
+{
+    std::atomic<uint32_t> g_testDeviceRemovalRequests{ 0 };
+}
+
+void DX12DeviceResources::RequestTestDeviceRemoval(TestDeviceRemovalTarget target)
+{
+    g_testDeviceRemovalRequests.fetch_or(static_cast<uint32_t>(target));
+}
+#endif
+
 bool DX12DeviceResources::BeginFrame(std::string& outError)
 {
+    if (m_queueFrameActive)
+    {
+        outError = "Queue frame must be ended or aborted before frame-slot reuse.";
+        return false;
+    }
+    GetRHISubmissionThread().CollectCompletedLifetimes(this);
+#if !CE_SHIPPING
+    const uint32_t removalBit = static_cast<uint32_t>(
+        HasSwapChain() ? TestDeviceRemovalTarget::Host : TestDeviceRemovalTarget::Scene);
+    if (0 != (g_testDeviceRemovalRequests.fetch_and(~removalBit) & removalBit))
+    {
+        Microsoft::WRL::ComPtr<ID3D12Device5> device5;
+        const bool removed = SUCCEEDED(m_device.As(&device5));
+        if (removed) device5->RemoveDevice();
+        std::printf("[test.device-removal] target=%s removed=%d\n",
+            HasSwapChain() ? "host" : "scene", removed ? 1 : 0);
+        std::fflush(stdout);
+    }
+#endif
     RHISubmissionThread& submission = GetRHISubmissionThread();
     if (submission.ConsumeFailure(this, outError)) return false;
     if (m_frameSubmissionTickets[m_frameIndex].IsValid() &&
@@ -536,17 +800,43 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
         return false;
     }
 
-    auto& allocator = m_allocators[m_frameIndex];
-
-    // 이 얼로케이터로 기록했던 프레임을 GPU가 끝냈는지 — 인플라이트 회전의 핵심.
-    const uint64_t completed = m_fence->GetCompletedValue();
-    if (completed < m_frameFenceValues[m_frameIndex])
+    if (HasSwapChain())
     {
-        HRESULT hr = m_fence->SetEventOnCompletion(m_frameFenceValues[m_frameIndex], m_fenceEvent);
-        if (FAILED(hr)) { outError = "펜스 대기 설정 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
-        ce::profile_scope wait{ce::marker<"DX12FrameFenceWait">()};
-        WaitForSingleObject(m_fenceEvent, INFINITE);
+        // CPU 제출 ticket만으로는 호스트 GPU 작업량을 제한할 수 없다.
+        // 기록을 시작하기 전에 이 소유자의 직전 GPU 프레임 완료도 기다린다.
+        if ((m_hostSubmissionTicket.IsValid() && !submission.Wait(m_hostSubmissionTicket, outError)) ||
+            !WaitForFenceValue(m_hostFenceValue, outError))
+        {
+            return false;
+        }
+        if (!m_frameLatencyReady)
+        {
+            ce::profile_scope wait{ce::marker<"DX12HostAdmissionWait">()};
+            // 창 가림·최소화가 표시 소유자의 리사이즈·종료 처리를 막아서는 안 된다.
+            // 시간 초과면 새 프레임을 허용하지 않는다. 다음 표시 요청에서 다시
+            // 시도하므로 바쁜 대기나 큐 누적이 생기지 않는다.
+            constexpr DWORD kHostAdmissionWaitMilliseconds = 100;
+            const DWORD result = WaitForSingleObject(m_frameLatencyWaitableObject, kHostAdmissionWaitMilliseconds);
+            if (WAIT_TIMEOUT == result)
+            {
+                outError = "DX12 host frame admission timed out";
+                return false;
+            }
+            if (WAIT_OBJECT_0 != result)
+            {
+                outError = "DX12 frame latency wait failed " +
+                    std::to_string(WAIT_FAILED == result ? GetLastError() : result);
+                return false;
+            }
+            // 기록을 취소하면 실제 Present까지 이 허용 상태를 유지한다.
+            m_frameLatencyReady = true;
+        }
     }
+    if (!WaitForFenceValue(m_frameFenceValues[m_frameIndex], outError))
+    {
+        return false;
+    }
+    auto& allocator = m_allocators[m_frameIndex];
 
     HRESULT hr = allocator->Reset();
     if (FAILED(hr)) { outError = "얼로케이터 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
@@ -580,18 +870,22 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     }
     ResetImmediateEncoder();
 
+    RHIRecordingAdmissionGuard beginGuard([this] { AbortFrame(); });
+
     // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
     RefreshUploadBudget();
     RefreshPersistentMemoryBudget();
-    m_uploadAllocator.Collect(m_fence->GetCompletedValue());
+    const uint64_t completed = GetCompletedFenceValue();
+    m_uploadAllocator.Collect(completed);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadCompleted(m_fence->GetCompletedValue());
+    {
+        listener->OnUploadCompleted(completed);
+    }
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    m_descriptorRecycler.Collect(RHICompletionPoint{ m_fence->GetCompletedValue() });
+    m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
     {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
         return false;
     }
 
@@ -603,10 +897,21 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     m_dsvViewHeap.BeginFrame();
     m_clearViewHeap.BeginFrame();
 
+    beginGuard.Accept();
     return true;
 }
 
 bool DX12DeviceResources::FlushCommandList(std::string& outError)
+{
+    if (m_queueFrameActive)
+    {
+        outError = "Queue frame upload/descriptor recording cannot be flushed before retirement.";
+        return false;
+    }
+    return FlushCommandListImpl(false, outError);
+}
+
+bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::string& outError)
 {
     if (!m_commandList)
     {
@@ -617,15 +922,24 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     if (FAILED(hr)) { outError = "중간 제출 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     const uint64_t fenceValue = m_nextFenceValue++;
-    m_uploadAllocator.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    m_descriptorRecycler.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    // 이 뒤 현재 recording이 Abort되더라도 같은 command allocator는 앞선
-    // 중간 제출이 끝나기 전 Reset할 수 없다.
-    m_frameFenceValues[m_frameIndex] = fenceValue;
+    const uint64_t recordingId = m_currentRecordingId;
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue, preserveRecording]
+    {
+        if (!preserveRecording)
+        {
+            RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+        }
+    });
+    if (!preserveRecording)
+    {
+        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        }
+        m_currentRecordingId = 0;
+    }
 
     const uint32_t frameSlot = m_frameIndex;
     ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
@@ -644,7 +958,11 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
                 return false;
             }
             ID3D12CommandList* lists[] = { submittedList.Get() };
-            queue->ExecuteCommandLists(1, lists);
+            {
+                // Immediate work has no proven frame/query token association.
+                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                queue->ExecuteCommandLists(1, lists);
+            }
             const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
             if (FAILED(signalResult))
             {
@@ -661,7 +979,22 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     {
         return false;
     }
+    admission.Accept();
+    if (!preserveRecording)
+    {
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+        }
+    }
     m_frameSubmissionTickets[frameSlot] = ticket;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    m_lastAdmittedFenceValue = fenceValue;
+    if (HasSwapChain())
+    {
+        m_hostSubmissionTicket = ticket;
+        m_hostFenceValue = fenceValue;
+    }
 
     // 같은 allocator는 되감지 않고 새 command-list 객체만 연다. 이전 객체는
     // RHI thread가 아직 Execute하지 않았을 수 있어 여기서 Reset할 수 없다.
@@ -670,35 +1003,147 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     if (FAILED(hr)) { outError = "중간 제출 후 command list 생성 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
     ResetImmediateEncoder();
 
-    m_currentRecordingId = m_nextRecordingId++;
-    m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+    if (!preserveRecording)
     {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
-        return false;
+        m_currentRecordingId = m_nextRecordingId++;
+        m_uploadAllocator.BeginRecording(m_currentRecordingId);
+        if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+        {
+            m_uploadAllocator.AbortRecording(m_currentRecordingId);
+            return false;
+        }
     }
 
     return true;
 }
 
+bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue,
+    std::string& outError)
+{
+    if (!m_queueService)
+    {
+        outError = "Queue service is unavailable.";
+        return false;
+    }
+    return m_queueService->GetPrimaryGraphicsQueue(m_queue.Get(), queue, outError);
+}
+
+bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics,
+    std::string& outError)
+{
+    if (!m_queueService || !graphics || m_queueFrameActive || m_currentRecordingId == 0 ||
+        graphics->GetIdentity().kind != RHIQueueKind::Graphics)
+    {
+        outError = "Queue frame requires an active recording and a graphics endpoint.";
+        return false;
+    }
+    if (!FlushCommandListImpl(true, outError) ||
+        !GetRHISubmissionThread().Wait(m_frameSubmissionTickets[m_frameIndex], outError))
+    {
+        std::string drainError;
+        const bool deviceLost = FAILED(m_device->GetDeviceRemovedReason());
+        if (deviceLost)
+        {
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, "Queue frame prefix failed after device removal.");
+        }
+        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError :
+            RHILifecycleCommand::OfflineReadbackCapture, drainError))
+        {
+            std::terminate();
+        }
+        return false;
+    }
+    RHITimelinePoint prefix;
+    m_queueFrameActive = true;
+    m_queueFrameJoined = false;
+    // The prefix ticket proves admission succeeded. On the primary graphics
+    // queue, FIFO already orders the graph after that prefix without a GPU wait.
+    if (DX12QueueService::NativeQueue(graphics) == m_queue.Get())
+    {
+        return true;
+    }
+    if (!m_queueService->ImportPrimaryCompletion(m_fence.Get(), m_lastAdmittedFenceValue, prefix, outError) ||
+        !graphics->Wait(prefix, outError))
+    {
+        return false;
+    }
+    return true;
+}
+
+bool DX12DeviceResources::JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError)
+{
+    if (!m_queueFrameActive || m_queueFrameJoined || !m_queueService)
+    {
+        outError = "No unjoined queue frame is active.";
+        return false;
+    }
+    if (!m_queueService->JoinPrimaryQueue(m_queue.Get(), completion, outError))
+    {
+        return false;
+    }
+    m_queueFrameJoined = true;
+    return true;
+}
+
+void DX12DeviceResources::DrainAbortedQueueFrame()
+{
+    if (m_queueFrameActive)
+    {
+        std::string error;
+        if (!m_queueService || !m_queueService->Shutdown(error))
+        {
+            // Releasing a frame reservation without completion/device-loss proof
+            // would let the GPU read reused upload or descriptor memory.
+            std::terminate();
+        }
+        const bool deviceLost = FAILED(m_device->GetDeviceRemovedReason());
+        if (deviceLost)
+        {
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, "Queue frame aborted after device removal.");
+        }
+        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError :
+            RHILifecycleCommand::OfflineReadbackCapture, error))
+        {
+            std::terminate();
+        }
+        m_queueFrameActive = false;
+        m_queueFrameJoined = false;
+    }
+}
+
+bool DX12DeviceResources::WaitForLastFrameSubmission(std::string& outError)
+{
+    const auto& ticket = m_frameSubmissionTickets[(m_frameIndex + kFrameCount - 1) % kFrameCount];
+    if (!ticket.IsValid())
+    {
+        outError = "No accepted frame submission is available.";
+        return false;
+    }
+    return GetRHISubmissionThread().Wait(ticket, outError);
+}
+
+bool DX12DeviceResources::ShutdownQueueService(std::string& outError)
+{
+    return !m_queueService || m_queueService->Shutdown(outError);
+}
+
 bool DX12DeviceResources::PrepareParallelSubmission(
     RHICompletionPoint& outCompletion, std::string& outError)
 {
-    if (!m_queue || !m_fence)
+    if (!m_queue || !m_fence || m_queueFrameActive)
     {
         outError = "DX12 병렬 제출 준비 coordinator가 초기화되지 않았다";
         return false;
     }
 
     const uint64_t fenceValue = m_nextFenceValue++;
+    outCompletion = RHICompletionPoint{ fenceValue };
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    m_frameFenceValues[m_frameIndex] = fenceValue;
-    outCompletion = RHICompletionPoint{ fenceValue };
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
@@ -708,6 +1153,35 @@ bool DX12DeviceResources::PrepareParallelSubmission(
     }
     ResetImmediateEncoder();
     return true;
+}
+
+void DX12DeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
+{
+    if (const auto batch = ticket.GetRecordedBatch())
+    {
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadAccepted(batch->GetRecordingId(), completion);
+        }
+    }
+    m_frameFenceValues[m_frameIndex] = completion.value;
+    m_frameSubmissionTickets[m_frameIndex] = ticket;
+    m_lastAdmittedFenceValue = completion.value;
+}
+
+void DX12DeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion)
+{
+    DrainAbortedQueueFrame();
+    m_uploadAllocator.RejectSubmission(recordingId, completion);
+    m_descriptorRecycler.RejectSubmission(recordingId, completion);
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadSubmissionRejected(recordingId, completion);
+    }
+    if (m_currentRecordingId == recordingId)
+    {
+        m_currentRecordingId = 0;
+    }
 }
 
 bool DX12DeviceResources::SubmitCommandLists(
@@ -725,15 +1199,31 @@ bool DX12DeviceResources::SubmitCommandLists(
         return false;
     }
     if (!lists.empty())
+    {
+        const ce::dx_capture::submission_scope capture(m_queue.Get(), static_cast<std::uint32_t>(lists.size()),
+            ce::dx_capture::current_submission_context());
         m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
-    const HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
+    }
+    HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
+    // Signal can report success after removal. The native fence sentinel is
+    // device loss, never proof that this batch finished on the GPU.
+    if (SUCCEEDED(hr) && m_fence->GetCompletedValue() == UINT64_MAX)
+    {
+        hr = m_device->GetDeviceRemovedReason();
+        if (SUCCEEDED(hr))
+        {
+            hr = DXGI_ERROR_DEVICE_REMOVED;
+        }
+    }
     if (FAILED(hr))
     {
-        outError = "DX12 외부 리스트 제출 Signal 실패 " + HrToString(hr);
+        outError = "DX12 외부 리스트 제출 Signal/장치 상태 실패 " + HrToString(hr);
         if (DXGI_ERROR_DEVICE_REMOVED == hr || DXGI_ERROR_DEVICE_RESET == hr ||
             DXGI_ERROR_DEVICE_HUNG == hr ||
             DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
+        {
             GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
+        }
         return false;
     }
     return true;
@@ -741,6 +1231,7 @@ bool DX12DeviceResources::SubmitCommandLists(
 
 void DX12DeviceResources::AbortFrame()
 {
+    DrainAbortedQueueFrame();
     // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
     if (m_commandList) m_commandList->Close();
@@ -754,6 +1245,11 @@ void DX12DeviceResources::AbortFrame()
 bool DX12DeviceResources::EndFrame(std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"DX12EnqueueCommands">()};
+    if (m_queueFrameActive && !m_queueFrameJoined)
+    {
+        outError = "Queue frame completion must be joined before frame retirement.";
+        return false;
+    }
     if (!m_commandList)
     {
         outError = "종료할 DX12 command list가 없다";
@@ -763,6 +1259,11 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     if (FAILED(hr)) { outError = "커맨드 리스트 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     const uint64_t fenceValue = m_nextFenceValue++;
+    const uint64_t recordingId = m_currentRecordingId;
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
+    {
+        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+    });
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
@@ -772,7 +1273,6 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     m_currentRecordingId = 0;
 
     const uint32_t frameSlot = m_frameIndex;
-    m_frameFenceValues[frameSlot] = fenceValue;
     ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
     m_retiredCommandLists[frameSlot].push_back(submittedList);
     m_commandList.Reset();
@@ -789,7 +1289,11 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
                 return false;
             }
             ID3D12CommandList* lists[] = { submittedList.Get() };
-            queue->ExecuteCommandLists(1, lists);
+            {
+                // Immediate tails must not inherit another recorded batch's IDs.
+                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                queue->ExecuteCommandLists(1, lists);
+            }
             const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
             if (FAILED(signalResult))
             {
@@ -806,8 +1310,57 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     {
         return false;
     }
+    admission.Accept();
+    m_queueFrameActive = false;
+    m_queueFrameJoined = false;
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
     m_frameSubmissionTickets[frameSlot] = ticket;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    m_lastAdmittedFenceValue = fenceValue;
+    if (HasSwapChain())
+    {
+        m_hostSubmissionTicket = ticket;
+        m_hostFenceValue = fenceValue;
+    }
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;
+    return true;
+}
+
+bool DX12DeviceResources::WaitForFenceValue(uint64_t value, std::string& outError)
+{
+    uint64_t completed = m_fence->GetCompletedValue();
+    if (UINT64_MAX != completed && completed < value)
+    {
+        const HRESULT result = m_fence->SetEventOnCompletion(value, m_fenceEvent);
+        if (FAILED(result))
+        {
+            outError = "DX12 fence wait setup failed " + HrToString(result);
+            AppendDeviceRemovedReport(result, outError);
+            return false;
+        }
+        ce::profile_scope wait{ce::marker<"DX12FrameFenceWait">()};
+        if (WAIT_OBJECT_0 != WaitForSingleObject(m_fenceEvent, INFINITE))
+        {
+            outError = "DX12 fence wait failed " + std::to_string(GetLastError());
+            return false;
+        }
+        completed = m_fence->GetCompletedValue();
+    }
+    if (UINT64_MAX == completed)
+    {
+        outError = "DX12 fence reports device removal";
+        AppendDeviceRemovedReport(DXGI_ERROR_DEVICE_REMOVED, outError);
+        GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
+        return false;
+    }
+    if (completed < value)
+    {
+        outError = "DX12 fence event did not establish GPU completion";
+        return false;
+    }
     return true;
 }
 
@@ -824,6 +1377,14 @@ void DX12DeviceResources::WaitForGpu()
 bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
     std::string& outError)
 {
+    const auto releaseCompletedTickets = [this]
+    {
+        GetRHISubmissionThread().CollectCompletedLifetimes(this);
+        m_frameSubmissionTickets = {};
+        m_hostSubmissionTicket = {};
+        m_frameFenceValues = {};
+        m_hostFenceValue = 0;
+    };
     if (!m_queue || !m_fence || !m_submissionClient) return true;
 
     RHISubmissionThread& submission = GetRHISubmissionThread();
@@ -853,18 +1414,22 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
         m_lastLifecycleResult.previousGeneration = before.generation - 1u;
         m_lastLifecycleResult.generation = before.generation;
         m_lastLifecycleResult.drained = true;
+        releaseCompletedTickets();
         return true;
     }
     if (RHILifecycleCommand::UnrecoverableDeviceError == command || before.faulted)
     {
-        return submission.AbandonForDeviceError(this,
-            m_lastLifecycleResult, outError);
+        const bool abandoned = submission.AbandonForDeviceError(this, m_lastLifecycleResult, outError);
+        if (abandoned)
+        {
+            releaseCompletedTickets();
+        }
+        return abandoned;
     }
 
     const uint64_t fenceValue = m_nextFenceValue++;
     if (!submission.ExecuteLifecycleDrain(this, command,
-        [owner = this, queue = m_queue, fence = m_fence,
-            fenceEvent = m_fenceEvent, fenceValue](std::string& taskError)
+        [owner = this, queue = m_queue, fence = m_fence, fenceValue](std::string& taskError)
         {
             if (!GetRHISubmissionThread().IsCurrentThread())
             {
@@ -885,23 +1450,13 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
                 }
                 return false;
             }
-            if (fence->GetCompletedValue() < fenceValue)
-            {
-                const HRESULT waitResult = fence->SetEventOnCompletion(
-                    fenceValue, fenceEvent);
-                if (FAILED(waitResult))
-                {
-                    taskError = "DX12 lifecycle fence wait 설정 실패 " +
-                        HrToString(waitResult);
-                    return false;
-                }
-                WaitForSingleObject(fenceEvent, INFINITE);
-            }
-            return true;
+            return owner->WaitForFenceValue(fenceValue, taskError);
         }, m_lastLifecycleResult, outError)) return false;
 
-    const uint64_t completed = m_fence->GetCompletedValue();
+    const uint64_t completed = GetCompletedFenceValue();
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    m_lastAdmittedFenceValue = fenceValue;
+    releaseCompletedTickets();
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completed);
     std::printf("[RHI lifecycle][DX12] %s generation %llu->%llu"
@@ -1098,6 +1653,10 @@ RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
     }
 
     constexpr uint64_t megabyte = 1024ull * 1024ull;
+    info.usedBytes = memory.CurrentUsage;
+    info.budgetBytes = memory.Budget;
+    info.usageAvailable = true;
+    info.budgetAvailable = memory.Budget > 0;
     info.usedMB = memory.CurrentUsage / megabyte;
     info.budgetMB = memory.Budget / megabyte;
     return info;
@@ -1327,15 +1886,15 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = kFrameCount;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    // Present uses sync interval zero. Opt in at creation and preserve the
-    // flag through resize so windowed presentation does not throttle the
-    // shared submission thread behind the desktop composition cadence.
+    // tearing은 선택 사항이다. 데스크톱 합성이 표시 주기를 정하더라도
+    // waitable swapchain이 DXGI의 새 프레임 허용량을 별도로 제한한다.
     ComPtr<IDXGIFactory5> tearingFactory;
     BOOL allowTearing = FALSE;
     const bool supportsTearing = SUCCEEDED(m_factory.As(&tearingFactory)) &&
         SUCCEEDED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
             &allowTearing, sizeof(allowTearing))) && allowTearing;
-    m_swapChainFlags = supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+    m_swapChainFlags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT |
+        (supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
     desc.Flags = m_swapChainFlags;
 
     ComPtr<IDXGISwapChain1> swapChain1;
@@ -1351,6 +1910,21 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
         outError = "IDXGISwapChain3 질의 실패";
         return false;
     }
+    hr = m_swapChain->SetMaximumFrameLatency(1);
+    if (FAILED(hr))
+    {
+        outError = "SetMaximumFrameLatency failed " + HrToString(hr);
+        m_swapChain.Reset();
+        return false;
+    }
+    m_frameLatencyWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+    if (nullptr == m_frameLatencyWaitableObject)
+    {
+        outError = "DX12 frame latency waitable object is unavailable";
+        m_swapChain.Reset();
+        return false;
+    }
+    m_frameLatencyReady = false;
     // 전체 화면 전환은 셸(창 계층)이 관리한다 — DXGI의 암묵 Alt+Enter를 끈다.
     m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
 
@@ -1423,32 +1997,39 @@ bool DX12DeviceResources::Present(std::string& outError)
         outError = "스왑체인이 없다";
         return false;
     }
-    return GetRHISubmissionThread().ExecuteAndWait(this, "DX12 Present",
-        [owner = this, swapChain = m_swapChain, creationFlags = m_swapChainFlags](std::string& error)
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    if (submission.ConsumeFailure(this, outError) ||
+        (m_hostSubmissionTicket.IsValid() && !submission.Wait(m_hostSubmissionTicket, outError)))
+    {
+        return false;
+    }
+
+    // 직렬 표시 소유자가 자신의 직전 큐 제출까지만 기다린 뒤 공용 RHI FIFO
+    // 밖에서 Present를 동기 호출한다. 리사이즈도 같은 소유자가 프레임 사이에
+    // 처리하고, 종료는 그 소유자를 join한 뒤 자원을 파괴한다. 반환 전에는 다음
+    // 호스트 제출이 없어 느린 Present가 씬 제출을 붙잡지 않는다.
+    // PHASE 4.5의 FG proxy·pacing·수명 관리는 이 네이티브 셸 경계의 책임이다.
+    // 에디터 뷰포트 live_present는 오프스크린 복사이므로 FG를 켜서는 안 된다.
+    ce::profile_scope present{ce::marker<"DXGIPresent">()};
+    BOOL fullscreen = FALSE;
+    const bool windowed = SUCCEEDED(m_swapChain->GetFullscreenState(&fullscreen, nullptr)) && !fullscreen;
+    const UINT flags = windowed && (m_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
+        ? DXGI_PRESENT_ALLOW_TEARING : 0;
+    const HRESULT result = m_swapChain->Present(0, flags);
+    if (FAILED(result))
+    {
+        outError = "DX12 Present 실패 " + HrToString(result);
+        if (DXGI_ERROR_DEVICE_REMOVED == result || DXGI_ERROR_DEVICE_RESET == result ||
+            DXGI_ERROR_DEVICE_HUNG == result || DXGI_ERROR_DRIVER_INTERNAL_ERROR == result)
         {
-            if (!GetRHISubmissionThread().IsCurrentThread())
-            {
-                error = "DX12 Present가 RHI thread 밖에서 호출됐다";
-                return false;
-            }
-            ce::profile_scope present{ce::marker<"DXGIPresent">()};
-            BOOL fullscreen = FALSE;
-            const bool windowed = SUCCEEDED(swapChain->GetFullscreenState(&fullscreen, nullptr)) && !fullscreen;
-            const UINT flags = windowed && (creationFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
-                ? DXGI_PRESENT_ALLOW_TEARING : 0;
-            const HRESULT hr = swapChain->Present(0, flags);
-            if (FAILED(hr))
-            {
-                error = "DX12 Present 실패 " + HrToString(hr);
-                if (DXGI_ERROR_DEVICE_REMOVED == hr ||
-                    DXGI_ERROR_DEVICE_RESET == hr ||
-                    DXGI_ERROR_DEVICE_HUNG == hr ||
-                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
-                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
-                return false;
-            }
-            return true;
-        }, outError);
+            submission.MarkUnrecoverableDeviceError(this, outError);
+        }
+        return false;
+    }
+    // 창이 가려졌으면 새 표시 프레임이 큐에 들어가지 않았다. AbortFrame처럼
+    // 허용 상태를 유지해 건너뛴 Present의 신호를 복구 과정에서 기다리지 않는다.
+    m_frameLatencyReady = DXGI_STATUS_OCCLUDED == result;
+    return true;
 }
 
 uint32_t DX12DeviceResources::GetBackBufferIndex() const
@@ -1512,6 +2093,10 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
     case RHIResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
     case RHIResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;
     case RHIResourceState::IndexBuffer:     return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    case RHIResourceState::IndirectArgument:
+        return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    case RHIResourceState::VertexAndShaderResource:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
     case RHIResourceState::Common:
     default:                                return D3D12_RESOURCE_STATE_COMMON;
     }
@@ -1928,8 +2513,14 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     RHIBufferHandle& outHandle, std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"DX12CreateBuffer">()};
+    outHandle = {};
     if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
     if (0 == desc.bytes)     { outError = "버퍼 크기가 0이다"; return false; }
+    if (RHIResourceState::IndirectArgument == desc.initialState && !desc.allowIndirectArguments)
+    {
+        outError = "IndirectArgument 상태에는 allowIndirectArguments가 필요하다";
+        return false;
+    }
 
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -1963,7 +2554,185 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     DevResApplyDebugName(resource.Get(), desc.debugName);
 
     // 표가 소유를 가져간다 — 호출부에는 핸들만 남는다(V2-a).
-    outHandle = m_resourceTable.AddBuffer(std::move(resource));
+    outHandle = m_resourceTable.AddBuffer(std::move(resource), desc.allowIndirectArguments);
+    if (!outHandle.IsValid())
+    {
+        outError = "버퍼 핸들 표가 가득 찼다";
+        return false;
+    }
+    return true;
+}
+
+namespace
+{
+    struct DX12GraphTransientHeap final : RHITransientHeap
+    {
+        Microsoft::WRL::ComPtr<ID3D12Heap> native;
+        ID3D12Device* owner{nullptr};
+        RHITransientAllocationInfo allocation{};
+    };
+
+    D3D12_RESOURCE_DESC DX12GraphTransientDesc(const RHITransientResourceDesc& desc)
+    {
+        D3D12_RESOURCE_DESC result{};
+        result.SampleDesc.Count = 1;
+        if (desc.buffer)
+        {
+            result.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            result.Width = desc.bufferDesc.bytes;
+            result.Height = result.DepthOrArraySize = result.MipLevels = 1;
+            result.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            result.Flags = desc.bufferDesc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+        }
+        else
+        {
+            const auto& texture = desc.textureDesc;
+            result.Dimension = texture.dim == RHITextureDesc::Dim::Texture3D
+                ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            result.Width = texture.width;
+            result.Height = texture.height;
+            result.DepthOrArraySize = static_cast<UINT16>(texture.depthOrArraySize);
+            result.MipLevels = static_cast<UINT16>(texture.mipLevels);
+            result.Format = ToDXGI(texture.format);
+            if (texture.allowRenderTarget)
+            {
+                result.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+            }
+            if (texture.allowDepthStencil)
+            {
+                result.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+            }
+            if (texture.allowUnorderedAccess)
+            {
+                result.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            }
+        }
+        return result;
+    }
+
+    D3D12_HEAP_FLAGS DX12GraphHeapFlags(uint32_t heapClass)
+    {
+        switch (heapClass)
+        {
+        case 1: return D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+        case 2: return D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+        case 3: return D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+        default: return D3D12_HEAP_FLAG_NONE;
+        }
+    }
+}
+
+bool DX12DeviceResources::DescribeTransientAllocation(const RHITransientResourceDesc& desc,
+    RHITransientAllocationInfo& info, std::string& error) const
+{
+    info = {};
+    if (!m_device || (desc.buffer ? desc.bufferDesc.bytes == 0 :
+        desc.textureDesc.width == 0 || desc.textureDesc.height == 0 ||
+        desc.textureDesc.depthOrArraySize == 0 || desc.textureDesc.depthOrArraySize > UINT16_MAX ||
+        desc.textureDesc.mipLevels == 0 || desc.textureDesc.mipLevels > UINT16_MAX ||
+        desc.textureDesc.format == RHIFormat::Unknown ||
+        (desc.textureDesc.allowRenderTarget && desc.textureDesc.allowDepthStencil)))
+    {
+        error = "Invalid transient allocation description";
+        return false;
+    }
+    const auto nativeDesc = DX12GraphTransientDesc(desc);
+    const auto nativeInfo = m_device->GetResourceAllocationInfo(0, 1, &nativeDesc);
+    if (nativeInfo.SizeInBytes == UINT64_MAX || !nativeInfo.SizeInBytes || !nativeInfo.Alignment)
+    {
+        error = "Cannot query transient resource allocation";
+        return false;
+    }
+    info.bytes = nativeInfo.SizeInBytes;
+    info.alignment = nativeInfo.Alignment;
+    // Homogeneous heaps also work on resource heap tier 1 hardware.
+    info.heapClass = desc.buffer ? 1 :
+        (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil ? 3 : 2);
+    return true;
+}
+
+bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& info,
+    std::shared_ptr<RHITransientHeap>& heap, std::string& error)
+{
+    heap.reset();
+    if (!m_device || !info.bytes || info.alignment != D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
+        info.bytes % info.alignment != 0 || info.heapClass < 1 || info.heapClass > 3)
+    {
+        error = "Invalid transient heap allocation";
+        return false;
+    }
+    auto result = std::make_shared<DX12GraphTransientHeap>();
+    D3D12_HEAP_DESC desc{};
+    desc.SizeInBytes = info.bytes;
+    desc.Alignment = info.alignment;
+    desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    desc.Properties.CreationNodeMask = desc.Properties.VisibleNodeMask = 1;
+    desc.Flags = DX12GraphHeapFlags(info.heapClass);
+    const auto hr = m_device->CreateHeap(&desc, IID_PPV_ARGS(&result->native));
+    if (FAILED(hr))
+    {
+        error = "Transient heap creation failed " + HrToString(hr);
+        return false;
+    }
+    result->owner = m_device.Get();
+    result->allocation = info;
+    heap = std::move(result);
+    return true;
+}
+
+bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& desc,
+    RHITransientHeap& heap, RHITextureHandle& texture, RHIBufferHandle& buffer, std::string& error)
+{
+    texture = {};
+    buffer = {};
+    auto* nativeHeap = dynamic_cast<DX12GraphTransientHeap*>(&heap);
+    RHITransientAllocationInfo info{};
+    if (!DescribeTransientAllocation(desc, info, error))
+    {
+        return false;
+    }
+    if (!nativeHeap || nativeHeap->owner != m_device.Get() || !nativeHeap->native ||
+        info.heapClass != nativeHeap->allocation.heapClass || info.bytes > nativeHeap->allocation.bytes ||
+        (desc.buffer ? desc.bufferDesc.initialState : desc.textureDesc.initialState) != RHIResourceState::Common)
+    {
+        error = "Placed transient resource does not fit its heap or initial state";
+        return false;
+    }
+    const auto nativeDesc = DX12GraphTransientDesc(desc);
+    D3D12_CLEAR_VALUE clear{};
+    clear.Format = nativeDesc.Format;
+    if (desc.textureDesc.allowDepthStencil)
+    {
+        clear.DepthStencil.Depth = desc.textureDesc.clearDepth;
+    }
+    else
+    {
+        std::copy_n(desc.textureDesc.clearColor, 4, clear.Color);
+    }
+    const bool hasClear = !desc.buffer && (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil);
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    const auto hr = m_device->CreatePlacedResource(nativeHeap->native.Get(), 0, &nativeDesc,
+        D3D12_RESOURCE_STATE_COMMON, hasClear ? &clear : nullptr, IID_PPV_ARGS(&resource));
+    if (FAILED(hr))
+    {
+        error = "Placed transient creation failed " + HrToString(hr);
+        return false;
+    }
+    if (desc.buffer)
+    {
+        DevResApplyDebugName(resource.Get(), desc.bufferDesc.debugName);
+        buffer = m_resourceTable.AddBuffer(std::move(resource), desc.bufferDesc.allowIndirectArguments);
+    }
+    else
+    {
+        DevResApplyDebugName(resource.Get(), desc.textureDesc.debugName);
+        texture = m_resourceTable.AddTexture(std::move(resource));
+    }
+    if (!buffer.IsValid() && !texture.IsValid())
+    {
+        error = "Placed transient resource table is full";
+        return false;
+    }
     return true;
 }
 

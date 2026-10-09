@@ -128,10 +128,23 @@ public:
 
     // ── 렌더 상태 ──
 
-    /// 뷰포트와 시저를 같은 크기로 건다. 지금 패스 열넷이 전부 이 형태다
-    /// (RSSetViewports와 RSSetScissorRects를 늘 같은 값으로 짝지어 부른다).
-    /// 따로 필요해지면 그때 나눈다.
+    /// 뷰포트와 시저를 같은 크기로 건다. 전체 화면 경로의 기본 상태다.
     virtual void SetViewportAndScissor(uint32_t width, uint32_t height) = 0;
+
+    /// 논리 좌상단과 전체 화면 크기를 보존한 채 작은 타깃으로 평행 이동한다.
+    /// 깊이 범위는 0..1이며 시저는 바꾸지 않는다. false면 상태도 그대로다.
+    virtual bool SetViewport(float, float, uint32_t, uint32_t)
+    {
+        return false;
+    }
+
+    /// 뷰포트를 보존하고 화면 좌표의 사각형만 제한한다. 타일 렌더링도
+    /// SV_Position과 깊이 조회가 전체 화면 좌표를 유지해야 하기 때문이다.
+    /// false면 상태를 바꾸지 않았다. 미지원 구현이 전체 화면에 쓰지 않게 한다.
+    virtual bool SetScissor(uint32_t, uint32_t, uint32_t, uint32_t)
+    {
+        return false;
+    }
 
     /// 파이프라인과 그 레이아웃을 함께 건다(위 ③·★★). 핸들 하나가 짝을 든다.
     virtual void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) = 0;
@@ -182,6 +195,31 @@ public:
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) = 0;
     virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) = 0;
+
+    /// One RHIDrawIndirectArguments command for the bound vertex graphics pipeline.
+    /// Same alignment, indirect-buffer state, lifetime and producer validation
+    /// contract as DrawIndexedIndirect. False records no command; a prepared GPU
+    /// route must propagate failure rather than silently restore CPU visibility.
+    virtual bool DrawIndirect(RHIBufferHandle, uint64_t = 0) { return false; }
+
+    /// 현재 바인딩으로 RHIDrawIndexedIndirectArguments 하나를 실행한다.
+    /// 버퍼는 allowIndirectArguments로 생성하고 IndirectArgument 상태로
+    /// 전이해야 한다. byteOffset은 4바이트 정렬이며 인자 전체가 범위 안이어야 한다.
+    /// 생산자는 index/instance 범위와 nonZeroFirstInstance 기능 제약을 지킨다.
+    /// GPU 메모리는 CPU에서 검사하지 않으며 완료점까지 버퍼를 보존해야 한다.
+    /// false면 draw를 기록하지 않았으므로 호출자가 CPU DrawIndexed로 대체할 수 있다.
+    virtual bool DrawIndexedIndirect(RHIBufferHandle, uint64_t = 0)
+    {
+        return false;
+    }
+
+    /// Graphics-bind-point mesh pipeline required. Failure records no command.
+    virtual bool DispatchMesh(uint32_t, uint32_t, uint32_t) { return false; }
+
+    /// One 12-byte command. Arguments must be 4-byte aligned, within a buffer
+    /// created for indirect use, and transitioned to IndirectArgument. The GPU
+    /// producer owns dimension/output bounds; no CPU readback is performed.
+    virtual bool DispatchMeshIndirect(RHIBufferHandle, uint64_t = 0) { return false; }
 
     virtual void Dispatch(uint32_t x, uint32_t y, uint32_t z) = 0;
 

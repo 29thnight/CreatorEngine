@@ -2,6 +2,30 @@
 #include "DX12DeviceResources.h"
 
 #include <vector>
+#include <cmath>
+#include <stdexcept>
+
+static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(D3D12_DRAW_ARGUMENTS));
+static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==
+    offsetof(D3D12_DRAW_ARGUMENTS, VertexCountPerInstance));
+static_assert(offsetof(RHIDrawIndirectArguments, instanceCount) ==
+    offsetof(D3D12_DRAW_ARGUMENTS, InstanceCount));
+static_assert(offsetof(RHIDrawIndirectArguments, firstVertex) ==
+    offsetof(D3D12_DRAW_ARGUMENTS, StartVertexLocation));
+static_assert(offsetof(RHIDrawIndirectArguments, firstInstance) ==
+    offsetof(D3D12_DRAW_ARGUMENTS, StartInstanceLocation));
+
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(D3D12_DRAW_INDEXED_ARGUMENTS));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, IndexCountPerInstance));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartIndexLocation));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, BaseVertexLocation));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartInstanceLocation));
 
 namespace
 {
@@ -31,15 +55,50 @@ void DX12Encoder::SetViewportAndScissor(uint32_t width, uint32_t height)
     m_commandList->RSSetScissorRects(1, &scissor);
 }
 
+bool DX12Encoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
+{
+    if (nullptr == m_commandList || !std::isfinite(x) || !std::isfinite(y) || width == 0 || height == 0)
+    {
+        return false;
+    }
+    const double right = static_cast<double>(x) + width;
+    const double bottom = static_cast<double>(y) + height;
+    if (x < D3D12_VIEWPORT_BOUNDS_MIN || y < D3D12_VIEWPORT_BOUNDS_MIN ||
+        right > D3D12_VIEWPORT_BOUNDS_MAX || bottom > D3D12_VIEWPORT_BOUNDS_MAX)
+    {
+        return false;
+    }
+
+    const D3D12_VIEWPORT viewport{ x, y, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f };
+    m_commandList->RSSetViewports(1, &viewport);
+    return true;
+}
+
+bool DX12Encoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    constexpr uint32_t kMaxScissorCoordinate = INT32_MAX;
+    if (nullptr == m_commandList || x > kMaxScissorCoordinate || y > kMaxScissorCoordinate ||
+        width > kMaxScissorCoordinate - x || height > kMaxScissorCoordinate - y)
+    {
+        return false;
+    }
+    const D3D12_RECT scissor{ static_cast<LONG>(x), static_cast<LONG>(y),
+        static_cast<LONG>(x + width), static_cast<LONG>(y + height) };
+    m_commandList->RSSetScissorRects(1, &scissor);
+    return true;
+}
+
 void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
 {
+    m_boundPipeline = {};
     if (nullptr == m_commandList || nullptr == m_resources) return;
 
     // ★ 핸들이 짝을 푼다(A-1). 예전에는 호출부가 둘을 따로 넘겼고, 그래서
     //   "파이프라인 P 를 레이아웃 L' 로 걸었다"가 표현 가능했다 — 표가 짝을
     //   들면서 그 조합이 만들어질 자리가 없어졌다.
     const DX12PipelineEntry entry = m_resources->Resolve(pipeline);
-    if (!entry.IsValid())
+    if (!entry.IsValid() || entry.computePipeline != (bindPoint == RHIBindPoint::Compute) ||
+        (entry.meshPipeline && bindPoint != RHIBindPoint::Graphics))
     {
         // 이미 놓인 핸들이거나 발급된 적이 없다. 이 draw는 화면에서 사라진다.
         NoteDropped("SetPipeline(stale handle)");
@@ -74,6 +133,7 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline
     }
 
     m_commandList->SetPipelineState(entry.pipeline);
+    m_boundPipeline = pipeline;
 }
 
 void DX12Encoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
@@ -211,25 +271,138 @@ void DX12Encoder::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view)
     m_commandList->IASetIndexBuffer(&view);
 }
 
+bool DX12Encoder::IsPipelineBound(RHIBindPoint point, bool mesh) const
+{
+    if (!m_resources || !m_boundPipeline.IsValid())
+    {
+        return false;
+    }
+    const auto entry = m_resources->Resolve(m_boundPipeline);
+    return entry.IsValid() && entry.computePipeline == (point == RHIBindPoint::Compute) &&
+        entry.meshPipeline == mesh;
+}
+
 void DX12Encoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
     uint32_t firstVertex, uint32_t firstInstance)
 {
-    if (nullptr == m_commandList || 0 == vertexCount || 0 == instanceCount) return;
+    if (nullptr == m_commandList || 0 == vertexCount || 0 == instanceCount)
+    {
+        return;
+    }
+    if (!IsPipelineBound(RHIBindPoint::Graphics))
+    {
+        NoteDropped("Draw(pipeline kind)");
+        return;
+    }
     m_commandList->DrawInstanced(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 void DX12Encoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance)
 {
-    if (nullptr == m_commandList || 0 == indexCount || 0 == instanceCount) return;
+    if (nullptr == m_commandList || 0 == indexCount || 0 == instanceCount)
+    {
+        return;
+    }
+    if (!IsPipelineBound(RHIBindPoint::Graphics))
+    {
+        NoteDropped("DrawIndexed(pipeline kind)");
+        return;
+    }
     m_commandList->DrawIndexedInstanced(indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
 }
 
+bool DX12Encoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (nullptr == m_commandList || nullptr == m_resources || 0 != byteOffset % 4 ||
+        !IsPipelineBound(RHIBindPoint::Graphics))
+    {
+        return false;
+    }
+    ID3D12CommandSignature* const signature = m_resources->GetDrawIndirectSignature();
+    const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
+    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+    m_commandList->ExecuteIndirect(signature, 1, entry.resource, byteOffset, nullptr, 0);
+    return true;
+}
+
+bool DX12Encoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (nullptr == m_commandList || nullptr == m_resources || 0 != byteOffset % 4 ||
+        !IsPipelineBound(RHIBindPoint::Graphics))
+    {
+        return false;
+    }
+    ID3D12CommandSignature* const signature = m_resources->GetDrawIndexedIndirectSignature();
+    const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
+    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+
+    // 개수 버퍼가 없고 최대 개수도 1이다. CPU 바인딩은 signature가 바꾸지 않는다.
+    m_commandList->ExecuteIndirect(signature, 1, entry.resource, byteOffset, nullptr, 0);
+    return true;
+}
+
+static_assert(sizeof(RHIDispatchMeshIndirectArguments) == sizeof(D3D12_DISPATCH_MESH_ARGUMENTS));
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountX) ==
+    offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountX));
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountY) ==
+    offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountY));
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountZ) ==
+    offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountZ));
+
+bool DX12Encoder::DispatchMesh(uint32_t x, uint32_t y, uint32_t z)
+{
+    if (!m_meshCommandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, true) ||
+        !m_resources->GetMeshShaderCapabilities().SupportsDispatch(x, y, z))
+    {
+        return false;
+    }
+    m_meshCommandList->DispatchMesh(x, y, z);
+    return true;
+}
+
+bool DX12Encoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (!m_meshCommandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, true) || byteOffset % 4 != 0 ||
+        !m_resources->GetMeshShaderCapabilities().meshIndirect)
+    {
+        return false;
+    }
+    const auto entry = m_resources->DescribeBuffer(arguments);
+    auto* signature = m_resources->GetDispatchMeshIndirectSignature();
+    if (!signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        sizeof(RHIDispatchMeshIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+    m_meshCommandList->ExecuteIndirect(signature, 1, entry.resource, byteOffset, nullptr, 0);
+    return true;
+}
+
 void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
-    if (nullptr == m_commandList) return;
-    if (0 == x || 0 == y || 0 == z) return;
+    if (nullptr == m_commandList)
+    {
+        return;
+    }
+    if (0 == x || 0 == y || 0 == z)
+    {
+        return;
+    }
+    if (!IsPipelineBound(RHIBindPoint::Compute))
+    {
+        NoteDropped("Dispatch(pipeline kind)");
+        return;
+    }
     m_commandList->Dispatch(x, y, z);
 }
 
@@ -268,8 +441,51 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
     if (nullptr == m_commandList || nullptr == m_resources || batch.IsEmpty()) return;
 
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    auto& barriers = m_barrierScratch;
+    barriers.clear();
     barriers.reserve(batch.GetBarrierCount());
+
+    const bool computeQueue = m_commandList->GetType() == D3D12_COMMAND_LIST_TYPE_COMPUTE;
+    const auto stateForQueue = [&](RHIResourceState state)
+    {
+        if (computeQueue)
+        {
+            switch (state)
+            {
+            case RHIResourceState::ShaderResource:
+                return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            case RHIResourceState::Common:
+            case RHIResourceState::UnorderedAccess:
+            case RHIResourceState::CopySource:
+            case RHIResourceState::CopyDest:
+            case RHIResourceState::IndirectArgument:
+                break;
+            default:
+                throw std::runtime_error("Graphics-only resource state on a compute queue");
+            }
+        }
+        return DX12DeviceResources::ToD3D12(state);
+    };
+
+    const auto activate = [&barriers](ID3D12Resource* resource)
+    {
+        if (!resource)
+        {
+            throw std::runtime_error("Aliasing activation refers to a stale resource");
+        }
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        barrier.Aliasing.pResourceAfter = resource;
+        barriers.push_back(barrier);
+    };
+    for (const auto texture : batch.aliasTextures)
+    {
+        activate(m_resources->Resolve(texture));
+    }
+    for (const auto buffer : batch.aliasBuffers)
+    {
+        activate(m_resources->Resolve(buffer));
+    }
 
     for (const RHITransition& transition : batch.textureTransitions)
     {
@@ -277,9 +493,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
         if (nullptr == resource) continue;
 
         const D3D12_RESOURCE_STATES before =
-            DX12DeviceResources::ToD3D12(transition.before);
+            stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after =
-            DX12DeviceResources::ToD3D12(transition.after);
+            stateForQueue(transition.after);
         if (before == after) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};
@@ -297,9 +513,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
         if (nullptr == resource) continue;
 
         const D3D12_RESOURCE_STATES before =
-            DX12DeviceResources::ToD3D12(transition.before);
+            stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after =
-            DX12DeviceResources::ToD3D12(transition.after);
+            stateForQueue(transition.after);
         if (before == after) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};

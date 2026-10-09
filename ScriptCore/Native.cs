@@ -257,13 +257,44 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<byte*, uint> Profiler_Register;
     public delegate* unmanaged<uint, void> Profiler_Begin;
     public delegate* unmanaged<void> Profiler_End;
+    public delegate* unmanaged<int, ulong> Audio_GetScope;
+    public delegate* unmanaged<ulong, AudioAssetId, int, int, Float3, ObjectHandle, AudioPlaySettings*, Native.AudioParameterABI*, int, ulong> Audio_Play;
+    public delegate* unmanaged<ulong, int, float, float, void> Audio_Control;
+    public delegate* unmanaged<ulong, int> Audio_State;
+    public delegate* unmanaged<ulong, Float3, Float3, void> Audio_SetTransform;
+    public delegate* unmanaged<ulong, byte*, int, int, float, byte*, int> Audio_SetParameter;
+    public delegate* unmanaged<AudioPlaybackCompletion*, int> Audio_TakeCompletion;
+    public delegate* unmanaged<ObjectHandle, int, ulong> Sound_PlayInstance;
+    public delegate* unmanaged<ObjectHandle, AudioPlaySettings*, void> Sound_GetSettings;
+    public delegate* unmanaged<ObjectHandle, AudioPlaySettings*, void> Sound_SetSettings;
+    public delegate* unmanaged<ObjectHandle, AudioAssetId*, int> Sound_GetSource;
+    public delegate* unmanaged<ObjectHandle, AudioAssetId, int, void> Sound_SetSource;
+    public delegate* unmanaged<ObjectHandle, int> AudioListener_Exists;
+    public delegate* unmanaged<ObjectHandle, int> AudioListener_GetActive;
+    public delegate* unmanaged<ObjectHandle, int, void> AudioListener_SetActive;
+    public delegate* unmanaged<int, float, void> Audio_SetBusVolume;
+    public delegate* unmanaged<byte*, int, int> Audio_LastError;
+    public delegate* unmanaged<uint, int, int, int, int> Audio_Configure;
+    public delegate* unmanaged<int, int> Audio_SetReverbPreset;
+    // Append-only v34. Owner-bearing native C++ types never cross this table.
+    public delegate* unmanaged<AssetLinkABI*, TextureAssetVariantABI*, int, AssetToken*, int> Asset_Request;
+    public delegate* unmanaged<AssetToken, AssetRequestSnapshotABI*, byte*, int, int> Asset_Snapshot;
+    public delegate* unmanaged<AssetToken, AssetToken*, int> Asset_AcquireResult;
+    public delegate* unmanaged<AssetToken, int> Asset_Cancel;
+    public delegate* unmanaged<AssetToken, int> Asset_Release;
+    public delegate* unmanaged<AssetToken, TextureDescriptor*, int> Asset_ReadTexture;
+    public delegate* unmanaged<ulong, uint, AssetLinkABI*, int, int*, int> Asset_ListRoots;
+    // Append-only v35. Selector IDs prove concrete views, not serialized kinds.
+    public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_RequestTyped;
+    public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_TryAcquireTyped;
+
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 32;
+    public const int ExpectedVersion = 35;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -368,10 +399,170 @@ internal static unsafe class Native
         if (table == null) return false;
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
+        if (table->Asset_RequestTyped == null || table->Asset_TryAcquireTyped == null)
+        {
+            return false;
+        }
+
+        if (sizeof(AssetLinkABI) != 40 || sizeof(AssetToken) != 12
+            || sizeof(TextureAssetVariantABI) != 12 || sizeof(AssetRequestSnapshotABI) != 16
+            || sizeof(TextureDescriptor) != 20)
+        {
+            return false;
+        }
 
         _api = *table;
         _bound = true;
         return true;
+    }
+
+    internal static void Unbind()
+    {
+        _bound = false;
+        _api = default;
+    }
+
+    private static void CheckAssetResult(AssetBindingResult result)
+    {
+        if (result == AssetBindingResult.Success)
+        {
+            return;
+        }
+        if (result == AssetBindingResult.InvalidToken)
+        {
+            throw new ObjectDisposedException("Asset handle", "The native owner/request token is stale or released.");
+        }
+        if (result == AssetBindingResult.UnsupportedType)
+        {
+            throw new NotSupportedException("This concrete type has no AssetDepot runtime binding.");
+        }
+        throw new InvalidOperationException($"AssetDepot binding failed: {result}.");
+    }
+
+    internal static AssetToken AssetRequestTyped(AssetLinkABI link, uint concreteType, TextureAssetVariant variant, bool residentOnly)
+    {
+        if (!Entered() || _api.Asset_RequestTyped == null || _api.Asset_TryAcquireTyped == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        var options = new TextureAssetVariantABI
+        {
+            ColorSpace = (uint)variant.ColorSpace,
+            Compress = variant.Compress ? 1u : 0u,
+            Role = variant.Role,
+        };
+        AssetToken token = default;
+        var result = (AssetBindingResult)(residentOnly
+            ? _api.Asset_TryAcquireTyped(&link, concreteType, &options, &token)
+            : _api.Asset_RequestTyped(&link, concreteType, &options, &token));
+        if (residentOnly && result == AssetBindingResult.NotResident)
+        {
+            return default;
+        }
+        CheckAssetResult(result);
+        return token;
+    }
+
+    internal static AssetRequestSnapshot AssetSnapshot(AssetToken token)
+    {
+        if (!Entered() || _api.Asset_Snapshot == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        AssetRequestSnapshotABI value = default;
+        CheckAssetResult((AssetBindingResult)_api.Asset_Snapshot(token, &value, null, 0));
+        if (value.MessageBytes == 0)
+        {
+            return new(value.Status, value.Error, string.Empty, value.WorkComplete != 0);
+        }
+        // A request changes Pending -> terminal once; if it completed between
+        // these calls, retry with the terminal message's exact required length.
+        byte[] buffer;
+        do
+        {
+            buffer = new byte[checked(value.MessageBytes + 1)];
+            fixed (byte* text = buffer)
+            {
+                CheckAssetResult((AssetBindingResult)_api.Asset_Snapshot(token, &value, text, buffer.Length));
+            }
+        }
+        while (value.MessageBytes >= buffer.Length);
+        return new(value.Status, value.Error,
+            System.Text.Encoding.UTF8.GetString(buffer, 0, value.MessageBytes), value.WorkComplete != 0);
+    }
+
+    internal static bool AssetAcquireResult(AssetToken request, out AssetToken owner)
+    {
+        owner = default;
+        if (!Entered() || _api.Asset_AcquireResult == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        AssetToken value = default;
+        var result = (AssetBindingResult)_api.Asset_AcquireResult(request, &value);
+        if (result == AssetBindingResult.NotResident)
+        {
+            return false;
+        }
+        CheckAssetResult(result);
+        owner = value;
+        return true;
+    }
+
+    internal static void AssetCancel(AssetToken request)
+    {
+        if (!Entered() || _api.Asset_Cancel == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        CheckAssetResult((AssetBindingResult)_api.Asset_Cancel(request));
+    }
+
+    internal static void AssetRelease(AssetToken token)
+    {
+        if (!Entered() || _api.Asset_Release == null)
+        {
+            return;
+        }
+        // A stale token after shutdown or a repeated release is a safe no-op.
+        // Native validates slot + generation + type before touching an owner.
+        _api.Asset_Release(token);
+    }
+
+    internal static TextureDescriptor AssetReadTexture(AssetToken token)
+    {
+        if (!Entered() || _api.Asset_ReadTexture == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        TextureDescriptor descriptor = default;
+        CheckAssetResult((AssetBindingResult)_api.Asset_ReadTexture(token, &descriptor));
+        return descriptor;
+    }
+
+    internal static AssetLinkABI[] AssetListRoots(ulong mount, AssetKind kind)
+    {
+        if (!Entered() || _api.Asset_ListRoots == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        int count = 0;
+        CheckAssetResult((AssetBindingResult)_api.Asset_ListRoots(mount, (uint)kind, null, 0, &count));
+        AssetLinkABI[] roots;
+        do
+        {
+            roots = new AssetLinkABI[count];
+            fixed (AssetLinkABI* buffer = roots)
+            {
+                CheckAssetResult((AssetBindingResult)_api.Asset_ListRoots(mount, (uint)kind, buffer, roots.Length, &count));
+            }
+        }
+        while (count > roots.Length);
+        if (count != roots.Length)
+        {
+            Array.Resize(ref roots, count);
+        }
+        return roots;
     }
 
     internal static uint RegisterProfilerMarker(string name)
@@ -690,6 +881,191 @@ internal static unsafe class Native
     public static void SoundSetPitch(ObjectHandle h, float value)
     {
         if (Entered() && _api.Sound_SetPitch != null) _api.Sound_SetPitch(h, value);
+    }
+
+    public static bool AudioConfigure(uint id, int cap, int policy, bool group)
+        => Entered() && _api.Audio_Configure != null && _api.Audio_Configure(id, cap, policy, group ? 1 : 0) != 0;
+    public static bool AudioSetReverbPreset(int preset)
+        => Entered() && _api.Audio_SetReverbPreset != null && _api.Audio_SetReverbPreset(preset) != 0;
+
+    public static string AudioLastError()
+    {
+        if (!Entered() || _api.Audio_LastError == null)
+        {
+            return string.Empty;
+        }
+        byte* buffer = stackalloc byte[2048];
+        int length = _api.Audio_LastError(buffer, 2048);
+        return length > 0 ? System.Text.Encoding.UTF8.GetString(buffer, length) : string.Empty;
+    }
+
+    public static ulong AudioGetScope(int kind)
+        => Entered() && _api.Audio_GetScope != null ? _api.Audio_GetScope(kind) : 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct AudioParameterABI
+    {
+        public byte* Name;
+        public int Type;
+        public int Integer;
+        public float Number;
+        public byte* Text;
+    }
+
+    public static ulong AudioPlay(ulong scope, AudioSource source, int mode, Float3 position,
+        ObjectHandle owner, AudioPlaySettings? settings, IReadOnlyList<AudioParameter>? parameters)
+    {
+        if (!Entered() || _api.Audio_Play == null || !source.Asset.IsValid)
+        {
+            return 0;
+        }
+        int count = parameters?.Count ?? 0;
+        if (count > 64)
+        {
+            throw new ArgumentOutOfRangeException(nameof(parameters), "At most 64 audio parameters are supported");
+        }
+        AudioParameterABI* values = stackalloc AudioParameterABI[count];
+        int initialized = 0;
+        try
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                AudioParameter parameter = parameters![i];
+                if (string.IsNullOrEmpty(parameter.Name) || parameter.Name.Contains('\0') || System.Text.Encoding.UTF8.GetByteCount(parameter.Name) > 256 ||
+                    (parameter.Text is not null && (parameter.Text.Contains('\0') || System.Text.Encoding.UTF8.GetByteCount(parameter.Text) > 4096)))
+                {
+                    throw new ArgumentException("Audio parameter names must be 1–256 UTF-8 bytes and strings at most 4096 bytes", nameof(parameters));
+                }
+                values[i] = default;
+                initialized = i + 1;
+                values[i].Name = (byte*)Marshal.StringToCoTaskMemUTF8(parameter.Name);
+                values[i].Type = (int)parameter.Type;
+                values[i].Integer = parameter.Integer;
+                values[i].Number = parameter.Number;
+                if (parameter.Text is not null)
+                {
+                    values[i].Text = (byte*)Marshal.StringToCoTaskMemUTF8(parameter.Text);
+                }
+            }
+            AudioPlaySettings settingsValue = settings.GetValueOrDefault();
+            return _api.Audio_Play(scope, source.Asset, (int)source.Kind, mode, position, owner,
+                settings.HasValue ? &settingsValue : null, values, count);
+        }
+        finally
+        {
+            for (int i = 0; i < initialized; ++i)
+            {
+                Marshal.FreeCoTaskMem((nint)values[i].Name);
+                Marshal.FreeCoTaskMem((nint)values[i].Text);
+            }
+        }
+    }
+
+    public static void AudioControl(ulong handle, int operation, float gain, float pitch)
+    {
+        if (Entered() && _api.Audio_Control != null)
+        {
+            _api.Audio_Control(handle, operation, gain, pitch);
+        }
+    }
+
+    public static AudioPlaybackState AudioState(ulong handle)
+        => Entered() && _api.Audio_State != null ? (AudioPlaybackState)_api.Audio_State(handle) : AudioPlaybackState.Stopped;
+
+    public static void AudioSetTransform(ulong handle, Float3 position, Float3 velocity)
+    {
+        if (Entered() && _api.Audio_SetTransform != null)
+        {
+            _api.Audio_SetTransform(handle, position, velocity);
+        }
+    }
+
+    public static bool AudioSetParameter(ulong handle, string name, int type, int integer, float number, string? text)
+    {
+        if (!Entered() || _api.Audio_SetParameter == null)
+        {
+            return false;
+        }
+        if (string.IsNullOrEmpty(name) || name.Contains('\0') || System.Text.Encoding.UTF8.GetByteCount(name) > 256 ||
+            (text is not null && (text.Contains('\0') || System.Text.Encoding.UTF8.GetByteCount(text) > 4096)))
+        {
+            throw new ArgumentException("Audio parameter exceeds its UTF-8 size limit");
+        }
+        byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name + '\0');
+        byte[] textBytes = System.Text.Encoding.UTF8.GetBytes((text ?? string.Empty) + '\0');
+        fixed (byte* namePointer = nameBytes)
+        fixed (byte* textPointer = textBytes)
+        {
+            return _api.Audio_SetParameter(handle, namePointer, type, integer, number, textPointer) != 0;
+        }
+    }
+
+    public static bool AudioTakeCompletion(out AudioPlaybackCompletion completion)
+    {
+        AudioPlaybackCompletion value = default;
+        bool found = Entered() && _api.Audio_TakeCompletion != null && _api.Audio_TakeCompletion(&value) != 0;
+        completion = value;
+        return found;
+    }
+
+    public static ulong SoundPlayInstance(ObjectHandle owner, bool oneShot)
+        => Entered() && _api.Sound_PlayInstance != null ? _api.Sound_PlayInstance(owner, oneShot ? 1 : 0) : 0;
+
+    public static AudioPlaySettings SoundGetSettings(ObjectHandle owner)
+    {
+        AudioPlaySettings settings = new();
+        if (Entered() && _api.Sound_GetSettings != null)
+        {
+            _api.Sound_GetSettings(owner, &settings);
+        }
+        return settings;
+    }
+
+    public static void SoundSetSettings(ObjectHandle owner, AudioPlaySettings settings)
+    {
+        if (Entered() && _api.Sound_SetSettings != null)
+        {
+            _api.Sound_SetSettings(owner, &settings);
+        }
+    }
+
+    public static AudioSource SoundGetSource(ObjectHandle owner)
+    {
+        AudioAssetId asset = default;
+        int kind = 0;
+        if (Entered() && _api.Sound_GetSource != null)
+        {
+            kind = _api.Sound_GetSource(owner, &asset);
+        }
+        return new(asset, (AudioSourceKind)kind);
+    }
+
+    public static void SoundSetSource(ObjectHandle owner, AudioSource source)
+    {
+        if (Entered() && _api.Sound_SetSource != null)
+        {
+            _api.Sound_SetSource(owner, source.Asset, (int)source.Kind);
+        }
+    }
+
+    public static bool HasAudioListener(ObjectHandle owner)
+        => Entered() && _api.AudioListener_Exists != null && _api.AudioListener_Exists(owner) != 0;
+    public static bool AudioListenerGetActive(ObjectHandle owner)
+        => Entered() && _api.AudioListener_GetActive != null && _api.AudioListener_GetActive(owner) != 0;
+    public static void AudioListenerSetActive(ObjectHandle owner, bool active)
+    {
+        if (Entered() && _api.AudioListener_SetActive != null)
+        {
+            _api.AudioListener_SetActive(owner, active ? 1 : 0);
+        }
+    }
+
+    public static void AudioSetBusVolume(int bus, float gain)
+    {
+        if (Entered() && _api.Audio_SetBusVolume != null)
+        {
+            _api.Audio_SetBusVolume(bus, gain);
+        }
     }
 
     // ── Animator ──

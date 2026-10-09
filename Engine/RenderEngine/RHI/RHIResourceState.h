@@ -68,6 +68,10 @@ enum class RHIResourceState
     CopySource,
     CopyDest,
     IndexBuffer,
+    // 버퍼 전용 읽기. GPU가 쓴 명령을 draw-indirect 단계가 소비한다.
+    IndirectArgument,
+    // Read-only buffer shared by indexed IA and mesh-shader vertex pulling.
+    VertexAndShaderResource,
 };
 
 /// 전이 하나. 그래프 밖에서 상태를 바꿀 때 쓴다(그래프 안은 usage 선언이 한다).
@@ -105,16 +109,20 @@ struct RHIBarrierBatch
     std::span<const RHIBufferTransition> bufferTransitions;
     std::span<const RHITextureHandle> uavTextures;
     std::span<const RHIBufferHandle> uavBuffers;
+    // Activation precedes state transitions; the previous occupant is unknown
+    // across recordings. Backend uses an all-previous alias barrier.
+    std::span<const RHITextureHandle> aliasTextures;
+    std::span<const RHIBufferHandle> aliasBuffers;
 
     bool IsEmpty() const
     {
         return textureTransitions.empty() && bufferTransitions.empty() &&
-            uavTextures.empty() && uavBuffers.empty();
+            uavTextures.empty() && uavBuffers.empty() && aliasTextures.empty() && aliasBuffers.empty();
     }
 
     std::size_t GetBarrierCount() const
     {
         return textureTransitions.size() + bufferTransitions.size() +
-            uavTextures.size() + uavBuffers.size();
+            uavTextures.size() + uavBuffers.size() + aliasTextures.size() + aliasBuffers.size();
     }
 };

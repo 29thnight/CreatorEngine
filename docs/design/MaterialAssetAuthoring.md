@@ -25,6 +25,8 @@ The generic graph canvas supports stationary right-click on a connected input to
 
 ## Publication and lifetime contracts
 
+- Accepted material owners use the same immutable ownership_cpp and bounded cache contracts as AssetDepot. Apply clones the draft, validates every replacement and retained-budget admission before compare-and-publish, then refreshes consumers using the accepted owner. Oversized replacement batches fail without publishing
+- Isolated and queued graph preparations share a never-reused generation identity space. Authoring publication invalidates stale preparation tickets; cooked AssetDepot graphs retain the same content digest and surface-alpha metadata
 - Draft compilation never writes the accepted graph-generation or material caches. Generated-source scratch directories are per request and released after the owned product is created
 - Job captures own the graph, paths, output, and error text; they never capture a Session or DataSystem pointer. The document/revision pair must still match before accepting completion
 - A compile or binding failure leaves the last good preview and accepted Scene material intact. Pending and error states are visible in the editor
@@ -46,7 +48,7 @@ Graph document undo/redo handles node/link/socket/layout operations. Material-de
 
 ## Validation
 
-Only source/static checks were performed for this change. No compiler, build, engine execution, unit/runtime tests, or benchmarks were run.
+The integration with master `d5a6a26a78da93686b8168429183ee7e0d50a8de` was reviewed for immutable cache ownership, asynchronous preparation, cooked metadata, material references, and model texture context. Only source/static checks were performed for this change. No compiler, build, engine execution, unit/runtime tests, or benchmarks were run.
 
 Owner validation checklist:
 

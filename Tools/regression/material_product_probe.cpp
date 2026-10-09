@@ -1,3 +1,5 @@
+#include "../../Engine/RenderEngine/Texture.h"
+#include "support/MaterialPipelineSlot.h"
 #include "../../Engine/RenderEngine/MaterialGraphProduct.h"
 #include "../../Engine/RenderEngine/RHI/RHIShaderCompiler.h"
 #include "../../Engine/RenderEngine/RHI/RHIShaderSource.h"
@@ -341,7 +343,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     auto tight = budget;
     tight.textureSamples = 0;
     Check(!SelectRoute(program, capabilities, tight, selected, diagnostics), "Sample budget enforced");
-    auto owner = std::make_shared<const int>(27);
+    auto owner = own::make_shared<const Texture>();
     const TextureBinding texture{0, {{1}, RHIFormat::RGBA8UnormSrgb, 2, 2, 1, 1, false}, owner};
     const std::vector<ParameterOverride> overrides{{900, .25},
                                                    {901, std::array<double, 4>{.5, .25, 2, .75}},
@@ -350,7 +352,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
                                                    {904, std::array<double, 3>{4, 5, 6}}};
     ResourcePacket packet;
     Check(PrepareResources(layout, overrides, std::span(&texture, 1), packet, diagnostics), "Prepare resources");
-    Check(packet.owners.size() == 1 && packet.owners[0] == owner, "Own texture generation");
+    Check(packet.owners.size() == 1 && packet.owners[0]->m_assetId == owner->m_assetId, "Own texture generation");
     MaterialProbe::TextureFixture tex;
     tex.width = tex.height = 2;
     tex.srgb8 = true;
@@ -549,8 +551,8 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
           "Same cache handle is not invalidated");
     PipelineSlot lifetimeSlot;
     auto retiringTexture = texture;
-    auto retiringOwner = std::make_shared<const int>(91);
-    const std::weak_ptr<const int> lifetime = retiringOwner;
+    auto retiringOwner = own::make_shared<const Texture>();
+    const own::weak_owner<const Texture> lifetime = retiringOwner;
     retiringTexture.owner = retiringOwner;
     retiringOwner.reset();
     Check(lifetimeSlot.Publish(cache, verified, RHIShaderBinary::Dxil, capabilities, budget, overrides,
@@ -566,8 +568,8 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     lifetimeSlot.CollectRetired({50});
     Check(lifetime.expired() && lifetimeSlot.RetiredGenerationCount() == 0,
           "Completed graphics fence releases replaced texture owner");
-    auto unknownOwner = std::make_shared<const int>(92);
-    const std::weak_ptr<const int> unknownLifetime = unknownOwner;
+    auto unknownOwner = own::make_shared<const Texture>();
+    const own::weak_owner<const Texture> unknownLifetime = unknownOwner;
     retiringTexture.owner = unknownOwner;
     unknownOwner.reset();
     Check(lifetimeSlot.Publish(cache, verified, RHIShaderBinary::Dxil, capabilities, budget, overrides,
@@ -738,7 +740,7 @@ void VerifyCookedTree(const std::filesystem::path& root)
         key = program.product.program.semanticKey;
         Capabilities capabilities;
         capabilities.coreForward = true;
-        auto owner = std::make_shared<const int>(10);
+        auto owner = own::make_shared<const Texture>();
         const TextureBinding texture{0, {{1}, RHIFormat::RGBA8UnormSrgb, 1, 1, 1, 1, false}, owner};
         RHIGraphicsPipelineDesc description;
         description.layout = {1};

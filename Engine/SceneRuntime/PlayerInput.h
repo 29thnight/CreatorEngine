@@ -6,6 +6,12 @@ class ActionMap;
 class [[reflgen::reflect]] PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	PlayerInputComponent() = default;
 	

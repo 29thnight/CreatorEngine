@@ -1,3 +1,10 @@
+#include "AssetSetBuild.h"
+#include "AssetDepot/AssetSetActivation.h"
+#include "AssetDepot/RuntimeBootstrap.h"
+#include "Experiment/Cooked/MaterialAssetSetCodec.h"
+#include "ArtifactStoreGuard.h"
+#include <cwctype>
+#include "SoundAssetCookProducer.h"
 #include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedAudioClipFormat.h"
@@ -29,6 +36,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <process.h>
 #include <objbase.h> // MBC11: CoInitializeEx
 #include <set>
@@ -57,12 +65,19 @@ namespace
             AuthorModelAsset,
             IssueModelIdentityEpoch,
             CompileRuntimeDocuments,
+            BuildAssetSet,
+            ValidateAssetSets,
+            CopyAssetSet,
+            BuildRuntimeBootstrap,
         };
 
         Mode mode{ Mode::Cook };
         std::filesystem::path assetRoot{};
         std::filesystem::path outputRoot{};
         std::filesystem::path runtimeRoot{};
+        std::filesystem::path assetSetDefinition{};
+        std::filesystem::path artifactCache{};
+        std::string toolFingerprint{};
         // MBC11 — 게시된 generation 루트. 비우면 <asset-root>/../Library/ModelAssetGenerations.
         std::filesystem::path generationRoot{};
         std::vector<std::filesystem::path> models{};
@@ -75,6 +90,8 @@ namespace
         std::vector<std::filesystem::path> scenes{};
         std::string identityEpoch{};
         assets::ModelAuthoringFailurePoint modelAuthoringFailurePoint{};
+        std::optional<bool> buildMeshlets{};
+        std::optional<std::uint32_t> lodLevels{};
     };
 
     void PrintUsage()
@@ -87,11 +104,17 @@ namespace
             << "       [--material-program-root <preverified-program-tree>]\n"
             << "       (--model은 게시된 generation을 내보낸다 — 먼저 --author-model-asset)\n"
             << "       AssetCooker --author-model-asset "
-               "--asset-root <Assets> --output <generation-root> --model <source>\n"
+               "--asset-root <Assets> --output <generation-root> --model <source> [--build-meshlets true|false] [--lod-levels 0..7]\n"
             << "       AssetCooker --issue-model-identity-epoch "
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
                "--runtime-root <package-input-root>\n"
+            << "       AssetCooker --build-runtime-bootstrap --asset-root <document Assets> --output <new output> "
+               "--runtime-root <activated AssetSets Assets> --scene <source> ...\n"
+            << "       AssetCooker --copy-asset-set --asset-root <immutable output> --output <new staging directory>\n"
+            << "       AssetCooker --validate-asset-set-activation --asset-root <runtime Assets>\n"
+            << "       AssetCooker --build-asset-set --asset-root <Assets> --asset-set <source.yml> "
+               "--output <new-dir> --artifact-cache <cache-dir> --tool-fingerprint <sha256>\n"
             << "       AssetCooker --arguments-file <UTF-8 file; one argument per line>\n";
     }
 
@@ -150,6 +173,46 @@ namespace
                 PrintUsage();
                 return false;
             }
+            if (option == L"--build-runtime-bootstrap")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::BuildRuntimeBootstrap;
+                continue;
+            }
+            if (option == L"--copy-asset-set")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::CopyAssetSet;
+                continue;
+            }
+            if (option == L"--validate-asset-set-activation")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::ValidateAssetSets;
+                continue;
+            }
+            if (option == L"--build-asset-set")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::BuildAssetSet;
+                continue;
+            }
             if (option == L"--author-model-asset")
             {
                 if (out.mode != Arguments::Mode::Cook)
@@ -205,6 +268,33 @@ namespace
                 }
                 out.outputRoot = value;
             }
+            else if (option == L"--asset-set")
+            {
+                if (!out.assetSetDefinition.empty())
+                {
+                    failure = "--asset-set may appear once.";
+                    return false;
+                }
+                out.assetSetDefinition = value;
+            }
+            else if (option == L"--artifact-cache")
+            {
+                if (!out.artifactCache.empty())
+                {
+                    failure = "--artifact-cache may appear once.";
+                    return false;
+                }
+                out.artifactCache = value;
+            }
+            else if (option == L"--tool-fingerprint")
+            {
+                if (!out.toolFingerprint.empty())
+                {
+                    failure = "--tool-fingerprint may appear once.";
+                    return false;
+                }
+                out.toolFingerprint = value.string();
+            }
             else if (option == L"--runtime-root")
             {
                 if (!out.runtimeRoot.empty())
@@ -222,6 +312,25 @@ namespace
                     return false;
                 }
                 out.generationRoot = value;
+            }
+            else if (option == L"--lod-levels")
+            {
+                const auto text = value.native();
+                if (out.lodLevels.has_value() || text.size() != 1u || text[0] < L'0' || text[0] > L'7')
+                {
+                    failure = "--lod-levels requires one integer from 0 to 7.";
+                    return false;
+                }
+                out.lodLevels = static_cast<std::uint32_t>(text[0] - L'0');
+            }
+            else if (option == L"--build-meshlets")
+            {
+                if (out.buildMeshlets.has_value() || (value != L"true" && value != L"false"))
+                {
+                    failure = "--build-meshlets requires one true or false value.";
+                    return false;
+                }
+                out.buildMeshlets = value == L"true";
             }
             else if (option == L"--model")
             {
@@ -296,6 +405,58 @@ namespace
                 failure = "알 수 없는 option이다.";
                 return false;
             }
+        }
+
+        if (out.mode == Arguments::Mode::BuildRuntimeBootstrap)
+        {
+            if (out.assetRoot.empty() || out.outputRoot.empty() || out.runtimeRoot.empty() || out.scenes.empty()
+                || !out.assetSetDefinition.empty() || !out.artifactCache.empty() || !out.toolFingerprint.empty()
+                || !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty()
+                || !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty()
+                || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty() || !out.identityEpoch.empty()
+                || out.buildMeshlets.has_value() || out.lodLevels.has_value()
+                || out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+            {
+                failure = "Runtime bootstrap accepts document asset root, new output, activated AssetSet root and scene/prefab inputs only.";
+                return false;
+            }
+            return true;
+        }
+        if (out.mode == Arguments::Mode::ValidateAssetSets || out.mode == Arguments::Mode::CopyAssetSet)
+        {
+            const bool copy = out.mode == Arguments::Mode::CopyAssetSet;
+            if (out.assetRoot.empty() || (copy ? out.outputRoot.empty() : !out.outputRoot.empty()) || !out.assetSetDefinition.empty()
+                || !out.artifactCache.empty() || !out.toolFingerprint.empty() || !out.runtimeRoot.empty()
+                || !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty()
+                || !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty()
+                || !out.scenes.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty()
+                || !out.identityEpoch.empty() || out.buildMeshlets.has_value() || out.lodLevels.has_value()
+                || out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+            {
+                failure = "AssetSet validation accepts --asset-root; copying additionally requires --output <new staging directory>.";
+                return false;
+            }
+            return true;
+        }
+        if (out.mode == Arguments::Mode::BuildAssetSet)
+        {
+            if (out.assetRoot.empty() || out.outputRoot.empty() || out.assetSetDefinition.empty() ||
+                out.artifactCache.empty() || out.toolFingerprint.empty() || !out.runtimeRoot.empty() ||
+                !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty() ||
+                !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty() ||
+                !out.scenes.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty() ||
+                !out.identityEpoch.empty() || out.buildMeshlets.has_value() || out.lodLevels.has_value() ||
+                out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+            {
+                failure = "build-asset-set requires only source root, definition, new output, cache and tool fingerprint.";
+                return false;
+            }
+            return true;
+        }
+        if (!out.assetSetDefinition.empty() || !out.artifactCache.empty() || !out.toolFingerprint.empty())
+        {
+            failure = "--asset-set, --artifact-cache and --tool-fingerprint require --build-asset-set.";
+            return false;
         }
 
         if ((!out.shaderGraphs.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty()) &&
@@ -700,7 +861,7 @@ namespace
                     failure = "OGG audio source는 지원하지 않는다: " + source.string();
                     return false;
                 }
-                if (assets::IsAudioClipSource(source))
+                if (assets::IsAudioClipSource(source) || extension == ".soundgraph" || extension == ".soundpreset")
                 {
                     std::filesystem::path metaPath = source;
                     metaPath += ".meta";
@@ -783,6 +944,12 @@ namespace
                 const Authoring::ReadNode hash = audio["sourceContentHash"];
                 assets::AudioClipSourceMetadata inspected{};
                 std::string inspectionError;
+                if (audio.HasChild("loopStartFrame") || audio.HasChild("loopEndFrame")
+                    || document.Root().HasChild("loopStartFrame") || document.Root().HasChild("loopEndFrame"))
+                {
+                    failure = "Audio loop markers require a newer CEAC schema; only whole-clip looping is supported: " + source.string();
+                    return false;
+                }
                 if (!audio.IsMap() || audio["schemaVersion"].Scalar() != "1"
                     || !mode.IsScalar() || !assets::IsAudioLoadMode(mode.Scalar())
                     || !spatial.IsScalar() || !assets::IsAudioSpatialKind(spatial.Scalar())
@@ -1061,6 +1228,74 @@ namespace
             return 2;
         }
 
+        const bool bootstrap = arguments.mode == Arguments::Mode::BuildRuntimeBootstrap;
+        std::vector<ck::AssetSetMountInput> bootstrapSets;
+        AssetDepot::RuntimeBootstrapReceipt bootstrapReceipt;
+        ck::CookedAssetCatalog bootstrapCatalog;
+        if (bootstrap)
+        {
+            std::string failure;
+            if (!AssetDepot::ValidateConfiguredAssetSets(arguments.runtimeRoot, failure)
+                || !AssetDepot::ReadConfiguredAssetSets(arguments.runtimeRoot, bootstrapSets, failure,
+                    &bootstrapReceipt.assetSetHashes) || bootstrapSets.empty())
+            {
+                std::cerr << "asset-cooker error: bootstrap AssetSet group is invalid: " << failure << '\n';
+                return 3;
+            }
+            std::uint64_t mount{};
+            for (auto& input : bootstrapSets) input.mountId.value = ++mount;
+            std::vector<ck::AssetManifestIssue> issues;
+            const ck::CookedAssetCatalog empty;
+            if (!empty.WithMountedAssetSets(bootstrapSets, mount, bootstrapCatalog, issues))
+            {
+                std::cerr << "asset-cooker error: bootstrap typed union is invalid.\n";
+                return 3;
+            }
+            const auto setRoot = std::filesystem::weakly_canonical(arguments.runtimeRoot);
+            if (IsContainedPath(setRoot, outputRoot) || IsContainedPath(outputRoot, setRoot) || outputRoot == setRoot
+                || IsContainedPath(assetRoot, setRoot) || IsContainedPath(setRoot, assetRoot) || assetRoot == setRoot)
+            {
+                std::cerr << "asset-cooker error: bootstrap document, output and activated-set roots must be disjoint.\n";
+                return 3;
+            }
+            std::set<std::filesystem::path> selectedDocuments;
+            for (const auto& source : arguments.scenes)
+                selectedDocuments.insert(std::filesystem::weakly_canonical(source.is_relative() ? assetRoot / source : source));
+            // Standalone native invocation has the same source boundary as BuildTool.
+            for (const auto& item : std::filesystem::recursive_directory_iterator(assetRoot))
+            {
+                const auto attributes = GetFileAttributesW(item.path().c_str());
+                if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0u)
+                {
+                    std::cerr << "asset-cooker error: bootstrap input identity is indirect.\n";
+                    return 3;
+                }
+                if (!item.is_regular_file()) continue;
+                auto path = item.path();
+                if (path.extension() == ".meta") path.replace_extension();
+                const auto extension = path.extension().string();
+                const auto relative = path.lexically_relative(assetRoot).generic_string();
+                const bool shader = relative.starts_with("Shaders/")
+                    && (extension == ".slang" || extension == ".hlsl" || extension == ".hlsli");
+                const bool document = extension == ".creator" || extension == ".prefab" || extension == ".inputmap"
+                    || extension == ".bt" || extension == ".blackboard" || extension == ".renderprofile"
+                    || extension == ".terrain" || extension == ".foliage" || extension == ".cegeometry"
+                    || extension == ".wav" || extension == ".mp3" || extension == ".flac"
+                    || extension == ".soundgraph" || extension == ".soundpreset";
+                if ((extension == ".creator" || extension == ".prefab")
+                    && !selectedDocuments.contains(std::filesystem::weakly_canonical(path)))
+                {
+                    std::cerr << "asset-cooker error: bootstrap document was not selected for compilation: " << relative << '\n';
+                    return 3;
+                }
+                if ((!shader && !document) || relative.starts_with("Derived/") || relative.starts_with("AssetSets/"))
+                {
+                    std::cerr << "asset-cooker error: non-document bootstrap input: " << relative << '\n';
+                    return 3;
+                }
+            }
+        }
+
         // MBC11 — 모델은 굽지 않고 게시된 generation을 검증해 내보낸다.
         std::vector<ck::ModelGenerationExportProduct> products;
         products.reserve(arguments.models.size());
@@ -1276,6 +1511,14 @@ namespace
                 }
                 verifiedProduct = std::move(verified.product);
             }
+            // The player picks DX12 or Vulkan at boot, so a package must carry both.
+            // An editor-built program may hold only the editor's backend.
+            if (!material_graph::HasSceneBackend(verifiedProduct, RHIShaderBinary::Dxil) ||
+                !material_graph::HasSceneBackend(verifiedProduct, RHIShaderBinary::SpirV))
+            {
+                std::cerr << "asset-cooker error: material program must carry both DXIL and SPIR-V stages.\n";
+                return 3;
+            }
             ck::MaterialProgramCookProduct product;
             if (!ck::BuildMaterialProgramCookProduct(graphId, *graph, verifiedProduct, materialBudget, product, graphError))
             {
@@ -1334,7 +1577,7 @@ namespace
         for (const std::filesystem::path& scene : arguments.scenes)
         {
             ck::SceneCookProductResult result =
-                ck::BuildSceneCookProduct({ scene, assetRoot });
+                ck::BuildSceneCookProduct({ scene, assetRoot, bootstrap });
             if (!result.Succeeded())
             {
                 for (const ck::SceneCookProductIssue& issue : result.issues)
@@ -1421,6 +1664,77 @@ namespace
             }
         }
 
+        if (bootstrap)
+        {
+            // .foliage remains an existing CEDO document, not a new AssetSet kind.
+            // Validate its explicit typed identities before its bytes are frozen
+            // with this exact activated set group in the bootstrap report.
+            std::size_t foliageDocuments{};
+            std::uint64_t foliageBytes{};
+            for (const auto& item : std::filesystem::recursive_directory_iterator(assetRoot))
+            {
+                if (!item.is_regular_file() || item.path().extension() != ".foliage") continue;
+                const auto size = item.file_size();
+                if (++foliageDocuments > 16384u || size == 0u || size > 16u * 1024u * 1024u
+                    || foliageBytes > 64u * 1024u * 1024u - size)
+                {
+                    std::cerr << "asset-cooker error: bootstrap Foliage document budget exceeded.\n";
+                    return 3;
+                }
+                foliageBytes += size;
+                std::string failure;
+                const auto document = Authoring::ParsedDocument::ParseFile(item.path().string(), failure);
+                std::vector<ck::TypedAssetReference> references;
+                if (!document || !ck::CollectFoliageBootstrapReferences(document.Root(), references, failure))
+                {
+                    std::cerr << "asset-cooker error: invalid bootstrap Foliage document: " << item.path()
+                        << ": " << failure << '\n';
+                    return 3;
+                }
+                for (const auto& reference : references)
+                {
+                    ck::ResolvedAssetEntry resolved;
+                    if (bootstrapCatalog.Find(reference, resolved) != ck::AssetLookupStatus::Found)
+                    {
+                        std::cerr << "asset-cooker error: missing/wrong-kind bootstrap Foliage reference in "
+                            << item.path() << ": " << Uuid::ToString(reference.key.assetId.value) << '\n';
+                        return 3;
+                    }
+                }
+            }
+            // Offline document validation may read prebuilt Program bytes, never
+            // graph source or a compiler. Runtime activation remains metadata-only.
+            for (const auto& scene : sceneProducts)
+            {
+                for (const auto& reference : scene.bootstrapReferences)
+                {
+                    if (reference.kind != ck::CookedAssetKind::MaterialProgram
+                        || materialPrograms.contains(reference.key.assetId)) continue;
+                    ck::ResolvedAssetEntry resolved;
+                    std::string failure;
+                    if (bootstrapCatalog.Find(reference, resolved) != ck::AssetLookupStatus::Found
+                        || resolved.blob.byteSize > ck::kMaterialProgramAssetSetMaxBytes)
+                    {
+                        std::cerr << "asset-cooker error: bootstrap MaterialProgram missing/oversized.\n";
+                        return 3;
+                    }
+                    std::vector<std::byte> bytes(static_cast<std::size_t>(resolved.blob.byteSize));
+                    ck::Sha256Digest digest{};
+                    material_graph::CookedProgram program;
+                    if (!ck::CaptureArtifactSource(resolved.byteSource, resolved.blob.artifactPath, failure)
+                        || !resolved.byteSource->ReadAt(resolved.blob.artifactPath, 0u, bytes, failure)
+                        || !ck::ComputeSha256(bytes, digest, failure) || digest != resolved.blob.contentSha256
+                        || !ck::ReadMaterialProgramAssetSetArtifact(bytes, reference, resolved.entry.dependencies,
+                            materialBudget, program, failure))
+                    {
+                        std::cerr << "asset-cooker error: bootstrap MaterialProgram invalid: " << failure << '\n';
+                        return 3;
+                    }
+                    materialPrograms.emplace(reference.key.assetId, std::move(program.product));
+                }
+            }
+        }
+
         auto instanceSources = arguments.materials;
         instanceSources.insert(instanceSources.end(), arguments.scenes.begin(), arguments.scenes.end());
         for (const auto& source : instanceSources)
@@ -1428,7 +1742,7 @@ namespace
             std::string failure;
             const auto path = source.is_relative() ? assetRoot / source : source;
             const auto document = Authoring::ParsedDocument::ParseFile(path.string(), failure);
-            if (!document || !material_cook::ValidateInstances(document.Root(), materialPrograms, manifest, failure))
+            if (!document || !material_cook::ValidateInstances(document.Root(), materialPrograms, manifest, failure, bootstrap ? &bootstrapCatalog : nullptr))
             {
                 std::cerr << "asset-cooker error: material instance closure failed: " << failure << '\n';
                 return 3;
@@ -1452,7 +1766,72 @@ namespace
             return 3;
         }
         for (const AudioCookProduct& product : audioProducts)
+        {
             totalArtifactBytes += product.manifestEntry.byteSize;
+        }
+        std::vector<sound_cook::Product> soundProducts;
+        if (!sound_cook::Build(assetRoot, manifest, artifactPaths, soundProducts, sourceIdentityFailure)
+            || !sound_cook::RewriteScenes(sceneProducts, manifest, sourceIdentityFailure))
+        {
+            std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
+            return 3;
+        }
+        for (const auto& product : soundProducts)
+        {
+            totalArtifactBytes += product.entry.byteSize;
+        }
+        totalSceneBytes = 0u;
+        for (const auto& scene : sceneProducts)
+        {
+            totalSceneBytes += scene.artifactBytes.size();
+        }
+        // Audio runtime uses cooked GUID entries only. The source identity
+        // table must not become a Player fallback to authoring audio paths.
+        std::erase_if(manifest.sourceAssets, [&](const auto& source)
+        {
+            const auto* entry = manifest.Find(source.assetId);
+            return entry && (entry->kind == ck::CookedAssetKind::AudioClip
+                || entry->kind == ck::CookedAssetKind::SoundGraph || entry->kind == ck::CookedAssetKind::SoundPreset);
+        });
+        if (bootstrap)
+        {
+            for (auto& scene : sceneProducts)
+            {
+                if (scene.legacyTextureNameReferences != 0u)
+                {
+                    std::cerr << "asset-cooker error: bootstrap scene still uses texture-name fallback.\n";
+                    return 3;
+                }
+                AssetDepot::RuntimeBootstrapDocument document{scene.sceneAssetId, scene.manifestEntry.contentSha256, {}};
+                for (const auto& reference : scene.bootstrapReferences)
+                {
+                    const auto* local = manifest.Find(reference.key.assetId);
+                    if (local)
+                    {
+                        if (local->kind != reference.kind)
+                        {
+                            std::cerr << "asset-cooker error: bootstrap local reference has the wrong kind.\n";
+                            return 3;
+                        }
+                        continue;
+                    }
+                    ck::ResolvedAssetEntry external;
+                    if (bootstrapCatalog.Find(reference, external) != ck::AssetLookupStatus::Found)
+                    {
+                        std::cerr << "asset-cooker error: missing/wrong-kind bootstrap reference: "
+                            << Uuid::ToString(reference.key.assetId.value) << '\n';
+                        return 3;
+                    }
+                    document.references.push_back(reference);
+                    std::erase(scene.manifestEntry.dependencies, reference.key.assetId);
+                }
+                // Only explicitly checked external document edges leave v2.
+                // Its remaining local dependency rules are exactly unchanged.
+                auto entry = std::ranges::find(manifest.entries, scene.sceneAssetId, &ck::CookedAssetManifestEntry::assetId);
+                *entry = scene.manifestEntry;
+                bootstrapReceipt.documents.push_back(std::move(document));
+            }
+        }
         if (manifest.entries.empty())
         {
             std::cerr << "asset-cooker error: cook할 cooked asset이 없다.\n";
@@ -1634,6 +2013,15 @@ namespace
             if (!WriteAudioCookProduct(product, stagingRoot, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+        }
+
+        for (const auto& product : soundProducts)
+        {
+            if (!WriteBinaryFile(stagingRoot / product.entry.artifactPath, product.bytes, failure))
+            {
+                std::cerr << "asset-cooker error: sound artifact publication failed: " << failure << '\n';
                 return 5;
             }
         }
@@ -1916,6 +2304,20 @@ namespace
             closureSweptFiles = sweptFiles;
         }
 
+        if (bootstrap)
+        {
+            std::string receiptText;
+            if (!ck::ComputeSha256(persistedManifest, bootstrapReceipt.legacyManifestSha256, failure)
+                || !AssetDepot::WriteRuntimeBootstrapReceipt(bootstrapReceipt, receiptText, failure)
+                || !WriteBinaryFile(stagingRoot / "Derived/bootstrap-asset-references.cebr",
+                    {reinterpret_cast<const std::byte*>(receiptText.data()), receiptText.size()}, failure))
+            {
+                std::cerr << "asset-cooker error: bootstrap receipt failed: " << failure << '\n';
+                return 5;
+            }
+            ++closureSweptFiles;
+        }
+
         // A freshly closed staging tree can be held briefly by another Windows
         // file-system consumer. Retry only access-denied publication while the
         // destination is still absent; other errors remain immediate failures.
@@ -1962,7 +2364,8 @@ namespace
             << " textureBytes=" << totalTextureBytes
             << " shaderMetaBytes=" << totalShaderMetaBytes
             << " manifest=Derived/asset-manifest.cemf\n";
-        std::cout << "asset-cooker audioClips=" << audioProducts.size() << '\n';
+        std::cout << "asset-cooker audioClips=" << audioProducts.size()
+            << " soundAssets=" << soundProducts.size() << '\n';
         for (const ck::ShaderMetaCookProduct& product : shaderMetaProducts)
         {
             // ★ source 셰이더 GUID 를 여기서 소비한다. 해소는 증명해 놓고
@@ -1986,6 +2389,97 @@ namespace
         }
         return 0;
     }
+    int CopyAssetSetForPackage(const Arguments& arguments)
+    {
+        try
+        {
+            std::string failure;
+            AssetDepot::ArtifactStoreGuard sourceGuard;
+            const auto sourceAccess = AssetDepot::ArtifactStoreGuard::OpenShared(
+                arguments.assetRoot, sourceGuard, failure);
+            if (sourceAccess != AssetDepot::ArtifactStoreAccess::Acquired
+                && sourceAccess != AssetDepot::ArtifactStoreAccess::Unmanaged)
+            {
+                throw std::runtime_error("Cannot lease AssetSet copy source: " + failure);
+            }
+            const auto source = sourceGuard.BackingPath();
+            const auto requested = std::filesystem::absolute(arguments.outputRoot).lexically_normal();
+            if (requested.filename().empty() || !std::filesystem::is_directory(source))
+            {
+                throw std::runtime_error("AssetSet copy requires a directory and a new named output.");
+            }
+            // The host must supply its private, unpublished staging tree.
+            // An unmanaged immediate parent alone does not prove that policy;
+            // GamePackager creates/owns the whole candidate and checks disjointness.
+            AssetDepot::ArtifactStoreGuard parentGuard;
+            if (AssetDepot::ArtifactStoreGuard::OpenShared(requested.parent_path(), parentGuard, failure)
+                != AssetDepot::ArtifactStoreAccess::Unmanaged)
+            {
+                throw std::runtime_error("AssetSet copy destination must be an unpublished unmanaged staging parent: " + failure);
+            }
+            const auto destination = parentGuard.BackingPath() / requested.filename();
+            const auto folded = [](const std::filesystem::path& path)
+            {
+                auto value = path.native();
+                for (auto& character : value)
+                {
+                    character = static_cast<wchar_t>(std::towlower(character));
+                    if (character == L'/')
+                    {
+                        character = L'\\';
+                    }
+                }
+                return value;
+            };
+            const auto sourceName = folded(source);
+            const auto destinationName = folded(destination);
+            if (destinationName == sourceName || destinationName.starts_with(sourceName + L"\\")
+                || sourceName.starts_with(destinationName + L"\\")
+                || std::filesystem::exists(destination)
+                || !std::filesystem::create_directory(destination))
+            {
+                throw std::runtime_error("AssetSet copy output exists or overlaps its immutable source.");
+            }
+            std::size_t copied{};
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(source))
+            {
+                const auto attributes = GetFileAttributesW(entry.path().c_str());
+                if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0u)
+                {
+                    throw std::runtime_error("AssetSet copy encountered an inaccessible or reparse entry.");
+                }
+                const auto relative = entry.path().lexically_relative(source);
+                const auto target = destination / relative;
+                if (entry.is_directory())
+                {
+                    std::filesystem::create_directory(target);
+                }
+                else if (entry.is_regular_file())
+                {
+                    std::filesystem::copy_file(entry.path(), target);
+                    ++copied;
+                }
+                else
+                {
+                    throw std::runtime_error("AssetSet copy supports only regular files/directories.");
+                }
+            }
+            if (!sourceGuard.ValidateBacking(failure) || !parentGuard.ValidateBacking(failure))
+            {
+                throw std::runtime_error("AssetSet copy backing changed: " + failure);
+            }
+            // No enrollment/guard is copied into portable package content. The
+            // caller validates every receipt/CAS byte in its unpublished stage.
+            std::cout << "asset-cooker asset-set copied files=" << copied << '\n';
+            return 0;
+        }
+        catch (const std::exception& exception)
+        {
+            std::cerr << "asset-cooker error: " << exception.what() << '\n';
+            return 9;
+        }
+    }
+
 }
 
 int wmain(int argc, wchar_t** argv)
@@ -2017,6 +2511,52 @@ int wmain(int argc, wchar_t** argv)
         PrintUsage();
         return 2;
     }
+    if (arguments.mode == Arguments::Mode::CopyAssetSet)
+    {
+        return CopyAssetSetForPackage(arguments);
+    }
+    if (arguments.mode == Arguments::Mode::ValidateAssetSets)
+    {
+        try
+        {
+            if (!AssetDepot::ValidateConfiguredAssetSets(arguments.assetRoot, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 9;
+            }
+            std::cout << "asset-cooker asset-set activation metadata validated\n";
+            return 0;
+        }
+        catch (const std::exception& exception)
+        {
+            std::cerr << "asset-cooker error: " << exception.what() << '\n';
+            return 9;
+        }
+    }
+    if (arguments.mode == Arguments::Mode::BuildAssetSet)
+    {
+        if (FAILED(comInit))
+        {
+            std::cerr << "asset-cooker error: COM initialization failed for texture validation.\n";
+            return 9;
+        }
+        const auto result = AssetCooking::BuildAssetSet({ arguments.assetRoot, arguments.assetSetDefinition,
+            arguments.outputRoot, arguments.artifactCache, arguments.toolFingerprint });
+        if (!result.succeeded)
+        {
+            std::cerr << "asset-cooker error: " << result.failure << '\n';
+            return 9;
+        }
+        std::cout << "asset-cooker asset-set format=CEMF3 assets=" << result.assets
+            << " blobs=" << result.blobs << " reusedBlobs=" << result.reusedBlobs << '\n';
+        return 0;
+    }
+    if ((arguments.buildMeshlets.has_value() || arguments.lodLevels.has_value())
+        && arguments.mode != Arguments::Mode::AuthorModelAsset)
+    {
+        std::cerr << "--build-meshlets is an authoring setting; cook only exports published generations.\n";
+        return 2;
+    }
     if (arguments.mode == Arguments::Mode::AuthorModelAsset)
     {
         const std::filesystem::path source = arguments.models.front().is_relative()
@@ -2029,6 +2569,8 @@ int wmain(int argc, wchar_t** argv)
             / "ProjectSetting" / "AssetIdentity.asset";
         request.generationRoot = arguments.outputRoot;
         request.failurePoint = arguments.modelAuthoringFailurePoint;
+        request.buildMeshlets = arguments.buildMeshlets;
+        request.lodLevels = arguments.lodLevels;
         const assets::ModelAssetAuthoringResult result =
             assets::AuthorModelAsset(request);
         if (!result.Succeeded())
@@ -2037,6 +2579,10 @@ int wmain(int argc, wchar_t** argv)
                 std::cerr << "asset-cooker error [" << issue.stage << "]: "
                     << issue.message << '\n';
             return 7;
+        }
+        for (const auto& warning : result.warnings)
+        {
+            std::cerr << "asset-cooker warning [" << warning.stage << "]: " << warning.message << '\n';
         }
         std::cout << "asset-cooker model-authoring model="
             << Uuid::ToString(result.modelAssetId)

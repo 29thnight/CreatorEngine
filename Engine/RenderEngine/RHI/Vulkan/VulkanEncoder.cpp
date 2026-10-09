@@ -6,6 +6,36 @@
 #include "VulkanBindingTable.h"
 
 #include <algorithm>
+#include <cmath>
+
+static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(VkDrawIndirectCommand));
+static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==
+    offsetof(VkDrawIndirectCommand, vertexCount));
+static_assert(offsetof(RHIDrawIndirectArguments, instanceCount) ==
+    offsetof(VkDrawIndirectCommand, instanceCount));
+static_assert(offsetof(RHIDrawIndirectArguments, firstVertex) ==
+    offsetof(VkDrawIndirectCommand, firstVertex));
+static_assert(offsetof(RHIDrawIndirectArguments, firstInstance) ==
+    offsetof(VkDrawIndirectCommand, firstInstance));
+
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(VkDrawIndexedIndirectCommand));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(VkDrawIndexedIndirectCommand, indexCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(VkDrawIndexedIndirectCommand, instanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(VkDrawIndexedIndirectCommand, firstIndex));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(VkDrawIndexedIndirectCommand, vertexOffset));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
+    offsetof(VkDrawIndexedIndirectCommand, firstInstance));
+static_assert(sizeof(RHIDispatchMeshIndirectArguments) == sizeof(VkDrawMeshTasksIndirectCommandEXT));
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountX) ==
+    offsetof(VkDrawMeshTasksIndirectCommandEXT, groupCountX));
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountY) ==
+    offsetof(VkDrawMeshTasksIndirectCommandEXT, groupCountY));
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountZ) ==
+    offsetof(VkDrawMeshTasksIndirectCommandEXT, groupCountZ));
 
 using namespace VulkanApi;
 
@@ -62,6 +92,52 @@ void VulkanEncoder::SetViewportAndScissor(uint32_t width, uint32_t height)
     vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
 }
 
+bool VulkanEncoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || !std::isfinite(x) || !std::isfinite(y) ||
+        width == 0 || height == 0 || width > m_viewportLimits.maxWidth || height > m_viewportLimits.maxHeight)
+    {
+        return false;
+    }
+    const double right = static_cast<double>(x) + width;
+    const double bottom = static_cast<double>(y) + height;
+    if (x < m_viewportLimits.lowerBound || y < m_viewportLimits.lowerBound ||
+        right > m_viewportLimits.upperBound || bottom > m_viewportLimits.upperBound)
+    {
+        return false;
+    }
+
+    // 기존 전체 화면 경로와 같은 Y 반전이다. 음수 오프셋도 논리 좌상단을 뜻한다.
+    const VkViewport viewport{ x, y + static_cast<float>(height),
+        static_cast<float>(width), -static_cast<float>(height), 0.f, 1.f };
+    const double nativeRight = static_cast<double>(viewport.x) + viewport.width;
+    const double nativeTop = static_cast<double>(viewport.y) + viewport.height;
+    if (!std::isfinite(viewport.y) ||
+        static_cast<double>(viewport.width) > m_viewportLimits.maxWidth ||
+        -static_cast<double>(viewport.height) > m_viewportLimits.maxHeight ||
+        nativeRight > m_viewportLimits.upperBound ||
+        viewport.y < m_viewportLimits.lowerBound || viewport.y > m_viewportLimits.upperBound ||
+        nativeTop < m_viewportLimits.lowerBound || nativeTop > m_viewportLimits.upperBound)
+    {
+        return false;
+    }
+    vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
+    return true;
+}
+
+bool VulkanEncoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    constexpr uint32_t kMaxScissorCoordinate = INT32_MAX;
+    if (VK_NULL_HANDLE == m_commandBuffer || x > kMaxScissorCoordinate || y > kMaxScissorCoordinate ||
+        width > kMaxScissorCoordinate - x || height > kMaxScissorCoordinate - y)
+    {
+        return false;
+    }
+    const VkRect2D scissor{ { static_cast<int32_t>(x), static_cast<int32_t>(y) }, { width, height } };
+    vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+    return true;
+}
+
 void VulkanEncoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
 {
     if (VK_NULL_HANDLE == m_commandBuffer) return;
@@ -70,18 +146,34 @@ void VulkanEncoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
 
 void VulkanEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
 {
-    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_pipelines) return;
+    const size_t index = static_cast<size_t>(bindPoint);
+    if (index >= 2)
+    {
+        return;
+    }
 
     // 핸들이 짝을 푼다. 어긋난 조합이 만들어질 자리가 없다.
-    const VulkanPipelineEntry entry = m_pipelines->Resolve(pipeline);
-    if (!entry.IsValid()) return;
+    const VulkanPipelineEntry entry = m_pipelines ? m_pipelines->Resolve(pipeline) : VulkanPipelineEntry{};
+    if (VK_NULL_HANDLE == m_commandBuffer || !entry.IsValid() ||
+        ((bindPoint == RHIBindPoint::Compute) != (entry.kind == VulkanPipelineKind::Compute)))
+    {
+        // Vulkan cannot unbind a pipeline. Invalidate our logical binding so a failed
+        // bind cannot dispatch the previous indexed/mesh pipeline by accident.
+        m_boundPipeline[index] = {};
+        m_boundLayout[index] = VK_NULL_HANDLE;
+        m_boundSetLayout[index] = VK_NULL_HANDLE;
+        m_boundLayoutHandle[index] = {};
+        m_pending[index].clear();
+        m_descriptorsDirty[index] = false;
+        NoteUnimplemented("SetPipeline(invalid handle or pipeline kind)");
+        return;
+    }
 
     vkCmdBindPipeline(m_commandBuffer, VkEncoderBindPoint(bindPoint), entry.pipeline);
 
     // 레이아웃을 기억한다. 파이프라인에 구워져 있어도 vkCmdBindDescriptorSets 가
     // 다시 요구하고, Vulkan 은 파이프라인에게 레이아웃을 되물을 방법을 주지
     // 않는다 — 그래서 '짝'이다(헤더 ★).
-    const size_t index = static_cast<size_t>(bindPoint);
     if (m_boundLayoutHandle[index].id != entry.layoutHandle.id)
     {
         // 서로 다른 셋 레이아웃의 디스크립터 상태를 섞지 않는다. 같은
@@ -92,6 +184,21 @@ void VulkanEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeli
     m_boundLayout[index] = entry.layout;
     m_boundSetLayout[index] = entry.setLayout;
     m_boundLayoutHandle[index] = entry.layoutHandle;
+    m_boundPipeline[index] = pipeline;
+}
+
+bool VulkanEncoder::IsPipelineBound(RHIBindPoint bindPoint, bool mesh) const
+{
+    const size_t index = static_cast<size_t>(bindPoint);
+    if (index >= 2 || !m_pipelines || !m_boundPipeline[index].IsValid())
+    {
+        return false;
+    }
+    // Resolve again to reject handles invalidated after SetPipeline.
+    const auto entry = m_pipelines->Resolve(m_boundPipeline[index]);
+    const auto expected = bindPoint == RHIBindPoint::Compute ? VulkanPipelineKind::Compute :
+        (mesh ? VulkanPipelineKind::Mesh : VulkanPipelineKind::Graphics);
+    return entry.IsValid() && entry.kind == expected && entry.layout == m_boundLayout[index];
 }
 
 void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
@@ -142,11 +249,14 @@ void VulkanEncoder::UpsertBinding(size_t bindPointIndex, const PendingBinding& b
     m_descriptorsDirty[bindPointIndex] = true;
 }
 
-void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
+bool VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
 {
     const size_t index = static_cast<size_t>(bindPoint);
     std::vector<PendingBinding>& pending = m_pending[index];
-    if (pending.empty() || !m_descriptorsDirty[index]) return;
+    if (pending.empty() || !m_descriptorsDirty[index])
+    {
+        return true;
+    }
 
     const VkPipelineLayout layout = m_boundLayout[index];
     const VkDescriptorSetLayout setLayout = m_boundSetLayout[index];
@@ -156,16 +266,14 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
         // 파이프라인을 안 걸고 상수를 건 것이다. 조용히 넘어가면 "그렸는데
         // 상수가 안 걸렸다"가 되므로 센다.
         NoteUnimplemented("FlushDescriptors(파이프라인 없음)");
-        m_descriptorsDirty[index] = false;
-        return;
+        return false;
     }
 
     const VkDescriptorSet set = m_descriptors->Allocate(m_device, setLayout);
     if (VK_NULL_HANDLE == set)
     {
         NoteUnimplemented("FlushDescriptors(디스크립터 예산 소진)");
-        m_descriptorsDirty[index] = false;
-        return;
+        return false;
     }
 
     std::vector<VkWriteDescriptorSet> writes;
@@ -183,12 +291,12 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
             if (!target.IsValid())
             {
                 NoteUnimplemented("FlushDescriptors(슬롯 번호표에 없다)");
-                continue;
+                return false;
             }
             if (1 != target.count || item.type != target.type)
             {
                 NoteUnimplemented("FlushDescriptors(루트 버퍼 종류 불일치)");
-                continue;
+                return false;
             }
             binding = target.binding;
             type = target.type;
@@ -219,13 +327,20 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
     }
 
     m_descriptorsDirty[index] = false;
+    return true;
 }
 
 void VulkanEncoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
     uint32_t firstVertex, uint32_t firstInstance)
 {
-    if (VK_NULL_HANDLE == m_commandBuffer) return;
-    FlushDescriptors(RHIBindPoint::Graphics);
+    if (VK_NULL_HANDLE == m_commandBuffer || !IsPipelineBound(RHIBindPoint::Graphics))
+    {
+        return;
+    }
+    if (!FlushDescriptors(RHIBindPoint::Graphics))
+    {
+        return;
+    }
     vkCmdDraw(m_commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
@@ -268,16 +383,113 @@ void VulkanEncoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format
 void VulkanEncoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance)
 {
-    if (VK_NULL_HANDLE == m_commandBuffer) return;
-    FlushDescriptors(RHIBindPoint::Graphics);
+    if (VK_NULL_HANDLE == m_commandBuffer || !IsPipelineBound(RHIBindPoint::Graphics))
+    {
+        return;
+    }
+    if (!FlushDescriptors(RHIBindPoint::Graphics))
+    {
+        return;
+    }
     vkCmdDrawIndexed(m_commandBuffer, indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
 }
 
+bool VulkanEncoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        !m_indirectDrawCapabilities.nonIndexedDraw || nullptr == vkCmdDrawIndirect ||
+        !m_renderingOpen || !IsPipelineBound(RHIBindPoint::Graphics) || 0 != byteOffset % 4)
+    {
+        return false;
+    }
+    const VulkanBufferEntry entry = m_resources->Resolve(arguments);
+    if (!entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndirectArguments) > entry.bytes - byteOffset ||
+        !FlushDescriptors(RHIBindPoint::Graphics))
+    {
+        return false;
+    }
+    // One command needs no multiDrawIndirect feature. firstInstance is zero for
+    // procedural geometry; the explicit shader base preserves original IDs.
+    vkCmdDrawIndirect(m_commandBuffer, entry.buffer, byteOffset, 1, sizeof(RHIDrawIndirectArguments));
+    return true;
+}
+
+bool VulkanEncoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        !m_indirectDrawCapabilities.indexedDraw || nullptr == vkCmdDrawIndexedIndirect ||
+        !m_renderingOpen || !IsPipelineBound(RHIBindPoint::Graphics) || 0 != byteOffset % 4)
+    {
+        return false;
+    }
+    const VulkanBufferEntry entry = m_resources->Resolve(arguments);
+    if (!entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+
+    if (!FlushDescriptors(RHIBindPoint::Graphics))
+    {
+        return false;
+    }
+
+    // multiDrawIndirect는 요구하지 않는다. firstInstance 제약은 생산자가 지킨다.
+    vkCmdDrawIndexedIndirect(m_commandBuffer, entry.buffer, byteOffset, 1,
+        sizeof(RHIDrawIndexedIndirectArguments));
+    return true;
+}
+
+bool VulkanEncoder::DispatchMesh(uint32_t x, uint32_t y, uint32_t z)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || !m_renderingOpen ||
+        !m_meshShaderCapabilities.SupportsDispatch(x, y, z) || nullptr == vkCmdDrawMeshTasksEXT ||
+        !IsPipelineBound(RHIBindPoint::Graphics, true) || !FlushDescriptors(RHIBindPoint::Graphics))
+    {
+        return false;
+    }
+    vkCmdDrawMeshTasksEXT(m_commandBuffer, x, y, z);
+    return true;
+}
+
+bool VulkanEncoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || !m_renderingOpen || !m_resources ||
+        !m_meshShaderCapabilities.meshShader || !m_meshShaderCapabilities.meshIndirect ||
+        nullptr == vkCmdDrawMeshTasksIndirectEXT || !IsPipelineBound(RHIBindPoint::Graphics, true) ||
+        byteOffset % 4 != 0)
+    {
+        return false;
+    }
+    const auto entry = m_resources->Resolve(arguments);
+    if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        sizeof(RHIDispatchMeshIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+    if (!FlushDescriptors(RHIBindPoint::Graphics))
+    {
+        return false;
+    }
+    // One 12-byte command; no multiDrawIndirect feature is needed. The GPU producer
+    // must bound every dimension and their product to GetMeshShaderCapabilities().
+    vkCmdDrawMeshTasksIndirectEXT(m_commandBuffer, entry.buffer, byteOffset, 1,
+                                sizeof(RHIDispatchMeshIndirectArguments));
+    return true;
+}
+
 void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
-    if (VK_NULL_HANDLE == m_commandBuffer) return;
-    FlushDescriptors(RHIBindPoint::Compute);
+    if (VK_NULL_HANDLE == m_commandBuffer || !IsPipelineBound(RHIBindPoint::Compute))
+    {
+        return;
+    }
+    if (!FlushDescriptors(RHIBindPoint::Compute))
+    {
+        return;
+    }
     vkCmdDispatch(m_commandBuffer, x, y, z);
 }
 
@@ -581,8 +793,10 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
         return;
     EndRenderTargets();
 
-    std::vector<VkImageMemoryBarrier2> imageBarriers;
-    std::vector<VkBufferMemoryBarrier2> bufferBarriers;
+    auto& imageBarriers = m_imageBarrierScratch;
+    auto& bufferBarriers = m_bufferBarrierScratch;
+    imageBarriers.clear();
+    bufferBarriers.clear();
     imageBarriers.reserve(batch.textureTransitions.size() + batch.uavTextures.size());
     bufferBarriers.reserve(batch.bufferTransitions.size() + batch.uavBuffers.size());
 
@@ -978,4 +1192,3 @@ void VulkanEncoder::EndRenderTargets()
     vkCmdEndRendering(m_commandBuffer);
     m_renderingOpen = false;
 }
-

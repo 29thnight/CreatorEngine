@@ -1,4 +1,5 @@
 #include "Material.h"
+#include "material_owner_checks.h"
 #include "MaterialPropertyPacker.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Scene/ExperimentMaterialSealing.h"
@@ -11,10 +12,36 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
-namespace reflgen::generated { void register_RenderEngine(reflgen::registry&); }
+namespace reflgen::generated
+{
+    void register_RenderEngine(reflgen::registry&);
+}
+
+namespace
+{
+    bool SameRuntimeInstance(const own::shared_owner<const LX::Runtime::Instance>& left,
+                             const own::shared_owner<const LX::Runtime::Instance>& right)
+    {
+        if (left && right)
+        {
+            return std::addressof(*left) == std::addressof(*right);
+        }
+        return !left && !right;
+    }
+
+    static_assert(std::is_same_v<decltype(std::declval<const Material&>().GetLXMaterialInstance()),
+        own::shared_owner<const LX::Runtime::Instance>>);
+    static_assert(std::is_same_v<decltype(EnhancedMaterialDrawSnapshot::runtimeInstance),
+        own::shared_owner<const LX::Runtime::Instance>>);
+    static_assert(std::is_same_v<decltype(EnhancedForwardMaterialDrawSnapshot::runtimeInstance),
+        own::shared_owner<const LX::Runtime::Instance>>);
+}
 
 void RunMaterialCodeRuntimeTests(const std::filesystem::path& root)
 {
@@ -103,7 +130,9 @@ RWStructuredBuffer<float4> result : register(u0, space0);
     }
     check(reference == accepted->uniforms, "Common instance is bit-exact with the established packer");
     check(material.TrySetVector("CodeValues.uv", math::vector2{.7f, .8f}) &&
-          material.GetLXMaterialInstance() != accepted, "Float2 setter publishes an immutable LX snapshot");
+          !SameRuntimeInstance(material.GetLXMaterialInstance(), accepted), "Float2 setter publishes an immutable LX snapshot");
+    check(accepted->uniforms == reference && material.GetLXMaterialInstance()->uniforms != reference,
+          "Publishing an own-backed instance preserves the retained immutable snapshot");
     math::vector4 uv{};
     check(material.TryGetVector("CodeValues.uv", uv) && uv.x == .7f && uv.y == .8f, "Float2 common readback");
     math::matrix4x4 matrix{};
@@ -117,23 +146,23 @@ RWStructuredBuffer<float4> result : register(u0, space0);
           "Keyword changes publish through the same runtime owner");
     accepted = material.GetLXMaterialInstance();
     check(!material.TrySetFloat("CodeValues.amount", std::numeric_limits<float>::quiet_NaN()) &&
-          material.GetLXMaterialInstance() == accepted, "Nonfinite edit preserves accepted bytes and owner");
+          SameRuntimeInstance(material.GetLXMaterialInstance(), accepted), "Nonfinite edit preserves accepted bytes and owner");
     check(!material.TrySetVector("CodeValues.direction", math::vector3{1, 0, 0}) &&
           !material.TrySetInt("CodeValues.amount", 7) && !material.TrySetKeywordSelection("QUALITY", "missing") &&
-          material.GetLXMaterialInstance() == accepted, "Private/type/keyword errors preserve the snapshot");
+          SameRuntimeInstance(material.GetLXMaterialInstance(), accepted), "Private/type/keyword errors preserve the snapshot");
     Material clone(material);
     check(clone.ConfigureShaderProperties(meta, layout, error, handle) &&
-          clone.GetLXMaterialInstance()->shader == accepted->shader &&
-          clone.TrySetFloat("CodeValues.amount", .8f) && material.GetLXMaterialInstance() == accepted,
+          material_graph_test::SamePinnedObject(clone.GetLXMaterialInstance()->shader, accepted->shader) &&
+          clone.TrySetFloat("CodeValues.amount", .8f) && SameRuntimeInstance(material.GetLXMaterialInstance(), accepted),
           "Code clone shares the shader contract and edits an independent instance");
     auto badLayout = layout;
     badLayout.properties[1].byteOffset = 0;
     check(!material.ConfigureShaderProperties(meta, badLayout, error, {333, 2}) &&
-          material.GetLXMaterialInstance() == accepted, "Bad reload layout preserves the complete accepted generation");
+          SameRuntimeInstance(material.GetLXMaterialInstance(), accepted), "Bad reload layout preserves the complete accepted generation");
     auto changedMeta = meta;
     changedMeta.name += " reloaded";
     check(clone.ConfigureShaderProperties(changedMeta, layout, error, {333, 2}) &&
-          clone.GetLXMaterialInstance()->shader != accepted->shader && accepted->shader->meta.name == meta.name,
+          !material_graph_test::SamePinnedObject(clone.GetLXMaterialInstance()->shader, accepted->shader) && accepted->shader->meta.name == meta.name,
           "Reload installs a distinct immutable shader owner");
 
     ExperimentMaterialSealing::SealSource sealSource;
@@ -141,9 +170,9 @@ RWStructuredBuffer<float4> result : register(u0, space0);
           "Generic Code source adapts to frame sealing: " + error);
     std::vector<std::uint8_t> sealedBytes;
     std::vector<EnhancedMaterialTextureBinding> bindings;
-    std::shared_ptr<const LX::Runtime::Instance> sealed;
+    own::shared_owner<const LX::Runtime::Instance> sealed;
     check(ExperimentMaterialSealing::SealCore(sealSource, meta, layout, sealedBytes, bindings, error, &sealed, handle) &&
-          sealed && sealed->shader == accepted->shader && sealedBytes == accepted->uniforms &&
+          sealed && material_graph_test::SamePinnedObject(sealed->shader, accepted->shader) && sealedBytes == accepted->uniforms &&
           sealed->keywordSelections == accepted->keywordSelections, "Frame sealing consumes the same generic LX contract");
     EnhancedMaterialDrawSnapshot gbuffer;
     gbuffer.shaderMetaHandle = handle;
@@ -162,7 +191,8 @@ RWStructuredBuffer<float4> result : register(u0, space0);
     const auto retained = sealed;
     sealSource.codeValues[0].m_numericValue[0] = std::numeric_limits<float>::infinity();
     check(!ExperimentMaterialSealing::SealCore(sealSource, meta, layout, sealedBytes, bindings, error, &sealed, handle) &&
-          sealed == retained && sealedBytes == retainedBytes, "Bad frame input preserves previous owner and outputs");
+          SameRuntimeInstance(sealed, retained) && sealedBytes == retainedBytes,
+          "Bad frame input preserves previous owner and outputs");
 
     reflgen::generated::register_RenderEngine(Meta::Types());
     Meta::Typed::RegisterOps<Material>();

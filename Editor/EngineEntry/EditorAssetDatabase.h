@@ -41,6 +41,8 @@ public:
 	bool Initialize();
 	void Shutdown() noexcept;
 	bool IsInitialized() const noexcept;
+    // Event revision only: the host refreshes its AudioCatalog on the game thread.
+    [[nodiscard]] std::uint64_t AudioRevision() const noexcept;
 
 	FileGuid CreateMeta(const file::path& filepath,
 		const FileGuid& preferredGuid = {});
@@ -70,6 +72,8 @@ public:
 	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool RecoverModel(const file::path& source, FileGuid expectedId);
+	bool SetModelMeshletsAndReimport(const file::path& source, bool enabled);
+	bool SetModelLodsAndReimport(const file::path& source, std::uint32_t levels);
 	struct ModelRecoveryStats
 	{
 		std::uint64_t attempts{}, succeeded{}, suppressed{}, declined{}, sourceReloads{};
@@ -77,7 +81,7 @@ public:
 	ModelRecoveryStats GetModelRecoveryStats() const;
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
-    bool SaveMaterialGraph(Material& material, const LX::LXMaterialAsset& graph, const file::path& graphPath,
+    bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph, const file::path& graphPath,
                            FileGuid graphGuid, std::string& error);
 	bool CreateSceneRenderProfile(const file::path& directory, std::string_view name,
 		file::path& createdPath, std::string& error);

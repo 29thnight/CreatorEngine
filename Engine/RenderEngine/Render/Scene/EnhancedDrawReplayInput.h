@@ -10,6 +10,7 @@ struct EnhancedDrawReplayInput
     struct Draw
     {
         std::array<uint8_t, 32> assetIds{};
+        assets::ModelMeshDomain domain{ assets::ModelMeshDomain::LegacyAggregate };
         uint64_t geometryDigest{};
         uint32_t route{}; // opaque=0, forward=1, LX=2
         math::matrix4x4 world{};
@@ -23,8 +24,17 @@ struct EnhancedDrawReplayInput
     static std::array<uint8_t, 32> Identity(const RHIModelMeshView& mesh)
     {
         std::array<uint8_t, 32> result{};
-        std::copy(mesh.handle.modelId.data.begin(), mesh.handle.modelId.data.end(), result.begin());
-        std::copy(mesh.handle.meshId.data.begin(), mesh.handle.meshId.data.end(), result.begin() + 16);
+        if (mesh.handle.domain == assets::ModelMeshDomain::Granular)
+        {
+            const auto& asset = mesh.handle.asset.key;
+            std::copy(asset.assetId.value.data.begin(), asset.assetId.value.data.end(), result.begin());
+            std::copy(asset.subassetId.value.data.begin(), asset.subassetId.value.data.end(), result.begin() + 16);
+        }
+        else
+        {
+            std::copy(mesh.handle.modelId.data.begin(), mesh.handle.modelId.data.end(), result.begin());
+            std::copy(mesh.handle.meshId.data.begin(), mesh.handle.meshId.data.end(), result.begin() + 16);
+        }
         return result;
     }
     static uint64_t GeometryDigest(const RHIModelMeshView& mesh)
@@ -38,6 +48,18 @@ struct EnhancedDrawReplayInput
             for (unsigned i = 0; i < 8; ++i) bytes[i] = static_cast<uint8_t>(value >> (8*i));
             mix(bytes);
         };
+        if (mesh.handle.domain == assets::ModelMeshDomain::Granular)
+        {
+            const auto& blob = mesh.handle.blob;
+            number(static_cast<uint64_t>(mesh.handle.domain));
+            number(static_cast<uint64_t>(blob.kind));
+            number(blob.byteSize); number(blob.representation); number(blob.schemaVersion);
+            mix(blob.contentSha256);
+            number(blob.targetPlatform.size());
+            mix({ reinterpret_cast<const uint8_t*>(blob.targetPlatform.data()), blob.targetPlatform.size() });
+            number(blob.targetAbi.size());
+            mix({ reinterpret_cast<const uint8_t*>(blob.targetAbi.data()), blob.targetAbi.size() });
+        }
         number(mesh.vertexBytes); number(mesh.vertexStride);
         number(mesh.vertexAttributeMask); number(mesh.vertexLayoutHash); number(mesh.indexCount);
         mix({static_cast<const uint8_t*>(mesh.vertexData), static_cast<size_t>(mesh.vertexBytes)});
@@ -61,10 +83,18 @@ struct EnhancedDrawReplayInput
             std::memcpy(floats.data(), &value, sizeof(value));
             for (float v : floats) number(std::bit_cast<uint32_t>(v), 4);
         };
-        number(1, 4); number(draws.size(), 4);
+        const bool granular = std::ranges::any_of(draws, [](const Draw& draw)
+        {
+            return draw.domain == assets::ModelMeshDomain::Granular;
+        });
+        number(granular ? 2u : 1u, 4); number(draws.size(), 4);
         for (const auto& draw : draws)
         {
             number(draw.route, 4);
+            if (granular)
+            {
+                number(static_cast<uint64_t>(draw.domain), 4);
+            }
             bytes.insert(bytes.end(), draw.assetIds.begin(), draw.assetIds.end());
             number(draw.geometryDigest, 8); number(draw.bones.size(), 4);
             matrix(draw.world);
@@ -95,23 +125,38 @@ struct EnhancedDrawReplayInput
             std::memcpy(&value, floats.data(), sizeof(value));
             return value;
         };
-        if (number(4)!=1) return reject("unsupported draw replay version");
+        const auto version = number(4);
+        if (version != 1u && version != 2u)
+        {
+            return reject("unsupported draw replay version");
+        }
+        const std::size_t recordBytes = version == 1u ? 112u : 116u;
         const auto count=number(4);
-        if (count>kMaxDraws || count>(payload.size()-offset)/112) return reject("draw replay count exceeds payload or budget");
+        if (count>kMaxDraws || count>(payload.size()-offset)/recordBytes) return reject("draw replay count exceeds payload or budget");
         EnhancedDrawReplayInput candidate;
         candidate.draws.reserve(static_cast<size_t>(count));
         for (uint64_t i=0; i<count; ++i)
         {
-            if (payload.size()-offset<112) return reject("draw replay record truncated");
+            if (payload.size()-offset<recordBytes) return reject("draw replay record truncated");
             Draw draw;
             draw.route=static_cast<uint32_t>(number(4));
+            if (version == 2u)
+            {
+                const auto domain = number(4);
+                if (domain > static_cast<uint64_t>(assets::ModelMeshDomain::Granular))
+                {
+                    return reject("draw replay identity domain invalid");
+                }
+                draw.domain = static_cast<assets::ModelMeshDomain>(domain);
+            }
             std::copy_n(payload.begin()+offset, 32, draw.assetIds.begin()); offset+=32;
             draw.geometryDigest=number(8);
             const auto boneCount=number(4);
             if (draw.route>2 || boneCount>kMaxBones || boneCount>(payload.size()-offset-64)/64)
                 return reject("draw replay route or pose count invalid");
             if (std::ranges::all_of(std::span(draw.assetIds).first(16), [](auto v){return v==0;})
-                || std::ranges::all_of(std::span(draw.assetIds).last(16), [](auto v){return v==0;}))
+                || (draw.domain == assets::ModelMeshDomain::LegacyAggregate
+                    && std::ranges::all_of(std::span(draw.assetIds).last(16), [](auto v){return v==0;})))
                 return reject("draw replay asset identity invalid");
             draw.world=matrix();
             if (!Finite(draw.world)) return reject("draw replay world nonfinite");
@@ -150,12 +195,13 @@ struct EnhancedDrawReplayInput
             const auto items=route==0 ? opaque : route==1 ? forward : graph;
             for (const auto& item : items)
             {
-                byteSize+=112+size_t(item.boneCount)*64;
+                byteSize+=116+size_t(item.boneCount)*64;
                 if (!item.modelMeshView.IsComplete() || item.boneCount>kMaxBones
                     || (item.boneCount && !item.bonePalette) || byteSize>kMaxBytes || candidate.draws.size()>=kMaxDraws)
                 { error="draw replay requires complete owned geometry and bounded pose"; return false; }
                 Draw draw;
                 draw.route=route; draw.assetIds=Identity(item.modelMeshView);
+                draw.domain = item.modelMeshView.handle.domain;
                 draw.geometryDigest=GeometryDigest(item.modelMeshView); draw.world=item.worldMatrix;
                 if (item.boneCount) draw.bones.assign(item.bonePalette, item.bonePalette+item.boneCount);
                 if (!Finite(draw.world) || !std::ranges::all_of(draw.bones, Finite))
@@ -168,16 +214,17 @@ struct EnhancedDrawReplayInput
     // The archive itself owns palette storage until frame preparation finishes.
     // Validate the ENTIRE closure before changing any item (transactional apply).
     bool Apply(std::span<EnhancedDrawItem> opaque, std::span<EnhancedDrawItem> forward,
-        std::span<EnhancedDrawItem> graph, std::span<EnhancedDrawItem> fallback, std::string& error) const
+        std::span<EnhancedDrawItem> graph, std::string& error) const
     {
         EnhancedDrawReplayInput current;
         if (!Seal(opaque,forward,graph,current,error)) return false;
-        if (fallback.size()!=graph.size() || current.draws.size()!=draws.size())
+        if (current.draws.size()!=draws.size())
         { error="draw replay selected closure count mismatch"; return false; }
         for (size_t i=0; i<draws.size(); ++i)
         {
             const auto& saved=draws[i]; const auto& live=current.draws[i];
-            if (saved.route!=live.route || saved.assetIds!=live.assetIds || saved.geometryDigest!=live.geometryDigest
+            if (saved.route!=live.route || saved.domain != live.domain
+                || saved.assetIds!=live.assetIds || saved.geometryDigest!=live.geometryDigest
                 || saved.bones.size()!=live.bones.size())
             { error="draw replay geometry/route/pose closure mismatch"; return false; }
         }
@@ -192,11 +239,6 @@ struct EnhancedDrawReplayInput
                 item.bonePalette=saved.bones.empty() ? nullptr : saved.bones.data();
                 item.boneCount=static_cast<uint32_t>(saved.bones.size());
                 item.animatorKey=saved.bones.empty() ? 0 : index+1;
-                if (route==2)
-                {
-                    fallback[j].worldMatrix=item.worldMatrix; fallback[j].bonePalette=item.bonePalette;
-                    fallback[j].boneCount=item.boneCount; fallback[j].animatorKey=item.animatorKey;
-                }
             }
         }
         error.clear(); return true;

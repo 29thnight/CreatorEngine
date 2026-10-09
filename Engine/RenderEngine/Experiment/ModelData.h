@@ -2,6 +2,8 @@
 
 #include "Uuid.h"
 #include "VertexLayout.h"
+#include "MeshletData.h"
+#include "MeshLodData.h"
 #include "../Assets/TextureCoordinates.h"
 #include "../Assets/TextureSampler.h"
 
@@ -19,12 +21,18 @@
 #include <cstring>
 #include <filesystem>
 #include <limits>
+#include "../../Utility_Framework/Ownership.h"
 #include <optional>
 #include <span>
 #include <string>
 #include <type_traits>
 #include <variant>
 #include <vector>
+
+namespace AssetDepot
+{
+    struct MaterialDocumentAssetOrigin;
+}
 
 namespace experiment
 {
@@ -363,6 +371,9 @@ namespace experiment
 		// 이름 해석은 shaderAssetId의 meta를 소유한 어댑터 책임이다. 이름 기반
 		// keywords가 채워져 있으면 그것이 정본이고 이 값은 보조다.
 		std::vector<std::uint16_t> keywordSelections{};
+        // Exact cooked hard owners. Copies/instance overrides retain the same
+        // captured closure; authoring serialization never persists this pin.
+        own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin> assetOrigin{};
 	};
 
 	struct Mesh final
@@ -372,6 +383,10 @@ namespace experiment
 		VertexBuffer vertices{};
 		std::vector<std::uint32_t> indices{};
 		math::aabb bounds{};
+		// Derived from this mesh's finalized indexed geometry; optional for legacy data.
+		MeshletPayload meshlets{};
+		// Optional coarse topology; LOD0 stays in indices/meshlets for all legacy consumers.
+		MeshLodChain coarseLods{};
 	};
 
 	// parent 하나만 hierarchy 정본이다. children/count 중복 저장을 없앴고,

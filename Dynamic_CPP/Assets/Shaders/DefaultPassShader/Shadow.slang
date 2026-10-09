@@ -16,9 +16,14 @@ struct ShadowInstance
     float cutoff;
     float baseAlpha;
     TextureCoordinates coordinates;
+    uint boneCount;
+    uint padding0;
+    uint padding1;
+    uint padding2;
 };
 
 StructuredBuffer<ShadowInstance> gInstances : register(t0);
+StructuredBuffer<uint> gVisibleInstanceIds : register(t3);
 
 #ifdef SHADOW_SKINNING
 StructuredBuffer<PackedBone> gBones : register(t1);
@@ -62,24 +67,47 @@ struct VSOut
 [shader("vertex")]
 VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
-    const ShadowInstance instance = gInstances[instanceId];
+    const ShadowInstance instance = gInstances[gVisibleInstanceIds[instanceId]];
 
 #ifdef SHADOW_SKINNING
     // GBuffer와 같은 수식·같은 규약이다. 둘이 갈리면 캐릭터의 그림자가 몸과
     // 다른 포즈로 나오는데, 그 증상은 '그림자가 좀 이상하다'로만 보인다.
     if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
     {
-        float4x4 boneTransform = input.boneWeights[0]
-            * UnpackBone(gBones[instance.boneOffset + (uint)input.boneIndices[0]]);
-
+        bool validSkin = instance.boneCount != 0u && all(isfinite(input.boneWeights))
+            && all(input.boneWeights >= 0.0f) && all(input.boneWeights <= 1.0f);
         [unroll]
-        for (int i = 1; i < 4; ++i)
+        for (int i = 0; i < 4; ++i)
         {
-            boneTransform += input.boneWeights[i]
-                * UnpackBone(gBones[instance.boneOffset + (uint)input.boneIndices[i]]);
+            if (input.boneWeights[i] > 0.0f)
+            {
+#ifdef MODEL_VERTEX_SKINNING
+                validSkin = validSkin && input.boneIndices[i] < instance.boneCount;
+#else
+                const float boneIndex = input.boneIndices[i];
+                validSkin = validSkin && isfinite(boneIndex) && boneIndex >= 0.0f
+                    && boneIndex < float(instance.boneCount) && boneIndex == floor(boneIndex);
+#endif
+            }
         }
-
-        input.position = mul(float4(input.position, 1.0f), boneTransform).xyz;
+        // Invalid active data retains the bind-pose input without touching the
+        // palette. CPU sealing bounds offset+count to the actual uploaded range.
+        if (validSkin)
+        {
+            float4x4 boneTransform = input.boneWeights[0]
+                * UnpackBone(gBones[instance.boneOffset + (uint)input.boneIndices[0]]);
+            [unroll]
+            for (int i = 1; i < 4; ++i)
+            {
+                // Zero-weight packed slots may carry the unused index 255.
+                if (input.boneWeights[i] > 0.0f)
+                {
+                    boneTransform += input.boneWeights[i]
+                        * UnpackBone(gBones[instance.boneOffset + (uint)input.boneIndices[i]]);
+                }
+            }
+            input.position = mul(float4(input.position, 1.0f), boneTransform).xyz;
+        }
     }
 #endif
 
@@ -105,6 +133,8 @@ void PSMain(VSOut input, bool frontFace : SV_IsFrontFace)
 {
     float alpha = input.alpha;
     if ((input.flags & PBR_COVERAGE_MASKED) != 0u)
+    {
         alpha *= gBaseColor.Sample(gSampler, input.uv).a;
+    }
     ApplyPbrCoverage(alpha, input.cutoff, input.flags, frontFace);
 }

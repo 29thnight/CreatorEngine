@@ -1,4 +1,6 @@
 #include "../EditorDiagnostics.h"
+#include "../../EngineGUIWindow/HierarchyFlatten.h"
+#include "SoundGraphEditor.h"
 // LC6 (PHASE 14.5) — SceneObject 도메인 명령.
 //
 // `object.*` · `scene.*` · `prefab.*` · `component.*` · `camera.*` · `undo.*` ·
@@ -41,6 +43,8 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "CameraComponent.h"
+#include "SoundComponent.h"
+#include "SoundSystem.h"
 #include "CharacterMovementComponent.h"
 #include "CameraSystem.h"
 #include "ClrHost.h"
@@ -172,55 +176,64 @@ namespace ConsoleCmd
 {
     static CommandCore::CommandResult Cmd_scene_load(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        if (parts.size() < 2)
+        using namespace CommandCore;
+        using State = SceneManager::SceneLoadRequestState;
+        if (ctx.parts.size() != 2u)
         {
-            std::printf("[CLI] 사용법: %s <씬 경로>\n", cmd.c_str());
-            return CommandCore::InvalidArguments(
-                cmd + ": 씬 경로가 없다", "scene.path_missing");
+            return InvalidArguments(ctx.cmd == "scene.load.status"
+                ? "Usage: scene.load.status <request-id>" : "Usage: " + ctx.cmd + " <scene-path>");
         }
-
-        // scene.load  : 씬을 열기만 한다(기존 씬 유지)
-        // scene.switch: 씬을 열고 활성 씬으로 교체한다(기존 씬 파괴 → 언로드 유발)
-        //
-        // ★ 단계마다 즉시 찍는다.
-        //
-        //   씬 교체가 멈추는 것을 쫓다가 출력이 0바이트인 실행을 만났다.
-        //   프로세스를 죽여도 아무것도 안 남아 어디까지 갔는지조차 알 수
-        //   없었다. 함수가 끝나야 찍히는 로그는 멈춘 자리를 못 알려 준다 —
-        //   dx12.compare 크래시 때와 같은 자리다(그때도 outLog가 함수 끝에
-        //   가서야 쓰여서 세 번을 헛짚었다).
-        std::printf("[CLI] %s 시작: %s\n", cmd.c_str(), parts[1].c_str());
-
-        Scene* scene = SceneManagers->LoadScene(parts[1]);
-        std::printf("[CLI] LoadScene 반환: %s\n",
-            (nullptr != scene) ? "성공" : "널");
-
-        if (!scene)
+        if (ctx.cmd == "scene.load.status")
         {
-            Debug::PrintLog(spdlog::level::err, "[CLI] 씬 로드 실패: " + parts[1]);
-            std::printf("[CLI] 씬 로드 실패: %s\n", parts[1].c_str());
-
-            // 선행조건 불충족이지 명령의 결함이 아니다 — 부를 수는 있으나
-            // 그 경로에 씬이 없다. §5.4 의 exit 3 이고 서비스에서는 409 다.
-            return CommandCore::PreconditionFailed(
-                "scene.not_found", cmd + ": 씬을 열 수 없다: " + parts[1]);
+            std::uint64_t id{};
+            const auto& text = ctx.parts[1];
+            const auto parsed = std::from_chars(text.data(), text.data() + text.size(), id);
+            if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || id == 0u)
+            {
+                return InvalidArguments("Scene request ID must be a positive integer.");
+            }
+            const auto status = SceneManagers->QuerySceneLoad(id);
+            if (status.state == State::Unknown)
+            {
+                return PreconditionFailed("scene.request_unknown", "Unknown or expired scene request; only 64 terminal results are retained.");
+            }
+            const char* state = "Pending";
+            switch (status.state)
+            {
+            case State::Ready: state = "Ready"; break;
+            case State::Failed: state = "Failed"; break;
+            case State::Cancelled: state = "Cancelled"; break;
+            case State::Stale: state = "Stale"; break;
+            case State::Superseded: state = "Superseded"; break;
+            default: break;
+            }
+            auto data = CommandData::Object();
+            data.Set("requestId", CommandData::String(std::to_string(id)));
+            data.Set("path", CommandData::String(status.path));
+            data.Set("state", CommandData::String(state));
+            data.Set("complete", CommandData::Bool(status.state != State::Pending));
+            data.Set("activationRequested", CommandData::Bool(status.activationRequested));
+            if (status.state == State::Failed || status.state == State::Stale)
+            {
+                return Fail(status.state == State::Stale ? "scene.load_stale" : "scene.load_failed",
+                    status.message.empty() ? state : status.message, std::move(data));
+            }
+            if (status.state == State::Cancelled || status.state == State::Superseded)
+            {
+                return { CommandStatus::Cancelled, status.state == State::Superseded
+                    ? "scene.load_superseded" : "scene.load_cancelled", state, std::move(data) };
+            }
+            return Ok(status.state == State::Pending ? "Scene preparation is pending"
+                : "Scene construction completed; requested activation commits at the frame boundary", std::move(data));
         }
-
-        if (cmd == "scene.switch")
-        {
-            std::printf("[CLI] ActivateScene 진입\n");
-            SceneManagers->ActivateScene(scene, true);
-            std::printf("[CLI] ActivateScene 반환\n");
-        }
-        std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("path",     CommandCore::CommandData::String(parts[1]));
-        data.Set("activated", CommandCore::CommandData::Bool(cmd == "scene.switch"));
-        return CommandCore::Ok(cmd + " 완료", std::move(data));
+        const bool activate = ctx.cmd != "scene.load";
+        const auto id = SceneManagers->QueueSceneLoad(ctx.parts[1], activate);
+        auto data = CommandData::Object();
+        data.Set("path", CommandData::String(ctx.parts[1]));
+        data.Set("requestId", CommandData::String(std::to_string(id)));
+        data.Set("queued", CommandData::Bool(true));
+        data.Set("activationRequested", CommandData::Bool(activate));
+        return Ok("Scene preparation queued; use scene.load.status for the terminal result", std::move(data));
     }
 
     // DontDestroyOnLoad 지정 — 씬 이송 경로를 시나리오에서 태우기 위한 진단 명령.
@@ -306,7 +319,8 @@ namespace ConsoleCmd
         // scene.switch가 쓰는 경로를 그대로 쓴다: 씬만 만들어 두고 교체는
         // ActivateScene에 맡긴다 — 그쪽은 BeforeAwakeSceneLoad(프레임의 안전
         // 지점)까지 미룬다.
-        Scene* scene = Scene::CreateNewScene(name);
+        Scene* scene = SceneManagers->AdoptScene(
+                Scene::CreateNewScene(SceneManagers->ManagedDomain(), name));
         if (!scene)
         {
             Debug::PrintLog(spdlog::level::err, "[CLI] 씬 생성 실패: " + name);
@@ -409,6 +423,75 @@ namespace ConsoleCmd
         return EditorObjectOperations::RemoveComponent(target, ctx.parts[2]);
     }
 
+    static CommandCore::CommandResult Cmd_audio_authoringprobe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1 && ctx.parts.size() != 4)
+        {
+            return InvalidArguments("audio.authoringprobe [directory name clip-guid]");
+        }
+        if (ctx.parts.size() == 4)
+        {
+            std::string error;
+            if (!editor::sound_graph_editing::QueueAuthoringAcceptance(
+                ctx.parts[1], ctx.parts[2], ctx.parts[3], error))
+            {
+                return Fail("audio.authoring.rejected", error);
+            }
+        }
+        auto data = CommandData::Object();
+        data.Set("authoring", CommandData::String(editor::sound_graph_editing::AuthoringAcceptanceStatus()));
+        data.Set("preview", CommandData::String(editor::sound_graph_editing::PreviewStatus()));
+        return Ok("Sound Graph presentation-owner acceptance", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_audio_status(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2)
+        {
+            return InvalidArguments("audio.status [target]");
+        }
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!playback)
+        {
+            return PreconditionFailed("audio.unavailable", "Audio playback service is unavailable");
+        }
+        auto data = CommandData::Object();
+        const auto metrics = playback->Audio().Metrics();
+        data.Set("activeVoices", CommandData::Int(metrics.active));
+        data.Set("physicalVoices", CommandData::Int(metrics.physical));
+        data.Set("virtualVoices", CommandData::Int(metrics.virtualized));
+        data.Set("pausedVoices", CommandData::Int(metrics.paused));
+        data.Set("backendFailures", CommandData::Int(metrics.backendFailures));
+        data.Set("playbackInstances", CommandData::Int(playback->AliveCount()));
+        data.Set("loadedClips", CommandData::Int(playback->Audio().ListClipKeys().size()));
+        data.Set("lastAudioError", CommandData::String(playback->Audio().LastError()));
+        data.Set("lastPlaybackError", CommandData::String(playback->LastError()));
+        data.Set("host", ctx.system.ReadAudioDiagnostics());
+        if (ctx.parts.size() == 2)
+        {
+            EntityHandle target;
+            auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+            if (!resolved.IsSuccess())
+            {
+                return resolved;
+            }
+            auto* scene = SceneManagers->GetActiveScene();
+            auto* owner = scene ? scene->Resolve(target) : nullptr;
+            auto* sound = owner ? owner->GetComponent<SoundComponent>() : nullptr;
+            if (!sound)
+            {
+                return PreconditionFailed("audio.no_component", "Target has no SoundComponent");
+            }
+            const auto handle = sound->CurrentPlayback();
+            data.Set("playbackHandle", CommandData::String(std::to_string(handle.Value())));
+            data.Set("playing", CommandData::Bool(sound->IsPlaying()));
+            data.Set("childVoices", CommandData::Int(playback->ChildVoiceCount(handle)));
+            data.Set("worldScopeAlive", CommandData::Bool(playback->IsScopeAlive(scene->Sounds().WorldScope())));
+        }
+        return Ok("Current audio playback state", std::move(data));
+    }
     static CommandCore::CommandResult Cmd_object_create(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return CommandCore::InvalidArguments("object.create <name> [type]");
@@ -605,6 +688,68 @@ namespace ConsoleCmd
         if (ctx.parts[2] == "-") parent = SceneManagers->GetActiveScene()->HandleOf(0);
         else { auto result = EditorObjectOperations::ResolveTarget(ctx.parts[2], parent); if (!result.IsSuccess()) return result; }
         return EditorObjectOperations::Parent(target, parent);
+    }
+
+    static CommandCore::CommandResult Cmd_object_order(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 4 || (ctx.parts[3] != "before" && ctx.parts[3] != "after"))
+        {
+            return CommandCore::InvalidArguments("object.order <target> <sibling> <before|after>");
+        }
+        EntityHandle target, sibling;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        result = EditorObjectOperations::ResolveTarget(ctx.parts[2], sibling);
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        return EditorObjectOperations::MoveRelative(target, sibling, ctx.parts[3] == "after");
+    }
+
+    static CommandCore::CommandResult Cmd_scene_order(const ConsoleCommandContext& ctx)
+    {
+        using D = CommandCore::CommandData;
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene || ctx.parts.size() != 2)
+        {
+            return CommandCore::InvalidArguments("scene.order <parent|->");
+        }
+        EntityHandle parent = scene->HandleOf(0);
+        if (ctx.parts[1] != "-")
+        {
+            auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], parent);
+            if (!result.IsSuccess())
+            {
+                return result;
+            }
+        }
+        auto names = D::Array();
+        for (auto index : scene->Resolve(parent)->GetChildrenIndices())
+        {
+            if (auto* child = scene->TryGetEntity(index))
+            {
+                names.Append(D::String(child->m_name.ToString()));
+            }
+        }
+        auto visible = D::Array();
+        editor::HierarchyFlatView flat;
+        ImGuiTextFilter filter;
+        const editor::hierarchy_flat_key key{scene->GetHierarchyStore().Revision(), scene->m_Entities.size()};
+        for (const auto& row : flat.Rows(scene, key, filter))
+        {
+            if (row.kind == editor::hierarchy_row_kind::entity && row.depth == 1)
+            {
+                visible.Append(D::String(scene->TryGetEntity(row.index)->m_name.ToString()));
+            }
+        }
+        auto data = D::Object();
+        data.Set("children", std::move(names));
+        data.Set("visibleRoots", std::move(visible));
+        return CommandCore::Ok("scene.order", std::move(data));
     }
 
     // H2 root-reference 회귀용. m_rootIndex는 일반 parent와 별개의 same-scene
@@ -1594,10 +1739,14 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
     void RegisterSceneObjectCommands(Registrar& reg)
     {
         reg.Result({ "scene.load", "scene.switch" }, &Cmd_scene_load);
+        reg.Result({ "scene.open_async" }, &Cmd_scene_load);
+        reg.Result({ "scene.load.status" }, &Cmd_scene_load);
         reg.Result({ "scene.new" }, &Cmd_scene_new);
         reg.Result({ "scene.ddol" }, &Cmd_scene_ddol);
         reg.Result({ "ai.status" }, &Cmd_ai_status);
         reg.Result({ "scene.save" }, &Cmd_scene_save);
+        reg.Result({ "audio.status" }, &Cmd_audio_status);
+        reg.Result({ "audio.authoringprobe" }, &Cmd_audio_authoringprobe);
         reg.Result({ "object.create" }, &Cmd_object_create);
         reg.Result({ "object.delete" }, &Cmd_object_delete);
         reg.Result({ "object.properties" }, &Cmd_object_properties);
@@ -1610,6 +1759,8 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "scene.navigate" }, &Cmd_scene_navigate);
         reg.Result({ "object.transform" }, &Cmd_object_transform);
         reg.Result({ "object.parent" }, &Cmd_object_parent);
+        reg.Result({ "object.order" }, &Cmd_object_order);
+        reg.Result({ "scene.order" }, &Cmd_scene_order);
         reg.Result({ "object.rootref" }, &Cmd_object_rootref);
         reg.Result({ "object.duplicate" }, &Cmd_object_duplicate);
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);

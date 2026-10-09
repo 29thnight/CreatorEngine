@@ -1,6 +1,6 @@
 #pragma once
 #include "RHIRecordedBatch.h"
-#include "JobScheduler.h"
+#include "RHICommandRecordingJobs.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -12,6 +12,7 @@
 #include <string>
 
 class RHIEncoder;
+class RHISubmissionTicket;
 
 /// RenderGraph 병렬 command recording의 백엔드 중립 계약(G-3).
 ///
@@ -66,16 +67,16 @@ public:
     /// 따라서 반환 뒤에는 기록 Job이 자원을 참조하지 않는다. GPU 완료 대기는 별도다.
     void RunParallel(const std::function<void(uint32_t)>& job, uint32_t workerCount)
     {
-        if (0 == workerCount) return;
-        if (thread_pool::is_worker_thread())
-            throw std::logic_error("command recording cannot wait from a job worker");
+        if (0 == workerCount)
+        {
+            return;
+        }
         if (!IsInitialized())
+        {
             throw std::logic_error("command recording pool is not initialized");
+        }
         workerCount = (std::min)(workerCount, GetWorkerCount());
-        job_group group;
-        for (uint32_t worker = 0; worker < workerCount; ++worker)
-            group.add([&job, worker] { job(worker); });
-        m_scheduler.submit(std::move(group)).wait();
+        RHIRunCommandRecordingJobs(m_scheduler, job, workerCount);
     }
 
     /// 열린 command target을 닫고 workerOrder를 복사해 이동 전용 batch로 만든다.
@@ -124,6 +125,9 @@ public:
         batch.m_frameId = desc.frameId;
         batch.m_backendGeneration = desc.backendGeneration;
         batch.m_displayToken = desc.displayToken;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+        batch.m_captureContext = desc.captureContext;
+#endif
         batch.m_frameSlot = GetCurrentFrameSlot();
         batch.m_lifetimeToken = desc.lifetimeToken;
         batch.m_state = RHIRecordedBatchState::Recorded;
@@ -136,7 +140,7 @@ public:
     bool PrepareRecordedBatchSubmission(RHIRecordedBatch& batch,
         std::string& outError)
     {
-        if (batch.m_pool != this || !batch.IsReadyForSubmit())
+        if (batch.m_pool != this || batch.m_admitted || !batch.IsReadyForSubmit())
         {
             outError = "제출 준비할 RHIRecordedBatch의 소유/상태가 잘못됐다";
             return false;
@@ -147,15 +151,19 @@ public:
             return false;
         }
 
-        RHICompletionPoint completion{};
-        if (!PrepareRecordedCommands(batch.m_frameSlot, completion, outError))
-            return false;
-        if (!completion.IsValid())
+        // backend가 다음 recording을 연 뒤 실패해도 원래 R,C를 잃지 않는다.
+        batch.m_recordingId = GetCurrentRecordingId();
+        if (!PrepareRecordedCommands(batch.m_frameSlot, batch.m_completion, outError))
         {
-            outError = "backend가 유효한 batch completion을 예약하지 않았다";
+            RejectPreparedRecordedBatch(batch);
             return false;
         }
-        batch.m_completion = completion;
+        if (!batch.m_completion.IsValid())
+        {
+            outError = "backend가 유효한 batch completion을 예약하지 않았다";
+            RejectPreparedRecordedBatch(batch);
+            return false;
+        }
         return true;
     }
 
@@ -163,7 +171,7 @@ public:
     /// native queue submit/signal은 이 함수 아래에서만 일어난다.
     bool SubmitRecordedBatch(RHIRecordedBatch& batch, std::string& outError)
     {
-        if (batch.m_pool != this)
+        if (batch.m_pool != this || !batch.m_admitted)
         {
             outError = "RHIRecordedBatch의 소유 command pool이 다르다";
             return false;
@@ -181,9 +189,12 @@ public:
             return false;
         }
 
+        // Execute 뒤 Signal 실패도 재시도할 수 없다. 예외가 나도 Started가 남는다.
+        batch.m_state = RHIRecordedBatchState::SubmissionStarted;
         if (!SubmitRecordedCommands(batch.m_frameSlot, batch.m_commandOrder,
             batch.m_completion, outError))
         {
+            batch.m_state = RHIRecordedBatchState::SubmissionFailed;
             return false;
         }
         batch.m_state = RHIRecordedBatchState::Submitted;
@@ -191,10 +202,33 @@ public:
     }
 
 private:
+    friend class RHISubmissionThread;
+
+    void RejectPreparedRecordedBatch(RHIRecordedBatch& batch)
+    {
+        if (batch.m_pool != this || batch.m_admitted || !batch.IsReadyForSubmit())
+        {
+            return;
+        }
+        if (batch.m_completion.IsValid())
+        {
+            RejectPreparedCommands(batch.m_recordingId, batch.m_completion);
+        }
+        batch.Reset();
+    }
+
+    void AcceptPreparedRecordedBatch(const RHIRecordedBatch& batch, const RHISubmissionTicket& ticket)
+    {
+        AcceptPreparedCommands(batch.m_completion, ticket);
+    }
+
     job_scheduler& m_scheduler; // Engine-owned; injected schedulers must outlive this pool.
 
 protected:
     virtual uint32_t GetCurrentFrameSlot() const = 0;
+    virtual uint64_t GetCurrentRecordingId() const { return 0; }
+    virtual void RejectPreparedCommands(uint64_t, RHICompletionPoint) {}
+    virtual void AcceptPreparedCommands(RHICompletionPoint, const RHISubmissionTicket&) {}
 
     /// producer-side bookkeeping only. queue API를 호출하면 안 된다.
     virtual bool PrepareRecordedCommands(uint32_t frameSlot,

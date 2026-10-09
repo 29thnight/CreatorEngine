@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	135
-# names	144
+# commands	138
+# names	147
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -22,7 +22,7 @@ component.remove	-	frames	editor	editor_operation	live	no	yes	<target> <componen
 crash.status	-	immediate	editor	engine_service	live	no	yes	-	크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다
 dump.list	-	immediate	editor	engine_service	live	no	yes	[limit]	크래시 덤프 목록을 최대 limit개 조회한다
 dump.show	-	immediate	editor	engine_service	live	no	yes	[limit]	덤프 목록과 최신 덤프 요약을 조회한다
-dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRenderer 메인 런타임 상태
+dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status|remove-device scene|host	EnhancedRenderer 메인 런타임 상태
 dx12.validation	-	immediate	editor	engine_service	live	no	yes	[reset]	검증 레이어 장부(레이어 상태·드레인 수·문제 건수·문구)
 editor.browser	-	immediate	editor	editor_operation	live	no	yes	[go <경로>|@recent|@everything | back | forward | up | search [텍스트] | select <경로> | scroll <px> | create folder|volume <이름>]	Content Browser 의 위치·이력·검색·선택을 읽고 탐색·생성을 요청한다
 editor.clipping	-	immediate	editor	engine_service	live	no	yes	[reset]	잘라 그리기 계약(넘침·조용한 잘림·클립 스택) 위반 수를 읽는다
@@ -88,12 +88,15 @@ prefab.objectguid	-	immediate	editor	engine_service	live	no	yes	<오브젝트 �
 prefab.overrides	-	immediate	editor	engine_service	live	no	yes	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
 prefab.status	-	immediate	editor	engine_service	live	no	yes	-	프리팹 등록·캐시 상태를 낸다
 prefab.update	-	frames	editor	engine_service	live	no	yes	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
+profile.deep.start	-	immediate	editor	engine_service	live	no	yes	-	Queue ordinary-privilege DX12 capture to an engine-owned spool; admission is not collector startup
+profile.deep.status	-	immediate	editor	engine_service	live	no	yes	-	Read deep capture session, collector state and artifact finalization without waiting
+profile.deep.stop	-	immediate	editor	engine_service	live	no	yes	<session-id>	Request asynchronous deep capture stop for the exact session; repeated stops are idempotent
 profile.frame	-	immediate	editor	engine_service	live	no	yes	-	보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)
 profile.pause	-	immediate	editor	engine_service	live	no	yes	-	녹화를 멈춰 그때까지를 얼린다(창이 그것을 집는다)
 profile.record	-	immediate	editor	engine_service	live	no	yes	-	얼린 캡처를 남긴 채 기록만 다시 연다
 profile.stats	-	immediate	editor	engine_service	live	no	yes	-	프로파일러 자체 비용과 용량 소진(교란 없음)
 quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
-render.backend	-	immediate	editor	engine_service	live	no	yes	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
+render.backend	-	immediate	editor	engine_service	live	no	yes	status	Editor scene/ImGui DX12 고정 상태 조회(Player 백엔드는 Build Settings)
 render.matmode	-	immediate	editor	editor_operation	live	no	yes	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
 render.rtinfo	-	immediate	editor	engine_service	live	no	yes	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
 render.shadowinfo	-	immediate	editor	engine_service	live	no	yes	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)

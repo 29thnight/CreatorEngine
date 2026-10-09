@@ -2,6 +2,7 @@
 
 - upstream: https://github.com/mackron/miniaudio
 - 고정 태그: **0.11.25** (2026-03-03 발행, 정찰 시점의 최신 안정 릴리스)
+- 고정 upstream commit: [`9634bedb5b5a2ca38c1ee7108a9358a4e233f14d`](https://github.com/mackron/miniaudio/commit/9634bedb5b5a2ca38c1ee7108a9358a4e233f14d) (2026-10-05 tag 재확인)
 - 받은 날: 2026-09-16
 - 받은 경로: `https://raw.githubusercontent.com/mackron/miniaudio/0.11.25/<파일>`
 
@@ -10,6 +11,8 @@
 | `miniaudio.h` | 4,108,168 | `ac7af4de748b7e26b777f37e01cee313a308a7296a3eb080e2906b320cc55c89` |
 | `miniaudio.c` | 56 | `ab1984bb9804ffd7b0303813595d0b345a8a86c34da1daffc353a14b34102a65` |
 | `LICENSE` | 2,597 | `457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b25ba0eb` |
+
+2026-10-05 upstream commit의 Git blob과 재대조했다: header `c6d493ee81f553b8dd584e402453f130c20e0546`, C TU `afcddad04c8d20a79cecdd130264dc4934596c2f`, license `2f9423addfe68aa01449ba885d56d832f04b5e8e`가 저장소 사본과 일치한다.
 
 소스는 **수정하지 않았다**. 버전은 헤더의 `MA_VERSION_MAJOR/MINOR/REVISION`
 (`miniaudio.h:3748-3750`)으로도 확인된다 — 파일 이름이 아니라 그 값이 정본이다.
@@ -37,7 +40,7 @@ vcpkg 에 포트가 있지만 벤더링한다. 이유 둘.
 ## 통합 규약
 
 - `miniaudio.h` 를 **아무 헤더에서도 include 하지 않는다.** 구현 TU 하나
-  (`Engine/SceneRuntime/Audio/MiniaudioBackend.cpp`)만 연다. `wave::` 공개 헤더에 `ma_*`
+  (`Engine/SceneRuntime/Audio/MiniaudioBackend.cpp`)만 연다. 별도 AssetCooker 링크 대상은 device/engine/resource manager를 끈 `AudioDecodeValidation.cpp`의 전용 구현 TU를 사용한다. `wave::` 공개 헤더에 `ma_*`
   토큰이 0인 것이 계약이다.
 - `miniaudio.c`(56바이트, `MINIAUDIO_IMPLEMENTATION` 정의 + include)는 **쓰지 않는다.**
   C 로 따로 컴파일하면 링크 단위가 하나 늘고, 우리 구현 TU 가 이미 그 역할을 한다.

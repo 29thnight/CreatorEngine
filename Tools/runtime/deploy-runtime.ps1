@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory)][string]$HostPath,
     [Parameter(Mandatory)][ValidateSet('CreatorEditor','Player','AssetCooker','AssetPacker')][string]$HostName,
     [Parameter(Mandatory)][ValidateSet('Debug','Release')][string]$Config,
+    [Parameter(Mandatory)][string]$GcceRuntimePath,
     [Parameter(Mandatory)][string]$VcpkgDirectory,
     [Parameter(Mandatory)][string]$VcToolsDirectory,
     [Parameter(Mandatory)][string]$VcRedistDirectory
@@ -28,9 +29,14 @@ try {
     $vcpkgBin = Join-Path $VcpkgDirectory $(if ($Config -eq 'Debug') { 'debug\bin' } else { 'bin' })
     if (-not (Test-Path -LiteralPath $vcpkgBin)) { throw "vcpkg runtime directory missing: $vcpkgBin" }
     $roots = @($vcpkgBin, (Join-Path $Repository 'ThirdParty\Slang\bin'),
-        (Join-Path $Repository 'ThirdParty\DotNetHost\bin'), (Join-Path $Repository 'ThirdParty\Fmod\bin\x64'))
+        (Join-Path $Repository 'ThirdParty\DotNetHost\bin'))
     foreach ($dir in $roots) {
         foreach ($file in @(Get-ChildItem -LiteralPath $dir -Filter '*.dll' -File)) { $lookup[$file.Name] = $file.FullName }
+    }
+    # GCCE is built once per architecture/configuration. A Shipping Player
+    # stages the same DLL as the Development Editor, preserving shared hashes.
+    if (Test-Path -LiteralPath $GcceRuntimePath -PathType Leaf) {
+        $lookup['gcce.dll'] = [IO.Path]::GetFullPath($GcceRuntimePath)
     }
     $asan = Join-Path $VcToolsDirectory 'bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll'
     if (Test-Path -LiteralPath $asan) { $lookup['clang_rt.asan_dynamic-x86_64.dll'] = $asan }
@@ -53,7 +59,7 @@ try {
     $queue = [Collections.Generic.Queue[string]]::new()
     foreach ($name in @(Get-EnginePeImports $HostPath)) { $queue.Enqueue($name) }
     if ($HostName -in @('CreatorEditor','Player')) {
-        foreach ($name in @('slang-compiler.dll','dxcompiler.dll','dxil.dll','PhysXGpu_64.dll','PhysXDevice64.dll')) { $queue.Enqueue($name) }
+        foreach ($name in @('gcce.dll','slang-compiler.dll','dxcompiler.dll','dxil.dll','PhysXGpu_64.dll','PhysXDevice64.dll')) { $queue.Enqueue($name) }
     }
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $paths = [Collections.Generic.List[string]]::new()
@@ -62,6 +68,7 @@ try {
     [void][IO.Directory]::CreateDirectory((Join-Path $runtime 'Editor'))
     while ($queue.Count) {
         $name = $queue.Dequeue()
+        if ($name -match '^(fmod(?:L|studio|studioL)?|miniaudio)\.dll$') { throw "Retired or non-source audio dependency imported by $HostName : $name" }
         if (-not $seen.Add($name)) { continue }
         if ([IO.Path]::GetFileName($name) -ne $name) { throw "Invalid import name: $name" }
         if ($name -match '^(api-ms-|ext-ms-)') { $systemImports.Add($name); continue }
@@ -105,6 +112,17 @@ try {
     $infoText = & $launcher --engine-info | Out-String
     if ($LASTEXITCODE -ne 0) { throw "Host loading probe failed: $HostName ($LASTEXITCODE)" }
     $info = ($infoText | Select-Object -Last 1) | ConvertFrom-Json
+    # Mode comes from the compiled ABI, independently of Debug/Release optimization.
+    # Package the matching native Player symbols only for Development distributions.
+    if ($HostName -eq 'Player' -and $info.shipping -eq 0) {
+        $symbols = Assert-EngineChildPath ([IO.Path]::ChangeExtension($HostPath, '.pdb')) $BinaryRoot
+        if (-not (Test-Path -LiteralPath $symbols -PathType Leaf)) {
+            throw "Development Player native symbols missing: $symbols"
+        }
+        $symbolEntries = @(Get-EngineEntries $BinaryRoot @([IO.Path]::GetRelativePath($BinaryRoot, $symbols).Replace('\','/')))
+        Test-EngineEntries $BinaryRoot $symbolEntries
+        $entries += $symbolEntries
+    }
     $manifest = [ordered]@{ schemaVersion = 1; host = $HostName; configuration = $Config;
         abi = $info; entries = $entries; digest = Get-EngineDigest $entries; systemImports = @($systemImports | Sort-Object) }
     Write-EngineJson (Join-Path $runtime "Manifests\$HostName.json") $manifest

@@ -56,7 +56,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;LX_PROBE_VULKAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)ThirdParty\Mathematics\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)ThirdParty\Mathematics\include;$(SolutionDir)ThirdParty\Vulkan-Headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -74,7 +74,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;LX_PROBE_VULKAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)ThirdParty\Mathematics\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)ThirdParty\Mathematics\include;$(SolutionDir)ThirdParty\Vulkan-Headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -87,6 +87,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="material_raster_surface_probe.cpp" />
+    <ClCompile Include="support\MaterialGraphScenePacket.cpp" />
 
   </ItemGroup>
   <ItemGroup>

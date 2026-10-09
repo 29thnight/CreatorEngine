@@ -10,6 +10,7 @@
 #include "HostAbi.h"
 #include "CrashReporter.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"
+#include "../../Engine/Utility_Framework/ContentAbi.h"
 
 namespace
 {
@@ -18,6 +19,16 @@ namespace
         std::fwprintf(stderr, L"[CreatorEngine loader] %ls (error=%lu)\n", message, error);
         OutputDebugStringW(message);
         return error ? static_cast<int>(error) : 126;
+    }
+
+    // 모듈 경로가 MAX_PATH 아래여도 로더가 그 폴더에서 의존 DLL 경로를 만들며 한계를
+    // 넘긴다(모듈 경로 255자에서 ERROR_FILENAME_EXCED_RANGE 실측). 길이와 무관하게
+    // 확장 경로 접두를 붙인다. 경로는 GetModuleFileNameW 에서 온 절대 경로다.
+    std::wstring ExtendedPath(const std::filesystem::path& path)
+    {
+        const std::wstring value = path.wstring();
+        if (value.starts_with(L"\\\\?\\")) return value;
+        return value.starts_with(L"\\\\") ? L"\\\\?\\UNC\\" + value.substr(2) : L"\\\\?\\" + value;
     }
 
     int Run(int argc, wchar_t** argv, int show)
@@ -46,19 +57,15 @@ namespace
         if (!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS))
             return Fail(L"Cannot set DLL search policy");
         const auto common = root / L"Runtime" / L"Common";
-        if (!AddDllDirectory(common.c_str())) return Fail(L"Cannot add shared runtime directory");
+        if (!AddDllDirectory(ExtendedPath(common).c_str())) return Fail(L"Cannot add shared runtime directory");
         // Only the editor can resolve editor-only dependencies.
         if (exe.stem() == L"CreatorEditor")
         {
             const auto editor = root / L"Runtime" / L"Editor";
-            if (!AddDllDirectory(editor.c_str())) return Fail(L"Cannot add editor runtime directory");
+            if (!AddDllDirectory(ExtendedPath(editor).c_str())) return Fail(L"Cannot add editor runtime directory");
         }
         const auto hostPath = directory / (exe.stem().wstring() + L".runtime.dll");
-        // The DLL loader still needs the extended-length prefix for long module
-        // names even when ordinary file operations are longPathAware.
-        auto loadPath = hostPath.wstring();
-        if (loadPath.size() >= MAX_PATH && !loadPath.starts_with(L"\\\\?\\"))
-            loadPath = loadPath.starts_with(L"\\\\") ? L"\\\\?\\UNC\\" + loadPath.substr(2) : L"\\\\?\\" + loadPath;
+        const std::wstring loadPath = ExtendedPath(hostPath);
         HMODULE host = LoadLibraryExW(loadPath.c_str(), nullptr,
             LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!host) return Fail(hostPath.c_str());
@@ -76,14 +83,23 @@ namespace
             strcmp(info->featureRelease, CreatorEngineVersion::FeatureRelease) != 0 ||
             info->localDevelopment != static_cast<unsigned>(CreatorEngineVersion::LocalDevelopment))
             return Fail(L"Launcher and host engine versions differ", ERROR_REVISION_MISMATCH);
+        auto getContentInfo = reinterpret_cast<CreatorHostGetContentInfo>(GetProcAddress(host, "CreatorHostGetContentInfoV1"));
+        if (!getContentInfo) return Fail(L"Host content ABI entry point is missing", ERROR_PROC_NOT_FOUND);
+        const auto* contentInfo = getContentInfo();
+        if (!contentInfo || contentInfo->size != sizeof(CreatorHostContentInfoV1) ||
+            contentInfo->contentAbiVersion != CreatorContentAbi::Version || !contentInfo->contentAbi ||
+            strcmp(contentInfo->contentAbi, CreatorContentAbi::Token) != 0)
+            return Fail(L"Launcher and host content ABIs differ", ERROR_REVISION_MISMATCH);
         if (argc == 2 && wcscmp(argv[1], L"--engine-info") == 0)
         {
             std::printf("{\"hostAbi\":%u,\"compiler\":%u,\"iteratorDebugLevel\":%u,"
                 "\"debug\":%u,\"shipping\":%u,\"scriptApi\":%u,\"pointerBits\":%u,"
-                "\"localDevelopment\":%s,\"productName\":\"%s\",\"featureRelease\":\"%s\",\"version\":\"%s\"}\n",
+                "\"localDevelopment\":%s,\"productName\":\"%s\",\"featureRelease\":\"%s\",\"version\":\"%s\","
+                "\"contentAbiVersion\":%u,\"contentAbi\":\"%s\"}\n",
                 info->hostAbi, info->compiler, info->iteratorDebugLevel, info->debug,
                 info->shipping, info->scriptApi, info->pointerBits,
-                info->localDevelopment ? "true" : "false", info->productName, info->featureRelease, info->engineVersion);
+                info->localDevelopment ? "true" : "false", info->productName, info->featureRelease, info->engineVersion,
+                contentInfo->contentAbiVersion, contentInfo->contentAbi);
             return 0;
         }
         return run(argc, argv, show);

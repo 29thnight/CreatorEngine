@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -21,7 +24,7 @@ internal static class EnginePublisher
             var installation = (await context.Run(vswhere, ["-latest", "-products", "*", "-requires", "Microsoft.Component.MSBuild", "-property", "installationPath"], echo: false)).Output.Trim();
             var msbuild = Path.Combine(installation, "MSBuild/Current/Bin/amd64/MSBuild.exe");
             // Build individual native hosts; never overwrite the currently running build tool.
-            foreach (var project in new[] { "Editor/CreatorEditor.vcxproj", "Player/Player.vcxproj", "Tools/AssetCooker/AssetCooker.vcxproj", "Tools/AssetPacker/AssetPacker.vcxproj" })
+            foreach (var project in new[] { "Editor/CreatorEditor.vcxproj", "Player/Player.vcxproj", "Tools/AssetCooker/AssetCooker.vcxproj", "Tools/AssetPacker/AssetPacker.vcxproj", "Tools/ProfilerViewer/ProfilerViewer.vcxproj" })
             {
                 var arguments = new List<string> { Path.Combine(repository, project), "/m", "/t:Build", $"/p:Configuration={config}", "/p:Platform=x64", "/nologo", "/verbosity:minimal" };
                 if (shipping && project.StartsWith("Player/")) arguments.Add("/p:EngineShipping=true");
@@ -57,6 +60,7 @@ internal static class EnginePublisher
                 if (record.Int("schemaVersion") != 1 || record.Text("host") != name || record.Text("configuration") != config || Metadata.Digest(entries) != record.Text("digest"))
                     throw new BuildException($"Invalid native build record: {name}");
                 Metadata.Verify(source, entries, context.Cancellation);
+                Metadata.AssertSourceOnlyAudio(entries.Select(entry => entry.Path));
                 if (abi.Text("version") != version || abi.Text("productName") != metadata.Text("productName") ||
                     abi.Text("featureRelease") != metadata.Text("featureRelease") || abi.Bool("localDevelopment") != metadata.Bool("localDevelopment") ||
                     (abi.Int("debug") != 0) != (config == "Debug") || (abi.Int("shipping") != 0) != (name == "Player" && shipping))
@@ -73,11 +77,68 @@ internal static class EnginePublisher
                 }
                 Copy(recordPath, Paths.Child(binaryTarget, $"Runtime/Manifests/{name}.json")); hosts[name] = abi.DeepClone();
             }
+            var content = ContentCompatibility.Read(hosts["Player"]!, "Player native build record");
+            foreach (var host in hosts)
+            {
+                if (ContentCompatibility.Read(host.Value!, $"{host.Key} native build record") != content)
+                    throw new BuildException($"Native content ABIs differ: {host.Key}. Rebuild all four engine hosts before publishing.");
+            }
+            // ProfilerViewer is a real standalone application, not an engine
+            // runtime host. Its bounded deployment record contains only its
+            // native import closure and the shared Editor fonts/licenses.
+            var viewerRoot = Path.Combine(binarySource, "Tools/ProfilerViewer");
+            var viewerRecordPath = Path.Combine(viewerRoot, "deployment.json");
+            var viewerRecord = Metadata.Read(viewerRecordPath);
+            var viewerEntries = Metadata.ParseEntries(viewerRecord.Array("entries"));
+            if (viewerRecord.Int("schemaVersion") != 1 || viewerRecord.Text("tool") != "ProfilerViewer" ||
+                viewerRecord.Text("configuration") != config || viewerRecord.Text("version") != version ||
+                Metadata.Digest(viewerEntries) != viewerRecord.Text("digest"))
+            {
+                throw new BuildException("Invalid ProfilerViewer build record. Rebuild Tools/ProfilerViewer/ProfilerViewer.vcxproj.");
+            }
+            Metadata.Verify(binarySource, viewerEntries, context.Cancellation);
+            var viewerPaths = viewerEntries.Select(entry => entry.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var required in new[] { "ProfilerViewer.exe", "Resources/Fonts/Inter-Regular.ttf", "Resources/Fonts/MaterialSymbolsOutlined-Editor.ttf", "Resources/Fonts/LICENSE-Inter.txt", "Resources/Fonts/LICENSE-MaterialSymbols.txt" })
+            {
+                if (!viewerPaths.Contains("Tools/ProfilerViewer/" + required))
+                {
+                    throw new BuildException($"ProfilerViewer deployment record is incomplete: {required}");
+                }
+            }
+            var viewerVersion = FileVersionInfo.GetVersionInfo(Path.Combine(viewerRoot, "ProfilerViewer.exe"));
+            if (viewerVersion.FileVersion != version || viewerVersion.ProductVersion != version)
+            {
+                throw new BuildException("ProfilerViewer version differs from the requested distribution. Rebuild the tool.");
+            }
+            foreach (var entry in viewerEntries)
+            {
+                var file = Paths.Child(binarySource, entry.Path);
+                Paths.AssertChild(file, viewerRoot);
+                Copy(file, Paths.Child(binaryTarget, entry.Path));
+            }
+            Copy(viewerRecordPath, Paths.Child(binaryTarget, "Tools/ProfilerViewer/deployment.json"));
             var api = hosts["Player"]!.Int("scriptApi");
             var expected = Regex.Match(File.ReadAllText(Path.Combine(repository, "ScriptCore/Native.cs")), @"ExpectedVersion\s*=\s*(\d+)");
-            if (!expected.Success || int.Parse(expected.Groups[1].Value) != api || hosts.Any(h => h.Value!.Int("scriptApi") != api))
-                throw new BuildException("Native and managed script API versions differ.");
-            foreach (var name in GameCompiler.CoreFiles) Copy(Path.Combine(binarySource, "Managed", name), Path.Combine(binaryTarget, "Managed", name));
+            var nativeExpected = Regex.Match(File.ReadAllText(Path.Combine(repository,
+                "Engine/Utility_Framework/ScriptApiVersion.h")), @"CreatorScriptApiVersion\s*=\s*(\d+)");
+            if (!expected.Success || !nativeExpected.Success
+                || !int.TryParse(expected.Groups[1].Value, out int managedApi)
+                || !int.TryParse(nativeExpected.Groups[1].Value, out int nativeApi)
+                || managedApi != nativeApi || nativeApi != api
+                || hosts.Any(h => h.Value!.Int("scriptApi") != api))
+            {
+                throw new BuildException("Native source, managed source and built host script API versions differ. Rebuild all hosts and ScriptCore together.");
+            }
+            foreach (var name in GameCompiler.CoreFiles)
+            {
+                Copy(Path.Combine(binarySource, "Managed", name), Path.Combine(binaryTarget, "Managed", name));
+            }
+            // Inspect the copied assembly bytes without loading or executing it.
+            // Matching source versions cannot prove an old ScriptCore was rebuilt.
+            if (ReadManagedApiVersion(Path.Combine(binaryTarget, "Managed", "ScriptCore.dll")) != api)
+            {
+                throw new BuildException("Built ScriptCore.dll script API differs from the native hosts. Rebuild ScriptCore before publishing.");
+            }
             Tree(Path.Combine(binarySource, "Resources"), Path.Combine(binaryTarget, "Resources"));
             var dotnetRoot = Path.GetDirectoryName(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory().TrimEnd(Path.DirectorySeparatorChar))!;
             dotnetRoot = Directory.GetParent(dotnetRoot)!.Parent!.FullName;
@@ -105,16 +166,18 @@ internal static class EnginePublisher
                 Copy(Path.Combine(toolSource, name), Path.Combine(binaryTarget, "Tools/CreatorBuildTool", name));
             }
             Tree(Path.Combine(repository, "Tools/packaging/templates"), Path.Combine(candidate, "Tools/packaging/templates"));
-            foreach (var file in Paths.Files(Path.Combine(repository, "ThirdParty")).Where(p => Regex.IsMatch(Path.GetFileName(p), "^(LICENSE|COPYING|NOTICE|README)", RegexOptions.IgnoreCase) && Path.GetExtension(p) is not (".dll" or ".lib")))
+            foreach (var file in Paths.Files(Path.Combine(repository, "ThirdParty")).Where(p => Regex.IsMatch(Path.GetFileName(p), "^(LICENSE|COPYING|NOTICE|README|PROVENANCE)", RegexOptions.IgnoreCase) && Path.GetExtension(p) is not (".dll" or ".lib")))
                 Copy(file, Paths.Child(candidate, "Licenses/ThirdParty/" + Paths.Relative(Path.Combine(repository, "ThirdParty"), file)));
             foreach (var file in Paths.Files(Path.Combine(repository, "vcpkg_installed")).Where(p => Path.GetFileName(p).Equals("copyright", StringComparison.OrdinalIgnoreCase)))
                 Copy(file, Paths.Child(candidate, "Licenses/vcpkg/" + Paths.Relative(Path.Combine(repository, "vcpkg_installed"), file)));
+            Metadata.AssertSourceOnlyAudio(Paths.Files(candidate));
             var entriesAll = Metadata.Entries(candidate); var digest = Metadata.Digest(entriesAll); var buildId = Guid.NewGuid().ToString("D");
             var revision = (await context.Run("git", ["-C", repository, "rev-parse", "HEAD"], echo: false)).Output.Trim();
             var dirty = (await context.Run("git", ["-C", repository, "status", "--porcelain"], echo: false)).Output.Length > 0;
             var manifest = (JsonObject)metadata.DeepClone();
             var payload = Metadata.Object(new { buildId, payloadDigest = digest, platform = "win-x64", configuration = config, shipping,
                 binaryRoot = $"Bin/x64-{config}", scriptApi = api, hostAbi = 1, supportedScriptApis = new[] { api },
+                contentAbiVersion = content.Version, contentAbi = content.Token,
                 source = new { revision, dirty, kind = "build-workspace-observation" },
                 toolchain = new { dotnetRuntime = Path.GetFileName(runtime), compilerSdk = Path.GetFileName(sdk), referencePack = Path.GetFileName(references) },
                 hosts, files = entriesAll, buildTool = $"Bin/x64-{config}/Tools/CreatorBuildTool/CreatorBuildTool.exe" });
@@ -142,4 +205,50 @@ internal static class EnginePublisher
         }
         catch { context.Error($"Unpublished engine candidate retained: {candidate}"); throw; }
     }
+
+    private static int ReadManagedApiVersion(string assemblyPath)
+    {
+        using var stream = File.OpenRead(assemblyPath);
+        using var image = new PEReader(stream);
+        if (!image.HasMetadata)
+        {
+            throw new BuildException("ScriptCore.dll has no managed metadata.");
+        }
+        var metadata = image.GetMetadataReader();
+        if (!metadata.IsAssembly || metadata.GetString(metadata.GetAssemblyDefinition().Name) != "ScriptCore")
+        {
+            throw new BuildException("Expected the compiled ScriptCore assembly.");
+        }
+        foreach (var typeHandle in metadata.TypeDefinitions)
+        {
+            var type = metadata.GetTypeDefinition(typeHandle);
+            if (metadata.GetString(type.Namespace) != "CreatorEngine" || metadata.GetString(type.Name) != "Native")
+            {
+                continue;
+            }
+            foreach (var fieldHandle in type.GetFields())
+            {
+                var field = metadata.GetFieldDefinition(fieldHandle);
+                if (metadata.GetString(field.Name) != "ExpectedVersion")
+                {
+                    continue;
+                }
+                var constantHandle = field.GetDefaultValue();
+                if ((field.Attributes & (FieldAttributes.Static | FieldAttributes.Literal))
+                    != (FieldAttributes.Static | FieldAttributes.Literal) || constantHandle.IsNil)
+                {
+                    throw new BuildException("ScriptCore Native.ExpectedVersion is not a compile-time constant.");
+                }
+                var constant = metadata.GetConstant(constantHandle);
+                var value = metadata.GetBlobReader(constant.Value);
+                if (constant.TypeCode != ConstantTypeCode.Int32 || value.Length != sizeof(int))
+                {
+                    throw new BuildException("ScriptCore Native.ExpectedVersion has an invalid metadata type.");
+                }
+                return value.ReadInt32();
+            }
+        }
+        throw new BuildException("ScriptCore Native.ExpectedVersion is missing; its script API cannot be verified.");
+    }
+
 }

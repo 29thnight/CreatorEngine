@@ -1,5 +1,26 @@
 ﻿#include "PlayerCommands.h"
 
+#include <string_view>
+
+namespace
+{
+    bool IsLocalCommandArgument(std::wstring_view option)
+    {
+        return option == L"--exec" || option == L"--exec-args" || option == L"--script" ||
+            option == L"--commandlet" || option == L"--commandlet-script" ||
+            option == L"--result-format" || option == L"--result-file" || option == L"--fail-fast";
+    }
+}
+
+#if CE_DEVELOPMENT
+#include "PlayerCommandService.h"
+#include "CommandCore/CommandParser.h"
+#include "CommandCore/CommandSession.h"
+#include <Windows.h>
+#include <filesystem>
+#include <fstream>
+#include <stdexcept>
+
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "CommandCore/CommandRegistry.h"
 
@@ -15,6 +36,8 @@
 #include "ProfileService.h"
 #include "ProfileCaptureFile.h"
 #include "JobScheduler.h"
+#include "RHI/DX12/DX12DeviceResources.h"
+#include "RuntimeSettings.h"
 #endif
 
 #include <algorithm>
@@ -34,6 +57,148 @@ namespace PlayerCmd
 {
 	namespace
 	{
+        struct BatchInput
+        {
+            std::vector<std::vector<std::string>> commands;
+            std::filesystem::path resultPath;
+            std::ofstream resultFile;
+            std::size_t next{};
+            bool requested{};
+            bool commandlet{};
+            bool modifiers{};
+            bool failFast{};
+            bool started{};
+            bool awaiting{};
+            bool completed{};
+        };
+
+        BatchInput g_batch;
+
+        std::string Utf8(const wchar_t* value)
+        {
+            const std::wstring_view text(value);
+            const int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+            if (length == 0 && !text.empty())
+            {
+                throw std::invalid_argument("Command argument is not valid Unicode");
+            }
+            std::string result(static_cast<std::size_t>(length), '\0');
+            if (length > 0)
+            {
+                WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(),
+                    static_cast<int>(text.size()), result.data(), length, nullptr, nullptr);
+            }
+            return result;
+        }
+
+        bool AddBatchLine(std::string_view line, std::string& error)
+        {
+            const auto first = line.find_first_not_of(" \t\r\n");
+            if (first == std::string_view::npos || line[first] == '#' || line.substr(first, 2) == "//")
+            {
+                return true;
+            }
+            auto parsed = CommandCore::Tokenize(line);
+            if (!parsed.ok)
+            {
+                error = parsed.errorCode + ": " + parsed.errorMessage;
+                return false;
+            }
+            if (!parsed.tokens.empty())
+            {
+                g_batch.commands.push_back(std::move(parsed.tokens));
+            }
+            return true;
+        }
+
+        bool LoadBatchScript(const std::filesystem::path& path, std::string& error)
+        {
+            std::ifstream input(path, std::ios::binary);
+            if (!input)
+            {
+                error = "Cannot open Player command script";
+                return false;
+            }
+            std::string line;
+            std::size_t lineNumber = 0;
+            while (std::getline(input, line))
+            {
+                ++lineNumber;
+                if (lineNumber == 1 && line.starts_with("\xEF\xBB\xBF"))
+                {
+                    line.erase(0, 3);
+                }
+                if (!AddBatchLine(line, error))
+                {
+                    error = "Script line " + std::to_string(lineNumber) + ": " + error;
+                    return false;
+                }
+            }
+            if (input.bad())
+            {
+                error = "Cannot read Player command script";
+                return false;
+            }
+            return true;
+        }
+
+        void FinishBatch()
+        {
+            if (g_batch.completed)
+            {
+                return;
+            }
+            g_batch.completed = true;
+            std::fprintf(stderr, "[PLAYER CLI] %s\n", CommandCore::CommandSession::Batch().Summary().c_str());
+            if (g_batch.commandlet || CommandCore::CommandSession::Batch().ShouldStopEarly())
+            {
+                CommandHost::Get().RequestQuit();
+            }
+        }
+
+        void QueueNextBatchCommand()
+        {
+            if (!g_batch.started || g_batch.awaiting || g_batch.completed)
+            {
+                return;
+            }
+            if (g_batch.next == g_batch.commands.size())
+            {
+                FinishBatch();
+                return;
+            }
+            auto arguments = std::move(g_batch.commands[g_batch.next++]);
+            const std::string command = arguments[0];
+            g_batch.awaiting = true;
+            CommandHost::Get().Enqueue(std::move(arguments),
+                [command](const CommandCore::CommandResult& result, const Timing& timing)
+                {
+                    auto& session = CommandCore::CommandSession::Batch();
+                    session.Record(command, result);
+                    const std::string json = PlayerCommandService::FormatResult(command, result, timing);
+                    std::fprintf(stdout, "%s\n", json.c_str());
+                    std::fflush(stdout);
+                    if (g_batch.resultFile.is_open())
+                    {
+                        g_batch.resultFile << json << '\n';
+                        g_batch.resultFile.flush();
+                        if (!g_batch.resultFile)
+                        {
+                            session.Record("--result-file", CommandCore::InternalError(
+                                "result.write_failed", "Cannot write Player result file"));
+                            CommandHost::Get().RequestQuit();
+                        }
+                    }
+                    g_batch.awaiting = false;
+                    if (g_batch.next == g_batch.commands.size() || session.ShouldStopEarly() ||
+                        CommandHost::Get().IsQuitRequested())
+                    {
+                        FinishBatch();
+                    }
+                }, 0);
+        }
+
 		using Handler = CommandCore::CommandResult(*)(const std::vector<std::string>&);
 
 		// ── 핸들러 ──────────────────────────────────────────────────────
@@ -268,6 +433,29 @@ namespace PlayerCmd
 			data.Set("position", Vector3Data(transform.GetPosition()));
 			return CommandCore::Ok("이동 완료: " + parts[1], std::move(data));
 		}
+
+#if !CE_SHIPPING
+		// 시험 전용: 다음 프레임 시작에 DX12 장치를 지워 장치 제거 경로를 재현한다.
+		// scene 은 렌더 장치, host 는 표시 장치지만 같은 어댑터라 실제로는 둘 다 지워진다.
+		CommandCore::CommandResult Cmd_device_remove(const std::vector<std::string>& parts)
+		{
+			if (parts.size() != 2 || (parts[1] != "scene" && parts[1] != "host"))
+			{
+				return CommandCore::InvalidArguments("player.device-remove: scene|host 가 필요하다");
+			}
+			if (RenderBackend::DX12 != RuntimeSettings::Get().GetRenderBackend())
+			{
+				return CommandCore::Fail("device.backend",
+					"player.device-remove: DX12 백엔드에서만 주입할 수 있다");
+			}
+			DX12DeviceResources::RequestTestDeviceRemoval(parts[1] == "scene"
+				? DX12DeviceResources::TestDeviceRemovalTarget::Scene
+				: DX12DeviceResources::TestDeviceRemovalTarget::Host);
+			auto data = CommandCore::CommandData::Object();
+			data.Set("target", CommandCore::CommandData::String(parts[1]));
+			return CommandCore::Ok("장치 제거 요청: " + parts[1], std::move(data));
+		}
+#endif
 
 #if !CE_SHIPPING
         struct ProfileSaveOperation
@@ -550,6 +738,7 @@ namespace PlayerCmd
             { "profile.record", &Cmd_profile_record },
             { "profile.pause", &Cmd_profile_pause },
             { "profile.save", &Cmd_profile_save },
+            { "player.device-remove", &Cmd_device_remove },
 #endif
             { "help",           &Cmd_help },
 			{ "quit",           &Cmd_quit },
@@ -567,6 +756,150 @@ namespace PlayerCmd
 			return table;
 		}
 	}
+
+    bool ParseCommandLineArgument(int argc, wchar_t* const* argv, int& index, std::string& error)
+    {
+        const std::wstring_view option(argv[index]);
+        if (!IsLocalCommandArgument(option))
+        {
+            return false;
+        }
+        try
+        {
+            if (option == L"--fail-fast")
+            {
+                g_batch.failFast = true;
+                g_batch.modifiers = true;
+                return true;
+            }
+            if (index + 1 >= argc)
+            {
+                error = Utf8(argv[index]) + " requires a value";
+                return true;
+            }
+            if (option == L"--result-format")
+            {
+                g_batch.modifiers = true;
+                if (std::wstring_view(argv[++index]) != L"jsonl")
+                {
+                    error = "Player --result-format must be jsonl";
+                }
+                return true;
+            }
+            if (option == L"--result-file")
+            {
+                g_batch.modifiers = true;
+                g_batch.resultPath = argv[++index];
+                if (g_batch.resultPath.empty())
+                {
+                    error = "--result-file requires a nonempty path";
+                }
+                return true;
+            }
+            const bool commandlet = option == L"--commandlet" || option == L"--commandlet-script";
+            if ((commandlet && g_batch.requested) || (!commandlet && g_batch.commandlet))
+            {
+                error = "Use one commandlet input, without --exec/--script";
+                return true;
+            }
+            g_batch.requested = true;
+            g_batch.commandlet = commandlet;
+            if (option == L"--exec")
+            {
+                AddBatchLine(Utf8(argv[++index]), error);
+            }
+            else if (option == L"--script" || option == L"--commandlet-script")
+            {
+                LoadBatchScript(std::filesystem::path(argv[++index]), error);
+            }
+            else
+            {
+                std::vector<std::string> arguments;
+                for (++index; index < argc; ++index)
+                {
+                    if (std::wstring_view(argv[index]) == L"--")
+                    {
+                        break;
+                    }
+                    arguments.push_back(Utf8(argv[index]));
+                }
+                if (arguments.empty() || arguments[0].empty())
+                {
+                    error = "Player command input requires a command name";
+                }
+                else
+                {
+                    g_batch.commands.push_back(std::move(arguments));
+                }
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            error = exception.what();
+        }
+        return true;
+    }
+
+    bool ValidateCommandLine(bool commandService, bool smoke, std::string& error)
+    {
+        if (g_batch.modifiers && !g_batch.requested)
+        {
+            error = "Player result/fail-fast options require --exec, --script, or --commandlet input";
+            return false;
+        }
+        if (g_batch.requested && (commandService || smoke))
+        {
+            error = "Player local batch/commandlets cannot be combined with --command-service or --smoke";
+            return false;
+        }
+        if (g_batch.requested && g_batch.commands.empty())
+        {
+            error = "Player command input is empty";
+            return false;
+        }
+        return true;
+    }
+
+    void CommandHost::StartBatch(bool runtimeReady)
+    {
+        if (!g_batch.requested || g_batch.started)
+        {
+            return;
+        }
+        g_batch.started = true;
+        if (!runtimeReady)
+        {
+            g_batch.completed = true;
+            RequestQuit();
+            return;
+        }
+        EnsureRegistered();
+        CommandCore::CommandSession::Batch().SetFailFast(g_batch.failFast);
+        // Preserve redirected handles. GUI-subsystem executables attach to the invoking
+        // terminal only when there is no existing stdout pipe or file.
+        const HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (output == nullptr || output == INVALID_HANDLE_VALUE)
+        {
+            if (AttachConsole(ATTACH_PARENT_PROCESS))
+            {
+                FILE* stream = nullptr;
+                freopen_s(&stream, "CONOUT$", "w", stdout);
+                freopen_s(&stream, "CONOUT$", "w", stderr);
+            }
+        }
+        if (!g_batch.resultPath.empty())
+        {
+            g_batch.resultFile.open(g_batch.resultPath, std::ios::binary | std::ios::trunc);
+            if (!g_batch.resultFile)
+            {
+                CommandCore::CommandSession::Batch().Record("--result-file",
+                    CommandCore::InternalError("result.open_failed", "Cannot open Player result file"));
+                std::fputs("[PLAYER CLI] Cannot open result file\n", stderr);
+                RequestQuit();
+                return;
+            }
+        }
+    }
 
 	CommandHost& CommandHost::Get()
 	{
@@ -681,6 +1014,11 @@ namespace PlayerCmd
 
 	void CommandHost::Pump()
 	{
+        if (IsQuitRequested())
+        {
+            return;
+        }
+        QueueNextBatchCommand();
 		const uint64_t frameIndex = m_frameIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
 
 		// 예산. Editor 의 서비스 큐와 같은 뜻이다(§7.2) — 한 프레임이 큐 전체를
@@ -763,3 +1101,23 @@ namespace PlayerCmd
 		return status;
 	}
 }
+
+#else
+namespace PlayerCmd
+{
+    bool ParseCommandLineArgument(int, wchar_t* const* argv, int& index, std::string& error)
+    {
+        if (!IsLocalCommandArgument(argv[index]))
+        {
+            return false;
+        }
+        error = "Player CLI and commandlets require a Development Build (EngineShipping=false)";
+        return true;
+    }
+
+    bool ValidateCommandLine(bool, bool, std::string&)
+    {
+        return true;
+    }
+}
+#endif // CE_DEVELOPMENT

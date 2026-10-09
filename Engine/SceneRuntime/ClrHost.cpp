@@ -16,6 +16,7 @@
 #include "Scene.h"
 #include "PrefabUtility.h"
 #include "SoundComponent.h"
+#include "AudioListenerComponent.h"
 #include "Animator.h"
 #include "ConditionParameter.h"
 #include "RectTransformComponent.h"
@@ -28,6 +29,7 @@
 #include "MeshRenderer.h"
 #include "LightComponent.h"
 #include "../RenderEngine/Material.h"
+#include "../RenderEngine/DataSystem.h"
 #include "InputManager.h"
 
 #include <nethost.h>
@@ -36,6 +38,7 @@
 
 #include <windows.h>
 #include <cstring>
+#include <cstddef>
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
 // 헤더·lib·DLL은 ThirdParty\DotNetHost\에 고정한 사본이고, 경로는 EngineOutput.props의
@@ -59,6 +62,48 @@ namespace
 
 	// UI 좌표·화면 크기용. math::vector2와 배치가 같다.
 	struct Float2 { float x, y; };
+
+    struct AudioAssetId
+    {
+        std::uint64_t first;
+        std::uint64_t second;
+    };
+    struct AudioPlaySettings
+    {
+        float volume;
+        float pitch;
+        int priority;
+        int loop;
+        int bus;
+        float spatialBlend;
+        float minimumDistance;
+        float maximumDistance;
+        int rolloff;
+        int useReverbSend;
+        float reverbSendDecibels;
+        int ownerPolicy;
+        std::uint32_t concurrencyGroup;
+        int preemptSameClip;
+        int allowVirtualization;
+    };
+    struct AudioParameter
+    {
+        const char* name;
+        int type;
+        int integer;
+        float number;
+        const char* text;
+    };
+    static_assert(sizeof(AudioParameter) == 32u);
+    struct AudioPlaybackCompletion
+    {
+        std::uint64_t playback;
+        std::uint64_t scope;
+        std::uint64_t ownerId;
+        int reason;
+    };
+    static_assert(sizeof(AudioAssetId) == 16u);
+    static_assert(sizeof(AudioPlaySettings) == 60u);
 
 	struct ScriptApiTable
 	{
@@ -316,9 +361,193 @@ namespace
 		std::uint32_t (__stdcall* Profiler_Register)(const char* name);
 		void (__stdcall* Profiler_Begin)(std::uint32_t marker);
 		void (__stdcall* Profiler_End)();
+        std::uint64_t (__stdcall* Audio_GetScope)(int kind);
+        std::uint64_t (__stdcall* Audio_Play)(std::uint64_t scope, AudioAssetId asset, int sourceKind, int mode, Float3 position, ScriptObjectHandle owner, const AudioPlaySettings* settings, const AudioParameter* parameters, int parameterCount);
+        void (__stdcall* Audio_Control)(std::uint64_t playback, int operation, float gain, float pitch);
+        int (__stdcall* Audio_State)(std::uint64_t playback);
+        void (__stdcall* Audio_SetTransform)(std::uint64_t playback, Float3 position, Float3 velocity);
+        int (__stdcall* Audio_SetParameter)(std::uint64_t playback, const char* name, int type, int integer, float number, const char* text);
+        int (__stdcall* Audio_TakeCompletion)(AudioPlaybackCompletion* completion);
+        std::uint64_t (__stdcall* Sound_PlayInstance)(ScriptObjectHandle owner, int oneShot);
+        void (__stdcall* Sound_GetSettings)(ScriptObjectHandle owner, AudioPlaySettings* settings);
+        void (__stdcall* Sound_SetSettings)(ScriptObjectHandle owner, const AudioPlaySettings* settings);
+        int (__stdcall* Sound_GetSource)(ScriptObjectHandle owner, AudioAssetId* asset);
+        void (__stdcall* Sound_SetSource)(ScriptObjectHandle owner, AudioAssetId asset, int kind);
+        int (__stdcall* AudioListener_Exists)(ScriptObjectHandle owner);
+        int (__stdcall* AudioListener_GetActive)(ScriptObjectHandle owner);
+        void (__stdcall* AudioListener_SetActive)(ScriptObjectHandle owner, int active);
+        void (__stdcall* Audio_SetBusVolume)(int bus, float gain);
+        int (__stdcall* Audio_LastError)(char* buffer, int capacity);
+        int (__stdcall* Audio_Configure)(std::uint32_t id, int cap, int policy, int group);
+        int (__stdcall* Audio_SetReverbPreset)(int preset);
+        // Append-only v34 AssetDepot ABI. All ownership stays in this module.
+        int (__stdcall* Asset_Request)(const ScriptAssetLink* link, const ScriptTextureAssetVariant* variant, int residentOnly, ScriptAssetToken* token);
+        int (__stdcall* Asset_Snapshot)(ScriptAssetToken token, ScriptAssetRequestSnapshot* snapshot, char* message, int capacity);
+        int (__stdcall* Asset_AcquireResult)(ScriptAssetToken request, ScriptAssetToken* owner);
+        int (__stdcall* Asset_Cancel)(ScriptAssetToken request);
+        int (__stdcall* Asset_Release)(ScriptAssetToken token);
+        int (__stdcall* Asset_ReadTexture)(ScriptAssetToken token, ScriptTextureDescriptor* descriptor);
+        int (__stdcall* Asset_ListRoots)(std::uint64_t mount, std::uint32_t kind, ScriptAssetLink* links, int capacity, int* count);
+        // Append-only v35: concrete-view selection never changes serialized links.
+        int (__stdcall* Asset_RequestTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
+        int (__stdcall* Asset_TryAcquireTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
+
+
 	};
 
+    static_assert(offsetof(ScriptApiTable, Asset_RequestTyped)
+        == offsetof(ScriptApiTable, Asset_ListRoots) + sizeof(decltype(ScriptApiTable::Asset_ListRoots)));
+    static_assert(offsetof(ScriptApiTable, Asset_TryAcquireTyped)
+        == offsetof(ScriptApiTable, Asset_RequestTyped) + sizeof(decltype(ScriptApiTable::Asset_RequestTyped)));
+
 	ScriptApiTable g_apiTable{};
+
+    // These adapters catch all C++ exceptions before returning to managed code.
+    int __stdcall Api_Asset_Request(const ScriptAssetLink* link, const ScriptTextureAssetVariant* variant,
+        int residentOnly, ScriptAssetToken* token)
+    {
+        if (token != nullptr)
+        {
+            *token = {};
+        }
+        if (link == nullptr || variant == nullptr || token == nullptr || (residentOnly != 0 && residentOnly != 1))
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().RequestAsset(*link, *variant, residentOnly != 0, *token));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int RequestTypedAsset(const ScriptAssetLink* link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant* variant, bool residentOnly, ScriptAssetToken* token)
+    {
+        if (token != nullptr)
+        {
+            *token = {};
+        }
+        if (link == nullptr || variant == nullptr || token == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().RequestAssetTyped(
+                *link, concreteType, *variant, residentOnly, *token));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_RequestTyped(const ScriptAssetLink* link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant* variant, ScriptAssetToken* token)
+    {
+        return RequestTypedAsset(link, concreteType, variant, false, token);
+    }
+
+    int __stdcall Api_Asset_TryAcquireTyped(const ScriptAssetLink* link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant* variant, ScriptAssetToken* token)
+    {
+        return RequestTypedAsset(link, concreteType, variant, true, token);
+    }
+
+    int __stdcall Api_Asset_Snapshot(ScriptAssetToken token, ScriptAssetRequestSnapshot* snapshot, char* message, int capacity)
+    {
+        if (snapshot == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().SnapshotAssetRequest(token, *snapshot, message, capacity));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_AcquireResult(ScriptAssetToken request, ScriptAssetToken* owner)
+    {
+        if (owner == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        *owner = {};
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().AcquireAssetResult(request, *owner));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_Cancel(ScriptAssetToken request)
+    {
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().CancelAssetRequest(request));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_Release(ScriptAssetToken token)
+    {
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().ReleaseAsset(token));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_ReadTexture(ScriptAssetToken token, ScriptTextureDescriptor* descriptor)
+    {
+        if (descriptor == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().ReadTexture(token, *descriptor));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_ListRoots(std::uint64_t mount, std::uint32_t kind, ScriptAssetLink* links, int capacity, int* count)
+    {
+        if (count == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().ListAssetRoots(mount, kind, links, capacity, *count));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+
 
 	std::uint32_t __stdcall Api_Profiler_Register(const char* name)
 	{
@@ -810,38 +1039,430 @@ namespace
 		auto* sound = ResolveSound(handle);
 		if (nullptr == sound) return 0;
 
-		const int length = static_cast<int>(std::min<size_t>(sound->clipKey.size(), static_cast<size_t>(capacity)));
-		std::memcpy(buffer, sound->clipKey.data(), length);
+		const auto settings = sound->ReadSettings();
+        const int length = static_cast<int>(std::min<size_t>(settings.clipKey.size(), static_cast<size_t>(capacity)));
+		std::memcpy(buffer, settings.clipKey.data(), length);
 		return length;
 	}
 
 	void __stdcall Api_Sound_SetClipKey(ScriptObjectHandle handle, const char* value)
 	{
 		if (nullptr == value) return;
-		if (auto* sound = ResolveSound(handle)) sound->clipKey = value;
+		if (auto* sound = ResolveSound(handle))
+        {
+            sound->SetClipKey(value);
+        }
 	}
 
 	float __stdcall Api_Sound_GetVolume(ScriptObjectHandle handle)
 	{
 		auto* sound = ResolveSound(handle);
-		return (nullptr != sound) ? sound->volume : 0.f;
+		return (nullptr != sound) ? sound->ReadSettings().volume : 0.f;
 	}
 
 	void __stdcall Api_Sound_SetVolume(ScriptObjectHandle handle, float value)
 	{
-		if (auto* sound = ResolveSound(handle)) sound->volume = value;
+		if (auto* sound = ResolveSound(handle))
+        {
+            sound->SetVolume(value);
+        }
 	}
 
 	float __stdcall Api_Sound_GetPitch(ScriptObjectHandle handle)
 	{
 		auto* sound = ResolveSound(handle);
-		return (nullptr != sound) ? sound->pitch : 0.f;
+		return (nullptr != sound) ? sound->ReadSettings().pitch : 0.f;
 	}
 
 	void __stdcall Api_Sound_SetPitch(ScriptObjectHandle handle, float value)
 	{
-		if (auto* sound = ResolveSound(handle)) sound->pitch = value;
+		if (auto* sound = ResolveSound(handle))
+        {
+            sound->SetPitch(value);
+        }
 	}
+
+    bool AudioApiEntered()
+    {
+        return g_physicsApiOwner == std::this_thread::get_id();
+    }
+
+    std::uint64_t PackAudioScope(wave::PlaybackScope scope)
+    {
+        return (static_cast<std::uint64_t>(scope.generation) << 32u) | scope.index;
+    }
+
+    wave::PlaybackScope UnpackAudioScope(std::uint64_t value)
+    {
+        return { static_cast<std::uint32_t>(value), static_cast<std::uint32_t>(value >> 32u) };
+    }
+
+    wave::ClipKey AudioKey(AudioAssetId asset)
+    {
+        Uuid::Uuid16 guid;
+        std::memcpy(guid.data.data(), &asset, sizeof(asset));
+        return wave::ClipKey::FromGuid(guid);
+    }
+
+    wave::PlayRequest AudioSettings(const AudioPlaySettings& settings)
+    {
+        wave::PlayRequest request;
+        request.volume = settings.volume;
+        request.pitch = settings.pitch;
+        request.priority = settings.priority;
+        request.loop = settings.loop != 0;
+        request.persistent = request.loop;
+        request.bus = { static_cast<std::uint16_t>(settings.bus + 1) };
+        request.spatialBlend = settings.spatialBlend;
+        request.minimumDistance = settings.minimumDistance;
+        request.maximumDistance = settings.maximumDistance;
+        request.rolloff = static_cast<wave::RolloffKind>(settings.rolloff);
+        request.useReverbSend = settings.useReverbSend != 0;
+        request.reverbSendDecibels = settings.reverbSendDecibels;
+        request.concurrencyGroup = { settings.concurrencyGroup };
+        request.preemptSameClip = settings.preemptSameClip != 0;
+        request.allowVirtualization = settings.allowVirtualization != 0;
+        return request;
+    }
+
+    bool ValidAudioSettings(const AudioPlaySettings& settings)
+    {
+        return settings.bus >= 0 && settings.bus < 5 && settings.rolloff >= 0 && settings.rolloff <= 2 &&
+            settings.ownerPolicy >= 0 && settings.ownerPolicy <= 1 && settings.concurrencyGroup <= 65535u;
+    }
+
+    std::uint64_t __stdcall Api_Audio_GetScope(int kind)
+    {
+        if (!AudioApiEntered())
+        {
+            return 0u;
+        }
+        if (kind == 1)
+        {
+            return PackAudioScope(SceneManagers->AudioSessionScope());
+        }
+        const auto* scene = SceneManagers->GetActiveScene();
+        return scene && kind == 0 ? PackAudioScope(scene->Sounds().WorldScope()) : 0u;
+    }
+
+    std::uint64_t __stdcall Api_Audio_Play(std::uint64_t scopeValue, AudioAssetId asset, int sourceKind,
+        int mode, Float3 position, ScriptObjectHandle owner, const AudioPlaySettings* settings, const AudioParameter* parameters, int parameterCount)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback || sourceKind < 0 || sourceKind > 2 || mode < 0 || mode > 2 ||
+            (settings && !ValidAudioSettings(*settings)) || parameterCount < 0 || parameterCount > 64 ||
+            (parameterCount > 0 && !parameters))
+        {
+            return 0u;
+        }
+        if (auto* scene = SceneManagers->GetActiveScene())
+        {
+            scene->Sounds().RefreshListener();
+        }
+        const auto scope = UnpackAudioScope(scopeValue);
+        wave::PlaybackRequest request;
+        request.source = { static_cast<wave::SoundSourceKind>(sourceKind), AudioKey(asset) };
+        if (settings)
+        {
+            request.settings = AudioSettings(*settings);
+            request.overridePresetSettings = true;
+            request.ownerPolicy = static_cast<wave::OwnerDestroyedPolicy>(settings->ownerPolicy);
+        }
+        for (int i = 0; i < parameterCount; ++i)
+        {
+            const auto& entry = parameters[i];
+            if (!entry.name || strnlen(entry.name, 257u) == 0u || strnlen(entry.name, 257u) > 256u)
+            {
+                return 0u;
+            }
+            wave::ParameterValue value;
+            switch (entry.type)
+            {
+            case 0: value = entry.integer != 0; break;
+            case 1: value = static_cast<std::int32_t>(entry.integer); break;
+            case 2: value = entry.number; break;
+            case 3:
+                if (!entry.text || strnlen(entry.text, 4097u) > 4096u)
+                {
+                    return 0u;
+                }
+                value = std::string(entry.text);
+                break;
+            default: return 0u;
+            }
+            if (!request.parameters.emplace(entry.name, std::move(value)).second)
+            {
+                return 0u;
+            }
+        }
+        if (mode == 0)
+        {
+            return playback->Play2D(scope, std::move(request)).Value();
+        }
+        if (mode == 1)
+        {
+            return playback->PlayAt(scope, std::move(request), { position.x, position.y, position.z }).Value();
+        }
+        auto* entity = ScriptObjectRegistry::Get().Resolve(owner);
+        if (!entity || !entity->GetScene() || entity->IsDestroyMark() ||
+            !entity->GetComponent<Transform>())
+        {
+            return 0u;
+        }
+        if (scope != entity->GetScene()->Sounds().WorldScope() && scope != SceneManagers->AudioSessionScope())
+        {
+            return 0u;
+        }
+        if (!entity->GetScene()->EnsureResolved(entity->GetScene()->HandleOf(entity->m_index)))
+        {
+            return 0u;
+        }
+        const auto handle = playback->PlayAttached(scope, std::move(request), entity->GetInstanceID(),
+            entity->GetComponent<Transform>()->GetWorldPosition());
+        entity->GetScene()->Sounds().TrackAttached(*entity, scope, handle);
+        return handle.Value();
+    }
+
+    void __stdcall Api_Audio_Control(std::uint64_t value, int operation, float gain, float pitch)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback)
+        {
+            return;
+        }
+        const auto handle = wave::PlaybackHandle::FromValue(value);
+        switch (operation)
+        {
+        case 0: playback->Stop(handle); break;
+        case 1: playback->SetPaused(handle, true); break;
+        case 2: playback->SetPaused(handle, false); break;
+        case 3: playback->SetGainPitch(handle, gain, pitch); break;
+        default: break;
+        }
+    }
+
+    int __stdcall Api_Audio_State(std::uint64_t value)
+    {
+        const auto* playback = SceneManagers->AudioPlayback();
+        return AudioApiEntered() && playback ? static_cast<int>(playback->State(wave::PlaybackHandle::FromValue(value))) : 0;
+    }
+
+    void __stdcall Api_Audio_SetTransform(std::uint64_t value, Float3 position, Float3 velocity)
+    {
+        if (auto* playback = SceneManagers->AudioPlayback(); AudioApiEntered() && playback)
+        {
+            playback->SetTransform(wave::PlaybackHandle::FromValue(value),
+                { position.x, position.y, position.z }, { velocity.x, velocity.y, velocity.z });
+        }
+    }
+
+    int __stdcall Api_Audio_SetParameter(std::uint64_t value, const char* name, int type,
+        int integer, float number, const char* text)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback || !name || strnlen(name, 257u) == 0u || strnlen(name, 257u) > 256u)
+        {
+            return 0;
+        }
+        wave::ParameterValue parameter;
+        switch (type)
+        {
+        case 0: parameter = integer != 0; break;
+        case 1: parameter = static_cast<std::int32_t>(integer); break;
+        case 2: parameter = number; break;
+        case 3:
+            if (!text || strnlen(text, 4097u) > 4096u)
+            {
+                return 0;
+            }
+            parameter = std::string(text);
+            break;
+        default: return 0;
+        }
+        return playback->SetParameter(wave::PlaybackHandle::FromValue(value), name, std::move(parameter)) ? 1 : 0;
+    }
+
+    int __stdcall Api_Audio_TakeCompletion(AudioPlaybackCompletion* completion)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback || !completion)
+        {
+            return 0;
+        }
+        wave::PlaybackCompletion event;
+        if (!playback->TryTakeCompletion(event))
+        {
+            return 0;
+        }
+        *completion = { event.playback.Value(), PackAudioScope(event.scope), event.ownerId, static_cast<int>(event.reason) };
+        return 1;
+    }
+
+    std::uint64_t __stdcall Api_Sound_PlayInstance(ScriptObjectHandle owner, int oneShot)
+    {
+        auto* sound = AudioApiEntered() ? ResolveSound(owner) : nullptr;
+        return sound ? sound->PlayInstance(oneShot != 0).Value() : 0u;
+    }
+
+    void __stdcall Api_Sound_GetSettings(ScriptObjectHandle owner, AudioPlaySettings* output)
+    {
+        const auto* sound = AudioApiEntered() ? ResolveSound(owner) : nullptr;
+        if (!sound || !output)
+        {
+            return;
+        }
+        const auto settings = sound->ReadSettings();
+        *output = { settings.volume, settings.pitch, settings.priority, settings.loop ? 1 : 0,
+            static_cast<int>(settings.bus), settings.spatial ? settings.spatialBlend : 0.0f,
+            settings.minDistance, settings.maxDistance, static_cast<int>(settings.rolloff),
+            settings.useReverbSend ? 1 : 0, settings.reverbLevel, static_cast<int>(settings.ownerDestroyedPolicy),
+            settings.concurrencyGroup, settings.preemptSameClip ? 1 : 0, settings.allowVirtualization ? 1 : 0 };
+    }
+
+    void __stdcall Api_Sound_SetSettings(ScriptObjectHandle owner, const AudioPlaySettings* input)
+    {
+        auto* sound = AudioApiEntered() ? ResolveSound(owner) : nullptr;
+        if (!sound || !input || !ValidAudioSettings(*input))
+        {
+            return;
+        }
+        auto settings = sound->ReadSettings();
+        settings.overridePresetSettings = true;
+        settings.volume = input->volume;
+        settings.pitch = input->pitch;
+        settings.priority = input->priority;
+        settings.concurrencyGroup = input->concurrencyGroup;
+        settings.preemptSameClip = input->preemptSameClip != 0;
+        settings.allowVirtualization = input->allowVirtualization != 0;
+        settings.loop = input->loop != 0;
+        settings.bus = static_cast<ChannelType>(input->bus);
+        settings.spatial = input->spatialBlend > 0.0f;
+        settings.spatialBlend = input->spatialBlend;
+        settings.minDistance = input->minimumDistance;
+        settings.maxDistance = input->maximumDistance;
+        settings.rolloff = static_cast<Rolloff>(input->rolloff);
+        settings.useReverbSend = input->useReverbSend != 0;
+        settings.reverbLevel = input->reverbSendDecibels;
+        settings.ownerDestroyedPolicy = static_cast<wave::OwnerDestroyedPolicy>(input->ownerPolicy);
+        sound->ApplySettings(settings);
+    }
+
+    int __stdcall Api_Sound_GetSource(ScriptObjectHandle owner, AudioAssetId* output)
+    {
+        const auto* sound = AudioApiEntered() ? ResolveSound(owner) : nullptr;
+        if (!sound || !output)
+        {
+            return 0;
+        }
+        const auto settings = sound->ReadSettings();
+        const auto& text = settings.sourceKind == wave::SoundSourceKind::Clip ? settings.clipKey :
+            (settings.sourceKind == wave::SoundSourceKind::Preset ? settings.soundPresetKey : settings.soundGraphKey);
+        const auto key = sound->GetOwner()->GetScene()->Sounds().ResolveAsset(text, settings.sourceKind);
+        Uuid::Uuid16 guid;
+        if (Uuid::TryParse(key.Text(), guid))
+        {
+            std::memcpy(output, guid.data.data(), sizeof(*output));
+        }
+        return static_cast<int>(settings.sourceKind);
+    }
+
+    void __stdcall Api_Sound_SetSource(ScriptObjectHandle owner, AudioAssetId asset, int kind)
+    {
+        auto* sound = AudioApiEntered() ? ResolveSound(owner) : nullptr;
+        if (!sound || kind < 0 || kind > 2)
+        {
+            return;
+        }
+        auto settings = sound->ReadSettings();
+        settings.sourceKind = static_cast<wave::SoundSourceKind>(kind);
+        auto& text = kind == 0 ? settings.clipKey : (kind == 1 ? settings.soundPresetKey : settings.soundGraphKey);
+        text = AudioKey(asset).Text();
+        sound->ApplySettings(settings);
+    }
+
+    void __stdcall Api_Audio_SetBusVolume(int bus, float gain)
+    {
+        if (auto* playback = SceneManagers->AudioPlayback(); AudioApiEntered() && playback && bus >= 0 && bus < 6)
+        {
+            playback->Audio().SetBusVolume({ static_cast<std::uint16_t>(bus + 1) }, gain);
+        }
+    }
+
+    int __stdcall Api_Audio_LastError(char* buffer, int capacity)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback || !buffer || capacity <= 0)
+        {
+            return 0;
+        }
+        const auto& error = playback->LastError();
+        const auto length = static_cast<int>(std::min<std::size_t>(error.size(), static_cast<std::size_t>(capacity)));
+        std::memcpy(buffer, error.data(), static_cast<std::size_t>(length));
+        return length;
+    }
+
+    int __stdcall Api_Audio_Configure(std::uint32_t id, int cap, int policy, int group)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback || cap < 0 || cap > 1024 || policy < 0 || policy > 3)
+        {
+            return 0;
+        }
+        if (group != 0)
+        {
+            if (id == 0u || id > 65535u)
+            {
+                return 0;
+            }
+            playback->Audio().ConfigureConcurrencyGroup({ id }, static_cast<std::size_t>(cap), static_cast<wave::StealPolicy>(policy));
+        }
+        else
+        {
+            if (id > 5u)
+            {
+                return 0;
+            }
+            playback->Audio().ConfigureBus({ static_cast<std::uint16_t>(id + 1u) }, static_cast<std::size_t>(cap),
+                static_cast<wave::StealPolicy>(policy));
+        }
+        return 1;
+    }
+
+    int __stdcall Api_Audio_SetReverbPreset(int preset)
+    {
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!AudioApiEntered() || !playback || preset < 0 || preset > 2)
+        {
+            return 0;
+        }
+        playback->Audio().SetReverbPreset(static_cast<wave::ReverbPreset>(preset));
+        return 1;
+    }
+
+    AudioListenerComponent* ResolveAudioListener(ScriptObjectHandle owner)
+    {
+        auto* entity = AudioApiEntered() ? ScriptObjectRegistry::Get().Resolve(owner) : nullptr;
+        return entity ? entity->GetComponent<AudioListenerComponent>() : nullptr;
+    }
+
+    int __stdcall Api_AudioListener_Exists(ScriptObjectHandle owner)
+    {
+        return ResolveAudioListener(owner) ? 1 : 0;
+    }
+
+    int __stdcall Api_AudioListener_GetActive(ScriptObjectHandle owner)
+    {
+        const auto* listener = ResolveAudioListener(owner);
+        return listener && listener->ReadSettings().active ? 1 : 0;
+    }
+
+    void __stdcall Api_AudioListener_SetActive(ScriptObjectHandle owner, int active)
+    {
+        if (auto* listener = ResolveAudioListener(owner))
+        {
+            listener->SetActive(active != 0);
+        }
+    }
 
 	// ── Animator ──
 	//
@@ -1304,7 +1925,7 @@ namespace
 	Material* ResolveMaterial(ScriptObjectHandle handle)
 	{
 		MeshRenderer* mesh = ResolveMesh(handle);
-		return (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
+		return (nullptr != mesh) ? (mesh->m_Material ? &*mesh->m_Material.borrow() : nullptr) : nullptr;
 	}
 
 	int __stdcall Api_Mesh_Exists(ScriptObjectHandle handle)
@@ -1357,7 +1978,7 @@ namespace
 		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
-		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
+		Material* material = (nullptr != mesh) ? (mesh->m_Material ? &*mesh->m_Material.borrow() : nullptr) : nullptr;
 		if (nullptr == material) return 0;
 
 		// I5-D5c3 — 저작 정본이 있으면 인스턴스도 함께 간다(c2-2 이후 sealing이
@@ -1371,7 +1992,7 @@ namespace
 		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
-		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
+		Material* material = (nullptr != mesh) ? (mesh->m_Material ? &*mesh->m_Material.borrow() : nullptr) : nullptr;
 		if (nullptr == material) return 0;
 
 		return MaterialScriptBinding::SetInt(*material, name, value,
@@ -2392,6 +3013,35 @@ namespace
 		g_apiTable.Profiler_Register           = &Api_Profiler_Register;
 		g_apiTable.Profiler_Begin              = &Api_Profiler_Begin;
 		g_apiTable.Profiler_End                = &Api_Profiler_End;
+        g_apiTable.Audio_GetScope = &Api_Audio_GetScope;
+        g_apiTable.Audio_Play = &Api_Audio_Play;
+        g_apiTable.Audio_Control = &Api_Audio_Control;
+        g_apiTable.Audio_State = &Api_Audio_State;
+        g_apiTable.Audio_SetTransform = &Api_Audio_SetTransform;
+        g_apiTable.Audio_SetParameter = &Api_Audio_SetParameter;
+        g_apiTable.Audio_TakeCompletion = &Api_Audio_TakeCompletion;
+        g_apiTable.Sound_PlayInstance = &Api_Sound_PlayInstance;
+        g_apiTable.Sound_GetSettings = &Api_Sound_GetSettings;
+        g_apiTable.Sound_SetSettings = &Api_Sound_SetSettings;
+        g_apiTable.Sound_GetSource = &Api_Sound_GetSource;
+        g_apiTable.Sound_SetSource = &Api_Sound_SetSource;
+        g_apiTable.AudioListener_Exists = &Api_AudioListener_Exists;
+        g_apiTable.AudioListener_GetActive = &Api_AudioListener_GetActive;
+        g_apiTable.AudioListener_SetActive = &Api_AudioListener_SetActive;
+        g_apiTable.Audio_SetBusVolume = &Api_Audio_SetBusVolume;
+        g_apiTable.Audio_LastError = &Api_Audio_LastError;
+        g_apiTable.Audio_Configure = &Api_Audio_Configure;
+        g_apiTable.Audio_SetReverbPreset = &Api_Audio_SetReverbPreset;
+        g_apiTable.Asset_Request = &Api_Asset_Request;
+        g_apiTable.Asset_Snapshot = &Api_Asset_Snapshot;
+        g_apiTable.Asset_AcquireResult = &Api_Asset_AcquireResult;
+        g_apiTable.Asset_Cancel = &Api_Asset_Cancel;
+        g_apiTable.Asset_Release = &Api_Asset_Release;
+        g_apiTable.Asset_ReadTexture = &Api_Asset_ReadTexture;
+        g_apiTable.Asset_ListRoots = &Api_Asset_ListRoots;
+        g_apiTable.Asset_RequestTyped = &Api_Asset_RequestTyped;
+        g_apiTable.Asset_TryAcquireTyped = &Api_Asset_TryAcquireTyped;
+
 	}
 
 	// ── hostfxr ──
@@ -2590,9 +3240,11 @@ bool ClrHost::Initialize()
 	if (!BindEntryPoints(assemblyPath)) return false;
 
 	FillApiTable();
+    ScriptObjectRegistry::Get().BeginAssetSession(DataSystem::GetIfAlive());
 	const int initResult = m_fnInitialize(&g_apiTable);
 	if (0 != initResult)
 	{
+        ScriptObjectRegistry::Get().EndAssetSession();
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer),
 			"[CLR] 관리 초기화 실패 (result=%d) — API 표 버전이 어긋났을 수 있습니다", initResult);
@@ -2736,9 +3388,14 @@ ClrHost::InvokeResult ClrHost::InvokeCallableStatic(const std::string& typeName,
 
 void ClrHost::Shutdown()
 {
-	if (!m_ready) return;
+    if (!m_ready)
+    {
+        ScriptObjectRegistry::Get().EndAssetSession();
+        return;
+    }
 
 	if (nullptr != m_fnShutdown) m_fnShutdown();
+    ScriptObjectRegistry::Get().EndAssetSession();
 
 	m_ready = false;
 	ScriptObjectRegistry::Get().Clear();
@@ -3161,6 +3818,23 @@ std::string ClrHost::GetFieldString(int instanceId, int index)
 void ClrHost::SetFieldString(int instanceId, int index, const std::string& value)
 {
 	if (m_ready && nullptr != m_fnSetFieldString) m_fnSetFieldString(instanceId, index, value.c_str());
+}
+
+bool ClrHost::SetFieldAssetLink(int instanceId, int index, const std::string& value)
+{
+    // v1 wire format: "1:<kind>:" + UUID + ":" + UUID. The uint32 kind
+    // has 1..10 decimal digits; typed managed parsing validates its exact value.
+    // Nil/nil is the canonical empty link; no runtime token is serialized.
+    if (!m_ready || m_fnSetFieldString == nullptr || m_fnGetFieldString == nullptr
+        || GetFieldType(instanceId, index) != ScriptFieldType::AssetLink
+        || value.size() < 77u || value.size() > 86u || value.find('\0') != std::string::npos)
+    {
+        return false;
+    }
+    m_fnSetFieldString(instanceId, index, value.c_str());
+    // The generated setter changes the field only when typed TryParse succeeds.
+    // Comparing canonical serialization also rejects malformed/version/type text.
+    return GetFieldString(instanceId, index) == value;
 }
 
 ClrHost::ScriptFloat2 ClrHost::GetFieldFloat2(int instanceId, int index)

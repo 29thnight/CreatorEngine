@@ -62,6 +62,10 @@ namespace ce
         //   여전히 재려는 대상을 흔든다.
         //   0 이면 요청마다 낸다 — 검사에서 쓰는 값이다.
         double live_capture_interval_ms = 100.0;
+
+        // Collector-only tail drain. Producers and UI never wait for this deadline.
+        // Values are clamped to 0..5000 ms; zero is an immediate incomplete snapshot.
+        double stop_drain_timeout_ms = 250.0;
     };
 
     // 전용 수집 스레드의 누적 QPC 경과 시간. wait 는 유휴 대기,
@@ -111,6 +115,10 @@ namespace ce
         // ★ 이 값이 0 이 아니면 얼린 캡처는 **온전하지 않다.** 창과 게이트가
         //   그것을 알아야 "비었다" 와 "못 받았다" 를 가릴 수 있다.
         std::uint32_t  pause_unacked_streams = 0;
+        std::uint64_t  pause_pending_gpu_submissions = 0;
+        std::uint64_t  pause_failed_gpu_submissions = 0;
+        std::uint64_t  pause_open_scopes = 0;
+        double         pause_drain_ms = 0.0;
         std::uint32_t  capture_unacked_streams = 0;
         bool           capture_complete = true;
 
@@ -139,6 +147,13 @@ namespace ce
         std::uint64_t  ingested_pages = 0;
         std::uint64_t  late_events_placed = 0;
         std::uint64_t  late_events_dropped = 0;
+    };
+
+    struct profiler_recording_publication
+    {
+        ce::recording_status status;
+        std::filesystem::path path;
+        std::uint64_t writer_id = 0;
     };
 
     // 한 프로세스에 동시에 살 수 있는 서비스 수. 라이브 하나 + 검사용 하나면
@@ -238,10 +253,15 @@ namespace ce
         // ★ 레인의 스트림은 **적는 쪽만** 봉인한다. publish_frame 은 이 레인을
         //   건너뛴다 — 적는 스레드가 렌더 스레드이고 프레임 경계를 도는 쪽은
         //   게임 스레드라, 남이 봉인하면 두 스레드가 같은 청크 포인터를 만진다.
+        // Admission is linearized with Stop. The backend carries the returned epoch
+        // until all spans are published, then finishes exactly once on its owner.
+        std::uint64_t begin_gpu_submission(std::uint32_t frame);
+        void finish_gpu_submission(std::uint64_t generation, std::uint32_t frame,
+                                   bool complete, const char* reason);
         void submit_gpu_span(marker_id id, profile_tick begin, profile_tick end,
                              std::uint32_t frame, const gpu_span_context& gpu);
         void report_gpu_issue(std::uint32_t frame, std::uint32_t lost_passes,
-                              bool collect_failed, const char* reason);
+                              bool collect_failed, const char* reason, std::uint64_t generation = 0);
 
         // 지금까지 적은 GPU 구간을 수집기에 넘긴다. 적는 스레드가 부른다.
         void publish_gpu_spans();
@@ -257,10 +277,6 @@ namespace ce
 
         // GPU 레인의 이름. 창과 게이트가 이 이름으로 레인을 찾는다.
         static constexpr const char* kGpuLaneName = "[GPU Graphics]";
-
-        // pause 가 봉인 응답을 기다리는 횟수. 상한을 두는 이유는 잠든
-        // producer 가 영영 안 깨어날 수 있기 때문이다.
-        static constexpr int kPauseAckAttempts = 256;
 
         // --- recorder ----------------------------------------------------
         // 시작 프레임 번호를 받는다. 이것이 없으면 첫 스코프들이 "아직 모르는"
@@ -286,8 +302,15 @@ namespace ce
 
         // 얼린 캡처. pause() 뒤에 유효하다.
         capture_session_ptr capture() const;
+        // Snapshot and its collector generation are read under the same lock.
+        // A Clear may advance the current generation before replacing a capture.
+        std::pair<capture_session_ptr, std::uint64_t> capture_publication() const;
+        std::uint64_t capture_generation() const { return m_generation.load(std::memory_order_acquire); }
         ce::recording_status recording_status() const;
         std::filesystem::path recording_path() const;
+        // Writer identity changes only when a new writer is installed. A ring
+        // Clear retains it; state/path/id are sampled under recording_lock_.
+        profiler_recording_publication recording_publication() const;
 
         live_summary summary() const;
 
@@ -410,6 +433,15 @@ namespace ce
 
         // 마지막 pause 에서 응답하지 않은 스트림 수.
         std::atomic<std::uint32_t> m_pauseUnacked{ 0 };
+        std::atomic<std::uint64_t> m_gpuPendingSubmissions{ 0 };
+        std::atomic<std::uint64_t> m_gpuFailedSubmissions{ 0 };
+        std::atomic<std::uint64_t> m_gpuAdmittedSubmissions{ 0 };
+        std::atomic<std::uint64_t> m_gpuAcceptGeneration{ 0 };
+        std::atomic<std::uint64_t> m_pausePendingGpu{ 0 };
+        std::atomic<std::uint64_t> m_pauseFailedGpu{ 0 };
+        std::atomic<std::uint64_t> m_pauseOpenScopes{ 0 };
+        std::atomic<double> m_pauseDrainMs{ 0.0 };
+        double m_stopDrainTimeoutMs = 250.0;
 
         // 녹화 세대. clear() 가 올린다. 그 전에 열린 청크가 나중에 도착하면
         // 세대가 어긋나고 수집기가 버린다 — 지운 것이 돌아오지 않게.
@@ -461,15 +493,17 @@ namespace ce
 
         std::atomic<bool>           m_initialized{ false };
         std::atomic<recorder_state> m_state{ recorder_state::stopped };
+        std::atomic<bool> m_stopAfterStart{ false };
         std::atomic<counter_mask> m_counterMask{
             counter_bit(counter_category::process) | counter_bit(counter_category::gpu) |
-            counter_bit(counter_category::render) | counter_bit(counter_category::managed) | counter_bit(counter_category::physics) };
+            counter_bit(counter_category::render) | counter_bit(counter_category::managed) | counter_bit(counter_category::physics) | counter_bit(counter_category::audio) };
         std::atomic<std::uint64_t> m_latestVramUsed{ 0 };
         std::atomic<std::uint64_t> m_latestVramBudget{ 0 };
         std::atomic<std::uint32_t>  m_engineFrame{ 0 };
         // An in-flight render submission may finish after Record starts even though
         // its source frame predates this recording. It is outside this capture.
         std::atomic<std::uint32_t>  m_recordStartFrame{ 0 };
+        std::atomic<bool> m_gpuFrameRangeReady{ false };
         bool m_firstRecordBoundaryPending = false; // collector-owned
 
         // ★ shared_ptr 인 이유는 **놓아 둔 스트림이 풀보다 오래 살기** 때문이다.
@@ -487,6 +521,7 @@ namespace ce
         // 파일 쓰기는 별도 worker가 소유한다. 이 잠금은 UI의 짧은 상태/경로 조회만 보호한다.
         mutable std::mutex recording_lock_;
         std::unique_ptr<continuous_capture_writer> recording_writer_;
+        std::uint64_t recording_writer_id_ = 0;
         std::optional<capture_file_error> recording_start_error_;
         std::vector<frame_record> recording_batch_;
         std::size_t recording_batch_bytes_ = 0;
@@ -521,6 +556,7 @@ namespace ce
 
         mutable std::mutex  m_captureLock;
         capture_session_ptr m_capture;
+        std::uint64_t m_captureGeneration = 0;
 
         // 녹화 중 공개. 청한 표식은 아무 스레드나 올리고, 나머지 둘은
         // 수집기만 만진다.

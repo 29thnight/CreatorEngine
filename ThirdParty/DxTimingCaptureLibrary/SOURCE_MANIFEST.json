@@ -1,0 +1,246 @@
+{
+  "upstream": "https://github.com/microsoft/DxTimingCaptureLibrary",
+  "commit": "05bf5ff1d9e1b1d63c7420a166e61ded2ca7c072",
+  "files": [
+    {
+      "path": "Directory.Build.props",
+      "bytes": 4758,
+      "git_blob_sha1": "a9e3bb1ee63dd884f29c282ff29242d8bae88d2f"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/D3D12EtwEventStructs.h",
+      "bytes": 5904,
+      "git_blob_sha1": "d1f4326c3f0877c041bcd968c59910f7ec4825a6"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/DxgkEtwEventStructs.h",
+      "bytes": 10590,
+      "git_blob_sha1": "3161215ba968e360d7fb310d47bfb897f359be25"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/DxTimingCaptureEventHandler.h",
+      "bytes": 6551,
+      "git_blob_sha1": "fe02ac09b1ac36e68dc9510fbbab537aae143bb6"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/DxTimingCaptureLibrary.h",
+      "bytes": 507,
+      "git_blob_sha1": "0ad13a19b0d8c6b5681cb1f5db6b7b20b3a3a85f"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EtwCallbacks.h",
+      "bytes": 15680,
+      "git_blob_sha1": "0abc1ef34ad62ebbc2f33d5116488eb7e090978c"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EtwDiagnostics.h",
+      "bytes": 2903,
+      "git_blob_sha1": "d26ae863b3e9045345155fff8043b2ea3fc914c6"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EtwDispatcher.h",
+      "bytes": 60140,
+      "git_blob_sha1": "40269e5643567076dd0cf0cc593264467048b587"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EtwException.h",
+      "bytes": 2296,
+      "git_blob_sha1": "6a3481657ecf0342dba1df29c750803514c61f3b"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EtwProviders.h",
+      "bytes": 600,
+      "git_blob_sha1": "c35433237fb42faa2dd8396699a844fcf50d534f"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EventData.h",
+      "bytes": 9563,
+      "git_blob_sha1": "25e8bbcd6fb9cbf414f335b250f1a34b46d55405"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/EventTypes.h",
+      "bytes": 993,
+      "git_blob_sha1": "4837316635e17f73c61fed07093af1cd3827d10b"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/GpuPacketEvents.h",
+      "bytes": 3576,
+      "git_blob_sha1": "13f5af2088894ba3d4347fb3f29ac3d8d9930f82"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/GpuPacketTracker.h",
+      "bytes": 7223,
+      "git_blob_sha1": "2f1b6fb570f55bbce5a9f3693d3013b3c5e44973"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/GpuTimingData.h",
+      "bytes": 19155,
+      "git_blob_sha1": "d227030413fc200936d8b0f2b257353b1f4b6c83"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/MarkerOp.h",
+      "bytes": 7665,
+      "git_blob_sha1": "3fd537fbb6f9d5a064882e348cf37add839b67ae"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/NoOpCallbacks.h",
+      "bytes": 7581,
+      "git_blob_sha1": "170a5c90181225696587a52630244a5b0dba7695"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/PixEtwManifest.h",
+      "bytes": 1242,
+      "git_blob_sha1": "38b5c3bf86e93dbbe09349ea44b76299c2429c45"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/QpcTimestampConverter.h",
+      "bytes": 1159,
+      "git_blob_sha1": "592caef1d73ab720e8601090142aab04188d8878"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/TicksToNanoseconds.h",
+      "bytes": 2027,
+      "git_blob_sha1": "2b9b07e499f58e4f5ab906483637edebac063e24"
+    },
+    {
+      "path": "include/DxTimingCaptureLibrary/Types.h",
+      "bytes": 5114,
+      "git_blob_sha1": "82bee0e5d140bb29d3e78e657c2e2319154fc2b1"
+    },
+    {
+      "path": "lib/AdapterTracker.h",
+      "bytes": 12454,
+      "git_blob_sha1": "641e9570501a88ad06a7ae30aaa5cdb8beaa34d8"
+    },
+    {
+      "path": "lib/AllocationTracker.cpp",
+      "bytes": 5405,
+      "git_blob_sha1": "36043b6a56f5cb28d262bae427998ed3989770d1"
+    },
+    {
+      "path": "lib/AllocationTracker.h",
+      "bytes": 3214,
+      "git_blob_sha1": "fde619fa4295eab9763eb2a0b022f4c8aab7acbc"
+    },
+    {
+      "path": "lib/D3D12ObjectProcessor.cpp",
+      "bytes": 50957,
+      "git_blob_sha1": "5f42538adfc571bfa6fb03cbd03e84774f7cf2a9"
+    },
+    {
+      "path": "lib/D3D12ObjectProcessor.h",
+      "bytes": 11896,
+      "git_blob_sha1": "1ea13d67068b3291d97b6fadfb8246bafa1fb378"
+    },
+    {
+      "path": "lib/DirectStorageProcessor.h",
+      "bytes": 13447,
+      "git_blob_sha1": "18c966b41ac57fbba637f4029f479ee74be1a31a"
+    },
+    {
+      "path": "lib/DxTimingCaptureEventHandler.cpp",
+      "bytes": 4331,
+      "git_blob_sha1": "44055af485512162b67f3c7a0dd0f8ea70ccb3e8"
+    },
+    {
+      "path": "lib/DxTimingCaptureLibrary.lib.vcxproj",
+      "bytes": 2295,
+      "git_blob_sha1": "59de1873eea4ce24ae71798499067c5babb64a9c"
+    },
+    {
+      "path": "lib/DxTimingCaptureLibrary.lib.vcxproj.filters",
+      "bytes": 918,
+      "git_blob_sha1": "999af6e16ec89b469372dbc9b41d5de4aba48264"
+    },
+    {
+      "path": "lib/DxTimingCaptureProcessor.h",
+      "bytes": 62363,
+      "git_blob_sha1": "b345954065c4b28be0e615d1011379d4090575e1"
+    },
+    {
+      "path": "lib/Identifiers.h",
+      "bytes": 2978,
+      "git_blob_sha1": "b116fb1ac0707884d876f319a0aadffd0eccf959"
+    },
+    {
+      "path": "lib/MemoryCounterWriter.h",
+      "bytes": 8665,
+      "git_blob_sha1": "2421c3f595f2eeb5503b3188e70173e35241818d"
+    },
+    {
+      "path": "lib/MonitorTracker.h",
+      "bytes": 2787,
+      "git_blob_sha1": "b85a4c68089f9550dca4e397f54e86b843c807aa"
+    },
+    {
+      "path": "lib/pch.cpp",
+      "bytes": 93,
+      "git_blob_sha1": "c084a84a60a87994c5f24a6731e6782f0a5ee631"
+    },
+    {
+      "path": "lib/pch.h",
+      "bytes": 874,
+      "git_blob_sha1": "5ca9ae25a17bc4935bc2edd08eddd9d0933533cf"
+    },
+    {
+      "path": "lib/PerProcessData.h",
+      "bytes": 121879,
+      "git_blob_sha1": "22b391225f1f1341ae7c9666991dc78175614a10"
+    },
+    {
+      "path": "lib/PixEventDecoderStub.cpp",
+      "bytes": 1463,
+      "git_blob_sha1": "8c2f6ecde2f26524d625be62dc34f94cc1878a03"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1074,
+      "git_blob_sha1": "22aed37e650bbf933b6983cda9c2c5db65dcdd04"
+    },
+    {
+      "path": "README.md",
+      "bytes": 10455,
+      "git_blob_sha1": "0d305fdfb31f8a6bd94a34fa59fd83f4f215cb29"
+    },
+    {
+      "path": "third_party/directstorage/dstorage_etw.h",
+      "bytes": 4421,
+      "git_blob_sha1": "075213eb7301403b50fe3b61a95a35486dc7ab62"
+    },
+    {
+      "path": "third_party/directstorage/PROVENANCE.md",
+      "bytes": 459,
+      "git_blob_sha1": "27a636d6a0cbee2054bb0d5708c982413b78c2e5"
+    },
+    {
+      "path": "third_party/dxgk/lddmcoreeventdefs.h",
+      "bytes": 3714,
+      "git_blob_sha1": "aa85ab15e260460625285f2e9289d4dae9b2270e"
+    },
+    {
+      "path": "third_party/dxgk/PROVENANCE.md",
+      "bytes": 421,
+      "git_blob_sha1": "686d06a94fe77710c4dc497f149e236f1d91f559"
+    },
+    {
+      "path": "third_party/PixEventDecoder/include/DecodedPixEventTypes.h",
+      "bytes": 861,
+      "git_blob_sha1": "5e91b7d59bb3ff2d3eb44b428af861536f626a88"
+    },
+    {
+      "path": "third_party/PixEventDecoder/include/PixEventDecoder.h",
+      "bytes": 615,
+      "git_blob_sha1": "63976f7f89665bcb06eca94561c97a25ff8cc3b3"
+    },
+    {
+      "path": "third_party/PixEventDecoder/PROVENANCE.md",
+      "bytes": 1146,
+      "git_blob_sha1": "e28ff8c51b4f07bc02c7067c865712cf74d5c007"
+    },
+    {
+      "path": "THIRD-PARTY-NOTICES.md",
+      "bytes": 5027,
+      "git_blob_sha1": "90daa2296baa648d42e04c9e01677c4bfb2bbf06"
+    }
+  ]
+}

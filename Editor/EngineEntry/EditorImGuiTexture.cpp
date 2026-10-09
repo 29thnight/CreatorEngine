@@ -1,61 +1,184 @@
 #include "EditorImGuiTexture.h"
+#include "DataSystem.h"
 #include "RHI/IImGuiHost.h"
-#include "Texture.h"
+
+#include <unordered_map>
 
 namespace EditorImGuiTexture
 {
+    namespace
+    {
+        struct PreparedImage
+        {
+            own::weak_owner<const Texture> descriptor;
+            AssetDepot::AssetRequest<Texture::CodecImage> request;
+            own::shared_owner<const Texture::CodecImage> image;
+            bool requested{};
+            bool demanded{};
+        };
+
+        // Presentation-thread consumer state only. DataSystem owns accepted jobs
+        // and drain tracking; dropping this request cancels only this subscriber.
+        std::unordered_map<uint64_t, PreparedImage>& PreparedImages()
+        {
+            static std::unordered_map<uint64_t, PreparedImage> images;
+            return images;
+        }
+    }
+
     bool IsHostActive() noexcept
     {
         return GetImGuiHost().IsActive();
     }
 
-    uint64_t From(Texture* texture)
+    void BeginFrame()
+    {
+        for (auto& [identity, prepared] : PreparedImages())
+        {
+            prepared.demanded = false;
+        }
+    }
+
+    void EndFrame()
+    {
+        auto& images = PreparedImages();
+        for (auto found = images.begin(); found != images.end();)
+        {
+            if (!found->second.demanded || !found->second.descriptor.lock())
+            {
+                found->second.request.Cancel();
+                found = images.erase(found);
+            }
+            else
+            {
+                ++found;
+            }
+        }
+    }
+
+    void Shutdown()
+    {
+        for (auto& [identity, prepared] : PreparedImages())
+        {
+            prepared.request.Cancel();
+        }
+        PreparedImages().clear();
+    }
+
+    uint64_t From(const Texture* texture)
     {
         IImGuiHost& host = GetImGuiHost();
-        if (host.IsActive())
+        if (!host.IsActive())
         {
-            // 널이어도 0을 돌려주지 않는다 — 헤더의 폴백 주석 참조.
-            return host.RegisterTexture(texture);
+            return 0;
+        }
+        // This borrow never schedules work or attempts to recover an owner.
+        // Generated editor artwork explicitly retains its irreplaceable source.
+        const auto image = texture && !host.IsTextureReady(texture)
+            ? texture->NonRehydratableImage()
+            : own::shared_owner<const Texture::CodecImage>{};
+        return host.RegisterTexture(texture, image);
+    }
+
+    uint64_t From(const own::shared_owner<const Texture>& texture)
+    {
+        IImGuiHost& host = GetImGuiHost();
+        if (!host.IsActive())
+        {
+            return 0;
+        }
+        if (!texture)
+        {
+            return host.RegisterTexture(nullptr, {});
         }
 
-        // ★ 여기 있던 DX11 폴백(texture->m_pSRV)을 걷었다 (T6, 2026-08-08).
-        //
-        //   Texture가 DX11 SRV를 드는 마지막 외부 소비처였다. 그것을 남겨 두면
-        //   T6이 끝나지 않는다 — Editor 셸이 기본으로 켜져 있고(590프레임 실측)
-        //   이 경로는 셸 초기화가 실패했을 때만 도는데, 그 예외 상황 하나를
-        //   위해 텍스처마다 DX11 뷰를 계속 만들어야 하기 때문이다.
-        //
-        //   지금 셸이 없으면 그림이 안 나온다. 그것이 잘못된 상태라는 표시이고,
-        //   공통 ImGuiHost가 선택된 렌더러 백엔드 실패를 로그로 남긴다.
-        return 0;
+        const Texture* descriptor = &*texture.borrow();
+        const auto identity = static_cast<uint64_t>(texture->m_assetId.m_ID_Data);
+        auto& images = PreparedImages();
+        // Let a GPU hit (including a newly allocated ImGui slot) resolve first.
+        // A valid native texture never requires CPU image residency.
+        const auto residentId = host.RegisterTexture(descriptor, {});
+        if (host.IsTextureReady(descriptor))
+        {
+            if (const auto found = images.find(identity); found != images.end())
+            {
+                found->second.request.Cancel();
+                images.erase(found);
+            }
+            return residentId;
+        }
+
+        auto& prepared = images[identity];
+        prepared.descriptor = texture;
+        prepared.demanded = true;
+        if (!prepared.image && prepared.requested)
+        {
+            const auto result = prepared.request.Snapshot();
+            if (result.status == AssetDepot::AssetRequestStatus::Ready)
+            {
+                // Keep this owner before releasing the request's result. A
+                // zero-budget cache has no other strong handoff reference.
+                prepared.image = result.asset;
+                prepared.request = {};
+            }
+        }
+        if (!prepared.image)
+        {
+            // A terminal subscriber is not an instruction to restart I/O. A
+            // later compatible cache success from another exact consumer may
+            // still satisfy this visible preview without hiding/reopening it.
+            prepared.image = texture->NonRehydratableImage();
+            if (!prepared.image)
+            {
+                if (auto* data = DataSystem::GetIfAlive())
+                {
+                    prepared.image = data->TryAcquire<Texture::CodecImage>(texture);
+                    if (!prepared.image && !prepared.requested)
+                    {
+                        prepared.request = data->RequestAsync<Texture::CodecImage>(texture);
+                        prepared.requested = true;
+                    }
+                }
+            }
+        }
+
+        const auto textureId = prepared.image
+            ? host.RegisterTexture(descriptor, prepared.image) : residentId;
+        if (host.IsTextureReady(descriptor))
+        {
+            // The host copies rows synchronously. GPU upload and submission
+            // allocations keep their existing completion ownership.
+            prepared.request.Cancel();
+            images.erase(identity);
+        }
+        return textureId;
     }
 
-    void Prime(Texture* texture)
+    void Prime(const Texture* texture)
     {
-        if (nullptr == texture) return;
+        if (texture)
+        {
+            (void)From(texture);
+        }
+    }
+
+    void Prime(const own::shared_owner<const Texture>& texture,
+        const own::shared_owner<const Texture::CodecImage>& image)
+    {
         IImGuiHost& host = GetImGuiHost();
-        // 반환 ID 를 버리는 것이 이 함수의 요점이다 — 그리지 않고 등록만 한다.
-        // 열린 프레임이면 RegisterTexture 가 그 자리에서 업로드한다.
-        if (host.IsActive()) (void)host.RegisterTexture(texture);
+        if (texture && host.IsActive())
+        {
+            (void)host.RegisterTexture(&*texture.borrow(), image);
+        }
     }
 
-    bool IsReady(Texture* texture)
+    bool IsReady(const Texture* texture)
     {
-        if (nullptr == texture) return false;
+        if (!texture)
+        {
+            return false;
+        }
         IImGuiHost& host = GetImGuiHost();
         return host.IsActive() && host.IsTextureReady(texture);
     }
-
-    // ★ FromRawDx11Srv를 걷었다 (E, 2026-08-09).
-    //
-    //   "Texture 객체 없이 원시 DX11 SRV만 든 디버그 뷰 부류"를 위한 변환기로,
-    //   셸에서는 표시할 방법이 없어 빈 그림을 돌려주고 DX11 백엔드에서는 SRV를
-    //   그대로 ImTextureID로 넘겼다.
-    //
-    //   호출자가 0이다. 그럴 만한 이유가 있다 - 그 '디버그 뷰 부류'였던
-    //   RenderDebugManager가 T6에서 걷혔고(패스 결과를 ID3D11DeviceContext로
-    //   복사해 두던 물건), DX11 백엔드 자체도 D4에서 사라졌다. 남은 쪽 가지는
-    //   빈 그림을 돌려주는 것뿐이라 부를 이유도 없다.
-    //
-    //   RHI 텍스처를 ImGui에 넘기는 길은 From(Texture*) 하나로 모였다.
 }

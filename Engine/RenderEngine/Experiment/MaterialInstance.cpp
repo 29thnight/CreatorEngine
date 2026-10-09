@@ -1,9 +1,32 @@
 #include "MaterialInstance.h"
+#include "MaterialResolver.h"
 
 #include <algorithm>
 
 namespace experiment
 {
+    bool MaterialInstance::BindPreparedTextureOwners(
+        std::span<const own::shared_owner<const Texture>> textures, std::string& outError)
+    {
+        if (!base_ || !base_->assetOrigin)
+        {
+            outError.clear();
+            return true;
+        }
+        Material effective;
+        if (!BuildEffectiveMaterial(effective, outError)
+            || !BindPreparedMaterialTextures(effective, textures, outError))
+        {
+            return false;
+        }
+        auto base = own::make_shared<Material>(*base_);
+        base->assetOrigin = std::move(effective.assetOrigin);
+        base_ = std::move(base);
+        ++revision_;
+        outError.clear();
+        return true;
+    }
+
     bool MaterialInstance::SetPropertyOverride(std::string_view name,
         MaterialPropertyValue value)
     {
@@ -59,11 +82,34 @@ namespace experiment
         return true;
     }
 
+    void MaterialInstance::SetKeywordSelectionOverrides(std::span<const std::uint16_t> selections)
+    {
+        std::vector<std::uint16_t> candidate(selections.begin(), selections.end());
+        keywordSelectionOverrides_ = std::move(candidate);
+        keywordOverrides_.clear();
+        ++revision_;
+    }
+
+    bool MaterialInstance::ClearKeywordSelectionOverrides()
+    {
+        if (!keywordSelectionOverrides_)
+        {
+            return false;
+        }
+        keywordSelectionOverrides_.reset();
+        ++revision_;
+        return true;
+    }
+
     void MaterialInstance::ClearAllOverrides()
     {
-        if (propertyOverrides_.empty() && keywordOverrides_.empty()) return;
+        if (propertyOverrides_.empty() && keywordOverrides_.empty() && !keywordSelectionOverrides_)
+        {
+            return;
+        }
         propertyOverrides_.clear();
         keywordOverrides_.clear();
+        keywordSelectionOverrides_.reset();
         ++revision_;
     }
 
@@ -86,6 +132,11 @@ namespace experiment
                 });
             if (found != effective.properties.end()) found->value = override_.value;
             else effective.properties.push_back(override_);
+        }
+        if (keywordSelectionOverrides_)
+        {
+            effective.keywordSelections = *keywordSelectionOverrides_;
+            effective.keywords.clear();
         }
         // resolver는 목록 순서대로 축 선택을 덮으므로, 뒤에 덧붙인 override가
         // base의 같은 축 선택을 이긴다.

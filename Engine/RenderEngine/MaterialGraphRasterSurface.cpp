@@ -179,37 +179,64 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
         return Fail(error, "Raster declaration needs its prepared owner, current descriptors and a fresh graph.");
     }
     std::vector<EnhancedRenderGraph::RGPassUsage> captureUsage, resolveUsage;
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
     for (std::size_t i = 0; i < targets_.size(); ++i)
     {
-        const auto texture = graph.ImportTexture(targets_[i], RHIResourceState::Common, "LX.Raster.Frame");
-        captureUsage.push_back({texture, RHIResourceState::RenderTarget});
-        resolveUsage.push_back({texture, RHIResourceState::ShaderResource});
+        auto texture = graph.ImportTexture(targets_[i], RHIResourceState::Common, "LX.Raster.Frame");
+        if (versioned)
+        {
+            texture = graph.Write(texture);
+        }
+        graphTargets_[i] = texture;
+        captureUsage.push_back({texture, RHIResourceState::RenderTarget, write});
+        resolveUsage.push_back({texture, RHIResourceState::ShaderResource, read});
     }
     auto depth = graph.FindImportedTexture(depth_);
     if (!depth.IsValid())
     {
         depth = graph.ImportTexture(depth_, RHIResourceState::Common, "LX.Raster.Depth");
     }
-    captureUsage.push_back({depth, depthSource_ ? RHIResourceState::DepthRead : RHIResourceState::DepthWrite});
+    if (depthSource_)
+    {
+        depth = depthSource_->graphDepth_;
+    }
+    else if (versioned)
+    {
+        depth = graph.Write(depth);
+    }
+    graphDepth_ = depth;
+    captureUsage.push_back({depth, depthSource_ ? RHIResourceState::DepthRead : RHIResourceState::DepthWrite,
+                           depthSource_ ? read : write});
     if (depthSource_)
     {
         captureUsage.push_back(
-            {graph.FindImportedTexture(depthSource_->targets_[1]), RHIResourceState::ShaderResource});
+            {depthSource_->graphTargets_[1], RHIResourceState::ShaderResource, read});
     }
     for (const auto& mesh : meshes_)
     {
-        auto vertex = graph.FindImportedBuffer(mesh->Buffer());
+        auto vertex = mesh->GraphOutput(graph);
+        if (!vertex.IsValid())
+        {
+            vertex = graph.FindImportedBuffer(mesh->Buffer());
+        }
         if (!vertex.IsValid())
         {
             vertex = graph.ImportBuffer(mesh->Buffer(), RHIResourceState::ShaderResource, "LX.Raster.Vertices");
         }
-        captureUsage.push_back({vertex, RHIResourceState::ShaderResource});
+        captureUsage.push_back({vertex, RHIResourceState::ShaderResource, read});
     }
-    const auto output = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.Raster.Pixels");
+    auto output = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.Raster.Pixels");
+    if (versioned)
+    {
+        output = graph.Write(output);
+    }
     graph_ = &graph;
     graphEpoch_ = graph.ResourceEpoch();
     graphOutput_ = output;
-    resolveUsage.push_back({output, RHIResourceState::UnorderedAccess});
+    resolveUsage.push_back({output, RHIResourceState::UnorderedAccess, write});
     graph.AddPass("LX.OpaqueRasterCapture", captureUsage, [owner](const auto& context) {
         if (!owner->IsCurrent() || !context.graph || !context.encoder ||
             !owner->GraphOutput(*context.graph).IsValid() || (owner->recordedStages_.fetch_or(1) & 1) != 0)
@@ -257,7 +284,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     });
     // Preserve the capture/resolve chain and transition the external consumer input.
     graph.AddPass(
-        "LX.VisibleSurfaceReady", {{output, RHIResourceState::ShaderResource}},
+        "LX.VisibleSurfaceReady", {{output, RHIResourceState::ShaderResource, read}},
         [owner](const auto&) {
             if (!owner->IsCurrent())
             {

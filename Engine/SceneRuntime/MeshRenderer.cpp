@@ -12,10 +12,12 @@
 #include "Experiment/MaterialAuthoringCodec.h" // S2c-2a: override 값 표기 정본
 #include "ExperimentMaterialMigration.h" // S2c-2a: diff 타이핑·override 적용
 #include "Experiment/MaterialInstance.h" // I5-D5c1: 재질 병행 표현
+#include "Assets/ModelMeshDescriptor.h"
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC7: typed 정본
 #include <mathematics/transform.hpp>
 
 #include <algorithm>
+#include <limits>
 #include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 계수(무조건 stdout 출력 제거)
 
 // The last observed values distinguish a fresh instance edit from an authored
@@ -23,7 +25,7 @@
 struct MaterialAssetReferenceState
 {
     material_graph::InstanceDocument overrides;
-    std::shared_ptr<const material_graph::Instance> observed;
+    own::shared_owner<const material_graph::Instance> observed;
     bool overrideDoubleSided{};
     bool overrideBlendMode{};
     bool observedDoubleSided{};
@@ -221,11 +223,12 @@ namespace
 	// 세므로 주석에 그 함수 이름을 적는 것만으로도 계수가 는다).
 	// outInstance는 선택이다(nullptr이면 legacy만).
 	[[nodiscard]] bool DecodeMaterialReferenceNode(
-		const Authoring::ReadNode materialNode, std::shared_ptr<Material>& outMaterial,
+		const Authoring::ReadNode materialNode, own::shared_owner<Material>& outMaterial,
 		FileGuid& outBaseGuid, std::string& outError,
 		experiment::MaterialInstance* outInstance,
-        std::shared_ptr<const Material>& outBase,
-        std::shared_ptr<const MaterialAssetReferenceState>* outReferenceState = nullptr)
+        own::shared_owner<const Material>& outBase,
+        own::shared_owner<const MaterialAssetReferenceState>* outReferenceState = nullptr,
+        std::span<const own::shared_owner<const Texture>> preparedTextures = {})
 	{
 		const Authoring::ReadNode ref = materialNode["ref"];
 		if (!ref || !ref.IsScalar())
@@ -244,19 +247,18 @@ namespace
             outError = "Restoring the referenced material's owned recovery snapshot.";
             return false;
         }
-		const std::shared_ptr<Material> base =
-			DataSystems->LoadMaterialShared(baseGuid);
-		if (!base)
-		{
-			outError = "base 재질 로드 실패: " + ref.AsString();
-			return false;
-		}
+        const auto base = DataSystems->LoadMaterialByGuid(baseGuid);
+        if (!base)
+        {
+            outError = "Base material requires completed asynchronous preparation: " + baseGuid.ToString();
+            return false;
+        }
 
-		auto owned = std::make_shared<Material>(*base);
-        std::shared_ptr<MaterialAssetReferenceState> referenceState;
+		auto owned = own::make_shared<Material>(*base);
+        own::shared_owner<MaterialAssetReferenceState> referenceState;
         if (const auto graph = materialNode["graphOverrides"])
         {
-            referenceState = std::make_shared<MaterialAssetReferenceState>();
+            referenceState = own::make_shared<MaterialAssetReferenceState>();
             auto& overrides = referenceState->overrides;
             if (!material_graph::ReadInstanceDocument(graph, overrides, outError)
                 || !ApplyGraphOverrides(*owned, *base, overrides.description, outError))
@@ -268,7 +270,7 @@ namespace
         {
             // Minimal references can author only the outer flags. Their
             // presence remains explicit even when today's base value matches.
-            referenceState = std::make_shared<MaterialAssetReferenceState>();
+            referenceState = own::make_shared<MaterialAssetReferenceState>();
             referenceState->overrides.description.graphId = owned->GetMaterialGraphInstance()->description.graphId;
         }
         if (const auto sided = materialNode["doubleSided"])
@@ -285,7 +287,10 @@ namespace
 		{
             if (blend.AsString() != "opaque" && blend.AsString() != "masked"
                 && blend.AsString() != "transparent")
-            { outError = "Unknown material alpha mode"; return false; }
+            {
+                outError = "Unknown material alpha mode";
+                return false;
+            }
 			owned->m_renderingMode = blend.AsString() == "transparent"
 				? MaterialRenderingMode::Transparent
                 : blend.AsString() == "masked" ? MaterialRenderingMode::Masked
@@ -298,11 +303,43 @@ namespace
 			values.reserve(selections.Size());
 			for (const Authoring::ReadNode selection : selections)
 			{
-				values.push_back(
-					static_cast<std::uint16_t>(selection.As<std::uint32_t>()));
+                if (!selection.IsScalar())
+                {
+                    outError = "Keyword selection must be an unsigned scalar.";
+                    return false;
+                }
+                const auto value = selection.As<std::uint32_t>();
+                if (value > (std::numeric_limits<std::uint16_t>::max)())
+                {
+                    outError = "Keyword selection exceeds uint16 range.";
+                    return false;
+                }
+                values.push_back(static_cast<std::uint16_t>(value));
 			}
+            if (outInstance && outInstance->Base() && outInstance->Base()->assetOrigin)
+            {
+                const auto program = outInstance->Base()->assetOrigin->codeProgram;
+                if (!program || values.size() != program->meta.keywords.size())
+                {
+                    outError = "Cooked keyword override count differs from its program.";
+                    return false;
+                }
+                for (std::size_t axis = 0; axis < values.size(); ++axis)
+                {
+                    if (values[axis] >= program->meta.keywords[axis].values.size())
+                    {
+                        outError = "Cooked keyword override is outside its exact program domain.";
+                        return false;
+                    }
+                }
+            }
+            if (outInstance && outInstance->Base())
+            {
+                outInstance->SetKeywordSelectionOverrides(values);
+            }
 			owned->m_keywordSelections = std::move(values);
 		}
+        std::vector<experiment::MaterialProperty> propertyOverrides;
 		if (const Authoring::ReadNode overrides = materialNode["overrides"];
 			overrides && overrides.IsSequence())
 		{
@@ -323,6 +360,7 @@ namespace
 				{
 					return false;
 				}
+                propertyOverrides.push_back(property);
 				// 같은 값을 experiment 인스턴스에도 얹는다 — 두 표현이 같은
 				// 파싱 결과를 공유해야 병행 대조가 의미를 갖는다.
 				if (nullptr != outInstance
@@ -335,7 +373,18 @@ namespace
 			}
 		}
 
-        if (!owned->HasMaterialGraph())
+        if (outInstance && !outInstance->BindPreparedTextureOwners(preparedTextures, outError))
+        {
+            return false;
+        }
+        if (owned->GetAssetOrigin() && !owned->HasMaterialGraph())
+        {
+            if (!DataSystems->RebuildCookedMaterialInstance(*owned, outError, preparedTextures, propertyOverrides))
+            {
+                return false;
+            }
+        }
+        else if (!owned->HasMaterialGraph())
         {
             DataSystems->FinalizeMaterialRuntime(*owned);
         }
@@ -393,25 +442,51 @@ namespace
             outNode.Assign(result);
             return true;
         }
-		std::string metaError;
-		const ShaderMetaHandle handle = DataSystems->LoadShaderMetaHandle(
-			current.m_shaderMetaGuid, metaError);
-		const std::shared_ptr<const ShaderMeta> meta =
-			DataSystems->ResolveShaderMeta(handle);
-		if (!meta)
-		{
-			outError = "diff 타이핑용 ShaderMeta 미해석: " + metaError;
-			return false;
-		}
-		experiment::Material currentConverted;
-		experiment::Material baseConverted;
-		if (!ExperimentMaterialMigration::ConvertLegacyMaterial(current, *meta,
-				currentConverted, outError)
-			|| !ExperimentMaterialMigration::ConvertLegacyMaterial(base, *meta,
-				baseConverted, outError))
-		{
-			return false;
-		}
+        std::string metaError;
+        ShaderMetaHandle handle;
+        own::shared_owner<const ShaderMeta> meta;
+        if (const auto origin = current.GetAssetOrigin(); origin && origin->codeProgram)
+        {
+            meta = origin->codeProgram->assetOrigin->shaderMetadata;
+            handle = origin->codeProgram->codeHandle;
+        }
+        else
+        {
+            meta = DataSystems->LoadShaderMetaOwner(current.m_shaderMetaGuid, handle, metaError);
+        }
+        if (!meta)
+        {
+            outError = "Material reference typing requires prepared metadata: " + metaError;
+            return false;
+        }
+        experiment::Material currentConverted;
+        experiment::Material baseConverted;
+        if (!ExperimentMaterialMigration::ConvertLegacyMaterial(current, *meta, currentConverted, outError)
+            || !ExperimentMaterialMigration::ConvertLegacyMaterial(base, *meta, baseConverted, outError))
+        {
+            return false;
+        }
+        if (meta->codeProgram)
+        {
+            const auto preserveColors = [](const Material& source, experiment::Material& converted)
+            {
+                for (auto& property : converted.properties)
+                {
+                    auto* reference = std::get_if<experiment::TextureReference>(&property.value);
+                    const auto owner = reference ? source.GetTextureMapShared(property.name) : nullptr;
+                    if (!reference || !owner)
+                    {
+                        continue;
+                    }
+                    const auto format = owner->GetImageDescription().Format();
+                    const bool srgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
+                        || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+                    reference->colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
+                }
+            };
+            preserveColors(current, currentConverted);
+            preserveColors(base, baseConverted);
+        }
 
 		const auto findByName = [](const experiment::Material& material,
 			const std::string& name) -> const experiment::MaterialProperty*
@@ -522,13 +597,18 @@ MeshRenderer::MeshRenderer()
 {
 }
 
-MeshRenderer::~MeshRenderer()
+MeshRenderer::~MeshRenderer() = default;
+
+void MeshRenderer::ReleaseManagedResources()
 {
+    m_meshRequest.Cancel();
+    m_meshRequest = {};
+    m_meshRequested = false;
 }
 
-void MeshRenderer::SetMaterialAssetReference(std::shared_ptr<Material> material, FileGuid baseGuid,
-                                            std::shared_ptr<const Material> acceptedBase,
-                                            std::shared_ptr<const MaterialAssetReferenceState> referenceState)
+void MeshRenderer::SetMaterialAssetReference(own::shared_owner<Material> material, FileGuid baseGuid,
+                                            own::shared_owner<const Material> acceptedBase,
+                                            own::shared_owner<const MaterialAssetReferenceState> referenceState)
 {
     m_materialBaseGuid = baseGuid;
     m_unresolvedMaterialReference.clear();
@@ -537,15 +617,16 @@ void MeshRenderer::SetMaterialAssetReference(std::shared_ptr<Material> material,
     if (material && material->HasMaterialGraph() && m_materialBaseSnapshot &&
         m_materialBaseSnapshot->HasMaterialGraph())
     {
-        auto observed = std::make_shared<MaterialAssetReferenceState>();
+        auto observed = own::make_shared<MaterialAssetReferenceState>();
+        const auto* previous = m_materialReferenceState ? &*m_materialReferenceState.borrow() : nullptr;
         std::string error;
         if (BuildGraphOverrides(*material, *m_materialBaseSnapshot, observed->overrides, error,
-                                m_materialReferenceState.get()))
+                                previous))
         {
             observed->overrideDoubleSided = OverridesDoubleSided(*material, *m_materialBaseSnapshot,
-                                                                 m_materialReferenceState.get());
+                                                                 previous);
             observed->overrideBlendMode = OverridesBlendMode(*material, *m_materialBaseSnapshot,
-                                                             m_materialReferenceState.get());
+                                                             previous);
             observed->observed = material->GetMaterialGraphInstance();
             observed->observedDoubleSided = material->m_doubleSided;
             observed->observedBlendMode = material->m_renderingMode;
@@ -580,16 +661,19 @@ bool MeshRenderer::RefreshMaterialAsset()
         // instance. No source I/O, compilation or retry loop belongs here.
         return false;
     }
+    const auto scenePins = GetOwner() && GetOwner()->GetScene()
+        ? GetOwner()->GetScene()->PreparedTextureImagePins() : nullptr;
+    const auto preparedTextures = scenePins ? scenePins->Owners() : std::vector<own::shared_owner<const Texture>>{};
     if (!m_unresolvedMaterialReference.empty())
     {
         std::string error;
         const auto document = Authoring::ParsedDocument::ParseText(m_unresolvedMaterialReference, error);
-        std::shared_ptr<Material> recovered;
-        std::shared_ptr<const Material> baseline;
-        std::shared_ptr<const MaterialAssetReferenceState> referenceState;
+        own::shared_owner<Material> recovered;
+        own::shared_owner<const Material> baseline;
+        own::shared_owner<const MaterialAssetReferenceState> referenceState;
         FileGuid baseGuid;
         if (!document || !DecodeMaterialReferenceNode(document.Root(), recovered, baseGuid, error, nullptr,
-                                                       baseline, &referenceState))
+                                                       baseline, &referenceState, preparedTextures))
         {
             return false;
         }
@@ -604,24 +688,25 @@ bool MeshRenderer::RefreshMaterialAsset()
         m_materialBaseSnapshot = accepted;
         if (!m_Material)
         {
-            SetMaterial(std::make_shared<Material>(*accepted));
+            SetMaterial(own::make_shared<Material>(*accepted));
             return true;
         }
         return false;
     }
-    if (accepted == m_materialBaseSnapshot)
+    if (&*accepted.borrow() == &*m_materialBaseSnapshot.borrow())
     {
         return false;
     }
-    auto candidate = std::make_shared<Material>(*accepted);
-    std::shared_ptr<MaterialAssetReferenceState> nextReferenceState;
+    auto candidate = own::make_shared<Material>(*accepted);
+    const auto* previous = m_materialReferenceState ? &*m_materialReferenceState.borrow() : nullptr;
+    own::shared_owner<MaterialAssetReferenceState> nextReferenceState;
     std::string error;
     if (m_Material && m_Material->HasMaterialGraph())
     {
-        nextReferenceState = std::make_shared<MaterialAssetReferenceState>();
+        nextReferenceState = own::make_shared<MaterialAssetReferenceState>();
         auto& overrides = nextReferenceState->overrides;
         if (!BuildGraphOverrides(*m_Material, *m_materialBaseSnapshot, overrides, error,
-            m_materialReferenceState.get()))
+            previous))
         {
             Debug::PrintLog(spdlog::level::warn, "Material asset update retained the last-good instance: " + error);
             return false;
@@ -636,9 +721,9 @@ bool MeshRenderer::RefreshMaterialAsset()
             }
         }
         nextReferenceState->overrideDoubleSided =
-            OverridesDoubleSided(*m_Material, *m_materialBaseSnapshot, m_materialReferenceState.get());
+            OverridesDoubleSided(*m_Material, *m_materialBaseSnapshot, previous);
         nextReferenceState->overrideBlendMode =
-            OverridesBlendMode(*m_Material, *m_materialBaseSnapshot, m_materialReferenceState.get());
+            OverridesBlendMode(*m_Material, *m_materialBaseSnapshot, previous);
         if (nextReferenceState->overrideDoubleSided)
         {
             candidate->m_doubleSided = m_Material->m_doubleSided;
@@ -667,8 +752,9 @@ bool MeshRenderer::RefreshMaterialAsset()
             return false;
         }
         FileGuid baseGuid;
-        std::shared_ptr<const Material> baseline;
-        if (!DecodeMaterialReferenceNode(document.Root().Read(), candidate, baseGuid, error, nullptr, baseline))
+        own::shared_owner<const Material> baseline;
+        if (!DecodeMaterialReferenceNode(document.Root().Read(), candidate, baseGuid, error, nullptr,
+                                         baseline, nullptr, preparedTextures))
         {
             Debug::PrintLog(spdlog::level::warn, "Material asset update retained the legacy instance: " + error);
             return false;
@@ -690,6 +776,7 @@ bool MeshRenderer::RefreshMaterialAsset()
 void MeshRenderer::OnInitialized()
 {
     RefreshMaterialAsset();
+    EnsureMeshBinding();
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if (scene)
@@ -711,35 +798,49 @@ void MeshRenderer::OnInitialized()
 
 void MeshRenderer::OnAddedToScene()
 {
-	if (!HasLifecycleState(State_Initialized) || !GetOwner()) return;
+	if (!HasLifecycleState(State_Initialized) || !GetOwner())
+    {
+        return;
+    }
     RefreshMaterialAsset();
 	if (Scene* scene = GetOwner()->GetScene())
 	{
 		scene->CollectMeshRenderer(this);
 		if (auto* renderScene = SceneManagers->GetRenderScene())
+        {
 			renderScene->RegisterCommand(this);
+        }
 	}
 }
 
 void MeshRenderer::OnRemovingFromScene()
 {
-	if (!GetOwner() || GetOwner()->IsDestroyMark()) return;
+	if (!GetOwner() || GetOwner()->IsDestroyMark())
+    {
+        return;
+    }
 	if (Scene* scene = GetOwner()->GetScene())
 	{
 		scene->UnCollectMeshRenderer(this);
 		if (auto* renderScene = SceneManagers->GetRenderScene())
+        {
 			renderScene->UnregisterCommand(this);
+        }
 	}
 }
 
 void MeshRenderer::OnUninitializing()
 {
-    auto scene = GetOwner()->m_ownerScene;
+    ReleaseManagedResources();
+    auto scene = GetOwner() ? GetOwner()->m_ownerScene : nullptr;
     auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectMeshRenderer(this);
-        renderScene->UnregisterCommand(this);
+        if (renderScene)
+        {
+            renderScene->UnregisterCommand(this);
+        }
 	}
 
 }
@@ -747,7 +848,7 @@ void MeshRenderer::OnUninitializing()
 // I5-D5c1 — 재질 병행 표현의 base 설치. base가 없으면 인스턴스도 없다
 // (빈 인스턴스를 들고 있으면 "저작 원본이 있다"는 거짓 신호가 된다).
 void MeshRenderer::SetExperimentMaterialBase(
-    std::shared_ptr<const experiment::Material> base)
+    own::shared_owner<const experiment::Material> base)
 {
     if (!base)
     {
@@ -755,7 +856,7 @@ void MeshRenderer::SetExperimentMaterialBase(
         return;
     }
     m_materialInstance =
-        std::make_unique<experiment::MaterialInstance>(std::move(base));
+        own::make_unique<experiment::MaterialInstance>(std::move(base));
 }
 
 math::aabb MeshRenderer::GetBoundingBox() const
@@ -765,6 +866,10 @@ math::aabb MeshRenderer::GetBoundingBox() const
 
 math::aabb MeshRenderer::GetBoundingBox(const math::matrix4x4& world) const
 {
+    if (m_meshDescriptor)
+    {
+        return math::transform(m_meshDescriptor->bounds, world);
+    }
     // typed 정본의 바운드(immutable aggregate가 소유). MBC9: legacy Mesh 바운드 폴백은
     // 은퇴했다 — generation이 없으면 빈 상자다.
     if (m_modelGeneration
@@ -780,9 +885,19 @@ math::aabb MeshRenderer::GetBoundingBox(const math::matrix4x4& world) const
 void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 {
 	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
+    const auto scenePins = GetOwner() && GetOwner()->GetScene()
+        ? GetOwner()->GetScene()->PreparedTextureImagePins() : nullptr;
+    const auto preparedTextures = scenePins ? scenePins->Owners() : std::vector<own::shared_owner<const Texture>>{};
+
     // Graph textures may be embedded in this model. Publish the immutable
     // model owner before resolving an inline graph instance's texture GUIDs.
-    if (m_modelGuid != FileGuid{}) DataSystems->LoadModelAssetGeneration(m_modelGuid);
+    const AssetDepot::AssetLink<assets::ModelMeshDescriptor> meshLink{
+        { experiment::AssetId{ m_meshAssetId.m_guid }, {} } };
+    m_granularMeshBinding = meshLink.IsValid() && DataSystems->HasModelMeshDescriptor(meshLink);
+    if (!m_granularMeshBinding && m_modelGuid != FileGuid{})
+    {
+        DataSystems->LoadModelAssetGeneration(m_modelGuid);
+    }
     // 재질 해석 → 모델 묶기 단계를 캡처에 가른다.
     std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"MeshRenderer.Material">() };
 	// typed 역직렬화가 m_Material의 소유 인스턴스를 이미 만들었다. 예전 경로는
@@ -800,8 +915,8 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	{
 		// I5-M5 S2c-2a — base 참조 표기. typed 역직렬화는 ref 노드에서 기본값
 		// 재질을 만들었을 뿐이다 — base 소유 사본+override로 교체한다.
-		std::shared_ptr<Material> resolved;
-		std::shared_ptr<const Material> acceptedBase;
+		own::shared_owner<Material> resolved;
+		own::shared_owner<const Material> acceptedBase;
 		FileGuid baseGuid;
 		std::string error;
 		// I5-D5c1 — base 저작 원본을 먼저 세운다. 그래야 아래 한 번의 파싱이
@@ -814,7 +929,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 				FileGuid(ref.AsString())));
 		}
 		if (DecodeMaterialReferenceNode(materialNode, resolved, baseGuid,
-			error, GetMaterialInstance(), acceptedBase, &m_materialReferenceState))
+			error, GetMaterialInstance(), acceptedBase, &m_materialReferenceState, preparedTextures))
 		{
 			m_Material = std::move(resolved);
 			m_materialBaseGuid = baseGuid;
@@ -842,8 +957,9 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
             }
             if (const auto fallback = materialNode["fallback"]; fallback && fallback.IsMap())
             {
-                auto recovered = std::make_shared<Material>();
-                if (DataSystems->DeserializeMaterialPayload(*recovered, Authoring::NodeViewAccess::Make(fallback)))
+                auto recovered = own::make_shared<Material>();
+                if (DataSystems->DeserializeMaterialPayload(*recovered, Authoring::NodeViewAccess::Make(fallback),
+                                                            nullptr, true, preparedTextures))
                 {
                     m_Material = std::move(recovered);
                 }
@@ -858,8 +974,9 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
         m_unresolvedMaterialReference.clear();
         m_materialBaseSnapshot.reset();
         m_materialReferenceState.reset();
-        auto decoded = std::make_shared<Material>();
-        if (DataSystems->DeserializeMaterialPayload(*decoded, Authoring::NodeViewAccess::Make(materialNode)))
+        auto decoded = own::make_shared<Material>();
+        if (DataSystems->DeserializeMaterialPayload(*decoded, Authoring::NodeViewAccess::Make(materialNode),
+                                                    nullptr, true, preparedTextures))
         {
             m_Material = std::move(decoded);
         }
@@ -877,10 +994,10 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
         m_unresolvedMaterialReference.clear();
         m_materialBaseSnapshot.reset();
         m_materialReferenceState.reset();
-        auto decoded = std::make_shared<Material>();
-        auto authored = std::make_shared<experiment::Material>();
+        auto decoded = own::make_shared<Material>();
+        auto authored = own::make_shared<experiment::Material>();
 		if (DataSystems->DeserializeMaterialPayload(*decoded,
-			Authoring::NodeViewAccess::Make(materialNode), authored.get()))
+			Authoring::NodeViewAccess::Make(materialNode), (authored ? &*authored.borrow() : nullptr), true, preparedTextures))
 		{
 			// FinalizeMaterialRuntime은 이중화 경로 안에서 이미 수행됐다.
 			m_Material = std::move(decoded);
@@ -923,7 +1040,14 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	}
 	step.reset();
 	step.emplace(ce::marker<"MeshRenderer.BindModel">());
-	const std::shared_ptr<const assets::ModelAssetGeneration> generation =
+    if (m_granularMeshBinding)
+    {
+        // A mounted v3 candidate, including a failed/unsupported one, never
+        // falls through to source-path or CEMCv11 loading.
+        EnsureMeshBinding();
+        return;
+    }
+	const assets::ModelAssetGeneration::Shared generation =
 		DataSystems->LoadModelAssetGeneration(m_modelGuid);
 
 	// 구 씬은 메시를 이름으로 적었다(m_Mesh.m_name) — 영속 MeshId가 없으면 이름으로
@@ -943,7 +1067,10 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		{
 			for (std::size_t index = 0; index < meshes.size(); ++index)
 			{
-				if (meshes[index].meshId != m_meshAssetId.m_guid) continue;
+				if (meshes[index].meshId != m_meshAssetId.m_guid)
+                {
+                    continue;
+                }
 				meshIndex = static_cast<std::uint32_t>(index);
 				break;
 			}
@@ -958,7 +1085,10 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 			std::size_t matches = 0;
 			for (std::size_t index = 0; index < meshes.size(); ++index)
 			{
-				if (meshes[index].name != meshName) continue;
+				if (meshes[index].name != meshName)
+                {
+                    continue;
+                }
 				++matches;
 				meshIndex = static_cast<std::uint32_t>(index);
 			}
@@ -1029,10 +1159,11 @@ void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 		std::string error;
         if (!m_materialBaseSnapshot)
         {
-            m_materialBaseSnapshot = DataSystems->LoadMaterialShared(m_materialBaseGuid);
+            m_materialBaseSnapshot = DataSystems->LoadMaterialByGuid(m_materialBaseGuid);
         }
+        const auto* previous = m_materialReferenceState ? &*m_materialReferenceState.borrow() : nullptr;
 		if (m_materialBaseSnapshot && BuildMaterialReferenceNode(*m_Material, *m_materialBaseSnapshot, m_materialBaseGuid,
-			node.Child("m_Material"), error, m_materialReferenceState.get()))
+			node.Child("m_Material"), error, previous))
 		{
 			return;
 		}
@@ -1062,15 +1193,18 @@ void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 }
 
 bool MeshRenderer::BindModelGeneration(
-	std::shared_ptr<const assets::ModelAssetGeneration> generation,
+	assets::ModelAssetGeneration::Shared generation,
 	std::uint32_t meshIndex)
 {
-	if (!generation || meshIndex >= generation->Meshes().size()) return false;
+	if (!generation || meshIndex >= generation->Meshes().size())
+    {
+        return false;
+    }
     if (m_materialBaseGuid == FileGuid{} && m_Material && !m_Material->HasMaterialGraph())
     {
         const auto* source = generation->FindMaterial(generation->Meshes()[meshIndex].materialId);
         std::string error;
-        auto candidate = std::make_shared<Material>(*m_Material);
+        auto candidate = own::make_shared<Material>(*m_Material);
         if (source && !DataSystems->ConfigureModelMaterialGraph(*candidate, *generation, *source, error))
         {
             Debug::PrintLog(spdlog::level::err, "MeshRenderer model graph conversion failed: " + error);
@@ -1082,6 +1216,11 @@ bool MeshRenderer::BindModelGeneration(
             SetExperimentMaterialBase(nullptr);
         }
     }
+    m_meshRequest.Cancel();
+    m_meshRequest = {};
+    m_meshDescriptor.reset();
+    m_granularMeshBinding = false;
+    m_meshRequested = false;
 	m_modelGeneration = std::move(generation);
 	m_modelMeshIndex = meshIndex;
 	m_meshAssetId = FileGuid(m_modelGeneration->Meshes()[meshIndex].meshId);
@@ -1098,6 +1237,10 @@ bool MeshRenderer::BindModelGeneration(
 
 assets::ModelMeshHandle MeshRenderer::GetModelMeshHandle() const
 {
+    if (m_meshDescriptor)
+    {
+        return assets::MakeModelMeshHandle(*m_meshDescriptor);
+    }
 	if (!m_modelGeneration
 		|| m_modelMeshIndex >= m_modelGeneration->Meshes().size())
 	{
@@ -1106,4 +1249,91 @@ assets::ModelMeshHandle MeshRenderer::GetModelMeshHandle() const
 	return { m_modelGeneration->Identity().modelId,
 		m_modelGeneration->Meshes()[m_modelMeshIndex].meshId,
 		m_modelGeneration->Identity().generation };
+}
+
+bool MeshRenderer::BindMeshDescriptor(
+    own::shared_owner<const assets::ModelMeshDescriptor> descriptor)
+{
+    if (!descriptor || !assets::MakeModelMeshHandle(*descriptor).IsValid()
+        || !assets::IsSupportedModelVertexLayout(descriptor->vertexAttributeMask)
+        || descriptor->vertexStride == 0u
+        || descriptor->skinned != assets::Has(descriptor->vertexAttributeMask, assets::VertexAttribute::BoneIndices)
+        || descriptor->vertexStride != assets::StrideOf(descriptor->vertexAttributeMask)
+        || descriptor->vertexLayoutHash != assets::VertexLayoutHash(descriptor->vertexAttributeMask)
+        || descriptor->vertexCount == 0u || descriptor->indexCount == 0u
+        || (descriptor->skinned && (!descriptor->skeleton
+            || descriptor->requiredBoneCount != descriptor->skeleton->skeleton.bones.size()
+            || descriptor->requiredSkinBindingSha256 != descriptor->skeleton->skinBindingSha256)))
+    {
+        return false;
+    }
+    m_meshRequest.Cancel();
+    m_meshRequest = {};
+    m_meshRequested = false;
+    m_meshFailureReported = false;
+    m_meshDescriptor = std::move(descriptor);
+    m_modelGeneration.reset();
+    m_modelMeshIndex = 0u;
+    m_meshAssetId = FileGuid(m_meshDescriptor->meshId);
+    m_isSkinnedMesh = m_meshDescriptor->skinned;
+    m_granularMeshBinding = true;
+    m_isNeedUpdateCulling = true;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+    return true;
+}
+
+void MeshRenderer::EnsureMeshBinding()
+{
+    const AssetDepot::AssetLink<assets::ModelMeshDescriptor> link{
+        { experiment::AssetId{ m_meshAssetId.m_guid }, {} } };
+    if (!link.IsValid())
+    {
+        return;
+    }
+    if (m_requestedMeshId != m_meshAssetId)
+    {
+        m_meshRequest.Cancel();
+        m_meshRequest = {};
+        m_requestedMeshId = m_meshAssetId;
+        m_meshRequested = false;
+        m_meshFailureReported = false;
+        m_granularMeshBinding = DataSystems->HasModelMeshDescriptor(link);
+    }
+    if (!m_granularMeshBinding || (m_meshDescriptor && m_meshDescriptor->meshId == m_meshAssetId.m_guid))
+    {
+        return;
+    }
+    if (!m_meshRequested)
+    {
+        if (auto descriptor = DataSystems->TryAcquire(link))
+        {
+            if (BindMeshDescriptor(std::move(descriptor)))
+            {
+                return;
+            }
+        }
+        m_meshRequest = DataSystems->RequestAsync(link);
+        m_meshRequested = true;
+    }
+    const auto result = m_meshRequest.Snapshot();
+    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+    {
+        return;
+    }
+    if (result.status == AssetDepot::AssetRequestStatus::Ready && BindMeshDescriptor(result.asset))
+    {
+        m_meshRequest = {};
+        m_meshRequested = false;
+        return;
+    }
+    // Failed, Cancelled and Stale are terminal for this requested link. Keep
+    // the result visible until an explicit bind or mesh-ID transition; silently
+    // issuing a new current-link request here would implement FollowLatest.
+    if (!m_meshFailureReported)
+    {
+        Debug::PrintLog(spdlog::level::err, "MeshRenderer v3 mesh binding failed: "
+            + m_meshAssetId.ToString() + " " + result.message);
+        m_meshFailureReported = true;
+    }
+    // Retain any previous valid descriptor/material while the replacement fails.
 }

@@ -1,0 +1,34 @@
+[
+  {
+    "canary": "stale-generation",
+    "source": "Engine/SceneRuntime/Audio/VoiceTable.cpp",
+    "exit_code": 1,
+    "detected": true,
+    "production_source_unchanged": true,
+    "failed_assertions": [
+      "[FAIL] 다시 쓸 때 세대가 바뀐다",
+      "[FAIL] 옛 핸들이 새 보이스를 가리키지 않는다",
+      "[FAIL] 낡은 핸들 조회는 nullptr 이다"
+    ]
+  },
+  {
+    "canary": "missing-clip-guard",
+    "source": "Engine/SceneRuntime/Audio/AudioRuntime.cpp",
+    "exit_code": 1,
+    "detected": true,
+    "production_source_unchanged": true,
+    "failed_assertions": [
+      "[FAIL] 없는 클립은 백엔드에 요청조차 가지 않는다"
+    ]
+  },
+  {
+    "canary": "graph-voice-bound",
+    "source": "Engine/SceneRuntime/Audio/SoundGraph.cpp",
+    "exit_code": 1,
+    "detected": true,
+    "production_source_unchanged": true,
+    "failed_assertions": [
+      "[FAIL] Layer expansion over maximumVoices fails closed"
+    ]
+  }
+]

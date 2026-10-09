@@ -13,6 +13,8 @@ namespace wave
     {
         std::uint32_t sampleRate{ 48000u };
         std::uint32_t channels{ 2u };
+        // Explicit offline rendering; never reported as a physical output device.
+        bool noDevice{ false };
     };
 
     // 오디오 백엔드 계약.
@@ -24,10 +26,10 @@ namespace wave
     //   논리 보이스와의 짝짓기는 상위가 한다.
     //
     // ★★ 정책을 내려보내지 않는다. priority · maxVoices · steal 은 이 인터페이스에
-    //   없다. 옛 배선이 그것을 백엔드에 맡겨(FMOD ChannelGroup 열거 + getAudibility)
+    //   없다. 옛 배선이 그것을 백엔드에 맡겨(legacy channel group 열거 + getAudibility)
     //   판정이 구현에 묶였고, 그래서 백엔드를 바꾸면 정책이 함께 바뀌었다.
     //
-    // ★★★ 구현체는 이 헤더를 넘어 vendor 타입을 노출하지 않는다. `ma_*` 든 `FMOD::*`
+    // ★★★ 구현체는 이 헤더를 넘어 vendor 타입을 노출하지 않는다. `vendor symbol` 든 `legacy vendor symbol`
     //   든 구현 TU 안에서 끝난다 — 그 규약이 지켜지는지는 게이트가 토큰 수로 잰다.
     class AudioBackend
     {
@@ -44,6 +46,7 @@ namespace wave
         [[nodiscard]] virtual bool Start(const DeviceSettings& settings) = 0;
         virtual void Stop() = 0;
         [[nodiscard]] virtual bool IsRunning() const = 0;
+        [[nodiscard]] virtual bool IsOutputAvailable() const { return IsRunning(); }
 
         // ── 클립 자원 ─────────────────────────────────────────────────────
         [[nodiscard]] virtual bool LoadClip(const ClipKey& key,
@@ -55,6 +58,10 @@ namespace wave
             (void)source;
             return false;
         }
+        // A logical voice retains its immutable clip generation while virtual.
+        // Backends with replaceable clip generations must implement this lease.
+        [[nodiscard]] virtual BackendClipId RetainClip(const ClipKey&) { return {}; }
+        virtual void ReleaseClip(BackendClipId) {}
         virtual void UnloadClip(const ClipKey& key) = 0;
         [[nodiscard]] virtual bool HasClip(const ClipKey& key) const = 0;
 
@@ -63,6 +70,10 @@ namespace wave
         // 요청을 그대로 받는다. 상위가 이미 정책을 통과시킨 뒤라, 백엔드는
         // "이 소리를 이 값으로 내라" 만 하면 된다. 못 내면 무효 id 를 돌려준다.
         [[nodiscard]] virtual BackendVoiceId StartVoice(const PlayRequest& request) = 0;
+        [[nodiscard]] virtual BackendVoiceId StartVoice(const PlayRequest& request, BackendClipId)
+        {
+            return StartVoice(request);
+        }
         virtual void StopVoice(BackendVoiceId voice) = 0;
         virtual void SetVoicePaused(BackendVoiceId voice, bool paused) = 0;
         [[nodiscard]] virtual bool IsVoicePlaying(BackendVoiceId voice) const = 0;
@@ -72,12 +83,29 @@ namespace wave
         virtual void SetVoiceTransform(BackendVoiceId voice,
             const math::vector3& position, const math::vector3& velocity) = 0;
 
+        virtual void SetVoiceSettings(BackendVoiceId voice, const PlayRequest& request)
+        {
+            SetVoiceVolume(voice, request.volume);
+            SetVoicePitch(voice, request.pitch);
+            SetVoiceTransform(voice, request.position, request.velocity);
+        }
+        virtual void SetVoiceLooping(BackendVoiceId, bool) {}
+        [[nodiscard]] virtual bool SeekVoice(BackendVoiceId, std::uint64_t) { return false; }
+        [[nodiscard]] virtual std::uint64_t VoicePlayhead(BackendVoiceId) const { return 0u; }
+        [[nodiscard]] virtual ClipInfo GetClipInfo(const ClipKey&) const { return {}; }
+        virtual void SetReverbPreset(ReverbPreset) {}
+
         // ── 믹스 ──────────────────────────────────────────────────────────
         virtual void SetBusVolume(BusId bus, float linearGain) = 0;
         virtual void SetListener(const ListenerState& listener) = 0;
 
         // 백엔드가 자기 정리(끝난 보이스 회수 등)를 할 기회. 게임 스레드에서 불린다.
         virtual void Update() = 0;
+        virtual void Advance(float deltaSeconds)
+        {
+            (void)deltaSeconds;
+            Update();
+        }
 
     protected:
         AudioBackend() = default;

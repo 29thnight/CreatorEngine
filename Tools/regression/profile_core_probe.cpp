@@ -12,6 +12,7 @@
 #include <crtdbg.h>
 #endif
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -19,7 +20,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <functional>
 #include <new>
+#include <semaphore>
 #include <string>
 #include <thread>
 #include <vector>
@@ -442,11 +446,14 @@ namespace
 		{
 			ce::profile_scope scope{ service, marker };
 		}
+		// Inspect the grown frame before Pause closes an empty tail frame. With a
+		// one-page retention budget, that later boundary legitimately evicts it.
+		service.request_live_capture();
 		publish_frame_sync(service, 1);
-		pause_sync(service);
 		const ce::capture_session_ptr capture = service.capture();
 		check(capture && count_marker(*capture, marker) == kScopes,
 		      "pool-growth/events — 초기 페이지를 넘어도 모든 이벤트가 남는다");
+		pause_sync(service);
 		check(service.summary().chunk_count > 1,
 		      "pool-growth/pages — 필요할 때 페이지를 추가한다");
 		check_eq(service.summary().memory_budget, sizeof(ce::event_chunk),
@@ -624,6 +631,64 @@ namespace
 			sink += static_cast<std::uint64_t>(i);
 		}
 		(void)sink;
+	}
+
+	void test_aggregate_nested_ranges()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Nested");
+		record_sync(service, 1);
+		{
+			ce::profile_scope root{ service, ce::marker<"NestedRoot">() };
+			{
+				ce::profile_scope branch{ service, ce::marker<"NestedBranch">() };
+				{
+					ce::profile_scope leaf{ service, ce::marker<"NestedLeaf">() };
+					busy_ticks(2);
+				}
+			}
+			{
+				ce::profile_scope branch{ service, ce::marker<"NestedLastBranch">() };
+				{
+					ce::profile_scope child{ service, ce::marker<"NestedChild">() };
+					{
+						ce::profile_scope leaf{ service, ce::marker<"NestedGrandchild">() };
+						busy_ticks(1);
+					}
+				}
+			}
+		}
+		publish_frame_sync(service, 1);
+		pause_sync(service);
+		const auto capture = service.capture();
+		check(capture != nullptr, "aggregate/nested-capture");
+		if (!capture)
+		{
+			return;
+		}
+		const auto aggregate = ce::aggregate_frames(*capture, 1, 1);
+		const auto& rows = aggregate.hierarchy();
+		check_eq(rows.size(), std::size_t{ 6 }, "aggregate/nested-rows");
+		for (std::size_t i = 0; i < rows.size(); ++i)
+		{
+			std::size_t end = i + 1;
+			while (end < rows.size() && rows[end].depth > rows[i].depth)
+			{
+				++end;
+			}
+			check_eq(rows[i].child_begin, static_cast<std::uint32_t>(i + 1), "aggregate/nested-begin");
+			check_eq(rows[i].child_end, static_cast<std::uint32_t>(end), "aggregate/nested-end");
+		}
+		std::size_t roots = 0;
+		std::uint64_t rootTicks = 0;
+		for (std::size_t i = 0; i < rows.size(); i = rows[i].child_end)
+		{
+			++roots;
+			rootTicks += rows[i].total_ticks;
+		}
+		check_eq(roots, std::size_t{ 1 }, "aggregate/nested-root-traversal");
+		check_eq(rootTicks, rows[0].total_ticks, "aggregate/nested-flame-root-total");
 	}
 
 	void test_aggregate_tree()
@@ -3266,6 +3331,37 @@ void test_gpu_issue_diagnostics()
 
 void test_page_backed_snapshots()
 {
+    {
+        auto pool = std::make_shared<ce::chunk_pool>();
+        pool->initialize(1, 1);
+        ce::frame_events events;
+        for (std::uint32_t i = 0; i < 64; ++i)
+        {
+            auto* chunk = pool->acquire();
+            check(chunk != nullptr, "sparse-pages/reuse — retained events do not exhaust producer pages");
+            if (!chunk)
+            {
+                break;
+            }
+            chunk->count = 1;
+            chunk->events[0].tick_begin = i;
+            chunk->events[0].tick_end = i + 1;
+            std::shared_ptr<const ce::event_chunk> page(chunk, [pool](const ce::event_chunk* value)
+            {
+                pool->release(const_cast<ce::event_chunk*>(value));
+            });
+            events.append_page(std::move(page), 0, 1);
+        }
+        check(events.size() == 64 && pool->free_count() == 1,
+              "sparse-pages/retained — all events survive repeated reuse of one producer page");
+        for (std::size_t i = 0; i < events.size(); ++i)
+        {
+            check(events[i].tick_begin == i && events[i].tick_end == i + 1,
+                  "sparse-pages/order — recycling pages preserves event contents and order");
+        }
+        check(events.memory_bytes() < sizeof(ce::event_chunk),
+              "sparse-pages/compact — sparse retained data uses less than one producer page");
+    }
 	ce::profiler_config config;
 	config.live_capture_interval_ms = 0.0;
 	ce::profiler_service service;
@@ -3326,6 +3422,11 @@ void test_live_snapshot_watermark()
 	const ce::capture_session_ptr provisional = service.capture();
 	check(provisional && !provisional->complete() && provisional->unacked_streams() == 1,
 	      "live-watermark/provisional — 안전 지점을 지나지 않은 워커를 미확정으로 낸다");
+    const ce::profile_event* projected = provisional
+        ? find_event(*provisional, ce::marker<"ParkedSpan">()) : nullptr;
+    check(projected && ce::has_flag(projected->flags, ce::event_flags::truncated_end) &&
+          count_marker(*provisional, ce::marker<"ParkedSpan">()) == 1,
+          "live-watermark/open-visible — parked open scope is visible as a provisional projection");
 	resume.store(true, std::memory_order_release);
 	worker.join();
 	service.request_live_capture();
@@ -3335,6 +3436,24 @@ void test_live_snapshot_watermark()
 	      "live-watermark/complete — 워커가 봉인한 뒤에는 확정된다");
 	check(complete && count_marker(*complete, ce::marker<"ParkedSpan">()) == 1,
 	      "live-watermark/delivered — 늦게 봉인한 구간도 다음 캡처에 들어온다");
+    const ce::profile_event* delivered = complete
+        ? find_event(*complete, ce::marker<"ParkedSpan">()) : nullptr;
+    check(projected && delivered && projected->tick_begin == delivered->tick_begin &&
+          projected->tick_end <= delivered->tick_end &&
+          ce::has_flag(projected->flags, ce::event_flags::truncated_end) &&
+          !ce::has_flag(delivered->flags, ce::event_flags::truncated_end),
+          "live-watermark/replaced — new snapshot has the complete span while the old projection stays immutable");
+    pause_sync(service);
+    const auto disk = ce::open_capture_recording(service.recording_path());
+    check(disk && (*disk)->finalized(), "live-watermark/disk-finalized");
+    if (disk)
+    {
+        const auto range = (*disk)->load_range(0, static_cast<std::uint32_t>((*disk)->frame_count()));
+        const auto* persisted = range ? find_event(**range, ce::marker<"ParkedSpan">()) : nullptr;
+        check(persisted && !ce::has_flag(persisted->flags, ce::event_flags::truncated_end) &&
+              count_marker(**range, ce::marker<"ParkedSpan">()) == 1,
+              "live-watermark/not-persisted — live projection is never appended as a duplicate disk event");
+    }
 	service.unregister_thread();
 	service.shutdown();
 }
@@ -4479,13 +4598,986 @@ void test_legacy_capture()
         check(event.cpu.session == 0 && event.cpu.tick == 0 && event.cpu.task == 0,
               "file-v1/context — absent ownership stays zero");
     }
+    const auto indexed = ce::open_capture_recording(path);
+    check(indexed && (*indexed)->finalized() && !(*indexed)->recovered(),
+          "file-v1/indexed — the recording reader still accepts the original snapshot format");
+    if (indexed)
+    {
+        const auto range = (*indexed)->load_range(0, 1);
+        check(range && (*range)->total_events() == 1 &&
+              (*range)->frames()[0].events[0].cpu.session == 0 &&
+              (*range)->frames()[0].events[0].cpu.tick == 0 &&
+              (*range)->frames()[0].events[0].cpu.task == 0,
+              "file-v1/indexed-context — lazy legacy decode retains absent CPU ownership");
+    }
 }
 
-int main()
+// Capture-integrity P0 regression sources. Added by static review only; these
+// cases have NOT been compiled or executed. Synthetic ticks and explicit owner
+// handshakes establish ordering; no elapsed-time performance bounds are asserted.
+namespace
+{
+    struct integrity_event
+    {
+        ce::profile_event value;
+        std::uint64_t generation = 0;
+    };
+
+    std::vector<integrity_event> take_integrity_events(ce::chunk_pool& pool)
+    {
+        std::vector<integrity_event> result;
+        ce::event_chunk* pages = pool.take_sealed();
+        for (const auto* page = pages; page; page = page->next)
+        {
+            for (std::uint32_t i = 0; i < page->count; ++i)
+            {
+                result.push_back({page->events[i], page->generation});
+            }
+        }
+        pool.release(pages);
+        return result;
+    }
+
+    void test_disabled_parent_enabled_child_pairing()
+    {
+        ce::chunk_pool pool;
+        pool.initialize(2, 2);
+        ce::thread_stream stream(pool, {"AdmissionProbe", 0, 7});
+        stream.set_generation(11);
+        const auto child = ce::marker<"AdmissionChild">();
+        const auto nested = ce::marker<"AdmissionNested">();
+        const auto sibling = ce::marker<"AdmissionSibling">();
+
+        stream.skip_scope();                    // A: disabled before Record
+        stream.begin_scope(child, 20, 31);       // B: admitted after Record
+        stream.skip_scope();                    // C: disabled inside B
+        stream.begin_scope(nested, 30, 31);      // D: admitted inside C
+        stream.end_scope(40);                   // D, never A or C's skip
+        stream.end_scope(50);                   // C
+        stream.end_scope(60);                   // B
+        stream.end_scope(70);                   // A
+        stream.begin_scope(sibling, 80, 31);
+        stream.end_scope(90);
+        stream.finish(100);
+
+        const auto events = take_integrity_events(pool);
+        check_eq(events.size(), std::size_t{3}, "admission/count — disabled entries emit nothing");
+        bool saw_child = false, saw_nested = false, saw_sibling = false;
+        for (const auto& event : events)
+        {
+            const auto& value = event.value;
+            check(event.generation == 11 && value.flags == ce::event_flags::none,
+                  "admission/complete — admitted scopes close normally in their own generation");
+            if (value.marker == child)
+            {
+                saw_child = value.tick_begin == 20 && value.tick_end == 60 && value.depth == 0;
+            }
+            if (value.marker == nested)
+            {
+                saw_nested = value.tick_begin == 30 && value.tick_end == 40 && value.depth == 1;
+            }
+            if (value.marker == sibling)
+            {
+                saw_sibling = value.tick_begin == 80 && value.tick_end == 90 && value.depth == 0;
+            }
+        }
+        check(saw_child && saw_nested && saw_sibling,
+              "admission/positional — each end closes its begin and disabled parents do not add depth");
+        check_eq(stream.unbalanced_scopes(), std::uint64_t{0}, "admission/balanced");
+        check_eq(stream.dropped_scopes(), std::uint64_t{0}, "admission/no-loss — disabled is not overflow");
+    }
+
+    void test_scope_generation_reuse_and_recursion()
+    {
+        ce::chunk_pool pool;
+        pool.initialize(4, 4); // Three generations need distinct sealed pages before collection.
+        ce::thread_stream stream(pool, {"GenerationProbe", 0, 3});
+        const auto recursive = ce::marker<"GenerationRecursive">();
+        const auto fresh = ce::marker<"GenerationFresh">();
+        const auto stale = ce::marker<"GenerationStale">();
+        stream.set_generation(11);
+        stream.begin_scope(recursive, 10, 1);
+        stream.skip_scope();
+        stream.begin_scope(recursive, 20, 1);
+        stream.freeze_self(30);
+        stream.set_generation(12);
+        stream.begin_scope(fresh, 40, 2);
+        stream.end_scope(50);
+        stream.end_scope(60); // Already truncated inner, generation 11.
+        stream.end_scope(70); // Disabled entry, still paired positionally.
+        stream.end_scope(80); // Already truncated outer, generation 11.
+        stream.publish_frame();
+
+        stream.begin_scope(stale, 90, 2);
+        stream.set_generation(13); // A stale ancestor must not deepen new work.
+        stream.begin_scope(fresh, 100, 3);
+        stream.end_scope(110);
+        stream.end_scope(120);
+        stream.finish(130);
+        const auto events = take_integrity_events(pool);
+        check_eq(events.size(), std::size_t{4}, "generation-pair/count — recursive scope instances remain distinct");
+        std::uint32_t truncated = 0, completed = 0;
+        for (const auto& event : events)
+        {
+            const auto& value = event.value;
+            if (value.marker == recursive)
+            {
+                ++truncated;
+                check(event.generation == 11 && value.tick_end == 30 &&
+                      value.depth == (value.tick_begin == 10 ? 0 : 1) &&
+                      ce::has_flag(value.flags, ce::event_flags::truncated_end),
+                      "generation-pair/freeze — each old instance is truncated once at the cutoff");
+            }
+            if (value.marker == fresh)
+            {
+                ++completed;
+                check(value.depth == 0 && value.flags == ce::event_flags::none &&
+                      ((event.generation == 12 && value.tick_begin == 40 && value.tick_end == 50) ||
+                       (event.generation == 13 && value.tick_begin == 100 && value.tick_end == 110)),
+                      "generation-pair/fresh — old admitted, disabled and stale ancestors add no depth");
+            }
+            check(value.marker != stale, "generation-pair/stale — old-generation end cannot resurrect its scope");
+        }
+        check(truncated == 2 && completed == 2, "generation-pair/exactly-once");
+        check_eq(stream.unbalanced_scopes(), std::uint64_t{0}, "generation-pair/balanced");
+        check_eq(stream.stale_scopes(), std::uint64_t{1}, "generation-pair/stale-accounted");
+    }
+
+    void test_recursive_scope_depth_overflow_pairing()
+    {
+        ce::chunk_pool pool;
+        pool.initialize(2, 2);
+        ce::thread_stream stream(pool, {"RecursiveProbe", 0, 0});
+        const auto recursive = ce::marker<"DepthRecursive">();
+        const auto sibling = ce::marker<"DepthSibling">();
+        for (std::uint32_t i = 0; i < ce::kMaxScopeDepth; ++i)
+        {
+            stream.begin_scope(recursive, 100 + i, 1);
+        }
+        stream.begin_scope(recursive, 200, 1);
+        stream.begin_scope(recursive, 201, 1);
+        stream.end_scope(210);
+        stream.end_scope(211);
+        for (std::uint32_t i = 0; i < ce::kMaxScopeDepth; ++i)
+        {
+            stream.end_scope(300 + i);
+        }
+        stream.begin_scope(sibling, 400, 1);
+        stream.end_scope(410);
+        stream.finish(420);
+
+        const auto events = take_integrity_events(pool);
+        check_eq(events.size(), std::size_t{ce::kMaxScopeDepth} + 1, "depth-pair/count");
+        std::array<bool, ce::kMaxScopeDepth> seen{};
+        bool saw_sibling = false;
+        for (const auto& event : events)
+        {
+            const auto& value = event.value;
+            if (value.marker == sibling)
+            {
+                saw_sibling = value.depth == 0 && value.tick_begin == 400 && value.tick_end == 410;
+                continue;
+            }
+            const bool valid = value.marker == recursive && value.depth < ce::kMaxScopeDepth;
+            check(valid, "depth-pair/bounded — no event exceeds the stack limit");
+            if (!valid)
+            {
+                continue;
+            }
+            check(!seen[value.depth] && value.tick_begin == ce::profile_tick{100} + value.depth &&
+                  value.tick_end == 300 + ce::kMaxScopeDepth - 1 - value.depth &&
+                  value.flags == ce::event_flags::none,
+                  "depth-pair/recursive-instance — overflow ends never consume an admitted parent");
+            seen[value.depth] = true;
+        }
+        check(saw_sibling, "depth-pair/reusable — unwinding overflow restores root depth");
+        for (bool depth_seen : seen)
+        {
+            check(depth_seen, "depth-pair/every-instance");
+        }
+        check_eq(stream.dropped_scopes(), std::uint64_t{2}, "depth-pair/loss-accounted");
+        check_eq(stream.unbalanced_scopes(), std::uint64_t{0}, "depth-pair/balanced");
+    }
+
+    void test_collector_claims_parked_open_scopes()
+    {
+        ce::chunk_pool pool;
+        pool.initialize(2, 2);
+        ce::thread_stream stream(pool, {"ParkedOwner", 0, 7});
+        stream.set_generation(41);
+        const auto outer = ce::marker<"ClaimOuter">();
+        const auto inner = ce::marker<"ClaimInner">();
+        stream.begin_scope(outer, 100, 31, {0x100000002ULL, 0x200000003ULL, 0});
+        stream.skip_scope();
+        stream.begin_scope(inner, 110, 31, {0x100000002ULL, 0x200000003ULL, 0x300000004ULL});
+
+        std::array<ce::profile_event, 2> claimed{};
+        std::thread collector([&]
+        {
+            std::array<ce::profile_event, ce::kMaxScopeDepth> snapshot{};
+            const ce::thread_stream& read_only = stream;
+            check_eq(read_only.snapshot_open_scopes(41, 150, snapshot.data(), ce::kMaxScopeDepth),
+                     std::uint32_t{2}, "claim/snapshot — parked owner publishes both open descriptors");
+            check_eq(read_only.snapshot_open_scopes(41, 150, snapshot.data(), ce::kMaxScopeDepth),
+                     std::uint32_t{2}, "claim/nondestructive — inspecting metadata does not consume it");
+            check_eq(stream.claim_open_scopes(40, 150, claimed.data(), 2),
+                     std::uint32_t{0}, "claim/generation — wrong capture cannot claim descriptors");
+            check_eq(stream.claim_open_scopes(41, 150, claimed.data(), 1),
+                     std::uint32_t{1}, "claim/capacity — only delivered descriptors are claimed");
+            check_eq(stream.claim_open_scopes(41, 150, claimed.data() + 1, 1),
+                     std::uint32_t{1}, "claim/remainder — capacity exhaustion leaves the other descriptor available");
+            check_eq(stream.claim_open_scopes(41, 150, snapshot.data(), ce::kMaxScopeDepth),
+                     std::uint32_t{0}, "claim/idempotent — a collector retry cannot duplicate the scope");
+        });
+        collector.join(); // Owner remains parked throughout collector inspection.
+        bool saw_outer = false, saw_inner = false;
+        for (const auto& value : claimed)
+        {
+            check(value.tick_end == 150 && value.frame == 31 && value.thread_slot == 7 &&
+                  value.cpu.session == 0x100000002ULL && value.cpu.tick == 0x200000003ULL &&
+                  ce::has_flag(value.flags, ce::event_flags::truncated_end),
+                  "claim/metadata — collector truncation preserves identity, ownership and cutoff");
+            saw_outer = saw_outer || (value.marker == outer && value.tick_begin == 100 && value.depth == 0 && value.cpu.task == 0);
+            saw_inner = saw_inner || (value.marker == inner && value.tick_begin == 110 && value.depth == 1 && value.cpu.task == 0x300000004ULL);
+        }
+        check(saw_outer && saw_inner, "claim/distinct — disabled entries do not hide or deepen open scopes");
+        stream.begin_scope(inner, 155, 31);
+        stream.end_scope(156);
+        stream.publish_frame();
+        const auto after_claim = take_integrity_events(pool);
+        check(after_claim.size() == 1 && after_claim[0].value.depth == 0 &&
+              after_claim[0].value.tick_begin == 155 && after_claim[0].value.tick_end == 156 &&
+              after_claim[0].value.flags == ce::event_flags::none,
+              "claim/new-child — claimed ancestors still awaiting their real ends do not deepen later work");
+        stream.end_scope(160);
+        stream.end_scope(170);
+        stream.end_scope(180);
+        stream.finish(190);
+        check(take_integrity_events(pool).empty(), "claim/owner-exactly-once — real ends never emit claimed scopes again");
+        check_eq(stream.foreign_touches(), std::uint64_t{0}, "claim/ownership — collector never touches owner storage");
+        check_eq(stream.unbalanced_scopes(), std::uint64_t{0}, "claim/paired-after-claim");
+
+        // The opposite winner must also work after reusing the same stack slot.
+        stream.begin_scope(inner, 200, 32);
+        stream.end_scope(210);
+        std::thread late_collector([&]
+        {
+            check_eq(stream.claim_open_scopes(41, 220, claimed.data(), 2), std::uint32_t{0},
+                     "claim/owner-wins — an already-ended reused slot cannot be synthesized");
+        });
+        late_collector.join();
+        stream.finish(230);
+        const auto owner_events = take_integrity_events(pool);
+        check(owner_events.size() == 1 && owner_events[0].value.depth == 0 && owner_events[0].value.tick_begin == 200 &&
+              owner_events[0].value.tick_end == 210 && owner_events[0].value.flags == ce::event_flags::none,
+              "claim/owner-delivery — owner winner remains an ordinary complete event");
+    }
+
+    void test_owner_exit_truncates_open_scopes()
+    {
+        ce::chunk_pool pool;
+        pool.initialize(2, 2);
+        const auto recursive = ce::marker<"ExitRecursive">();
+        std::thread owner([&]
+        {
+            ce::thread_stream stream(pool, {"ExitingOwner", 0, 9});
+            stream.set_generation(51);
+            stream.begin_scope(recursive, 100, 12);
+            stream.skip_scope();
+            stream.begin_scope(recursive, 110, 12);
+            stream.finish(150); // The unregister/owner-exit boundary.
+        });
+        owner.join();
+        const auto events = take_integrity_events(pool);
+        check_eq(events.size(), std::size_t{2}, "owner-exit/count — every admitted open scope survives owner exit");
+        std::array<bool, 2> seen{};
+        for (const auto& event : events)
+        {
+            const auto& value = event.value;
+            const bool valid = value.depth < seen.size();
+            check(valid && event.generation == 51 && value.thread_slot == 9 && value.marker == recursive &&
+                  value.tick_end == 150 && ce::has_flag(value.flags, ce::event_flags::truncated_end),
+                  "owner-exit/truncated — exit preserves recursion and thread ownership");
+            if (valid)
+            {
+                check(!seen[value.depth] && value.tick_begin == ce::profile_tick{100} + ce::profile_tick{10} * value.depth,
+                      "owner-exit/exactly-once — finish and destruction do not duplicate open instances");
+                seen[value.depth] = true;
+            }
+        }
+        check(seen[0] && seen[1], "owner-exit/depth — disabled entry is absent from the captured hierarchy");
+    }
+
+    void test_record_inside_disabled_scope()
+    {
+        ce::profiler_service service;
+        service.initialize();
+        service.register_thread("AdmissionService");
+        service.begin_scope(ce::marker<"DisabledBeforeRecord">());
+        record_sync(service, 61);
+        service.begin_scope(ce::marker<"EnabledAfterRecord">());
+        service.end_scope();
+        const auto child_closed = ce::profiler_service::now();
+        service.end_scope();
+        publish_frame_sync(service, 61);
+        pause_sync(service);
+        const auto capture = service.capture();
+        check(bool(capture), "admission-service/capture");
+        if (capture)
+        {
+            const auto* event = find_event(*capture, ce::marker<"EnabledAfterRecord">());
+            check(event && event->depth == 0 && event->tick_end <= child_closed &&
+                  event->flags == ce::event_flags::none,
+                  "admission-service/child — Record inside disabled parent preserves the child's own end");
+            check_eq(count_marker(*capture, ce::marker<"DisabledBeforeRecord">()), std::size_t{0},
+                     "admission-service/parent — disabled entry never becomes a captured parent");
+        }
+        check_eq(service.summary().unbalanced_scopes, std::uint64_t{0}, "admission-service/balanced");
+    }
+
+    void test_stop_preserves_parked_producer_and_next_session()
+    {
+        ce::profiler_config config;
+        config.stop_drain_timeout_ms = 1; // Exercise fallback; owner cannot acknowledge until explicitly released.
+        ce::profiler_service service;
+        service.initialize(config);
+        service.register_thread("StopMain");
+        record_sync(service, 81);
+        const auto outer = ce::marker<"ParkedAtStopOuter">();
+        const auto inner = ce::marker<"ParkedAtStopInner">();
+        const auto fresh = ce::marker<"ParkedNextSession">();
+        std::binary_semaphore opened(0), resume(0);
+        std::thread producer([&]
+        {
+            service.register_thread("ParkedProducer");
+            service.begin_scope(outer, {0x100000002ULL, 81, 0});
+            service.begin_scope(inner, {0x100000002ULL, 81, 0x300000004ULL});
+            opened.release();
+            resume.acquire(); // No producer safe point until the old recording is finalized.
+            service.begin_scope(fresh);
+            service.end_scope();
+            service.end_scope();
+            service.end_scope();
+            service.unregister_thread();
+        });
+        opened.acquire();
+        publish_frame_sync(service, 81);
+        pause_sync(service);
+        const auto first = service.capture();
+        check(bool(first), "stop-parked/capture");
+        if (first)
+        {
+            check(!first->complete() && first->unacked_streams() == 1,
+                  "stop-parked/incomplete — synthesized open scopes do not imply the private tail was acknowledged");
+            check(count_marker(*first, outer) == 1 && count_marker(*first, inner) == 1,
+                  "stop-parked/preserved — unresponsive producer still contributes each open scope exactly once");
+            const auto* parent = find_event(*first, outer);
+            const auto* child = find_event(*first, inner);
+            check(parent && child && parent->depth == 0 && child->depth == 1 &&
+                  parent->tick_end == child->tick_end && parent->cpu.session == 0x100000002ULL &&
+                  child->cpu.task == 0x300000004ULL &&
+                  ce::has_flag(parent->flags, ce::event_flags::truncated_end) &&
+                  ce::has_flag(child->flags, ce::event_flags::truncated_end),
+                  "stop-parked/metadata — fallback preserves hierarchy, ownership and one stop cutoff");
+        }
+
+        const auto disk = ce::open_capture_recording(service.recording_path());
+        check(disk && (*disk)->finalized() && !(*disk)->complete(), "stop-parked/disk-incomplete");
+        if (disk)
+        {
+            const auto tail = (*disk)->load_range(0, static_cast<std::uint32_t>((*disk)->frame_count()));
+            check(tail && count_marker(**tail, outer) == 1 && count_marker(**tail, inner) == 1,
+                  "stop-parked/disk-tail — synthesized events are persisted before the footer");
+        }
+
+        record_sync(service, 82);
+        resume.release();
+        producer.join();
+        publish_frame_sync(service, 82);
+        pause_sync(service);
+        const auto second = service.capture();
+        check(bool(second), "stop-parked/next-capture");
+        if (second)
+        {
+            const auto* event = find_event(*second, fresh);
+            check(event && event->depth == 0 && event->flags == ce::event_flags::none,
+                  "stop-parked/new-depth — resumed producer's new scope has no old-session parents");
+            check(count_marker(*second, outer) == 0 && count_marker(*second, inner) == 0,
+                  "stop-parked/no-contamination — late real ends do not enter the new session");
+        }
+        if (first)
+        {
+            check(count_marker(*first, outer) == 1 && count_marker(*first, inner) == 1,
+                  "stop-parked/immutable — later owner activity cannot mutate the frozen capture");
+        }
+        check_eq(service.summary().foreign_stream_touches, std::uint64_t{0}, "stop-parked/no-foreign-writes");
+    }
+
+    void test_stop_drains_admitted_gpu_and_rejects_old_session()
+    {
+        ce::profiler_config config;
+        config.stop_drain_timeout_ms = 1000; // Not a latency assertion: completion is supplied explicitly below.
+        ce::profiler_service service;
+        service.initialize(config);
+        service.register_thread("GpuDrainMain");
+        record_sync(service, 91);
+        publish_frame_sync(service, 91);
+        ce::gpu_span_context old_context;
+        old_context.generation = service.begin_gpu_submission(91);
+        old_context.submission = 701;
+        old_context.view = 2;
+        old_context.queue = 1;
+        check(old_context.generation != 0, "gpu-drain/admitted — Record admits a tracked submission");
+        const auto begin = ce::profiler_service::now();
+        const auto end = ce::profiler_service::now();
+        service.pause();
+        check(service.state() == ce::recorder_state::pausing,
+              "gpu-drain/pending — Stop remains open while an admitted submission is outstanding");
+        check_eq(service.begin_gpu_submission(92), std::uint64_t{0},
+                 "gpu-drain/no-new-admission — Stop rejects work submitted after its cutoff");
+        service.submit_gpu_span(ce::marker<"GpuResolvedAfterStop">(), begin, end, 91, old_context);
+        service.publish_gpu_spans();
+        service.finish_gpu_submission(old_context.generation, 91, true, nullptr);
+        service.wait_until_idle();
+        finalize_sync(service);
+        const auto first = service.capture();
+        check(first && first->complete(), "gpu-drain/complete — admitted GPU result closes the drain without loss");
+        if (first)
+        {
+            const auto* event = find_event(*first, ce::marker<"GpuResolvedAfterStop">());
+            check(event && event->frame == 91 && event->submission == 701 && event->view == 2 &&
+                  event->queue == 1 && event->tick_begin == begin && event->tick_end == end &&
+                  ce::has_flag(event->flags, ce::event_flags::gpu_span),
+                  "gpu-drain/late-result — result arriving during pausing retains its original attribution");
+            check_eq(count_marker(*first, ce::marker<"GpuResolvedAfterStop">()), std::size_t{1},
+                     "gpu-drain/once");
+        }
+        const auto disk = ce::open_capture_recording(service.recording_path());
+        check(disk && (*disk)->finalized() && (*disk)->complete(), "gpu-drain/disk-finalized");
+        if (disk)
+        {
+            const auto tail = (*disk)->load_range(0, static_cast<std::uint32_t>((*disk)->frame_count()));
+            check(tail && count_marker(**tail, ce::marker<"GpuResolvedAfterStop">()) == 1,
+                  "gpu-drain/disk-tail — delayed GPU event precedes the final footer");
+        }
+
+        // Reuse the frame ID deliberately: generation, not frame-number filtering,
+        // must reject an old callback even when its supplied timestamps are current.
+        record_sync(service, 91);
+        publish_frame_sync(service, 91);
+        ce::gpu_span_context new_context = old_context;
+        new_context.generation = service.begin_gpu_submission(91);
+        new_context.submission = 702;
+        check(new_context.generation != 0 && new_context.generation != old_context.generation,
+              "gpu-drain/new-generation — each Record has a distinct admission generation");
+        const auto fresh_begin = ce::profiler_service::now();
+        const auto fresh_end = ce::profiler_service::now();
+        service.submit_gpu_span(ce::marker<"GpuStaleSession">(), fresh_begin, fresh_end, 91, old_context);
+        service.finish_gpu_submission(old_context.generation, 91, false, "old session callback");
+        service.submit_gpu_span(ce::marker<"GpuFreshSession">(), fresh_begin, fresh_end, 91, new_context);
+        service.publish_gpu_spans();
+        service.finish_gpu_submission(new_context.generation, 91, true, nullptr);
+        pause_sync(service);
+        const auto second = service.capture();
+        check(second && second->complete(), "gpu-drain/old-completion-isolated — old failure cannot taint the fresh session");
+        if (second)
+        {
+            check(count_marker(*second, ce::marker<"GpuStaleSession">()) == 0 &&
+                  count_marker(*second, ce::marker<"GpuFreshSession">()) == 1 &&
+                  count_marker(*second, ce::marker<"GpuResolvedAfterStop">()) == 0,
+                  "gpu-drain/no-contamination — reused frame number never admits stale GPU data");
+        }
+        service.retire_gpu_lane();
+    }
+
+    void test_recording_partial_eof_preserves_valid_prefix()
+    {
+        const auto marker = ce::marker<"RecoveryPrefix">();
+        std::vector<ce::frame_record> frames(2);
+        for (std::uint32_t i = 0; i < 2; ++i)
+        {
+            auto& frame = frames[i];
+            frame.engine_frame = 701 + i;
+            frame.tick_begin = 1000 + 100 * i;
+            frame.tick_end = frame.tick_begin + 100;
+            ce::profile_event event;
+            event.marker = marker;
+            event.frame = frame.engine_frame;
+            event.tick_begin = frame.tick_begin + 10;
+            event.tick_end = frame.tick_begin + 50;
+            event.cpu = {0x100000002ULL, frame.engine_frame, 0x300000004ULL};
+            frame.events.push_back(event);
+        }
+        const auto fixture = std::make_shared<const ce::capture_session>(
+            std::move(frames), std::vector<ce::thread_info>{{"RecoveryOwner", 0, 0}},
+            ce::snapshot_markers(), ce::capture_environment{1000}, true, 0);
+        auto writer = ce::continuous_capture_writer::start();
+        check(bool(writer), "recovery/start — unique temporary recording can be created");
+        if (!writer)
+        {
+            return;
+        }
+        const auto path = (*writer)->path();
+        auto partial_path = path;
+        partial_path += ".partial.ceprof";
+        auto snapshot_path = path;
+        snapshot_path += ".v2.ceprof";
+        // Clean only paths created by this fixture, including on an early failure.
+        struct cleanup_files
+        {
+            std::array<std::filesystem::path, 3> paths;
+            ~cleanup_files()
+            {
+                std::error_code ignored;
+                for (const auto& entry : paths)
+                {
+                    std::filesystem::remove(entry, ignored);
+                }
+            }
+        } cleanup{{path, partial_path, snapshot_path}};
+        check((*writer)->append(fixture), "recovery/append");
+        (*writer)->request_finalize(true, 0);
+        (*writer)->wait();
+        check((*writer)->status().state == ce::recording_state::finalized, "recovery/finalized");
+        writer->reset();
+
+        std::ifstream input(path, std::ios::binary | std::ios::ate);
+        if (!input || input.tellg() <= 0)
+        {
+            check(false, "recovery/read-generated-file");
+            return;
+        }
+        std::vector<std::byte> bytes(static_cast<std::size_t>(input.tellg()));
+        input.seekg(0);
+        check(bool(input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))),
+              "recovery/read-all-bytes");
+        input.close();
+
+        // Locate complete v3 envelopes instead of assuming metadata payload size.
+        // Header = 16 bytes; envelope = magic/type/sequence/size/payload CRC/header CRC.
+        std::size_t second_frame = 0, footer = 0, offset = 16;
+        std::uint32_t frame_records = 0;
+        while (offset <= bytes.size() && bytes.size() - offset >= 32)
+        {
+            std::uint32_t type = 0;
+            std::uint64_t size = 0;
+            std::memcpy(&type, bytes.data() + offset + 4, sizeof(type));
+            std::memcpy(&size, bytes.data() + offset + 16, sizeof(size));
+            if (size > bytes.size() - offset - 32)
+            {
+                break;
+            }
+            if (type == 2 && ++frame_records == 2)
+            {
+                second_frame = offset;
+            }
+            if (type == 3)
+            {
+                footer = offset;
+            }
+            offset += 32 + static_cast<std::size_t>(size);
+        }
+        check(second_frame != 0 && footer > second_frame + 32 && offset == bytes.size(),
+              "recovery/layout — fixture contains two complete frames and a final footer");
+        if (second_frame == 0 || footer <= second_frame + 32 || offset != bytes.size())
+        {
+            return;
+        }
+
+        const auto complete = ce::open_capture_recording(path);
+        check(complete && (*complete)->finalized() && (*complete)->complete() &&
+              !(*complete)->recovered() && (*complete)->frame_count() == 2,
+              "recovery/control — intact file is finalized and complete");
+        struct cut_case { std::size_t bytes; std::uint32_t frames; std::size_t valid_bytes; };
+        const std::array<cut_case, 8> cuts{{
+            {second_frame + 1, 1, second_frame}, {second_frame + 31, 1, second_frame},
+            {second_frame + 32, 1, second_frame}, {footer - 1, 1, second_frame},
+            {footer, 2, footer}, {footer + 1, 2, footer},
+            {footer + 31, 2, footer}, {bytes.size() - 1, 2, footer},
+        }};
+        for (const auto& cut : cuts)
+        {
+            std::ofstream output(partial_path, std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(cut.bytes));
+            output.close();
+            check(bool(output), "recovery/write-partial-fixture");
+            const auto recovered = ce::open_capture_recording(partial_path);
+            check(recovered && (*recovered)->recovered() && !(*recovered)->finalized() && !(*recovered)->complete(),
+                  "recovery/partial — partial EOF is recovered without claiming a complete recording");
+            if (!recovered)
+            {
+                continue;
+            }
+            check((*recovered)->frame_count() == cut.frames && (*recovered)->valid_bytes() == cut.valid_bytes,
+                  "recovery/prefix-boundary — only wholly validated records contribute to the prefix");
+            const auto range = (*recovered)->load_range(0, cut.frames);
+            check(range && (*range)->frame_count() == cut.frames && count_marker(**range, marker) == cut.frames,
+                  "recovery/prefix-events — validated events survive both partial envelopes and payloads");
+            if (range && !(*range)->frames().empty() && !(*range)->frames()[0].events.empty())
+            {
+                check(same_event((*range)->frames()[0].events[0], fixture->frames()[0].events[0]),
+                      "recovery/identity — recovered data preserves the exact CPU context and timestamps");
+            }
+        }
+
+        // Complete damaged records are corruption, not a recoverable partial EOF.
+        bytes[second_frame + 32] ^= std::byte{1};
+        std::ofstream corrupt(partial_path, std::ios::binary | std::ios::trunc);
+        corrupt.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        corrupt.close();
+        const auto rejected = ce::open_capture_recording(partial_path);
+        check(!rejected && rejected.error() == ce::capture_file_error::checksum_mismatch,
+              "recovery/corruption — complete bad-CRC record is rejected rather than silently truncated");
+
+        const auto saved = ce::save_capture(*fixture, snapshot_path);
+        check(bool(saved), "file-v2/indexed-fixture");
+        const auto legacy = ce::open_capture_recording(snapshot_path);
+        check(legacy && (*legacy)->finalized() && !(*legacy)->recovered() && (*legacy)->frame_count() == 2,
+              "file-v2/indexed — snapshot v2 remains readable through the continuous-recording reader");
+        if (legacy)
+        {
+            const auto range = (*legacy)->load_range(0, 2);
+            check(range && (*range)->frame_count() == 2 && (*range)->total_events() == 2 &&
+                  !(*range)->frames()[1].events.empty() &&
+                  same_event((*range)->frames()[1].events[0], fixture->frames()[1].events[0]),
+                  "file-v2/context — indexed snapshot read preserves full-width CPU identity");
+        }
+    }
+
+    void test_stop_reports_gpu_timeout_and_failure()
+    {
+        for (bool timed_out : {true, false})
+        {
+            ce::profiler_config config;
+            config.stop_drain_timeout_ms = 0; // Deterministic immediate deadline, no scheduler-speed assertion.
+            ce::profiler_service service;
+            service.initialize(config);
+            service.register_thread("GpuIncompleteMain");
+            record_sync(service, 101);
+            publish_frame_sync(service, 101);
+            ce::gpu_span_context context;
+            context.generation = service.begin_gpu_submission(101);
+            check(context.generation != 0, "gpu-incomplete/admitted");
+            if (!timed_out)
+            {
+                service.finish_gpu_submission(context.generation, 101, false, "probe query retrieval failed");
+            }
+            pause_sync(service);
+            const auto capture = service.capture();
+            check(capture && !capture->complete(), "gpu-incomplete/flag — unresolved or failed GPU work is incomplete");
+            check_eq(service.summary().pause_pending_gpu_submissions, std::uint64_t{timed_out ? 1u : 0u},
+                     "gpu-incomplete/pending — timeout reports the outstanding submission count");
+            check_eq(service.summary().pause_failed_gpu_submissions, std::uint64_t{timed_out ? 0u : 1u},
+                     "gpu-incomplete/failed — completed retrieval failures are distinct from timeouts");
+            bool found_reason = false;
+            if (capture)
+            {
+                for (const auto& frame : capture->frames())
+                {
+                    for (const auto& event : frame.events)
+                    {
+                        const auto& name = capture->marker(event.marker).name;
+                        found_reason = found_reason ||
+                            (ce::has_flag(event.flags, ce::event_flags::instant) &&
+                             name.starts_with("Capture.Incomplete.Gpu:") &&
+                             name.find(timed_out ? "deadline" : "probe query retrieval failed") != std::string::npos);
+                    }
+                }
+            }
+            check(found_reason, "gpu-incomplete/reason — the capture itself retains the failure reason");
+            const auto disk = ce::open_capture_recording(service.recording_path());
+            check(disk && (*disk)->finalized() && !(*disk)->complete(),
+                  "gpu-incomplete/footer — finalized disk output preserves incomplete status");
+
+            record_sync(service, 101);
+            const auto now = ce::profiler_service::now();
+            service.submit_gpu_span(ce::marker<"GpuAfterExpiredSession">(), now, now, 101, context);
+            service.finish_gpu_submission(context.generation, 101, false, "expired callback");
+            publish_frame_sync(service, 101);
+            pause_sync(service);
+            const auto next = service.capture();
+            check(next && next->complete() && count_marker(*next, ce::marker<"GpuAfterExpiredSession">()) == 0,
+                  "gpu-incomplete/new-session — late expired callbacks neither emit nor taint the next recording");
+            service.retire_gpu_lane();
+        }
+    }
+
+    void test_immediate_record_stop_finalizes()
+    {
+        ce::profiler_config config;
+        config.stop_drain_timeout_ms = 0;
+        ce::profiler_service service;
+        service.initialize(config);
+        service.register_thread("RapidRecordStop");
+        // Match the UI gesture without waiting for the asynchronous Record.
+        // The collector may still be starting or may already be recording;
+        // either interleaving must honor this Stop and ignore the duplicate.
+        service.record(111);
+        service.pause();
+        service.pause();
+        service.wait_until_idle();
+        check(service.state() == ce::recorder_state::frozen,
+              "rapid-stop/frozen — a Stop immediately after Record is never lost during startup");
+        finalize_sync(service);
+        const auto first = service.capture();
+        check(first && first->complete() && first->frame_count() != 0,
+              "rapid-stop/tail — even an immediate stop publishes its diagnostic tail");
+        const auto disk = ce::open_capture_recording(service.recording_path());
+        check(disk && (*disk)->finalized() && (*disk)->complete(),
+              "rapid-stop/disk — queued startup Stop finalizes the recording file");
+
+        record_sync(service, 112);
+        check(service.state() == ce::recorder_state::recording,
+              "rapid-stop/not-sticky — previous startup Stop cannot stop the next Record");
+        service.begin_scope(ce::marker<"AfterRapidStop">());
+        service.end_scope();
+        publish_frame_sync(service, 112);
+        pause_sync(service);
+        const auto second = service.capture();
+        check(second && count_marker(*second, ce::marker<"AfterRapidStop">()) == 1,
+              "rapid-stop/reusable — recording after rapid startup/stop still accepts work");
+    }
+
+    void test_pause_unwinds_full_scope_stack()
+    {
+        ce::profiler_service service;
+        service.initialize();
+        service.register_thread("FullStackAcrossPause");
+        record_sync(service, 121);
+        for (std::uint32_t i = 0; i < ce::kMaxScopeDepth; ++i)
+        {
+            service.begin_scope(ce::marker<"FullStackOldSession">());
+        }
+        pause_sync(service);
+        const auto first = service.capture();
+        check(first && count_marker(*first, ce::marker<"FullStackOldSession">()) == ce::kMaxScopeDepth,
+              "resume-full-stack/truncated — stop preserves every recursive instance at the depth limit");
+        for (std::uint32_t i = 0; i < ce::kMaxScopeDepth; ++i)
+        {
+            service.end_scope(); // Ends must still unwind logical slots while frozen.
+        }
+        record_sync(service, 122);
+        service.begin_scope(ce::marker<"FullStackFreshSession">());
+        service.end_scope();
+        publish_frame_sync(service, 122);
+        pause_sync(service);
+        const auto second = service.capture();
+        const auto* fresh = second ? find_event(*second, ce::marker<"FullStackFreshSession">()) : nullptr;
+        check(fresh && fresh->depth == 0 && fresh->flags == ce::event_flags::none,
+              "resume-full-stack/reusable — frozen ends release stack capacity for the next recording");
+        check_eq(service.summary().dropped_events, std::uint64_t{0},
+                 "resume-full-stack/no-overflow — old logical slots cannot silently exhaust new-session capacity");
+    }
+
+    void test_retired_owner_accounts_finish_allocation_failure()
+    {
+        ce::profiler_config config;
+        config.chunk_count = 1;
+        config.max_chunk_count = 1;
+        ce::profiler_service service;
+        service.initialize(config);
+        service.register_thread("OnlyPageOwner");
+        record_sync(service, 131);
+        service.begin_scope(ce::marker<"OnlyPageHeld">());
+        service.end_scope(); // Keep the sole page unsealed while the other owner exits.
+        std::thread retiring([&]
+        {
+            service.register_thread("RetiringOpenOwner");
+            service.begin_scope(ce::marker<"RetiredAllocationFailure">());
+            service.unregister_thread(); // finish() must allocate, fail, and only then retire its counters.
+        });
+        retiring.join();
+        publish_frame_sync(service, 131);
+        pause_sync(service);
+        const auto capture = service.capture();
+        check(capture && !capture->complete(),
+              "retired-loss/incomplete — a loss during owner finish cannot be hidden by stream destruction");
+        check_eq(service.summary().dropped_events, std::uint64_t{1},
+                 "retired-loss/accounted — the failed final allocation is included exactly once");
+        check_eq(service.summary().unbalanced_scopes, std::uint64_t{1},
+                 "retired-loss/open-accounted — owner-exit imbalance is sampled after finish");
+        if (capture)
+        {
+            check(count_marker(*capture, ce::marker<"OnlyPageHeld">()) == 1 &&
+                  count_marker(*capture, ce::marker<"RetiredAllocationFailure">()) == 0,
+                  "retired-loss/stimulus — held page survives and the missing final span is explicitly accounted");
+        }
+        const auto disk = ce::open_capture_recording(service.recording_path());
+        check(disk && (*disk)->finalized() && !(*disk)->complete() &&
+              (*disk)->status().source_losses.dropped_events == 1,
+              "retired-loss/footer — final loss accounting survives the continuous file footer");
+    }
+
+    void test_admitted_gpu_before_first_collected_frame_is_accounted()
+    {
+        ce::profiler_service service;
+        ce::profiler_config config;
+        config.retained_frames = 1;
+        service.initialize(config);
+        service.register_thread("GpuFirstBoundary");
+        record_sync(service, 100);
+        check_eq(service.begin_gpu_submission(100), std::uint64_t{0},
+                 "gpu-first-boundary/not-ready — no admission before the actual capture range exists");
+        publish_frame_sync(service, 102);
+        check_eq(service.begin_gpu_submission(100), std::uint64_t{0},
+                 "gpu-first-boundary/outside — stale render frames remain outside this recording");
+        ce::gpu_span_context context;
+        context.generation = service.begin_gpu_submission(102);
+        check(context.generation != 0, "gpu-first-boundary/admitted");
+        const auto begin = ce::profiler_service::now();
+        const auto end = ce::profiler_service::now();
+        publish_frame_sync(service, 103); // Evict an actually admitted frame; this must still count as loss.
+        service.submit_gpu_span(ce::marker<"GpuBeforeFirstBoundary">(), begin, end, 102, context);
+        service.publish_gpu_spans();
+        service.finish_gpu_submission(context.generation, 102, true, nullptr);
+        pause_sync(service);
+        const auto capture = service.capture();
+        check(capture && !capture->complete(),
+              "gpu-first-boundary/incomplete — admitted out-of-range GPU work cannot disappear as a complete capture");
+        check_eq(service.summary().late_spans_dropped, std::uint64_t{1},
+                 "gpu-first-boundary/accounted — generation-tagged result reaches explicit late attribution loss");
+        const auto disk = ce::open_capture_recording(service.recording_path());
+        check(disk && (*disk)->finalized() && !(*disk)->complete() &&
+              (*disk)->status().source_losses.late_gpu_spans == 1,
+              "gpu-first-boundary/footer — missing admitted GPU frame is retained as a source loss");
+        service.retire_gpu_lane();
+    }
+
+    void test_gpu_tail_extends_prepared_timeline_bounds()
+    {
+        constexpr ce::profile_tick cpu_begin = 10000, cpu_stop = 20000, gpu_end = 30000;
+        ce::frame_record frame;
+        frame.engine_frame = 141;
+        frame.tick_begin = cpu_begin;
+        frame.tick_end = cpu_stop;
+        ce::profile_event gpu;
+        gpu.marker = ce::marker<"GpuBeyondCpuStop", ce::marker_kind::gpu_span>();
+        gpu.frame = frame.engine_frame;
+        gpu.tick_begin = 15000;
+        gpu.tick_end = gpu_end;
+        gpu.flags = ce::event_flags::gpu_span;
+        frame.events.push_back(gpu);
+        const auto capture = std::make_shared<const ce::capture_session>(
+            std::vector<ce::frame_record>{frame},
+            std::vector<ce::thread_info>{{"GpuTail", 0, 0, ce::track_kind::gpu_graphics, 0}},
+            ce::snapshot_markers(), ce::capture_environment{100000}, true, 0);
+        const auto aggregate = ce::aggregate_frames(*capture, 141, 141);
+        check(aggregate.tick_begin() == cpu_begin && aggregate.tick_end() == gpu_end,
+              "gpu-tail/aggregate — admitted GPU work extends the timeline beyond the CPU Stop cutoff");
+        check(aggregate.boundaries().size() == 1 && aggregate.boundaries()[0].tick_end == cpu_stop &&
+              capture->frames()[0].tick_begin == cpu_begin && capture->frames()[0].tick_end == cpu_stop,
+              "gpu-tail/frame-identity — timeline extent never rewrites the CPU frame boundary");
+
+        std::vector<std::function<void()>> scheduled;
+        ce::capture_reader reader([&](std::function<void()> work)
+        {
+            scheduled.push_back(std::move(work));
+        });
+        reader.open(capture);
+        reader.set_graph_span(1);
+        reader.reset_view(); // Fit before the asynchronous window is prepared.
+        check(reader.view_end() == cpu_stop, "gpu-tail/before-preparation — initial fit uses available CPU bounds");
+        (void)reader.prepared_window();
+        while (!scheduled.empty())
+        {
+            auto work = std::move(scheduled.back());
+            scheduled.pop_back();
+            work(); // Explicit executor handoff, never called inline by the dispatch callback.
+        }
+        const auto prepared = reader.prepared_window();
+        check(prepared && prepared->aggregate_.tick_end() == gpu_end &&
+              reader.view_begin() == cpu_begin && reader.view_end() == gpu_end &&
+              reader.view_span() == gpu_end - cpu_begin,
+              "gpu-tail/prepared-fit — publishing prepared GPU bounds expands an existing whole-window fit");
+        check(capture->frames()[0].tick_end == cpu_stop,
+              "gpu-tail/prepared-immutable — preparing the reader never mutates frame ownership");
+    }
+
+    void test_admitted_invalid_gpu_interval_is_accounted()
+    {
+        ce::profiler_service service;
+        service.initialize();
+        service.register_thread("GpuInvalidInterval");
+        record_sync(service, 151);
+        publish_frame_sync(service, 151);
+        ce::gpu_span_context context;
+        context.generation = service.begin_gpu_submission(151);
+        check(context.generation != 0, "gpu-invalid/admitted");
+        const auto tick = ce::profiler_service::now();
+        service.submit_gpu_span(ce::marker<"GpuInvalidAdmittedInterval">(), tick + 1, tick, 151, context);
+        service.publish_gpu_spans();
+        service.finish_gpu_submission(context.generation, 151, true, nullptr);
+        pause_sync(service);
+        const auto first = service.capture();
+        check(first && !first->complete() &&
+              count_marker(*first, ce::marker<"GpuInvalidAdmittedInterval">()) == 0,
+              "gpu-invalid/incomplete — a malformed admitted interval is rejected without hiding its loss");
+        check_eq(service.summary().dropped_events, std::uint64_t{1},
+                 "gpu-invalid/accounted — reversed interval counts as one admitted source loss");
+        const auto disk = ce::open_capture_recording(service.recording_path());
+        check(disk && (*disk)->finalized() && !(*disk)->complete() &&
+              (*disk)->status().source_losses.dropped_events == 1,
+              "gpu-invalid/footer — malformed admitted interval remains visible in the finalized file");
+
+        record_sync(service, 151); // Same frame ID rules out accidental frame-range filtering.
+        const auto fresh_tick = ce::profiler_service::now();
+        service.submit_gpu_span(ce::marker<"GpuInvalidOldInterval">(), fresh_tick + 1, fresh_tick, 151, context);
+        service.finish_gpu_submission(context.generation, 151, false, "expired invalid callback");
+        service.begin_scope(ce::marker<"AfterInvalidGpuSession">());
+        service.end_scope();
+        publish_frame_sync(service, 151);
+        pause_sync(service);
+        const auto second = service.capture();
+        check(second && second->complete() &&
+              count_marker(*second, ce::marker<"GpuInvalidOldInterval">()) == 0 &&
+              count_marker(*second, ce::marker<"AfterInvalidGpuSession">()) == 1,
+              "gpu-invalid/old-epoch — invalid old-generation callback cannot taint new work");
+        check_eq(service.summary().dropped_events, std::uint64_t{0},
+                 "gpu-invalid/new-loss-baseline — neither prior losses nor stale rejection count in the new session");
+        const auto next_disk = ce::open_capture_recording(service.recording_path());
+        check(next_disk && (*next_disk)->finalized() && (*next_disk)->complete() &&
+              (*next_disk)->status().source_losses.dropped_events == 0,
+              "gpu-invalid/new-footer — new session remains complete on disk after stale invalid input");
+        service.retire_gpu_lane();
+    }
+}
+
+int main(int argc, char** argv)
 {
 	silence_crt_dialogs();
+	if (argc == 2 && std::strcmp(argv[1], "--aggregate-only") == 0)
+	{
+		test_aggregate_tree();
+		test_aggregate_nested_ranges();
+		test_aggregate_range();
+		test_aggregate_threads();
+		test_aggregate_flat();
+		test_aggregate_truncated();
+		std::printf("profile aggregate probe: %d checks, %d failures\n", g_checks, g_failures);
+		if (g_failures == 0)
+		{
+			std::printf("PROFILE_CORE_OK=true scope=aggregate-only\n");
+		}
+		return g_failures == 0 ? 0 : 1;
+	}
 
 	test_marker_identity();
+	test_disabled_parent_enabled_child_pairing();
+	test_scope_generation_reuse_and_recursion();
+	test_recursive_scope_depth_overflow_pairing();
+	test_collector_claims_parked_open_scopes();
+	test_owner_exit_truncates_open_scopes();
+	test_record_inside_disabled_scope();
+	test_stop_preserves_parked_producer_and_next_session();
+	test_stop_drains_admitted_gpu_and_rejects_old_session();
+	test_recording_partial_eof_preserves_valid_prefix();
+	test_stop_reports_gpu_timeout_and_failure();
+	test_immediate_record_stop_finalizes();
+	test_pause_unwinds_full_scope_stack();
+	test_retired_owner_accounts_finish_allocation_failure();
+	test_admitted_gpu_before_first_collected_frame_is_accounted();
+	test_gpu_tail_extends_prepared_timeline_bounds();
+	test_admitted_invalid_gpu_interval_is_accounted();
 	test_cpu_context();
 	test_legacy_capture();
 	test_basic_capture();
@@ -4497,6 +5589,7 @@ int main()
 	test_recorder_states();
 	test_rolling_retention();
 	test_aggregate_tree();
+	test_aggregate_nested_ranges();
 	test_aggregate_range();
 	test_aggregate_threads();
 	test_aggregate_flat();

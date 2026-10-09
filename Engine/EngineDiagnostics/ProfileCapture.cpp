@@ -282,6 +282,17 @@ namespace ce
             return;
         }
         assert(offset + count <= page->count);
+        // Sparse producer pages must return to the bounded pool promptly. Keeping
+        // one whole page for a few events can exhaust producers before ring trim.
+        // Dense ranges retain the zero-copy path; owned segments remain copy-on-write.
+        if (count < kEventsPerChunk / 2)
+        {
+            for (std::uint32_t i = 0; i < count; ++i)
+            {
+                push_back(page->events[offset + i]);
+            }
+            return;
+        }
         if (!m_segments.empty())
         {
             segment& last = m_segments.back();

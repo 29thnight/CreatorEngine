@@ -147,12 +147,33 @@ namespace assets
 
     // ── 판정·표기 ─────────────────────────────────────────────────────────
     // nil이 아니고 version nibble 8, RFC variant 10xx.
-    [[nodiscard]] bool IsUuidV8(const Uuid::Uuid16& value) noexcept;
+    [[nodiscard]] inline bool IsUuidV8(const Uuid::Uuid16& value) noexcept
+    {
+        return !value.IsNil()
+            && (value.data[6] & 0xF0u) == 0x80u
+            && (value.data[8] & 0xC0u) == 0x80u;
+    }
 
-    // 소문자 8-4-4-4-12의 UUIDv8만 받는다. 대문자·brace·무하이픈·v4·v5는 거부 —
-    // experiment::TryParseCanonicalAssetId(v4)와 대칭이되 버전만 다르다.
-    [[nodiscard]] bool TryParseCanonicalUuidV8(std::string_view text,
-        Uuid::Uuid16& out) noexcept;
+    [[nodiscard]] inline bool TryParseCanonicalUuidV8(std::string_view text, Uuid::Uuid16& out) noexcept
+    {
+        Uuid::Uuid16 parsed{};
+        if (!Uuid::TryParse(text, parsed))
+        {
+            return false;
+        }
+        if (!IsUuidV8(parsed))
+        {
+            return false;
+        }
+        // 소문자 8-4-4-4-12만. Uuid::TryParse가 받는 대문자·brace·무하이픈은 여기서
+        // 걸린다(재표기가 원문과 다르다).
+        if (Uuid::ToString(parsed) != text)
+        {
+            return false;
+        }
+        out = parsed;
+        return true;
+    }
 
     // ── 문자열 규약 ───────────────────────────────────────────────────────
     [[nodiscard]] bool IsWellFormedUtf8(std::string_view text) noexcept;

@@ -6,6 +6,9 @@ internal sealed record EngineDistribution(string Root, JsonObject Manifest)
 {
     public string Configuration => Manifest.Text("configuration");
     public string BinaryRoot => Paths.Child(Root, Manifest.Text("binaryRoot"));
+    // Opt in only for AssetSets/bootstrap; older distributions still support
+    // legacy packages without inventing a content identity for old binaries.
+    public string RequireContentAbi(BuildContext context) => ContentCompatibility.RequireInstalled(this, context);
     public static EngineDistribution Load(string root, BuildContext context)
     {
         root = Paths.Canonical(root, true);

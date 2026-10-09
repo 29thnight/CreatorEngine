@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "LightProperty.h"
+#include "SceneGC.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
 #include "EntityHandle.h"
@@ -7,7 +8,9 @@
 #include "SystemSchedule.h"
 #include "JobScheduler.h"
 #include "CameraSystem.h"
+#include "SoundSystem.h"
 #include "AssetBundle.h"
+#include "TextureFramePins.h"
 #include "TransformStore.h"
 #include "HierarchyStore.h"
 #include "DetachedEntityTransfer.h"
@@ -17,7 +20,7 @@
 #include "SceneLayerIndex.h"
 #include <mathematics/rect.hpp>
 // Entity.h를 온전히 include한다 — ReflectScene의 meta_property(m_Entities)가
-// vector<unique_ptr<Entity>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
+// vector<gc::trace_ref<Entity>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
 // 전방 선언으로는 부족하다. 과거에는 이 include가
 //   Scene.h → Entity.h → Entity.inl → Scene.h
 // 순환을 닫아 금지였지만, 지금은 Entity.inl이 Scene.h를 include하지 않는다
@@ -28,6 +31,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <span>
 #include <unordered_map>
 #include <mutex> // MBC10: 마지막 animator publish 메트릭 스냅샷
@@ -275,9 +279,26 @@ struct TransformWriteMetrics
 	std::array<uint64_t, kTransformWriteReasonCount> byReason{};
 };
 
-class [[reflgen::reflect]] Scene
+class [[reflgen::reflect]] Scene : public gc::managed
 {
-   public:
+private:
+    [[reflgen::ignore]]
+    own::shared_owner<TextureFramePins> m_preparedTextureImagePins;
+public:
+    // Scene-owner handoff only. The first queued packet owns these preload pins.
+    void SetPreparedTextureImagePins(own::shared_owner<TextureFramePins> pins)
+    {
+        m_preparedTextureImagePins = std::move(pins);
+    }
+    own::shared_owner<TextureFramePins> PreparedTextureImagePins() const
+    {
+        return m_preparedTextureImagePins;
+    }
+    own::shared_owner<TextureFramePins> TakePreparedTextureImagePins()
+    {
+        return std::exchange(m_preparedTextureImagePins, {});
+    }
+
 public:
 	class HierarchyBulkBuildScope
 	{
@@ -295,7 +316,19 @@ public:
 		Scene* m_scene = nullptr;
 	};
 
-	Scene();
+	explicit Scene(gc::domain& domain);
+    [[reflgen::ignore]]
+	gc::domain& ManagedDomain() const noexcept { return *m_gcDomain; }
+    [[reflgen::ignore]]
+	void gc_trace(gc::tracer& tracer) const;
+	// Explicit engine teardown; the collector destructor never runs lifecycle hooks.
+    [[reflgen::ignore]]
+	void RetireManagedGraph();
+    [[reflgen::ignore]]
+    bool IsManagedRetiringOrRetired() const noexcept
+    {
+        return m_managedRetiring || m_managedRetired;
+    }
 	~Scene();
 	Scene(const Scene&) = delete;
 	Scene& operator=(const Scene&) = delete;
@@ -307,14 +340,14 @@ public:
     void EndIncrementalConstruction() { if (m_incrementalConstructions) --m_incrementalConstructions; }
     void OnBeforeSerialize() const;
 
-	// Entity의 단독 소유자. 외부에는 프레임 경계를 넘지 않는 raw pointer 또는
-	// EntityHandle만 노출한다. DDOL 이송은 unique_ptr 자체를 Scene 간 이동한다.
-	std::vector<std::unique_ptr<Entity>> m_Entities;
+	// Strong scene-graph edges. External users borrow pointers or resolve handles;
+	// detached DDOL transfers retain explicit owner-thread roots.
+	std::vector<gc::trace_ref<Entity>> m_Entities;
 
 	[[reflgen::ignore]]
 	job_handle m_AIJob;
 
-	Entity* AddEntity(std::unique_ptr<Entity> entity);
+	Entity* AddEntity(gc::root_ref<Entity> entity);
 	Entity* CreateEntity(std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);
 	Entity* LoadEntity(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);
 	Entity* GetEntity(Entity::Index index);
@@ -331,6 +364,7 @@ public:
     // tombstone) 무효 핸들을 돌려준다.
     EntityHandle HandleOf(Entity::Index index) const;
 	ReparentResult Reparent(EntityHandle child, EntityHandle newParent);
+	bool ReorderChildren(EntityHandle parent, std::span<const EntityHandle> children);
 	uint64_t GetTopologyVersion() const
 	{
 		return m_topologyVersion.load(std::memory_order_acquire);
@@ -367,7 +401,7 @@ public:
     void DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached);
     // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
     // 단일 객체를 붙임(부모 인덱스는 이 씬 기준). 유니크 네임/Tag/Layer/루트 children/Transform 부모까지 처리.
-    Entity::Index AttachExistingEntity(std::unique_ptr<Entity> entity, Entity::Index parentIndex);
+    Entity::Index AttachExistingEntity(gc::root_ref<Entity> entity, Entity::Index parentIndex);
     // DDOL 서브트리를 한꺼번에 붙임. parent/child 인덱스는 go들이 원래 갖고 있던 서브트리 상대관계를 따름.
     // 반환: oldIndex -> newIndex 매핑(이 씬 기준)
     std::unordered_map<Entity::Index, Entity::Index>
@@ -406,6 +440,18 @@ public:
 	// 있었다면 결함이고, 죽어 있었으니 제거가 정답이다.
 
 private:
+    void InitializeManaged();
+    void RequireManagedMutable() const;
+
+    [[reflgen::ignore]]
+    gc::domain* m_gcDomain;
+
+    [[reflgen::ignore]]
+    bool m_managedRetired = false;
+
+    [[reflgen::ignore]]
+    bool m_managedRetiring = false;
+
     friend class Entity;
     friend class SceneManager;
     //for Editor
@@ -474,8 +520,10 @@ private:
     // 느린 결과를 보관하는 동안 새 제출을 막아 미소비 batch는 하나로 제한한다.
     [[reflgen::ignore]]
     std::shared_ptr<AIUpdateBatch> m_aiUpdateBatch;
+
     [[reflgen::ignore]]
     std::vector<std::shared_ptr<AIUpdateBatch>> m_completedAIUpdates;
+
     [[reflgen::ignore]]
     bool m_aiTickBoundaryReached = false;
 
@@ -486,7 +534,7 @@ private:
     // 슬롯 해제 단일점. tombstone(reset)+세대 증가+free 리스트 등록을 한 곳에서
     // 한다 — DestroyEntities·DetachEntityHierarchy가 공유한다. 루트(0)는
     // 여기로 오면 안 된다(호출부가 먼저 걸러야 하지만 방어적으로 한 번 더 막는다).
-    std::unique_ptr<Entity> ReleaseSlot(Entity::Index index);
+    gc::root_ref<Entity> ReleaseSlot(Entity::Index index);
 	// H3 저장 어댑터: Entity node에 Store 정본을 기존 계층 키로 쓴다.
 	// Entity::OnAfterSerialize만 호출하며 detached/비점유 Entity에는 쓰지 않는다.
 	void SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& node) const;
@@ -538,6 +586,8 @@ public:
     /// 네이티브 컴포넌트의 프레임 틱은 이제 이 API를 거치지 않고 전용 시스템
     /// (AnimatorSystem 등)의 조밀 vector가 돈다(SystemSchedule.h 클래스 주석 참고).
     SystemSchedule& Schedule() { return m_schedule; }
+	SoundSystem& Sounds() noexcept { return m_soundSystem; }
+	const SoundSystem& Sounds() const noexcept { return m_soundSystem; }
 	CameraSystem& Cameras() noexcept { return m_cameraSystem; }
 	const CameraSystem& Cameras() const noexcept { return m_cameraSystem; }
 	TweenManager& Tweens() noexcept;
@@ -649,6 +699,9 @@ private:
 	[[reflgen::ignore]]
 	CameraSystem m_cameraSystem;
 
+    [[reflgen::ignore]]
+    SoundSystem m_soundSystem;
+
 	// math::tween<T> 값과 engine binding의 Scene-scoped 소유자. 전방 선언 +
 	// unique_ptr로 Scene.h의 광범위한 소비자가 tween.hpp까지 전이 include하지 않게 한다.
 	[[reflgen::ignore]]
@@ -745,20 +798,11 @@ public:
 	// 사라져 const char* 오버로드가 골라진다 — 널 종료가 없는 부분 뷰였다면
 	// 뷰 뒤쪽까지 딸려 들어오거나 버퍼 밖을 읽는다. string_view 오버로드가
 	// 이미 있으므로 그냥 넘기면 된다.
-	static Scene* CreateNewScene(std::string_view sceneName = "SampleScene")
-	{
-		Scene* allocScene = new Scene();
-		allocScene->m_sceneName = sceneName;
-		allocScene->AddRootEntity(sceneName);
-		return allocScene;
-	}
-
-	static Scene* LoadScene(std::string_view name)
-	{
-		Scene* allocScene = new Scene();
-		allocScene->m_sceneName = name;
-		return allocScene;
-	}
+    [[reflgen::ignore]]
+	static gc::root_ref<Scene> CreateNewScene(gc::domain& domain,
+        std::string_view sceneName = "SampleScene");
+    [[reflgen::ignore]]
+	static gc::root_ref<Scene> LoadScene(gc::domain& domain, std::string_view name);
 
     size_t m_buildIndex{ 0 };
 	HashingString m_sceneName;
@@ -1114,8 +1158,10 @@ private:
 
     [[reflgen::ignore]]
     std::mutex m_physicsTransformMutex;
+
     [[reflgen::ignore]]
     std::vector<EntityHandle> m_physicsTransformDirty;
+
     [[reflgen::ignore]]
     std::vector<EntityHandle> m_physicsTransformDrain;
 

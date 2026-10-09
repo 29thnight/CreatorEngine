@@ -85,9 +85,7 @@ bool EditorSettingsStore::Initialize() noexcept
 {
     EditorPreferences preferences{};
     BuildSettings buildSettings{};
-    // 에디터 프로세스의 백엔드는 사람이 고르는 값이 아니다 (DX12 고정).
-    // 사람이 고르는 유일한 노브는 build.render.backend — Player만 받는다.
-    buildSettings.SetRenderBackend(RuntimeSettings::Get().GetRenderBackend());
+    // Player의 빌드 설정은 Editor의 빌드 고정 DX12 정책과 독립적이다.
     buildSettings.SetStartupSceneName(RuntimeSettings::Get().GetStartupSceneName());
 
     const std::filesystem::path settingsPath =
@@ -129,6 +127,32 @@ bool EditorSettingsStore::Initialize() noexcept
                     preferences.SetContentTreeWidth(width);
             }
 
+            if (root["frameRateMode"])
+            {
+                const std::string mode = root["frameRateMode"].AsString();
+                if (mode == "display") preferences.SetFrameRateMode(EditorFrameRateMode::Display);
+                else if (mode == "unlimited") preferences.SetFrameRateMode(EditorFrameRateMode::Unlimited);
+                else if (mode == "custom") preferences.SetFrameRateMode(EditorFrameRateMode::Custom);
+                else return ReportSettingsError("frameRateMode must be display, unlimited or custom.");
+            }
+
+            if (root["customFrameRate"])
+            {
+                const int rate = root["customFrameRate"].As<int>();
+                if (rate < static_cast<int>(EditorPreferences::kMinCustomFrameRate)
+                    || rate > static_cast<int>(EditorPreferences::kMaxCustomFrameRate))
+                    return ReportSettingsError("customFrameRate must be between 10 and 1000.");
+                preferences.SetCustomFrameRate(static_cast<std::uint32_t>(rate));
+            }
+
+            if (root["backgroundFrameRate"])
+            {
+                const int rate = root["backgroundFrameRate"].As<int>();
+                if (rate < 0 || rate > static_cast<int>(EditorPreferences::kMaxBackgroundFrameRate))
+                    return ReportSettingsError("backgroundFrameRate must be between 0 and 60.");
+                preferences.SetBackgroundFrameRate(static_cast<std::uint32_t>(rate));
+            }
+
             if (root["startupSceneName"])
             {
 				const std::filesystem::path startupScene =
@@ -140,31 +164,38 @@ bool EditorSettingsStore::Initialize() noexcept
             if (buildNode)
             {
                 if (!buildNode.IsMap())
-                    return ReportSettingsError("build must be a map.");
-
-				const Authoring::ReadNode buildRenderNode = buildNode["render"];
-                if (buildRenderNode)
                 {
-                    if (!buildRenderNode.IsMap())
-                        return ReportSettingsError("build.render must be a map.");
+                    return ReportSettingsError("build must be a map.");
+                }
 
-					const Authoring::ReadNode buildBackendNode = buildRenderNode["backend"];
-                    if (buildBackendNode)
+                if (const Authoring::ReadNode developmentNode = buildNode["development"])
+                {
+                    if (!developmentNode.IsScalar())
                     {
-                        if (!buildBackendNode.IsScalar())
-                            return ReportSettingsError(
-                                "build.render.backend must be dx12 or vulkan.");
-						const std::string backendName =
-							buildBackendNode.AsString();
-                        RenderBackend backend{};
-                        if (!TryParseRenderBackend(backendName, backend))
-                        {
-                            return ReportSettingsError(
-                                "Unsupported build.render.backend '" + backendName +
-                                "' (expected dx12 or vulkan).");
-                        }
-                        buildSettings.SetRenderBackend(backend);
+                        return ReportSettingsError("build.development must be true or false.");
                     }
+                    buildSettings.SetDevelopmentBuild(developmentNode.As<bool>());
+                }
+
+                // build.render.backend 는 Player 패키징 선택이다. 에디터 시작은 이 값에
+                // 기대지 않으므로 검사하지 않는다. 알아볼 수 없으면 원문만 남기고
+                // 패키징 때 거절한다(GameBuilderSystem::BuildGame).
+				const Authoring::ReadNode buildRenderNode = buildNode["render"];
+				const Authoring::ReadNode buildBackendNode = buildRenderNode && buildRenderNode.IsMap()
+					? buildRenderNode["backend"] : Authoring::ReadNode{};
+                if (buildRenderNode && !buildRenderNode.IsMap())
+                {
+                    buildSettings.SetUnrecognizedRenderBackend("(build.render is not a map)");
+                }
+                else if (buildBackendNode)
+                {
+                    RenderBackend backend{};
+                    const std::string backendName = buildBackendNode.IsScalar()
+                        ? buildBackendNode.AsString() : std::string("(not a scalar)");
+                    if (TryParseRenderBackend(backendName, backend))
+                        buildSettings.SetRenderBackend(backend);
+                    else
+                        buildSettings.SetUnrecognizedRenderBackend(backendName);
                 }
             }
         }
@@ -244,18 +275,20 @@ bool EditorSettingsStore::Save() noexcept
             std::filesystem::path(
                 m_buildSettings.GetStartupSceneName()).string());
         root.Child("imguiScale").SetScalar(m_preferences.GetImGuiScale());
+        root.Child("frameRateMode").SetScalar(std::string(
+            EditorFrameRateMode::Unlimited == m_preferences.GetFrameRateMode() ? "unlimited"
+            : EditorFrameRateMode::Custom == m_preferences.GetFrameRateMode() ? "custom" : "display"));
+        root.Child("customFrameRate").SetScalar(static_cast<int>(m_preferences.GetCustomFrameRate()));
+        root.Child("backgroundFrameRate").SetScalar(static_cast<int>(m_preferences.GetBackgroundFrameRate()));
         // W3: read the legacy personal width for migration only; workspace owns future writes.
         root.Child("projectName").SetScalar(m_buildSettings.GetProjectName());
-        // render.backend에는 사람이 고른 값이 아니라 **지금 돌고 있는** 백엔드를
-        // 적는다. 에디터 호스트는 DX12 고정이라 이 키는 GUI에 노브가 없고,
-        // verify-pbr-wiring-baseline.ps1이 에디터를 Vulkan으로 몰 때 쓰는
-        // 하네스 전용 재정의로만 남는다. 돌고 있는 값을 되쓰면 그 재정의가
-        // 그대로 왕복하면서, 키가 없는 새 프로젝트에서도 한 번은 씨앗이 선다
-        // (그 게이트는 이 키가 정확히 한 번 나타날 것을 단정한다).
-        root.Child("render").Child("backend").SetScalar(
-            RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
-        root.Child("build").Child("render").Child("backend").SetScalar(
-            RenderBackendName(m_buildSettings.GetRenderBackend()));
+        // Editor 호스트는 백엔드 키를 읽거나 덮어쓰지 않는다.
+        // 패키징이 build.render.backend를 Player의 런타임 설정에 투영한다.
+        // 알아볼 수 없는 값은 사용자가 고를 때까지 원문 그대로 둔다.
+        if (m_buildSettings.HasRecognizedRenderBackend())
+            root.Child("build").Child("render").Child("backend").SetScalar(
+                RenderBackendName(m_buildSettings.GetRenderBackend()));
+        root.Child("build").Child("development").SetScalar(m_buildSettings.IsDevelopmentBuild());
         root.RemoveChild("renderBackendDx12");
         root.RemoveChild("imguiBackendDx12");
 

@@ -119,14 +119,26 @@ public:
         return m_lastLifecycleResult;
     }
 
-    uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
+    uint64_t GetLastSignaledFenceValue() const override { return m_lastAdmittedFenceValue; }
     uint64_t GetCompletedFenceValue() const override;
+    // RHI 잠금 밖의 직렬 RT·PT 소유자만 호출한다. 완료 조회 콜백에서 부르면
+    // submission 잠금을 재진입하므로 GetCompletedFenceValue와 분리한다.
+    bool ConsumeSubmissionFailure(std::string& outError);
 
     bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) override;
     bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError) override;
+    // 직렬 표시 소유자가 EndFrame 뒤에 호출한다. 리사이즈는 프레임 사이에
+    // 처리하며, 호출자는 종료·파괴 전에 그 소유자를 join해야 한다.
     bool Present(std::string& outError) override;
     bool HasSwapChain() const override { return VK_NULL_HANDLE != m_swapChain; }
+    bool NeedsSwapChainRecreation() const
+    {
+        // 네이티브 surface·device 손실은 swapchain 교체만으로 복구할 수 없다.
+        return VK_ERROR_OUT_OF_DATE_KHR == m_swapChainError ||
+            VK_ERROR_OUT_OF_HOST_MEMORY == m_swapChainError ||
+            VK_ERROR_OUT_OF_DEVICE_MEMORY == m_swapChainError;
+    }
     uint32_t GetBackBufferIndex() const override { return m_backBufferIndex; }
 
     uint32_t DrainDebugMessages(std::string& outMessages) override;
@@ -138,6 +150,14 @@ public:
 
     bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) override;
+    RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
+    {
+        return m_indirectDrawCapabilities;
+    }
+    RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override
+    {
+        return m_meshShaderCapabilities;
+    }
     bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) override;
 
@@ -253,7 +273,7 @@ public:
     ///   사는데, 여기서는 캐시가 셰이더 모듈·셋 레이아웃까지 들어서 수명이
     ///   더 크고 live pipeline/자가 검증이 직접 소유한다. 인코더 resolve와
     ///   BeginFrame completion retirement를 위해 **가리키기만** 한다.
-    void SetPipelineCache(VulkanPipelineCache* cache) { m_pipelineCache = cache; }
+    void SetPipelineCache(VulkanPipelineCache* cache);
 
     // ── 자가 검증이 쓰는 원시 표면 (인터페이스 밖) ──
     //
@@ -271,6 +291,8 @@ public:
     VkCommandBuffer GetCommandBuffer() const;
     VkImage         GetBackBuffer(uint32_t index) const;
     VkFormat        GetBackBufferFormat() const { return m_swapChainFormat; }
+    // Surface capabilities may choose an extent different from the requested window size.
+    VkExtent2D      GetBackBufferExtent() const { return m_swapChainExtent; }
     uint32_t        GetBackBufferCount() const
     {
         return static_cast<uint32_t>(m_backBuffers.size());
@@ -327,12 +349,15 @@ private:
     bool AcquireCommandContext(std::string& outError);
     bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    void AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket);
+    void RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion);
     bool SubmitParallelCommandBuffers(std::span<const VkCommandBuffer> buffers,
         RHICompletionPoint completion, std::string& outError);
     void RetireCurrentCommandContext(uint64_t completionValue);
     void DestroySwapChain();
     bool CreateSwapChainInternal(uint32_t width, uint32_t height, std::string& outError);
     bool WaitForFenceValue(uint64_t value, std::string& outError);
+    bool PresentAcquiredImage(std::string& outError);
     void AccumulateEncoderDiagnostics();
 
     VkInstance       m_instance{ VK_NULL_HANDLE };
@@ -342,6 +367,10 @@ private:
     uint32_t         m_queueFamily{ UINT32_MAX };
     bool             m_memoryBudgetSupported{ false };
     bool             m_nullDescriptorSupported{ false };
+    bool             m_meshShaderExtensionSupported{ false };
+    RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
+    RHIMeshShaderCapabilities m_meshShaderCapabilities;
+    VulkanViewportLimits m_viewportLimits;
     bool             m_uploadMemoryPressure{ false };
     RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
 
@@ -350,6 +379,7 @@ private:
     // 타임라인 세마포어 하나가 DX12 의 ID3D12Fence 자리다.
     VkSemaphore m_timeline{ VK_NULL_HANDLE };
     uint64_t    m_nextFenceValue{ 1 };
+    uint64_t    m_lastAdmittedFenceValue{ 0 };
     std::array<uint64_t, kFrameCount> m_frameFenceValues{};
     std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
     bool m_submissionClient{ false };
@@ -372,6 +402,7 @@ private:
     VkSurfaceKHR   m_surface{ VK_NULL_HANDLE };
     VkSwapchainKHR m_swapChain{ VK_NULL_HANDLE };
     VkFormat       m_swapChainFormat{ VK_FORMAT_UNDEFINED };
+    VkExtent2D     m_swapChainExtent{};
     std::vector<VkImage> m_backBuffers;
     uint32_t m_backBufferIndex{ 0 };
 
@@ -385,7 +416,11 @@ private:
     std::vector<VkSemaphore> m_presentSemaphores;
     uint32_t m_semaphoreIndex{ 0 };
     bool     m_imageAcquired{ false };
+    VkResult m_swapChainError{ VK_SUCCESS };
     bool     m_acquireConsumed{ false };
+    // 미완료 호스트 GPU 프레임은 하나다. WSI 허용량은 이미지 가용성이 따로 제한한다.
+    RHISubmissionTicket m_hostSubmissionTicket;
+    uint64_t m_hostFenceValue{ 0 };
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
@@ -493,7 +528,9 @@ public:
     bool Initialize(VulkanDeviceResources* resources, std::string& outError);
     void Shutdown();
 
-    RHITextureEntry GetOrUpload(Texture* texture, std::string& outError) override;
+    bool IsResident(const Texture* texture) const override;
+    RHITextureEntry GetOrUpload(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) override;
     RHITextureEntry GetBlackTexture(std::string& outError) override;
     RHITextureEntry GetOrmNeutralTexture(std::string& outError) override;
     uint32_t GetUploadFailureCount() const override;
@@ -501,6 +538,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     void BeginFrame(uint64_t frameIndex);
     uint64_t RetireUnused(uint64_t completionValue,
@@ -530,6 +568,10 @@ public:
         // 구분되지 않는다.
         // I5-D4b: DX12와 대칭 — 핸들 진입점 계수.
         uint32_t modelGenerationUploads{ 0 };
+        uint32_t meshletUploads{ 0 };
+        uint32_t meshletFallbacks{ 0 };
+        uint32_t coarseLodUploads{ 0 };
+        uint32_t coarseLodFallbacks{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
         uint32_t residentCount{ 0 };
@@ -556,6 +598,7 @@ public:
     void Shutdown();
 
     RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) override;
+    RHIMeshBinding FindModel(const assets::ModelMeshHandle& handle) const override;
     RHIMeshBinding GetOrUploadModel(
         const RHIModelMeshView& view, std::string& outError) override;
     uint32_t GetModelGenerationUploadCount() const override;
@@ -563,6 +606,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     void BeginFrame(uint64_t frameIndex);
     uint64_t RetireUnused(uint64_t completionValue,
@@ -579,9 +623,8 @@ private:
         const assets::ModelMeshHandle* modelKey, const void* vertexData,
         uint64_t vertexBytes, uint32_t vertexStride, uint32_t attributeMask,
         const uint32_t* indexData, uint32_t indexCount,
-        std::string& outError);
+        std::string& outError, const RHIModelMeshView* modelView = nullptr);
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;
 };
-

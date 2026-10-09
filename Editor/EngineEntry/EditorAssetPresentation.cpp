@@ -126,7 +126,7 @@ void EditorAssetPresentation::OpenMaterialPicker()
 	editor::open_window(kMaterialPicker);
 }
 
-std::shared_ptr<Material> EditorAssetPresentation::TakeSelectedMaterial() noexcept
+own::shared_owner<const Material> EditorAssetPresentation::TakeSelectedMaterial() noexcept
 {
 	return std::exchange(m_selectedMaterial, {});
 }
@@ -270,7 +270,9 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".shadermeta", FileType::Shader }, { ".shader", FileType::Shader },
 		{ ".cpp", FileType::CppScript }, { ".h", FileType::CppScript },
 		{ ".cs", FileType::CSharpScript }, { ".wav", FileType::Sound },
-		{ ".mp3", FileType::Sound }, { ".terrain", FileType::TerrainTexture },
+		{ ".mp3", FileType::Sound }, { ".flac", FileType::Sound },
+        { ".soundgraph", FileType::Sound }, { ".soundpreset", FileType::Sound },
+        { ".terrain", FileType::TerrainTexture },
 		{ ".prefab", FileType::Prefab }, { ".renderprofile", FileType::SceneRenderProfile },
 		{ ".spritefont", FileType::Font },
 	};

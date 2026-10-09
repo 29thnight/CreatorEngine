@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <cstddef>
 #include <cstring>
 
 #include "RHIFormat.h"
@@ -85,6 +86,7 @@ struct RHITextureEntry
     uint32_t         mipLevels{ 0 };
     uint32_t         arraySize{ 1 };
     bool             isCube{ false };
+    bool             preparationNeeded{ false };
 
     bool IsValid() const { return handle.IsValid(); }
 };
@@ -648,6 +650,105 @@ struct RHIUploadStats
     uint32_t registryHighWater{ 0 };
 };
 
+/// Native D3D12_DRAW_ARGUMENTS / VkDrawIndirectCommand, one nonindexed draw.
+/// GPU producers own all ranges and the nonZeroFirstInstance capability contract.
+struct RHIDrawIndirectArguments
+{
+    uint32_t vertexCount{ 0 };
+    uint32_t instanceCount{ 0 };
+    uint32_t firstVertex{ 0 };
+    uint32_t firstInstance{ 0 };
+};
+static_assert(sizeof(RHIDrawIndirectArguments) == 16);
+static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) == 0);
+static_assert(offsetof(RHIDrawIndirectArguments, instanceCount) == 4);
+static_assert(offsetof(RHIDrawIndirectArguments, firstVertex) == 8);
+static_assert(offsetof(RHIDrawIndirectArguments, firstInstance) == 12);
+
+/// 두 백엔드의 단건 indexed indirect 명령과 같은 20바이트 계약이다.
+/// GPU 생산자도 이 순서와 부호를 지켜야 하며, instanceCount=0으로 숨길 수 있다.
+struct RHIDrawIndexedIndirectArguments
+{
+    uint32_t indexCount{ 0 };
+    uint32_t instanceCount{ 0 };
+    uint32_t firstIndex{ 0 };
+    int32_t baseVertex{ 0 };
+    uint32_t firstInstance{ 0 };
+};
+
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == 20);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) == 0);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) == 4);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) == 8);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) == 12);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) == 16);
+
+/// A GPU producer may expose the first 16 bytes of an indexed record to a
+/// nonindexed single-command consumer ONLY when firstIndex == baseVertex == 0:
+/// {indexCount, instanceCount, 0, 0} means {vertexCount, instanceCount, 0, 0}.
+/// Indexed firstInstance at byte 16 is NOT part of that command. Consumers must
+/// retain the producer's 20-byte record offsets, never assume a 16-byte stride.
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(RHIDrawIndirectArguments, vertexCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(RHIDrawIndirectArguments, instanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(RHIDrawIndirectArguments, firstVertex));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(RHIDrawIndirectArguments, firstInstance));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) == sizeof(RHIDrawIndirectArguments));
+
+/// 실제 생성·활성화한 기능만 보고한다. 기본값이면 CPU DrawIndexed를 쓴다.
+/// 단건만 보장하며 count buffer·multi-draw·mesh shader·DXR은 전제하지 않는다.
+struct RHIIndirectDrawCapabilities
+{
+    bool indexedDraw{ false };
+    // false면 모든 GPU 인자에서 firstInstance를 0으로 써야 한다.
+    bool nonZeroFirstInstance{ false };
+    bool nonIndexedDraw{ false };
+};
+
+/// Native DispatchMesh / VkDrawMeshTasksIndirectCommandEXT ABI. A producer
+/// must bound all dimensions and their product before GPU execution.
+struct RHIDispatchMeshIndirectArguments
+{
+    uint32_t groupCountX{ 0 };
+    uint32_t groupCountY{ 1 };
+    uint32_t groupCountZ{ 1 };
+};
+static_assert(sizeof(RHIDispatchMeshIndirectArguments) == 12);
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountX) == 0);
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountY) == 4);
+static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountZ) == 8);
+
+/// Only enabled backend features are published. Task/amplification shaders are
+/// not part of this first mesh-only contract. Zero limits mean unsupported.
+struct RHIMeshShaderCapabilities
+{
+    bool meshShader{ false };
+    bool meshIndirect{ false };
+    uint32_t maxGroupCountX{}, maxGroupCountY{}, maxGroupCountZ{};
+    uint64_t maxTotalGroupCount{};
+    uint32_t maxOutputVertices{}, maxOutputPrimitives{};
+    uint32_t maxThreadsPerGroup{}, maxOutputMemoryBytes{};
+    uint32_t maxThreadGroupSizeX{}, maxThreadGroupSizeY{}, maxThreadGroupSizeZ{};
+
+    bool SupportsDispatch(uint32_t x, uint32_t y, uint32_t z) const
+    {
+        if (!meshShader || x > maxGroupCountX || y > maxGroupCountY || z > maxGroupCountZ)
+        {
+            return false;
+        }
+        // A zero dimension is a valid empty GPU-produced command.
+        if (!x || !y || !z)
+        {
+            return true;
+        }
+        const uint64_t xy = uint64_t(x) * y;
+        return xy <= maxTotalGroupCount && z <= maxTotalGroupCount / xy;
+    }
+};
+
 struct RHIBufferDesc
 {
     uint64_t bytes{ 0 };
@@ -660,6 +761,10 @@ struct RHIBufferDesc
 
     /// PIX·DRED에서 읽히는 이름. 비우지 말 것.
     const wchar_t* debugName{ nullptr };
+
+    /// Vulkan은 생성 때 INDIRECT_BUFFER 용도가 필요하다. DX12도 같은
+    /// 선언을 검사해 한쪽에서만 우연히 동작하는 인자 버퍼를 막는다.
+    bool allowIndirectArguments{ false };
 };
 
 struct RHITextureDesc
@@ -884,6 +989,39 @@ struct RHIReadback
 /// 정점 뷰가 든 세 값 중 크기는 슬라이스가, 보폭과 인덱스 포맷은 여기가 든다.
 /// 보폭은 정점 레이아웃의 성질이고 포맷은 인덱스 폭이라, 둘 다 백엔드가 아니라
 /// 메시가 아는 것이다.
+/// ByteAddressBuffer header. Section offsets are bytes from the whole buffer;
+/// descriptor vertex/primitive offsets remain element indices, triangle offsets
+/// remain logical byte offsets. Padding never changes authored stream indices.
+struct alignas(16) RHIMeshletBufferHeader
+{
+    uint32_t schemaVersion{ 1 }, profileVersion{}, meshletCount{}, descriptorOffset{};
+    uint32_t descriptorStride{}, vertexRemapOffset{}, vertexRemapCount{}, triangleOffset{};
+    uint32_t triangleByteCount{}, primitiveRemapOffset{}, primitiveRemapCount{}, vertexCount{};
+    uint32_t vertexStride{}, vertexAttributeMask{}, reserved[2]{};
+};
+static_assert(sizeof(RHIMeshletBufferHeader) == 64);
+static_assert(offsetof(RHIMeshletBufferHeader, descriptorStride) == 16);
+static_assert(offsetof(RHIMeshletBufferHeader, triangleByteCount) == 32);
+static_assert(offsetof(RHIMeshletBufferHeader, vertexStride) == 48);
+
+struct RHIMeshletBinding
+{
+    RHIBufferSlice data;
+    uint32_t meshletCount{};
+    uint32_t profileVersion{};
+    bool IsValid() const { return data.IsValid() && meshletCount != 0; }
+};
+
+inline constexpr uint32_t kRHIMaxCoarseMeshLods = 7;
+struct RHIMeshLodBinding
+{
+    RHIBufferSlice indices;
+    uint32_t indexCount{};
+    float geometricError{};
+    RHIMeshletBinding meshlets;
+    bool IsValid() const { return indices.IsValid() && indexCount != 0; }
+};
+
 struct RHIMeshBinding
 {
     RHIBufferSlice vertices;
@@ -898,6 +1036,10 @@ struct RHIMeshBinding
     RHIBufferSlice indices;
     RHIFormat      indexFormat{ RHIFormat::R32Uint };
     uint32_t       indexCount{ 0 };
+    RHIMeshletBinding meshlets;
+    // A contiguous optional LOD1..LOD7 prefix, all referencing the base vertices.
+    uint32_t coarseLodCount{};
+    RHIMeshLodBinding coarseLods[kRHIMaxCoarseMeshLods]{};
 
     bool IsValid() const { return 0 != indexCount; }
 };

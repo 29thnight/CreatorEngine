@@ -5,6 +5,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../GpuGeometryVisibility.h"
 #include "EnhancedGBufferPass.h"
 
 // 데칼 패스 (PHASE 3-6, 미구현 패스 이식 2차).
@@ -69,14 +70,16 @@ public:
 
         // 셋 다 null일 수 있으나 하나는 있어야 한다. 어느 것이 있느냐가
         // 곧 어느 채널을 켤지를 정한다(DX11의 g_useFlags와 같은 규칙).
-        Texture* diffuse{ nullptr };
-        Texture* normal{ nullptr };
-        Texture* occRoughMetal{ nullptr };
+        const Texture* diffuse{ nullptr };
+        const Texture* normal{ nullptr };
+        const Texture* occRoughMetal{ nullptr };
 
         // 아틀라스 분할. sliceNum이 몇 번째 칸을 쓸지 고른다.
         uint32_t sliceX{ 1 };
         uint32_t sliceY{ 1 };
         int32_t  sliceNum{ 0 };
+        std::array<std::size_t, 3> texturePinIndices{ TextureFramePins::InvalidIndex,
+            TextureFramePins::InvalidIndex, TextureFramePins::InvalidIndex };
     };
 
     static_assert(std::is_same_v<decltype(Item::worldMatrix), math::matrix4x4>);
@@ -95,6 +98,13 @@ public:
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Called after the upload prefix, under the backend shader-output scope.
+    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
+    GpuGeometryVisibility::PreparedStats GetGpuVisibilityStats() const
+    {
+        return m_visibilityFrame ? m_visibilityFrame->GetPreparedStats() : GpuGeometryVisibility::PreparedStats{};
+    }
+
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
 
@@ -103,7 +113,12 @@ public:
     void SetInputs(const EnhancedGBufferPass::Outputs& inputs) { m_inputs = inputs; }
 
     /// 이번 프레임에 그릴 데칼. PrepareFrame이 텍스처를 올리고 배치를 짠다.
-    void SetDecals(const std::vector<Item>& decals) { m_decals = decals; }
+    void SetDecals(const std::vector<Item>& decals,
+        own::shared_owner<TextureFramePins> texturePins = {})
+    {
+        m_decals = decals;
+        m_texturePins = std::move(texturePins);
+    }
 
     bool HasPreparedDecals() const { return !m_batches.empty(); }
     const EnhancedGBufferPass::Outputs& GetOutputs() const { return m_outputs; }
@@ -124,7 +139,10 @@ public:
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+    GpuGeometryVisibility m_visibility;
+    std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibilityFrame;
+    bool m_gpuVisibilityEnabled{ false };
+    std::vector<math::vector4> m_visibilitySpheres;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
@@ -153,7 +171,9 @@ private:
         // 묶음의 정체성은 올라간 자원이 아니라 원본 포인터로 판단한다.
         // 업로드가 실패하거나 아직 안 된 텍스처도 서로 같고 다름은 정해지고,
         // 그래야 배칭이 업로드 성공 여부에 흔들리지 않는다.
-        Texture*        sources[3]{};    // 확산·노멀·ORM
+        std::array<std::size_t, 3> texturePinIndices{ TextureFramePins::InvalidIndex,
+            TextureFramePins::InvalidIndex, TextureFramePins::InvalidIndex };
+        std::uint64_t textureIds[3]{};
         RHITextureHandle textures[3]{};
         RHIFormat       formats[3]{};
         uint32_t        mipLevels[3]{};
@@ -162,6 +182,7 @@ private:
     EnhancedGBufferPass::Outputs m_inputs{};
     EnhancedGBufferPass::Outputs m_outputs{};
     std::vector<Item>            m_decals;
+    own::shared_owner<TextureFramePins> m_texturePins;
     bool                         m_keepAlive{ false };
 
     // PrepareFrame이 채우고 Record가 읽는다.

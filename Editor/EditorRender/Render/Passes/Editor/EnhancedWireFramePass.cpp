@@ -2,6 +2,8 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
 #include "Mesh.h"
+#include "MaterialGraphSceneInput.h"
+#include "RHI/ModelVertexInputLayout.h"
 
 #include <cstring>
 #include <string>
@@ -47,7 +49,7 @@ bool EnhancedWireFramePass::Initialize(const EnhancedFrameContext& context,
 }
 
 bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
-    std::string& outError)
+    std::string& outError, assets::VertexAttributeMask mask)
 {
     // b0 상수(뷰투영) · t0 인스턴스 · t1 본 팔레트(둘 다 루트 SRV).
     // 텍스처가 없어 디스크립터 테이블도 없다.
@@ -66,7 +68,9 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
-    if (!CompileWireFrameShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
+    const bool skinned = assets::Has(mask, assets::VertexAttribute::BoneIndices);
+    const char* vertexEntry = mask ? (skinned ? "VSMainModel" : "VSMainStatic") : "VSMain";
+    if (!CompileWireFrameShader(vertexEntry, "vs_5_0", vsBlob, outError)) return false;
     if (!CompileWireFrameShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
     // 엔진 Vertex에서 위치와 본 가중만 읽는다. 스트라이드는 정점 버퍼 뷰가
@@ -88,6 +92,18 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.layout = root;
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
+    std::vector<RHIInputElement> modelElements;
+    if (mask)
+    {
+        const auto consumed = assets::Bit(assets::VertexAttribute::Position)
+            | (skinned ? assets::Bit(assets::VertexAttribute::BoneIndices) | assets::Bit(assets::VertexAttribute::BoneWeights) : 0);
+        if (!ModelVertexInput::BuildInputElements(mask, consumed, modelElements, outError))
+        {
+            return false;
+        }
+        desc.inputElements = modelElements.data();
+        desc.inputElementCount = static_cast<uint32_t>(modelElements.size());
+    }
     desc.topologyType = RHITopologyType::Triangle;
 
     // ★ 이 패스의 요점 — 채우기 대신 선을 긋는다.
@@ -101,8 +117,16 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.rtvFormats[0] = m_outputFormat;
     desc.dsvFormat = kDepthFormat;
 
-    m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (!m_pso.IsValid()) return false;
+    const auto pipeline = context.psoManager->GetOrCreate(desc, outError);
+    if (!pipeline.IsValid()) return false;
+    if (mask)
+    {
+        m_modelPsos[mask] = pipeline;
+    }
+    else
+    {
+        m_pso = pipeline;
+    }
 
     return true;
 }
@@ -168,6 +192,53 @@ void EnhancedWireFramePass::CollectDraws(const EnhancedFrameContext& context,
 bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
     std::string& outError)
 {
+    if (context.graphSceneInput)
+    {
+        std::vector<EnhancedDrawItem> graphDraws;
+        std::vector<std::vector<math::matrix4x4>> poses;
+        poses.reserve(context.graphSceneInput->Draws().size());
+        for (const auto& source : context.graphSceneInput->Draws())
+        {
+            if (!source.material->generation->cooked.product.program.surface)
+            {
+                continue;
+            }
+            const auto& geometry = *source.geometry->Source();
+            EnhancedDrawItem draw;
+            draw.geometryKey = source.geometryKey;
+            draw.modelMeshView = geometry.Geometry();
+            draw.worldMatrix = geometry.World();
+            poses.emplace_back();
+            for (const auto& packed : geometry.Bones())
+            {
+                auto transposed = math::matrix4x4::identity();
+                std::memcpy(transposed.m, packed.rows, sizeof(packed.rows));
+                poses.back().push_back(math::transpose(transposed));
+            }
+            size_t palette = poses.size() - 1;
+            for (size_t existing = 0; existing < palette; ++existing)
+            {
+                if (poses[existing].size() == poses[palette].size()
+                    && (poses[palette].empty() || std::memcmp(poses[existing].data(), poses[palette].data(),
+                        poses[palette].size() * sizeof(math::matrix4x4)) == 0))
+                {
+                    palette = existing;
+                    poses.pop_back();
+                    break;
+                }
+            }
+            draw.bonePalette = poses[palette].data();
+            draw.boneCount = static_cast<uint32_t>(poses[palette].size());
+            draw.animatorKey = reinterpret_cast<uintptr_t>(draw.bonePalette);
+            graphDraws.push_back(std::move(draw));
+        }
+        auto sealed = context;
+        sealed.graphSceneInput.reset();
+        sealed.draws = &graphDraws;
+        sealed.forwardDraws = nullptr;
+        sealed.animationPalettes = nullptr;
+        return PrepareFrame(sealed, outError);
+    }
     m_width = context.width;
     m_height = context.height;
 
@@ -210,10 +281,11 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
         if (nullptr == draws) return;
         for (const EnhancedDrawItem& draw : *draws)
         {
-            if (nullptr == draw.mesh) continue;
+            if (nullptr == draw.mesh && !draw.modelMeshView.IsComplete()) continue;
+            const auto key = draw.geometryKey ? draw.geometryKey : reinterpret_cast<size_t>(draw.mesh);
             for (Batch& batch : m_batches)
             {
-                if (batch.mesh != draw.mesh) continue;
+                if (batch.geometryKey != key) continue;
 
                 InstanceData& instance = m_instances[batch.first + batch.count];
                 instance.world = math::transpose(draw.worldMatrix);
@@ -241,6 +313,12 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
     for (const Batch& batch : m_batches)
     {
         std::string uploadError;
+        const auto mask = batch.modelMeshView.vertexAttributeMask;
+        if (batch.modelMeshView.IsComplete() && !m_modelPsos.contains(mask)
+            && !CreatePipelines(context, outError, mask))
+        {
+            return false;
+        }
         // I5-D4b: 3패스와 같은 분기 — 같은 stableKey라 GBuffer가 올린 것을
         // 캐시 히트로 받는다.
         const auto entry = batch.modelMeshView.IsComplete()
@@ -307,19 +385,31 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         m_depth = m_inputs.depth;
     }
 
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+        m_depth = ownsDepth ? graph.Write(m_depth) : graph.Modify(m_depth);
+    }
+    const auto colorAccess = explicitAccess
+        ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto depthAccess = explicitAccess
+        ? (ownsDepth ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto output = m_output;
+    const auto depth = m_depth;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RHIResourceState::RenderTarget });
-    usages.push_back({ m_depth, RHIResourceState::DepthWrite });
+    usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
+    usages.push_back({ depth, RHIResourceState::DepthWrite, depthAccess });
 
     graph.AddPass(GetName(), usages,
-        [this, &context, ownsColor, ownsDepth](
+        [this, &context, ownsColor, ownsDepth, output, depth](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.ResolveHandle(m_depth), kDepthFormat);
+                executeContext.ResolveHandle(depth), kDepthFormat);
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
@@ -356,7 +446,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             // 팔레트가 없어도 t1은 꽂는다. 스킨드가 없는 프레임에서도 루트
             // SRV가 비면 검증 레이어가 잡는다(GBuffer에서 겪은 것과 같다).
             RHIBufferSlice paletteUpload{};
-            if (context.animationPalettes)
+            if (context.animationPalettes && !context.graphSceneInput)
                 paletteUpload = context.animationPalettes->Upload();
             else
             {
@@ -384,6 +474,8 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             for (const Batch& batch : m_batches)
             {
+                encoder.SetPipeline(RHIBindPoint::Graphics, batch.modelMeshView.IsComplete()
+                    ? m_modelPsos.at(batch.modelMeshView.vertexAttributeMask) : m_pso);
                 const auto geometry = m_geometry.find(batch.geometryKey);
                 if (geometry == m_geometry.end()) continue;
 
@@ -415,4 +507,5 @@ void EnhancedWireFramePass::Shutdown()
     m_viewProjection = math::matrix4x4::identity();
 
     m_pso = {};
+    m_modelPsos.clear();
 }

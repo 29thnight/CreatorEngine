@@ -82,6 +82,9 @@ struct VulkanBufferEntry
     /// 계속 매핑해 두는 경우(업로드 링). 아니면 nullptr.
     void* mapped{ nullptr };
 
+    /// 생성 때 INDIRECT_BUFFER 용도를 실제로 켠 버퍼만 indirect로 읽는다.
+    bool allowIndirectArguments{ false };
+
     bool IsValid() const { return VK_NULL_HANDLE != buffer; }
 };
 

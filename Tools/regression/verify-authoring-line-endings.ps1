@@ -47,7 +47,7 @@ if ($scanRoots.Count -eq 0) {
 
 # 저작 **텍스트** 자산만 본다. `.asset`은 확장자 하나가 두 포맷을 담으므로
 # (재질=YAML, 모델=CEMA 바이너리) 내용으로 가른다.
-$textExtensions = @('.creator', '.prefab', '.meta', '.shadermeta', '.renderprofile', '.asset')
+$textExtensions = @('.creator', '.prefab', '.meta', '.shadermeta', '.renderprofile', '.soundgraph', '.soundpreset', '.asset')
 
 $failures = New-Object System.Collections.Generic.List[string]
 $crlfFiles = New-Object System.Collections.Generic.List[string]

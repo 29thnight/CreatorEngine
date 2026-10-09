@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -117,7 +117,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EngineEntry\;$(DotNetHostIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\Utility_Framework\;$(DotNetHostIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -145,7 +145,7 @@
            LNK1103/LNK4020/LNK1318을 유발한다. Release LTCG는 유지하고 이
            라이브러리의 컴파일 디버그 타입만 제외한다. -->
       <DebugInformationFormat>None</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EngineEntry\;$(DotNetHostIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\Utility_Framework\;$(DotNetHostIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -225,7 +225,6 @@
     <ClCompile Include="ScriptObjectRegistry.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="RuntimeFrame.cpp" />
-    <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="GameObjectIndex.h" />
     <ClInclude Include="AnchorPreset.h" />
@@ -336,7 +335,6 @@
     <ClInclude Include="ScriptObjectRegistry.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="RuntimeFrame.h" />
-    <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
@@ -359,6 +357,47 @@
   <ItemGroup>
     <None Include="Component.inl" />
     <None Include="Entity.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AudioListenerComponent.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\AudioCatalog.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\AudioProfileProvider.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\AudioHost.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\AudioRuntime.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\ClipDirectory.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\MiniaudioBackend.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\NullAudioBackend.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\PlaybackService.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\SoundAssetSerialization.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\SoundGraph.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Audio\VoiceTable.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="AudioListenerComponent.h" />
+    <ClInclude Include="Audio\AudioBackend.h" />
+    <ClInclude Include="Audio\AudioCatalog.h" />
+    <ClInclude Include="Audio\AudioProfileProvider.h" />
+    <ClInclude Include="Audio\AudioHost.h" />
+    <ClInclude Include="Audio\AudioRuntime.h" />
+    <ClInclude Include="Audio\AudioService.h" />
+    <ClInclude Include="Audio\AudioValues.h" />
+    <ClInclude Include="Audio\ClipDirectory.h" />
+    <ClInclude Include="Audio\ListenerState.h" />
+    <ClInclude Include="Audio\MiniaudioBackend.h" />
+    <ClInclude Include="Audio\NullAudioBackend.h" />
+    <ClInclude Include="Audio\PlayRequest.h" />
+    <ClInclude Include="Audio\PlaybackService.h" />
+    <ClInclude Include="Audio\SoundAssetSerialization.h" />
+    <ClInclude Include="Audio\SoundGraph.h" />
+    <ClInclude Include="Audio\VoiceTable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GCCE\GCCE.vcxproj">
+      <Project>{F0C6E84D-AD92-45B8-9037-ED3F058C1A46}</Project>
+      <!-- SceneRuntime is static; final hosts link the import library. -->
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SceneGC.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
@@ -385,6 +424,12 @@
     <ClInclude Include="CollisionGeometryLibrary.h" />
     <ClInclude Include="CollisionGeometryIO.h" />
     <ClInclude Include="CookedCollisionGeometry.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Audio\EditorAudioClipCache.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="Audio\AudioSourceInspection.h" />
+    <ClInclude Include="Audio\AudioSourceValidation.h" />
+    <ClInclude Include="Audio\EditorAudioClipCache.h" />
   </ItemGroup>
 </Project>
 

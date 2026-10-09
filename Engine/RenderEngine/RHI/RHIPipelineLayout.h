@@ -37,6 +37,7 @@ enum class RHIShaderVisibility
     All,
     Vertex,
     Pixel,
+    Mesh,
 };
 
 // ── 샘플러 ──
@@ -75,6 +76,7 @@ enum class RHICompareOp
     Less,        ///< V6 이 더했다 — 깊이 테스트의 기본값이다
     LessEqual,
     Equal,       ///< Shared opaque depth capture: preserve the prepass winner.
+    Always,      ///< 깊이를 그대로 옮겨 쓰는 복사 패스(판정 없이 쓰기).
 };
 
 enum class RHIBorderColor

@@ -23,6 +23,10 @@
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;
 struct ShaderMetaPropertyBinding;
+namespace AssetDepot
+{
+    struct MaterialDocumentAssetOrigin;
+}
 
 enum class MaterialRenderingMode
 {
@@ -47,15 +51,22 @@ public:
 
     // Snapshot owns the graph program, packed instance values and CPU texture
     // generations. Render-thread resource registration is a separate step.
-    const std::shared_ptr<const material_graph::Instance>& GetMaterialGraphInstance() const
+    const own::shared_owner<const material_graph::Instance>& GetMaterialGraphInstance() const
     {
         return m_materialGraphInstance;
     }
     bool HasMaterialGraph() const { return !!m_materialGraphInstance; }
-    std::shared_ptr<const LX::Runtime::Instance> GetLXMaterialInstance() const
+    const own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin>& GetAssetOrigin() const noexcept
     {
-        return m_materialGraphInstance ? std::static_pointer_cast<const LX::Runtime::Instance>(m_materialGraphInstance)
-                                       : m_runtimeInstance;
+        return m_assetOrigin;
+    }
+    own::shared_owner<const LX::Runtime::Instance> GetLXMaterialInstance() const
+    {
+        if (m_materialGraphInstance)
+        {
+            return m_materialGraphInstance;
+        }
+        return m_runtimeInstance;
     }
     bool TrySetMaterialGraphParameter(LX::Id parameter, LX::LXSocketValue value, std::string& error);
     bool TrySetMaterialGraphParameters(std::span<const material_graph::ParameterOverride> values, std::string& error);
@@ -71,7 +82,8 @@ public:
 	// shared_ptr이 DataSystem 캐시에만 있어서 캐시가 정리되면 사용 중인 클론이
 	// 그대로 파괴됐다(12.2 보충 분석). 호출자가 소유권을 함께 받도록 강제해
 	// 그 상황 자체를 없앤다.
-	static std::shared_ptr<Material> InstantiateShared(const Material* origin, std::string_view newName = {});
+	// 런타임 클론은 자산 캐시에 게시하지 않는다. 이름과 수명은 호출자의 몫이다.
+	static own::shared_owner<Material> InstantiateShared(const Material* origin, std::string_view newName = {});
 
 //initialize material chainable functions
 public:
@@ -83,25 +95,25 @@ public:
 public:
 	// Material이 Texture generation을 직접 소유한다. 호출자는 raw alias를 저장하지
 	// 않고 아래 shared getter에서 필요한 순간 view만 얻는다.
-	Material& UseBaseColorMap(std::shared_ptr<Texture> texture);
-	Material& UseNormalMap(std::shared_ptr<Texture> texture);
-	Material& UseOccRoughMetalMap(std::shared_ptr<Texture> texture);
-	Material& UseAOMap(std::shared_ptr<Texture> texture);
-	Material& UseEmissiveMap(std::shared_ptr<Texture> texture);
-	Material& UseTextureMap(std::string_view property, std::shared_ptr<Texture> texture);
+	Material& UseBaseColorMap(own::shared_owner<const Texture> texture);
+	Material& UseNormalMap(own::shared_owner<const Texture> texture);
+	Material& UseOccRoughMetalMap(own::shared_owner<const Texture> texture);
+	Material& UseAOMap(own::shared_owner<const Texture> texture);
+	Material& UseEmissiveMap(own::shared_owner<const Texture> texture);
+	Material& UseTextureMap(std::string_view property, own::shared_owner<const Texture> texture);
 
-	const std::shared_ptr<Texture>& GetTextureMapShared(
+	const own::shared_owner<const Texture>& GetTextureMapShared(
 		std::string_view property) const noexcept;
 	std::span<const MaterialTextureOwner> GetTextureOwners() const noexcept
 	{
         if (const auto* instance = RuntimeInstance()) return instance->textureOwners;
         return m_textureOwners;
 	}
-	const std::shared_ptr<Texture>& GetBaseColorMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetNormalMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetOccRoughMetalMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetAOMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetEmissiveMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetBaseColorMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetNormalMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetOccRoughMetalMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetAOMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetEmissiveMapShared() const noexcept;
 
 	Material& ConvertToLinearSpace(bool32 convert);
 	Material& SetWindVector(const math::vector4& windVector);
@@ -180,8 +192,11 @@ private:
 
     const LX::Runtime::Instance* RuntimeInstance() const
     {
-        return m_materialGraphInstance ? static_cast<const LX::Runtime::Instance*>(m_materialGraphInstance.get())
-                                       : m_runtimeInstance.get();
+        if (m_materialGraphInstance)
+        {
+            return std::addressof(*m_materialGraphInstance);
+        }
+        return m_runtimeInstance ? std::addressof(*m_runtimeInstance) : nullptr;
     }
     void SynchronizeCodeRuntime();
 
@@ -202,7 +217,7 @@ public:
     bool m_doubleSided{ false };
 
 	[[reflgen::ignore]]
-	HashedGuid m_materialGuid{ make_guid() };
+	HashedGuid m_materialGuid{ TypeTrait::MakeRuntimeResourceId() };
 
 	// typed setter/getter와 legacy payload 왕복을 위한 CPU byte view. 값의 저장
 	// 정본은 위 m_propertyValues이고 제품 draw packet은 그 정본에서 다시 pack한다.
@@ -215,7 +230,7 @@ private:
 	void ResetTextureRuntime();
 
 	[[reflgen::ignore]]
-    std::shared_ptr<const LX::Runtime::Instance> m_runtimeInstance{};
+    own::shared_owner<const LX::Runtime::Instance> m_runtimeInstance{};
 
 	// runtime-only. GUID는 디스크 정본이고 이 값은 적용한 cache generation이다.
 	[[reflgen::ignore]]
@@ -225,5 +240,8 @@ private:
 	std::vector<MaterialTextureOwner> m_textureOwners{};
 
     [[reflgen::ignore]]
-    std::shared_ptr<const material_graph::Instance> m_materialGraphInstance;
+    own::shared_owner<const material_graph::Instance> m_materialGraphInstance;
+
+    [[reflgen::ignore]]
+    own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin> m_assetOrigin{};
 };

@@ -45,6 +45,7 @@ public:
 
     const void* Data() const { return m_bytes.empty() ? nullptr : m_bytes.data(); }
     size_t      Size() const { return m_bytes.size(); }
+    size_t      Capacity() const noexcept { return m_bytes.capacity(); }
     bool        IsValid() const { return !m_bytes.empty(); }
 
 private:

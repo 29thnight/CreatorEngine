@@ -140,7 +140,7 @@ Assert ($onlyDeclare.Count -eq 0) `
     ("선언만 하고 신고하지 않는 파일: " + ($onlyDeclare -join ', ') +
      ". 선언한 상태가 영원히 관측되지 않는다")
 
-# W2-2 가 계약 대상으로 뽑은 여섯과 같아야 한다. 절마다 강제 단위가 다르다는
+# W2-2 의 기존 여섯과 하단 상태 탭을 포함한다. 절마다 강제 단위가 다르다는
 # 것을 배웠지만(§7.1 정정), 상태 행렬의 단위는 "아이템을 그리는 custom widget"
 # 이고 그것은 clipping 절의 집합과 같다 — 배지 하나만 상태가 없다.
 $expectedFiles = @(
@@ -149,6 +149,7 @@ $expectedFiles = @(
     'EditorModeButton.cpp'
     'EditorPropertyRow.cpp'
     'EditorSectionHeader.cpp'
+    'MenuBarWindow.cpp'
     'SceneViewportOverlay.cpp'
 )
 $missingFiles = @($expectedFiles | Where-Object { $declaringFiles -notcontains $_ })

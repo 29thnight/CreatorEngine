@@ -133,7 +133,7 @@ foreach ($scenario in $scenarios) {
             }
             if ($mode -eq 'normal') {
                 if ($process.ExitCode -ne 0 -or $stderr -match '\[player.simulation.failed\]' -or
-                    $stdout -notmatch '\[player.smoke.reload\] activated=true gameStart=true pending=false displayedAfterActivation=true') {
+                    $stdout -notmatch '\[player.smoke.reload\] activated=true gameStart=true pending=false compositionSubmittedAfterActivation=true') {
                     throw 'Healthy transition control failed'
                 }
                 if ($Ddol) {
@@ -157,7 +157,7 @@ foreach ($scenario in $scenarios) {
             } else {
                 if ($process.ExitCode -ne 3 -or $stderr -notmatch '\[player.simulation.failed\] exit=3 reason=\S' -or
                     $stdout.Substring($destinationPosition) -match '\[physics.player(?:\.convex|\.heightfield)?\] .*"passed":12' -or
-                    $stdout -match 'displayedAfterActivation=true') {
+                    $stdout -match 'compositionSubmittedAfterActivation=true') {
                     throw "$mode destination physics rejection did not reach the production fatal policy"
                 }
                 if ($Ddol) {

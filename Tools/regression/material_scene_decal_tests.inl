@@ -1,5 +1,5 @@
 // Included after the shared Shadow/Decal product and native submission helpers.
-std::shared_ptr<Texture> DecalImage(std::array<float, 4> value)
+own::shared_owner<const Texture> DecalImage(std::array<float, 4> value)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), value.data(), sizeof(value));
@@ -7,15 +7,15 @@ std::shared_ptr<Texture> DecalImage(std::array<float, 4> value)
 }
 
 void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines, ProbeTextures& textures,
-                   ProbePool& pool, const std::filesystem::path& root, const std::shared_ptr<Texture>& image,
-                   const std::shared_ptr<Texture>& cube, bool versionedAcceptance = false)
+                   ProbePool& pool, const std::filesystem::path& root, const own::shared_owner<const Texture>& image,
+                   const own::shared_owner<const Texture>& cube, bool versionedAcceptance = false)
 {
     const std::array products{ShadowDecalProduct(root, false), ShadowDecalProduct(root, true)};
     GenerationStore store;
     experiment::AssetId id;
     Check(Uuid::TryParse("EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE", id.value), "Decal graph identity");
     std::string error;
-    std::array<std::shared_ptr<const Generation>, 2> generations;
+    std::array<own::shared_owner<const Generation>, 2> generations;
     for (unsigned i = 0; i < 2; ++i)
     {
         generations[i] = store.Load(
@@ -88,24 +88,24 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                               [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; },
                               geometry.draw.materialGraphInstance, error),
                           "Decal instance " + error);
-                    std::shared_ptr<const SceneViewInput> input;
+                    own::shared_owner<const SceneViewInput> input;
                     Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 97 + tier, 1, 16, 16, camera},
                                                {&geometry.draw, 1}, {}, input, error),
                           "Decal seal " + error);
                     Check(device.BeginFrame(error), "Decal begin");
                     textures.BeginFrame(context.frameId);
                     meshes.BeginFrame(context.frameId);
-                    const auto environment = textures.GetOrUpload(cube.get(), error).handle;
+                    const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
                     Check(environment.IsValid() && host.PrepareResidency(context, input, error),
                           "Decal residency " + error);
                     EnhancedDecalPass::Item item;
                     item.worldMatrix = math::matrix4x4::identity();
                     item.worldMatrix.m[3][2] = .5f;
-                    item.diffuse = fixture == 1 || fixture == 3 ? diffuse.get()
-                                   : fixture == 5               ? transparent.get()
+                    item.diffuse = fixture == 1 || fixture == 3 ? (diffuse ? &*diffuse.borrow() : nullptr)
+                                   : fixture == 5               ? (transparent ? &*transparent.borrow() : nullptr)
                                                                 : nullptr;
-                    item.occRoughMetal = fixture == 2 || fixture == 3 || fixture == 6 ? orm.get() : nullptr;
-                    item.normal = fixture == 4 ? normal.get() : nullptr;
+                    item.occRoughMetal = fixture == 2 || fixture == 3 || fixture == 6 ? (orm ? &*orm.borrow() : nullptr) : nullptr;
+                    item.normal = fixture == 4 ? (normal ? &*normal.borrow() : nullptr) : nullptr;
                     decal.SetDecals(fixture >= 1 && fixture <= 6 ? std::vector{item}
                                                                  : std::vector<EnhancedDecalPass::Item>{});
                     Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
@@ -122,6 +122,8 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                         pool.BeginFrame(static_cast<unsigned>(context.frameId));
                         Check(graph->PrepareParallel(pool, error), "Decal prefix " + error);
                     }
+                    Check(gbuffer.PrepareGpuVisibility(context, error) && decal.PrepareGpuVisibility(context, error),
+                          "Decal GPU visibility preparation " + error);
                     Check(host.Prepare(context, input, environment, {}, {}, {}, {}, error, 1),
                           "Decal host prepare " + error);
                     gbuffer.Declare(*graph, context);

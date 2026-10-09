@@ -1,4 +1,4 @@
-﻿#include "EditorProjectLayerSettings.h"
+#include "EditorProjectLayerSettings.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
@@ -8,25 +8,32 @@
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "SceneViewportOverlay.h"
 #include "RHI/IImGuiHost.h"
 #include "RHI/ImGuiHostPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ViewportHostWindow.h"
 #include "InputManager.h"
 #include "ImGui.h"
-#include "SoundManager.h"
+#include "Audio/AudioHost.h"
+#include "ConsoleCommandSystem.h"
+#include "Audio/AudioProfileProvider.h"
+#include "Audio/MiniaudioBackend.h"
+#include "Audio/PlaybackService.h"
+#include "Audio/AudioCatalog.h"
+#include "SoundGraphEditor.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Player와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
 #include "ClrHost.h"
-#include "RuntimeSettings.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
+#include "EditorImGuiTexture.h"
 #include "RegisterEditorWindowManual.h"
 #include "RegisterEditorMenuManual.h"
 #include "EditorModelPlacement.h"
@@ -34,6 +41,8 @@
 #include "EditorWindowChrome.h"
 #include "UIManager.h"
 #include "ProfileScope.h"
+#include "DxCaptureService.h"
+#include "ProfilerHUD.h"
 #include "ResourceCounterWindow.h"
 #include "MemoryProfilerSnapshot.h"
 #include "ThreadPool.h"
@@ -69,8 +78,7 @@ namespace
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
 
-	// 표시 sink 어댑터는 HostImGuiPresentation의 공용 타입을 쓴다(E4-6c) —
-	// E4-6a 때 여기 있던 ~20줄이 Player 쪽 중복과 함께 그리로 합쳐졌다.
+	// Editor 표시 sink는 DX12 ImGui 호스트로 위임한다. Player 표시는 native RHI가 소유한다.
 }
 
 Editor::EditorMain::EditorMain()
@@ -80,6 +88,7 @@ Editor::EditorMain::EditorMain()
 
 Editor::EditorMain::~EditorMain()
 {
+    SceneManagers->BindAudioPlayback(nullptr);
 	Core::TimeSystem::Destroy();
 }
 
@@ -140,12 +149,15 @@ void Editor::EditorMain::Initialize()
 	// 게시하기 전에 있어야 한다. 셸이 아직 Initialize 전이어도 위임은
 	// 안전하다(비활성 셸은 no-op/0).
 	EnhancedSceneRenderer::SetDisplayPresentationSink(
-		std::make_shared<ImGuiHostPresentationSink>());
+		std::make_shared<ImGuiHostPresentationSink>([this]
+        {
+            NotifyDisplayAvailable();
+        }));
 
 	std::string enhancedError;
-	const EnhancedLiveBackend startupBackend =
-		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
-		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
+    // 모든 Editor 뷰(Scene, Game, material preview)는 빌드에서 DX12로 고정한다.
+    // 런타임 설정 선택이나 거절 경로 없이 렌더러/PSO를 생성한다.
+    constexpr EnhancedLiveBackend startupBackend = EnhancedLiveBackend::DX12;
 	BootProgress::Step(L"Starting render backend", L"Creating the scene renderer");
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
@@ -222,21 +234,15 @@ void Editor::EditorMain::Initialize()
 	BootProgress::Step(L"Registering editor windows", L"Building the editor panel registry");
 	::editor::register_editor_windows();
 
-	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
+	// Editor 호스트(IImGuiHost → concrete DX12 shell)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
 	// 그릴 표를 넘긴다(PHASE 21 W3). 표는 위 `register_editor_windows` 가
 	// 이미 채워 두었다.
 	BootProgress::Step(L"Starting editor interface", L"Initializing the ImGui presentation host");
 	m_editorRenderer = std::make_unique<EditorRenderer>(
 		EditorWindowHandle(), ::editor::process_windows());
-	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
-		GetImGuiHost().GetBackendKind();
-	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
-		throw std::runtime_error("Editor scene/ImGui backend 설정 불일치");
-	std::printf("[RenderBackend] source=render.backend active=%s scene=%s imgui=%s\n",
-		RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
-		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
-		GetImGuiHost().GetBackendName());
+    std::printf("[RenderBackend] source=editor-build active=dx12 scene=dx12 imgui=%s policy=build-fixed-dx12\n",
+        GetImGuiHost().GetBackendName());
 
 	BootProgress::Step(L"Preparing editor tools", L"Connecting gizmos, menus and inspectors");
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(
@@ -260,8 +266,77 @@ void Editor::EditorMain::Initialize()
 	// 그 표를 읽는 것이 인스펙터만이 아니라서 부팅의 일로 올렸다.
 	::editor::windows::register_inspector_typed_draws();
 
-	BootProgress::Step(L"Initializing audio", L"Starting the sound manager");
-	Sound->initialize(128);
+	BootProgress::Step(L"Initializing audio", L"Starting the audio runtime");
+	#if CE_SHIPPING
+    constexpr bool profileAudioCallbacks = false;
+#else
+    constexpr bool profileAudioCallbacks = true;
+#endif
+    m_audioHost = std::make_unique<wave::AudioHost>(std::make_unique<wave::MiniaudioBackend>(profileAudioCallbacks), 128u);
+    if (!m_audioHost->Start({}))
+    {
+        throw std::runtime_error("Audio runtime initialization failed");
+    }
+    if (m_audioHost->Mode() == wave::AudioHostMode::Null)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.runtime.null] Audio graph initialization failed; silent logical runtime active");
+    }
+    else if (m_audioHost->Mode() == wave::AudioHostMode::DegradedDevice)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.device.degraded] Output device unavailable; graph retained and output recovery will retry");
+    }
+    m_audioPlayback = std::make_unique<wave::PlaybackService>(*m_audioHost->Service());
+    ConsoleCommandSystem::Get().SetAudioDiagnosticsReader([this]
+    {
+        using CommandCore::CommandData;
+        const auto counters = m_audioHost->Counters();
+        auto data = CommandData::Object();
+        data.Set("available", CommandData::Bool(counters.backendCountersAvailable));
+        data.Set("outputMode", CommandData::Int(static_cast<int>(m_audioHost->Mode())));
+        data.Set("runtimeUpdateNs", CommandData::Int(counters.runtimeUpdateNanoseconds));
+        const auto rank = (m_audioUpdateSamples * 99u + 99u) / 100u;
+        std::uint64_t cumulative{};
+        std::uint64_t p99{};
+        for (std::size_t index = 0u; index < m_audioUpdateHistogram.size(); ++index)
+        {
+            cumulative += m_audioUpdateHistogram[index];
+            if (rank > 0u && cumulative >= rank)
+            {
+                p99 = index == m_audioUpdateHistogram.size() - 1u
+                    ? UINT64_MAX : (index + 1u) * 1000u;
+                break;
+            }
+        }
+        data.Set("runtimeUpdateSamples", CommandData::Int(m_audioUpdateSamples));
+        data.Set("runtimeUpdateP99UpperNs", CommandData::String(std::to_string(p99)));
+        data.Set("runtime128UpdateSamples", CommandData::Int(m_audio128UpdateSamples));
+        data.Set("runtime128UpdatesOverOneMillisecond", CommandData::Int(m_audio128UpdatesOverOneMillisecond));
+        data.Set("callbackCount", CommandData::Int(counters.callbackCount));
+        data.Set("callbackP99Ns", CommandData::Int(counters.callbackP99Nanoseconds));
+        data.Set("callbackMaxNs", CommandData::Int(counters.callbackMaxNanoseconds));
+        data.Set("callbackOverHalfPeriod", CommandData::Int(counters.callbackOverHalfPeriod));
+        data.Set("streamBytesRead", CommandData::Int(counters.streamBytesRead));
+        data.Set("streamReadFailures", CommandData::Int(counters.streamReadFailures));
+        data.Set("streamPcmReads", CommandData::Int(counters.streamPcmReads));
+        data.Set("streamStarvationReads", CommandData::Int(counters.streamStarvationReads));
+        return data;
+    });
+    m_audioCatalog = std::make_unique<wave::AudioCatalog>(*m_audioHost->Service(), *m_audioPlayback);
+    SceneManagers->BindAudioPlayback(m_audioPlayback.get(), [this](std::string_view key)
+    {
+        std::string error;
+        const auto resolved = m_audioCatalog->ResolveLegacyClip(key, error);
+        Uuid::Uuid16 guid;
+        if (!Uuid::TryParse(resolved, guid))
+        {
+            if (!key.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "[audio.clip.resolve] " + error);
+            }
+            return wave::ClipKey{};
+        }
+        return wave::ClipKey::FromGuid(guid);
+    });
 
 	BootProgress::Step(L"Loading assets", L"Initializing engine data services");
 
@@ -282,6 +357,15 @@ void Editor::EditorMain::Initialize()
 		throw std::runtime_error("Editor asset database initialization failed");
 	BootProgress::Step(L"Preparing asset previews", L"Loading editor icons and preview services");
 	EditorAssetPresentation::Get().Initialize();
+    {
+        std::string error;
+        if (!m_audioCatalog->LoadEditorAssets(PathFinder::Relative(),
+            PathFinder::Relative().parent_path() / "Library" / "AudioClipImports", error))
+        {
+            Debug::PrintLog(spdlog::level::err, "[audio.catalog] " + error);
+        }
+        m_audioRevision = EditorAssetDatabase::Get().AudioRevision();
+    }
 
 	// 콘텐츠 브라우저는 여기서 만들지 않는다(PHASE 21 W3). "presentation 이
 	// 아이콘·폰트를 올린 뒤" 라는 순서 제약은 실재하지 않았다 — 생성자가
@@ -326,7 +410,6 @@ void Editor::EditorMain::Initialize()
 		}
 
 		UIManagers->Update();
-		Sound->update();
 	});
 	BootProgress::Step(L"Initializing scene systems", L"Starting scene managers");
 	// Editor 모듈의 반영 타입(인스펙터 자극물 등)은 에디터만 링크한다 — 런타임 모듈의 등록(RegisterReflectManual,
@@ -364,6 +447,7 @@ void Editor::EditorMain::StartPresentationThread()
 		m_presentationThreadStarted = false;
 		m_presentationThreadStartFailed = false;
 		m_presentationStopRequested = false;
+        m_displayUpdateRequested = false;
 		m_requestedPresentationFrameId = 0;
 		m_consumedPresentationFrameId = 0;
 		m_presentationRequests = 0;
@@ -442,9 +526,11 @@ void Editor::EditorMain::PresentationThreadMain()
 			{
 				return m_presentationStopRequested ||
 					m_isInvokeResize.load(std::memory_order_acquire) ||
+                    m_displayUpdateRequested ||
 					m_requestedPresentationFrameId > m_consumedPresentationFrameId;
 			});
 			if (m_presentationStopRequested) break;
+            m_displayUpdateRequested = false;
 
 			hasFrameRequest =
 				m_requestedPresentationFrameId > m_consumedPresentationFrameId;
@@ -494,6 +580,15 @@ void Editor::EditorMain::PresentationThreadMain()
 			std::lock_guard<std::mutex> lock(m_presentationMutex);
 			++m_presentationFrames;
 		}
+
+		// 장치가 제거되면 진입 대기와 Present 가 즉시 실패해 속도 제한이 사라진다.
+		// 평소 진입 대기 상한과 같은 100 ms 를 잔다. GT 가 프레임마다 깨우는 조건
+		// 변수로 기다리면 초당 수천 번 깨어나므로 잠든다. 종료는 다음 바퀴에서 본다.
+		if (GetImGuiHost().IsDisplayLost())
+		{
+			ce::profile_scope lost{ ce::marker<"PresentationDisplayLost">() };
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
 	}
 
 	// 스레드가 죽기 전에 스트림을 끊는다. 서비스가 나중에 정리하기도 하지만,
@@ -501,6 +596,21 @@ void Editor::EditorMain::PresentationThreadMain()
 	// 가리키는 구간이 생기지 않는다.
 	ce::profiler().unregister_thread();
 	CoUninitialize();
+}
+
+void Editor::EditorMain::NotifyDisplayAvailable()
+{
+    {
+        std::lock_guard<std::mutex> lock(m_presentationMutex);
+        if (m_presentationStopRequested)
+        {
+            return;
+        }
+        // 마지막 GT 요청을 소비한 뒤에도 두 번째 뷰나 마지막 GPU 제출이 끝날 수 있다.
+        // 더 큰 GT frame ID가 없어도 완성된 이미지는 PT를 깨워야 한다.
+        m_displayUpdateRequested = true;
+    }
+    m_presentationWake.notify_one();
 }
 
 void Editor::EditorMain::NotifyRenderFramePublished(uint64_t frameId)
@@ -521,27 +631,33 @@ void Editor::EditorMain::NotifyRenderFramePublished(uint64_t frameId)
 
 void Editor::EditorMain::Finalize()
 {
-	// 표시/렌더 소비자를 세우기 전에 관리 측을 먼저 정리한다.
-	// 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
+	// Stop admission first; logical scene cleanup needs CLR/audio services alive.
 	// ★ 단계마다 즉시 찍는다. 종료가 멈추는 자리를 찾는 데 로그가
 	//   없으면 어디까지 갔는지조차 알 수 없다.
-	std::printf("[SHUTDOWN] ClrHost 진입\n");
 	SceneManagers->SetDecommissioning();
 	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
-	ClrHost::Get().Shutdown();
-	std::printf("[SHUTDOWN] ClrHost 반환\n");
 
 	// 표시 소비자를 먼저 세운다. GT는 이미 메인 루프를 빠져나와 새 frame을
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
+	EditorImGuiTexture::Shutdown();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
+    editor::shutdown_profiler_viewer();
+    editor::sound_graph_editing::ShutdownPreview(m_audioPlayback.get());
 	// Asset and scene teardown may release proxies still referenced by a queued
 	// render frame. Drain the consumer before either owner starts shutting down.
 	EnhancedSceneRenderer::StopLiveRenderThread();
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 	Editor::ModelPlacement::Get().Shutdown();
 	EditorScriptAuthoring::Shutdown();
+	// Every PT/RT/job borrow is drained. Run hooks, invalidate handles and
+	// finish GC while managed callbacks and native services still exist.
+	SceneManagers->Decommissioning();
+	std::printf("[SHUTDOWN] SceneManagers 반환\n");
+	std::printf("[SHUTDOWN] ClrHost 진입\n");
+	ClrHost::Get().Shutdown();
+	std::printf("[SHUTDOWN] ClrHost 반환\n");
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
 
@@ -567,9 +683,12 @@ void Editor::EditorMain::Finalize()
 	EditorSessionState::Get().SetCameraRig({});
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
-	SceneManagers->Decommissioning();
+    SceneManagers->BindAudioPlayback(nullptr);
+    ConsoleCommandSystem::Get().SetAudioDiagnosticsReader({});
+    m_audioPlayback->Shutdown();
+    m_audioCatalog->Clear();
+    m_audioHost->Shutdown();
     m_projectLayers.reset();
-	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 
 	EditorSettingsStore::Get().Save();
 	std::printf("[SHUTDOWN] EditorSettingsStore::Save 반환\n");
@@ -597,6 +716,7 @@ void Editor::EditorMain::Finalize()
 	//   해체된 뒤라 새 작업이 들어올 곳이 없다.
 	ce::get_thread_pool().shutdown();
 
+    ce::dx_capture::deep_capture().shutdown();
 	ce::profiler().shutdown();
 }
 
@@ -766,8 +886,40 @@ void Editor::EditorMain::Update()
 			ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
 			SceneManagers->DisableOrEnable();
 			SceneManagers->EndOfFrame();
+			SceneManagers->CollectManagedAtFrameBoundary();
 		}
 	}
+
+
+    const auto audioRevision = EditorAssetDatabase::Get().AudioRevision();
+    if (audioRevision != m_audioRevision)
+    {
+        std::string error;
+        if (!m_audioCatalog->LoadEditorAssets(PathFinder::Relative(),
+            PathFinder::Relative().parent_path() / "Library" / "AudioClipImports", error))
+        {
+            Debug::PrintLog(spdlog::level::err, "[audio.catalog.reload] " + error);
+        }
+        m_audioRevision = audioRevision;
+        SceneManagers->RefreshAudioClipKeys();
+    }
+    editor::sound_graph_editing::TickPreview(m_audioPlayback.get());
+    m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
+    const auto audioCounters = m_audioHost->Counters();
+    const auto updateNanoseconds = audioCounters.runtimeUpdateNanoseconds;
+    const auto histogramIndex = std::min<std::size_t>(updateNanoseconds / 1000u, m_audioUpdateHistogram.size() - 1u);
+    ++m_audioUpdateHistogram[histogramIndex];
+    ++m_audioUpdateSamples;
+    if (audioCounters.voices.physical == 128u)
+    {
+        ++m_audio128UpdateSamples;
+        if (updateNanoseconds > 1000000u)
+        {
+            ++m_audio128UpdatesOverOneMillisecond;
+        }
+    }
+    m_audioPlayback->Update();
+    wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);
 
 	const std::uint32_t profileFrame = Time->GetFrameCount();
 	ResourceCounterWindow::PublishFromGameThread(profileFrame);
@@ -835,8 +987,24 @@ void Editor::EditorMain::OnGui()
         ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
         sceneLock.lock();
     }
+    // Remote controls and bounded immutable scene snapshots share the existing
+    // owner/lifetime boundary, including hidden-UI frames. No viewer I/O or
+    // capture analysis runs here, and no second scene mutex is introduced.
+    editor::pump_profiler_viewer();
+    // Acceptance is not installation. Show the new environment only after its
+    // render-thread application was recorded; failures preserve overlay state.
+    // Keep this before the hidden-UI return so completion is consumed there too.
+    const auto environment = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+    if (environment.appliedRequestId != 0 && environment.appliedRequestId != m_lastAppliedEnvironmentRequest)
+    {
+        m_lastAppliedEnvironmentRequest = environment.appliedRequestId;
+        editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
+    }
     if (EditorSessionState::Get().IsGameViewHidden())
     {
+        // Hidden UI never reaches EditorRenderer's demand sweep. Drop only CPU
+        // preview subscribers here; native ImGui/GPU retirement is unchanged.
+        EditorImGuiTexture::Shutdown();
         if (auto* cameraRig = EditorSessionState::Get().CameraRig())
         {
             cameraRig->BeginPresentationFrame(false);
@@ -846,10 +1014,10 @@ void Editor::EditorMain::OnGui()
 
     {
         ce::profile_scope begin{ ce::marker<"ImGuiBeginFrame">() };
-        m_editorRenderer->BeginRender();
+        m_editorRenderer->BeginRender(sceneLock);
     }
-    // 아직 live 패널의 비소유 texture ID를 만들지 않았다. 불변 capture의 긴
-    // timeline 순회를 먼저 끝내야 GT가 이 표시 비용 때문에 기다리지 않는다.
+    // The legacy Frame Profiler window is now only a launch/focus route. Keep
+    // the shell's window-request processing outside the scene lifetime lock.
     sceneLock.unlock();
     {
         ce::profile_scope profiler{ ce::marker<"ImGuiProfilerPanel">() };
@@ -859,7 +1027,7 @@ void Editor::EditorMain::OnGui()
         ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
         sceneLock.lock();
     }
-    // NewFrame과 오래 걸릴 수 있는 프로파일러 표시 뒤에서 판독한다. 카메라를
+    // NewFrame과 창 요청 처리 뒤에서 판독한다. 카메라를
     // 조작하는 PT가 같은 주기로 읽으며, GT InputManager의 초기화와 무관하다.
     if (auto* cameraRig = EditorSessionState::Get().CameraRig())
     {
@@ -867,8 +1035,9 @@ void Editor::EditorMain::OnGui()
         cameraRig->BeginPresentationFrame(!IsIconic(EditorWindowHandle()) &&
             GetForegroundWindow() == EditorWindowHandle());
     }
-    // 나머지 패널은 live Scene과 texture를 참조한다. CPU draw data에 자원
-    // 소유권이 없으므로 제출까지 잠금을 유지하고, 무조건 unlock하지 않는다.
+    // 라이브 패널과 사용자 draw callback은 아직 씬을 읽는다. 백엔드 기록이
+    // 이를 호스트 소유 GPU 자원과 표시 소비 lease로 바꿀 때까지만 잠근다.
+    // 이후 큐 진입·GPU 대기·Present는 씬 잠금 밖에서 진행한다.
     ce::profile_scope ui{ ce::marker<"PresentationUI">() };
     {
         ce::profile_scope menu{ ce::marker<"ImGuiMenuBar">() };
@@ -880,7 +1049,10 @@ void Editor::EditorMain::OnGui()
     }
     {
         ce::profile_scope submit{ ce::marker<"ImGuiRenderPresent">() };
-        m_editorRenderer->EndRender();
+        m_editorRenderer->EndRender([&sceneLock]
+        {
+            sceneLock.unlock();
+        });
     }
 }
 
@@ -889,4 +1061,3 @@ void Editor::EditorMain::InvokeResizeFlag()
 	m_isInvokeResize.store(true, std::memory_order_release);
 	m_presentationWake.notify_one();
 }
-

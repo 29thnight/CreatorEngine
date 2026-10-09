@@ -66,8 +66,6 @@ public:
     static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     // b0에 올라가는 라이팅 상수. HLSL의 cbuffer와 배치가 같아야 한다.
     struct LightingConstants
     {

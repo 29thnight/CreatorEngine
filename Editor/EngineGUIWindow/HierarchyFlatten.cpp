@@ -117,14 +117,38 @@ void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& fil
 	// 슬롯 0 은 씬 자신이다. 머리 행은 늘 펼쳐져 있다(옛 SetNextItemOpen(true, Always)).
 	m_rows.push_back({ 0, 0, 0, hierarchy_row_kind::scene_group, true, true });
 
-	// 루트를 슬롯 순서로 모은다 — 옛 `for (int i = 1; i < sceneObjects.size(); ++i)`
-	// 두 벌과 같은 차례이고, 그래서 화면에 줄이 놓이는 순서가 달라지지 않는다.
+	// Authoring order belongs to hierarchy children, never recycled storage slots.
 	std::vector<int> roots;
 	std::vector<int> dontDestroyRoots;
-	for (int index = 1; index < count; ++index)
+	std::vector<int> orderedSlots;
+	std::vector<std::uint8_t> visited(static_cast<std::size_t>(count), 0);
+	if (auto* root = entityAt(0))
 	{
+		const auto& children = root->GetChildrenIndices();
+		for (auto it = children.rbegin(); it != children.rend(); ++it)
+		{
+			orderedSlots.push_back(static_cast<int>(*it));
+		}
+	}
+	while (!orderedSlots.empty())
+	{
+		const int index = orderedSlots.back();
+		orderedSlots.pop_back();
+		if (index <= 0 || index >= count || visited[index])
+		{
+			continue;
+		}
+		visited[index] = 1;
 		Entity* obj = entityAt(index);
-		if (!obj) continue;
+		if (!obj)
+		{
+			continue;
+		}
+		const auto& children = obj->GetChildrenIndices();
+		for (auto it = children.rbegin(); it != children.rend(); ++it)
+		{
+			orderedSlots.push_back(static_cast<int>(*it));
+		}
 
 		if (obj->IsDontDestroyOnLoad())
 		{

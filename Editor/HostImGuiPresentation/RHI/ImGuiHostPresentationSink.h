@@ -1,22 +1,34 @@
 #pragma once
 
+#if defined(CE_PLAYER)
+#error "Editor ImGui presentation is unavailable to Player; use native RHI presentation."
+#endif
+
 #include "IImGuiHost.h"
 #include "RHI/IDisplayPresentationSink.h"
+#include <functional>
+#include <utility>
 
-// IImGuiHost를 Core의 표시 sink 계약 뒤로 위임하는 공용 어댑터(E4-6c).
-// E4-6a 때 Editor/Player 각자에 있던 ~20줄 중복이 여기로 합쳐졌다 —
-// 두 Host 모두 이 타입을 SetDisplayPresentationSink로 설치한다.
+// Editor의 IImGuiHost를 Core의 표시 sink 계약 뒤로 위임한다.
+// Player는 native RHI 표시 경로를 사용하며 이 어댑터를 설치하지 않는다.
 // 셸이 아직 Initialize 전이어도 위임은 안전하다(비활성 셸은 no-op/0).
 struct ImGuiHostPresentationSink final : IDisplayPresentationSink
 {
+    explicit ImGuiHostPresentationSink(std::function<void()> onDisplayAvailable = {})
+        : m_onDisplayAvailable(std::move(onDisplayAvailable))
+    {
+    }
+
     bool IsActive() const override { return GetImGuiHost().IsActive(); }
     const char* GetName() const override
     {
         return GetImGuiHost().GetBackendName();
     }
-    uint64_t OpenSharedTexture(void* sharedHandle) override
+    uint64_t OpenSharedTexture(void* sharedHandle,
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override
     {
-        const uint64_t textureId = GetImGuiHost().OpenSharedTexture(sharedHandle);
+        const uint64_t textureId = GetImGuiHost().OpenSharedTexture(
+            sharedHandle, std::move(consumerLease));
         // 폴백 검정 텍스처는 완료 장면의 픽셀이 아니므로 준비된 bundle로 게시하지 않는다.
         return textureId == GetImGuiHost().GetFallbackTextureId() ? 0 : textureId;
     }
@@ -29,4 +41,14 @@ struct ImGuiHostPresentationSink final : IDisplayPresentationSink
     {
         return GetImGuiHost().GetCpuFrameTexture(key);
     }
+    void NotifyDisplayAvailable() override
+    {
+        if (m_onDisplayAvailable)
+        {
+            m_onDisplayAvailable();
+        }
+    }
+
+private:
+    std::function<void()> m_onDisplayAvailable;
 };

@@ -87,6 +87,8 @@ PROJECTS = {
     'EngineEntry': ('Editor/EngineEntry', 6),
     'EngineGUIWindow': ('Editor/EngineGUIWindow', 6),
     'Player': ('Player', 6),
+    # Shared bootstrap and role-neutral command values; no Editor dependency.
+    'RuntimeHost': ('Engine/RuntimeHost', 6),
 }
 
 # 실제 MSBuild 프로젝트 그래프. ImGuiHelper는 presentation 층이므로 Runtime

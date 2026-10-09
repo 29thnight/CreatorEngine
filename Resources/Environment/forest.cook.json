@@ -1,10 +1,10 @@
 {
   "schemaVersion": 5,
   "artifact": "forest.ceibl",
-  "artifactSha256": "7b4e9ad53d806195b2fdf4af2cb0ac39dc2709524028eb2707d5dd3d9a631acb",
+  "artifactSha256": "a59cdd4ea3a4fd04650bd13df61ab8c8a75970e3fb1943ac800eb6ca9b65aff4",
   "source": "Blender 5.1.1 release/datafiles/studiolights/world/forest.exr",
   "sourceSha256": "bdf2298244affa0f85509380fd130ac6d4dfaa3c856df065998f7f4c1a93dc0d",
-  "recipeSha256": "c40f0bc775d49d61f81ae29259aca9973b58e6a3dc8da109179b8b97a98b691a",
+  "recipeSha256": "1aa59ce5f719a0df15de399772b360084b02df71a2a858aa16884ca6944d76f9",
   "cubeSize": 512,
   "irradianceSize": 64,
   "environmentMipLevels": 7,

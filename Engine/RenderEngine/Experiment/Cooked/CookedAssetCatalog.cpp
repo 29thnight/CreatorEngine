@@ -1,6 +1,5 @@
 #include "CookedAssetCatalog.h"
 #include "CookedAudioClipSource.h"
-#include "CookedMaterialProgram.h"
 
 #include <algorithm>
 #include <set>
@@ -9,28 +8,6 @@
 
 namespace experiment::cooked
 {
-    bool CookedAssetCatalog::OpenMaterialProgram(const AssetId& assetId,
-        const ArtifactByteSource& bytes, const material_graph::Budget& budget,
-        material_graph::CookedProgram& out, std::string& failure) const
-    {
-        const auto* entry = Find(assetId);
-        if (!entry || entry->kind != CookedAssetKind::MaterialProgram)
-        {
-            failure = "Material graph has no cooked program in the catalog.";
-            return false;
-        }
-        for (const auto& dependency : entry->dependencies)
-        {
-            const auto* texture = Find(dependency);
-            if (!texture || texture->kind != CookedAssetKind::Texture)
-            {
-                failure = "Cooked material texture dependency is missing or has the wrong kind.";
-                return false;
-            }
-        }
-        return OpenCookedMaterialProgram(*entry, bytes, budget, out, failure);
-    }
-
     CookedAssetCatalog CookedAssetCatalog::Load(
         std::span<const std::byte> manifestBytes,
         std::filesystem::path derivedRoot,
@@ -96,10 +73,21 @@ namespace experiment::cooked
     {
         out.clear();
         const auto* entry = Find(assetId);
-        std::uint64_t size = 0;
         if (!entry || entry->kind != CookedAssetKind::CollisionGeometry || entry->formatVersion != 1 ||
-            !IsCollisionGeometryArtifactVirtualPath(entry->artifactPath) ||
-            !bytes.Size(entry->artifactPath, size, failure) || size != entry->byteSize || size < 68 || size > 256 * 1024 * 1024)
+            !IsCollisionGeometryArtifactVirtualPath(entry->artifactPath))
+        {
+            failure = "Collision geometry artifact missing or incompatible";
+            return false;
+        }
+        own::shared_owner<const ArtifactByteSource> exactBytes;
+        if (!bytes.CaptureArtifact(entry->artifactPath, exactBytes, failure))
+        {
+            return false;
+        }
+        const auto& source = exactBytes ? *exactBytes : bytes;
+        std::uint64_t size = 0;
+        if (!source.Size(entry->artifactPath, size, failure)
+            || size != entry->byteSize || size < 68 || size > 256 * 1024 * 1024)
         {
             failure = "Collision geometry artifact missing or incompatible";
             return false;
@@ -107,7 +95,10 @@ namespace experiment::cooked
         try
         {
             std::vector<std::byte> prepared(static_cast<std::size_t>(size));
-            if (!bytes.ReadAt(entry->artifactPath, 0, prepared, failure)) return false;
+            if (!source.ReadAt(entry->artifactPath, 0, prepared, failure))
+            {
+                return false;
+            }
 
             Sha256Digest digest;
             if (!ComputeSha256(prepared, digest, failure) || digest != entry->contentSha256)
@@ -222,5 +213,493 @@ namespace experiment::cooked
         }
 
         return true;
+    }
+
+    namespace
+    {
+        [[nodiscard]] std::string MountedIdentityText(const AssetIdentity& identity)
+        {
+            std::string text = Uuid::ToString(identity.assetId.value);
+            if (identity.subassetId.IsValid())
+            {
+                text += "/" + Uuid::ToString(identity.subassetId.value);
+            }
+            return text;
+        }
+
+        [[nodiscard]] bool SameMountedDefinition(const AssetSetManifest& leftManifest,
+            const AssetSetEntry& left, const AssetSetManifest& rightManifest, const AssetSetEntry& right)
+        {
+            const AssetBlobRecord& leftBlob = leftManifest.blobs[left.blobIndex];
+            const AssetBlobRecord& rightBlob = rightManifest.blobs[right.blobIndex];
+            // Locator paths are mount-local, not part of an immutable content
+            // definition. Every semantic/compatibility field must still match.
+            return left.asset == right.asset && left.dependencies == right.dependencies
+                && leftBlob.kind == rightBlob.kind && leftBlob.representation == rightBlob.representation
+                && leftBlob.schemaVersion == rightBlob.schemaVersion && leftBlob.byteSize == rightBlob.byteSize
+                && leftBlob.contentSha256 == rightBlob.contentSha256
+                && leftBlob.targetPlatform == rightBlob.targetPlatform && leftBlob.targetAbi == rightBlob.targetAbi;
+        }
+
+        [[nodiscard]] std::string MountedSourceText(AssetDepot::AssetMountId mountId,
+            const AssetSetManifest& manifest, const AssetSetEntry& entry)
+        {
+            return "mount " + std::to_string(mountId.value) + ", AssetSet "
+                + Uuid::ToString(manifest.assetSetId.value) + " revision " + std::to_string(manifest.revision)
+                + ", " + manifest.blobs[entry.blobIndex].artifactPath;
+        }
+
+        [[nodiscard]] bool MountIssue(std::vector<AssetManifestIssue>& outIssues,
+            std::string context, std::string message)
+        {
+            outIssues.push_back({ std::move(context), std::move(message) });
+            return false;
+        }
+    }
+
+    bool CookedAssetCatalog::IsMounted(AssetDepot::AssetMountId mountId) const noexcept
+    {
+        return std::ranges::any_of(m_mounts, [mountId](const MountedAssetSet& mount)
+        {
+            return mount.mountId == mountId;
+        });
+    }
+
+    bool CookedAssetCatalog::WithMountedAssetSet(const AssetSetManifest& manifest,
+        own::shared_owner<const ArtifactByteSource> byteSource, AssetDepot::AssetMountId mountId,
+        std::uint64_t nextResolverRevision, const AssetSetMountOptions& options,
+        CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const
+    {
+        return AddMountedAssetSetCandidate(manifest, std::move(byteSource), mountId,
+            nextResolverRevision, options, true, outCatalog, outIssues);
+    }
+
+    bool CookedAssetCatalog::WithMountedAssetSets(std::span<const AssetSetMountInput> inputs,
+        std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
+        std::vector<AssetManifestIssue>& outIssues) const
+    {
+        outIssues.clear();
+        if (&outCatalog == this || inputs.empty() || inputs.size() > 64u
+            || nextResolverRevision <= m_resolverRevision
+            || nextResolverRevision - m_resolverRevision < inputs.size())
+        {
+            return MountIssue(outIssues, "catalog.mountGroup",
+                "Mount group requires 1..64 inputs, an independent output and a monotonic revision range.");
+        }
+        auto candidate = *this;
+        auto revision = nextResolverRevision - inputs.size();
+        for (const auto& input : inputs)
+        {
+            CookedAssetCatalog next;
+            if (!candidate.AddMountedAssetSetCandidate(input.manifest, input.byteSource,
+                input.mountId, ++revision, input.options, false, next, outIssues))
+            {
+                return false;
+            }
+            candidate = std::move(next);
+        }
+        AssetCatalogLookupIssue lookupIssue;
+        if (!candidate.ValidateMountedHardGraph(lookupIssue))
+        {
+            return MountIssue(outIssues, "catalog.hardClosure", std::move(lookupIssue.message));
+        }
+        outCatalog = std::move(candidate);
+        return true;
+    }
+
+    bool CookedAssetCatalog::AddMountedAssetSetCandidate(const AssetSetManifest& manifest,
+        own::shared_owner<const ArtifactByteSource> byteSource, AssetDepot::AssetMountId mountId,
+        std::uint64_t nextResolverRevision, const AssetSetMountOptions& options, bool validateHardGraph,
+        CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const
+    {
+        outIssues.clear();
+        if (&outCatalog == this)
+        {
+            return MountIssue(outIssues, "catalog.mount", "The immutable candidate must not alias its input snapshot.");
+        }
+        if (!mountId.IsValid() || IsMounted(mountId))
+        {
+            return MountIssue(outIssues, "catalog.mountId", "Mount ID is invalid or already active.");
+        }
+        if (!byteSource)
+        {
+            return MountIssue(outIssues, "catalog.byteSource",
+                "Mount requires an owned immutable artifact byte source.");
+        }
+        if (nextResolverRevision <= m_resolverRevision)
+        {
+            return MountIssue(outIssues, "catalog.resolverRevision", "Resolver revision must advance monotonically.");
+        }
+        if (options.expectedTargetPlatform.empty() || options.expectedTargetAbi.empty()
+            || manifest.targetPlatform != options.expectedTargetPlatform
+            || manifest.targetAbi != options.expectedTargetAbi
+            || (!m_targetPlatform.empty() && m_targetPlatform != options.expectedTargetPlatform)
+            || (!m_targetAbi.empty() && m_targetAbi != options.expectedTargetAbi))
+        {
+            return MountIssue(outIssues, "catalog.target",
+                "AssetSet platform/ABI does not match the host resolver target.");
+        }
+
+        MountedAssetSet mounted;
+        mounted.mountId = mountId;
+        mounted.byteSource = std::move(byteSource);
+        if (!NormalizeAssetSetManifest(manifest, mounted.manifest, outIssues))
+        {
+            return false;
+        }
+        std::set<AssetIdentity> overrides;
+        for (const AssetIdentity& identity : options.overrideIdentities)
+        {
+            if (!overrides.insert(identity).second)
+            {
+                return MountIssue(outIssues, "catalog.overrides",
+                    "Duplicate override identity: " + MountedIdentityText(identity));
+            }
+        }
+        mounted.definitionRevisions.reserve(mounted.manifest.entries.size());
+        for (const AssetSetEntry& entry : mounted.manifest.entries)
+        {
+            const auto existing = m_mountedEntries.find(entry.asset.key);
+            const bool overrideRequested = overrides.erase(entry.asset.key) != 0u;
+            if (existing == m_mountedEntries.end())
+            {
+                if (overrideRequested)
+                {
+                    return MountIssue(outIssues, "catalog.overrides", "Override has no mounted definition: "
+                        + MountedIdentityText(entry.asset.key));
+                }
+                mounted.definitionRevisions.push_back(0u);
+                continue;
+            }
+
+            const MountedEntryLocation& location = existing->second;
+            const MountedAssetSet& previousMount = m_mounts[location.mountIndex];
+            const AssetSetEntry& previous = previousMount.manifest.entries[location.entryIndex];
+            if (SameMountedDefinition(previousMount.manifest, previous, mounted.manifest, entry))
+            {
+                if (overrideRequested)
+                {
+                    return MountIssue(outIssues, "catalog.overrides",
+                        "Override names an identical, non-conflicting definition: "
+                        + MountedIdentityText(entry.asset.key));
+                }
+                mounted.definitionRevisions.push_back(previousMount.definitionRevisions[location.entryIndex]);
+                continue;
+            }
+            if (!overrideRequested)
+            {
+                return MountIssue(outIssues, "catalog.conflict." + MountedIdentityText(entry.asset.key),
+                    "Conflicting definitions require an explicit identity override. Existing: "
+                    + MountedSourceText(previousMount.mountId, previousMount.manifest, previous) + "; incoming: "
+                    + MountedSourceText(mountId, mounted.manifest, entry));
+            }
+            mounted.definitionRevisions.push_back(nextResolverRevision);
+        }
+        if (!overrides.empty())
+        {
+            return MountIssue(outIssues, "catalog.overrides", "Override identity is absent from the incoming AssetSet: "
+                + MountedIdentityText(*overrides.begin()));
+        }
+
+        CookedAssetCatalog candidate = *this;
+        candidate.m_mounts.push_back(std::move(mounted));
+        candidate.m_resolverRevision = nextResolverRevision;
+        candidate.m_targetPlatform = options.expectedTargetPlatform;
+        candidate.m_targetAbi = options.expectedTargetAbi;
+        candidate.RebuildMountedIndex();
+        AssetCatalogLookupIssue lookupIssue;
+        if (validateHardGraph && !candidate.ValidateMountedHardGraph(lookupIssue))
+        {
+            return MountIssue(outIssues, "catalog.hardClosure", std::move(lookupIssue.message));
+        }
+        outCatalog = std::move(candidate);
+        return true;
+    }
+
+    bool CookedAssetCatalog::WithoutMountedAssetSet(AssetDepot::AssetMountId mountId,
+        std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
+        std::vector<AssetManifestIssue>& outIssues) const
+    {
+        outIssues.clear();
+        if (&outCatalog == this)
+        {
+            return MountIssue(outIssues, "catalog.unmount",
+                "The immutable candidate must not alias its input snapshot.");
+        }
+        if (!mountId.IsValid() || !IsMounted(mountId))
+        {
+            return MountIssue(outIssues, "catalog.mountId", "Mount ID is not active in this resolver snapshot.");
+        }
+        if (nextResolverRevision <= m_resolverRevision)
+        {
+            return MountIssue(outIssues, "catalog.resolverRevision", "Resolver revision must advance monotonically.");
+        }
+
+        CookedAssetCatalog candidate = *this;
+        std::erase_if(candidate.m_mounts, [mountId](const MountedAssetSet& mount)
+        {
+            return mount.mountId == mountId;
+        });
+        candidate.m_resolverRevision = nextResolverRevision;
+        candidate.RebuildMountedIndex();
+        // Unlike mount, explicit logical removal may break surviving external
+        // hard edges. New closure lookup must fail instead of borrowing a removed
+        // mount from an old snapshot. No source unmap/delete occurs here.
+        outCatalog = std::move(candidate);
+        return true;
+    }
+
+    void CookedAssetCatalog::RebuildMountedIndex()
+    {
+        m_mountedEntries.clear();
+        for (std::size_t mountIndex = 0u; mountIndex < m_mounts.size(); ++mountIndex)
+        {
+            const MountedAssetSet& mount = m_mounts[mountIndex];
+            for (std::size_t entryIndex = 0u; entryIndex < mount.manifest.entries.size(); ++entryIndex)
+            {
+                const AssetSetEntry& entry = mount.manifest.entries[entryIndex];
+                const MountedEntryLocation location{ mountIndex, entryIndex };
+                const auto [existing, inserted] = m_mountedEntries.emplace(entry.asset.key, location);
+                if (inserted)
+                {
+                    continue;
+                }
+                const MountedEntryLocation& previousLocation = existing->second;
+                const MountedAssetSet& previousMount = m_mounts[previousLocation.mountIndex];
+                const std::uint64_t previousRank = previousMount.definitionRevisions[previousLocation.entryIndex];
+                const std::uint64_t incomingRank = mount.definitionRevisions[entryIndex];
+                if (incomingRank > previousRank
+                    || (incomingRank == previousRank && mount.mountId < previousMount.mountId))
+                {
+                    existing->second = location;
+                }
+            }
+        }
+    }
+
+    ResolvedAssetEntry CookedAssetCatalog::ResolveMountedEntry(const MountedEntryLocation& location) const
+    {
+        const MountedAssetSet& mount = m_mounts[location.mountIndex];
+        const AssetSetEntry& entry = mount.manifest.entries[location.entryIndex];
+        return { mount.mountId, mount.manifest.assetSetId, mount.manifest.revision,
+            m_resolverRevision, entry, mount.manifest.blobs[entry.blobIndex], mount.byteSource };
+    }
+
+    AssetLookupStatus CookedAssetCatalog::Find(const TypedAssetReference& asset, ResolvedAssetEntry& out) const
+    {
+        const TypedAssetReference reference = asset;
+        out = {};
+        const auto found = m_mountedEntries.find(reference.key);
+        if (found == m_mountedEntries.end())
+        {
+            return AssetLookupStatus::NotMounted;
+        }
+        const MountedEntryLocation& location = found->second;
+        if (m_mounts[location.mountIndex].manifest.entries[location.entryIndex].asset.kind != reference.kind)
+        {
+            return AssetLookupStatus::TypeMismatch;
+        }
+        out = ResolveMountedEntry(location);
+        return AssetLookupStatus::Found;
+    }
+
+    std::vector<TypedAssetReference> CookedAssetCatalog::ListRoots(
+        AssetDepot::AssetMountId mountId, CookedAssetKind kind) const
+    {
+        std::vector<TypedAssetReference> roots;
+        const auto mount = std::ranges::find_if(m_mounts, [mountId](const MountedAssetSet& mounted)
+        {
+            return mounted.mountId == mountId;
+        });
+        if (mount == m_mounts.end())
+        {
+            return roots;
+        }
+        for (const TypedAssetReference& root : mount->manifest.roots)
+        {
+            if (root.kind == kind)
+            {
+                roots.push_back(root);
+            }
+        }
+        return roots;
+    }
+
+    AssetLookupStatus CookedAssetCatalog::TraverseHardClosure(const TypedAssetReference& root,
+        std::map<AssetIdentity, std::uint8_t>& states, std::vector<ResolvedAssetEntry>* outOrdered,
+        AssetCatalogLookupIssue& outIssue) const
+    {
+        struct Frame final
+        {
+            MountedEntryLocation location{};
+            std::size_t nextDependency{};
+        };
+        std::vector<Frame> stack;
+        const auto fail = [&](AssetLookupStatus status, const TypedAssetReference& asset)
+        {
+            outIssue = {};
+            outIssue.status = status;
+            outIssue.asset = asset;
+            for (const Frame& frame : stack)
+            {
+                outIssue.dependencyPath.push_back(
+                    m_mounts[frame.location.mountIndex].manifest.entries[frame.location.entryIndex].asset);
+            }
+            outIssue.dependencyPath.push_back(asset);
+            if (status == AssetLookupStatus::NotMounted)
+            {
+                outIssue.message = "Hard dependency is NotMounted: ";
+            }
+            else if (status == AssetLookupStatus::TypeMismatch)
+            {
+                outIssue.message = "Hard dependency type mismatch: ";
+            }
+            else
+            {
+                outIssue.message = "Hard dependency ownership cycle: ";
+            }
+            bool first = true;
+            for (const TypedAssetReference& pathAsset : outIssue.dependencyPath)
+            {
+                if (!first)
+                {
+                    outIssue.message += " -> ";
+                }
+                first = false;
+                outIssue.message += MountedIdentityText(pathAsset.key) + " (kind "
+                    + std::to_string(static_cast<unsigned>(pathAsset.kind)) + ")";
+            }
+            return status;
+        };
+        const auto enter = [&](const TypedAssetReference& asset)
+        {
+            const auto found = m_mountedEntries.find(asset.key);
+            if (found == m_mountedEntries.end())
+            {
+                return fail(AssetLookupStatus::NotMounted, asset);
+            }
+            const MountedEntryLocation& location = found->second;
+            if (m_mounts[location.mountIndex].manifest.entries[location.entryIndex].asset.kind != asset.kind)
+            {
+                return fail(AssetLookupStatus::TypeMismatch, asset);
+            }
+            std::uint8_t& state = states[asset.key];
+            if (state == 1u)
+            {
+                return fail(AssetLookupStatus::HardDependencyCycle, asset);
+            }
+            if (state == 0u)
+            {
+                state = 1u;
+                stack.push_back({ location, 0u });
+            }
+            return AssetLookupStatus::Found;
+        };
+
+        AssetLookupStatus status = enter(root);
+        if (status != AssetLookupStatus::Found)
+        {
+            return status;
+        }
+        while (!stack.empty())
+        {
+            Frame& frame = stack.back();
+            const AssetSetEntry& entry =
+                m_mounts[frame.location.mountIndex].manifest.entries[frame.location.entryIndex];
+            if (frame.nextDependency == entry.dependencies.size())
+            {
+                states[entry.asset.key] = 2u;
+                if (outOrdered)
+                {
+                    outOrdered->push_back(ResolveMountedEntry(frame.location));
+                }
+                stack.pop_back();
+                continue;
+            }
+            const AssetDependency& edge = entry.dependencies[frame.nextDependency++];
+            if (edge.kind == AssetDependencyKind::Hard)
+            {
+                status = enter(edge.target);
+                if (status != AssetLookupStatus::Found)
+                {
+                    return status;
+                }
+            }
+        }
+        return AssetLookupStatus::Found;
+    }
+
+    bool CookedAssetCatalog::ValidateMountedHardGraph(AssetCatalogLookupIssue& outIssue) const
+    {
+        outIssue = {};
+        // Every advertised root must retain its expected kind under an explicit
+        // override. Missing loadable targets are allowed, but a mounted target
+        // of the wrong kind is already a known reference-integrity error.
+        for (const MountedAssetSet& mount : m_mounts)
+        {
+            for (const TypedAssetReference& root : mount.manifest.roots)
+            {
+                const auto found = m_mountedEntries.find(root.key);
+                const MountedEntryLocation& location = found->second;
+                if (m_mounts[location.mountIndex].manifest.entries[location.entryIndex].asset.kind != root.kind)
+                {
+                    outIssue.status = AssetLookupStatus::TypeMismatch;
+                    outIssue.asset = root;
+                    outIssue.dependencyPath = { root };
+                    outIssue.message = "Mounted root type mismatch: " + MountedIdentityText(root.key)
+                        + " declared by mount " + std::to_string(mount.mountId.value);
+                    return false;
+                }
+            }
+        }
+        std::map<AssetIdentity, std::uint8_t> states;
+        for (const auto& [identity, location] : m_mountedEntries)
+        {
+            const AssetSetEntry& entry = m_mounts[location.mountIndex].manifest.entries[location.entryIndex];
+            for (const AssetDependency& edge : entry.dependencies)
+            {
+                if (edge.kind != AssetDependencyKind::Loadable)
+                {
+                    continue;
+                }
+                const auto target = m_mountedEntries.find(edge.target.key);
+                if (target != m_mountedEntries.end())
+                {
+                    const MountedEntryLocation& targetLocation = target->second;
+                    const AssetSetEntry& targetEntry =
+                        m_mounts[targetLocation.mountIndex].manifest.entries[targetLocation.entryIndex];
+                    if (targetEntry.asset.kind != edge.target.kind)
+                    {
+                        outIssue.status = AssetLookupStatus::TypeMismatch;
+                        outIssue.asset = edge.target;
+                        outIssue.dependencyPath = { entry.asset, edge.target };
+                        outIssue.message = "Mounted loadable dependency type mismatch: "
+                            + MountedIdentityText(entry.asset.key) + " -> " + MountedIdentityText(edge.target.key);
+                        return false;
+                    }
+                }
+            }
+            if (TraverseHardClosure(entry.asset, states, nullptr, outIssue) != AssetLookupStatus::Found)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    AssetLookupStatus CookedAssetCatalog::CollectHardClosure(const TypedAssetReference& root,
+        std::vector<ResolvedAssetEntry>& outOrdered, AssetCatalogLookupIssue& outIssue) const
+    {
+        const TypedAssetReference reference = root;
+        outOrdered.clear();
+        outIssue = {};
+        std::map<AssetIdentity, std::uint8_t> states;
+        std::vector<ResolvedAssetEntry> candidate;
+        const AssetLookupStatus status = TraverseHardClosure(reference, states, &candidate, outIssue);
+        if (status == AssetLookupStatus::Found)
+        {
+            outOrdered.swap(candidate);
+        }
+        return status;
     }
 }

@@ -58,7 +58,7 @@ namespace RenderTest
             socket->AttachObject(marker);
             marker->Transform_().SetScale({0.12f, 0.12f, 0.12f});
             auto* mesh = marker->GetComponent<MeshRenderer>();
-            auto material = std::make_shared<Material>(*mesh->m_Material);
+            auto material = own::make_shared<Material>(*mesh->m_Material);
             material->UseBaseColorMap(nullptr);
             material->SetBaseColor(0.01f, 1.f, 0.03f);
             material->SetMetallic(0.f);
@@ -116,7 +116,12 @@ namespace RenderTest
             {
                 for (Socket* socket : animator->socketvec)
                 {
-                    if (socket) { socket->DetachAllObject(); delete socket; }
+                    if (socket)
+                    {
+                        socket->DetachAllObject();
+                        socket->ReleaseManagedResources();
+                        delete socket;
+                    }
                 }
                 animator->socketvec.clear();
                 marker->SetEnabled(false);

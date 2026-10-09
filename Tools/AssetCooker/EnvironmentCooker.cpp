@@ -74,7 +74,7 @@ int wmain(int argc,wchar_t** argv)
         { std::cout<<"ENVIRONMENT_COOK_CACHE_MISS\n"; CoUninitialize(); return 3; }
         error.clear();
         const auto start=std::chrono::steady_clock::now();
-        std::shared_ptr<Texture> texture;
+        own::shared_owner<const Texture> texture;
         if (argc==5)
         {
             std::ifstream input(argv[4],std::ios::binary);
@@ -97,13 +97,12 @@ int wmain(int argc,wchar_t** argv)
         EnhancedIBLGenerator generator;
         EnvironmentRequire(generator.Initialize(context,error),error);
         EnvironmentRequire(device.BeginFrame(error),error);
-        const auto uploaded=textures.GetOrUpload(texture.get(),error);
+        const auto uploaded=textures.GetOrUpload((texture ? &*texture.borrow() : nullptr),error);
         EnvironmentRequire(error.empty() && uploaded.IsValid() && !uploaded.isCube,"Environment source upload: "+error);
         EnvironmentRequire(generator.Generate(context,uploaded.handle,uploaded.format,cube,brdf,error),error);
         EnvironmentRequire(generator.QueueCookedCapture(output,identity,error),error);
         EnvironmentRequire(device.EndFrame(error),error);
         EnvironmentRequire(GetRHISubmissionThread().DrainSubmissions(&device,error),error);
-        generator.MarkCookedCaptureSubmitted(device.GetLastSignaledFenceValue());
         device.WaitForGpu();
         const auto generationMs=EnvironmentElapsed(start);
         do
@@ -123,7 +122,7 @@ int wmain(int argc,wchar_t** argv)
         EnvironmentRequire(generator.QueueCookedCapture(roundtrip,identity,error),error);
         EnvironmentRequire(device.EndFrame(error),error);
         EnvironmentRequire(GetRHISubmissionThread().DrainSubmissions(&device,error),error);
-        generator.MarkCookedCaptureSubmitted(device.GetLastSignaledFenceValue()); device.WaitForGpu();
+        device.WaitForGpu();
         const auto uploadMs=EnvironmentElapsed(uploadStart);
         do { EnvironmentRequire(generator.FinishCookedCapture(device.GetCompletedFenceValue(),error),error);
             if (generator.HasPendingCookedCapture()) std::this_thread::sleep_for(std::chrono::milliseconds(5));

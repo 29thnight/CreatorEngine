@@ -65,7 +65,7 @@ namespace
 // 하나가 틀려도 알 수 없다.
 uint32_t EnhancedUIPass::BuildRectsFromQueue(
     UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects,
-    float screenWidth, float screenHeight)
+    float screenWidth, float screenHeight, TextureFramePins* texturePins)
 {
     outRects.clear();
     outRects.reserve(count);
@@ -143,7 +143,9 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         rect.rotation = image->rotation;
         rect.canvasOrder = image->canvasOrder;
         rect.layerOrder = image->layerOrder;
-        rect.texture = image->texture.get();
+        rect.texturePinIndex = texturePins ? texturePins->Retain(image->texture)
+            : TextureFramePins::InvalidIndex;
+        rect.texture = (image->texture ? &*image->texture.borrow() : nullptr);
 
         outRects.push_back(rect);
     }
@@ -273,7 +275,7 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
         m_instances.push_back(instance);
 
         // 앞 배치와 텍스처가 같으면 이어 붙인다.
-        if (!m_batches.empty() && m_batches.back().texture == rect.texture)
+        if (!m_batches.empty() && m_batches.back().textureId == TextureFramePins::Identity(rect.texture))
         {
             ++m_batches.back().count;
         }
@@ -282,7 +284,9 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
+            batch.texturePinIndex = rect.texturePinIndex;
             batch.texture = rect.texture;
+            batch.textureId = TextureFramePins::Identity(rect.texture);
             m_batches.push_back(batch);
         }
     }
@@ -301,8 +305,8 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
             std::string uploadError;
             // nullptr은 캐시의 1x1 흰색으로 해석된다 — 단색 사각형 계약.
             batch.uploaded =
-                context.textureCache->GetOrUpload(batch.texture, uploadError);
-            if (!batch.uploaded.IsValid() && !uploadError.empty())
+                context.textureCache->GetOrUpload(batch.texture, context.TextureImage(batch.texture), uploadError);
+            if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "UI 텍스처 업로드 실패: " + uploadError;
                 return false;
@@ -337,15 +341,46 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
         m_output = m_inputs.color;
     }
 
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+    }
+    const auto colorAccess = explicitAccess
+        ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto output = m_output;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RHIResourceState::RenderTarget });
+    usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
+    if (explicitAccess)
+    {
+        for (const auto& batch : m_batches)
+        {
+            if (!batch.uploaded.IsValid())
+            {
+                continue;
+            }
+            auto texture = graph.FindImportedTexture(batch.uploaded.handle);
+            if (!texture.IsValid())
+            {
+                texture = graph.ImportTexture(batch.uploaded.handle,
+                    RHIResourceState::PixelShaderResource, "UI.Texture");
+            }
+            if (std::none_of(usages.begin(), usages.end(), [texture](const auto& usage)
+                {
+                    return usage.handle.index == texture.index;
+                }))
+            {
+                usages.push_back({ texture, RHIResourceState::PixelShaderResource, RGAccessMode::Read });
+            }
+        }
+    }
 
     graph.AddPass("UI.Draw", usages,
-        [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        [this, &context, ownsColor, output](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 
@@ -422,6 +457,7 @@ void EnhancedUIPass::Shutdown()
 {
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     m_lastRectCount = 0;
     m_lastBatchCount = 0;
     m_width = 0;

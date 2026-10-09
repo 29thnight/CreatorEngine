@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
@@ -89,7 +89,8 @@ public sealed class ScriptGenerator : IIncrementalGenerator
             if (kind == FieldKind.Unsupported)
                 continue;   // 지원하지 않는 타입은 조용히 건너뛴다(진단은 아래 Emit에서)
 
-            fields.Add(new FieldInfo(field.Name, kind, GetDisplayName(field)));
+            fields.Add(new FieldInfo(field.Name, kind, GetDisplayName(field),
+                field.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
         }
 
         // 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션)의 디스패치 표.
@@ -179,6 +180,16 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         "string"                   => FieldKind.String,
         "string?"                  => FieldKind.String,
         "CreatorEngine.Entity" => FieldKind.Object,
+        "CreatorEngine.AssetLink<CreatorEngine.Texture>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Model>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Mesh>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Skeleton>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.AnimationClip>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.ShaderMeta>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.MaterialProgram>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Material>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.CodeMaterialProgram>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.AuthoredMaterial>" => FieldKind.AssetLink,
         _                          => FieldKind.Unsupported,
     };
 
@@ -298,7 +309,10 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         var matching = new List<(int Index, string Name)>();
         for (int i = 0; i < info.Fields.Length; ++i)
         {
-            if (info.Fields[i].Kind == kind) matching.Add((i, info.Fields[i].Name));
+            if (info.Fields[i].Kind == kind || (kind == FieldKind.String && info.Fields[i].Kind == FieldKind.AssetLink))
+            {
+                matching.Add((i, info.Fields[i].Name));
+            }
         }
 
         if (matching.Count == 0) return;   // 해당 타입 필드가 없으면 기본 구현을 그대로 둔다
@@ -307,7 +321,16 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         foreach ((int index, string name) in matching)
         {
-            sb.AppendLine($"        {index} => {name},");
+            if (info.Fields[index].Kind == FieldKind.AssetLink)
+            {
+                // Direct closed-generic calls keep the lazy link serializer and
+                // exact supported marker visible to the NativeAOT linker.
+                sb.AppendLine($"        {index} => {name}.ToString(),");
+            }
+            else
+            {
+                sb.AppendLine($"        {index} => {name},");
+            }
         }
         sb.AppendLine($"        _ => {fallback},");
         sb.AppendLine("    };");
@@ -319,7 +342,21 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         foreach ((int index, string name) in matching)
         {
-            sb.AppendLine($"            case {index}: {name} = value; break;");
+            if (info.Fields[index].Kind == FieldKind.AssetLink)
+            {
+                sb.AppendLine($"            case {index}:");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                if ({info.Fields[index].TypeName}.TryParse(value, out var link))");
+                sb.AppendLine("                {");
+                sb.AppendLine($"                    {name} = link;");
+                sb.AppendLine("                }");
+                sb.AppendLine("                break;");
+                sb.AppendLine("            }");
+            }
+            else
+            {
+                sb.AppendLine($"            case {index}: {name} = value; break;");
+            }
         }
         sb.AppendLine("        }");
         sb.AppendLine("    }");
@@ -419,9 +456,9 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         isEnabledByDefault: true);
 
     // 값은 CreatorEngine.FieldType과 이름이 같아야 한다(생성 코드가 그대로 찍는다).
-    private enum FieldKind { Unsupported, Float, Int32, Bool, Float3, String, Object, Float2 }
+    private enum FieldKind { Unsupported, Float, Int32, Bool, Float3, String, Object, Float2, AssetLink }
 
-    private sealed record FieldInfo(string Name, FieldKind Kind, string? DisplayName);
+    private sealed record FieldInfo(string Name, FieldKind Kind, string? DisplayName, string TypeName);
 
     private enum BTNodeKind { None, Action, Condition, ConditionDecorator }
 

@@ -3,6 +3,7 @@
 #include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../Texture.h"
 #include "../../Graph/EnhancedRenderGraph.h"
+#include "../../Graph/ShadowCasterBounds.h"
 #include "EnhancedGBufferPass.h"
 
 #include <algorithm>
@@ -12,6 +13,14 @@
 namespace
 {
     constexpr const char *kWorldSpriteShaderFile = "WorldSprite.slang";
+    struct WorldSpriteConstants
+    {
+        math::matrix4x4 viewProjection{};
+        uint32_t instanceBase{};
+        uint32_t padding[3]{};
+    };
+    static_assert(sizeof(WorldSpriteConstants) == 80);
+    static_assert(offsetof(WorldSpriteConstants, instanceBase) == 64);
 
     bool CompileWorldSpriteShader(const char *entry, const char *target, RHIShaderBlob &outBlob, std::string &outError)
     {
@@ -93,6 +102,9 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
     m_viewProjection = context.camera ? context.camera->view * context.camera->projection : math::matrix4x4::identity();
     m_instances.clear();
     m_batches.clear();
+    m_visibilityFrame.reset();
+    m_visibilitySpheres.clear();
+    m_gpuVisibilityEnabled = context.resources && context.resources->GetIndirectDrawCapabilities().nonIndexedDraw;
     m_lastItemCount = 0;
     m_lastBatchCount = 0;
     if (nullptr == m_items || m_items->empty())
@@ -100,6 +112,12 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         return true;
     }
 
+    if (m_items->size() > (std::numeric_limits<uint32_t>::max)())
+    {
+        outError = "Sprite instance count exceeds 32-bit addressing.";
+        return false;
+    }
+    m_visibilitySpheres.reserve(m_items->size());
     std::vector<uint32_t> order(m_items->size());
     for (uint32_t i = 0; i < order.size(); ++i)
     {
@@ -124,8 +142,14 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         instance.uv = item.uv;
         instance.color = item.color;
         m_instances.push_back(instance);
+        EnhancedDrawItem bounds{};
+        bounds.worldMatrix = item.world;
+        // Encloses the procedural [-.5,.5] XY quad, rounded upward.
+        bounds.boundRadius = 0.707107f;
+        const auto sphere = shadow_math::WorldBounds(bounds);
+        m_visibilitySpheres.push_back({sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius});
 
-        if (!m_batches.empty() && m_batches.back().texture == item.texture &&
+        if (!m_batches.empty() && m_batches.back().textureId == TextureFramePins::Identity(item.texture) &&
             m_batches.back().enableDepth == item.enableDepth)
         {
             ++m_batches.back().count;
@@ -135,7 +159,9 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
+            batch.texturePinIndex = item.texturePinIndex;
             batch.texture = item.texture;
+            batch.textureId = TextureFramePins::Identity(item.texture);
             batch.enableDepth = item.enableDepth;
             m_batches.push_back(batch);
         }
@@ -148,13 +174,73 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         for (Batch &batch : m_batches)
         {
             std::string uploadError;
-            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
-            if (!batch.uploaded.IsValid() && !uploadError.empty())
+            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, context.TextureImage(batch.texture), uploadError);
+            if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "스프라이트 텍스처 업로드 실패: " + uploadError;
                 return false;
             }
         }
+    }
+    return true;
+}
+
+bool EnhancedSpritePass::PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError)
+{
+    m_visibilityFrame.reset();
+    if (!m_gpuVisibilityEnabled || m_batches.empty())
+    {
+        outError.clear();
+        return true;
+    }
+    if (!context.resources || !context.resources->GetIndirectDrawCapabilities().nonIndexedDraw ||
+        m_visibilitySpheres.size() != m_instances.size())
+    {
+        outError = "Sprite GPU visibility lost its prepared geometry contract.";
+        return false;
+    }
+    if (!m_visibility.PreparePipelines(context, outError))
+    {
+        return false;
+    }
+    std::vector<GpuGeometryVisibility::Candidate> candidates;
+    std::vector<GpuGeometryVisibility::Bin> bins;
+    candidates.reserve(m_instances.size());
+    bins.reserve(m_batches.size());
+    uint64_t outputOffset = 0;
+    for (const auto& batch : m_batches)
+    {
+        const uint64_t count = batch.count;
+        if (!count || uint64_t(batch.first) + count > m_instances.size() ||
+            outputOffset + count > (std::numeric_limits<uint32_t>::max)())
+        {
+            outError = "Sprite GPU visibility exceeds valid instance/output ranges.";
+            return false;
+        }
+        const uint32_t bin = static_cast<uint32_t>(bins.size());
+        // Deliberate 16B nonindexed prefix of a 20B GPU-produced indexed record.
+        // firstIndex and baseVertex MUST both remain zero (RHI ABI assertions).
+        // Preserve the entire contiguous batch if any instance is visible; GPU
+        // compaction may not reorder blending or change original instance IDs.
+        bins.push_back({4u, 0u, 0, batch.count});
+        for (uint32_t local = 0; local < batch.count; ++local)
+        {
+            const auto sphere = m_visibilitySpheres[batch.first + local];
+            const uint32_t flags = sphere.w > 0.f ? 0u : GpuGeometryVisibility::kConservative;
+            candidates.push_back({sphere, bin, local, static_cast<uint32_t>(outputOffset), flags});
+        }
+        outputOffset += count;
+        outputOffset = (outputOffset + GpuGeometryVisibility::kOutputAlignment - 1u) &
+            ~(uint64_t(GpuGeometryVisibility::kOutputAlignment) - 1u);
+    }
+    if (!m_visibility.Prepare(context, m_viewProjection, candidates, bins, m_visibilityFrame, outError))
+    {
+        return false;
+    }
+    if (!m_visibilityFrame)
+    {
+        outError = "Sprite GPU visibility did not produce a supported indirect frame.";
+        return false;
     }
     return true;
 }
@@ -167,6 +253,15 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
         return;
     }
 
+    const auto visibility = m_visibilityFrame;
+    if (m_gpuVisibilityEnabled && !visibility)
+    {
+        throw std::runtime_error("Sprite GPU visibility must be prepared before graph declaration.");
+    }
+    if (visibility)
+    {
+        visibility->Declare(graph);
+    }
     const bool ownsColor = !m_inputs.color.IsValid();
     if (ownsColor)
     {
@@ -223,8 +318,12 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
         }
     }
 
+    if (visibility)
+    {
+        visibility->AddReadUsages(graph, usages);
+    }
     graph.AddPass(
-        GetName(), usages, [this, &context, ownsColor, output, depth](const EnhancedRenderGraph::ExecuteContext &ec) {
+        GetName(), usages, [this, &context, ownsColor, output, depth, visibility](const EnhancedRenderGraph::ExecuteContext &ec) {
             const RHITextureHandle colors[] = {ec.ResolveHandle(output)};
             RHIRenderTargetBinding targets{};
             if (depth.IsValid())
@@ -239,6 +338,10 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
             }
             if (!targets.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Sprite render-target binding failed on the prepared GPU route.");
+                }
                 return;
             }
 
@@ -250,25 +353,26 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
                 constexpr float clear[4] = {0.f, 0.f, 0.f, 0.f};
                 encoder.ClearRenderTargets(targets, clear);
             }
-            const math::matrix4x4 viewProjection = math::transpose(m_viewProjection);
-            const auto constants = context.resources->UploadConstants(&viewProjection, sizeof(viewProjection));
-            if (!constants.IsValid())
-            {
-                return;
-            }
+            WorldSpriteConstants camera{};
+            camera.viewProjection = math::transpose(m_viewProjection);
 
             const uint64_t bytes = sizeof(Instance) * static_cast<uint64_t>(m_instances.size());
             const auto upload = context.resources->AllocateUpload(
-                RHIUploadRequest{bytes, RHIUploadUsage::BufferCopy, sizeof(Instance)});
+                RHIUploadRequest{bytes, RHIUploadUsage::BufferCopy, 256});
             if (!upload.IsValid())
             {
+                if (visibility)
+                {
+                    throw std::runtime_error("Sprite instance upload failed on the prepared GPU route.");
+                }
                 return;
             }
             memcpy(upload.cpuAddress, m_instances.data(), static_cast<size_t>(bytes));
 
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
-            for (const Batch &batch : m_batches)
+            for (uint32_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
             {
+                const Batch& batch = m_batches[batchIndex];
                 if (!batch.uploaded.IsValid())
                 {
                     continue;
@@ -279,25 +383,50 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
                 const auto table = context.resources->CreateBindings(texture);
                 if (!table.IsValid())
                 {
+                    if (visibility)
+                    {
+                        throw std::runtime_error("Sprite texture bindings failed on the prepared GPU route.");
+                    }
                     break;
                 }
 
                 const RHIPipelineHandle pso = batch.enableDepth && depth.IsValid() ? m_depthPso : m_overlayPso;
                 encoder.SetPipeline(RHIBindPoint::Graphics, pso);
+                camera.instanceBase = batch.first;
+                const auto constants = context.resources->UploadConstants(&camera, sizeof(camera));
+                if (!constants.IsValid())
+                {
+                    throw std::runtime_error("Sprite batch constant upload failed.");
+                }
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, constants);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                                      upload.SubRange(sizeof(Instance) * static_cast<uint64_t>(batch.first),
-                                                      sizeof(Instance) * static_cast<uint64_t>(batch.count)));
+                // Full aligned storage binding; batch bases may not satisfy Vulkan
+                // minStorageBufferOffsetAlignment and are applied in the shader.
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, upload);
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                encoder.Draw(4, batch.count);
+                if (visibility)
+                {
+                    if (!encoder.DrawIndirect(visibility->Arguments(), visibility->ArgsOffset(batchIndex)))
+                    {
+                        throw std::runtime_error("Sprite nonindexed indirect submission failed.");
+                    }
+                }
+                else
+                {
+                    encoder.Draw(4, batch.count);
+                }
             }
         });
 }
 
 void EnhancedSpritePass::Shutdown()
 {
+    m_visibilityFrame.reset();
+    m_visibility.ShutdownAfterIdle();
+    m_gpuVisibilityEnabled = false;
+    m_visibilitySpheres.clear();
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     m_width = 0;
     m_height = 0;
     m_lastItemCount = 0;

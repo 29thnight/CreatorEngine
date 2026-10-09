@@ -60,14 +60,36 @@ struct InstanceData
     uint coverageFlags;
     float coverageCutoff;
     uint usePropertyBlock;
-    uint padding;
+    uint boneCount;
 };
 
 StructuredBuffer<InstanceData> gInstances : register(t4);
+// The CPU fallback binds identity indices; GPU bins bind their compacted slice.
+// Indirect firstInstance stays zero on every backend.
+#if defined(GBUFFER_MESH_SHADER)
+// Each GPU-produced group owns one {batch-local instance, meshlet} pair.
+StructuredBuffer<uint2> gVisibleMeshlets : register(t6);
+ByteAddressBuffer gMeshletData : register(t7);
+ByteAddressBuffer gMeshletVertices : register(t8);
+#else
+StructuredBuffer<uint> gVisibleInstanceIds : register(t6);
+#endif
 
 // 프레임의 모든 본 팔레트를 이어 붙인 것. 인스턴스의 boneOffset이 자기
 // 구간의 시작을 가리킨다.
 StructuredBuffer<PackedBone> gBones : register(t5);
+
+// Explicit uniform ABI inherited by custom wrappers that include this vertex
+// program. It does not opt them into visibility compaction or overwrite their
+// historical instance padding. The host validates the complete reflected V1
+// layout and supplies the actual sealed palette extent, never upload padding.
+cbuffer GBufferSkinPaletteExtentV1 : register(b4)
+{
+    uint gGBufferSkinPaletteMatrixCount;
+    uint gGBufferSkinPaletteVersion;
+    uint gGBufferSkinPalettePadding0;
+    uint gGBufferSkinPalettePadding1;
+};
 
 static const uint kNoSkinning = 0xFFFFFFFFu;
 
@@ -139,10 +161,10 @@ struct VSOut
     nointerpolation float3 material        : TEXCOORD1;  // x 금속성 · y 거칠기 · z 노멀맵
 };
 
-[shader("vertex")]
-VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
+// The indexed and mesh front-ends share every vertex/material evaluation step.
+// Only the source vertex fetch and work-ID lookup differ.
+VSOut EvaluateGBufferVertex(VSIn input, InstanceData instance)
 {
-    const InstanceData instance = gInstances[instanceId];
     const float4x4 gWorld = instance.world;
 
 #ifdef MODEL_VERTEX_LAYOUT
@@ -154,14 +176,56 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 #endif
     float3x3 frameTransform = (float3x3)gWorld;
 #if !defined(MODEL_VERTEX_LAYOUT) || defined(MODEL_VERTEX_SKINNING)
-    if (instance.boneOffset != kNoSkinning && input.boneWeights[0] > 0.0)
+    // Validate the complete active influence set before any fetch. The legacy
+    // layout stores indices as float, so range/finiteness must precede uint casts.
+    // Invalid input keeps bind pose rather than applying a partial skin matrix.
+    const uint availableMatrices = instance.boneOffset < gGBufferSkinPaletteMatrixCount
+        ? gGBufferSkinPaletteMatrixCount - instance.boneOffset : 0u;
+    const uint boneCount = instance.boneCount != 0u
+        ? min(instance.boneCount, availableMatrices) : availableMatrices;
+    bool validSkin = gGBufferSkinPaletteVersion == 1u && boneCount != 0u
+        && all(isfinite(input.boneWeights))
+        && all(input.boneWeights >= 0.0) && all(input.boneWeights <= 1.0);
+    [unroll]
+    for (int influence = 0; influence < 4; ++influence)
+    {
+        if (input.boneWeights[influence] > 0.0)
+        {
+#ifdef MODEL_VERTEX_SKINNING
+            validSkin = validSkin && input.boneIndices[influence] < boneCount;
+#else
+            const float index = float(input.boneIndices[influence]);
+            if (!isfinite(index) || index < 0.0 || index >= 4294967296.0 || floor(index) != index)
+            {
+                validSkin = false;
+            }
+            else
+            {
+                // Integer comparison avoids a rounded float palette extent
+                // accepting an index at or past the end of a large allocation.
+                validSkin = validSkin && uint(index) < boneCount;
+            }
+#endif
+        }
+    }
+    [branch]
+    if (instance.boneOffset != kNoSkinning && input.boneWeights[0] > 0.0
+        && validSkin)
     {
         float4x4 boneTransform = input.boneWeights[0]
             * UnpackBone(gBones[instance.boneOffset + uint(input.boneIndices[0])]);
         [unroll]
         for (int i = 1; i < 4; ++i)
-            boneTransform += input.boneWeights[i]
-                * UnpackBone(gBones[instance.boneOffset + uint(input.boneIndices[i])]);
+        {
+            // Unused packed influences use index 255. Never fetch an unused
+            // matrix, including on direct fallback, just to multiply it by zero.
+            [branch]
+            if (input.boneWeights[i] > 0.0)
+            {
+                boneTransform += input.boneWeights[i]
+                    * UnpackBone(gBones[instance.boneOffset + uint(input.boneIndices[i])]);
+            }
+        }
         input.position = mul(float4(input.position, 1.0), boneTransform).xyz;
         frameTransform = mul((float3x3)boneTransform, frameTransform);
     }
@@ -198,6 +262,77 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     return output;
 }
 
+#if !defined(GBUFFER_MESH_SHADER)
+[shader("vertex")]
+VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
+{
+    return EvaluateGBufferVertex(input, gInstances[gVisibleInstanceIds[instanceId]]);
+}
+#else
+#if !defined(MODEL_VERTEX_LAYOUT) || defined(MODEL_VERTEX_SKINNING)
+#error The first mesh shader profile requires static packed model vertices.
+#endif
+
+VSIn ReadGBufferMeshletVertex(uint vertexIndex, uint stride)
+{
+    const uint base = vertexIndex * stride;
+    VSIn input;
+    input.position = asfloat(gMeshletVertices.Load3(base));
+    input.normal = asfloat(gMeshletVertices.Load3(base + 12u));
+    input.uv = asfloat(gMeshletVertices.Load2(base + 24u));
+    uint offset = 32u;
+#ifdef MODEL_VERTEX_UV1
+    input.uv1 = asfloat(gMeshletVertices.Load2(base + offset));
+    offset += 8u;
+#endif
+    input.tangent = asfloat(gMeshletVertices.Load4(base + offset));
+    offset += 16u;
+#ifdef MODEL_VERTEX_COLOR
+    input.color = asfloat(gMeshletVertices.Load4(base + offset));
+#endif
+    return input;
+}
+
+uint ReadGBufferMeshletIndex(uint byteOffset)
+{
+    const uint packed = gMeshletData.Load(byteOffset & ~3u);
+    return (packed >> ((byteOffset & 3u) * 8u)) & 255u;
+}
+
+[shader("mesh")]
+[numthreads(64, 1, 1)]
+[outputtopology("triangle")]
+void MSMain(uint3 groupId : SV_GroupID, uint lane : SV_GroupIndex,
+    out vertices VSOut outputVertices[64], out indices uint3 outputTriangles[126])
+{
+    const uint2 work = gVisibleMeshlets[groupId.x];
+    // RHIMeshletBufferHeader: descriptorBase=12, stride=16,
+    // vertexRemapBase=20, triangleBase=28 and packed vertex stride=48.
+    const uint descriptor = gMeshletData.Load(12u) + work.y * gMeshletData.Load(16u);
+    const uint vertexOffset = gMeshletData.Load(descriptor);
+    const uint triangleOffset = gMeshletData.Load(descriptor + 4u);
+    const uint vertexCount = gMeshletData.Load(descriptor + 12u);
+    const uint triangleCount = gMeshletData.Load(descriptor + 16u);
+    SetMeshOutputCounts(vertexCount, triangleCount);
+
+    const InstanceData instance = gInstances[work.x];
+    const uint vertexRemap = gMeshletData.Load(20u);
+    const uint triangles = gMeshletData.Load(28u) + triangleOffset;
+    const uint vertexStride = gMeshletData.Load(48u);
+    if (lane < vertexCount)
+    {
+        const uint vertex = gMeshletData.Load(vertexRemap + (vertexOffset + lane) * 4u);
+        outputVertices[lane] = EvaluateGBufferVertex(ReadGBufferMeshletVertex(vertex, vertexStride), instance);
+    }
+    for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
+    {
+        const uint first = triangles + triangle * 3u;
+        outputTriangles[triangle] = uint3(ReadGBufferMeshletIndex(first),
+            ReadGBufferMeshletIndex(first + 1u), ReadGBufferMeshletIndex(first + 2u));
+    }
+}
+#endif
+
 struct PSOut
 {
     float4 diffuse    : SV_TARGET0;
@@ -207,8 +342,9 @@ struct PSOut
     uint   bitmask    : SV_TARGET4;
 };
 
-[shader("fragment")]
-PSOut PSMain(VSOut input, bool frontFace : SV_IsFrontFace)
+// Keep all pixel coverage/discard behavior in this shared evaluation. The depth
+// entry discards color outputs, never a separately maintained coverage policy.
+PSOut EvaluateGBufferSurface(VSOut input, bool frontFace)
 {
     const bool usePropertyBlock = input.usePropertyBlock != 0u;
     const float4 materialBaseColor = usePropertyBlock
@@ -258,4 +394,19 @@ PSOut PSMain(VSOut input, bool frontFace : SV_IsFrontFace)
         material.emission, 1.0);
     output.bitmask    = 0xABCDu;
     return output;
+}
+
+[shader("fragment")]
+PSOut PSMain(VSOut input, bool frontFace : SV_IsFrontFace)
+{
+    return EvaluateGBufferSurface(input, frontFace);
+}
+
+// CPU eligibility remains opaque Standard only. Calling the same evaluation
+// preserves sidedness and every discard; dead color-only work can be optimized
+// away. A no-PS/cull-none prepass would incorrectly write single-sided backs.
+[shader("fragment")]
+void PSDepthOnly(VSOut input, bool frontFace : SV_IsFrontFace)
+{
+    EvaluateGBufferSurface(input, frontFace);
 }

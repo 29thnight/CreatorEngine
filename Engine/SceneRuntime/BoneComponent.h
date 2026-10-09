@@ -32,6 +32,12 @@
 class [[reflgen::reflect]] BoneComponent : public meta::identity<BoneComponent, Component>
 {
 public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
     BoneComponent() = default;
     virtual ~BoneComponent() = default;
 

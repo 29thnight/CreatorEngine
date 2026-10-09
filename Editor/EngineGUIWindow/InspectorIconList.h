@@ -127,6 +127,7 @@ CREATOR_INSPECTOR_ICON(StateMachineComponent, "Graph")
 
 // ── 소리·스크립트 ───────────────────────────────────────────────────────
 CREATOR_INSPECTOR_ICON(SoundComponent, "Audio")
+CREATOR_INSPECTOR_ICON(AudioListenerComponent, "Audio")
 CREATOR_INSPECTOR_ICON(ScriptComponent, "Script")
 CREATOR_INSPECTOR_ICON(InvalidScriptComponent, "Error")
 

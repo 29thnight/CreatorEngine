@@ -5,9 +5,34 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 
 class IRHIDeviceResources;
 class RHIRecordedBatch;
+
+/// producer의 예약을 큐 admission까지 지킨다. 예외도 never-admitted 거절이며,
+/// Accept 뒤에는 native 실패가 나더라도 rollback하지 않는다.
+template<class Rejected>
+class RHIRecordingAdmissionGuard
+{
+public:
+    explicit RHIRecordingAdmissionGuard(Rejected rejected)
+        : m_rejected(std::move(rejected)) {}
+    ~RHIRecordingAdmissionGuard()
+    {
+        if (!m_admitted)
+        {
+            m_rejected();
+        }
+    }
+    RHIRecordingAdmissionGuard(const RHIRecordingAdmissionGuard&) = delete;
+    RHIRecordingAdmissionGuard& operator=(const RHIRecordingAdmissionGuard&) = delete;
+    void Accept() { m_admitted = true; }
+
+private:
+    Rejected m_rejected;
+    bool m_admitted{ false };
+};
 
 /// RHI owner의 세대를 바꾸는 명시적 경계. 정상 프레임은 이 명령을 만들지 않는다.
 /// GPU drain은 아래 네 경우에만 허용한다.
@@ -39,6 +64,7 @@ struct RHISubmissionOwnerStats
     bool accepting{ false };
     bool transitioning{ false };
     bool faulted{ false };
+    bool submissionBlocked{ false };
 
     bool IsIdle() const
     {
@@ -108,7 +134,9 @@ private:
     std::shared_ptr<State> m_state;
 };
 
-/// 프로세스의 native queue 호출을 하나의 bounded FIFO와 전용 스레드로 모은다.
+/// 네이티브 제출과 수명 작업을 하나의 bounded FIFO·전용 스레드로 모은다.
+/// 직렬화된 표시 소유자는 자기 제출 ticket 뒤 네이티브 Present를 직접 부를 수 있다.
+/// 그 호출이 끝나기 전에는 다음 제출·resize·shutdown을 시작하지 않는다.
 ///
 /// 각 DeviceResources가 client 하나를 잡고 owner=this로 작업을 넣는다. owner drain은
 /// 그 디바이스의 CPU 제출과 GPU completion 기반 lifetime retirement가 모두 끝날 때만
@@ -143,6 +171,8 @@ public:
     bool DrainSubmissions(const void* owner, std::string& outError);
     /// CPU 제출과 GPU completion retirement를 모두 비운다.
     bool Drain(const void* owner, std::string& outError);
+    /// 완료된 자원 토큰의 소멸은 producer가 맡는다. 콜백/캐시를 RHI worker에서 파괴하지 않는다.
+    void CollectCompletedLifetimes(const void* owner);
     bool ConsumeFailure(const void* owner, std::string& outError);
 
     /// 앞선 owner 제출을 FIFO로 지난 뒤 backend의 GPU-idle 작업을 RHI thread에서

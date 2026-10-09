@@ -1,4 +1,5 @@
 #include "Texture.h"
+#include "AssetDepot/TextureAssetRuntime.h"
 #include "PathFinder.h"
 #include "Core.Memory.hpp"
 // Win32::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
@@ -6,7 +7,10 @@
 #include "DirectXHelper.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <optional>
+#include <limits>
+#include <atomic>
 #include <DirectXTex.h>
+#include <objbase.h>
 
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 이 using을 공급했다.
 // ASan 구성은 블롭을 끄므로 직접 받는다(PHASE 9-9).
@@ -21,6 +25,13 @@ using namespace DirectX;
 //   만든다 — 그 표가 가리키는 것이 scratch(또는 owned)의 내부 버퍼다.
 //   컨테이너로 옮기면 로드마다 전량 복사가 붙는데, 4K HDR equirect 한 장이
 //   128MB 라 그 한 번이 무시되지 않는다.
+namespace
+{
+    std::atomic<std::size_t> TextureLiveImageBytes{};
+    std::atomic<std::size_t> TextureNonRehydratableBytes{};
+    std::atomic<std::size_t> TextureLiveImageCount{};
+}
+
 struct Texture::CodecImage
 {
     /// 출처 A — 파일·메모리 디코드. DirectXTex 가 픽셀을 소유한 채 남는다.
@@ -38,6 +49,35 @@ struct Texture::CodecImage
     uint32_t  mipLevels{ 0 };
     uint32_t  arraySize{ 0 };
     bool      isCube{ false };
+    bool hasAlpha{};
+    std::optional<AssetDepot::TextureImageKey> key{};
+    std::size_t accountedBytes{};
+
+    void Account()
+    {
+        for (const auto& subresource : subresources)
+        {
+            accountedBytes += subresource.slicePitch;
+        }
+        TextureLiveImageBytes.fetch_add(accountedBytes, std::memory_order_relaxed);
+        TextureLiveImageCount.fetch_add(1u, std::memory_order_relaxed);
+        if (!key)
+        {
+            TextureNonRehydratableBytes.fetch_add(accountedBytes, std::memory_order_relaxed);
+        }
+    }
+    ~CodecImage()
+    {
+        if (accountedBytes != 0u)
+        {
+            TextureLiveImageBytes.fetch_sub(accountedBytes, std::memory_order_relaxed);
+            TextureLiveImageCount.fetch_sub(1u, std::memory_order_relaxed);
+            if (!key)
+            {
+                TextureNonRehydratableBytes.fetch_sub(accountedBytes, std::memory_order_relaxed);
+            }
+        }
+    }
 };
 
 // ── DirectXTex 와 나머지 엔진의 유일한 접점 (축 A) ──────────────────────
@@ -189,34 +229,59 @@ namespace
 	}
 
 	/// 디코드 결과를 Texture 가 들 형태로 감싼다. 픽셀 복사 0.
-	std::shared_ptr<Texture::CodecImage> TextureMakeCodecImage(ScratchImage&& image)
+	own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(ScratchImage&& image,
+        const std::optional<AssetDepot::TextureImageKey>& key = {})
 	{
-		if (!TextureIsUploadableShape(image.GetMetadata())) return nullptr;
+		if (!TextureIsUploadableShape(image.GetMetadata()))
+		{
+			return {};
+		}
 
-		auto codec = std::make_shared<Texture::CodecImage>();
+		auto codec = own::make_shared<Texture::CodecImage>();
+        codec->key = key;
+        codec->hasAlpha = !image.IsAlphaAllOpaque();
 		const RHIFormat known = TextureDecodedFormatToRHI(image.GetMetadata().format);
 		if (RHIFormat::Unknown != known)
 		{
-			if (!TextureAdoptScratch(*codec, std::move(image), known)) return nullptr;
-			return codec;
+			if (!TextureAdoptScratch(*codec, std::move(image), known))
+			{
+				return {};
+			}
+			codec->Account();
+			return std::move(codec);
 		}
 
 		ScratchImage lowered;
-		if (!TextureLowerToRgba8(image, lowered)) return nullptr;
+		if (!TextureLowerToRgba8(image, lowered))
+		{
+			return {};
+		}
 		const RHIFormat loweredFormat =
 			TextureDecodedFormatToRHI(lowered.GetMetadata().format);
-		if (RHIFormat::Unknown == loweredFormat) return nullptr;
+		if (RHIFormat::Unknown == loweredFormat)
+		{
+			return {};
+		}
 		if (!TextureAdoptScratch(*codec, std::move(lowered), loweredFormat))
-			return nullptr;
-		return codec;
+		{
+			return {};
+		}
+		codec->Account();
+		return std::move(codec);
 	}
 
 	/// 이미 중립인 이미지를 Texture 가 들 형태로 감싼다.
-	std::shared_ptr<Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
+	own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
 	{
-		auto codec = std::make_shared<Texture::CodecImage>();
-		if (!TextureAdoptImage(*codec, std::move(image))) return nullptr;
-		return codec;
+		auto codec = own::make_shared<Texture::CodecImage>();
+		if (!TextureAdoptImage(*codec, std::move(image)))
+		{
+			return {};
+		}
+		codec->hasAlpha = RHIFormatChannels(codec->format) == 4u
+            || RHIFormatIsBlockCompressed(codec->format);
+        codec->Account();
+        return std::move(codec);
 	}
 
 	/// 디코드 결과를 소유 컨테이너로 **복사한다**. cook 경로 전용이다 —
@@ -302,22 +367,57 @@ namespace
 	}
 }
 
-TextureImageView Texture::GetImageView() const
+TextureImageDescription Texture::GetImageDescription() const noexcept
 {
-	if (!m_codecImage || m_codecImage->subresources.empty()) return {};
-	const CodecImage& codec = *m_codecImage;
-	return TextureImageView(m_samplingFormat == RHIFormat::Unknown ? codec.format : m_samplingFormat,
-        codec.width, codec.height,
-		codec.mipLevels, codec.arraySize, codec.isCube,
-		codec.subresources.data(),
-		static_cast<uint32_t>(codec.subresources.size()));
+    return m_imageDescription;
 }
 
-std::shared_ptr<Texture> Texture::WithColorSpace(
-    const std::shared_ptr<Texture>& source, bool srgb)
+TextureImageView Texture::GetImageView(const own::shared_owner<const CodecImage>& image) const
 {
-    if (!source || source->GetImageView().IsEmpty()) return nullptr;
-    const auto format = source->GetImageView().Format();
+    if (!image || image->subresources.empty())
+    {
+        return {};
+    }
+    if (m_assetOrigin && (!image->key || *image->key != m_assetOrigin->imageKey))
+    {
+        return {};
+    }
+    if (!m_assetOrigin && (!m_nonRehydratableImage
+        || &*image.borrow() != &*m_nonRehydratableImage.borrow()))
+    {
+        return {};
+    }
+    const CodecImage& codec = *image;
+    return TextureImageView(m_imageDescription.format, codec.width, codec.height,
+        codec.mipLevels, codec.arraySize, codec.isCube, codec.subresources.data(),
+        static_cast<uint32_t>(codec.subresources.size()));
+}
+
+own::shared_owner<const Texture::CodecImage> Texture::NonRehydratableImage() const
+{
+    return m_nonRehydratableImage;
+}
+
+void Texture::SetNonRehydratableImage(own::shared_owner<const CodecImage> image)
+{
+    m_nonRehydratableImage = std::move(image);
+    if (m_nonRehydratableImage)
+    {
+        const auto& codec = *m_nonRehydratableImage;
+        m_imageDescription = { codec.format, codec.width, codec.height,
+            codec.mipLevels, codec.arraySize, codec.isCube };
+        m_decodedBytes = codec.accountedBytes;
+    }
+}
+
+own::shared_owner<const Texture> Texture::WithColorSpace(
+    const own::shared_owner<const Texture>& source, bool srgb)
+{
+    if (!source || source->GetImageDescription().IsEmpty())
+    {
+        return nullptr;
+    }
+    const auto format = source->GetImageDescription().Format();
     RHIFormat target = format;
     switch (format)
     {
@@ -331,11 +431,29 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
         target = srgb ? RHIFormat::BC3UnormSrgb : RHIFormat::BC3Unorm; break;
     // Floating-point HDR images are already linear radiance.
     case RHIFormat::RGBA16Float: case RHIFormat::RGBA32Float: break;
-    default: if (srgb) return nullptr; break;
+    default:
+        if (srgb)
+        {
+            return nullptr;
+        }
+        break;
     }
-    if (target == format) return source;
-    auto texture = std::make_shared<Texture>();
-    texture->m_codecImage = source->m_codecImage;
+    if (target == format)
+    {
+        return source;
+    }
+    auto texture = own::make_shared<Texture>();
+    texture->m_nonRehydratableImage = source->m_nonRehydratableImage;
+    texture->m_imageDescription = source->m_imageDescription;
+    texture->m_imageDescription.format = target;
+    texture->m_decodedBytes = source->m_decodedBytes;
+    if (source->m_assetOrigin)
+    {
+        auto origin = *source->m_assetOrigin;
+        origin.variant.colorSpace = srgb ? AssetDepot::TextureAssetColorSpace::Srgb
+            : AssetDepot::TextureAssetColorSpace::Linear;
+        texture->m_assetOrigin = own::make_shared<const AssetDepot::TextureAssetOrigin>(std::move(origin));
+    }
     texture->m_samplingFormat = target;
     texture->m_textureType = source->m_textureType;
     texture->m_name = source->m_name;
@@ -343,100 +461,181 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
     texture->m_assetPath = source->m_assetPath;
     texture->m_size = source->m_size;
     texture->m_isTextureAlpha = source->m_isTextureAlpha;
-    return texture;
+    return std::move(texture);
 }
 
-//static functions
-std::shared_ptr<Texture> Texture::WithMipChain(
-    const std::shared_ptr<Texture>& source, std::string& outFailure)
+namespace
 {
-    ce::profile_scope profile{ ce::marker<"Texture.MipChain">() };
-    outFailure.clear();
-    const auto fail = [&](std::string_view message) -> std::shared_ptr<Texture> {
-        outFailure = message; return nullptr;
-    };
-    if (!source || source->GetImageView().IsEmpty()) return fail("Mip source is empty");
-    const auto view = source->GetImageView();
-    // An authored partial chain is intentional too. Never replace it.
-    if (view.MipLevels() > 1 || (view.Width() == 1 && view.Height() == 1)) return source;
-    const DXGI_FORMAT format = TextureMipFormatFromRHI(view.Format());
-    if (format == DXGI_FORMAT_UNKNOWN) return fail("Unsupported material mip format");
-    TexMetadata metadata{};
-    metadata.width = view.Width(); metadata.height = view.Height(); metadata.depth = 1;
-    metadata.arraySize = view.ArraySize(); metadata.mipLevels = 1;
-    metadata.dimension = TEX_DIMENSION_TEXTURE2D; metadata.format = format;
-    if (view.IsCube()) metadata.miscFlags = TEX_MISC_TEXTURECUBE;
-    std::vector<Image> images;
-    for (uint32_t item = 0; item < view.ArraySize(); ++item)
+    own::shared_owner<const Texture::CodecImage> TextureGenerateMipImage(
+        const TextureImageView& view, const std::optional<AssetDepot::TextureImageKey>& key,
+        std::string& outFailure)
     {
-        const auto* base = view.Find(0, item);
-        if (!base || !base->pixels) return fail("Mip source subresource is empty");
-        images.push_back({base->width, base->height, format, base->rowPitch,
-            base->slicePitch, const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base->pixels))});
-    }
-    ScratchImage decoded;
-    const Image* input = images.data();
-    size_t count = images.size();
-    if (IsCompressed(format))
-    {
-        // Keep the encoded transfer function while unpacking BC blocks.
-        const auto rgba = IsSRGB(format) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-        if (FAILED(Decompress(input, count, metadata, rgba, decoded)))
-            return fail("Mip source decompression failed");
-        input = decoded.GetImages(); count = decoded.GetImageCount(); metadata = decoded.GetMetadata();
-    }
-    ScratchImage chain;
-    // Non-WIC keeps alpha independent and HDR unclamped. DirectXTex chooses box
-    // for power-of-two sizes and linear for NPOT; sRGB formats imply RGB decode/encode.
-    if (FAILED(GenerateMipMaps(input, count, metadata, TEX_FILTER_FORCE_NON_WIC, 0, chain)))
-        return fail("Material mip generation failed");
-    if (IsCompressed(format))
-    {
-        ScratchImage compressed;
-        auto targetMetadata = chain.GetMetadata();
-        targetMetadata.format = format;
-        if (FAILED(compressed.Initialize(targetMetadata))) return fail("Material mip allocation failed");
-        // Recompress only the added levels. Reprocessing mip 0 would spend most
-        // of the compression time on blocks that must be copied back unchanged.
-        for (uint32_t item = 0; item < view.ArraySize(); ++item)
-        for (size_t mip = 1; mip < targetMetadata.mipLevels; ++mip)
+        const auto fail = [&](std::string_view message) -> own::shared_owner<const Texture::CodecImage>
         {
-            ScratchImage level;
-            const auto* inputLevel = chain.GetImage(mip, item, 0);
-            if (!inputLevel || FAILED(Compress(*inputLevel, format, TEX_COMPRESS_DEFAULT,
-                    TEX_THRESHOLD_DEFAULT, level))) return fail("Material mip compression failed");
-            const auto* from = level.GetImage(0, 0, 0);
-            const auto* to = compressed.GetImage(mip, item, 0);
-            if (!from || !to) return fail("Compressed mip level is missing");
-            CopyImageRows(reinterpret_cast<std::byte*>(to->pixels), to->rowPitch,
-                reinterpret_cast<const std::byte*>(from->pixels), from->rowPitch,
-                RHIFormatRowCount(view.Format(), static_cast<uint32_t>(to->height)), to->rowPitch);
+            outFailure = message;
+            return {};
+        };
+        const DXGI_FORMAT format = TextureMipFormatFromRHI(view.Format());
+        if (format == DXGI_FORMAT_UNKNOWN)
+        {
+            return fail("Unsupported material mip format");
         }
-        chain = std::move(compressed);
+        TexMetadata metadata{};
+        metadata.width = view.Width(); metadata.height = view.Height(); metadata.depth = 1;
+        metadata.arraySize = view.ArraySize(); metadata.mipLevels = 1;
+        metadata.dimension = TEX_DIMENSION_TEXTURE2D; metadata.format = format;
+        if (view.IsCube())
+        {
+            metadata.miscFlags = TEX_MISC_TEXTURECUBE;
+        }
+        std::vector<Image> images;
+        for (uint32_t item = 0; item < view.ArraySize(); ++item)
+        {
+            const auto* base = view.Find(0, item);
+            if (!base || !base->pixels)
+            {
+                return fail("Mip source subresource is empty");
+            }
+            images.push_back({base->width, base->height, format, base->rowPitch,
+                base->slicePitch, const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base->pixels))});
+        }
+        ScratchImage decoded;
+        const Image* input = images.data();
+        size_t count = images.size();
+        if (IsCompressed(format))
+        {
+            // Keep the encoded transfer function while unpacking BC blocks.
+            const auto rgba = IsSRGB(format) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+            if (FAILED(Decompress(input, count, metadata, rgba, decoded)))
+            {
+                return fail("Mip source decompression failed");
+            }
+            input = decoded.GetImages(); count = decoded.GetImageCount(); metadata = decoded.GetMetadata();
+        }
+        ScratchImage chain;
+        // Non-WIC keeps alpha independent and HDR unclamped. DirectXTex chooses box
+        // for power-of-two sizes and linear for NPOT; sRGB formats imply RGB decode/encode.
+        if (FAILED(GenerateMipMaps(input, count, metadata, TEX_FILTER_FORCE_NON_WIC, 0, chain)))
+        {
+            return fail("Material mip generation failed");
+        }
+        if (IsCompressed(format))
+        {
+            ScratchImage compressed;
+            auto targetMetadata = chain.GetMetadata();
+            targetMetadata.format = format;
+            if (FAILED(compressed.Initialize(targetMetadata)))
+            {
+                return fail("Material mip allocation failed");
+            }
+            // Recompress only the added levels. Reprocessing mip 0 would spend most
+            // of the compression time on blocks that must be copied back unchanged.
+            for (uint32_t item = 0; item < view.ArraySize(); ++item)
+            {
+                for (size_t mip = 1; mip < targetMetadata.mipLevels; ++mip)
+                {
+                    ScratchImage level;
+                    const auto* inputLevel = chain.GetImage(mip, item, 0);
+                    if (!inputLevel || FAILED(Compress(*inputLevel, format, TEX_COMPRESS_DEFAULT,
+                            TEX_THRESHOLD_DEFAULT, level)))
+                    {
+                        return fail("Material mip compression failed");
+                    }
+                    const auto* from = level.GetImage(0, 0, 0);
+                    const auto* to = compressed.GetImage(mip, item, 0);
+                    if (!from || !to)
+                    {
+                        return fail("Compressed mip level is missing");
+                    }
+                    CopyImageRows(reinterpret_cast<std::byte*>(to->pixels), to->rowPitch,
+                        reinterpret_cast<const std::byte*>(from->pixels), from->rowPitch,
+                        RHIFormatRowCount(view.Format(), static_cast<uint32_t>(to->height)), to->rowPitch);
+                }
+            }
+            chain = std::move(compressed);
+        }
+        // Compression may choose different endpoints even for the same input. Restore
+        // the original base bytes; only the added levels may have new BC blocks.
+        for (uint32_t item = 0; item < view.ArraySize(); ++item)
+        {
+            const auto* base = view.Find(0, item);
+            const auto* target = chain.GetImage(0, item, 0);
+            if (!target)
+            {
+                return fail("Generated mip base is missing");
+            }
+            CopyImageRows(reinterpret_cast<std::byte*>(target->pixels), target->rowPitch,
+                base->pixels, base->rowPitch, RHIFormatRowCount(view.Format(), base->height),
+                static_cast<size_t>(RHIFormatRowPitch(view.Format(), base->width)));
+        }
+        auto codec = TextureMakeCodecImage(std::move(chain), key);
+        if (!codec)
+        {
+            return fail("Generated mip chain is invalid");
+        }
+        return codec;
     }
-    // Compression may choose different endpoints even for the same input. Restore
-    // the original base bytes; only the added levels may have new BC blocks.
-    for (uint32_t item = 0; item < view.ArraySize(); ++item)
-    {
-        const auto* base = view.Find(0, item);
-        const auto* target = chain.GetImage(0, item, 0);
-        if (!target) return fail("Generated mip base is missing");
-        CopyImageRows(reinterpret_cast<std::byte*>(target->pixels), target->rowPitch,
-            base->pixels, base->rowPitch, RHIFormatRowCount(view.Format(), base->height),
-            static_cast<size_t>(RHIFormatRowPitch(view.Format(), base->width)));
-    }
-    auto codec = TextureMakeCodecImage(std::move(chain));
-    if (!codec) return fail("Generated mip chain is invalid");
-    auto texture = std::make_shared<Texture>();
-    texture->m_codecImage = std::move(codec);
-    texture->m_textureType = source->m_textureType;
-    texture->m_name = source->m_name; texture->m_extension = source->m_extension;
-    texture->m_assetPath = source->m_assetPath;
-    texture->m_size = source->m_size; texture->m_isTextureAlpha = source->m_isTextureAlpha;
-    return texture;
 }
 
-Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
+own::shared_owner<const Texture> Texture::WithMipChain(
+    const own::shared_owner<const Texture>& source, std::string& outFailure)
+{
+    outFailure.clear();
+    if (!source || source->GetImageDescription().IsEmpty())
+    {
+        outFailure = "Mip source is empty";
+        return {};
+    }
+    const auto description = source->GetImageDescription();
+    if (description.MipLevels() > 1u || (description.Width() == 1u && description.Height() == 1u))
+    {
+        return source;
+    }
+    auto texture = own::make_shared<Texture>();
+    texture->m_textureType = source->m_textureType;
+    texture->m_name = source->m_name;
+    texture->m_extension = source->m_extension;
+    texture->m_assetPath = source->m_assetPath;
+    texture->m_size = source->m_size;
+    texture->m_isTextureAlpha = source->m_isTextureAlpha;
+    texture->m_samplingFormat = source->m_samplingFormat;
+    if (source->m_assetOrigin)
+    {
+        // Descriptor-only recipe transformation. Exact rehydration regenerates
+        // this chain with its filtering color space, never the original image.
+        auto origin = *source->m_assetOrigin;
+        origin.variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
+        origin.imageKey.recipe.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
+        origin.imageKey.recipe.mipColorSpace = IsSRGB(TextureMipFormatFromRHI(description.Format()))
+            ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
+        texture->m_assetOrigin = own::make_shared<const AssetDepot::TextureAssetOrigin>(std::move(origin));
+        texture->m_imageDescription = description;
+        texture->m_imageDescription.mipLevels = 1u;
+        for (auto size = (std::max)(description.Width(), description.Height()); size > 1u; size >>= 1u)
+        {
+            ++texture->m_imageDescription.mipLevels;
+        }
+        for (uint32_t mip = 0u; mip < texture->m_imageDescription.MipLevels(); ++mip)
+        {
+            texture->m_decodedBytes += static_cast<std::size_t>(RHIFormatSlicePitch(description.Format(),
+                (std::max)(1u, description.Width() >> mip), (std::max)(1u, description.Height() >> mip)))
+                * description.ArraySize();
+        }
+    }
+    else
+    {
+        const auto image = source->NonRehydratableImage();
+        const auto codec = TextureGenerateMipImage(source->GetImageView(image), {}, outFailure);
+        if (!codec)
+        {
+            return {};
+        }
+        texture->SetNonRehydratableImage(codec);
+    }
+    return std::move(texture);
+}
+
+own::shared_owner<const Texture> Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	_In_ std::string_view name, _In_ RHIFormat textureFormat,
 	_In_reads_bytes_(rowPitch* height) const void* pixels, _In_opt_ size_t rowPitch)
 {
@@ -465,23 +664,22 @@ Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 		static_cast<const std::byte*>(pixels), sourcePitch,
 		RHIFormatRowCount(textureFormat, height), destination->rowPitch);
 
-	Texture* texture = new Texture();
+	auto texture = own::make_shared<Texture>();
 	texture->m_name = std::string(name);
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(width), float(height) };
 
 	// 파일 로더가 남기는 자리와 같다 — 텍스처 캐시가 여기서 가져간다(T1·T4).
-	texture->m_codecImage = TextureMakeCodecImage(std::move(image));
-	if (!texture->m_codecImage)
+	texture->SetNonRehydratableImage(TextureMakeCodecImage(std::move(image)));
+	if (!texture->m_nonRehydratableImage)
 	{
-		delete texture;
 		return nullptr;
 	}
 
-	return texture;
+	return std::move(texture);
 }
 
-std::shared_ptr<Texture> Texture::CreateSharedFromImage(
+own::shared_owner<const Texture> Texture::CreateSharedFromImage(
 	std::string_view name, TextureImage image)
 {
 	if (!image.IsValid()) return nullptr;
@@ -492,10 +690,10 @@ std::shared_ptr<Texture> Texture::CreateSharedFromImage(
 	const float height = float(image.Height());
 	const RHIFormat format = image.Format();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::shared_ptr<Texture>(new Texture());
+	auto texture = own::make_shared<Texture>();
 	texture->m_name = std::string(name);
 	texture->m_textureType = isCube
 		? TextureType::TextureCube
@@ -507,11 +705,11 @@ std::shared_ptr<Texture> Texture::CreateSharedFromImage(
 	//   지금은 채널 수로 같은 답을 준다(뜻이 바뀌지 않는다).
 	texture->m_isTextureAlpha = (4 == RHIFormatChannels(format))
 		|| RHIFormatIsBlockCompressed(format);
-	texture->m_codecImage = std::move(codecImage);
-	return texture;
+	texture->SetNonRehydratableImage(std::move(codecImage));
+	return std::move(texture);
 }
 
-Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
@@ -618,10 +816,10 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-    Texture* texture = new Texture();
+    auto texture = own::make_shared<Texture>();
 	// ★ 여기 있던 DX11 SRV 생성을 걷었다 (T6, 2026-08-08).
 	//
 	//   이 로더가 만들던 것은 둘이었다 - CPU 픽셀(m_cpuPixels)과 DX11
@@ -634,12 +832,12 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	texture->m_isTextureAlpha = hasAlpha;
 	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->m_codecImage = std::move(codecImage);
+	texture->SetNonRehydratableImage(std::move(codecImage));
 
-	return texture;
+	return std::move(texture);
 }
 
-std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress, std::string_view assetPath)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
@@ -746,10 +944,13 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::make_shared<Texture>();
+	auto texture = own::make_shared<Texture>();
+    texture->m_name = path.stem().string();
+    texture->m_extension = path.extension().string();
+    texture->m_assetPath = assetPath.empty() ? path.lexically_normal().generic_string() : std::string(assetPath);
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 
@@ -758,13 +959,13 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 	texture->m_isTextureAlpha = hasAlpha;
 	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->m_codecImage = std::move(codecImage);
+	texture->SetNonRehydratableImage(std::move(codecImage));
 
-	return texture;
+	return std::move(texture);
 }
 
 
-std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
+own::shared_owner<const Texture> Texture::LoadSharedFromMemory(
 	std::span<const std::byte> bytes, bool isCompress)
 {
 	ScratchImage image{};
@@ -797,18 +998,266 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::make_shared<Texture>();
+	auto texture = own::make_shared<Texture>();
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { imageWidth, imageHeight };
 	texture->m_isTextureAlpha = hasAlpha;
-	texture->m_codecImage = std::move(codecImage);
-	return texture;
+	texture->SetNonRehydratableImage(std::move(codecImage));
+	return std::move(texture);
 }
 
-std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
+own::shared_owner<const Texture::CodecImage> Texture::DecodeOwnedImage(
+    std::span<const std::byte> bytes, const AssetDepot::TextureImageKey& key, std::string& failure)
+{
+    failure.clear();
+    struct DecoderApartment final
+    {
+        HRESULT result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
+        ~DecoderApartment()
+        {
+            if (SUCCEEDED(result))
+            {
+                CoUninitialize();
+            }
+        }
+    } apartment;
+    if (FAILED(apartment.result) && apartment.result != RPC_E_CHANGED_MODE)
+    {
+        failure = "Texture decoder COM initialization failed.";
+        return {};
+    }
+    ScratchImage image{};
+    TexMetadata metadata{};
+    bool alreadyFinal = false;
+    if (!TextureDecodeImageBytes(bytes, metadata, image, alreadyFinal))
+    {
+        failure = "Texture source-image decoding failed.";
+        return {};
+    }
+    if (!TextureIsUploadableShape(metadata))
+    {
+        failure = "Texture source-image shape is unsupported.";
+        return {};
+    }
+    if (key.recipe.forceRgba8 && metadata.format != DXGI_FORMAT_R8G8B8A8_UNORM
+        && metadata.format != DXGI_FORMAT_R8G8B8A8_UNORM_SRGB)
+    {
+        ScratchImage lowered;
+        if (!TextureLowerToRgba8(image, lowered))
+        {
+            failure = "Texture RGBA8 lowering failed.";
+            return {};
+        }
+        image = std::move(lowered);
+        metadata = image.GetMetadata();
+    }
+    if (key.recipe.compress && !alreadyFinal && !IsCompressed(metadata.format))
+    {
+        ScratchImage compressed{};
+        const bool srgb = key.recipe.compressionColorSpace == AssetDepot::TextureAssetColorSpace::Srgb
+            || (key.recipe.compressionColorSpace == AssetDepot::TextureAssetColorSpace::Source && IsSRGB(metadata.format));
+        const auto format = srgb ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+        const auto flags = srgb
+            ? TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM
+            : TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM;
+        if (FAILED(DirectX::Compress(image.GetImages(), image.GetImageCount(), metadata,
+            format, flags, 0.5f, compressed)))
+        {
+            failure = "Texture compression failed.";
+            return {};
+        }
+        metadata = compressed.GetMetadata();
+        image = std::move(compressed);
+    }
+    auto codec = TextureMakeCodecImage(std::move(image), key);
+    if (!codec)
+    {
+        failure = "Texture decoded pixels are invalid.";
+        return {};
+    }
+    if (key.recipe.mipPolicy == AssetDepot::TextureMipPolicy::GenerateFull
+        && codec->mipLevels == 1u && (codec->width != 1u || codec->height != 1u))
+    {
+        auto format = TextureMipFormatFromRHI(codec->format);
+        if (key.recipe.mipColorSpace != AssetDepot::TextureAssetColorSpace::Source)
+        {
+            const bool srgb = key.recipe.mipColorSpace == AssetDepot::TextureAssetColorSpace::Srgb;
+            switch (codec->format)
+            {
+            case RHIFormat::RGBA8Unorm: case RHIFormat::RGBA8UnormSrgb:
+                format = srgb ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+                break;
+            case RHIFormat::BGRA8Unorm: case RHIFormat::BGRA8UnormSrgb:
+                format = srgb ? DXGI_FORMAT_B8G8R8A8_UNORM_SRGB : DXGI_FORMAT_B8G8R8A8_UNORM;
+                break;
+            case RHIFormat::BC1Unorm: case RHIFormat::BC1UnormSrgb:
+                format = srgb ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+                break;
+            case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
+                format = srgb ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+                break;
+            default:
+                break;
+            }
+        }
+        const TextureImageView view(TextureDecodedFormatToRHI(format), codec->width, codec->height,
+            codec->mipLevels, codec->arraySize, codec->isCube, codec->subresources.data(),
+            static_cast<uint32_t>(codec->subresources.size()));
+        return TextureGenerateMipImage(view, key, failure);
+    }
+    return codec;
+}
+
+own::shared_owner<const Texture> Texture::CreateOwnedDescriptor(
+    const own::shared_owner<const CodecImage>& codec,
+    own::shared_owner<const AssetDepot::TextureAssetOrigin> origin, std::string& failure)
+{
+    if (!codec || !origin || !origin->imageSource || !codec->key || *codec->key != origin->imageKey)
+    {
+        failure = "Texture descriptor requires its verified exact image source and payload.";
+        return {};
+    }
+    const auto& variant = origin->variant;
+    RHIFormat samplingFormat = codec->format;
+    if (variant.colorSpace != AssetDepot::TextureAssetColorSpace::Source)
+    {
+        const bool srgb = variant.colorSpace == AssetDepot::TextureAssetColorSpace::Srgb;
+        switch (samplingFormat)
+        {
+        case RHIFormat::RGBA8Unorm: case RHIFormat::RGBA8UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::RGBA8UnormSrgb : RHIFormat::RGBA8Unorm;
+            break;
+        case RHIFormat::BGRA8Unorm: case RHIFormat::BGRA8UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BGRA8UnormSrgb : RHIFormat::BGRA8Unorm;
+            break;
+        case RHIFormat::BC1Unorm: case RHIFormat::BC1UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BC1UnormSrgb : RHIFormat::BC1Unorm;
+            break;
+        case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BC3UnormSrgb : RHIFormat::BC3Unorm;
+            break;
+        case RHIFormat::RGBA16Float: case RHIFormat::RGBA32Float:
+            if (srgb)
+            {
+                failure = "Floating-point texture cannot use an sRGB sampling representation.";
+                return {};
+            }
+            break;
+        default:
+            failure = "Texture sampling representation is unsupported.";
+            return {};
+        }
+    }
+    auto texture = own::make_shared<Texture>();
+    texture->m_textureType = codec->isCube ? TextureType::TextureCube
+        : (codec->arraySize > 1u ? TextureType::TextureArray : TextureType::ImageTexture);
+    texture->m_size = { float(codec->width), float(codec->height) };
+    texture->m_samplingFormat = samplingFormat;
+    texture->m_isTextureAlpha = codec->hasAlpha;
+    texture->m_imageDescription = { samplingFormat, codec->width, codec->height,
+        codec->mipLevels, codec->arraySize, codec->isCube };
+    texture->m_decodedBytes = codec->accountedBytes;
+    texture->m_assetOrigin = std::move(origin);
+    return std::move(texture);
+}
+
+own::shared_owner<const AssetDepot::TextureAssetOrigin> Texture::GetAssetOrigin() const
+{
+    return m_assetOrigin;
+}
+
+std::size_t Texture::DecodedByteSize() const noexcept
+{
+    return m_decodedBytes;
+}
+
+std::size_t Texture::ImageByteSize(const own::shared_owner<const CodecImage>& image) noexcept
+{
+    return image ? image->accountedBytes : 0u;
+}
+
+std::size_t Texture::ImageRetainedCharge(const own::shared_owner<const CodecImage>& image) noexcept
+{
+    if (!image)
+    {
+        return 0u;
+    }
+    std::size_t bytes = sizeof(CodecImage);
+    const auto maximum = (std::numeric_limits<std::size_t>::max)();
+    const auto add = [&](std::size_t charge)
+    {
+        bytes = charge > maximum - bytes ? maximum : bytes + charge;
+    };
+    add(image->scratch.GetPixelsSize());
+    add(image->scratch.GetImageCount() > maximum / sizeof(DirectX::Image)
+        ? maximum : image->scratch.GetImageCount() * sizeof(DirectX::Image));
+    add(image->owned.RetainedBytes());
+    add(image->subresources.capacity() > maximum / sizeof(TextureSubimage)
+        ? maximum : image->subresources.capacity() * sizeof(TextureSubimage));
+    if (image->key)
+    {
+        add(image->key->targetPlatform.capacity());
+        add(1u);
+        add(image->key->targetAbi.capacity());
+        add(1u);
+    }
+    return bytes;
+}
+
+std::size_t Texture::DescriptorByteSize() const noexcept
+{
+    std::size_t bytes = sizeof(Texture);
+    const auto add = [&](std::size_t charge)
+    {
+        const auto maximum = (std::numeric_limits<std::size_t>::max)();
+        bytes = charge > maximum - bytes ? maximum : bytes + charge;
+    };
+    const auto addString = [&](const std::string& value)
+    {
+        add(value.capacity());
+        add(1u);
+    };
+    const auto addVector = [&]<class T>(const std::vector<T>& values)
+    {
+        const auto maximum = (std::numeric_limits<std::size_t>::max)();
+        add(values.capacity() > maximum / sizeof(T) ? maximum : values.capacity() * sizeof(T));
+    };
+    addString(m_name);
+    addString(m_extension);
+    addString(m_assetPath);
+    if (m_assetOrigin)
+    {
+        add(sizeof(AssetDepot::TextureAssetOrigin));
+        addString(m_assetOrigin->resolved.blob.artifactPath);
+        addString(m_assetOrigin->resolved.blob.targetPlatform);
+        addString(m_assetOrigin->resolved.blob.targetAbi);
+        addVector(m_assetOrigin->resolved.entry.dependencies);
+        addString(m_assetOrigin->imageKey.targetPlatform);
+        addString(m_assetOrigin->imageKey.targetAbi);
+        addVector(m_assetOrigin->hardDependencies);
+        addVector(m_assetOrigin->loadableDependencies);
+        if (m_assetOrigin->imageSource)
+        {
+            // Shared exact-locator metadata is conservatively charged per retained
+            // descriptor; no decoded pixels or source filesystem bytes are hidden.
+            add(sizeof(AssetDepot::TextureImageSource));
+            addString(m_assetOrigin->imageSource->artifactPath);
+        }
+    }
+    return bytes;
+}
+
+Texture::ImageMemorySnapshot Texture::SnapshotImageMemory() noexcept
+{
+    return { TextureLiveImageBytes.load(std::memory_order_relaxed),
+        TextureNonRehydratableBytes.load(std::memory_order_relaxed),
+        TextureLiveImageCount.load(std::memory_order_relaxed) };
+}
+
+own::shared_owner<const Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
@@ -914,10 +1363,10 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::make_unique<Texture>();
+	auto texture = own::make_shared<Texture>();
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 
@@ -926,9 +1375,9 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 	texture->m_isTextureAlpha = hasAlpha;
 	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->m_codecImage = std::move(codecImage);
+	texture->SetNonRehydratableImage(std::move(codecImage));
 
-	return texture;
+	return std::move(texture);
 }
 
 // ── cook 경로의 디코드 창구 (축 A) ──────────────────────────────────────
@@ -1022,12 +1471,16 @@ bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
 //   남은 것은 CPU 자료뿐이고, 그것은 shared_ptr과 값이라 옮기기만 하면 된다.
 Texture::Texture(Texture&& texture) noexcept
 {
-	m_codecImage = std::move(texture.m_codecImage);
+	m_nonRehydratableImage = std::move(texture.m_nonRehydratableImage);
+    m_imageDescription = texture.m_imageDescription;
+    m_decodedBytes = texture.m_decodedBytes;
+    m_assetOrigin = std::move(texture.m_assetOrigin);
     m_samplingFormat = texture.m_samplingFormat;
 	m_assetId = texture.m_assetId;
 	m_textureType = texture.m_textureType;
 	m_name = std::move(texture.m_name);
 	m_extension = std::move(texture.m_extension);
+    m_assetPath = std::move(texture.m_assetPath);
 	m_size = texture.m_size;
 	m_isTextureAlpha = texture.m_isTextureAlpha;
 
@@ -1036,7 +1489,6 @@ Texture::Texture(Texture&& texture) noexcept
 	texture.m_isTextureAlpha = false;
 }
 
-Texture::~Texture() = default;
 
 math::vector2 Texture::GetImageSize() const
 {

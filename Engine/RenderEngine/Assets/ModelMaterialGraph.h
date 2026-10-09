@@ -14,6 +14,7 @@ std::filesystem::path ModelMaterialGraphPath(const std::filesystem::path& assets
 bool ModelMaterialGraphsPresent(const std::filesystem::path& assets, const ModelAssetGeneration& model);
 bool ModelMaterialGraphIdentityMatches(const std::filesystem::path& path, const Uuid::Uuid16& graphId);
 std::optional<LX::LXMaterialAsset> BuildModelMaterialGraph(const experiment::Material& material, std::string& error);
+    std::optional<LX::LXMaterialAsset> BuildDefaultMaterialGraph(std::string& error);
 
 // New files are staged, then published before the model commit record. Failure
 // rolls back only files owned by this publication; existing graphs are read-only.

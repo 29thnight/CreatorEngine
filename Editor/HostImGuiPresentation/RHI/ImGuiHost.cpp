@@ -2,10 +2,8 @@
 #include "IImGuiHost.h"
 #include "ImGuiWin32Cursor.h"
 #include "DX12/ImGuiDx12Shell.h"
-#include "Vulkan/ImGuiVulkanShell.h"
 #include "GlobalImGuiContext.h"
 #include "LogSystem.h"
-#include "RuntimeSettings.h"
 #include "../../../Engine/Utility_Framework/PathFinder.h"
 #include "../../../Engine/Utility_Framework/WarmupLedger.h"
 
@@ -15,6 +13,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <utility>
 
 namespace
 {
@@ -86,13 +85,9 @@ namespace
                 return false;
             }
 
-            // Scene renderer와 같은 active backend를 소비한다. 선택 값에는 setter가
-            // 없고, 초기화 실패 시 다른 backend를 만들지 않는다(Slice 8-c).
-            if (RenderBackend::DX12 ==
-                RuntimeSettings::Get().GetRenderBackend())
-                m_renderer = std::make_unique<ImGuiDx12Shell>();
-            else
-                m_renderer = std::make_unique<ImGuiVulkanShell>();
+            // Editor 표시 정책은 타입으로 고정한다. Vulkan 셸이나 공통 renderer
+            // 인터페이스를 저장할 수 없으므로 설정에 따른 런타임 분기도 없다.
+            m_renderer = std::make_unique<ImGuiDx12Shell>();
 
             RECT clientRect{};
             GetClientRect(hwnd, &clientRect);
@@ -121,9 +116,9 @@ namespace
             return m_renderer && m_renderer->IsActive();
         }
 
-        ImGuiRendererBackendKind GetBackendKind() const override
+        bool IsDisplayLost() const override
         {
-            return m_renderer ? m_renderer->GetKind() : ImGuiRendererBackendKind::DX12;
+            return m_renderer && m_renderer->IsDeviceLost();
         }
 
         const char* GetBackendName() const override
@@ -180,7 +175,7 @@ namespace
             ImGui::NewFrame();
         }
 
-        void EndFrame() override
+        void EndFrame(std::function<void()> onRecorded) override
         {
             if (!m_renderer) return;
             {
@@ -192,19 +187,31 @@ namespace
             engine::warmup::mark(engine::warmup::stage::first_ui_frame);
             ImGuiWin32Cursor::PublishFrameCursor(static_cast<HWND>(m_windowHandle));
 
+            // 분리된 플랫폼 창도 드로우 콜백을 실행하므로 그 경로에서는
+            // 모든 기록이 끝날 때까지 장면 소유권을 유지한다.
+            ImGuiIO& io = ImGui::GetIO();
+            const bool hasPlatformWindows =
+                0 != (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable);
+            const std::function<void()> recordCallback =
+                hasPlatformWindows ? std::function<void()>{} : onRecorded;
             std::string presentError;
-            if (!m_renderer->RenderAndPresent(presentError))
+            // 장치 제거는 셸이 한 번만 알린다. 이후 매 프레임 같은 실패를 다시 찍지 않는다.
+            if (!m_renderer->RenderAndPresent(presentError, recordCallback) &&
+                !m_renderer->IsDeviceLost())
             {
                 std::printf("[ImGui] %s 렌더 실패: %s\n",
                     m_renderer->GetName(), presentError.c_str());
             }
 
-            ImGuiIO& io = ImGui::GetIO();
-            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            if (hasPlatformWindows)
             {
                 ce::profile_scope platforms{ce::marker<"ImGuiPlatformWindows">()};
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault();
+                if (onRecorded)
+                {
+                    onRecorded();
+                }
             }
         }
 
@@ -213,19 +220,22 @@ namespace
             if (m_renderer) m_renderer->RebuildFontAtlas();
         }
 
-        uint64_t RegisterTexture(Texture* texture) override
+        uint64_t RegisterTexture(const Texture* texture,
+            const own::shared_owner<const Texture::CodecImage>& image) override
         {
-            return m_renderer ? m_renderer->RegisterTexture(texture) : 0;
+            return m_renderer ? m_renderer->RegisterTexture(texture, image) : 0;
         }
 
-        bool IsTextureReady(Texture* texture) const override
+        bool IsTextureReady(const Texture* texture) const override
         {
             return m_renderer && m_renderer->IsTextureReady(texture);
         }
 
-        uint64_t OpenSharedTexture(void* sharedHandle) override
+        uint64_t OpenSharedTexture(void* sharedHandle,
+            std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override
         {
-            return m_renderer ? m_renderer->OpenSharedTexture(sharedHandle) : 0;
+            return m_renderer
+                ? m_renderer->OpenSharedTexture(sharedHandle, std::move(consumerLease)) : 0;
         }
 
         void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
@@ -260,7 +270,7 @@ namespace
 
     private:
         void* m_windowHandle{ nullptr };
-        std::unique_ptr<IImGuiRendererBackend> m_renderer;
+        std::unique_ptr<ImGuiDx12Shell> m_renderer;
     };
 }
 

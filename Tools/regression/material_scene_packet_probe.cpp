@@ -1,4 +1,5 @@
-#include "MaterialGraphScenePacket.h"
+#include "material_owner_checks.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -123,7 +124,7 @@ float4 PSMain(float4 position : SV_Position, bool frontFace : SV_IsFrontFace) : 
     return product;
 }
 
-std::shared_ptr<Texture> TextureFixture(bool cube)
+own::shared_owner<const Texture> TextureFixture(bool cube)
 {
     auto image =
         TextureImage::Allocate(cube ? RHIFormat::RGBA32Float : RHIFormat::RGBA8UnormSrgb, 1, 1, cube ? 6 : 1, 1, cube);
@@ -212,7 +213,7 @@ void Run(const std::filesystem::path& root)
             true, error);
     };
     const auto core = generation(false), layered = generation(true);
-    Check(core && layered && core != layered, "Immutable compiled generations");
+    Check(core && layered && !material_graph_test::SamePinnedObject(core, layered), "Immutable compiled generations");
     const auto texture = TextureFixture(false), environmentTexture = TextureFixture(true);
     const float base = std::pow((128.f / 255.f + .055f) / 1.055f, 2.4f);
     const auto evaluation = [&](float ior, bool coat, std::uint64_t view = 1) {
@@ -283,8 +284,8 @@ void Run(const std::filesystem::path& root)
     IblEnvironment environment;
     Check(device.BeginFrame(error), "Warm upload BeginFrame");
     textures.BeginFrame(0);
-    const auto imageEntry = textures.GetOrUpload(texture.get(), error);
-    environment = {textures.GetOrUpload(environmentTexture.get(), error), 1, environmentTexture};
+    const auto imageEntry = textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
+    environment = {textures.GetOrUpload((environmentTexture ? &*environmentTexture.borrow() : nullptr), environmentTexture ? environmentTexture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, environmentTexture};
     Check(imageEntry.IsValid() && environment.cube.IsValid(), "Native owning textures");
     const RHITransition envTransition{environment.cube.handle, RHIResourceState::PixelShaderResource,
                                       RHIResourceState::ShaderResource};
@@ -306,7 +307,7 @@ void Run(const std::filesystem::path& root)
         const auto prepare = [&](IRenderPipelineCache& cache, const SceneSurfaceEvaluation& values,
                                  const EnhancedMaterialCoverage& policy, const IblEnvironment& env,
                                  std::shared_ptr<const SceneMaterialPacket>& result) {
-            const bool coat = values.instance->generation == layered;
+            const bool coat = material_graph_test::SamePinnedObject(values.instance->generation, layered);
             const auto& layout = layouts[coat ? 1 : 0];
             RHIGraphicsPipelineDesc pipeline;
             pipeline.layout = layout.material.handle;
@@ -396,6 +397,10 @@ void Run(const std::filesystem::path& root)
             currentEvaluation = evaluation(frame ? 2.7f : 1.3f, frame != 0, frame + 1);
             Check(prepare(pipelines, currentEvaluation, coverage, environment, packet),
                   "Native Scene prepare: " + error);
+            Check(packet->instancePins && packet->instancePinIndex != InstanceFramePins::InvalidIndex &&
+                      material_graph_test::SamePinnedObject(
+                          packet->instancePins->Borrow(packet->instancePinIndex), currentEvaluation.instance),
+                  "Scene packet's borrowed evaluation retains the exact source through its frame pin index");
             Check(packet->queue == SceneCoverage::Opaque && packet->selection.route == Route::Forward,
                   "Opaque queue remains separate from Forward shading");
             Check((frame == 0 && !slot.Active()) || (frame == 1 && slot.Active()->serial != packet->serial),
@@ -410,7 +415,7 @@ void Run(const std::filesystem::path& root)
             Check((frame == 0 && !slot.Active()) || (frame == 1 && slot.Active()->serial != packet->serial),
                   "RHI allocation submission callback alone is not publication");
             publish(recording);
-            Check(slot.Active() == packet && slot.Active()->evaluation.instance == currentEvaluation.instance,
+            Check(slot.Active() == packet && material_graph_test::SamePinnedObject(slot.Active()->evaluation.instance, currentEvaluation.instance),
                   "Publish complete owning generation");
             fences[frame] = device.GetLastSignaledFenceValue();
             packet.reset();
@@ -462,7 +467,8 @@ void Run(const std::filesystem::path& root)
               "Invalid coverage is rejected");
         Check(prepare(pipelines, currentEvaluation, coverage, environment, packet),
               "Rebuild current recording bindings");
-        Check(packet->ibl == accepted->ibl && packet->bindings != accepted->bindings &&
+        Check(packet->ibl == accepted->ibl &&
+                  !material_graph_test::SamePinnedObject(packet->bindings, accepted->bindings) &&
                   packet->pipeline->GetHandle() == accepted->pipeline->GetHandle(),
               "Reuse exact IBL and shared PSO with fresh frame bindings");
         const auto ready = packet;

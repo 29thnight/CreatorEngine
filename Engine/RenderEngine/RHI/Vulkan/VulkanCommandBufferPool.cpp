@@ -60,7 +60,7 @@ bool VulkanCommandBufferPool::Initialize(VulkanDeviceResources& resources,
     return true;
 }
 
-void VulkanCommandBufferPool::RetireEncoder(Slot& slot)
+void VulkanCommandBufferPool::RetireEncoder(Slot& slot, bool destroy)
 {
     if (!slot.encoder) return;
     if (0 != slot.encoder->GetUnimplementedCount())
@@ -70,7 +70,12 @@ void VulkanCommandBufferPool::RetireEncoder(Slot& slot)
         m_lastUnimplemented.store(
             slot.encoder->GetLastUnimplemented(), std::memory_order_relaxed);
     }
-    slot.encoder.reset();
+    slot.encoder->EndRenderTargets();
+    slot.encoder->ClearUnimplemented();
+    if (destroy)
+    {
+        slot.encoder.reset();
+    }
 }
 
 void VulkanCommandBufferPool::Shutdown()
@@ -80,7 +85,7 @@ void VulkanCommandBufferPool::Shutdown()
     {
         for (Slot& slot : frame)
         {
-            RetireEncoder(slot);
+            RetireEncoder(slot, true);
             if (VK_NULL_HANDLE != m_device && VK_NULL_HANDLE != slot.pool)
                 vkDestroyCommandPool(m_device, slot.pool, nullptr);
             slot.pool = VK_NULL_HANDLE;
@@ -153,11 +158,16 @@ RHIEncoder& VulkanCommandBufferPool::AcquireEncoder(uint32_t worker)
 
     Slot& slot = m_slots[m_frameIndex][worker];
     RetireEncoder(slot);
-    slot.encoder = std::make_unique<VulkanEncoder>(
+    if (!slot.encoder)
+    {
+        slot.encoder = std::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
+    }
+    slot.encoder->Rebind(
         slot.buffer, m_resources->m_pipelineCache, &m_resources->m_resourceTable,
         &m_resources->m_renderTargetTables[m_resources->m_frameIndex], m_device,
         &m_resources->m_descriptorRecycler, &m_resources->m_bindingTable,
-        &m_resources->m_samplerTable);
+        &m_resources->m_samplerTable, m_resources->GetIndirectDrawCapabilities(), m_resources->m_viewportLimits,
+        m_resources->GetMeshShaderCapabilities());
     return *slot.encoder;
 }
 
@@ -192,6 +202,27 @@ bool VulkanCommandBufferPool::HasRecorded(uint32_t worker) const
 {
     return !m_slots.empty() && worker < m_workerCount &&
         m_slots[m_frameIndex][worker].opened;
+}
+
+uint64_t VulkanCommandBufferPool::GetCurrentRecordingId() const
+{
+    return m_resources ? m_resources->GetCurrentUploadRecordingId() : 0;
+}
+
+void VulkanCommandBufferPool::RejectPreparedCommands(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (m_resources)
+    {
+        m_resources->RejectNeverEnqueuedRecording(recordingId, completion);
+    }
+}
+
+void VulkanCommandBufferPool::AcceptPreparedCommands(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
+{
+    if (m_resources)
+    {
+        m_resources->AcceptParallelSubmission(completion, ticket);
+    }
 }
 
 bool VulkanCommandBufferPool::PrepareRecordedCommands(uint32_t frameSlot,
@@ -230,4 +261,3 @@ bool VulkanCommandBufferPool::SubmitRecordedCommands(uint32_t frameSlot,
     }
     return m_resources->SubmitParallelCommandBuffers(buffers, completion, outError);
 }
-

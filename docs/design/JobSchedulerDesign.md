@@ -108,9 +108,11 @@ Presentation/Render/GPU 제출·소켓·파일 감시 등 장기 루프는 전�
 SceneManager가 경로·파싱 문서·번들·두 완료 토큰·promise를 소유한다. 게임 스레드는
 파싱 토큰 완료 후 자산 토큰을 읽고, 두 작업이 끝난 뒤에만 엔티티/컴포넌트·계층·
 프리팹·DDOL을 구성한다. 완료 게시 지점은 Editor/Player의
-`ApplyPendingSceneStructureChange`다. 명시적으로 기다려야 하면 같은 씬 구조 변경
-경계에서 `WaitForSceneLoad()`를 호출한다. 이 함수는 준비 결과를 구성하지만 자동
-활성화는 프레임 경계에 남긴다. DDOL은 기존 API별 목적지를 유지한다: 반환형 로드는
+`ApplyPendingSceneStructureChange`다. 명시적으로 완료를 확인할 때도 같은 씬 구조 변경
+경계에서 비차단 `PollSceneLoads()`를 호출한다. 대기 중인 요청이 있으면 false를 반환하므로
+다음 경계에서 다시 호출한다. 완료된 준비 결과만 구성하며 자동 활성화는 프레임 경계에
+남긴다. 이전 `WaitForSceneLoad()`는 제거했다. 종료의 내부 취소·drain 경계만 별도로 유지하며
+게임/렌더 스레드에서 미완료 granular asset 작업을 기다리지 않는다. DDOL은 기존 API별 목적지를 유지한다: 반환형 로드는
 결과 씬, callback 로드는 활성 씬에서 기존 이송 절차로 넘어간다. 저장 파일의 일반
 엔티티/DDOL 두 절에 같은 instance ID가 있으면 DDOL 경로에서 한 번만 구성한다.
 

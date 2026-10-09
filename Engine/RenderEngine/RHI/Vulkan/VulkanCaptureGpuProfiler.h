@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <cstdio>
+#include <exception>
 
 // One diagnostic submission. Query ownership never borrows the interactive
 // profiler's ring slot. Destruction waits for device completion on abort too.
@@ -18,12 +20,47 @@ public:
     {
         if (pool_ != VK_NULL_HANDLE)
         {
-            resources_.WaitForGpu();
-            VulkanApi::vkDestroyQueryPool(resources_.GetDevice(), pool_, nullptr);
+            std::string error;
+            bool safe = resources_.IsInitialized() &&
+                resources_.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error);
+            if (!safe && GetRHISubmissionThread().GetOwnerStats(&resources_).faulted)
+            {
+                safe = resources_.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, error);
+            }
+            if (!safe)
+            {
+                std::fprintf(stderr, "Fatal Vulkan capture teardown invariant: query pool still owned without "
+                    "verified GPU idle or device loss: %s\n", error.c_str());
+                std::fflush(stderr);
+                std::terminate();
+            }
+            ReleaseAfterIdle();
         }
     }
+
+    /// 소유자가 실제 GPU-idle 또는 확인된 장치 손실을 증명한 뒤에만 호출한다.
+    void ReleaseAfterIdle()
+    {
+        if (pool_ != VK_NULL_HANDLE)
+        {
+            if (resources_.GetDevice() == VK_NULL_HANDLE)
+            {
+                std::fputs("Fatal Vulkan capture teardown invariant: query pool outlived its native device\n", stderr);
+                std::fflush(stderr);
+                std::terminate();
+            }
+            VulkanApi::vkDestroyQueryPool(resources_.GetDevice(), pool_, nullptr);
+            pool_ = VK_NULL_HANDLE;
+        }
+    }
+
     bool Initialize(std::string& error)
     {
+        if (pool_ != VK_NULL_HANDLE || !resources_.IsInitialized())
+        {
+            error = "Vulkan capture requires an initialized device and no previous query pool";
+            return false;
+        }
         VkPhysicalDeviceProperties properties{};
         VulkanApi::vkGetPhysicalDeviceProperties(resources_.GetPhysicalDevice(), &properties);
         period_ = properties.limits.timestampPeriod;
@@ -38,9 +75,12 @@ public:
         info.queryCount = kCapacity * 2;
         if (VulkanApi::vkCreateQueryPool(resources_.GetDevice(), &info, nullptr, &pool_) != VK_SUCCESS)
         { error = "Vulkan capture query pool creation failed"; return false; }
+        used_.store(0);
+        failed_.store(false);
         return true;
     }
-    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) override
+    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
+        const GpuPassTimingIdentity& = {}) override
     {
         auto* vk = dynamic_cast<VulkanEncoder*>(&encoder);
         const uint32_t slot = used_.fetch_add(1, std::memory_order_relaxed);
@@ -65,7 +105,20 @@ public:
     uint32_t SliceCount() const { return used_.load(); }
     bool Collect(std::vector<Timing>& passes, double& spanMs, double& busyMs, std::string& error)
     {
-        resources_.WaitForGpu();
+        if (pool_ == VK_NULL_HANDLE || !resources_.IsInitialized())
+        {
+            error = "Vulkan capture query pool/device unavailable";
+            return false;
+        }
+        if (!resources_.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error))
+        {
+            return false;
+        }
+        if (resources_.GetLastLifecycleResult().command == RHILifecycleCommand::UnrecoverableDeviceError)
+        {
+            error = "Vulkan capture has device-loss proof, not completed timestamp data";
+            return false;
+        }
         const uint32_t count = used_.load();
         if (!count || count > kCapacity || failed_.load())
         { error = "Vulkan capture timestamp coverage incomplete"; return false; }

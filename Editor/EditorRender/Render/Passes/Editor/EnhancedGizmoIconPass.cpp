@@ -1,22 +1,15 @@
 #include "EnhancedGizmoIconPass.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
+#include "Texture.h"
 
 #include <cstring>
-#include <sstream>
+#include <algorithm>
 #include <string>
 #include "RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string GizmoIconHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 빌보드 셰이더 ──
     //
     // DX11 Gizmo_billboard.vs/gs/ps의 이식. GS의 쿼드 확장을 VS로 옮겼다 —
@@ -148,7 +141,8 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
             icon.position.x, icon.position.y, icon.position.z, icon.size);
         m_instances.push_back(instance);
 
-        if (!m_batches.empty() && m_batches.back().texture == icon.texture)
+        const std::size_t textureId = icon.texture ? icon.texture->m_assetId.m_ID_Data : 0;
+        if (!m_batches.empty() && m_batches.back().textureId == textureId)
         {
             ++m_batches.back().count;
         }
@@ -157,7 +151,7 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
-            batch.texture = icon.texture;
+            batch.textureId = textureId;
             m_batches.push_back(batch);
         }
     }
@@ -174,8 +168,8 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
         for (Batch& batch : m_batches)
         {
             std::string uploadError;
-            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
-            if (!batch.uploaded.IsValid() && !uploadError.empty())
+            batch.uploaded = context.textureCache->GetOrUpload((*m_icons)[batch.first].texture, context.TextureImage((*m_icons)[batch.first].texture), uploadError);
+            if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "기즈모 아이콘 텍스처 업로드 실패: " + uploadError;
                 return false;
@@ -212,15 +206,46 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
         m_output = m_inputs.color;
     }
 
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+    }
+    const auto colorAccess = explicitAccess
+        ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto output = m_output;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RHIResourceState::RenderTarget });
+    usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
+    if (explicitAccess)
+    {
+        for (const auto& batch : m_batches)
+        {
+            if (!batch.uploaded.IsValid())
+            {
+                continue;
+            }
+            auto texture = graph.FindImportedTexture(batch.uploaded.handle);
+            if (!texture.IsValid())
+            {
+                texture = graph.ImportTexture(batch.uploaded.handle,
+                    RHIResourceState::PixelShaderResource, "GizmoIcon.Texture");
+            }
+            if (std::none_of(usages.begin(), usages.end(), [texture](const auto& usage)
+                {
+                    return usage.handle.index == texture.index;
+                }))
+            {
+                usages.push_back({ texture, RHIResourceState::PixelShaderResource, RGAccessMode::Read });
+            }
+        }
+    }
 
     graph.AddPass(GetName(), usages,
-        [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        [this, &context, ownsColor, output](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 

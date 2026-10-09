@@ -1,15 +1,21 @@
 #pragma once
+#include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <optional>
+#include <array>
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
 #include "../../RHI/RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../../RHI/RHIHandle.h"
+#include "../../RHI/RHIQueueContract.h"
+#include "../../RHI/RHIQueueRecorder.h"
 #include "../../RHI/RHIResourceState.h"
 
 /// 그래프는 backend-neutral device service만 보며 포인터·참조만 보관한다.
@@ -24,7 +30,7 @@ class IRenderDeviceServices;
 //     씬 뷰와 게임 뷰가 같은 그래프를 공유하게 된다.
 //   - 배리어 유도가 없다. 위상 정렬까지만 있고, DX12에서 그래프를 두는 이유의
 //     절반이 배리어 자동화인데 그 절반이 비어 있다.
-//   - 리소스 타입이 Texture*와 uint32 format 자리표시자다.
+//   - 리소스 타입이 const Texture*와 uint32 format 자리표시자다.
 // 3-6에서 패스를 새로 쓰기로 한 것과 같은 이유다 — 껍데기를 맞추는 데 드는 노력이
 // 새로 쓰는 것보다 크고, 결과도 더 나쁘다.
 //
@@ -38,7 +44,7 @@ class IRenderDeviceServices;
 //
 // RG1 ExplicitSingleWriter 모드는 명시적 접근으로 안정적 DAG 정렬을 수행한다.
 // ExplicitVersioned 모드는 RG2 Write/Modify 계보로 RAW/WAR/WAW를 정렬한다.
-// 제품 기본값은 RG5 선언 이관과 RG6 전환까지 기존 선언 순서를 유지한다.
+// 제품은 ExplicitVersioned를 명시한다. 기본 DeclarationOrder는 기존 진단 fixture의 계약을 보존한다.
 // 단일 writer로 순서가 결정되지 않는 입력은 DAG 모드에서 컴파일 오류다.
 //
 // 배리어를 사람이 붙이지 않는 것이 요점이다. DX11은 드라이버가 해 주던 일이라
@@ -66,6 +72,45 @@ enum class RGAccessMode { LegacyState, Read, Write, ReadWrite };
 enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };
 // Access/version declarations and execution ordering are independent contracts.
 enum class RGOrderPolicy { DependencyOrder, PreserveDeclarationOrder };
+enum class RGMeasurementDomain : uint8_t { Normal, Capture };
+enum class RGQueueFallbackReason : uint8_t
+{
+    None,
+    Disabled,
+    Unsupported,
+    MissingMeasurement,
+    UnsupportedState,
+    InsufficientGain,
+};
+
+inline const char* RGMeasurementDomainName(RGMeasurementDomain domain)
+{
+    return domain == RGMeasurementDomain::Capture ? "capture" : "normal";
+}
+inline const char* RGQueueFallbackReasonName(RGQueueFallbackReason reason)
+{
+    switch (reason)
+    {
+    case RGQueueFallbackReason::None: return "none";
+    case RGQueueFallbackReason::Disabled: return "disabled";
+    case RGQueueFallbackReason::Unsupported: return "unsupported";
+    case RGQueueFallbackReason::MissingMeasurement: return "missing-measurement";
+    case RGQueueFallbackReason::UnsupportedState: return "unsupported-state";
+    case RGQueueFallbackReason::InsufficientGain: return "insufficient-gain";
+    default: return "unknown";
+    }
+}
+
+// How BuildQueueSchedule assigns compute-compatible passes to the compute queue.
+enum class RGQueuePlacement : uint8_t
+{
+    // Every eligible measured pass moves and compiled order is kept. Deterministic
+    // placement for queue execution contract tests; ignores whether work can overlap.
+    Threshold,
+    // Two-queue list schedule over the dependency DAG. Compute is used only when the
+    // predicted span after cross-queue handoff costs improves by minimumGainNanoseconds.
+    Overlap,
+};
 
 // 그래프가 만들 리소스의 설명. transient(그래프 소유)만 이 설명을 쓴다.
 struct RGTextureDesc
@@ -91,6 +136,14 @@ struct RGTextureDesc
     std::string name;
 };
 
+struct RGBufferDesc
+{
+    uint64_t bytes{0};
+    bool allowUnorderedAccess{false};
+    bool allowIndirectArguments{false};
+    std::string name;
+};
+
 // transient 리소스 풀 (PHASE 3-9, 상시 러너의 프레임당 생성 비용 제거).
 //
 // 그래프는 프레임마다 새로 만들어지는데 transient도 매번 CreateCommittedResource로
@@ -110,10 +163,69 @@ public:
         RHITextureHandle handle;
         RHIResourceState state{ RHIResourceState::Common };
     };
+    // 대여·반납·비우기는 동일한 producer 스레드가 소유한다. GPU 완료 토큰도 그
+    // 스레드에서 회수해 graph를 파괴하며, 풀 소유자는 모든 토큰을 drain한 뒤 파괴한다.
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
+    struct AliasHeapMemory
+    {
+        uint64_t domainId{0}; // Process-local accounting state identity, shared by its graphs.
+        uint64_t retainedBytes{0}, cachedBytes{0}, leasedBytes{0}, peakRetainedBytes{0};
+        uint64_t retainedHeaps{0}, cachedHeaps{0}, leasedHeaps{0};
+    };
+    struct AliasHeapAccounting;
+    // Unique group-owned native heaps, including incomplete creation and GPU
+    // retirement. Excludes committed resources and physical residency.
+    // Query on the producer or after a synchronized lifecycle boundary.
+    AliasHeapMemory GetAliasHeapMemory() const;
+    std::shared_ptr<AliasHeapAccounting> aliasHeapAccounting;
+    struct AliasedEntry
+    {
+        RHITextureHandle texture;
+        RHIBufferHandle buffer;
+        RHIResourceState state{RHIResourceState::Common};
+    };
+    struct AliasedGroup
+    {
+        AliasedGroup() = default;
+        AliasedGroup(const AliasedGroup&) = delete;
+        AliasedGroup& operator=(const AliasedGroup&) = delete;
+        IRenderDeviceServices* owner{nullptr};
+        std::shared_ptr<RHITransientHeap> heap;
+        RHITransientAllocationInfo allocation;
+        std::vector<RHITransientResourceDesc> descriptions;
+        std::vector<AliasedEntry> entries;
+        void TrackHeap(const std::shared_ptr<AliasHeapAccounting>& accounting);
+        void SetCached(bool cached);
+        ~AliasedGroup();
+    private:
+        std::shared_ptr<AliasHeapAccounting> m_accounting;
+        bool m_cached{false};
+    };
+    using AllocationKey = std::array<uint64_t, 6>;
+    struct AllocationKeyHash
+    {
+        size_t operator()(const AllocationKey& key) const noexcept
+        {
+            size_t hash = 0;
+            for (auto value : key)
+            {
+                hash ^= std::hash<uint64_t>{}(value) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+            }
+            return hash;
+        }
+    };
+    // Free groups enter only after the caller's graph-completion contract.
+    // Clear before the owning device shuts down, on the same producer thread.
+    void ClearAliasingCache();
+    IRenderDeviceServices* aliasOwner{nullptr};
+    std::vector<std::shared_ptr<AliasedGroup>> freeAliasedGroups;
+    std::unordered_map<AllocationKey, RHITransientAllocationInfo, AllocationKeyHash> allocationCache;
+    uint64_t freeAliasBytes{0};
+    uint64_t maxFreeAliasBytes{128ull * 1024 * 1024};
+    size_t maxFreeAliasGroups{32};
 };
 
-class EnhancedRenderGraph
+class EnhancedRenderGraph : private IRHIUploadTransactionListener
 {
 public:
     // 패스가 기록할 때 받는 것. 커맨드 리스트는 호출부가 준 것을 그대로 넘긴다 —
@@ -177,6 +289,15 @@ public:
         uint32_t barriersEmitted{ 0 };
         uint32_t barrierBatches{ 0 };   // 배리어를 몇 번에 나눠 넣었는가 — 적을수록 좋다
         uint32_t transientCreated{ 0 };
+        uint32_t aliasReuseCount{0};
+        uint64_t transientCommittedBytes{0};
+        uint64_t transientUnaliasedBytes{0};
+        uint32_t transientAllocationQueries{0};
+        uint32_t aliasHeapCreates{0}, aliasHeapReuses{0}, aliasResourceReuses{0};
+        uint32_t poisonInitializations{0};
+        // CPU wall time for lifetime discovery, allocation/cache lookup and
+        // resource creation; excludes barrier planning and command recording.
+        double transientPrepareCpuMs{0};
 
         // 병렬 기록에서만 채워진다. batch의 기록 리스트 수가 워커 수보다 적으면
         // 놀고 있는 워커가 있다는 뜻이다(패스가 워커보다 적을 때 정상).
@@ -256,7 +377,17 @@ public:
     /// transient 풀 연결(선택). 있으면 Compile이 생성 대신 재사용을 시도하고,
     /// 소멸자가 반납한다 — 호출부는 소멸 시점에 GPU 완료를 보장해야 한다
     /// (그래프 수명 규칙과 같은 계약).
-    void SetTransientPool(RGTransientPool* pool) { m_transientPool = pool; }
+    void SetTransientPool(RGTransientPool* pool) { RequireQueueIdle(); m_transientPool = pool; }
+    // Configure before declaration. Defaults preserve the committed/pool path.
+    void SetTransientAliasing(bool enabled, bool extendLifetimes = false)
+    {
+        RequireQueueIdle();
+        m_aliasing = enabled;
+        m_extendLifetimes = extendLifetimes;
+    }
+    // Diagnostic only: placed RT/DS targets and float-view-compatible UAV buffers.
+    // Other placed kinds fail Compile rather than silently remain unpoisoned.
+    void SetPlacedTransientPoison(bool enabled) { m_poison = enabled; }
 
     /// 디바이스 서비스는 필수다 — 인코더가 이것 없이는 아무것도 못 건다.
     ///
@@ -293,6 +424,8 @@ public:
     bool PrepareParallel(IRHIParallelCommandPool& pool, std::string& outError);
 
     ~EnhancedRenderGraph();
+    EnhancedRenderGraph(const EnhancedRenderGraph&) = delete;
+    EnhancedRenderGraph& operator=(const EnhancedRenderGraph&) = delete;
 
     /// 이미 표에 있는 리소스를 들인다 — 패스가 소유한 것(V2-a로 핸들이 된 것들).
     RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,
@@ -307,10 +440,15 @@ public:
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
     RGHandle CreateTexture(const RGTextureDesc& desc);
+    RGHandle CreateBuffer(const RGBufferDesc& desc);
     // Version declarations do not mutate the physical resource. Compile validates
     // their producer usages and rejects forks; old versions remain readable.
     RGHandle Write(RGHandle previous);
     RGHandle Modify(RGHandle previous);
+
+    // 캐시처럼 그래프 밖에서 상태를 고정한 소유자에게 마지막 소비 뒤 돌려준다.
+    // 유효성·서로 다른 최종 상태 요구는 Compile에서 진단한다.
+    void RequireImportedFinalState(RGHandle handle, RHIResourceState state);
 
     // 패스 선언. usages는 (핸들, 그 패스가 요구하는 상태) 목록이다.
     //
@@ -327,6 +465,22 @@ public:
 
     RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
         ExecuteCallback execute, bool hasSideEffect = false);
+
+    struct RepeatedPhase
+    {
+        std::string name;
+        std::vector<RGPassUsage> usages;
+    };
+    using RepeatedExecuteCallback =
+        std::function<void(const ExecuteContext&, uint32_t iterationIndex, uint32_t phaseIndex)>;
+    static constexpr uint32_t kMaxRepeatedPhases = 16;
+    static constexpr uint32_t kMaxPassRepetitions = 1024;
+
+    // 외부 버전은 한 번 발행한다. 내부 단계는 그 핸들을 그대로 쓰며,
+    // usage.state는 해당 자원의 첫 단계 상태다. 반복은 같은 인코더에서 직렬 기록한다.
+    RGPassId AddRepeatedPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+        const std::vector<RepeatedPhase>& phases, uint32_t repeatCount,
+        RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
 
     /// 여러 커맨드 리스트에 나눠 기록할 수 있는 패스.
     ///
@@ -355,6 +509,126 @@ public:
     ///   이미 들고 있으므로 호출부가 같은 값을 도로 넘기지 않는다.
     bool Compile(std::string& outError);
 
+    struct QueueHint
+    {
+        RGPassId pass;
+        bool computeCompatible{false}; // Explicit author contract, never inferred from resource states.
+        uint64_t measuredGpuNanoseconds{0}; // recordCost is CPU recording work, not GPU cost.
+        bool hasGpuMeasurement{measuredGpuNanoseconds != 0}; // Explicit true also represents a measured empty scope.
+    };
+    struct QueueSchedule
+    {
+        struct Entry { uint16_t pass; RHIQueueKind queue; };
+        struct Wait { uint16_t producer, consumer; uint32_t resource; };
+        std::vector<Entry> entries; // Submission order; a topological order of the DAG.
+        std::vector<Wait> waits;
+        uint64_t compileGeneration{0};
+        // Analytical estimates; missing timing samples disable Overlap placement.
+        uint64_t predictedSerialNanoseconds{0};
+        uint64_t predictedNanoseconds{0};
+        bool usesCompute{false};
+        bool predictionComplete{false}; // Every executed pass has a valid timing sample.
+        bool predictionCalibrated{false}; // No measured overhead/contention calibration yet.
+        RGQueueFallbackReason fallbackReason{RGQueueFallbackReason::None};
+        uint32_t eligibleComputePasses{0}, rejectedStatePasses{0};
+        uint32_t measuredPasses{0}, missingMeasurementPasses{0};
+    };
+    struct QueueCostModel
+    {
+        RGQueuePlacement placement{RGQueuePlacement::Threshold};
+        // Approximate cross-queue handoff penalty, not a calibrated measurement.
+        // It does not fully price every extra batch, boundary transition or GPU
+        // contention effect. predictionCalibrated must remain false until measured.
+        uint64_t handoffNanoseconds{20'000};
+        uint64_t minimumGainNanoseconds{50'000};
+    };
+    void SetQueueCostModel(const QueueCostModel& model) { RequireQueueIdle(); m_queueCostModel = model; }
+    // minimumGpuNanoseconds is the per-pass measured time a compute candidate needs.
+    // Overlap placement may reorder compatible same-queue immutable reads.
+    // Writers and state/ownership changes join every reader, not the last declared
+    // reader. Cross-queue reads remain ordered until a backend shared-state contract
+    // exists; in particular graphics SRV and compute SRV are not the same DX12 state.
+    bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
+        const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+        QueueSchedule& output, std::string& outError) const;
+
+    void DeclareComputeCompatible(RGPassId pass);
+    // A culling root is not a CPU side effect. This opt-in additionally orders
+    // every live pass before/after the callback and prevents parallel recording.
+    void DeclareRecordingSideEffect(RGPassId pass);
+    void SetMeasurementDomain(RGMeasurementDomain domain)
+    {
+        RequireQueueIdle();
+        m_measurementDomain = domain;
+        m_queueDiagnostics.measurementDomain = domain;
+    }
+    RGMeasurementDomain GetMeasurementDomain() const { return m_measurementDomain; }
+    void SetQueueExecutionMode(uint32_t mode)
+    {
+        RequireQueueIdle();
+        m_queueExecutionMode = mode;
+        m_queueDiagnostics.requestedExecutionMode = mode;
+        m_queueDiagnostics.schedule.fallbackReason = mode == 0 ? RGQueueFallbackReason::Disabled :
+            RGQueueFallbackReason::None;
+    }
+    uint32_t GetQueueExecutionMode() const { return m_queueExecutionMode; }
+    std::vector<QueueHint> MeasuredQueueHints(
+        const std::function<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const;
+
+    struct QueueEndpoint
+    {
+        std::shared_ptr<IRHICommandQueue> queue;
+        uint64_t nextSignal{1}; // Exclusive submission ownership; advances on accepted signals.
+        IRHIGpuProfiler* profiler{nullptr}; // Queue-local query heap and clock; owner pins lifetime.
+    };
+    struct QueueExecution
+    {
+        double scheduleMilliseconds{0.0}; // Planning, wait reduction and barrier specialization.
+        double recordingMilliseconds{0.0}; // Recording only; excludes queue submission.
+        double submissionMilliseconds{0.0}; // Includes CPU submission-ticket waits, not GPU completion waits.
+        double totalMilliseconds{0.0}; // Entire SubmitQueues call, including failed attempts.
+        RHITimelinePoint completion; // Graphics epilogue joins both queues.
+        uint32_t plannedBatches{0}, plannedComputeBatches{0}, plannedWaits{0};
+        uint32_t submittedBatches{0}, computeBatches{0}, submittedWaits{0};
+        uint32_t plannedBarriers{0}; // Includes queue boundary plans and repeated phases.
+        uint32_t prologueBarriers{0}, epilogueBarriers{0};
+        uint64_t predictedSerialNanoseconds{0}, predictedNanoseconds{0};
+        bool submissionAttempted{false};
+        bool recoveryRequired{false}; // Partial execution: never retry on the fallback path.
+        bool completed{false}; // All batches accepted, not proof that GPU work has completed.
+    };
+    struct QueueDiagnostics
+    {
+        struct Batch
+        {
+            RHIQueueKind queue{RHIQueueKind::Graphics};
+            std::vector<uint16_t> passes; // Empty first/last batches are prologue/epilogue.
+            uint32_t barriers{0};
+            bool submitted{false};
+        };
+        struct Wait
+        {
+            uint32_t producerBatch{0}, consumerBatch{0};
+            bool submitted{false};
+        };
+        QueueExecution execution;
+        QueueSchedule schedule;
+        std::vector<Batch> batches;
+        std::vector<Wait> waits; // Actual reduced queue waits, including prefix and final join.
+        bool specialized{false};
+        uint32_t requestedExecutionMode{0}, effectiveExecutionMode{0};
+        RGMeasurementDomain measurementDomain{RGMeasurementDomain::Normal};
+    };
+    const QueueDiagnostics& GetQueueDiagnostics() const { return m_queueDiagnostics; }
+    // One-shot explicit graph execution. Imported DEFAULT resources must already be
+    // ready for these queues. owner pins imported storage, descriptors and any pool;
+    // services must outlive queue collection. No upload/frame-ring reset until done.
+    // All callbacks are recorded before any submission. Retained batches pin self.
+    bool SubmitQueues(const std::shared_ptr<EnhancedRenderGraph>& self,
+        IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
+        const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+        std::shared_ptr<const void> owner, QueueExecution& output, std::string& outError);
+
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
     /// 〃 (G-1). 호출부 30곳이 `resources.GetCommandList()` 를 넘겼다.
     bool Execute(std::string& outError);
@@ -367,6 +641,7 @@ public:
     void SetProfiler(IRHIGpuProfiler* profiler) { m_profiler = profiler; }
 
     Stats GetStats() const { return m_stats; }
+    RGTransientPool::AliasHeapMemory GetAliasHeapMemory() const;
 
     // Explicit diagnostic copy only. It owns no GPU objects and never drives execution.
     // Legacy inference and explicit versioned accesses remain distinguishable.
@@ -376,6 +651,8 @@ public:
         uint32_t resource;
         RHIResourceState before, after;
         bool uav;
+        bool afterPass{false};
+        bool aliasing{false};
     };
     struct DiagnosticPass
     {
@@ -386,16 +663,29 @@ public:
         uint32_t recordCost, maxSlices;
         std::vector<DiagnosticUsage> usages;
         std::vector<DiagnosticBarrier> barriers;
+        struct Phase
+        {
+            std::string name;
+            std::vector<DiagnosticUsage> usages;
+            std::vector<DiagnosticBarrier> firstBarriers, repeatBarriers;
+        };
+        uint32_t repeatCount{1};
+        std::vector<Phase> phases;
     };
     struct DiagnosticResource
     {
         std::string name;
         bool imported, buffer, used;
         uint32_t firstUse, lastUse;
+        uint32_t versionCount{0};
+        RHIResourceState initialState{RHIResourceState::Common};
+        RHIResourceState finalState{RHIResourceState::Common};
+        uint32_t aliasGroup{UINT32_MAX};
+        uint64_t allocationBytes{0};
     };
     struct DiagnosticSnapshot
     {
-        struct VersionEdge { uint32_t producer, consumer, resource; uint16_t version; enum class Reason { RAW, WAR, WAW } reason; };
+        struct VersionEdge { uint32_t producer, consumer, resource; uint16_t version; enum class Reason { RAW, WAR, WAW, RecordingSideEffect } reason; };
         struct ReachabilityEdge { uint32_t producer, consumer, resource; };
         std::vector<DiagnosticPass> passes;
         std::vector<DiagnosticResource> resources;
@@ -404,6 +694,48 @@ public:
         std::vector<VersionEdge> versionEdges;
         std::vector<int32_t> dependencyWaves; // authored pass index; -1 is culled/unavailable
         std::vector<uint16_t> criticalPath;
+        uint64_t generation{0};
+        uint64_t graphEpoch{0};
+        uint64_t dependencyHash{0};
+        RGTransientPool::AliasHeapMemory aliasHeapMemory;
+        QueueDiagnostics queueExecution;
+        RGSchedulingMode scheduling{RGSchedulingMode::DeclarationOrder};
+        RGOrderPolicy orderPolicy{RGOrderPolicy::DependencyOrder};
+        // 뷰 귀속은 게시자가 채운다. 그래프 복사본은 GPU 리소스를 소유하지 않는다.
+        uint64_t viewId{0}, frameId{0}, historyRevision{0}, sceneEpoch{0};
+        uint32_t width{0}, height{0};
+        uint64_t copyNanoseconds{0};
+        // Vector/string capacities; allocator bookkeeping is excluded.
+        size_t StorageBytes() const
+        {
+            size_t bytes = sizeof(*this) + passes.capacity() * sizeof(DiagnosticPass) +
+                resources.capacity() * sizeof(DiagnosticResource) + executeOrder.capacity() * sizeof(uint16_t) +
+                reachabilityEdges.capacity() * sizeof(ReachabilityEdge) + versionEdges.capacity() * sizeof(VersionEdge) +
+                dependencyWaves.capacity() * sizeof(int32_t) + criticalPath.capacity() * sizeof(uint16_t);
+            bytes += queueExecution.schedule.entries.capacity() * sizeof(QueueSchedule::Entry) +
+                queueExecution.schedule.waits.capacity() * sizeof(QueueSchedule::Wait) +
+                queueExecution.batches.capacity() * sizeof(QueueDiagnostics::Batch) +
+                queueExecution.waits.capacity() * sizeof(QueueDiagnostics::Wait);
+            for (const auto& batch : queueExecution.batches)
+            {
+                bytes += batch.passes.capacity() * sizeof(uint16_t);
+            }
+            for (const auto& resource : resources)
+            {
+                bytes += resource.name.capacity();
+            }
+            for (const auto& pass : passes)
+            {
+                bytes += pass.name.capacity() + pass.usages.capacity() * sizeof(DiagnosticUsage) +
+                    pass.barriers.capacity() * sizeof(DiagnosticBarrier) + pass.phases.capacity() * sizeof(DiagnosticPass::Phase);
+                for (const auto& phase : pass.phases)
+                {
+                    bytes += phase.name.capacity() + phase.usages.capacity() * sizeof(DiagnosticUsage) +
+                        (phase.firstBarriers.capacity() + phase.repeatBarriers.capacity()) * sizeof(DiagnosticBarrier);
+                }
+            }
+            return bytes;
+        }
     };
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
@@ -433,6 +765,8 @@ public:
 
 
     bool IsPassCulled(RGPassId pass) const;
+    /// Total planned resource barriers, including repeated phases and final-state
+    /// restoration. Counts emitted barriers, not barrier batches or templates.
     uint32_t GetPassBarrierCount(RGPassId pass) const;
 
     // transient 리소스의 수명(첫 사용 패스 ~ 마지막 사용 패스, 실행 순서 기준).
@@ -440,31 +774,55 @@ public:
     bool GetTransientLifetime(RGHandle handle, uint32_t& outFirst, uint32_t& outLast) const;
 
 private:
+    void RequireQueueIdle() const;
+    std::weak_ptr<const void> m_queueLease;
+    bool m_queueExecutionAttempted{false};
+    QueueDiagnostics m_queueDiagnostics;
+    void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
+    void OnUploadCompleted(uint64_t) override {}
+    void OnUploadAborted(uint64_t) override {}
+    void OnUploadAccepted(uint64_t recording, RHICompletionPoint) override;
+    uint64_t m_recordedRecording{};
+    bool m_statesCommitted{};
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
 private:
     struct Resource
     {
         RGTextureDesc    desc;
+        RGBufferDesc bufferDesc;
+        bool bufferKind{false};
 
         // 표 안의 자리. 임포트든 transient든 같은 표를 쓴다 (V2-c2) —
         // 예전의 external 포인터 / owned ComPtr 두 갈래가 이 한 칸이 됐다.
         RHITextureHandle handle;
         RHIBufferHandle  buffer;
 
-        bool IsBuffer() const { return buffer.IsValid(); }
+        bool IsBuffer() const { return bufferKind; }
         bool IsValid() const { return handle.IsValid() || buffer.IsValid(); }
 
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RHIResourceState state{ RHIResourceState::Common };
+        RHIResourceState initialState{ RHIResourceState::Common };
         RHIResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
         uint32_t firstUse{ 0xFFFFFFFF };
         uint32_t lastUse{ 0 };
+        uint32_t aliasGroup{UINT32_MAX};
+        uint32_t aliasMember{UINT32_MAX};
+        uint64_t allocationBytes{0};
         std::string name;
         struct Version { uint16_t parent; bool modify; };
         std::vector<Version> versions;
+    };
+
+    struct PhaseBarrierPlan
+    {
+        std::vector<RHITransition> transitions;
+        std::vector<RHIBufferTransition> bufferTransitions;
+        std::vector<RHITextureHandle> uavBarriers;
+        std::vector<RHIBufferHandle> uavBufferBarriers;
     };
 
     struct Pass
@@ -477,38 +835,98 @@ private:
         uint32_t                 recordCost{ 0 };
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
+        bool                     computeCompatible{ false };
+        bool                     recordingSideEffect{ false };
         // ★ 이 패스 직전에 한 번에 낸다. 계획 단계는 네 중립 배열만 만들고,
         //   기록 시점에 `RHIBarrierBatch`로 묶어 백엔드 인코더에 넘긴다.
         std::vector<RHITransition>    transitions;
         std::vector<RHIBufferTransition> bufferTransitions;
         std::vector<RHITextureHandle> uavBarriers;
         std::vector<RHIBufferHandle>  uavBufferBarriers;
+        std::vector<RHITransition> finalTransitions;
+        std::vector<RHIBufferTransition> finalBufferTransitions;
+        std::vector<RHITextureHandle> aliasTextures;
+        std::vector<RHIBufferHandle> aliasBuffers;
+        std::vector<uint16_t> poisonBuffers;
+        std::vector<std::pair<uint16_t, RHIRenderTargetBinding>> aliasClears;
+        uint32_t repeatCount{1};
+        std::vector<RepeatedPhase> phases;
+        bool repeated{false};
+        RepeatedExecuteCallback repeatedExecute;
+        std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
+    };
+
+    struct FinalStateRequirement
+    {
+        RGHandle handle;
+        RHIResourceState state;
     };
 
     void ReleaseResources();
+    bool CheckDeclarationCapacity(std::size_t count, uint16_t limit,
+        const char* kind, const std::string& name);
     bool BuildOrder(std::string& outError);
     void CullPasses();
     /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
-    void PlanBarriers();
+    bool CreateAliasedTransients(std::string& outError);
+    RHITransientResourceDesc TransientDescription(const Resource& resource) const;
+    // Queue execution specializes the same planner at submission boundaries.
+    // Pass states persist inside each batch; boundary plans use COMMON.
+    void PlanBarriers(const std::vector<bool>* batchEnds = nullptr,
+        PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr);
+    bool ValidateFinalStates(std::string& outError) const;
+    bool ValidateRepeatedPasses(std::string& outError) const;
+    void PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite);
 
     /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
     /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
     void RecordPassBarriers(RHIEncoder& encoder, const Pass& pass) const;
+    void RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const;
+    void RecordPassBody(const ExecuteContext& context, const Pass& pass,
+        uint32_t slice, uint32_t sliceCount) const;
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };
+    std::vector<std::shared_ptr<RGTransientPool::AliasedGroup>> m_transientHeaps;
+    std::shared_ptr<RGTransientPool::AliasHeapAccounting> m_aliasHeapAccounting;
+    bool m_aliasing{false}, m_extendLifetimes{false};
+    bool m_poison{false};
     std::vector<Pass>     m_passes;
+    std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
+    std::shared_ptr<const std::string> m_timingSignature;
+    void BuildTimingSignature();
+    GpuPassTimingIdentity TimingIdentity(uint16_t passIndex) const
+    {
+        return {m_timingSignature, passIndex};
+    }
     IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
+    std::string m_declarationError;
     RGSchedulingMode m_scheduling{ RGSchedulingMode::DeclarationOrder };
     RGOrderPolicy m_orderPolicy{ RGOrderPolicy::DependencyOrder };
     bool BuildExplicitOrder(std::string& outError);
     void BuildDependencyWaves();
     std::vector<int32_t> m_dependencyWaves;
     std::vector<uint16_t> m_criticalPath;
+    // Queue assignment is part of state compatibility. Whole-resource access is
+    // conservative for all subresources until declarations expose a narrower range.
+    void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
+        std::vector<std::vector<uint16_t>>& predecessors,
+        std::vector<std::vector<uint16_t>>& successors) const;
+    bool IsComputeStateCompatible(uint16_t pass) const;
+    // Two-queue list simulation. Returns the predicted span and, if requested,
+    // the submission order. reorder=false keeps the compiled order.
+    uint64_t SimulateQueues(const std::vector<RHIQueueKind>& queues, const std::vector<uint64_t>& costs,
+        const std::vector<std::vector<uint16_t>>& predecessors,
+        const std::vector<std::vector<uint16_t>>& successors,
+        bool reorder, std::vector<uint16_t>* order) const;
+    void UpdateResourceUses();
+    QueueCostModel m_queueCostModel;
+    RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};
+    uint32_t m_queueExecutionMode{0};
     RGHandle VersionHandle(uint16_t index, uint16_t version) const;
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;
@@ -517,8 +935,8 @@ private:
 
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
     uint64_t m_resourceEpoch{1};
+    uint64_t m_compileGeneration{0};
     IRHIParallelCommandPool* m_preparedPool{nullptr};
     uint64_t m_preparedRecording{0}, m_preparedDescriptors{0};
     bool m_preparedRecordingConsumed{false};
 };
-

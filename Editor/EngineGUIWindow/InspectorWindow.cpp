@@ -1,4 +1,4 @@
-#include "../EngineEntry/EditorProjectOperations.h"
+﻿#include "../EngineEntry/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
 #include "InspectorControl.h"
@@ -50,7 +50,7 @@
 #include "TagManager.h"
 #include "PlayerInput.h"
 #include "InputActionManager.h"
-#include "SoundManager.h"
+#include "SoundSystem.h"
 #include <mathematics/scalar.hpp>
 //----------------------------
 #include "ExternUI.h"
@@ -62,6 +62,7 @@
 #include "DecalComponent.h"
 #include "SpriteRenderer.h"
 #include "SoundComponent.h"
+#include "AudioListenerComponent.h"
 //----------------------------
 
 #include "EditorIcons.h"
@@ -285,7 +286,7 @@ void draw_character_movement(CharacterMovementComponent& character, editor::widg
 
 struct ComponentMenuVisual
 {
-    Texture* image{};
+    const Texture* image{};
     const char* fallback{};
 };
 
@@ -847,6 +848,26 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 			}
 			break;
 		}
+        case ClrHost::ScriptFieldType::AssetLink:
+        {
+            std::string value = clr.GetFieldString(instanceId, i);
+            if (ImGui::InputText("##Value", &value, ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+                if (clr.SetFieldAssetLink(instanceId, i, value))
+                {
+                    script->CaptureFields();
+                }
+                else
+                {
+                    Debug::PrintLog(spdlog::level::warn, "[ScriptCore] Invalid AssetLink version, kind or UUID; expected 1:<this field's kind>:<canonical asset UUID>:<subasset UUID or nil>.");
+                }
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Typed link: 1:<expected kind>:<canonical asset UUID>:<subasset UUID or nil>. Preserve this field's kind. Press Enter to apply. Nil/nil clears the link.");
+            }
+            break;
+        }
 		case ClrHost::ScriptFieldType::String:
 		{
 			std::string value = clr.GetFieldString(instanceId, i);
@@ -1387,7 +1408,7 @@ static bool NameButton(const std::string& name, const char* id, float width)
 
 // 자산 칸: 이름을 보여 주는 버튼 하나. 버튼이 끌어 놓기 대상이다. 텍스처가 있으면
 // 앞에 줄 높이의 미리보기를 붙인다. 놓인 자산 경로를 돌려준다(없으면 빈 경로).
-static file::path DrawAssetSlot(const char* id, Texture* texture, const char* emptyText,
+static file::path DrawAssetSlot(const char* id, const own::shared_owner<const Texture>& texture, const char* emptyText,
 	const char* payloadType, float width)
 {
 	ImGui::PushID(id);
@@ -1647,18 +1668,24 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	}
 
 	// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
-	const auto slot = [&](const char* label, Texture* texture, const char* context)
+	const auto slot = [&](const char* label, const own::shared_owner<const Texture>& texture, const char* context)
 	{
 		const file::path dropped = DrawAssetSlot(label, texture, "None", "Texture", sheet.line(label));
 		return !dropped.empty() && editor::asset_drag::lives_in(dropped, "Textures", context)
 			? dropped.filename().string() : std::string();
 	};
-	if (auto name = slot("Diffuse", decalComponent->GetDecalTexture(), "Decal Decal texture drop"); !name.empty())
+	if (auto name = slot("Diffuse", decalComponent->GetDecalTextureShared(), "Decal Decal texture drop"); !name.empty())
+	{
 		decalComponent->SetDecalTexture(name.c_str());
-	if (auto name = slot("Normal", decalComponent->GetNormalTexture(), "Decal Normal texture drop"); !name.empty())
+	}
+	if (auto name = slot("Normal", decalComponent->GetNormalTextureShared(), "Decal Normal texture drop"); !name.empty())
+	{
 		decalComponent->SetNormalTexture(name.c_str());
-	if (auto name = slot("ORM", decalComponent->GetORMTexture(), "Decal ORM texture drop"); !name.empty())
+	}
+	if (auto name = slot("ORM", decalComponent->GetORMTextureShared(), "Decal ORM texture drop"); !name.empty())
+	{
 		decalComponent->SetORMTexture(name.c_str());
+	}
 }
 
 void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageComponent)
@@ -1691,7 +1718,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 
-	const file::path dropped = DrawAssetSlot("AddTexture", nullptr,
+	const file::path dropped = DrawAssetSlot("AddTexture", {},
 		count > 0 ? "Drag UI texture to add" : "No textures - drag UI texture", "UI_TEXTURE",
 		sheet.line("Add Texture"));
 	if (!dropped.empty())
@@ -1763,7 +1790,8 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 {
 	{
 		const editor::widgets::property_sheet sheet(m_layout, { "Sprite" });
-		const file::path dropped = DrawAssetSlot("Sprite", spriteRenderer->GetSprite().get(), "None (drag texture)",
+		const auto& sprite = spriteRenderer->GetSprite();
+		const file::path dropped = DrawAssetSlot("Sprite", sprite, "None (drag texture)",
 			"Texture", sheet.line("Sprite"));
 		if (!dropped.empty())
 		{
@@ -1794,201 +1822,151 @@ void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
 
 void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 {
-	using namespace ImGui;
+    using namespace ImGui;
+    sc->MarkPreviewVisible();
+    auto settings = sc->ReadSettings();
+    bool changed = false;
+    const editor::widgets::property_sheet sheet(m_layout, { "Source", "Clip", "Asset GUID", "Bus",
+        "Volume", "Pitch", "Priority", "Concurrency Group", "Same Clip", "Virtualization", "Loop", "Play On Start", "Spatial", "Spatial Blend",
+        "Min Distance", "Max Distance", "Rolloff", "Reverb Send", "Reverb Level (dB)", "Preview" });
 
-	const editor::widgets::property_sheet sheet(m_layout, { "Clip", "Bus", "Volume", "Pitch", "Priority",
-		"Loop", "Play On Start", "Spatial", "Spatial Blend", "Min Distance", "Max Distance", "Rolloff",
-		"Reverb Send", "Reverb Level (dB)", "Reverb Index", "Preview" });
+    const char* sources[] = { "Audio Clip", "Sound Preset", "Sound Graph" };
+    int source = static_cast<int>(settings.sourceKind);
+    SetNextItemWidth(sheet.line("Source"));
+    if (Combo("##SoundSource", &source, sources, IM_ARRAYSIZE(sources)))
+    {
+        settings.sourceKind = static_cast<wave::SoundSourceKind>(source);
+        changed = true;
+    }
+    if (settings.sourceKind == wave::SoundSourceKind::Clip)
+    {
+        if (DrawNamedPicker(sheet, "Clip", settings.clipKey, "None",
+            EditorIcon::Label<EditorIcon::Audio, "##PickClip">))
+        {
+            m_clipKeyCache = sc->GetOwner()->GetScene()->Sounds().ClipKeys();
+            m_clipSearch.clear();
+            m_clipPickerOwner = sc->GetOwner()->GetScene()->HandleOf(sc->GetOwner()->m_index);
+            m_clipPickerComponent = sc->GetInstanceID();
+            m_openClipPicker = true;
+        }
+    }
+    else
+    {
+        auto& asset = settings.sourceKind == wave::SoundSourceKind::Preset ?
+            settings.soundPresetKey : settings.soundGraphKey;
+        SetNextItemWidth(sheet.line("Asset GUID"));
+        changed |= InputText("##SoundAssetGuid", &asset);
+    }
+    if (settings.sourceKind == wave::SoundSourceKind::Preset)
+    {
+        changed |= Checkbox("Override preset settings", &settings.overridePresetSettings);
+    }
+    BeginDisabled(settings.sourceKind == wave::SoundSourceKind::Preset && !settings.overridePresetSettings);
+    SeparatorText("Bus / Params");
+    const char* buses[] = { "BGM", "SFX", "PLAYER", "MONSTER", "UI" };
+    int bus = static_cast<int>(settings.bus);
+    SetNextItemWidth(sheet.line("Bus"));
+    if (Combo("##Bus", &bus, buses, IM_ARRAYSIZE(buses)))
+    {
+        settings.bus = static_cast<ChannelType>(bus);
+        changed = true;
+    }
+    SetNextItemWidth(sheet.line("Volume"));
+    changed |= DragFloat("##Volume", &settings.volume, 0.01f, 0.0f, 1.0f, "%.3f");
+    SetNextItemWidth(sheet.line("Pitch"));
+    changed |= DragFloat("##Pitch", &settings.pitch, 0.01f, 0.25f, 4.0f, "%.2f");
+    SetNextItemWidth(sheet.line("Priority"));
+    changed |= DragInt("##Priority", &settings.priority, 1, 0, 256);
+    int concurrency = static_cast<int>(settings.concurrencyGroup);
+    SetNextItemWidth(sheet.line("Concurrency Group"));
+    if (DragInt("##ConcurrencyGroup", &concurrency, 1.0f, 0, 65535))
+    {
+        settings.concurrencyGroup = static_cast<std::uint32_t>(concurrency);
+        changed = true;
+    }
+    sheet.line("Same Clip");
+    changed |= Checkbox("Preempt same clip##Audio", &settings.preemptSameClip);
+    sheet.line("Virtualization");
+    changed |= Checkbox("Allow virtualization##Audio", &settings.allowVirtualization);
+    sheet.line("Loop");
+    changed |= Checkbox("##Loop", &settings.loop);
+    sheet.line("Play On Start");
+    changed |= Checkbox("##PlayOnStart", &settings.playOnStart);
 
-	// ─────────────────────────────────────────────────────────────
-	//  Clip / Picker
-	// ─────────────────────────────────────────────────────────────
-	if (DrawNamedPicker(sheet, "Clip", sc->clipKey, "None",
-		EditorIcon::Label<EditorIcon::Audio, "##PickClip">))
-	{
-		m_clipKeyCache = Sound->getAllClipKeys();
-		m_clipSearch.clear();
-		m_clipPickerTarget = sc;
-		m_openClipPicker = true;
-	}
-
-	// ─────────────────────────────────────────────────────────────
-	//  Bus / Basic Params
-	// ─────────────────────────────────────────────────────────────
-	SeparatorText("Bus / Params");
-
-	const char* busNames[] = { "BGM","SFX","PLAYER","MONSTER","UI" };
-	int busIdx = (int)sc->bus;
-	SetNextItemWidth(sheet.line("Bus"));
-	if (Combo("##Bus", &busIdx, busNames, IM_ARRAYSIZE(busNames))) {
-		sc->bus = (ChannelType)busIdx;
-	}
-
-	SetNextItemWidth(sheet.line("Volume"));
-	DragFloat("##Volume", &sc->volume, 0.01f, 0.0f, 1.0f, "%.3f");
-	SetNextItemWidth(sheet.line("Pitch"));
-	DragFloat("##Pitch", &sc->pitch, 0.01f, 0.25f, 4.0f, "%.2f");
-	SetNextItemWidth(sheet.line("Priority"));
-	DragInt("##Priority", &sc->priority, 1, 0, 256);
-
-	bool loopBefore = sc->loop;
-	sheet.line("Loop");
-	Checkbox("##Loop", &sc->loop);
-	sheet.line("Play On Start");
-	Checkbox("##PlayOnStart", &sc->playOnStart);
-
-	// 루프 상태 변경 즉시 채널에 반영
-	if (loopBefore != sc->loop) {
-		auto applyLoop = [&](FMOD::Channel* ch) {
-			if (!ch) return;
-			FMOD_MODE mode = FMOD_DEFAULT; ch->getMode(&mode);
-			mode &= ~(FMOD_MODE)FMOD_LOOP_NORMAL;
-			mode &= ~(FMOD_MODE)FMOD_LOOP_OFF;
-			mode |= sc->loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF;
-			ch->setMode(mode);
-			};
-		applyLoop(sc->Get2DChannel());
-		applyLoop(sc->Get3DChannel());
-	}
-
-	// ─────────────────────────────────────────────────────────────
-	//  Spatial
-	// ─────────────────────────────────────────────────────────────
-	SeparatorText("Spatial");
-	sheet.line("Spatial");
-	Checkbox("##Spatial", &sc->spatial);
-	if (IsItemHovered()) SetTooltip("Blend 2D + 3D");
-
-	if (sc->spatial)
-	{
-		SetNextItemWidth(sheet.line("Spatial Blend"));
-		DragFloat("##SpatialBlend", &sc->spatialBlend, 0.01f, 0.0f, 1.0f, "%.2f");
-
-		float minBefore = sc->minDistance, maxBefore = sc->maxDistance;
-		SetNextItemWidth(sheet.line("Min Distance"));
-		DragFloat("##MinDistance", &sc->minDistance, 0.01f, 0.01f, 200.0f, "%.2f");
-		SetNextItemWidth(sheet.line("Max Distance"));
-		DragFloat("##MaxDistance", &sc->maxDistance, 0.10f, 0.10f, 500.0f, "%.2f");
-		if (sc->minDistance > sc->maxDistance) sc->maxDistance = sc->minDistance + 0.01f;
-
-		const char* rolloffNames[] = { "Linear", "Inverse", "Custom" };
-		int roll = (int)sc->rolloff;
-		SetNextItemWidth(sheet.line("Rolloff"));
-		bool rollChanged = Combo("##Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
-		sc->rolloff = (Rolloff)roll;
-
-		// 그래프: spatial이면 항상 표시
-		SeparatorText("Distance Rolloff Curve");
-
-		const bool isCustom = (sc->rolloff == Rolloff::Custom);
-		const ImVec2 curveSize(0.f, editor::ThemePixels(200.f));
-
-		// Linear /Inverse 선택 시: 자동 곡선으로 동기화(읽기전용)
-		if (!isCustom) {
-			if (rollChanged || minBefore != sc->minDistance || maxBefore != sc->maxDistance || sc->localRolloffCurve.size() < 2) {
-				if (sc->rolloff == Rolloff::Linear)  BuildLinearCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
-				if (sc->rolloff == Rolloff::Inverse) BuildInverseCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
-			}
-			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), curveSize, nullptr, /*readOnly=*/true);
-			PushStyleColor(ImGuiCol_Text, GetStyleColorVec4(ImGuiCol_TextDisabled));
-			TextWrapped("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
-			PopStyleColor();
-		}
-		else {
-			// Custom: 에디트 가능
-			if (sc->localRolloffCurve.size() < 2) {
-				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
-			}
-			// maxDistance 변경 시 마지막 점 X를 범위 내로 보정(편집 내용은 유지)
-			sc->localRolloffCurve.back().distance = std::clamp(sc->localRolloffCurve.back().distance, 0.1f, std::max(0.1f, sc->maxDistance));
-
-			if (SmallButton("Reset to Default")) {
-				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
-			}
-			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), curveSize, nullptr, /*readOnly=*/false);
-			PushStyleColor(ImGuiCol_Text, GetStyleColorVec4(ImGuiCol_TextDisabled));
-			TextWrapped("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
-			PopStyleColor();
-		}
-
-		// 실시간 3D 채널 반영(위치/거리/롤오프 모드 등)
-		if (auto* ch3 = sc->Get3DChannel()) {
-			FMOD_VECTOR p{ sc->position.x, sc->position.y, sc->position.z };
-			FMOD_VECTOR v{ sc->velocity.x, sc->velocity.y, sc->velocity.z };
-			ch3->set3DAttributes(&p, &v);
-
-			if (minBefore != sc->minDistance || maxBefore != sc->maxDistance || rollChanged) {
-				FMOD_MODE mode = FMOD_DEFAULT | FMOD_3D | (sc->loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
-				mode &= ~(FMOD_MODE)FMOD_3D_LINEARROLLOFF;
-				mode &= ~(FMOD_MODE)FMOD_3D_INVERSEROLLOFF;
-				mode &= ~(FMOD_MODE)FMOD_3D_CUSTOMROLLOFF;
-
-				switch (sc->rolloff) {
-				case Rolloff::Linear:  mode |= FMOD_3D_LINEARROLLOFF;  break;
-				case Rolloff::Inverse: mode |= FMOD_3D_INVERSEROLLOFF; break;
-				case Rolloff::Custom:  mode |= FMOD_3D_CUSTOMROLLOFF;  break;
-				}
-				ch3->setMode(mode);
-				ch3->set3DMinMaxDistance(sc->minDistance, sc->maxDistance);
-			}
-		}
-	}
-
-	// ─────────────────────────────────────────────────────────────
-	//  Reverb Send
-	// ─────────────────────────────────────────────────────────────
-	SeparatorText("Reverb Send");
-	bool useRevBefore = sc->useReverbSend;
-	sheet.line("Reverb Send");
-	Checkbox("##EnableReverbSend", &sc->useReverbSend);
-
-	auto applyReverb = [&](FMOD::Channel* ch) {
-		if (!ch) return;
-		if (!sc->useReverbSend) { ch->setReverbProperties(sc->reverbIndex, 0.0f); return; }
-
-		// dB -> linear (0~1 clamp)
-		float wet = powf(10.0f, sc->reverbLevel / 20.0f);
-		wet = std::clamp(wet, 0.0f, 1.0f);
-		ch->setReverbProperties(sc->reverbIndex, wet);
-		};
-
-	// dB 슬라이더(-80~+10), 내부는 선형(0~1)로 변환해서 FMOD에 적용
-	SetNextItemWidth(sheet.line("Reverb Level (dB)"));
-	DragFloat("##ReverbLevel", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
-	bool reverbEdited = IsItemEdited() || IsItemDeactivatedAfterEdit();
-	SetNextItemWidth(sheet.line("Reverb Index"));
-	DragInt("##ReverbIndex", &sc->reverbIndex, 1, 0, 3);
-	reverbEdited |= IsItemEdited() || IsItemDeactivatedAfterEdit();
-
-	// 값이 바뀌면 적용한다. 예전 판은 마지막 항목(Reverb Index)의 편집만 보았다.
-	if (useRevBefore != sc->useReverbSend || reverbEdited) {
-		applyReverb(sc->Get2DChannel());
-		applyReverb(sc->Get3DChannel());
-	}
-
-	// ─────────────────────────────────────────────────────────────
-	//  Preview Controls
-	// ─────────────────────────────────────────────────────────────
-	Separator();
-	{
-		const float gap = GetStyle().ItemInnerSpacing.x;
-		const float button = ImMax(1.f, (sheet.line("Preview") - gap * 2.f) / 3.f);
-		if (Button("Play", ImVec2(button, 0.f))) { sc->Play(); }
-		SameLine(0.f, gap);
-		if (Button("Stop", ImVec2(button, 0.f))) { sc->Stop(); }
-		SameLine(0.f, gap);
-		if (Button("OneShot", ImVec2(button, 0.f))) { sc->PlayOneShot(); }
-	}
-
-	// 볼륨/피치/프라이어리티 변경 실시간 반영(채널 살아있을 때)
-	auto applyBasic = [&](FMOD::Channel* ch) {
-		if (!ch) return;
-		ch->setVolume(sc->volume);
-		ch->setPitch(sc->pitch);
-		ch->setPriority(sc->priority);
-		};
-	applyBasic(sc->Get2DChannel());
-	applyBasic(sc->Get3DChannel());
+    SeparatorText("Spatial");
+    sheet.line("Spatial");
+    changed |= Checkbox("##Spatial", &settings.spatial);
+    if (settings.spatial)
+    {
+        SetNextItemWidth(sheet.line("Spatial Blend"));
+        changed |= DragFloat("##SpatialBlend", &settings.spatialBlend, 0.01f, 0.0f, 1.0f, "%.2f");
+        SetNextItemWidth(sheet.line("Min Distance"));
+        changed |= DragFloat("##MinDistance", &settings.minDistance, 0.01f, 0.01f, 200.0f, "%.2f");
+        SetNextItemWidth(sheet.line("Max Distance"));
+        changed |= DragFloat("##MaxDistance", &settings.maxDistance, 0.1f, 0.1f, 500.0f, "%.2f");
+        settings.maxDistance = std::max(settings.minDistance, settings.maxDistance);
+        const char* rolloffs[] = { "Linear", "Inverse", "Custom" };
+        int rolloff = static_cast<int>(settings.rolloff);
+        SetNextItemWidth(sheet.line("Rolloff"));
+        if (Combo("##Rolloff", &rolloff, rolloffs, IM_ARRAYSIZE(rolloffs)))
+        {
+            settings.rolloff = static_cast<Rolloff>(rolloff);
+            changed = true;
+        }
+        SeparatorText("Distance Rolloff Curve");
+        if (settings.rolloff == Rolloff::Custom)
+        {
+            if (settings.localRolloffCurve.size() < 2u)
+            {
+                settings.localRolloffCurve = { { 0.0f, 1.0f }, { settings.maxDistance, 0.0f } };
+                changed = true;
+            }
+            changed |= DrawRolloffCurveEditor(settings.localRolloffCurve, settings.maxDistance,
+                ImVec2(0.0f, editor::ThemePixels(200.0f)), nullptr, false);
+        }
+        else
+        {
+            std::vector<CurvePoint> curve;
+            if (settings.rolloff == Rolloff::Linear)
+            {
+                BuildLinearCurve(curve, settings.minDistance, settings.maxDistance);
+            }
+            else
+            {
+                BuildInverseCurve(curve, settings.minDistance, settings.maxDistance);
+            }
+            DrawRolloffCurveEditor(curve, settings.maxDistance,
+                ImVec2(0.0f, editor::ThemePixels(200.0f)), nullptr, true);
+        }
+    }
+    SeparatorText("Room Reverb Send");
+    sheet.line("Reverb Send");
+    changed |= Checkbox("##EnableReverbSend", &settings.useReverbSend);
+    SetNextItemWidth(sheet.line("Reverb Level (dB)"));
+    changed |= DragFloat("##ReverbLevel", &settings.reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
+    EndDisabled();
+    if (changed)
+    {
+        settings.reverbBus = "Room";
+        sc->QueueSettings(std::move(settings));
+    }
+    Separator();
+    const float gap = GetStyle().ItemInnerSpacing.x;
+    const float button = ImMax(1.0f, (sheet.line("Preview") - gap * 2.0f) / 3.0f);
+    if (Button("Play", ImVec2(button, 0.0f)))
+    {
+        sc->QueuePreview(SoundComponent::PreviewCommand::Play);
+    }
+    SameLine(0.0f, gap);
+    if (Button("Stop", ImVec2(button, 0.0f)))
+    {
+        sc->QueuePreview(SoundComponent::PreviewCommand::Stop);
+    }
+    SameLine(0.0f, gap);
+    if (Button("OneShot", ImVec2(button, 0.0f)))
+    {
+        sc->QueuePreview(SoundComponent::PreviewCommand::OneShot);
+    }
 }
 
 bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& sourceCurve, float maxDist, ImVec2 size, int* outSelected, bool readOnly)
@@ -2125,96 +2103,74 @@ bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& sourceCurv
 
 void InspectorWindow::DrawSoundClipPicker()
 {
-	using namespace ImGui;
-	if (!m_openClipPicker) return;
-
-	// 독립 윈도우(모달 느낌)
-	SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
-	if (Begin("Select Audio Clip", &m_openClipPicker,
-		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
-	{
-		// 상단: 검색/리프레시
-		if (InputTextWithHint("##search", "Search clip key...", &m_clipSearch)) {
-			// 입력 시 즉시 필터 반영
-		}
-		SameLine();
-		if (Button("Refresh")) {
-			m_clipKeyCache = Sound->getAllClipKeys();
-		}
-		Separator();
-
-		// 필터링
-		auto toLower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), ::tolower); return s; };
-		std::string q = toLower(m_clipSearch);
-
-		// 리스트 영역
-		BeginChild("##cliplist", ImVec2(0, -48), true);
-		static int selectedIndex = -1;
-		const int N = (int)m_clipKeyCache.size();
-		for (int i = 0; i < N; ++i) {
-			const std::string& key = m_clipKeyCache[i];
-			if (!q.empty() && toLower(key).find(q) == std::string::npos) continue;
-
-			bool selected = (i == selectedIndex);
-			if (Selectable(key.c_str(), selected)) {
-				selectedIndex = i;
-			}
-
-			// 우측 프리뷰 버튼
-			if (IsItemHovered() && IsMouseDoubleClicked(0)) 
-			{
-				// 더블클릭 = 선택 확정
-				if (m_clipPickerTarget && i >= 0) m_clipPickerTarget->clipKey = key;
-				m_openClipPicker = false;
-				selectedIndex = -1;
-				break;
-			}
-			SameLine();
-			if (SmallButton((EditorIcon::Label<EditorIcon::Play, "##prev"> + std::to_string(i)).c_str()))
-			{
-				if (m_clipPickerTarget) 
-				{
-					// 미리듣기: 현재 타겟 버스/볼륨/피치 사용
-					FMOD_VECTOR pos{ m_clipPickerTarget->position.x,
-									 m_clipPickerTarget->position.y,
-									 m_clipPickerTarget->position.z };
-
-					FMOD_VECTOR vel{ m_clipPickerTarget->velocity.x,
-									 m_clipPickerTarget->velocity.y,
-									 m_clipPickerTarget->velocity.z };
-
-					Sound->playOneShotPooled(
-						key,
-						m_clipPickerTarget->bus,
-						m_clipPickerTarget->volume,
-						m_clipPickerTarget->pitch,
-						m_clipPickerTarget->priority,
-						m_clipPickerTarget->spatial ? m_clipPickerTarget->spatialBlend : 0.0f,
-						m_clipPickerTarget->spatial ? &pos : nullptr,
-						m_clipPickerTarget->spatial ? &vel : nullptr,
-						m_clipPickerTarget
-					);
-				}
-			}
-		}
-		EndChild();
-
-		// 하단 버튼
-		BeginDisabled(selectedIndex < 0);
-		if (Button("Use")) 
-		{
-			if (m_clipPickerTarget && selectedIndex >= 0) 
-			{
-				m_clipPickerTarget->clipKey = m_clipKeyCache[selectedIndex];
-			}
-			m_openClipPicker = false;
-			selectedIndex = -1;
-		}
-		EndDisabled();
-		SameLine();
-		if (Button("Close")) { m_openClipPicker = false; selectedIndex = -1; }
-	}
-	End();
+    using namespace ImGui;
+    if (!m_openClipPicker)
+    {
+        return;
+    }
+    // The picker may outlive component removal without an entity-selection
+    // change. Borrow the exact instance again for this presentation frame.
+    auto* scene = SceneManagers->GetActiveScene();
+    auto* owner = scene ? scene->Resolve(m_clipPickerOwner) : nullptr;
+    SoundComponent* clipPickerTarget = nullptr;
+    if (owner && !owner->IsDestroyMark())
+    {
+        for (const auto& component : owner->m_components)
+        {
+            if (component && !component->IsDestroyMark() && component->GetInstanceID() == m_clipPickerComponent)
+            {
+                clipPickerTarget = dynamic_cast<SoundComponent*>(component.get());
+                break;
+            }
+        }
+    }
+    if (!clipPickerTarget)
+    {
+        m_openClipPicker = false;
+        m_clipPickerOwner = {};
+        m_clipPickerComponent = 0;
+        return;
+    }
+    SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
+    if (Begin("Select Audio Clip", &m_openClipPicker,
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
+    {
+        InputTextWithHint("##search", "Search clip GUID...", &m_clipSearch);
+        SameLine();
+        if (Button("Refresh"))
+        {
+            m_clipKeyCache = clipPickerTarget->GetOwner()->GetScene()->Sounds().ClipKeys();
+        }
+        Separator();
+        BeginChild("##cliplist", ImVec2(0, -48), true);
+        for (std::size_t i = 0; i < m_clipKeyCache.size(); ++i)
+        {
+            const auto& key = m_clipKeyCache[i];
+            if (!m_clipSearch.empty() && key.find(m_clipSearch) == std::string::npos)
+            {
+                continue;
+            }
+            if (Selectable(key.c_str(), false))
+            {
+                auto settings = clipPickerTarget->ReadSettings();
+                settings.clipKey = key;
+                settings.sourceKind = wave::SoundSourceKind::Clip;
+                clipPickerTarget->QueueSettings(std::move(settings));
+                m_openClipPicker = false;
+            }
+            SameLine();
+            if (SmallButton((EditorIcon::Label<EditorIcon::Play, "##prev"> + std::to_string(i)).c_str()))
+            {
+                clipPickerTarget->QueuePreview(SoundComponent::PreviewCommand::OneShot, key);
+            }
+        }
+        EndChild();
+        if (Button("Close"))
+        {
+            m_openClipPicker = false;
+        }
+    }
+    End();
 }
 
 // PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
@@ -2283,7 +2239,8 @@ void InspectorWindow::Draw()
     if (changedTarget || editLocked)
     {
         m_openClipPicker = false;
-        m_clipPickerTarget = nullptr;
+        m_clipPickerOwner = {};
+        m_clipPickerComponent = 0;
         m_openNewTagPopup = m_openNewLayerPopup = false;
     }
 	TerrainBrush* terrainBrush = EditorSessionState::Get().FindTerrainBrush();
@@ -2303,8 +2260,31 @@ void InspectorWindow::Draw()
 		}
 
 		static bool isOpen = false;
-		static Component* selectedComponent = nullptr;
-        if (changedTarget || editLocked) { isOpen = false; selectedComponent = nullptr; }
+        static EntityHandle selectedComponentOwner;
+        static std::uint64_t selectedComponentId{};
+        Component* selectedComponent = nullptr;
+        if (changedTarget || editLocked || selectedComponentOwner != inspected)
+        {
+            isOpen = false;
+            selectedComponentOwner = {};
+            selectedComponentId = 0;
+        }
+        for (const auto& component : selectedSceneObject->m_components)
+        {
+            if (component && !component->IsDestroyMark() && component->GetInstanceID() == selectedComponentId)
+            {
+                selectedComponent = component.get();
+                selectedComponentOwner = inspected;
+                selectedComponentId = component->GetInstanceID();
+                break;
+            }
+        }
+        if (!selectedComponent)
+        {
+            isOpen = false;
+            selectedComponentOwner = {};
+            selectedComponentId = 0;
+        }
 
 		if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
 			terrainBrush)
@@ -2312,25 +2292,11 @@ void InspectorWindow::Draw()
 			terrainBrush->m_isEditMode = false;
 		}
 
-		// ★ range-for가 아니라 인덱스 순회인 이유 (트랙 C · C2)
-		//
-		// 이 루프 안에서 그리는 드로어가 **같은 오브젝트에 컴포넌트를 붙인다**.
-		// 확정된 실사례: ImGuiDrawHelperTerrainComponent가 "Paint Foliage"를 열 때
-		// FoliageComponent가 없으면 그 자리에서 owner->AddComponent<FoliageComponent>()를
-		// 부른다(ImGuiDrawHelperTerrainComponent.cpp). AddComponent는 m_components에
-		// push_back하므로 커패시티를 넘기는 순간 벡터가 재할당되고, range-for가 쥐고
-		// 있던 반복자와 component 참조가 그 자리에서 무효해진다 — 드로어가 반환된 뒤
-		// 반복자를 증가시키는 것만으로 UB다(이 반복에서는 그 뒤로 component를 더 쓰지
-		// 않아 증상이 늦게 나타날 뿐이다).
-		//
-		// 인덱스는 재할당을 건너도 유효하고, size()를 매 반복 다시 읽으므로 방금 붙은
-		// 컴포넌트도 같은 프레임에 자연스럽게 그려진다. 무한 증식은 드로어 쪽 "없을
-		// 때만 만든다" 가드가 막는다. 저장소에 이미 있는 관용구다 —
-		// Entity::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
-		//
-		// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
-		// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
-		//
+        // Structural edits are queued for the GameThread. Presentation keeps
+        // only this frame's component borrows; terrain auto-attachment waits
+        // until the next frame before reading the new FoliageComponent.
+        // Retain indexed iteration and the existing component ordering policy.
+        //
 		// ★ 모든 컴포넌트가 이 순회 하나를 지난다 (W2-I1 · Transform 2안)
 		//
 		// 예전에는 공간 컴포넌트 둘을 순회 **앞에서** 전용 드로어로 따로 부르고 순회에서는
@@ -2389,6 +2355,8 @@ void InspectorWindow::Draw()
 			{
 				isOpen = true;
 				selectedComponent = component.get();
+                selectedComponentOwner = inspected;
+                selectedComponentId = component->GetInstanceID();
 			}
 			const bool isHeaderOpen = componentHeaderState.open;
 			inspector_body_probe bodyProbe;
@@ -2409,6 +2377,8 @@ void InspectorWindow::Draw()
 				if(isOpen && nullptr == selectedComponent)
 				{
 					selectedComponent = component.get();
+                    selectedComponentOwner = inspected;
+                    selectedComponentId = component->GetInstanceID();
 				}
 				auto componentTypeID = component->GetTypeID();
 				if (componentTypeID == type_guid(Transform))
@@ -2517,6 +2487,21 @@ void InspectorWindow::Draw()
 						ImGuiDrawHelperCanvas(canvas);
 					}
 				}
+                else if (componentTypeID == type_guid(AudioListenerComponent))
+                {
+                    auto* listener = dynamic_cast<AudioListenerComponent*>(component.get());
+                    if (listener)
+                    {
+                        auto settings = listener->ReadSettings();
+                        bool changed = ImGui::Checkbox("Active listener", &settings.active);
+                        changed |= ImGui::DragFloat3("Velocity", &settings.velocity.x, 0.01f);
+                        ImGui::TextWrapped("Use one enabled active listener per world. Legacy scenes fall back to their primary camera.");
+                        if (changed)
+                        {
+                            listener->QueueSettings(settings);
+                        }
+                    }
+                }
 				else if (componentTypeID == type_guid(SoundComponent))
 				{
 					SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
@@ -2596,6 +2581,10 @@ void InspectorWindow::Draw()
 
 		if (ImGui::BeginPopup("ComponentMenu"))
 		{
+            if (!selectedComponent)
+            {
+                ImGui::CloseCurrentPopup();
+            }
 			// 제거할 수 없는 컴포넌트에는 항목을 내지 않는다. 눌러도 작업이 거부하지만, 거부될 항목을
 			// 보여 주는 것은 정책을 화면에서 숨기는 일이다.
 			if (selectedComponent && EditorObjectOperations::PolicyOf(*selectedComponent).removable &&
@@ -2603,14 +2592,18 @@ void InspectorWindow::Draw()
 			{
 				EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
 				ImGui::CloseCurrentPopup();
-				selectedComponent = nullptr;
+                selectedComponent = nullptr;
+                selectedComponentOwner = {};
+                selectedComponentId = 0;
 			}
 			if (selectedComponent && selectedComponent->GetTypeID() == type_guid(Transform) &&
 				ImGui::MenuItem("Reset Transform"))
 			{
 				ResetTransform(selectedSceneObject);
 				ImGui::CloseCurrentPopup();
-				selectedComponent = nullptr;
+                selectedComponent = nullptr;
+                selectedComponentOwner = {};
+                selectedComponentId = 0;
 			}
 
 			// 선언된 컴포넌트 팝업 항목(PHASE 21 M1). 문맥은 (엔티티 신원, 컴포넌트

@@ -10,9 +10,31 @@
 //   게이트: Tools/regression/verify-header-inline-singleton.ps1
 
 #include "TypeTrait.h"
+#include <atomic>
+#include <exception>
+#include <limits>
 
 namespace TypeTrait
 {
+    HashedGuid MakeRuntimeResourceId() noexcept
+    {
+        static_assert(sizeof(std::size_t) >= sizeof(std::uint64_t));
+        static std::atomic<std::uint64_t> lastIssued{0};
+        auto previous = lastIssued.load(std::memory_order_relaxed);
+        for (;;)
+        {
+            if (previous == (std::numeric_limits<std::uint64_t>::max)())
+            {
+                std::terminate(); // Exhaustion must never wrap into a live identity.
+            }
+            if (lastIssued.compare_exchange_weak(previous, previous + 1,
+                std::memory_order_relaxed, std::memory_order_relaxed))
+            {
+                return HashedGuid{static_cast<std::size_t>(previous + 1)};
+            }
+        }
+    }
+
     std::unordered_map<HashedGuid, uint32_t>& ComponentTypeIndex::Table()
     {
         static std::unordered_map<HashedGuid, uint32_t> table;

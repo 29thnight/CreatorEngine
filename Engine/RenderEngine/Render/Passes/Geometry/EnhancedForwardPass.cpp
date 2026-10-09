@@ -28,10 +28,15 @@
 #include "../../../ShaderPermutationDomain.h"
 #include "../../../StandardMaterialProperty.h"
 
+#include "JobScheduler.h"
+
 #include <algorithm>
+#include <atomic>
+#include <cstring>
 #include <filesystem>
 #include <functional>
-#include <sstream>
+#include <limits>
+#include <stdexcept>
 #include <string_view>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -49,14 +54,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string FwdHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 광원 컬링 ──
     //
     // 스레드 그룹 하나가 타일 하나다(16x16 = 256스레드). 세 단계:
@@ -87,6 +84,138 @@ namespace
     // 달라져 무엇 때문에 다른지 알 수 없으므로, 광원을 고르는 부분만 다르게
     // 하고 나머지는 같은 코드를 쓴다.
     constexpr const char* kShadeShaderFile = "ForwardShade.slang";
+
+    // 셰이딩 변형(일반·참조 × 기본·모델 정점 mask)의 단계들을 작업 스레드에서 미리 컴파일해
+    // 셰이더 캐시를 채운다. 렌더 스레드가 하나씩 컴파일하면 셰이더를 고친 뒤 시작이 수십 초 걸린다.
+    // 결과와 실패는 버린다. 뒤따르는 직렬 경로가 같은 요청을 캐시에서 읽고, 실패하면 그 경로가
+    // 같은 오류를 다시 만나 보고한다. 선택값을 쌓는 순서(REFERENCE_PATH 뒤 mask)가 직렬 경로와
+    // 같아야 캐시 키가 맞는다.
+    void FwdPrecompileShadeVariants(const char* shaderFile, const char* vertexEntry,
+        const char* pixelEntry, const RHIShaderPermutation& base)
+    {
+        // 작업 스레드는 다른 작업을 기다릴 수 없다. 스케줄러가 없는 도구에서는 직렬 경로에 맡긴다.
+        if (thread_pool::is_worker_thread() || !ce::get_job_scheduler().is_running()) return;
+        struct Stage
+        {
+            RHIShaderPermutation permutation;
+            const char* entry;
+            const char* profile;
+        };
+        std::vector<Stage> stages;
+        std::string error;
+        for (const bool reference : { false, true })
+        {
+            RHIShaderPermutation pathPermutation = base;
+            if (reference && !pathPermutation.Enable("REFERENCE_PATH", error)) return;
+            std::vector<RHIShaderPermutation> permutations{ pathPermutation };
+            for (const uint32_t mask : assets::kModelVertexMasks)
+            {
+                RHIShaderPermutation model = pathPermutation;
+                if (!ModelVertexInput::ApplyShaderPermutation(mask, model, error)) return;
+                permutations.push_back(std::move(model));
+            }
+            for (RHIShaderPermutation& permutation : permutations)
+            {
+                stages.push_back({ permutation, vertexEntry, "vs_6_0" });
+                stages.push_back({ std::move(permutation), pixelEntry, "ps_6_0" });
+            }
+        }
+        const RHIShaderBinary output = RHIShaderCompiler::GetOutput();
+        std::atomic<std::size_t> next{};
+        const auto work = [&]()
+        {
+            for (std::size_t index = next++; index < stages.size(); index = next++)
+            {
+                RHIShaderCompiler::VerifiedShader ignored;
+                std::string ignoredError;
+                RHIShaderCompiler::VerifyFile(shaderFile, stages[index].entry, stages[index].profile, output,
+                    stages[index].permutation, ignored, ignoredError, {});
+            }
+        };
+        // 컴파일 칸 수만큼만 작업 스레드를 쓴다. 더 띄우면 칸을 기다리며 작업 스레드를 붙든다.
+        const std::size_t workers = std::min(stages.size(), RHIShaderCompiler::MaxParallelCompiles());
+        ce::get_job_scheduler().submit_indexed(workers, [&](std::size_t) { work(); }).wait();
+    }
+
+    // Forward ShaderMeta 패스의 원본 파일과 컴파일 선택값(REFERENCE_PATH 제외)을 정한다.
+    // 파이프라인을 만드는 경로와 미리 컴파일하는 경로가 같은 값을 쓰도록 한곳에 둔다.
+    bool FwdResolveMetaCompile(const ShaderMeta& meta, std::span<const std::uint16_t> keywordSelections,
+        const ShaderPassDesc*& outPass, ShaderMetaPermutation& outMaterialPermutation,
+        std::string& outShaderFile, RHIShaderPermutation& outPermutation, std::string& outError)
+    {
+        const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
+            [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
+        if (passIt == meta.passes.end())
+        {
+            outError = "Forward ShaderMeta에 Forward pass가 없다";
+            return false;
+        }
+        const ShaderPassDesc& pass = *passIt;
+        if (pass.IsCompute() || !pass.vertex || !pass.pixel
+            || ShaderPassQueue::Transparent != pass.queue)
+        {
+            outError = "Forward ShaderMeta pass는 transparent VS+PS graphics여야 한다";
+            return false;
+        }
+
+        const std::uint32_t passIndex = static_cast<std::uint32_t>(
+            std::distance(meta.passes.begin(), passIt));
+        if (!ShaderPermutationDomain::Resolve(meta, passIndex, keywordSelections,
+                outMaterialPermutation, outError))
+        {
+            return false;
+        }
+
+        std::filesystem::path shaderPath = meta.source;
+        if (!meta.codeProgram && !meta.originPath.empty())
+        {
+            std::error_code pathError;
+            shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
+                RHIShaderSource::Resolve(""), pathError);
+            const auto first = shaderPath.begin();
+            if (pathError || shaderPath.empty() || shaderPath.is_absolute()
+                || (first != shaderPath.end() && *first == ".."))
+            {
+                outError = "Forward ShaderMeta source가 shader root 밖이다";
+                return false;
+            }
+        }
+        outShaderFile = shaderPath.generic_string();
+        if (outShaderFile.empty() || pass.vertex->entry.empty() || pass.pixel->entry.empty())
+        {
+            outError = "Forward ShaderMeta source/entry가 비었다";
+            return false;
+        }
+
+        outPermutation = outMaterialPermutation.defines;
+        if (!outPermutation.Set("TILE_SIZE", std::to_string(EnhancedForwardPass::kTileSize), outError)
+            || !outPermutation.Set("MAX_LIGHTS_PER_TILE",
+                std::to_string(EnhancedForwardPass::kMaxLightsPerTile), outError))
+        {
+            return false;
+        }
+        outPass = &pass;
+        return true;
+    }
+
+    // ShaderMeta 변형 전부를 미리 컴파일한다. 풀이가 실패하면 아무것도 하지 않는다 —
+    // 직렬 경로가 같은 오류를 보고한다.
+    void FwdPrecompileMetaVariants(const ShaderMeta& meta, std::span<const std::uint16_t> keywordSelections)
+    {
+        if (meta.assetOrigin || meta.codeProgram)
+        {
+            return; // Mounted variants are already carried by their CPU program.
+        }
+        const ShaderPassDesc* pass = nullptr;
+        ShaderMetaPermutation materialPermutation;
+        std::string shaderFile;
+        RHIShaderPermutation permutation;
+        std::string error;
+        if (!FwdResolveMetaCompile(meta, keywordSelections, pass, materialPermutation, shaderFile, permutation, error))
+            return;
+        FwdPrecompileShadeVariants(shaderFile.c_str(), pass->vertex->entry.c_str(), pass->pixel->entry.c_str(),
+            permutation);
+    }
 
     // snapshot이 없는 격리 selftest는 기존 ShadeInstance scalar를 쓰되 b2를
     // 비워 두지 않는다. 제품 draw는 reflection-packed 48B Standard prefix와
@@ -303,7 +432,7 @@ namespace
 bool EnhancedForwardPass::MaterialKey::operator==(const MaterialKey& other) const
 {
     if (coordinates != other.coordinates || sampler != other.sampler
-        || textures != other.textures
+        || textureIds != other.textureIds
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -340,8 +469,7 @@ bool EnhancedForwardPass::MaterialKey::operator<(const MaterialKey& other) const
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
     if (sampler != other.sampler) return sampler < other.sampler;
-    return std::lexicographical_compare(textures.begin(), textures.end(),
-        other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+    return textureIds < other.textureIds;
 }
 
 RHISamplerTable EnhancedForwardPass::SamplerTableFor(
@@ -411,6 +539,11 @@ EnhancedForwardPass::MaterialKey EnhancedForwardPass::MakeMaterialKey(
     {
         key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
     }
+    key.textureIds.reserve(key.textures.size());
+    for (const Texture* texture : key.textures)
+    {
+        key.textureIds.push_back(TextureFramePins::Identity(texture));
+    }
     return key;
 }
 
@@ -460,7 +593,7 @@ bool EnhancedForwardPass::ResolveShaderVariant(
     if (!shade || !reference) return false;
     outShadePipeline = shade->pipeline.GetHandle();
     outReferencePipeline = reference->pipeline.GetHandle();
-    outLayout = {shade->shader.shader, &shade->shader.shader->layout};
+    outLayout = {shade, &shade->shader.shader->layout};
     return true;
 }
 RHIPipelineHandle EnhancedForwardPass::GetShaderVariantPipeline(
@@ -495,7 +628,18 @@ bool EnhancedForwardPass::Initialize(const EnhancedFrameContext& context, std::s
     return CreatePipelines(context, outError);
 }
 
-bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedForwardPass::InitializeGraphLighting(const EnhancedFrameContext& context, std::string& outError)
+{
+    if (!context.resources || !context.psoManager || !context.rootSignatures)
+    {
+        outError = "Graph Forward+ requires device, pipeline and layout services.";
+        return false;
+    }
+    return CreatePipelines(context, outError, false);
+}
+
+bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError,
+    bool nativeMaterials)
 {
     const auto traceForward = [](const char* phase, uint32_t mask = 0, bool reference = false) {
         static const bool trace = [] {
@@ -548,6 +692,12 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     traceForward("cull.pso.begin");
     LX::Runtime::ComputePipeline cullCandidate;
     if (!cullCandidate.Create(*context.psoManager, desc, std::move(blob.description), outError)) return false;
+
+    if (!nativeMaterials)
+    {
+        m_cullPSO = std::move(cullCandidate);
+        return true;
+    }
 
     traceForward("texture.reflect.begin");
     if (!MaterialTextureTable::Reflect(kShadeShaderFile, "PSMain", forwardPermutation,
@@ -613,6 +763,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         variants.push_back({ true, mask, &pair.reference });
     }
 
+    FwdPrecompileShadeVariants(kShadeShaderFile, "VSMain", "PSMain", forwardPermutation);
     for (const ShadeVariant& variant : variants)
     {
         RHIShaderPermutation permutation = forwardPermutation;
@@ -638,7 +789,8 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     const ShaderRenderState* renderState,
     const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
-    RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled)
+    RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled,
+    const LX::Runtime::CompiledGraphics* prepared)
 {
     // I5-D34c: experiment 짝은 퍼뮤테이션 위에 레이아웃 매크로를 얹는다 —
     // 호출자마다 얹게 하면 하나가 빠뜨렸을 때 화면이 조용히 틀린다.
@@ -654,8 +806,23 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     }
 
     LX::Runtime::CompiledGraphics verified;
-    if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
-            *effectivePermutation, {}, verified, outError)) return false;
+    if (prepared)
+    {
+        if (prepared->identity.backend != RHIShaderCompiler::GetOutput()
+            || prepared->identity.vertexEntry != vertexEntry || prepared->identity.pixelEntry != pixelEntry
+            || prepared->identity.permutation.Entries() != effectivePermutation->Entries()
+            || prepared->identity.sealedProgramIdentity.empty())
+        {
+            outError = "Prepared code graphics does not match the exact pipeline request.";
+            return false;
+        }
+        verified = *prepared;
+    }
+    else if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
+        *effectivePermutation, {}, verified, outError))
+    {
+        return false;
+    }
     verified.identity.vertexAttributeMask = modelVertexMask;
     outVs = std::move(verified.vertex.bytecode);
     outPs = std::move(verified.pixel.bytecode);
@@ -736,66 +903,35 @@ bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
     std::string& outError, LX::Runtime::GraphicsShaderDescription* shader, ShaderMetaHandle ownerHandle)
 {
-    const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
-        [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
-    if (passIt == meta.passes.end())
-    {
-        outError = "Forward ShaderMeta에 Forward pass가 없다";
-        return false;
-    }
-    const ShaderPassDesc& pass = *passIt;
-    if (pass.IsCompute() || !pass.vertex || !pass.pixel
-        || ShaderPassQueue::Transparent != pass.queue)
-    {
-        outError = "Forward ShaderMeta pass는 transparent VS+PS graphics여야 한다";
-        return false;
-    }
-
-    const std::uint32_t passIndex = static_cast<std::uint32_t>(
-        std::distance(meta.passes.begin(), passIt));
+    const ShaderPassDesc* passPointer = nullptr;
     ShaderMetaPermutation materialPermutation;
-    if (!ShaderPermutationDomain::Resolve(meta, passIndex, keywordSelections,
-            materialPermutation, outError))
+    std::string shaderFile;
+    RHIShaderPermutation compilePermutation;
+    if (!FwdResolveMetaCompile(meta, keywordSelections, passPointer, materialPermutation, shaderFile,
+            compilePermutation, outError)
+        || (referencePath && !compilePermutation.Enable("REFERENCE_PATH", outError)))
     {
         return false;
     }
+    const ShaderPassDesc& pass = *passPointer;
 
-    std::filesystem::path shaderPath = meta.source;
-    if (!meta.originPath.empty())
+    if (meta.assetOrigin && !meta.codeProgram)
     {
-        std::error_code pathError;
-        shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
-            RHIShaderSource::Resolve(""), pathError);
-        const auto first = shaderPath.begin();
-        if (pathError || shaderPath.empty() || shaderPath.is_absolute()
-            || (first != shaderPath.end() && *first == ".."))
-        {
-            outError = "Forward ShaderMeta source가 shader root 밖이다";
-            return false;
-        }
-    }
-    const std::string shaderFile = shaderPath.generic_string();
-    if (shaderFile.empty() || pass.vertex->entry.empty() || pass.pixel->entry.empty())
-    {
-        outError = "Forward ShaderMeta source/entry가 비었다";
+        outError = "Mounted ShaderMeta descriptor has no prepared code program.";
         return false;
     }
-
-    RHIShaderPermutation compilePermutation = materialPermutation.defines;
-    if (!compilePermutation.Set("TILE_SIZE", std::to_string(kTileSize), outError)
-        || !compilePermutation.Set("MAX_LIGHTS_PER_TILE",
-            std::to_string(kMaxLightsPerTile), outError)
-        || (referencePath
-            && !compilePermutation.Enable("REFERENCE_PATH", outError)))
+    const auto passIndex = static_cast<std::uint32_t>(passPointer - meta.passes.data());
+    LX::Runtime::CompiledGraphics prepared;
+    if (meta.codeProgram && !LX::Runtime::RestoreCodeGraphics(meta, passIndex, keywordSelections,
+        modelVertexMask, referencePath, prepared, outError))
     {
         return false;
     }
-
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildShadePipelineDesc(context, shaderFile.c_str(),
             pass.vertex->entry.c_str(), pass.pixel->entry.c_str(), &pass.state,
             compilePermutation, modelVertexMask, outDesc, outVs, outPs,
-            outError, &compiled))
+            outError, &compiled, meta.codeProgram ? &prepared : nullptr))
     {
         return false;
     }
@@ -834,6 +970,7 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     if (handle == m_shaderMetaHandle) return true;
 
     const std::vector<std::uint16_t> defaultSelections(meta.keywords.size(), 0);
+    FwdPrecompileMetaVariants(meta, defaultSelections);
     RHIGraphicsPipelineDesc shadeDesc{};
     RHIGraphicsPipelineDesc referenceDesc{};
     RHIShaderBlob shadeVs, shadePs, referenceVs, referencePs;
@@ -1015,6 +1152,7 @@ bool EnhancedForwardPass::EnsureShaderMetaVariant(
             && existing->second.reference.IsValid() && nullptr != outLayout;
     }
 
+    FwdPrecompileMetaVariants(meta, keywordSelections);
     RHIGraphicsPipelineDesc shadeDesc{}, referenceDesc{};
     RHIShaderBlob shadeVs, shadePs, referenceVs, referencePs;
     RHIShaderPermutationKey shadeKey{}, referenceKey{};
@@ -1169,11 +1307,16 @@ std::uint32_t EnhancedForwardPass::CommitShaderMetaFrame(
 bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     std::string& outError)
 {
+    if (!context.resources || !m_resourceRetirement.Attach(*context.resources))
+    {
+        outError = "Forward tile buffers require their owning device.";
+        return false;
+    }
     const uint32_t tileTotal = m_tileCountX * m_tileCountY;
     if (0 == tileTotal) return true;
 
     // 크기가 그대로면 다시 만들지 않는다(SSGI 히스토리와 같은 계약).
-    if (m_tileCountBuffer.IsValid())
+    if (m_tileCountBuffer.IsValid() && m_tileListBuffer.IsValid())
     {
         if (m_allocatedTiles >= tileTotal) return true;
     }
@@ -1188,20 +1331,34 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     // UAV를 초기 상태로 주면 검증 레이어가 '무시한다'고 경고만 남긴다.
     desc.bytes = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
     desc.debugName = L"Forward+.TileCount";
-    if (!context.resources->CreateBuffer(desc, m_tileCountBuffer, outError))
+    RHIBufferHandle count{}, list{};
+    if (!context.resources->CreateBuffer(desc, count, outError))
     {
+        if (count.IsValid())
+        {
+            context.resources->ReleaseBuffer(count);
+        }
         outError = "타일 카운트 버퍼 — " + outError;
         return false;
     }
 
     desc.bytes = static_cast<uint64_t>(tileTotal) * kMaxLightsPerTile * sizeof(uint32_t);
     desc.debugName = L"Forward+.TileList";
-    if (!context.resources->CreateBuffer(desc, m_tileListBuffer, outError))
+    if (!context.resources->CreateBuffer(desc, list, outError))
     {
+        context.resources->ReleaseBuffer(count);
+        if (list.IsValid())
+        {
+            context.resources->ReleaseBuffer(list);
+        }
         outError = "타일 목록 버퍼 — " + outError;
         return false;
     }
 
+    m_resourceRetirement.Retire(m_tileCountBuffer);
+    m_resourceRetirement.Retire(m_tileListBuffer);
+    m_tileCountBuffer = count;
+    m_tileListBuffer = list;
     m_allocatedTiles = tileTotal;
 
     // 새 리소스는 COMMON이다. 상태 멤버가 이전 버퍼의 끝 상태를 들고 있으면
@@ -1221,6 +1378,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastDrawCount = 0;
     m_lastMaterialCount = 0;
     m_lastBatchCount = 0;
+    m_visibilityStats = {};
     m_batches.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
@@ -1228,8 +1386,19 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_sealLedger.Begin(context.frameId, context.sceneEpoch);
     m_rejectedSnapshots.clear();
 
+    if (!context.forwardLightingConsumer)
+    {
+        outError.clear();
+        return true;
+    }
+
     if (nullptr != context.forwardDraws)
     {
+        if (context.forwardDraws->size() > (std::numeric_limits<std::uint32_t>::max)())
+        {
+            outError = "Forward+ draw count exceeds 32-bit instance addressing.";
+            return false;
+        }
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
             MaterialView material{};
@@ -1282,6 +1451,10 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_drawGeometry.clear();
     if (nullptr != context.meshCache && nullptr != context.forwardDraws)
     {
+        if (!enhanced_draw::ValidateGeometryIdentities(*context.forwardDraws, outError))
+        {
+            return false;
+        }
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
             if (0 == enhanced_draw::GeometryKey(draw)
@@ -1289,7 +1462,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
             std::string uploadError;
             // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
-            const RHIMeshBinding entry = draw.modelMeshView.IsComplete()
+            const RHIMeshBinding entry = draw.modelMeshView.handle.IsValid()
                 ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
@@ -1326,7 +1499,11 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                     key.snapshot->bindingLayout, schema, outError)) return false;
             MaterialTextures textures;
             if (!MaterialTextureTable::Upload(*context.textureCache, schema,
-                    key.textures, textures.views, outError, !key.snapshot)) return false;
+                    key.textures, textures.views, outError, !key.snapshot,
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
+            {
+                return false;
+            }
             m_materialTextures.emplace(key, std::move(textures));
         }
     }
@@ -1334,6 +1511,16 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastMaterialCount = static_cast<uint32_t>(m_materialTextures.size());
     BuildAdjacentBatches(context);
     return EnsureTileBuffers(context, outError);
+}
+
+bool EnhancedForwardPass::PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError)
+{
+    if (m_batches.empty())
+    {
+        outError.clear();
+        return true;
+    }
+    return m_visibility.PreparePipelines(context, outError);
 }
 
 void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& context)
@@ -1441,7 +1628,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             "Forward+ Graph stream requires ExplicitVersioned resource declarations.");
     }
 
-    if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
+    if (!context.forwardLightingConsumer || !m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
     {
         return;
     }
@@ -1707,6 +1894,89 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         }
         return a.index < b.index;
     });
+    // Preserve the exact existing command boundary after the global depth
+    // merge. A Graph draw can split a native batch; each such range must retain
+    // its original local SV_InstanceID = 0..N-1 and instance-buffer slice.
+    // One GPU zero/full-count command per range avoids atomic order changes and
+    // needs neither a custom t6 binding nor nonportable base-instance behavior.
+    auto visibility = std::make_shared<OrderedVisibility>();
+    std::vector<GpuGeometryVisibility::Candidate> candidates;
+    std::vector<GpuGeometryVisibility::Bin> bins;
+    std::uint64_t outputOffset = 0;
+    constexpr auto maximum = (std::numeric_limits<std::uint32_t>::max)();
+    if (context.resources->GetIndirectDrawCapabilities().indexedDraw)
+    {
+        for (std::size_t i = 0; i < order.size();)
+        {
+            if (order[i].graph)
+            {
+                ++i;
+                continue;
+            }
+            const auto first = order[i++].index;
+            auto end = first + 1;
+            while (i < order.size() && !order[i].graph && order[i].index == end)
+            {
+                ++end;
+                ++i;
+            }
+            for (const auto& batch : m_batches)
+            {
+                const auto rangeFirst = (std::max)(first, batch.firstDraw);
+                const auto rangeEnd = (std::min)(end, batch.firstDraw + batch.drawCount);
+                if (rangeEnd <= rangeFirst)
+                {
+                    continue;
+                }
+                const auto count = rangeEnd - rangeFirst;
+                if (bins.size() >= maximum || count > maximum || outputOffset > maximum ||
+                    count > maximum - outputOffset || candidates.size() > maximum - count)
+                {
+                    throw std::runtime_error("Forward+ visibility ranges exceed 32-bit addressing.");
+                }
+                const auto bin = static_cast<std::uint32_t>(bins.size());
+                visibility->bins.emplace(std::make_pair(rangeFirst, rangeEnd), bin);
+                bins.push_back({m_drawGeometry.at(batch.geometryKey).indexCount, 0, 0,
+                                static_cast<std::uint32_t>(count)});
+                for (std::uint32_t local = 0; local < count; ++local)
+                {
+                    // Forward accepts arbitrary vertex programs without the
+                    // GBuffer deformation/bounds promise. Preserve every valid
+                    // custom/skinned effect conservatively until a sealed bound
+                    // contract proves rejection safe. No HZB rejection is used.
+                    candidates.push_back({{}, bin, local, static_cast<std::uint32_t>(outputOffset),
+                        GpuGeometryVisibility::kConservative | GpuGeometryVisibility::kNoOcclusion});
+                }
+                outputOffset += (std::uint64_t(count) + GpuGeometryVisibility::kOutputAlignment - 1u) /
+                    GpuGeometryVisibility::kOutputAlignment * GpuGeometryVisibility::kOutputAlignment;
+            }
+        }
+    }
+    std::string visibilityError;
+    const auto viewProjection = context.camera ? context.camera->view * context.camera->projection
+                                               : math::matrix4x4::identity();
+    if (!m_visibility.Prepare(context, viewProjection, candidates, bins, visibility->frame, visibilityError))
+    {
+        throw std::runtime_error(visibilityError);
+    }
+    if (visibility->frame)
+    {
+        const auto stats = visibility->frame->GetPreparedStats();
+        const auto accumulate = [](std::uint32_t& total, std::uint32_t count) {
+            if (count > (std::numeric_limits<std::uint32_t>::max)() - total)
+            {
+                throw std::runtime_error("Forward+ prepared visibility statistics exceed 32-bit addressing.");
+            }
+            total += count;
+        };
+        accumulate(m_visibilityStats.candidateCount, stats.candidateCount);
+        accumulate(m_visibilityStats.compactedBins, stats.compactedBins);
+        accumulate(m_visibilityStats.preservedBins, stats.preservedBins);
+        accumulate(m_visibilityStats.conservativeCandidates, stats.conservativeCandidates);
+        visibility->frame->Declare(graph);
+        visibility->frame->AddReadUsages(graph, shadeUsages);
+    }
+
     for (std::size_t i = 0; i < order.size();)
     {
         if (order[i].graph)
@@ -1732,7 +2002,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         shadeUsages.front().handle = shadeOutput;
         graph.AddPass(
             "Forward+.Shade", shadeUsages,
-            [this, &context, hasShadowMap, shared, first, end, shadeOutput](const auto& execution) mutable {
+            [this, &context, hasShadowMap, shared, first, end, shadeOutput, visibility](const auto& execution) mutable {
                 const RHITextureHandle colors[]{execution.ResolveHandle(shadeOutput)};
                 const auto depth =
                     RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(m_inputs.depth), kDepthFormat);
@@ -1761,7 +2031,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 }
                 RecordShading(encoder, context, static_cast<std::uint32_t>(context.lights->size()),
                               hasShadowMap ? execution.ResolveHandle(m_shadowMap) : RHITextureHandle{}, shared, first,
-                              end);
+                              end, *visibility);
             },
             true);
     }
@@ -1772,7 +2042,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
 bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrameContext& context, uint32_t lightCount,
                                         RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting,
-                                        std::size_t first, std::size_t end)
+                                        std::size_t first, std::size_t end, const OrderedVisibility& visibility)
 {
     if (!m_shadePipelineRequest.IsValid() || !m_referencePipelineRequest.IsValid() || nullptr == context.forwardDraws ||
         context.forwardDraws->empty() || m_batches.empty())
@@ -1784,14 +2054,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
     // 인스턴스는 한 번에 올리고 드로우마다 주소만 옮긴다. 루트 SRV는 주소를
     // 받으므로 드로우별 재업로드가 필요 없다.
     const size_t drawCount = end - first;
-    const auto instanceUpload = context.resources->AllocateUpload(
-        RHIUploadRequest{drawCount * sizeof(ShadeInstance), RHIUploadUsage::BufferCopy, sizeof(ShadeInstance)});
-    if (!instanceUpload.IsValid())
-    {
-        return false;
-    }
-
-    auto* instances = static_cast<ShadeInstance*>(instanceUpload.cpuAddress);
+    std::vector<ShadeInstance> instances(drawCount);
     std::vector<MaterialView> materials(drawCount);
     std::string materialError;
     for (size_t i = 0; i < drawCount; ++i)
@@ -1802,7 +2065,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
         {
             return false;
         }
-        instances[i] = {}; // recycled upload memory must not supply legacy flow/UV state
+        instances[i] = {}; // keep every legacy flow/UV field and padding byte deterministic
         instances[i].world = math::transpose(draw.worldMatrix);
         instances[i].baseColor = material.baseColorFactor.rgba();
         instances[i].metallic = material.metallic;
@@ -1839,6 +2102,47 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
             instances[i].flowTotalSeconds = flow.totalSeconds;
             instances[i].flowDeltaSeconds = flow.deltaSeconds;
         }
+    }
+
+    // Every original command keeps the same element-zero and range length.
+    // Pad only between commands so Vulkan storage-buffer offsets are portable;
+    // changing byte allocation must not change custom SV_InstanceID semantics.
+    std::vector<std::uint64_t> batchOffsets(m_batches.size());
+    std::uint64_t instanceBytes = 0;
+    for (std::size_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
+    {
+        const auto& batch = m_batches[batchIndex];
+        const auto batchFirst = (std::max)(first, batch.firstDraw);
+        const auto batchEnd = (std::min)(end, batch.firstDraw + batch.drawCount);
+        if (batchEnd <= batchFirst)
+        {
+            continue;
+        }
+        instanceBytes = (instanceBytes + 255u) & ~std::uint64_t{255u};
+        batchOffsets[batchIndex] = instanceBytes;
+        instanceBytes += (batchEnd - batchFirst) * sizeof(ShadeInstance);
+    }
+    if (instanceBytes == 0)
+    {
+        return false;
+    }
+    const auto instanceUpload = context.resources->AllocateUpload(
+        {instanceBytes, RHIUploadUsage::BufferCopy, 256});
+    if (!instanceUpload.IsValid() || !instanceUpload.IsWritable())
+    {
+        return false;
+    }
+    for (std::size_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
+    {
+        const auto& batch = m_batches[batchIndex];
+        const auto batchFirst = (std::max)(first, batch.firstDraw);
+        const auto batchEnd = (std::min)(end, batch.firstDraw + batch.drawCount);
+        if (batchEnd <= batchFirst)
+        {
+            continue;
+        }
+        std::memcpy(static_cast<std::byte*>(instanceUpload.cpuAddress) + batchOffsets[batchIndex],
+                    instances.data() + (batchFirst - first), (batchEnd - batchFirst) * sizeof(ShadeInstance));
     }
 
     ShadeParams params{};
@@ -1979,8 +2283,9 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
     }
 
     bool drewAnything = false;
-    for (const DrawBatch& batch : m_batches)
+    for (std::size_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
     {
+        const DrawBatch& batch = m_batches[batchIndex];
         const auto batchFirst = (std::max)(first, std::size_t{batch.firstDraw});
         const auto batchEnd = (std::min)(end, std::size_t{batch.firstDraw} + batch.drawCount);
         if (batchEnd <= batchFirst)
@@ -2050,12 +2355,26 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
 
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
             instanceUpload.SubRange(
-                static_cast<uint64_t>(batchFirst - first) * sizeof(ShadeInstance),
+                batchOffsets[batchIndex],
                 static_cast<uint64_t>(batchEnd - batchFirst) * sizeof(ShadeInstance)));
 
         encoder.SetVertexBuffer(entry.vertices, entry.vertexStride);
         encoder.SetIndexBuffer(entry.indices, entry.indexFormat);
-        encoder.DrawIndexed(entry.indexCount, static_cast<std::uint32_t>(batchEnd - batchFirst));
+        if (visibility.frame)
+        {
+            const auto bin = visibility.bins.find({batchFirst, batchEnd});
+            if (bin == visibility.bins.end() ||
+                !encoder.DrawIndexedIndirect(visibility.frame->Arguments(), visibility.frame->ArgsOffset(bin->second)))
+            {
+                throw std::runtime_error("Forward+ ordered indexed indirect submission failed.");
+            }
+        }
+        else
+        {
+            // Capability-only compatibility path, never selected by material,
+            // blending, skinning or arbitrary vertex-program semantics.
+            encoder.DrawIndexed(entry.indexCount, static_cast<std::uint32_t>(batchEnd - batchFirst));
+        }
         drewAnything = true;
     }
 
@@ -2064,6 +2383,20 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
 
 void EnhancedForwardPass::Shutdown()
 {
+    if (auto* device = m_resourceRetirement.Device())
+    {
+        if (m_tileCountBuffer.IsValid())
+        {
+            device->ReleaseBuffer(m_tileCountBuffer);
+        }
+        if (m_tileListBuffer.IsValid())
+        {
+            device->ReleaseBuffer(m_tileListBuffer);
+        }
+    }
+    m_resourceRetirement.ClearAfterIdle();
+    m_visibility.ShutdownAfterIdle();
+    m_visibilityStats = {};
     m_graphMaterials = nullptr;
     m_tileCountBuffer = {};
     m_tileListBuffer = {};
@@ -2074,8 +2407,6 @@ void EnhancedForwardPass::Shutdown()
     m_tileListState = RHIResourceState::Common;
     m_tileCountX = 0;
     m_tileCountY = 0;
-    m_lastCulledLights = 0;
-    m_lastOverflowTiles = 0;
     m_lastDrawCount = 0;
     m_lastMaterialCount = 0;
     m_lastBatchCount = 0;
