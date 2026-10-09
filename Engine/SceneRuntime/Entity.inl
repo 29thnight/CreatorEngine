@@ -10,60 +10,29 @@
 template<typename T>
 inline T* Entity::AddComponent()
 {
-    // K2: 중복 검사가 맵 조회 → FindComponentSlot(마스크 선판정 + 선형 탐색)로
-    // 바뀌었다. m_componentIds가 있던 시절엔 여기서 인덱스도 함께 심었지만,
-    // 이제 정본은 m_components 하나뿐이라 심을 곳이 없다 — push_back 자체가
-    // 곧 등록이다.
-    if (FindComponentSlot(TypeTrait::GUIDCreator::GetTypeID<T>()) != kInvalidComponentSlot)
+    if (FindComponentSlot(TypeTrait::GUIDCreator::GetTypeID<T>()) != kInvalidComponentSlot
+        || !CanAttachComponentType(TypeTrait::GUIDCreator::GetTypeID<T>()))
     {
         return nullptr;
     }
-
-    // K2 스테이지 A: make_shared → make_unique. push_back으로 소유권을
-    // 옮기기 전에 raw 포인터를 먼저 뽑아둔다 — move 후에는 로컬 component가
-    // null이라 이후 줄에서 쓸 수 없다.
-    if (!CanAttachComponentType(TypeTrait::GUIDCreator::GetTypeID<T>())) return nullptr;
-
-    std::unique_ptr<T> component = std::make_unique<T>();
-    T* rawComponent = component.get();
-    AttachComponentLifecycle(rawComponent);
-
-    m_components.push_back(std::move(component));
-    rawComponent->SetOwner(this);
+    auto component = Component::CreateManaged<T>(Domain());
+    PublishManagedComponent(component, true);
     m_componentTypeMask |= (1ull << TypeTrait::ComponentTypeIndex::Get<T>());
-
-    if (auto* initializable = dynamic_cast<System::IInitializable*>(rawComponent))
-    {
-        initializable->Initialize();
-    }
-
-    return rawComponent;
+    return component.get();
 }
 
-template<typename T, typename ...Args>
-inline T* Entity::AddComponent(Args && ...args)
+template<typename T, typename... Args>
+inline T* Entity::AddComponent(Args&&... args)
 {
-    if (FindComponentSlot(TypeTrait::GUIDCreator::GetTypeID<T>()) != kInvalidComponentSlot)
+    if (FindComponentSlot(TypeTrait::GUIDCreator::GetTypeID<T>()) != kInvalidComponentSlot
+        || !CanAttachComponentType(TypeTrait::GUIDCreator::GetTypeID<T>()))
     {
         return nullptr;
     }
-
-    if (!CanAttachComponentType(TypeTrait::GUIDCreator::GetTypeID<T>())) return nullptr;
-
-    std::unique_ptr<T> component = std::make_unique<T>(std::forward<Args>(args)...);
-    T* rawComponent = component.get();
-    AttachComponentLifecycle(rawComponent);
-
-    m_components.push_back(std::move(component));
-    rawComponent->SetOwner(this);
+    auto component = Component::CreateManaged<T>(Domain(), std::forward<Args>(args)...);
+    PublishManagedComponent(component, true);
     m_componentTypeMask |= (1ull << TypeTrait::ComponentTypeIndex::Get<T>());
-
-    if (auto* initializable = dynamic_cast<System::IInitializable*>(rawComponent))
-    {
-        initializable->Initialize();
-    }
-
-    return rawComponent;
+    return component.get();
 }
 
 template<typename T>
@@ -197,20 +166,10 @@ inline void Entity::CollectComponents(std::vector<T*>& out)
 template<typename T>
 inline void Entity::RemoveComponent(T* component)
 {
-	// K2: 여기서 물리적으로 슬롯을 비우지 않는다(swap-and-pop을 하지 않는다) —
-	// 의도적이다. Scene::RegisterComponent가 컴포넌트를 SystemSchedule의 페이즈
-	// 리스트(Update/LateUpdate/FixedUpdate/DestroyWatch 등)에 raw Component*로
-	// 등록해 두는데, 그 구독 해제(UnregisterComponent)는 프레임 끝의 단일 파괴
-	// 지점(Scene::FlushPendingDestroy)에서만 일어난다(Scene.cpp:1047 주석 —
-	// "여기가 유일하다는 것이 순회 중 UAF와 즉시 파괴를 동시에 닫는다"). 지금
-	// m_components에서 바로 지우면 고유 소유(K2 스테이지 A: std::unique_ptr)가
-	// 여기서 끝나 컴포넌트가 즉시 소멸하고, 아직 구독 해제 전인 스케줄 리스트의
-	// raw 포인터가 댕글링된다 — component->Destroy()로 마크만 하고, 실제 슬롯
-	// 압축은 기존과 동일하게 Scene::DestroyComponents()(프레임마다 도는 압축
-	// 패스)에 맡긴다. 이중 구조(벡터+맵)가 사라진 것과 "언제 지우는가"는 별개다 —
-	// 즉시 삭제로 바꾸는 건 별도 위험을 새로 들이는 것이라 K2 범위 밖으로 둔다.
+    // Leave the edge until Scene has joined workers and removed raw lifecycle,
+    // script and proxy observers. The collector never performs those callbacks.
     component->Destroy();
-	auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& comp) { return comp.get() == component; });
+	auto it = std::ranges::find_if(m_components, [&](const gc::trace_ref<Component>& comp) { return comp.get() == component; });
 
 	if (it != m_components.end())
 	{
@@ -222,7 +181,7 @@ inline void Entity::RemoveComponent(T* component)
 		// 담아 판정 근거가 못 됐다)가 있던 시절과 마찬가지로, 실제 잔존 여부는
 		// m_components 선형 탐색으로만 알 수 있다.
 		const bool anyRemaining = std::any_of(m_components.begin(), m_components.end(),
-			[&](const std::unique_ptr<Component>& comp)
+			[&](const gc::trace_ref<Component>& comp)
 			{
 				return comp && comp.get() != component && comp->GetTypeID() == typeID;
 			});

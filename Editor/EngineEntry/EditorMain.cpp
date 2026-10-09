@@ -1,4 +1,4 @@
-﻿#include "EditorProjectLayerSettings.h"
+#include "EditorProjectLayerSettings.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
@@ -631,16 +631,12 @@ void Editor::EditorMain::NotifyRenderFramePublished(uint64_t frameId)
 
 void Editor::EditorMain::Finalize()
 {
-	// 표시/렌더 소비자를 세우기 전에 관리 측을 먼저 정리한다.
-	// 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
+	// Stop admission first; logical scene cleanup needs CLR/audio services alive.
 	// ★ 단계마다 즉시 찍는다. 종료가 멈추는 자리를 찾는 데 로그가
 	//   없으면 어디까지 갔는지조차 알 수 없다.
-	std::printf("[SHUTDOWN] ClrHost 진입\n");
 	SceneManagers->SetDecommissioning();
 	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
-	ClrHost::Get().Shutdown();
-	std::printf("[SHUTDOWN] ClrHost 반환\n");
 
 	// 표시 소비자를 먼저 세운다. GT는 이미 메인 루프를 빠져나와 새 frame을
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
@@ -655,6 +651,13 @@ void Editor::EditorMain::Finalize()
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 	Editor::ModelPlacement::Get().Shutdown();
 	EditorScriptAuthoring::Shutdown();
+	// Every PT/RT/job borrow is drained. Run hooks, invalidate handles and
+	// finish GC while managed callbacks and native services still exist.
+	SceneManagers->Decommissioning();
+	std::printf("[SHUTDOWN] SceneManagers 반환\n");
+	std::printf("[SHUTDOWN] ClrHost 진입\n");
+	ClrHost::Get().Shutdown();
+	std::printf("[SHUTDOWN] ClrHost 반환\n");
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
 
@@ -685,9 +688,7 @@ void Editor::EditorMain::Finalize()
     m_audioPlayback->Shutdown();
     m_audioCatalog->Clear();
     m_audioHost->Shutdown();
-	SceneManagers->Decommissioning();
     m_projectLayers.reset();
-	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 
 	EditorSettingsStore::Get().Save();
 	std::printf("[SHUTDOWN] EditorSettingsStore::Save 반환\n");
@@ -885,6 +886,7 @@ void Editor::EditorMain::Update()
 			ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
 			SceneManagers->DisableOrEnable();
 			SceneManagers->EndOfFrame();
+			SceneManagers->CollectManagedAtFrameBoundary();
 		}
 	}
 

@@ -12,6 +12,12 @@ class Canvas;
 class [[reflgen::reflect]] SpriteSheetComponent : public meta::identity<SpriteSheetComponent, UIComponent>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        UIComponent::gc_trace(tracer);
+    }
+
 public:
 	SpriteSheetComponent() = default;
 

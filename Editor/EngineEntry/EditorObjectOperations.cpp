@@ -1,4 +1,5 @@
 #include "EditorObjectOperations.h"
+#include "ConsoleCommandSystem.h"
 #include "EditorEntityIcons.h"
 #include "EditorSessionState.h"
 #include "Scene.h"
@@ -447,6 +448,19 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            const auto parentHandle = scene ? scene->HandleOf(parent) : EntityHandle{};
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([parentHandle, name, type]
+            {
+                auto* owner = Resolve(parentHandle);
+                if (!owner)
+                {
+                    return CommandCore::PreconditionFailed("object.stale", "Creation parent no longer exists");
+                }
+                return Create(owner->GetScene(), name, type, parentHandle.index);
+            });
+        }
         using namespace CommandCore;
         if (!scene) return PreconditionFailed("scene.none", "No active scene");
         if (name.empty() || name.find('\0') != std::string::npos) return InvalidArguments("Invalid object name");
@@ -460,6 +474,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Delete(EntityHandle target)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target]
+            {
+                return Delete(target);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object || object->IsDestroyMark()) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -472,6 +493,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Duplicate(EntityHandle target, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, name]
+            {
+                return Duplicate(target, name);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object || object->IsDestroyMark()) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -661,11 +689,25 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, parent]
+            {
+                return Parent(target, parent);
+            });
+        }
         return ParentAt(target, parent);
     }
 
     CommandCore::CommandResult MoveRelative(EntityHandle target, EntityHandle sibling, bool after)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, sibling, after]
+            {
+                return MoveRelative(target, sibling, after);
+            });
+        }
         Entity* object = Resolve(target);
         Entity* anchor = Resolve(sibling);
         if (!object || !anchor || target.sceneId != sibling.sceneId || object == anchor || sibling.index == 0)
@@ -960,6 +1002,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult AddComponent(EntityHandle target, const std::string& typeName)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, typeName]
+            {
+                return AddComponent(target, typeName);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -1001,6 +1050,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult AddManagedScript(EntityHandle target, const std::string& typeName)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, typeName]
+            {
+                return AddManagedScript(target, typeName);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -1056,6 +1112,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult RemoveComponent(EntityHandle target, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, name]
+            {
+                return RemoveComponent(target, name);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -1081,11 +1144,44 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult InstantiatePrefab(const std::string& prefabName, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            const auto* scene = SceneManagers->GetActiveScene();
+            const auto sceneId = scene ? scene->GetSceneId() : 0;
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([prefabName, name, sceneId]
+            {
+                auto* current = SceneManagers->GetActiveScene();
+                if (!current || current->GetSceneId() != sceneId)
+                {
+                    return CommandCore::PreconditionFailed("scene.stale", "Prefab destination changed");
+                }
+                return InstantiatePrefab(prefabName, name);
+            });
+        }
         return InstantiatePrefab(PrefabUtilitys->LoadPrefab(prefabName), name.empty() ? prefabName : name);
     }
 
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            if (!prefab)
+            {
+                return CommandCore::PreconditionFailed("prefab.not_found", "Prefab does not exist");
+            }
+            const auto guid = prefab->GetFileGuid();
+            const auto* scene = SceneManagers->GetActiveScene();
+            const auto sceneId = scene ? scene->GetSceneId() : 0;
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([guid, name, sceneId]
+            {
+                auto* current = SceneManagers->GetActiveScene();
+                if (!current || current->GetSceneId() != sceneId)
+                {
+                    return CommandCore::PreconditionFailed("scene.stale", "Prefab destination changed");
+                }
+                return InstantiatePrefab(PrefabUtilitys->LoadPrefabGuid(guid), name);
+            });
+        }
         using namespace CommandCore;
         if (!prefab) return PreconditionFailed("prefab.not_found", "Prefab does not exist");
         auto deletion = std::make_shared<std::unique_ptr<Meta::DeleteGameObjectCommand>>();
@@ -1355,6 +1451,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult UndoRedo(bool redo)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([redo]
+            {
+                return UndoRedo(redo);
+            });
+        }
         using namespace CommandCore;
         auto* undo = Meta::UndoManager::GetInstance();
         const auto depth = redo ? (undo->m_isGameMode ? undo->GameRedoDepth() : undo->EditRedoDepth())

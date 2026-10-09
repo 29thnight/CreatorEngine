@@ -1,6 +1,7 @@
 #pragma once
 #include "ImGui.h"
 #include "HierarchyFlatten.h"
+#include "EntityHandle.h"
 
 class Entity;
 class HierarchyWindow
@@ -13,7 +14,7 @@ public:
 	~HierarchyWindow() = default;
 
 	ImGuiTextFilter m_searchFilter{};
-	std::vector<Entity*> m_clipboard{};
+	std::vector<EntityHandle> m_clipboard{};
 	// W8-2: 선택이 **바뀐** 프레임에만 선다. 매 프레임 끌면 사람이 굴린 스크롤을
 	// 빼앗는다. 끌어온 뒤(또는 끌 자리가 없다고 판정한 뒤) 스스로 내린다.
 	bool m_requestScrollToSelection = false;

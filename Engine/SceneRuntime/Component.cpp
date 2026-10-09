@@ -5,6 +5,7 @@
 void Component::SetOwner(Entity* owner)
 {
 	m_pOwner = owner;
+    m_ownerReference = owner ? owner->weak_from_this() : gc::weak_ref<Entity>{};
 
 	// ★ 캐시(Entity::m_pTransformComponent)를 읽으면 안 된다 — 순서가 어긋난다.
 	//
@@ -24,6 +25,43 @@ void Component::SetOwner(Entity* owner)
 	// 널 소유자 방어도 겸한다 — 예전 `&m_pOwner->m_transform`은 owner가 널이면
 	// 그 자리에서 널 역참조였다(호출부는 현재 0곳이지만 다음 사람이 시도할 모양).
 	m_pTransform = owner ? owner->GetComponentDynamicCast<Transform>() : nullptr;
+}
+
+void Component::gc_trace(gc::tracer&) const
+{
+    // Both the owner identity and transform cache are nonowning. Derived
+    // hooks must call this base before visiting their own strong graph edges.
+}
+
+void Component::Destroy()
+{
+    Object::Destroy();
+    gc::advance_lifecycle(root_from_this(), gc::lifecycle_state::destroy_requested);
+}
+
+void Component::BeginManagedCleanup()
+{
+    gc::begin_cleanup_obligation(root_from_this());
+}
+
+void Component::FinalizeManagedDestroy()
+{
+    auto self = root_from_this();
+    if (gc::lifecycle_of(self) == gc::lifecycle_state::destroyed)
+    {
+        return;
+    }
+    gc::advance_lifecycle(self, gc::lifecycle_state::destroy_requested);
+    gc::advance_lifecycle(self, gc::lifecycle_state::destroying);
+    // Scene has already delivered lifecycle hooks. This final idempotent
+    // release also covers standalone factory/probe objects never registered
+    // with a Scene. Collector destructors never run engine callbacks.
+    ReleaseManagedResources();
+    m_ownerReference.reset();
+    m_pOwner = nullptr;
+    m_pTransform = nullptr;
+    m_destroyMark = true;
+    gc::advance_lifecycle(self, gc::lifecycle_state::destroyed);
 }
 
 void Component::SetEnabled(bool able)

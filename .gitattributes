@@ -125,3 +125,8 @@ Dynamic_CPP/ProjectSetting/*.asset       text eol=lf
 # 출처: Tools/regression/fixtures/imgui-ini/README.md
 ###############################################################################
 Tools/regression/fixtures/imgui-ini/*.ini -text
+
+# Preserve the pinned GCCE source bytes on Windows checkouts as well.
+ThirdParty/GCCE/include/** text eol=lf
+ThirdParty/GCCE/src/** text eol=lf
+ThirdParty/GCCE/CMakeLists.txt text eol=lf

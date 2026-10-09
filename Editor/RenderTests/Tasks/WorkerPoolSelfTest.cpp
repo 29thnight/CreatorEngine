@@ -1,3 +1,4 @@
+#include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Tasks/WorkerPoolSelfTest.h"
 #include "DataSystem.h"
 #include "AssetDepot/LegacyResourceCache.h"
@@ -124,7 +125,10 @@ namespace RenderTest
             const auto generation = DataSystems->LoadModelAssetGenerationByPath(modelPath);
             if (!generation || !generation->Skeleton() || generation->Animations().size() < 2)
                 throw std::runtime_error("Real model generation missing after bundle load");
-            FoliageComponent foliage;
+            gc::domain foliageDomain;
+            auto foliageRoot = Component::CreateManaged<FoliageComponent>(foliageDomain);
+            FoliageComponent& foliage = *foliageRoot;
+            gcce_probe::cleanup foliageCleanup(foliage);
             FoliageType type;
             type.m_modelName = generation->Name();
             type.m_modelGuid = FileGuid(generation->Identity().modelId);

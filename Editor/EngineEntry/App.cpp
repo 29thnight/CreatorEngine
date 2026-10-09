@@ -565,6 +565,8 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
+        // Establish the immutable command owner before Initialize starts PT.
+        (void)ConsoleCommandSystem::Get();
 		m_main->Initialize();
 		BootProgress::Step(L"Initializing input", L"Connecting keyboard and mouse devices");
         InputManagement->Initialize(m_hWnd);
@@ -621,7 +623,7 @@ void Core::App::Run()
 
 		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
 		auto& cli = ConsoleCommandSystem::Get();
-		cli.Pump();
+        cli.Pump([this] { return m_main->LockSceneStructure(); });
 
 		PublishRenderFrame();
 

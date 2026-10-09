@@ -319,7 +319,8 @@ namespace ConsoleCmd
         // scene.switch가 쓰는 경로를 그대로 쓴다: 씬만 만들어 두고 교체는
         // ActivateScene에 맡긴다 — 그쪽은 BeforeAwakeSceneLoad(프레임의 안전
         // 지점)까지 미룬다.
-        Scene* scene = Scene::CreateNewScene(name);
+        Scene* scene = SceneManagers->AdoptScene(
+                Scene::CreateNewScene(SceneManagers->ManagedDomain(), name));
         if (!scene)
         {
             Debug::PrintLog(spdlog::level::err, "[CLI] 씬 생성 실패: " + name);

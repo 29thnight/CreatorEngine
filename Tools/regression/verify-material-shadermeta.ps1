@@ -1,6 +1,7 @@
 param([string]$VisualStudioInstallation = '', [switch]$VerifyAssetCooker, [switch]$VerifyConsumer, [string]$CookFixtureRoot = '')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'GCCEProbe.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -40,19 +41,20 @@ $sources = @('Tools/regression/material_shadermeta_probe.cpp',
     'Lattice/Core/LXGraph.cpp', 'Lattice/Core/LXNodeDefinition.cpp', 'Lattice/Material/LXMaterialGraph.cpp',
     'Lattice/Material/LXMaterialIR.cpp', 'Lattice/Material/LXMaterialNodes.cpp',
     'Lattice/Material/LXMaterialOperators.cpp', 'Lattice/Material/LXMaterialCompiler.cpp')
+$gcce = Get-GCCEProbeSettings -Repository $repo -Configuration Release
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '
-$compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /MP2 /EHsc /std:c++latest /permissive- /utf-8 ' +
+$compile = 'call "' + $vcvars + '" >nul && cl.exe ' + $gcce.CompileArguments + ' /nologo /MP2 /EHsc /std:c++latest /permissive- /utf-8 ' +
     '/DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /MD /I"' + (Join-Path $repo 'ThirdParty/Slang/include') +
     '" /I"' + (Join-Path $repo 'ThirdParty/Mathematics/include') + '" /I"' + (Join-Path $repo 'Engine/Utility_Framework') +
     '" /I"' + (Join-Path $dependencies 'include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe +
-    '" ' + $quoted + ' /link /LIBPATH:"' + (Join-Path $dependencies 'lib') + '" ryml.lib c4core.lib d3d12.lib dxgi.lib ole32.lib'
+    '" ' + $quoted + ' /link /LIBPATH:"' + (Join-Path $dependencies 'lib') + '" ryml.lib c4core.lib d3d12.lib dxgi.lib ole32.lib' + ' ' + $gcce.LinkArguments
 $build = @(& $env:ComSpec /d /s /c $compile 2>&1)
 $build | Set-Content -LiteralPath (Join-Path $output 'build.log') -Encoding utf8
 if ($LASTEXITCODE -ne 0) { throw "ShaderMeta adapter build failed. See $output\build.log" }
 $work = Join-Path $output ('Run-' + [Guid]::NewGuid().ToString('N'))
 $previousPath = $env:PATH
 try {
-    $env:PATH = (Join-Path $dependencies 'bin') + ';' + $previousPath
+    $env:PATH = $gcce.RuntimeDirectory + ';' + (Join-Path $dependencies 'bin') + ';' + $previousPath
     $result = @(& $exe $repo $work 2>&1)
     $exitCode = $LASTEXITCODE
 } finally { $env:PATH = $previousPath }

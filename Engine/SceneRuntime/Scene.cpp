@@ -326,20 +326,18 @@ static void UnregisterRenderProxy(SceneRenderRegistryState& state,
 	state.registrations.erase(found);
 }
 
-Scene::Scene()
+Scene::Scene(gc::domain& domain)
     // 씬 식별자(트랙 W)는 생성자에서 딱 한 번 받는다 — Scene은 복사·이동이
     // 불가능한 타입이라(Scene.h의 m_sceneId 주석 참고) 이 값이 인스턴스 생애
     // 내내 유일하다는 전제가 깨지지 않는다.
-    : m_sceneId(NextSceneId()), m_executionGraphs(std::make_unique<TransformExecutionGraphState>()),
+    : m_gcDomain(&domain), m_sceneId(NextSceneId()), m_executionGraphs(std::make_unique<TransformExecutionGraphState>()),
       m_renderRegistry(std::make_unique<SceneRenderRegistryState>())
 {
-    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
     m_layerIndex = std::make_unique<SceneLayerIndex>(m_sceneId);
     m_Entities.reserve(3000);
     m_generations.reserve(3000);
     m_hierarchyStore.Reserve(3000);
     m_tweenManager = std::make_unique<TweenManager>();
-    m_soundSystem.Bind(*this, SceneManagers->AudioPlayback(), SceneManagers->AudioResolver());
 }
 
 TweenManager& Scene::Tweens() noexcept
@@ -361,27 +359,125 @@ uint32_t Scene::NextSceneId()
     return counter.fetch_add(1, std::memory_order_relaxed);
 }
 
-Scene::~Scene()
+Scene::~Scene() = default;
+
+void Scene::gc_trace(gc::tracer& tracer) const
 {
+    tracer.visit(m_Entities);
+}
+
+void Scene::InitializeManaged()
+{
+    gc::begin_cleanup_obligation(root_from_this());
+    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
+    m_soundSystem.Bind(*this, SceneManagers->AudioPlayback(), SceneManagers->AudioResolver());
+}
+
+gc::root_ref<Scene> Scene::LoadScene(gc::domain& domain, std::string_view name)
+{
+    if (SceneManagers->IsDecommissioning())
+    {
+        throw std::logic_error("Scene creation is closed during shutdown");
+    }
+    auto scene = gc::make<Scene>(domain, domain);
+    try
+    {
+        scene->InitializeManaged();
+        scene->m_sceneName = name;
+    }
+    catch (...)
+    {
+        scene->RetireManagedGraph();
+        throw;
+    }
+    return scene;
+}
+
+gc::root_ref<Scene> Scene::CreateNewScene(gc::domain& domain, std::string_view sceneName)
+{
+    auto scene = LoadScene(domain, sceneName);
+    try
+    {
+        scene->AddRootEntity(sceneName);
+    }
+    catch (...)
+    {
+        scene->RetireManagedGraph();
+        throw;
+    }
+    return scene;
+}
+
+void Scene::RequireManagedMutable() const
+{
+    if (IsManagedRetiringOrRetired())
+    {
+        throw std::logic_error("Cannot mutate a retiring or retired Scene");
+    }
+}
+
+void Scene::RetireManagedGraph()
+{
+    if (m_managedRetired)
+    {
+        return;
+    }
+    if (m_managedRetiring)
+    {
+        throw std::logic_error("Scene retirement cannot be reentered from cleanup callbacks");
+    }
+    // Keep the actual Scene rooted through hooks, joins and handle invalidation.
+    auto keepAlive = root_from_this();
+    // Remain blocked if cleanup throws: accepting new graph edges into a partially
+    // dismantled Scene would publish invalid native registrations and identities.
+    m_managedRetiring = true;
+    gc::advance_lifecycle(keepAlive, gc::lifecycle_state::destroy_requested);
+    gc::advance_lifecycle(keepAlive, gc::lifecycle_state::destroying);
+    DrainAIUpdate();
     m_soundSystem.EndWorld();
     (void)m_physicsSimulation.Stop();
-	DrainAIUpdate();
+    AllDestroyMark(true);
+    // The synthetic root is protected during ordinary destruction and Play restore.
+    // Only retiring the Scene tears down its final Transform and registrations.
+    if (Entity* root = GetEntityRaw(Entity::kSceneRootIndex))
+    {
+        root->Object::Destroy();
+        for (const auto& component : root->m_components)
+        {
+            if (component)
+            {
+                component->Destroy();
+            }
+        }
+    }
+    m_aiTickBoundaryReached = false;
+    EndFramePass();
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
-    // 생명주기 델리게이트 15종의 Clear 연쇄가 여기 있었다(PHASE 9-3에서 철거).
-    //
-    // 종료 행의 자리이기도 했다: Clear가 콜백을 파괴하는데 그 파괴가 같은 델리게이트의
-    // Remove를 다시 부르면 재진입 불가 스핀락에서 영원히 돌았다(커밋 c712011f).
-    // 델리게이트가 없으니 그 연쇄 자체가 성립하지 않는다.
-    //
-    // 리스트는 비우기만 하면 된다 — 원소가 raw 포인터라 소멸자 연쇄가 없다.
     m_schedule.Clear();
-
+    ResetSelectedEntity();
+    m_simulationSelection.clear();
+    Canvases.clear();
+    CanvasMap.clear();
     m_entityNameSet.clear();
     m_renderRegistry->Clear();
+    for (auto& entity : m_Entities)
+    {
+        if (entity)
+        {
+            ScriptObjectRegistry::Get().Unregister(entity.get());
+            entity->FinalizeManagedDestroy();
+            entity.reset();
+        }
+    }
+    // Clear the identity store before the final root is released. Stale Scene and
+    // entity handles fail closed even if a diagnostic root postpones reclamation.
     m_Entities.clear();
     m_generations.clear();
     m_freeSlots.clear();
     m_hierarchyStore.Clear();
+    m_managedRetired = true;
+    gc::advance_lifecycle(keepAlive, gc::lifecycle_state::destroyed);
+    ManagedDomain().request_collection();
 }
 
 const char* ReparentResultName(ReparentResult result)
@@ -755,6 +851,7 @@ void Scene::ExitHierarchyBulkBuild()
 // 일어나도 절대 바뀌지 않는다.
 Entity::Index Scene::AllocateSlot()
 {
+    RequireManagedMutable();
     if (!m_freeSlots.empty())
     {
         Entity::Index index = static_cast<Entity::Index>(m_freeSlots.back());
@@ -772,7 +869,7 @@ Entity::Index Scene::AllocateSlot()
     return index;
 }
 
-std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
+gc::root_ref<Entity> Scene::ReleaseSlot(Entity::Index index)
 {
     // 루트(0)는 씬 자체가 서 있는 동안 절대 해제하지 않는다.
     if (index == 0) return {};
@@ -802,7 +899,20 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
         if (!m_layerIndex->Remove(handle))
             throw std::runtime_error("Layer removal owner violation");
 
-    std::unique_ptr<Entity> released = std::move(m_Entities[index]);
+    if (m_freeSlots.size() == m_freeSlots.capacity())
+    {
+        // Grow before dropping the graph edge, while retaining amortized growth
+        // during mass destruction rather than reserving one slot per entity.
+        m_freeSlots.reserve(std::max<size_t>(8u, m_freeSlots.capacity() * 2u));
+    }
+    gc::root_ref<Entity> released = m_Entities[index];
+    if (m_selectedEntity == released.get())
+    {
+        m_selectedEntity = nullptr;
+    }
+    std::erase(m_selectedEntities, released.get());
+    std::erase(m_simulationSelection, released.get());
+    m_Entities[index].reset();
 
     // 트랜스폼 스토어 슬롯 리셋(트랙 S, S1) — Transform::ResolveStore의 점유자
     // 확인이 이 시점부터 실패하므로(m_Entities[index]가 비었다) 이 리셋을
@@ -949,6 +1059,7 @@ EntityHandle Scene::HandleOf(Entity::Index index) const
 
 ReparentResult Scene::Reparent(EntityHandle childHandle, EntityHandle newParentHandle)
 {
+    RequireManagedMutable();
 	if (!childHandle.IsValid() || !newParentHandle.IsValid())
 		return ReparentResult::InvalidHandle;
 	if (childHandle.sceneId != m_sceneId || newParentHandle.sceneId != m_sceneId)
@@ -1019,6 +1130,7 @@ ReparentResult Scene::Reparent(EntityHandle childHandle, EntityHandle newParentH
 
 bool Scene::ReorderChildren(EntityHandle parent, std::span<const EntityHandle> children)
 {
+    RequireManagedMutable();
     Entity* owner = Resolve(parent);
     if (!owner || owner->GetChildrenIndices().size() != children.size())
     {
@@ -1467,10 +1579,21 @@ Scene::HierarchyBulkBuildScope Scene::BeginHierarchyBulkBuild()
 	return HierarchyBulkBuildScope(*this);
 }
 
-Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
+Entity* Scene::AddEntity(gc::root_ref<Entity> sceneObject)
 {
+    RequireManagedMutable();
     if (!sceneObject)
+    {
         return nullptr;
+    }
+    if (sceneObject->IsDestroyMark())
+    {
+        throw std::logic_error("Cannot add an entity whose destruction was requested");
+    }
+    if (&sceneObject->Domain() != &ManagedDomain())
+    {
+        throw std::logic_error("Entity transfers must stay in the SceneManager GC domain");
+    }
     if (!sceneObject->SetLayer(sceneObject->GetLayer()))
         throw std::runtime_error("Invalid incoming entity layer");
     std::string uniqueName = GenerateUniqueEntityName(sceneObject->GetHashedName().ToString());
@@ -1484,7 +1607,8 @@ Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
 
     Entity::Index index = AllocateSlot();
     Entity* added = sceneObject.get();
-	m_Entities[index] = std::move(sceneObject);
+	m_Entities[index] = sceneObject;
+    added->BeginManagedCleanup();
 
 	added->m_index = index;
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index));
@@ -1511,6 +1635,7 @@ Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
 
 void Scene::AddRootEntity(std::string_view name)
 {
+    RequireManagedMutable();
     std::string uniqueName{};
 
     if (name.empty())
@@ -1523,14 +1648,15 @@ void Scene::AddRootEntity(std::string_view name)
     }
 
     Entity::Index index = AllocateSlot();
-    auto ptr = std::make_unique<Entity>(this, uniqueName, GameObjectType::Empty, index, -1);
+    auto ptr = Entity::Create(ManagedDomain(), this, uniqueName, GameObjectType::Empty, index, -1);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
         return;
     }
 
-	m_Entities[index] = std::move(ptr);
+	m_Entities[index] = ptr;
+    ptr->BeginManagedCleanup();
     m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::kInvalidIndex, Entity::kSceneRootIndex);
     RecordTopologyCreated();
     if (!m_Entities[index]->SetLayer(m_Entities[index]->GetLayer()))
@@ -1547,6 +1673,7 @@ void Scene::OnBeforeSerialize() const
 
 Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::Index parentIndex)
 {
+    RequireManagedMutable();
     if (name.empty())
     {
         return nullptr;
@@ -1572,7 +1699,16 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
 
     Entity::Index index = AllocateSlot();
 
-    auto ptr = std::make_unique<Entity>(this, uniqueName, type, index, parentIndex);
+    gc::root_ref<Entity> ptr;
+    try
+    {
+        ptr = Entity::Create(ManagedDomain(), this, uniqueName, type, index, parentIndex);
+    }
+    catch (...)
+    {
+        ReleaseSlot(index);
+        throw;
+    }
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
@@ -1582,7 +1718,8 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
     ptr->m_removedSuffixNumberTag = name.data();
 
     Entity* created = ptr.get();
-	m_Entities[index] = std::move(ptr);
+	m_Entities[index] = ptr;
+    ptr->BeginManagedCleanup();
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), parentIndex,
 		Entity::kSceneRootIndex);
 	RecordTopologyCreated();
@@ -1621,6 +1758,7 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
 
 Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectType type, Entity::Index parentIndex)
 {
+    RequireManagedMutable();
     if (name.empty())
     {
         return nullptr;
@@ -1634,7 +1772,16 @@ Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectTy
     std::string uniqueName = GenerateUniqueEntityName(name);
 
     Entity::Index index = AllocateSlot();
-    auto ptr = std::make_unique<Entity>(this, uniqueName, type, index, parentIndex);
+    gc::root_ref<Entity> ptr;
+    try
+    {
+        ptr = Entity::Create(ManagedDomain(), this, uniqueName, type, index, parentIndex);
+    }
+    catch (...)
+    {
+        ReleaseSlot(index);
+        throw;
+    }
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
@@ -1645,7 +1792,8 @@ Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectTy
     ptr->m_removedSuffixNumberTag = name.data();
 
     Entity* loaded = ptr.get();
-	m_Entities[index] = std::move(ptr);
+	m_Entities[index] = ptr;
+    ptr->BeginManagedCleanup();
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), parentIndex,
 		Entity::kSceneRootIndex);
 	RecordTopologyCreated();
@@ -1691,6 +1839,7 @@ Entity* Scene::TryGetEntity(Entity::Index index)
 
 void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached)
 {
+    RequireManagedMutable();
     if (!root) return;
     Scene* origin = root->GetScene();
     if (origin != this) return;
@@ -1702,6 +1851,8 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
 
     // breadth-first (인덱스 재배열 없이 안전하게 순회)
     std::vector<Entity::Index> queue;
+    queue.reserve(m_Entities.size());
+    detached.reserve(detached.size() + m_Entities.size());
 	const Entity::Index rootIndex = root->m_index;
     queue.push_back(rootIndex);
 
@@ -1752,13 +1903,16 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
             // 호출 하나가 이송과 파괴 양쪽을 덮는다(트랙 L · L3 완결). 파괴 경로에서
             // 관리 측 TearDown과 겹치는 문제는 관리 측 '축소 전달됨' 상태가 가른다.
             component->OnRemovingFromScene();
+            // The destination re-registers lifecycle phases after attachment.
+            // No raw source schedule entry may outlive the detached root handoff.
+            UnregisterComponent(component.get());
         }
         node->m_scenePhase = ScenePhase::Attached;
 		node->m_ownerScene = nullptr;
 
         // 슬롯 해제 단일점(트랙 E1) — tombstone+세대 증가+free 리스트 등록을
         // DestroyEntities와 공유한다. 재부착은 AttachExistingEntity가
-		if (std::unique_ptr<Entity> owned = ReleaseSlot(idx))
+		if (gc::root_ref<Entity> owned = ReleaseSlot(idx))
 		{
 			transfer.entity = std::move(owned);
 			detached.push_back(std::move(transfer));
@@ -1781,10 +1935,21 @@ std::string Scene::MakeUniqueName(std::string_view base)
 }
 
 // === C안 구현: 단일 객체 부착 ===
-Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::Index parentIndex)
+Entity::Index Scene::AttachExistingEntity(gc::root_ref<Entity> go, Entity::Index parentIndex)
 {
+    RequireManagedMutable();
     if (!go)
+    {
         return Entity::kInvalidIndex;
+    }
+    if (go->IsDestroyMark())
+    {
+        throw std::logic_error("Cannot reattach an entity whose destruction was requested");
+    }
+    if (&go->Domain() != &ManagedDomain())
+    {
+        throw std::logic_error("DDOL transfers must stay in the SceneManager GC domain");
+    }
     if (!go->SetLayer(go->GetLayer()))
         throw std::runtime_error("Invalid transferred entity layer");
     Entity* object = go.get();
@@ -1799,7 +1964,8 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
     // 새 인덱스 할당 — free 리스트가 있으면 재사용한다(트랙 E1).
     Entity::Index newIndex = AllocateSlot();
 	object->m_index = newIndex;
-	m_Entities[newIndex] = std::move(go);
+	m_Entities[newIndex] = go;
+    object->BeginManagedCleanup();
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(newIndex));
 	RecordTopologyCreated();
 	if (Transform* transform = object->GetComponent<Transform>())
@@ -1871,6 +2037,7 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
 std::unordered_map<Entity::Index, Entity::Index>
 Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& objects)
 {
+    RequireManagedMutable();
     std::unordered_map<Entity::Index, Entity::Index> remap;
     if (objects.empty()) return remap;
 	[[maybe_unused]] auto hierarchyTransaction = BeginHierarchyBulkBuild();
@@ -1892,7 +2059,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 			remap.contains(transfer.oldParentIndex) ? remap[transfer.oldParentIndex] :
             Entity::kInvalidIndex;
 
-		auto newIdx = AttachExistingEntity(std::move(transfer.entity), newParent);
+		auto newIdx = AttachExistingEntity(transfer.entity, newParent);
 		remap[transfer.oldIndex] = newIdx;
 		pendingRoots.push_back({ newIdx, transfer.oldRootIndex });
     }
@@ -2299,7 +2466,12 @@ namespace
 
 void Scene::RegisterComponent(Component* component)
 {
-    if (nullptr == component) return;
+    RequireManagedMutable();
+    if (nullptr == component)
+    {
+        return;
+    }
+    component->BeginManagedCleanup();
 
     // 표가 비어 있으면 여기서 세운다.
     //
@@ -2649,7 +2821,17 @@ void Scene::FlushPendingDestroy()
 
     for (Component* component : doomed)
     {
+        // Scene edges retain every doomed object until all dependent jobs and
+        // these existing cleanup hooks have completed on the owner thread.
+        auto cleanupRoot = component->root_from_this();
+        gc::advance_lifecycle(cleanupRoot, gc::lifecycle_state::destroy_requested);
+        gc::advance_lifecycle(cleanupRoot, gc::lifecycle_state::destroying);
         Entity* owner = component->GetOwner();
+        if (owner && owner->IsDestroyMark())
+        {
+            gc::advance_lifecycle(owner->root_from_this(), gc::lifecycle_state::destroy_requested);
+            gc::advance_lifecycle(owner->root_from_this(), gc::lifecycle_state::destroying);
+        }
 
         // 이름을 값으로 붙든다.
         //
@@ -3536,7 +3718,9 @@ void Scene::DestroyEntities()
         // 이송은 DetachEntityHierarchy가 ReleaseSlot을 직접 부른다.
         ScriptObjectRegistry::Get().Unregister(obj.get());
 
-        ReleaseSlot(static_cast<Entity::Index>(index));
+        auto retired = ReleaseSlot(static_cast<Entity::Index>(index));
+        retired->FinalizeManagedDestroy();
+        ManagedDomain().request_collection();
     }
 }
 
@@ -3564,7 +3748,9 @@ void Scene::DestroyComponents()
 
                 obj->RemoveComponentTypeID(component->GetTypeID());
 
+                component->FinalizeManagedDestroy();
                 component.reset();
+                ManagedDomain().request_collection();
             }
 
             if (false == isDirty) continue;
@@ -3614,6 +3800,7 @@ void Scene::RemoveEntityName(const std::string_view& name)
 
 void Scene::RenameEntity(Entity& entity, std::string_view name)
 {
+    RequireManagedMutable();
     RemoveEntityName(entity.GetHashedName().ToString());
     m_entityNameSet.emplace(name);
     entity.SetName(name);
@@ -4161,6 +4348,12 @@ bool Scene::ResolveSpatialTransformsLegacy(uint64_t,
 		if (metrics) dispatchBegin = TransformUpdateAccumulator::Clock::now();
 		if (!rootObjects.empty())
 		{
+            gc::pinned<Scene> scenePin(root_from_this());
+            // This is a joined, stable-graph borrow: the owner thread blocks here,
+            // cannot mutate Scene edges or collect, and for_each joins every worker
+            // before returning. Every Entity and Component stays in its traced
+            // scene graph throughout. A borrow that outlives an edge instead needs
+            // a separate pin for that exact object, retained on the owner thread.
 			std::for_each(std::execution::par, rootObjects.begin(),
 				rootObjects.end(), updateFunc);
 		}

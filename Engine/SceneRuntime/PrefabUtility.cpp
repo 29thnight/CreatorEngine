@@ -174,7 +174,7 @@ namespace
 		std::unordered_map<std::string, std::vector<size_t>> existingByType;
 		for (size_t i = 0; i < originalCount; ++i)
 		{
-			const auto& comp = obj.m_components[i];
+			const auto comp = obj.m_components[i];
 			if (!comp)
 				continue;
 
@@ -240,7 +240,7 @@ namespace
 			if (kept[i])
 				continue;
 
-			auto& comp = obj.m_components[i];
+			auto comp = obj.m_components[i];
 			if (!comp)
 				continue;
 
@@ -270,7 +270,9 @@ namespace
 			// 시스템(C3의 AnimatorSystem 등)이 해제된 객체를 계속 들고 있게 된다 —
 			// 프리팹 편집에서 Animator를 지우고 "인스턴스에 적용"하면 다음 프레임에
 			// 죽은 포인터를 틱하는 경로였다.
+			auto cleanupRoot = comp->root_from_this();
 			comp->Destroy();
+			gc::advance_lifecycle(cleanupRoot, gc::lifecycle_state::destroying);
 			// 이 축소 삼단도 기록한다(C5). 여기는 즉시 소멸 경로라 Scene의 프레임 끝
 			// 정리와 순서가 다르고, 기록이 없으면 그 차이가 기준선에 안 보인다.
 			LIFECYCLE_TRACE(Lifecycle::Phase::OnEndSimulation, Lifecycle::Trace::TypeNameOf(comp.get()),
@@ -283,10 +285,23 @@ namespace
 				obj.m_name.ToString().c_str(), comp->GetInstanceID());
 			comp->OnUninitializing();   // L3: 옛 OnDestroy — 브리지 철거로 이름이 정본으로 바뀌었다
 			if (scene)
+			{
 				scene->UnregisterComponent(comp.get());
+			}
+			comp->FinalizeManagedDestroy();
+			// A hook may append components; find the current slot rather than
+			// retain a reference into a potentially reallocated vector.
+			for (auto& current : obj.m_components)
+			{
+				if (current.get() == comp.get())
+				{
+					current.reset();
+					break;
+				}
+			}
 			comp.reset();
 		}
-		std::erase_if(obj.m_components, [](const std::unique_ptr<Component>& c) { return c == nullptr; });
+		std::erase_if(obj.m_components, [](const gc::trace_ref<Component>& c) { return c == nullptr; });
 
 		// m_componentIds·m_componentTypeMask를 한 번에 다시 세운다 — GameObject의
 		// 기존 공개 API(내부에서 RebuildComponentTypeMask도 함께 부른다). 파괴분만큼

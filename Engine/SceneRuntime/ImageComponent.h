@@ -15,6 +15,12 @@ class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent
 {
    friend struct reflgen::access;
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        UIComponent::gc_trace(tracer);
+    }
+
 public:
 	ImageComponent();
 	~ImageComponent() = default;

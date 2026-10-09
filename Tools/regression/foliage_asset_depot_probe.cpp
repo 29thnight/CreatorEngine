@@ -1,3 +1,4 @@
+#include "gcce_probe_cleanup.h"
 // Source-only integration fixture, intentionally not executed in this change.
 // Run in a dedicated initialized engine test host with a source-free CEMF3 set:
 // one model, at least two distinct static mesh artifacts, and Lattice materials.
@@ -116,7 +117,10 @@ namespace RenderTest
             type.m_allowLegacySource = false;
             FoliageRenderProxy proxy;
             {
-                FoliageComponent component;
+                gc::domain componentDomain;
+                auto componentRoot = Component::CreateManaged<FoliageComponent>(componentDomain);
+                FoliageComponent& component = *componentRoot;
+                gcce_probe::cleanup componentCleanup(component);
                 component.AddFoliageType(type);
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
                 while (component.GetAssetBindingStatus(0u) == AssetDepot::AssetRequestStatus::Pending
@@ -158,7 +162,10 @@ namespace RenderTest
                 RequireFoliage(!counts->reads.contains(model->meshes[0u].blob.artifactPath),
                     "Selected foliage loaded an unrelated mesh sibling.");
             }
-            FoliageComponent absent;
+            gc::domain absentDomain;
+            auto absentRoot = Component::CreateManaged<FoliageComponent>(absentDomain);
+            FoliageComponent& absent = *absentRoot;
+            gcce_probe::cleanup absentCleanup(absent);
             absent.AddFoliageType(type);
             RequireFoliage(absent.GetAssetBindingStatus(0u) == AssetDepot::AssetRequestStatus::Failed,
                 "Unmounted current binding did not terminate.");

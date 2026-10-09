@@ -8,6 +8,12 @@ class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent
 {
    friend struct reflgen::access;
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
     DecalComponent() = default;
 

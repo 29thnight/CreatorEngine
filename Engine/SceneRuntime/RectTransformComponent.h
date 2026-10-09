@@ -43,6 +43,12 @@ class [[reflgen::reflect]] RectTransformComponent : public meta::identity<RectTr
 {
    friend struct reflgen::access;
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
     RectTransformComponent();
     virtual ~RectTransformComponent() = default;

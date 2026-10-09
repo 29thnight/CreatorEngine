@@ -3,6 +3,7 @@
 #include "SceneViewportOverlay.h"
 #include "EditorViewportCanvas.h"
 #include "EntityHandle.h"
+#include "SceneGC.h"
 #include <mathematics/vector3.hpp>
 #include <memory>
 #include <vector>
@@ -35,11 +36,11 @@ namespace editor::picking
 	/// 프로세스를 죽여 무엇이 틀렸는지 남지 않는다. 목록으로 돌려주면 같은
 	/// 변이가 **널이 섞인 목록**이 되어 검사가 값으로 잡아낸다.
 	std::vector<Entity*> CollectOccupants(
-		const std::vector<std::unique_ptr<Entity>>& slots);
+		const std::vector<gc::trace_ref<Entity>>& slots);
 
 	/// 레이가 맞힌 것들을 가까운 순으로 모은다.
 	std::vector<RayHitResult> GatherRayHits(
-		const Ray& ray, const std::vector<std::unique_ptr<Entity>>& slots);
+		const Ray& ray, const std::vector<gc::trace_ref<Entity>>& slots);
 
 	/// 겹친 것들 사이의 순환 인덱스를 정한다. 이번 클릭이 맞힌 더미의 신원이
 	/// 직전과 같으면 뒤엣것으로 넘어가고, 달라졌으면 맨 앞으로 되돌린다.

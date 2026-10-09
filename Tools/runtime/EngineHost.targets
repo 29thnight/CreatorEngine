@@ -27,6 +27,6 @@
   <Target Name="DeploySharedEngineRuntime" AfterTargets="Build" Condition="'$(EngineHostedApplication)' == 'true'">
     <MSBuild Projects="$(SolutionDir)Tools\runtime\RuntimeLauncher.vcxproj" Targets="Build"
       Properties="Configuration=$(Configuration);Platform=$(Platform);SolutionDir=$(SolutionDir);LauncherName=$(MSBuildProjectName);LauncherOutputDir=$(OutDir);LauncherSubsystem=$(_EngineLauncherSubsystem);EngineShipping=$(EngineShipping);EngineAsan=false" />
-    <Exec Command="pwsh -NoProfile -File &quot;$(SolutionDir)Tools\runtime\deploy-runtime.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -BinaryRoot &quot;$(EngineBinaryRoot).&quot; -HostPath &quot;$(TargetPath)&quot; -HostName &quot;$(MSBuildProjectName)&quot; -Config &quot;$(Configuration)&quot; -VcpkgDirectory &quot;$(_ZVcpkgCurrentInstalledDir).&quot; -VcToolsDirectory &quot;$(VCToolsInstallDir).&quot; -VcRedistDirectory &quot;$(VCToolsRedistDir).&quot;" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(SolutionDir)Tools\runtime\deploy-runtime.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -BinaryRoot &quot;$(EngineBinaryRoot).&quot; -HostPath &quot;$(TargetPath)&quot; -HostName &quot;$(MSBuildProjectName)&quot; -Config &quot;$(Configuration)&quot; -GcceRuntimePath &quot;$(EngineGCCERuntimeDir)gcce.dll&quot; -VcpkgDirectory &quot;$(_ZVcpkgCurrentInstalledDir).&quot; -VcToolsDirectory &quot;$(VCToolsInstallDir).&quot; -VcRedistDirectory &quot;$(VCToolsRedistDir).&quot;" />
   </Target>
 </Project>

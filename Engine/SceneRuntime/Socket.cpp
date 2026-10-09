@@ -9,9 +9,16 @@ Socket::Socket()
 	AttachObjects.clear();
 
 }
-Socket::~Socket()
+void Socket::ReleaseManagedResources()
 {
-	SceneManagers->activeSceneChangedEvent -= m_activeSceneChangedEventHandle;
+    if (auto* manager = SceneManager::GetIfAlive())
+    {
+        manager->activeSceneChangedEvent -= m_activeSceneChangedEventHandle;
+    }
+    m_activeSceneChangedEventHandle = {};
+    // AttachObjects is borrowed scene data; shutdown must not dereference it.
+    AttachObjects.clear();
+    AttachObejctIndex.clear();
 }
 
 void Socket::AttachObject(Entity* Object)
