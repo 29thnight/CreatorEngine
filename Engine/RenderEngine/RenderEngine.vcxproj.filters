@@ -1289,4 +1289,20 @@
     <ClInclude Include="RHI\Temporal\Fsr\FsrBackendVulkan.h"><Filter>RHI\Temporal</Filter></ClInclude>
     <None Include="RHI\Temporal\TemporalSdk.props"><Filter>RHI\Temporal</Filter></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Render\Temporal\TemporalRuntimeControl.cpp"><Filter>Render\Temporal</Filter></ClCompile>
+    <ClCompile Include="Render\Temporal\TemporalUpscalerHost.cpp"><Filter>Render\Temporal</Filter></ClCompile>
+    <ClCompile Include="RHI\Temporal\TemporalDeviceDX12.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.cpp"><Filter>Render\Temporal</Filter></ClCompile>
+    <ClInclude Include="Render\Temporal\TemporalRuntimeControl.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Temporal\TemporalUpscalerHost.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\TemporalDeviceDX12.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Temporal\TemporalMeasurementProvenance.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Scene\EnhancedTemporalViewState.h"><Filter>Render\Temporal</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RHI\Temporal\AntiLag2DX12Adapter.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClInclude Include="RHI\Temporal\AntiLag2DX12Adapter.h"><Filter>RHI\Temporal</Filter></ClInclude>
+  </ItemGroup>
 </Project>

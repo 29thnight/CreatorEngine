@@ -78,6 +78,7 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     };
     // ShaderMeta describes generated entry contracts, including the installed
     // common Forward+ alpha consumer.
+    graphics("LXSceneTemporal", "LXSceneTemporalVS", "LXSceneTemporalPS", ShaderPassQueue::Opaque, true);
     graphics("GBuffer", "LXSceneVS", "LXSceneGBufferPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneDepth", "LXSceneVS", "LXSceneDepthPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
@@ -113,6 +114,8 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
     {
         if (only && *only != backend) continue;
         targets.push_back({backend, "LXSceneVS", "vs_6_0"});
+        targets.push_back({backend, "LXSceneTemporalVS", "vs_6_0"});
+        targets.push_back({backend, "LXSceneTemporalPS", "ps_6_0"});
         targets.push_back({backend, "LXSceneMS", "ms_6_5"});
         for (const auto entry : {"LXSceneGBufferPS", "LXSceneDepthPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
@@ -272,6 +275,8 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
         const std::pair<std::string_view, Member> members[]{{"LXSceneVS", &SceneShaderSet::vertex},
                                                             {"LXSceneDepthPS", &SceneShaderSet::depth},
+                                                            {"LXSceneTemporalVS", &SceneShaderSet::temporalVertex},
+                                                            {"LXSceneTemporalPS", &SceneShaderSet::temporal},
                                                             {"LXSceneMS", &SceneShaderSet::mesh},
                                                             {"LXSceneShadowMS", &SceneShaderSet::shadowMesh},
                                                             {"LXSceneGBufferPS", &SceneShaderSet::gbuffer},

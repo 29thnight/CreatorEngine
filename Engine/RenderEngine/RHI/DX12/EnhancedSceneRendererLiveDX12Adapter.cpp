@@ -74,6 +74,14 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         DisplayToken token{ kInvalidDisplayToken };
         ComPtr<ID3D12Resource> texture;
         HANDLE sharedHandle{ nullptr };
+        std::array<ComPtr<ID3D12Resource>, 4> temporalTextures;
+        std::array<HANDLE, 4> temporalHandles{};
+        RHITemporalDisplayResources temporalResources;
+        TemporalFrame temporalFrame;
+        TemporalExtent temporalRenderExtent, temporalDisplayExtent;
+        std::shared_ptr<const void> temporalLifetime;
+        bool temporalSealed{ false };
+        bool temporalNativeGateActive{ false };
         uint64_t producerCompletion{};
         bool producerComplete{};
         bool producerCompletionLost{};
@@ -476,6 +484,13 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownInterop()
             if (nullptr != display.sharedHandle) ::CloseHandle(display.sharedHandle);
             display.sharedHandle = nullptr;
             display.texture.Reset();
+            for (auto& handle : display.temporalHandles)
+            {
+                if (handle) ::CloseHandle(handle);
+                handle = nullptr;
+            }
+            display.temporalTextures = {};
+            display.temporalLifetime.reset();
         }
         displays.clear();
     };
@@ -549,6 +564,11 @@ void EnhancedSceneRendererLiveDX12Adapter::AbortFrame()
 {
     m_impl->DiscardMeasurements(m_impl->currentProfilerToken);
     m_impl->resources.AbortFrame();
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::WaitForLastFrameSubmission(std::string& outError)
+{
+    return m_impl->resources.WaitForLastFrameSubmission(outError);
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
@@ -828,6 +848,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::ConsumeSubmissionFailure(std::string&
     return false;
 }
 
+IRHIDeviceResources& EnhancedSceneRendererLiveDX12Adapter::DeviceResources()
+{
+    return m_impl->resources;
+}
+
 IRenderDeviceServices& EnhancedSceneRendererLiveDX12Adapter::Resources()
 {
     return m_impl->resources;
@@ -912,6 +937,118 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     return true;
 }
 
+bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
+    DisplayToken token, TemporalExtent renderExtent, TemporalExtent displayExtent,
+    RHITemporalDisplayResources& output, std::string& outError)
+{
+    output = {};
+    if (!renderExtent.IsValid() || !displayExtent.IsValid())
+    {
+        outError = "Temporal shared export needs valid render/display extents";
+        return false;
+    }
+    auto& impl = *m_impl;
+    for (auto& display : impl.activeDisplays)
+    {
+        if (display.token != token) continue;
+        if (display.temporalTextures[0])
+        {
+            if (display.temporalRenderExtent == renderExtent && display.temporalDisplayExtent == displayExtent)
+            {
+                output = display.temporalResources;
+                display.temporalSealed = false;
+                display.temporalLifetime.reset();
+                return true;
+            }
+            // The renderer calls this only after selecting a producer-complete,
+            // nonpending slot under displayLifetimeMutex. Check the consumer
+            // half again before a render-scale-only extent change replaces copies.
+            if (!CanReuseDisplayTexture(token))
+            {
+                outError = "Temporal extent change still has an SDK/display consumer";
+                return false;
+            }
+            for (const auto handle : {display.temporalResources.hudlessColor, display.temporalResources.uiColor,
+                display.temporalResources.depth, display.temporalResources.motionVectors})
+                if (handle.IsValid()) impl.resources.ReleaseTexture(handle);
+            for (auto& handle : display.temporalHandles) { if (handle) CloseHandle(handle); handle = nullptr; }
+            display.temporalTextures = {};
+            display.temporalResources = {};
+            display.temporalLifetime.reset();
+            display.temporalSealed = false;
+        }
+        constexpr DXGI_FORMAT formats[]{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
+            DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R16G16_FLOAT};
+        std::array<Impl::ComPtr<ID3D12Resource>, 4> textures;
+        std::array<HANDLE, 4> handles{};
+        std::array<RHITextureHandle, 4> registered{};
+        const auto rollback = [&]
+        {
+            for (size_t index = 0; index < handles.size(); ++index)
+            {
+                if (handles[index]) CloseHandle(handles[index]);
+                if (registered[index].IsValid()) impl.resources.ReleaseTexture(registered[index]);
+            }
+        };
+        for (size_t index = 0; index < textures.size(); ++index)
+        {
+            const auto extent = index < 2 ? displayExtent : renderExtent;
+            D3D12_HEAP_PROPERTIES heap{};
+            heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+            D3D12_RESOURCE_DESC description{};
+            description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            description.Width = extent.width;
+            description.Height = extent.height;
+            description.DepthOrArraySize = description.MipLevels = 1;
+            description.Format = formats[index];
+            description.SampleDesc.Count = 1;
+            // No simultaneous-access flag: producer and consumer synchronize by
+            // completion + lease and return each copy to COPY_DEST before reuse.
+            if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED,
+                    &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textures[index]))) ||
+                FAILED(impl.resources.GetDevice()->CreateSharedHandle(textures[index].Get(), nullptr,
+                    GENERIC_ALL, nullptr, &handles[index])))
+            {
+                rollback();
+                outError = "Could not allocate full temporal shared display inputs";
+                return false;
+            }
+            registered[index] = impl.resources.RegisterExternalTexture(textures[index].Get());
+            if (!registered[index].IsValid())
+            {
+                rollback();
+                outError = "Could not register temporal shared display inputs";
+                return false;
+            }
+        }
+        display.temporalTextures = std::move(textures);
+        display.temporalHandles = handles;
+        display.temporalResources = {registered[0], registered[1], registered[2], registered[3]};
+        display.temporalRenderExtent = renderExtent;
+        display.temporalDisplayExtent = displayExtent;
+        output = display.temporalResources;
+        return true;
+    }
+    outError = "Temporal shared display token is not active";
+    return false;
+}
+
+void EnhancedSceneRendererLiveDX12Adapter::SealTemporalDisplayFrame(DisplayToken token,
+    const TemporalFrame& frame, std::shared_ptr<const void> lifetimeToken, bool nativeGateActive)
+{
+    for (auto& display : m_impl->activeDisplays)
+    {
+        if (display.token != token) continue;
+        display.temporalFrame = frame;
+        display.temporalNativeGateActive = nativeGateActive;
+        display.temporalLifetime = std::move(lifetimeToken);
+        display.temporalSealed = display.temporalTextures[0] &&
+            frame.renderExtent == display.temporalRenderExtent &&
+            frame.displayExtent == display.temporalDisplayExtent && ValidateTemporalFrame(frame).IsSuccess();
+        return;
+    }
+}
+
 void EnhancedSceneRendererLiveDX12Adapter::RetireDisplayTexture(DisplayToken token)
 {
     if (kInvalidDisplayToken == token) return;
@@ -942,6 +1079,15 @@ void EnhancedSceneRendererLiveDX12Adapter::CollectRetiredDisplays()
         {
             CloseHandle(display.sharedHandle);
             display.sharedHandle = nullptr;
+        }
+        for (const auto handle : {display.temporalResources.hudlessColor, display.temporalResources.uiColor,
+            display.temporalResources.depth, display.temporalResources.motionVectors})
+            if (handle.IsValid()) impl.resources.ReleaseTexture(handle);
+        display.temporalResources = {};
+        for (auto& handle : display.temporalHandles)
+        {
+            if (handle) CloseHandle(handle);
+            handle = nullptr;
         }
         return true;
     });
@@ -975,7 +1121,22 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
             // 호출자는 생산자 슬롯 선택과 같은 뮤텍스를 쥔다. sink는 잠금을
             // 놓기 전에 이 참조를 확보해야 하며 CPU 드로우 데이터가 아직
             // 기록·제출되지 않은 동안에도 참조를 유지한다.
-            return sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+            const auto textureId = sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+            if (textureId && sink.AcceptsTemporalFrames() && display.temporalSealed)
+            {
+                RHITemporalDisplayPacket packet;
+                packet.frame = display.temporalFrame;
+                for (size_t index = 0; index < packet.sharedHandles.size(); ++index)
+                    packet.sharedHandles[index] = display.temporalHandles[index];
+                packet.consumerLease = display.consumerLease;
+                // Dedicated shared copies do not alias graph pool memory. Retain
+                // the optional source owner too when supplied by the graph.
+                packet.lifetimeToken = display.temporalLifetime ? display.temporalLifetime : display.consumerLease;
+                packet.valid = true;
+                packet.nativeGateActive = display.temporalNativeGateActive;
+                sink.OpenTemporalFrame(packet);
+            }
+            return textureId;
         }
     }
     return 0;

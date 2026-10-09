@@ -105,6 +105,7 @@
     <ClCompile Include="PlayerApp.cpp" />
     <ClCompile Include="PlayerMain.cpp" />
     <ClCompile Include="PlayerDX12Presentation.cpp" />
+    <ClCompile Include="PlayerTemporalDX12.cpp" />
     <ClCompile Include="PlayerVulkanPresentation.cpp" />
     <!-- Role-neutral command/bootstrap code is owned by Engine/RuntimeHost.
          Shipping compile-excludes the developer registry/parser/session and service implementation. -->
@@ -120,6 +121,7 @@
     <ClInclude Include="PlayerApp.h" />
     <ClInclude Include="PlayerMain.h" />
     <ClInclude Include="PlayerPresentation.h" />
+    <ClInclude Include="PlayerTemporalDX12.h" />
     <ClInclude Include="PlayerDdolProbe.h" />
     <ClInclude Include="PlayerCommands.h" />
     <ClInclude Include="PlayerCommandService.h" />
@@ -157,6 +159,7 @@
       <Project>{F0C6E84D-AD92-45B8-9037-ED3F058C1A46}</Project>
     </ProjectReference>
   </ItemGroup>
+  <Import Project="..\Engine\RenderEngine\RHI\Temporal\TemporalSdk.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

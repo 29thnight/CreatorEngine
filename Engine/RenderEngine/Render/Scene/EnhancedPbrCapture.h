@@ -4,6 +4,8 @@
 #include "EnhancedCameraReplayInput.h"
 #include "EnhancedDrawReplayInput.h"
 #include "EnhancedLatticeReplayInput.h"
+#include "../Temporal/TemporalRuntimeControl.h"
+#include "../Temporal/TemporalMeasurementProvenance.h"
 #include <optional>
 #include <stdexcept>
 #include "../Core/EnhancedLivePipelineDesc.h"
@@ -26,6 +28,10 @@
 // readbacks. Release must run after submission completion (or frame abort).
 struct EnhancedPbrCapture
 {
+    // Acquired when the request is created, before the next frame is configured.
+    std::optional<TemporalNativeCaptureExclusion> nativeExclusion{ std::in_place };
+    TemporalMeasurementProvenance temporalProvenance;
+    uint64_t capturedViewId{}, capturedSceneEpoch{}, capturedRealFrameId{};
     EnhancedLivePbrCaptureStatus result;
     EnhancedLiveBackend resourceBackend{ EnhancedLiveBackend::DX12 };
     EnhancedLiveDisplayTarget target{ EnhancedLiveDisplayTarget::Game };
@@ -140,6 +146,10 @@ struct EnhancedPbrCapture
         result.state = EnhancedPbrCaptureState::Recording;
         resourceBackend = backend;
         result.frameId = frame.frameId;
+        capturedViewId = view.key.viewId;
+        capturedSceneEpoch = frame.sceneEpoch;
+        capturedRealFrameId = view.displayTarget == EnhancedLiveDisplayTarget::Game && frame.temporalRealFrameId
+            ? frame.temporalRealFrameId : frame.frameId;
         Authoring::EnsureRymlErrorPolicy();
         auto root = manifest.rootref();
         root |= ryml::MAP;
@@ -147,6 +157,7 @@ struct EnhancedPbrCapture
         root["source"] << "product-live";
         root["backend"] << (backend == EnhancedLiveBackend::DX12 ? "dx12" : "vulkan");
         root["frameId"] << frame.frameId;
+        root["sourceRealFrameId"] << capturedRealFrameId;
         root["requestedAfterFrameId"] << afterFrameId;
         root["sceneEpoch"] << frame.sceneEpoch;
         root["viewId"] << view.key.viewId;
@@ -158,11 +169,6 @@ struct EnhancedPbrCapture
         root["captureMode"] << (controlled
             ? (cameraReplay && (frame.totalSeconds != 0.f || frame.deltaSeconds != 0.f)
                 ? "camera-clock-replay-v1" : "static-repeatability-v1") : "observation");
-        root["frameKind"] << "real";
-        root["renderWidth"] << frame.width;
-        root["renderHeight"] << frame.height;
-        root["displayWidth"] << frame.width;
-        root["displayHeight"] << frame.height;
         root["skyBoxEnabled"] << frame.skyBoxEnabled;
         root["viewFlags"] << static_cast<uint32_t>(view.viewFlags);
         root["cameraInputContract"] << "camera-clock-v1";
@@ -274,6 +280,24 @@ struct EnhancedPbrCapture
         // 그것 자체가 배선 결함이므로 기본값을 "미기록"으로 둔다.
         root["sealLedger"] |= ryml::MAP;
         root["sealLedger"]["recorded"] << false;
+    }
+
+    void RecordTemporalProvenance(const TemporalMeasurementProvenance& provenance)
+    {
+        temporalProvenance = provenance;
+        auto root = manifest.rootref();
+        root["frameKind"] << TemporalMeasuredFrameKindName(provenance.frameKind);
+        root["realFrameId"] << provenance.realFrameId;
+        root["generatedOrdinal"] << provenance.generatedOrdinal;
+        root["renderWidth"] << provenance.renderExtent.width;
+        root["renderHeight"] << provenance.renderExtent.height;
+        root["displayWidth"] << provenance.displayExtent.width;
+        root["displayHeight"] << provenance.displayExtent.height;
+        root["upscaler"] << TemporalMeasuredProviderName(provenance.upscaler);
+        root["frameGenerator"] << TemporalMeasuredProviderName(provenance.frameGenerator);
+        root["resolutionState"] << TemporalResolutionStateName(provenance.resolutionState);
+        root["temporalNativeGateActive"] << provenance.nativeGateActive;
+        root["goldenEligible"] << provenance.IsGoldenEligible();
     }
 
     void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
@@ -614,6 +638,15 @@ struct EnhancedPbrCapture
             }
         }
         root["measurement"] |= ryml::MAP;
+        // All timing/memory values below belong to this submitted real frame,
+        // never to a generated presentation or a newer status snapshot.
+        root["measurement"]["frameKind"] << TemporalMeasuredFrameKindName(temporalProvenance.frameKind);
+        root["measurement"]["realFrameId"] << temporalProvenance.realFrameId;
+        root["measurement"]["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
+        root["measurement"]["renderWidth"] << temporalProvenance.renderExtent.width;
+        root["measurement"]["renderHeight"] << temporalProvenance.renderExtent.height;
+        root["measurement"]["displayWidth"] << temporalProvenance.displayExtent.width;
+        root["measurement"]["displayHeight"] << temporalProvenance.displayExtent.height;
         root["measurement"]["cpuRecordMs"] << recordMs;
         root["measurement"]["cpuGraphCompileMs"] << compileMs;
         root["measurement"]["cpuTransientPrepareMs"] << graph.GetStats().transientPrepareCpuMs;
@@ -732,6 +765,14 @@ struct EnhancedPbrCapture
     bool Save(IRenderDeviceServices& resources, const EnhancedRenderGraph::Stats& stats,
         std::string& error, uint32_t validationCount, const std::string& validation)
     {
+        if (!temporalProvenance.IsGoldenEligible() || temporalProvenance.realFrameId != capturedRealFrameId ||
+            temporalProvenance.publicationFrameId != result.frameId ||
+            temporalProvenance.viewId != capturedViewId || temporalProvenance.sceneEpoch != capturedSceneEpoch)
+        {
+            error = "capture requires observed native-only real-frame provenance for this frame";
+            Fail(error);
+            return false;
+        }
         try
         {
             const std::filesystem::path root(result.directory);
@@ -778,6 +819,9 @@ struct EnhancedPbrCapture
                 attachment["channels"] << channels;
                 attachment["width"] << image.width;
                 attachment["height"] << image.height;
+                attachment["frameKind"] << TemporalMeasuredFrameKindName(temporalProvenance.frameKind);
+                attachment["realFrameId"] << temporalProvenance.realFrameId;
+                attachment["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
                 attachment["nonfinite"] << nonfinite;
                 attachment["min"] << minimum;
                 attachment["max"] << maximum;
@@ -889,6 +933,7 @@ struct EnhancedPbrCapture
                 if (!packet) { error = "Lattice replay input write failed"; return false; }
             }
             result.state = EnhancedPbrCaptureState::Complete;
+            nativeExclusion.reset();
             return true;
         }
         catch (const std::exception& exception) { error = exception.what(); return false; }
@@ -923,5 +968,6 @@ struct EnhancedPbrCapture
     {
         result.state = EnhancedPbrCaptureState::Failed;
         result.error = error;
+        nativeExclusion.reset();
     }
 };

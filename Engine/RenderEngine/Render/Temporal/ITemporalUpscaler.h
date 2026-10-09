@@ -12,6 +12,9 @@ class ITemporalUpscaler
 public:
     virtual ~ITemporalUpscaler() = default;
     virtual TemporalCapabilities GetCapabilities() const = 0;
+    // SDK-derived sizing, queried after successful context creation.
+    virtual TemporalResult QueryRenderExtent(TemporalQuality, TemporalExtent, TemporalExtent& extent) const
+    { extent = {}; return { TemporalStatus::IntegrationRequired }; }
     // Inputs must already be in RHIResourceState::ShaderResource, output in UnorderedAccess.
     // Use the graph callback's encoder, never a frame-global command list.
     // The SDK can invalidate encoder binding caches; implementations reset them.

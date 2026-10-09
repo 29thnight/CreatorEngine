@@ -4,12 +4,14 @@
     <ClCompile Include="PlayerApp.cpp" />
     <ClCompile Include="PlayerMain.cpp" />
     <ClCompile Include="PlayerDX12Presentation.cpp" />
+    <ClCompile Include="PlayerTemporalDX12.cpp" />
     <ClCompile Include="PlayerVulkanPresentation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PlayerApp.h" />
     <ClInclude Include="PlayerMain.h" />
     <ClInclude Include="PlayerPresentation.h" />
+    <ClInclude Include="PlayerTemporalDX12.h" />
     <ClInclude Include="PlayerDdolProbe.h" />
   </ItemGroup>
   <ItemGroup>

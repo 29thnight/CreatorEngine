@@ -318,7 +318,7 @@ TemporalResult XeSSFrameGenerationDX12::SetEnabled(bool enabled)
     if (!m_state || !m_state->m_initialized) return { TemporalStatus::NotInitialized };
     auto& state = *m_state;
     if (state.m_reinitializeRequired) return { TemporalStatus::IntegrationRequired };
-    if (state.m_sleepFrameId) return { TemporalStatus::InvalidInput };
+    if (state.m_prepared) return { TemporalStatus::InvalidInput };
     if (state.m_enabled == enabled && state.m_latencyEnabled == enabled) return { TemporalStatus::Success };
     const auto drained = state.Drain();
     if (!drained.IsSuccess()) return drained;
@@ -401,6 +401,34 @@ TemporalResult XeSSFrameGenerationDX12::Sleep(uint64_t realFrameId)
     return result;
 #else
     return { TemporalStatus::SdkNotBuilt };
+#endif
+}
+
+TemporalResult XeSSFrameGenerationDX12::ReleaseInputsAfterGpuIdle()
+{
+#if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
+    if (!m_state || !m_state->m_initialized) return {TemporalStatus::NotInitialized};
+    if (m_state->m_prepared) return {TemporalStatus::IntegrationRequired};
+    return m_state->Drain();
+#else
+    return {TemporalStatus::SdkNotBuilt};
+#endif
+}
+
+TemporalResult XeSSFrameGenerationDX12::DiscardRealFrame(uint64_t realFrameId)
+{
+#if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
+    if (!m_state || !m_state->m_initialized) return {TemporalStatus::NotInitialized};
+    auto& state = *m_state;
+    if (!state.m_sleepFrameId) return {TemporalStatus::Success};
+    if (realFrameId != state.m_sleepFrameId || state.m_prepared || state.m_lifetimeToken)
+        return {TemporalStatus::IntegrationRequired};
+    state.m_sleepFrameId = 0;
+    state.m_markers = 0;
+    state.m_forceReset = true;
+    return {TemporalStatus::Success};
+#else
+    return {TemporalStatus::SdkNotBuilt};
 #endif
 }
 

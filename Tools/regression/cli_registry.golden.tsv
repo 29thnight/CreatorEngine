@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	138
-# names	147
+# commands	148
+# names	157
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -129,6 +129,16 @@ tag.add	-	immediate	editor	editor_operation	live	no	yes	<name>	Add and persist a
 tag.has	-	immediate	editor	engine_service	live	no	yes	<name>	Query a project tag
 tag.list	-	immediate	editor	engine_service	live	no	yes	-	Read project tags and layers
 tag.remove	-	immediate	editor	editor_operation	live	no	yes	<name>	Remove and persist a project tag with Undo
+temporal.fallback	-	immediate	both	engine_service	live	no	yes	-	Read requested/effective temporal providers and actual fallback reasons
+temporal.fg	-	immediate	both	engine_service	live	no	yes	[none|fsr|dlss|xess]	Request independent Player frame generation; receipt is not activation
+temporal.latency	-	immediate	both	engine_service	live	no	yes	-	Read real-frame latency markers without claiming input-to-photon latency
+temporal.metadata	-	immediate	both	engine_service	live	no	yes	-	Read observed temporal frame metadata and separate completion identities
+temporal.motion	-	immediate	both	engine_service	live	no	yes	-	Read live motion-input coverage and explicit missing paths
+temporal.reset	-	immediate	both	engine_service	live	no	yes	-	Queue history reset and return its generation for frame acknowledgement
+temporal.runtime	-	immediate	both	engine_service	live	no	yes	<absolute-trusted-directory> [dlss-project-id]	Configure the trusted external runtime directory without installing a SDK
+temporal.status	-	immediate	both	engine_service	live	no	yes	[generation]	Read live temporal status and optionally require a rendered request acknowledgement
+temporal.support	-	immediate	both	engine_service	live	no	yes	-	Read active-device temporal SDK and runtime capability snapshots
+temporal.upscale	-	immediate	both	engine_service	live	no	yes	[none|fsr|dlss|xess] [native-aa|quality|balanced|performance|ultra-performance]	Request temporal upscaling; completion is observed on a later real frame
 ui.anchor	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <minX> <minY> <maxX> <maxY>	앵커를 직접 지정한다
 ui.hitbox	-	frames	editor	engine_service	live	no	yes	-	버튼의 rect와 클릭 판정 상자를 나란히 출력한다
 ui.pos	-	frames	editor	editor_operation	live	no	yes	<target> <x> <y>	UI anchored position을 편집한다

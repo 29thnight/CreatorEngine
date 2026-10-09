@@ -9,6 +9,7 @@
 #include "../../../TextureCodecImage.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -58,9 +59,10 @@ namespace
         float screenDimensions[2]{};
         uint32_t hasOwners{};
         uint32_t instanceBase{};
+        math::matrix4x4 currentUnjittered{}, previousUnjittered{};
     };
 
-    static_assert(sizeof(DecalFrameConstants) == 208);
+    static_assert(sizeof(DecalFrameConstants) == 336);
     static_assert(offsetof(DecalFrameConstants, instanceBase) == 204);
     static_assert(std::is_trivially_copyable_v<DecalFrameConstants>);
 
@@ -120,6 +122,7 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         RHILayout::SrvTable(4, 0, RHIShaderVisibility::Pixel), // G버퍼
         RHILayout::SrvTable(3, 4, RHIShaderVisibility::Pixel), // 데칼 텍스처
         RHILayout::SrvTable(1, 8, RHIShaderVisibility::Pixel), // LX/legacy channel ABI
+        RHILayout::SrvTable(1, 9, RHIShaderVisibility::Pixel), // temporal foreground depth
     };
 
     const RHIStaticSamplerDesc samplers[] = {
@@ -189,7 +192,16 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         }
     }
 
-    return true;
+    RHIShaderBlob temporalShader;
+    if (!CompileDecalShader("TemporalPS", "ps_5_0", temporalShader, outError)) return false;
+    RHIGraphicsPipelineDesc temporal;
+    temporal.layout = root; temporal.vsBytecode = vsBlob.Data(); temporal.vsSize = vsBlob.Size();
+    temporal.psBytecode = temporalShader.Data(); temporal.psSize = temporalShader.Size();
+    temporal.cullMode = RHICullMode::Back; temporal.depthEnable = false;
+    temporal.numRenderTargets = 4; temporal.rtvFormats[0] = RHIFormat::RG16Float;
+    std::fill_n(std::begin(temporal.rtvFormats) + 1, 3, RHIFormat::R16Float);
+    m_temporalPipeline = context.psoManager->GetOrCreate(temporal, outError);
+    return m_temporalPipeline.IsValid();
 }
 
 bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
@@ -326,6 +338,8 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         instance.sliceX = (std::max)(1u, decal.sliceX);
         instance.sliceY = (std::max)(1u, decal.sliceY);
         instance.sliceNum = decal.sliceNum;
+        instance.previousWorld = math::transpose(decal.temporalHistoryValid ? decal.previousWorldMatrix : decal.worldMatrix);
+        instance.historyValid = decal.temporalHistoryValid && !context.temporalFrame.reset;
         m_instances.push_back(instance);
         EnhancedDrawItem bounds{};
         bounds.worldMatrix = decal.worldMatrix;
@@ -719,6 +733,75 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             }
         },
         m_keepAlive);
+}
+
+std::array<RGHandle, 5> EnhancedDecalPass::DeclareTemporal(EnhancedRenderGraph& graph,
+    const EnhancedFrameContext& context, std::array<RGHandle, 5> outputs)
+{
+    if (m_batches.empty()) return outputs;
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
+    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    for (unsigned i=0; i<4; ++i)
+    {
+        if (versioned) outputs[i] = graph.Modify(outputs[i]);
+        uses.push_back({outputs[i], RHIResourceState::RenderTarget, modify});
+    }
+    const auto sourceDepth = m_inputs.depth;
+    uses.push_back({sourceDepth, RHIResourceState::ShaderResource, read});
+    uses.push_back({outputs[4], RHIResourceState::ShaderResource, read});
+    for (const auto& batch : m_batches) for (auto texture : batch.textures)
+    {
+        if (!texture.IsValid()) continue;
+        auto handle = graph.FindImportedTexture(texture);
+        if (!handle.IsValid()) handle=graph.ImportTexture(texture,RHIResourceState::PixelShaderResource,"Temporal.DecalImage");
+        if (std::none_of(uses.begin(),uses.end(),[handle](const auto& use){return use.handle.index==handle.index && use.handle.version==handle.version && use.handle.kind==handle.kind && use.handle.epoch==handle.epoch;}))
+            uses.push_back({handle,RHIResourceState::PixelShaderResource,read});
+    }
+    graph.AddPass("Temporal.DecalMotion",uses,[this,outputs,sourceDepth,&context](const auto& execute){
+        std::array<RHITextureHandle,4> colors;
+        for (unsigned i=0;i<4;++i) colors[i]=execute.ResolveHandle(outputs[i]);
+        const auto targets=context.resources->CreateRenderTargets(colors);
+        if (!targets.IsValid()) throw std::runtime_error("Temporal decal render targets unavailable.");
+        auto& encoder=*execute.encoder; encoder.BindRenderTargets(targets);
+        encoder.SetViewportAndScissor(m_width,m_height);
+        encoder.SetPipeline(RHIBindPoint::Graphics,m_temporalPipeline);
+        encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+        DecalFrameConstants constants;
+        constants.inverseView=math::transpose(m_inverseView);constants.inverseProjection=math::transpose(m_inverseProjection);
+        constants.viewProjection=math::transpose(m_viewProjection);
+        constants.screenDimensions[0]=float(m_width);constants.screenDimensions[1]=float(m_height);
+        const auto current=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.viewMatrix)*
+            std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.projectionMatrix);
+        constants.currentUnjittered=math::transpose(current);
+        constants.previousUnjittered=math::transpose(current*std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.clipToPreviousClip));
+        const auto instances=context.resources->AllocateUpload({sizeof(InstanceData)*m_instances.size(),RHIUploadUsage::BufferCopy,256});
+        if(!instances.IsValid())throw std::runtime_error("Temporal decal upload failed.");
+        memcpy(instances.cpuAddress,m_instances.data(),sizeof(InstanceData)*m_instances.size());
+        encoder.SetRootBuffer(RHIBindPoint::Graphics,1,instances);
+        const RHIBindingDesc background[]{RHIBindingDesc::SrvDepth(execute.ResolveHandle(sourceDepth)),
+            RHIBindingDesc::Srv2D({},RHIFormat::RGBA16Float).OrNull(),RHIBindingDesc::Srv2D({},RHIFormat::RGBA16Float).OrNull(),
+            RHIBindingDesc::Srv2D({},RHIFormat::RGBA16Float).OrNull()};
+        const RHIBindingDesc foreground[]{RHIBindingDesc::SrvDepth(execute.ResolveHandle(outputs[4]))};
+        const auto depthTable=context.resources->CreateBindings(background),foregroundTable=context.resources->CreateBindings(foreground);
+        if(!depthTable.IsValid()||!foregroundTable.IsValid())throw std::runtime_error("Temporal decal depth binding failed.");
+        encoder.SetBindings(RHIBindPoint::Graphics,2,depthTable);encoder.SetBindings(RHIBindPoint::Graphics,5,foregroundTable);
+        for (const auto& batch:m_batches)
+        {
+            RHIBindingDesc images[3];
+            for(unsigned i=0;i<3;++i)images[i]=RHIBindingDesc::Srv2D(batch.textures[i],
+                batch.textures[i].IsValid()?batch.formats[i]:RHIFormat::RGBA8Unorm,0,std::max(1u,batch.mipLevels[i])).OrNull();
+            const auto table=context.resources->CreateBindings(images);
+            constants.instanceBase=batch.firstInstance;
+            const auto cb=context.resources->UploadConstants(&constants,sizeof(constants));
+            if(!table.IsValid()||!cb.IsValid())throw std::runtime_error("Temporal decal material binding failed.");
+            encoder.SetBindings(RHIBindPoint::Graphics,3,table);encoder.SetConstantBuffer(RHIBindPoint::Graphics,0,cb);
+            encoder.Draw(36,batch.instanceCount);
+        }
+    }, true);
+    return outputs;
 }
 
 void EnhancedDecalPass::Shutdown()

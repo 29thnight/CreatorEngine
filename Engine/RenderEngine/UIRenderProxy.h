@@ -5,6 +5,7 @@
 #include <mathematics/vector4.hpp>
 #include <variant>
 #include <cstdint>
+#include <atomic>
 #include <mathematics/color.hpp>
 #include <mathematics/vector2.hpp>
 #include <type_traits>
@@ -110,11 +111,16 @@ public:
     }
 
     const HashedGuid& GetInstanceID() const { return m_instancedID; }
+    uint64_t GetTemporalIncarnation() const { return m_temporalIncarnation; }
     bool IsEnabled() const { return m_isEnabled; }
 	void SetEnabled(bool enable) { m_isEnabled = enable; }
 
 private:
 	friend class ProxyCommand;
+    // Snapshot copies preserve incarnation; a new proxy with a reused GUID
+    // cannot inherit stale world-space canvas/glyph temporal history.
+    inline static std::atomic<uint64_t> s_temporalIncarnation{1};
+    uint64_t m_temporalIncarnation{s_temporalIncarnation.fetch_add(1, std::memory_order_relaxed)};
     std::variant<ImageData, TextData, SpriteSheetData>   m_data;
     own::shared_owner<const Texture>                             m_texture{ nullptr };
     std::shared_ptr<SpriteSheet>                         m_spriteSheet{ nullptr };

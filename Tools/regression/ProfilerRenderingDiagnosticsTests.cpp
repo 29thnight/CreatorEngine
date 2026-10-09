@@ -63,6 +63,10 @@ namespace rendering_diagnostics_tests
         original.lastGpuViewId = 42;
         original.lastGpuFrameId = 73;
         original.lastGpuSubmissionId = 101;
+        original.gpuTemporalProvenance = { 1, 2, 1, 0, 73, 42, 5, 0, 1280, 720, 1920, 1080, false };
+        original.temporalProvenance = original.gpuTemporalProvenance;
+        original.gpuTemporalProvenance.publicationFrameId = 73;
+        original.temporalProvenance.publicationFrameId = 73;
         original.passTimings = { { "Shadow", 1.5 }, { "GBuffer", .75 } };
         original.validationMessages = { "first observed warning", "second warning" };
         original.lastError = "example renderer error";
@@ -76,6 +80,16 @@ namespace rendering_diagnostics_tests
         }
         check(decode_rendering(encoded, decoded), "round trip accepted", failures);
         check(encode_rendering(decoded) == encoded, "round trip preserves every serialized field", failures);
+        check(decoded.gpuTemporalProvenance.renderWidth == 1280 &&
+            decoded.gpuTemporalProvenance.displayWidth == 1920 &&
+            decoded.gpuTemporalProvenance.realFrameId == 73,
+            "GPU sample retains exact resolution and real-frame identity", failures);
+        auto mixedFrame = original;
+        mixedFrame.gpuTemporalProvenance.generatedOrdinal = 1;
+        check(encode_rendering(mixedFrame).empty(), "generated ordinal cannot be counted as real", failures);
+        auto missingResolution = original;
+        missingResolution.gpuTemporalProvenance.renderWidth = 0;
+        check(encode_rendering(missingResolution).empty(), "missing temporal resolution rejected", failures);
         check(decoded.views[0].viewId != decoded.views[1].viewId &&
             decoded.lastGpuViewId == decoded.views[0].viewId,
             "GPU sample retains selected-view identity", failures);

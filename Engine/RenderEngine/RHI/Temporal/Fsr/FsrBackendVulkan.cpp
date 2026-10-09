@@ -55,6 +55,8 @@ public:
         if (!VulkanApi::IsLoaderReady()) return { TemporalStatus::RuntimeUnavailable, 0 };
         return m_upscaler->Initialize(MakeFsrBackendDeviceVulkan(*m_deviceContext), description, synchronization);
     }
+    TemporalResult QueryRenderExtent(TemporalQuality quality, TemporalExtent display, TemporalExtent& extent) const override
+    { return FsrUpscaler::GetRenderExtent(display, quality, extent); }
     TemporalCapabilities GetCapabilities() const override
     {
         auto result = QueryFsrBuildAvailability(TemporalBackend::Vulkan);

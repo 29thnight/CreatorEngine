@@ -45,6 +45,7 @@
 #include "RegisterEditorMenuManual.h"
 #include "CommandSupport.h"
 
+#include "CommandCore/TemporalCommands.h"
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -2234,8 +2235,23 @@ namespace ConsoleCmd
     }
 
 
+    static CommandCore::CommandResult Cmd_temporal(const ConsoleCommandContext& ctx)
+    {
+        return CommandCore::ExecuteTemporalCommand(ctx.parts, TemporalPresentationTarget::EditorViewport);
+    }
+
     void RegisterCoreCommands(Registrar& reg)
     {
+        reg.Result({ "temporal.fallback" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.fg" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.latency" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.metadata" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.motion" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.reset" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.runtime" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.status" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.support" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.upscale" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "help" }, &Cmd_help);
         reg.Result({ "commands.list" }, &Cmd_commands_list);
         reg.Result({ "commands.describe" }, &Cmd_commands_describe);

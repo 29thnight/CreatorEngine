@@ -650,6 +650,12 @@ void EnhancedRenderDebugWindow::Draw()
         static_cast<unsigned long long>(snapshot.generation), static_cast<unsigned long long>(snapshot.graphEpoch),
         static_cast<unsigned long long>(snapshot.frameId), static_cast<unsigned long long>(snapshot.viewId),
         snapshot.width, snapshot.height);
+    const auto& temporal = snapshot.temporalProvenance;
+    ImGui::Text("%s real #%llu / render %u x %u / display %u x %u / %s",
+        TemporalMeasuredFrameKindName(temporal.frameKind), static_cast<unsigned long long>(temporal.realFrameId),
+        temporal.renderExtent.width, temporal.renderExtent.height,
+        temporal.displayExtent.width, temporal.displayExtent.height,
+        TemporalResolutionStateName(temporal.resolutionState));
     ImGui::Text("Scene epoch %llu | view history %llu",
         static_cast<unsigned long long>(snapshot.sceneEpoch),
         static_cast<unsigned long long>(snapshot.historyRevision));

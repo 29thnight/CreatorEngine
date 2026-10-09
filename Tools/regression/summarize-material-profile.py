@@ -62,6 +62,11 @@ def analyze(path):
    name,unit,category=descriptors.get(cid,(str(cid),'',0))
    counter_rows.append({'name':name,'unit':unit,'category':category,'session':session,'samples':len(v),'min':min(x[2] for x in v),'max':max(x[2] for x in v),'last':v[-1][2],'lastTick':v[-1][1],'lastFrame':v[-1][0]})
  out={'path':str(path),'frames':len(frames),'frameMs':stats(frames),'complete':complete,'unacked':unacked,'droppedEvents':drops,'excludedBoundaryEvents':boundary,'markers':rows,'droppedCounters':dropped_counters,'counterTicks':len(counter_owners),'counters':counter_rows,'cpuOwnership':{'sessions':len(cpu_sessions),'ticks':len(cpu_ticks),'tasks':len(cpu_tasks)}}
+ # Legacy CEPROF v1/v2 does not carry render/display extents or temporal frame kind.
+ # Keep engine diagnostics useful, but never promote this artifact to a TR0 gate.
+ out['temporalPerformanceGateEligible']=False
+ out['temporalProvenanceStatus']='unavailable-in-ceprof-v1-v2'
+ out['frameMsAxis']='engine-frame-boundaries-not-real-render-or-presented-fps'
  Path(str(path)+'.summary.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
  print(json.dumps({**out,'markers':rows[:35]},indent=2))
 for path in sys.argv[1:]:analyze(path)

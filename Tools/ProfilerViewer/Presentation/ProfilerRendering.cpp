@@ -110,6 +110,19 @@ namespace editor::profiler_view
             char buffer[128]{};
             std::snprintf(buffer, sizeof(buffer), "%u x %u", displayed.width, displayed.height);
             LabeledValue("Render target", buffer);
+            const auto& provenance = displayed.temporalProvenance;
+            std::snprintf(buffer, sizeof(buffer), "%u x %u -> %u x %u", provenance.renderWidth,
+                provenance.renderHeight, provenance.displayWidth, provenance.displayHeight);
+            LabeledValue("Render / display", buffer);
+            std::snprintf(buffer, sizeof(buffer), "%s / real #%llu / generated ordinal %u",
+                provenance.frameKind == 1 ? "real" : provenance.frameKind == 2 ? "generated" : "unknown",
+                static_cast<unsigned long long>(provenance.realFrameId), provenance.generatedOrdinal);
+            LabeledValue("Frame provenance", buffer);
+            constexpr const char* providers[]{"none", "fsr", "dlss", "xess"};
+            constexpr const char* resolutions[]{"unknown", "native", "reconstructed", "native-fallback"};
+            std::snprintf(buffer, sizeof(buffer), "%s / TU %s / FG %s", resolutions[provenance.resolutionState],
+                providers[provenance.upscaler], providers[provenance.frameGenerator]);
+            LabeledValue("Temporal state", buffer);
 
             // 드로우 0은 파이프라인이 멀쩡해도 화면이 비는 유일한 조건이라
             // 따로 색을 준다 — 여기서 멈춰야 할 신호다.
@@ -200,7 +213,14 @@ namespace editor::profiler_view
         ImGui::Combo("View", &selectedTarget, targets, 3);
         const auto& view = displayed.views[static_cast<std::size_t>(selectedTarget)];
         const bool gpuMatches = view.ready && view.viewId == displayed.lastGpuViewId &&
-            displayed.lastGpuSubmissionId && !displayed.passTimings.empty();
+            displayed.lastGpuSubmissionId && !displayed.passTimings.empty() &&
+            displayed.gpuTemporalProvenance.frameKind == 1 &&
+            displayed.gpuTemporalProvenance.generatedOrdinal == 0 &&
+            displayed.gpuTemporalProvenance.publicationFrameId == displayed.lastGpuFrameId &&
+            displayed.gpuTemporalProvenance.viewId == displayed.lastGpuViewId &&
+            displayed.gpuTemporalProvenance.resolutionState != 0 &&
+            displayed.gpuTemporalProvenance.renderWidth && displayed.gpuTemporalProvenance.renderHeight &&
+            displayed.gpuTemporalProvenance.displayWidth && displayed.gpuTemporalProvenance.displayHeight;
         ImGui::Text("Completed frame %llu / view %llu / %u x %u / %s",
             static_cast<unsigned long long>(view.completedFrameId), static_cast<unsigned long long>(view.viewId),
             view.completedWidth, view.completedHeight, view.ready ? "ready" : "unavailable");
@@ -247,6 +267,10 @@ namespace editor::profiler_view
             LabeledValue("CPU (all views)", buffer);
             std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.gpuMs);
             LabeledValue("GPU (selected view)", gpuMatches ? buffer : "unavailable");
+            const auto& p = displayed.gpuTemporalProvenance;
+            ImGui::Text("GPU real-frame extent: %u x %u render / %u x %u display",
+                p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight);
+            ImGui::TextDisabled("Real-frame pass costs only; generated presentations have no render-pass timings.");
             ImGui::Text("GPU samples: %llu, rejected: %llu, query overflow: %llu",
                 static_cast<unsigned long long>(displayed.gpuCollects),
                 static_cast<unsigned long long>(displayed.gpuCollectMismatches),

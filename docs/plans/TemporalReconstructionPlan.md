@@ -1,5 +1,13 @@
 # PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation
 
+## 2026-10-09 실제 입력·렌더 그래프·Player 배선 확장
+
+벤더 중립 계약/SDK 어댑터에 이어 실제 LX 이전 오브젝트·스키닝 입력, per-view history/jitter와 렌더/표시 크기 분리, PostChain 전 TU, DX12 Player의 전체 GPU temporal packet·proxy·최종 소비 lease와 게임 루프 지연 마커를 연결하는 소스 구현을 진행한다. TR0는 캡처 강제 native 범위와 실/생성·양쪽 해상도 provenance를 실제 capture/profiler/gate에 전달한다.
+
+단계별 관측/요청 커맨드와 실행 드라이버는 [Temporal validation](../../Tools/temporal-validation/README.md)에 둔다. 요청 접수와 renderer/Player 관측 세대를 나누며, SDK query·선택·실제 dispatch/present·완료점을 섞지 않는다. **빌드·컴파일러·셰이더·테스트·제품·성능 실행은 하지 않았으므로 아래 16행 완료선/71인일 수용을 완료로 바꾸지 않는다.**
+
+Vulkan Player FG의 현 CPU 표시 브리지는 GPU temporal 입력/전용 present queue 배선이 없으므로 `NativePresentationInteropUnavailable`로 fail-closed한다. 이는 FSR Vulkan SDK 또는 GPU 지원 부재 판정이 아니다. Vulkan SR/native 어댑터 경계는 유지하고, Vulkan 실행 비교는 PHASE 4.9가 소유한다. 상세 소스 범위·외부 SDK 설정·미실행 검증은 [벤더 통합 기록](TemporalVendorIntegration20261009.md)을 참조한다.
+
 ## 2026-10-09 벤더 구현 착수
 
 사용자 결정에 따라 업스케일러/FG의 **벤더 구현과 중립 공통 계약부터** 만들고, 실제 렌더 입력·그래프·Player 실행 경로는 뒤에 연결한다. 첫 구현의 SDK 정본과 제한은 [벤더 통합 기록](TemporalVendorIntegration20261009.md)에 둔다. FSR은 사용자 최종 선택인 **3.1.4 / FidelityFX SDK 1.1.4**, DLSS는 Streamline 2.14.1, XeSS는 3.0.2를 기준으로 한다.

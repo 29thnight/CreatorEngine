@@ -319,6 +319,14 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     // 알파 블렌딩. UI는 겹쳐 그리는 것이 기본이라 이것이 없으면
     // 뒤에 그린 것이 앞의 것을 통째로 덮는다.
     desc.blendEnable = true;
+    if (m_separateLayer)
+    {
+        desc.independentBlend = true;
+        auto& blend = desc.renderTargetBlend[0];
+        blend.enable = true; blend.srcColor = RHIBlendFactor::SrcAlpha;
+        blend.dstColor = RHIBlendFactor::InvSrcAlpha;
+        blend.srcAlpha = RHIBlendFactor::One; blend.dstAlpha = RHIBlendFactor::InvSrcAlpha;
+    }
     desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
     desc.rtvFormats[0] = m_outputFormat;

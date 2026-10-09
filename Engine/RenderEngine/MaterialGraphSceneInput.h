@@ -29,6 +29,7 @@ namespace material_graph
         std::uint64_t frameId{}, sceneEpoch{}, viewId{}, historyRevision{};
         std::uint32_t width{}, height{};
         FrameCameraSnapshot camera;
+        TemporalFrame temporalFrame;
     };
 
     struct SceneInputBudget
@@ -49,6 +50,8 @@ namespace material_graph
     struct SceneDrawInput
     {
         std::size_t sourceIndex{};
+        std::uint64_t temporalObjectId{}, temporalIncarnation{}, temporalInstanceId{};
+        bool temporalHistoryValid{};
         std::size_t geometryKey{};
         assets::ModelAssetGenerationHandle model;
         assets::ModelMeshHandle mesh;
@@ -64,6 +67,7 @@ namespace material_graph
         std::uint32_t geometryLod{};
         std::shared_ptr<const MeshSurfacePlan> geometry;
         std::shared_ptr<const MeshSurfacePlan> shadowGeometry;
+        std::shared_ptr<const MeshSurfacePlan> previousGeometry;
     };
 
     // One selected Scene view. No proxy, Material, Camera, mutable mesh bytes or
@@ -90,7 +94,8 @@ namespace material_graph
                          const SceneInputBudget& budget, own::shared_owner<const SceneViewInput>& result, std::string& error,
                          own::shared_owner<const assets::ModelAssetGenerationPins> modelPins = {},
                          own::shared_owner<InstanceFramePins> materialPins = {},
-                         const assets::ModelGeometryPreparationPins* geometryPins = nullptr);
+                         const assets::ModelGeometryPreparationPins* geometryPins = nullptr,
+                         const SceneViewInput* previous = nullptr);
         const SceneInputView& View() const { return view_; }
         const SurfaceView& Surface() const { return surface_; }
         const math::matrix4x4& ViewProjection() const { return viewProjection_; }

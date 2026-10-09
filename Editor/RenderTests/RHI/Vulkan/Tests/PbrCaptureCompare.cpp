@@ -66,6 +66,41 @@ namespace
             error = "manifest에 attachments가 없다: " + directory.string();
             return false;
         }
+        // A pixel gate cannot turn already reconstructed pixels back into native
+        // pixels. Require proof that the capture's runtime exclusion produced
+        // this exact real frame with both TU and FG disabled.
+        constexpr const char* required[]{ "frameKind", "realFrameId", "sourceRealFrameId", "frameId", "generatedOrdinal",
+            "renderWidth", "renderHeight", "displayWidth", "displayHeight", "width", "height",
+            "upscaler", "frameGenerator", "resolutionState", "temporalNativeGateActive", "goldenEligible" };
+        for (const auto* key : required)
+        {
+            if (!root.has_child(key))
+            {
+                error = std::string("missing temporal capture provenance: ") + key;
+                return false;
+            }
+        }
+        std::string kind, upscaler, frameGenerator, resolution;
+        uint64_t realFrame{}, frame{}, sourceRealFrame{};
+        uint32_t ordinal{}, renderWidth{}, renderHeight{}, displayWidth{}, displayHeight{}, width{}, height{};
+        bool forcedNative{}, eligible{};
+        root["frameKind"] >> kind; root["upscaler"] >> upscaler;
+        root["frameGenerator"] >> frameGenerator; root["resolutionState"] >> resolution;
+        root["realFrameId"] >> realFrame; root["frameId"] >> frame;
+        root["sourceRealFrameId"] >> sourceRealFrame;
+        root["generatedOrdinal"] >> ordinal;
+        root["renderWidth"] >> renderWidth; root["renderHeight"] >> renderHeight;
+        root["displayWidth"] >> displayWidth; root["displayHeight"] >> displayHeight;
+        root["width"] >> width; root["height"] >> height;
+        root["temporalNativeGateActive"] >> forcedNative; root["goldenEligible"] >> eligible;
+        if (kind != "real" || realFrame == 0 || frame == 0 || realFrame != sourceRealFrame || ordinal != 0 ||
+            !forcedNative || !eligible || upscaler != "none" || frameGenerator != "none" ||
+            resolution != "native" || width == 0 || height == 0 || width != renderWidth ||
+            height != renderHeight || renderWidth != displayWidth || renderHeight != displayHeight)
+        {
+            error = "pixel comparison requires observed native-only real-frame capture provenance";
+            return false;
+        }
         if (root.has_child("backend")) root["backend"] >> backend;
         for (const ryml::ConstNodeRef node : root["attachments"])
         {
@@ -75,6 +110,11 @@ namespace
             node["width"] >> info.width;
             node["height"] >> info.height;
             node["channels"] >> info.channels;
+            if (info.width != width || info.height != height)
+            {
+                error = "attachment dimensions disagree with temporal capture provenance";
+                return false;
+            }
             out.push_back(std::move(info));
         }
         return !out.empty();

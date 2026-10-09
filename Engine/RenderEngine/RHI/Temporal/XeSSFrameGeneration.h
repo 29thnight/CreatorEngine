@@ -56,6 +56,10 @@ public:
     TemporalResult SetEnabled(bool enabled);
     TemporalResult SetInterpolatedFrames(uint32_t count);
     TemporalResult Sleep(uint64_t realFrameId);
+    // CPU-only dropped frame: caller guarantees no further producer SDK calls
+    // for this ID. No tagged/retained GPU input may be discarded by this method.
+    TemporalResult DiscardRealFrame(uint64_t realFrameId);
+    TemporalResult ReleaseInputsAfterGpuIdle();
     TemporalResult Mark(uint64_t realFrameId, XeSSLatencyMarker marker);
     // Serial baseline drains the previous frame before replacing its retained
     // owner. A failed/partially recorded tag keeps the owner until a successful drain.

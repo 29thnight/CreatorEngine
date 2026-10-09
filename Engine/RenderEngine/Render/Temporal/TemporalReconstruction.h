@@ -27,7 +27,8 @@ enum class TemporalStatus : uint8_t
     AlreadyInitialized,
     SdkFailure,
     IntegrationRequired,
-    EditorViewportForbidden
+    EditorViewportForbidden,
+    ProjectionUnsupported
 };
 
 struct TemporalResult
@@ -79,6 +80,7 @@ struct TemporalFrame
     // Pixel axes originate top-left, +X right and +Y down.
     float jitterX{ 0.0f };
     float jitterY{ 0.0f };
+    float previousJitterX{ 0.0f }, previousJitterY{ 0.0f };
     float motionVectorScaleX{ 0.0f };
     float motionVectorScaleY{ 0.0f };
     float frameTimeMilliseconds{ 0.0f };
@@ -177,3 +179,8 @@ TemporalResult ValidateTemporalFrameGenerationInputs(const TemporalFrameGenerati
 TemporalSelection SelectTemporalProviders(TemporalProvider requestedUpscaler,
     TemporalProvider requestedFrameGenerator, TemporalBackend backend,
     std::span<const TemporalCapabilities> capabilities);
+
+struct TemporalJitterOffset { float x{ 0.0f }, y{ 0.0f }; };
+// Stateless, reproducible render-pixel sample. View owners advance the index
+// only after submission and reset it when temporal history is invalidated.
+TemporalJitterOffset SampleTemporalJitter(uint64_t sequenceIndex, uint64_t seed = 0);

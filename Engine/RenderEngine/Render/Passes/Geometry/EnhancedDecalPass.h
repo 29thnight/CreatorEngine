@@ -67,6 +67,9 @@ public:
     struct Item
     {
         math::matrix4x4 worldMatrix{};
+        math::matrix4x4 previousWorldMatrix{};
+        uint64_t temporalObjectId{}, temporalIncarnation{};
+        bool temporalHistoryValid{};
 
         // 셋 다 null일 수 있으나 하나는 있어야 한다. 어느 것이 있느냐가
         // 곧 어느 채널을 켤지를 정한다(DX11의 g_useFlags와 같은 규칙).
@@ -107,6 +110,7 @@ public:
 
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
+    std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph&, const EnhancedFrameContext&, std::array<RGHandle, 5>);
 
     /// 덧칠 대상. GBuffer 출력을 그대로 받는다 — 데칼은 새 타깃을 만들지 않고
     /// 이미 그려진 GBuffer에 얹는다.
@@ -156,9 +160,11 @@ private:
         uint32_t      sliceX{ 1 };
         uint32_t      sliceY{ 1 };
         int32_t       sliceNum{ 0 };
+        math::matrix4x4 previousWorld{};
+        uint32_t historyValid{}, temporalPadding[3]{};
     };
 
-    static_assert(sizeof(InstanceData) == 144);
+    static_assert(sizeof(InstanceData) == 224);
     static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     /// 한 번의 DrawInstanced로 그릴 묶음. 텍스처 셋이 같고 큐에서 연속한 것들.
@@ -210,5 +216,6 @@ private:
 
     // 채널 조합마다 하나. 조합이 곧 어느 타깃에 쓸지라 PSO가 갈린다.
     RHIPipelineHandle m_pipelines[kChannelCount]{};
+    RHIPipelineHandle m_temporalPipeline;
 };
 

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
 #include <cstddef>
@@ -704,6 +705,7 @@ public:
         // 뷰 귀속은 게시자가 채운다. 그래프 복사본은 GPU 리소스를 소유하지 않는다.
         uint64_t viewId{0}, frameId{0}, historyRevision{0}, sceneEpoch{0};
         uint32_t width{0}, height{0};
+        TemporalMeasurementProvenance temporalProvenance;
         uint64_t copyNanoseconds{0};
         // Vector/string capacities; allocator bookkeeping is excluded.
         size_t StorageBytes() const

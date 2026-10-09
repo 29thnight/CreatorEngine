@@ -153,10 +153,14 @@ public:
     // Serial baseline: wait for SDK presentation AND GPU before overwriting the
     // one prepared resource set. This is also the graph/lease release boundary.
     TemporalResult FinishFrame();
+    TemporalResult DisableGeneration(FfxSwapchain swapchain);
     TemporalResult Shutdown();
     bool IsInitialized() const { return m_initialized; }
     uint64_t GetPreparedFrameID() const { return m_sdkFrameID; }
     bool HasPendingFrame() const { return m_framePending; }
+    // Published only after callback/presentation drain. Counts SDK generation
+    // output, not physical display scan-out or a requested interpolation count.
+    uint32_t GetCompletedGeneratedFrameCount() const { return m_completedGeneratedFrameCount; }
 
 private:
     static FfxErrorCode Generate(const FfxFrameGenerationDispatchDescription*, void*);
@@ -184,6 +188,7 @@ private:
     bool m_framePending{ false };
     bool m_configured{ false };
     bool m_generated{ false };
+    uint32_t m_completedGeneratedFrameCount{ 0 };
     FfxErrorCode m_generationError{ FFX_OK };
     bool m_reset{ true };
     bool m_initialized{ false };

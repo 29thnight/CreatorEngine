@@ -95,6 +95,7 @@ public:
     TemporalResult Initialize(const DlssInitialization& initialization);
     TemporalResult BindDX12Device(ID3D12Device* nativeDevice);
     bool IsBoundToDX12Device(ID3D12Device* nativeDevice) const;
+    bool MatchesRuntimeConfiguration(const std::wstring& directory, const std::string& projectId) const;
     TemporalCapabilities QueryCapabilities();
 
     // Immediately after native creation, upgrade DEVICE and FACTORY, then use
@@ -116,6 +117,9 @@ public:
     // Begin before input/simulation. SR, FG and all latency markers share the
     // same token for this REAL frame. At most six unreleased tokens may exist.
     TemporalResult BeginRealFrame(uint64_t realFrameId);
+    TemporalResult EnsureRealFrame(uint64_t realFrameId);
+    void SetPlayerFrameTokenOwnership(bool enabled);
+    bool HasPlayerFrameTokenOwnership() const;
     TemporalResult SetFrameConstants(uint32_t viewportId, const TemporalFrame& frame);
     TemporalResult DispatchUpscaling(uint32_t viewportId, uint64_t realFrameId,
         TemporalQuality quality, const DlssUpscaleResources& resources);
@@ -136,6 +140,9 @@ public:
     // Sleep remains required while the Reflex feature is supported, even Off.
     TemporalResult Sleep(uint64_t realFrameId);
     TemporalResult MarkLatency(uint64_t realFrameId, DlssLatencyMarker marker);
+    // Only after renderer cancellation proves there are no further CPU users;
+    // refuses a frame already tagged for frame generation.
+    TemporalResult DiscardRealFrame(uint64_t realFrameId);
     TemporalResult EndRealFrame(uint64_t realFrameId); // After final CPU consumer/PresentEnd, not a GPU release.
     TemporalResult TakePresentationError(); // Native asynchronous DXGI error, when supplied by SDK.
 

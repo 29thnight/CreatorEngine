@@ -493,6 +493,10 @@ void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
     if (found == m_foliageInstances.end())
     {
         FoliageInstance sealed = instance;
+        // Insertion creates a new instance, even when a caller reuses a copied
+        // template. Snapshot copies and later edits preserve this fresh identity.
+        sealed.m_temporalIdentity = FoliageInstance::s_nextTemporalIdentity.fetch_add(
+            1, std::memory_order_relaxed);
         sealed.RebuildWorldMatrix();
         m_foliageInstances.push_back(std::move(sealed));
 		PublishRenderProxyDirty(ProxyDirty::Payload);

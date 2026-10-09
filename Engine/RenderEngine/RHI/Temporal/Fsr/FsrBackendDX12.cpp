@@ -42,6 +42,8 @@ public:
     {
         return m_upscaler->Initialize(MakeFsrBackendDeviceDX12(m_resources.GetDevice()), description, synchronization);
     }
+    TemporalResult QueryRenderExtent(TemporalQuality quality, TemporalExtent display, TemporalExtent& extent) const override
+    { return FsrUpscaler::GetRenderExtent(display, quality, extent); }
     TemporalCapabilities GetCapabilities() const override
     {
         auto result = QueryFsrBuildAvailability(TemporalBackend::DX12);
@@ -229,6 +231,28 @@ TemporalResult FsrFrameGeneratorDX12::Present(uint32_t syncInterval, uint32_t fl
     m_pending = m_canPresent = false;
     if (FAILED(present)) return { TemporalStatus::SdkFailure, present };
     return complete;
+}
+
+TemporalResult FsrFrameGeneratorDX12::DisableGeneration()
+{
+    if (!m_swapchain || m_pending) return {TemporalStatus::IntegrationRequired};
+    // The SDK composes registered UI on real frames even with FG disabled.
+    // Native-gate passthrough already contains UI, so remove that registration.
+    const auto cleared = FsrResult(ffxRegisterFrameinterpolationUiResourceDX12(
+        ffxGetSwapchainDX12(m_swapchain.Get()), FfxResource{}, 0));
+    if (!cleared.IsSuccess()) return cleared;
+    return m_generator->DisableGeneration(ffxGetSwapchainDX12(m_swapchain.Get()));
+}
+
+TemporalResult FsrFrameGeneratorDX12::PresentRealFrame(uint32_t syncInterval, uint32_t flags)
+{
+    if (!m_swapchain || m_pending) return {TemporalStatus::IntegrationRequired};
+    const HRESULT result = m_swapchain->Present(syncInterval, flags);
+    // DisableGeneration drains the replacement's presentation work even when
+    // there is no interpolation preparation for a native-gate real frame.
+    const auto drained = DisableGeneration();
+    if (!drained.IsSuccess()) return drained;
+    return {SUCCEEDED(result) ? TemporalStatus::Success : TemporalStatus::SdkFailure, result};
 }
 
 TemporalResult FsrFrameGeneratorDX12::Shutdown()

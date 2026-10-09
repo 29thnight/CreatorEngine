@@ -11,7 +11,7 @@
 // scene, RHI, editor, or ImGui dependency and contains no process-local handles.
 namespace ce::profiler_viewer::diagnostics
 {
-    inline constexpr std::uint32_t rendering_schema_version = 1;
+    inline constexpr std::uint32_t rendering_schema_version = 2;
     inline constexpr std::size_t maximum_rendering_bytes = 256 * 1024;
     inline constexpr std::size_t maximum_rendering_passes = 512;
     inline constexpr std::size_t maximum_rendering_messages = 128;
@@ -71,6 +71,17 @@ namespace ce::profiler_viewer::diagnostics
         bool ready{};
     };
 
+    // Numeric values are the versioned wire contract: kind 0 unknown/1 real/2
+    // generated, resolution 0 unknown/1 native/2 reconstructed/3 native fallback.
+    struct rendering_temporal_provenance
+    {
+        std::uint8_t frameKind{}, resolutionState{}, upscaler{}, frameGenerator{};
+        std::uint64_t realFrameId{}, viewId{}, sceneEpoch{};
+        std::uint32_t generatedOrdinal{}, renderWidth{}, renderHeight{}, displayWidth{}, displayHeight{};
+        bool nativeGateActive{};
+        std::uint64_t publicationFrameId{};
+    };
+
     struct rendering_snapshot
     {
         rendering_backend backend{};
@@ -101,6 +112,7 @@ namespace ce::profiler_viewer::diagnostics
         std::array<rendering_display, rendering_view_count> views{};
         double cpuMs{};
         double gpuMs{};
+        rendering_temporal_provenance temporalProvenance, gpuTemporalProvenance;
         std::uint64_t gpuCollects{};
         std::uint64_t gpuCollectMismatches{};
         std::uint64_t gpuQueryOverflowPasses{};

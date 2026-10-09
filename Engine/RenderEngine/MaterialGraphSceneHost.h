@@ -96,6 +96,8 @@ namespace material_graph
         {
             return selectionDeferred_;
         }
+        std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph,
+            std::array<RGHandle, 5> targets) const;
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
         // With no earlier occluder depth, RG2 builds current-frame LX depth
         // before HZB. Compatibility graphs retain the frustum-only route.

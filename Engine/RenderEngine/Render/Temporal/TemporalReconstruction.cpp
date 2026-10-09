@@ -51,16 +51,21 @@ TemporalResult ValidateTemporalFrame(const TemporalFrame& frame)
         frame.renderExtent.height > frame.displayExtent.height ||
         !std::isfinite(frame.jitterX) || !std::isfinite(frame.jitterY) ||
         std::abs(frame.jitterX) > 0.5f || std::abs(frame.jitterY) > 0.5f ||
+        !std::isfinite(frame.previousJitterX) || !std::isfinite(frame.previousJitterY) ||
+        std::abs(frame.previousJitterX) > 0.5f || std::abs(frame.previousJitterY) > 0.5f ||
         !std::isfinite(frame.motionVectorScaleX) || !std::isfinite(frame.motionVectorScaleY) ||
         frame.motionVectorScaleX == 0.0f || frame.motionVectorScaleY == 0.0f ||
-        !IsPositiveFinite(frame.frameTimeMilliseconds) || !IsPositiveFinite(frame.cameraNear) ||
-        !IsPositiveFinite(frame.cameraVerticalFov) || frame.cameraVerticalFov >= 3.141592654f ||
+        !IsPositiveFinite(frame.frameTimeMilliseconds) ||
+        (frame.camera.orthographicProjection ? !std::isfinite(frame.cameraNear) : !IsPositiveFinite(frame.cameraNear)) ||
+        !std::isfinite(frame.cameraVerticalFov) || frame.cameraVerticalFov >= 3.141592654f ||
+        (frame.camera.orthographicProjection ? frame.cameraVerticalFov < 0.0f : frame.cameraVerticalFov <= 0.0f) ||
         !IsPositiveFinite(frame.preExposure) || !IsPositiveFinite(frame.viewSpaceToMeters))
         return { TemporalStatus::InvalidInput };
     // Infinite projection uses depthInfinite instead of an IEEE infinity value;
     // providers translate it to their SDK's own near/far convention.
     if (!frame.depthInfinite &&
-        (!IsPositiveFinite(frame.cameraFar) || frame.cameraFar <= frame.cameraNear))
+        ((frame.camera.orthographicProjection ? !std::isfinite(frame.cameraFar) : !IsPositiveFinite(frame.cameraFar)) ||
+            frame.cameraFar <= frame.cameraNear))
         return { TemporalStatus::InvalidInput };
     return { TemporalStatus::Success };
 }
@@ -103,6 +108,7 @@ TemporalResult ValidateTemporalCamera(const TemporalCamera& camera)
 
 TemporalResult ValidateTemporalUpscaleInputs(const TemporalUpscaleInputs& inputs)
 {
+    if (inputs.frame.camera.orthographicProjection) return { TemporalStatus::ProjectionUnsupported };
     const auto frameResult = ValidateTemporalFrame(inputs.frame);
     if (!frameResult.IsSuccess()) return frameResult;
     if (!inputs.color.IsValid() || !inputs.depth.IsValid() || !inputs.motionVectors.IsValid() ||
@@ -131,6 +137,7 @@ TemporalResult ValidateTemporalFrameGenerationConfig(const TemporalFrameGenerati
 
 TemporalResult ValidateTemporalFrameGenerationInputs(const TemporalFrameGenerationInputs& inputs)
 {
+    if (inputs.frame.camera.orthographicProjection) return { TemporalStatus::ProjectionUnsupported };
     const auto frameResult = ValidateTemporalFrame(inputs.frame);
     if (!frameResult.IsSuccess()) return frameResult;
     if (!inputs.lifetimeToken || !inputs.hudlessColor.IsValid() || !inputs.depth.IsValid() ||
@@ -151,4 +158,20 @@ TemporalSelection SelectTemporalProviders(TemporalProvider requestedUpscaler,
     result.frameGenerator = SelectProvider(requestedFrameGenerator, backend, capabilities, true,
         result.requestedFrameGenerator);
     return result;
+}
+
+TemporalJitterOffset SampleTemporalJitter(uint64_t sequenceIndex, uint64_t seed)
+{
+    const auto halton = [](uint64_t index, uint32_t base)
+    {
+        float value = 0.0f, factor = 1.0f;
+        for (; index; index /= base)
+        {
+            factor /= static_cast<float>(base);
+            value += factor * static_cast<float>(index % base);
+        }
+        return value;
+    };
+    const uint64_t index = ((sequenceIndex % 1024) + (seed % 1024)) % 1024 + 1;
+    return { halton(index, 2) - 0.5f, halton(index, 3) - 0.5f };
 }

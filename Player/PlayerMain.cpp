@@ -553,8 +553,14 @@ void Player::PlayerMain::NotifyRenderFramePublished(uint64_t frameId)
 	m_presentationWake.notify_one();
 }
 
+void Player::PlayerMain::DiscardTemporalRealFrame()
+{
+    if (m_presentation) m_presentation->DiscardTemporalFrame(m_temporalRealFrameId);
+}
+
 void Player::PlayerMain::StopPresentation()
 {
+    if (m_presentation) m_presentation->StopSimulationFrames();
     if (m_presentationStopped)
     {
         return;
@@ -644,6 +650,7 @@ void Player::PlayerMain::Finalize()
 
 void Player::PlayerMain::Update()
 {
+    m_temporalFrameReady = false;
     if (m_presentationFailed.load(std::memory_order_acquire))
     {
         EngineBootstrap::SetExitCode(5);
@@ -670,9 +677,26 @@ void Player::PlayerMain::Update()
     }
 #endif
 
+    ++m_temporalRealFrameId;
+    // Wake PT before waiting for a settings-generation change or previous SDK
+    // token. The GT does not hold the presentation mailbox mutex during sleep.
+    m_presentation->NotifyDisplayAvailable();
+    std::string temporalError;
+    if (!m_presentation->BeginSimulationFrame(m_temporalRealFrameId, temporalError))
+    {
+        std::fprintf(stderr, "[Player temporal] %s\n", temporalError.c_str());
+        m_presentationFailed.store(true, std::memory_order_release);
+        EngineBootstrap::SetExitCode(5);
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return;
+    }
+    RECT temporalClient{};
+    m_temporalFrameReady = !IsIconic(PlayerWindowHandle()) && GetClientRect(PlayerWindowHandle(), &temporalClient) &&
+        temporalClient.right > temporalClient.left && temporalClient.bottom > temporalClient.top;
     Time->Tick([&] {
 		m_frameDeltaTime = Runtime::ResolveFrameDelta();
 
+        m_presentation->MarkTemporalLatency(m_temporalRealFrameId, RHITemporalLatencyMarker::InputSample);
 		InputManagement->Update(m_frameDeltaTime);
 
 		// 시뮬레이션 순서는 Runtime이 소유한다(E3-7). 에디터의 재생 분기와 같은
@@ -680,6 +704,7 @@ void Player::PlayerMain::Update()
 		// 갈리지 않는다. 에디터가 여기에 더 얹는 것은 SceneManagers->Editor()뿐이고
 		// 그것은 에디터 씬 상태 머신(선택·프리뷰)이지 게임 로직이 아니다.
 		Runtime::TickSimulationFrame(m_frameDeltaTime);
+        m_presentation->MarkTemporalLatency(m_temporalRealFrameId, RHITemporalLatencyMarker::SimulationEnd);
 	});
 
 	// 전용 RenderThread는 밀봉된 packet/delta만 소비하므로 씬 구조 변경을 위해

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../FrameCameraSnapshot.h"
+#include "../Render/Temporal/TemporalReconstruction.h"
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -37,4 +39,32 @@ struct RHIDisplayConsumerLease
     // 포기된 소비자는 장치 해체 중에도 완료를 증명할 수 없다.
     // 해당 표시 슬롯을 영구 사용 불가로 남겨 덮어쓰기를 막는다.
     std::atomic<bool> m_completionLost{ false };
+};
+
+// One completed real-frame export. Shared handles are process-local transport
+// identities, not native graphics API objects. The producer publishes only after
+// its copy fence completes. Every image is a dedicated, non-aliased allocation;
+// the common lease prevents ALL four images from reuse until SDK final consumption.
+struct RHITemporalDisplayPacket
+{
+    TemporalFrame frame;
+    // HUD-less post-tone-map RGBA8, premultiplied RGBA8 UI, R32F depth, RG16F motion.
+    std::array<void*, 4> sharedHandles{};
+    std::shared_ptr<RHIDisplayConsumerLease> consumerLease;
+    std::shared_ptr<const void> lifetimeToken;
+    bool valid{ false };
+    bool nativeGateActive{ false }; // Immutable capture/quality-gate provenance.
+};
+
+struct RHITemporalDisplayResources
+{
+    RHITextureHandle hudlessColor;
+    RHITextureHandle uiColor;
+    RHITextureHandle depth;
+    RHITextureHandle motionVectors;
+};
+
+enum class RHITemporalLatencyMarker : uint8_t
+{
+    InputSample, SimulationStart, SimulationEnd, RenderSubmitStart, RenderSubmitEnd
 };

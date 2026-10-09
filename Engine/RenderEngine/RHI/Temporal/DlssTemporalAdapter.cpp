@@ -198,6 +198,7 @@ struct DlssTemporalAdapter::Implementation
     bool deviceProxyUpgraded{ false };
     bool factoryProxyUpgraded{ false };
     bool frameGenerationEnabled{ false };
+    bool playerFrameTokenOwnership{ false };
     bool frameGenerationConfigured{ false };
     bool frameGenerationFaulted{ false };
     uint32_t frameGenerationViewport{ 0 };
@@ -459,9 +460,9 @@ TemporalResult DlssTemporalAdapter::BindDX12Device(ID3D12Device* nativeDevice)
     state.nativeDevice = nativeDevice;
     state.deviceBound = true;
     state.capabilities.upscaling = state.configuration.loadUpscaling ? state.ResolveUpscaling() :
-        TemporalResult{ TemporalStatus::FeatureUnsupported };
+        TemporalResult{ TemporalStatus::IntegrationRequired };
     state.capabilities.frameGeneration = state.configuration.loadFrameGeneration ? state.ResolveFrameGeneration() :
-        TemporalResult{ TemporalStatus::FeatureUnsupported };
+        TemporalResult{ TemporalStatus::IntegrationRequired };
     // Binding succeeded even if only one independently requested axis is usable.
     return { TemporalStatus::Success };
 }
@@ -471,6 +472,15 @@ bool DlssTemporalAdapter::IsBoundToDX12Device(ID3D12Device* nativeDevice) const
     auto& state = *m_implementation;
     std::lock_guard lock(state.mutex);
     return state.deviceBound && nativeDevice && state.nativeDevice == nativeDevice;
+}
+
+bool DlssTemporalAdapter::MatchesRuntimeConfiguration(const std::wstring& directory,
+    const std::string& projectId) const
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    return state.initialized && directory == state.configuration.pluginDirectory &&
+        projectId == state.configuration.projectId;
 }
 
 TemporalCapabilities DlssTemporalAdapter::QueryCapabilities()
@@ -621,6 +631,46 @@ TemporalResult DlssTemporalAdapter::BeginRealFrame(uint64_t realFrameId)
     state.frames.emplace(realFrameId, std::move(frame));
     state.lastRealFrameId = realFrameId;
     return result;
+}
+
+TemporalResult DlssTemporalAdapter::EnsureRealFrame(uint64_t realFrameId)
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    if (!state.deviceBound) return { TemporalStatus::NotInitialized };
+    if (state.frames.contains(realFrameId)) return { TemporalStatus::Success };
+    if (realFrameId == 0 || realFrameId <= state.lastRealFrameId) return { TemporalStatus::InvalidInput };
+    // The render thread records all views for one real frame before advancing.
+    // Retain one token across those views; retire it at the next frame boundary.
+    if (!state.playerFrameTokenOwnership && !state.frameGenerationEnabled) state.frames.clear();
+    if (state.frames.size() >= sl::MAX_FRAMES_IN_FLIGHT) return { TemporalStatus::IntegrationRequired };
+    for (const auto& [id, frame] : state.frames)
+        if (state.nextTokenSerial - frame.allocationSerial >= sl::MAX_FRAMES_IN_FLIGHT)
+            return { TemporalStatus::IntegrationRequired };
+    sl::FrameToken* token = nullptr;
+    // SDK owns its uint32_t token index. Do not truncate the engine's uint64_t ID.
+    const auto result = ToResult(state.getFrameToken(token, nullptr));
+    if (!result.IsSuccess()) return result;
+    if (!token) return { TemporalStatus::SdkFailure };
+    Implementation::Frame frame;
+    frame.token = token;
+    frame.allocationSerial = state.nextTokenSerial++;
+    state.frames.emplace(realFrameId, std::move(frame));
+    state.lastRealFrameId = realFrameId;
+    return result;
+}
+
+void DlssTemporalAdapter::SetPlayerFrameTokenOwnership(bool enabled)
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    state.playerFrameTokenOwnership = enabled;
+}
+bool DlssTemporalAdapter::HasPlayerFrameTokenOwnership() const
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    return state.playerFrameTokenOwnership;
 }
 
 TemporalResult DlssTemporalAdapter::SetFrameConstants(uint32_t viewportId, const TemporalFrame& frame)
@@ -981,6 +1031,23 @@ TemporalResult DlssTemporalAdapter::MarkLatency(uint64_t realFrameId, DlssLatenc
     return result;
 }
 
+TemporalResult DlssTemporalAdapter::DiscardRealFrame(uint64_t realFrameId)
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    if (!state.deviceBound) return { TemporalStatus::NotInitialized };
+    const auto frame = state.frames.find(realFrameId);
+    if (frame == state.frames.end()) return { TemporalStatus::Success };
+    for (auto& [viewportId, viewport] : state.viewports)
+    {
+        if (viewport.lastFrameGenerationFrame == realFrameId) return { TemporalStatus::IntegrationRequired };
+    }
+    for (const auto& [viewportId, constants] : frame->second.viewports)
+        state.viewports[viewportId].forceReset = true;
+    state.frames.erase(frame);
+    return { TemporalStatus::Success };
+}
+
 TemporalResult DlssTemporalAdapter::EndRealFrame(uint64_t realFrameId)
 {
     auto& state = *m_implementation;
@@ -1018,6 +1085,10 @@ TemporalResult DlssTemporalAdapter::FreeUpscalingAfterGpuIdle(uint32_t viewportI
     auto& state = *m_implementation;
     std::lock_guard lock(state.mutex);
     if (!state.deviceBound) return { TemporalStatus::NotInitialized };
+    // The caller has drained this viewport's GPU work. Retire its constants
+    // from the multiview render-only token; other views retain their own data.
+    if (!state.playerFrameTokenOwnership && !state.frameGenerationEnabled)
+        for (auto& [id, frame] : state.frames) frame.viewports.erase(viewportId);
     for (const auto& [id, frame] : state.frames)
         if (frame.viewports.contains(viewportId)) return { TemporalStatus::IntegrationRequired };
     const sl::ViewportHandle handle{ viewportId };
@@ -1076,6 +1147,7 @@ TemporalResult DlssTemporalAdapter::ShutdownAfterGpuIdle()
     auto& state = *m_implementation;
     std::lock_guard lock(state.mutex);
     if (!state.initialized) return { TemporalStatus::NotInitialized };
+    if (!state.playerFrameTokenOwnership && !state.frameGenerationEnabled) state.frames.clear();
     if (state.frameGenerationEnabled || !state.frames.empty()) return { TemporalStatus::IntegrationRequired };
     const auto result = ToResult(state.shutdown());
     if (!result.IsSuccess()) return result;
@@ -1128,6 +1200,13 @@ namespace
             if (!Shutdown().IsSuccess()) (void)m_session.release();
         }
 
+        TemporalResult QueryRenderExtent(TemporalQuality quality, TemporalExtent display, TemporalExtent& extent) const override
+        {
+            DlssOptimalSettings settings;
+            const auto result = (*m_session)->GetOptimalSettings(quality, display, settings);
+            extent = settings.optimalRenderExtent;
+            return result;
+        }
         TemporalCapabilities GetCapabilities() const override { return (*m_session)->QueryCapabilities(); }
 
         TemporalResult Evaluate(const TemporalUpscaleInputs& inputs, RHIEncoder& encoder) override
@@ -1326,6 +1405,7 @@ TemporalCapabilities DlssTemporalAdapter::QueryCapabilities()
 }
 TemporalResult DlssTemporalAdapter::BindDX12Device(ID3D12Device*) { return { TemporalStatus::SdkNotBuilt }; }
 bool DlssTemporalAdapter::IsBoundToDX12Device(ID3D12Device*) const { return false; }
+bool DlssTemporalAdapter::MatchesRuntimeConfiguration(const std::wstring&, const std::string&) const { return false; }
 TemporalResult DlssTemporalAdapter::UpgradeDX12Interface(void**, DlssDX12ProxyKind)
 { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::BindPlayerSwapchain(IDXGISwapChain3*,
@@ -1339,6 +1419,9 @@ TemporalResult DlssTemporalAdapter::GetOptimalSettings(TemporalQuality, Temporal
 TemporalResult DlssTemporalAdapter::ValidatePlayerSwapchainBinding(const TemporalFrameGenerationConfig&) const
 { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::BeginRealFrame(uint64_t) { return { TemporalStatus::SdkNotBuilt }; }
+TemporalResult DlssTemporalAdapter::EnsureRealFrame(uint64_t) { return { TemporalStatus::SdkNotBuilt }; }
+void DlssTemporalAdapter::SetPlayerFrameTokenOwnership(bool) {}
+bool DlssTemporalAdapter::HasPlayerFrameTokenOwnership() const { return false; }
 TemporalResult DlssTemporalAdapter::SetFrameConstants(uint32_t, const TemporalFrame&)
 { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::DispatchUpscaling(uint32_t, uint64_t, TemporalQuality, const DlssUpscaleResources&)
@@ -1355,6 +1438,7 @@ TemporalResult DlssTemporalAdapter::GetFrameGenerationState(uint32_t, DlssFrameG
 { state = {}; return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::Sleep(uint64_t) { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::MarkLatency(uint64_t, DlssLatencyMarker) { return { TemporalStatus::SdkNotBuilt }; }
+TemporalResult DlssTemporalAdapter::DiscardRealFrame(uint64_t) { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::EndRealFrame(uint64_t) { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::TakePresentationError() { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::FreeViewportAfterGpuIdle(uint32_t) { return { TemporalStatus::SdkNotBuilt }; }

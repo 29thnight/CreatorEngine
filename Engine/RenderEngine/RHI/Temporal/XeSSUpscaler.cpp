@@ -374,6 +374,14 @@ public:
         if (!Shutdown().IsSuccess()) (void)m_adapter.release();
     }
     XeSSUpscalerDX12& GetAdapter() { return *m_adapter; }
+    TemporalResult QueryRenderExtent(TemporalQuality, TemporalExtent, TemporalExtent& extent) const override
+    {
+        if (!m_adapter) return { TemporalStatus::NotInitialized };
+        XeSSInputResolution resolution;
+        const auto result = m_adapter->QueryInputResolution(resolution);
+        extent = resolution.optimal;
+        return result;
+    }
     TemporalCapabilities GetCapabilities() const override
     {
         TemporalCapabilities capabilities;
@@ -678,6 +686,14 @@ public:
     ~XeSSUpscalerBridgeVulkan() override
     {
         if (!Shutdown().IsSuccess()) (void)m_adapter.release();
+    }
+    TemporalResult QueryRenderExtent(TemporalQuality, TemporalExtent, TemporalExtent& extent) const override
+    {
+        if (!m_adapter) return { TemporalStatus::NotInitialized };
+        XeSSInputResolution resolution;
+        const auto result = m_adapter->QueryInputResolution(resolution);
+        extent = resolution.optimal;
+        return result;
     }
     TemporalCapabilities GetCapabilities() const override
     {

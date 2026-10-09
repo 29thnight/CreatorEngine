@@ -211,6 +211,21 @@ namespace ce::profiler_viewer::diagnostics
             fields(archive, value.cpuMs, value.gpuMs, value.gpuCollects, value.gpuCollectMismatches,
                 value.gpuQueryOverflowPasses, value.lastGpuFrameId, value.lastGpuSubmissionId,
                 value.lastGpuViewId);
+            const auto provenance = [&](auto& p) {
+                fields(archive, p.frameKind, p.resolutionState, p.upscaler, p.frameGenerator,
+                    p.realFrameId, p.viewId, p.sceneEpoch, p.generatedOrdinal,
+                    p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight, p.nativeGateActive,
+                    p.publicationFrameId);
+                archive.valid = archive.valid && p.frameKind <= 2 && p.resolutionState <= 3 &&
+                    p.upscaler <= 3 && p.frameGenerator <= 3 &&
+                    (p.frameKind == 0 || (p.realFrameId != 0 && p.resolutionState != 0 &&
+                        p.renderWidth != 0 && p.renderHeight != 0 &&
+                        p.displayWidth != 0 && p.displayHeight != 0)) &&
+                    (p.frameKind != 1 || p.generatedOrdinal == 0) &&
+                    (p.frameKind != 2 || (p.generatedOrdinal != 0 && p.frameGenerator != 0));
+            };
+            provenance(value.temporalProvenance);
+            provenance(value.gpuTemporalProvenance);
             archive.text(value.lastGpuCollectError, maximum_rendering_text_bytes);
             archive.field(value.graveyardCount);
             archive.text(value.lastError, maximum_rendering_text_bytes);

@@ -97,6 +97,7 @@ public:
         RGHandle diffuse;
         RGHandle metalRough;
         RGHandle lighting;
+        RGHandle motionVectors, responsiveMask, reactiveMask;
 
         /// SSAO 결과(반해상도, x = AO). 간접광에 곱한다.
         ///

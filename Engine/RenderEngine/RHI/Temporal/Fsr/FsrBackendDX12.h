@@ -34,8 +34,11 @@ public:
     // Caller submits the graph's real-frame commands before this method. The
     // serial baseline drains after Present, preserving pinned inputs until then.
     TemporalResult Present(uint32_t syncInterval, uint32_t flags);
+    TemporalResult DisableGeneration();
+    TemporalResult PresentRealFrame(uint32_t syncInterval, uint32_t flags);
     TemporalResult Shutdown() override;
     IDXGISwapChain4* GetSwapchain() const { return m_swapchain.Get(); } // Borrowed.
+    uint32_t GetCompletedGeneratedFrameCount() const { return m_generator->GetCompletedGeneratedFrameCount(); }
 
 private:
     DX12DeviceResources* m_resources{ nullptr };

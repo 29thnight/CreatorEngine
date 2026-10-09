@@ -469,6 +469,7 @@ TemporalResult FsrFrameGenerator::Prepare(const TemporalFrame& frame, const FsrF
     std::lock_guard lock(m_mutex);
     if (!m_initialized) return { TemporalStatus::NotInitialized, 0 };
     if (m_framePending) return { TemporalStatus::IntegrationRequired, 0 };
+    m_completedGeneratedFrameCount = 0;
     auto result = ValidateTemporalFrame(frame);
     if (result.IsSuccess()) result = ValidateTemporalCamera(frame.camera);
     if (!result.IsSuccess()) return result;
@@ -635,9 +636,29 @@ TemporalResult FsrFrameGenerator::FinishFrame()
         m_hasHistory = false;
     m_framePending = false;
     m_hudlessColor = {};
+    m_completedGeneratedFrameCount = m_generated && m_generationError == FFX_OK ? 1u : 0u;
     ++m_sdkFrameID;
     if (m_generationError != FFX_OK) return FsrResult(m_generationError);
-    return m_generated ? Success() : TemporalResult{ TemporalStatus::IntegrationRequired, 0 };
+    // A completed real-only warmup/reset present is not a failed provider.
+    // Generated output evidence remains zero unless the callback really ran.
+    return Success();
+}
+
+TemporalResult FsrFrameGenerator::DisableGeneration(FfxSwapchain swapchain)
+{
+    if (!m_initialized || !swapchain || m_framePending) return {TemporalStatus::IntegrationRequired};
+    FfxFrameGenerationConfig disable{};
+    disable.swapChain = swapchain;
+    disable.frameGenerationEnabled = false;
+    const auto result = FsrResult(m_interpolationBackend.GetInterface().fpSwapChainConfigureFrameGeneration(&disable));
+    if (!result.IsSuccess()) return result;
+    m_swapchain = swapchain;
+    const auto drained = Drain();
+    if (!drained.IsSuccess()) return drained;
+    m_configured = false;
+    m_hasHistory = false;
+    m_completedGeneratedFrameCount = 0;
+    return Success();
 }
 
 TemporalResult FsrFrameGenerator::Shutdown()

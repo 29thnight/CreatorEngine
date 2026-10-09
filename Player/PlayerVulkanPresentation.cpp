@@ -1,4 +1,5 @@
 #include "PlayerPresentation.h"
+#include "Render/Temporal/TemporalRuntimeControl.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 
@@ -131,6 +132,7 @@ namespace Player
                 m_width = width;
                 m_height = height;
                 m_active.store(true, std::memory_order_release);
+                PublishTemporalState();
                 return true;
             }
 
@@ -190,6 +192,7 @@ namespace Player
             bool BeginFrame(std::string& outError) override
             {
                 outError.clear();
+                PublishTemporalState();
                 if (!IsActive() || m_frameOpen)
                 {
                     outError = "Player Vulkan presentation is inactive or a frame is already open";
@@ -358,6 +361,7 @@ namespace Player
                 if (0 != textureId)
                 {
                     RecordSubmittedGameFrame();
+                    TemporalRuntimeControl::Get().PublishPlayer([](auto& snapshot) { ++snapshot.realPresentationCount; });
                 }
                 return true;
             }
@@ -524,6 +528,22 @@ namespace Player
             }
 
         private:
+            void PublishTemporalState()
+            {
+                const auto request = TemporalRuntimeControl::Get().Snapshot();
+                TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+                {
+                    snapshot.playerObservedGeneration = request.requestedGeneration;
+                    snapshot.presentationTarget = TemporalPresentationTarget::PlayerSwapchain;
+                    snapshot.selectedFrameGenerator = snapshot.activeFrameGenerator = TemporalProvider::None;
+                    snapshot.lastFrameGenerationResult = {request.settings.enabled &&
+                        request.settings.requestedFrameGenerator != TemporalProvider::None ?
+                        TemporalStatus::IntegrationRequired : TemporalStatus::Success};
+                    snapshot.requestedFrameGenerationResult = snapshot.lastFrameGenerationResult;
+                    if (snapshot.lastFrameGenerationResult.status == TemporalStatus::IntegrationRequired)
+                        snapshot.diagnostic = "NativePresentationInteropUnavailable: Vulkan Player CPU display bridge has no native multi-resource SDK transport; real-frame fallback";
+                });
+            }
             struct CpuFrame
             {
                 uint64_t key{0};

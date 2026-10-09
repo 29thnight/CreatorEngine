@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <array>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -52,6 +53,13 @@ namespace LiveSlots
     constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
     constexpr const char* kGBufferDepth      = "GBuffer.Depth";
 
+    constexpr const char* kTemporalMotion = "Temporal.Motion";
+    constexpr const char* kTemporalReactive = "Temporal.Reactive";
+    constexpr const char* kTemporalTransparency = "Temporal.Transparency";
+    constexpr const char* kTemporalResponsive = "Temporal.Responsive";
+    constexpr const char* kTemporalDepth = "Temporal.Depth";
+    constexpr const char* kHudlessLdr = "Display.Hudless";
+    constexpr const char* kUiLayer = "Display.UI";
     constexpr const char* kShadowMap         = "Shadow.Map";
     constexpr const char* kAmbientOcclusion  = "Scene.AmbientOcclusion";
 
@@ -115,6 +123,7 @@ struct LiveFrameBinding
     uint32_t         viewIndex{ 0 };
     RHITextureHandle sharedTarget{};
     RHIReadback      readbackTarget{};
+    std::array<RHITextureHandle,4> temporalTargets{};
 
     // 뷰의 표시 성격(LiveViewFlags 비트 조합). 화면 UI는 kScreenSpaceUI 뷰에만,
     // Host가 기여한 씬 오버레이는 kSceneOverlay 뷰에만 그린다 — 게임 뷰는

@@ -1,6 +1,7 @@
 #pragma once
 #include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
+#include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include <algorithm>
 #include <array>
@@ -199,6 +200,7 @@ struct EnhancedRequiredAssetPacket
 struct EnhancedLiveFramePacket
 {
     uint64_t frameId{ 0 };
+    uint64_t temporalRealFrameId{ 0 }; // Player simulation/latency identity, independent from publication
     // 같은 프로세스 steady_clock의 캡처 시각이며 시뮬레이션 시간이나 fence가 아니다.
     // 0은 관측 불가다. 병합해도 교체된 입력의 실제 캡처 시각을 그대로 보존한다.
     uint64_t sourceCaptureNanoseconds{ 0 };
@@ -686,6 +688,7 @@ struct EnhancedLiveShadowStats
 /// 것을 읽게 된다.
 struct EnhancedLiveDebugSnapshot
 {
+    TemporalMeasurementProvenance temporalProvenance, gpuTemporalProvenance;
     EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
     bool     enabled{ false };
     bool     pipelineReady{ false };
