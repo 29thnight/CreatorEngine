@@ -12,7 +12,7 @@ Both Editor and development Player register these commands through the existing 
 | TR0 | `temporal.metadata` | Real-frame identity, render/display extents, separate GPU/present completion |
 | TR1 | `temporal.motion` | Published production input validity and static/skinned/instanced/decal/alpha coverage |
 | TR2–3 | `temporal.reset` | Queue a history reset; returns a request generation |
-| TU1–5 | `temporal.upscale none\|fsr\|dlss\|xess [quality]` | Independently request SR and quality |
+| TU1–5 | `temporal.upscale none\|fsr\|dlss\|xess [quality]` | Request the temporal AA/upscale provider and quality, independently of FG |
 | FG0–4 | `temporal.fg none\|fsr\|dlss\|xess` | Independently request FG; non-none is rejected in Editor |
 | FG1 | `temporal.latency` | Real-frame marker identity; no invented input-to-photon timing |
 | TFG9 | `temporal.fallback` | Requested, selected and active providers plus concrete failure results |
@@ -20,6 +20,35 @@ Both Editor and development Player register these commands through the existing 
 | Async | `temporal.status [generation]` | Snapshot; optional acknowledgement check against live consumers |
 
 Quality names: `native-aa`, `quality`, `balanced`, `performance`, `ultra-performance`.
+
+## Anti-aliasing and upscale selection
+
+Use the existing provider and quality together. `temporal.upscale dlss native-aa` selects DLAA, `temporal.upscale fsr native-aa` selects FSR Native AA, and `temporal.upscale xess native-aa` selects XeSS AA. Native AA reconstructs at display resolution (1:1); the other quality choices request lower-resolution rendering and temporal upscaling. There is no additional standalone TAA pass or separate global AA setting. Omitting quality preserves the last requested quality.
+
+Project Settings > Graphics > Pass settings > Anti-aliasing / Upscaling exposes the same provider and quality selection. The native choices are Off and FXAA; temporal choices are FSR, DLSS and XeSS, with the provider's native-AA mode first in the quality list. These are temporary live controls, not saved project-profile settings. Frame generation remains independent.
+
+Choosing a temporal provider preserves the existing `fxaaEnabled` preference, shown as “FXAA on native / fallback frames.” FXAA is skipped only after successful temporal reconstruction of that frame, including native-AA modes. A request, supported SDK, configured adapter or successful FG does not suppress it. Returning to native rendering with `temporal.upscale none`, a native capture, or a native fallback uses the saved FXAA preference. Selecting Off or FXAA explicitly in the UI changes that preference. If a requested provider falls back to another temporal provider that successfully reconstructs the frame, FXAA is still skipped.
+
+SDK dispatch failure is fail-closed: the failed frame is discarded, with no same-frame FXAA fallback and no new submitted-AA observation. A subsequent successfully configured and submitted FSR/native frame resumes rendering. Successful FSR reconstruction still skips FXAA; native rendering resumes the saved FXAA preference. Failure must not overwrite that preference or publish the failed frame as an AA success.
+
+Snapshots expose `requestedUpscaleQuality` and `effectiveRequestedUpscaleQuality` beside their existing requested providers. The observed submitted frame has `aaObserved`, `temporalAaApplied`, `fxaaRequested` (its saved native preference) and `fxaaApplied` (its actual FXAA dispatch), plus `activeAaMethod` and `activeUpscaleQuality`. `activeAaMethod` is `none`, `fxaa`, `fsr_native_aa`, `dlaa`, `xess_aa`, `fsr_upscale`, `dlss_upscale` or `xess_upscale`; it is null before AA is observed. Active quality is null without successful temporal reconstruction. These observations retain the submitted frame's quality when a later request is pending; inspect `viewId`, `lastRealFrameId` and the generation fields rather than treating the latest request as already active. Submitted execution evidence is not a GPU-completion, pixel-quality or display-presentation result.
+
+### AA acceptance matrix (authored, unexecuted)
+
+Run only with separate execution authorization and the applicable SDK/runtime/hardware. Repeat successful temporal and fallback cases with the saved FXAA preference both on and off; unsupported configurations remain explicit failures, not passes.
+
+| Case | Required evidence |
+|---|---|
+| Native default, FXAA preference on / off | Display-size rendering; `temporalAaApplied=false`, `fxaaApplied` matches the preference; active AA is `fxaa` / `none` |
+| Each of FSR, DLSS and XeSS with `native-aa` | Requested provider actually reconstructs at equal render/display extents; correct native-AA name, `activeUpscaleQuality=native-aa`, `fxaaApplied=false`; preference unchanged |
+| Each provider with every supported SR quality | Requested provider actually reconstructs at the SDK-selected lower extent; observed quality matches that submitted frame; `fxaaApplied=false`; preference unchanged |
+| Requested provider unavailable, FSR fallback succeeds | Requested failure remains visible; active provider is FSR and actual AA/quality match FSR; FXAA skipped |
+| All temporal providers unavailable, native fallback; also explicit disable and native capture | Display-size native rendering uses saved FXAA preference; active quality is null; capture preserves requested temporal selection |
+| Injected SDK dispatch failure | Failed frame discarded; no same-frame FXAA dispatch or successful-AA publication; subsequent successful FSR/native submission follows its own AA policy |
+| Alternating temporal and native views | Per-view frame identities and dispatch records show no suppression/result leaking across views, including parallel recording |
+| Quality change while previous frame remains observed | Requested quality changes immediately; active AA/quality retain the previous submitted frame until the new generation is submitted |
+
+## Snapshot and acknowledgement
 
 All read-only commands return the same complete versioned snapshot so each saved stage preserves provenance. A successful command means its query or enqueue operation succeeded. Only `activeUpscaler`/`activeFrameGenerator`, actual evaluation results and SDK presentation counts describe execution. Requested and selected providers are not activation.
 
@@ -34,7 +63,7 @@ Attach to an already running command service using its endpoint file. The driver
 ./Tools/temporal-validation/Invoke-TemporalStage.ps1 -EndpointFile C:/Project/Library/CommandService/endpoint.json -Stage upscale -Provider fsr -Quality quality
 ```
 
-Stages: `discover`, `support`, `metadata`, `motion`, `reset`, `upscale`, `fg`, `disable`, `latency`, `fallback`, `golden-baseline`. Use a Player endpoint for `fg`. Provider-specific stages require the requested provider actually active; successful fallback does not pass the requested-provider stage. FG additionally requires increased SDK-observed evidence: completed generated output for FSR, or SDK-reported presentations for DLSS/XeSS. The report names the evidence and never treats FSR callback completion as an observed native presentation. Missing SDKs, runtimes, inputs, unsupported hardware/API and setup failures remain visible and do not become synthetic green checks.
+Stages: `discover`, `support`, `metadata`, `motion`, `reset`, `upscale`, `fg`, `disable`, `latency`, `fallback`, `golden-baseline`. Use a Player endpoint for `fg`. Provider-specific stages require the requested provider actually active; successful fallback does not pass the requested-provider stage. `upscale` additionally requires a fresh submitted real-frame AA observation at the exact receipt generation, matching requested and observed quality/method, successful temporal AA and no FXAA dispatch. `native-aa` also requires equal render/display extents, so a previously active provider at another quality cannot pass. Provider `none` verifies native rendering resumes its saved FXAA preference. FG additionally requires increased SDK-observed evidence: completed generated output for FSR, or SDK-reported presentations for DLSS/XeSS. The report names the evidence and never treats FSR callback completion as an observed native presentation. Missing SDKs, runtimes, inputs, unsupported hardware/API and setup failures remain visible and do not become synthetic green checks.
 
 `support`, `discover` and `fallback` are diagnostic stages only. `motion` requires all declared production coverage but cannot establish vector direction/magnitude without the plan's independent pixel fixtures. `latency` checks marker presence, not latency improvement. `golden-baseline` explicitly disables both independent features, waits for real-frame acknowledgement, and requires matching native extents before a later pixel capture; it does not compare pixels. It deliberately leaves TU/FG off so the caller's next golden capture is not silently re-enabled.
 

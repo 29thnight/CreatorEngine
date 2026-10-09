@@ -2,6 +2,7 @@
 #include "../../MaterialGraphSceneInput.h"
 #include "../Temporal/TemporalUpscalerHost.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
+#include <algorithm>
 #include <bit>
 #include <map>
 #include <tuple>
@@ -29,6 +30,10 @@ struct EnhancedTemporalViewState
     uint64_t submittedFrame{};
     float previousSeconds{}, pendingSeconds{}, previousJitterX{}, previousJitterY{};
     TemporalExtent previousRender, previousDisplay;
+    TemporalQuality quality{ TemporalQuality::Quality };
+    // One writer per callback, read only after the graph's recording joins.
+    // These observations never choose whether another callback records FXAA.
+    bool temporalAaApplied{ false }, fxaaRequested{ true }, fxaaApplied{ false };
 
     TemporalResult Begin(IRHIDeviceResources& resources, TemporalBackend backend,
         const TemporalRuntimeSnapshot& control, const FrameCameraSnapshot& camera,
@@ -36,7 +41,12 @@ struct EnhancedTemporalViewState
         TemporalExtent display, float deltaSeconds, float totalSeconds, bool nativeOnly)
     {
         auto settings = control.settings;
-        if (nativeOnly) settings.requestedUpscaler = TemporalProvider::None;
+        if (nativeOnly)
+        {
+            settings.requestedUpscaler = TemporalProvider::None;
+        }
+        quality = settings.quality;
+        temporalAaApplied = fxaaApplied = false;
         const auto configured = upscaler.Configure(resources, backend, settings,
             control.requestedGeneration, display, false, camera.isOrthographic);
         const auto render = upscaler.RenderExtent();
@@ -114,4 +124,35 @@ struct EnhancedTemporalViewState
         previousDecals = std::move(pendingDecals); previousSprites = std::move(pendingSprites); ++jitterIndex;
     }
     void Invalidate() { submittedFrame = 0; previousInput.reset(); previousDecals.clear(); previousSprites.clear(); }
+
+    // Call only after successful graph recording and submission. In particular,
+    // Configure success is not evidence that the current SDK evaluation ran.
+    void PublishSubmitted(TemporalRuntimeSnapshot& snapshot) const
+    {
+        snapshot.observedGeneration = settingsGeneration;
+        snapshot.viewId = viewId; snapshot.sceneEpoch = sceneEpoch; snapshot.frame = frame;
+        snapshot.selectedUpscaler = upscaler.Provider();
+        snapshot.activeUpscaler = temporalAaApplied ? upscaler.Provider() : TemporalProvider::None;
+        snapshot.lastUpscaleResult = upscaler.LastResult();
+        snapshot.requestedUpscaleResult = upscaler.RequestedResult();
+        snapshot.renderSubmittedFrameId = snapshot.lastRealFrameId = frame.realFrameId;
+        snapshot.observedUpscaleQuality = quality;
+        snapshot.aaObserved = true;
+        snapshot.temporalAaApplied = temporalAaApplied;
+        snapshot.fxaaRequested = fxaaRequested; snapshot.fxaaApplied = fxaaApplied;
+        for (const auto& capability : upscaler.Capabilities())
+        {
+            auto found = std::find_if(snapshot.capabilities.begin(), snapshot.capabilities.end(),
+                [&](const auto& old) { return old.provider == capability.provider && old.backend == capability.backend; });
+            if (found == snapshot.capabilities.end())
+            {
+                snapshot.capabilities.push_back(capability);
+            }
+            else
+            {
+                found->upscaling = capability.upscaling;
+                found->upscalerImplementation = capability.upscalerImplementation;
+            }
+        }
+    }
 };

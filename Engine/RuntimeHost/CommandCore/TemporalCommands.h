@@ -48,6 +48,31 @@ namespace CommandCore
             return true;
         }
 
+        inline const char* QualityName(TemporalQuality value)
+        {
+            switch (value)
+            {
+            case TemporalQuality::NativeAA: return "native-aa";
+            case TemporalQuality::Quality: return "quality";
+            case TemporalQuality::Balanced: return "balanced";
+            case TemporalQuality::Performance: return "performance";
+            case TemporalQuality::UltraPerformance: return "ultra-performance";
+            }
+            return "unknown";
+        }
+
+        inline const char* TemporalAaName(TemporalProvider provider, TemporalQuality quality)
+        {
+            switch (provider)
+            {
+            case TemporalProvider::Fsr: return quality == TemporalQuality::NativeAA ? "fsr_native_aa" : "fsr_upscale";
+            case TemporalProvider::Dlss: return quality == TemporalQuality::NativeAA ? "dlaa" : "dlss_upscale";
+            case TemporalProvider::XeSS: return quality == TemporalQuality::NativeAA ? "xess_aa" : "xess_upscale";
+            case TemporalProvider::None: return "none";
+            }
+            return "unknown";
+        }
+
         inline const char* StatusName(TemporalStatus value)
         {
             switch (value)
@@ -118,6 +143,7 @@ namespace CommandCore
                 snapshot.presentationTarget == TemporalPresentationTarget::EditorViewport ? "editor_viewport" : "unbound"));
             data.Set("nativeCaptureExclusionActive", CommandData::Bool(snapshot.nativeCaptureExclusionActive));
             data.Set("effectiveRequestedUpscaler", CommandData::String(ProviderName(snapshot.settings.requestedUpscaler)));
+            data.Set("effectiveRequestedUpscaleQuality", CommandData::String(QualityName(snapshot.settings.quality)));
             data.Set("effectiveRequestedFrameGenerator", CommandData::String(ProviderName(snapshot.settings.requestedFrameGenerator)));
             data.Set("rendererObserved", CommandData::Bool(snapshot.rendererObserved));
             data.Set("playerObserved", CommandData::Bool(snapshot.playerObserved));
@@ -126,11 +152,21 @@ namespace CommandCore
             data.Set("playerObservedGeneration", Identity(snapshot.playerObservedGeneration));
             data.Set("historyResetGeneration", Identity(snapshot.historyResetGeneration));
             data.Set("requestedUpscaler", CommandData::String(ProviderName(snapshot.requestedSettings.requestedUpscaler)));
+            data.Set("requestedUpscaleQuality", CommandData::String(QualityName(snapshot.requestedSettings.quality)));
             data.Set("requestedFrameGenerator", CommandData::String(ProviderName(snapshot.requestedSettings.requestedFrameGenerator)));
             data.Set("selectedUpscaler", CommandData::String(ProviderName(snapshot.selectedUpscaler)));
             data.Set("selectedFrameGenerator", CommandData::String(ProviderName(snapshot.selectedFrameGenerator)));
             data.Set("activeUpscaler", CommandData::String(ProviderName(snapshot.activeUpscaler)));
             data.Set("activeFrameGenerator", CommandData::String(ProviderName(snapshot.activeFrameGenerator)));
+            data.Set("aaObserved", CommandData::Bool(snapshot.aaObserved));
+            data.Set("fxaaRequested", CommandData::Bool(snapshot.fxaaRequested));
+            data.Set("fxaaApplied", CommandData::Bool(snapshot.fxaaApplied));
+            data.Set("temporalAaApplied", CommandData::Bool(snapshot.temporalAaApplied));
+            data.Set("activeUpscaleQuality", snapshot.aaObserved && snapshot.temporalAaApplied
+                ? CommandData::String(QualityName(snapshot.observedUpscaleQuality)) : CommandData{});
+            data.Set("activeAaMethod", snapshot.aaObserved ? CommandData::String(snapshot.temporalAaApplied
+                ? TemporalAaName(snapshot.activeUpscaler, snapshot.observedUpscaleQuality)
+                : snapshot.fxaaApplied ? "fxaa" : "none") : CommandData{});
             data.Set("upscaleState", CommandData::String(ExecutionState(snapshot.settings.requestedUpscaler,
                 snapshot.activeUpscaler, snapshot.lastUpscaleResult, snapshot.rendererObserved,
                 snapshot.observedGeneration < snapshot.requestedGeneration)));
@@ -229,7 +265,8 @@ namespace CommandCore
             TemporalProvider provider;
             if (parts.size() > (upscale ? 3u : 2u) || !ParseProvider(parts[1], provider))
             {
-                return InvalidArguments(command + " [none|fsr|dlss|xess]" + (upscale ? " [quality]" : ""));
+                return InvalidArguments(command + " [none|fsr|dlss|xess]" +
+                    (upscale ? " [native-aa|quality|balanced|performance|ultra-performance]" : ""));
             }
             if (!upscale && target == TemporalPresentationTarget::EditorViewport && provider != TemporalProvider::None)
             {

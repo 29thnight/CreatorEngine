@@ -112,12 +112,51 @@ try {
             }
         }
         'upscale' {
-            $data = Set-Temporal 'temporal.upscale' @($Provider,$Quality)
-            Require-RealMetadata $data
-            if ($Provider -ne 'none' -and ($data.upscaleState -ne 'active' -or $data.activeUpscaler -ne $Provider)) {
-                throw "Requested upscaler is not active: $($data.upscaleState), effective=$($data.activeUpscaler)"
+            $receipt = Invoke-TemporalCommand 'temporal.upscale' @($Provider,$Quality)
+            $generation = [string]$receipt.data.receiptGeneration
+            $report.receiptGeneration = $generation
+            $data = Wait-TemporalGeneration $generation
+            $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            # Acknowledgement alone cannot reuse an older frame's provider or AA quality.
+            while (!$data.aaObserved -or [uint64]$data.lastRealFrameId -le [uint64]$before.lastRealFrameId -or
+                [uint64]$data.renderSubmittedFrameId -ne [uint64]$data.lastRealFrameId) {
+                if ($data.requestState -eq 'superseded' -or [uint64]$data.requestedGeneration -ne [uint64]$generation) {
+                    throw "Upscale generation $generation was superseded before fresh AA evidence"
+                }
+                if ([DateTime]::UtcNow -ge $limit) {
+                    throw 'No fresh submitted real-frame AA observation for the upscale request'
+                }
+                Start-Sleep -Milliseconds 100
+                $data = (Invoke-TemporalCommand 'temporal.status' @($generation)).data
             }
-            if ($Provider -eq 'none' -and $data.activeUpscaler -ne 'none') { throw 'Upscaler remains active' }
+            Require-RealMetadata $data
+            if (!$data.acknowledged -or $data.requestState -ne 'acknowledged' -or
+                [uint64]$data.requestedGeneration -ne [uint64]$generation -or
+                [uint64]$data.observedGeneration -ne [uint64]$generation -or
+                [uint64]$data.viewId -eq 0 -or [uint64]$data.sceneEpoch -eq 0 -or
+                $data.requestedUpscaler -ne $Provider -or $data.effectiveRequestedUpscaler -ne $Provider -or
+                $data.requestedUpscaleQuality -ne $Quality -or $data.effectiveRequestedUpscaleQuality -ne $Quality) {
+                throw 'Submitted AA evidence does not match the exact requested generation/provider/quality'
+            }
+            if ($Provider -ne 'none') {
+                $nativeAaNames = @{ fsr='fsr_native_aa'; dlss='dlaa'; xess='xess_aa' }
+                $expectedAa = if ($Quality -eq 'native-aa') { $nativeAaNames[$Provider] } else { $Provider + '_upscale' }
+                if ($data.upscaleState -ne 'active' -or $data.activeUpscaler -ne $Provider -or
+                    $data.upscaleResult.status -ne 'success' -or !$data.temporalAaApplied -or $data.fxaaApplied -or
+                    $data.activeUpscaleQuality -ne $Quality -or $data.activeAaMethod -ne $expectedAa) {
+                    throw "Requested temporal AA/quality was not observed: state=$($data.upscaleState), provider=$($data.activeUpscaler), AA=$($data.activeAaMethod), quality=$($data.activeUpscaleQuality)"
+                }
+                if ($Quality -eq 'native-aa' -and ($data.renderExtent.width -ne $data.displayExtent.width -or
+                    $data.renderExtent.height -ne $data.displayExtent.height)) {
+                    throw 'Native AA requires matching observed render/display extents'
+                }
+            } else {
+                $expectedAa = if ($data.fxaaRequested) { 'fxaa' } else { 'none' }
+                if ($data.activeUpscaler -ne 'none' -or $data.temporalAaApplied -or $null -ne $data.activeUpscaleQuality -or
+                    $data.fxaaApplied -ne $data.fxaaRequested -or $data.activeAaMethod -ne $expectedAa) {
+                    throw 'Native rendering did not resume its saved FXAA preference'
+                }
+            }
         }
         'fg' {
             if ($before.target -ne 'player_swapchain') { throw 'FG stage requires development Player; Editor is forbidden' }

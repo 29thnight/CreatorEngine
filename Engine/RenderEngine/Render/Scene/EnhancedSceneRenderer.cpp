@@ -1356,6 +1356,34 @@ namespace
             committed = true;
             views[viewIndex].temporal.Commit(graphInput);
             slot->temporalProvenance = views[viewIndex].temporal.provenance;
+            TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
+                const auto& view = views[viewIndex];
+                if (view.displayTarget != EnhancedLiveDisplayTarget::Game && snapshot.rendererObserved &&
+                    snapshot.viewId != view.key.viewId)
+                {
+                    return;
+                }
+                snapshot.presentationTarget = TemporalPresentationTarget::EditorViewport;
+                view.temporal.PublishSubmitted(snapshot);
+                snapshot.motionVectorsValid = true;
+                snapshot.motionStaticValid = snapshot.motionSkinnedValid = snapshot.motionInstancedValid = false;
+                snapshot.motionAlphaValid = false;
+                if (graphInput)
+                {
+                    for (const auto& draw : graphInput->Draws())
+                    {
+                        if (!draw.temporalHistoryValid)
+                        {
+                            continue;
+                        }
+                        snapshot.motionStaticValid |= draw.geometry->Source()->Bones().empty();
+                        snapshot.motionSkinnedValid |= !draw.geometry->Source()->Bones().empty();
+                        snapshot.motionInstancedValid |= draw.temporalInstanceId != 0;
+                        snapshot.motionAlphaValid |= draw.queue != material_graph::SceneCoverage::Opaque;
+                    }
+                }
+                snapshot.motionDecalValid = decal.HasPreparedDecals() && !view.temporal.frame.reset;
+            });
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
@@ -3757,42 +3785,69 @@ namespace
             // TU is one neutral graph operation on linear HDR, after scene
             // composition and before tone mapping. Native means equal extents.
             {
-                LivePassNode node;node.name="Temporal.Upscale";
-                node.reads={LiveSlots::kTemporalMotion,LiveSlots::kTemporalDepth,LiveSlots::kTemporalReactive,
-                    LiveSlots::kTemporalTransparency,LiveSlots::kTemporalResponsive};
-                node.modifies={LiveSlots::kLitColor};
+                LivePassNode node;
+                node.name = "Temporal.Upscale";
+                node.reads = { LiveSlots::kTemporalMotion, LiveSlots::kTemporalDepth, LiveSlots::kTemporalReactive,
+                    LiveSlots::kTemporalTransparency, LiveSlots::kTemporalResponsive };
+                node.modifies = { LiveSlots::kLitColor };
 
-                node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding& binding) {
-                    auto& host=p.views[binding.viewIndex].temporal.upscaler;
-                    if(host.Provider()==TemporalProvider::None)
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                {
+                    auto& temporal = p.views[binding.viewIndex].temporal;
+                    auto& host = temporal.upscaler;
+                    if (host.Provider() == TemporalProvider::None)
                     {
-                        if(ctx.width!=ctx.displayWidth||ctx.height!=ctx.displayHeight)
+                        if (ctx.width != ctx.displayWidth || ctx.height != ctx.displayHeight)
+                        {
                             throw std::runtime_error("Native temporal fallback must render at display resolution.");
+                        }
                         return;
                     }
-                    RGTextureDesc desc;desc.width=ctx.displayWidth;desc.height=ctx.displayHeight;desc.format=RHIFormat::RGBA16Float;
-                    desc.allowUnorderedAccess=true;desc.allowRenderTarget=true;desc.name="Temporal.ReconstructedHDR";
-                    auto output=graph.CreateTexture(desc);
-                    const bool explicitAccess=graph.GetSchedulingMode()!=RGSchedulingMode::DeclarationOrder;
-                    if(graph.GetSchedulingMode()==RGSchedulingMode::ExplicitVersioned)output=graph.Write(output);
-                    const auto read=explicitAccess?RGAccessMode::Read:RGAccessMode::LegacyState;
-                    const auto write=explicitAccess?RGAccessMode::Write:RGAccessMode::LegacyState;
-                    const std::array<RGHandle,6> inputs{bb.Get(LiveSlots::kLitColor),bb.Get(LiveSlots::kTemporalDepth),
-                        bb.Get(LiveSlots::kTemporalMotion),bb.Get(LiveSlots::kTemporalReactive),
-                        bb.Get(LiveSlots::kTemporalTransparency),bb.Get(LiveSlots::kTemporalResponsive)};
+                    RGTextureDesc desc;
+                    desc.width = ctx.displayWidth;
+                    desc.height = ctx.displayHeight;
+                    desc.format = RHIFormat::RGBA16Float;
+                    desc.allowUnorderedAccess = true;
+                    desc.allowRenderTarget = true;
+                    desc.name = "Temporal.ReconstructedHDR";
+                    auto output = graph.CreateTexture(desc);
+                    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+                    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+                    {
+                        output = graph.Write(output);
+                    }
+                    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+                    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+                    const std::array<RGHandle, 6> inputs{ bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kTemporalDepth),
+                        bb.Get(LiveSlots::kTemporalMotion), bb.Get(LiveSlots::kTemporalReactive),
+                        bb.Get(LiveSlots::kTemporalTransparency), bb.Get(LiveSlots::kTemporalResponsive) };
                     std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-                    for(auto input:inputs)uses.push_back({input,RHIResourceState::ShaderResource,read});
-                    uses.push_back({output,RHIResourceState::UnorderedAccess,write});
-                    const auto frame=ctx.temporalFrame;
-                    graph.AddPass("Temporal.Upscale",uses,[&host,inputs,output,frame](const auto& execute) {
-                        TemporalUpscaleInputs packet;packet.frame=frame;packet.color=execute.ResolveHandle(inputs[0]);
-                        packet.depth=execute.ResolveHandle(inputs[1]);packet.motionVectors=execute.ResolveHandle(inputs[2]);
-                        packet.reactiveMask=execute.ResolveHandle(inputs[3]);packet.transparencyMask=execute.ResolveHandle(inputs[4]);
-                        packet.responsiveMask=execute.ResolveHandle(inputs[5]);packet.output=execute.ResolveHandle(output);
-                        const auto result=host.Evaluate(packet,*execute.encoder);
-                        if(!result.IsSuccess())throw std::runtime_error("Temporal upscale recording failed; discard this frame and rebuild at fallback extent.");
+                    for (auto input : inputs)
+                    {
+                        uses.push_back({ input, RHIResourceState::ShaderResource, read });
+                    }
+                    uses.push_back({ output, RHIResourceState::UnorderedAccess, write });
+                    const auto frame = ctx.temporalFrame;
+                    graph.AddPass("Temporal.Upscale", uses, [&temporal, inputs, output, frame](const auto& execute)
+                    {
+                        TemporalUpscaleInputs packet;
+                        packet.frame = frame;
+                        packet.color = execute.ResolveHandle(inputs[0]);
+                        packet.depth = execute.ResolveHandle(inputs[1]);
+                        packet.motionVectors = execute.ResolveHandle(inputs[2]);
+                        packet.reactiveMask = execute.ResolveHandle(inputs[3]);
+                        packet.transparencyMask = execute.ResolveHandle(inputs[4]);
+                        packet.responsiveMask = execute.ResolveHandle(inputs[5]);
+                        packet.output = execute.ResolveHandle(output);
+                        const auto result = temporal.upscaler.Evaluate(packet, *execute.encoder);
+                        if (!result.IsSuccess())
+                        {
+                            throw std::runtime_error("Temporal upscale recording failed; discard this frame and rebuild at fallback extent.");
+                        }
+                        temporal.temporalAaApplied = true;
                     });
-                    bb.Set(LiveSlots::kLitColor,output);
+                    bb.Set(LiveSlots::kLitColor, output);
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3810,10 +3865,19 @@ namespace
                 node.reads = { LiveSlots::kLitColor };
                 node.writes = { LiveSlots::kDisplayLdr };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    auto& temporal = p.views[binding.viewIndex].temporal;
                     EnhancedPostChainPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kLitColor);
+                    // The current view's effective producer is authoritative.
+                    // Requested/previous-frame providers cannot suppress FXAA.
+                    // Evaluate failure above aborts every submission path, so a
+                    // graph using this reconstructed color never publishes an
+                    // unresolved frame. Native fallback keeps the saved tuning.
+                    inputs.requiresTemporalResolve = temporal.upscaler.Provider() != TemporalProvider::None;
+                    temporal.fxaaRequested = p.postChain.GetTuning().fxaaEnabled;
+                    inputs.fxaaRecorded = &temporal.fxaaApplied;
                     p.postChain.SetInputs(inputs);
                     p.postChain.Declare(graph, p.displayFrameContext);
                     bb.Set(LiveSlots::kDisplayLdr, p.postChain.GetOutput());
@@ -6472,18 +6536,8 @@ namespace
                 if(view.displayTarget!=EnhancedLiveDisplayTarget::Game && snapshot.rendererObserved && snapshot.viewId!=view.key.viewId)return;
                 snapshot.presentationTarget=temporalSink && temporalSink->AcceptsTemporalFrames() &&
                     view.displayTarget==EnhancedLiveDisplayTarget::Game?TemporalPresentationTarget::PlayerSwapchain:TemporalPresentationTarget::EditorViewport;
-                snapshot.observedGeneration=view.temporal.settingsGeneration;snapshot.viewId=view.key.viewId;
-                snapshot.sceneEpoch=p.frameContext.sceneEpoch;snapshot.frame=view.temporal.frame;
-                snapshot.selectedUpscaler=view.temporal.upscaler.Provider();snapshot.lastUpscaleResult=view.temporal.upscaler.LastResult();
-                snapshot.requestedUpscaleResult=view.temporal.upscaler.RequestedResult();
-                for(const auto& capability:view.temporal.upscaler.Capabilities())
-                {
-                    auto found=std::find_if(snapshot.capabilities.begin(),snapshot.capabilities.end(),[&](const auto& old) {return old.provider==capability.provider&&old.backend==capability.backend;});
-                    if(found==snapshot.capabilities.end())snapshot.capabilities.push_back(capability);
-                    else {found->upscaling=capability.upscaling;found->upscalerImplementation=capability.upscalerImplementation;}
-                }
-                snapshot.renderSubmittedFrameId=view.temporal.frame.realFrameId;snapshot.lastRealFrameId=view.temporal.frame.realFrameId;
-                snapshot.activeUpscaler=view.temporal.upscaler.Provider();snapshot.motionVectorsValid=true;
+                view.temporal.PublishSubmitted(snapshot);
+                snapshot.motionVectorsValid=true;
                 snapshot.motionStaticValid=false;snapshot.motionSkinnedValid=false;snapshot.motionInstancedValid=false;
                 snapshot.motionAlphaValid=false;
                 if(p.graphInput)for(const auto& draw:p.graphInput->Draws())

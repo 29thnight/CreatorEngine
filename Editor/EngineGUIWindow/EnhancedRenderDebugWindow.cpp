@@ -2,6 +2,7 @@
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "Render/Temporal/TemporalRuntimeControl.h"
 #include "EditorIcons.h"
 #include "ProfilerHUD.h"
 #include "EditorWindowRegistry.h"
@@ -33,6 +34,107 @@ namespace EnhancedRenderDebugUi
 	// EnhancedShadowFilter 순서 그대로다(셰이더의 CASCADED_SHADOW_FILTER_* 와도 같다).
 	constexpr const char* kShadowFilters[]{
 		"Hardware 2x2 (1 tap)", "Tent 3x3 (4 taps)", "Tent 5x5 (9 taps)", "Tent 7x7 (16 taps)" };
+
+	const char* TemporalAaLabel(TemporalProvider provider, TemporalQuality quality)
+	{
+		switch (provider)
+		{
+		case TemporalProvider::Fsr: return quality == TemporalQuality::NativeAA ? "FSR Native AA" : "FSR temporal upscaling";
+		case TemporalProvider::Dlss: return quality == TemporalQuality::NativeAA ? "DLAA" : "DLSS temporal upscaling";
+		case TemporalProvider::XeSS: return quality == TemporalQuality::NativeAA ? "XeSS AA" : "XeSS temporal upscaling";
+		case TemporalProvider::None: return "Off";
+		}
+		return "Unknown";
+	}
+
+	bool DrawAntiAliasingSettings(EnhancedLiveTuning::PostChain& post)
+	{
+		if (!ImGui::TreeNodeEx("Anti-aliasing / Upscaling", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			return false;
+		}
+		auto& control = TemporalRuntimeControl::Get();
+		const auto snapshot = control.Snapshot();
+		auto settings = snapshot.requestedSettings;
+		bool postChanged = false;
+		bool settingsChanged = false;
+		int method = settings.requestedUpscaler == TemporalProvider::None
+			? (post.fxaaEnabled ? 1 : 0) : static_cast<int>(settings.requestedUpscaler) + 1;
+		constexpr const char* methods[]{ "Off (native)", "FXAA (native)", "FSR", "DLSS", "XeSS" };
+		if (ImGui::Combo("AA method", &method, methods, static_cast<int>(std::size(methods))))
+		{
+			settings.requestedUpscaler = method < 2 ? TemporalProvider::None : static_cast<TemporalProvider>(method - 1);
+			if (method < 2)
+			{
+				post.fxaaEnabled = method == 1;
+				postChanged = true;
+			}
+			settingsChanged = true;
+		}
+		const bool temporalRequested = settings.requestedUpscaler != TemporalProvider::None;
+		const char* qualities[]{ temporalRequested ? TemporalAaLabel(settings.requestedUpscaler, TemporalQuality::NativeAA)
+			: "Native AA (1:1)", "Quality", "Balanced", "Performance", "Ultra performance" };
+		int quality = static_cast<int>(settings.quality);
+		ImGui::BeginDisabled(!temporalRequested);
+		if (ImGui::Combo("Upscale quality", &quality, qualities, static_cast<int>(std::size(qualities))))
+		{
+			settings.quality = static_cast<TemporalQuality>(quality);
+			settingsChanged = true;
+		}
+		ImGui::EndDisabled();
+		if (temporalRequested)
+		{
+			postChanged |= ImGui::Checkbox("FXAA on native / fallback frames", &post.fxaaEnabled);
+			ImGui::TextWrapped("Native AA uses the display resolution. Other quality modes reconstruct a lower-resolution image.");
+			ImGui::TextWrapped("Successful temporal reconstruction automatically skips FXAA for that frame; this fallback preference is preserved.");
+		}
+		if (settingsChanged)
+		{
+			settings.enabled = temporalRequested || settings.requestedFrameGenerator != TemporalProvider::None;
+			control.Request(settings);
+		}
+		if (settingsChanged || snapshot.observedGeneration < snapshot.requestedGeneration)
+		{
+			ImGui::TextColored(kWarnColor, "Temporal selection pending a live renderer frame.");
+		}
+		if (snapshot.nativeCaptureExclusionActive)
+		{
+			ImGui::TextColored(kWarnColor, "Native capture override is active; your temporal selection is preserved.");
+		}
+		if (snapshot.aaObserved)
+		{
+			const char* activeAa = snapshot.temporalAaApplied
+				? TemporalAaLabel(snapshot.activeUpscaler, snapshot.observedUpscaleQuality)
+				: snapshot.fxaaApplied ? "FXAA" : "Off";
+			ImGui::Text("Last submitted AA: %s", activeAa);
+			if (snapshot.temporalAaApplied)
+			{
+				constexpr const char* qualityNames[]{ "Native AA (1:1)", "Quality", "Balanced", "Performance", "Ultra performance" };
+				ImGui::Text("Observed quality: %s", qualityNames[static_cast<int>(snapshot.observedUpscaleQuality)]);
+				if (snapshot.fxaaRequested)
+				{
+					ImGui::TextDisabled("FXAA automatically skipped after successful temporal reconstruction.");
+				}
+			}
+			ImGui::TextDisabled("View %llu | real frame %llu | render %u x %u / display %u x %u",
+				static_cast<unsigned long long>(snapshot.viewId), static_cast<unsigned long long>(snapshot.lastRealFrameId),
+				snapshot.frame.renderExtent.width, snapshot.frame.renderExtent.height,
+				snapshot.frame.displayExtent.width, snapshot.frame.displayExtent.height);
+		}
+		else
+		{
+			ImGui::TextDisabled("Waiting for an observed anti-aliasing result.");
+		}
+		if (ImGui::TreeNodeEx("FXAA tuning (native / fallback)"))
+		{
+			postChanged |= ImGui::SliderFloat("Bias##fxaa", &post.fxaaBias, 0.f, 1.f, "%.3f");
+			postChanged |= ImGui::SliderFloat("Bias min##fxaa", &post.fxaaBiasMin, 0.f, 0.5f, "%.3f");
+			postChanged |= ImGui::SliderFloat("Span max##fxaa", &post.fxaaSpanMax, 1.f, 16.f);
+			ImGui::TreePop();
+		}
+		ImGui::TreePop();
+		return postChanged;
+	}
 
 	// 고른 보기의 색 뜻. 색만 칠하고 읽는 법을 안 적으면 다음 사람이 다시 쫓는다.
 	const char* ShadowDebugViewLegend(int view)
@@ -491,6 +593,8 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		ImGui::TreePop();
 	}
 
+	changed |= DrawAntiAliasingSettings(m_editing.postChain);
+
 	if (ImGui::TreeNodeEx("PostChain"))
 	{
 		EnhancedLiveTuning::PostChain& post = m_editing.postChain;
@@ -529,15 +633,6 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 			changed |= ImGui::Checkbox("Enabled##grading", &post.gradingEnabled);
 			changed |= ImGui::SliderFloat("Saturation##grading", &post.saturation, 0.f, 4.f);
 			changed |= ImGui::SliderFloat("Contrast##grading", &post.contrast, 0.f, 4.f);
-			ImGui::TreePop();
-		}
-
-		if (ImGui::TreeNodeEx("FXAA"))
-		{
-			changed |= ImGui::Checkbox("Enabled##fxaa", &post.fxaaEnabled);
-			changed |= ImGui::SliderFloat("Bias##fxaa", &post.fxaaBias, 0.f, 1.f, "%.3f");
-			changed |= ImGui::SliderFloat("Bias min##fxaa", &post.fxaaBiasMin, 0.f, 0.5f, "%.3f");
-			changed |= ImGui::SliderFloat("Span max##fxaa", &post.fxaaSpanMax, 1.f, 16.f);
 			ImGui::TreePop();
 		}
 

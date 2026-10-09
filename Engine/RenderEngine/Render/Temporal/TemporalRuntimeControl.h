@@ -30,6 +30,11 @@ struct TemporalRuntimeSnapshot
     std::vector<TemporalCapabilities> capabilities;
     TemporalProvider selectedUpscaler{ TemporalProvider::None }, selectedFrameGenerator{ TemporalProvider::None };
     TemporalProvider activeUpscaler{ TemporalProvider::None }, activeFrameGenerator{ TemporalProvider::None };
+    // Belongs to lastRealFrameId, not the latest requested settings. Recorded
+    // dispatches are published only after graph submission; GPU completion is
+    // still reported separately through renderGpuCompletedFrameId.
+    TemporalQuality observedUpscaleQuality{ TemporalQuality::Quality };
+    bool aaObserved{ false }, temporalAaApplied{ false }, fxaaRequested{ true }, fxaaApplied{ false };
     TemporalResult lastUpscaleResult, lastFrameGenerationResult;
     TemporalResult requestedUpscaleResult, requestedFrameGenerationResult;
     uint64_t generatedPresentationCount{ 0 }, realPresentationCount{ 0 };

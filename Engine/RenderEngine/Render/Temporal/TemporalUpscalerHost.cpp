@@ -217,7 +217,15 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
             TemporalExtent render;
             result = state.adapter->QueryRenderExtent(settings.quality, display, render);
             if (result.IsSuccess() && (!render.IsValid() || render.width > display.width || render.height > display.height))
+            {
                 result = { TemporalStatus::InvalidInput };
+            }
+            // Native AA is a full-resolution contract for every provider and
+            // every fallback candidate, not just a label on an SR preset.
+            if (result.IsSuccess() && settings.quality == TemporalQuality::NativeAA && render != display)
+            {
+                result = { TemporalStatus::InvalidInput };
+            }
             if (result.IsSuccess()) state.render = render;
         }
         for (auto& capability : state.capabilities)
