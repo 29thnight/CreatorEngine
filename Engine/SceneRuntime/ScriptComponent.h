@@ -17,6 +17,12 @@
 class [[reflgen::reflect]] ScriptComponent : public meta::identity<ScriptComponent, Component>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	ScriptComponent() = default;
 

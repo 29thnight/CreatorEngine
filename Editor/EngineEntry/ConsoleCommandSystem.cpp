@@ -651,8 +651,48 @@ bool ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments,
     return true;
 }
 
-void ConsoleCommandSystem::Pump()
+CommandCore::CommandResult ConsoleCommandSystem::EnqueueEditorMutation(EditorMutation mutation)
 {
+    if (!mutation)
+    {
+        return CommandCore::InvalidArguments("Empty editor mutation");
+    }
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        if (!m_acceptEditorMutations)
+        {
+            return CommandCore::PreconditionFailed("editor.shutdown", "Editor is shutting down");
+        }
+        // Admission is called while presentation holds the scene borrow fence.
+        // A queued click belongs to that scene/play session, not whichever scene
+        // happens to be active when the GameThread next drains the queue.
+        const auto* scene = SceneManagers->GetActiveScene();
+        const auto sceneId = scene ? scene->GetSceneId() : 0;
+        const auto contextEpoch = SceneManagers->SceneContextEpoch();
+        m_editorMutations.push_back([sceneId, contextEpoch, mutation = std::move(mutation)]
+        {
+            const auto* current = SceneManagers->GetActiveScene();
+            if ((current ? current->GetSceneId() : 0) != sceneId ||
+                SceneManagers->SceneContextEpoch() != contextEpoch)
+            {
+                return CommandCore::PreconditionFailed("editor.context_changed", "Scene or play session changed before the edit ran");
+            }
+            return mutation();
+        });
+    }
+    auto data = CommandCore::CommandData::Object();
+    data.Set("queued", CommandCore::CommandData::Bool(true));
+    auto result = CommandCore::Ok("Queued for the GameThread", std::move(data));
+    result.code = "editor.queued";
+    return result;
+}
+
+void ConsoleCommandSystem::Pump(const SceneBorrowFactory& acquireSceneBorrow)
+{
+    if (!IsGameThread() || !acquireSceneBorrow)
+    {
+        throw std::logic_error("Editor commands require the GameThread and a scene borrow fence");
+    }
     // 생명주기 기록기의 프레임 경계(PHASE 9-0).
     //
     // 여기에 두는 이유는 이 함수가 이미 "게임 스레드에서 프레임마다 정확히 한 번"이고,
@@ -675,14 +715,52 @@ void ConsoleCommandSystem::Pump()
     m_sceneLoading.store(sceneLoading, std::memory_order_release);
     m_waitFramesRemaining.store(static_cast<uint32_t>(m_waitFrames), std::memory_order_release);
 
+    // Fence only live-scene work, not console orchestration, pure deferred
+    // polls, or result delivery. No presentation callback waits on this drain.
+    // Keep it independent of console waits and the HTTP drain budget.
+    if (!SceneManagers->IsSceneLoading())
+    {
+        auto sceneBorrow = acquireSceneBorrow();
+        std::deque<EditorMutation> mutations;
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            mutations.swap(m_editorMutations);
+        }
+        for (auto& mutation : mutations)
+        {
+            CommandCore::CommandResult result;
+            try
+            {
+                result = mutation();
+            }
+            catch (const std::exception& error)
+            {
+                result = CommandCore::InternalError("editor.mutation_failed", error.what());
+            }
+            catch (...)
+            {
+                result = CommandCore::InternalError("editor.mutation_failed", "Editor mutation failed");
+            }
+            if (!result.IsSuccess())
+            {
+                Debug::PrintLog(spdlog::level::err, "[editor.mutation] " + result.code + ": " + result.message);
+            }
+        }
+    }
+
     if (m_waitResult)
     {
         std::optional<CommandCore::CommandResult> result;
-        try { result = m_waitResult(); }
+        try
+        {
+            auto sceneBorrow = m_waitNeedsSceneBorrow ? acquireSceneBorrow() : std::unique_lock<std::mutex>{};
+            result = m_waitResult();
+        }
         catch (const std::exception& error) { result = CommandCore::InternalError("commandlet.poll_exception", error.what()); }
         catch (...) { result = CommandCore::InternalError("commandlet.poll_exception", "Deferred command failed"); }
         if (!result) return;
         m_waitResult = {};
+        m_waitNeedsSceneBorrow = false;
         auto finish = std::move(m_finishWait);
         finish(*result);
         return;
@@ -725,7 +803,11 @@ void ConsoleCommandSystem::Pump()
             EnqueueStructured(m_commandletArguments);
         else
         {
-            const auto result = EditorCommandlets::Run(m_commandletArguments);
+            const auto result = [&]
+            {
+                auto sceneBorrow = acquireSceneBorrow();
+                return EditorCommandlets::Run(m_commandletArguments);
+            }();
             const auto name = m_commandletArguments.empty() ? "--commandlet" : m_commandletArguments[0];
             PublishResult(name, result);
             WriteResultLine(name, result, 0, 0, 0);
@@ -750,7 +832,7 @@ void ConsoleCommandSystem::Pump()
                 has = true;
             }
         }
-        if (has) RunOne(std::move(pending), frameIndex);
+        if (has) RunOne(std::move(pending), frameIndex, acquireSceneBorrow);
         else if (m_commandletMode) { RequestQuit(); return; }
     }
 
@@ -798,12 +880,13 @@ void ConsoleCommandSystem::Pump()
             m_servicePending.pop_front();
         }
 
-        RunOne(std::move(pending), frameIndex);
+        RunOne(std::move(pending), frameIndex, acquireSceneBorrow);
         if (needsFrame) break; // Let frame-end lifecycle work finish before the next mutation.
     }
 }
 
-bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
+bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex,
+    const SceneBorrowFactory& acquireSceneBorrow)
 {
     const std::string line = TrimLine(pending.text);
 
@@ -821,9 +904,9 @@ bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
 
     // 구조화 입력은 라인 문법을 거치지 않는다(LC2). 재구성한 문자열은 진단용
     // 으로만 넘긴다 — 그것을 다시 파싱하면 §3.2 의 왕복 손실이 되살아난다.
-    const CommandCore::CommandResult result = pending.IsStructured()
-        ? ExecuteParsed(pending.arguments, line)
-        : Execute(line);
+    const auto result = pending.IsStructured()
+        ? ExecuteParsed(pending.arguments, line, acquireSceneBorrow)
+        : Execute(line, acquireSceneBorrow);
 
     auto finish = [this, pending = std::move(pending), frameIndex, dequeuedAt, line](const CommandCore::CommandResult& result)
     {
@@ -891,11 +974,13 @@ bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
         return true;
     }
     m_waitResult = {};
+    m_waitNeedsSceneBorrow = false;
     finish(result);
     return true;
 }
 
-void ConsoleCommandSystem::WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll)
+void ConsoleCommandSystem::WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll,
+    bool needsSceneBorrow)
 {
     if ((!m_commandletMode && !m_executingFromService) || !m_executing.load(std::memory_order_acquire) ||
         m_waitResult || !poll)
@@ -903,6 +988,7 @@ void ConsoleCommandSystem::WaitForResult(std::function<std::optional<CommandCore
         throw std::logic_error("Deferred results require one active commandlet or service request");
     }
     m_waitResult = std::move(poll);
+    m_waitNeedsSceneBorrow = needsSceneBorrow;
 }
 
 std::size_t ConsoleCommandSystem::ServiceQueueDepth() const
@@ -2284,6 +2370,7 @@ namespace ConsoleCmd
     struct CommandEntry
     {
         ConsoleCommandResultHandler modern{ nullptr };
+        SceneAccess sceneAccess{ SceneAccess::BorrowLiveState };
 
         // 예외를 결과로 바꾸지 않고 그대로 빠져나가게 둔다.
         //
@@ -2432,10 +2519,12 @@ namespace ConsoleCmd
             };
 
             auto regResult = [&regEntry](std::initializer_list<const char*> names,
-                                         ConsoleCommandResultHandler fn)
+                                         ConsoleCommandResultHandler fn,
+                                         SceneAccess access = SceneAccess::BorrowLiveState)
             {
                 CommandEntry entry;
                 entry.modern = fn;
+                entry.sceneAccess = access;
                 regEntry(names, entry);
             };
 
@@ -2467,7 +2556,10 @@ namespace ConsoleCmd
                     : result(&r), escaping(&e) {}
 
                 void Result(std::initializer_list<const char*> names,
-                            ConsoleCommandResultHandler fn) override { (*result)(names, fn); }
+                            ConsoleCommandResultHandler fn, SceneAccess access) override
+                {
+                    (*result)(names, fn, access);
+                }
                 void Escaping(std::initializer_list<const char*> names,
                               ConsoleCommandResultHandler fn) override { (*escaping)(names, fn); }
 
@@ -2501,7 +2593,8 @@ namespace ConsoleCmd
     }
 }
 
-CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line)
+CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line,
+    const SceneBorrowFactory& acquireSceneBorrow)
 {
     // 빈 줄은 명령이 아니다 — 결과도 없다. 시나리오 파일의 빈 줄이 여기까지
     // 오지는 않지만(LoadScriptFile 이 거른다) stdin 은 빈 줄을 보낸다.
@@ -2515,11 +2608,12 @@ CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line
                                              tokenized.errorCode);
     }
 
-    return ExecuteParsed(tokenized.tokens, line);
+    return ExecuteParsed(tokenized.tokens, line, acquireSceneBorrow);
 }
 
 CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
-    const std::vector<std::string>& parts, const std::string& diagnosticLine)
+    const std::vector<std::string>& parts, const std::string& diagnosticLine,
+    const SceneBorrowFactory& acquireSceneBorrow)
 {
     if (parts.empty()) return CommandCore::Ok();
 
@@ -2531,7 +2625,11 @@ CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
     const auto it = table.find(cmd);
     if (it == table.end())
     {
-        if (m_commandletMode) return EditorCommandlets::Run(parts);
+        if (m_commandletMode)
+        {
+            auto sceneBorrow = acquireSceneBorrow();
+            return EditorCommandlets::Run(parts);
+        }
         // ★ 예전에는 여기서 printf 하고 그냥 return 했다.
         //
         //   그래서 오타 하나가 exit 0 이었고, help 가 안내하지만 등록돼 있지
@@ -2553,6 +2651,14 @@ CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
             "다른 요청의 지연이 되므로 받지 않는다", "service.wait_forbidden");
     }
 
+    // Explicit registration controls the borrow: raw fixtures, scene readers,
+    // and menu selftests retain it; audited owned-state GPU/profiler commands
+    // run without blocking PT on this mutex. No command-name allowlist.
+    // A fenced handler must never synchronously wait for PT. Split future PT
+    // work into a request and deferred poll. The source audit found no current
+    // PT wait cycle in RT drains, which is not a guarantee for new handlers.
+    auto sceneBorrow = it->second.sceneAccess == ConsoleCmd::SceneAccess::BorrowLiveState
+        ? acquireSceneBorrow() : std::unique_lock<std::mutex>{};
     const ConsoleCommandContext ctx{ cmd, parts, diagnosticLine, *this };
 
     // ── LC7: 사용자 코드에 닿는 창은 표시된 명령에만 열린다 (§6.2 · §10.2) ──
@@ -2777,9 +2883,16 @@ void ConsoleCommandSystem::PrintHelp() const
 
 void ConsoleCommandSystem::Shutdown()
 {
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        m_acceptEditorMutations = false;
+        m_editorMutations.clear();
+    }
+
     if (m_finishWait)
     {
         m_waitResult = {};
+        m_waitNeedsSceneBorrow = false;
         auto finish = std::move(m_finishWait);
         finish({ CommandCore::CommandStatus::Cancelled, "commandlet.shutdown", "Editor is shutting down" });
     }

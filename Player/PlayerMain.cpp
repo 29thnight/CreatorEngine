@@ -595,12 +595,11 @@ void Player::PlayerMain::Finalize()
 	// 그 호출까지 세어야 하고, 닫기 전에 찍으면 마지막 요청이 빠진다.
 	EmitTextParseTelemetry();
 
-	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 표시/렌더
-	// 소비자 join → 씬 해체 → 렌더러. 새 frame 발행은 메인 루프 종료와 함께 끝났다.
+	// Stop producers, join PT/RT, then run scene cleanup while CLR/audio
+	// are alive. The collector only reclaims already-cleaned objects.
 	SceneManagers->SetDecommissioning();
 	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
-	ClrHost::Get().Shutdown();
 
     StopPresentation();
     if (m_presentationFailed.load(std::memory_order_acquire))
@@ -608,12 +607,13 @@ void Player::PlayerMain::Finalize()
         EngineBootstrap::SetExitCode(5);
     }
 
+	SceneManagers->Decommissioning();
+	ClrHost::Get().Shutdown();
 	TagManagers->Finalize();
     SceneManagers->BindAudioPlayback(nullptr);
     m_audioPlayback->Shutdown();
     m_audioCatalog->Clear();
     m_audioHost->Shutdown();
-	SceneManagers->Decommissioning();
     m_projectLayers.reset();
 
 	// 에디터는 여기서 SaveSettings를 부른다 — 플레이어의 설정 루트는
@@ -688,6 +688,7 @@ void Player::PlayerMain::Update()
 	CoroutineManagers->yield_OnRender();
 	SceneManagers->DisableOrEnable();
 	SceneManagers->EndOfFrame();
+	SceneManagers->CollectManagedAtFrameBoundary();
     m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
     m_audioPlayback->Update();
     wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);

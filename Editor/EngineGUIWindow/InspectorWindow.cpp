@@ -1845,7 +1845,8 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
         {
             m_clipKeyCache = sc->GetOwner()->GetScene()->Sounds().ClipKeys();
             m_clipSearch.clear();
-            m_clipPickerTarget = sc;
+            m_clipPickerOwner = sc->GetOwner()->GetScene()->HandleOf(sc->GetOwner()->m_index);
+            m_clipPickerComponent = sc->GetInstanceID();
             m_openClipPicker = true;
         }
     }
@@ -2103,8 +2104,31 @@ bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& sourceCurv
 void InspectorWindow::DrawSoundClipPicker()
 {
     using namespace ImGui;
-    if (!m_openClipPicker || !m_clipPickerTarget)
+    if (!m_openClipPicker)
     {
+        return;
+    }
+    // The picker may outlive component removal without an entity-selection
+    // change. Borrow the exact instance again for this presentation frame.
+    auto* scene = SceneManagers->GetActiveScene();
+    auto* owner = scene ? scene->Resolve(m_clipPickerOwner) : nullptr;
+    SoundComponent* clipPickerTarget = nullptr;
+    if (owner && !owner->IsDestroyMark())
+    {
+        for (const auto& component : owner->m_components)
+        {
+            if (component && !component->IsDestroyMark() && component->GetInstanceID() == m_clipPickerComponent)
+            {
+                clipPickerTarget = dynamic_cast<SoundComponent*>(component.get());
+                break;
+            }
+        }
+    }
+    if (!clipPickerTarget)
+    {
+        m_openClipPicker = false;
+        m_clipPickerOwner = {};
+        m_clipPickerComponent = 0;
         return;
     }
     SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
@@ -2115,7 +2139,7 @@ void InspectorWindow::DrawSoundClipPicker()
         SameLine();
         if (Button("Refresh"))
         {
-            m_clipKeyCache = m_clipPickerTarget->GetOwner()->GetScene()->Sounds().ClipKeys();
+            m_clipKeyCache = clipPickerTarget->GetOwner()->GetScene()->Sounds().ClipKeys();
         }
         Separator();
         BeginChild("##cliplist", ImVec2(0, -48), true);
@@ -2128,16 +2152,16 @@ void InspectorWindow::DrawSoundClipPicker()
             }
             if (Selectable(key.c_str(), false))
             {
-                auto settings = m_clipPickerTarget->ReadSettings();
+                auto settings = clipPickerTarget->ReadSettings();
                 settings.clipKey = key;
                 settings.sourceKind = wave::SoundSourceKind::Clip;
-                m_clipPickerTarget->QueueSettings(std::move(settings));
+                clipPickerTarget->QueueSettings(std::move(settings));
                 m_openClipPicker = false;
             }
             SameLine();
             if (SmallButton((EditorIcon::Label<EditorIcon::Play, "##prev"> + std::to_string(i)).c_str()))
             {
-                m_clipPickerTarget->QueuePreview(SoundComponent::PreviewCommand::OneShot, key);
+                clipPickerTarget->QueuePreview(SoundComponent::PreviewCommand::OneShot, key);
             }
         }
         EndChild();
@@ -2215,7 +2239,8 @@ void InspectorWindow::Draw()
     if (changedTarget || editLocked)
     {
         m_openClipPicker = false;
-        m_clipPickerTarget = nullptr;
+        m_clipPickerOwner = {};
+        m_clipPickerComponent = 0;
         m_openNewTagPopup = m_openNewLayerPopup = false;
     }
 	TerrainBrush* terrainBrush = EditorSessionState::Get().FindTerrainBrush();
@@ -2235,8 +2260,31 @@ void InspectorWindow::Draw()
 		}
 
 		static bool isOpen = false;
-		static Component* selectedComponent = nullptr;
-        if (changedTarget || editLocked) { isOpen = false; selectedComponent = nullptr; }
+        static EntityHandle selectedComponentOwner;
+        static std::uint64_t selectedComponentId{};
+        Component* selectedComponent = nullptr;
+        if (changedTarget || editLocked || selectedComponentOwner != inspected)
+        {
+            isOpen = false;
+            selectedComponentOwner = {};
+            selectedComponentId = 0;
+        }
+        for (const auto& component : selectedSceneObject->m_components)
+        {
+            if (component && !component->IsDestroyMark() && component->GetInstanceID() == selectedComponentId)
+            {
+                selectedComponent = component.get();
+                selectedComponentOwner = inspected;
+                selectedComponentId = component->GetInstanceID();
+                break;
+            }
+        }
+        if (!selectedComponent)
+        {
+            isOpen = false;
+            selectedComponentOwner = {};
+            selectedComponentId = 0;
+        }
 
 		if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
 			terrainBrush)
@@ -2244,25 +2292,11 @@ void InspectorWindow::Draw()
 			terrainBrush->m_isEditMode = false;
 		}
 
-		// ★ range-for가 아니라 인덱스 순회인 이유 (트랙 C · C2)
-		//
-		// 이 루프 안에서 그리는 드로어가 **같은 오브젝트에 컴포넌트를 붙인다**.
-		// 확정된 실사례: ImGuiDrawHelperTerrainComponent가 "Paint Foliage"를 열 때
-		// FoliageComponent가 없으면 그 자리에서 owner->AddComponent<FoliageComponent>()를
-		// 부른다(ImGuiDrawHelperTerrainComponent.cpp). AddComponent는 m_components에
-		// push_back하므로 커패시티를 넘기는 순간 벡터가 재할당되고, range-for가 쥐고
-		// 있던 반복자와 component 참조가 그 자리에서 무효해진다 — 드로어가 반환된 뒤
-		// 반복자를 증가시키는 것만으로 UB다(이 반복에서는 그 뒤로 component를 더 쓰지
-		// 않아 증상이 늦게 나타날 뿐이다).
-		//
-		// 인덱스는 재할당을 건너도 유효하고, size()를 매 반복 다시 읽으므로 방금 붙은
-		// 컴포넌트도 같은 프레임에 자연스럽게 그려진다. 무한 증식은 드로어 쪽 "없을
-		// 때만 만든다" 가드가 막는다. 저장소에 이미 있는 관용구다 —
-		// Entity::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
-		//
-		// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
-		// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
-		//
+        // Structural edits are queued for the GameThread. Presentation keeps
+        // only this frame's component borrows; terrain auto-attachment waits
+        // until the next frame before reading the new FoliageComponent.
+        // Retain indexed iteration and the existing component ordering policy.
+        //
 		// ★ 모든 컴포넌트가 이 순회 하나를 지난다 (W2-I1 · Transform 2안)
 		//
 		// 예전에는 공간 컴포넌트 둘을 순회 **앞에서** 전용 드로어로 따로 부르고 순회에서는
@@ -2321,6 +2355,8 @@ void InspectorWindow::Draw()
 			{
 				isOpen = true;
 				selectedComponent = component.get();
+                selectedComponentOwner = inspected;
+                selectedComponentId = component->GetInstanceID();
 			}
 			const bool isHeaderOpen = componentHeaderState.open;
 			inspector_body_probe bodyProbe;
@@ -2341,6 +2377,8 @@ void InspectorWindow::Draw()
 				if(isOpen && nullptr == selectedComponent)
 				{
 					selectedComponent = component.get();
+                    selectedComponentOwner = inspected;
+                    selectedComponentId = component->GetInstanceID();
 				}
 				auto componentTypeID = component->GetTypeID();
 				if (componentTypeID == type_guid(Transform))
@@ -2543,6 +2581,10 @@ void InspectorWindow::Draw()
 
 		if (ImGui::BeginPopup("ComponentMenu"))
 		{
+            if (!selectedComponent)
+            {
+                ImGui::CloseCurrentPopup();
+            }
 			// 제거할 수 없는 컴포넌트에는 항목을 내지 않는다. 눌러도 작업이 거부하지만, 거부될 항목을
 			// 보여 주는 것은 정책을 화면에서 숨기는 일이다.
 			if (selectedComponent && EditorObjectOperations::PolicyOf(*selectedComponent).removable &&
@@ -2550,14 +2592,18 @@ void InspectorWindow::Draw()
 			{
 				EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
 				ImGui::CloseCurrentPopup();
-				selectedComponent = nullptr;
+                selectedComponent = nullptr;
+                selectedComponentOwner = {};
+                selectedComponentId = 0;
 			}
 			if (selectedComponent && selectedComponent->GetTypeID() == type_guid(Transform) &&
 				ImGui::MenuItem("Reset Transform"))
 			{
 				ResetTransform(selectedSceneObject);
 				ImGui::CloseCurrentPopup();
-				selectedComponent = nullptr;
+                selectedComponent = nullptr;
+                selectedComponentOwner = {};
+                selectedComponentId = 0;
 			}
 
 			// 선언된 컴포넌트 팝업 항목(PHASE 21 M1). 문맥은 (엔티티 신원, 컴포넌트

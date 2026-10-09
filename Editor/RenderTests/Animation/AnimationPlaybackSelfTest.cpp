@@ -1,3 +1,4 @@
+#include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Animation/AnimationPlaybackSelfTest.h"
 #include "AnimationScheduler.h"
 #include "AnimationBudget.h"
@@ -334,7 +335,10 @@ namespace RenderTest
             AnimatorSystems->DestroyInstance(reused);
             AnimatorSystems->DestroyInstance(survivor);
             {
-                Animator source;
+                gc::domain sourceDomain;
+                auto sourceRoot = Component::CreateManaged<Animator>(sourceDomain);
+                Animator& source = *sourceRoot;
+                gcce_probe::cleanup sourceCleanup(source);
                 source.m_AnimIndex = 1;
                 source.SetSelectedClipIndex(2);
                 TwoBoneIKConstraint savedIK{};
@@ -353,7 +357,10 @@ namespace RenderTest
                 require(saved["m_AnimIndexChosen"].As<int>() == 2
                     && saved["m_AnimIndex"].As<int>() == 1,
                     "Existing clip-selection YAML keys retain their values");
-                Animator restored;
+                gc::domain restoredDomain;
+                auto restoredRoot = Component::CreateManaged<Animator>(restoredDomain);
+                Animator& restored = *restoredRoot;
+                gcce_probe::cleanup restoredCleanup(restored);
                 Meta::Deserialize(&restored, saved);
                 restored.OnDeserialized(Authoring::NodeViewAccess::Make(saved));
                 require(restored.GetSelectedClipIndex() == 2 && restored.m_AnimIndex == 1,
@@ -374,7 +381,10 @@ namespace RenderTest
                     "Serialization refreshes the compatibility mirror from live playback");
             }
             {
-                Animator layerOwner;
+                gc::domain layerOwnerDomain;
+                auto layerOwnerRoot = Component::CreateManaged<Animator>(layerOwnerDomain);
+                Animator& layerOwner = *layerOwnerRoot;
+                gcce_probe::cleanup layerOwnerCleanup(layerOwner);
                 std::vector<std::shared_ptr<AnimationController>> layers;
                 std::vector<std::uintptr_t> slotAddresses;
                 layers.reserve(10);
@@ -1661,7 +1671,10 @@ namespace RenderTest
             Runtime::TickSimulationFrame(0.f);
             require(job.GetAnimatorCount() == 1 && AnimatorSystems->GetCount() == 1,
                 "DDOL animator enters both animation registries");
-            Animator detachedAnimator;
+            gc::domain detachedAnimatorDomain;
+            auto detachedAnimatorRoot = Component::CreateManaged<Animator>(detachedAnimatorDomain);
+            Animator& detachedAnimator = *detachedAnimatorRoot;
+            gcce_probe::cleanup detachedAnimatorCleanup(detachedAnimator);
             std::array<bool, 5> offOwnerRejected{};
             std::thread offOwner([&]
             {
@@ -1691,7 +1704,8 @@ namespace RenderTest
             Object::SetDontDestroyOnLoad(ddolRoot);
             require(ddolRoot->IsDontDestroyOnLoad(), "DDOL actor is marked for scene transfer");
 
-            Scene* nextScene = Scene::CreateNewScene("AnimationDdolDestination");
+            Scene* nextScene = SceneManagers->AdoptScene(
+                Scene::CreateNewScene(SceneManagers->ManagedDomain(), "AnimationDdolDestination"));
             SceneManagers->ActivateScene(nextScene, true);
             scene = nullptr; // The old scene is deleted during the switch.
             SceneManagers->BeforeAwakeSceneLoad();

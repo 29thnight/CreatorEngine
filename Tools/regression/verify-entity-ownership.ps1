@@ -1,6 +1,5 @@
-# E5-d: Entity 소유권이 다시 shared_ptr로 되돌아가지 않는지 정적으로 고정한다.
-# 런타임 게이트가 파괴/DDOL 이송을 담당하고, 이 검사는 저장 타입과 공개 소스의
-# shared ownership 재유입을 잡는다.
+# GCCE: static source-only ownership contract. This script does not build or run the engine.
+# Runtime regression source covers lifecycle, DDOL, stale handles, cycles and fenced borrows.
 
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $sceneHeader = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\Scene.h") -Raw -Encoding UTF8
@@ -29,8 +28,8 @@ foreach ($entityPath in @(
     }
 }
 
-if ($sceneHeader -notmatch 'std::vector<std::unique_ptr<Entity>>\s+m_Entities') {
-    $failures += "Scene::m_Entities가 unique_ptr 슬롯 저장소가 아니다"
+if ($sceneHeader -notmatch 'std::vector<gc::trace_ref<Entity>>\s+m_Entities') {
+    $failures += "Scene::m_Entities must use traced GC graph edges"
 }
 if ($entityHeader -match 'enable_shared_from_this\s*<\s*Entity\s*>') {
     $failures += "Entity가 enable_shared_from_this를 다시 상속한다"
@@ -41,8 +40,38 @@ if ($sceneManagerHeader -notmatch 'std::vector<Object\*>\s+m_dontDestroyOnLoadOb
 if ($sceneManagerHeader -notmatch 'std::vector<DetachedEntityTransfer>\s+m_detachedDontDestroyOnLoadObjects') {
     $failures += "DDOL 이송 중 저장소가 계층 transfer 레코드 벡터가 아니다"
 }
-if ($transferHeader -notmatch 'std::unique_ptr<Entity>\s+entity') {
-    $failures += "DDOL 계층 transfer 레코드가 Entity 단독 소유권을 보존하지 않는다"
+if ($transferHeader -notmatch 'gc::root_ref<Entity>\s+entity') {
+    $failures += "DDOL transfer must retain an owner-thread GC root"
+}
+
+if ($sceneHeader -notmatch 'class\s+\[\[reflgen::reflect\]\]\s+Scene\s*:\s*public\s+gc::managed') {
+    $failures += 'Scene must be allocated as a GCCE managed object'
+}
+if ($entityHeader -notmatch 'std::vector<gc::trace_ref<Component>>\s+m_components') {
+    $failures += 'Entity components must be traced GC graph edges'
+}
+if ($sceneManagerHeader -notmatch 'gc::domain\s+m_gcDomain' -or
+    $sceneManagerHeader -notmatch 'std::vector<gc::root_ref<Scene>>\s+m_sceneRoots') {
+    $failures += 'SceneManager must retain scenes in its single shared GC domain'
+}
+if ($sceneManagerHeader.IndexOf('gc::domain m_gcDomain') -gt $sceneManagerHeader.IndexOf('m_sceneRoots')) {
+    $failures += 'SceneManager domain must be declared before roots so it is destroyed last'
+}
+if ($sceneHeader -notmatch 'static gc::root_ref<Scene> CreateNewScene\(gc::domain&' -or
+    $sceneHeader -notmatch 'static gc::root_ref<Scene> LoadScene\(gc::domain&') {
+    $failures += 'Scene factories must publish owner-thread roots in an explicit domain'
+}
+$sceneSource = Get-Content (Join-Path $repoRoot 'Engine\SceneRuntime\Scene.cpp') -Raw -Encoding UTF8
+$sceneManagerSource = Get-Content (Join-Path $repoRoot 'Engine\SceneRuntime\SceneManager.cpp') -Raw -Encoding UTF8
+if ($sceneSource -notmatch 'tracer\.visit\(m_Entities\)') {
+    $failures += 'Scene gc_trace must visit the Entity graph independently of serialization'
+}
+if ($sceneManagerSource -notmatch 'm_gcDomain\.collect_step\(gc::step_budget') {
+    $failures += 'Frame-boundary collection must use an explicit incremental soft budget'
+}
+if ($sceneSource -notmatch 'std::erase\(m_selectedEntities, released\.get\(\)\)' -or
+    $sceneSource -notmatch 'std::erase\(m_simulationSelection, released\.get\(\)\)') {
+    $failures += 'Slot release must prune all retained selection borrows'
 }
 
 $sourceRoots = @("Editor\EngineEntry", "Editor\EngineGUIWindow", "Engine\RenderEngine", "Engine\SceneRuntime") |
@@ -80,5 +109,5 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-"전체 통과 — Entity 파일명/프로젝트/include 수렴, Scene·DDOL 단독 소유, shared_ptr<Entity> 0건"
+"PASS — managed Scene/Entity graph, explicit scene/DDOL roots, owner-thread domain, budgeted collection, no shared_ptr<Entity>"
 exit 0

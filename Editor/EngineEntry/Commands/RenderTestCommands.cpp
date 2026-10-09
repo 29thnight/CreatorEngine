@@ -1354,8 +1354,8 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.transform" }, &Cmd_render_pbr_transform);
         reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
         reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
-        reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture);
-        reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture);
+        reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
+        reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
         reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);
         reg.Result({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);

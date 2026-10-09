@@ -1062,8 +1062,8 @@ namespace ConsoleCmd
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "render.pacing" }, &Cmd_render_pacing);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
-        reg.Result({ "render.live.wait" }, &Cmd_render_live_wait);
-        reg.Result({ "render.live.fence" }, &Cmd_render_live_wait);
+        reg.Result({ "render.live.wait" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
+        reg.Result({ "render.live.fence" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);

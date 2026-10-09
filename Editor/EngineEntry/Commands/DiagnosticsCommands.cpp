@@ -1972,16 +1972,16 @@ namespace ConsoleCmd
     void RegisterDiagnosticsCommands(Registrar& reg)
     {
         reg.Result({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
-        reg.Result({ "pix.capture" }, &Cmd_pix_capture);
+        reg.Result({ "pix.capture" }, &Cmd_pix_capture, SceneAccess::OwnedState);
         reg.Result({ "profile.stats" }, &Cmd_profile_stats);
         reg.Result({ "profile.frame" }, &Cmd_profile_frame);
         reg.Result({ "profile.record" }, &Cmd_profile_record);
         reg.Result({ "profile.pause" }, &Cmd_profile_pause);
         reg.Result({ "profile.save" }, &Cmd_profile_save);
         reg.Result({ "profile.counter-mask" }, &Cmd_profile_counter_mask);
-        reg.Result({ "profile.deep.start" }, &Cmd_profile_deep_start);
-        reg.Result({ "profile.deep.status" }, &Cmd_profile_deep_status);
-        reg.Result({ "profile.deep.stop" }, &Cmd_profile_deep_stop);
+        reg.Result({ "profile.deep.start" }, &Cmd_profile_deep_start, SceneAccess::OwnedState);
+        reg.Result({ "profile.deep.status" }, &Cmd_profile_deep_status, SceneAccess::OwnedState);
+        reg.Result({ "profile.deep.stop" }, &Cmd_profile_deep_stop, SceneAccess::OwnedState);
         reg.Result({ "memory.capture" }, &Cmd_memory_capture);
         reg.Result({ "memory.snapshot" }, &Cmd_memory_snapshot);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).

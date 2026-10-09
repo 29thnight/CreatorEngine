@@ -14,6 +14,12 @@ class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<Ph
     friend class Scene;
 
   public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
     PhysicsBodyComponent() = default;
     PhysicsBodyComponent(ce::physics::body_kind motion, std::vector<PhysicsShapeDefinition> shapes);
 

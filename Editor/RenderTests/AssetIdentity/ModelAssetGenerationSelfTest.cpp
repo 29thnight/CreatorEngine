@@ -1,4 +1,5 @@
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
+#include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Texture.h"
 
 #include "Assets/ModelAssetGeneration.h"
@@ -298,7 +299,10 @@ namespace RenderTest
             check.Check(coldReady, "runtime probe cold loads the selected older generation with textures");
             if (!coldReady) return;
 
-            MeshRenderer instance;
+            gc::domain instanceDomain;
+            auto instanceRoot = Component::CreateManaged<MeshRenderer>(instanceDomain);
+            auto& instance = *instanceRoot;
+            gcce_probe::cleanup instanceCleanup(instance);
             const auto verifyFailure = [&](const char* name, auto tamper)
             {
                 const auto before = DataSystems->LoadModelAssetGeneration(guid);
@@ -378,7 +382,10 @@ namespace RenderTest
                             return previous && previous->m_assetId == owner->m_assetId;
                         });
                 }
-            MeshRenderer fresh;
+            gc::domain freshDomain;
+            auto freshRoot = Component::CreateManaged<MeshRenderer>(freshDomain);
+            auto& fresh = *freshRoot;
+            gcce_probe::cleanup freshCleanup(fresh);
             RHIModelMeshView oldView;
             report.runtimeRecovered = after && after->Handle().generation > before->Handle().generation
                 && cacheAfter.replacements == cacheBefore.replacements + 1

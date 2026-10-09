@@ -116,7 +116,12 @@ namespace RenderTest
             {
                 for (Socket* socket : animator->socketvec)
                 {
-                    if (socket) { socket->DetachAllObject(); delete socket; }
+                    if (socket)
+                    {
+                        socket->DetachAllObject();
+                        socket->ReleaseManagedResources();
+                        delete socket;
+                    }
                 }
                 animator->socketvec.clear();
                 marker->SetEnabled(false);

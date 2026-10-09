@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -35,6 +35,7 @@
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
     <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
     <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h" />
+    <ClInclude Include="Tasks\SceneGCSelfTest.h" />
     <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
     <ClInclude Include="Animation\AnimationBaselineProbe.h" />
     <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
@@ -73,6 +74,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Tasks\SceneGCSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp">

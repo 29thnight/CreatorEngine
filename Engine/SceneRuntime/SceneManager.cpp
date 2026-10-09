@@ -38,6 +38,7 @@
 #include "GpuDiagnostics.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
+#include "ScriptObjectRegistry.h"
 
 // 예전에는 여기에 SuspendSceneScripts가 있었다. 재생 시작이 에디터 씬을 복제해
 // PlayScene을 만들던 시절, 원본과 사본의 스크립트 인스턴스가 둘 다 틱을 받아
@@ -294,6 +295,162 @@ SceneManager::SceneManager()
 SceneManager::~SceneManager()
 {
     DrainSceneLoads();
+    // Normal hosts already called Decommissioning while their services were live.
+    // Keep the fallback ordered as well if initialization exited early.
+    if (!m_sceneRoots.empty())
+    {
+        Decommissioning();
+    }
+    m_gcDomain.collect_full();
+}
+
+gc::domain& SceneManager::ManagedDomain()
+{
+    RequireSceneLoadOwner();
+    return m_gcDomain;
+}
+
+gc::statistics SceneManager::ManagedStatistics() const
+{
+    RequireSceneLoadOwner();
+    return m_gcDomain.stats();
+}
+
+Scene* SceneManager::AdoptScene(gc::root_ref<Scene> scene)
+{
+    RequireSceneLoadOwner();
+    if (!scene)
+    {
+        return nullptr;
+    }
+    if (&scene->ManagedDomain() != &m_gcDomain)
+    {
+        throw std::logic_error("SceneManager cannot adopt a Scene from another GC domain");
+    }
+    if (scene->IsManagedRetiringOrRetired())
+    {
+        throw std::logic_error("Cannot adopt a retiring or retired Scene");
+    }
+    if (m_exitCommand)
+    {
+        RetireScene(scene.get());
+        return nullptr;
+    }
+    Scene* borrowed = scene.get();
+    if (std::ranges::any_of(m_sceneRoots, [borrowed](const auto& root)
+        { return root.get() == borrowed; }))
+    {
+        return borrowed;
+    }
+    try
+    {
+        m_scenes.push_back(borrowed);
+        m_sceneRoots.push_back(std::move(scene));
+        m_sceneRoots.back().set_label("SceneManager.scenes");
+    }
+    catch (...)
+    {
+        std::erase(m_scenes, borrowed);
+        if (m_activeScene == borrowed)
+        {
+            SetActiveScene(nullptr);
+        }
+        borrowed->RetireManagedGraph();
+        throw;
+    }
+    return borrowed;
+}
+
+void SceneManager::RetireScene(Scene* scene)
+{
+    RequireSceneLoadOwner();
+    if (!scene)
+    {
+        return;
+    }
+    if (&scene->ManagedDomain() != &m_gcDomain)
+    {
+        throw std::logic_error("SceneManager cannot retire a Scene from another GC domain");
+    }
+    if (scene->m_managedRetiring && !scene->m_managedRetired)
+    {
+        throw std::logic_error("Cannot reenter Scene retirement from a cleanup callback");
+    }
+    auto cleanupRoot = scene->root_from_this();
+    cleanupRoot.set_label("SceneManager.retiring");
+    if (!std::ranges::any_of(m_sceneRoots, [scene](const auto& root)
+        { return root.get() == scene; }))
+    {
+        // Failed construction candidates were never published. Retain them too
+        // if a cleanup callback throws, rather than abandoning its obligation.
+        m_sceneRoots.push_back(cleanupRoot);
+        m_sceneRoots.back().set_label("SceneManager.retiring");
+    }
+    if (m_activeScene == scene)
+    {
+        SetActiveScene(nullptr);
+    }
+    if (m_sceneToActivate == scene)
+    {
+        m_sceneToActivate = nullptr;
+    }
+    if (m_asyncSceneToActivate == scene)
+    {
+        m_asyncSceneToActivate = nullptr;
+    }
+    std::erase_if(m_dontDestroyOnLoadObjects, [scene](Object* object)
+    {
+        const auto* entity = dynamic_cast<const Entity*>(object);
+        return entity && entity->GetScene() == scene;
+    });
+    scene->RetireManagedGraph();
+    PrefabUtilitys->ForgetScene(scene);
+    std::erase(m_scenes, scene);
+    std::erase_if(m_sceneRoots, [scene](const auto& root)
+        { return root.get() == scene; });
+    m_gcDomain.request_collection();
+}
+
+void SceneManager::CollectManagedAtFrameBoundary()
+{
+    RequireSceneLoadOwner();
+    // A soft budget, not a latency guarantee: a single trace/destructor and the
+    // finalize transition may overrun. GCCE records those overruns in stats().
+    m_gcDomain.collect_step(gc::step_budget{ std::chrono::microseconds(250), 16 });
+}
+
+void SceneManager::AdvanceSceneContextEpoch()
+{
+    const auto previous = m_sceneContextEpoch.load(std::memory_order_relaxed);
+    if (previous == (std::numeric_limits<std::uint64_t>::max)())
+    {
+        throw std::overflow_error("Scene context identity space exhausted");
+    }
+    m_sceneContextEpoch.store(previous + 1u, std::memory_order_release);
+}
+
+void SceneManager::SetActiveScene(Scene* scene)
+{
+    RequireSceneLoadOwner();
+    if (scene && scene->IsManagedRetiringOrRetired())
+    {
+        throw std::logic_error("Cannot activate a retiring or retired Scene");
+    }
+    if (m_activeScene.load() != scene)
+    {
+        AdvanceSceneContextEpoch();
+        m_activeScene = scene;
+    }
+}
+
+void SceneManager::SetCommittedSimulation(bool committed)
+{
+    RequireSceneLoadOwner();
+    if (m_isPlayCommitted.load() != committed)
+    {
+        AdvanceSceneContextEpoch();
+        m_isPlayCommitted = committed;
+    }
 }
 
 void SceneManager::BindAudioPlayback(wave::PlaybackService* playback, SoundSystem::AssetResolver resolver)
@@ -384,6 +541,9 @@ void SceneManager::ToggleGamePaused()
 void SceneManager::ManagerInitialize()
 {
     m_sceneLoadOwner = std::this_thread::get_id();
+    m_gcDomain.bind_to_current_thread();
+    m_gcDomain.set_allocation_threshold(1024u * 1024u);
+    m_gcDomain.set_max_cycle_interval(std::chrono::seconds(1));
     RegisterReflectManual(); // CT4: 명시 메타 파일럿 4타입 — def에서 빠진 몫
     ComponentFactorys->Initialize();
     m_inputActionManager = new InputActionManager();
@@ -444,7 +604,7 @@ void SceneManager::ApplyPendingSceneStructureChange()
 		m_isSimulationSessionActive = true;
         // 확정은 맨 끝이다. 이 줄이 참이면 위의 전부가 끝났다는 뜻이라야
         // 읽는 쪽이 하나만 보고 판단할 수 있다.
-        m_isPlayCommitted = true;
+        SetCommittedSimulation(true);
     }
     else if (!m_isGameStart && m_isSimulationSessionActive)
     {
@@ -618,27 +778,61 @@ void SceneManager::Decommissioning()
     }
     m_animationScheduler->Finalize();
 
-	// DDOL 대상을 먼저 파괴 표시한다. Scene이 소유한 unique_ptr를 해제하기 전에
+	// DDOL 대상을 먼저 파괴 표시한다. Scene graph의 강한 참조를 해제하기 전에
 	// 표시를 세워야 하며, 평상시 DDOL 목록은 비소유 포인터일 뿐이다.
-	for (Object* object : m_dontDestroyOnLoadObjects)
-		if (object) object->Destroy();
-	m_dontDestroyOnLoadObjects.clear();
-
-    for (auto& scene : m_scenes)
+    for (Object* object : m_dontDestroyOnLoadObjects)
     {
-        if (scene)
+        if (object)
         {
-            (void)scene->StopPhysicsSimulation();
-            scene->AllDestroyMark(true);
-            scene->EndFramePass();
+            object->Destroy();
         }
     }
+	m_dontDestroyOnLoadObjects.clear();
 
+    for (auto& transfer : m_detachedDontDestroyOnLoadObjects)
+    {
+        if (transfer.entity)
+        {
+            transfer.entity->Destroy();
+            gc::advance_lifecycle(transfer.entity, gc::lifecycle_state::destroying);
+            Scene* attachedScene = transfer.entity->GetScene();
+            for (const auto& component : transfer.entity->m_components)
+            {
+                if (component)
+                {
+                    auto cleanupRoot = component->root_from_this();
+                    gc::advance_lifecycle(cleanupRoot, gc::lifecycle_state::destroy_requested);
+                    gc::advance_lifecycle(cleanupRoot, gc::lifecycle_state::destroying);
+                    component->OnEndSimulation();
+                    if (attachedScene)
+                    {
+                        // A failed attachment may retain both its transfer root
+                        // and a destination edge. Retire its registrations once.
+                        component->OnRemovingFromScene();
+                        attachedScene->UnregisterComponent(component.get());
+                    }
+                    component->OnUninitializing();
+                    component->FinalizeManagedDestroy();
+                }
+            }
+            ScriptObjectRegistry::Get().Unregister(transfer.entity.get());
+            transfer.entity->FinalizeManagedDestroy();
+        }
+    }
 	m_detachedDontDestroyOnLoadObjects.clear();
 
-    Memory::SafeDelete(m_inputActionManager);
+    m_sceneToActivate = nullptr;
+    m_asyncSceneToActivate = nullptr;
+    while (!m_sceneRoots.empty())
+    {
+        RetireScene(m_sceneRoots.back().get());
+    }
+    m_scenes.clear();
+    // Accepted worker results and scene roots are gone. Asset/render snapshots
+    // retain their independent owners through their own fences.
+    m_gcDomain.collect_full();
 
-
+    // Keep callback targets alive through scene hooks and the first sweep.
 	PlayModeEvent.Clear();
 	InputEvent.Clear();
 	SceneRenderingEvent.Clear();
@@ -651,21 +845,15 @@ void SceneManager::Decommissioning()
     activeSceneChangedEvent.Clear();
     newSceneCreatedEvent.Clear();
     resourceTrimEvent.Clear();
-    m_activeScene = nullptr;
+    AssetLoadEvent.Clear();
+    resetSelectedObjectEvent.Clear();
+    // Callback destruction can release external roots. Sweep those releases
+    // while the input/animation/audio/CLR services are still available too.
+    m_gcDomain.collect_full();
+    Memory::SafeDelete(m_inputActionManager);
+    SetActiveScene(nullptr);
     m_activeSceneIndex = 0;
 
-    for(auto& scene : m_scenes)
-    {
-        if (scene)
-        {
-            // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
-            // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
-            PrefabUtilitys->ForgetScene(scene);
-            delete scene;
-        }
-	}
-    // 지운 씬을 목록에 남기면 뒤이은 순회(BindAudioPlayback 등)가 해제된 메모리를 읽는다.
-    m_scenes.clear();
 }
 
 void SceneManager::SetDecommissioning()
@@ -675,57 +863,57 @@ void SceneManager::SetDecommissioning()
 
 Scene* SceneManager::CreateScene(std::string_view name)
 {
+    RequireSceneLoadOwner();
+    if (m_exitCommand)
+    {
+        return nullptr;
+    }
     DrainSceneLoads();
     resourceTrimEvent.Broadcast();
-    Scene* allocScene = Scene::CreateNewScene(name);
-	Scene* swapScene = nullptr;
-
-	if (!allocScene) return nullptr;
-
-    if (m_activeScene)
+    auto candidate = Scene::CreateNewScene(m_gcDomain, name);
+    Scene* scene = candidate.get();
+    try
     {
-		swapScene = m_activeScene.load();
-        if (!PreparePhysicsSceneExit(swapScene)) { delete allocScene; return nullptr; }
-
-        for (auto* object : m_dontDestroyOnLoadObjects)
-            if (auto* entity = dynamic_cast<Entity*>(object))
-                swapScene->DetachEntityHierarchy(entity, m_detachedDontDestroyOnLoadObjects);
-
-        sceneUnloadedEvent.Broadcast();
-
-        swapScene->AllDestroyMark();
-        swapScene->EndFramePass();
-
-        // 관리 측 그물은 파괴가 끝난 뒤에 던진다 — 근거는 ClrHost.h의 선언 주석 참고.
-        // sceneUnloadedEvent(위)는 파괴 '전'이라 이 자리에 쓸 수 없다.
-        ClrHost::Get().NotifySceneUnload();
-
-        std::erase_if(m_scenes,
-            [&](const auto& scene) { return scene == swapScene; });
-
-        // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
-        // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
-        PrefabUtilitys->ForgetScene(swapScene);
-
-        delete swapScene;
-		swapScene = nullptr;
-        m_activeScene = allocScene;
+        if (Scene* oldScene = m_activeScene.load())
+        {
+            if (!PreparePhysicsSceneExit(oldScene))
+            {
+                candidate->RetireManagedGraph();
+                return nullptr;
+            }
+            for (Object* object : m_dontDestroyOnLoadObjects)
+            {
+                if (auto* entity = dynamic_cast<Entity*>(object))
+                {
+                    oldScene->DetachEntityHierarchy(entity, m_detachedDontDestroyOnLoadObjects);
+                }
+            }
+            sceneUnloadedEvent.Broadcast();
+            oldScene->AllDestroyMark();
+            oldScene->EndFramePass();
+            // Script handles stay valid through the old Scene's cleanup hooks.
+            ClrHost::Get().NotifySceneUnload();
+            RetireScene(oldScene);
+        }
+        SetActiveScene(scene);
+        AdoptScene(candidate);
+        m_activeSceneIndex = m_scenes.size() - 1;
+        scene->m_buildIndex = m_activeSceneIndex.load();
+        RebindEventDontDestroyOnLoadObjects(scene);
+        scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
+        ResumePhysicsAfterSceneActivation();
+        NotifyActiveSceneChanged();
+        newSceneCreatedEvent.Broadcast();
+        return scene;
     }
-    else
+    catch (...)
     {
-        m_activeScene = allocScene;
+        if (candidate)
+        {
+            RetireScene(candidate.get());
+        }
+        throw;
     }
-
-    m_scenes.push_back(allocScene);
-    m_activeSceneIndex = m_scenes.size() - 1;
-    allocScene->m_buildIndex = m_activeSceneIndex.load();
-    RebindEventDontDestroyOnLoadObjects(allocScene);
-    allocScene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
-    ResumePhysicsAfterSceneActivation();
-    NotifyActiveSceneChanged();
-    newSceneCreatedEvent.Broadcast();
-
-    return allocScene;
 }
 
 Scene* SceneManager::SaveScene(std::string_view name)
@@ -782,12 +970,18 @@ Scene* SceneManager::SaveScene(std::string_view name)
 
 Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 {
+    RequireSceneLoadOwner();
+    if (m_exitCommand)
+    {
+        return nullptr;
+    }
     ce::profile_scope profile{ ce::marker<"SceneLoad">() };
     DrainSceneLoads();
 	// D0(SerializationPlan): 이 함수 전체가 "씬 전환 1회"를 재는 자다. 하위 단계
 	// 합과 이 값의 차이가 곧 미귀속분이고, 그 차이를 숨기지 않는 것이 이 계측의 요점이다.
 	SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneLoadTotal);
 	std::string loadSceneName = name.data();
+    gc::root_ref<Scene> candidate;
 
 	try
 	{
@@ -821,7 +1015,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
             ClrHost::Get().NotifySceneUnload();
 
-            m_activeScene = nullptr;
+            SetActiveScene(nullptr);
             
             std::erase_if(m_scenes,
                 [&](const auto& scene) { return scene == swapScene; });
@@ -830,7 +1024,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
             PrefabUtilitys->ForgetScene(swapScene);
 
-            delete swapScene;
+            RetireScene(swapScene);
         }
 		file::path sceneName = name.data();
         resourceTrimEvent.Broadcast();
@@ -871,7 +1065,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         }
         // Preparation exceptions and non-ready outcomes reach the existing
         // scene-load failure handler before a new Scene or its entities exist.
-        m_activeScene = Scene::LoadScene(sceneName.stem().string());
+        candidate = Scene::LoadScene(m_gcDomain, sceneName.stem().string());
+        SetActiveScene(candidate.get());
         m_activeScene.load()->m_requiredLoadAssetsBundle = std::move(requiredBundle);
 
         DataSystems->ClearRetainedAssets();
@@ -943,7 +1138,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
         ResumePhysicsAfterSceneActivation();
 
-		m_scenes.push_back(m_activeScene);
+        AdoptScene(candidate);
 		m_activeSceneIndex = m_scenes.size() - 1;
 		NotifyActiveSceneChanged();
 		sceneLoadedEvent.Broadcast();
@@ -955,6 +1150,10 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 	}
 	catch (const std::exception& e)
 	{
+        if (candidate)
+        {
+            RetireScene(candidate.get());
+        }
 		Debug::PrintLog(spdlog::level::err, e.what());
 		return nullptr;
 	}
@@ -963,11 +1162,17 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
 Scene* SceneManager::LoadScene(std::string_view name)
 {
+    RequireSceneLoadOwner();
+    if (m_exitCommand)
+    {
+        return nullptr;
+    }
     // 장면 열기 전체. 하위 표지 합과의 차이가 미귀속분이다.
     ce::profile_scope profile{ ce::marker<"SceneLoad">() };
     DrainSceneLoads();
     std::string loadSceneName = name.data();
     Scene* scene{ nullptr };
+    gc::root_ref<Scene> candidate;
 
     try
     {
@@ -997,7 +1202,8 @@ Scene* SceneManager::LoadScene(std::string_view name)
                 RequireReadySceneBundle(bundleAssets);
             }
         }
-        scene = Scene::LoadScene(sceneName.stem().string());
+        candidate = Scene::LoadScene(m_gcDomain, sceneName.stem().string());
+        scene = candidate.get();
         scene->m_requiredLoadAssetsBundle = std::move(requiredBundle);
 
         // ★ 두 루프가 서로 다른 씬을 타깃으로 한다 — m_Entities는 방금 만든
@@ -1061,11 +1267,15 @@ Scene* SceneManager::LoadScene(std::string_view name)
 		scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
 
 
-        m_scenes.push_back(scene);
+        AdoptScene(candidate);
         sceneLoadedEvent.Broadcast();
     }
     catch (const std::exception& e)
     {
+        if (candidate)
+        {
+            RetireScene(candidate.get());
+        }
         Debug::PrintLog(spdlog::level::err, e.what());
         return nullptr;
     }
@@ -1221,52 +1431,69 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 
 Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
 {
-    auto scene = std::unique_ptr<Scene>(Scene::LoadScene(file::path(load.m_path).stem().string()));
-    scene->m_requiredLoadAssetsBundle = load.m_bundle;
-    const auto root = load.m_document.Root();
-    LoadIndexBatch batch;
-    // New DDOL entities remain in this candidate until acceptance. Existing
-    // persistent identities are skipped by the DDOL loader; failed candidates
-    // cannot leave entities or image roots behind in the active scene.
-    Scene* ddolScene = scene.get();
-    const auto preparedTextures = DataSystems->SceneTextureImagePins(load.m_assets);
-    scene->SetPreparedTextureImagePins(preparedTextures);
-    auto hierarchy = scene->BeginHierarchyBulkBuild();
-    auto deserialize = [&](const Authoring::ReadNode& node, bool ddol)
-    {
-        try
-        {
-            const auto* type = Meta::ExtractTypeFromYAML(node);
-            if (!type) throw std::runtime_error("Failed to extract scene entity type");
-            if (ddol)
-            {
-                DesirealizeDontDestroyOnLoadObjects(ddolScene, type, Authoring::NodeViewAccess::Make(node), &batch);
-            }
-            else
-            {
-                DesirealizeGameObject(scene.get(), type, Authoring::NodeViewAccess::Make(node), &batch);
-            }
-        }
-        catch (const std::exception& e)
-        {
-            Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize scene entity: ") + e.what());
-        }
-    };
+    auto scene = Scene::LoadScene(m_gcDomain, file::path(load.m_path).stem().string());
     try
     {
-        // SaveScene records DDOL entities in both sections. Instantiate each identity
-        // only through the DDOL path; otherwise activation keeps a normal duplicate.
+        scene->m_requiredLoadAssetsBundle = load.m_bundle;
+        const auto root = load.m_document.Root();
+        LoadIndexBatch batch;
+        // New DDOL entities remain rooted in the candidate until owner acceptance.
+        // A failed candidate never installs them in the currently active scene.
+        const auto preparedTextures = DataSystems->SceneTextureImagePins(load.m_assets);
+        scene->SetPreparedTextureImagePins(preparedTextures);
+        auto hierarchy = scene->BeginHierarchyBulkBuild();
+        auto deserialize = [&](const Authoring::ReadNode& node, bool ddol)
+        {
+            try
+            {
+                const auto* type = Meta::ExtractTypeFromYAML(node);
+                if (!type)
+                {
+                    throw std::runtime_error("Failed to extract scene entity type");
+                }
+                if (ddol)
+                {
+                    DesirealizeDontDestroyOnLoadObjects(scene.get(), type,
+                        Authoring::NodeViewAccess::Make(node), &batch);
+                }
+                else
+                {
+                    DesirealizeGameObject(scene.get(), type,
+                        Authoring::NodeViewAccess::Make(node), &batch);
+                }
+            }
+            catch (const std::exception& error)
+            {
+                Debug::PrintLog(spdlog::level::err,
+                    std::string("Failed to deserialize scene entity: ") + error.what());
+            }
+        };
+        // SaveScene records DDOL entities in both sections. Construct each identity
+        // only once, using the DDOL section for persistent entities.
         std::unordered_set<size_t> ddolIds;
         for (const auto node : root["DontDestroyOnLoadObjects"])
-            if (node["m_instanceID"]) ddolIds.insert(node["m_instanceID"].As<size_t>());
-        // Required CPU generations were prepared and published by the owner pump.
+        {
+            if (node["m_instanceID"])
+            {
+                ddolIds.insert(node["m_instanceID"].As<size_t>());
+            }
+        }
         for (const auto node : SerializedEntities(root))
+        {
             if (!node["m_instanceID"] || !ddolIds.contains(node["m_instanceID"].As<size_t>()))
+            {
                 deserialize(node, false);
-        for (const auto node : root["DontDestroyOnLoadObjects"]) deserialize(node, true);
-
+            }
+        }
+        for (const auto node : root["DontDestroyOnLoadObjects"])
+        {
+            deserialize(node, true);
+        }
         RemapLoadBatchIndices(scene.get(), batch);
-        for (const auto& entry : batch) ReconnectPrefabInstance(scene.get(), entry.object);
+        for (const auto& entry : batch)
+        {
+            ReconnectPrefabInstance(scene.get(), entry.object);
+        }
         hierarchy.Complete();
         scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
         if (load.m_cancelled || m_exitCommand
@@ -1275,26 +1502,14 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
         {
             throw std::runtime_error("Scene construction was cancelled or superseded before handoff.");
         }
-        m_scenes.push_back(scene.get());
+        AdoptScene(scene);
     }
     catch (...)
     {
-        std::erase_if(m_dontDestroyOnLoadObjects, [&](Object* object)
-        {
-            auto* entity = dynamic_cast<Entity*>(object);
-            return entity && entity->GetScene() == scene.get();
-        });
-        for (const auto& entity : scene->m_Entities)
-            if (entity)
-            {
-                TagManagers->RemoveTagFromObject(entity->m_tag.ToString(), entity.get());
-                entity->Destroy();
-            }
-        scene->EndFramePass();
-        PrefabUtilitys->ForgetScene(scene.get());
+        RetireScene(scene.get());
         throw;
     }
-    return scene.release();
+    return scene.get();
 }
 
 void SceneManager::CompleteSceneLoads(bool wait)
@@ -1406,7 +1621,18 @@ void SceneManager::DrainSceneLoads()
 
 void SceneManager::ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete)
 {
-    if (!sceneToActivate) return;
+    RequireSceneLoadOwner();
+    if (m_exitCommand)
+    {
+        return;
+    }
+    if (!sceneToActivate)
+    {
+        return;
+    }
+    // A queued activation outlives the requesting stack. Retain its exact Scene
+    // now, before the requester's temporary factory root can be released.
+    AdoptScene(sceneToActivate->root_from_this());
     m_asyncSceneToActivate = nullptr;
 
 	m_sceneToActivate = sceneToActivate;
@@ -1466,7 +1692,7 @@ void SceneManager::BeforeAwakeSceneLoad()
         }
 
         //resourceTrimEvent.Broadcast();
-        m_activeScene = m_sceneToActivate.load();
+        SetActiveScene(m_sceneToActivate.load());
 
         // ★ 이미 목록에 있으면 다시 넣지 않는다.
         //
@@ -1483,7 +1709,7 @@ void SceneManager::BeforeAwakeSceneLoad()
             m_sceneToActivate.load());
         if (found == m_scenes.end())
         {
-            m_scenes.push_back(m_sceneToActivate);
+            AdoptScene(m_sceneToActivate.load()->root_from_this());
             m_activeSceneIndex = m_scenes.size() - 1;
         }
         else
@@ -1510,7 +1736,7 @@ void SceneManager::BeforeAwakeSceneLoad()
             // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
             // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
             PrefabUtilitys->ForgetScene(oldScene);
-            delete oldScene;
+            RetireScene(oldScene);
         }
         m_sceneToActivate = nullptr;
         m_asyncSceneToActivate = nullptr;
@@ -1570,7 +1796,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
     if (!scene) return;
     if (m_dontDestroyOnLoadObjects.empty()) return;
 	// 비동기 LoadScene은 새 Scene이 준비되기 전에 이 함수에 들어올 수 있다. 아직
-	// Detach가 만든 unique_ptr transfer가 없다면 옛 Scene의 엔티티를 목적 Scene에
+	// Detach가 만든 root_ref transfer가 없다면 옛 Scene의 엔티티를 목적 Scene에
 	// 중복 등록하지 않는다. 실제 이송이 준비된 경우에만 아래를 실행한다.
 	if (m_detachedDontDestroyOnLoadObjects.empty()) return;
 
@@ -1918,7 +2144,7 @@ void SceneManager::EndPlayTransaction()
             active->Sounds().EndWorld();
         }
     }
-    m_isPlayCommitted = false;
+    SetCommittedSimulation(false);
     Scene* scene = m_activeScene.load();
     if (!scene)
     {
@@ -2009,7 +2235,7 @@ bool SceneManager::ResumePhysicsAfterSceneActivation()
 
         std::printf("[physics.scene.activation.failed] transferredPersistent=%zu\n", static_cast<size_t>(persistent));
 
-        m_isPlayCommitted = false;
+        SetCommittedSimulation(false);
         NotePlayFailure(std::string(started.error().message));
         Debug::PrintLog(spdlog::level::err, std::string(started.error().message));
         SetGameStart(false);

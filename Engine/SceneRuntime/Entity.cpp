@@ -12,36 +12,138 @@
 #include "BoneComponent.h"
 #include "PrefabUtility.h"
 #include "ScriptObjectRegistry.h"
+#include "ComponentFactory.h"
+#include <stdexcept>
 
-Entity::Entity() :
-	Object("Entity"),
-	m_index(0)
-{
-	m_ownerScene = SceneManagers->GetActiveScene();
-    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
-	// 기본 Entity는 Empty 생성과 같은 최소 공간 구성(Transform)을 갖는다.
-	// UI/Canvas 클론은 Object::Instantiate가 이 기본 팩토리를 쓰지 않고 Scene의
-	// 타입 인자 생성 경로로 들어가므로 공간 조합이 섞이지 않는다(E7-c).
-	m_pTransformComponent = AddComponent<Transform>();
-	m_pTransformComponent->SetParentID(0);
-}
-
-Entity::Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
-    Object(name),
-    m_index(index),
-	m_ownerScene(scene)
+Entity::Entity() : Object("Entity"), m_index(0)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
-	AttachSpatialComponent(type, parentIndex);
 }
 
-Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
-	Object(name, instanceID),
-	m_index(index),
-	m_ownerScene(scene)
+Entity::Entity(Scene* scene, std::string_view name, GameObjectType,
+    Entity::Index index, Entity::Index) : Object(name), m_index(index), m_ownerScene(scene)
 {
-	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
-	AttachSpatialComponent(type, parentIndex);
+    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
+}
+
+Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType,
+    Entity::Index index, Entity::Index) : Object(name, instanceID), m_index(index), m_ownerScene(scene)
+{
+    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
+}
+
+gc::root_ref<Entity> Entity::Create(gc::domain& domain)
+{
+    auto entity = gc::make<Entity>(domain);
+    entity->InitializeManaged(domain, GameObjectType::Empty, kSceneRootIndex);
+    return entity;
+}
+
+gc::root_ref<Entity> Entity::Create(gc::domain& domain, Scene* scene,
+    std::string_view name, GameObjectType type, Index index, Index parentIndex)
+{
+    if (scene && (scene->IsManagedRetiringOrRetired() || &scene->ManagedDomain() != &domain))
+    {
+        throw std::logic_error("Entity factory requires a live Scene in the same GC domain");
+    }
+    auto entity = gc::make<Entity>(domain, scene, name, type, index, parentIndex);
+    entity->InitializeManaged(domain, type, parentIndex);
+    return entity;
+}
+
+gc::root_ref<Entity> Entity::Create(gc::domain& domain, Scene* scene, size_t instanceID,
+    std::string_view name, GameObjectType type, Index index, Index parentIndex)
+{
+    if (scene && (scene->IsManagedRetiringOrRetired() || &scene->ManagedDomain() != &domain))
+    {
+        throw std::logic_error("Entity factory requires a live Scene in the same GC domain");
+    }
+    auto entity = gc::make<Entity>(domain, scene, instanceID, name, type, index, parentIndex);
+    entity->InitializeManaged(domain, type, parentIndex);
+    return entity;
+}
+
+void Entity::InitializeManaged(gc::domain& domain, GameObjectType type, Index parentIndex)
+{
+    if (m_gcDomain || !root_from_this())
+    {
+        throw std::logic_error("Entity must be initialized once, after gc::make publication");
+    }
+    m_gcDomain = &domain;
+    try
+    {
+        AttachSpatialComponent(type, parentIndex);
+        if (!m_pTransformComponent)
+        {
+            m_missingTransformFallback = Component::CreateManaged<Transform>(domain);
+        }
+    }
+    catch (...)
+    {
+        // A later spatial/fallback allocation can fail after an earlier
+        // component was registered. Roll back those raw schedule observers
+        // before releasing the factory's root; no lifecycle hook has run yet.
+        if (m_ownerScene)
+        {
+            for (const auto& component : m_components)
+            {
+                m_ownerScene->UnregisterComponent(component.get());
+            }
+        }
+        FinalizeManagedDestroy();
+        throw;
+    }
+}
+
+gc::domain& Entity::Domain() const
+{
+    if (!m_gcDomain)
+    {
+        throw std::logic_error("Entity allocation requires Entity::Create");
+    }
+    return *m_gcDomain;
+}
+
+void Entity::gc_trace(gc::tracer& tracer) const
+{
+    tracer.visit(m_components);
+    tracer.visit(m_missingTransformFallback);
+    // Scene/Prefab/hierarchy/transform-cache are borrowed observers, not owners.
+}
+
+void Entity::BeginManagedCleanup()
+{
+    gc::begin_cleanup_obligation(root_from_this());
+}
+
+void Entity::FinalizeManagedDestroy()
+{
+    auto self = root_from_this();
+    if (gc::lifecycle_of(self) == gc::lifecycle_state::destroyed)
+    {
+        return;
+    }
+    gc::advance_lifecycle(self, gc::lifecycle_state::destroy_requested);
+    gc::advance_lifecycle(self, gc::lifecycle_state::destroying);
+    for (const auto& component : m_components)
+    {
+        if (component)
+        {
+            component->FinalizeManagedDestroy();
+        }
+    }
+    m_components.clear();
+    if (m_missingTransformFallback)
+    {
+        m_missingTransformFallback->FinalizeManagedDestroy();
+    }
+    m_missingTransformFallback.reset();
+    m_pTransformComponent = nullptr;
+    m_componentTypeMask = 0;
+    m_ownerScene = nullptr;
+    m_prefab = nullptr;
+    m_destroyMark = true;
+    gc::advance_lifecycle(self, gc::lifecycle_state::destroyed);
 }
 
 // ★ S3 — 공간 컴포넌트는 계열당 하나다. 단, 경계는 UI이지 Canvas가 아니다.
@@ -163,6 +265,7 @@ void Entity::Destroy()
     PrefabUtilitys->UnregisterInstance(this);
 
 	m_destroyMark = true;
+    gc::advance_lifecycle(root_from_this(), gc::lifecycle_state::destroy_requested);
 	TypeTrait::GUIDCreator::EraseGUID(m_instanceID);
 
 	// ★ 스크립트 핸들은 여기서 죽이지 않는다 — Scene::DestroyEntities로 옮겼다.
@@ -234,6 +337,10 @@ void Entity::AttachComponentLifecycle(Component* component)
 
 bool Entity::CanAttachComponentType(const HashedGuid& type) const
 {
+    if (m_destroyMark || (m_ownerScene && m_ownerScene->IsManagedRetiringOrRetired()))
+    {
+        return false;
+    }
     if (type == type_guid(CharacterMovementComponent))
         return FindComponentSlot(type_guid(PhysicsBodyComponent)) == kInvalidComponentSlot &&
             FindComponentSlot(type_guid(CharacterMovementComponent)) == kInvalidComponentSlot;
@@ -242,83 +349,75 @@ bool Entity::CanAttachComponentType(const HashedGuid& type) const
     return true;
 }
 
+Component* Entity::PublishManagedComponent(const gc::root_ref<Component>& component, bool initialize)
+{
+    Component* raw = component.get();
+    try
+    {
+        // Own the edge before publishing a raw scheduler observer. The local
+        // root remains live through every throwing allocation/initialization.
+        m_components.emplace_back(component);
+        raw->SetOwner(this);
+        if (auto* transform = dynamic_cast<Transform*>(raw))
+        {
+            m_pTransformComponent = transform;
+        }
+        AttachComponentLifecycle(raw);
+        const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(raw->GetTypeID());
+        if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
+        {
+            m_componentTypeMask |= (1ull << maskIndex);
+        }
+        if (initialize)
+        {
+            if (auto* initializable = dynamic_cast<System::IInitializable*>(raw))
+            {
+                initializable->Initialize();
+            }
+        }
+        return raw;
+    }
+    catch (...)
+    {
+        if (m_ownerScene)
+        {
+            m_ownerScene->UnregisterComponent(raw);
+        }
+        raw->FinalizeManagedDestroy();
+        std::erase_if(m_components, [raw](const gc::trace_ref<Component>& entry)
+        {
+            return entry.get() == raw;
+        });
+        RebuildComponentTypeMask();
+        throw;
+    }
+}
+
 Component* Entity::AddComponent(const reflgen::type_descriptor& type)
 {
     const HashedGuid typeID = Meta::TypeIDOf(type);
-    if (auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& component) { return component->GetTypeID() == typeID; }); it != m_components.end())
+    if (auto* existing = FindComponent(typeID))
     {
-		Debug::PrintLog(spdlog::level::warn, "Component of type " + std::string(type.name()) + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
-		return it->get();
+        Debug::PrintLog(spdlog::level::warn, "Component of type " + std::string(type.name())
+            + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
+        return existing;
     }
-
-    // CT11: 팩토리 접합 — 이미 손에 쥔 서술자가 생성 함수를 직접 든다(조회 0회).
-    // K2 스테이지 A: GameObject가 유일한 소유자이므로 고유 소유로 만든다.
-    // reflgen 도입 P5: T* → Component* 는 서술자의 base 체인이 보정한다(옛 경로는 오프셋 0을 가정했다) —
-    // Component 의 반영된 자손이 아니면 nullptr 이다. 삭제는 가상 소멸자(meta::polymorphic)가 파생 타입으로 한다.
-    if (!CanAttachComponentType(Meta::TypeIDOf(type))) return nullptr;
-
-    std::unique_ptr<Component> component = Meta::Create<Component>(type);
-
-    Component* rawComponent = component.get();
-    if (rawComponent)
+    if (!CanAttachComponentType(typeID))
     {
-		rawComponent->SetOwner(this);
-		if (auto* transform = dynamic_cast<Transform*>(rawComponent))
-		{
-			m_pTransformComponent = transform;
-		}
-
-		AttachComponentLifecycle(rawComponent);
-
-        m_components.push_back(std::move(component));
-
-		// K2: m_componentIds(맵) 소멸 — push_back 자체가 등록이다. 조회는
-		// FindComponentSlot(마스크 선판정 + 선형 탐색)으로 수렴했다.
-
-		// K1-a 후속 배선: 서술자 경유 부착(디스크 로드 경로, ComponentFactory::
-		// LoadComponent가 실제로 부른다)도 템플릿 AddComponent<T>()와 동일하게
-		// 마스크 비트를 세워야 HasComponent<T>()가 로드된 오브젝트에서도 맞는다.
-		const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(rawComponent->GetTypeID());
-		if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
-		{
-			m_componentTypeMask |= (1ull << maskIndex);
-		}
+        return nullptr;
     }
-
-	return rawComponent;
+    auto component = ComponentFactorys->CreateManaged(Domain(), type);
+    return PublishManagedComponent(component, false);
 }
 
 Component* Entity::AddComponentAllowMultiple(const reflgen::type_descriptor& type)
 {
-    if (!CanAttachComponentType(Meta::TypeIDOf(type))) return nullptr;
-
-	std::unique_ptr<Component> component = Meta::Create<Component>(type);
-
-	Component* rawComponent = component.get();
-	if (!rawComponent)
-	{
-		return nullptr;
-	}
-
-	rawComponent->SetOwner(this);
-
-	AttachComponentLifecycle(rawComponent);
-
-	m_components.push_back(std::move(component));
-
-	// K2: 타입→인덱스 맵(m_componentIds) 소멸 — 맵은 타입당 인덱스 하나만 담아서
-	// 다중 부착 시 나머지 인스턴스를 표현할 수 없었다. FindComponentSlot의 선형
-	// 탐색은 살아있는 인스턴스를 전부 정확히 찾으므로 이 블록 자체가 필요 없다.
-
-	// K1-a 후속 배선: 다중 부착 경로(ScriptComponent 등)도 마스크를 세운다.
-	// 이미 켜져 있으면(같은 타입 두 번째 이상 부착) 아무 효과 없는 OR라 안전하다.
-	const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(rawComponent->GetTypeID());
-	if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
-	{
-		m_componentTypeMask |= (1ull << maskIndex);
-	}
-
-	return rawComponent;
+    if (!CanAttachComponentType(Meta::TypeIDOf(type)))
+    {
+        return nullptr;
+    }
+    auto component = ComponentFactorys->CreateManaged(Domain(), type);
+    return PublishManagedComponent(component, false);
 }
 
 Component* Entity::GetComponent(const reflgen::type_descriptor& type)
@@ -351,17 +450,17 @@ void Entity::AddChild(Entity* _objcet)
 // 오브젝트 이름별로 한 번씩만 찍는다(매 프레임 호출이면 로그가 묻힌다).
 Transform& Entity::MissingTransformFallback(const Entity* who)
 {
-	static Transform s_dummy{};
-	static std::unordered_set<std::string> s_reported;
-
-	const std::string name = who ? who->m_name.ToString() : std::string("<null>");
-	if (s_reported.insert(name).second)
-	{
-		Debug::PrintLog(spdlog::level::err, "[S3] Transform이 없는 오브젝트에서 Transform_()가 불렸다: '" + name
-			+ "' — UI는 RectTransformComponent만 갖는다. 이 호출부를 찾아 고쳐야 한다"
-			" (지금은 공유 더미를 돌려주므로 값이 반영되지 않는다).");
-	}
-	return s_dummy;
+    if (!who || !who->m_missingTransformFallback)
+    {
+        throw std::logic_error("Transform requested on an uninitialized or retired Entity");
+    }
+    std::call_once(who->m_missingTransformReported, [who]
+    {
+        Debug::PrintLog(spdlog::level::err,
+            "Transform requested on UI Entity '" + who->m_name.ToString()
+            + "'; writes affect only its diagnostic fallback");
+    });
+    return *who->m_missingTransformFallback;
 }
 
 Entity::Index Entity::GetParentIndex() const
@@ -496,7 +595,7 @@ Entity* Entity::FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid)
 	auto& gameObjects = scene->m_Entities;
 	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — free 리스트로 회수된
 	// 슬롯이 재사용되기 전까지 m_Entities에 계속 남는다.
-	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::unique_ptr<Entity>& object)
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const gc::trace_ref<Entity>& object)
 	{
 		return object && object->m_instanceID == guid;
 	});
@@ -510,7 +609,7 @@ Entity* Entity::FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid)
 
 	auto& gameObjects = scene->m_Entities;
 	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
-	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::unique_ptr<Entity>& object)
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const gc::trace_ref<Entity>& object)
 	{
 		return object && object->m_attachedSoketID == guid;
 	});

@@ -38,6 +38,19 @@ inline size_t ConvertGUIDToHash(const GUID& guid)
 	return guid.Data1 + guid.Data2 + guid.Data3;
 }
 
+namespace gc
+{
+    template<class T> class trace_ref;
+    template<class T> class root_ref;
+}
+
+template<class T>
+inline constexpr bool is_gc_strong_ref_v = false;
+template<class T>
+inline constexpr bool is_gc_strong_ref_v<gc::trace_ref<T>> = true;
+template<class T>
+inline constexpr bool is_gc_strong_ref_v<gc::root_ref<T>> = true;
+
 template<typename T>
 constexpr bool is_shared_ptr_v = false;
 
@@ -80,7 +93,12 @@ constexpr bool is_unique_ptr_v<own::unique_owner<T>> = true;
 template<typename T>
 constexpr bool IsCopyableForProperty()
 {
-	if constexpr (requires { typename T::value_type; })
+	if constexpr (is_gc_strong_ref_v<T>)
+    {
+        // An authoring/undo snapshot is not a GC root or graph owner.
+        return false;
+    }
+    else if constexpr (requires { typename T::value_type; })
 	{
 		return IsCopyableForProperty<typename T::value_type>();
 	}

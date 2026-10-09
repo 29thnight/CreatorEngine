@@ -31,7 +31,8 @@ namespace Meta::Typed
 	concept ReflgenRecord = std::is_class_v<T> && reflgen::reflectable<T>;
 
 	template<class P>
-	concept PointerLike = std::is_pointer_v<P> || is_shared_ptr_v<P> || is_unique_ptr_v<P>;
+	concept PointerLike = std::is_pointer_v<P> || is_shared_ptr_v<P> || is_unique_ptr_v<P>
+        || is_gc_strong_ref_v<P>;
 
 	template<class C>
 	concept PointerSequence = SerializedAsSequence<C> && PointerLike<meta::container::ValueT<C>>;
@@ -303,7 +304,18 @@ namespace Meta::Typed
 			using P = std::remove_cv_t<U>;
 			if constexpr (ReflgenRecord<P>)
 			{
-				if constexpr (std::is_default_constructible_v<P>)
+				if constexpr (gc::managed_type<P>)
+                {
+                    // Scene/ComponentFactory restores graph identity in its
+                    // explicit domain. Never create a second unmanaged object
+                    // through a raw or legacy owning-pointer serializer.
+                    if (in.peek() == reflgen::value_kind::object)
+                    {
+                        throw reflgen::serialization_error(
+                            "managed graph references require the scene/component loader");
+                    }
+                }
+                else if constexpr (std::is_default_constructible_v<P>)
 				{
 					if (in.peek() == reflgen::value_kind::object)
 					{
@@ -428,6 +440,33 @@ struct reflgen::serializer<own::unique_owner<U>>
     static void read(reflgen::reader& in, own::unique_owner<U>& value)
     {
         Meta::Typed::ReflgenDetail::ReadPointee<own::unique_owner<U>, U>(in, value);
+    }
+};
+
+template<class U>
+struct reflgen::serializer<gc::trace_ref<U>>
+{
+    static void write(reflgen::writer& out, const gc::trace_ref<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::WritePointee(out, value.get());
+    }
+    static void read(reflgen::reader& in, gc::trace_ref<U>&)
+    {
+        // Identity and ownership are restored only by scene/component loaders.
+        in.skip_value();
+    }
+};
+
+template<class U>
+struct reflgen::serializer<gc::root_ref<U>>
+{
+    static void write(reflgen::writer& out, const gc::root_ref<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::WritePointee(out, value.get());
+    }
+    static void read(reflgen::reader& in, gc::root_ref<U>&)
+    {
+        in.skip_value();
     }
 };
 

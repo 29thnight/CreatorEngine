@@ -16,6 +16,12 @@ class ProxyCommand;
 class [[reflgen::reflect]] TerrainComponent : public meta::identity<TerrainComponent, Component>
 {
     public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
     void OnDeserialized(); // CT6-d: 지형 애셋 로드(구 팩토리 분기)
 

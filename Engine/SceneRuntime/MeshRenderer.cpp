@@ -337,9 +337,13 @@ MeshRenderer::MeshRenderer()
 {
 }
 
-MeshRenderer::~MeshRenderer()
+MeshRenderer::~MeshRenderer() = default;
+
+void MeshRenderer::ReleaseManagedResources()
 {
     m_meshRequest.Cancel();
+    m_meshRequest = {};
+    m_meshRequested = false;
 }
 
 void MeshRenderer::OnInitialized()
@@ -388,12 +392,16 @@ void MeshRenderer::OnRemovingFromScene()
 
 void MeshRenderer::OnUninitializing()
 {
-    auto scene = GetOwner()->m_ownerScene;
+    ReleaseManagedResources();
+    auto scene = GetOwner() ? GetOwner()->m_ownerScene : nullptr;
     auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectMeshRenderer(this);
-        renderScene->UnregisterCommand(this);
+        if (renderScene)
+        {
+            renderScene->UnregisterCommand(this);
+        }
 	}
 
 }

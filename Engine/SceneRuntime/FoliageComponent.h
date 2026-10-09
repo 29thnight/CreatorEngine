@@ -12,6 +12,12 @@ class TerrainComponent;
 class [[reflgen::reflect]] FoliageComponent : public meta::identity<FoliageComponent, Component>
 {
     public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
     FoliageComponent();
     ~FoliageComponent() override;
@@ -67,4 +73,8 @@ private:
 
     [[reflgen::ignore]]
     std::vector<FoliageInstance> m_foliageInstances{};
+private:
+    [[reflgen::ignore]]
+    void ReleaseManagedResources() override;
+
 };

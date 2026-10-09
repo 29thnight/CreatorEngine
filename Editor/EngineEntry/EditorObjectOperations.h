@@ -21,6 +21,12 @@ enum class GameObjectType;
 
 namespace EditorObjectOperations
 {
+    // Structural operations called from presentation enqueue owned values for
+    // the GameThread and return code "editor.queued" (admission only). Their
+    // terminal failures go to Output Log. GameThread callers receive the real
+    // synchronous result; dependent create/configure work must share one queued
+    // operation rather than dereference a queued result. Value-only gestures
+    // remain synchronous under the scene borrow fence.
     // Runtime identity: @scene:index:generation. Names are lookup input, not identity.
     std::string ObjectId(EntityHandle target);
     CommandCore::CommandResult ResolveTarget(const std::string& nameOrId, EntityHandle& target);

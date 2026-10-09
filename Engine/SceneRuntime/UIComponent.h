@@ -22,6 +22,12 @@ enum class UItype : uint16_t
 class [[reflgen::reflect]] UIComponent : public meta::identity<UIComponent, Component>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	UIComponent(); 
 	virtual ~UIComponent() = default;

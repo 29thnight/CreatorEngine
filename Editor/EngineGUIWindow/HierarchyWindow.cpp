@@ -11,6 +11,7 @@
 #include "EditorMenuDraw.h"
 #include "EditorMenuTargets.h"
 #include "ReflectionUndo.h"
+#include "ConsoleCommandSystem.h"
 #include "SpriteRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -112,27 +113,86 @@ namespace
 		return 3;
 	}
 
+    // UI borrows the live scene under the presentation lock. Queue only its
+    // generation-checked root handle and owned operation data, never that borrow.
+    void queue_hierarchy_edit(Scene* scene, std::function<CommandCore::CommandResult(Scene&)> edit)
+    {
+        const auto root = scene ? scene->HandleOf(0) : EntityHandle{};
+        ConsoleCommandSystem::Get().EnqueueEditorMutation([root, edit = std::move(edit)]
+        {
+            auto* current = SceneManagers->GetActiveScene();
+            if (!current || !current->Resolve(root))
+            {
+                return CommandCore::PreconditionFailed("scene.stale", "Hierarchy destination changed");
+            }
+            return edit(*current);
+        });
+    }
+
+    std::vector<EntityHandle> copy_selection(Scene* scene)
+    {
+        std::vector<EntityHandle> handles;
+        for (auto* object : scene->m_selectedEntities)
+        {
+            if (object)
+            {
+                handles.push_back(scene->HandleOf(object->m_index));
+            }
+        }
+        return handles;
+    }
+
+    void paste_selection(Scene* scene, std::vector<EntityHandle> handles)
+    {
+        queue_hierarchy_edit(scene, [handles = std::move(handles)](Scene& current)
+        {
+            std::vector<Entity*> objects;
+            for (const auto handle : handles)
+            {
+                auto* object = current.Resolve(handle);
+                if (!object || object->IsDestroyMark())
+                {
+                    return CommandCore::PreconditionFailed("object.stale", "Clipboard object no longer exists");
+                }
+                objects.push_back(object);
+            }
+            current.ClearSelectedEntities();
+            Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
+                &current, std::span<Entity* const>(objects.data(), objects.size())));
+            return CommandCore::Ok();
+        });
+    }
+
 	// The toolbar and context menu use the same creation operations and Undo path.
 	void draw_creation_menu(Scene* scene)
 	{
 		if (ImGui::MenuItem("Create Empty", "Ctrl + Shift + N"))
 			EditorObjectOperations::Create(scene, "Entity", GameObjectType::Empty);
 
-		const auto create_light = [scene](const char* name, LightType type)
-		{
-			auto creation = EditorObjectOperations::Create(scene, name, GameObjectType::Light);
-			auto* obj = creation.IsSuccess()
-				? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt()))
-				: nullptr;
-			if (!obj) return;
-			if (type == LightType::SpotLight)
-				obj->Transform_().SetRotation({ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
-			if (auto* light = obj->GetComponent<LightComponent>())
-			{
-				light->SetLightType(type);
-				light->m_lightStatus = LightStatus::Enabled;
-			}
-		};
+        const auto create_light = [scene](const char* name, LightType type)
+        {
+            queue_hierarchy_edit(scene, [name = std::string(name), type](Scene& current)
+            {
+                auto creation = EditorObjectOperations::Create(&current, name, GameObjectType::Light);
+                const auto* index = creation.data.Find("index");
+                auto* object = creation.IsSuccess() && index
+                    ? current.TryGetEntity(static_cast<Entity::Index>(index->AsInt())) : nullptr;
+                if (!object)
+                {
+                    return creation;
+                }
+                if (type == LightType::SpotLight)
+                {
+                    object->Transform_().SetRotation({ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
+                }
+                if (auto* light = object->GetComponent<LightComponent>())
+                {
+                    light->SetLightType(type);
+                    light->m_lightStatus = LightStatus::Enabled;
+                }
+                return creation;
+            });
+        };
 		if (ImGui::BeginMenu("Light"))
 		{
 			if (ImGui::MenuItem("Directional Light"))
@@ -147,8 +207,22 @@ namespace
 			EditorObjectOperations::Create(scene, "Camera", GameObjectType::Camera);
 		if (ImGui::BeginMenu("UI"))
 		{
-			if (ImGui::MenuItem("Image")) UIManagers->MakeImage("NoneImage", nullptr);
-			if (ImGui::MenuItem("Text")) UIManagers->MakeText("Text", "null", nullptr);
+            if (ImGui::MenuItem("Image"))
+            {
+                queue_hierarchy_edit(scene, [](Scene&)
+                {
+                    return UIManagers->MakeImage("NoneImage", nullptr) ? CommandCore::Ok()
+                        : CommandCore::Fail("ui.create_failed", "Cannot create UI image");
+                });
+            }
+            if (ImGui::MenuItem("Text"))
+            {
+                queue_hierarchy_edit(scene, [](Scene&)
+                {
+                    return UIManagers->MakeText("Text", "null", nullptr) ? CommandCore::Ok()
+                        : CommandCore::Fail("ui.create_failed", "Cannot create UI text");
+                });
+            }
 			ImGui::MenuItem("Button", nullptr, false, false);
 			ImGui::EndMenu();
 		}
@@ -371,13 +445,11 @@ void HierarchyWindow::Draw()
 					bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
 					if (ctrl && ImGui::IsKeyPressed(ImGuiKey_C))
 					{
-						m_clipboard = scene->m_selectedEntities;
+						m_clipboard = copy_selection(scene);
 					}
 					if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V))
 					{
-						scene->ClearSelectedEntities();
-						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
-							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
+						paste_selection(scene, m_clipboard);
 					}
 				}
 
@@ -407,20 +479,17 @@ void HierarchyWindow::Draw()
 					}
 					if (ImGui::MenuItem("       Copy", "       Ctrl + C", nullptr, !scene->m_selectedEntities.empty()))
 					{
-						m_clipboard = scene->m_selectedEntities;
+						m_clipboard = copy_selection(scene);
 					}
 					if (ImGui::MenuItem("       Paste", "	Ctrl + V", nullptr, !m_clipboard.empty()))
 					{
-						scene->ClearSelectedEntities();
-						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
-							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
+						paste_selection(scene, m_clipboard);
 					}
 					if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected && !EditorObjectOperations::IsEditLocked(selectedSceneObject, true)))
 					{
 						if (selectedSceneObject)
 						{
-							if (EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index)).IsSuccess())
-                                scene->m_selectedEntity = nullptr;
+							EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index));
 						}
 					}
 					ImGui::Separator();
@@ -445,8 +514,7 @@ void HierarchyWindow::Draw()
 				if (selectedSceneObject && ImGui::IsWindowFocused() &&
 					!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false))
 				{
-					if (EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index)).IsSuccess())
-                        scene->m_selectedEntity = nullptr;
+					EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index));
 				}
 			}
 
@@ -465,124 +533,114 @@ void HierarchyWindow::Draw()
 	                    Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), filepath.string());
 					}
 				}
-				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
-				{
-					//TODO : 불필요 로직 제거 -> DataSystem에서 LoadUITexture로 변경
-					const file::path filepath = editor::asset_drag::path_of(*payload);
-					const file::path filename = filepath.filename();
-					auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::UITexture);
-					ImageComponent* sprite = nullptr;
-					if (selectedSceneObject)
-					{
-						if (ImageComponent* hasSprite = selectedSceneObject->GetComponent<ImageComponent>())
-						{
-							sprite = hasSprite;
-						}
-						else
-						{
-							sprite = selectedSceneObject->AddComponent<ImageComponent>();
-						}
-
-						if (sprite)
-						{
-							sprite->Load(texture);
-						}
-					}
-					else
-					{
-						ImGui::Text("No Entity Selected");
-						UIManagers->MakeImage(filename.stem().string().c_str(), texture);
-					}
-				}
-				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
-				{
-					const file::path filepath = editor::asset_drag::path_of(*payload);
-					const file::path filename = filepath.filename();
-					auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::Texture);
-
-					if (scene)
-					{
-						auto obj = scene->CreateEntity(filename.stem().string().c_str(), GameObjectType::Empty);
-						if (obj)
-						{
-							auto spriteRenderer = obj->AddComponent<SpriteRenderer>();
-							if (spriteRenderer)
-							{
-								spriteRenderer->SetSprite(texture);
-							}
-						}
-					}
-				}
-				//else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Prefab"))
-				//{
-				//	const char* droppedFilePath = (const char*)payload->Data;
-				//	file::path filename = droppedFilePath;
-				//	file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
-				//	if (scene)
-				//	{
-				//		Meta::UndoManager::GetInstance()->Execute(
-				//			std::make_unique<Meta::LoadPrefabToSceneObjCommand>(
-				//				scene,
-				//				DataSystems->LoadCashedPrefab(filepath.string())));
-				//	}
-				//}
-				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Font"))
-				{
-					const file::path filepath = editor::asset_drag::path_of(*payload);
-					const file::path filename = filepath.filename();
-					if (selectedSceneObject)
-					{
-						TextComponent* text = nullptr;
-						if (TextComponent* hasText = selectedSceneObject->GetComponent<TextComponent>())
-						{
-							text = hasText;
-						}
-						else
-						{
-							text = selectedSceneObject->AddComponent<TextComponent>();
-						}
-						if (text)
-						{
-							text->SetFont(filepath);
-							text->SetMessage("New Text");
-						}
-					}
-					else
-					{
-						ImGui::Text("No Entity Selected");
-						UIManagers->MakeText(filename.stem().string().c_str(), filepath);
-					}
-				}
-				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SPRITESHEET"))
-				{
-					const file::path filepath = editor::asset_drag::path_of(*payload);
-					const file::path filename = filepath.filename();
-					if (!editor::asset_drag::lives_in(filepath, "SpriteSheets", "Hierarchy sprite sheet drop"))
-					{
-						// 거부 사유는 lives_in 이 로그에 남겼다 — 스프라이트 시트는 이름만 저장한다.
-					}
-					else if (selectedSceneObject)
-					{
-						SpriteSheetComponent* spriteSheet = nullptr;
-						if (SpriteSheetComponent* hasSpriteSheet = selectedSceneObject->GetComponent<SpriteSheetComponent>())
-						{
-							spriteSheet = hasSpriteSheet;
-						}
-						else
-						{
-							spriteSheet = selectedSceneObject->AddComponent<SpriteSheetComponent>();
-						}
-						if (spriteSheet)
-						{
-							spriteSheet->LoadSpriteSheet(filepath.string());
-						}
-					}
-					else
-					{
-						ImGui::Text("No Entity Selected");
-						UIManagers->MakeSpriteSheet(filename.stem().string().c_str(), filepath.string());
-					}
-				}
+                else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
+                {
+                    const auto path = editor::asset_drag::path_of(*payload);
+                    const auto target = selectedSceneObject ? scene->HandleOf(selectedSceneObject->m_index) : EntityHandle{};
+                    queue_hierarchy_edit(scene, [path, target](Scene& current)
+                    {
+                        auto texture = DataSystems->LoadSharedTexture(path.string().c_str(), DataSystem::TextureFileType::UITexture);
+                        if (!target.IsValid())
+                        {
+                            return UIManagers->MakeImage(path.stem().string(), texture) ? CommandCore::Ok()
+                                : CommandCore::Fail("ui.create_failed", "Cannot create UI image");
+                        }
+                        auto* object = current.Resolve(target);
+                        if (!object || object->IsDestroyMark() || EditorObjectOperations::IsEditLocked(object, true))
+                        {
+                            return CommandCore::PreconditionFailed("object.stale_or_locked", "Image target no longer editable");
+                        }
+                        auto* image = object->GetComponent<ImageComponent>();
+                        if (!image)
+                        {
+                            image = object->AddComponent<ImageComponent>();
+                        }
+                        if (!image)
+                        {
+                            return CommandCore::Fail("component.create_failed", "Cannot add image component");
+                        }
+                        image->Load(texture);
+                        return CommandCore::Ok();
+                    });
+                }
+                else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+                {
+                    const auto path = editor::asset_drag::path_of(*payload);
+                    queue_hierarchy_edit(scene, [path](Scene& current)
+                    {
+                        auto texture = DataSystems->LoadSharedTexture(path.string().c_str(), DataSystem::TextureFileType::Texture);
+                        auto* object = current.CreateEntity(path.stem().string(), GameObjectType::Empty);
+                        auto* sprite = object ? object->AddComponent<SpriteRenderer>() : nullptr;
+                        if (!sprite)
+                        {
+                            return CommandCore::Fail("sprite.create_failed", "Cannot create sprite");
+                        }
+                        sprite->SetSprite(texture);
+                        return CommandCore::Ok();
+                    });
+                }
+                else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Font"))
+                {
+                    const auto path = editor::asset_drag::path_of(*payload);
+                    const auto target = selectedSceneObject ? scene->HandleOf(selectedSceneObject->m_index) : EntityHandle{};
+                    queue_hierarchy_edit(scene, [path, target](Scene& current)
+                    {
+                        if (!target.IsValid())
+                        {
+                            return UIManagers->MakeText(path.stem().string(), path) ? CommandCore::Ok()
+                                : CommandCore::Fail("ui.create_failed", "Cannot create UI text");
+                        }
+                        auto* object = current.Resolve(target);
+                        if (!object || object->IsDestroyMark() || EditorObjectOperations::IsEditLocked(object, true))
+                        {
+                            return CommandCore::PreconditionFailed("object.stale_or_locked", "Text target no longer editable");
+                        }
+                        auto* text = object->GetComponent<TextComponent>();
+                        if (!text)
+                        {
+                            text = object->AddComponent<TextComponent>();
+                        }
+                        if (!text)
+                        {
+                            return CommandCore::Fail("component.create_failed", "Cannot add text component");
+                        }
+                        text->SetFont(path);
+                        text->SetMessage("New Text");
+                        return CommandCore::Ok();
+                    });
+                }
+                else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SPRITESHEET"))
+                {
+                    const auto path = editor::asset_drag::path_of(*payload);
+                    if (editor::asset_drag::lives_in(path, "SpriteSheets", "Hierarchy sprite sheet drop"))
+                    {
+                        const auto target = selectedSceneObject ? scene->HandleOf(selectedSceneObject->m_index) : EntityHandle{};
+                        queue_hierarchy_edit(scene, [path, target](Scene& current)
+                        {
+                            if (!target.IsValid())
+                            {
+                                return UIManagers->MakeSpriteSheet(path.stem().string(), path) ? CommandCore::Ok()
+                                    : CommandCore::Fail("ui.create_failed", "Cannot create sprite sheet");
+                            }
+                            auto* object = current.Resolve(target);
+                            if (!object || object->IsDestroyMark() || EditorObjectOperations::IsEditLocked(object, true))
+                            {
+                                return CommandCore::PreconditionFailed("object.stale_or_locked", "Sprite sheet target no longer editable");
+                            }
+                            auto* sheet = object->GetComponent<SpriteSheetComponent>();
+                            if (!sheet)
+                            {
+                                sheet = object->AddComponent<SpriteSheetComponent>();
+                            }
+                            if (!sheet)
+                            {
+                                return CommandCore::Fail("component.create_failed", "Cannot add sprite sheet component");
+                            }
+                            sheet->LoadSpriteSheet(path.string());
+                            return CommandCore::Ok();
+                        });
+                    }
+                }
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 				{
 					Entity::Index draggedIndex = *(Entity::Index*)payload->Data;

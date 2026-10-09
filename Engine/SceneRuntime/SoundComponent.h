@@ -39,6 +39,12 @@ struct SoundComponentSettings final
 class [[reflgen::reflect]] SoundComponent : public meta::identity<SoundComponent, Component>
 {
 public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
     void OnBeginSimulation() override;
     void OnEndSimulation() override;
     void OnUninitializing() override;
