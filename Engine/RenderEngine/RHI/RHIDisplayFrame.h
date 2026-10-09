@@ -2,6 +2,7 @@
 
 #include "../FrameCameraSnapshot.h"
 #include "../Render/Temporal/TemporalReconstruction.h"
+#include "../Render/Temporal/TemporalMeasurementProvenance.h"
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -48,6 +49,7 @@ struct RHIDisplayConsumerLease
 struct RHITemporalDisplayPacket
 {
     TemporalFrame frame;
+    TemporalMeasurementProvenance provenance;
     // HUD-less post-tone-map RGBA8, premultiplied RGBA8 UI, R32F depth, RG16F motion.
     std::array<void*, 4> sharedHandles{};
     std::shared_ptr<RHIDisplayConsumerLease> consumerLease;

@@ -260,6 +260,7 @@ namespace ce
                                    bool complete, const char* reason);
         void submit_gpu_span(marker_id id, profile_tick begin, profile_tick end,
                              std::uint32_t frame, const gpu_span_context& gpu);
+        void submit_render_measurement(const profile_render_measurement& sample, std::uint64_t generation);
         void report_gpu_issue(std::uint32_t frame, std::uint32_t lost_passes,
                               bool collect_failed, const char* reason, std::uint64_t generation = 0);
 

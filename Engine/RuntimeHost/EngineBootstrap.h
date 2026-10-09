@@ -26,6 +26,29 @@
 
 namespace EngineBootstrap
 {
+    inline ce::profile_render_provenance ProfileRenderProvenance(const TemporalMeasurementProvenance& source)
+    {
+        ce::profile_render_provenance value;
+        value.frame_kind = static_cast<std::uint8_t>(source.frameKind);
+        value.resolution_state = static_cast<std::uint8_t>(source.resolutionState);
+        value.upscaler = static_cast<std::uint8_t>(source.upscaler);
+        value.frame_generator = static_cast<std::uint8_t>(source.frameGenerator);
+        value.real_frame_id = source.realFrameId;
+        value.view_id = source.viewId;
+        value.scene_epoch = source.sceneEpoch;
+        value.publication_frame_id = source.publicationFrameId;
+        value.generated_ordinal = source.generatedOrdinal;
+        value.render_width = source.renderExtent.width;
+        value.render_height = source.renderExtent.height;
+        value.display_width = source.displayExtent.width;
+        value.display_height = source.displayExtent.height;
+        value.native_gate_active = source.IsValid() && source.nativeGateActive;
+        value.spatial_provenance_available = source.IsValid();
+        value.spatial_mode = static_cast<std::uint8_t>(source.spatialMode);
+        value.deep_dvc_applied = source.deepDvcApplied;
+        return value;
+    }
+
     // 종료 단계 추적.
     //
     // 프로세스 종료 중 크래시는 로그 시스템(spdlog/싱크)이 이미 정리된 뒤에 일어나
@@ -180,6 +203,8 @@ namespace EngineBootstrap
                 gpu.view = origin.renderViewId;
                 gpu.queue = origin.queueId;
                 gpu.generation = origin.captureGeneration;
+                gpu.submission_id = origin.fullSubmissionId;
+                gpu.provenance = ProfileRenderProvenance(origin.temporalProvenance);
 
                 ce::profiler().submit_gpu_span(
                     ce::intern_runtime_marker(name, ce::marker_kind::gpu_span),
@@ -195,6 +220,21 @@ namespace EngineBootstrap
             [](std::uint64_t generation, std::uint32_t frame, bool complete, const char* reason)
             {
                 ce::profiler().finish_gpu_submission(generation, frame, complete, reason);
+            },
+            [](std::uint64_t begin, std::uint64_t end, std::uint32_t frame,
+               const EnhancedLiveGpuSpanOrigin& origin)
+            {
+                ce::profile_render_measurement sample;
+                sample.engine_frame = frame;
+                sample.axis = ce::profile_render_axis::cpu_render_submit;
+                sample.queue = origin.queueId;
+                sample.event_view = origin.renderViewId;
+                sample.event_submission = origin.submissionId;
+                sample.submission_id = origin.fullSubmissionId;
+                sample.tick_begin = begin;
+                sample.tick_end = end;
+                sample.provenance = ProfileRenderProvenance(origin.temporalProvenance);
+                ce::profiler().submit_render_measurement(sample, origin.captureGeneration);
             } });
 
 		if ((config.prepareRuntimeContent ||

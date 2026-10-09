@@ -2013,7 +2013,16 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
 
 bool DX12DeviceResources::Present(std::string& outError)
 {
+    return Present(outError, nullptr);
+}
+
+bool DX12DeviceResources::Present(std::string& outError, HRESULT* nativeResult)
+{
     ce::profile_scope profile{ce::marker<"DX12PresentWait">()};
+    if (nativeResult)
+    {
+        *nativeResult = E_PENDING;
+    }
     if (!m_swapChain)
     {
         outError = "스왑체인이 없다";
@@ -2038,6 +2047,10 @@ bool DX12DeviceResources::Present(std::string& outError)
     const UINT flags = windowed && (m_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
         ? DXGI_PRESENT_ALLOW_TEARING : 0;
     const HRESULT result = m_swapChain->Present(0, flags);
+    if (nativeResult)
+    {
+        *nativeResult = result;
+    }
     if (FAILED(result))
     {
         outError = "DX12 Present 실패 " + HrToString(result);

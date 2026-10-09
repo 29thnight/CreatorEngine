@@ -18,10 +18,15 @@ struct TemporalMeasurementProvenance
     bool deepDvcApplied{ false }; // SDK-accepted dispatch, not pixel/quality validation.
     TemporalResolutionState resolutionState{ TemporalResolutionState::Unknown };
     bool nativeGateActive{ false };
+    bool testFaultActive{ false }; // Deliberate faults are never quality/performance evidence.
     uint64_t publicationFrameId{ 0 }; // Render publication identity, distinct from GT/SDK realFrameId.
+    // Runtime-only source controls travel with the displayed image. These are
+    // not inferred from newer global settings or serialized in profiler PLRD.
+    uint64_t requestedGeneration{ 0 }, testFaultRevision{ 0 };
+    uint8_t testFaultMode{ 0 }; // 0 none, 1 capability, 2 dispatch.
     bool IsValid() const
     {
-        return realFrameId != 0 && renderExtent.IsValid() && displayExtent.IsValid() &&
+        return !testFaultActive && realFrameId != 0 && renderExtent.IsValid() && displayExtent.IsValid() &&
             resolutionState != TemporalResolutionState::Unknown &&
             spatialMode <= SpatialScalingMode::NisSharpen &&
             ((resolutionState == TemporalResolutionState::SpatialScaled) == (spatialMode == SpatialScalingMode::NisScale)) &&
@@ -40,6 +45,20 @@ struct TemporalMeasurementProvenance
             upscaler == TemporalProvider::None && frameGenerator == TemporalProvider::None &&
             spatialMode == SpatialScalingMode::Off && !deepDvcApplied &&
             renderExtent == displayExtent && resolutionState == TemporalResolutionState::Native;
+    }
+    void InvalidateAcceptanceEvidence()
+    {
+        // Keep immutable source identities/extents for presenter correlation.
+        // Unknown proof survives old diagnostics/file schemas without relabeling
+        // a deliberately fault-contaminated measurement as an ordinary native run.
+        frameKind = TemporalMeasuredFrameKind::Unknown;
+        resolutionState = TemporalResolutionState::Unknown;
+        upscaler = frameGenerator = TemporalProvider::None;
+        generatedOrdinal = 0;
+        spatialMode = SpatialScalingMode::Off;
+        deepDvcApplied = false;
+        // nativeGateActive also suppresses presentation FG. Keep that runtime
+        // fact; diagnostics codecs omit its proof when IsValid() is false.
     }
 };
 

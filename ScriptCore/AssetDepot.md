@@ -141,9 +141,10 @@ slot and its eight kind-to-view mappings remain unchanged, including graph progr
 and the prepared Material facade. No old function offset, POD shape or token meaning
 changed. Existing request result/cancel/release entries use the token's exact type.
 
-Native ScriptApiVersion and managed ExpectedVersion are both 35. Bind requires the
-matching version, full table size and both new entry points, so mixed 34/35 hosts and
-assemblies fail closed. All native host manifests and crash reports derive their
+Native ScriptApiVersion and managed ExpectedVersion are both 36. The append-only
+v36 camera-cut entry preserves the v35 AssetDepot offsets. Bind requires the
+matching version, full table size, both typed asset entries and the camera-cut entry,
+so mixed-version hosts and assemblies fail closed. All native host manifests and crash reports derive their
 version from ScriptApiVersion.h. EnginePublisher cross-checks both source constants,
 all built host manifest versions and the ExpectedVersion constant in the copied
 ScriptCore.dll PE metadata without executing it. Distribution supportedScriptApis,

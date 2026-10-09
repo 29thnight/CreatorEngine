@@ -33,9 +33,11 @@ public:
     TemporalResult Prepare(const TemporalFrameGenerationInputs&, RHIEncoder&) override;
     // Caller submits the graph's real-frame commands before this method. The
     // serial baseline drains after Present, preserving pinned inputs until then.
-    TemporalResult Present(uint32_t syncInterval, uint32_t flags);
+    // Optional raw native-call observation, separate from the returned SDK drain result.
+    TemporalResult Present(uint32_t syncInterval, uint32_t flags, TemporalResult* presentObservation = nullptr);
     TemporalResult DisableGeneration();
-    TemporalResult PresentRealFrame(uint32_t syncInterval, uint32_t flags);
+    TemporalResult PresentRealFrame(uint32_t syncInterval, uint32_t flags,
+        TemporalResult* presentObservation = nullptr);
     TemporalResult Shutdown() override;
     IDXGISwapChain4* GetSwapchain() const { return m_swapchain.Get(); } // Borrowed.
     uint32_t GetCompletedGeneratedFrameCount() const { return m_generator->GetCompletedGeneratedFrameCount(); }

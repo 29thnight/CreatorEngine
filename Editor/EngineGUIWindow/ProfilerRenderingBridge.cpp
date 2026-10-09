@@ -109,7 +109,7 @@ namespace editor
             value.generatedOrdinal = p.generatedOrdinal;
             value.renderWidth = p.renderExtent.width; value.renderHeight = p.renderExtent.height;
             value.displayWidth = p.displayExtent.width; value.displayHeight = p.displayExtent.height;
-            value.nativeGateActive = p.nativeGateActive;
+            value.nativeGateActive = p.IsValid() && p.nativeGateActive;
             value.publicationFrameId = p.publicationFrameId;
             value.spatialProvenanceAvailable = p.IsValid();
             value.spatialMode = static_cast<std::uint8_t>(p.spatialMode);

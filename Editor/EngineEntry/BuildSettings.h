@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderBackend.h"
+#include "TemporalProductSettings.h"
 
 #include <string>
 #include <utility>
@@ -36,8 +37,11 @@ struct BuildSettings
     // prebuilt EngineShipping=false/true distribution; it never rebuilds the engine.
     bool IsDevelopmentBuild() const noexcept { return developmentBuild; }
     void SetDevelopmentBuild(bool value) noexcept { developmentBuild = value; }
+    TemporalProductSettings& PlayerRenderFeatures() noexcept { return playerRenderFeatures; }
+    const TemporalProductSettings& PlayerRenderFeatures() const noexcept { return playerRenderFeatures; }
 
 private:
+    TemporalProductSettings playerRenderFeatures{};
     bool developmentBuild{ true };
     std::string projectName{};
     std::wstring startupSceneName{ L"SampleScene" };

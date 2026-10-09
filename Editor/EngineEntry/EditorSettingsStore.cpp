@@ -6,6 +6,8 @@
 #include "ReflectionTypedYml.h"
 #include "RuntimeSettings.h"
 #include "AuthoringParsedDocument.h"
+#include "TemporalProductSettingsIO.h"
+#include "Render/Temporal/TemporalRuntimeControl.h"
 
 #include <Windows.h>
 
@@ -102,6 +104,13 @@ bool EditorSettingsStore::Initialize() noexcept
 				return ReportSettingsError(
 					"Unable to load Editor settings: " + parseError);
 			const Authoring::ReadNode root = document.Root();
+            // Player migration reads the authored legacy AA value, never an
+            // Editor-only product override already applied by RuntimeSettings.
+            const auto legacyAa = root["renderPassSettings"]["aa"]["isApply"];
+            if (legacyAa)
+            {
+                buildSettings.PlayerRenderFeatures().fallbackAa = legacyAa.As<bool>();
+            }
 
 			if (root["projectName"])
 			{
@@ -167,6 +176,10 @@ bool EditorSettingsStore::Initialize() noexcept
                 {
                     return ReportSettingsError("build must be a map.");
                 }
+                if (!TemporalProductSettingsIO::Read(buildNode["renderFeatures"], buildSettings.PlayerRenderFeatures()))
+                {
+                    return ReportSettingsError("Invalid or unsupported build.renderFeatures settings.");
+                }
 
                 if (const Authoring::ReadNode developmentNode = buildNode["development"])
                 {
@@ -205,7 +218,9 @@ bool EditorSettingsStore::Initialize() noexcept
 
         m_preferences = std::move(preferences);
         m_buildSettings = std::move(buildSettings);
+        m_editorRenderFeatures = RuntimeSettings::Get().GetTemporalProductSettings();
         m_initialized = true;
+        TemporalRuntimeControl::Get().InitializeProjectDefaults(m_editorRenderFeatures);
 
         if (!std::filesystem::exists(settingsPath)) return Save();
         return true;
@@ -257,6 +272,13 @@ bool EditorSettingsStore::Save() noexcept
         }
         const Authoring::WriteNode root = rootDocument.Root();
         if (!root.Read().IsMap()) root.SetMap();
+        if (!ValidateTemporalProductSettings(m_editorRenderFeatures) ||
+            !ValidateTemporalProductSettings(m_buildSettings.PlayerRenderFeatures()))
+        {
+            return ReportSettingsError("Invalid render feature settings cannot be saved.");
+        }
+        TemporalProductSettingsIO::Write(root.Child("editorRenderFeatures"), m_editorRenderFeatures);
+        TemporalProductSettingsIO::Write(root.Child("build").Child("renderFeatures"), m_buildSettings.PlayerRenderFeatures());
 
         RenderPassSettings renderPassSettings =
             RuntimeSettings::Get().GetRenderPassSettings();

@@ -27,7 +27,26 @@ Check((uint)CharacterCollisionFlags.Simulating == 8 && (uint)CharacterCollisionF
 var assembly = typeof(Physics).Assembly;
 var native = assembly.GetType("CreatorEngine.Native", true)!;
 var version = native.GetField("ExpectedVersion", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
-Check((int)version.GetRawConstantValue()! == 32, "ABI version");
+var apiVersion = (int)version.GetRawConstantValue()!;
+Check(apiVersion == 36, "current host ABI version");
+// The physics PODs above did not change. This executable references current
+// ScriptCore, so validate the current append-only host table as well instead of
+// treating this as a legacy ABI-32 fixture. Authored update; not executed.
+var apiTable = assembly.GetType("CreatorEngine.ScriptApiTable", true)!;
+long Offset(string name) => Marshal.OffsetOf(apiTable, name).ToInt64();
+Check(Offset("Version") == 0 && Offset("StructSize") == sizeof(int), "API table header layout");
+Check(Offset("Asset_RequestTyped") == Offset("Asset_ListRoots") + IntPtr.Size,
+    "v35 request slot appended after v34");
+Check(Offset("Asset_TryAcquireTyped") == Offset("Asset_RequestTyped") + IntPtr.Size,
+    "v35 resident slot layout");
+Check(Offset("Camera_NotifyCameraCut") == Offset("Asset_TryAcquireTyped") + IntPtr.Size,
+    "v36 camera cut appended without moving asset slots");
+Check(Marshal.SizeOf(apiTable) == Offset("Camera_NotifyCameraCut") + IntPtr.Size,
+    "full current API table size includes the appended camera cut slot");
+var cameraCut = apiTable.GetField("Camera_NotifyCameraCut")!.FieldType;
+Check(cameraCut.IsFunctionPointer && cameraCut.GetFunctionPointerReturnType() == typeof(void) &&
+    cameraCut.GetFunctionPointerParameterTypes().SequenceEqual(new[] { typeof(ObjectHandle) }),
+    "camera cut function pointer signature");
 var summary = assembly.GetType("CreatorEngine.NativePhysicsQueryResult", true)!;
 Check(Marshal.SizeOf(summary) == 12, "query summary layout");
 
@@ -61,4 +80,4 @@ Check(Marshal.OffsetOf<CharacterMovementState>(nameof(CharacterMovementState.For
 Check(character.Jump() == PhysicsError.WrongPhase, "unbound jump");
 Check(character.ForceVelocity(default, 1) == PhysicsError.WrongPhase, "unbound force");
 Check(character.CancelForcedVelocity() == PhysicsError.WrongPhase, "unbound cancel");
-Console.WriteLine($"PHYSICS_SCRIPT_ABI_OK checks={checks} version=32");
+Console.WriteLine($"PHYSICS_SCRIPT_ABI_OK checks={checks} version={apiVersion}");

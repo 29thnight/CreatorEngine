@@ -164,6 +164,29 @@ namespace CommandCore
             return data;
         }
 
+        inline CommandData PresenterObservationData(const TemporalPresenterObservation& observation)
+        {
+            auto data = CommandData::Object();
+            data.Set("realFrameId", Identity(observation.realFrameId));
+            data.Set("publicationFrameId", Identity(observation.publicationFrameId));
+            data.Set("viewId", Identity(observation.viewId));
+            data.Set("sceneEpoch", Identity(observation.sceneEpoch));
+            data.Set("requestGeneration", Identity(observation.requestGeneration));
+            data.Set("playerObservedGeneration", Identity(observation.playerObservedGeneration));
+            data.Set("provider", CommandData::String(ProviderName(observation.provider)));
+            data.Set("interpolatedFrameCount", CommandData::Int(observation.interpolatedFrameCount));
+            data.Set("faultMode", CommandData::String(observation.faultMode == TemporalTestFaultMode::None
+                ? "none" : observation.faultMode == TemporalTestFaultMode::Capability ? "capability"
+                : observation.faultMode == TemporalTestFaultMode::Dispatch ? "dispatch" : "unknown"));
+            data.Set("faultRevision", Identity(observation.faultRevision));
+            data.Set("nativeGateActive", CommandData::Bool(observation.nativeGateActive));
+            data.Set("valid", CommandData::Bool(observation.valid));
+            data.Set("result", ResultData(observation.result));
+            data.Set("evidenceNote", CommandData::String(
+                "identified Present return only; no GPU/SDK final-consumption, generated-frame or display-timestamp proof"));
+            return data;
+        }
+
         inline CommandData SnapshotData(const TemporalRuntimeSnapshot& snapshot,
             TemporalPresentationTarget target)
         {
@@ -226,7 +249,12 @@ namespace CommandCore
             data.Set("depthInfinite", CommandData::Bool(snapshot.frame.depthInfinite));
             data.Set("highDynamicRange", CommandData::Bool(snapshot.frame.highDynamicRange));
             data.Set("preExposure", CommandData::Double(snapshot.frame.preExposure));
-            data.Set("requestedInterpolatedFrameCount", CommandData::Int(snapshot.settings.interpolatedFrameCount));
+            data.Set("requestedInterpolatedFrameCount", CommandData::Int(snapshot.requestedSettings.interpolatedFrameCount));
+            data.Set("effectiveRequestedInterpolatedFrameCount", CommandData::Int(
+                snapshot.settings.enabled && snapshot.settings.requestedFrameGenerator != TemporalProvider::None
+                    ? snapshot.settings.interpolatedFrameCount : 0));
+            data.Set("configuredInterpolatedFrameCount", CommandData::Int(snapshot.configuredInterpolatedFrameCount));
+            data.Set("activeInterpolatedFrameCount", CommandData::Int(snapshot.activeInterpolatedFrameCount));
             data.Set("historyRevision", Identity(snapshot.frame.historyRevision));
             data.Set("reset", CommandData::Bool(snapshot.frame.reset));
             data.Set("jitterX", CommandData::Double(snapshot.frame.jitterX));
@@ -246,6 +274,7 @@ namespace CommandCore
             data.Set("renderSubmittedFrameId", Identity(snapshot.renderSubmittedFrameId));
             data.Set("renderGpuCompletedFrameId", Identity(snapshot.renderGpuCompletedFrameId));
             data.Set("cpuPresentReturnedFrameId", Identity(snapshot.cpuPresentReturnedFrameId));
+            data.Set("presenterObservation", PresenterObservationData(snapshot.presenterObservation));
             data.Set("sdkFinalConsumedFrameId", Identity(snapshot.sdkFinalConsumedFrameId));
             data.Set("realPresentationCount", Identity(snapshot.realPresentationCount));
             auto generatedIdentity = CommandData::Object();
@@ -323,6 +352,25 @@ namespace CommandCore
             spatial.Set("outputExtent", ExtentData(observedSpatial.outputExtent));
             spatial.Set("evidenceNote", CommandData::String("submitted pre-UI SDK-accepted dispatch; DeepDVC SDK success is not proof of internal NGX evaluation or pixel/visual correctness"));
             data.Set("spatialPost", std::move(spatial));
+            auto fault = CommandData::Object();
+#if CE_DEVELOPMENT && !CE_SHIPPING
+            fault.Set("available", CommandData::Bool(true));
+#else
+            fault.Set("available", CommandData::Bool(false));
+#endif
+            const auto& requestedFault = snapshot.requestedSettings.testFault;
+            fault.Set("mode", CommandData::String(requestedFault.mode == TemporalTestFaultMode::Capability ? "capability" :
+                requestedFault.mode == TemporalTestFaultMode::Dispatch ? "dispatch" : "none"));
+            fault.Set("provider", CommandData::String(ProviderName(requestedFault.provider)));
+            fault.Set("revision", Identity(requestedFault.revision));
+            fault.Set("targetViewId", Identity(requestedFault.viewId));
+            fault.Set("consumedRevision", Identity(snapshot.testFaultConsumedRevision));
+            fault.Set("consumedCount", Identity(snapshot.testFaultConsumedCount));
+            fault.Set("realFrameId", Identity(snapshot.testFaultRealFrameId));
+            fault.Set("viewId", Identity(snapshot.testFaultViewId));
+            fault.Set("sceneEpoch", Identity(snapshot.testFaultSceneEpoch));
+            fault.Set("scope", CommandData::String("developer-TU-only; capability consumption precedes a real-frame identity"));
+            data.Set("faultInjection", std::move(fault));
             data.Set("inputToPhotonMilliseconds", CommandData{});
             data.Set("completionNote", CommandData::String("zero means unobserved; CPU present return, GPU completion and SDK final consumption are distinct"));
             auto capabilities = CommandData::Array();
@@ -358,7 +406,41 @@ namespace CommandCore
         auto settings = snapshot.requestedSettings;
         const auto& command = parts[0];
         uint64_t generation = 0;
-        if (command == "temporal.upscale" || command == "temporal.fg")
+        if (command == "temporal.fault")
+        {
+#if CE_DEVELOPMENT && !CE_SHIPPING
+            if (parts.size() == 1)
+            {
+                return Ok("Developer TU fault state; consumption is separate from requested injection", SnapshotData(snapshot, target));
+            }
+            TemporalTestFaultMode mode{ TemporalTestFaultMode::None };
+            TemporalProvider provider{ TemporalProvider::None };
+            if (parts.size() == 2 && parts[1] == "clear")
+            {
+                generation = control.RequestTestFault(mode, provider);
+            }
+            else if (parts.size() == 4 && (parts[1] == "capability" || parts[1] == "dispatch") &&
+                ParseProvider(parts[2], provider) && provider != TemporalProvider::None)
+            {
+                uint64_t viewId = 0;
+                const auto& text = parts[3];
+                const auto parsed = std::from_chars(text.data(), text.data() + text.size(), viewId);
+                if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || viewId == 0)
+                {
+                    return InvalidArguments("Fault injection requires the positive viewId from temporal.status");
+                }
+                mode = parts[1] == "capability" ? TemporalTestFaultMode::Capability : TemporalTestFaultMode::Dispatch;
+                generation = control.RequestTestFault(mode, provider, viewId);
+            }
+            else
+            {
+                return InvalidArguments("temporal.fault clear | capability|dispatch fsr|dlss|xess <view-id>");
+            }
+#else
+            return PreconditionFailed("temporal.development_required", "Temporal fault injection is disabled outside development builds");
+#endif
+        }
+        else if (command == "temporal.upscale" || command == "temporal.fg")
         {
             const bool upscale = command == "temporal.upscale";
             if (parts.size() == 1)
@@ -366,10 +448,10 @@ namespace CommandCore
                 return Ok("Live state; support and request acknowledgement do not prove activation", SnapshotData(snapshot, target));
             }
             TemporalProvider provider;
-            if (parts.size() > (upscale ? 3u : 2u) || !ParseProvider(parts[1], provider))
+            if (parts.size() > 3u || !ParseProvider(parts[1], provider))
             {
                 return InvalidArguments(command + " [none|fsr|dlss|xess]" +
-                    (upscale ? " [native-aa|quality|balanced|performance|ultra-performance]" : ""));
+                    (upscale ? " [native-aa|quality|balanced|performance|ultra-performance]" : " [interpolated-frame-count]"));
             }
             if (!upscale && target == TemporalPresentationTarget::EditorViewport && provider != TemporalProvider::None)
             {
@@ -386,6 +468,17 @@ namespace CommandCore
             else
             {
                 settings.requestedFrameGenerator = provider;
+                if (parts.size() == 3)
+                {
+                    const auto& text = parts[2];
+                    uint32_t count = 0;
+                    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), count);
+                    if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || count == 0)
+                    {
+                        return InvalidArguments("Interpolated frame count must be a positive uint32; live support is checked before activation");
+                    }
+                    settings.interpolatedFrameCount = count;
+                }
             }
             settings.enabled = settings.requestedUpscaler != TemporalProvider::None ||
                 settings.requestedFrameGenerator != TemporalProvider::None;

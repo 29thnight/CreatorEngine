@@ -40,6 +40,18 @@ int main()
     mutation = frame;
     mutation.deepDvcApplied = true;
     assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+
+    mutation = frame;
+    mutation.publicationFrameId = 29;
+    mutation.testFaultActive = true;
+    assert(!mutation.IsValid() && !mutation.IsGoldenEligible());
+    mutation.InvalidateAcceptanceEvidence();
+    assert(!mutation.IsValid() && !mutation.IsGoldenEligible());
+    assert(mutation.realFrameId == frame.realFrameId && mutation.publicationFrameId == 29);
+    assert(mutation.viewId == frame.viewId && mutation.sceneEpoch == frame.sceneEpoch);
+    assert(mutation.renderExtent == frame.renderExtent && mutation.displayExtent == frame.displayExtent);
+    // Runtime native suppression remains factual even when acceptance proof is unknown.
+    assert(mutation.nativeGateActive);
     mutation.spatialMode = SpatialScalingMode::NisSharpen;
     assert(mutation.IsValid() && !mutation.IsGoldenEligible());
 

@@ -37,6 +37,8 @@ struct EnhancedPbrCapture
     EnhancedLiveDisplayTarget target{ EnhancedLiveDisplayTarget::Game };
     uint64_t afterFrameId{};
     bool controlled{ false }; // Static scene repeatability; not a simulation clock.
+    bool motionValidation{ false }; // Native, non-reset motion input observation.
+    TemporalFrame capturedTemporalFrame;
     bool replayExtensions{ false }; // Optional archive/replay diagnostics, not BASE-0 acceptance.
     bool latticeReplayExtension{ false }; // Independent material archive opt-in.
     std::optional<EnhancedCameraReplayInput> cameraReplay;
@@ -46,7 +48,7 @@ struct EnhancedPbrCapture
     std::optional<EnhancedLatticeReplayInput> latticeReplay;
     std::vector<uint8_t> latticeInputBytes;
     ryml::Tree manifest;
-    std::array<RHIReadback, 7> readbacks{};
+    std::array<RHIReadback, 12> readbacks{};
     struct StageReadback
     {
         std::string name;
@@ -166,7 +168,7 @@ struct EnhancedPbrCapture
         root["height"] << frame.height;
         root["totalSeconds"] << frame.totalSeconds;
         root["deltaSeconds"] << frame.deltaSeconds;
-        root["captureMode"] << (controlled
+        root["captureMode"] << (motionValidation ? "temporal-motion-v1" : controlled
             ? (cameraReplay && (frame.totalSeconds != 0.f || frame.deltaSeconds != 0.f)
                 ? "camera-clock-replay-v1" : "static-repeatability-v1") : "observation");
         root["skyBoxEnabled"] << frame.skyBoxEnabled;
@@ -313,6 +315,33 @@ struct EnhancedPbrCapture
         {
             WriteTemporalProvenance(root["measurement"]);
         }
+    }
+
+    void RecordTemporalInputs(const TemporalFrame& frame)
+    {
+        capturedTemporalFrame = frame;
+        if (!motionValidation)
+        {
+            return;
+        }
+        auto node = manifest.rootref()["temporalMotion"];
+        node |= ryml::MAP;
+        node["schemaVersion"] << 1;
+        node["source"] << "final-production-temporal-inputs";
+        node["direction"] << "current-to-previous";
+        node["units"] << "render-pixels";
+        node["origin"] << "top-left";
+        node["jitterIncluded"] << false;
+        node["historyReset"] << frame.reset;
+        node["historyGeneration"] << frame.historyRevision;
+        node["realFrameId"] << frame.realFrameId;
+        node["renderWidth"] << frame.renderExtent.width;
+        node["renderHeight"] << frame.renderExtent.height;
+        node["jitterX"] << frame.jitterX;
+        node["jitterY"] << frame.jitterY;
+        node["previousJitterX"] << frame.previousJitterX;
+        node["previousJitterY"] << frame.previousJitterY;
+        node["pixelAcceptance"] << "requires-independent-fixture-comparison";
     }
 
     void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
@@ -750,14 +779,19 @@ struct EnhancedPbrCapture
         constexpr const char* slots[] = { LiveSlots::kGBufferDiffuse,
             LiveSlots::kGBufferMetalRough, LiveSlots::kGBufferNormal,
             LiveSlots::kGBufferEmissive, LiveSlots::kGBufferDepth,
-            LiveSlots::kLitColor, LiveSlots::kDisplayLdr };
-        for (uint32_t i = 0; i < readbacks.size(); ++i)
+            LiveSlots::kLitColor, LiveSlots::kDisplayLdr,
+            LiveSlots::kTemporalMotion, LiveSlots::kTemporalReactive,
+            LiveSlots::kTemporalTransparency, LiveSlots::kTemporalResponsive, LiveSlots::kTemporalDepth };
+        const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
+        for (uint32_t i = 0; i < count; ++i)
         {
             const auto handle = blackboard.Get(slots[i]);
             if (!handle.IsValid()) { error = std::string("missing capture output: ") + slots[i]; return false; }
             const auto format = i < 4 ? EnhancedGBufferPass::GetRenderTargetFormat(i)
-                : i == 4 ? RHIFormat::D32Float
-                : i == 5 ? RHIFormat::RGBA16Float : RHIFormat::RGBA8Unorm;
+                : i == 4 || i == 11 ? RHIFormat::D32Float
+                : i == 5 ? RHIFormat::RGBA16Float
+                : i == 6 ? RHIFormat::RGBA8Unorm
+                : i == 7 ? RHIFormat::RG16Float : RHIFormat::R16Float;
             if (!resources.CreateReadback(width, height, format, 1, readbacks[i], error))
                 return false;
             const auto readback = readbacks[i];
@@ -774,6 +808,13 @@ struct EnhancedPbrCapture
     bool Save(IRenderDeviceServices& resources, const EnhancedRenderGraph::Stats& stats,
         std::string& error, uint32_t validationCount, const std::string& validation)
     {
+        if (motionValidation && (capturedTemporalFrame.reset ||
+            capturedTemporalFrame.realFrameId != capturedRealFrameId))
+        {
+            error = "motion capture requires a matching non-reset real frame with submitted previous history";
+            Fail(error);
+            return false;
+        }
         if (!temporalProvenance.IsGoldenEligible() || temporalProvenance.realFrameId != capturedRealFrameId ||
             temporalProvenance.publicationFrameId != result.frameId ||
             temporalProvenance.viewId != capturedViewId || temporalProvenance.sceneEpoch != capturedSceneEpoch)
@@ -786,17 +827,29 @@ struct EnhancedPbrCapture
         {
             const std::filesystem::path root(result.directory);
             constexpr const char* names[] = { "baseColor", "metalRough", "normal",
-                "emissive", "depth", "preToneHdr", "display" };
+                "emissive", "depth", "preToneHdr", "display", "temporalMotionRG",
+                "temporalReactive", "temporalTransparency", "temporalResponsive", "temporalDepth" };
             auto rootNode = manifest.rootref();
             rootNode["validationCount"] << validationCount;
             rootNode["validation"] << validation;
             rootNode["attachments"] |= ryml::SEQ;
             bool finite = true;
-            for (uint32_t i = 0; i < readbacks.size(); ++i)
+            const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
+            for (uint32_t i = 0; i < count; ++i)
             {
                 RHIReadbackImage image;
                 if (!resources.MapReadback(readbacks[i], image, error)) return false;
-                const uint32_t channels = i == 4 ? 1 : 4;
+                if (motionValidation && (!image.IsValid() ||
+                    image.width != capturedTemporalFrame.renderExtent.width ||
+                    image.height != capturedTemporalFrame.renderExtent.height ||
+                    (i == 7 && image.format != RHIFormat::RG16Float) ||
+                    (i >= 8 && i <= 10 && image.format != RHIFormat::R16Float) ||
+                    (i == 11 && image.format != RHIFormat::D32Float)))
+                {
+                    error = "motion capture readback extent or format mismatch";
+                    return false;
+                }
+                const uint32_t channels = i == 7 ? 2 : i == 4 || i >= 8 ? 1 : 4;
                 std::vector<float> pixels;
                 pixels.reserve(static_cast<size_t>(image.width) * image.height * channels);
                 float minimum = std::numeric_limits<float>::max();

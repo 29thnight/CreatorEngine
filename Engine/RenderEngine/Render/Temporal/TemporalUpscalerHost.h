@@ -11,7 +11,7 @@ inline bool SameTemporalReconstructionSettings(const TemporalRuntimeSettings& le
 {
     const auto leftProvider = left.enabled ? left.requestedUpscaler : TemporalProvider::None;
     const auto rightProvider = right.enabled ? right.requestedUpscaler : TemporalProvider::None;
-    if (leftProvider != rightProvider)
+    if (leftProvider != rightProvider || left.testFault != right.testFault)
     {
         return false;
     }
@@ -26,7 +26,7 @@ inline bool SameTemporalReconstructionSettings(const TemporalRuntimeSettings& le
 // One owner per logical view. Configure is called before graph resource sizing.
 // A failed SDK recording invalidates that frame; the caller must not publish its
 // unwritten output. The following Configure selects FSR or full native extent.
-// Retry a faulted provider with an actual reconstruction selection change.
+// Retry a faulted provider with a reconstruction change or explicit test-fault revision.
 class TemporalUpscalerHost
 {
 public:
@@ -36,7 +36,7 @@ public:
     TemporalUpscalerHost& operator=(const TemporalUpscalerHost&) = delete;
     TemporalResult Configure(IRHIDeviceResources&, TemporalBackend,
         const TemporalRuntimeSettings&, uint64_t generation, TemporalExtent displayExtent,
-        bool depthInverted = false, bool orthographic = false);
+        bool depthInverted = false, bool orthographic = false, uint64_t viewId = 0, uint64_t sceneEpoch = 0);
     TemporalExtent RenderExtent() const;
     TemporalProvider Provider() const;
     TemporalResult LastResult() const;

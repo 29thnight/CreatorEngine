@@ -200,6 +200,10 @@ struct EnhancedRequiredAssetPacket
 struct EnhancedLiveFramePacket
 {
     uint64_t frameId{ 0 };
+    // Host CPU-profiler boundary, independent from render publication and SDK
+    // simulation identities. A repeated publication can retain the same source.
+    uint32_t sourceEngineFrame{ 0 };
+    bool sourceEngineFrameAvailable{ false };
     uint64_t temporalRealFrameId{ 0 }; // Player simulation/latency identity, independent from publication
     // 같은 프로세스 steady_clock의 캡처 시각이며 시뮬레이션 시간이나 fence가 아니다.
     // 0은 관측 불가다. 병합해도 교체된 입력의 실제 캡처 시각을 그대로 보존한다.
@@ -500,6 +504,8 @@ struct EnhancedLiveGpuSpanOrigin
     uint16_t renderViewId = 0;
     uint8_t  queueId = 0;
     uint64_t captureGeneration{ 0 };
+    uint64_t fullSubmissionId{ 0 };
+    TemporalMeasurementProvenance temporalProvenance;
 };
 
 struct EnhancedLiveGpuSpanSink
@@ -515,6 +521,8 @@ struct EnhancedLiveGpuSpanSink
     uint64_t (*on_begin_capture)(uint32_t engineFrameId) = nullptr;
     void (*on_finish_capture)(uint64_t captureGeneration, uint32_t engineFrameId,
                               bool complete, const char* reason) = nullptr;
+    void (*on_cpu_render)(uint64_t beginCpuTick, uint64_t endCpuTick,
+        uint32_t engineFrameId, const EnhancedLiveGpuSpanOrigin& origin) = nullptr;
 };
 
 /// sink 를 건다. 렌더러가 서기 전에 걸어야 첫 수집부터 흐른다.
@@ -828,7 +836,7 @@ namespace EnhancedSceneRenderer
         EnhancedLiveDisplayTarget target, std::string& outError, bool controlled = false,
         const std::string& cameraReplayPath = {}, const std::string& drawReplayPath = {},
         const std::string& latticeReplayPath = {}, bool replayExtensions = false,
-        bool latticeReplayExtension = false);
+        bool latticeReplayExtension = false, bool motionValidation = false);
     EnhancedLivePbrCaptureStatus GetLivePbrCaptureStatus();
     void CancelLivePbrCapture();
 

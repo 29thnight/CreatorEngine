@@ -106,6 +106,7 @@ public:
     // Seal after successful recording; OpenDisplayTexture only publishes once
     // the existing producer completion/promotion boundary makes the slot visible.
     void SealTemporalDisplayFrame(DisplayToken token, const TemporalFrame& frame,
+        const TemporalMeasurementProvenance& provenance,
         std::shared_ptr<const void> lifetimeToken = {}, bool nativeGateActive = false);
     void RetireDisplayTexture(DisplayToken token);
     // Caller holds displayLifetimeMutex, as for retire/open/reuse.

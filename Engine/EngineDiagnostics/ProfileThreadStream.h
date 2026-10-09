@@ -159,6 +159,7 @@ namespace ce
 
         void write_span(marker_id id, profile_tick begin, profile_tick end,
                         std::uint32_t frame, std::uint16_t depth, const gpu_span_context& gpu);
+        void write_render_measurement(const profile_render_measurement& sample, std::uint64_t generation);
         void write_instant(marker_id id, profile_tick tick, std::uint32_t frame,
                            const cpu_span_context& cpu = {});
         void write_instant(marker_id id, profile_tick tick, std::uint32_t frame,
@@ -263,7 +264,7 @@ namespace ce
         };
 
         bool ensure_chunk(std::uint64_t generation);
-        void write(const profile_event& value, std::uint64_t generation, bool late_ingest = false);
+        bool write(const profile_event& value, std::uint64_t generation, bool late_ingest = false);
         void seal_current(bool writing = false);
         void honor_seal_request();
         bool owned_by_caller() const;

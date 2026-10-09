@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cmath>
@@ -74,6 +75,10 @@ struct EditorCameraRig::PresentationInput
 
 EditorCameraRig::EditorCameraRig()
 {
+    // A replacement rig must not inherit the previous editor view's history.
+    // This is a source identity, independent of motion and cut revisions.
+    static std::atomic<std::uint64_t> nextSourceIdentity{ 1 };
+    m_sourceIdentity = nextSourceIdentity.fetch_add(1, std::memory_order_relaxed);
     // 파일 녹화가 시작되기 전에 설명자를 등록한다. 표시는 같은 ID를 재사용한다.
     (void)editor::camera_diagnostics::counter_ids();
     ResetToDefaultPose();
@@ -84,7 +89,9 @@ EditorCameraRig::~EditorCameraRig() = default;
 FrameCameraSnapshot EditorCameraRig::CaptureFrameSnapshot(float aspectRatio) const
 {
     FrameCameraSnapshot snapshot = m_camera.CaptureFrameSnapshot(aspectRatio);
-    // Camera 직접 편집(선택 대상으로 이동·투영 메뉴·방향 기즈모)도 신원에 반영한다.
+    // Camera 직접 편집(선택 대상으로 이동·투영 메뉴·방향 기즈모)도 진단에 반영한다.
+    // This diagnostic revision advances on ordinary motion; temporal history
+    // uses cameraCutRevision instead and must never reset from this counter.
     // 패딩이나 부동소수점 바이트가 아니라 실제 행렬 값을 비교한다.
     if (m_cameraRevision == 0 || !(snapshot.view == m_lastCapturedCamera.view) ||
         !(snapshot.projection == m_lastCapturedCamera.projection))
@@ -186,8 +193,13 @@ void EditorCameraRig::BeginPresentationFrame(bool applicationFocused)
     }
 }
 
-void EditorCameraRig::SetPose(const math::vector3& position, const math::quaternion& rotation) noexcept
+void EditorCameraRig::SetPose(const math::vector3& position, const math::quaternion& rotation,
+    bool cameraCut) noexcept
 {
+    if (cameraCut)
+    {
+        NotifyCameraCut();
+    }
     m_camera.m_eyePosition = position;
     m_camera.rotate = math::normalize(rotation);
     m_camera.m_forward = math::normalize(math::rotate(Camera::kForward, m_camera.rotate));
@@ -339,8 +351,19 @@ void EditorCameraRig::PublishPresentationDiagnostics(const EnhancedLiveDisplayTe
     ce::profiler().publish_counters(ce::profiler().current_frame(), ce::counter_category::render, samples);
 }
 
-void EditorCameraRig::ApplySnapshot(const FrameCameraSnapshot& snapshot) noexcept
+void EditorCameraRig::ApplySnapshot(const FrameCameraSnapshot& snapshot, std::uint64_t sourceIdentity,
+    bool cameraCut) noexcept
 {
+    // Follow is continuous after the initial match, except when its game
+    // camera is replaced or explicitly cuts. The editor's own revision is
+    // independent of the followed source revision and diagnostic motion ID.
+    if (cameraCut || sourceIdentity != m_followSourceIdentity ||
+        snapshot.cameraCutRevision != m_followSourceCutRevision)
+    {
+        NotifyCameraCut();
+    }
+    m_followSourceIdentity = sourceIdentity;
+    m_followSourceCutRevision = snapshot.cameraCutRevision;
     m_camera.m_eyePosition = snapshot.eyePosition;
     m_camera.m_forward = math::normalize(snapshot.forward);
     m_camera.m_up = math::normalize(snapshot.up);

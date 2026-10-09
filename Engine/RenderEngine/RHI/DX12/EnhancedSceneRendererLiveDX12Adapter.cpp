@@ -78,6 +78,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         std::array<HANDLE, 4> temporalHandles{};
         RHITemporalDisplayResources temporalResources;
         TemporalFrame temporalFrame;
+        TemporalMeasurementProvenance temporalProvenance;
         TemporalExtent temporalRenderExtent, temporalDisplayExtent;
         std::shared_ptr<const void> temporalLifetime;
         bool temporalSealed{ false };
@@ -1034,12 +1035,17 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::SealTemporalDisplayFrame(DisplayToken token,
-    const TemporalFrame& frame, std::shared_ptr<const void> lifetimeToken, bool nativeGateActive)
+    const TemporalFrame& frame, const TemporalMeasurementProvenance& provenance,
+    std::shared_ptr<const void> lifetimeToken, bool nativeGateActive)
 {
     for (auto& display : m_impl->activeDisplays)
     {
-        if (display.token != token) continue;
+        if (display.token != token)
+        {
+            continue;
+        }
         display.temporalFrame = frame;
+        display.temporalProvenance = provenance;
         display.temporalNativeGateActive = nativeGateActive;
         display.temporalLifetime = std::move(lifetimeToken);
         display.temporalSealed = display.temporalTextures[0] &&
@@ -1124,14 +1130,17 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
             const auto textureId = sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
             if (textureId)
             {
-                sink.OpenTemporalRealFrame(display.temporalFrame.realFrameId);
+                sink.OpenTemporalRealFrame(display.temporalProvenance);
             }
             if (textureId && sink.AcceptsTemporalFrames() && display.temporalSealed)
             {
                 RHITemporalDisplayPacket packet;
                 packet.frame = display.temporalFrame;
+                packet.provenance = display.temporalProvenance;
                 for (size_t index = 0; index < packet.sharedHandles.size(); ++index)
+                {
                     packet.sharedHandles[index] = display.temporalHandles[index];
+                }
                 packet.consumerLease = display.consumerLease;
                 // Dedicated shared copies do not alias graph pool memory. Retain
                 // the optional source owner too when supplied by the graph.

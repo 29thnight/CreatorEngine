@@ -65,7 +65,9 @@ public:
     // owner. A failed/partially recorded tag keeps the owner until a successful drain.
     TemporalResult Prepare(ID3D12CommandList* commands, const TemporalFrame& frame,
         const XeSSFrameGenerationDX12Bindings& bindings, std::shared_ptr<const void> lifetimeToken);
-    TemporalResult Present(uint64_t realFrameId, uint32_t syncInterval, uint32_t flags);
+    // Optional raw native-call observation, independent of PresentEnd marker results.
+    TemporalResult Present(uint64_t realFrameId, uint32_t syncInterval, uint32_t flags,
+        TemporalResult* presentObservation = nullptr);
     TemporalResult GetLastPresentStatus(XeSSPresentStatus& status) const;
     TemporalResult Resize(TemporalExtent displayExtent);
     // Borrow only for buffers/metadata. Do not Present directly, cache extra COM

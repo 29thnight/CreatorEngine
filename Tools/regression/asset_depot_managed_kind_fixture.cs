@@ -186,6 +186,7 @@ namespace AssetDepotRegression
         private static int _requestCalls;
         private static int _residentCalls;
         private static int _legacyCalls;
+        private static int _cameraCutCalls;
 
         private static void Require(bool condition, string message)
         {
@@ -198,27 +199,32 @@ namespace AssetDepotRegression
         internal static void VerifyVersionAndTypedEntries()
         {
             Require(!Native.IsReady, "ABI fixture requires a fresh isolated managed session");
-            var table = new ScriptApiTable { Version = 34, StructSize = sizeof(ScriptApiTable) };
-            Require(Native.ExpectedVersion == 35, "Fixture expects the intentional ABI 35 migration");
-            Require(!Native.Bind(&table), "A version 34 table bound to managed API 35");
-            table.Version = 35;
+            var table = new ScriptApiTable { Version = 35, StructSize = sizeof(ScriptApiTable) };
+            Require(Native.ExpectedVersion == 36, "Fixture expects the intentional ABI 36 migration");
+            Require(!Native.Bind(&table), "A version 35 table bound to managed API 36");
+            table.Version = 36;
             Require(!Native.Bind(&table), "Missing typed entries were accepted");
             table.Asset_RequestTyped = &RequestStub;
             Require(!Native.Bind(&table), "Missing resident entry was accepted");
             table.Asset_TryAcquireTyped = &ResidentStub;
+            Require(!Native.Bind(&table), "Missing camera-cut entry was accepted");
+            table.Camera_NotifyCameraCut = &CameraCutStub;
             table.Asset_Request = &LegacyRequestStub;
-            table.StructSize = sizeof(ScriptApiTable) - 2 * IntPtr.Size;
-            Require(!Native.Bind(&table), "The old truncated table size was accepted");
+            table.StructSize = sizeof(ScriptApiTable) - IntPtr.Size;
+            Require(!Native.Bind(&table), "The old v35 table size without the camera-cut slot was accepted");
             table.StructSize = sizeof(ScriptApiTable);
-            table.Version = 36;
+            table.Version = 37;
             Require(!Native.Bind(&table), "An unknown future table version was accepted");
-            table.Version = 35;
-            Require(Native.Bind(&table), "Complete ABI 35 table failed to bind");
+            table.Version = 36;
+            Require(Native.Bind(&table), "Complete ABI 36 table failed to bind");
             try
             {
                 _requestCalls = 0;
                 _residentCalls = 0;
                 _legacyCalls = 0;
+                _cameraCutCalls = 0;
+                Native.CameraNotifyCameraCut(default);
+                Require(_cameraCutCalls == 1, "Camera cut did not cross the appended ABI entry");
                 Probe<Texture>(3u);
                 Probe<Model>(0x00010001u);
                 Probe<Mesh>(0x00010002u);
@@ -236,6 +242,12 @@ namespace AssetDepotRegression
             {
                 Native.Unbind();
             }
+        }
+
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        private static void CameraCutStub(ObjectHandle handle)
+        {
+            ++_cameraCutCalls;
         }
 
         private static void Probe<T>(uint concreteType)

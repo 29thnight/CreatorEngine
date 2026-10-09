@@ -17,6 +17,7 @@ struct EnhancedTemporalViewState
     TemporalFrame frame;
     TemporalMeasurementProvenance provenance;
     FrameCameraSnapshot rasterCamera;
+    FrameCameraSnapshot pendingHistoryCamera, previousHistoryCamera;
     own::shared_owner<const material_graph::SceneViewInput> previousInput;
     using DecalKey = std::tuple<uint64_t, uint64_t>;
     std::map<DecalKey, math::matrix4x4> previousDecals, pendingDecals;
@@ -30,6 +31,7 @@ struct EnhancedTemporalViewState
     math::matrix4x4 previousViewProjection{math::matrix4x4::identity()};
     uint64_t viewId{}, sceneEpoch{}, revision{}, settingsGeneration{}, resetGeneration{}, jitterIndex{};
     uint64_t submittedFrame{};
+    uint64_t committedHistoryGeneration{};
     float previousSeconds{}, pendingSeconds{}, previousJitterX{}, previousJitterY{};
     TemporalExtent previousRender, previousDisplay;
     TemporalQuality quality{ TemporalQuality::Quality };
@@ -52,7 +54,7 @@ struct EnhancedTemporalViewState
         quality = settings.quality;
         temporalAaApplied = fxaaApplied = false;
         const auto configured = upscaler.Configure(resources, backend, settings,
-            control.requestedGeneration, display, false, camera.isOrthographic);
+            control.requestedGeneration, display, false, camera.isOrthographic, logicalView, scene);
         if (!configured.IsSuccess())
         {
             return configured;
@@ -67,6 +69,7 @@ struct EnhancedTemporalViewState
         if (!render.IsValid()) return {TemporalStatus::InvalidInput};
         const bool reset = !submittedFrame || realFrame <= submittedFrame ||
             viewId != logicalView || sceneEpoch != scene || revision != history ||
+            !camera.HasSameTemporalHistory(previousHistoryCamera) ||
             previousRender != render || previousDisplay != display ||
             !SameTemporalReconstructionSettings(reconstructionSettings, settings) ||
             previousProvider != upscaler.Provider() || resetGeneration != control.historyResetGeneration;
@@ -77,8 +80,12 @@ struct EnhancedTemporalViewState
         settingsGeneration = control.requestedGeneration; resetGeneration = control.historyResetGeneration;
         reconstructionSettings = settings;
         pendingSeconds = totalSeconds;
+        pendingHistoryCamera = camera;
         frame = {};
-        frame.realFrameId = realFrame; frame.historyRevision = history + control.historyResetGeneration;
+        frame.realFrameId = realFrame;
+        // Independent source/cut/control revisions can collide when added.
+        // Advance one submitted-history generation only when a reset commits.
+        frame.historyRevision = committedHistoryGeneration + (reset ? 1 : 0);
         frame.renderExtent = render; frame.displayExtent = display; frame.reset = reset;
         frame.motionVectorScaleX = frame.motionVectorScaleY = 1.f;
         frame.frameTimeMilliseconds = 1000.f * std::clamp(reset ? deltaSeconds : totalSeconds - previousSeconds, 0.0001f, 1.f);
@@ -125,6 +132,10 @@ struct EnhancedTemporalViewState
         provenance.upscaler = upscaler.Provider();
         provenance.frameGenerator = TemporalProvider::None; // renderer never generates frames
         provenance.nativeGateActive = control.nativeCaptureExclusionActive;
+        provenance.testFaultActive = control.requestedSettings.testFault.mode != TemporalTestFaultMode::None;
+        provenance.requestedGeneration = control.requestedGeneration;
+        provenance.testFaultRevision = control.requestedSettings.testFault.revision;
+        provenance.testFaultMode = static_cast<uint8_t>(control.requestedSettings.testFault.mode);
         provenance.resolutionState = spatialPost.Scales() ? TemporalResolutionState::SpatialScaled :
             upscaler.Provider() != TemporalProvider::None ? TemporalResolutionState::Reconstructed :
             settings.requestedUpscaler != TemporalProvider::None ? TemporalResolutionState::NativeFallback : TemporalResolutionState::Native;
@@ -133,6 +144,8 @@ struct EnhancedTemporalViewState
     void Commit(own::shared_owner<const material_graph::SceneViewInput> input)
     {
         previousInput = std::move(input);
+        previousHistoryCamera = pendingHistoryCamera;
+        committedHistoryGeneration = frame.historyRevision;
         previousViewProjection = std::bit_cast<math::matrix4x4>(frame.camera.viewMatrix) *
             std::bit_cast<math::matrix4x4>(frame.camera.projectionMatrix);
         previousRender = frame.renderExtent; previousDisplay = frame.displayExtent;
@@ -140,6 +153,10 @@ struct EnhancedTemporalViewState
         const auto spatial = spatialPost.Snapshot();
         provenance.spatialMode = spatial.activeNisMode;
         provenance.deepDvcApplied = spatial.deepDvcApplied;
+        if (provenance.testFaultActive)
+        {
+            provenance.InvalidateAcceptanceEvidence();
+        }
         submittedFrame = frame.realFrameId; previousSeconds = pendingSeconds;
         previousJitterX = frame.jitterX; previousJitterY = frame.jitterY;
         previousDecals = std::move(pendingDecals); previousSprites = std::move(pendingSprites); ++jitterIndex;

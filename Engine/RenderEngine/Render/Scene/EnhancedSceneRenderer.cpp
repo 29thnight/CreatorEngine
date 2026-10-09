@@ -205,7 +205,7 @@ namespace
         const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
         if (generation != 0 && sink.on_finish_capture)
         {
-            sink.on_finish_capture(generation, static_cast<uint32_t>(token.engineFrameId), complete, reason);
+            sink.on_finish_capture(generation, token.sourceEngineFrame, complete, reason);
         }
     }
 
@@ -446,6 +446,34 @@ namespace
                 * 1000.0 / static_cast<double>(frequency.QuadPart);
         }
     };
+
+    uint64_t ProfileCpuTick()
+    {
+        LARGE_INTEGER tick{};
+        ::QueryPerformanceCounter(&tick);
+        return static_cast<uint64_t>(tick.QuadPart);
+    }
+
+    void PublishCpuRenderMeasurement(uint64_t begin, uint32_t engineFrame,
+        uint64_t generation, uint64_t submissionId, const TemporalMeasurementProvenance& provenance)
+    {
+        const auto& sink = GpuSpanSink();
+        if (generation == 0 || !sink.on_cpu_render)
+        {
+            return;
+        }
+        EnhancedLiveGpuSpanOrigin origin;
+        origin.captureGeneration = generation;
+        origin.fullSubmissionId = submissionId;
+        origin.submissionId = static_cast<uint32_t>(submissionId);
+        origin.renderViewId = static_cast<uint16_t>(provenance.viewId);
+        origin.temporalProvenance = provenance;
+        sink.on_cpu_render(begin, ProfileCpuTick(), engineFrame, origin);
+        if (sink.on_flush)
+        {
+            sink.on_flush();
+        }
+    }
 
     // 뷰 하나를 준비한 직후의 그림자 수치. 그림자 패스와 재질 그래프 호스트가
     // 모두 그 뷰의 Prepare 를 마친 뒤에 불러야 같은 뷰의 값이 모인다.
@@ -1123,11 +1151,13 @@ namespace
 
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint32_t sourceEngineFrame, bool sourceEngineFrameAvailable,
             uint64_t resizeGeneration, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            const uint64_t profileCpuBegin = GpuSpanSink().on_cpu_render ? ProfileCpuTick() : 0;
             preparationDeferred = false;
             if (retainedCaptureProfiler)
             {
@@ -1208,15 +1238,29 @@ namespace
             // Account for this admitted submission explicitly instead of claiming
             // a complete GPU capture with an empty lane.
             const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-            if (sink.on_begin_capture && sink.on_finish_capture)
+            uint64_t profileCaptureGeneration = 0;
+            if (sourceEngineFrameAvailable && sink.on_begin_capture && sink.on_finish_capture)
             {
-                const uint64_t generation = sink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
-                if (generation != 0)
-                {
-                    sink.on_finish_capture(generation, static_cast<uint32_t>(sourceFrameId), false,
-                        "Vulkan live GPU timestamps are unavailable");
-                }
+                profileCaptureGeneration = sink.on_begin_capture(sourceEngineFrame);
             }
+            struct VulkanProfileCompletion
+            {
+                const EnhancedLiveGpuSpanSink& sink;
+                uint64_t generation;
+                uint32_t frame;
+                ~VulkanProfileCompletion()
+                {
+                    if (generation != 0)
+                    {
+                        if (sink.on_flush)
+                        {
+                            sink.on_flush();
+                        }
+                        sink.on_finish_capture(generation, frame, false,
+                            "Vulkan live GPU timestamps are unavailable");
+                    }
+                }
+            } profileCompletion{ sink, profileCaptureGeneration, sourceEngineFrame };
 
             // Keep the diagnostic reset guard alive through recording/submission,
             // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
@@ -1359,6 +1403,8 @@ namespace
                     views[viewIndex].temporal.provenance);
             }
             slot->temporalProvenance = views[viewIndex].temporal.provenance;
+            PublishCpuRenderMeasurement(profileCpuBegin, sourceEngineFrame, profileCaptureGeneration,
+                resources.GetLastSignaledFenceValue(), slot->temporalProvenance);
             TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
                 const auto& view = views[viewIndex];
                 if (view.displayTarget != EnhancedLiveDisplayTarget::Game && snapshot.rendererObserved &&
@@ -1849,11 +1895,22 @@ namespace
             if (!pbrCapture || pbrCapture->result.state != EnhancedPbrCaptureState::Pending
                 || pbrCapture->target != view.displayTarget
                 || frame.frameId <= pbrCapture->afterFrameId) return nullptr;
+            // Acquiring the native-only gate invalidates history. Let that
+            // frame submit normally, then capture actual current-to-previous
+            // vectors instead of accepting reset-generated zeros as evidence.
+            if (pbrCapture->motionValidation && (!activeTemporal || activeTemporal->frame.reset))
+            {
+                return nullptr;
+            }
             try { pbrCapture->Begin(frame, view, backend, emptyReferenceDraws, emptyReferenceDraws, lights, skyBoxPath); }
             catch (const std::exception& error)
             {
                 pbrCapture->Fail(error.what());
                 return nullptr;
+            }
+            if (activeTemporal)
+            {
+                pbrCapture->RecordTemporalInputs(activeTemporal->frame);
             }
             return pbrCapture.get();
         }
@@ -6250,9 +6307,11 @@ namespace
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint32_t sourceEngineFrame, bool sourceEngineFrameAvailable,
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            const uint64_t profileCpuBegin = GpuSpanSink().on_cpu_render ? ProfileCpuTick() : 0;
             static const bool queueEvidence = []
             {
                 const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
@@ -6342,12 +6401,16 @@ namespace
 
             const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
             profilerToken.engineFrameId = sourceFrameId;
-            if (captureSink.on_begin_capture && captureSink.on_finish_capture)
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
+            if (sourceEngineFrameAvailable && captureSink.on_begin_capture && captureSink.on_finish_capture)
             {
-                profilerToken.captureGeneration = captureSink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
+                profilerToken.captureGeneration = captureSink.on_begin_capture(sourceEngineFrame);
             }
             profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
                 view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -6566,12 +6629,14 @@ namespace
                     view.temporal.provenance);
             }
             slot.temporalProvenance = view.temporal.provenance;
+            PublishCpuRenderMeasurement(profileCpuBegin, sourceEngineFrame, profilerToken.captureGeneration,
+                profilerToken.submissionId, slot.temporalProvenance);
             temporalProvenance = slot.temporalProvenance;
             if (view.displayTarget == EnhancedLiveDisplayTarget::Game)
             {
                 // Native presentation also needs the original simulation ID
                 // for independent low-latency markers, without FG resources.
-                dx12.SealTemporalDisplayFrame(slot.interopToken, view.temporal.frame,
+                dx12.SealTemporalDisplayFrame(slot.interopToken, view.temporal.frame, view.temporal.provenance,
                     slot.temporalResources.hudlessColor.IsValid() ? slot.graph : nullptr,
                     view.temporal.provenance.nativeGateActive);
             }
@@ -7182,8 +7247,7 @@ namespace
                                 const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
                                 if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
                                 {
-                                    sink.on_issue(static_cast<uint32_t>(
-                                        view.slots[slotIndex].profilerToken.engineFrameId),
+                                    sink.on_issue(view.slots[slotIndex].profilerToken.sourceEngineFrame,
                                         span.queryOverflowPasses, false, "GPU query slots exhausted",
                                         view.slots[slotIndex].profilerToken.captureGeneration);
                                 }
@@ -7239,8 +7303,8 @@ namespace
                                 if (sink.on_span && view.slots[slotIndex].profilerToken.captureGeneration != 0 &&
                                     span.submitToGpuBeginMs >= 0.0 && span.gpuEndToCollectMs >= 0.0)
                                 {
-                                    const uint32_t frameLabel = static_cast<uint32_t>(
-                                        view.slots[slotIndex].profilerToken.engineFrameId);
+                                    const uint32_t frameLabel =
+                                        view.slots[slotIndex].profilerToken.sourceEngineFrame;
 
                                     // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
                                     // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
@@ -7251,6 +7315,8 @@ namespace
                                         view.slots[slotIndex].profilerToken.renderViewId);
                                     origin.queueId = view.slots[slotIndex].profilerToken.queueId;
                                     origin.captureGeneration = view.slots[slotIndex].profilerToken.captureGeneration;
+                                    origin.fullSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
+                                    origin.temporalProvenance = view.slots[slotIndex].temporalProvenance;
 
                                     for (const EnhancedLiveGpuSlice& slice : slices)
                                     {
@@ -7291,8 +7357,7 @@ namespace
                             const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
                             if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
                             {
-                                sink.on_issue(static_cast<uint32_t>(
-                                    view.slots[slotIndex].profilerToken.engineFrameId),
+                                sink.on_issue(view.slots[slotIndex].profilerToken.sourceEngineFrame,
                                     0, true, collectError.c_str(),
                                     view.slots[slotIndex].profilerToken.captureGeneration);
                             }
@@ -7700,7 +7765,8 @@ namespace
                         try
                         {
 							const auto& hooks = EnhancedSceneRenderer::MutableRenderThreadHooks();
-							const bool sampleCounters = hooks.OnCounters && hooks.ShouldSampleCounters &&
+							const bool sampleCounters = submission.frame.sourceEngineFrameAvailable &&
+								hooks.OnCounters && hooks.ShouldSampleCounters &&
 								hooks.ShouldSampleCounters();
 							std::chrono::steady_clock::duration counterQueryTime{};
 							const auto beforeQueryStarted = std::chrono::steady_clock::now();
@@ -7755,12 +7821,13 @@ namespace
 									afterDescriptorOverflows >= beforeDescriptorOverflows ? afterDescriptorOverflows - beforeDescriptorOverflows : 0,
 									profileFrameDrawCount, profileFrameBatchCount,
 									std::chrono::duration<double, std::micro>(counterQueryTime).count() };
-								hooks.OnCounters(static_cast<std::uint32_t>(submission.frame.frameId), sample);
+								hooks.OnCounters(submission.frame.sourceEngineFrame, sample);
 							}
 							// Query on the resource-owning thread at 4 Hz. No Editor/UI
 							// path touches the renderer's state or its lock for this graph.
 							const auto sampleTime = std::chrono::steady_clock::now();
-							if (hooks.OnVideoMemory && sampleTime >= nextVideoMemorySample)
+							if (submission.frame.sourceEngineFrameAvailable && hooks.OnVideoMemory &&
+								sampleTime >= nextVideoMemorySample)
 							{
 								nextVideoMemorySample = sampleTime + std::chrono::milliseconds(250);
 								std::uint64_t usedMB = 0;
@@ -7776,7 +7843,7 @@ namespace
 								else if (backend == EnhancedLiveBackend::DX12 && pipeline)
 									available = dx12.QueryVideoMemory(usedMB, budgetMB);
 								if (available)
-									hooks.OnVideoMemory(static_cast<std::uint32_t>(submission.frame.frameId), usedMB, budgetMB);
+									hooks.OnVideoMemory(submission.frame.sourceEngineFrame, usedMB, budgetMB);
 							}
                         }
                         catch (const std::exception& exception)
@@ -8450,8 +8517,14 @@ EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
 bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     EnhancedLiveDisplayTarget target, std::string& outError, bool controlled,
     const std::string& cameraReplayPath, const std::string& drawReplayPath, const std::string& latticeReplayPath,
-    bool replayExtensions, bool latticeReplayExtension)
+    bool replayExtensions, bool latticeReplayExtension, bool motionValidation)
 {
+    if (motionValidation && (controlled || target == EnhancedLiveDisplayTarget::MaterialPreview ||
+        !cameraReplayPath.empty() || !drawReplayPath.empty() || !latticeReplayPath.empty()))
+    {
+        outError = "motion capture requires an observed editor/game view without controlled replay";
+        return false;
+    }
     std::optional<EnhancedCameraReplayInput> replay;
     if (!cameraReplayPath.empty())
     {
@@ -8508,6 +8581,7 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     state.pbrCapture = std::make_unique<EnhancedPbrCapture>();
     state.pbrCapture->target = target;
     state.pbrCapture->controlled = controlled;
+    state.pbrCapture->motionValidation = motionValidation;
     state.pbrCapture->replayExtensions = replayExtensions || latticeReplayExtension
         || !drawReplayPath.empty() || !latticeReplayPath.empty();
     state.pbrCapture->latticeReplayExtension = latticeReplayExtension || !latticeReplayPath.empty();
@@ -8921,7 +8995,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 ImageReleaseGuard imageRelease{ state, p.textureCache };
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
-                    frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
+                    frame.frameId, frame.sourceCaptureNanoseconds,
+                    frame.sourceEngineFrame, frame.sourceEngineFrameAvailable, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
                     prepareFrame,
                     error, state.BeginPbrCapture(frame, viewPacket),
@@ -9298,7 +9373,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         {
             ImageReleaseGuard imageRelease{ state, state.dx12.TextureCache() };
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
-            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, error,
+            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds,
+                frame.sourceEngineFrame, frame.sourceEngineFrameAvailable, error,
                 state.BeginPbrCapture(frame, viewPacket),
                 captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
         }

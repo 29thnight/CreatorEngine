@@ -1,0 +1,39 @@
+{
+  "schema": "temporal.motion.analytic-fixture.v1",
+  "status": "authored-unexecuted-scene-driver-unauthored",
+  "extent": [256, 256],
+  "previousCamera": {"projection": "orthographic", "position": [0, 0, 0], "width": 16, "height": 16},
+  "currentCamera": {"projection": "orthographic", "position": [0, 0, 0], "width": 16, "height": 16},
+  "probes": [
+    {
+      "name": "rigid-right-and-up", "route": "static", "pixel": [128, 32],
+      "previous": {"localPoint": [0, 0, 0], "worldTranslation": [-0.21875, 5.84375, 4]},
+      "current": {"localPoint": [0, 0, 0], "worldTranslation": [0.03125, 5.96875, 4]}
+    },
+    {
+      "name": "two-bone-weighted-motion", "route": "skinned", "pixel": [128, 64],
+      "previous": {"localPoint": [-0.5, 0.25, 0], "worldTranslation": [0.03125, 3.96875, 4], "skinTranslations": [{"weight": 0.25, "translation": [0, 0, 0]}, {"weight": 0.75, "translation": [0, 0, 0]}]},
+      "current": {"localPoint": [-0.5, 0.25, 0], "worldTranslation": [0.03125, 3.96875, 4], "skinTranslations": [{"weight": 0.25, "translation": [0.125, -0.0625, 0]}, {"weight": 0.75, "translation": [0.625, -0.3125, 0]}]}
+    },
+    {
+      "name": "independent-instance-left-and-up", "route": "instanced", "pixel": [128, 96],
+      "previous": {"localPoint": [0, 0, 0], "instanceTranslation": [0.40625, 1.78125, 4]},
+      "current": {"localPoint": [0, 0, 0], "instanceTranslation": [0.03125, 1.96875, 4]}
+    },
+    {
+      "name": "decal-local-receiver-correspondence", "route": "decal", "pixel": [128, 128],
+      "previous": {"localPoint": [0, 0, 0], "worldTranslation": [0.53125, -0.28125, 4]},
+      "current": {"localPoint": [0, 0, 0], "worldTranslation": [0.03125, -0.03125, 4]}
+    },
+    {
+      "name": "covered-alpha-interior", "route": "alpha", "pixel": [128, 160],
+      "previous": {"localPoint": [0, 0, 0], "worldTranslation": [-0.15625, -1.65625, 4]},
+      "current": {"localPoint": [0, 0, 0], "worldTranslation": [0.03125, -2.03125, 4]}
+    },
+    {
+      "name": "world-sprite-covered-interior", "route": "sprite", "pixel": [128, 192],
+      "previous": {"localPoint": [0, 0, 0], "worldTranslation": [-0.09375, -4.09375, 4]},
+      "current": {"localPoint": [0, 0, 0], "worldTranslation": [0.03125, -4.03125, 4]}
+    }
+  ]
+}

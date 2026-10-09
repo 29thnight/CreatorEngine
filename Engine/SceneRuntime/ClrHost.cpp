@@ -391,7 +391,8 @@ namespace
         // Append-only v35: concrete-view selection never changes serialized links.
         int (__stdcall* Asset_RequestTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
         int (__stdcall* Asset_TryAcquireTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
-
+        // Append-only v36: explicit same-camera discontinuities.
+        void (__stdcall* Camera_NotifyCameraCut)(ScriptObjectHandle handle);
 
 	};
 
@@ -399,6 +400,10 @@ namespace
         == offsetof(ScriptApiTable, Asset_ListRoots) + sizeof(decltype(ScriptApiTable::Asset_ListRoots)));
     static_assert(offsetof(ScriptApiTable, Asset_TryAcquireTyped)
         == offsetof(ScriptApiTable, Asset_RequestTyped) + sizeof(decltype(ScriptApiTable::Asset_RequestTyped)));
+    static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
+        == offsetof(ScriptApiTable, Asset_TryAcquireTyped) + sizeof(decltype(ScriptApiTable::Asset_TryAcquireTyped)));
+    static_assert(sizeof(ScriptApiTable)
+        == offsetof(ScriptApiTable, Camera_NotifyCameraCut) + sizeof(decltype(ScriptApiTable::Camera_NotifyCameraCut)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -1795,6 +1800,14 @@ namespace
 		if (nullptr != camera) camera->SetPrimary(0 != primary);
 	}
 
+    void __stdcall Api_Camera_NotifyCameraCut(ScriptObjectHandle handle)
+    {
+        if (CameraComponent* camera = ResolveCameraComponent(handle))
+        {
+            camera->NotifyCameraCut();
+        }
+    }
+
 	// 주 카메라의 소유 오브젝트 핸들. 없으면 무효 핸들이라 C# 쪽에서 IsAlive로 걸린다.
 	ScriptObjectHandle __stdcall Api_Camera_GetPrimaryHandle()
 	{
@@ -2920,6 +2933,7 @@ namespace
 		g_apiTable.Camera_IsPrimary            = &Api_Camera_IsPrimary;
 		g_apiTable.Camera_SetPrimary           = &Api_Camera_SetPrimary;
 		g_apiTable.Camera_GetPrimaryHandle     = &Api_Camera_GetPrimaryHandle;
+        g_apiTable.Camera_NotifyCameraCut      = &Api_Camera_NotifyCameraCut;
 
 		g_apiTable.Light_Exists                = &Api_Light_Exists;
 		g_apiTable.Light_GetColor              = &Api_Light_GetColor;

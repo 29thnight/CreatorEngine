@@ -44,7 +44,7 @@ struct TemporalDX12::State
     bool sdkPresented{false}, sdkConsumed{false}, markerFailure{false}, recordingSubmitted{false};
     uint64_t generation{UINT64_MAX}, latencyFrame{0}, lastPresented{0};
     uint64_t reportedDisplayFrames{0};
-    uint64_t openedRealFrame{0};
+    TemporalMeasurementProvenance openedRealFrame;
     TemporalProvider selected{TemporalProvider::None};
     TemporalFrameGenerationConfig configuration;
     TemporalRuntimeSettings settings;
@@ -65,6 +65,9 @@ struct TemporalDX12::State
     struct Pins
     {
         RHITemporalDisplayPacket packet;
+        TemporalProvider presenterProvider{ TemporalProvider::None };
+        uint32_t presenterInterpolatedFrameCount{ 0 };
+        uint64_t presenterGeneration{ 0 };
         std::array<ComPtr<ID3D12Resource>, 4> textures;
         std::array<RHITextureHandle, 4> handles{};
     };
@@ -179,6 +182,40 @@ struct TemporalDX12::State
         return QueueIdle(error);
     }
 
+    static void PublishPresent(const TemporalMeasurementProvenance& source, uint64_t frameId,
+        TemporalProvider provider, uint32_t interpolatedFrameCount, bool nativeGateActive,
+        TemporalResult result, uint64_t presenterGeneration)
+    {
+        TemporalPresenterObservation observation;
+        observation.realFrameId = frameId;
+        observation.publicationFrameId = source.publicationFrameId;
+        observation.viewId = source.viewId;
+        observation.sceneEpoch = source.sceneEpoch;
+        observation.requestGeneration = source.requestedGeneration;
+        observation.playerObservedGeneration = presenterGeneration;
+        observation.provider = provider;
+        observation.interpolatedFrameCount = provider != TemporalProvider::None ? interpolatedFrameCount : 0;
+        observation.faultMode = static_cast<TemporalTestFaultMode>(source.testFaultMode);
+        observation.faultRevision = source.testFaultRevision;
+        observation.nativeGateActive = nativeGateActive;
+        observation.result = result;
+        // Fault-armed provenance deliberately fails measurement IsValid(). It
+        // still identifies real rendered pixels and must not block presentation.
+        observation.valid = frameId != 0 && frameId == source.realFrameId &&
+            source.publicationFrameId != 0 && source.viewId != 0 && source.sceneEpoch != 0 &&
+            source.testFaultMode <= static_cast<uint8_t>(TemporalTestFaultMode::Dispatch);
+        TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+        {
+            snapshot.presenterObservation = observation;
+            snapshot.cpuPresentReturnedFrameId = observation.valid && result.status != TemporalStatus::NotQueried
+                ? frameId : 0;
+            snapshot.activeFrameGenerator = observation.valid && result.IsSuccess()
+                ? observation.provider : TemporalProvider::None;
+            snapshot.activeInterpolatedFrameCount = snapshot.activeFrameGenerator != TemporalProvider::None
+                ? observation.interpolatedFrameCount : 0;
+        });
+    }
+
     void Publish(TemporalResult result, const std::string& diagnostic = {})
     {
         TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
@@ -188,7 +225,12 @@ struct TemporalDX12::State
             snapshot.requestedFrameGenerationResult = requestedResult;
             snapshot.selectedFrameGenerator = selected;
             snapshot.lastFrameGenerationResult = result;
-            snapshot.activeFrameGenerator = sdkPresented && result.IsSuccess() ? selected : TemporalProvider::None;
+            snapshot.activeFrameGenerator = sdkPresented && result.IsSuccess() &&
+                (!pins || !pins->packet.nativeGateActive) ? selected : TemporalProvider::None;
+            snapshot.configuredInterpolatedFrameCount = generator && selected != TemporalProvider::None
+                ? configuration.interpolatedFrameCount : 0;
+            snapshot.activeInterpolatedFrameCount = snapshot.activeFrameGenerator != TemporalProvider::None
+                ? snapshot.configuredInterpolatedFrameCount : 0;
             for (const auto& candidate : capabilities)
             {
                 auto found = std::find_if(snapshot.capabilities.begin(), snapshot.capabilities.end(),
@@ -390,8 +432,10 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     FsrContextDescription fsrDescription;
     fsrDescription.maxRenderExtent = fsrDescription.displayExtent = {width, height};
     fsrDescription.highDynamicRange = true;
+    auto fsrQueryConfiguration = state.configuration;
+    fsrQueryConfiguration.interpolatedFrameCount = 1;
     fsr = QueryFsrCapabilities(MakeFsrBackendDeviceDX12(state.resources.GetDevice()), fsrDescription,
-        state.configuration, FFX_SURFACE_FORMAT_R8G8B8A8_UNORM);
+        fsrQueryConfiguration, FFX_SURFACE_FORMAT_R8G8B8A8_UNORM);
 #endif
     state.capabilities.push_back(fsr);
     TemporalCapabilities dlss;
@@ -421,11 +465,25 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
         state.settings.runtimeDirectory.c_str(), xess.maxInterpolatedFrames);
     state.capabilities.push_back(xess);
     for (auto& candidate : state.capabilities)
+    {
         if (state.failedProviders[static_cast<size_t>(candidate.provider)])
+        {
             candidate.frameGeneration = {TemporalStatus::SdkFailure};
+        }
+    }
+    auto eligibleCapabilities = state.capabilities;
+    for (auto& candidate : eligibleCapabilities)
+    {
+        if (candidate.frameGeneration.IsSuccess() && (state.configuration.interpolatedFrameCount == 0 ||
+            state.configuration.interpolatedFrameCount > TemporalSupportedInterpolatedFrameCount(
+                candidate.provider, TemporalBackend::DX12, state.capabilities)))
+        {
+            candidate.frameGeneration = {TemporalStatus::FeatureUnsupported};
+        }
+    }
     const auto requested = state.settings.enabled ? state.settings.requestedFrameGenerator : TemporalProvider::None;
     const auto selection = SelectTemporalProviders(TemporalProvider::None, requested,
-        TemporalBackend::DX12, state.capabilities);
+        TemporalBackend::DX12, eligibleCapabilities);
     state.selected = selection.frameGenerator;
     state.requestedResult = selection.requestedFrameGenerator;
     if (requested == TemporalProvider::XeSS && state.UsesDlssToken())
@@ -560,6 +618,7 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
 #endif
         state.dlssSwapchain.Reset();
         if (state.selected != TemporalProvider::Fsr && fsr.frameGeneration.IsSuccess() &&
+            state.configuration.interpolatedFrameCount == 1 &&
             !state.failedProviders[static_cast<size_t>(TemporalProvider::Fsr)])
         {
             state.selected = TemporalProvider::Fsr;
@@ -715,13 +774,13 @@ void TemporalDX12::Mark(uint64_t realFrameId, RHITemporalLatencyMarker marker)
     if (state.latencyFrame == realFrameId) state.Mark(realFrameId, marker);
 }
 
-void TemporalDX12::OpenRealFrame(uint64_t realFrameId)
+void TemporalDX12::OpenRealFrame(const TemporalMeasurementProvenance& provenance)
 {
     std::lock_guard lock(m_state->mutex);
-    m_state->openedRealFrame = realFrameId;
+    m_state->openedRealFrame = provenance;
 }
 
-bool TemporalDX12::PresentRealFrame(std::string& error)
+bool TemporalDX12::PresentRealFrame(std::string& error, bool sourceComposed)
 {
     auto& state = *m_state;
     std::unique_lock lock(state.mutex);
@@ -730,14 +789,22 @@ bool TemporalDX12::PresentRealFrame(std::string& error)
         error = "Native presentation cannot bypass an active frame-generation proxy";
         return false;
     }
-    const uint64_t frameId = state.openedRealFrame;
-    state.openedRealFrame = 0;
+    const auto source = sourceComposed ? state.openedRealFrame : TemporalMeasurementProvenance{};
+    const uint64_t frameId = source.realFrameId;
+    const uint64_t presenterGeneration = state.generation;
+    state.openedRealFrame = {};
     const bool token = state.UsesDlssToken() && frameId != 0 && frameId == state.latencyFrame &&
         state.renderSubmitEnded && !state.sleepInProgress;
     if (!token)
     {
         lock.unlock();
-        return state.resources.Present(error);
+        HRESULT native = E_PENDING;
+        const bool presented = state.resources.Present(error, &native);
+        state.PublishPresent(source, frameId, TemporalProvider::None, 0, source.nativeGateActive,
+            {native == E_PENDING ? TemporalStatus::NotQueried : native == S_OK ? TemporalStatus::Success
+                : presented ? TemporalStatus::NotInitialized
+                : TemporalStatus::SdkFailure, native}, presenterGeneration);
+        return presented;
     }
     TemporalResult marker{TemporalStatus::Success};
     if (token && state.reflexMarkersSupported)
@@ -746,7 +813,12 @@ bool TemporalDX12::PresentRealFrame(std::string& error)
     }
     // A stale/native placeholder image may still be presented; never label it
     // with the current GT token or retire a newer simulation's admission.
-    const bool presented = state.resources.Present(error);
+    HRESULT native = E_PENDING;
+    const bool presented = state.resources.Present(error, &native);
+    state.PublishPresent(source, frameId, TemporalProvider::None, 0, source.nativeGateActive,
+        {native == E_PENDING ? TemporalStatus::NotQueried : native == S_OK ? TemporalStatus::Success
+            : presented ? TemporalStatus::NotInitialized
+            : TemporalStatus::SdkFailure, native}, presenterGeneration);
     if (token)
     {
         if (state.reflexMarkersSupported)
@@ -763,12 +835,11 @@ bool TemporalDX12::PresentRealFrame(std::string& error)
             return Report(retired, "Native Reflex token retirement", error);
         }
         state.latencyFrame = 0;
-        state.lastPresented = frameId;
-        state.PublishLatency(marker);
-        TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+        if (presented && frameId > state.lastPresented)
         {
-            snapshot.cpuPresentReturnedFrameId = frameId;
-        });
+            state.lastPresented = frameId;
+        }
+        state.PublishLatency(marker);
         state.wake.notify_all();
     }
     return presented;
@@ -835,6 +906,10 @@ bool TemporalDX12::Open(const RHITemporalDisplayPacket& packet, std::string& err
     }
     auto pins = std::make_shared<State::Pins>();
     pins->packet = packet;
+    pins->presenterProvider = packet.nativeGateActive ? TemporalProvider::None : state.selected;
+    pins->presenterInterpolatedFrameCount = pins->presenterProvider != TemporalProvider::None
+        ? state.configuration.interpolatedFrameCount : 0;
+    pins->presenterGeneration = state.generation;
     constexpr DXGI_FORMAT formats[]{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
         DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R16G16_FLOAT};
     for (size_t index = 0; index < pins->textures.size(); ++index)
@@ -932,6 +1007,7 @@ bool TemporalDX12::Present(std::string& error)
     if (!state.resources.WaitForLastFrameSubmission(error)) return false;
     const auto frameId = state.pins->packet.frame.realFrameId;
     TemporalResult result{TemporalStatus::NotInitialized};
+    TemporalResult presentObservation;
     TemporalResult latency{TemporalStatus::Success};
     if (state.reflexMarkersSupported)
     {
@@ -943,15 +1019,31 @@ bool TemporalDX12::Present(std::string& error)
         }
     }
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
-    if (state.fsr) result = state.pins->packet.nativeGateActive ? state.fsr->PresentRealFrame(1, 0) : state.fsr->Present(1, 0);
+    if (state.fsr)
+    {
+        result = state.pins->packet.nativeGateActive ? state.fsr->PresentRealFrame(1, 0, &presentObservation)
+            : state.fsr->Present(1, 0, &presentObservation);
+    }
 #endif
-    if (state.xess) result = state.xess->Present(frameId, 1, 0);
+    if (state.xess)
+    {
+        result = state.xess->Present(frameId, 1, 0, &presentObservation);
+    }
     if (state.selected == TemporalProvider::Dlss)
     {
         const HRESULT native = state.dlssSwapchain->Present(0, 0);
         state.sdkPresented = true; // Even a failing call may have submitted SDK work.
         result = {SUCCEEDED(native) ? TemporalStatus::Success : TemporalStatus::SdkFailure, native};
+        presentObservation = {native == S_OK ? TemporalStatus::Success : SUCCEEDED(native)
+            ? TemporalStatus::NotInitialized : TemporalStatus::SdkFailure, native};
     }
+    // Publish the exact input and raw native-call result, independently of any
+    // later SDK marker/drain failure folded into the adapter's return value.
+    // Neither observation is a physical display timestamp.
+    const auto& packet = state.pins->packet;
+    state.PublishPresent(packet.provenance, frameId, state.pins->presenterProvider,
+        state.pins->presenterInterpolatedFrameCount, packet.nativeGateActive, presentObservation,
+        state.pins->presenterGeneration);
     if (state.reflexMarkersSupported)
     {
         const auto ended = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentEnd);
@@ -961,7 +1053,6 @@ bool TemporalDX12::Present(std::string& error)
     }
     state.sdkPresented = true;
     state.Publish(result);
-    TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot) { snapshot.cpuPresentReturnedFrameId = frameId; });
     if (!Report(result, "SDK proxy Present", error) || !state.Drain(error))
     {
         return false; // PT attempts drained fallback before releasing GT admission.
@@ -1012,6 +1103,8 @@ bool TemporalDX12::Present(std::string& error)
         }
         snapshot.sdkFinalConsumedFrameId = frameId;
         snapshot.activeFrameGenerator = state.pins->packet.nativeGateActive ? TemporalProvider::None : state.selected;
+        snapshot.activeInterpolatedFrameCount = snapshot.activeFrameGenerator != TemporalProvider::None
+            ? state.configuration.interpolatedFrameCount : 0;
     });
     return true;
 }
@@ -1124,8 +1217,14 @@ bool TemporalDX12::Shutdown(std::string& error, bool stopGameLoop)
     if (state.finalEvent) { CloseHandle(state.finalEvent); state.finalEvent = nullptr; }
     state.readState = state.prepared = state.sdkPresented = false;
     state.reflexSleepSupported = state.reflexMarkersSupported = false;
-    state.openedRealFrame = 0;
+    state.openedRealFrame = {};
     state.selected = TemporalProvider::None;
+    TemporalRuntimeControl::Get().PublishPlayer([](auto& snapshot)
+    {
+        snapshot.configuredInterpolatedFrameCount = 0;
+        snapshot.activeInterpolatedFrameCount = 0;
+        snapshot.activeFrameGenerator = TemporalProvider::None;
+    });
     return true;
 }
 }

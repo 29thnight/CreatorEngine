@@ -218,18 +218,40 @@ TemporalResult FsrFrameGeneratorDX12::Prepare(const TemporalFrameGenerationInput
     return result;
 }
 
-TemporalResult FsrFrameGeneratorDX12::Present(uint32_t syncInterval, uint32_t flags)
+TemporalResult FsrFrameGeneratorDX12::Present(uint32_t syncInterval, uint32_t flags,
+    TemporalResult* presentObservation)
 {
-    if (!m_swapchain || !m_pending || !m_canPresent) return { TemporalStatus::NotInitialized, 0 };
+    if (presentObservation)
+    {
+        *presentObservation = {};
+    }
+    if (!m_swapchain || !m_pending || !m_canPresent)
+    {
+        return { TemporalStatus::NotInitialized, 0 };
+    }
     if (syncInterval > 4 || (flags & ~DXGI_PRESENT_ALLOW_TEARING) ||
-        ((flags & DXGI_PRESENT_ALLOW_TEARING) && syncInterval != 0)) return Invalid();
+        ((flags & DXGI_PRESENT_ALLOW_TEARING) && syncInterval != 0))
+    {
+        return Invalid();
+    }
     m_canPresent = false;
     const auto present = m_swapchain->Present(syncInterval, flags);
+    if (presentObservation)
+    {
+        *presentObservation = { present == S_OK ? TemporalStatus::Success : SUCCEEDED(present)
+            ? TemporalStatus::NotInitialized : TemporalStatus::SdkFailure, present };
+    }
     const auto complete = m_generator->FinishFrame();
-    if (m_generator->HasPendingFrame()) return complete;
+    if (m_generator->HasPendingFrame())
+    {
+        return complete;
+    }
     m_lifetime.reset();
     m_pending = m_canPresent = false;
-    if (FAILED(present)) return { TemporalStatus::SdkFailure, present };
+    if (FAILED(present))
+    {
+        return { TemporalStatus::SdkFailure, present };
+    }
     return complete;
 }
 
@@ -244,14 +266,30 @@ TemporalResult FsrFrameGeneratorDX12::DisableGeneration()
     return m_generator->DisableGeneration(ffxGetSwapchainDX12(m_swapchain.Get()));
 }
 
-TemporalResult FsrFrameGeneratorDX12::PresentRealFrame(uint32_t syncInterval, uint32_t flags)
+TemporalResult FsrFrameGeneratorDX12::PresentRealFrame(uint32_t syncInterval, uint32_t flags,
+    TemporalResult* presentObservation)
 {
-    if (!m_swapchain || m_pending) return {TemporalStatus::IntegrationRequired};
+    if (presentObservation)
+    {
+        *presentObservation = {};
+    }
+    if (!m_swapchain || m_pending)
+    {
+        return {TemporalStatus::IntegrationRequired};
+    }
     const HRESULT result = m_swapchain->Present(syncInterval, flags);
+    if (presentObservation)
+    {
+        *presentObservation = { result == S_OK ? TemporalStatus::Success : SUCCEEDED(result)
+            ? TemporalStatus::NotInitialized : TemporalStatus::SdkFailure, result };
+    }
     // DisableGeneration drains the replacement's presentation work even when
     // there is no interpolation preparation for a native-gate real frame.
     const auto drained = DisableGeneration();
-    if (!drained.IsSuccess()) return drained;
+    if (!drained.IsSuccess())
+    {
+        return drained;
+    }
     return {SUCCEEDED(result) ? TemporalStatus::Success : TemporalStatus::SdkFailure, result};
 }
 

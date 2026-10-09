@@ -38,6 +38,7 @@ struct TemporalUpscalerHost::State
     TemporalBackend backend{ TemporalBackend::DX12 };
     TemporalRuntimeSettings settings;
     uint64_t generation{ UINT64_MAX };
+    uint64_t viewId{ 0 }, sceneEpoch{ 0 };
     TemporalExtent display, render;
     TemporalProvider provider{ TemporalProvider::None };
     TemporalResult result{ TemporalStatus::NotQueried }, requestedResult{ TemporalStatus::NotQueried };
@@ -75,9 +76,12 @@ TemporalResult TemporalUpscalerHost::Shutdown()
     return { TemporalStatus::Success };
 }
 TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, TemporalBackend backend,
-    const TemporalRuntimeSettings& settings, uint64_t generation, TemporalExtent display, bool depthInverted, bool orthographic)
+    const TemporalRuntimeSettings& settings, uint64_t generation, TemporalExtent display, bool depthInverted,
+    bool orthographic, uint64_t viewId, uint64_t sceneEpoch)
 {
     auto& state = *m_state;
+    state.viewId = viewId;
+    state.sceneEpoch = sceneEpoch;
     if (!display.IsValid() || !resources.IsInitialized()) return { TemporalStatus::InvalidInput };
     const bool changed = state.resources != &resources || state.backend != backend ||
         !SameTemporalReconstructionSettings(state.settings, settings) || state.display != display ||
@@ -235,6 +239,15 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
             }
             if (result.IsSuccess()) state.render = render;
         }
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        if (result.IsSuccess() && state.adapter && TemporalRuntimeControl::Get().ConsumeTestFault(
+            settings.testFault, TemporalTestFaultMode::Capability, provider, 0, viewId, sceneEpoch))
+        {
+            // Reject actual SDK readiness, then traverse the same retirement,
+            // failed-provider ledger and FSR/native selection as a real failure.
+            result = { TemporalStatus::SdkFailure, -45001 };
+        }
+#endif
         for (auto& capability : state.capabilities)
             if (capability.provider == provider)
             {
@@ -272,7 +285,22 @@ TemporalResult TemporalUpscalerHost::Evaluate(const TemporalUpscaleInputs& input
         providerInputs.transparencyMask = {};
     }
     if (state.provider != TemporalProvider::XeSS) providerInputs.responsiveMask = {};
-    if (result.IsSuccess()) result = state.adapter->Evaluate(providerInputs, encoder);
+    if (result.IsSuccess())
+    {
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        if (TemporalRuntimeControl::Get().ConsumeTestFault(state.settings.testFault,
+            TemporalTestFaultMode::Dispatch, state.provider, inputs.frame.realFrameId, state.viewId, state.sceneEpoch))
+        {
+            // No SDK work is fabricated. The renderer discards this failed frame
+            // and the next Configure enters the normal failed-provider fallback.
+            result = { TemporalStatus::SdkFailure, -45002 };
+        }
+        else
+#endif
+        {
+            result = state.adapter->Evaluate(providerInputs, encoder);
+        }
+    }
     state.result = result;
     if (!result.IsSuccess())
     {

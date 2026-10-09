@@ -149,7 +149,7 @@ internal static class PackageInputs
         finally { Paths.AssertChild(archive, Path.GetDirectoryName(destination)!); File.Delete(archive); }
         return destination;
     }
-    public static void Materialize(string template, string destination, string requestedScene, string requestedBackend)
+    public static void Materialize(string template, string destination, string requestedScene, string requestedBackend, string? renderFeatures = null)
     {
         var text = File.ReadAllText(template);
         if (requestedScene.Length > 0)
@@ -163,6 +163,10 @@ internal static class PackageInputs
         var backend = requestedBackend.Length == 0 ? Regex.Match(text, BackendPatterns[1]).Groups[2].Value : requestedBackend.ToLowerInvariant();
         if (backend is not ("dx12" or "vulkan")) throw new BuildException("Render backend must be dx12 or vulkan.");
         foreach (var pattern in BackendPatterns) text = Regex.Replace(text, pattern, m => m.Groups[1].Value + backend + m.Groups[3].Value);
+        if (renderFeatures is not null)
+        {
+            text = RenderFeatureSettings.Apply(text, renderFeatures);
+        }
         Paths.NoReparseAncestors(destination); Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.WriteAllText(destination, text);
     }
     private static void ValidateSceneName(string name)

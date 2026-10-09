@@ -1,9 +1,12 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$EndpointFile,
-    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','golden-baseline')]
+    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','fault-fallback','golden-baseline')]
     [string]$Stage = 'support',
     [ValidateSet('none','fsr','dlss','xess')][string]$Provider = 'fsr',
+    [uint32]$InterpolatedFrameCount = 1,
+    [ValidateSet('capability','dispatch')][string]$FaultMode = 'dispatch',
+    [ValidateSet('none','fsr')][string]$ExpectedFallback = 'none',
     [ValidateSet('native-aa','quality','balanced','performance','ultra-performance')][string]$Quality = 'quality',
     [ValidateSet('off','scale','sharpen')][string]$NisMode = 'scale',
     [ValidateRange(0.5,1.0)][float]$NisRenderScale = 0.77,
@@ -109,8 +112,35 @@ function Format-Setting([float]$Value) {
     return $Value.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
 }
 
+function Require-ExactGeneration($Data, [string]$Generation) {
+    if ($Data.requestState -eq 'superseded' -or !$Data.acknowledged -or
+        [uint64]$Data.requestedGeneration -ne [uint64]$Generation -or
+        [uint64]$Data.observedGeneration -ne [uint64]$Generation -or
+        ($Data.target -eq 'player_swapchain' -and [uint64]$Data.playerObservedGeneration -ne [uint64]$Generation)) {
+        throw 'Temporal acceptance requires the exact acknowledged renderer/presenter generation'
+    }
+}
+
+function Wait-SubmittedTemporal([string]$Generation, [uint64]$PreviousFrameId) {
+    $data = Wait-TemporalGeneration $Generation
+    $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while (!$data.aaObserved -or [uint64]$data.lastRealFrameId -le $PreviousFrameId -or
+        [uint64]$data.renderSubmittedFrameId -ne [uint64]$data.lastRealFrameId) {
+        if ($data.requestState -eq 'superseded' -or [uint64]$data.requestedGeneration -ne [uint64]$Generation) {
+            throw 'Temporal request was superseded before a fresh submitted observation'
+        }
+        if ([DateTime]::UtcNow -ge $limit) { throw 'No fresh submitted temporal frame' }
+        Start-Sleep -Milliseconds 100
+        $data = (Invoke-TemporalCommand 'temporal.status' @($Generation)).data
+    }
+    Require-ExactGeneration $data $Generation
+    Require-RealMetadata $data
+    return $data
+}
+
 $report = [ordered]@{ stage=$Stage; passed=$false; scope='live-diagnostic-only'; pixelAcceptance=$false;
     performanceAcceptance=$false; latencyAcceptance=$false; timestampUtc=[DateTime]::UtcNow.ToString('o') }
+$ownedFaultRevision = $null
 try {
     $discovery = Invoke-RestMethod "$base/commands" -Headers $headers -WebSession $session -TimeoutSec $TimeoutSeconds
     $discovery | ConvertTo-Json -Depth 30 | Set-Content (Join-Path $OutputDirectory 'commands.json') -Encoding utf8
@@ -196,7 +226,9 @@ try {
         }
         'fg' {
             if ($before.target -ne 'player_swapchain') { throw 'FG stage requires development Player; Editor is forbidden' }
-            $data = Set-Temporal 'temporal.fg' @($Provider)
+            if ($InterpolatedFrameCount -eq 0) { throw 'InterpolatedFrameCount must be positive' }
+            $data = Set-Temporal 'temporal.fg' @($Provider,[string]$InterpolatedFrameCount)
+            $generation = [string]$data.requestedGeneration
             if ($Provider -eq 'none') {
                 if ($data.activeFrameGenerator -ne 'none') { throw 'Frame generator remains active' }
             } else {
@@ -207,13 +239,24 @@ try {
                 $report.generatedEvidence = if ($Provider -eq 'fsr') { 'sdk-output-completed' } else { 'sdk-reported-presentations' }
                 $report.presentationAcceptance = $false
                 while ($data.activeFrameGenerator -ne $Provider -or
+                    $data.configuredInterpolatedFrameCount -ne $InterpolatedFrameCount -or
+                    $data.activeInterpolatedFrameCount -ne $InterpolatedFrameCount -or
                     [uint64]$data.$counter -le [uint64]$before.$counter) {
+                    if ([string]$data.requestedGeneration -ne $generation -or $data.requestState -eq 'superseded') {
+                        throw 'Frame-generation request was superseded'
+                    }
                     if ([DateTime]::UtcNow -ge $limit) {
                         throw "No observed generated output/presentation evidence: $($data.frameGenerationState)"
                     }
                     Start-Sleep -Milliseconds 100
-                    $data = (Invoke-TemporalCommand 'temporal.status').data
+                    $data = (Invoke-TemporalCommand 'temporal.status' @($generation)).data
                 }
+                Require-ExactGeneration $data $generation
+                if ($data.requestedInterpolatedFrameCount -ne $InterpolatedFrameCount -or
+                    $data.effectiveRequestedInterpolatedFrameCount -ne $InterpolatedFrameCount) {
+                    throw 'Observed MFG count does not match the requested count'
+                }
+                $report.interpolatedFrameCount = $InterpolatedFrameCount
             }
         }
         'nis' {
@@ -320,13 +363,14 @@ try {
                 $data.spatialPost.activeNisMode -ne 'off' -or $data.spatialPost.deepDvcApplied) { throw 'Image feature remains active' }
         }
         'golden-baseline' {
+            if ($before.faultInjection.mode -ne 'none') { throw 'Golden baseline cannot run while a developer fault is armed' }
             Set-Temporal 'temporal.fg' @('none') | Out-Null
             Set-Temporal 'temporal.nis' @('off') | Out-Null
             Set-Temporal 'temporal.deepdvc' @('off') | Out-Null
             $receipt = Invoke-TemporalCommand 'temporal.upscale' @('none')
             $data = Wait-SpatialFrame ([string]$receipt.data.receiptGeneration) ([uint64]$before.lastRealFrameId)
             Require-RealMetadata $data
-            if ($data.activeUpscaler -ne 'none' -or $data.activeFrameGenerator -ne 'none' -or
+            if ($data.faultInjection.mode -ne 'none' -or $data.activeUpscaler -ne 'none' -or $data.activeFrameGenerator -ne 'none' -or
                 $data.spatialPost.activeNisMode -ne 'off' -or $data.spatialPost.deepDvcApplied -or
                 $data.renderExtent.width -ne $data.displayExtent.width -or
                 $data.renderExtent.height -ne $data.displayExtent.height) {
@@ -357,6 +401,60 @@ try {
             Require-RealMetadata $data
             $report.scope = 'fallback-diagnostic-only-no-fault-injected'
         }
+        'fault-fallback' {
+            if (!$before.faultInjection.available -or $before.faultInjection.mode -ne 'none') {
+                throw 'A development build with no already-active test injection is required'
+            }
+            if ($Provider -eq 'none' -or $ExpectedFallback -eq $Provider) {
+                throw 'Fault stage requires a concrete provider and a different expected fallback'
+            }
+            $receipt = Invoke-TemporalCommand 'temporal.upscale' @($Provider,$Quality)
+            $baseline = Wait-SubmittedTemporal ([string]$receipt.data.receiptGeneration) ([uint64]$before.lastRealFrameId)
+            if ($baseline.activeUpscaler -ne $Provider -or !$baseline.temporalAaApplied -or
+                $baseline.upscaleResult.status -ne 'success') {
+                throw 'Requested provider must actually reconstruct before injection; unavailable SDK is not a fault pass'
+            }
+            $receipt = Invoke-TemporalCommand 'temporal.fault' @($FaultMode,$Provider,[string]$baseline.viewId)
+            $generation = [string]$receipt.data.receiptGeneration
+            $ownedFaultRevision = [string]$receipt.data.faultInjection.revision
+            $data = Wait-SubmittedTemporal $generation ([uint64]$baseline.lastRealFrameId)
+            $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            while ([string]$data.faultInjection.consumedRevision -ne $ownedFaultRevision -or
+                [uint64]$data.faultInjection.consumedCount -le [uint64]$baseline.faultInjection.consumedCount -or
+                [string]$data.viewId -ne [string]$baseline.viewId -or
+                [string]$data.sceneEpoch -ne [string]$baseline.sceneEpoch -or
+                $data.activeUpscaler -ne $ExpectedFallback) {
+                if ($data.requestState -eq 'superseded' -or [string]$data.requestedGeneration -ne $generation) {
+                    throw 'Fault stage request was superseded'
+                }
+                if ([DateTime]::UtcNow -ge $limit) { throw 'Injected failure was not consumed followed by the expected live fallback' }
+                Start-Sleep -Milliseconds 100
+                $data = (Invoke-TemporalCommand 'temporal.status' @($generation)).data
+            }
+            Require-ExactGeneration $data $generation
+            $expectedCode = if ($FaultMode -eq 'capability') { -45001 } else { -45002 }
+            if ($data.requestedUpscaler -ne $Provider -or $data.requestedUpscaleResult.nativeCode -ne $expectedCode -or
+                [string]$data.faultInjection.viewId -ne [string]$baseline.viewId -or
+                [string]$data.faultInjection.sceneEpoch -ne [string]$baseline.sceneEpoch -or
+                [uint64]$data.lastRealFrameId -le [uint64]$baseline.lastRealFrameId -or
+                [uint64]$data.renderSubmittedFrameId -ne [uint64]$data.lastRealFrameId -or
+                ($FaultMode -eq 'dispatch' -and ([uint64]$data.faultInjection.realFrameId -eq 0 -or
+                    [uint64]$data.lastRealFrameId -le [uint64]$data.faultInjection.realFrameId))) {
+                throw 'Fallback lacks the injected failure code or a later successfully submitted real frame'
+            }
+            if ($ExpectedFallback -eq 'none') {
+                if ($data.temporalAaApplied -or $data.fxaaApplied -ne $data.fxaaRequested -or
+                    $data.renderExtent.width -ne $data.displayExtent.width -or
+                    $data.renderExtent.height -ne $data.displayExtent.height) {
+                    throw 'Native fault fallback did not restore display extents and the saved FXAA preference'
+                }
+            } elseif (!$data.temporalAaApplied -or $data.fxaaApplied -or $data.upscaleResult.status -ne 'success') {
+                throw 'FSR fallback was selected but did not successfully reconstruct the submitted frame'
+            }
+            $report.scope = 'live-injected-TU-fallback-submission-only-no-pixel-or-FG-fault-acceptance'
+            $report.faultEvidence = $data.faultInjection
+            $report.requestedFailureCode = $expectedCode
+        }
     }
     $report.snapshot = $data
     $report.passed = $true
@@ -364,6 +462,24 @@ try {
     $report.error = $_.Exception.Message
     throw
 } finally {
+    if ($null -ne $ownedFaultRevision) {
+        try {
+            $current = (Invoke-TemporalCommand 'temporal.status').data
+            if ([string]$current.faultInjection.revision -eq $ownedFaultRevision) {
+                $report.faultCleanup = Set-Temporal 'temporal.fault' @('clear')
+                if ($report.faultCleanup.faultInjection.mode -ne 'none') { throw 'Fault injection remained active after clear' }
+            } else {
+                $report.faultCleanup = 'not-cleared-because-another-request-replaced-the-owned-fault'
+                $report.passed = $false
+            }
+        } catch {
+            $report.passed = $false
+            $report.faultCleanupError = $_.Exception.Message
+            $report | ConvertTo-Json -Depth 40 | Set-Content (Join-Path $OutputDirectory 'stage.json') -Encoding utf8
+            throw
+        }
+    }
     $report | ConvertTo-Json -Depth 40 | Set-Content (Join-Path $OutputDirectory 'stage.json') -Encoding utf8
 }
 $report | ConvertTo-Json -Depth 40
+if (!$report.passed) { throw 'Temporal stage did not satisfy its declared scope' }

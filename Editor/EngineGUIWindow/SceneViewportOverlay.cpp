@@ -301,7 +301,10 @@ void editor::SceneViewportOverlay::Draw(
         const ImGuiConfigFlags flags = io.ConfigFlags;
         if (!canUse && !ImViewGuizmo::IsUsing()) io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
         if (ImViewGuizmo::Rotate(cam.m_eyePosition, cam.rotate, orbitPivot, layout.gizmoCenter))
-            rig.SetPose(cam.m_eyePosition, cam.rotate);
+        {
+            // Orbit dragging and animated axis snaps are continuous motion.
+            rig.SetPose(cam.m_eyePosition, cam.rotate, false);
+        }
         io.ConfigFlags = flags;
         viewUsing = ImViewGuizmo::IsUsing();
         pointerOverToolbar |= canUse && ImViewGuizmo::IsOver();

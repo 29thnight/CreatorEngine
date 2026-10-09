@@ -408,6 +408,33 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    static CommandCore::CommandData LiveTemporalProvenanceData(
+        const TemporalMeasurementProvenance& temporal)
+    {
+        using namespace CommandCore;
+        auto data = CommandData::Object();
+        data.Set("schemaVersion", CommandData::Int(2));
+        data.Set("valid", CommandData::Bool(temporal.IsValid()));
+        data.Set("frameKind", CommandData::String(TemporalMeasuredFrameKindName(temporal.frameKind)));
+        data.Set("realFrameId", CommandData::String(std::to_string(temporal.realFrameId)));
+        data.Set("publicationFrameId", CommandData::String(std::to_string(temporal.publicationFrameId)));
+        data.Set("viewId", CommandData::String(std::to_string(temporal.viewId)));
+        data.Set("sceneEpoch", CommandData::String(std::to_string(temporal.sceneEpoch)));
+        data.Set("generatedOrdinal", CommandData::Int(temporal.generatedOrdinal));
+        data.Set("renderWidth", CommandData::Int(temporal.renderExtent.width));
+        data.Set("renderHeight", CommandData::Int(temporal.renderExtent.height));
+        data.Set("displayWidth", CommandData::Int(temporal.displayExtent.width));
+        data.Set("displayHeight", CommandData::Int(temporal.displayExtent.height));
+        data.Set("upscaler", CommandData::String(TemporalMeasuredProviderName(temporal.upscaler)));
+        data.Set("frameGenerator", CommandData::String(TemporalMeasuredProviderName(temporal.frameGenerator)));
+        data.Set("resolutionState", CommandData::String(TemporalResolutionStateName(temporal.resolutionState)));
+        data.Set("spatialMode", CommandData::String(SpatialScalingModeName(temporal.spatialMode)));
+        data.Set("deepDvcApplied", CommandData::Bool(temporal.deepDvcApplied));
+        data.Set("nativeGateActive", CommandData::Bool(temporal.nativeGateActive));
+        data.Set("goldenEligible", CommandData::Bool(temporal.IsGoldenEligible()));
+        return data;
+    }
+
     static CommandCore::CommandResult Cmd_dx12_live(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -440,6 +467,11 @@ namespace ConsoleCmd
         data.Set("framesRendered", CommandData::Int(snapshot.framesRendered));
         data.Set("framesIdle", CommandData::Int(snapshot.framesIdle));
         data.Set("framesInFlight", CommandData::Int(snapshot.framesInFlight));
+        data.Set("framesRenderedAxis", CommandData::String("completed-real-view-renders-not-display-presentations"));
+        // Each value was retained with its own submission. A newer submitted
+        // frame must never relabel an older completed GPU timing measurement.
+        data.Set("temporalProvenance", LiveTemporalProvenanceData(snapshot.temporalProvenance));
+        data.Set("gpuTemporalProvenance", LiveTemporalProvenanceData(snapshot.gpuTemporalProvenance));
 
         // 진입 나이는 실프레임 packet 캡처 이후 시간이며 입력-광자 지연이 아니다.
         // 픽셀 제출 없이 CPU 소비만 진행할 수 있으므로 세 신원을 나누어 낸다.

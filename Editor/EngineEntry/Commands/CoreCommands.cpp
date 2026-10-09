@@ -2244,6 +2244,9 @@ namespace ConsoleCmd
     {
         reg.Result({ "temporal.deepdvc" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.fallback" }, &Cmd_temporal, SceneAccess::OwnedState);
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        reg.Result({ "temporal.fault" }, &Cmd_temporal, SceneAccess::OwnedState);
+#endif
         reg.Result({ "temporal.fg" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.latency" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.metadata" }, &Cmd_temporal, SceneAccess::OwnedState);

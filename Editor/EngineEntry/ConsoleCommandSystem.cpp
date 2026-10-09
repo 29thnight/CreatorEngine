@@ -2815,7 +2815,7 @@ void ConsoleCommandSystem::SetEditorCameraFollowing(bool follow) noexcept
     g_editorCameraFollowsGame = follow;
 }
 
-bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
+bool ConsoleCommandSystem::MatchEditorCameraToGameCamera(bool cameraCut)
 {
     EditorCameraRig* editorRig = EditorSessionState::Get().CameraRig();
     Scene* activeScene = SceneManagers->GetActiveScene();
@@ -2826,7 +2826,8 @@ bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
         return false;
     }
 
-    editorRig->ApplySnapshot(gameCamera->CaptureFrameSnapshot());
+    editorRig->ApplySnapshot(gameCamera->CaptureFrameSnapshot(),
+        static_cast<std::uint64_t>(gameCamera->GetInstanceID()), cameraCut);
     return true;
 }
 

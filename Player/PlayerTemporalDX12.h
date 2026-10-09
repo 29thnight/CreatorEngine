@@ -25,8 +25,8 @@ public:
     IDXGISwapChain3* GetSwapchain() const; // Borrowed; never cache an owning COM ref.
     bool BeginSimulationFrame(uint64_t realFrameId, std::string& error);
     void Mark(uint64_t realFrameId, RHITemporalLatencyMarker marker);
-    void OpenRealFrame(uint64_t realFrameId);
-    bool PresentRealFrame(std::string& error);
+    void OpenRealFrame(const TemporalMeasurementProvenance& provenance);
+    bool PresentRealFrame(std::string& error, bool sourceComposed);
     void StopSimulationFrames();
     void Discard(uint64_t realFrameId);
     bool SuspendProxy(std::string& error);

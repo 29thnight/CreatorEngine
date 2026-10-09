@@ -287,14 +287,15 @@ internal unsafe struct ScriptApiTable
     // Append-only v35. Selector IDs prove concrete views, not serialized kinds.
     public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_RequestTyped;
     public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_TryAcquireTyped;
-
+    // Append-only v36. Camera identity and cut revision remain independent.
+    public delegate* unmanaged<ObjectHandle, void> Camera_NotifyCameraCut;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 35;
+    public const int ExpectedVersion = 36;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -399,7 +400,8 @@ internal static unsafe class Native
         if (table == null) return false;
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
-        if (table->Asset_RequestTyped == null || table->Asset_TryAcquireTyped == null)
+        if (table->Asset_RequestTyped == null || table->Asset_TryAcquireTyped == null ||
+            table->Camera_NotifyCameraCut == null)
         {
             return false;
         }
@@ -1306,6 +1308,14 @@ internal static unsafe class Native
 
     public static ObjectHandle CameraGetPrimaryHandle()
         => Entered() && _api.Camera_GetPrimaryHandle != null ? _api.Camera_GetPrimaryHandle() : default;
+
+    public static void CameraNotifyCameraCut(ObjectHandle h)
+    {
+        if (Entered() && _api.Camera_NotifyCameraCut != null)
+        {
+            _api.Camera_NotifyCameraCut(h);
+        }
+    }
 
     public static bool LightExists(ObjectHandle h)
         => Entered() && _api.Light_Exists != null && _api.Light_Exists(h) != 0;

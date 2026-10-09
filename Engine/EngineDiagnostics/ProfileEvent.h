@@ -15,6 +15,7 @@
 #include <cstdint>
 
 #include "ProfileMarker.h"
+#include "ProfileRenderMeasurement.h"
 
 namespace ce
 {
@@ -138,6 +139,8 @@ namespace ce
 		// GPU readback이 늦어져도 새 녹화 세대의 청크에 섞이지 않게 한다.
 		// 0은 직접 쓰는 스트림 호출의 현재 세대를 뜻한다. 파일 레코드에는 없다.
 		std::uint64_t generation = 0;
+		std::uint64_t submission_id = 0;
+		profile_render_provenance provenance;
 	};
 
 	// 청크 하나의 이벤트 수. 프레임당 27~38 개가 현재 실측이므로 256 이면
@@ -145,7 +148,8 @@ namespace ce
 	// 숨기지 않는다(§6.2) — 부족하면 drop 이 아니라 봉인 빈도로 먼저 나타난다.
 	inline constexpr std::uint32_t kEventsPerChunk = 256;
 	inline constexpr std::uint32_t kProfilePageMagic = 0x43505246; // CPRF
-	inline constexpr std::uint16_t kProfilePageVersion = 2;
+	inline constexpr std::uint16_t kProfilePageVersion = 3;
+	inline constexpr std::uint32_t kRenderMeasurementsPerChunk = 32;
 
 	// writer 전용 저장소. 봉인 전에는 오직 자기 스레드만, 봉인 뒤에는 오직
 	// 수집기만 만진다. 두 시기가 겹치지 않는다는 것이 이 타입의 계약 전부다.
@@ -158,6 +162,10 @@ namespace ce
 		std::uint16_t event_bytes = sizeof(profile_event);
 		profile_event events[kEventsPerChunk]{};
 		std::uint32_t count = 0;
+		// A bounded value sidecar keeps ordinary CPU events at 64 bytes. These
+		// samples are owned/sealed with the same page and generation as events.
+		profile_render_measurement render_measurements[kRenderMeasurementsPerChunk]{};
+		std::uint32_t render_measurement_count = 0;
 
 		// 이 청크를 쓴 스레드의 슬롯. 봉인 뒤 수집기가 귀속을 읽는 유일한
 		// 근거다 — 옛 코어처럼 수집 시점에 스팬을 정렬해 맞추지 않는다.
@@ -185,6 +193,7 @@ namespace ce
 			version = kProfilePageVersion;
 			event_bytes = sizeof(profile_event);
 			count = 0;
+			render_measurement_count = 0;
 			late_ingest = false;
 			generation = 0;
 			thread_slot = slot;
@@ -192,6 +201,9 @@ namespace ce
 			next = nullptr;
 		}
 
-		bool full() const { return count >= kEventsPerChunk; }
+		bool full() const
+		{
+			return count >= kEventsPerChunk || render_measurement_count >= kRenderMeasurementsPerChunk;
+		}
 	};
 }

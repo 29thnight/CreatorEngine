@@ -15,6 +15,7 @@
 #include "PakHelper.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
+#include "TimeSystem.h"
 
 #include <shellapi.h>
 
@@ -379,6 +380,8 @@ void Player::App::Run()
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(m_main->GetFrameDeltaTime()),
 			views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
+        renderFrame.sourceEngineFrame = Time->GetFrameCount();
+        renderFrame.sourceEngineFrameAvailable = true;
         renderFrame.temporalRealFrameId = m_main->GetTemporalRealFrameId();
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))

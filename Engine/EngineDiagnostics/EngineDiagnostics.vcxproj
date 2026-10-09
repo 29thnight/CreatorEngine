@@ -35,6 +35,7 @@
     <ClInclude Include="ProfileCapture.h" />
     <ClInclude Include="ProfileCaptureFile.h" />
     <ClInclude Include="ProfileEvent.h" />
+    <ClInclude Include="ProfileRenderMeasurement.h" />
     <ClInclude Include="ProfileMarker.h" />
     <ClInclude Include="ProfileReader.h" />
     <ClInclude Include="ProfileScope.h" />

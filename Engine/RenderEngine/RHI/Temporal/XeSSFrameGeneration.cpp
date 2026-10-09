@@ -536,22 +536,43 @@ TemporalResult XeSSFrameGenerationDX12::Prepare(ID3D12CommandList* commands, con
 #endif
 }
 
-TemporalResult XeSSFrameGenerationDX12::Present(uint64_t realFrameId, uint32_t syncInterval, uint32_t flags)
+TemporalResult XeSSFrameGenerationDX12::Present(uint64_t realFrameId, uint32_t syncInterval, uint32_t flags,
+    TemporalResult* presentObservation)
 {
+    if (presentObservation)
+    {
+        *presentObservation = {};
+    }
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
-    if (!m_state || !m_state->m_initialized) return { TemporalStatus::NotInitialized };
+    if (!m_state || !m_state->m_initialized)
+    {
+        return { TemporalStatus::NotInitialized };
+    }
     auto& state = *m_state;
     const uint32_t required = MarkerBit(XELL_SIMULATION_START) | MarkerBit(XELL_SIMULATION_END) |
         MarkerBit(XELL_RENDERSUBMIT_START) | MarkerBit(XELL_RENDERSUBMIT_END);
     if (!ValidFrameId(realFrameId) || realFrameId != state.m_sleepFrameId || (state.m_enabled && !state.m_prepared) ||
         (state.m_markers & required) != required || (flags & DXGI_PRESENT_TEST) != 0 || syncInterval > 4)
+    {
         return { TemporalStatus::InvalidInput };
+    }
     const auto frameId = static_cast<uint32_t>(realFrameId);
     auto result = FrameGenerationResult(state.m_setPresentId(state.m_context, frameId));
-    if (!result.IsSuccess()) return result;
+    if (!result.IsSuccess())
+    {
+        return result;
+    }
     result = LatencyResult(state.m_marker(state.m_latency, frameId, XELL_PRESENT_START));
-    if (!result.IsSuccess()) return result;
+    if (!result.IsSuccess())
+    {
+        return result;
+    }
     const HRESULT presented = state.m_proxy->Present(syncInterval, flags);
+    if (presentObservation)
+    {
+        *presentObservation = { presented == S_OK ? TemporalStatus::Success : SUCCEEDED(presented)
+            ? TemporalStatus::NotInitialized : TemporalStatus::SdkFailure, presented };
+    }
     const auto ended = LatencyResult(state.m_marker(state.m_latency, frameId, XELL_PRESENT_END));
     const bool hadPreparedFrame = state.m_prepared;
     state.m_prepared = false;
@@ -566,7 +587,10 @@ TemporalResult XeSSFrameGenerationDX12::Present(uint64_t realFrameId, uint32_t s
         }
     }
     state.m_forceReset = !hadPreparedFrame || presented != S_OK || !ended.IsSuccess();
-    if (FAILED(presented)) return { TemporalStatus::SdkFailure, presented };
+    if (FAILED(presented))
+    {
+        return { TemporalStatus::SdkFailure, presented };
+    }
     return ended.IsSuccess() ? TemporalResult{ TemporalStatus::Success, presented } : ended;
 #else
     return { TemporalStatus::SdkNotBuilt };

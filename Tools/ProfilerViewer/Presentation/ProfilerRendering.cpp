@@ -195,12 +195,101 @@ namespace editor::profiler_view
             LabeledValue("Graveyard", buffer,
                 0u == displayed.graveyardCount ? kDimColor : kWarnColor);
         }
+
+        void DrawRecordedRenderMeasurements()
+        {
+            const auto capture = reader().capture();
+            if (!capture || !ImGui::CollapsingHeader("Recorded frame provenance", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                return;
+            }
+            const auto* frame = capture->find_frame(reader().selected_last());
+            if (!frame || frame->render_measurements.empty())
+            {
+                ImGui::TextDisabled("Selected CPU frame: render provenance unknown (not recorded).");
+                return;
+            }
+            ImGui::Text("CPU engine frame %u: %zu measured render samples", frame->engine_frame,
+                frame->render_measurements.size());
+            ImGui::TextDisabled("Render-submit CPU and GPU-pass axes; no generated display cadence is inferred.");
+            constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit;
+            if (!ImGui::BeginTable("RecordedRenderMeasurements", 7, flags))
+            {
+                return;
+            }
+            ImGui::TableSetupColumn("Measured source");
+            ImGui::TableSetupColumn("Cost");
+            ImGui::TableSetupColumn("Render -> display");
+            ImGui::TableSetupColumn("Frame identities");
+            ImGui::TableSetupColumn("View / submission / scene");
+            ImGui::TableSetupColumn("Applied state");
+            ImGui::TableSetupColumn("Native quality metadata");
+            ImGui::TableHeadersRow();
+            constexpr const char* providers[]{ "none", "fsr", "dlss", "xess" };
+            constexpr const char* resolutions[]{ "unknown", "native", "reconstructed", "native-fallback", "spatial-scaled" };
+            constexpr const char* spatialModes[]{ "off", "scale", "sharpen" };
+            const auto frequency = capture->environment().ticks_per_second;
+            ImGuiListClipper clipper;
+            clipper.Begin(static_cast<int>(frame->render_measurements.size()));
+            while (clipper.Step())
+            {
+                for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+                {
+                    const auto& sample = frame->render_measurements[static_cast<std::size_t>(index)];
+                    const auto& p = sample.provenance;
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(sample.axis == ce::profile_render_axis::gpu_pass
+                        ? marker_name(capture, sample.marker) : "CPU render-submit");
+                    ImGui::TableNextColumn();
+                    if (frequency != 0)
+                    {
+                        ImGui::Text("%.4f ms", static_cast<double>(sample.tick_end - sample.tick_begin) *
+                            1000.0 / static_cast<double>(frequency));
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted("unknown clock");
+                    }
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%u x %u -> %u x %u", p.render_width, p.render_height,
+                        p.display_width, p.display_height);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s real #%llu / pub #%llu / ordinal %u",
+                        p.frame_kind == 1 ? "real" : p.frame_kind == 2 ? "generated" : "unknown",
+                        static_cast<unsigned long long>(p.real_frame_id),
+                        static_cast<unsigned long long>(p.publication_frame_id), p.generated_ordinal);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%llu / %llu / %llu", static_cast<unsigned long long>(p.view_id),
+                        static_cast<unsigned long long>(sample.submission_id),
+                        static_cast<unsigned long long>(p.scene_epoch));
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s / TU %s / FG %s", p.resolution_state < 5 ? resolutions[p.resolution_state] : "unknown",
+                        p.upscaler < 4 ? providers[p.upscaler] : "unknown",
+                        p.frame_generator < 4 ? providers[p.frame_generator] : "unknown");
+                    if (p.spatial_provenance_available && p.spatial_mode < 3)
+                    {
+                        ImGui::Text("NIS %s / DeepDVC %s", spatialModes[p.spatial_mode], p.deep_dvc_applied ? "applied" : "off");
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted("Spatial effects unknown");
+                    }
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(p.native_quality_eligible() ? "eligible metadata" : "ineligible / unknown");
+                }
+            }
+            ImGui::EndTable();
+            ImGui::TextDisabled("Metadata eligibility alone is not an image-quality validation result.");
+        }
     }
 
     void draw_rendering_live()
     {
         using namespace rendering_ui;
         using namespace ce::profiler_viewer::diagnostics;
+        DrawRecordedRenderMeasurements();
         static bool m_sortByDuration = false;
         static int selectedTarget = 0;
         static std::uint64_t targetRevision = 0;
@@ -230,6 +319,7 @@ namespace editor::profiler_view
             displayed.gpuTemporalProvenance.frameKind == 1 &&
             displayed.gpuTemporalProvenance.generatedOrdinal == 0 &&
             displayed.gpuTemporalProvenance.publicationFrameId == displayed.lastGpuFrameId &&
+            displayed.lastGpuFrameId == view.completedFrameId &&
             displayed.gpuTemporalProvenance.viewId == displayed.lastGpuViewId &&
             displayed.gpuTemporalProvenance.resolutionState != 0 &&
             displayed.gpuTemporalProvenance.renderWidth && displayed.gpuTemporalProvenance.renderHeight &&
@@ -243,7 +333,7 @@ namespace editor::profiler_view
             static_cast<unsigned long long>(displayed.lastGpuViewId));
         if (displayed.lastGpuFrameId && displayed.consumedFrameId >= displayed.lastGpuFrameId)
         {
-            ImGui::Text("Sample age: %llu engine frames", static_cast<unsigned long long>(displayed.consumedFrameId - displayed.lastGpuFrameId));
+            ImGui::Text("Sample age: %llu render publications", static_cast<unsigned long long>(displayed.consumedFrameId - displayed.lastGpuFrameId));
         }
 
         // ── 러너 상태 ──
@@ -281,10 +371,13 @@ namespace editor::profiler_view
             std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.gpuMs);
             LabeledValue("GPU (selected view)", gpuMatches ? buffer : "unavailable");
             const auto& p = displayed.gpuTemporalProvenance;
-            ImGui::Text("GPU real-frame extent: %u x %u render / %u x %u display",
-                p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight);
+            if (gpuMatches)
+            {
+                ImGui::Text("GPU real-frame extent: %u x %u render / %u x %u display",
+                    p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight);
+            }
             constexpr const char* spatialModes[]{"off", "scale", "sharpen"};
-            if (p.spatialProvenanceAvailable && p.spatialMode < 3)
+            if (gpuMatches && p.spatialProvenanceAvailable && p.spatialMode < 3)
             {
                 ImGui::Text("GPU sample effects: NIS %s / DeepDVC %s", spatialModes[p.spatialMode],
                     p.deepDvcApplied ? "applied" : "off");

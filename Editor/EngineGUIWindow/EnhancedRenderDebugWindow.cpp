@@ -12,6 +12,8 @@
 
 #include <iterator>
 #include <atomic>
+#include <algorithm>
+#include <limits>
 
 // 익명 네임스페이스가 아니라 이름을 준다. 이 프로젝트는 유니티 빌드라
 // (EnableUnitySupport) 여러 .cpp가 한 TU로 합쳐지는데, ResourceCounterWindow.cpp도
@@ -25,6 +27,12 @@ namespace EnhancedRenderDebugUi
 
 	constexpr ImVec4 kWarnColor{ 0.96f, 0.78f, 0.36f, 1.0f };
 	constexpr ImVec4 kDimColor{ 0.55f, 0.58f, 0.65f, 1.0f };
+    bool g_renderFeaturesSaveFailed{ false };
+
+    void SaveRenderFeatureSettings()
+    {
+        g_renderFeaturesSaveFailed = !EditorSettingsStore::Get().Save();
+    }
 
 	// EnhancedShadowDebugView 순서 그대로다(셰이더의 CASCADED_SHADOW_DEBUG_* 와도 같다).
 	constexpr const char* kShadowDebugViews[]{
@@ -56,6 +64,7 @@ namespace EnhancedRenderDebugUi
 		auto& control = TemporalRuntimeControl::Get();
 		const auto snapshot = control.Snapshot();
 		auto settings = snapshot.requestedSettings;
+		const auto previousPost = post;
 		bool postChanged = false;
 		bool settingsChanged = false;
 		int method = settings.requestedUpscaler == TemporalProvider::None
@@ -133,6 +142,33 @@ namespace EnhancedRenderDebugUi
 			ImGui::TreePop();
 		}
 		ImGui::TreePop();
+
+        if (settingsChanged || postChanged)
+        {
+            auto& saved = EditorSettingsStore::Get().EditorRenderFeatures();
+            const auto intent = TemporalProductSettingsFromRuntime(settings, post.fxaaEnabled);
+            if (settings.requestedUpscaler != snapshot.requestedSettings.requestedUpscaler)
+            {
+                saved.upscaler = intent.upscaler;
+                saved.enabled = saved.upscaler != "none" || saved.frameGenerator != "none";
+            }
+            if (settings.quality != snapshot.requestedSettings.quality)
+            {
+                saved.quality = intent.quality;
+            }
+            if (post.fxaaEnabled != previousPost.fxaaEnabled)
+            {
+                saved.fallbackAa = post.fxaaEnabled;
+            }
+            auto passSettings = RuntimeSettings::Get().GetRenderPassSettings();
+            if (post.fxaaEnabled != previousPost.fxaaEnabled) { passSettings.aa.isApply = post.fxaaEnabled; }
+            if (post.fxaaBias != previousPost.fxaaBias) { passSettings.aa.bias = post.fxaaBias; }
+            if (post.fxaaBiasMin != previousPost.fxaaBiasMin) { passSettings.aa.biasMin = post.fxaaBiasMin; }
+            if (post.fxaaSpanMax != previousPost.fxaaSpanMax) { passSettings.aa.spanMax = post.fxaaSpanMax; }
+            RuntimeSettings::Get().SetRenderPassSettings(passSettings);
+            SaveRenderFeatureSettings();
+        }
+
 		return postChanged;
 	}
 
@@ -258,7 +294,7 @@ namespace EnhancedRenderDebugUi
 				ImGui::EndDisabled();
 				ImGui::EndCombo();
 			}
-			ImGui::TextWrapped("Independent of AA, upscaling and FG. Player required: enabled modes are unavailable in Editor. Use the DX12 Player command service or CREATOR_TEMPORAL_REFLEX before Player startup.");
+			ImGui::TextWrapped("Independent of AA, upscaling and FG. Player required: enabled modes cannot execute in Editor. Configure persistent startup intent under Project Settings > Player render defaults, or override it with CREATOR_TEMPORAL_REFLEX before Player startup.");
 			ImGui::Text("Support: %s | sleep: %s | markers: %s", LiveFeatureStatusLabel(snapshot.reflex.support.status),
 				LiveFeatureStatusLabel(snapshot.reflex.sleepSupport.status), LiveFeatureStatusLabel(snapshot.reflex.markerSupport.status));
 			if (snapshot.reflex.configured)
@@ -293,8 +329,103 @@ namespace EnhancedRenderDebugUi
 		if (changed)
 		{
 			control.Request(settings);
+            const auto intent = TemporalProductSettingsFromRuntime(settings,
+                EditorSettingsStore::Get().EditorRenderFeatures().fallbackAa);
+            auto& saved = EditorSettingsStore::Get().EditorRenderFeatures();
+            const auto& previous = snapshot.requestedSettings;
+            if (settings.spatialPost.nisMode != previous.spatialPost.nisMode) { saved.spatialMode = intent.spatialMode; }
+            if (settings.spatialPost.nisRenderScale != previous.spatialPost.nisRenderScale) { saved.spatialRenderScale = intent.spatialRenderScale; }
+            if (settings.spatialPost.nisSharpness != previous.spatialPost.nisSharpness) { saved.spatialSharpness = intent.spatialSharpness; }
+            if (settings.spatialPost.deepDvcEnabled != previous.spatialPost.deepDvcEnabled) { saved.digitalVibrance = intent.digitalVibrance; }
+            if (settings.spatialPost.deepDvcIntensity != previous.spatialPost.deepDvcIntensity) { saved.vibranceIntensity = intent.vibranceIntensity; }
+            if (settings.spatialPost.deepDvcSaturationBoost != previous.spatialPost.deepDvcSaturationBoost) { saved.saturationBoost = intent.saturationBoost; }
+            if (settings.reflexMode != previous.reflexMode) { saved.latencyMode = intent.latencyMode; }
+            SaveRenderFeatureSettings();
 		}
 	}
+
+    void DrawPlayerRenderDefaults()
+    {
+        auto& defaults = EditorSettingsStore::Get().Build().PlayerRenderFeatures();
+        auto settings = TemporalRuntimeSettingsFromProduct(defaults);
+        bool fallbackAa = defaults.fallbackAa;
+        bool changed = ImGui::Checkbox("Enable temporal reconstruction / frame generation", &settings.enabled);
+        constexpr const char* providers[]{ "None", "FSR", "DLSS", "XeSS" };
+        int upscaler = static_cast<int>(settings.requestedUpscaler);
+        if (ImGui::Combo("Player upscaler", &upscaler, providers, static_cast<int>(std::size(providers))))
+        {
+            settings.requestedUpscaler = static_cast<TemporalProvider>(upscaler);
+            changed = true;
+        }
+        constexpr const char* qualities[]{ "Native AA (1:1)", "Quality", "Balanced", "Performance", "Ultra performance" };
+        int quality = static_cast<int>(settings.quality);
+        if (ImGui::Combo("Player upscale quality", &quality, qualities, static_cast<int>(std::size(qualities))))
+        {
+            settings.quality = static_cast<TemporalQuality>(quality);
+            changed = true;
+        }
+        changed |= ImGui::Checkbox("Player native / fallback FXAA", &fallbackAa);
+        int generator = static_cast<int>(settings.requestedFrameGenerator);
+        if (ImGui::Combo("Player frame generator", &generator, providers, static_cast<int>(std::size(providers))))
+        {
+            settings.requestedFrameGenerator = static_cast<TemporalProvider>(generator);
+            changed = true;
+        }
+        const auto snapshot = TemporalRuntimeControl::Get().Snapshot();
+        const auto backend = EditorSettingsStore::Get().Build().GetRenderBackend() == RenderBackend::DX12
+            ? TemporalBackend::DX12 : TemporalBackend::Vulkan;
+        const uint32_t maximum = TemporalSupportedInterpolatedFrameCount(settings.requestedFrameGenerator,
+            backend, snapshot.capabilities);
+        if (ImGui::InputScalar("Requested interpolated frames", ImGuiDataType_U32, &settings.interpolatedFrameCount))
+        {
+            settings.interpolatedFrameCount = std::max(1u, settings.interpolatedFrameCount);
+            changed = true;
+        }
+        if (maximum != 0)
+        {
+            const int upper = static_cast<int>(std::min(maximum, static_cast<uint32_t>((std::numeric_limits<int>::max)())));
+            int count = static_cast<int>(std::min(settings.interpolatedFrameCount, static_cast<uint32_t>(upper)));
+            if (ImGui::SliderInt("Observed supported count", &count, 1, upper))
+            {
+                settings.interpolatedFrameCount = static_cast<uint32_t>(count);
+                changed = true;
+            }
+            ImGui::Text("This host's last queried maximum: %u", maximum);
+        }
+        else
+        {
+            ImGui::TextDisabled("No verified Player capacity on this host. The requested count is an unverified startup preference.");
+        }
+        ImGui::TextWrapped("The packaged Player checks its own SDK/device capacity. Unknown or excessive counts fail closed; the request is never silently clamped or treated as generated output.");
+
+        constexpr const char* latencyModes[]{ "Off", "On", "On + Boost" };
+        int latency = static_cast<int>(settings.reflexMode);
+        if (ImGui::Combo("Player low latency (Reflex)", &latency, latencyModes, static_cast<int>(std::size(latencyModes))))
+        {
+            settings.reflexMode = static_cast<TemporalLatencyMode>(latency);
+            changed = true;
+        }
+        ImGui::TextWrapped("Saved for Player startup before graphics-device creation. This control does not run Reflex in Editor. On + Boost can increase GPU power use; XeSS FG owns XeLL timing.");
+        auto& spatial = settings.spatialPost;
+        constexpr const char* spatialModes[]{ "Off", "NIS scale + sharpen", "NIS sharpen only" };
+        int mode = static_cast<int>(spatial.nisMode);
+        if (ImGui::Combo("Player spatial mode", &mode, spatialModes, static_cast<int>(std::size(spatialModes))))
+        {
+            spatial.nisMode = static_cast<SpatialScalingMode>(mode);
+            changed = true;
+        }
+        changed |= ImGui::SliderFloat("Player spatial render scale", &spatial.nisRenderScale, .5f, 1.f, "%.2f");
+        changed |= ImGui::SliderFloat("Player spatial sharpness", &spatial.nisSharpness, 0.f, 1.f, "%.2f");
+        changed |= ImGui::Checkbox("Player digital vibrance (DeepDVC)", &spatial.deepDvcEnabled);
+        changed |= ImGui::SliderFloat("Player vibrance intensity", &spatial.deepDvcIntensity, 0.f, 1.f, "%.2f");
+        changed |= ImGui::SliderFloat("Player saturation boost", &spatial.deepDvcSaturationBoost, 0.f, 1.f, "%.2f");
+        if (changed)
+        {
+            defaults = TemporalProductSettingsFromRuntime(settings, fallbackAa);
+            SaveRenderFeatureSettings();
+        }
+        ImGui::TextWrapped("Precedence: saved project defaults, then explicitly set startup environment values, then live Player commands. Live commands are session-only. Optional runtime paths and SDK application identity remain machine-local and are never packaged from this asset.");
+    }
 
 	// 고른 보기의 색 뜻. 색만 칠하고 읽는 법을 안 적으면 다음 사람이 다시 쫓는다.
 	const char* ShadowDebugViewLegend(int view)
@@ -968,11 +1099,16 @@ void editor::windows::draw_project_settings()
         if (ImGui::BeginTabItem("Graphics"))
         {
             ImGui::TextUnformatted("Enhanced Scene Renderer");
-            ImGui::TextWrapped("SceneRenderProfile owns Scene parameters. The controls below are temporary live tuning; they do not save a project profile.");
+            ImGui::TextWrapped("AA, upscaling and spatial choices below save Editor startup defaults. SceneRenderProfile continues to own scene pass parameters and can override fallback FXAA. Other live pass tuning does not save a scene profile.");
             auto settings = RuntimeSettings::Get().GetRenderPassSettings();
             if (ImGui::Checkbox("Show environment background", &settings.m_isSkyboxEnabled))
             { RuntimeSettings::Get().SetRenderPassSettings(settings); EditorSettingsStore::Get().Save(); }
             render_pass_state().DrawPassSettings();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Player render defaults"))
+        {
+            DrawPlayerRenderDefaults();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Quality"))
@@ -981,5 +1117,13 @@ void editor::windows::draw_project_settings()
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
+    }
+    if (g_renderFeaturesSaveFailed)
+    {
+        ImGui::TextColored(kWarnColor, "Settings changed in memory, but saving failed. Check the Editor log before restart or packaging.");
+        if (ImGui::Button("Retry render settings save"))
+        {
+            SaveRenderFeatureSettings();
+        }
     }
 }
