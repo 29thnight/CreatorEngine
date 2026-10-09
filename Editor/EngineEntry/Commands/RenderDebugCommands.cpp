@@ -604,8 +604,63 @@ namespace ConsoleCmd
     //
     // ★ 판정 값은 `completedFrameId`(TickLive 를 끝낸 id)다. 디버그 스냅샷의
     //   `consumedFrameId` 는 TickLive 시작에 적혀, 긴 첫 프레임 도중에도 이미 넘어간다.
-    // 낡은 픽셀 생략과 delta만 소비한 경우도 포함하는 CPU 소비 대기다.
-    // GPU 완료·호스트 sampling·Present 반환·실제 scan-out 완료를 기다리지 않는다.
+    // Queue-mode control for normal, same-process warm A/B. Submission admission
+    // is acknowledged; GPU completion and actual overlap are measured separately.
+    static CommandCore::CommandResult Cmd_render_queue_mode(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        uint32_t mode = 0;
+        if (ctx.parts.size() != 2 || !ParseNumber(ctx.parts[1], mode) || mode > 2)
+        {
+            return InvalidArguments("render.queue.mode 0|1|2");
+        }
+        const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        const auto start = EnhancedSceneRenderer::GetLiveRenderThreadStats();
+        if (!start.running || snapshot.backend != EnhancedLiveBackend::DX12)
+        {
+            return PreconditionFailed("render.queue.mode.unavailable", "A running DX12 renderer is required");
+        }
+        uint64_t requestId = 0;
+        std::string error;
+        if (!EnhancedSceneRenderer::RequestLiveQueueExecutionMode(mode, requestId, error))
+        {
+            return Fail("render.queue.mode.rejected", error);
+        }
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
+        ctx.system.WaitForResult([requestId, mode, afterFrame = start.publishedFrameId, deadline]()
+            -> std::optional<CommandResult>
+        {
+            const auto status = EnhancedSceneRenderer::GetLiveQueueExecutionStatus();
+            if (status.requestId != requestId)
+            {
+                return Fail("render.queue.mode.superseded", "A newer queue-mode request replaced this request");
+            }
+            if (status.appliedRequestId == requestId && status.appliedMode == mode)
+            {
+                auto data = CommandData::Object();
+                data.Set("requestedMode", CommandData::Int(mode));
+                data.Set("appliedMode", CommandData::Int(status.appliedMode));
+                data.Set("afterFrame", CommandData::Int(static_cast<int64_t>(afterFrame)));
+                data.Set("appliedFrame", CommandData::Int(static_cast<int64_t>(status.appliedFrame)));
+                data.Set("requestId", CommandData::Int(static_cast<int64_t>(requestId)));
+                return Ok("Queue mode applied to a submitted frame; GPU completion and overlap remain unverified",
+                    std::move(data));
+            }
+            if (!EnhancedSceneRenderer::GetLiveRenderThreadStats().running)
+            {
+                return Fail("render.queue.mode.stopped", "Render thread stopped before applying queue mode");
+            }
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                return CommandResult{CommandStatus::TimedOut, "render.queue.mode.timeout",
+                    "Queue-mode request did not reach a submitted frame within 120 seconds"};
+            }
+            return std::nullopt;
+        });
+        return Ok(); // The command system publishes only the eventual result.
+    }
+
+    // CPU packet consumption only, not GPU completion or host presentation.
     static CommandCore::CommandResult Cmd_render_live_wait(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -788,6 +843,15 @@ namespace ConsoleCmd
             return Ok("Compiled graph requested; poll on a later frame", std::move(data));
         }
         data.Set("generation", CommandData::Int(snapshot->generation));
+        const auto& heapMemory = snapshot->aliasHeapMemory;
+        auto heaps = CommandData::Object();
+        heaps.Set("domainId", CommandData::Int(heapMemory.domainId));
+        heaps.Set("retainedBytes", CommandData::Int(heapMemory.retainedBytes));
+        heaps.Set("cachedBytes", CommandData::Int(heapMemory.cachedBytes));
+        heaps.Set("leasedBytes", CommandData::Int(heapMemory.leasedBytes));
+        heaps.Set("peakRetainedBytes", CommandData::Int(heapMemory.peakRetainedBytes));
+        heaps.Set("scope", CommandData::String("unique-group-owned-native-heaps-not-resident"));
+        data.Set("aliasHeapMemory", std::move(heaps));
         data.Set("epoch", CommandData::Int(snapshot->graphEpoch));
         data.Set("frame", CommandData::Int(snapshot->frameId));
         data.Set("sceneEpoch", CommandData::Int(snapshot->sceneEpoch));
@@ -1053,6 +1117,7 @@ namespace ConsoleCmd
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "render.pacing" }, &Cmd_render_pacing);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
+        reg.Result({ "render.queue.mode" }, &Cmd_render_queue_mode, SceneAccess::OwnedState);
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "render.live.fence" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);

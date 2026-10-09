@@ -3,9 +3,11 @@
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <mathematics/color.hpp>
+#include <memory>
 #include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../UIRenderProxy.h"
 
 // UI·스프라이트 패스 (PHASE 3-6, 신규 작성).
 //
@@ -56,9 +58,9 @@
 //   ★ 배치 수를 두 배치로 나란히 재는 것이 요점이다. '배치 1'만 보면
 //     '묶었다'와 '애초에 하나였다'가 구분되지 않는다.
 //
-// 텍스트(SpriteFont)는 이 슬라이스에 넣지 않는다. 폰트 아틀라스 생성과
-// 글리프 배치가 따로 필요하고, 그것까지 한 번에 하면 무엇이 실패했는지
-// 분리되지 않는다. 사각형이 서고 나서 그 위에 얹는다.
+// 텍스트는 CPU에서 완성한 불변 TextLayout을 글리프 사각형으로 펼친다.
+// 이미지와 같은 순서·배칭·업로드 경로를 쓰고, 인스턴스 표식만으로 SDF를
+// 구분하므로 백엔드별 텍스트 패스나 셰이더가 필요하지 않다.
 class EnhancedUIPass : public EnhancedRenderPass
 {
 public:
@@ -80,6 +82,7 @@ public:
         float uvBottom{ 1.f };
 
         float rotation{ 0.f };
+        bool signedDistance{ false };
 
         math::color   color{ 1.f, 1.f, 1.f, 1.f };
 
@@ -123,15 +126,25 @@ public:
     /// 클리핑은 DX11 경로와 같은 함수(UIClipping.h)를 쓴다. 두 곳에 따로
     /// 두면 하나가 틀려도 알 수 없다.
     ///
-    /// 텍스트·스프라이트시트는 아직 건너뛴다. 건너뛴 수를 돌려주므로
+    /// Overlay 이미지와 SDF 텍스트를 지원한다. 스프라이트시트와 다른
+    /// Canvas 모드는 건너뛴다. 건너뛴 수를 돌려주므로
     /// '아직 안 되는 것'과 '되는데 안 나오는 것'이 구분된다.
     /// 컨테이너 종류를 묻지 않으려고 포인터와 개수로 받는다 — 엔진의 UI
     /// 큐는 concurrent_vector라, 그 타입을 이 헤더가 알 이유가 없다.
+    /// SDF 텍스트는 texturePins가 있어야 펼칠 수 있다.
     static uint32_t BuildRectsFromQueue(
         class UIRenderProxy* const* proxies, size_t count,
         std::vector<Rect>& outRects,
         float screenWidth = 0.f, float screenHeight = 0.f,
         TextureFramePins* texturePins = nullptr);
+
+    /// Canvas 모드와 무관한 글리프 배치. Overlay와 3D Canvas가 같은 앵커·
+    /// 뒤집기·소유권 규약을 쓴다. 기존 목록은 유지하고 유효 글리프를 붙인다.
+    /// texturePins가 업로드까지 각 아틀라스 스냅샷을 보존한다.
+    /// 잘못된 레이아웃/글리프가 있으면 false이며, 유효 글리프는 남긴다.
+    static bool AppendTextRects(const UIRenderProxy::TextData& text,
+        std::vector<Rect>& outRects, TextureFramePins& texturePins,
+        float offsetX = 0.f, float offsetY = 0.f);
 
     RGHandle GetOutput() const { return m_output; }
 
@@ -149,7 +162,7 @@ private:
         math::vector4 bounds{};   // left · top · right · bottom (픽셀)
         math::vector4 uv{};       // uvLeft · uvTop · uvRight · uvBottom
         math::color    color{};
-        math::vector4 rotation{}; // x = radians
+        math::vector4 rotation{}; // x = radians, y = signed-distance flag
     };
 
     static_assert(sizeof(RectInstance) == 64u);

@@ -53,8 +53,8 @@ namespace experiment::importer
                     return false;
                 }
 
-                std::filesystem::path resolvedPath = std::filesystem::u8path(
-                    path, path + pathLength);
+                const std::u8string encodedPath(path, path + pathLength);
+                std::filesystem::path resolvedPath(encodedPath);
                 if (!resolvedPath.is_absolute())
                 {
                     resolvedPath = context.request->sourcePath.parent_path() / resolvedPath;

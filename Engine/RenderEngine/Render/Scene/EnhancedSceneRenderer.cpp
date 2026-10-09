@@ -50,7 +50,6 @@
 #include "../../MaterialGraphSceneHost.h"
 #include "../../MaterialGraphSceneCompiler.h"
 #include "../../RenderScene.h"
-#include "../../../SceneRuntime/Scene.h"
 #include "../Core/EnhancedLightPacking.h"
 #include "../../Texture.h"
 #include "../../PrimitiveRenderProxy.h"
@@ -626,7 +625,8 @@ namespace
     template <typename PipelineT, typename CommandPoolT>
     bool PrepareSceneRecording(PipelineT& pipeline, EnhancedRenderGraph& graph,
         CommandPoolT& commandPool, RHIShaderBinary output, bool& preparationDeferred,
-        EnhancedPbrCapture* capture, std::string& error)
+        EnhancedPbrCapture* capture, std::string& error,
+        const std::function<bool(std::string&)>& prepareBoundary = {})
     {
         RHIShaderCompiler::ScopedOutput outputScope(output);
         auto& context = pipeline.frameContext;
@@ -634,7 +634,7 @@ namespace
         {
             return false;
         }
-        if (!graph.PrepareParallel(commandPool, error))
+        if (!prepareBoundary && !graph.PrepareParallel(commandPool, error))
         {
             return false;
         }
@@ -661,6 +661,12 @@ namespace
         if (capture)
         {
             capture->RecordLatticeInput(pipeline.graphInput);
+        }
+        // Owned queues preserve the recording reservation, so defer queue-frame
+        // admission until asynchronous material preparation has succeeded.
+        if (prepareBoundary && !prepareBoundary(error))
+        {
+            return false;
         }
         return true;
     }
@@ -1358,7 +1364,7 @@ namespace
                     resources.DescribeTexture(ibl.GetImportanceMaps()[2]));
                 capture->manifest.rootref()["measurement"]["validationLayerEnabled"] << resources.IsValidationEnabled();
                 const auto memory = resources.QueryVideoMemory();
-                capture->RecordMemory(memory.usedMB, memory.budgetMB, memory.budgetMB > 0);
+                capture->RecordMemory(memory);
                 std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
                 EnhancedLiveGpuSpan captureSpan;
                 std::string timingError;
@@ -1918,6 +1924,9 @@ namespace
         Microsoft::WRL::Wrappers::HandleT<Microsoft::WRL::Wrappers::HandleTraits::HANDLENullTraits> pacingTimer{
             CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS) };
         std::atomic<EnhancedLivePacing> livePacing{};
+        std::atomic<bool> hasPendingQueueMode{false};
+        EnhancedLiveQueueExecutionStatus queueExecutionStatus; // debugMutex
+
         uint64_t armedGpuFenceValue{ 0 };          // RT 전용
         bool compositorTickSinceAdmission{ true };  // RT 전용
         uint64_t pacedAdmissionNanoseconds{ 0 };    // RT 전용
@@ -2066,7 +2075,7 @@ namespace
 
         // 렌더 backend가 소유하는 카메라별 뷰. CE/UI는 이 파이프라인을 직접
         // 순회하지 않고 아래 display snapshot의 Editor/Game 대상만 소비한다.
-        std::unique_ptr<LivePipeline> pipeline;
+        std::shared_ptr<LivePipeline> pipeline;
         std::unique_ptr<VulkanLivePipeline> vulkanPipeline;
 
         // RenderThread는 완료된 슬롯을 아래 값 스냅샷으로 승격하고, CE는 그
@@ -2593,6 +2602,7 @@ namespace
                 addVisibility(source.decal.GetGpuVisibilityStats());
                 addVisibility(source.sprite.GetGpuVisibilityStats());
                 addVisibility(source.graphMaterials.CameraVisibilityStats());
+                debugSnapshot.preparedMeshletBatchCount += source.graphMaterials.PreparedMeshletDrawCount();
             };
             if (pipeline)
             {
@@ -2702,7 +2712,7 @@ namespace
             {
                 std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
                 InvalidateDisplayResultsLocked();
-                pipeline = std::make_unique<LivePipeline>();
+                pipeline = std::make_shared<LivePipeline>();
                 pipeline->resizeGeneration = displaySnapshot.resizeGeneration;
             }
             LivePipeline& p = *pipeline;
@@ -3215,6 +3225,8 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
+                    // Graph-only GBuffer owns no native occluder raster. LX
+                    // builds its current-frame depth before HZB and main color.
                     const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb), false);
                     bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
@@ -3894,20 +3906,40 @@ namespace
                 center.x, center.y, center.z, 1.f };
         }
 
-        static CanvasPlane ResolveCanvasPlane(const UIRenderProxy::ImageData& image,
+        template<typename TUIData>
+        static CanvasPlane ResolveCanvasPlane(const TUIData& image,
             const FrameCameraSnapshot* gameCamera)
         {
             CanvasPlane plane{};
             const float rootWidth = image.canvasRect.z;
             const float rootHeight = image.canvasRect.w;
-            if (rootWidth <= 0.f || rootHeight <= 0.f) return plane;
+            if (!std::isfinite(rootWidth) || !std::isfinite(rootHeight)
+                || !std::isfinite(image.canvasRect.x) || !std::isfinite(image.canvasRect.y)
+                || rootWidth <= 0.f || rootHeight <= 0.f)
+            {
+                return plane;
+            }
+            for (int row = 0; row < 4; ++row)
+            {
+                for (int column = 0; column < 4; ++column)
+                {
+                    if (!std::isfinite(image.canvasWorld(row, column)))
+                    {
+                        return plane;
+                    }
+                }
+            }
 
             if (CanvasRenderMode::ScreenSpaceCamera == image.renderMode)
             {
                 if (nullptr == gameCamera) return plane;
                 const float projectionX = std::abs(gameCamera->projection(0, 0));
                 const float projectionY = std::abs(gameCamera->projection(1, 1));
-                if (projectionX < 1e-6f || projectionY < 1e-6f) return plane;
+                if (!std::isfinite(projectionX) || !std::isfinite(projectionY)
+                    || !std::isfinite(image.planeDistance) || projectionX < 1e-6f || projectionY < 1e-6f)
+                {
+                    return plane;
+                }
 
                 float distance = (std::max)(image.planeDistance,
                     gameCamera->nearPlane + 0.01f);
@@ -3928,7 +3960,7 @@ namespace
 
             const float centerX = image.canvasRect.x + rootWidth * 0.5f;
             const float centerY = image.canvasRect.y + rootHeight * 0.5f;
-        const math::matrix4x4& canvasWorld = image.canvasWorld;
+            const math::matrix4x4& canvasWorld = image.canvasWorld;
             plane.center = math::transform_point(
                 math::vector3{ centerX, -centerY, 0.f }, canvasWorld);
             plane.right = math::transform_direction(
@@ -4019,7 +4051,59 @@ namespace
             return true;
         }
 
-        static void AppendCanvasOutline(const UIRenderProxy::ImageData& image,
+        static void AppendTextToPlane(const UIRenderProxy::TextData& text,
+            const CanvasPlane& plane, bool enableDepth, std::vector<EnhancedSpritePass::Item>& output,
+            TextureFramePins& texturePins)
+        {
+            if (!plane.valid)
+            {
+                return;
+            }
+            // Overlay and plane paths consume exactly the same glyph rectangles,
+            // including alignment, fallback, line wrapping and whole-block flips.
+            std::vector<EnhancedUIPass::Rect> glyphs;
+            EnhancedUIPass::AppendTextRects(text, glyphs, texturePins);
+            const float rootWidth = text.canvasRect.z;
+            const float rootHeight = text.canvasRect.w;
+            const float rootCenterX = text.canvasRect.x + rootWidth * 0.5f;
+            const float rootCenterY = text.canvasRect.y + rootHeight * 0.5f;
+            for (const auto& glyph : glyphs)
+            {
+                const float centerX = (glyph.left + glyph.right) * 0.5f;
+                const float centerY = (glyph.top + glyph.bottom) * 0.5f;
+                const math::vector3 center = plane.center
+                    + plane.right * ((centerX - rootCenterX) / rootWidth)
+                    + plane.down * ((centerY - rootCenterY) / rootHeight);
+                const math::vector3 right = plane.right * ((glyph.right - glyph.left) / rootWidth);
+                const math::vector3 down = plane.down * ((glyph.bottom - glyph.top) / rootHeight);
+                EnhancedSpritePass::Item item{};
+                item.world = MakeSpriteMatrix(right, down, center);
+                bool finite = true;
+                for (int row = 0; row < 4; ++row)
+                {
+                    for (int column = 0; column < 4; ++column)
+                    {
+                        finite = finite && std::isfinite(item.world(row, column));
+                    }
+                }
+                if (!finite)
+                {
+                    continue;
+                }
+                item.uv = { glyph.uvLeft, glyph.uvTop, glyph.uvRight, glyph.uvBottom };
+                item.color = glyph.color;
+                item.texture = glyph.texture;
+                item.texturePinIndex = glyph.texturePinIndex;
+                item.signedDistance = true;
+                item.canvasOrder = glyph.canvasOrder;
+                item.layerOrder = glyph.layerOrder;
+                item.enableDepth = enableDepth;
+                output.push_back(std::move(item));
+            }
+        }
+
+        template<typename TUIData>
+        static void AppendCanvasOutline(const TUIData& image,
             const CanvasPlane& plane, std::vector<EnhancedSpritePass::Item>& output)
         {
             if (!plane.valid) return;
@@ -5366,7 +5450,27 @@ namespace
             std::unordered_set<size_t> outlinedCanvases;
             for (UIRenderProxy* proxy : uiProxyPointers)
             {
-                if (nullptr == proxy) continue;
+                if (nullptr == proxy || !proxy->IsEnabled())
+                {
+                    continue;
+                }
+                if (const auto* text = std::get_if<UIRenderProxy::TextData>(&proxy->GetData()))
+                {
+                    if (CanvasRenderMode::ScreenSpaceOverlay == text->renderMode
+                        && HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::ScreenSpaceUI))
+                    {
+                        continue;
+                    }
+                    const CanvasPlane plane = ResolveCanvasPlane(*text, gameCamera);
+                    AppendTextToPlane(*text, plane, CanvasRenderMode::WorldSpace == text->renderMode,
+                        worldSprites, *textureFramePins);
+                    if (HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::CanvasPreview)
+                        && outlinedCanvases.insert(text->canvasId.m_ID_Data).second)
+                    {
+                        AppendCanvasOutline(*text, plane, worldSprites);
+                    }
+                    continue;
+                }
                 const auto* image = std::get_if<UIRenderProxy::ImageData>(
                     &proxy->GetData());
                 if (nullptr == image) continue;
@@ -5768,6 +5872,17 @@ namespace
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            static const bool queueEvidence = []
+            {
+                const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
+                return value && std::string_view(value) == "1";
+            }();
+            std::optional<LiveStopwatch> renderOnceWatch;
+            if (queueEvidence)
+            {
+                renderOnceWatch.emplace();
+                renderOnceWatch->Start();
+            }
             preparationDeferred = false;
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
@@ -5776,6 +5891,18 @@ namespace
             if (!p.ibl.FinishCookedCapture(dx12.GetCompletedFenceValue(),environmentCacheError))
                 Debug::PrintLog(spdlog::level::warn,"[EnvironmentCache] " + environmentCacheError);
 
+            EnhancedLiveQueueExecutionStatus queueModeRequest;
+            if (hasPendingQueueMode.load(std::memory_order_acquire))
+            {
+                {
+                    std::lock_guard<std::mutex> lock(debugMutex);
+                    queueModeRequest = queueExecutionStatus;
+                }
+                if (!dx12.SetQueueExecutionMode(queueModeRequest.requestedMode, outError))
+                {
+                    return false;
+                }
+            }
             {
                 RenderThreadPhaseScope begin(RenderPhase::begin_frame);
                 if (!dx12.BeginFrame(outError))
@@ -5839,7 +5966,7 @@ namespace
                 profilerToken.captureGeneration = captureSink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
             }
             profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
-                view.key.viewId, profilerToken.captureGeneration);
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -5877,12 +6004,28 @@ namespace
             slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
                 kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot.graph;
+            graph.SetQueueExecutionMode(dx12.GetQueueExecutionMode());
+            graph.SetMeasurementDomain(capture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal);
+            const bool ownedQueueExecution = dx12.UsesOwnedQueueExecution();
+            if (ownedQueueExecution && ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false))
+            {
+                outError = "Owned queue execution requires transient aliasing OFF.";
+                return false;
+            }
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
             graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
                 ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
+            // Owned queues use compute only when measured independent graphics work
+            // can hide it. Cost constants are uncalibrated estimates (QueueCostModel).
+            EnhancedRenderGraph::QueueCostModel queueCosts;
+            queueCosts.placement = RGQueuePlacement::Overlap;
+            graph.SetQueueCostModel(queueCosts);
+            const std::function<bool(std::string&)> queueBoundary = ownedQueueExecution
+                ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
+                : std::function<bool(std::string&)>{};
             if (!PrepareSceneRecording(p, graph, dx12.CommandPool(), RHIShaderBinary::Dxil,
-                    preparationDeferred, capture, outError))
+                    preparationDeferred, capture, outError, queueBoundary))
             {
                 return false;
             }
@@ -5932,12 +6075,6 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
-            if (diagnosticOutput)
-            {
-                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
-                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
-            }
-
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
@@ -5951,40 +6088,111 @@ namespace
 #endif
             RHIRecordedBatch batch;
             RHISubmissionTicket batchTicket;
+            double ownedRecordingMilliseconds = 0.0;
             LiveStopwatch recordWatch;
             recordWatch.Start();
             {
                 RenderThreadPhaseScope record(RenderPhase::command_record);
-                if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc,
-                    batch, outError)) return false;
+                if (ownedQueueExecution)
+                {
+                    if (!dx12.SubmitOwnedGraph(slot.graph, pipeline, ownedRecordingMilliseconds, outError))
+                    {
+                        return false;
+                    }
+                }
+                else if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc, batch, outError))
+                {
+                    return false;
+                }
+            }
+            p.lastNativeRecordMs = ownedQueueExecution ? ownedRecordingMilliseconds : recordWatch.ElapsedMs();
+            // SubmitOwnedGraph specializes order, lifetimes and barriers. Copy
+            // that final plan, never the pre-specialization Compile snapshot.
+            // Failed submissions still return false above; publication clears a
+            // failed frame rather than labeling an unsubmitted plan as displayed.
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
+                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
             }
             viewShadowStats[targetIndex] = CaptureShadowStats(p);
-            p.lastNativeRecordMs = recordWatch.ElapsedMs();
             if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
             { outError = "capture graph is not compiled"; return false; }
             p.lastGraphStats = graph.GetStats();
+            LiveStopwatch submitWatch;
+            submitWatch.Start();
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
-                if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
-                    outError))
+                if (ownedQueueExecution)
                 {
-                    return false;
+                    dx12.ResolveProfilerFrame(profilerToken);
+                    if (!dx12.EndFrame(outError))
+                    {
+                        return false;
+                    }
+                    frameCommitted = true;
+                    // EndFrame's CPU ticket has succeeded and its primary fence
+                    // includes the owned graph join. Publish the same upload transaction.
+                    if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        RHICompletionPoint{dx12.GetLastSignaledFenceValue()}, outError))
+                    {
+                        return false;
+                    }
                 }
-                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-                if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
-                        graphCompletion, outError, batchTicket))
+                else
                 {
-                    return false;
-                }
-
-                dx12.ResolveProfilerFrame(profilerToken);
-
-                if (!dx12.EndFrame(outError))
-                {
-                    return false;
+                    if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket, outError))
+                    {
+                        return false;
+                    }
+                    const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                    if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId, graphCompletion, outError, batchTicket))
+                    {
+                        return false;
+                    }
+                    dx12.ResolveProfilerFrame(profilerToken);
+                    if (!dx12.EndFrame(outError))
+                    {
+                        return false;
+                    }
                 }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
+            if (queueModeRequest.requestId != 0)
+            {
+                std::lock_guard<std::mutex> lock(debugMutex);
+                queueExecutionStatus.appliedRequestId = queueModeRequest.requestId;
+                queueExecutionStatus.appliedMode = dx12.GetQueueExecutionMode();
+                queueExecutionStatus.appliedFrame = sourceFrameId;
+                if (queueExecutionStatus.requestId == queueModeRequest.requestId)
+                {
+                    hasPendingQueueMode.store(false, std::memory_order_release);
+                }
+            }
+            const double submissionMilliseconds = submitWatch.ElapsedMs() +
+                (ownedQueueExecution ? graph.GetQueueDiagnostics().execution.submissionMilliseconds : 0.0);
+            const double recordSubmitMilliseconds = recordWatch.ElapsedMs();
+            if (capture)
+            {
+                capture->RecordSubmissionCpu(recordSubmitMilliseconds, submissionMilliseconds);
+            }
+            if (queueEvidence)
+            {
+                const std::string line = "[rg8.cpu] {\"schemaVersion\":2,\"mode\":" +
+                    std::to_string(dx12.GetQueueExecutionMode()) + ",\"measurementDomain\":\"" +
+                    RGMeasurementDomainName(graph.GetMeasurementDomain()) +
+                    "\",\"scope\":\"record-schedule-submit-frame-retirement-enqueue\",\"backendGeneration\":" +
+                    std::to_string(dx12.GetBackendGeneration()) + ",\"frameId\":" +
+                    std::to_string(sourceFrameId) + ",\"viewId\":" + std::to_string(view.key.viewId) +
+                    ",\"submissionId\":" + std::to_string(profilerToken.submissionId) +
+                    ",\"captureGeneration\":" + std::to_string(profilerToken.captureGeneration) +
+                    ",\"renderOnceMilliseconds\":" + std::to_string(renderOnceWatch->ElapsedMs()) +
+                    ",\"compileMilliseconds\":" + std::to_string(compileMs) +
+                    ",\"frameScope\":\"view-prepare-build-compile-record-schedule-submit-retirement-enqueue\"" +
+                    ",\"totalMilliseconds\":" + std::to_string(recordSubmitMilliseconds) +
+                    ",\"submissionMilliseconds\":" + std::to_string(submissionMilliseconds) + "}";
+                std::printf("%s\n", line.c_str());
+            }
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -6038,15 +6246,13 @@ namespace
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
                     EnhancedIBLGenerator::kSceneReflectionSampleCount,
                     dx12.Resources().DescribeTexture(p.ibl.GetImportanceMaps()[2]));
-                uint64_t usedMB = 0, budgetMB = 0;
-                const bool memoryAvailable = dx12.QueryVideoMemory(usedMB, budgetMB);
-                capture->RecordMemory(usedMB, budgetMB, memoryAvailable);
+                capture->RecordMemory(dx12.QueryVideoMemory());
                 std::vector<EnhancedLivePassTiming> captureTimings;
                 std::vector<EnhancedLiveGpuSlice> captureSlices;
                 EnhancedLiveGpuSpan captureSpan;
                 double captureTotalMs = 0.0;
                 std::string timingError;
-                if (!dx12.CollectProfiler(profilerToken, captureTimings, captureSlices,
+                if (!dx12.CollectProfiler(slot.profilerToken, captureTimings, captureSlices,
                         captureSpan, captureTotalMs, timingError) && timingError.empty())
                     timingError = "capture submission timestamps unavailable";
                 capture->RecordGpuTiming(captureTimings, captureSpan, captureTotalMs, timingError);
@@ -6605,6 +6811,7 @@ namespace
 
                                     for (const EnhancedLiveGpuSlice& slice : slices)
                                     {
+                                        origin.queueId = slice.queueId;
                                         sink.on_span(slice.name.c_str(), slice.beginCpuTick,
                                                      slice.endCpuTick, frameLabel, origin);
                                         ++state.gpuSpansEmitted;
@@ -7746,10 +7953,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     }
     if (!sceneLoading && hasSceneView && state.renderScene)
     {
-        if (auto* scene = state.renderScene->GetScene())
-        {
-            frame.preparedTextureImages = scene->TakePreparedTextureImagePins();
-        }
+        frame.preparedTextureImages = state.renderScene->TakePreparedTextureImagePins();
     }
     return frame;
 }
@@ -7765,10 +7969,7 @@ bool EnhancedSceneRenderer::PublishLiveFrame(EnhancedLiveFramePacket frame)
     const bool accepted = state.PublishFrame(std::move(submission));
     if (!accepted && preparedImages && state.sceneEpoch == sceneEpoch && state.renderScene)
     {
-        if (auto* scene = state.renderScene->GetScene())
-        {
-            scene->SetPreparedTextureImagePins(preparedImages);
-        }
+        state.renderScene->RestorePreparedTextureImagePins(preparedImages);
     }
     return accepted;
 }
@@ -9087,7 +9288,13 @@ EnhancedSceneRenderer::WarmupStatus EnhancedSceneRenderer::GetWarmupStatus()
 std::string EnhancedSceneRenderer::GetLiveStatus()
 {
     const LiveState& state = GetLiveState();
-    std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
+    // The UI also queries status while the render thread creates driver pipelines.
+    // Never wait for that work, or read mutable pipeline state without the lock.
+    std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::try_to_lock);
+    if (!stateLock.owns_lock())
+    {
+        return "EnhancedRenderer — busy (render state is being updated; retry status shortly)";
+    }
 
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
@@ -9580,6 +9787,39 @@ void EnhancedSceneRenderer::SetLiveTuning(const EnhancedLiveTuning& tuning)
     std::lock_guard<std::mutex> lock(state.debugMutex);
     state.pendingTuning = tuning;
     state.hasPendingTuning = true;
+}
+
+bool EnhancedSceneRenderer::RequestLiveQueueExecutionMode(uint32_t mode,
+    uint64_t& requestId, std::string& error)
+{
+    requestId = 0;
+    error.clear();
+    if (mode > 2)
+    {
+        error = "Queue execution mode must be 0, 1 or 2";
+        return false;
+    }
+    LiveState& state = GetLiveState();
+    {
+        std::lock_guard<std::mutex> lock(state.debugMutex);
+        if (state.queueExecutionStatus.requestId == UINT64_MAX)
+        {
+            error = "Queue execution request range is exhausted";
+            return false;
+        }
+        requestId = ++state.queueExecutionStatus.requestId;
+        state.queueExecutionStatus.requestedMode = mode;
+        state.hasPendingQueueMode.store(true, std::memory_order_release);
+    }
+    SetEvent(state.renderWakeEvent.Get());
+    return true;
+}
+
+EnhancedLiveQueueExecutionStatus EnhancedSceneRenderer::GetLiveQueueExecutionStatus()
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    return state.queueExecutionStatus;
 }
 
 void EnhancedSceneRenderer::ShutdownLive()

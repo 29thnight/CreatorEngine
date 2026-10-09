@@ -160,6 +160,9 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     RGHandle GraphOutput(const EnhancedRenderGraph& graph) const override;
     bool HasGraphDeclaration() const { return graph_ != nullptr; }
     RHIBufferSlice Indices() const;
+    RHIBufferSlice Meshlets() const;
+    uint32_t MeshletCount() const;
+    RGHandle GraphMeshlets(const EnhancedRenderGraph& graph) const;
     bool Declare(EnhancedRenderGraph& graph, std::string& error) const;
     void MarkSubmitted(RHICompletionPoint completion) const { completion_ = completion; }
     bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;

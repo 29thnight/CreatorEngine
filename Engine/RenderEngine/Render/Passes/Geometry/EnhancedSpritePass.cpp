@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 namespace
@@ -141,6 +142,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         instance.world = math::transpose(item.world);
         instance.uv = item.uv;
         instance.color = item.color;
+        instance.sampling.x = item.signedDistance ? 1.f : 0.f;
         m_instances.push_back(instance);
         EnhancedDrawItem bounds{};
         bounds.worldMatrix = item.world;
@@ -163,7 +165,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
             batch.texture = item.texture;
             batch.textureId = TextureFramePins::Identity(item.texture);
             batch.enableDepth = item.enableDepth;
-            m_batches.push_back(batch);
+            m_batches.push_back(std::move(batch));
         }
     }
 

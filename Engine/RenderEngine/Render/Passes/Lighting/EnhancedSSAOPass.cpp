@@ -182,7 +182,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     };
 
     // ── AO ──
-    graph.AddPass("SSAO.Compute",
+    const auto aoPass = graph.AddPass("SSAO.Compute",
                   {{m_inputs.depth, RHIResourceState::ShaderResource, readAccess},
                    {m_inputs.normal, RHIResourceState::ShaderResource, readAccess},
                    {m_rawOutput, RHIResourceState::UnorderedAccess, writeAccess}},
@@ -218,7 +218,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                   });
 
     // ── 디노이즈 ──
-    graph.AddPass(
+    const auto filterPass = graph.AddPass(
         "SSAO.Filter",
         {{m_rawOutput, RHIResourceState::ShaderResource, readAccess},
          {m_output, RHIResourceState::UnorderedAccess, writeAccess}},
@@ -259,6 +259,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             encoder.Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
         },
         m_keepAlive);
+    // These callbacks use only compute commands and declare every GPU resource.
+    graph.DeclareComputeCompatible(aoPass);
+    graph.DeclareComputeCompatible(filterPass);
 }
 
 void EnhancedSSAOPass::Shutdown()

@@ -15,6 +15,7 @@
 #include "MaterialGraphSceneCompiler.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include "FontAsset.h"
 #include "Sha256.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <fstream> // I7-C1: manifest 읽기
@@ -52,6 +53,7 @@
 #include <chrono>
 #include <istream>
 #include <limits>
+#include <memory>
 #include <utility>
 #include <optional>
 #include <ostream>
@@ -174,7 +176,14 @@ namespace
 		if (extension == ".asset")
 		{
 			if (parent == "models") return RuntimeAssetType::Model;
-			if (parent == "materials") return RuntimeAssetType::Material;
+            for (auto folder = path.parent_path(); !folder.empty() && folder != folder.parent_path();
+                 folder = folder.parent_path())
+            {
+                if (Lowercase(folder.filename().string()) == "materials")
+                {
+                    return RuntimeAssetType::Material;
+                }
+            }
 			return RuntimeAssetType::CatalogOnly;
 		}
 
@@ -185,12 +194,44 @@ namespace
 			if (parent == "spritesheets") return RuntimeAssetType::SpriteSheet;
 			return RuntimeAssetType::Texture;
 		}
+        if (extension == ".ttf" || extension == ".otf")
+        {
+            return RuntimeAssetType::Font;
+        }
 		if (extension == ".shadermeta") return RuntimeAssetType::ShaderMeta;
         if (extension == ".shadergraph")
             return RuntimeAssetType::MaterialGraph;
 
         return RuntimeAssetType::CatalogOnly;
 	}
+
+    file::path MaterialSourcePath(std::string_view name)
+    {
+        file::path requested(name);
+        if (requested.is_absolute())
+        {
+            return requested.lexically_normal();
+        }
+        // Relative strings retain the legacy asset-name contract, including
+        // names containing dots or ending in .asset. GUID loads use full paths.
+        requested += ".asset";
+        return (PathFinder::Relative("Materials") / requested).lexically_normal();
+    }
+
+    std::string MaterialCacheKey(const file::path& path)
+    {
+        std::error_code error;
+        const auto absolute = file::absolute(path, error).lexically_normal();
+        if (error)
+        {
+            return path.lexically_normal().generic_string();
+        }
+        const auto root = file::absolute(PathFinder::Relative("Materials"), error).lexically_normal();
+        const auto relative = error ? file::path{} : absolute.lexically_relative(root);
+        auto key = !relative.empty() && *relative.begin() != ".." ? relative : absolute;
+        key.replace_extension();
+        return key.generic_string();
+    }
 
 	file::path ResolveRuntimeAssetPath(std::string_view requestedPath,
 		std::string_view fallbackDirectory)
@@ -208,6 +249,80 @@ namespace
 		}
 		return PathFinder::Relative(std::string(fallbackDirectory)) / requested.filename();
 	}
+
+    file::path normalize_font_path(const file::path& path)
+    {
+        std::error_code error;
+        const auto canonical = file::weakly_canonical(path, error);
+        if (!error)
+        {
+            return canonical.lexically_normal();
+        }
+        return file::absolute(path).lexically_normal();
+    }
+
+    file::path resolve_font_path(std::string_view requestedPath, const DataSystem& data)
+    {
+        if (requestedPath.empty())
+        {
+            return normalize_font_path(PathFinder::EngineResourcePath("Fonts/Runtime/Inter-Regular.ttf"));
+        }
+        if (requestedPath.size() == 36u && requestedPath[8] == '-' && requestedPath[13] == '-'
+            && requestedPath[18] == '-' && requestedPath[23] == '-')
+        {
+            const FileGuid guid{ std::string(requestedPath) };
+            const auto resolved = data.GetFilePath(guid);
+            if (resolved.empty())
+            {
+                throw std::runtime_error("Font catalog GUID is unresolved: " + std::string(requestedPath));
+            }
+            return normalize_font_path(resolved);
+        }
+        const file::path requested(std::u8string(requestedPath.begin(), requestedPath.end()));
+        if (requested.is_absolute())
+        {
+            return normalize_font_path(requested);
+        }
+        std::error_code error;
+        // Folder-qualified requests retain their full identity even on failure.
+        // Never redirect a missing A/font.ttf to an unrelated B/font.ttf.
+        if (requested.has_parent_path())
+        {
+            const auto underAssets = PathFinder::Relative() / requested;
+            if (file::is_regular_file(underAssets, error))
+            {
+                return normalize_font_path(underAssets);
+            }
+            error.clear();
+            const auto underResources = PathFinder::EngineResourcePath() / requested;
+            if (file::is_regular_file(underResources, error))
+            {
+                return normalize_font_path(underResources);
+            }
+            return normalize_font_path(underAssets);
+        }
+        for (const auto& candidate : { PathFinder::Relative("Fonts") / requested,
+            PathFinder::Relative("Font") / requested,
+            PathFinder::EngineResourcePath("Fonts/Runtime") / requested })
+        {
+            error.clear();
+            if (file::is_regular_file(candidate, error))
+            {
+                return normalize_font_path(candidate);
+            }
+        }
+        return normalize_font_path(PathFinder::Relative("Fonts") / requested);
+    }
+
+    std::string font_cache_key(const file::path& path, FileGuid guid)
+    {
+        const auto utf8Path = normalize_font_path(path).generic_u8string();
+        std::string normalized(utf8Path.begin(), utf8Path.end());
+#ifdef _WIN32
+        normalized = Lowercase(std::move(normalized));
+#endif
+        return guid.ToString() + "|" + normalized;
+    }
 
 	// G2 — 텍스처 캐시의 신원. stem 은 신원이 아니다: 다른 폴더의 같은 이름,
 	// 같은 이름의 다른 확장자가 한 칸을 나눠 먼저 온 쪽이 이겼다.
@@ -354,6 +469,7 @@ struct DataSystem::SceneAssetPreparation
     std::vector<own::shared_owner<const Material>> materialPins;
     std::vector<own::shared_owner<const experiment::Material>> authoredMaterialPins;
     std::vector<own::shared_owner<const Texture>> texturePins;
+    std::vector<std::shared_ptr<FontAsset>> fontPins;
     own::shared_owner<TextureFramePins> textureImages{ own::make_shared<TextureFramePins>() };
     std::vector<PreparedTextureImageRequest> imageRequests;
     std::map<std::pair<AssetDepot::AssetLink<Texture>, AssetDepot::TextureAssetVariant>,
@@ -418,6 +534,7 @@ void DataSystem::AssetBundlePreparation::Cancel()
     std::vector<assets::ModelAssetGeneration::Shared> retiredModels;
     std::vector<own::shared_owner<const Material>> retiredMaterials;
     std::vector<own::shared_owner<const Texture>> retiredTextures;
+    std::vector<std::shared_ptr<FontAsset>> retiredFonts;
     {
         std::lock_guard lock(mutex);
         bool pending = result.status == AssetDepot::AssetRequestStatus::Pending;
@@ -448,6 +565,7 @@ void DataSystem::AssetBundlePreparation::Cancel()
             retiredModels.swap(result.models);
             retiredMaterials.swap(result.materials);
             retiredTextures.swap(result.textures);
+            retiredFonts.swap(result.fonts);
         }
     }
     // Subscriber/result pins release outside the bundle lock. Shared decode jobs
@@ -1416,6 +1534,16 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             throw std::runtime_error("Decal texture is absent or has the wrong cooked asset kind: " + guid.ToString());
         }
     };
+    const auto discoverFont = [&](std::string_view reference)
+    {
+        AssetEntry asset;
+        asset.assetTypeID = static_cast<int>(ManagedAssetType::SpriteFont);
+        asset.assetName = reference;
+        if (!preparation->resources.ContainsAsset(asset))
+        {
+            preparation->resources.AddAsset(asset);
+        }
+    };
     std::function<void(const Authoring::ReadNode&, std::size_t)> walk;
     walk = [&](const Authoring::ReadNode& node, std::size_t depth)
     {
@@ -1500,10 +1628,18 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                         }
                         discoverDecalTexture(node["m_propertyName"].Scalar(), value.AsString());
                     }
+                    if (node["m_propertyName"].Scalar() == "fontPath" && document->Root().Read().IsScalar())
+                    {
+                        discoverFont(document->Root().Read().Scalar());
+                    }
                     walk(document->Root().Read(), depth + 1);
                 }
                 else
                 {
+                    if (key == "fontPath" && entry.value.IsScalar())
+                    {
+                        discoverFont(entry.value.Scalar());
+                    }
                     if (key == "texturePaths" && entry.value.IsSequence())
                     {
                         for (const auto texture : entry.value)
@@ -1569,7 +1705,8 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     {
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
         const auto path = type == ManagedAssetType::Material
-            ? PathFinder::Relative("Materials\\") / (file::path(entry.assetName).stem().string() + ".asset")
+            ? MaterialSourcePath(entry.assetName)
+            : type == ManagedAssetType::SpriteFont ? resolve_font_path(entry.assetName, *this)
             : ResolveRuntimeAssetPath(entry.assetName, type == ManagedAssetType::Model ? "Models\\" : "Textures\\");
         auto guid = GetFileGuid(path);
         if (guid == FileGuid{} && type == ManagedAssetType::Model)
@@ -1585,7 +1722,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     std::erase_if(preparation->resources.assets, [](const AssetEntry& entry)
     {
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
-        return type == ManagedAssetType::Model || type == ManagedAssetType::SpriteFont;
+        return type == ManagedAssetType::Model;
     });
     for (std::size_t index = 0; index < documents.size(); ++index)
     {
@@ -2161,6 +2298,21 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                         throw std::runtime_error("Required texture could not be prepared: " + entry.assetName);
                     }
                     preparation->texturePins.push_back(std::move(texture));
+                    break;
+                }
+                case ManagedAssetType::SpriteFont:
+                {
+                    std::string failure;
+                    auto font = LoadFontShared(entry.assetName, failure);
+                    if (!font)
+                    {
+                        throw std::runtime_error("Required font could not be prepared: " + entry.assetName + ": " + failure);
+                    }
+                    if (!failure.empty())
+                    {
+                        Debug::PrintLog(spdlog::level::warn, "SDF font preparation: " + failure);
+                    }
+                    preparation->fontPins.push_back(std::move(font));
                     break;
                 }
                 default:
@@ -3065,17 +3217,23 @@ void DataSystem::DetachLegacyCachesLocked(LegacyCacheRetirement& retired) noexce
 {
     // Every map shell and strong cancellation pin already exists. This phase
     // swaps only into empty caller-owned storage and never destroys retired owners.
-    assert(retired.materials.empty() && retired.authoredMaterials.empty()
+    assert(retired.fonts.empty() && retired.materials.empty() && retired.authoredMaterials.empty()
         && retired.textures.empty() && retired.uiTextures.empty() && retired.spriteSheets.empty()
         && retired.modelTextures.empty() && retired.modelTextureOwners.empty()
         && retired.shaderSlots.empty() && retired.shaderSlotsByGuid.empty() && retired.shaderFreeSlots.empty()
         && retired.preparations.empty() && retired.scenes.empty() && retired.bundles.empty());
+    {
+        std::lock_guard lock(m_fontMutex);
+        m_fonts.swap(retired.fonts);
+        m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+    }
     m_modelAssetGenerations.DetachAll(retired.models);
     m_materialGraphGenerations.DetachAll(retired.graphs);
     {
         std::lock_guard lock(m_materialMutex);
         static_assert(noexcept(Materials.swap(retired.materials)));
         Materials.swap(retired.materials);
+        m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
     }
     {
         std::lock_guard lock(m_authoredMaterialMutex);
@@ -3246,6 +3404,295 @@ own::shared_owner<const Material> DataSystem::FindCachedMaterial(std::string_vie
     return owner;
 }
 
+own::shared_owner<const Material> DataSystem::FindCachedMaterial(FileGuid guid)
+{
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    if (guid == FileGuid{} || m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+    {
+        return {};
+    }
+    std::lock_guard guard(m_materialMutex);
+    for (auto& [key, entry] : Materials)
+    {
+        auto material = asset_cache_detail::Acquire(entry, m_assetDepotRevision);
+        if (material && material->m_fileGuid == guid)
+        {
+            return material;
+        }
+    }
+    return {};
+}
+
+own::shared_owner<const Material> DataSystem::AdoptAuthoringMaterialOwner(
+    own::shared_owner<const Material> material)
+{
+    if (!material || !PathFinder::IsAssetAuthoringEnabled() || !material->HasMaterialGraph())
+    {
+        return material;
+    }
+    const auto path = GetFilePath(material->m_fileGuid);
+    if (path.empty())
+    {
+        return material;
+    }
+    const auto key = MaterialCacheKey(path);
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    const auto origin = material->GetAssetOrigin();
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || m_assetRootHandoffs != 0u ||
+        !origin || origin->resolved.resolverRevision != m_assetDepotRevision)
+    {
+        return {};
+    }
+    // Index only the exact completed immutable typed result. This does not
+    // permit source fallback or alter Player's explicit mounted-winner rules.
+    std::lock_guard guard(m_materialMutex);
+    const auto charge = LegacyMaterialRetainedBytes(*material);
+    auto accepted = asset_cache_detail::Publish(Materials, key, std::move(material),
+        charge, kLegacyMaterialBudgetBytes, kLegacyCacheBudgetEntries, m_assetDepotRevision);
+    m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
+    return accepted;
+}
+
+bool DataSystem::ReloadMaterialAsset(FileGuid guid, std::string& error)
+{
+    error.clear();
+    const auto expected = FindCachedMaterial(guid);
+    const auto path = GetFilePath(guid);
+    const auto document = Authoring::ParsedDocument::ParseFile(path.string(), error);
+    material_graph::InstanceDocument authored;
+    if (!PathFinder::IsAssetAuthoringEnabled() || !document ||
+        !material_graph::ReadInstanceDocument(document.Root(), authored,
+            error) || authored.materialId.value != guid.m_guid)
+    {
+        if (error.empty())
+        {
+            error = "The material document no longer has the expected graph asset identity.";
+        }
+        return false;
+    }
+    const auto graphGuid = FileGuid(authored.description.graphId.value);
+    const auto source = LX::LXMaterialAsset::Load(GetMaterialGraphSourcePath(graphGuid),
+        LX::CreateMaterialDefinitions(), &error);
+    if (!source)
+    {
+        return false;
+    }
+    auto generation = ResolveMaterialGraphGeneration(graphGuid);
+    const auto program = LX::GenerateMaterialSlang(*source);
+    if (!generation || !program || program->slang != generation->cooked.product.program.slang ||
+        LX::WriteMaterialProgramMetadata(*program) != generation->cooked.metadata)
+    {
+        generation = CompileMaterialGraphAuthoring(*source, graphGuid,
+            PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+    }
+    if (!generation)
+    {
+        return false;
+    }
+    auto candidate = own::make_shared<Material>();
+    candidate->m_name = path.stem().string();
+    candidate->m_fileGuid = guid;
+    candidate->m_doubleSided = authored.doubleSided;
+    candidate->m_renderingMode = authored.blendMode == "transparent" ? MaterialRenderingMode::Transparent :
+        authored.blendMode == "masked" ? MaterialRenderingMode::Masked : MaterialRenderingMode::Opaque;
+    if (!ConfigureMaterialGraph(*candidate, generation, authored.description, error))
+    {
+        return false;
+    }
+    return PublishMaterialAsset(std::move(candidate), expected, error);
+}
+
+bool DataSystem::PublishMaterialAsset(own::shared_owner<Material> candidate,
+                                      const own::shared_owner<const Material>& expectedCurrent, std::string& error)
+{
+    if (!PathFinder::IsAssetAuthoringEnabled() || !candidate || !candidate->HasMaterialGraph() ||
+        !candidate->m_fileGuid.IsRandomV4() || (expectedCurrent && std::addressof(*candidate) == std::addressof(*expectedCurrent)))
+    {
+        error = "Apply requires an isolated, valid material asset with its own UUIDv4 identity.";
+        return false;
+    }
+    candidate = own::make_shared<Material>(*candidate);
+    candidate->m_assetOrigin.reset();
+    auto generation = candidate->GetMaterialGraphInstance()->generation;
+    const auto expectedGeneration = m_materialGraphGenerations.Current(generation->assetId);
+    if (expectedGeneration && expectedGeneration->contentDigest == generation->contentDigest &&
+        expectedGeneration->surfaceBlendMode == generation->surfaceBlendMode)
+    {
+        // Default-only edits do not replace unrelated consumers of an identical
+        // graph contract or invalidate other graph editor sessions.
+        auto instance = own::make_shared<material_graph::Instance>(*candidate->GetMaterialGraphInstance());
+        instance->generation = expectedGeneration;
+        candidate->m_materialGraphInstance = std::move(instance);
+        generation = expectedGeneration;
+    }
+    return PublishMaterialGraphGeneration(generation, expectedGeneration, std::move(candidate), expectedCurrent, error);
+}
+
+bool DataSystem::PublishMaterialGraphGeneration(
+    own::shared_owner<const material_graph::Generation> generation,
+    const own::shared_owner<const material_graph::Generation>& expectedGeneration,
+    own::shared_owner<Material> candidate, const own::shared_owner<const Material>& expectedMaterial, std::string& error)
+{
+    if (!generation || !generation->cooked.product.materialShader)
+    {
+        error = "Apply requires a fully compiled graph generation.";
+        return false;
+    }
+    struct Replacement
+    {
+        std::string key;
+        own::shared_owner<const Material> previous;
+        own::shared_owner<const Material> next;
+    };
+    std::vector<Replacement> replacements;
+    decltype(Materials) updated;
+    std::uint64_t revision{}, epoch{}, resolverRevision{};
+    bool targetFound = false;
+    file::path targetPath;
+    if (candidate)
+    {
+        targetPath = GetFilePath(candidate->m_fileGuid);
+        if (targetPath.empty())
+        {
+            targetPath = MaterialSourcePath(candidate->m_name);
+        }
+        if (Lowercase(targetPath.extension().string()) != ".asset")
+        {
+            error = "Material identity resolves to a non-material asset.";
+            return false;
+        }
+        const auto pathGuid = GetFileGuid(targetPath);
+        if (pathGuid != FileGuid{} && pathGuid != candidate->m_fileGuid)
+        {
+            error = "Another material owns the destination. Choose a different material name.";
+            return false;
+        }
+    }
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || m_assetRootHandoffs != 0u)
+        {
+            error = "Material publication is shutting down or invalidated.";
+            return false;
+        }
+        epoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+        std::lock_guard guard(m_materialMutex);
+        revision = m_materialAssetRevision.load(std::memory_order_relaxed);
+        for (auto& [key, entry] : Materials)
+        {
+            const auto current = asset_cache_detail::Acquire(entry, resolverRevision);
+            if (!current)
+            {
+                continue;
+            }
+            if (candidate && current->m_fileGuid == candidate->m_fileGuid)
+            {
+                if (!expectedMaterial || std::addressof(*current) != std::addressof(*expectedMaterial))
+                {
+                    error = "The material changed since it was opened. Reload before applying.";
+                    return false;
+                }
+                replacements.push_back({key, current, candidate});
+                targetFound = true;
+            }
+            else if (const auto& instance = current->GetMaterialGraphInstance();
+                     instance && instance->description.graphId == generation->assetId &&
+                     instance->generation->generation != generation->generation)
+            {
+                replacements.push_back({key, current, {}});
+            }
+        }
+        if (candidate && !targetFound)
+        {
+            if (expectedMaterial)
+            {
+                error = "The material was removed or replaced. Reload before applying.";
+                return false;
+            }
+            const auto key = MaterialCacheKey(targetPath);
+            if (const auto found = Materials.find(key); found != Materials.end() &&
+                asset_cache_detail::Acquire(found->second, resolverRevision))
+            {
+                error = "The destination is already occupied by another cached material.";
+                return false;
+            }
+            replacements.push_back({key, {}, candidate});
+        }
+    }
+    // Every dependent asset keeps its own defaults. One invalid dependency
+    // rejects the entire graph replacement before any accepted state changes.
+    for (auto& replacement : replacements)
+    {
+        if (replacement.next)
+        {
+            continue;
+        }
+        auto next = own::make_shared<Material>(*replacement.previous);
+        next->m_assetOrigin.reset();
+        if (!ConfigureMaterialGraph(*next, generation,
+                replacement.previous->GetMaterialGraphInstance()->description, error))
+        {
+            error = "Material '" + replacement.previous->m_name + "' cannot use this graph: " + error;
+            return false;
+        }
+        replacement.next = std::move(next);
+    }
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        std::lock_guard guard(m_materialMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || m_assetRootHandoffs != 0u || epoch != m_assetPreparationEpoch ||
+            resolverRevision != m_assetDepotRevision || revision != m_materialAssetRevision.load(std::memory_order_relaxed))
+        {
+            error = "Material assets changed while Apply was being prepared. Try again.";
+            return false;
+        }
+        for (const auto& replacement : replacements)
+        {
+            const auto found = Materials.find(replacement.key);
+            const auto current = found == Materials.end() ? own::shared_owner<const Material>{}
+                : asset_cache_detail::Acquire(found->second, resolverRevision);
+            if (static_cast<bool>(current) != static_cast<bool>(replacement.previous) ||
+                (current && std::addressof(*current) != std::addressof(*replacement.previous)))
+            {
+                error = "A dependent material changed while Apply was being prepared. Reload it first.";
+                return false;
+            }
+        }
+        // Allocate/cache-charge all replacements before publishing either side.
+        // Existing consumers retain their immutable pins across the map swap.
+        updated = Materials;
+        for (const auto& replacement : replacements)
+        {
+            auto& entry = updated[replacement.key];
+            entry.current = own::weak_owner<const Material>(replacement.next);
+            entry.retained = replacement.next;
+            entry.publication = asset_cache_detail::NextUse();
+            entry.lastUse = entry.publication;
+            entry.resolverRevision = resolverRevision;
+            entry.retainedBytes = LegacyMaterialRetainedBytes(*replacement.next);
+        }
+        asset_cache_detail::Trim(updated, kLegacyMaterialBudgetBytes, kLegacyCacheBudgetEntries);
+        for (const auto& replacement : replacements)
+        {
+            const auto found = updated.find(replacement.key);
+            if (found == updated.end() || !found->second.retained)
+            {
+                error = "The material update exceeds the retained asset budget. Reduce its resource footprint before applying.";
+                return false;
+            }
+        }
+        if (!m_materialGraphGenerations.Publish(generation, expectedGeneration, error))
+        {
+            return false;
+        }
+        Materials.swap(updated);
+        m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
+    }
+    error.clear();
+    return true;
+}
+
 std::vector<std::pair<std::string, own::shared_owner<const Material>>> DataSystem::SnapshotMaterials()
 {
     std::lock_guard admissionLock(m_assetPreparationMutex);
@@ -3299,8 +3746,10 @@ own::shared_owner<const Material> DataSystem::RegisterImportedMaterial(
             candidate->m_name = name;
             const auto charge = LegacyMaterialRetainedBytes(*candidate);
             own::shared_owner<const Material> published = std::move(candidate);
-            return asset_cache_detail::Publish(Materials, name, std::move(published),
+            auto accepted = asset_cache_detail::Publish(Materials, name, std::move(published),
                 charge, kLegacyMaterialBudgetBytes, kLegacyCacheBudgetEntries, m_assetDepotRevision);
+            m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
+            return accepted;
         }
         if (current->m_fileGuid == candidate->m_fileGuid)
         {
@@ -3703,7 +4152,8 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view header,
 }
 
 bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
-                              std::string& error)
+                              std::string& error, const file::path& shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader"),
+                              const file::path& cacheDirectory = PathFinder::CachePath("Lattice"))
 {
     ce::profile_scope profile{ ce::marker<"Material.CompileAuthoring">() };
     error.clear();
@@ -3719,12 +4169,11 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
         }
         return false;
     }
-    const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
     const std::string cacheHeader = MaterialGraphCacheHeader(*program, shaderDirectory);
     const std::string sourceIdentity = cacheHeader.empty()
         ? material_graph::BuildBoundSource(*program) + LX::WriteMaterialProgramMetadata(*program) : cacheHeader;
     const auto sourceRevision = Hash::ToHex(Hash::Sha256::Compute(sourceIdentity.data(), sourceIdentity.size()));
-    const auto source = PathFinder::CachePath("Lattice") / (guid.ToString() + "-" + sourceRevision + ".slang");
+    const auto source = cacheDirectory / (guid.ToString() + "-" + sourceRevision + ".slang");
     std::error_code filesystemError;
     std::filesystem::create_directories(source.parent_path(), filesystemError);
     if (filesystemError)
@@ -3739,7 +4188,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
                        : material_graph::HasSceneBackend(product, RHIShaderBinary::Dxil) &&
                              material_graph::HasSceneBackend(product, RHIShaderBinary::SpirV);
     };
-    const auto cachePath = PathFinder::CachePath("Lattice") / (guid.ToString() + ".slang.scene-cache");
+    const auto cachePath = cacheDirectory / (guid.ToString() + ".slang.scene-cache");
     step.emplace(ce::marker<"Material.CacheRead">());
     if (!cacheHeader.empty() && ReadMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result) &&
         result.product.program.slang == program->slang &&
@@ -3766,10 +4215,47 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
 }
 }
 
+own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialGraphAuthoring(
+    const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
+    const file::path& cacheDirectory, std::string& error)
+{
+    const auto isolatedDirectory = cacheDirectory / ("authoring-" + FileGuid::CreateRandomV4().ToString());
+    struct Cleanup
+    {
+        file::path directory;
+        ~Cleanup()
+        {
+            std::error_code ignored;
+            file::remove_all(directory, ignored);
+        }
+    } cleanup{isolatedDirectory};
+    // Scene products retain verified bytecode, reflection, generated source and
+    // metadata by value; these producer scratch files are never runtime owners.
+    return material_graph::PrepareGeneration(
+        experiment::AssetId{graphGuid.m_guid},
+        [&](material_graph::CookedProgram& result, std::string& failure) {
+            return CompileAuthoringMaterial(asset, graphGuid, result, failure, shaderDirectory, isolatedDirectory);
+        }, error);
+}
+
 own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGraphGeneration(FileGuid guid,
                                                                                           std::string& error,
                                                                                           bool reload)
 {
+    if (!reload && PathFinder::IsAssetAuthoringEnabled())
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+        {
+            error = "Material graph loading is shutting down or invalidated.";
+            return {};
+        }
+        if (auto accepted = m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid}))
+        {
+            error.clear();
+            return accepted;
+        }
+    }
     const AssetDepot::AssetLink<material_graph::Generation> link{ { experiment::AssetId{ guid.m_guid }, {} } };
     const auto catalog = GetCookedCatalog();
     experiment::cooked::ResolvedAssetEntry resolved;
@@ -4162,6 +4648,19 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
     return true;
 }
 
+bool DataSystem::PrepareMaterialGraphAuthoring(const Material& source, const LX::LXMaterialAsset& asset,
+                                               const material_graph::InstanceDescription& description,
+                                               own::shared_owner<Material>& candidate, std::string& error)
+{
+    auto prepared = own::make_shared<Material>(source);
+    if (!ConfigureMaterialGraphAuthoring(*prepared, asset, description, error))
+    {
+        return false;
+    }
+    candidate = std::move(prepared);
+    return true;
+}
+
 bool DataSystem::ConfigureEditableDefaultMaterialGraph(Material& material, std::string_view cause, std::string& error)
 {
     {
@@ -4222,50 +4721,36 @@ bool DataSystem::ConfigureMaterialGraphAuthoring(Material& material, const LX::L
         error = "Material graph authoring requires an Editor project.";
         return false;
     }
-    std::uint64_t loadEpoch;
-    material_graph::GenerationPreparationRequest request;
-    {
-        std::lock_guard lock(m_assetPreparationMutex);
-        if (m_assetPreparationStopping)
-        {
-            error = "Material graph authoring is shutting down.";
-            return false;
-        }
-        loadEpoch = m_assetPreparationEpoch;
-        request = m_materialGraphGenerations.BeginPreparation(description.graphId, true, error);
-    }
-    const auto prepared = material_graph::GenerationStore::Prepare(
-        request,
-        [&](material_graph::CookedProgram& result, std::string& failure) {
-            return CompileAuthoringMaterial(asset, FileGuid(description.graphId.value), result, failure);
-        },
-        error);
-    if (!prepared)
-    {
-        return false;
-    }
-    own::shared_owner<const material_graph::Generation> generation;
-    {
-        std::lock_guard lock(m_assetPreparationMutex);
-        if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
-        {
-            error = "Material graph authoring was cancelled or invalidated.";
-            return false;
-        }
-        generation = m_materialGraphGenerations.Publish(*prepared, error);
-    }
-    return generation && ConfigureMaterialGraph(material, description, error);
+    auto generation = CompileMaterialGraphAuthoring(asset, FileGuid(description.graphId.value),
+        PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+    return generation && ConfigureMaterialGraph(material, std::move(generation), description, error);
 }
 
 bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
                                         std::string& error, bool reload, const assets::ModelAssetGeneration* model)
 {
-    FileGuid guid;
-    guid.m_guid = description.graphId.value;
-    auto generation = LoadMaterialGraphGeneration(guid, error, reload);
-    if (!generation)
-        return false;
-    if (!generation->cooked.product.materialShader)
+    if (reload && PathFinder::IsAssetAuthoringEnabled())
+    {
+        const auto source = LX::LXMaterialAsset::Load(GetMaterialGraphSourcePath(FileGuid(description.graphId.value)),
+            LX::CreateMaterialDefinitions(), &error);
+        if (!source)
+        {
+            return false;
+        }
+        auto generation = CompileMaterialGraphAuthoring(*source, FileGuid(description.graphId.value),
+            PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+        return generation && ConfigureMaterialGraph(material, std::move(generation), description, error, model);
+    }
+    auto generation = LoadMaterialGraphGeneration(FileGuid(description.graphId.value), error, reload);
+    return generation && ConfigureMaterialGraph(material, std::move(generation), description, error, model);
+}
+
+bool DataSystem::ConfigureMaterialGraph(Material& material,
+                                        own::shared_owner<const material_graph::Generation> generation,
+                                        const material_graph::InstanceDescription& description, std::string& error,
+                                        const assets::ModelAssetGeneration* model)
+{
+    if (!generation || !generation->cooked.product.materialShader)
     {
         error = "Graph material requires a cooked/generated ShaderMeta contract; regenerate the material cook.";
         return false;
@@ -4365,6 +4850,12 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
     material.m_ORM_TexName.clear();
     material.m_AO_TexName.clear();
     material.m_EmissiveTexName.clear();
+    if (candidate->generation->surfaceBlendMode)
+    {
+        const auto& mode = *candidate->generation->surfaceBlendMode;
+        material.m_renderingMode = mode == "transparent" ? MaterialRenderingMode::Transparent :
+            mode == "masked" ? MaterialRenderingMode::Masked : MaterialRenderingMode::Opaque;
+    }
     material.m_materialGraphInstance = std::move(candidate);
     return true;
 }
@@ -4415,8 +4906,11 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
         material.m_name = std::move(document.name);
         material.m_fileGuid.m_guid = document.materialId.value;
         material.m_doubleSided = document.doubleSided;
-        material.m_renderingMode = document.blendMode == "transparent" ? MaterialRenderingMode::Transparent :
-            document.blendMode == "masked" ? MaterialRenderingMode::Masked : MaterialRenderingMode::Opaque;
+        if (!material.GetMaterialGraphInstance()->generation->surfaceBlendMode)
+        {
+            material.m_renderingMode = document.blendMode == "transparent" ? MaterialRenderingMode::Transparent :
+                document.blendMode == "masked" ? MaterialRenderingMode::Masked : MaterialRenderingMode::Opaque;
+        }
         if (outAuthored)
             *outAuthored = {};
         return true;
@@ -4723,14 +5217,24 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 
 own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name)
 {
-    const auto guid = GetStemToGuid(file::path(name).stem().string());
+    const file::path sourcePath = MaterialSourcePath(name);
+    const std::string materialName = MaterialCacheKey(sourcePath);
+    const auto pathGuid = GetFileGuid(sourcePath);
+    const auto guid = pathGuid != FileGuid{} ? pathGuid : GetStemToGuid(file::path(name).stem().string());
+    if (PathFinder::IsAssetAuthoringEnabled() && guid != FileGuid{})
+    {
+        if (auto accepted = FindCachedMaterial(guid))
+        {
+            return accepted;
+        }
+    }
     const auto catalog = GetCookedCatalog();
     const AssetDepot::AssetLink<Material> link{ { experiment::AssetId{ guid.m_guid }, {} } };
     experiment::cooked::ResolvedAssetEntry resolved;
     if (guid != FileGuid{} && catalog
         && catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::NotMounted)
     {
-        return TryAcquire(link);
+        return AdoptAuthoringMaterialOwner(TryAcquire(link));
     }
     std::uint64_t loadEpoch;
     std::uint64_t resolverRevision;
@@ -4744,7 +5248,6 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
         resolverRevision = m_assetDepotRevision;
     }
 
-    std::string materialName(name);
 
     // 조회와 삽입만 락으로 감싼다. 중간의 파일 로딩은 LoadMaterialTexture를 호출하는데
     // 그쪽이 m_textureMutex를 잡으므로, 여기서 락을 유지하면 material→texture 순서의
@@ -4766,8 +5269,6 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
             }
         }
     }
-    const file::path sourcePath =
-		PathFinder::Relative("Materials\\") / (materialName + ".asset");
     if (!file::exists(sourcePath))
     {
 		return nullptr;
@@ -4786,11 +5287,26 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
 	if (!document)
 		throw std::runtime_error("Material parse failed: " + parseError);
 	const Authoring::ReadNode node = document.Root();
+    if (node["lattice_material"] && assetGuid != FileGuid{})
+    {
+        material_graph::InstanceDocument authored;
+        if (!material_graph::ReadInstanceDocument(node, authored, parseError) ||
+            authored.materialId.value != assetGuid.m_guid)
+        {
+            Debug::PrintLog(spdlog::level::err, "LX material payload identity differs from its catalog sidecar: " +
+                sourcePath.string());
+            return nullptr;
+        }
+    }
     auto material = own::make_shared<Material>();
     if (!DeserializeMaterialPayload(*material, Authoring::NodeViewAccess::Make(node))) return nullptr;
     // 파일 stem이 cache key의 정본이다. 내부 m_name이 낡았거나 비어 있어도
     // LoadMaterialShared(name)가 같은 세대를 찾도록 게시 직전에 맞춘다.
-    material->m_name = materialName;
+    material->m_name = sourcePath.stem().string();
+    if (assetGuid != FileGuid{})
+    {
+        material->m_fileGuid = assetGuid;
+    }
 	if (assetGuid != FileGuid{})
 	{
 		std::printf("[material.document] source=%s guid=%s\n",
@@ -4799,20 +5315,46 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
 			assetGuid.ToString().c_str());
 	}
 
-    std::lock_guard preparationLock(m_assetPreparationMutex);
-    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || loadEpoch != m_assetPreparationEpoch
-        || resolverRevision != m_assetDepotRevision)
+    while (true)
     {
-        return {};
-    }
-    {
-        std::lock_guard<std::mutex> guard(m_materialMutex);
-        // 로딩 중 다른 스레드가 같은 머티리얼을 먼저 넣었을 수 있다.
-        // 그 경우 맵에 있는 쪽을 반환해 인스턴스가 갈라지지 않게 한다.
+        std::unique_lock preparationLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || loadEpoch != m_assetPreparationEpoch ||
+            resolverRevision != m_assetDepotRevision || (assetGuid != FileGuid{} && GetFileGuid(sourcePath) != assetGuid))
+        {
+            return {};
+        }
+        std::unique_lock guard(m_materialMutex);
+        for (auto& [key, entry] : Materials)
+        {
+            const auto resident = asset_cache_detail::Acquire(entry, resolverRevision);
+            if (resident && material->m_fileGuid != FileGuid{} && resident->m_fileGuid == material->m_fileGuid)
+            {
+                return resident;
+            }
+        }
+        if (const auto& instance = material->GetMaterialGraphInstance())
+        {
+            const auto current = m_materialGraphGenerations.Current(instance->description.graphId);
+            if (current && current->generation != instance->generation->generation)
+            {
+                const auto description = instance->description;
+                guard.unlock();
+                preparationLock.unlock();
+                std::string error;
+                if (!ConfigureMaterialGraph(*material, current, description, error))
+                {
+                    Debug::PrintLog(spdlog::level::err, "Material load retained the newer graph generation: " + error);
+                    return {};
+                }
+                continue;
+            }
+        }
         const auto charge = LegacyMaterialRetainedBytes(*material);
         own::shared_owner<const Material> published = std::move(material);
-        return asset_cache_detail::Publish(Materials, materialName, std::move(published),
+        auto accepted = asset_cache_detail::Publish(Materials, materialName, std::move(published),
             charge, kLegacyMaterialBudgetBytes, kLegacyCacheBudgetEntries, resolverRevision);
+        m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
+        return accepted;
     }
 }
 
@@ -4901,6 +5443,27 @@ own::shared_owner<const experiment::Material> DataSystem::LoadAuthoredMaterialSh
     own::shared_owner<const experiment::Material> published = std::move(authored);
     return asset_cache_detail::Publish(m_authoredMaterials, assetGuid, std::move(published),
         charge, kLegacyMaterialBudgetBytes, kLegacyCacheBudgetEntries, resolverRevision);
+}
+
+own::shared_owner<const Material> DataSystem::LoadMaterialShared(FileGuid guid)
+{
+    if (const auto current = FindCachedMaterial(guid))
+    {
+        return current;
+    }
+    const auto path = GetFilePath(guid);
+    if (path.empty() || Lowercase(path.extension().string()) != ".asset")
+    {
+        return {};
+    }
+    std::error_code error;
+    const auto absolute = file::absolute(path, error);
+    if (error)
+    {
+        return {};
+    }
+    auto material = LoadMaterialShared(absolute.string());
+    return material && material->m_fileGuid == guid ? material : nullptr;
 }
 
 own::shared_owner<const Material> DataSystem::LoadMaterialShared(std::string_view name)
@@ -5215,10 +5778,179 @@ own::shared_owner<Material> DataSystem::CreateMaterial()
     return material;
 }
 
-// ★ LoadSFont(DirectXTK SpriteFont)를 걷었다 (D4, 2026-08-09).
-//   ID3D11Device로 폰트를 만들던 유일한 자리였고, 그 결과를 그리는 쪽은
-//   T6에서 사라졌다. 게다가 Assets/Font/ 가 비어 있어 읽을 자산도 없었다.
-//   폰트는 SDF 계통으로 새로 세운다.
+std::shared_ptr<FontAsset> DataSystem::LoadFontFile(const file::path& path, std::string& error) const
+{
+    const auto extension = Lowercase(path.extension().string());
+    if (extension != ".ttf" && extension != ".otf")
+    {
+        error = "SDF fonts require TTF/OTF; legacy .spritefont binaries are not supported: " + path.string();
+        return {};
+    }
+    auto font = FontAsset::Load(path, error);
+    if (!font)
+    {
+        return {};
+    }
+    const auto fallback = normalize_font_path(PathFinder::EngineResourcePath("Fonts/Runtime/NanumGothic-Regular.ttf"));
+    if (path != fallback)
+    {
+        std::string fallbackError;
+        if (!font->AddFallback(fallback, fallbackError))
+        {
+            error = "Font loaded without its bundled Korean fallback: " + fallbackError;
+        }
+    }
+    return font;
+}
+
+std::shared_ptr<FontAsset> DataSystem::LoadFontShared(std::string_view requestedPath, std::string& error)
+{
+    error.clear();
+    try
+    {
+        std::uint64_t loadEpoch;
+        std::uint64_t resolverRevision;
+        {
+            std::lock_guard preparationLock(m_assetPreparationMutex);
+            loadEpoch = m_assetPreparationEpoch;
+            resolverRevision = m_assetDepotRevision;
+        }
+        const auto path = resolve_font_path(requestedPath, *this);
+        const auto key = font_cache_key(path, GetFileGuid(path));
+        {
+            std::lock_guard preparationLock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0
+                || loadEpoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+            {
+                error = "Font loading is unavailable while the asset cache is changing.";
+                return {};
+            }
+            std::lock_guard lock(m_fontMutex);
+            if (const auto found = m_fonts.find(key); found != m_fonts.end())
+            {
+                return found->second;
+            }
+            // A catalog upsert may attach a GUID to an already loaded path.
+            // Re-key that owner instead of duplicating its bytes and atlas.
+            for (auto iterator = m_fonts.begin(); iterator != m_fonts.end(); ++iterator)
+            {
+                if (iterator->second->GetPath() == path)
+                {
+                    auto font = iterator->second;
+                    const auto oldKey = iterator->first;
+                    m_fonts.emplace(key, font);
+                    m_fonts.erase(oldKey);
+                    return font;
+                }
+            }
+            if (m_fonts.size() >= kMaxCachedFonts)
+            {
+                error = "Font cache reached its 32-font budget.";
+                return {};
+            }
+        }
+        // Never hold the preparation/cache locks across disk or parser work.
+        // Concurrent misses may prepare duplicate candidates; one owner wins.
+        auto font = LoadFontFile(path, error);
+        if (!font)
+        {
+            return {};
+        }
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || loadEpoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+        {
+            error = "Font asset changed while its bytes were being prepared.";
+            return {};
+        }
+        std::lock_guard lock(m_fontMutex);
+        if (const auto found = m_fonts.find(key); found != m_fonts.end())
+        {
+            error.clear(); // The accepted winner, not this discarded candidate, is returned.
+            return found->second;
+        }
+        if (m_fonts.size() >= kMaxCachedFonts)
+        {
+            error = "Font cache reached its 32-font budget.";
+            return {};
+        }
+        m_fonts.emplace(key, font);
+        return font;
+    }
+    catch (const std::exception& exception)
+    {
+        error = std::string("Font load failed: ") + exception.what();
+        return {};
+    }
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<FontAsset>>> DataSystem::SnapshotFonts() const
+{
+    std::lock_guard lock(m_fontMutex);
+    return { m_fonts.begin(), m_fonts.end() };
+}
+
+std::size_t DataSystem::SnapshotFontCount() const
+{
+    std::lock_guard lock(m_fontMutex);
+    return m_fonts.size();
+}
+
+bool DataSystem::ReloadCachedFont(const file::path& source, FileGuid guid, std::string& error)
+{
+    try
+    {
+        const auto path = normalize_font_path(source);
+        const auto prefix = guid.ToString() + "|";
+        std::vector<std::string> keys;
+        {
+            std::lock_guard lock(m_fontMutex);
+            for (const auto& [key, font] : m_fonts)
+            {
+                if (font->GetPath() == path || (guid != FileGuid{} && key.starts_with(prefix)))
+                {
+                    keys.push_back(key);
+                }
+            }
+        }
+        if (keys.empty())
+        {
+            // A previously missing/invalid requested font may now exist. Wake
+            // failed component loads too, without reading unused font bytes.
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+            return true;
+        }
+        auto replacement = LoadFontFile(path, error);
+        if (!replacement)
+        {
+            return false; // Keep the last valid font and layouts.
+        }
+        const auto replacementKey = font_cache_key(path, guid);
+        std::lock_guard lock(m_fontMutex);
+        const bool stillResident = std::any_of(keys.begin(), keys.end(), [this](const std::string& key)
+        {
+            return m_fonts.contains(key);
+        });
+        if (stillResident)
+        {
+            // Insert before detach: allocation failure preserves accepted owners.
+            m_fonts.insert_or_assign(replacementKey, std::move(replacement));
+            for (const auto& key : keys)
+            {
+                if (key != replacementKey)
+                {
+                    m_fonts.erase(key);
+                }
+            }
+        }
+        m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        return true;
+    }
+    catch (const std::exception& exception)
+    {
+        error = std::string("Font reload failed: ") + exception.what();
+        return false;
+    }
+}
 
 // ★ 콘텐츠 브라우저 UI 전체가 여기 있었다 (PHASE 4-3 슬라이스 2).
 //   창 등록과 그리기 함수 일곱, 그리고 그 상태(현재 폴더·검색 필터·
@@ -5304,6 +6036,87 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
                 QueueAssetChange(change);
                 std::lock_guard lock(m_assetPreparationMutex);
                 m_authoredTextureMounts[guid] = retired;
+                return false;
+            }
+        }
+    }
+
+    if (change.kind == RuntimeAssetChangeKind::ContentReload && PathFinder::IsAssetAuthoringEnabled())
+    {
+        {
+            std::lock_guard admissionLock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+            {
+                return false;
+            }
+            if (m_assetRootHandoffs != 0u)
+            {
+                QueueAssetChange(change);
+                return false;
+            }
+        }
+        const auto registry = SnapshotAssetMetaRegistry();
+        if (!registry)
+        {
+            return false;
+        }
+        const auto assetType = change.assetType == RuntimeAssetType::Auto
+            ? ResolveRuntimeAssetType(change.path) : change.assetType;
+        if (assetType == RuntimeAssetType::MaterialGraph)
+        {
+            const FileGuid guid = change.guid != FileGuid{} ? change.guid : registry->GetGuid(change.path);
+            if (guid == FileGuid{} || !RegisterAssetMeta(*registry, guid, change.path))
+            {
+                return false;
+            }
+            const auto current = ResolveMaterialGraphGeneration(guid);
+            if (!current)
+            {
+                m_materialGraphGenerations.InvalidatePreparation(experiment::AssetId{guid.m_guid});
+                return true;
+            }
+            std::string error;
+            const auto source = LX::LXMaterialAsset::Load(change.path, LX::CreateMaterialDefinitions(), &error);
+            if (source)
+            {
+                // Self-save and duplicate watcher events preserve accepted owner
+                // identity, including unsaved material defaults already applied.
+                const auto program = LX::GenerateMaterialSlang(*source);
+                if (program && program->slang == current->cooked.product.program.slang &&
+                    LX::WriteMaterialProgramMetadata(*program) == current->cooked.metadata)
+                {
+                    return true;
+                }
+                const auto generation = CompileMaterialGraphAuthoring(*source, guid,
+                    PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+                if (generation && PublishMaterialGraphGeneration(generation, current, {}, {}, error))
+                {
+                    return true;
+                }
+            }
+            Debug::PrintLog(spdlog::level::err, "LX graph reload retained accepted materials: " + error);
+            return false;
+        }
+        if (assetType == RuntimeAssetType::Material)
+        {
+            const FileGuid guid = change.guid != FileGuid{} ? change.guid : registry->GetGuid(change.path);
+            const auto current = FindCachedMaterial(guid);
+            if (current && current->HasMaterialGraph())
+            {
+                std::string error;
+                std::ifstream input(change.path, std::ios::binary);
+                const std::string payload{std::istreambuf_iterator<char>(input), {}};
+                Authoring::WriteDocument accepted;
+                Material serializable(*current);
+                if (input && SerializeMaterialPayload(serializable, accepted.Root()) && payload == accepted.Dump())
+                {
+                    return true;
+                }
+                if (ReloadMaterialAsset(guid, error))
+                {
+                    return true;
+                }
+                Debug::PrintLog(spdlog::level::err, "LX material reload retained its accepted generation: " + error);
                 return false;
             }
         }
@@ -5426,21 +6239,29 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 	switch (change.kind)
 	{
 	case RuntimeAssetChangeKind::CatalogUpsert:
-		return RegisterAssetMeta(*registry, change.guid, change.path);
-	case RuntimeAssetChangeKind::ContentReload:
-
-        if (assetType == RuntimeAssetType::MaterialGraph)
+    {
+        const bool registered = RegisterAssetMeta(*registry, change.guid, change.path);
+        if (registered && assetType == RuntimeAssetType::Font)
         {
-            const FileGuid guid = change.guid != FileGuid{} ? change.guid : registry->GetGuid(change.path);
-            if (guid == FileGuid{} || !RegisterAssetMeta(*registry, guid, change.path))
-                return false;
-            if (!ResolveMaterialGraphGeneration(guid))
-                return true;
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        }
+        return registered;
+    }
+	case RuntimeAssetChangeKind::ContentReload:
+        if (assetType == RuntimeAssetType::Font)
+        {
+            const auto guid = change.guid != FileGuid{} ? change.guid : GetFileGuid(change.path);
             std::string error;
-            if (LoadMaterialGraphGeneration(guid, error, true))
-                return true;
-            Debug::PrintLog(spdlog::level::err, "LX graph reload retained the accepted generation: " + error);
-            return false;
+            if (!ReloadCachedFont(change.path, guid, error))
+            {
+                Debug::PrintLog(spdlog::level::err, "SDF font reload retained the accepted font: " + error);
+                return false;
+            }
+            if (!error.empty())
+            {
+                Debug::PrintLog(spdlog::level::warn, "SDF font reload: " + error);
+            }
+            return guid == FileGuid{} || RegisterAssetMeta(*registry, guid, change.path);
         }
         if (assetType == RuntimeAssetType::Model)
 		{
@@ -5471,10 +6292,15 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 		if (change.guid != FileGuid{})
 			return RegisterAssetMeta(*registry, change.guid, change.path);
 		return true;
-	case RuntimeAssetChangeKind::Removed:
-		RetireCachedAsset(assetType, change.path, change.guid, true);
-		registry->Unregister(change.path);
-		return true;
+    case RuntimeAssetChangeKind::Removed:
+    {
+        const auto guid = change.guid != FileGuid{} ? change.guid : registry->GetGuid(change.path);
+        // Remove identity before cache retirement so an in-flight cold loader
+        // cannot insert its stale owner between these two operations.
+        registry->Unregister(change.path);
+        RetireCachedAsset(assetType, change.path, guid, true);
+        return true;
+    }
 	}
 	return false;
 }
@@ -5486,6 +6312,25 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	if (RuntimeAssetType::Auto == assetType)
 		assetType = ResolveRuntimeAssetType(path);
 	if (RuntimeAssetType::CatalogOnly == assetType) return;
+    if (assetType == RuntimeAssetType::Font)
+    {
+        const auto normalized = normalize_font_path(path);
+        if (guid == FileGuid{})
+        {
+            guid = GetFileGuid(path);
+        }
+        const auto prefix = guid.ToString() + "|";
+        std::lock_guard lock(m_fontMutex);
+        const auto removed = std::erase_if(m_fonts, [&](const auto& item)
+        {
+            return item.second->GetPath() == normalized || (guid != FileGuid{} && item.first.starts_with(prefix));
+        });
+        if (removed != 0u)
+        {
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        }
+        return;
+    }
     if (assetType == RuntimeAssetType::MaterialGraph)
     {
         if (guid == FileGuid{} && registry)
@@ -5509,7 +6354,7 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	// G2 — 텍스처 캐시는 적재와 같은 신원으로 뗀다. stem 으로 떼면 다른 폴더의 같은
 	// 이름 항목이 대신 떨어졌다. 재질 캐시는 이름 키 그대로다.
 	const std::string key = RuntimeAssetType::Material == assetType
-		? path.stem().string() : TextureCacheKey(path);
+		? MaterialCacheKey(path) : TextureCacheKey(path);
 	auto detach = [&key](auto& cache, std::mutex& cacheMutex)
 	{
 		using Resource = typename std::decay_t<decltype(cache)>::mapped_type::Resource;
@@ -5543,14 +6388,38 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
             }
 		}
 		break;
-	case RuntimeAssetType::Material:
-		(void)detach(Materials, m_materialMutex);
+    case RuntimeAssetType::Material:
+    {
+        if (guid == FileGuid{} && registry)
+        {
+            guid = registry->GetGuid(path);
+        }
+        std::lock_guard lock(m_materialMutex);
+        bool changed = false;
+        for (auto iterator = Materials.begin(); iterator != Materials.end();)
+        {
+            const auto owner = asset_cache_detail::Acquire(iterator->second);
+            if (iterator->first == key || (guid != FileGuid{} && owner && owner->m_fileGuid == guid))
+            {
+                iterator = Materials.erase(iterator);
+                changed = true;
+            }
+            else
+            {
+                ++iterator;
+            }
+        }
+        if (changed)
+        {
+            m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
+        }
         {
             const auto materialGuid = guid != FileGuid{} ? guid : GetFileGuid(path);
             std::lock_guard lock(m_authoredMaterialMutex);
             m_authoredMaterials.erase(materialGuid);
         }
-		break;
+        break;
+    }
     case RuntimeAssetType::Texture:
     case RuntimeAssetType::UITexture:
     case RuntimeAssetType::SpriteSheet:
@@ -5619,6 +6488,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         std::vector<assets::ModelAssetGeneration::Shared> models;
         std::vector<own::shared_owner<const Material>> materials;
         std::vector<own::shared_owner<const Texture>> textures;
+        std::vector<std::shared_ptr<FontAsset>> fonts;
         std::vector<PreparedTextureImageRequest> imageRequests;
         std::vector<AssetDepot::AssetRequest<Texture>> descriptorRequests;
         own::shared_owner<TextureFramePins> images;
@@ -5644,6 +6514,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         retired->models.swap(request->result.models);
         retired->materials.swap(request->result.materials);
         retired->textures.swap(request->result.textures);
+        retired->fonts.swap(request->result.fonts);
         retired->imageRequests.swap(request->result.imageRequests);
         retired->descriptorRequests.swap(request->descriptorRequests);
         retired->images = std::move(request->result.textureImages);
@@ -5715,8 +6586,11 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
     for (const auto& entry : bundle.assets)
     {
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
-        const file::path name = entry.assetName;
-        jobs.add([this, request, type, name]
+        // Keep authored UTF-8 font references out of the native narrow path constructor.
+        const file::path name = type == ManagedAssetType::SpriteFont
+            ? file::path{} : file::path(entry.assetName);
+        const std::string fontReference = entry.assetName;
+        jobs.add([this, request, type, name, fontReference]
         {
             ce::profile_scope profile{ ce::marker<"Asset.BundleJob">() };
             {
@@ -5751,6 +6625,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             assets::ModelAssetGeneration::Shared model;
             own::shared_owner<const Material> material;
             own::shared_owner<const Texture> texture;
+            std::shared_ptr<FontAsset> font;
             switch (type)
             {
             case ManagedAssetType::Model:
@@ -5779,8 +6654,19 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
                 }
                 break;
             case ManagedAssetType::SpriteFont:
-                // Font loading retired with DX11 SpriteFont; old entries are ignored.
+            {
+                std::string error;
+                font = LoadFontShared(fontReference, error);
+                if (!font)
+                {
+                    throw std::runtime_error("Required bundle font could not be loaded: " + error);
+                }
+                if (!error.empty())
+                {
+                    Debug::PrintLog(spdlog::level::warn, "SDF font bundle load: " + error);
+                }
                 break;
+            }
             default:
                 break;
             }
@@ -5831,6 +6717,10 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             if (texture)
             {
                 request->result.textures.push_back(std::move(texture));
+            }
+            if (font)
+            {
+                request->result.fonts.push_back(std::move(font));
             }
             for (auto& image : images)
             {
@@ -5918,12 +6808,20 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 	std::lock_guard retainedGuard(m_retainedAssetsMutex);
 	for (const auto& entry : bundle.assets)
 	{
-		file::path name = entry.assetName;
 		// G2 — 텍스처 캐시는 경로 키다. 적재와 같은 해석으로 키를 만들지 않으면
 		// UnloadUnusedAssets 가 번들이 붙든 텍스처를 전부 "안 쓰는 것" 으로 지운다.
 		std::string key;
 		switch (static_cast<ManagedAssetType>(entry.assetTypeID))
 		{
+        case ManagedAssetType::SpriteFont:
+        {
+            const auto path = resolve_font_path(entry.assetName, *this);
+            key = font_cache_key(path, GetFileGuid(path));
+            break;
+        }
+        case ManagedAssetType::Material:
+            key = MaterialCacheKey(MaterialSourcePath(entry.assetName));
+            break;
 		case ManagedAssetType::Texture:
 			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::Texture)));
 			break;
@@ -5934,7 +6832,7 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::SpriteSheet)));
 			break;
 		default:
-			key = name.stem().string();
+			key = file::path(entry.assetName).stem().string();
 			break;
 		}
 		m_retainedAssets[entry.assetTypeID].insert(std::move(key));
@@ -5996,6 +6894,19 @@ void DataSystem::UnloadUnusedAssets()
         asset_cache_detail::PruneExpired(container);
 	};
 
+    if (const auto retained = m_retainedAssets.find(static_cast<int>(ManagedAssetType::SpriteFont));
+        retained != m_retainedAssets.end())
+    {
+        std::lock_guard lock(m_fontMutex);
+        const auto removed = std::erase_if(m_fonts, [&](const auto& item)
+        {
+            return !retained->second.contains(item.first);
+        });
+        if (removed != 0u)
+        {
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        }
+    }
 	removeUnused(Materials,    static_cast<int>(ManagedAssetType::Material),    m_materialMutex);
 	removeUnused(Textures,     static_cast<int>(ManagedAssetType::Texture),     m_textureMutex);
 	// 예전에는 이 두 캐시가 ManagedAssetType에 없어 언로드 대상에서 아예 빠져 있었다(12.2-②).
@@ -6348,15 +7259,21 @@ bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const
 
 own::shared_owner<const Material> DataSystem::LoadMaterialByGuid(FileGuid guid)
 {
+    if (PathFinder::IsAssetAuthoringEnabled())
+    {
+        if (auto accepted = FindCachedMaterial(guid))
+        {
+            return accepted;
+        }
+    }
     const AssetDepot::AssetLink<Material> link{ { experiment::AssetId{ guid.m_guid }, {} } };
     const auto catalog = GetCookedCatalog();
     experiment::cooked::ResolvedAssetEntry resolved;
     if (catalog && catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::NotMounted)
     {
-        return TryAcquire(link);
+        return AdoptAuthoringMaterialOwner(TryAcquire(link));
     }
-    const auto path = GetFilePath(guid);
-    return path.empty() ? nullptr : LoadMaterialShared(path.stem().string());
+    return LoadMaterialShared(guid);
 }
 
 bool DataSystem::RebuildCookedMaterialInstance(Material& material, std::string& error,

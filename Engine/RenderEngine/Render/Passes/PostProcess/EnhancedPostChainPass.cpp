@@ -202,7 +202,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-    const auto declareStage = [this, &graph, &context, versioned, explicitAccess, readAccess](
+    const auto declareStage = [&graph, &context, versioned, explicitAccess, readAccess](
         const char* name, RHIPipelineHandle pso,
         RGHandle srcA, RGHandle srcB, RGHandle& dst,
         const PostParams& params, uint32_t dispatchW, uint32_t dispatchH,
@@ -223,8 +223,8 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         }
         usages.push_back({ dst, RHIResourceState::UnorderedAccess, outputAccess });
 
-        graph.AddPass(name, usages,
-            [this, &context, pso, srcA, srcB, dst, params, dispatchW, dispatchH]
+        const auto stagePass = graph.AddPass(name, usages,
+            [&context, pso, srcA, srcB, dst, params, dispatchW, dispatchH]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 // device를 더 들지 않는다 — 뷰 생성이 CreateBindings로 넘어가면서
@@ -277,6 +277,9 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
 
                 encoder.Dispatch((dispatchW + 7) / 8, (dispatchH + 7) / 8, 1);
             });
+        // Includes the bloom accumulation ReadWrite UAV: no graphics commands
+        // or shared pass-state mutation are hidden behind this dispatch helper.
+        graph.DeclareComputeCompatible(stagePass);
     };
 
     // ── 블룸 체인 ──

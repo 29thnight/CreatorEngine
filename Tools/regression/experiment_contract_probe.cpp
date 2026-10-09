@@ -47,6 +47,7 @@
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
+#include "FontCookContract.h"
 
 #include <cstdio>
 #include <cstring>
@@ -67,6 +68,7 @@ namespace
     //   다르기 때문이다. 다만 이름이 셋이라는 사실이 registry 밖으로 나왔다.
     constexpr Contract kContracts[] = {
         { "cacheopt",     &RenderTest::RunExperimentCacheOptSelfTest },
+        { "fontcook",     &run_font_cook_contract },
         { "matcodec",     &RenderTest::RunExperimentMaterialCodecSelfTest },
         { "matinstance",  &RenderTest::RunExperimentMaterialInstanceSelfTest },
         { "matseal",      &RenderTest::RunExperimentMaterialSealSelfTest },

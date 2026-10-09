@@ -103,6 +103,9 @@ internal static class AssetCooking
         counts["audio-clips"] = all.Count(p => Path.GetExtension(p).ToLowerInvariant() is ".wav" or ".mp3" or ".flac");
         counts["sound-graphs"] = all.Count(p => Path.GetExtension(p).Equals(".soundgraph", StringComparison.OrdinalIgnoreCase));
         counts["sound-presets"] = all.Count(p => Path.GetExtension(p).Equals(".soundpreset", StringComparison.OrdinalIgnoreCase));
+        // Trusted raw font bytes are pass-through Assets payloads. Their GUIDs
+        // enter CEMF through sidecars; no synthetic font artifact is generated.
+        counts["fonts"] = all.Count(p => Path.GetExtension(p).ToLowerInvariant() is ".ttf" or ".otf");
         var argumentsFile = Path.Combine(Path.GetDirectoryName(output)!, "cook.arguments");
         if (arguments.Any(a => a.IndexOfAny(['\r', '\n', '\0']) >= 0)) throw new BuildException("Cook argument contains an unsupported control character.");
         await File.WriteAllLinesAsync(argumentsFile, arguments, new System.Text.UTF8Encoding(false), context.Cancellation);

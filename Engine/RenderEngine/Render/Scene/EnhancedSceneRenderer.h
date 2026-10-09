@@ -306,6 +306,14 @@ struct EnhancedLivePacing
     bool operator==(const EnhancedLivePacing&) const = default;
 };
 
+// Runtime queue-mode requests cross to the render owner at a frame boundary.
+// Applied means submitted, not completed on the GPU or proof of compute overlap.
+struct EnhancedLiveQueueExecutionStatus
+{
+    uint64_t requestId{0}, appliedRequestId{0}, appliedFrame{0};
+    uint32_t requestedMode{0}, appliedMode{0};
+};
+
 /// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이
 /// RuntimeSettings의 백엔드를 이 값으로 변환하고, 같은 선택을 ImGuiHost에도 적용한다.
 enum class EnhancedLiveBackend : uint8_t
@@ -413,6 +421,13 @@ struct EnhancedLiveGpuSpan
     double   queueSpanMs{ 0.0 };
     double   busyMs{ 0.0 };
     uint32_t sliceCount{ 0 };
+    uint32_t computeSliceCount{ 0 };
+    // Intersection of queue-local pass interval unions in calibrated QPC time.
+    // Compute submission alone is not evidence of concurrent GPU execution.
+    double measuredOverlapMilliseconds{ 0.0 };
+    double overlapClockErrorMilliseconds{ 0.0 };
+    uint64_t cpuTicksPerSecond{ 0 };
+    bool overlapClockValid{ false };
     uint32_t queryOverflowPasses{ 0 };
     uint32_t droppedSlices{ 0 };
 
@@ -460,6 +475,8 @@ struct EnhancedLiveGpuSlice
     std::string name;
     uint64_t    beginCpuTick{ 0 };
     uint64_t    endCpuTick{ 0 };
+    uint8_t     queueId{ 0 }; // 0 graphics, 1 compute; timestamps already in QPC domain.
+    uint32_t    passIndex{ UINT32_MAX }; // Authored graph index, never the display name.
 };
 
 /// GPU 구간을 밖으로 흘리는 자리(§7.3 의 GPU Graphics queue).
@@ -1066,6 +1083,9 @@ namespace EnhancedSceneRenderer
     /// 게임 스레드가 수행한다 — 창이 패스를 직접 만지지 않는 이유는
     /// EnhancedLiveTuning 주석 참조.
     void SetLiveTuning(const EnhancedLiveTuning& tuning);
+
+    bool RequestLiveQueueExecutionMode(uint32_t mode, uint64_t& requestId, std::string& error);
+    EnhancedLiveQueueExecutionStatus GetLiveQueueExecutionStatus();
 
     /// 최종 정리. 렌더 스레드 join 이후에만 부른다.
     void ShutdownLive();

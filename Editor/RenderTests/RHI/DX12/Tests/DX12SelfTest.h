@@ -82,6 +82,11 @@ namespace DX12Test
     /// 그때는 원인이 그래프인지 패스인지도 구분되지 않는다. 계약을 직접 단정한다.
     bool RunRenderGraphTest(std::string& outLog, bool replayExtensions = false);
     bool RunTransientAliasingTest(std::string& outLog);
+    bool RunQueueExecutionTest(std::string& outLog);
+    bool RunQueueScheduleTest(std::string& outLog);
+    bool RunQueueContractTest(std::string& outLog);
+    bool RunQueueNativeTest(std::string& outLog);
+    bool RunQueueOwnershipTest(std::string& outLog);
 
     /// GBuffer 패스 검증 (PHASE 3-6, 첫 패스).
     ///

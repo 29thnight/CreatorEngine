@@ -1,6 +1,7 @@
 #pragma once
 #include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
+#include "DX12QueueService.h"
 #include <cstdint>
 #include <string>
 #include <array>
@@ -21,6 +22,7 @@
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
 class DX12Encoder;
+class DX12MemorySamplingSession;
 
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
 //
@@ -42,9 +44,12 @@ class DX12Encoder;
 //
 // 한 클래스가 둘을 겸하는 것은 지금 이 객체가 실제로 둘 다이기 때문이다.
 // 쪼갤 근거가 생기면(예: 서비스만 가짜로 바꿔 패스를 검증할 때) 그때 나눈다.
-class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
+class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices, public IRHICommandQueueFactory
 {
 public:
+    RHIQueueCapabilities QueryQueueCapabilities() const override;
+    bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue,
+        std::string& error) override;
     bool SupportsTransientAliasing() const override { return true; }
     bool DescribeTransientAllocation(const RHITransientResourceDesc& desc,
         RHITransientAllocationInfo& info, std::string& error) const override;
@@ -71,6 +76,11 @@ public:
     // 씬은 스왑체인이 없는 장치, 호스트는 스왑체인을 붙인 장치다.
     enum class TestDeviceRemovalTarget : uint32_t { Scene = 1u << 0, Host = 1u << 1 };
     static void RequestTestDeviceRemoval(TestDeviceRemovalTarget target);
+    bool EnqueueQueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue,
+        ID3D12Fence* fence, uint64_t value, std::string& error)
+    {
+        return m_queueService && m_queueService->EnqueueTestGate(queue, fence, value, error);
+    }
 #endif
 
     // 렌더 타깃의 최적화 클리어 값. 생성 힌트와 실제 클리어가 일치해야 검증
@@ -134,6 +144,15 @@ public:
     /// 얼로케이터는 되돌리지 않는다 — GPU가 아직 그 메모리를 읽는 중이다.
     /// 리스트만 다시 여는 것은 제출 직후에도 허용된다.
     bool FlushCommandList(std::string& outError) override;
+    // Upload prefix -> owned graph queues -> primary frame retirement.
+    // EndFrame requires JoinQueueFrame; AbortFrame drains and revokes the queue
+    // service. Queue execution then needs backend reinitialization; legacy frames
+    // remain usable. Prefix reservations retire with EndFrame, never prefix alone.
+    bool BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError);
+    bool GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue, std::string& outError);
+    bool JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError);
+    bool WaitForLastFrameSubmission(std::string& outError);
+    bool ShutdownQueueService(std::string& outError);
     /// 이미 닫힌 backend command list 묶음을 제출하고 같은 queue fence로
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
     bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
@@ -532,7 +551,13 @@ private:
 
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
+    std::unique_ptr<DX12MemorySamplingSession> m_memorySampling;
     ComPtr<ID3D12Device>               m_device;
+    std::unique_ptr<DX12QueueService> m_queueService;
+    bool m_queueFrameActive{false};
+    bool m_queueFrameJoined{false};
+    void DrainAbortedQueueFrame();
+    bool FlushCommandListImpl(bool preserveRecording, std::string& outError);
     ComPtr<ID3D12CommandSignature>     m_drawIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_dispatchMeshIndirectSignature;

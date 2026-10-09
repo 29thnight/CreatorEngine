@@ -1,6 +1,6 @@
 # GitHub issue remediation — 2026-10-08
 
-Base: `9c1c2aeae0e85cc3a2caacea142aee1e706cf88f`. Scope: audit all 33 open issues against current consumers and canonical plans, then fix valid issues sequentially. Existing unrelated dirty changes are preserved. Issue closure requires validation evidence; no GitHub comments or status changes are authorized by this implementation task.
+Base: `9c1c2aeae0e85cc3a2caacea142aee1e706cf88f`. Scope: audit all 33 open issues against current consumers and canonical plans, then fix valid issues sequentially. Existing unrelated dirty changes are preserved. Issue closure requires validation evidence. The original implementation task excluded GitHub status changes; the explicit 2026-10-09 closure request and its results are recorded below.
 
 Backend implementation remains neutral. PHASE 4.9 owns cross-backend runtime/pixel acceptance; this does not block scoped DX12 fixes. RG6 acceptance is not a performance-improvement claim. Material recovery preserves authored sources and does not restore native fallback.
 
@@ -64,3 +64,71 @@ Backend implementation remains neutral. PHASE 4.9 owns cross-backend runtime/pix
 - Asset authoring runtime semantic checks all passed: source intake/reuse, runtime reload, Terrain/Foliage/BlackBoard transactions, collision matrix, tags, input map and animator single truth. The script exited 1 in cleanup because an already missing model sidecar was removed. Added an existence guard; the cleanup change itself has not been re-run through the entire suite. Probe asset files were then removed individually. Temporary diagnostic logs remain under the exact CE_AssetWriterProbe_2f4bf2c7f5ae4ecb8a60a8e45ae30a0f directory; bulk cleanup commands were rejected by automatic approval review.
 - Vulkan Release resource tests passed with validation=0 / encoderDrops=0. The separate actual Scene-only run did not produce an acceptance marker before the 900-second wall limit (including cold preparation/cleanup) and was terminated. It is not Vulkan full-scene acceptance; PHASE 4.9 remains responsible for that gate.
 - Logs are under Build/Verification/GitHubIssueAudit20261008. Performance timings in concurrent correctness runs are not performance acceptance evidence.
+
+## 2026-10-09 follow-up: Editor status and continuous capture
+
+Base: `329fad205f6560fc4462354b9287d64a68049c8a` plus the preserved local worktree. This follow-up fixes two newly observed problems; it does not close all 33 historical issues or replace their targeted acceptance gates.
+
+- `GetLiveStatus` now tries the render-state lock and returns an explicit busy response on contention. It neither waits for driver pipeline compilation on the UI thread nor reads unlocked mutable state. Release TestShadow returned all 45 contended status requests successfully, maximum command execution 0.2334 ms. This was the normal DX12 run; the earlier long GPU-validation driver compile was not repeated.
+- Sparse event ranges are copied into compact collector-owned storage instead of retaining whole producer pages. Dense ranges retain page sharing; existing immutable snapshot/late-event tests remain in the full core suite. The intermediate TestShadow run had zero CPU source loss with 256 pages, versus the previous exhausted 8,192-page pool.
+- GPU recording admission now waits until the first collected frame establishes the actual recording range. A stale asynchronous Record frame cannot admit work outside that range. Already admitted GPU work still participates in drain, timeout, generation isolation and explicit loss accounting; a regression retains the loss check for an admitted frame evicted before its result arrives.
+- Corrected the existing pool-growth probe to inspect its oversized frame before Pause's empty tail legitimately evicts it under a one-page retention budget. Its no-loss and pool-growth assertions remain.
+- VS 2026 Release full Editor build passed. Final profiler core Debug/Release each passed 1,387 checks. Sparse-page retention and premature GPU-admission mutations were each rejected in Debug/Release (two focused mutation runs, not the whole mutation catalog).
+- Final actual `Dynamic_CPP/Assets/Scenes/TestShadow.creator` load/play/stop passed; hierarchy: 127 objects, zero violations; Editor exit 0. Saved `TestShadow-fixed.ceprof`: 766 frames, finalized and complete, CPU source drops 0, late GPU spans 0, writer/counter/frame-boundary loss 0. Producer pool remained at 256 pages (252 free after stop).
+- Evidence: `Build/Verification/IssueFollowup20261009/` (`build-final.log`, `profile-core.log`, `profile-gpu-boundary.log`, and `Final/commands.jsonl`, `Final/profile-result.json`, `Final/status-samples.json`, `Final/exit-off.json`, `Final/TestShadow-fixed.ceprof`). No FPS improvement, fresh Debug Editor build, or Vulkan runtime acceptance is claimed. Existing Utility_Framework PDB LNK4020 warnings remain.
+- GitHub issue states, commits and remote branches were not changed by this follow-up.
+
+## 2026-10-09 closure-candidate audit after AssetDepot merge
+
+Base: `329fad205f6560fc4462354b9287d64a68049c8a` plus preserved local changes. The current GitHub snapshot still contains 33 open issues. This audit checks the original criteria of the 14 previously selected closure candidates; it adds no FPS or new phase acceptance requirement.
+
+Thirteen candidates retain their implementation and supporting regression evidence. #134 remains pending its originally requested actual Scene View visual verification. GPU fixture output alone does not establish that selected/all static, skinned and typed geometry is displayed correctly in the product viewport.
+
+| Issue | Current audit result and evidence |
+| --- | --- |
+| #131 | Closure candidate confirmed. Removed authored owner/revision fields, empty opaque-shadow indices and native sorting remain absent. Graph geometry migration remains wired to the Editor contributor; existing draw identity/coverage/replay and Debug/Release integration evidence is retained. #134's separate product visual check remains outstanding. |
+| #132 | Closure candidate confirmed. Readiness checks precede one SceneViewInput copy; copied records receive selection revisions directly. No clear/repopulate remains. Existing empty/repeated/multiple-slot/deferred/failed coverage regressions are retained. |
+| #134 | Keep open for original product acceptance. Static/skinned GPU WireFrame fixture and contributor source prove geometry transport, but no sufficient actual Scene View selected/all/opaque/transparent display record was found. |
+| #135 | Closure candidate confirmed. Fresh Release mesh probe: 1,119,903 checks / 454,580 GPU components, including remap storage identity and retained-owner readback. |
+| #140 | Closure candidate confirmed. Fresh Release resource-lifetime probe preserves imported initial state on compile-only and callback abort, and commits on sequential/parallel queue acceptance. Existing transient failure/recovery and DX12/Vulkan evidence is retained; this run is not fresh Vulkan acceptance. |
+| #141 | Closure candidate confirmed. Fog implementation is unchanged by the merge. Fresh allocation rollback, six on/off cycles and resource retirement checks pass; prior product pixel/multi-view evidence remains applicable. |
+| #142 | Closure candidate confirmed. Nested child-range implementation is unchanged. Original Debug/Release nested-range mutation was rejected; current full profiler core passes 1,387 checks in both configurations, including the previously blocked pool-growth case. |
+| #143 | Closure candidate confirmed. Fresh Release: 80 distinct failed revisions, memoized repeated failure, normal recovery without host recreation, and 64 pending requests with overflow progress pass. GenerationStore reserves unique IDs and publishes immutable generations; the migrated fixture now follows that identity contract. |
+| #144 | Closure candidate confirmed. SSGI implementation is unchanged by the merge. Fresh second/third/fourth allocation failure, complete-set retry and shutdown recovery pass; prior product pixel/resize/multi-view evidence is retained. |
+| #153 | Closure candidate confirmed. Fresh first/second tile-buffer allocation failure, growth/rollback, old-pair retirement and shutdown checks pass; existing product/readback evidence is retained. |
+| #156 | Closure candidate confirmed. Fresh Release mesh probe admits 260 completed geometries, bounds cache entries and reads an externally retained output after eviction; GPU validation is clean. |
+| #161 | Closure candidate confirmed. SceneInput includes the small coverage contract; standalone packet/publication support remains outside Engine. Fresh Scene packet probe: 171 checks / 16 GPU components, two in-flight packets and abort/publication/retirement preserved. Existing product/runtime probes are retained. |
+| #162 | Closure candidate confirmed. No RebindPass reference remains; main/shadow use one packet with their Program layouts. Fresh bindings probe: 200 checks / 64 GPU components; layout, recording and descriptor validation preserved. Existing actual scene/shadow regressions are retained. |
+| #163 | Closure candidate confirmed. No RenderFrameServices.h source/project reference remains. Current Release Editor and focused probe builds pass using direct includes; prior Debug include/build evidence is retained. |
+
+### Test migration repairs and fresh execution
+
+- Fixed legacy texture raw access to borrow from ownership_cpp, and Scene packet comparisons to compare retained object addresses through the existing test helper. No product owner-comparison operator was introduced.
+- Shader admission fixtures now create completed immutable generations with distinct revision IDs. Previously, copied revisions shared the same identity tuple, so the first memoized failure correctly matched all later copies and the supposed corrected revision. Repeated requests for the same actual failed revision still assert memoization.
+- Split missing image preparation from actual upload failure in the bindings fixture. Pending preparation must retain the accepted packet without incrementing upload failure counts. A mismatched pinned image/descriptor triggers actual neutral substitution; its valid fallback plus error is rejected and the accepted packet remains intact.
+- VS 2026 / v18 / v145 Release builds of MaterialMeshSurfaceProbe, MaterialRenderBindingsProbe, MaterialRasterSurfaceProbe and MaterialScenePacketProbe passed. Fresh mesh, bindings, admission, resource-lifetime and Scene packet processes exited 0 with GPU validation enabled and no validation errors. Existing Utility_Framework LNK4020 warnings remain.
+- Evidence: `Build/Verification/IssueClosureCandidates20261009/`: `static-audit.json`, `mesh-runtime.log`, `bindings-accepted-runtime.log`, `admission-final-runtime.log`, `issue-resource-lifetime-runtime.log`, `scene-packet-final-runtime.log` and the corresponding build logs. The open issue snapshot is `Build/Verification/IssueFollowup20261009/issues-current.json`.
+- Remaining original acceptance work: #134 plus #133, #136, #137, #138, #139, #145, #146, #147, #148, #149, #150, #151, #152, #154, #155, #157, #158, #159, #160. Prior implementation does not replace the specific operation-count, failure-injection, lifetime or product-runtime evidence required by those issues.
+- No fresh Debug Editor build, Vulkan full-scene acceptance, FPS improvement, GitHub issue closure, commit or push is claimed by this audit. RG7/RG8 phase status is unchanged.
+
+## 2026-10-09 #134 actual Scene View verification and skinning repair
+
+This follow-up supersedes the pending #134 visual gate above. All 14 selected closure candidates now have supporting evidence; the other 19 issues retain their original outstanding gates. GitHub issue states have not been changed.
+
+- Actual Release Editor, `Dynamic_CPP/Assets/Scenes/TestShadow.creator`: enabled Wireframe overlay from the Scene View toolbar. Static floor and the large character displayed green geometry, but CreatorRobot initially had no wire overlay. Selecting and framing its typed MeshRenderer confirmed the omission; the isolated fixture alone had missed this product input.
+- `WireFrame.slang` read all four bone indices even when later weights were zero. Cooked model vertices use index 255 for unused influences. Reading beyond the palette can consume unrelated upload data, including nonfinite values; multiplying by zero does not reliably remove them. The common material mesh shader already skips these unused reads. WireFrame now likewise reads only positive-weight influences.
+- Restarted the same Editor/project with the corrected shader: CreatorRobot's wire geometry reappeared on its shaded surface. The Scene View overlay remained global with no selection and with CreatorRobot selected. During Play, the animated character's wire surface followed its pose; the Game View showed shaded geometry without Editor wires. No separate selected-only wire mode was introduced. These visual runs used validation OFF to exercise the ordinary product path.
+- Extended the existing Editor wireframe regression, without another test project: typed one-bone vertices now contain `{0,255,255,255}` with weights `{1,0,0,0}`. The second graph draw is Blended; explicit pixel checks require both opaque and blended geometry edges. Existing static/skinned transport, moved-vs-bind-pose pixels, two-draw/one-batch and one-shared-palette assertions remain.
+- Final VS 2026 / v18 / v145 Release full Editor build passed. The focused `dx12.wireframe` command passed in the actual Editor executable with GPU-based validation enabled. Both instances' edge green was 1.000; triangle interior was 0.000; moved skinned edge was 1.000 and bind-pose edge 0.000. Validation problems=0, droppedMessages=0, process exit=0. No fresh Debug or Vulkan execution is claimed; existing Utility_Framework PDB warnings remain.
+- Evidence: `Build/Verification/Issue134Live20261009/`: `wire-all.png` (before repair), `wire-fixed.png`, `wire-playing-selected.png`, `source-hashes.json`, `commands.jsonl`, `build-release-final.log`, and `Release/results.jsonl`, `Release/process.json`. The first overlapping build attempt failed with an Editor.lib file lock; after the original build completed, the sequential final build passed. Acceptance uses the final build and test artifacts only.
+- Scoped changes: `Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang` and `Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp`. Scene assets were not saved or changed. No FPS improvement, phase-status change, commit, push or GitHub closure was performed.
+
+## 2026-10-09 authorized GitHub closure
+
+After the owner explicitly requested closing the verified candidates, each issue received a scoped implementation/validation comment and was closed with reason `completed`. A fresh GitHub query confirmed all 14 are CLOSED: #131, #132, #134, #135, #140, #141, #142, #143, #144, #153, #156, #161, #162, #163.
+
+The remaining 19 are OPEN: #133, #136, #137, #138, #139, #145, #146, #147, #148, #149, #150, #151, #152, #154, #155, #157, #158, #159, #160. Their original acceptance work remains outstanding.
+
+Every closure comment explicitly distinguishes local verified changes from remote publication: latest fixes and evidence updates include uncommitted/unpushed work based on `329fad205f6560fc4462354b9287d64a68049c8a`. No commit or push was performed by the closure operation. Earlier statements of no GitHub changes describe their respective historical steps, not this final state.
+
+Evidence: `Build/Verification/IssueClosureCandidates20261009/closures.jsonl` retains comment URLs; `github-final-state.json` retains the independently fetched final issue states and timestamps.

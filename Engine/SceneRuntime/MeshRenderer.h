@@ -12,6 +12,7 @@ namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1
 namespace assets { class ModelAssetGeneration; struct ModelMeshHandle; struct ModelMeshDescriptor; } // PHASE 3.75 MBC7
 
 class Material;
+struct MaterialAssetReferenceState;
 class Animator;
 class Camera;
 // K2: 죽은 enable_shared_from_this<MeshRenderer> 제거 — shared_from_this() 호출부 0(확증).
@@ -59,6 +60,22 @@ public:
 		m_Material = std::move(material);
 		PublishRenderProxyDirty(ProxyDirty::Material);
 	}
+
+    // A reference owns the accepted base used to identify instance edits. Keep
+    // that owner with undo snapshots; comparing against a newer base would
+    // accidentally turn inherited defaults into instance overrides.
+    void SetMaterialAssetReference(own::shared_owner<Material> material, FileGuid baseGuid,
+                                   own::shared_owner<const Material> acceptedBase = {},
+                                   own::shared_owner<const MaterialAssetReferenceState> referenceState = {});
+    [[nodiscard]] const own::shared_owner<const Material>& GetMaterialAssetBase() const
+    {
+        return m_materialBaseSnapshot;
+    }
+    [[nodiscard]] const own::shared_owner<const MaterialAssetReferenceState>& GetMaterialAssetReferenceState() const
+    {
+        return m_materialReferenceState;
+    }
+    bool RefreshMaterialAsset();
 	void SetLODEnabled(bool enabled)
 	{
 		m_isEnableLOD = enabled;
@@ -110,6 +127,19 @@ public:
     uint32 m_bitflag{ 0 };
 
 private:
+
+    [[reflgen::ignore]]
+    own::shared_owner<const Material> m_materialBaseSnapshot;
+
+    [[reflgen::ignore]]
+    own::shared_owner<const MaterialAssetReferenceState> m_materialReferenceState;
+
+    [[reflgen::ignore]]
+    std::string m_unresolvedMaterialReference;
+
+    [[reflgen::ignore]]
+    std::uint64_t m_materialAssetRevision = ~std::uint64_t{};
+
 	[[reflgen::ignore]]
 	bool m_isNeedUpdateCulling{ false };
 

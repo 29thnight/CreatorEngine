@@ -262,6 +262,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Objects\Camera</Filter>
     </ClCompile>
+    <ClCompile Include="FontAsset.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -648,6 +651,9 @@
     <ClInclude Include="CanvasRenderMode.h">
       <Filter>Resources</Filter>
     </ClInclude>
+    <ClInclude Include="FontAsset.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
@@ -966,6 +972,9 @@
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
@@ -1127,6 +1136,9 @@
     </ClInclude>
     <ClInclude Include="RHI\RHIParallelCommandPool.h">
       <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHICommandRecordingJobs.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIPersistentHeapPolicy.h">
       <Filter>RHI\Core</Filter>

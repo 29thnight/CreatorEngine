@@ -221,6 +221,7 @@
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\DX12\DX12QueueService.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
@@ -326,6 +327,7 @@
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp" />
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -361,6 +363,10 @@
     <ClCompile Include="TerrainMaterial.cpp" />
 	<ClCompile Include="AssetAuthoringPort.cpp" />
     <ClCompile Include="DataSystem.cpp" />
+    <ClCompile Include="FontAsset.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="MaterialPropertyPacker.cpp" />
@@ -678,6 +684,8 @@
     <ClInclude Include="PrimitiveRenderProxy.h" />
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueService.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueBatchAdapter.h" />
     <ClInclude Include="RHI\RHIShaderCompiler.h" />
     <ClInclude Include="RHI\RHIShaderPermutation.h" />
     <ClInclude Include="RHI\RHIShaderReflection.h" />
@@ -716,9 +724,13 @@
     <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
+    <ClInclude Include="FontAsset.h" />
     <ClInclude Include="RHI\IDisplayPresentationSink.h" />
     <ClInclude Include="RHI\RHIDisplayFrame.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />
+    <ClInclude Include="RHI\RHIQueueContract.h" />
+    <ClInclude Include="RHI\RHIQueueRecorder.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueRecorder.h" />
     <ClInclude Include="RHI\RHIDescriptorVersionPolicy.h" />
     <ClInclude Include="RHI\RHIAssetEvictionPolicy.h" />
     <ClInclude Include="RHI\RHIDeviceMemoryBudgetCoordinator.h" />
@@ -735,9 +747,11 @@
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
+    <ClInclude Include="MaterialGraphMeshletTopology.h" />
     <ClInclude Include="MaterialGraphRasterSurface.h" />
     <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
+    <ClInclude Include="MaterialGraphSceneLod.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
     <ClInclude Include="GpuGeometryVisibility.h" />
     <ClInclude Include="MaterialGraphSceneCompiler.h" />
@@ -846,6 +860,7 @@
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />
+    <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSAOPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIPass.h" />
@@ -861,6 +876,7 @@
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
+    <ClInclude Include="RHI\RHICommandRecordingJobs.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />
     <ClInclude Include="RHI\RHISubmissionThread.h" />
     <ClInclude Include="TextureImage.h" />

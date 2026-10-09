@@ -626,7 +626,7 @@ void GpuMeshletVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     {
         m_graphArguments = graph.Write(m_graphArguments);
     }
-    graph.AddPass("Geometry.MeshletVisibility.Reset",
+    const auto resetPass = graph.AddPass("Geometry.MeshletVisibility.Reset",
         {{m_graphArguments, RHIResourceState::UnorderedAccess,
             versioned ? RGAccessMode::Write : RGAccessMode::LegacyState}},
         [owner](const auto& execution) {
@@ -657,12 +657,17 @@ void GpuMeshletVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
         usages.push_back({m_source->m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
         usages.push_back({m_source->m_graphArguments, RHIResourceState::ShaderResource, RGAccessMode::Read});
     }
-    graph.AddPass(m_pyramid ? "Geometry.MeshletVisibility.CullOcclusion" : "Geometry.MeshletVisibility.Cull", usages,
+    const auto cullPass = graph.AddPass(
+        m_pyramid ? "Geometry.MeshletVisibility.CullOcclusion" : "Geometry.MeshletVisibility.Cull", usages,
         [owner](const auto& execution) {
             owner->CheckCurrent(execution.graph);
             const auto depth = owner->m_pyramid ? owner->m_pyramid->Bindings(execution) : RHIBindingTable{};
             owner->Dispatch(*execution.encoder, false, depth);
         });
+    // Recording reads the retained prepared frame without mutating it. The
+    // mesh data, outputs, pyramid and optional recheck source are graph usages.
+    graph.DeclareComputeCompatible(resetPass);
+    graph.DeclareComputeCompatible(cullPass);
 }
 
 void GpuMeshletVisibility::Frame::AddReadUsages(EnhancedRenderGraph& graph,

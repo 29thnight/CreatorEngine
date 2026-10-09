@@ -23,7 +23,7 @@ def main():
     if Path(left["skyBoxPath"]).name != Path(right["skyBoxPath"]).name:
         raise ValueError("Environment asset names differ")
     def material_draws(manifest):
-        draws = [{k: draw.get(k) for k in ("route", "modelId", "meshId")} |
+        draws = [{k: draw.get(k) for k in ("route", "modelId", "meshId", "modelGeneration", "world", "pose")} |
                 {"material": {k: draw.get("lattice", {}).get(k)
                               for k in ("features", "coverage", "uniformBytes", "textures")}}
                 for draw in manifest["draws"]]

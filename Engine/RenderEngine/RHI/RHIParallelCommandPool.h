@@ -1,6 +1,6 @@
 #pragma once
 #include "RHIRecordedBatch.h"
-#include "JobScheduler.h"
+#include "RHICommandRecordingJobs.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -67,16 +67,16 @@ public:
     /// 따라서 반환 뒤에는 기록 Job이 자원을 참조하지 않는다. GPU 완료 대기는 별도다.
     void RunParallel(const std::function<void(uint32_t)>& job, uint32_t workerCount)
     {
-        if (0 == workerCount) return;
-        if (thread_pool::is_worker_thread())
-            throw std::logic_error("command recording cannot wait from a job worker");
+        if (0 == workerCount)
+        {
+            return;
+        }
         if (!IsInitialized())
+        {
             throw std::logic_error("command recording pool is not initialized");
+        }
         workerCount = (std::min)(workerCount, GetWorkerCount());
-        job_group group;
-        for (uint32_t worker = 0; worker < workerCount; ++worker)
-            group.add([&job, worker] { job(worker); });
-        m_scheduler.submit(std::move(group)).wait();
+        RHIRunCommandRecordingJobs(m_scheduler, job, workerCount);
     }
 
     /// 열린 command target을 닫고 workerOrder를 복사해 이동 전용 batch로 만든다.

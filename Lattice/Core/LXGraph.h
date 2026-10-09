@@ -246,6 +246,7 @@ class LXGraph
     bool SetSocketValue(Id pin, LXSocketValue value);
     bool CanConnect(Id first, Id second, std::string* reason = nullptr) const;
     std::optional<Id> Connect(Id first, Id second, std::string* reason = nullptr);
+    std::optional<Id> ReplaceInputConnection(Id first, Id second, std::string* reason = nullptr);
     bool Disconnect(Id link);
     std::vector<Issue> Validate(bool checkSharedCopies = true) const;
     bool Undo();
@@ -272,6 +273,7 @@ class LXGraph
     void Commit();
     void Restore(const Snapshot& snapshot);
     bool WouldCycle(Id outputNode, Id inputNode) const;
+    bool CanConnect(Id first, Id second, bool replaceInput, std::string* reason) const;
     static std::optional<LXGraph> LoadExact(const std::string& path, std::string* error,
                                             std::shared_ptr<const LXNodeDefinitionRegistry> definitions);
     static std::optional<LXGraph> LoadStream(std::istream& in, std::string* error,

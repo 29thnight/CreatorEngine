@@ -22,6 +22,11 @@
     <ClInclude Include="ExperimentParity\ExperimentTexturePipelineSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueContractTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueNativeTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueOwnershipTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RenderQueueScheduleRg8Tests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RenderQueueExecutionRg8Tests.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
     <ClInclude Include="RHI\DX12\Tests\EnhancedScreenRg5Tests.h" />
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h" />

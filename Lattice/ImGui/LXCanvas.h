@@ -28,8 +28,14 @@ struct CanvasState
     Id selectedFrame = 0;
     std::vector<Id> selectedNodes;
     Id pendingPin = 0;
+    Id pendingDocument = 0;
+    std::uint64_t pendingRevision = 0;
     ImVec2 pendingStartMouse{};
     ImVec2 pendingAnchor{};
+    Id disconnectPin = 0;
+    Id disconnectLink = 0;
+    Id disconnectDocument = 0;
+    std::uint64_t disconnectRevision = 0;
     Id creationPin = 0;
     ImVec2 creationAt{};
     bool creationPopupOpen = false;

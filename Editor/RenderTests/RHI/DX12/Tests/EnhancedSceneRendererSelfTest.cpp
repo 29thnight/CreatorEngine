@@ -1,6 +1,11 @@
 #include "../../../../../Tools/regression/material_owner_checks.h"
 #include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
+#include "RHIQueueContractTests.h"
+#include "RHIQueueNativeTests.h"
+#include "RHIQueueOwnershipTests.h"
+#include "RenderQueueScheduleRg8Tests.h"
+#include "RenderQueueExecutionRg8Tests.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -5531,7 +5536,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
     //   그 상태로 두면 '변환이 틀렸다'와 '엉뚱한 곳을 봤다'가 구분되지
     //   않는다.
     //
-    // 텍스트·스프라이트시트는 아직 건너뛰고, 건너뛴 수를 남겨
+    // Overlay 이미지·SDF 텍스트를 펼치고, 스프라이트시트 등 건너뛴 수를 남겨
     // '아직 안 되는 것'과 '되는데 안 나오는 것'을 가른다.
     std::vector<EnhancedUIPass::Rect> uiRects;
     uint32_t uiSkipped = 0;
@@ -5557,7 +5562,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             + " · 큐 " + std::to_string(flat.size()) + "\n";
 
         uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
-            flat.data(), flat.size(), uiRects, &*sceneTexturePins.borrow());
+            flat.data(), flat.size(), uiRects, 0.f, 0.f, &*sceneTexturePins.borrow());
     }
 
     if (report) { report->drawCandidates = draws.size(); report->lights = lights.size(); }

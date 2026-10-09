@@ -273,6 +273,25 @@
     <Exec Command="&quot;$(OutDir)AssetCooker.exe&quot; --cook-builtin-textures --blue-noise-source &quot;$(SolutionDir)Dynamic_CPP\Assets\VolumetricFog\blueNoise.dds&quot; --output &quot;$(EngineResourceOutDir)VolumetricFog\blueNoise.cetex&quot;" />
   </Target>
 
+  <Target Name="DeployRuntimeFontResources"
+          AfterTargets="Build"
+          Condition="'$(MSBuildProjectName)' == 'CreatorEditor' Or '$(MSBuildProjectName)' == 'Player'">
+    <PropertyGroup>
+      <_RuntimeFontSourceRoot>$(SolutionDir)Resources\Fonts\Runtime\</_RuntimeFontSourceRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <_RuntimeFontResource Include="$(_RuntimeFontSourceRoot)*" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(_RuntimeFontSourceRoot)Inter-Regular.ttf') Or !Exists('$(_RuntimeFontSourceRoot)LICENSE-Inter.txt')"
+           Text="Runtime Inter font or license is missing: $(_RuntimeFontSourceRoot)" />
+    <Error Condition="!Exists('$(_RuntimeFontSourceRoot)NanumGothic-Regular.ttf') Or !Exists('$(_RuntimeFontSourceRoot)LICENSE-NanumGothic.txt')"
+           Text="Runtime Korean font or license is missing: $(_RuntimeFontSourceRoot)" />
+    <Error Condition="!Exists('$(_RuntimeFontSourceRoot)README.md') Or !Exists('$(_RuntimeFontSourceRoot)provenance.json')"
+           Text="Runtime font provenance is missing: $(_RuntimeFontSourceRoot)" />
+    <Copy SourceFiles="@(_RuntimeFontResource)" DestinationFolder="$(EngineResourceOutDir)Fonts\Runtime\"
+          SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="DeployEditorResources"
           AfterTargets="Build"
           Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">

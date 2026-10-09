@@ -62,6 +62,8 @@ namespace material_graph
         SceneProgramStats ProgramStats() const;
         // Submitted commands, not a GPU-visible draw count.
         uint32_t ShadowDrawCount() const;
+        // Prepared lattice mesh draw bins, before GPU visibility rejection.
+        uint32_t PreparedMeshletDrawCount() const;
         // GPU candidates per cascade (direct compatibility uses CPU-visible
         // casters). No GPU visibility counter is read back here.
         std::array<uint32_t, 3> ShadowCasterCounts() const;
@@ -95,6 +97,8 @@ namespace material_graph
             return selectionDeferred_;
         }
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
+        // With no earlier occluder depth, RG2 builds current-frame LX depth
+        // before HZB. Compatibility graphs retain the frustum-only route.
         EnhancedGBufferPass::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
                                                     const EnhancedGBufferPass::Outputs& inputs,
                                                     bool hasOccluderDepth = true) const;

@@ -31,7 +31,7 @@ private:
 		size_t textures{ 0 };
 		size_t uiTextures{ 0 };
 		size_t spriteSheets{ 0 };
-		size_t spriteFonts{ 0 };
+		size_t fonts{ 0 };
 		size_t retainedAssets{ 0 };
 
 		// 렌더 프록시 (RenderScene)

@@ -50,6 +50,17 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     };
     static_assert(sizeof(Bin) == 16);
 
+    // A dedicated mesh draw bin reuses the visibility kernel's first three
+    // argument words as DispatchMesh(x=groups, y=visible 0/1, z=1). It must be
+    // consumed only by DispatchMeshIndirect, never DrawIndexedIndirect, and
+    // must contain exactly one candidate. This preserves camera HZB and the
+    // independent shadow selection without CPU readback or another dispatch.
+    static Bin MeshDispatchBin(std::uint32_t groups)
+    {
+        return {groups, 1, 0, 0};
+    }
+
+
     struct PreparedStats
     {
         std::uint32_t candidateCount{}, compactedBins{}, preservedBins{}, conservativeCandidates{};

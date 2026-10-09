@@ -42,6 +42,8 @@ struct PreparedTextureImageRequest final
     AssetDepot::AssetRequest<Texture::CodecImage> request;
 };
 
+class FontAsset;
+
 struct AssetBundleLoadResult
 {
     std::size_t submitted{};
@@ -52,6 +54,7 @@ struct AssetBundleLoadResult
     std::vector<assets::ModelAssetGeneration::Shared> models;
     std::vector<own::shared_owner<const Material>> materials;
     std::vector<own::shared_owner<const Texture>> textures;
+    std::vector<std::shared_ptr<FontAsset>> fonts;
     own::shared_owner<TextureFramePins> textureImages;
     std::vector<PreparedTextureImageRequest> imageRequests;
     // Nonblocking, including for direct LoadAssetBundle result owners.
@@ -62,6 +65,7 @@ struct AssetBundleLoadResult
 class ModelLoader;
 class Model;
 class Material;
+class FontAsset;
 struct ShaderMeta;
 namespace Authoring { class WriteNode; }
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
@@ -84,6 +88,7 @@ enum class RuntimeAssetType
 	SpriteSheet,
 	ShaderMeta,
     MaterialGraph,
+    Font,
 };
 
 enum class RuntimeAssetChangeKind
@@ -499,9 +504,27 @@ public:
     // Texture::m_assetPath stays the source path suitable for serialization.
 	own::shared_owner<const Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
 	std::vector<std::pair<std::string, own::shared_owner<const Texture>>> SnapshotTextures(TextureFileType type = TextureFileType::Texture);
+    // CPU SDF fonts use catalog GUID + normalized resolved path identity, never
+    // the basename. Accepts a catalog GUID or a source path; an empty path
+    // selects the bundled engine default.
+    std::shared_ptr<FontAsset> LoadFontShared(std::string_view path, std::string& error);
+    std::vector<std::pair<std::string, std::shared_ptr<FontAsset>>> SnapshotFonts() const;
+    std::size_t SnapshotFontCount() const;
+    std::uint64_t GetFontCacheRevision() const noexcept
+    {
+        return m_fontCacheRevision.load(std::memory_order_acquire);
+    }
 	//Resource Material
 	void InsertMaterial(own::shared_owner<const Material> material);
 	own::shared_owner<const Material> FindCachedMaterial(std::string_view name);
+    own::shared_owner<const Material> FindCachedMaterial(FileGuid guid);
+    std::uint64_t MaterialAssetRevision() const noexcept
+    {
+        return m_materialAssetRevision.load(std::memory_order_relaxed);
+    }
+    bool ReloadMaterialAsset(FileGuid guid, std::string& error);
+    bool PublishMaterialAsset(own::shared_owner<Material> candidate, const own::shared_owner<const Material>& expectedCurrent,
+                              std::string& error);
 	std::vector<std::pair<std::string, own::shared_owner<const Material>>> SnapshotMaterials();
 	own::shared_owner<const Material> RegisterImportedMaterial(
 		own::shared_owner<const Material> material, std::string_view baseName);
@@ -536,6 +559,7 @@ public:
 	// 소유권을 공유하는 조회. 컴포넌트처럼 참조를 보관하는 쪽은 이것을 써야
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
 	own::shared_owner<const Material> LoadMaterialShared(std::string_view name);
+    own::shared_owner<const Material> LoadMaterialShared(FileGuid guid);
 	own::shared_owner<const Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
         std::optional<bool> srgb = std::nullopt);
 	own::shared_owner<Material> CreateMaterial();
@@ -570,6 +594,17 @@ public:
                                  const assets::ModelAssetGeneration* model = nullptr);
     bool ConfigureMaterialGraphAuthoring(Material& material, const LX::LXMaterialAsset& asset,
                                          const material_graph::InstanceDescription& description, std::string& error);
+    bool ConfigureMaterialGraph(Material& material, own::shared_owner<const material_graph::Generation> generation,
+                                const material_graph::InstanceDescription& description, std::string& error,
+                                const assets::ModelAssetGeneration* model = nullptr);
+    bool PrepareMaterialGraphAuthoring(const Material& source, const LX::LXMaterialAsset& asset,
+                                      const material_graph::InstanceDescription& description,
+                                      own::shared_owner<Material>& candidate, std::string& error);
+    // Capture paths on the caller thread. This CPU-only job owns all inputs and
+    // has no DataSystem lifetime dependency or shared generated-source filename.
+    static own::shared_owner<const material_graph::Generation> CompileMaterialGraphAuthoring(
+        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
+        const file::path& cacheDirectory, std::string& error);
     own::shared_owner<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
 	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 		std::string& outError);
@@ -606,12 +641,13 @@ private:
 	// 캐시별 보호 규약(모델 generation cache는 자체 동기화 — ModelAssetGenerationCache).
 	//   m_materialMutex : Materials
 	//   m_textureMutex  : Textures / UITextures / SpriteSheets
-	//   m_fontMutex     : SFonts
+	//   m_fontMutex     : m_fonts
 	// 이 맵들은 LoadAssetBundle이 스레드풀로 병렬 로딩하므로,
 	// 조회·삽입 시 반드시 해당 뮤텍스를 잡아야 한다.
 	std::mutex m_textureMutex;
 	std::mutex m_materialMutex;
-	std::mutex m_fontMutex;
+    std::atomic<std::uint64_t> m_materialAssetRevision{};
+	mutable std::mutex m_fontMutex;
 	mutable std::mutex m_retainedAssetsMutex;
 
 	// I5-D5c1 — base 재질 자산의 저작 원본 캐시(GUID 키). legacy Materials
@@ -655,6 +691,11 @@ private:
 	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
+    static constexpr std::size_t kMaxCachedFonts = 32u;
+    std::unordered_map<std::string, std::shared_ptr<FontAsset>> m_fonts;
+    std::atomic<std::uint64_t> m_fontCacheRevision{ 1 };
+    std::shared_ptr<FontAsset> LoadFontFile(const file::path& path, std::string& error) const;
+    bool ReloadCachedFont(const file::path& path, FileGuid guid, std::string& error);
     [[nodiscard]] own::shared_owner<const Texture> TryAcquireTexture(
         AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
     [[nodiscard]] AssetDepot::AssetRequest<Texture> RequestTextureAsync(
@@ -810,6 +851,12 @@ private:
 	void SynchronizeLegacyMaterialProperties(Material& material) const;
 
 private:
+    own::shared_owner<const Material> AdoptAuthoringMaterialOwner(own::shared_owner<const Material> material);
+    bool PublishMaterialGraphGeneration(own::shared_owner<const material_graph::Generation> generation,
+                                       const own::shared_owner<const material_graph::Generation>& expectedGeneration,
+                                       own::shared_owner<Material> candidate,
+                                       const own::shared_owner<const Material>& expectedMaterial, std::string& error);
+
 	//--------- current file count
 	uint32 currModelFileCount = 0;
 	uint32 currShaderFileCount = 0;
@@ -869,6 +916,7 @@ private:
     {
         assets::ModelAssetGenerationCache::RetiredEntries models;
         material_graph::GenerationStore::RetiredEntries graphs;
+        std::unordered_map<std::string, std::shared_ptr<FontAsset>> fonts;
         DataContainer<Material> materials;
         std::unordered_map<FileGuid, asset_cache_detail::Entry<experiment::Material>> authoredMaterials;
         DataContainer<Texture> textures;

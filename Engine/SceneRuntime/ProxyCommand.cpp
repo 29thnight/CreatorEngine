@@ -9,6 +9,7 @@
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "RenderScene.h"
+#include "Scene.h"
 #include "ProxyCommandQueue.h"
 #include "Material.h"
 #include "MaterialGraphSceneInput.h"
@@ -20,6 +21,23 @@
 #include "RectTransformComponent.h"
 #include <algorithm>
 #include <array>
+
+own::shared_owner<TextureFramePins> RenderScene::TakePreparedTextureImagePins()
+{
+    if (auto* scene = GetScene())
+    {
+        return scene->TakePreparedTextureImagePins();
+    }
+    return {};
+}
+
+void RenderScene::RestorePreparedTextureImagePins(own::shared_owner<TextureFramePins> pins)
+{
+    if (auto* scene = GetScene())
+    {
+        scene->SetPreparedTextureImagePins(std::move(pins));
+    }
+}
 
 namespace
 {
@@ -327,23 +345,36 @@ ProxyCommand::ProxyCommand(TextComponent* component, uint64_t sceneEpoch) :
 	TextUpdate update{};
 	update.data.fontPath = component->GetFontPath();
 	update.data.message = component->message;
+	update.data.layout = component->GetTextLayout();
 	update.data.color = component->color;
 	update.data.position = { component->pos.x, component->pos.y };
-	update.data.fontSize = component->fontSize;
+	update.data.fontSize = component->fontSize * component->layoutScale;
 	if (auto* canvas = component->GetOwnerCanvas())
 	{
 		update.data.canvasOrder = canvas->GetCanvasOrder();
+		update.data.renderMode = canvas->GetRenderMode();
+		update.data.canvasId = canvas->GetInstanceID();
+		update.data.planeDistance = canvas->GetPlaneDistance();
+		if (auto* canvasOwner = canvas->GetOwner())
+		{
+			update.data.canvasWorld = canvasOwner->Transform_().GetRenderWorldMatrix();
+			if (auto* rect = canvasOwner->GetComponent<RectTransformComponent>())
+			{
+				const auto& root = rect->GetWorldRect();
+				update.data.canvasRect = { root.x, root.y, root.width, root.height };
+			}
+		}
 	}
 	update.data.layerOrder = component->GetLayerOrder();
 	update.data.maxSize = component->stretchSize;
 	update.data.stretchX = component->isStretchX;
 	update.data.stretchY = component->isStretchY;
 	update.data.alignment = component->GetHorizontalAlignment();
+	update.data.filpEffect = component->uiEffects;
 	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 
-	// m_textMeasureSize는 현재 UIRenderProxy 어디에서도 0 이외의 값으로
-	// 발행되지 않는다. 명령 생산자가 프록시를 역조회해 그 0을 되복사하던
-	// 경로는 render -> game readback 계약이 아니었으므로 제거한다.
+	// Layout and measured bounds are produced on GT. The immutable snapshot owns
+	// every atlas generation through render submission; no render -> game readback.
 	m_proxyGUID = component->GetInstanceID();
 	m_payload = std::move(update);
 }

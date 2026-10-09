@@ -39,16 +39,36 @@ namespace material_graph
             return experiment::IsAssetIdV4(id) || assets::IsUuidV8(id.value);
         }
 
+        std::uint64_t ReserveGenerationIdentity() noexcept
+        {
+            // Every path shares this identity space. Failed and unchanged
+            // preparations may leave gaps, but no store or preview can reuse an ID.
+            static std::atomic<std::uint64_t> serial{};
+            auto previous = serial.load(std::memory_order_relaxed);
+            do
+            {
+                if (previous == UINT64_MAX)
+                {
+                    return 0u;
+                }
+            } while (!serial.compare_exchange_weak(previous, previous + 1, std::memory_order_relaxed));
+            return previous + 1;
+        }
+
         bool ValidateDescription(const InstanceDescription& description, std::string& error)
         {
             if (!ValidTextureId(description.graphId) || description.parameters.size() > 128 ||
                 description.textures.size() > 64)
+            {
                 return Fail(error, "Invalid graph identity or oversized material instance.");
+            }
             std::set<LX::Id> ids;
             for (const auto& parameter : description.parameters)
             {
                 if (parameter.id == 0 || !ids.insert(parameter.id).second)
+                {
                     return Fail(error, "Invalid or duplicate material parameter ID.");
+                }
                 const bool valid = std::visit(
                     [](const auto& value) {
                         using T = std::decay_t<decltype(value)>;
@@ -56,36 +76,56 @@ namespace material_graph
                             return std::isfinite(number) && std::abs(number) <= std::numeric_limits<float>::max();
                         };
                         if constexpr (std::is_same_v<T, bool>)
+                        {
                             return true;
+                        }
                         else if constexpr (std::is_same_v<T, std::int64_t>)
+                        {
                             return value >= INT32_MIN && value <= INT32_MAX;
+                        }
                         else if constexpr (std::is_same_v<T, double>)
+                        {
                             return finite(value);
+                        }
                         else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                        {
                             return std::ranges::all_of(value, finite);
+                        }
                         else
+                        {
                             return false;
+                        }
                     },
                     parameter.value);
                 if (!valid)
+                {
                     return Fail(error, "Material overrides require finite float32/int32-compatible typed values.");
+                }
             }
             for (const auto& texture : description.textures)
+            {
                 if (texture.parameter == 0 || !ids.insert(texture.parameter).second || !ValidTextureId(texture.assetId))
+                {
                     return Fail(error, "Invalid or duplicate material texture parameter ID/GUID.");
+                }
+            }
             return true;
         }
 
         bool Keys(const Authoring::ReadNode& node, std::initializer_list<std::string_view> allowed)
         {
             if (!node.IsMap() || node.Size() != allowed.size())
+            {
                 return false;
+            }
             std::set<std::string_view> seen;
             for (const auto entry : node.Map())
             {
                 const auto key = entry.key.Scalar();
                 if (std::ranges::find(allowed, key) == allowed.end() || !seen.insert(key).second)
+                {
                     return false;
+                }
             }
             return true;
         }
@@ -94,11 +134,17 @@ namespace material_graph
         T Scalar(const Authoring::ReadNode& node)
         {
             if (!node.IsScalar())
+            {
                 throw std::runtime_error("Expected material scalar.");
+            }
             if constexpr (std::is_same_v<T, std::string>)
+            {
                 return node.AsString();
+            }
             else
+            {
                 return node.As<T>();
+            }
         }
 
         void WriteDouble(Authoring::WriteNode node, double value)
@@ -109,6 +155,108 @@ namespace material_graph
             node.SetScalar(std::string_view(buffer.data(), converted.ptr));
         }
     } // namespace
+
+    bool PrepareGenerationMetadata(Generation& generation, std::string& error)
+    {
+        error.clear();
+        if (!ValidTextureId(generation.assetId) || generation.generation == 0)
+        {
+            return Fail(error, "Material generation requires a canonical UUIDv4/UUIDv8 and a reserved identity.");
+        }
+        const auto& loaded = generation.cooked;
+        std::vector<std::uint8_t> payload;
+        if (!WriteCookedProgram(loaded.product, {}, payload, error) ||
+            (loaded.product.materialShader && loaded.product.materialShader->meta.guid.m_guid != generation.assetId.value) ||
+            loaded.boundSource != BuildBoundSource(loaded.product.program) ||
+            loaded.metadata != LX::WriteMaterialProgramMetadata(loaded.product.program))
+        {
+            if (error.empty())
+            {
+                error = "Material generation metadata differs from its verified product.";
+            }
+            return false;
+        }
+        ck::Sha256Digest digest{};
+        if (!ck::ComputeSha256(std::as_bytes(std::span(payload)), digest, error))
+        {
+            return false;
+        }
+        // The compiler emits one canonical line for the final active surface.
+        // Marker-less legacy graphs continue using their material document mode.
+        constexpr std::string_view marker = "#define LX_MATERIAL_SURFACE_ALPHA_MODE ";
+        const auto& slang = loaded.product.program.slang;
+        const auto position = slang.find(marker);
+        std::optional<std::string> surfaceBlendMode;
+        if (position != std::string::npos && (position == 0 || slang[position - 1] == '\n'))
+        {
+            const auto value = position + marker.size();
+            if (value + 1 >= slang.size() || slang[value + 1] != '\n')
+            {
+                return Fail(error, "Invalid compiled surface alpha routing marker.");
+            }
+            switch (slang[value])
+            {
+            case '0':
+                surfaceBlendMode = "opaque";
+                break;
+            case '1':
+                surfaceBlendMode = "masked";
+                break;
+            case '2':
+                surfaceBlendMode = "transparent";
+                break;
+            default:
+                return Fail(error, "Invalid compiled surface alpha routing marker.");
+            }
+        }
+        generation.contentDigest = digest;
+        generation.surfaceBlendMode = std::move(surfaceBlendMode);
+        return true;
+    }
+
+    own::shared_owner<const Generation> PrepareGeneration(const experiment::AssetId& id,
+                                                         const GenerationLoader& loader, std::string& error)
+    {
+        error.clear();
+        if (!ValidTextureId(id) || !loader)
+        {
+            error = "Material graph generation requires a canonical UUIDv4/UUIDv8 and a loader.";
+            return {};
+        }
+        try
+        {
+            Generation generation;
+            generation.assetId = id;
+            generation.generation = ReserveGenerationIdentity();
+            if (generation.generation == 0)
+            {
+                error = "Material generation counter is exhausted.";
+                return {};
+            }
+            if (!loader(generation.cooked, error))
+            {
+                if (error.empty())
+                {
+                    error = "Material generation loader failed.";
+                }
+                return {};
+            }
+            if (!PrepareGenerationMetadata(generation, error))
+            {
+                return {};
+            }
+            return own::make_shared<const Generation>(std::move(generation));
+        }
+        catch (const std::exception& exception)
+        {
+            error = std::string("Material generation preparation failed: ") + exception.what();
+        }
+        catch (...)
+        {
+            error = "Material generation preparation failed with an unknown exception.";
+        }
+        return {};
+    }
 
     namespace
     {
@@ -171,6 +319,10 @@ namespace material_graph
         charge.Add(sizeof(Generation));
         charge.AddString(cooked.metadata);
         charge.AddString(cooked.boundSource);
+        if (surfaceBlendMode)
+        {
+            charge.AddString(*surfaceBlendMode);
+        }
         const auto& product = cooked.product;
         const auto& program = product.program;
         charge.AddString(program.slang);
@@ -429,14 +581,15 @@ namespace material_graph
             }
             else
             {
-                if (serial_ == UINT64_MAX)
+                const auto generation = ReserveGenerationIdentity();
+                if (generation == 0)
                 {
                     error = "Material generation counter is exhausted.";
                     return {};
                 }
                 candidate = own::make_shared<GenerationPreparationState>();
                 candidate->m_assetId = id;
-                candidate->m_generation = ++serial_;
+                candidate->m_generation = generation;
                 candidate->m_previousOwner = std::move(current);
                 candidate->m_previousDigest = entry.digest;
                 entry.request = candidate;
@@ -480,7 +633,6 @@ namespace material_graph
                 Generation generation;
                 generation.assetId = state.m_assetId;
                 generation.generation = state.m_generation;
-                std::vector<std::uint8_t> payload;
                 bool verified = false;
                 {
                     auto& loaded = generation.cooked;
@@ -491,25 +643,16 @@ namespace material_graph
                             state.m_error = "Material generation loader failed.";
                         }
                     }
-                    else if (!WriteCookedProgram(loaded.product, {}, payload, state.m_error) ||
-                             (loaded.product.materialShader &&
-                              loaded.product.materialShader->meta.guid.m_guid != state.m_assetId.value) ||
-                             loaded.boundSource != BuildBoundSource(loaded.product.program) ||
-                             loaded.metadata != LX::WriteMaterialProgramMetadata(loaded.product.program))
-                    {
-                        if (state.m_error.empty())
-                        {
-                            state.m_error = "Material generation metadata differs from its verified product.";
-                        }
-                    }
                     else
                     {
-                        verified = ck::ComputeSha256(std::as_bytes(std::span(payload)), state.m_digest, state.m_error);
+                        verified = PrepareGenerationMetadata(generation, state.m_error);
+                        state.m_digest = generation.contentDigest;
                     }
                 }
                 if (verified)
                 {
-                    if (state.m_previousOwner && state.m_previousDigest == state.m_digest)
+                    if (state.m_previousOwner && state.m_previousDigest == state.m_digest &&
+                        state.m_previousOwner->surfaceBlendMode == generation.surfaceBlendMode)
                     {
                         state.m_owner = state.m_previousOwner;
                     }
@@ -561,7 +704,8 @@ namespace material_graph
             released.reserve(entries_.size() + 1);
             auto& entry = found->second;
             current = entry.current.lock();
-            if (current && current->generation == entry.currentGeneration && entry.digest == prepared.m_digest)
+            if (current && current->generation == entry.currentGeneration && entry.digest == prepared.m_digest &&
+                current->surfaceBlendMode == prepared.m_owner->surfaceBlendMode)
             {
                 result = std::move(current);
             }
@@ -579,6 +723,54 @@ namespace material_graph
             RetainLocked(entry, result, released);
         }
         return result;
+    }
+
+    bool GenerationStore::Publish(own::shared_owner<const Generation> candidate,
+                                  const own::shared_owner<const Generation>& expected, std::string& error)
+    {
+        error.clear();
+        if (!candidate || candidate->generation == 0 || !ValidTextureId(candidate->assetId))
+        {
+            return Fail(error, "Only a verified, owned material graph generation can be published.");
+        }
+        std::vector<own::shared_owner<const Generation>> released;
+        own::shared_owner<const Generation> current;
+        {
+            std::lock_guard lock(mutex_);
+            const auto found = entries_.find(candidate->assetId);
+            if (found != entries_.end())
+            {
+                current = found->second.current.lock();
+                if (current && (current->assetId != candidate->assetId ||
+                                current->generation != found->second.currentGeneration))
+                {
+                    current.reset();
+                }
+            }
+            if (bool(current) != bool(expected) ||
+                (current && (current->assetId != expected->assetId || current->generation != expected->generation)))
+            {
+                return Fail(error, "The graph changed while preparing Apply. Reload before applying again.");
+            }
+            // Even an unchanged Apply invalidates older cached/prepared tickets.
+            const auto publicationGeneration = ReserveGenerationIdentity();
+            if (publicationGeneration == 0)
+            {
+                return Fail(error, "Material generation counter is exhausted.");
+            }
+            // Allocate before touching publication or retained-byte accounting.
+            // One new entry and its evicted owners can be retired below.
+            released.reserve(entries_.size() + 2);
+            auto& entry = entries_[candidate->assetId];
+            entry.current = candidate;
+            entry.currentGeneration = candidate->generation;
+            entry.digest = candidate->contentDigest;
+            entry.requestGeneration = publicationGeneration;
+            entry.request.reset();
+            entry.dirty = false;
+            RetainLocked(entry, candidate, released);
+        }
+        return true;
     }
 
     own::shared_owner<const Generation> GenerationStore::Load(const experiment::AssetId& id,
@@ -693,13 +885,17 @@ namespace material_graph
     {
         CookedProgram candidate;
         if (!catalog.OpenMaterialProgram(id, bytes, {}, candidate, error))
+        {
             return false;
+        }
         if (source)
         {
             const auto generated = LX::GenerateMaterialSlang(*source);
             if (!generated || generated->slang != candidate.product.program.slang ||
                 LX::WriteMaterialProgramMetadata(*generated) != candidate.metadata)
+            {
                 return Fail(error, "Cooked material generation differs from the current source graph; regenerate it.");
+            }
         }
         result = std::move(candidate);
         error.clear();
@@ -708,12 +904,7 @@ namespace material_graph
 
     std::uint64_t GenerationStore::ReserveGeneration()
     {
-        std::lock_guard lock(mutex_);
-        if (serial_ == UINT64_MAX)
-        {
-            return 0u;
-        }
-        return ++serial_;
+        return ReserveGenerationIdentity();
     }
 
     bool BuildInstance(own::shared_owner<const Generation> generation, const InstanceDescription& description,
@@ -868,7 +1059,9 @@ namespace material_graph
             (document.blendMode != "opaque" && document.blendMode != "masked" && document.blendMode != "transparent") ||
             (document.materialId.IsValid() && !ValidTextureId(document.materialId)) ||
             !ValidateDescription(document.description, error))
+        {
             return Fail(error, error.empty() ? "Invalid lattice material document." : error);
+        }
         Authoring::WriteDocument staging;
         const auto node = staging.Root();
         node.SetMap();
@@ -890,17 +1083,25 @@ namespace material_graph
                 [&](const auto& value) {
                     using T = std::decay_t<decltype(value)>;
                     if constexpr (std::is_same_v<T, bool>)
+                    {
                         entry.Child("bool").SetScalar(value);
+                    }
                     else if constexpr (std::is_same_v<T, std::int64_t>)
+                    {
                         entry.Child("int").SetScalar(value);
+                    }
                     else if constexpr (std::is_same_v<T, double>)
+                    {
                         WriteDouble(entry.Child("float"), value);
+                    }
                     else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
                     {
                         const auto values = entry.Child(value.size() == 3 ? "vector" : "color");
                         values.SetSequence(true);
                         for (double number : value)
+                        {
                             WriteDouble(values.Append(), number);
+                        }
                     }
                 },
                 parameter.value);
@@ -929,56 +1130,82 @@ namespace material_graph
                 : Keys(node, {"lattice_material", "name", "assetId", "graphAssetId", "doubleSided", "parameters", "textures"});
             if (!keys ||
                 Scalar<std::uint32_t>(node["lattice_material"]) != 1)
+            {
                 return Fail(error, "Unknown, duplicate or incomplete lattice material document keys/version.");
+            }
             InstanceDocument candidate;
             candidate.name = Scalar<std::string>(node["name"]);
             const auto materialId = Scalar<std::string>(node["assetId"]);
             if (materialId != Uuid::ToString(Uuid::Uuid16{}) && !ParseTextureId(materialId, candidate.materialId))
+            {
                 return Fail(error, "Invalid lattice material asset GUID.");
+            }
             if (!ParseTextureId(Scalar<std::string>(node["graphAssetId"]), candidate.description.graphId))
+            {
                 return Fail(error, "Invalid lattice graph asset GUID.");
+            }
             candidate.doubleSided = Scalar<bool>(node["doubleSided"]);
             if (node["blendMode"])
             {
                 candidate.blendMode = Scalar<std::string>(node["blendMode"]);
                 if (candidate.blendMode != "opaque" && candidate.blendMode != "masked" && candidate.blendMode != "transparent")
+                {
                     return Fail(error, "Invalid lattice material alpha mode.");
+                }
             }
             if (candidate.name.size() > 4096 || !node["parameters"].IsSequence() || node["parameters"].Size() > 128 ||
                 !node["textures"].IsSequence() || node["textures"].Size() > 64)
+            {
                 return Fail(error, "Invalid lattice material parameter/texture list.");
+            }
             for (const auto entry : node["parameters"])
             {
                 ParameterOverride parameter;
                 parameter.id = Scalar<LX::Id>(entry["id"]);
                 if (Keys(entry, {"id", "bool"}))
+                {
                     parameter.value = Scalar<bool>(entry["bool"]);
+                }
                 else if (Keys(entry, {"id", "int"}))
+                {
                     parameter.value = Scalar<std::int64_t>(entry["int"]);
+                }
                 else if (Keys(entry, {"id", "float"}))
+                {
                     parameter.value = Scalar<double>(entry["float"]);
+                }
                 else if (Keys(entry, {"id", "vector"}) && entry["vector"].IsSequence() && entry["vector"].Size() == 3)
+                {
                     parameter.value =
                         std::array<double, 3>{Scalar<double>(entry["vector"].At(0)), Scalar<double>(entry["vector"].At(1)),
                                               Scalar<double>(entry["vector"].At(2))};
+                }
                 else if (Keys(entry, {"id", "color"}) && entry["color"].IsSequence() && entry["color"].Size() == 4)
+                {
                     parameter.value =
                         std::array<double, 4>{Scalar<double>(entry["color"].At(0)), Scalar<double>(entry["color"].At(1)),
                                               Scalar<double>(entry["color"].At(2)), Scalar<double>(entry["color"].At(3))};
+                }
                 else
+                {
                     return Fail(error, "Material parameter needs exactly one known typed value.");
+                }
                 candidate.description.parameters.push_back(std::move(parameter));
             }
             for (const auto entry : node["textures"])
             {
                 TextureOverride texture;
                 if (!Keys(entry, {"id", "guid"}) || !ParseTextureId(Scalar<std::string>(entry["guid"]), texture.assetId))
+                {
                     return Fail(error, "Invalid lattice texture override.");
+                }
                 texture.parameter = Scalar<LX::Id>(entry["id"]);
                 candidate.description.textures.push_back(texture);
             }
             if (!ValidateDescription(candidate.description, error))
+            {
                 return false;
+            }
             std::ranges::sort(candidate.description.parameters, {}, &ParameterOverride::id);
             std::ranges::sort(candidate.description.textures, {}, &TextureOverride::parameter);
             result = std::move(candidate);

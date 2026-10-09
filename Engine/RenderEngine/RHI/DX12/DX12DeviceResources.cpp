@@ -12,12 +12,79 @@
 #include <cstdio>
 #include <exception>
 #include <sstream>
+#include <fstream>
+#include <thread>
+#include <chrono>
+#include <mutex>
 #include <dxgidebug.h>   // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
 #include "../RHIValidationLedger.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
+
+// Opt-in diagnostics: query an owned adapter independently of rendering stalls.
+// Each device stream is retained separately; process usage must not be summed.
+class DX12MemorySamplingSession
+{
+public:
+    DX12MemorySamplingSession(IDXGIAdapter1* adapter, const char* path)
+        : m_file(path, std::ios::app)
+    {
+        if (!m_file || FAILED(adapter->QueryInterface(IID_PPV_ARGS(&m_adapter))))
+        {
+            throw std::runtime_error("DX12 memory sampling initialization failed");
+        }
+        static std::atomic<uint64_t> next{1};
+        m_stream = next.fetch_add(1);
+        Record("start");
+        m_worker = std::jthread([this](std::stop_token stop)
+        {
+            while (!stop.stop_requested())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                if (!stop.stop_requested())
+                {
+                    Record("sample");
+                }
+            }
+        });
+    }
+    ~DX12MemorySamplingSession()
+    {
+        m_worker.request_stop();
+        if (m_worker.joinable())
+        {
+            m_worker.join();
+        }
+        Record("end");
+    }
+private:
+    void Record(const char* kind)
+    {
+        DXGI_QUERY_VIDEO_MEMORY_INFO info{};
+        const HRESULT hr = m_adapter->QueryVideoMemoryInfo(0,
+            DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+        const auto utcMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - m_began).count();
+        static std::mutex writerMutex;
+        std::lock_guard lock(writerMutex);
+        m_file << "{\"stream\":" << m_stream << ",\"kind\":\"" << kind
+            << "\",\"utcMs\":" << utcMs << ",\"elapsedMs\":" << elapsedMs
+            << ",\"valid\":" << (SUCCEEDED(hr) ? "true" : "false")
+            << ",\"hresult\":" << static_cast<int64_t>(hr)
+            << ",\"usedBytes\":" << info.CurrentUsage
+            << ",\"budgetBytes\":" << info.Budget << "}\n";
+        m_file.flush();
+    }
+    Microsoft::WRL::ComPtr<IDXGIAdapter3> m_adapter;
+    std::ofstream m_file;
+    uint64_t m_stream{0};
+    std::chrono::steady_clock::time_point m_began{std::chrono::steady_clock::now()};
+    std::jthread m_worker;
+};
 
 namespace
 {
@@ -277,6 +344,21 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }
+    char samplingPath[32768]{};
+    const DWORD samplingLength = GetEnvironmentVariableA("CREATOR_GPU_MEMORY_SAMPLES",
+        samplingPath, static_cast<DWORD>(sizeof(samplingPath)));
+    if (samplingLength > 0 && samplingLength < sizeof(samplingPath))
+    {
+        try
+        {
+            m_memorySampling = std::make_unique<DX12MemorySamplingSession>(m_adapter.Get(), samplingPath);
+        }
+        catch (const std::exception& error)
+        {
+            outError = error.what();
+            return false;
+        }
+    }
 
     // 알려진 정상 경로 메시지를 억제한다.
     //
@@ -495,11 +577,33 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     RefreshPersistentMemoryBudget();
     if (!GetRHISubmissionThread().AcquireClient(this, outError)) return false;
     m_submissionClient = true;
+    m_queueService = std::make_unique<DX12QueueService>(m_device.Get());
     return true;
+}
+
+RHIQueueCapabilities DX12DeviceResources::QueryQueueCapabilities() const
+{
+    return m_queueService ? m_queueService->QueryQueueCapabilities() : RHIQueueCapabilities{};
+}
+
+bool DX12DeviceResources::CreateQueue(RHIQueueKind kind,
+    std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+{
+    if (!m_queueService)
+    {
+        queue.reset();
+        error = "DX12 queue service is not initialized.";
+        return false;
+    }
+    return m_queueService->CreateQueue(kind, queue, error);
 }
 
 void DX12DeviceResources::Shutdown()
 {
+    // Separate primitive queues are not covered by the legacy frame queue drain.
+    m_queueService.reset();
+    m_queueFrameActive = false;
+    m_queueFrameJoined = false;
     // 구독을 먼저 끊는다. 해체 중에 리사이즈 콜백이 들어오면 이미 놓은 것을
     // 만진다.
     ScreenResizeBus::Get().Unsubscribe(m_resizeSubscription);
@@ -595,6 +699,7 @@ void DX12DeviceResources::Shutdown()
     m_queue.Reset();
     m_infoQueue.Reset();
     m_device.Reset();
+    m_memorySampling.reset();
     m_adapter.Reset();
     m_factory.Reset();
     m_width = 0;
@@ -668,6 +773,11 @@ void DX12DeviceResources::RequestTestDeviceRemoval(TestDeviceRemovalTarget targe
 
 bool DX12DeviceResources::BeginFrame(std::string& outError)
 {
+    if (m_queueFrameActive)
+    {
+        outError = "Queue frame must be ended or aborted before frame-slot reuse.";
+        return false;
+    }
     GetRHISubmissionThread().CollectCompletedLifetimes(this);
 #if !CE_SHIPPING
     const uint32_t removalBit = static_cast<uint32_t>(
@@ -793,6 +903,16 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
 
 bool DX12DeviceResources::FlushCommandList(std::string& outError)
 {
+    if (m_queueFrameActive)
+    {
+        outError = "Queue frame upload/descriptor recording cannot be flushed before retirement.";
+        return false;
+    }
+    return FlushCommandListImpl(false, outError);
+}
+
+bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::string& outError)
+{
     if (!m_commandList)
     {
         outError = "중간 제출할 DX12 command list가 없다";
@@ -803,19 +923,23 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
 
     const uint64_t fenceValue = m_nextFenceValue++;
     const uint64_t recordingId = m_currentRecordingId;
-    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue, preserveRecording]
     {
-        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+        if (!preserveRecording)
+        {
+            RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+        }
     });
-    m_uploadAllocator.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    m_descriptorRecycler.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    // 이 뒤 현재 recording이 Abort되더라도 같은 command allocator는 앞선
-    // 중간 제출이 끝나기 전 Reset할 수 없다.
-    m_currentRecordingId = 0;
+    if (!preserveRecording)
+    {
+        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        }
+        m_currentRecordingId = 0;
+    }
 
     const uint32_t frameSlot = m_frameIndex;
     ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
@@ -856,9 +980,12 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
         return false;
     }
     admission.Accept();
-    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    if (!preserveRecording)
     {
-        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+        }
     }
     m_frameSubmissionTickets[frameSlot] = ticket;
     m_frameFenceValues[frameSlot] = fenceValue;
@@ -876,21 +1003,134 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     if (FAILED(hr)) { outError = "중간 제출 후 command list 생성 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
     ResetImmediateEncoder();
 
-    m_currentRecordingId = m_nextRecordingId++;
-    m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+    if (!preserveRecording)
     {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
-        return false;
+        m_currentRecordingId = m_nextRecordingId++;
+        m_uploadAllocator.BeginRecording(m_currentRecordingId);
+        if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+        {
+            m_uploadAllocator.AbortRecording(m_currentRecordingId);
+            return false;
+        }
     }
 
     return true;
 }
 
+bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue,
+    std::string& outError)
+{
+    if (!m_queueService)
+    {
+        outError = "Queue service is unavailable.";
+        return false;
+    }
+    return m_queueService->GetPrimaryGraphicsQueue(m_queue.Get(), queue, outError);
+}
+
+bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics,
+    std::string& outError)
+{
+    if (!m_queueService || !graphics || m_queueFrameActive || m_currentRecordingId == 0 ||
+        graphics->GetIdentity().kind != RHIQueueKind::Graphics)
+    {
+        outError = "Queue frame requires an active recording and a graphics endpoint.";
+        return false;
+    }
+    if (!FlushCommandListImpl(true, outError) ||
+        !GetRHISubmissionThread().Wait(m_frameSubmissionTickets[m_frameIndex], outError))
+    {
+        std::string drainError;
+        const bool deviceLost = FAILED(m_device->GetDeviceRemovedReason());
+        if (deviceLost)
+        {
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, "Queue frame prefix failed after device removal.");
+        }
+        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError :
+            RHILifecycleCommand::OfflineReadbackCapture, drainError))
+        {
+            std::terminate();
+        }
+        return false;
+    }
+    RHITimelinePoint prefix;
+    m_queueFrameActive = true;
+    m_queueFrameJoined = false;
+    // The prefix ticket proves admission succeeded. On the primary graphics
+    // queue, FIFO already orders the graph after that prefix without a GPU wait.
+    if (DX12QueueService::NativeQueue(graphics) == m_queue.Get())
+    {
+        return true;
+    }
+    if (!m_queueService->ImportPrimaryCompletion(m_fence.Get(), m_lastAdmittedFenceValue, prefix, outError) ||
+        !graphics->Wait(prefix, outError))
+    {
+        return false;
+    }
+    return true;
+}
+
+bool DX12DeviceResources::JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError)
+{
+    if (!m_queueFrameActive || m_queueFrameJoined || !m_queueService)
+    {
+        outError = "No unjoined queue frame is active.";
+        return false;
+    }
+    if (!m_queueService->JoinPrimaryQueue(m_queue.Get(), completion, outError))
+    {
+        return false;
+    }
+    m_queueFrameJoined = true;
+    return true;
+}
+
+void DX12DeviceResources::DrainAbortedQueueFrame()
+{
+    if (m_queueFrameActive)
+    {
+        std::string error;
+        if (!m_queueService || !m_queueService->Shutdown(error))
+        {
+            // Releasing a frame reservation without completion/device-loss proof
+            // would let the GPU read reused upload or descriptor memory.
+            std::terminate();
+        }
+        const bool deviceLost = FAILED(m_device->GetDeviceRemovedReason());
+        if (deviceLost)
+        {
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, "Queue frame aborted after device removal.");
+        }
+        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError :
+            RHILifecycleCommand::OfflineReadbackCapture, error))
+        {
+            std::terminate();
+        }
+        m_queueFrameActive = false;
+        m_queueFrameJoined = false;
+    }
+}
+
+bool DX12DeviceResources::WaitForLastFrameSubmission(std::string& outError)
+{
+    const auto& ticket = m_frameSubmissionTickets[(m_frameIndex + kFrameCount - 1) % kFrameCount];
+    if (!ticket.IsValid())
+    {
+        outError = "No accepted frame submission is available.";
+        return false;
+    }
+    return GetRHISubmissionThread().Wait(ticket, outError);
+}
+
+bool DX12DeviceResources::ShutdownQueueService(std::string& outError)
+{
+    return !m_queueService || m_queueService->Shutdown(outError);
+}
+
 bool DX12DeviceResources::PrepareParallelSubmission(
     RHICompletionPoint& outCompletion, std::string& outError)
 {
-    if (!m_queue || !m_fence)
+    if (!m_queue || !m_fence || m_queueFrameActive)
     {
         outError = "DX12 병렬 제출 준비 coordinator가 초기화되지 않았다";
         return false;
@@ -931,6 +1171,7 @@ void DX12DeviceResources::AcceptParallelSubmission(RHICompletionPoint completion
 
 void DX12DeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion)
 {
+    DrainAbortedQueueFrame();
     m_uploadAllocator.RejectSubmission(recordingId, completion);
     m_descriptorRecycler.RejectSubmission(recordingId, completion);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
@@ -963,14 +1204,26 @@ bool DX12DeviceResources::SubmitCommandLists(
             ce::dx_capture::current_submission_context());
         m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
     }
-    const HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
+    HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
+    // Signal can report success after removal. The native fence sentinel is
+    // device loss, never proof that this batch finished on the GPU.
+    if (SUCCEEDED(hr) && m_fence->GetCompletedValue() == UINT64_MAX)
+    {
+        hr = m_device->GetDeviceRemovedReason();
+        if (SUCCEEDED(hr))
+        {
+            hr = DXGI_ERROR_DEVICE_REMOVED;
+        }
+    }
     if (FAILED(hr))
     {
-        outError = "DX12 외부 리스트 제출 Signal 실패 " + HrToString(hr);
+        outError = "DX12 외부 리스트 제출 Signal/장치 상태 실패 " + HrToString(hr);
         if (DXGI_ERROR_DEVICE_REMOVED == hr || DXGI_ERROR_DEVICE_RESET == hr ||
             DXGI_ERROR_DEVICE_HUNG == hr ||
             DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
+        {
             GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
+        }
         return false;
     }
     return true;
@@ -978,6 +1231,7 @@ bool DX12DeviceResources::SubmitCommandLists(
 
 void DX12DeviceResources::AbortFrame()
 {
+    DrainAbortedQueueFrame();
     // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
     if (m_commandList) m_commandList->Close();
@@ -991,6 +1245,11 @@ void DX12DeviceResources::AbortFrame()
 bool DX12DeviceResources::EndFrame(std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"DX12EnqueueCommands">()};
+    if (m_queueFrameActive && !m_queueFrameJoined)
+    {
+        outError = "Queue frame completion must be joined before frame retirement.";
+        return false;
+    }
     if (!m_commandList)
     {
         outError = "종료할 DX12 command list가 없다";
@@ -1052,6 +1311,8 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
         return false;
     }
     admission.Accept();
+    m_queueFrameActive = false;
+    m_queueFrameJoined = false;
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
     {
         listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
@@ -1392,6 +1653,10 @@ RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
     }
 
     constexpr uint64_t megabyte = 1024ull * 1024ull;
+    info.usedBytes = memory.CurrentUsage;
+    info.budgetBytes = memory.Budget;
+    info.usageAvailable = true;
+    info.budgetAvailable = memory.Budget > 0;
     info.usedMB = memory.CurrentUsage / megabyte;
     info.budgetMB = memory.Budget / megabyte;
     return info;

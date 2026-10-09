@@ -467,7 +467,8 @@ void Run(const std::filesystem::path& root)
               "Invalid coverage is rejected");
         Check(prepare(pipelines, currentEvaluation, coverage, environment, packet),
               "Rebuild current recording bindings");
-        Check(packet->ibl == accepted->ibl && packet->bindings != accepted->bindings &&
+        Check(packet->ibl == accepted->ibl &&
+                  !material_graph_test::SamePinnedObject(packet->bindings, accepted->bindings) &&
                   packet->pipeline->GetHandle() == accepted->pipeline->GetHandle(),
               "Reuse exact IBL and shared PSO with fresh frame bindings");
         const auto ready = packet;

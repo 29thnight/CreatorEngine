@@ -445,6 +445,28 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     barriers.clear();
     barriers.reserve(batch.GetBarrierCount());
 
+    const bool computeQueue = m_commandList->GetType() == D3D12_COMMAND_LIST_TYPE_COMPUTE;
+    const auto stateForQueue = [&](RHIResourceState state)
+    {
+        if (computeQueue)
+        {
+            switch (state)
+            {
+            case RHIResourceState::ShaderResource:
+                return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            case RHIResourceState::Common:
+            case RHIResourceState::UnorderedAccess:
+            case RHIResourceState::CopySource:
+            case RHIResourceState::CopyDest:
+            case RHIResourceState::IndirectArgument:
+                break;
+            default:
+                throw std::runtime_error("Graphics-only resource state on a compute queue");
+            }
+        }
+        return DX12DeviceResources::ToD3D12(state);
+    };
+
     const auto activate = [&barriers](ID3D12Resource* resource)
     {
         if (!resource)
@@ -471,9 +493,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
         if (nullptr == resource) continue;
 
         const D3D12_RESOURCE_STATES before =
-            DX12DeviceResources::ToD3D12(transition.before);
+            stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after =
-            DX12DeviceResources::ToD3D12(transition.after);
+            stateForQueue(transition.after);
         if (before == after) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};
@@ -491,9 +513,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
         if (nullptr == resource) continue;
 
         const D3D12_RESOURCE_STATES before =
-            DX12DeviceResources::ToD3D12(transition.before);
+            stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after =
-            DX12DeviceResources::ToD3D12(transition.after);
+            stateForQueue(transition.after);
         if (before == after) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};

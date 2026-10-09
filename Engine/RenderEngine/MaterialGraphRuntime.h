@@ -9,6 +9,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 
 class Texture;
 namespace AssetDepot
@@ -33,6 +34,9 @@ namespace material_graph
         experiment::AssetId assetId;
         std::uint64_t generation{};
         CookedProgram cooked;
+        experiment::cooked::Sha256Digest contentDigest{};
+        // Verified graph source carries active-surface routing through cooked loading.
+        std::optional<std::string> surfaceBlendMode;
         // AssetDepot pins the exact artifact and resolved default Texture
         // representations. Legacy source generations leave this empty.
         own::shared_owner<const AssetDepot::MaterialProgramAssetOrigin> assetOrigin{};
@@ -44,6 +48,14 @@ namespace material_graph
     };
 
     using GenerationLoader = std::function<bool(CookedProgram&, std::string&)>;
+
+    // Validate a completed cooked payload and derive its content identity/routing
+    // before publishing its immutable owner, including AssetDepot decode paths.
+    bool PrepareGenerationMetadata(Generation& generation, std::string& error);
+
+    // Isolated authoring/preview preparation never changes accepted store state.
+    own::shared_owner<const Generation> PrepareGeneration(const experiment::AssetId& id,
+                                                         const GenerationLoader& loader, std::string& error);
 
     struct GenerationPreparationState;
 
@@ -134,6 +146,10 @@ namespace material_graph
         // Call on the owning publication boundary. Removal, Clear or a newer
         // reload invalidates old tickets; identical payloads retain their owner.
         own::shared_owner<const Generation> Publish(const PreparedGeneration& prepared, std::string& error);
+        // Apply a verified isolated candidate only while the expected accepted
+        // generation is current. Success invalidates outstanding store tickets.
+        bool Publish(own::shared_owner<const Generation> candidate,
+                     const own::shared_owner<const Generation>& expected, std::string& error);
         own::shared_owner<const Generation> Load(const experiment::AssetId& id, const GenerationLoader& loader, bool reload,
                                               std::string& error);
         own::shared_owner<const Generation> Current(const experiment::AssetId& id) const;
@@ -150,7 +166,8 @@ namespace material_graph
         void SetRetainedBudgetBytes(std::size_t bytes);
         std::size_t RetainedBytes() const;
         std::size_t RetainedBudgetBytes() const;
-        // Reserve in the same never-reset identity space as legacy preparation.
+        // Reserve in the same process-wide, never-reset identity space as isolated
+        // previews, legacy preparation and AssetDepot generations.
         // Zero means exhausted. Caller may already hold asset admission.
         [[nodiscard]] std::uint64_t ReserveGeneration();
 
@@ -164,9 +181,6 @@ namespace material_graph
         std::size_t retainedBudgetBytes_ = 128u * 1024u * 1024u;
         std::size_t retainedBytes_{};
         mutable std::uint64_t useSerial_{};
-        // Reserved at BeginPreparation, never reset by Remove/Clear. Failed or
-        // unchanged preparations may leave gaps, but an ID is never reused.
-        std::uint64_t serial_{};
     };
 
     // An authoring host supplies the current source graph for exact freshness.

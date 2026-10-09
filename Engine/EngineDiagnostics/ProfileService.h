@@ -503,6 +503,7 @@ namespace ce
         // An in-flight render submission may finish after Record starts even though
         // its source frame predates this recording. It is outside this capture.
         std::atomic<std::uint32_t>  m_recordStartFrame{ 0 };
+        std::atomic<bool> m_gpuFrameRangeReady{ false };
         bool m_firstRecordBoundaryPending = false; // collector-owned
 
         // ★ shared_ptr 인 이유는 **놓아 둔 스트림이 풀보다 오래 살기** 때문이다.

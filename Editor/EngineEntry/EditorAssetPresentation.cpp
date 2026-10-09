@@ -275,6 +275,7 @@ void EditorAssetPresentation::LoadPresentationResources()
         { ".terrain", FileType::TerrainTexture },
 		{ ".prefab", FileType::Prefab }, { ".renderprofile", FileType::SceneRenderProfile },
 		{ ".spritefont", FileType::Font },
+		{ ".ttf", FileType::Font }, { ".otf", FileType::Font },
 	};
 
 	auto gizmoIcons = std::make_shared<EnhancedGizmoIconTextures>();

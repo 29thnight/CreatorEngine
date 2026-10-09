@@ -1901,11 +1901,17 @@ RHIVideoMemoryInfo VulkanDeviceResources::QueryVideoMemory() const
             const uint64_t budgetBytes = m_memoryBudgetSupported &&
                 0 != budget.heapBudget[i]
                 ? budget.heapBudget[i] : props.memoryHeaps[i].size;
-            info.budgetMB += budgetBytes / (1024ull * 1024ull);
+            info.budgetBytes += budgetBytes;
             if (m_memoryBudgetSupported)
-                info.usedMB += budget.heapUsage[i] / (1024ull * 1024ull);
+            {
+                info.usedBytes += budget.heapUsage[i];
+            }
         }
     }
+    info.usageAvailable = m_memoryBudgetSupported;
+    info.budgetAvailable = info.budgetBytes > 0;
+    info.usedMB = info.usedBytes / (1024ull * 1024ull);
+    info.budgetMB = info.budgetBytes / (1024ull * 1024ull);
     return info;
 }
 

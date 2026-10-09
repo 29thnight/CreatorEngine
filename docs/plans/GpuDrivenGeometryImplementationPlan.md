@@ -7,6 +7,23 @@ or broadly runtime-validated feature.
 
 ## Goal and boundaries
 
+2026-10-09 lattice follow-up: opaque/masked SceneHost camera/shadow consumers now
+have a capability-gated mesh shader route with the existing GPU draw visibility.
+Release DX12 TestShadow produced 64 byte-identical indexed/mesh attachment comparisons
+and mesh-route GPU validation reported zero problems. See
+[implementation and exact acceptance scope](../analysis/LatticeMeshletRendering20261009.md).
+Lattice meshlet-level compaction/culling, LOD, broader backend/material acceptance and
+performance remain unearned; this does not close GPU-1.
+
+Later on 2026-10-09, LX gained posed-vertex per-meshlet frustum rejection,
+CPU selection/submission of authored geometric LODs, independent LOD0 shadow
+geometry, current-frame LX depth followed by draw HZB, and cache admission before
+topology construction. Debug/Release passed 8 combinations / 192 frames with GPU
+validation 0; Release TestShadow had 32 byte-identical attachment comparisons.
+GPU LOD selection, visible-meshlet compaction, per-meshlet HZB, light-space LOD,
+LOD-scene quality and pressure/performance/Vulkan gates remain unearned. See
+[LX integration and evidence](../analysis/LatticeGeometryIntegration20261009.md).
+
 For supported production opaque/masked geometry, the GPU selects visibility and LOD,
 compacts bounded work, and produces draw/dispatch arguments. CPU scene publication,
 material/PSO bins and command submission remain explicit responsibilities. Existing

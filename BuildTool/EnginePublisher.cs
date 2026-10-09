@@ -139,6 +139,7 @@ internal static class EnginePublisher
             {
                 throw new BuildException("Built ScriptCore.dll script API differs from the native hosts. Rebuild ScriptCore before publishing.");
             }
+            RuntimeFonts.Require(binarySource);
             Tree(Path.Combine(binarySource, "Resources"), Path.Combine(binaryTarget, "Resources"));
             // Cook the tracked engine-owned DDS explicitly; it has no GUID
             // sidecar and must never rely on a project's source-image decoder.

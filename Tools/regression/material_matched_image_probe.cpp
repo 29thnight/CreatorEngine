@@ -24,7 +24,8 @@ struct MatchedPassTimer final : IRHIGpuProfiler
     static constexpr unsigned capacity = 128;
     Microsoft::WRL::ComPtr<ID3D12QueryHeap> heap;
     std::vector<std::string> names;
-    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) override
+    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
+        const GpuPassTimingIdentity& = {}) override
     {
         Check(names.size() < capacity, "Matched pass timestamp capacity");
         const auto slot = static_cast<uint32_t>(names.size());

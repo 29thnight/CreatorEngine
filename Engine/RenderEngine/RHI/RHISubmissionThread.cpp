@@ -224,6 +224,13 @@ struct RHISubmissionThread::Impl
             {
                 continue;
             }
+            // A failed native submission does not prove which commands executed.
+            // Its reservation becoming observable cannot reopen the cache by itself.
+            // Lifecycle GPU-idle/device-loss handling explicitly releases this token.
+            if (retirement.failedSubmission)
+            {
+                continue;
+            }
             const uint64_t completed = retirement.completionQuery ? retirement.completionQuery() : 0;
             if (completed < retirement.point.value)
             {
@@ -312,8 +319,6 @@ struct RHISubmissionThread::Impl
             {
                 error = entry.label + " 실패";
             }
-            entry.ticket->PublishCompletion(success, error);
-
             {
                 std::lock_guard lock(mutex);
                 ++stats.executed;
@@ -348,6 +353,9 @@ struct RHISubmissionThread::Impl
                 PollRetirementsLocked();
                 drainWake.notify_all();
             }
+            // Acquire of a completed ticket must also observe quarantine and the
+            // registered GPU lifetime token, not an intermediate bookkeeping state.
+            entry.ticket->PublishCompletion(success, error);
         }
 
         ce::profiler().unregister_thread();

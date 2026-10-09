@@ -1,8 +1,17 @@
-param([ValidateSet('Debug','Release')][string]$Configuration = 'Debug', [switch]$IncludeFullRegression)
+param([ValidateSet('Debug','Release')][string]$Configuration = 'Debug', [switch]$IncludeFullRegression,
+    [string]$OutputDirectory = '')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $out = Join-Path $repo "Build/Verification/Phase43/RG7/$Configuration"
+if ($OutputDirectory)
+{
+    $out = [IO.Path]::GetFullPath($OutputDirectory)
+    if (Test-Path -LiteralPath $out)
+    {
+        throw 'Use a fresh evidence directory.'
+    }
+}
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 $commandFile = Join-Path $out 'commands.txt'
 $resultFile = Join-Path $out 'results.jsonl'

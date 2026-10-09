@@ -132,12 +132,18 @@ void RenderScene::UnregisterCommand(ImageComponent* imagePtr)
 void RenderScene::RegisterCommand(TextComponent* textPtr)
 {
 	if (nullptr == textPtr) return;
+	textPtr->TickLayout(0.f);
 	EnqueueProxyDelta(ProxyCommand::CreateUI(
 		std::make_shared<UIRenderProxy>(textPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(TextComponent* textPtr)
 {
+	if (nullptr == textPtr)
+	{
+		return;
+	}
+	textPtr->TickLayout(0.f);
 	EnqueueProxyDelta(ProxyCommand(textPtr, GetSceneEpoch()));
 }
 
