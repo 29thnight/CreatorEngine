@@ -10,7 +10,73 @@
 #include <thread>
 #include <stdexcept>
 #include <atomic>
+#include <memory>
+#include <utility>
+#include <vector>
 #include "RHI/DX12/DX12GpuProfiler.h"
+
+namespace Rg8QueueExecutionTests
+{
+    // Forward real native operations and inject only the selected failure. The
+    // recorder unwraps this endpoint so DX12 still owns every command list.
+    class FaultQueue final : public IRHICommandQueue
+    {
+    public:
+        FaultQueue(std::shared_ptr<IRHICommandQueue> queue, DX12QueueService& service,
+            bool rejectWait, bool rejectSubmit)
+            : m_queue(std::move(queue)), m_service(service), m_rejectWait(rejectWait), m_rejectSubmit(rejectSubmit)
+        {
+        }
+        const std::shared_ptr<IRHICommandQueue>& Native() const { return m_queue; }
+        RHIQueueIdentity GetIdentity() const override { return m_queue->GetIdentity(); }
+        bool Signal(uint64_t value, RHITimelinePoint& point, std::string& error) override
+        {
+            return m_queue->Signal(value, point, error);
+        }
+        bool Wait(const RHITimelinePoint& point, std::string& error) override
+        {
+            if (m_rejectWait)
+            {
+                error = "injected overlap wait failure";
+                return false;
+            }
+            return m_queue->Wait(point, error);
+        }
+        bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value,
+            RHITimelinePoint& point, std::string& error) override
+        {
+            if (m_rejectSubmit)
+            {
+                m_service.RejectNextTestSubmission(true);
+                m_rejectSubmit = false;
+            }
+            return m_queue->Submit(batch, value, point, error);
+        }
+        size_t CollectCompleted() override { return m_queue->CollectCompleted(); }
+        size_t GetPendingBatchCount() const override { return m_queue->GetPendingBatchCount(); }
+    private:
+        std::shared_ptr<IRHICommandQueue> m_queue;
+        DX12QueueService& m_service;
+        bool m_rejectWait;
+        bool m_rejectSubmit;
+    };
+
+    class FaultRecorder final : public IRHIQueueRecorder
+    {
+    public:
+        explicit FaultRecorder(IRHIQueueRecorder& recorder) : m_recorder(recorder) {}
+        IRenderDeviceServices& DeviceServices() const override { return m_recorder.DeviceServices(); }
+        bool Record(const std::shared_ptr<IRHICommandQueue>& queue,
+            const std::function<void(RHIEncoder&)>& commands, std::shared_ptr<const void> token,
+            std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) override
+        {
+            const auto fault = std::dynamic_pointer_cast<FaultQueue>(queue);
+            return m_recorder.Record(fault ? fault->Native() : queue, commands, std::move(token), batch, error);
+        }
+    private:
+        IRHIQueueRecorder& m_recorder;
+    };
+}
 
 bool DX12Test::RunQueueExecutionTest(std::string& outLog)
 {
@@ -67,13 +133,15 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         struct Storage
         {
             DX12DeviceResources* device;
-            RHIReadback readback;
+            RHIReadback readback, graphicsReadback, readReadback;
             RHITextureHandle texture;
             RHIBufferHandle prefixBuffer;
             RHIResourceState state{RHIResourceState::Common};
             ~Storage()
             {
                 device->ReleaseReadback(readback);
+                device->ReleaseReadback(graphicsReadback);
+                device->ReleaseReadback(readReadback);
                 device->ReleaseTexture(texture);
                 device->ReleaseBuffer(prefixBuffer);
             }
@@ -156,9 +224,9 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             } release{gate.Get()};
             require(service.EnqueueTestGate(graphics.queue, gate.Get(), 1, error), error);
             EnhancedRenderGraph::QueueExecution execution;
-            const auto measuredHints = graph->MeasuredQueueHints([](const std::string& name)
+            const auto measuredHints = graph->MeasuredQueueHints([&](const GpuPassTimingIdentity& identity)
             {
-                return name == "transform" ? uint64_t{100} : uint64_t{0};
+                return identity.passIndex == transform.index ? uint64_t{100} : uint64_t{0};
             });
             const auto transformHint = std::find_if(measuredHints.begin(), measuredHints.end(),
                 [&](const auto& hint) { return hint.pass.index == transform.index; });
@@ -264,6 +332,392 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             require(DX12QueueService::QueryRecordingPool(graphics.queue).leased == 0,
                 "Last batch owner did not release recording storage.");
             storage.reset();
+            device.AbortFrame();
+        }
+        // Analytical costs select a deterministic plan; readbacks establish actual
+        // GPU work on each selected queue. Submission counts do not prove measured
+        // hardware overlap or speedup, and this fixture makes no such assertion.
+        enum class OverlapCase
+        {
+            GraphicsReference,
+            Reordered,
+            NoBenefit,
+            PreserveDeclarationOrder,
+            RecordingFailure,
+            WaitFailure,
+            UnfencedSubmission
+        };
+        std::vector<uint8_t> overlapBaseline, readReadBaseline;
+        for (const auto mode : {OverlapCase::GraphicsReference, OverlapCase::Reordered, OverlapCase::NoBenefit,
+            OverlapCase::PreserveDeclarationOrder, OverlapCase::RecordingFailure,
+            OverlapCase::WaitFailure, OverlapCase::UnfencedSubmission})
+        {
+            const bool withShadow = mode != OverlapCase::NoBenefit;
+            const bool moved = mode == OverlapCase::Reordered || mode == OverlapCase::RecordingFailure ||
+                mode == OverlapCase::WaitFailure || mode == OverlapCase::UnfencedSubmission;
+            const bool recordingFailure = mode == OverlapCase::RecordingFailure;
+            const bool submissionFailure = mode == OverlapCase::WaitFailure || mode == OverlapCase::UnfencedSubmission;
+            const bool failureExpected = recordingFailure || submissionFailure;
+            require(device.BeginFrame(error), error);
+            DX12QueueService overlapService(device.GetDevice());
+            EnhancedRenderGraph::QueueEndpoint overlapGraphics, overlapCompute;
+            require(overlapService.CreateQueue(RHIQueueKind::Graphics, overlapGraphics.queue, error) &&
+                overlapService.CreateQueue(RHIQueueKind::Compute, overlapCompute.queue, error), error);
+            const auto nativeCompute = overlapCompute.queue;
+            if (submissionFailure)
+            {
+                overlapCompute.queue = std::make_shared<Rg8QueueExecutionTests::FaultQueue>(nativeCompute,
+                    overlapService, mode == OverlapCase::WaitFailure, mode == OverlapCase::UnfencedSubmission);
+            }
+            Rg8QueueExecutionTests::FaultRecorder overlapRecorder(recorder);
+            auto storage = std::make_shared<Storage>();
+            storage->device = &device;
+            require(device.CreateBufferReadback(256, storage->readback, error) &&
+                device.CreateBufferReadback(256, storage->graphicsReadback, error) &&
+                device.CreateBufferReadback(256, storage->readReadback, error), error);
+            RHIBufferDesc importedDesc{};
+            importedDesc.bytes = 256;
+            importedDesc.allowUnorderedAccess = true;
+            RHITextureDesc finalTextureDesc{};
+            finalTextureDesc.width = finalTextureDesc.height = 8;
+            finalTextureDesc.allowRenderTarget = true;
+            finalTextureDesc.format = RHIFormat::RGBA8Unorm;
+            require(device.CreateBuffer(importedDesc, storage->prefixBuffer, error) &&
+                device.CreateTexture(finalTextureDesc, storage->texture, error), error);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
+                mode == OverlapCase::PreserveDeclarationOrder ? RGOrderPolicy::PreserveDeclarationOrder :
+                    RGOrderPolicy::DependencyOrder);
+            EnhancedRenderGraph::QueueCostModel model;
+            model.placement = RGQueuePlacement::Overlap;
+            model.handoffNanoseconds = 20'000;
+            model.minimumGainNanoseconds = 50'000;
+            graph->SetQueueCostModel(model);
+            const auto depth = graph->Write(graph->ImportBuffer(storage->prefixBuffer, RHIResourceState::Common,
+                "overlap-depth"));
+            const auto finalTexture = graph->Write(graph->ImportTexture(storage->texture, storage->state,
+                "overlap-final-texture", &storage->state));
+            const auto raw = graph->Write(graph->CreateBuffer({256, true, false, "overlap-raw"}));
+            const auto filtered = graph->Write(graph->CreateBuffer({256, true, false, "overlap-filtered"}));
+            const auto output = graph->Write(graph->CreateBuffer({256, true, false, "overlap-output"}));
+            const auto readRead = graph->Write(graph->CreateBuffer({256, true, false, "overlap-read-read"}));
+            const auto dispatch = [&device](const auto& context, RHIPipelineHandle pipeline,
+                RGHandle input, RGHandle destination)
+            {
+                context.encoder->SetPipeline(RHIBindPoint::Compute, pipeline);
+                const bool reads = input.IsValid();
+                if (reads)
+                {
+                    context.encoder->SetRootBuffer(RHIBindPoint::Compute, 0,
+                        {context.graph->ResolveBufferHandle(input), 0, 256});
+                }
+                const auto view = RHIBindingDesc::UavBuffer(context.graph->ResolveBufferHandle(destination), 64, 4);
+                const auto bindings = device.CreateBindings(std::span<const RHIBindingDesc>{&view, 1});
+                if (!bindings.IsValid())
+                {
+                    throw std::runtime_error("Overlap descriptor allocation failed.");
+                }
+                context.encoder->SetBindings(RHIBindPoint::Compute, reads ? 1 : 0, bindings);
+                context.encoder->Dispatch(1, 1, 1);
+            };
+            const auto clearFinalTexture = [&device, finalTexture](const auto& context)
+            {
+                const auto color = RHIColorTargetDesc::Texture(context.ResolveHandle(finalTexture));
+                const auto targets = device.CreateRenderTargets(std::span<const RHIColorTargetDesc>{&color, 1});
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("Overlap render target creation failed.");
+                }
+                const float value[]{0.25f, 0.5f, 0.75f, 1.0f};
+                context.encoder->ClearRenderTargets(targets, value);
+            };
+            RGHandle shadow{};
+            RGPassId shadowPass{};
+            std::vector<EnhancedRenderGraph::QueueHint> hints;
+            std::vector<uint16_t> callbacks;
+            if (withShadow)
+            {
+                shadow = graph->Write(graph->CreateBuffer({256, true, false, "overlap-shadow"}));
+                shadowPass = graph->AddPass("overlap-shadow",
+                    {{shadow, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+                     {finalTexture, RHIResourceState::RenderTarget, RGAccessMode::Write}},
+                    [&, shadow](const auto& context)
+                    {
+                        callbacks.push_back(shadowPass.index);
+                        dispatch(context, producerPipeline, {}, shadow);
+                        clearFinalTexture(context);
+                    });
+                hints.push_back({shadowPass, false, 400'000});
+            }
+            RGPassId gbuffer, rawPass, filterPass, deferred, readback;
+            std::vector<EnhancedRenderGraph::RGPassUsage> gbufferUsages{
+                {depth, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
+            if (!withShadow)
+            {
+                gbufferUsages.push_back({finalTexture, RHIResourceState::RenderTarget, RGAccessMode::Write});
+            }
+            gbuffer = graph->AddPass("overlap-gbuffer", gbufferUsages,
+                [&, depth](const auto& context)
+                {
+                    callbacks.push_back(gbuffer.index);
+                    dispatch(context, producerPipeline, {}, depth);
+                    if (!withShadow)
+                    {
+                        clearFinalTexture(context);
+                    }
+                });
+            rawPass = graph->AddPass("overlap-raw", {
+                {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {raw, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                [&, depth, raw](const auto& context)
+                {
+                    callbacks.push_back(rawPass.index);
+                    dispatch(context, transformPipeline, depth, raw);
+                });
+            filterPass = graph->AddPass("overlap-filter", {
+                {raw, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {filtered, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                [&, raw, filtered](const auto& context)
+                {
+                    callbacks.push_back(filterPass.index);
+                    if (recordingFailure)
+                    {
+                        throw std::runtime_error("injected reordered recording failure");
+                    }
+                    dispatch(context, transformPipeline, raw, filtered);
+                });
+            std::vector<EnhancedRenderGraph::RGPassUsage> deferredUsages{
+                {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {filtered, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {output, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+                {readRead, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
+            if (withShadow)
+            {
+                deferredUsages.push_back({shadow, RHIResourceState::CopySource, RGAccessMode::Read});
+            }
+            deferred = graph->AddPass("overlap-deferred", deferredUsages,
+                [&, depth, filtered, output, readRead, shadow, storage](const auto& context)
+                {
+                    callbacks.push_back(deferred.index);
+                    dispatch(context, transformPipeline, filtered, output);
+                    // This is a real second reader of depth, in the same SRV state
+                    // as rawPass on compute; resource ownership still serializes it.
+                    dispatch(context, transformPipeline, depth, readRead);
+                    if (shadow.IsValid())
+                    {
+                        context.encoder->CopyBufferToReadback(storage->graphicsReadback,
+                            context.graph->ResolveBufferHandle(shadow));
+                    }
+                });
+            readback = graph->AddPass("overlap-readback", {
+                {output, RHIResourceState::CopySource, RGAccessMode::Read},
+                {readRead, RHIResourceState::CopySource, RGAccessMode::Read}},
+                [&, output, readRead, storage](const auto& context)
+                {
+                    callbacks.push_back(readback.index);
+                    context.encoder->CopyBufferToReadback(storage->readback, context.graph->ResolveBufferHandle(output));
+                    context.encoder->CopyBufferToReadback(storage->readReadback,
+                        context.graph->ResolveBufferHandle(readRead));
+                }, true);
+            graph->DeclareComputeCompatible(rawPass);
+            graph->DeclareComputeCompatible(filterPass);
+            graph->RequireImportedFinalState(finalTexture, RHIResourceState::RenderTarget);
+            hints.insert(hints.end(), {{gbuffer, false, 500'000}, {rawPass, true, 200'000},
+                {filterPass, true, 200'000}, {deferred, false, 300'000}, {readback, false, 1000}});
+            require(graph->Compile(error), error);
+            EnhancedRenderGraph::QueueSchedule planned;
+            require(graph->BuildQueueSchedule({true, mode != OverlapCase::GraphicsReference, false,
+                mode != OverlapCase::GraphicsReference}, hints, 1000, planned, error), error);
+            const auto compiledOrder = graph->GetExecuteOrder();
+            require(compiledOrder.front() == (withShadow ? shadowPass.index : gbuffer.index),
+                "Overlap fixture did not preserve its authored independent-first order.");
+            Microsoft::WRL::ComPtr<ID3D12Fence> gate;
+            require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))),
+                "Overlap gate creation failed.");
+            struct OverlapGateRelease
+            {
+                ID3D12Fence* gate;
+                ~OverlapGateRelease() { gate->Signal(1); }
+            } gateRelease{gate.Get()};
+            require(overlapService.EnqueueTestGate(overlapGraphics.queue, gate.Get(), 1, error), error);
+            EnhancedRenderGraph::QueueExecution execution;
+            const bool accepted = graph->SubmitQueues(graph, overlapRecorder, overlapGraphics,
+                mode == OverlapCase::GraphicsReference ? nullptr : &overlapCompute,
+                hints, 1000, storage, execution, error);
+            require(accepted == !failureExpected, "Overlap submission returned the wrong outcome: " + error);
+            const auto diagnostics = graph->GetQueueDiagnostics();
+            const auto& schedule = diagnostics.schedule;
+            require(schedule.usesCompute == moved && schedule.predictionComplete &&
+                !schedule.predictionCalibrated && schedule.entries.size() == compiledOrder.size(),
+                "Overlap execution did not expose its complete uncalibrated plan.");
+            std::vector<uint16_t> scheduledOrder;
+            for (const auto& entry : schedule.entries)
+            {
+                scheduledOrder.push_back(entry.pass);
+            }
+            require(graph->GetExecuteOrder() == scheduledOrder &&
+                (moved ? scheduledOrder.front() == gbuffer.index && scheduledOrder != compiledOrder :
+                    scheduledOrder == compiledOrder), "Executed barrier order differs from the selected schedule.");
+            require(schedule.predictedSerialNanoseconds == (withShadow ? 1'601'000u : 1'201'000u) &&
+                schedule.predictedNanoseconds == (moved ? 1'241'000u : schedule.predictedSerialNanoseconds),
+                "Overlap execution prediction differs from the analytical fixture.");
+            if (recordingFailure)
+            {
+                require(!execution.submissionAttempted && !execution.completed && !execution.recoveryRequired &&
+                    overlapGraphics.queue->GetPendingBatchCount() == 0 && nativeCompute->GetPendingBatchCount() == 0 &&
+                    DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 0 &&
+                    DX12QueueService::QueryRecordingPool(nativeCompute).leased == 0,
+                    "Reordered recording failure submitted work or retained a recording lease.");
+                require(callbacks == std::vector<uint16_t>{gbuffer.index, shadowPass.index, rawPass.index, filterPass.index} &&
+                    storage->state == RHIResourceState::Common && !graph->Execute(error),
+                    "Reordered recording failure wrote back state or allowed ordinary execution.");
+                graph->Reset();
+                require(graph->GetExecuteOrder().empty(), "Recording failure could not reset after local leases retired.");
+                graph.reset();
+                storage.reset();
+                require(SUCCEEDED(gate->Signal(1)) && overlapService.Shutdown(error), error);
+                device.AbortFrame();
+                continue;
+            }
+            require(callbacks == scheduledOrder, "Native callbacks were not recorded in selected execution order.");
+            const uint32_t expectedBatches = moved ? 6u : 3u;
+            require(execution.plannedBatches == expectedBatches && diagnostics.batches.size() == expectedBatches &&
+                execution.plannedComputeBatches == (moved ? 1u : 0u) &&
+                execution.plannedWaits == (moved ? 2u : 0u) &&
+                diagnostics.waits.size() == execution.plannedWaits,
+                "Overlap batch boundaries or reduced waits differ from the selected schedule.");
+            if (moved)
+            {
+                const auto resourceWait = [&](RGPassId producer, RGPassId consumer, RGHandle resource)
+                {
+                    return std::any_of(planned.waits.begin(), planned.waits.end(), [&](const auto& wait)
+                    {
+                        return wait.producer == producer.index && wait.consumer == consumer.index &&
+                            wait.resource == resource.index;
+                    });
+                };
+                require(resourceWait(gbuffer, rawPass, depth) && resourceWait(rawPass, deferred, depth) &&
+                    resourceWait(filterPass, deferred, filtered), "Native overlap lost RAW or read/read ownership edges.");
+                require(diagnostics.batches[1].passes == std::vector<uint16_t>{gbuffer.index} &&
+                    diagnostics.batches[2].passes == std::vector<uint16_t>{shadowPass.index} &&
+                    diagnostics.batches[3].passes == std::vector<uint16_t>{rawPass.index, filterPass.index} &&
+                    diagnostics.batches[3].queue == RHIQueueKind::Compute &&
+                    diagnostics.batches[4].passes == std::vector<uint16_t>{deferred.index, readback.index} &&
+                    diagnostics.batches[4].queue == RHIQueueKind::Graphics &&
+                    diagnostics.waits[0].producerBatch == 1 && diagnostics.waits[0].consumerBatch == 3 &&
+                    diagnostics.waits[1].producerBatch == 3 && diagnostics.waits[1].consumerBatch == 4,
+                    "Independent graphics work was trapped behind the compute wait frontier.");
+            }
+            if (submissionFailure)
+            {
+                require(execution.submissionAttempted && execution.recoveryRequired && !execution.completed &&
+                    !execution.completion.IsValid() && execution.submittedBatches == 3 && execution.computeBatches == 0 &&
+                    execution.submittedWaits == (mode == OverlapCase::WaitFailure ? 0u : 1u) &&
+                    storage->state == RHIResourceState::Common,
+                    "Partial reordered failure published completion or final states.");
+                std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
+                graph.reset();
+                require(overlapGraphics.queue->CollectCompleted() == 0 && nativeCompute->CollectCompleted() == 0 &&
+                    !graphWeak.expired() && DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 3 &&
+                    DX12QueueService::QueryRecordingPool(nativeCompute).leased ==
+                        (mode == OverlapCase::UnfencedSubmission ? 1u : 0u),
+                    "Partial/unfenced reordered work was reclaimed before drain.");
+                require(SUCCEEDED(gate->Signal(1)) && overlapService.Shutdown(error) && graphWeak.expired(),
+                    "Reordered failure drain did not retire graph storage: " + error);
+                require(DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 0 &&
+                    DX12QueueService::QueryRecordingPool(nativeCompute).leased == 0,
+                    "Reordered failure drain retained recording leases.");
+                storage.reset();
+                device.AbortFrame();
+                continue;
+            }
+            require(execution.completed && !execution.recoveryRequired && !execution.completion.IsComplete() &&
+                execution.submittedBatches == expectedBatches && execution.computeBatches == (moved ? 1u : 0u) &&
+                execution.submittedWaits == execution.plannedWaits &&
+                std::all_of(diagnostics.batches.begin(), diagnostics.batches.end(),
+                    [](const auto& batch) { return batch.submitted; }) &&
+                std::all_of(diagnostics.waits.begin(), diagnostics.waits.end(),
+                    [](const auto& wait) { return wait.submitted; }),
+                "Overlap native submissions/waits were not accepted exactly as planned.");
+            require(overlapGraphics.nextSignal - 1 == expectedBatches - execution.computeBatches &&
+                overlapCompute.nextSignal - 1 == execution.computeBatches &&
+                overlapGraphics.queue->GetPendingBatchCount() + nativeCompute->GetPendingBatchCount() == expectedBatches &&
+                DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased +
+                    DX12QueueService::QueryRecordingPool(nativeCompute).leased == expectedBatches,
+                "Native queue counters or blocked recording leases disagree with diagnostics.");
+            require(storage->state == RHIResourceState::RenderTarget, "Reordered imported final-state writeback missing.");
+            bool resetRejected = false;
+            try
+            {
+                graph->Reset();
+            }
+            catch (const std::logic_error&)
+            {
+                resetRejected = true;
+            }
+            require(resetRejected, "Blocked reordered graph was reset.");
+            std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
+            std::weak_ptr<Storage> storageWeak = storage;
+            graph.reset();
+            storage.reset();
+            require(overlapGraphics.queue->CollectCompleted() == 0 && nativeCompute->CollectCompleted() == 0 &&
+                !graphWeak.expired() && !storageWeak.expired(), "Blocked reordered graph or imported storage retired.");
+            require(SUCCEEDED(gate->Signal(1)), "Overlap gate release failed.");
+            waitComplete(execution.completion);
+            storage = storageWeak.lock();
+            require(storage != nullptr, "Joined overlap graph lost pinned readback storage.");
+            const auto verifyPayload = [&](const RHIReadback& readbackHandle, uint32_t multiplier, uint32_t addend,
+                std::vector<uint8_t>* expected)
+            {
+                RHIReadbackImage image;
+                require(device.MapReadback(readbackHandle, image, error), error);
+                bool correct = image.ElementCount<uint32_t>() == 64;
+                for (uint32_t index = 0; correct && index < 64; ++index)
+                {
+                    correct = image.Elements<uint32_t>()[index] == index * multiplier + addend;
+                }
+                require(correct, "Native overlap dispatch/readback payload mismatch.");
+                if (expected)
+                {
+                    if (expected->empty())
+                    {
+                        *expected = image.data;
+                    }
+                    require(image.data == *expected, "Reordered/fallback payload differs from graphics reference.");
+                }
+            };
+            verifyPayload(storage->readback, 27, 388, &overlapBaseline);
+            verifyPayload(storage->readReadback, 3, 40, &readReadBaseline);
+            if (withShadow)
+            {
+                verifyPayload(storage->graphicsReadback, 1, 11, nullptr);
+            }
+            require(overlapGraphics.queue->CollectCompleted() + nativeCompute->CollectCompleted() == expectedBatches &&
+                graphWeak.expired(), "Completed reordered graph did not retire exactly its submitted batches.");
+            require(DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 0 &&
+                DX12QueueService::QueryRecordingPool(nativeCompute).leased == 0,
+                "Completed reordered recording storage was still leased.");
+            // Non-simultaneous render-target textures do not get buffer-style
+            // implicit COMMON decay, and RenderTarget cannot promote from COMMON.
+            // Validate the native epilogue state with an
+            // explicit transition, rather than trusting only CPU writeback.
+            std::shared_ptr<IRHIQueueCommandBatch> finalStateProbe;
+            require(recorder.Record(overlapGraphics.queue, [&](RHIEncoder& encoder)
+            {
+                const RHITransition transition{storage->texture,
+                    RHIResourceState::RenderTarget, RHIResourceState::Common};
+                RHIBarrierBatch barriers{};
+                barriers.textureTransitions = {&transition, 1};
+                encoder.ResourceBarriers(barriers);
+            }, storage, finalStateProbe, error), error);
+            RHITimelinePoint restored;
+            require(overlapGraphics.queue->Submit(finalStateProbe, overlapGraphics.nextSignal++, restored, error), error);
+            waitComplete(restored);
+            overlapGraphics.queue->CollectCompleted();
+            finalStateProbe.reset();
+            storage.reset();
+            require(storageWeak.expired() && DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 0,
+                "Final-state verification retained imported storage or a recording lease.");
+            require(overlapService.Shutdown(error), error);
             device.AbortFrame();
         }
         graphics.profiler = compute.profiler = nullptr;
@@ -452,8 +906,15 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         device.AbortFrame();
         std::string validation;
         require(device.DrainDebugMessages(validation) == 0, validation);
-        outLog = "RG8_QUEUE_EXECUTION_OK checks=" + std::to_string(checks) +
-            " payloadError=0 validationErrors=0 modes=2 delayedLifetime=true quarantineReleased=true frameRetirement=true\n";
+        constexpr uint32_t kExpectedChecks = 361;
+        if (checks != kExpectedChecks)
+        {
+            throw std::runtime_error("Queue execution acceptance check count changed.");
+        }
+        outLog = "RG8_QUEUE_EXECUTION_OK schema=2 checks=" + std::to_string(checks) +
+            " payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true" +
+            " negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true" +
+            " delayedLifetime=true quarantineReleased=true frameRetirement=true measuredOverlap=false\n";
         return true;
     }
     catch (const std::exception& exception)

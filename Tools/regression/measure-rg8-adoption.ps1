@@ -1,15 +1,30 @@
 #Requires -Version 7.0
-param([Parameter(Mandatory)][string]$OutputDirectory,[ValidateRange(4,32)][int]$Samples=8,[switch]$TimingOnly,[switch]$ValidateGpu)
+param(
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [ValidateRange(4,32)][int]$Samples=8,
+    [switch]$TimingOnly,
+    [switch]$ValidateGpu,
+    # Explicit fixture scenes may provide real positive-overlap/fallback workloads.
+    # A scene name alone is not evidence; the strict audit checks actual intervals.
+    [string]$ScenePath=''
+)
 $ErrorActionPreference='Stop'
 if($ValidateGpu -and $TimingOnly){throw 'GPU validation is correctness-only, not a timing measurement'}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out=[IO.Path]::GetFullPath($OutputDirectory)
+if(!$ScenePath){$ScenePath="$repo/Dynamic_CPP/Assets/Scenes/TestShadow.creator"}
+$ScenePath=[IO.Path]::GetFullPath($ScenePath)
+if(!(Test-Path -LiteralPath $ScenePath)){throw "Missing explicit workload scene: $ScenePath"}
 if(Test-Path $out){throw 'Use a new evidence directory'}
 if(Get-Process CreatorEditor -ErrorAction SilentlyContinue){throw 'Close the existing Editor before measurement'}
 New-Item -ItemType Directory $out | Out-Null
 $exe="$repo/Bin/x64-Release/Editor/CreatorEditor.exe"
 $binary=@{head=(git -C $repo rev-parse HEAD);exe=(Get-FileHash $exe).Hash;runtime=(Get-FileHash "$repo/Bin/x64-Release/Editor/CreatorEditor.runtime.dll").Hash}
 $binary | ConvertTo-Json | Set-Content "$out/binary.json"
+@{schemaVersion=2; scene=$ScenePath; processOrder='separate-process-forward-reverse';
+    cpuScope='record-schedule-submit-frame-join'; overlapScope='calibrated-pass-interval-intersection';
+    performanceValidated=$false; note='Cost constants remain uncalibrated; collection alone makes no speedup claim'} |
+    ConvertTo-Json | Set-Content "$out/measurement-context.json"
 $runs=@()
 $orders=if($ValidateGpu){@('Forward')}else{@('Forward','Reverse')}
 foreach($order in $orders)
@@ -33,6 +48,7 @@ foreach($order in $orders)
         }
         $start.Environment['CREATOR_DX12_VALIDATION']=if($ValidateGpu){'gpu'}else{'off'}
         $start.Environment['CREATOR_RENDERGRAPH_QUEUE_EXECUTION']="$mode"
+        $start.Environment['CREATOR_RG8_EVIDENCE']='1'
         $start.Environment['CREATOR_RENDERGRAPH_ALIASING']='0'
         $start.Environment['CREATOR_RENDERGRAPH_EXTEND_LIFETIMES']='0'
         $start.Environment['CREATOR_EDITOR_WORKSPACE_DIR']="$case/workspace"
@@ -81,7 +97,7 @@ foreach($order in $orders)
                 if($result.status -ne 'succeeded'){throw "$name failed: $($result.message)"}
                 return $result.data
             }
-            $load=Cmd 'scene.switch' @("$repo/Dynamic_CPP/Assets/Scenes/TestShadow.creator")
+            $load=Cmd 'scene.switch' @($ScenePath)
             $deadline=[DateTime]::UtcNow.AddSeconds(180)
             do
             {
@@ -103,18 +119,18 @@ foreach($order in $orders)
             if($TimingOnly)
             {
                 $normal=@()
-                $lastFrame=0
+                $lastSubmission=0
                 $attempts=0
                 while($normal.Count -lt 32)
                 {
                     $live=Cmd 'dx12.live'
                     ++$attempts
                     if($attempts -gt 120){throw 'Insufficient valid normal frames'}
-                    if($live.gpu.clockValid -and $live.gpu.queueSpanMs -gt 0 -and $live.gpu.frame -ne $lastFrame -and
+                    if($live.gpu.clockValid -and $live.gpu.queueSpanMs -gt 0 -and $live.gpu.submission -ne $lastSubmission -and
                         @($live.gpu.passes | Where-Object name -Like 'PBR.*').Count -eq 0 -and
                         $live.gpu.droppedTotal -eq 0 -and $live.gpu.queryOverflowPasses -eq 0)
                     {
-                        $lastFrame=$live.gpu.frame
+                        $lastSubmission=$live.gpu.submission
                         $normal+=@{utcMs=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();gpu=$live.gpu;display=$live.display}
                         $normal | ConvertTo-Json -Depth 70 | Set-Content "$case/normal-frames.json"
                     }
@@ -144,7 +160,7 @@ foreach($order in $orders)
             Cmd 'quit' | Out-Null
             if(!$process.WaitForExit(30000)){throw 'Editor shutdown timeout'}
             if($process.ExitCode -ne 0){throw "Editor exit $($process.ExitCode)"}
-            $runs+=@{order=$order;mode=$mode;path=$case;samples=$captureSamples;timingOnly=[bool]$TimingOnly;gpuValidation=[bool]$ValidateGpu;exitCode=$process.ExitCode}
+            $runs+=@{schemaVersion=2;scene=$ScenePath;order=$order;mode=$mode;path=$case;samples=$captureSamples;timingOnly=[bool]$TimingOnly;gpuValidation=[bool]$ValidateGpu;exitCode=$process.ExitCode}
             $runs | ConvertTo-Json -Depth 5 | Set-Content "$out/runs.json"
         }
         finally
@@ -154,6 +170,23 @@ foreach($order in $orders)
             $stderr.GetAwaiter().GetResult() | Set-Content "$case/stderr.log"
             $process.Dispose()
         }
+        # Preserve the complete actual plan and raw calibrated slices, not just
+        # the last dx12.live sample. Joining uses backend/view/submission identity.
+        $telemetry=@{schemaVersion=2; execution=@(); timing=@(); cpu=@()}
+        foreach($line in (Get-Content "$case/stdout.log"))
+        {
+            if($line -match '\[rg8\.(execution|timing|cpu)\] (\{.*\})')
+            {
+                $tag=$Matches[1]
+                $telemetry[$tag]+=($Matches[2] | ConvertFrom-Json)
+            }
+        }
+        if($telemetry.timing.Count -eq 0 -or $telemetry.cpu.Count -eq 0 -or
+            ($mode -ne 0 -and $telemetry.execution.Count -eq 0))
+        {
+            throw 'Current-binary per-submission telemetry is missing'
+        }
+        $telemetry | ConvertTo-Json -Depth 70 | Set-Content "$case/queue-evidence.json"
         if((Get-FileHash $exe).Hash -ne $binary.exe -or (Get-FileHash "$repo/Bin/x64-Release/Editor/CreatorEditor.runtime.dll").Hash -ne $binary.runtime)
         {
             throw 'Binary changed during measurement'

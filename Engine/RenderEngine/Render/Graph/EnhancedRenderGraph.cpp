@@ -10,6 +10,7 @@
 #include <chrono>
 #include <tuple>
 #include <mutex>
+#include <bit>
 
 namespace
 {
@@ -110,10 +111,12 @@ void EnhancedRenderGraph::Reset()
     m_recordedRecording = 0;
     m_statesCommitted = false;
     m_queueExecutionAttempted = false;
+    m_queueDiagnostics = {};
     m_resources.clear();
     m_passes.clear();
     m_finalStateRequirements.clear();
     m_executeOrder.clear();
+    m_timingSignature.reset();
     m_versionEdges.clear();
     m_dependencyWaves.clear();
     m_criticalPath.clear();
@@ -1873,6 +1876,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
     output.scheduling = m_scheduling;
     output.orderPolicy = m_orderPolicy;
     output.executeOrder = m_executeOrder;
+    output.queueExecution = m_queueDiagnostics;
     for (const auto& resource : m_resources)
     {
         output.resources.push_back({resource.name, resource.imported, resource.IsBuffer(),
@@ -2175,6 +2179,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
 
     m_compiled = false;
     m_stats = Stats{};
+    m_timingSignature.reset();
     if (!m_transientHeaps.empty())
     {
         outError = "An aliased graph must be Reset after GPU completion before recompilation";
@@ -2218,6 +2223,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     }
 
     m_stats.passesExecuted = static_cast<uint32_t>(m_executeOrder.size());
+    BuildTimingSignature();
     m_compileGeneration = NextRenderGraphCompileGeneration();
     m_compiled = true;
     return true;
@@ -2233,17 +2239,121 @@ void EnhancedRenderGraph::DeclareComputeCompatible(RGPassId pass)
     m_passes[pass.index].computeCompatible = true;
 }
 
+void EnhancedRenderGraph::BuildTimingSignature()
+{
+    // 프레임마다 달라지는 핸들/epoch/포인터는 빼되 선언 슬롯, 이름, 접근과
+    // 반복 구조는 전부 넣는다. 문자열 길이를 먼저 적으므로 같은 이름, 빈 이름,
+    // '(xN)'이 실제 이름인 경우도 서로 다른 선언을 합치지 않는다.
+    std::string signature;
+    const auto number = [&](uint64_t value)
+    {
+        for (uint32_t byte = 0; byte < sizeof(value); ++byte)
+        {
+            signature.push_back(static_cast<char>((value >> (byte * 8)) & 0xFFu));
+        }
+    };
+    const auto name = [&](const std::string& value)
+    {
+        number(value.size());
+        signature.append(value);
+    };
+    const auto usages = [&](const std::vector<RGPassUsage>& values)
+    {
+        number(values.size());
+        for (const auto& usage : values)
+        {
+            number(usage.handle.index);
+            number(usage.handle.version);
+            number(static_cast<uint64_t>(usage.handle.kind));
+            number(static_cast<uint64_t>(usage.state));
+            number(static_cast<uint64_t>(usage.access));
+        }
+    };
+    number(static_cast<uint64_t>(m_scheduling));
+    number(static_cast<uint64_t>(m_orderPolicy));
+    number(m_aliasing);
+    number(m_extendLifetimes);
+    number(m_poison);
+    number(m_resources.size());
+    for (const auto& resource : m_resources)
+    {
+        name(resource.name);
+        number(resource.imported);
+        number(resource.bufferKind);
+        if (resource.bufferKind)
+        {
+            number(resource.bufferDesc.bytes);
+            number(resource.bufferDesc.allowUnorderedAccess);
+            number(resource.bufferDesc.allowIndirectArguments);
+        }
+        else
+        {
+            number(resource.desc.width);
+            number(resource.desc.height);
+            number(resource.desc.arraySize);
+            number(static_cast<uint64_t>(resource.desc.format));
+            number(resource.desc.allowRenderTarget);
+            number(resource.desc.allowDepthStencil);
+            number(resource.desc.allowUnorderedAccess);
+            for (const float component : resource.desc.clearColor)
+            {
+                number(std::bit_cast<uint32_t>(component));
+            }
+        }
+        number(resource.versions.size());
+        for (const auto& version : resource.versions)
+        {
+            number(version.parent);
+            number(version.modify);
+        }
+    }
+    number(m_passes.size());
+    for (const auto& pass : m_passes)
+    {
+        name(pass.name);
+        number(pass.culled);
+        number(pass.hasSideEffect);
+        number(pass.computeCompatible);
+        number(pass.maxSlices);
+        number(pass.recordCost);
+        number(static_cast<bool>(pass.splitExecute));
+        number(pass.repeated);
+        number(pass.repeatCount);
+        usages(pass.usages);
+        number(pass.phases.size());
+        for (const auto& phase : pass.phases)
+        {
+            name(phase.name);
+            usages(phase.usages);
+        }
+    }
+    number(m_finalStateRequirements.size());
+    for (const auto& requirement : m_finalStateRequirements)
+    {
+        number(requirement.handle.index);
+        number(requirement.handle.version);
+        number(static_cast<uint64_t>(requirement.handle.kind));
+        number(static_cast<uint64_t>(requirement.state));
+    }
+    m_timingSignature = std::make_shared<const std::string>(std::move(signature));
+}
+
 std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHints(
-    const std::function<uint64_t(const std::string&)>& measurement) const
+    const std::function<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const
 {
     std::vector<QueueHint> hints;
-    // Graphics passes are measured too: overlap placement needs the work that can
-    // run beside a compute pass, not only the compute candidate itself.
+    if (!m_compiled || !m_timingSignature)
+    {
+        return hints;
+    }
+    // 겹쳐 실행할 graphics 비용도 필요하다. 표시 이름이 아닌 선언 정체성으로
+    // 조회해야 같은 이름의 다른 패스와 분할 조각이 서로 비용을 덮지 않는다.
     hints.reserve(m_executeOrder.size());
     for (const auto index : m_executeOrder)
     {
         const auto& pass = m_passes[index];
-        hints.push_back({RGPassId{index}, pass.computeCompatible, measurement(pass.name)});
+        const auto sample = measurement(TimingIdentity(index));
+        hints.push_back({RGPassId{index}, pass.computeCompatible, sample.value_or(0), sample.has_value()});
     }
     return hints;
 }
@@ -2300,6 +2410,10 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
     const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order) const
 {
     const uint64_t handoff = m_queueCostModel.handoffNanoseconds;
+    const auto addTime = [](uint64_t left, uint64_t right)
+    {
+        return right > UINT64_MAX - left ? UINT64_MAX : left + right;
+    };
     std::vector<uint32_t> position(m_passes.size(), UINT32_MAX);
     for (uint32_t index = 0; index < m_executeOrder.size(); ++index)
     {
@@ -2332,7 +2446,9 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
             ready.push_back(pass);
         }
     }
-    uint64_t queueFree[2]{0, 0};
+    // The first compute batch always waits for the graphics prologue, even
+    // without a resource edge. It cannot start before this modeled handoff.
+    uint64_t queueFree[2]{0, usesCompute ? handoff : 0};
     const auto slot = [&](uint16_t pass) { return queues[pass] == RHIQueueKind::Compute ? 1 : 0; };
     const auto start = [&](uint16_t pass) { return (std::max)(earliest[pass], queueFree[slot(pass)]); };
     if (order)
@@ -2358,7 +2474,7 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
         }
         const auto pass = *best;
         ready.erase(best);
-        finish[pass] = start(pass) + costs[pass];
+        finish[pass] = addTime(start(pass), costs[pass]);
         queueFree[slot(pass)] = finish[pass];
         if (order)
         {
@@ -2366,7 +2482,7 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
         }
         for (const auto next : successors[pass])
         {
-            const uint64_t available = finish[pass] + (queues[next] != queues[pass] ? handoff : 0);
+            const uint64_t available = addTime(finish[pass], queues[next] != queues[pass] ? handoff : 0);
             earliest[next] = (std::max)(earliest[next], available);
             if (--remaining[next] == 0)
             {
@@ -2375,7 +2491,7 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
         }
     }
     // The graphics epilogue joins the last compute completion.
-    return (std::max)(queueFree[0], usesCompute ? queueFree[1] + handoff : 0);
+    return (std::max)(queueFree[0], usesCompute ? addTime(queueFree[1], handoff) : 0);
 }
 
 bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
@@ -2407,22 +2523,38 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     const bool overlap = m_queueCostModel.placement == RGQueuePlacement::Overlap;
     std::vector<uint64_t> costs(m_passes.size(), 0);
     std::vector<uint16_t> candidates;
+    plan.predictionComplete = true;
     for (const auto pass : m_executeOrder)
     {
         const auto* hint = byPass[pass];
-        costs[pass] = hint ? hint->measuredGpuNanoseconds : 0;
+        costs[pass] = hint && hint->hasGpuMeasurement ? hint->measuredGpuNanoseconds : 0;
+        plan.predictionComplete = plan.predictionComplete && hint && hint->hasGpuMeasurement;
+        plan.predictedSerialNanoseconds = costs[pass] > UINT64_MAX - plan.predictedSerialNanoseconds
+            ? UINT64_MAX : plan.predictedSerialNanoseconds + costs[pass];
         // Overlap placement also requires the author declaration: hints are data.
-        if (allowCompute && hint && hint->computeCompatible && (!overlap || m_passes[pass].computeCompatible) &&
+        if (allowCompute && hint && hint->hasGpuMeasurement && hint->computeCompatible &&
+            (!overlap || m_passes[pass].computeCompatible) &&
             hint->measuredGpuNanoseconds >= minimumGpuNanoseconds)
         {
             candidates.push_back(pass);
         }
     }
+    // A single serial queue is exactly the saturated sum of pass costs. Do not
+    // run the ready-list heuristic at all for missing samples or disabled compute.
+    plan.predictedNanoseconds = plan.predictedSerialNanoseconds;
+    plan.predictionComplete = plan.predictionComplete && plan.predictedSerialNanoseconds != UINT64_MAX;
+    if (candidates.empty() || (overlap && !plan.predictionComplete))
+    {
+        for (const auto pass : m_executeOrder)
+        {
+            plan.entries.push_back({pass, RHIQueueKind::Graphics});
+        }
+        output = std::move(plan);
+        return true;
+    }
     std::vector<std::vector<uint16_t>> predecessors, successors;
     BuildQueueDependencies(predecessors, successors);
     const std::vector<RHIQueueKind> serial(m_passes.size(), RHIQueueKind::Graphics);
-    plan.predictedSerialNanoseconds = SimulateQueues(serial, costs, predecessors, successors, false, nullptr);
-    plan.predictedNanoseconds = plan.predictedSerialNanoseconds;
     std::vector<RHIQueueKind> queues = serial;
     std::vector<uint16_t> order = m_executeOrder;
     if (!overlap)
@@ -2433,7 +2565,9 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         }
         plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr);
     }
-    else if (!candidates.empty())
+    // Missing samples and saturated arithmetic are not evidence of a benefit.
+    // Retain the original graphics order until the entire executed graph is timed.
+    else if (!candidates.empty() && plan.predictionComplete)
     {
         const bool reorder = m_orderPolicy == RGOrderPolicy::DependencyOrder;
         uint64_t best = plan.predictedSerialNanoseconds;
@@ -2497,7 +2631,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         }
         else
         {
-            queues = serial; // No measurable overlap: keep the single-queue plan.
+            queues = serial; // No predicted benefit: keep the single-queue plan.
         }
     }
     for (const auto pass : order)
@@ -2580,7 +2714,7 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
         // 배리어를 측정 구간 안에 둔다. 배리어도 GPU 시간을 쓰고, 그 비용이
         // 어느 패스 때문에 생겼는지가 곧 그 패스의 비용이다.
         const uint32_t timerSlot = (nullptr != m_profiler)
-            ? m_profiler->BeginPass(encoder, pass.name)
+            ? m_profiler->BeginPass(encoder, pass.name, TimingIdentity(passIndex))
             : IRHIGpuProfiler::kInvalidSlot;
 
         // 네 부류를 하나의 batch로 건다. 인코더가 감싼 command target에
@@ -2936,7 +3070,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                 // 처음 시작~마지막 끝으로 합친다 — GPU 타임라인은 하나이고
                 // 조각들은 순서대로 실행되므로 그 구간이 곧 패스 전체 시간이다.
                 const uint32_t timerSlot = (nullptr != m_profiler)
-                    ? m_profiler->BeginPass(encoder, pass.name)
+                    ? m_profiler->BeginPass(encoder, pass.name, TimingIdentity(m_executeOrder[unit.order]))
                     : IRHIGpuProfiler::kInvalidSlot;
 
                 // 배리어는 패스의 첫 조각에만 넣는다. 조각들은 순서대로

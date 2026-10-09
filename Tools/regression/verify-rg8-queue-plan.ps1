@@ -4,6 +4,9 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory
 )
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$expectedChecks = 82
+$expectedLog = 'RG8_QUEUE_SCHEDULE_OK schema=2 checks=82 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true modelGuards=true timingIdentity=true' + "`n"
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath($OutputDirectory)
@@ -31,6 +34,8 @@ $start.Environment.Remove('CREATOR_RENDERGRAPH_ALIASING') | Out-Null
 $binary = [ordered]@{configuration=$Configuration; head=(git -C $repo rev-parse HEAD);
     exe=(Get-FileHash $exe).Hash;
     runtime=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;
+    acceptanceSchema=2; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
+    wrapper=(Get-FileHash $PSCommandPath).Hash;
     implementation=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp')).Hash;
     contract=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h')).Hash;
     tests=(Get-FileHash (Join-Path $repo 'Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h')).Hash}
@@ -49,16 +54,24 @@ try
         }
     }
     $results = @(Read-CommandResults "$out/results.jsonl")
-    $probe = @($results | Where-Object command -eq 'dx12.rendergraph')
-    if ($process.ExitCode -ne 0 -or $results.Count -ne 2 -or $probe.Count -ne 1 -or
-        @($results | Where-Object status -ne 'succeeded').Count -or
-        !$probe[0].data.passed -or
-        $probe[0].data.log -notmatch 'RG8_QUEUE_SCHEDULE_OK checks=24 scope=compiled-plan nativeExecution=false')
+    if ($process.ExitCode -ne 0 -or $results.Count -ne 2)
     {
-        throw 'Queue schedule acceptance failed or tested header is stale.'
+        throw 'Queue schedule acceptance requires exactly the requested probe and quit results.'
     }
-    [ordered]@{passed=$true; phaseComplete=$false; checks=24; scope='Compiled queue plan in existing offscreen Editor';
-        nativeQueueExecutionTested=$false; binary=$binary; exitCode=$process.ExitCode} |
+    $probe = $results[0]
+    $quit = $results[1]
+    if ($probe.command -cne 'dx12.rendergraph' -or $probe.status -cne 'succeeded' -or $probe.code -cne 'ok' -or
+        $probe.data.passed -isnot [bool] -or $probe.data.passed -ne $true -or
+        $probe.data.log -isnot [string] -or $probe.data.log -cne $expectedLog -or
+        $quit.command -cne 'quit' -or $quit.status -cne 'succeeded' -or $quit.code -cne 'ok')
+    {
+        throw 'Queue schedule identity, exact check count, terminal ordering or result failed; rebuild the tested header.'
+    }
+    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=2; checks=$expectedChecks;
+        scope='Compiled queue plan in existing offscreen Editor'; overlapPlanTested=$true;
+        declarationOrderTested=$true; readReadOwnershipTested=$true; modelGuardsTested=$true; timingIdentityTested=$true;
+        nativeQueueExecutionTested=$false;
+        binary=$binary; exitCode=$process.ExitCode} |
         ConvertTo-Json -Depth 10 | Set-Content "$out/schedule-result.json" -Encoding utf8
     "RG8_PLAN_ACCEPTANCE_OK configuration=$Configuration"
 }

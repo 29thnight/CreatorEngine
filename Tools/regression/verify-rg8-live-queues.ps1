@@ -3,6 +3,7 @@ param(
     [ValidateSet('Debug','Release')][string]$Configuration = 'Debug',
     [switch]$AsyncCompute,
     [string]$ReuseOffEvidence = '',
+    [string]$WorkloadEvidence = '',
     [Parameter(Mandatory)][string]$FixtureProject,
     [Parameter(Mandatory)][string]$NativeEvidence,
     [Parameter(Mandatory)][string]$OutputDirectory,
@@ -18,12 +19,28 @@ if (Test-Path -LiteralPath $out)
 $native = Get-Content (Join-Path $NativeEvidence 'execution-result.json') -Raw | ConvertFrom-Json
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 $runtime = Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
-if (!$native.passed -or !$native.fullRegression -or
+if ($native.schemaVersion -ne 2 -or !$native.passed -or !$native.fullRegression -or
+    !$native.positiveOverlapExecutionTested -or !$native.negativeFallbackExecutionTested -or
+    !$native.declarationOrderTested -or !$native.readReadOwnershipTested -or !$native.frameRetirementTested -or
     $native.binary.exe -ne (Get-FileHash $exe).Hash -or $native.binary.runtime -ne (Get-FileHash $runtime).Hash)
 {
     throw 'Native evidence must include the current binary full regression.'
 }
+if ($AsyncCompute -and !$WorkloadEvidence)
+{
+    throw 'Async correctness requires separately supplied calibrated positive-overlap and negative-fallback workload evidence. Native dispatch coverage alone cannot prove GPU overlap.'
+}
 New-Item -ItemType Directory -Path "$out/CompilerEvidence" | Out-Null
+$native.binary | ConvertTo-Json -Depth 10 | Set-Content "$out/binary.json" -Encoding utf8
+if ($AsyncCompute)
+{
+    & $Python (Join-Path $PSScriptRoot 'audit-rg8-adoption.py') --verify-workloads `
+        --workload-evidence $WorkloadEvidence --binary "$out/binary.json" > "$out/workload-audit.json"
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw 'Real positive-overlap/negative-fallback workload evidence is missing or invalid.'
+    }
+}
 $commands = @(Get-Content (Join-Path $NativeEvidence 'results.jsonl') | ConvertFrom-Json)
 $full = @($commands | Where-Object { $_.data.log -match 'RGV_READER_OK[^\r\n]*stale-scene' })
 $quit = @($commands | Where-Object command -eq 'quit')
@@ -37,7 +54,7 @@ if ($full.Count -ne 1 -or $quit.Count -ne 1 -or $full[0].status -ne 'succeeded')
     ConvertTo-Json | Set-Content "$out/CompilerEvidence/compiler-binary-hashes.json" -Encoding utf8
 $saved = @{}
 foreach ($name in @('CREATOR_RENDERGRAPH_QUEUE_EXECUTION','CREATOR_RENDERGRAPH_ALIASING',
-    'CREATOR_RENDERGRAPH_EXTEND_LIFETIMES','CREATOR_EDITOR_WORKSPACE_DIR','CREATOR_EDITOR_LEGACY_INI'))
+    'CREATOR_RENDERGRAPH_EXTEND_LIFETIMES','CREATOR_EDITOR_WORKSPACE_DIR','CREATOR_EDITOR_LEGACY_INI','CREATOR_RG8_EVIDENCE'))
 {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name)
 }
@@ -48,6 +65,7 @@ try
     foreach ($mode in @('Off','On'))
     {
         $env:CREATOR_RENDERGRAPH_QUEUE_EXECUTION = if ($mode -eq 'On') { if ($AsyncCompute) { '2' } else { '1' } } else { '0' }
+        $env:CREATOR_RG8_EVIDENCE = '1'
         $env:CREATOR_RENDERGRAPH_ALIASING = '0'
         $env:CREATOR_RENDERGRAPH_EXTEND_LIFETIMES = '0'
         $env:CREATOR_EDITOR_WORKSPACE_DIR = Join-Path $out "workspace-$mode"
@@ -100,11 +118,12 @@ try
         {
             $computeCount += [long]$match.Groups[1].Value
         }
-        if ($AsyncCompute -and $mode -eq 'On' -and
-            ($computeCount -le 0 -or $capture.measurement.computeSliceCount -ne 2 -or
-             $capture.measurement.gpuBusyMs -gt ($capture.measurement.gpuQueueSpanMs + 0.000001)))
+        $actualMode = if ($mode -eq 'Off') { 0 } elseif ($AsyncCompute) { 2 } else { 1 }
+        & $Python (Join-Path $PSScriptRoot 'audit-rg8-adoption.py') --verify-live-evidence $path `
+            --mode $actualMode > "$out/schedule-$mode.json"
+        if ($LASTEXITCODE -ne 0)
         {
-            throw 'Missing actual compute submissions or queue-local timing slices.'
+            throw "Actual schedule, timing, barrier, pool or CPU evidence failed: $mode"
         }
         $views = @()
         foreach ($target in @('scene','game','preview'))
@@ -133,8 +152,14 @@ try
     {
         throw 'Live queue OFF/ON output mismatch.'
     }
-    @{passed=$true; phaseComplete=$false; configuration=$Configuration; runs=$rows;
-        scope=$(if ($AsyncCompute) { 'Live SSAO compute pilot with queue-local clocks; performance adoption pending' } else { 'Live owned graphics queue; performance adoption pending' });
+    $comparison = Get-Content "$out/comparison.json" -Raw | ConvertFrom-Json
+    if (!$comparison.passed -or @($comparison.attachments).Count -eq 0 -or
+        @($comparison.attachments | Where-Object { $_.maxAbs -ne 0 -or $_.nonfinite -ne 0 }).Count)
+    {
+        throw 'Live queue output must match exactly; tolerance-only comparison is insufficient.'
+    }
+    @{schemaVersion=2;passed=$true;evidenceValid=$true;phaseComplete=$false;adoptionEstablished=$false;performanceValidated=$false;configuration=$Configuration;runs=$rows;
+        scope=$(if ($AsyncCompute) { 'Actual schedule-checked live execution plus separately verified real overlap/fallback workloads; performance adoption pending' } else { 'Live owned graphics queue; performance adoption pending' });
         binary=$native.binary} | ConvertTo-Json -Depth 30 | Set-Content "$out/live-result.json" -Encoding utf8
     "RG8_LIVE_QUEUE_OK configuration=$Configuration"
 }
