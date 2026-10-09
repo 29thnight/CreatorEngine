@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ExperimentParity\ExperimentTexturePipelineSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
@@ -46,6 +47,9 @@
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ExperimentParity\ExperimentTexturePipelineSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>

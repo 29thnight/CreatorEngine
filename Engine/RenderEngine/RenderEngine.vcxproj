@@ -183,6 +183,18 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedTexture.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\TextureImportSettings.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\TextureCooker.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Experiment\Cooked\CookedShaderMeta.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
@@ -620,6 +632,8 @@
     <ClInclude Include="Experiment\Cooked\MaterialAssetSetCodec.h" />
     <ClInclude Include="Experiment\Cooked\CookedCodeMaterial.h" />
     <ClInclude Include="Experiment\Cooked\MaterialAssetSetProducer.h" />
+    <ClInclude Include="Experiment\Cooked\CookedTexture.h" />
+    <ClInclude Include="Experiment\Cooked\TextureImportSettings.h" />
     <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
     <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
     <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
