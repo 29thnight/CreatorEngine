@@ -5,8 +5,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$expectedChecks = 82
-$expectedLog = 'RG8_QUEUE_SCHEDULE_OK schema=2 checks=82 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true modelGuards=true timingIdentity=true' + "`n"
+$expectedChecks = 111
+$expectedLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=111 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath($OutputDirectory)
@@ -34,10 +34,11 @@ $start.Environment.Remove('CREATOR_RENDERGRAPH_ALIASING') | Out-Null
 $binary = [ordered]@{configuration=$Configuration; head=(git -C $repo rev-parse HEAD);
     exe=(Get-FileHash $exe).Hash;
     runtime=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;
-    acceptanceSchema=2; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
+    acceptanceSchema=3; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
     wrapper=(Get-FileHash $PSCommandPath).Hash;
     implementation=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp')).Hash;
     contract=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h')).Hash;
+    measurementHistory=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/Render/Graph/EnhancedGpuMeasurementHistory.h')).Hash;
     tests=(Get-FileHash (Join-Path $repo 'Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h')).Hash}
 $binary | ConvertTo-Json | Set-Content "$out/binary-metadata.json" -Encoding utf8
 $process = [Diagnostics.Process]::Start($start)
@@ -67,9 +68,11 @@ try
     {
         throw 'Queue schedule identity, exact check count, terminal ordering or result failed; rebuild the tested header.'
     }
-    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=2; checks=$expectedChecks;
+    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=3; checks=$expectedChecks;
         scope='Compiled queue plan in existing offscreen Editor'; overlapPlanTested=$true;
         declarationOrderTested=$true; readReadOwnershipTested=$true; modelGuardsTested=$true; timingIdentityTested=$true;
+        sharedGraphicsReadsTested=$true; readerEpochJoinTested=$true; sideEffectsTested=$true;
+        fallbackReasonsTested=$true; measurementDomainsTested=$true;
         nativeQueueExecutionTested=$false;
         binary=$binary; exitCode=$process.ExitCode} |
         ConvertTo-Json -Depth 10 | Set-Content "$out/schedule-result.json" -Encoding utf8

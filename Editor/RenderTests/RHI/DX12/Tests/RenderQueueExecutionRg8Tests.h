@@ -13,6 +13,9 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <sstream>
+#include <iomanip>
+#include <array>
 #include "RHI/DX12/DX12GpuProfiler.h"
 
 namespace Rg8QueueExecutionTests
@@ -115,7 +118,9 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         require(producerPipeline.IsValid() && transformPipeline.IsValid(), error);
         DX12GpuProfiler graphicsProfiler, computeProfiler;
         DX12QueueService service(device.GetDevice()); // Drains before pipelines and device die.
-        DX12QueueRecorder recorder(device);
+        // Existing order-sensitive fixtures deliberately use one recording job.
+        // Dedicated split coverage below exercises the same executor at 1/2/4.
+        DX12QueueRecorder recorder(device, 1);
         EnhancedRenderGraph::QueueEndpoint graphics, compute;
         require(service.CreateQueue(RHIQueueKind::Graphics, graphics.queue, error) &&
             service.CreateQueue(RHIQueueKind::Compute, compute.queue, error), error);
@@ -285,11 +290,16 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             DX12GpuProfiler::FrameTimings graphicsTiming, computeTiming;
             require(graphicsProfiler.Collect(graphicsToken, graphicsTiming, error) &&
                 computeProfiler.Collect(computeToken, computeTiming, error), error);
-            require(graphicsTiming.slices.size() == (mode ? 5u : 6u) && computeTiming.slices.size() == mode &&
+            require(graphicsTiming.slices.size() == (mode ? 7u : 8u) && computeTiming.slices.size() == mode &&
                 graphicsTiming.overflowedPasses == 0 && computeTiming.overflowedPasses == 0 &&
                 graphicsTiming.droppedSlices == 0 && computeTiming.droppedSlices == 0 && execution.computeBatches == mode,
                 "Queue-local profiler lost or misattributed slices.");
             require(graphicsTiming.cpuAligned && (!mode || computeTiming.cpuAligned) &&
+                std::count_if(graphicsTiming.slices.begin(), graphicsTiming.slices.end(), [](const auto& slice)
+                {
+                    return !slice.identity.IsValid() && (slice.name == "RenderGraph.QueuePrologue" ||
+                        slice.name == "RenderGraph.QueueEpilogue");
+                }) == 2 &&
                 (!mode || computeTiming.slices.front().name == "transform"), "Queue clocks or compute attribution unavailable.");
             RHIReadbackImage image;
             require(device.MapReadback(storage->readback, image, error), error);
@@ -334,9 +344,9 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             storage.reset();
             device.AbortFrame();
         }
-        // Analytical costs select a deterministic plan; readbacks establish actual
-        // GPU work on each selected queue. Submission counts do not prove measured
-        // hardware overlap or speedup, and this fixture makes no such assertion.
+        // Analytical costs select a deterministic plan. Exact readbacks remain
+        // correctness evidence; calibrated independent pass intervals are emitted
+        // separately. Their presence never establishes a measured speedup.
         enum class OverlapCase
         {
             GraphicsReference,
@@ -348,6 +358,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             UnfencedSubmission
         };
         std::vector<uint8_t> overlapBaseline, readReadBaseline;
+        std::ostringstream overlapEvidence;
+        overlapEvidence << std::setprecision(17);
+        overlapEvidence << "{\"schemaVersion\":1,\"scope\":\"native-correctness\",\"cases\":[";
+        bool firstOverlapEvidence = true;
         for (const auto mode : {OverlapCase::GraphicsReference, OverlapCase::Reordered, OverlapCase::NoBenefit,
             OverlapCase::PreserveDeclarationOrder, OverlapCase::RecordingFailure,
             OverlapCase::WaitFailure, OverlapCase::UnfencedSubmission})
@@ -359,10 +373,24 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const bool submissionFailure = mode == OverlapCase::WaitFailure || mode == OverlapCase::UnfencedSubmission;
             const bool failureExpected = recordingFailure || submissionFailure;
             require(device.BeginFrame(error), error);
+            DX12GpuProfiler overlapGraphicsProfiler, overlapComputeProfiler;
             DX12QueueService overlapService(device.GetDevice());
             EnhancedRenderGraph::QueueEndpoint overlapGraphics, overlapCompute;
             require(overlapService.CreateQueue(RHIQueueKind::Graphics, overlapGraphics.queue, error) &&
                 overlapService.CreateQueue(RHIQueueKind::Compute, overlapCompute.queue, error), error);
+            GpuFrameToken overlapGraphicsToken, overlapComputeToken;
+            if (!failureExpected)
+            {
+                require(overlapGraphicsProfiler.Initialize(device.GetDevice(),
+                    DX12QueueService::NativeQueue(overlapGraphics.queue), 16, 3, error) &&
+                    overlapComputeProfiler.Initialize(device.GetDevice(),
+                    DX12QueueService::NativeQueue(overlapCompute.queue), 16, 3, error), error);
+                const auto submission = 10 + static_cast<uint64_t>(mode);
+                overlapGraphicsToken = overlapGraphicsProfiler.BeginFrame(submission, submission, 8);
+                overlapComputeToken = overlapComputeProfiler.BeginFrame(submission, submission, 8);
+                overlapGraphics.profiler = &overlapGraphicsProfiler;
+                overlapCompute.profiler = &overlapComputeProfiler;
+            }
             const auto nativeCompute = overlapCompute.queue;
             if (submissionFailure)
             {
@@ -401,7 +429,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const auto output = graph->Write(graph->CreateBuffer({256, true, false, "overlap-output"}));
             const auto readRead = graph->Write(graph->CreateBuffer({256, true, false, "overlap-read-read"}));
             const auto dispatch = [&device](const auto& context, RHIPipelineHandle pipeline,
-                RGHandle input, RGHandle destination)
+                RGHandle input, RGHandle destination, uint32_t repetitions = 1)
             {
                 context.encoder->SetPipeline(RHIBindPoint::Compute, pipeline);
                 const bool reads = input.IsValid();
@@ -417,7 +445,15 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     throw std::runtime_error("Overlap descriptor allocation failed.");
                 }
                 context.encoder->SetBindings(RHIBindPoint::Compute, reads ? 1 : 0, bindings);
-                context.encoder->Dispatch(1, 1, 1);
+                const auto buffer = context.graph->ResolveBufferHandle(destination);
+                for (uint32_t iteration = 0; iteration < repetitions; ++iteration)
+                {
+                    if (iteration != 0)
+                    {
+                        context.encoder->UavBarrierBuffers(std::span<const RHIBufferHandle>{&buffer, 1});
+                    }
+                    context.encoder->Dispatch(1, 1, 1);
+                }
             };
             const auto clearFinalTexture = [&device, finalTexture](const auto& context)
             {
@@ -443,7 +479,9 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     [&, shadow](const auto& context)
                     {
                         callbacks.push_back(shadowPass.index);
-                        dispatch(context, producerPipeline, {}, shadow);
+                        // Test-only long-enough native work. UAV ordering keeps
+                        // repeated writes defined while the final output is exact.
+                        dispatch(context, producerPipeline, {}, shadow, 256);
                         clearFinalTexture(context);
                     });
                 hints.push_back({shadowPass, false, 400'000});
@@ -471,7 +509,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 [&, depth, raw](const auto& context)
                 {
                     callbacks.push_back(rawPass.index);
-                    dispatch(context, transformPipeline, depth, raw);
+                    dispatch(context, transformPipeline, depth, raw, 128);
                 });
             filterPass = graph->AddPass("overlap-filter", {
                 {raw, RHIResourceState::ShaderResource, RGAccessMode::Read},
@@ -483,7 +521,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     {
                         throw std::runtime_error("injected reordered recording failure");
                     }
-                    dispatch(context, transformPipeline, raw, filtered);
+                    dispatch(context, transformPipeline, raw, filtered, 128);
                 });
             std::vector<EnhancedRenderGraph::RGPassUsage> deferredUsages{
                 {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
@@ -663,6 +701,74 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 !graphWeak.expired() && !storageWeak.expired(), "Blocked reordered graph or imported storage retired.");
             require(SUCCEEDED(gate->Signal(1)), "Overlap gate release failed.");
             waitComplete(execution.completion);
+            overlapGraphicsProfiler.ResolveFrame(device.GetCommandList(), overlapGraphicsToken);
+            overlapComputeProfiler.ResolveFrame(device.GetCommandList(), overlapComputeToken);
+            require(device.FlushCommandList(error), error);
+            device.WaitForGpu();
+            DX12GpuProfiler::FrameTimings overlapGraphicsTiming, overlapComputeTiming;
+            require(overlapGraphicsProfiler.SampleClockCalibration(error) &&
+                overlapComputeProfiler.SampleClockCalibration(error) &&
+                overlapGraphicsProfiler.Collect(overlapGraphicsToken, overlapGraphicsTiming, error) &&
+                overlapComputeProfiler.Collect(overlapComputeToken, overlapComputeTiming, error), error);
+            const auto& graphicsClock = overlapGraphicsProfiler.Calibration();
+            const auto& computeClock = overlapComputeProfiler.Calibration();
+            require(overlapGraphicsTiming.cpuAligned && (!moved || overlapComputeTiming.cpuAligned) &&
+                overlapGraphicsTiming.overflowedPasses == 0 && overlapComputeTiming.overflowedPasses == 0 &&
+                overlapGraphicsTiming.droppedSlices == 0 && overlapComputeTiming.droppedSlices == 0 &&
+                overlapGraphicsTiming.slices.size() + overlapComputeTiming.slices.size() == compiledOrder.size() + 2 &&
+                overlapComputeTiming.slices.size() == (moved ? 2u : 0u) &&
+                graphicsClock.valid && computeClock.valid && graphicsClock.sampleCount >= 2 &&
+                computeClock.sampleCount >= 2 && graphicsClock.cpuTicksPerSecond != 0 &&
+                graphicsClock.cpuTicksPerSecond == computeClock.cpuTicksPerSecond,
+                "Native overlap evidence requires complete queue-local samples and a shared calibrated CPU clock.");
+            uint64_t shadowBegin = 0, shadowEnd = 0, overlapTicks = 0;
+            bool validIntervals = true;
+            for (const auto& slice : overlapGraphicsTiming.slices)
+            {
+                const auto begin = overlapGraphicsProfiler.GpuTickToCpuTick(slice.beginTicks);
+                const auto end = overlapGraphicsProfiler.GpuTickToCpuTick(slice.endTicks);
+                validIntervals = validIntervals && begin >= overlapGraphicsToken.cpuSubmitTick && end >= begin;
+                if (slice.identity.passIndex == shadowPass.index)
+                {
+                    shadowBegin = begin;
+                    shadowEnd = end;
+                }
+            }
+            std::ostringstream computeIntervals;
+            bool firstInterval = true;
+            for (const auto& slice : overlapComputeTiming.slices)
+            {
+                // Raw GPU timestamp origins/frequencies belong to each queue.
+                // Only independently calibrated QPC intervals may intersect.
+                const auto begin = overlapComputeProfiler.GpuTickToCpuTick(slice.beginTicks);
+                const auto end = overlapComputeProfiler.GpuTickToCpuTick(slice.endTicks);
+                validIntervals = validIntervals && begin >= overlapComputeToken.cpuSubmitTick && end >= begin &&
+                    (slice.identity.passIndex == rawPass.index || slice.identity.passIndex == filterPass.index);
+                const auto intersectionBegin = (std::max)(shadowBegin, begin);
+                const auto intersectionEnd = (std::min)(shadowEnd, end);
+                overlapTicks += intersectionEnd > intersectionBegin ? intersectionEnd - intersectionBegin : 0;
+                computeIntervals << (firstInterval ? "" : ",") << "{\"pass\":" << slice.identity.passIndex <<
+                    ",\"beginCpuTick\":" << begin << ",\"endCpuTick\":" << end << "}";
+                firstInterval = false;
+            }
+            require(validIntervals && (!moved || shadowEnd > shadowBegin) &&
+                (moved || overlapTicks == 0), "Calibrated native pass intervals were invalid or fallback overlapped.");
+            // Two endpoint conversions per queue plus observed calibration drift.
+            const auto uncertainty = static_cast<uint64_t>(graphicsClock.maxAbsoluteDriftTicks) +
+                static_cast<uint64_t>(computeClock.maxAbsoluteDriftTicks) + 4;
+            overlapEvidence << (firstOverlapEvidence ? "" : ",") << "{\"case\":" << static_cast<uint32_t>(mode) <<
+                ",\"usesCompute\":" << (moved ? "true" : "false") <<
+                ",\"cpuTicksPerSecond\":" << graphicsClock.cpuTicksPerSecond <<
+                ",\"graphicsCalibrationSamples\":" << graphicsClock.sampleCount <<
+                ",\"computeCalibrationSamples\":" << computeClock.sampleCount <<
+                ",\"shadowBeginCpuTick\":" << shadowBegin << ",\"shadowEndCpuTick\":" << shadowEnd <<
+                ",\"computeIntervals\":[" << computeIntervals.str() << "],\"overlapCpuTicks\":" << overlapTicks <<
+                ",\"clockErrorCpuTicks\":" << uncertainty <<
+                ",\"scheduleMilliseconds\":" << execution.scheduleMilliseconds <<
+                ",\"recordingMilliseconds\":" << execution.recordingMilliseconds <<
+                ",\"submissionMilliseconds\":" << execution.submissionMilliseconds <<
+                ",\"totalMilliseconds\":" << execution.totalMilliseconds << "}";
+            firstOverlapEvidence = false;
             storage = storageWeak.lock();
             require(storage != nullptr, "Joined overlap graph lost pinned readback storage.");
             const auto verifyPayload = [&](const RHIReadback& readbackHandle, uint32_t multiplier, uint32_t addend,
@@ -721,6 +827,114 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             device.AbortFrame();
         }
         graphics.profiler = compute.profiler = nullptr;
+        std::vector<uint8_t> parallelBaseline;
+        for (const int variant : {1, 2, 4, -4, -2})
+        {
+            const bool smallFallback = variant == -4;
+            const bool recordingFailure = variant == -2;
+            const uint32_t workers = static_cast<uint32_t>(variant < 0 ? -variant : variant);
+            const uint32_t wantedSlices = smallFallback ? 1u : workers;
+            require(device.BeginFrame(error), error);
+            DX12QueueRecorder parallelRecorder(device, workers);
+            auto storage = std::make_shared<Storage>();
+            storage->device = &device;
+            require(device.CreateBufferReadback(1024, storage->readback, error), error);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            graph->SetParallelRecordCostThreshold(smallFallback ? 100u : 0u);
+            graph->SetQueueExecutionMode(2);
+            const auto output = graph->Write(graph->CreateBuffer({1024, true, false, "parallel-queue-output"}));
+            std::array<RHIBindingTable, 4> tileBindings{};
+            std::array<std::atomic<uint32_t>, 4> slices{};
+            std::atomic<uint32_t> completedSlices{0}, independentCalls{0};
+            const auto produce = graph->AddSplitPass("parallel-queue-produce",
+                {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                [&](const auto& context, uint32_t slice, uint32_t count)
+                {
+                    if (count != wantedSlices || slice >= wantedSlices || slices[slice].fetch_add(1) != 0)
+                    {
+                        throw std::runtime_error("Queue split count or exclusive slice recording was violated.");
+                    }
+                    if (recordingFailure && slice == 1)
+                    {
+                        throw std::runtime_error("injected parallel queue recording failure");
+                    }
+                    context.encoder->SetPipeline(RHIBindPoint::Compute, producerPipeline);
+                    // Each slice owns disjoint output tiles. No descriptor
+                    // creation or shared-vector mutation happens on workers.
+                    for (uint32_t tile = slice; tile < tileBindings.size(); tile += count)
+                    {
+                        context.encoder->SetBindings(RHIBindPoint::Compute, 0, tileBindings[tile]);
+                        context.encoder->Dispatch(1, 1, 1);
+                    }
+                    completedSlices.fetch_add(1);
+                }, 4, false, 1);
+            graph->DeclareComputeCompatible(produce);
+            const auto readback = graph->AddPass("parallel-queue-readback",
+                {{output, RHIResourceState::CopySource, RGAccessMode::Read}},
+                [&](const auto& context)
+                {
+                    if (completedSlices.load() != wantedSlices)
+                    {
+                        throw std::runtime_error("Queue consumer recorded before all producer slices joined.");
+                    }
+                    context.encoder->CopyBufferToReadback(storage->readback, context.graph->ResolveBufferHandle(output));
+                }, true);
+            const auto independent = graph->AddPass("parallel-queue-independent", {},
+                [&](const auto&) { independentCalls.fetch_add(1); }, true);
+            require(graph->Compile(error), error);
+            bool bindingsValid = true;
+            for (uint32_t tile = 0; tile < tileBindings.size(); ++tile)
+            {
+                const auto view = RHIBindingDesc::UavBuffer(graph->ResolveBufferHandle(output), 64, 4, tile * 64);
+                tileBindings[tile] = device.CreateBindings(std::span<const RHIBindingDesc>{&view, 1});
+                bindingsValid = bindingsValid && tileBindings[tile].IsValid();
+            }
+            require(bindingsValid, "Prebuilt parallel tile descriptors are invalid.");
+            EnhancedRenderGraph::QueueExecution execution;
+            const bool accepted = graph->SubmitQueues(graph, parallelRecorder, graphics, &compute,
+                {{produce, true, 100}, {readback, false, 100}, {independent, false, 0, true}},
+                100, storage, execution, error);
+            require(accepted == !recordingFailure, "Parallel queue recording returned the wrong result: " + error);
+            const auto stats = graph->GetStats();
+            require(stats.recordWorkers == wantedSlices && stats.recordUnits == wantedSlices + 2 &&
+                stats.recordedLists >= execution.plannedBatches && stats.parallelDeclined == smallFallback &&
+                stats.recordingWaveCount == (wantedSlices == 1 ? 1u : 2u),
+                "Owned queue execution lost RG4 slicing, dependency waves or the small-workload fallback.");
+            if (recordingFailure)
+            {
+                require(!execution.submissionAttempted && !execution.recoveryRequired &&
+                    graphics.queue->GetPendingBatchCount() == 0 && compute.queue->GetPendingBatchCount() == 0 &&
+                    DX12QueueService::QueryRecordingPool(graphics.queue).leased == 0 &&
+                    DX12QueueService::QueryRecordingPool(compute.queue).leased == 0,
+                    "Parallel recording failure submitted work or leaked owned targets.");
+                graph->Reset();
+                storage.reset();
+                device.AbortFrame();
+                continue;
+            }
+            waitComplete(execution.completion);
+            RHIReadbackImage image;
+            require(device.MapReadback(storage->readback, image, error), error);
+            bool correct = image.ElementCount<uint32_t>() == 256 && completedSlices.load() == wantedSlices &&
+                independentCalls.load() == 1;
+            for (uint32_t index = 0; correct && index < 256; ++index)
+            {
+                correct = image.Elements<uint32_t>()[index] == index % 64 + 11;
+            }
+            if (parallelBaseline.empty())
+            {
+                parallelBaseline = image.data;
+            }
+            require(correct && image.data == parallelBaseline, "Parallel/small-fallback queue payload or callback count differs.");
+            std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
+            graph.reset();
+            require(graphics.queue->CollectCompleted() + compute.queue->CollectCompleted() == execution.submittedBatches &&
+                graphWeak.expired() && DX12QueueService::QueryRecordingPool(graphics.queue).leased == 0 &&
+                DX12QueueService::QueryRecordingPool(compute.queue).leased == 0,
+                "Completed parallel queue recording did not release every target lease.");
+            storage.reset();
+            device.AbortFrame();
+        }
         auto owner = std::make_shared<int>(1);
         auto failure = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         failure->AddPass("recording-failure", {}, [](const auto&)
@@ -906,15 +1120,17 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         device.AbortFrame();
         std::string validation;
         require(device.DrainDebugMessages(validation) == 0, validation);
-        constexpr uint32_t kExpectedChecks = 361;
+        constexpr uint32_t kExpectedChecks = 428;
         if (checks != kExpectedChecks)
         {
             throw std::runtime_error("Queue execution acceptance check count changed.");
         }
-        outLog = "RG8_QUEUE_EXECUTION_OK schema=2 checks=" + std::to_string(checks) +
+        overlapEvidence << "]}";
+        outLog = "RG8_QUEUE_EXECUTION_OK schema=3 checks=" + std::to_string(checks) +
             " payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true" +
             " negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true" +
-            " delayedLifetime=true quarantineReleased=true frameRetirement=true measuredOverlap=false\n";
+            " delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false\n" +
+            "RG8_QUEUE_INTERVALS " + overlapEvidence.str() + "\n";
         return true;
     }
     catch (const std::exception& exception)

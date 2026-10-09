@@ -50,6 +50,7 @@ def inputs(manifest):
     return {k: manifest.get(k) for k in ("width", "height", "camera", "lights", "captureMode",
                                         "sampleIndex", "historyPolicy", "ibl", "viewFlags")} | {
         "draws": sorted(draws, key=lambda row: json.dumps(row, sort_keys=True)),
+        "diagnosticStageNames": [stage["name"] for stage in manifest.get("diagnosticStages", [])],
         "skybox": Path(manifest["skyBoxPath"]).name}
 
 
@@ -85,6 +86,14 @@ def verify_schedule(diagnostics, mode, graph=None):
     check(compute == execution["plannedComputeBatches"] == execution["computeBatches"], "Compute batch mismatch")
     check(schedule["usesCompute"] == (compute > 0), "Schedule/execution placement mismatch")
     check(mode == 2 or compute == 0, "Compute submitted outside requested mode 2")
+    check(diagnostics["requestedExecutionMode"] == mode and
+          diagnostics["effectiveExecutionMode"] == (2 if compute else 1),
+          "Requested mode and effective queue placement were conflated")
+    check(diagnostics["measurementDomain"] in ("normal", "capture"), "Missing measurement-domain provenance")
+    reason = schedule["fallbackReason"]
+    check(reason in ("none", "disabled", "unsupported", "missing-measurement", "unsupported-state", "insufficient-gain") and
+          diagnostics["fallbackReason"] == reason and (reason == "none") == (compute > 0),
+          "Missing/inconsistent effective fallback reason")
     check(not schedule["predictionCalibrated"] and (compute == 0 or schedule["predictionComplete"]),
           "Compute placement requires complete costs; model calibration remains unproven")
     check(execution["plannedWaits"] == execution["submittedWaits"] == len(waits), "Wait accounting mismatch")
@@ -92,6 +101,19 @@ def verify_schedule(diagnostics, mode, graph=None):
     check(execution["prologueBarriers"] == batches[0]["barriers"] and
           execution["epilogueBarriers"] == batches[-1]["barriers"], "Boundary barrier mismatch")
     entries = schedule["entries"]
+    check(all(isinstance(execution[k], int) and execution[k] >= 0 for k in
+              ("recordedLists", "recordWorkers", "recordUnits", "recordingWaveCount")) and
+          execution["recordedLists"] >= len(batches) and execution["recordWorkers"] >= 1 and
+          execution["recordUnits"] >= len(entries) and execution["recordingWaveCount"] >= 1,
+          "Missing/invalid owned recording target, worker, slice or wave accounting")
+    check(all(isinstance(schedule[k], int) and schedule[k] >= 0 for k in
+              ("eligibleComputePasses", "rejectedStatePasses", "measuredPasses", "missingMeasurementPasses")) and
+          schedule["measuredPasses"] + schedule["missingMeasurementPasses"] == len(entries) and
+          schedule["eligibleComputePasses"] + schedule["rejectedStatePasses"] <= len(entries),
+          "Invalid measured/eligible/rejected pass accounting")
+    check(not compute or schedule["eligibleComputePasses"] > 0, "Compute queue has no eligible authored pass")
+    check(reason != "missing-measurement" or not schedule["predictionComplete"],
+          "Complete timing history was labeled missing")
     passes = [p for b in batches for p in b["passes"]]
     check(passes == [e["pass"] for e in entries] and len(passes) == len(set(passes)), "Pass order/identity mismatch")
     assignment = {p: (i, b["queue"]) for i, b in enumerate(batches) for p in b["passes"]}
@@ -132,6 +154,7 @@ def verify_timing(timing, diagnostics=None):
     check(timing["schemaVersion"] == 2 and timing["clockValid"] and timing["cpuTicksPerSecond"] > 0,
           "Calibrated queue clocks missing")
     check(timing["queryOverflow"] == timing["droppedSlices"] == 0, "Dropped/overflowed timing slices")
+    check(timing["measurementDomain"] in ("normal", "capture"), "Unknown origin timing domain")
     check(all(math.isfinite(timing[k]) and timing[k] >= 0 for k in
               ("queueSpanMilliseconds", "busyMilliseconds", "measuredOverlapMilliseconds", "overlapClockErrorMilliseconds")),
           "Nonfinite/negative GPU timing")
@@ -142,8 +165,16 @@ def verify_timing(timing, diagnostics=None):
     check(timing["graphicsCalibrationSamples"] > 0 and
           (timing["computeSliceCount"] == 0 or timing["computeCalibrationSamples"] > 0), "Uncalibrated queue")
     if diagnostics is not None:
+        check(timing["measurementDomain"] == diagnostics["measurementDomain"] and
+              timing["mode"] == diagnostics["requestedExecutionMode"],
+              "Collection was attributed to a different mode/domain than submission")
         entries = {(e["pass"], e["queue"]) for e in diagnostics["schedule"]["entries"]}
-        check({(s["passIndex"], s["queue"]) for s in slices} == entries,
+        boundaries = [s for s in slices if s["passIndex"] == 0xFFFFFFFF]
+        check(len(boundaries) == 2 and {s["name"] for s in boundaries} ==
+              {"RenderGraph.QueuePrologue", "RenderGraph.QueueEpilogue"} and
+              all(s["queue"] == 0 for s in boundaries),
+              "Full graph span requires exactly the two designated graphics boundary scopes")
+        check({(s["passIndex"], s["queue"]) for s in slices if s["passIndex"] != 0xFFFFFFFF} == entries,
               "Measured pass identities/queues differ from actual schedule")
     lanes = [interval_union((s["beginCpuTick"], s["endCpuTick"]) for s in slices if s["queue"] == q)
              for q in (0, 1)]
@@ -165,11 +196,14 @@ def verify_timing(timing, diagnostics=None):
 def verify_native(path, binary):
     native = read(path)
     same_binary(native["binary"], binary)
-    check(native["schemaVersion"] == 2 and native["passed"] and native["fullRegression"] and
+    check(native["schemaVersion"] == 2 and native["acceptanceSchema"] == 3 and native["passed"] and native["fullRegression"] and
           native["nativeQueueExecutionTested"] and native["frameRetirementTested"] and
           native["positiveOverlapExecutionTested"] and native["negativeFallbackExecutionTested"] and
           native["declarationOrderTested"] and native["readReadOwnershipTested"] and
-          native["reorderedFailureTested"] and native["exitCode"] == 0,
+          native["reorderedFailureTested"] and native["parallelRecordingTested"] and native["calibratedIntervalsTested"] and
+          native["sharedGraphicsReadsTested"] and native["readerEpochJoinTested"] and
+          native["sideEffectsTested"] and native["fallbackReasonsTested"] and
+          native["measurementDomainsTested"] and native["exitCode"] == 0,
           "Current full native overlap-path, retirement and fallback coverage required")
     return native
 
@@ -203,29 +237,36 @@ def verify_workloads(path, binary):
               "Real workload requires exact pixel/output equivalence")
         log = resolve("stdout").read_text(encoding="utf-8-sig", errors="replace")
         executions, timings = unique_rows(log_rows(log, "execution")), unique_rows(log_rows(log, "timing"))
-        check(workload["frames"] and len({identity(f) for f in workload["frames"]}) == len(workload["frames"]),
-              "Workload requires distinct measured frames")
+        check(len(workload["frames"]) >= 4 and len({identity(f) for f in workload["frames"]}) == len(workload["frames"]),
+              "Workload requires at least four distinct warm measured frames")
         for diagnostics in executions.values():
             verify_schedule(diagnostics, diagnostics["mode"])
-        overlaps = []
+        overlaps, reasons = [], set()
         for frame in workload["frames"]:
             key = identity(frame)
             diagnostics, timing = executions[key], timings[key]
             check(diagnostics["mode"] == timing["mode"] == 2 and
+                  diagnostics["measurementDomain"] == timing["measurementDomain"] == "normal" and
                   diagnostics["captureGeneration"] == timing["captureGeneration"] == frame["captureGeneration"] == 0,
                   "Workload proof must use ordinary mode-2 submissions")
             execution = verify_schedule(diagnostics, 2)
-            check(diagnostics["schedule"]["predictionComplete"], "Warm complete-cost workload required; missing history is not negative-fallback proof")
+            schedule = diagnostics["schedule"]
+            check(schedule["predictionComplete"] and schedule["missingMeasurementPasses"] == 0 and
+                  schedule["eligibleComputePasses"] > 0,
+                  "Warm complete-cost eligible workload required; missing history is not negative-fallback proof")
             overlap = verify_timing(timing, diagnostics)
             if kind == "positive-overlap":
                 check(execution["computeBatches"] > 0 and overlap > timing["overlapClockErrorMilliseconds"],
                       "Positive real workload has no overlap above measured clock drift")
             else:
-                check(execution["computeBatches"] == timing["computeSliceCount"] == overlap == 0,
+                check(execution["computeBatches"] == timing["computeSliceCount"] == overlap == 0 and
+                      schedule["fallbackReason"] == "insufficient-gain",
                       "Negative workload did not select graphics-only fallback")
             overlaps.append(overlap)
+            reasons.add(schedule["fallbackReason"])
         verify_counters(log, list(executions.values()))
-        summaries.append({"kind": kind, "measuredOverlapMilliseconds": distribution(overlaps)})
+        summaries.append({"kind": kind, "fallbackReasons": sorted(reasons),
+                          "measuredOverlapMilliseconds": distribution(overlaps)})
     check(kinds == {"positive-overlap", "negative-fallback"}, "Both real positive-overlap and negative-fallback workloads required")
     return summaries
 
@@ -240,8 +281,10 @@ def verify_counters(log, executions):
           "Shutdown must release all recording leases and cached storage")
     created, reused = sum(p[0] for p in pools), sum(p[1] for p in pools)
     batch_count = sum(e["execution"]["submittedBatches"] for e in executions)
-    check(created > 0 and reused > 0 and created + reused == batch_count == sum(t[1] for t in totals),
-          "Pool leases do not match actual submitted batch list")
+    target_count = sum(e["execution"]["recordedLists"] for e in executions)
+    check(created > 0 and reused > 0 and created + reused == target_count and
+          target_count >= batch_count == sum(t[1] for t in totals),
+          "Pool target leases or logical submission counts do not match recorded evidence")
     check(len(executions) == sum(t[0] for t in totals) and
           sum(e["execution"]["plannedBarriers"] for e in executions) == sum(b[0] for b in barriers),
           "Aggregate graph/barrier counters do not match per-submission evidence")
@@ -252,6 +295,7 @@ def verify_counters(log, executions):
     check(schedules and sum(r[0] for r in schedules) == sum(e["execution"]["computeBatches"] > 0 for e in executions),
           "Compute-submission counter is not actual placement")
     return {"createdPairs": created, "reusedPairs": reused, "graphs": len(executions), "batches": batch_count,
+            "recordedLists": target_count,
             "computeBatches": compute, "plannedBarriers": sum(b[0] for b in barriers)}
 
 
@@ -264,31 +308,61 @@ def load_run(directory, mode):
     timings = unique_rows(log_rows(log, "timing"))
     cpus = unique_rows(log_rows(log, "cpu"))
     check(timings and cpus, "Missing opt-in per-submission timing/CPU evidence")
-    check(all(row["mode"] == mode for row in list(executions.values()) + list(timings.values()) + list(cpus.values())),
-          "Requested mode differs from actual execution evidence")
+    context_path = directory / "run-context.json"
+    mixed = context_path.exists() and read(context_path).get("sameProcess", False)
+    if mixed:
+        context = read(context_path)
+        check(context["mode"] == mode and context["processId"] > 0, "Wrong same-process mode context")
+        check(all(row["mode"] in (0, 1, 2) for row in list(executions.values()) + list(timings.values()) + list(cpus.values())),
+              "Unknown mode in same-process evidence")
+    else:
+        check(all(row["mode"] == mode for row in list(executions.values()) + list(timings.values()) + list(cpus.values())),
+              "Requested mode differs from actual execution evidence")
     for row in executions.values():
-        verify_schedule(row, mode)
+        verify_schedule(row, row["mode"])
     for key, timing in timings.items():
-        check(mode == 0 or key in executions, "Timing has no matching actual schedule")
+        check(timing["mode"] == 0 or key in executions, "Timing has no matching actual schedule")
         verify_timing(timing, executions.get(key))
-    pool = verify_counters(log, list(executions.values())) if mode else None
-    check(mode != 0 or not executions, "Mode 0 unexpectedly used queue executor")
+    pool = verify_counters(log, list(executions.values())) if executions else None
+    check(all(row["mode"] != 0 for row in executions.values()), "Mode 0 unexpectedly used queue executor")
+    if mixed:
+        executions = {key: row for key, row in executions.items() if row["mode"] == mode}
+        timings = {key: row for key, row in timings.items() if row["mode"] == mode}
+        cpus = {key: row for key, row in cpus.items() if row["mode"] == mode}
+        check(timings and cpus, "Same-process evidence has no samples for requested mode")
     return executions, timings, cpus, pool
 
 
 def verify_capture(manifest, mode):
     measurement = manifest["measurement"]
+    check(measurement["domain"] == "capture" and measurement["normalFrameComparable"] is False,
+          "Capture readback graph was labeled ordinary performance evidence")
     check(measurement["gpuStatus"] == "measured" and measurement["clockValid"] and
           measurement["queryOverflow"] == measurement["droppedSlices"] == 0, "Invalid capture timing")
     check(measurement["cpuRecordSubmitMs"] >= measurement["cpuSubmitMs"] >= 0, "Incomplete CPU scope")
     diagnostics = manifest["compiledGraph"]["queueExecution"]
     if mode:
+        check(diagnostics["measurementDomain"] == "capture", "Controlled capture contaminated normal measurement domain")
         execution = verify_schedule(diagnostics, mode, manifest["compiledGraph"])
         check(manifest["graph"]["barriers"] == execution["plannedBarriers"], "Capture barrier count mismatch")
         check((measurement["computeSliceCount"] > 0) == (execution["computeBatches"] > 0),
               "Capture slices differ from actual queue placement")
     else:
         check(measurement["computeSliceCount"] == 0, "Legacy path emitted compute slices")
+    stages = manifest.get("diagnosticStages", [])
+    check(len({stage["name"] for stage in stages}) == len(stages), "Duplicate diagnostic stage name")
+    stage_names = {stage["name"] for stage in stages}
+    by_file = {}
+    for stage in stages:
+        check(stage["readbackStage"] in stage_names and stage["sharedReadback"] == (stage["name"] != stage["readbackStage"]) and
+              stage["nonfinite"] == 0, "Missing/invalid diagnostic stage alias")
+        key = tuple(stage[k] for k in ("resource", "version", "kind", "graphEpoch"))
+        if stage["file"] in by_file:
+            check(manifest["compiledGraph"]["versionsSupported"] and by_file[stage["file"]] == key,
+                  "Diagnostic readback deduplicated different logical versions or legacy mutable handles")
+        else:
+            by_file[stage["file"]] = key
+    check(manifest["diagnosticStageReadbackCount"] == len(by_file), "Diagnostic readback count lost aliases or duplicated copies")
 
 
 def main():
@@ -317,11 +391,32 @@ def main():
         verify_validation(result)
         for capture in result["captures"]:
             verify_capture(read(Path(capture["path"]) / "manifest.json"), args.mode)
-        print(json.dumps({"scheduleEvidencePassed": True, "pool": pool, "adoptionEstablished": False}))
+        ordinary = [t for t in timings.values() if t["measurementDomain"] == "normal" and t["captureGeneration"] == 0]
+        fallback_counts = {}
+        for row in executions.values():
+            if row["measurementDomain"] == "normal":
+                reason = row["fallbackReason"]
+                fallback_counts[reason] = fallback_counts.get(reason, 0) + 1
+        print(json.dumps({"scheduleEvidencePassed": True, "pool": pool, "adoptionEstablished": False,
+                          "performanceValidated": False, "fallbackReasons": fallback_counts,
+                          "measuredOverlapSubmissions": sum(t["computeSliceCount"] > 0 and
+                              t["measuredOverlapMilliseconds"] > t["overlapClockErrorMilliseconds"] for t in ordinary),
+                          "measuredOverlapMilliseconds": distribution([t["measuredOverlapMilliseconds"] for t in ordinary]) if ordinary else None,
+                          "overlapScope": "ordinary calibrated pass intervals; queue counts are not overlap evidence"}))
         return
     check(args.captures and args.normal and args.native_evidence and args.validation_evidence and args.workload_evidence,
           "Strict audit requires captures, normal, native, validation, and real workload evidence")
     binary = read(args.normal / "binary.json")
+    normal_context = read(args.normal / "measurement-context.json")
+    capture_context = read(args.captures / "measurement-context.json")
+    check(normal_context["acceptanceSchema"] == capture_context["acceptanceSchema"] == 3 and
+          normal_context["evidencePurpose"] == "normal-timing" and
+          capture_context["evidencePurpose"] == "capture-correctness",
+          "Normal-frame timing and capture correctness must be collected separately")
+    same_process = normal_context["sameProcessOffOn"]
+    check(isinstance(same_process["supported"], bool) and isinstance(same_process["established"], bool) and
+          (same_process["supported"] or not same_process["established"]),
+          "Unsupported mode switching cannot establish same-process OFF/ON evidence")
     same_binary(read(args.captures / "binary.json"), binary)
     verify_native(args.native_evidence / "execution-result.json", binary)
     same_binary(read(args.validation_evidence / "binary.json"), binary)
@@ -336,12 +431,23 @@ def main():
     check(len(capture_runs) == len(normal_runs) == 6 and
           {(r["order"], r["mode"]) for r in capture_runs} == expected and
           {(r["order"], r["mode"]) for r in normal_runs} == expected, "Incomplete forward/reverse mode matrix")
+    if same_process["established"]:
+        check(same_process["supported"] and same_process["command"] == "render.queue.mode",
+              "Same-process acceptance requires the supported runtime control")
+        for order in ("Forward", "Reverse"):
+            group = [r for r in normal_runs if r["order"] == order]
+            check(len({r["processId"] for r in group}) == 1, "OFF/ON measurements restarted the process")
     check(all(not r["gpuValidation"] for r in capture_runs + normal_runs), "Validation runs cannot establish timing")
     baseline_dir = args.captures / "Forward-0/sample-0"
     baseline = read(baseline_dir / "manifest.json")
     references = {a["name"]: (a, np.fromfile(baseline_dir / a["file"], dtype="<f4")) for a in baseline["attachments"]}
     check(references and all(np.isfinite(a).all() for _, a in references.values()), "Invalid reference pixels")
-    comparisons, diagnostic = 0, []
+    stage_files = {stage["file"]: np.fromfile(baseline_dir / stage["file"], dtype="<f4")
+                   for stage in baseline.get("diagnosticStages", [])}
+    stage_references = {stage["name"]: (stage, stage_files[stage["file"]])
+                        for stage in baseline.get("diagnosticStages", [])}
+    check(all(np.isfinite(array).all() for array in stage_files.values()), "Invalid reference stage pixels")
+    comparisons, stage_comparisons, diagnostic = 0, 0, []
     for run in capture_runs:
         check(run["exitCode"] == 0 and run["samples"] >= 4, "Missing successful diagnostic captures")
         _, capture_timings, _, _ = load_run(Path(run["path"]), run["mode"])
@@ -352,7 +458,7 @@ def main():
             check(inputs(manifest) == inputs(baseline), f"Input mismatch: {sample}")
             verify_capture(manifest, run["mode"])
             measured = [t for t in capture_timings.values() if t["frameId"] == manifest["frameId"] and
-                        t["viewId"] == manifest["viewId"] and t["captureGeneration"] > 0]
+                        t["viewId"] == manifest["viewId"] and t["measurementDomain"] == "capture"]
             check(len(measured) == 1 and measured[0]["computeSliceCount"] == manifest["measurement"]["computeSliceCount"],
                   "Capture does not match its canonical submission timing")
             check({a["name"] for a in manifest["attachments"]} == references.keys(), "Missing/extra attachment")
@@ -363,31 +469,78 @@ def main():
                 check(array.size == reference.size and np.isfinite(array).all() and np.array_equal(array, reference),
                       f"Pixel mismatch: {sample}/{attachment['name']}")
                 comparisons += 1
+            current_stage_files = {}
+            for stage in manifest.get("diagnosticStages", []):
+                description, reference = stage_references[stage["name"]]
+                check(all(stage[k] == description[k] for k in ("channels", "width", "height", "encoding")),
+                      "Diagnostic stage format mismatch")
+                if stage["file"] not in current_stage_files:
+                    current_stage_files[stage["file"]] = np.fromfile(sample / stage["file"], dtype="<f4")
+                array = current_stage_files[stage["file"]]
+                check(array.size == reference.size and np.isfinite(array).all() and np.array_equal(array, reference),
+                      f"Diagnostic stage pixel mismatch: {sample}/{stage['name']}")
+                stage_comparisons += 1
             costs.append(manifest["measurement"]["cpuRecordSubmitMs"])
         diagnostic.append({"order": run["order"], "mode": run["mode"], "captureCpuRecordSubmitMs": distribution(costs)})
     normal, metrics = [], {}
     for run in normal_runs:
-        check(run["exitCode"] == 0 and run["timingOnly"], "Failed ordinary-frame run")
+        check(run["exitCode"] == 0 and run["timingOnly"] and run["warmNormalOnly"] and
+              run["evidencePurpose"] == "normal-timing" and run["processId"] > 0,
+              "Failed ordinary-frame run or capture-dependent warm-up")
         directory = Path(run["path"])
         rows = read(directory / "normal-frames.json")
         check(len(rows) == 32 and len({(r["gpu"]["frame"], r["gpu"]["submission"]) for r in rows}) == 32, "Expected 32 unique normal submissions")
         executions, timings, cpus, pool = load_run(directory, run["mode"])
-        cpu_costs, schedule_costs, overlap_costs = [], [], []
+        mode_switch = None
+        if same_process["established"]:
+            context = read(directory / "run-context.json")
+            mode_switch = read(directory / "mode-switch.json")
+            check(context["sameProcess"] and context["processId"] == run["processId"] and
+                  context["order"] == run["order"] and context["mode"] == run["mode"] and
+                  mode_switch["requestedMode"] == mode_switch["appliedMode"] == run["mode"] and
+                  mode_switch["requestId"] > 0 and mode_switch["appliedFrame"] > 0 and mode_switch["afterFrame"] >= 0,
+                  "Mode switch was not acknowledged at the render-owner frame boundary")
+        cpu_costs, full_cpu_costs, compile_costs = [], [], []
+        schedule_costs, record_costs, submit_costs, executor_costs, overlap_costs = [], [], [], [], []
+        fallback_counts, effective_modes = {}, {}
         for row in rows:
             gpu = row["gpu"]
+            check(mode_switch is None or gpu["frame"] > mode_switch["appliedFrame"],
+                  "Pre-switch/in-flight frame was counted as a warm new-mode sample")
             matching = [key for key, t in timings.items() if t["frameId"] == gpu["frame"] and t["viewId"] == gpu["viewId"] and t["submissionId"] == gpu["submission"]]
             check(len(matching) == 1, "Normal sample lacks unique submission evidence")
             key = matching[0]
-            check(timings[key]["captureGeneration"] == 0 and key in cpus, "Capture/CPU mismatch in normal sample")
+            check(timings[key]["captureGeneration"] == 0 and timings[key]["measurementDomain"] == "normal" and key in cpus,
+                  "Capture/CPU mismatch in normal sample")
             check(gpu["viewId"] == baseline["viewId"] and gpu["clockValid"] and gpu["queueSpanMs"] > 0 and
                   gpu["busyMs"] <= gpu["queueSpanMs"] + 1e-5 and
                   gpu["droppedTotal"] == gpu["queryOverflowPasses"] == gpu["spanViolations"] == 0 and
                   not any(p["name"].startswith("PBR.") for p in gpu["passes"]), "Invalid ordinary GPU measurement")
             check((row["display"]["width"], row["display"]["height"]) == (baseline["width"], baseline["height"]), "Normal dimensions differ")
             cpu = cpus[key]
-            check(math.isfinite(cpu["totalMilliseconds"]) and cpu["totalMilliseconds"] >= cpu["submissionMilliseconds"] >= 0, "Invalid full record/submit CPU timing")
+            check(cpu["measurementDomain"] == "normal" and cpu["frameScope"] ==
+                  "view-prepare-build-compile-record-schedule-submit-retirement-enqueue" and
+                  all(math.isfinite(cpu[k]) and cpu[k] >= 0 for k in
+                      ("totalMilliseconds", "submissionMilliseconds", "compileMilliseconds", "renderOnceMilliseconds")) and
+                  cpu["totalMilliseconds"] >= cpu["submissionMilliseconds"] and
+                  cpu["renderOnceMilliseconds"] + 1e-5 >= cpu["compileMilliseconds"] + cpu["totalMilliseconds"],
+                  "Missing/nonfinite full graph CPU scope or omitted compile/record/submit costs")
             cpu_costs.append(cpu["totalMilliseconds"])
+            full_cpu_costs.append(cpu["renderOnceMilliseconds"])
+            compile_costs.append(cpu["compileMilliseconds"])
             schedule_costs.append(executions[key]["execution"]["scheduleMilliseconds"] if run["mode"] else 0)
+            submit_costs.append(cpu["submissionMilliseconds"])
+            if run["mode"]:
+                submission = executions[key]
+                check(submission["measurementDomain"] == "normal" and submission["schedule"]["predictionComplete"],
+                      "Normal samples contain capture scheduling costs or unwarmed timing history")
+                record_costs.append(submission["execution"]["recordingMilliseconds"])
+                executor_costs.append(submission["execution"]["totalMilliseconds"])
+                reason, effective = submission["fallbackReason"], submission["effectiveExecutionMode"]
+            else:
+                reason, effective = "disabled", 0
+            fallback_counts[reason] = fallback_counts.get(reason, 0) + 1
+            effective_modes[effective] = effective_modes.get(effective, 0) + 1
             overlap_costs.append(timings[key]["measuredOverlapMilliseconds"])
         memory = [json.loads(line) for line in (directory / "memory-continuous.jsonl").read_text(encoding="utf-8-sig").splitlines()]
         check(memory and all(r["valid"] and r["budgetBytes"] > 0 for r in memory), "Invalid memory sampling")
@@ -401,6 +554,11 @@ def main():
                    "gpuQueueSpanMs": distribution([r["gpu"]["queueSpanMs"] for r in rows]),
                    "gpuBusyMs": distribution([r["gpu"]["busyMs"] for r in rows]),
                    "cpuRecordSubmitMs": distribution(cpu_costs), "cpuScheduleMs": distribution(schedule_costs),
+                   "cpuFullGraphMs": distribution(full_cpu_costs), "cpuCompileMs": distribution(compile_costs),
+                   "cpuRecordingMs": distribution(record_costs) if record_costs else None,
+                   "cpuSubmissionMs": distribution(submit_costs),
+                   "cpuExecutorTotalMs": distribution(executor_costs) if executor_costs else None,
+                   "fallbackReasons": fallback_counts, "effectiveExecutionModes": effective_modes,
                    "measuredOverlapMs": distribution(overlap_costs),
                    "normalWindowUsagePeakBytes": max(r["usedBytes"] for r in window),
                    "lifecycleSampledUsagePeakBytes": max(r["usedBytes"] for r in memory)}
@@ -411,11 +569,13 @@ def main():
         for before, after, purpose in ((0, 1, "owned-executor-overhead"), (1, 2, "compute-placement-delta")):
             differences.append({"order": order, "comparison": f"{before}-to-{after}", "purpose": purpose,
                 "medianGpuDeltaMs": metrics[(order, after)]["gpuQueueSpanMs"]["median"] - metrics[(order, before)]["gpuQueueSpanMs"]["median"],
-                "medianCpuDeltaMs": metrics[(order, after)]["cpuRecordSubmitMs"]["median"] - metrics[(order, before)]["cpuRecordSubmitMs"]["median"]})
+                "medianCpuDeltaMs": metrics[(order, after)]["cpuFullGraphMs"]["median"] - metrics[(order, before)]["cpuFullGraphMs"]["median"]})
     result = {"passed": True, "evidenceValid": True, "schemaVersion": 2, "phaseComplete": False,
               "adoptionEstablished": False, "performanceValidated": False,
-              "performanceClaim": "none; process-separated distributions and uncalibrated cost constants do not establish speedup",
-              "binary": binary, "captureComparisons": comparisons, "captureMaxAbs": 0, "normalFrames": 192,
+              "sameProcessOffOn": same_process,
+              "performanceClaim": "none; warm distributions and calibrated overlap do not by themselves establish net speedup or adoption",
+              "binary": binary, "captureComparisons": comparisons, "diagnosticStageComparisons": stage_comparisons,
+              "captureMaxAbs": 0, "normalFrames": 192,
               "realWorkloads": workloads, "normal": normal, "diagnostic": diagnostic, "comparisons": differences,
               "cpuMeasurementCaveat": "Full CPU scope includes opt-in evidence serialization; executor phase timers exclude adapter log serialization",
               "memoryScope": "DXGI sampled budget usage, not exact residency or retained-resource peak"}
