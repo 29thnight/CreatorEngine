@@ -156,6 +156,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Render\Temporal\TemporalReconstruction.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ShaderMetadataRuntime.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -873,6 +877,9 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />
+    <ClInclude Include="Render\Temporal\TemporalReconstruction.h" />
+    <ClInclude Include="Render\Temporal\ITemporalUpscaler.h" />
+    <ClInclude Include="Render\Temporal\ITemporalFrameGenerator.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
@@ -896,6 +903,7 @@
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
   </ItemGroup>
+  <Import Project="RHI\Temporal\TemporalSdk.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

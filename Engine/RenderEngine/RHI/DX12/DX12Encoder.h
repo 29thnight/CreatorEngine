@@ -134,6 +134,7 @@ public:
     ///   프레임에 섞어 쓸 수 있으므로(같은 리스트에 기록) 패스 단위로 A/B가
     ///   된다. 그 이행 기간에만 쓰는 문이고, R3가 끝나면 사라진다.
     ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList; }
+    bool UsesResources(const DX12DeviceResources* resources) const { return m_resources == resources; }
 
     /// W8 — 조용히 버린 명령의 수.
     ///

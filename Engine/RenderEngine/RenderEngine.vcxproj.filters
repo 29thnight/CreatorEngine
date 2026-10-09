@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Render\Temporal"><UniqueIdentifier>{E7C8CB36-15D0-4658-AF3A-0E0E99AE0D6D}</UniqueIdentifier></Filter>
     <Filter Include="Asset">
       <UniqueIdentifier>{4a8a014e-3971-482b-bafe-54c2f3c2ff33}</UniqueIdentifier>
     </Filter>
@@ -1264,5 +1265,11 @@
     <ClCompile Include="LXMaterialRuntime.cpp">
       <Filter>Resources</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Render\Temporal\TemporalReconstruction.cpp"><Filter>Render\Temporal</Filter></ClCompile>
+    <ClInclude Include="Render\Temporal\TemporalReconstruction.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Temporal\ITemporalUpscaler.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Temporal\ITemporalFrameGenerator.h"><Filter>Render\Temporal</Filter></ClInclude>
   </ItemGroup>
 </Project>
