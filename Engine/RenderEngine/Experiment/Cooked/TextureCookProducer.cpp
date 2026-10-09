@@ -1,14 +1,20 @@
 #include "TextureCookProducer.h"
 
 #include "CookSupport.h"
+#include "ModelCookIdentity.h"
+#include "CookedTexture.h"
+#include "TextureImportSettings.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <fstream>
 #include <utility>
 
 namespace experiment::cooked
 {
+    static_assert(kTextureArtifactVersion == kCookedTextureSchemaVersion);
+
     namespace
     {
         void AddIssue(TextureCookProductResult& result,
@@ -29,18 +35,52 @@ namespace experiment::cooked
             return text;
         }
 
-        inline constexpr std::array<std::string_view, 4> kSupportedExtensions{
-            ".png", ".hdr", ".dds", ".jpg"
+        inline constexpr std::array<std::string_view, 5> kSupportedExtensions{
+            ".png", ".hdr", ".dds", ".jpg", ".jpeg"
         };
 
         [[nodiscard]] bool StartsWith(std::span<const std::byte> bytes,
             std::span<const std::uint8_t> magic) noexcept
         {
-            if (bytes.size() < magic.size()) return false;
+            if (bytes.size() < magic.size())
+            {
+                return false;
+            }
             for (std::size_t index = 0u; index < magic.size(); ++index)
             {
                 if (static_cast<std::uint8_t>(bytes[index]) != magic[index])
+                {
                     return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool ReadInput(const std::filesystem::path& path,
+            std::uint64_t limit, std::vector<std::byte>& bytes, std::string& failure)
+        {
+            std::ifstream stream(path, std::ios::binary | std::ios::ate);
+            if (!stream)
+            {
+                failure = "Cannot open texture input: " + path.string();
+                return false;
+            }
+            const auto size = stream.tellg();
+            if (size < 0 || static_cast<std::uint64_t>(size) > limit)
+            {
+                failure = "Texture input exceeds its byte budget: " + path.string();
+                return false;
+            }
+            bytes.resize(static_cast<std::size_t>(size));
+            stream.seekg(0, std::ios::beg);
+            if (!bytes.empty())
+            {
+                stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            }
+            if (!stream || stream.peek() != std::char_traits<char>::eof())
+            {
+                failure = "Texture input changed size or could not be read: " + path.string();
+                return false;
             }
             return true;
         }
@@ -58,10 +98,22 @@ namespace experiment::cooked
         // Radiance HDR. "#?RADIANCE" 와 "#?RGBE" 두 서명이 모두 쓰인다.
         static constexpr std::uint8_t kRadiance[]{ 0x23u, 0x3Fu };           // "#?"
 
-        if (StartsWith(bytes, kPng)) return ".png";
-        if (StartsWith(bytes, kJpeg)) return ".jpg";
-        if (StartsWith(bytes, kDds)) return ".dds";
-        if (StartsWith(bytes, kRadiance)) return ".hdr";
+        if (StartsWith(bytes, kPng))
+        {
+            return ".png";
+        }
+        if (StartsWith(bytes, kJpeg))
+        {
+            return ".jpg";
+        }
+        if (StartsWith(bytes, kDds))
+        {
+            return ".dds";
+        }
+        if (StartsWith(bytes, kRadiance))
+        {
+            return ".hdr";
+        }
         return {};
     }
 
@@ -114,44 +166,95 @@ namespace experiment::cooked
             //   여기서 멀어져 있다.
             AddIssue(result, "texture.extension",
                 "지원하지 않는 texture 확장자다: '" + extension
-                + "' (허용: .png .hdr .dds .jpg)");
+                + "' (허용: .png .hdr .dds .jpg .jpeg)");
             return result;
         }
 
         std::filesystem::path metaPath = source;
         metaPath += ".meta";
+        error.clear();
+        metaPath = std::filesystem::weakly_canonical(metaPath, error);
+        if (error || !IsContainedPath(assetRoot, metaPath))
+        {
+            AddIssue(result, "texture.meta", "Texture sidecar escapes the asset root.");
+            return result;
+        }
+        constexpr std::uint64_t kMaxSourceBytes = 512ull * 1024ull * 1024ull;
+        constexpr std::uint64_t kMaxMetaBytes = 16ull * 1024ull * 1024ull;
+        std::string failure;
+        const auto capture = [&](const std::filesystem::path& path, std::uint64_t limit,
+            std::vector<std::byte>& out)
+        {
+            const bool read = request.captureSource
+                ? request.captureSource(path, out, failure) : ReadInput(path, limit, out, failure);
+            if (read && out.size() > limit)
+            {
+                failure = "Captured texture input exceeds its byte budget: " + path.string();
+                return false;
+            }
+            return read;
+        };
+        std::vector<std::byte> metaBytes;
+        if (!capture(metaPath, kMaxMetaBytes, metaBytes))
+        {
+            AddIssue(result, "texture.meta", std::move(failure));
+            return result;
+        }
+        const std::string_view metaText(reinterpret_cast<const char*>(metaBytes.data()), metaBytes.size());
         AssetId textureAssetId{};
-        std::string metaFailure;
-        if (!ReadMetaAssetId(metaPath, textureAssetId, metaFailure))
+        std::vector<ModelIdentityIssue> identityIssues;
+        if (!ReadAssetIdFromMeta(metaText, textureAssetId, identityIssues) || !IsAssetIdV4(textureAssetId))
         {
-            AddIssue(result, "texture.meta", std::move(metaFailure));
+            AddIssue(result, "texture.meta", "Texture sidecar must contain a canonical UUIDv4 GUID.");
             return result;
         }
-        if (!IsAssetIdV4(textureAssetId))
+        TextureImportSettings settings;
+        if (!ParseTextureImportSettings(metaText, settings, failure))
         {
-            AddIssue(result, "texture.meta",
-                "texture meta GUID가 canonical UUIDv4가 아니다.");
+            AddIssue(result, "texture.settings", std::move(failure));
             return result;
         }
-
         std::vector<std::byte> bytes;
-        if (!ReadBinaryFile(source, bytes))
+        if (!capture(source, kMaxSourceBytes, bytes) || bytes.empty())
         {
-            AddIssue(result, "texture.read",
-                "source texture를 읽을 수 없다: " + source.string());
+            AddIssue(result, "texture.read", failure.empty() ? "Source texture is empty." : std::move(failure));
             return result;
         }
-        if (bytes.empty())
+        if (SniffTextureExtension(bytes) != (extension == ".jpeg" ? ".jpg" : extension))
         {
-            // 0바이트는 디코더가 못 읽는다. 해시와 크기는 멀쩡히 계산되므로
-            // manifest 검증만으로는 안 걸린다 — 여기서 막아야 한다.
-            AddIssue(result, "texture.read",
-                "source texture가 비어 있다: " + source.string());
+            AddIssue(result, "texture.decode", "Source image signature does not match its declared extension.");
+            return result;
+        }
+        TextureCookProduct product;
+        if (!ComputeSha256(bytes, product.sourceContentSha256, failure) ||
+            !ComputeSha256(metaBytes, product.sourceMetaSha256, failure))
+        {
+            AddIssue(result, "texture.sha256", std::move(failure));
+            return result;
+        }
+        if (!CookTexture(bytes, settings, product.artifactBytes, failure))
+        {
+            AddIssue(result, "texture.decode", std::move(failure));
+            return result;
+        }
+        // Compare the captured inputs to the actual producer inputs, never to
+        // the cooked bytes: cooking necessarily changes the representation.
+        std::vector<std::byte> currentSource;
+        std::vector<std::byte> currentMeta;
+        Sha256Digest sourceDigest{};
+        Sha256Digest metaDigest{};
+        if (!ReadInput(source, kMaxSourceBytes, currentSource, failure) ||
+            !ReadInput(metaPath, kMaxMetaBytes, currentMeta, failure) ||
+            !ComputeSha256(currentSource, sourceDigest, failure) ||
+            !ComputeSha256(currentMeta, metaDigest, failure) ||
+            sourceDigest != product.sourceContentSha256 || metaDigest != product.sourceMetaSha256)
+        {
+            AddIssue(result, "texture.snapshot", "Texture source or sidecar changed during cooking: " + failure);
             return result;
         }
 
         const std::string artifactPath =
-            MakeDerivedTextureArtifactPath(textureAssetId, extension);
+            MakeDerivedTextureArtifactPath(textureAssetId, ".cetex");
         if (artifactPath.empty())
         {
             AddIssue(result, "texture.artifactPath",
@@ -161,17 +264,16 @@ namespace experiment::cooked
 
         Sha256Digest digest{};
         std::string hashError;
-        if (!ComputeSha256(bytes, digest, hashError))
+        if (!ComputeSha256(product.artifactBytes, digest, hashError))
         {
             AddIssue(result, "texture.sha256", std::move(hashError));
             return result;
         }
 
-        TextureCookProduct product;
         product.textureAssetId = textureAssetId;
         product.artifactPath = artifactPath;
         product.sourceExtension = extension;
-        product.artifactBytes = std::move(bytes);
+        product.importRecipe = TextureImportRecipe(settings);
 
         CookedAssetManifestEntry entry;
         entry.assetId = textureAssetId;

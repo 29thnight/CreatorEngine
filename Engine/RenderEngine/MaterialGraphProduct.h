@@ -82,10 +82,32 @@ struct ParameterBinding
     bool operator==(const ParameterBinding&) const = default;
 };
 
+    // Internal per-resource storage contract, not an editable graph parameter.
+    // Values match MaterialGraphTextureSample.slang: 0 = RGBA, 1 = BC5 normal XY.
+    enum class TextureSampleEncoding : std::uint32_t
+    {
+        Rgba = 0,
+        BC5Normal = 1
+    };
+
+    struct TextureEncodingBinding
+    {
+        std::uint32_t slot{};
+        std::uint32_t offset{};
+
+        bool operator==(const TextureEncodingBinding&) const = default;
+    };
+
+    inline std::string TextureEncodingUniformName(std::uint32_t slot)
+    {
+        return "lx_bound_texture_" + std::to_string(slot) + "_encoding";
+    }
+
 struct BindingLayout
 {
     std::uint32_t uniformBytes{};
     std::vector<ParameterBinding> parameters;
+    std::vector<TextureEncodingBinding> textureEncodings;
     std::vector<LX::LXMaterialResource> textures;
     std::vector<LX::LXMaterialResource> samplers;
 
@@ -182,7 +204,7 @@ struct CookedProgram
     std::string boundSource;
 };
 
-inline constexpr std::uint32_t CookedProgramVersion = 4;
+inline constexpr std::uint32_t CookedProgramVersion = 5;
 bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,

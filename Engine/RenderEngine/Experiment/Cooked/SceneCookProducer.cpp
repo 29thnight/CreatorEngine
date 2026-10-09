@@ -2,6 +2,7 @@
 #include "../MaterialAuthoringCodec.h"
 
 #include "CookSupport.h"
+#include "TextureCookProducer.h"
 #include "../../Assets/AssetIdentityProfile.h" // PHASE 3.75 MBC8: UUIDv8 참조
 #include "../../MaterialGraphRuntime.h"
 #include "AuthoringCookedDocument.h"
@@ -83,6 +84,127 @@ inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
     "m_BehaviorTreeGuid",
     "m_BlackBoardGuid",
 };
+
+        [[nodiscard]] bool IsDecalTextureField(std::string_view key)
+        {
+            return key == "m_diffusefileName" || key == "m_normalFileName" || key == "m_ormFileName";
+        }
+
+        // Preserve the serialized component shape. Only these three existing
+        // string fields are lowered to typed identities in the cooked document.
+        [[nodiscard]] bool LowerDecalTexture(const Authoring::WriteNode& node,
+            const std::filesystem::path& assetRoot, std::vector<AssetId>& references, std::string& error)
+        {
+            if (!node.Read().IsScalar())
+            {
+                error = "Decal texture reference must be a scalar";
+                return false;
+            }
+            const auto text = node.Read().AsString();
+            if (text.empty() || IsNilGuidText(text))
+            {
+                node.SetScalar(std::string_view{});
+                return true;
+            }
+            AssetId id;
+            if (!TryParseCanonicalAssetId(text, id) && !assets::TryParseCanonicalUuidV8(text, id.value))
+            {
+                // Match the legacy DecalComponent rule exactly. Do not scan
+                // global basenames, stems, or substitute a similarly named image.
+                const auto filename = std::filesystem::path(text).filename();
+                std::error_code ec;
+                const auto source = std::filesystem::weakly_canonical(assetRoot / "Textures" / filename, ec);
+                auto extension = source.extension().string();
+                std::ranges::transform(extension, extension.begin(), [](unsigned char ch)
+                {
+                    return static_cast<char>(ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch);
+                });
+                if (ec || filename.empty() || !IsContainedPath(assetRoot, source)
+                    || !IsSupportedTextureExtension(extension))
+                {
+                    error = "Cannot resolve decal texture under Assets/Textures: " + text;
+                    return false;
+                }
+                const auto meta = std::filesystem::weakly_canonical(source.string() + ".meta", ec);
+                constexpr std::uintmax_t maximumSidecarBytes = 1024u * 1024u;
+                if (ec || !IsContainedPath(assetRoot, meta) || !std::filesystem::is_regular_file(meta, ec) || ec
+                    || std::filesystem::file_size(meta, ec) > maximumSidecarBytes || ec
+                    || !ReadMetaAssetId(meta, id, error) || !IsAssetIdV4(id))
+                {
+                    error = "Decal texture requires a canonical source sidecar: " + text + ": " + error;
+                    return false;
+                }
+            }
+            node.SetScalar(Uuid::ToString(id.value));
+            if (std::ranges::find(references, id) == references.end())
+            {
+                references.push_back(id);
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool LowerDecalTextures(const Authoring::WriteNode& node,
+            const std::filesystem::path& assetRoot, std::vector<AssetId>& references,
+            std::string& error, std::size_t& visited, std::size_t depth = 0u)
+        {
+            if (depth > 256u || ++visited > 1024u * 1024u)
+            {
+                error = "Decal reference traversal exceeds the scene document limit";
+                return false;
+            }
+            if (node.Read().IsSequence())
+            {
+                for (std::size_t index = 0u; index < node.Size(); ++index)
+                {
+                    if (!LowerDecalTextures(node.At(index), assetRoot, references, error, visited, depth + 1u))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            if (!node.Read().IsMap())
+            {
+                return true;
+            }
+            for (const auto entry : node.Read().Map())
+            {
+                const auto key = entry.key.AsString();
+                const auto child = node.Child(key);
+                if (IsDecalTextureField(key))
+                {
+                    if (!LowerDecalTexture(child, assetRoot, references, error))
+                    {
+                        return false;
+                    }
+                }
+                else if (key == "m_valueYaml" && entry.value.IsScalar() && !entry.value.Scalar().empty())
+                {
+                    auto nested = Authoring::WriteDocument::ParseText(entry.value.AsString(), &error);
+                    if (!nested)
+                    {
+                        return false;
+                    }
+                    if (IsDecalTextureField(node.Read()["m_propertyName"].Scalar()))
+                    {
+                        if (!LowerDecalTexture(nested->Root(), assetRoot, references, error))
+                        {
+                            return false;
+                        }
+                    }
+                    else if (!LowerDecalTextures(nested->Root(), assetRoot, references, error, visited, depth + 1u))
+                    {
+                        return false;
+                    }
+                    child.SetScalar(nested->Dump());
+                }
+                else if (!LowerDecalTextures(child, assetRoot, references, error, visited, depth + 1u))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
 // PrefabOverride::m_valueYaml is an authoring file-format scalar that
 // contains a second YAML document. Leaving it unchanged would make a
@@ -592,6 +714,25 @@ SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& requ
         return result;
     }
 
+    const auto textureIdentityRoot = request.textureIdentityRoot.empty() ? assetRoot
+        : std::filesystem::weakly_canonical(request.textureIdentityRoot, error);
+    if (error || !std::filesystem::is_directory(textureIdentityRoot, error) || error)
+    {
+        AddIssue(result, "request.textureIdentityRoot", "Texture identity root must be an existing asset directory");
+        return result;
+    }
+    Authoring::WriteDocument loweredDocument;
+    loweredDocument.Root().Assign(root);
+    std::vector<AssetId> decalTextures;
+    std::size_t visited{};
+    std::string loweringError;
+    if (!LowerDecalTextures(loweredDocument.Root(), textureIdentityRoot, decalTextures, loweringError, visited))
+    {
+        AddIssue(result, "scene.decalTexture", std::move(loweringError));
+        return result;
+    }
+    const auto loweredRoot = loweredDocument.Root().Read();
+
     SceneCookProduct product;
     product.sceneAssetId = sceneAssetId;
     product.kind = kind;
@@ -601,7 +742,11 @@ SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& requ
     std::string failureValue;
     std::string failureContext;
     Walk walk{product, sceneAssetId, dependencies, failureKey, failureValue, failureContext, false, request.bootstrapReferences};
-    walk.Visit(root);
+    walk.Visit(loweredRoot);
+    for (const auto& texture : decalTextures)
+    {
+        walk.AddEdge(texture, product.textureEdges, CookedAssetKind::Texture);
+    }
     if (walk.failed)
     {
         AddIssue(result, failureContext, failureKey + "가 canonical UUIDv4가 아니다: " + failureValue);
@@ -618,7 +763,7 @@ SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& requ
 
     Authoring::WriteDocument runtimeDocument;
     std::string encodeError;
-    if (!BuildRuntimeTree(root, runtimeDocument.Root(), product.cookedOverrideValues, encodeError))
+    if (!BuildRuntimeTree(loweredRoot, runtimeDocument.Root(), product.cookedOverrideValues, encodeError))
     {
         AddIssue(result, "scene.runtimeDocument", std::move(encodeError));
         return result;

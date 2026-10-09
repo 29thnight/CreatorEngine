@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -12,33 +13,16 @@
 
 namespace experiment::cooked
 {
-    // Source texture 하나를 publication 직전의 완전 소유 산출물로 바꾼다.
-    // `ModelCookProducer` 와 같은 규약이다 — 파일은 쓰지 않고, AssetCooker 가
-    // 여러 product 를 한 staging 디렉터리에 모아 원자적으로 게시한다.
-    //
-    // ★ **이 슬라이스의 artifact 는 원본 바이트 그대로다. 트랜스코딩하지 않는다.**
-    //
-    //   BC7 압축·밉 생성은 여기 없다. 그건 압축기를 들이는 별개의 작업이고,
-    //   지금 넣으면 D5-b2c 가 그 작업에 묶인다. `BuildPipelinePlan` B3 가
-    //   셰이더에 대해 이미 같은 자세를 취한다 — artifact 경로가 서기 전까지
-    //   HLSL source 를 pak 에 싣는다.
-    //
-    //   그러면 무엇을 얻는가. **압축이 아니라 주소 체계다:**
-    //     - GUID 주소  — `.meta` 를 읽어 경로를 찾는 런타임 탐색이 사라진다
-    //     - 내용 해시  — stale artifact 를 fail-closed 로 잡는다
-    //     - manifest 등재 — 의존 폐포(D5-b2c-5)의 노드가 된다
-    //
-    //   이것이 D5-c(Player 소비)가 실제로 필요로 하는 것이고, 트랜스코딩은
-    //   그 위에 나중에 얹으면 된다. `formatVersion` 이 1 이므로 트랜스코딩이
-    //   들어오는 날 2 가 되고 구버전 artifact 는 자동으로 거부된다.
-    //
-    // ★ 확장자는 artifactPath 에 남긴다. 로더가 그것으로 디코더를 고른다.
-    //   지금은 pass-through 라 확장자가 곧 포맷이다.
-
+    // Offline source image -> validated GPU-ready CECT artifact. The producer
+    // owns every returned byte and never publishes files. Source and metadata
+    // are captured together; callers can supply their build-local pinned reader.
     struct TextureCookProductRequest final
     {
         std::filesystem::path sourcePath{};
         std::filesystem::path assetRoot{};
+        // A failed supplied reader never falls back to a different disk read.
+        std::function<bool(const std::filesystem::path&, std::vector<std::byte>&,
+            std::string&)> captureSource{};
     };
 
     struct TextureCookProduct final
@@ -47,6 +31,9 @@ namespace experiment::cooked
         std::string artifactPath{};
         std::vector<std::byte> artifactBytes{};
         CookedAssetManifestEntry manifestEntry{};
+        Sha256Digest sourceContentSha256{};
+        Sha256Digest sourceMetaSha256{};
+        std::string importRecipe{};
 
         // 진단용이다. identity 가 아니다 — 확장자로 GUID 를 만들지 않는다.
         std::string sourceExtension{};

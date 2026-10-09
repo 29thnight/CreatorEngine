@@ -6,8 +6,135 @@
 #include "EditorPropertyRow.h"
 #include "ExternUI.h"
 #include "InspectorControl.h"
+#include "EditorAssetDatabase.h"
+#include "ConsoleCommandSystem.h"
+#include "FileDialog.h"
+#include "PathFinder.h"
+#include "Experiment/Cooked/TextureImportSettings.h"
+#include <algorithm>
+#include <type_traits>
 #include <sstream>
 #include <unordered_set>
+
+bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::path& source)
+{
+    namespace cooked = experiment::cooked;
+    if (!EditorAssetDatabase::IsTextureSource(source))
+    {
+        return false;
+    }
+    struct Draft final
+    {
+        std::filesystem::path source;
+        std::string baseline;
+        cooked::TextureImportSettings settings;
+        std::string parseError;
+        std::string saveError;
+        editor::widgets::property_layout_state layout;
+    };
+    static Draft draft;
+    const auto document = node.Dump();
+    if (draft.source != source || draft.baseline != document)
+    {
+        draft = {};
+        draft.source = source;
+        draft.baseline = document;
+        (void)cooked::ParseTextureImportSettings(document, draft.settings, draft.parseError);
+    }
+    if (!draft.parseError.empty())
+    {
+        ImGui::TextWrapped("Invalid texture import settings: %s", draft.parseError.c_str());
+        return true;
+    }
+    auto& settings = draft.settings;
+    const editor::widgets::property_sheet sheet(draft.layout, { "Color Space", "Compression", "Mip Policy",
+        "Maximum Dimension", "Normal Map", "Alpha Coverage", "Alpha Cutoff", "Compression Quality" });
+    const auto combo = [&sheet](const char* label, auto& value, const char* entries)
+    {
+        ImGui::PushID(label);
+        int selected = static_cast<int>(value);
+        ImGui::SetNextItemWidth(sheet.line(label));
+        if (ImGui::Combo("##Value", &selected, entries))
+        {
+            value = static_cast<std::remove_reference_t<decltype(value)>>(selected);
+        }
+        ImGui::PopID();
+    };
+    combo("Color Space", settings.colorSpace, "Source\0Linear\0Srgb\0");
+    combo("Compression", settings.compression, "None\0Auto\0BC1\0BC3\0BC5\0BC7\0");
+    combo("Mip Policy", settings.mipPolicy, "PreserveAuthored\0GenerateFull\0");
+    ImGui::SetNextItemWidth(sheet.line("Maximum Dimension"));
+    int dimension = static_cast<int>(settings.maxDimension);
+    if (ImGui::InputInt("##MaximumDimension", &dimension))
+    {
+        settings.maxDimension = static_cast<std::uint32_t>(std::clamp(dimension, 0, 16384));
+    }
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::SetTooltip("0 preserves the source dimensions");
+    }
+    sheet.line("Normal Map");
+    ImGui::Checkbox("##NormalMap", &settings.normalMap);
+    sheet.line("Alpha Coverage");
+    ImGui::Checkbox("##AlphaCoverage", &settings.preserveAlphaCoverage);
+    ImGui::SetNextItemWidth(sheet.line("Alpha Cutoff"));
+    ImGui::SliderFloat("##AlphaCutoff", &settings.alphaCutoff, 0.001f, 0.999f);
+    combo("Compression Quality", settings.compressionQuality, "Fast\0Normal\0High\0");
+    ImGui::TextWrapped("Sampler wrap and filter are set on each texture reference.");
+    std::string validationError;
+    const bool valid = cooked::ValidateTextureImportSettings(settings, validationError);
+    if (!valid)
+    {
+        ImGui::TextWrapped("%s", validationError.c_str());
+    }
+    ImGui::BeginDisabled(!valid);
+    if (ImGui::Button("Save and Reimport"))
+    {
+        draft.saveError.clear();
+        if (EditorAssetDatabase::Get().SetTextureImportSettingsAndReimport(source, settings, draft.saveError))
+        {
+            EditorAssetDatabase::WriteTextureImportSettings(node, settings);
+            draft.baseline = node.Dump();
+        }
+    }
+    ImGui::EndDisabled();
+    if (!draft.saveError.empty())
+    {
+        ImGui::TextWrapped("%s", draft.saveError.c_str());
+    }
+    ImGui::TextWrapped("%s", EditorAssetDatabase::Get().TextureImportStatus(source).c_str());
+    ImGui::BeginDisabled(!EditorAssetDatabase::Get().TextureImportReady(source));
+    if (ImGui::Button("Reload Saved Scene..."))
+    {
+        ImGui::OpenPopup("##TextureReloadScene");
+    }
+    ImGui::EndDisabled();
+    if (ImGui::BeginPopupModal("##TextureReloadScene", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextWrapped("Reload a saved scene to replace existing texture references with the cooked generation.");
+        ImGui::TextWrapped("Unsaved changes in the active scene will be discarded. Save the scene first if you need to keep them.");
+        if (ImGui::Button("Choose Scene and Reload"))
+        {
+            const auto scene = ShowOpenFileDialog(L"Scene Files (*.creator)\0*.creator\0",
+                L"Reload Scene with Cooked Textures", PathFinder::Relative("Scenes\\").wstring());
+            if (!scene.empty())
+            {
+                // Match the existing scene menu: owner-thread admission and
+                // asynchronous dependency preparation retain the current scene
+                // until the complete replacement is ready for activation.
+                ConsoleCommandSystem::Get().EnqueueStructured({ "scene.open_async", scene.string() });
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    return true;
+}
 
 // 자산 Import Settings 본문 (PHASE 21 W2-I4).
 //

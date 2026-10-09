@@ -37,6 +37,7 @@ $sources += @('Engine/RenderEngine/Experiment/Cooked/CookedMaterialProgram.cpp',
     'Engine/RenderEngine/MaterialGraphRuntime.cpp', 'Tools/regression/material_runtime_tests.cpp',
     'Engine/Utility_Framework/AuthoringScalarConvert.cpp', 'Engine/Utility_Framework/AuthoringRymlErrorPolicy.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.cpp',
+    'Engine/RenderEngine/Experiment/Cooked/CookedTexture.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.cpp',
     'Engine/RenderEngine/Assets/AssetIdentityProfile.cpp')
 $gcce = Get-GCCEProbeSettings -Repository $repo -Configuration Release

@@ -98,6 +98,21 @@ enum class RuntimeAssetChangeKind
 	Removed,
 };
 
+// Authoring prepares complete immutable storage off-thread. Only the existing
+// asset-change drain installs the resolver generation; accepted owners survive.
+struct RuntimeTexturePublication final
+{
+    enum class State { Queued, Loading, Failed, Superseded };
+    experiment::cooked::AssetSetManifest manifest{};
+    std::vector<std::byte> manifestBytes{};
+    own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource{};
+    std::shared_ptr<std::atomic<std::uint64_t>> latestRevision{};
+    std::uint64_t revision{};
+    std::atomic<State> state{ State::Queued };
+    // Written before Loading (release), then read through Snapshot (acquire).
+    AssetDepot::AssetRequest<Texture> request{};
+};
+
 // Editor 같은 authoring Host가 완전히 게시한 파일의 결과만 이 계약으로 넘긴다.
 // Runtime은 source/meta 작성 방법을 알지 않고 catalog와 cache generation만 갱신한다.
 struct RuntimeAssetChange
@@ -106,6 +121,7 @@ struct RuntimeAssetChange
 	RuntimeAssetType assetType{ RuntimeAssetType::Auto };
 	FileGuid guid{};
 	file::path path{};
+    own::shared_owner<RuntimeTexturePublication> texturePublication{};
 };
 
 class DataSystem : public Singleton<DataSystem>
@@ -430,12 +446,14 @@ public:
 	bool MountCookedCatalog(const file::path& derivedRoot, std::string& outError);
 
     // AssetDepot metadata transactions. v2 packages remain on MountCookedCatalog;
-    // a new AssetSet must be explicitly cooked as CEMF v3.
+    // a new AssetSet must be explicitly cooked as CEMF v3. replaceMount retires
+    // an old logical mount in the same candidate transaction, preserving owners.
     [[nodiscard]] AssetDepot::AssetMountId MountAssetSet(
         std::span<const std::byte> manifestBytes,
         own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource,
         const experiment::cooked::AssetSetMountOptions& options,
-        std::vector<experiment::cooked::AssetManifestIssue>& outIssues);
+        std::vector<experiment::cooked::AssetManifestIssue>& outIssues,
+        AssetDepot::AssetMountId replaceMount = {});
     [[nodiscard]] bool UnmountAssetSet(AssetDepot::AssetMountId mountId,
         std::vector<experiment::cooked::AssetManifestIssue>& outIssues);
 
@@ -660,6 +678,9 @@ private:
     // Guarded with m_cookedCatalogMutex; never reset/reused on reinitialize.
     std::uint64_t m_assetDepotRevision{};
     std::uint64_t m_nextAssetMountId{ 1u };
+    // Frame-boundary authoring overlays, guarded by m_assetPreparationMutex.
+    std::map<FileGuid, AssetDepot::AssetMountId> m_authoredTextureMounts;
+    bool PublishAuthoredTexture(const RuntimeAssetChange& change);
     [[nodiscard]] std::vector<experiment::cooked::TypedAssetReference> ListAssetSetRoots(
         AssetDepot::AssetMountId mountId, experiment::cooked::CookedAssetKind kind) const;
 	// I7-C2 — 마운트 때 한 번 판정한 stale 집합. 해석마다 stat을 두 번 하면

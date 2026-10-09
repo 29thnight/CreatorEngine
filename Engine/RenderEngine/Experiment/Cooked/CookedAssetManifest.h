@@ -16,16 +16,15 @@ namespace experiment::cooked
     inline constexpr std::uint32_t kAssetManifestMagic = 0x464d4543u; // CEMF
     inline constexpr std::uint16_t kAssetManifestVersion = 2u;
 
-    // pass-through texture artifact 의 버전이다. 트랜스코딩(BC7·밉)이
-    // 들어오는 날 2 가 되고 구버전 artifact 는 자동으로 거부된다.
-    inline constexpr std::uint32_t kTextureArtifactVersion = 1u;
+    // GPU-ready CECT texture payload. CEMF itself remains unchanged.
+    inline constexpr std::uint32_t kTextureArtifactVersion = 2u;
 
     // standalone material artifact 의 버전. ShaderMeta 처럼 유도할 schema 상수가
     // 없다 — `Material::reflect()` 는 버전을 들지 않는다. 그래서 여기 손으로
     // 둔다. 저작 스키마가 바뀌면 **이 숫자를 함께 올려야 하고**, 안 올리면
     // 구형 artifact 가 새 리더에 조용히 들어간다.
     inline constexpr std::uint32_t kMaterialArtifactVersion = 2u;
-    inline constexpr std::uint32_t kMaterialProgramArtifactVersion = 4u;
+    inline constexpr std::uint32_t kMaterialProgramArtifactVersion = 5u;
 
     // scene/prefab artifact 의 버전. 저작 스키마가 바뀌면 함께 올려야 한다.
     inline constexpr std::uint32_t kSceneArtifactVersion = 2u;
@@ -198,8 +197,8 @@ namespace experiment::cooked
     //   있어도 매번 Assimp 를 돌았다. 경로를 만드는 지점이 갈라지면 반드시
     //   이렇게 어긋난다.
     //
-    //   extension 은 소문자 점 포함 표기다(".png"). pass-through artifact 라
-    //   확장자가 곧 포맷이고, 로더가 그것으로 디코더를 고른다.
+    //   New texture artifacts use .cetex; the path helper also validates legacy
+    //   caller spelling without deriving logical identity from an extension.
     [[nodiscard]] std::string MakeDerivedTextureArtifactPath(
         const AssetId& textureAssetId, std::string_view extension);
 

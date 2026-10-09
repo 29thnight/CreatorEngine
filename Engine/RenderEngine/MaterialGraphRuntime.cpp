@@ -348,6 +348,7 @@ namespace material_graph
         {
             charge.AddParameter(binding.parameter);
         }
+        charge.AddVector(product.layout.textureEncodings);
         charge.AddVector(product.layout.textures);
         for (const auto& resource : product.layout.textures)
         {

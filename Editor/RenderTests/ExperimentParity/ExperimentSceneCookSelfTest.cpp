@@ -15,6 +15,7 @@
 #include <process.h>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace RenderTest
@@ -82,8 +83,27 @@ namespace RenderTest
 
         [[nodiscard]] bool RuntimeDocumentEquivalent(
             const Authoring::ReadNode& source,
-            const Authoring::ReadNode& cooked)
+            const Authoring::ReadNode& cooked,
+            const std::filesystem::path& assetRoot = {}, std::string_view field = {})
         {
+            const bool decalTexture = field == "m_diffusefileName"
+                || field == "m_normalFileName" || field == "m_ormFileName";
+            if (decalTexture && source.IsScalar() && cooked.IsScalar())
+            {
+                const auto reference = source.AsString();
+                if (reference.empty() || reference == "00000000-0000-0000-0000-000000000000")
+                {
+                    return cooked.Scalar().empty();
+                }
+                if (source.Scalar() == cooked.Scalar())
+                {
+                    return true;
+                }
+                std::string error;
+                const auto sidecar = assetRoot / "Textures" / (std::filesystem::path(reference).filename().string() + ".meta");
+                const auto meta = Authoring::ParsedDocument::ParseFile(sidecar.string(), error);
+                return meta && meta.Root()["guid"].Scalar() == cooked.Scalar();
+            }
             if (!source || !cooked) return !source && !cooked;
             if (source.IsNull() || cooked.IsNull())
                 return source.IsNull() && cooked.IsNull();
@@ -97,7 +117,7 @@ namespace RenderTest
                 for (std::size_t index = 0u; index < source.Size(); ++index)
                 {
                     if (!RuntimeDocumentEquivalent(
-                        source.At(index), cooked.At(index))) return false;
+                        source.At(index), cooked.At(index), assetRoot)) return false;
                 }
                 return true;
             }
@@ -121,12 +141,13 @@ namespace RenderTest
                         Authoring::DecodeCookedDocumentTextEnvelope(
                             cookedValue.Scalar(), cookedError);
                     if (!embeddedSource || !embeddedCooked
-                        || !Authoring::NodesEqual(
-                            embeddedSource.Root(), embeddedCooked->Root()))
+                        || !RuntimeDocumentEquivalent(
+                            embeddedSource.Root(), embeddedCooked->Root().Read(), assetRoot,
+                            source["m_propertyName"].Scalar()))
                         return false;
                     continue;
                 }
-                if (!RuntimeDocumentEquivalent(entry.value, cookedValue))
+                if (!RuntimeDocumentEquivalent(entry.value, cookedValue, assetRoot, key))
                     return false;
             }
             return true;
@@ -299,7 +320,7 @@ namespace RenderTest
                         product.artifactBytes, cookedError);
                 check.Check(sourceDocument && cookedDocument
                     && RuntimeDocumentEquivalent(
-                        sourceDocument.Root(), cookedDocument.Root()),
+                        sourceDocument.Root(), cookedDocument.Root(), root),
                     "fixture authoring/CEDO 구조가 같아야 한다");
                 check.Check(sourceDocument
                     && product.cookedOverrideValues
@@ -479,6 +500,72 @@ namespace RenderTest
                 "request.assetRoot", "디렉터리가 아닌 asset root");
         }
 
+        // PHASE 12: decal strings retain their schema, while cooked documents
+        // and nested prefab overrides carry canonical typed Texture identities.
+        {
+            check.Check(WriteTextFile(root / "Textures/decal.png", "identity-only fixture")
+                && WriteTextFile(root / "Textures/decal.png.meta", "guid: " + std::string(kTextureGuid) + "\n")
+                && WriteTextFile(root / "Materials/decal.png", "wrong-folder fixture")
+                && WriteTextFile(root / "Materials/decal.png.meta", "guid: " + std::string(kModelGuid) + "\n"),
+                "decal exact-folder identity fixtures");
+            SceneSpec spec;
+            spec.folder = "DecalTexture";
+            spec.documentOverride = "Decal:\n  m_diffusefileName: decal.png\n"
+                "  m_normalFileName: ''\n  m_ormFileName: decal.png\n"
+                "Override:\n  m_propertyName: m_ormFileName\n  m_valueYaml: \"decal.png\\n\"\n";
+            const auto fixture = MakeFixture(root, spec);
+            const auto result = ck::BuildSceneCookProduct({ fixture.source, root, true });
+            check.Check(result.Succeeded(), "decal filename references lower offline");
+            if (result.Succeeded())
+            {
+                const auto& product = *result.product;
+                check.Check(product.manifestEntry.dependencies == std::vector<experiment::AssetId>{ texture },
+                    "decal dependency resolves exact Textures path and deduplicates");
+                check.Check(product.bootstrapReferences.size() == 1u
+                    && product.bootstrapReferences.front().key.assetId == texture
+                    && product.bootstrapReferences.front().kind == ck::CookedAssetKind::Texture,
+                    "decal bootstrap closure carries typed Texture edge");
+                std::string error;
+                const auto document = Authoring::ParsedDocument::ParseCooked(product.artifactBytes, error);
+                check.Check(document && document.Root()["Decal"]["m_diffusefileName"].AsString() == kTextureGuid
+                    && document.Root()["Decal"]["m_normalFileName"].AsString().empty(),
+                    "cooked decal fields are canonical GUID strings or empty");
+                if (document)
+                {
+                    const auto override = Authoring::DecodeCookedDocumentTextEnvelope(
+                        document.Root()["Override"]["m_valueYaml"].Scalar(), error);
+                    check.Check(override && override->Root().Read().AsString() == kTextureGuid,
+                        "prefab decal scalar override lowers before CEDO envelope encoding");
+                }
+                std::string unchanged;
+                check.Check(ReadFileBytes(fixture.source, unchanged) && unchanged == spec.documentOverride,
+                    "scene cooking never rewrites authoring source");
+                const auto documentsRoot = root / "DocumentsOnly";
+                const auto identitiesRoot = root / "IdentityOnly";
+                check.Check(WriteTextFile(identitiesRoot / "Textures/decal.png.meta",
+                    "guid: " + std::string(kTextureGuid) + "\n"), "metadata-only identity fixture");
+                const auto documentsFixture = MakeFixture(documentsRoot, spec);
+                const auto metadataOnly = ck::BuildSceneCookProduct(
+                    { documentsFixture.source, documentsRoot, true, identitiesRoot });
+                check.Check(metadataOnly.Succeeded()
+                    && metadataOnly.product->artifactBytes == product.artifactBytes
+                    && !std::filesystem::exists(identitiesRoot / "Textures/decal.png"),
+                    "documents-only bootstrap lowers from explicit sidecar root without source pixels");
+                ExpectRejected(check, documentsFixture, "scene.decalTexture",
+                    "documents-only legacy decal needs an explicit identity root");
+            }
+            SceneSpec missing;
+            missing.folder = "DecalMissing";
+            missing.documentOverride = "m_diffusefileName: only-in-materials.png\n";
+            (void)WriteTextFile(root / "Materials/only-in-materials.png", "wrong-folder fixture");
+            (void)WriteTextFile(root / "Materials/only-in-materials.png.meta", "guid: " + std::string(kTextureGuid) + "\n");
+            ExpectRejected(check, MakeFixture(root, missing), "scene.decalTexture", "decal must not scan global basenames");
+            SceneSpec malformed;
+            malformed.folder = "DecalMalformed";
+            malformed.documentOverride = "m_diffusefileName: [decal.png]\n";
+            ExpectRejected(check, MakeFixture(root, malformed), "scene.decalTexture", "decal non-scalar reference fails closed");
+        }
+
         // ── 5. 경로 헬퍼 ───────────────────────────────────────────────
         {
             experiment::AssetId id{};
@@ -540,7 +627,7 @@ namespace RenderTest
 		if (sourceDocument && cookedDocument)
 		{
 			check.Check(RuntimeDocumentEquivalent(
-				sourceDocument.Root(), cookedDocument.Root()),
+				sourceDocument.Root(), cookedDocument.Root(), std::filesystem::path(assetRootPath)),
 				"authoring/cooked scene-payload 의미 구조가 같아야 한다");
 			check.Check(product.cookedOverrideValues
 				== CountAuthoredOverrideValues(sourceDocument.Root()),

@@ -2634,12 +2634,25 @@ void InspectorWindow::Draw()
 		stem += " Import Settings";
 
 		const bool importOpen = ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+		file::path importSource = selectedMetaFilePath;
+		importSource.replace_extension();
+		const bool textureImport = EditorAssetDatabase::IsTextureSource(importSource);
 		{
 			inspector_body_probe probe;
-			if (importOpen) DrawYamlNodeEditor(selectedNode->Root());
+			if (importOpen)
+			{
+				if (textureImport)
+				{
+					DrawTextureImportEditor(selectedNode->Root(), importSource);
+				}
+				else
+				{
+					DrawYamlNodeEditor(selectedNode->Root());
+				}
+			}
 			probe.finish("ImportSettings", 0, importOpen);
 		}
-		if (importOpen)
+		if (importOpen && !textureImport)
 		{
 
 			ImGui::Spacing();

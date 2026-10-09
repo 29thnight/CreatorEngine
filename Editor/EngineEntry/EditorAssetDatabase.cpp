@@ -4,7 +4,13 @@
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ProjectLayerSettingsCodec.h"
 #include "EditorAssetDatabase.h"
+#include "TextureSourceProcessing.h"
 #include "Assets/ModelMaterialGraph.h"
+#include "Experiment/Cooked/TextureImportSettings.h"
+#include "Experiment/Cooked/TextureCookProducer.h"
+#include "Experiment/Cooked/CookedTexture.h"
+#include "ContentAbi.h"
+#include "JobScheduler.h"
 
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Assets/AudioClipSourceMetadata.h"
@@ -24,8 +30,7 @@
 
 #include <efsw/efsw.hpp>
 #include <DirectXTex.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
+#include <wincodec.h>
 
 #include <algorithm>
 #include <array>
@@ -581,7 +586,8 @@ namespace
 	};
 }
 
-struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
+struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
+    std::enable_shared_from_this<EditorAssetDatabase::Impl>
 {
 	explicit Impl(file::path root) : m_root(std::move(root)) {}
 
@@ -617,6 +623,12 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		// FileWatcher owns the callback thread. Destroy it while this listener is
 		// still alive, then let the rest of Impl be released.
 		m_watcher.reset();
+        std::lock_guard lock(m_authoringMutex);
+        m_stopping = true;
+        for (auto& [path, work] : m_textureImports)
+        {
+            work.latestRevision->fetch_add(1u, std::memory_order_release);
+        }
 	}
 
     std::uint64_t AudioRevision() const noexcept
@@ -635,6 +647,335 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		std::lock_guard lock(m_authoringMutex);
 		return CreateMetaLocked(targetFile, preferredGuid);
 	}
+
+    struct TextureImportWork final
+    {
+        std::array<ModelSourceStamp, 2> stamps{};
+        std::shared_ptr<std::atomic<std::uint64_t>> latestRevision{
+            std::make_shared<std::atomic<std::uint64_t>>(0u) };
+        job_handle completion{};
+        std::shared_ptr<std::atomic<bool>> dispatchFailed{ std::make_shared<std::atomic<bool>>(false) };
+        own::shared_owner<RuntimeTexturePublication> publication{};
+        AssetDepot::AssetRequest<Texture> refreshRequest{};
+        std::uint64_t refreshRevision{};
+        std::string failure{};
+        bool cooking{};
+    };
+
+    bool SetTextureImportSettingsAndReimport(const file::path& requestedSource,
+        const experiment::cooked::TextureImportSettings& settings, std::string& failure)
+    {
+        failure.clear();
+        if (!experiment::cooked::ValidateTextureImportSettings(settings, failure))
+        {
+            return false;
+        }
+        std::lock_guard lock(m_authoringMutex);
+        std::error_code error;
+        const auto source = file::weakly_canonical(requestedSource, error);
+        if (m_stopping || error || !IsPathInside(source, file::weakly_canonical(m_root))
+            || !EditorAssetDatabase::IsTextureSource(source) || !file::is_regular_file(source, error) || error)
+        {
+            failure = "Choose a supported texture inside the project Assets directory";
+            return false;
+        }
+        const file::path sidecar = source.string() + ".meta";
+        const auto canonicalSidecar = file::weakly_canonical(sidecar, error);
+        if (error || !IsPathInside(canonicalSidecar, file::weakly_canonical(m_root)))
+        {
+            failure = "Texture sidecar escapes the project Assets directory";
+            return false;
+        }
+        auto document = Authoring::WriteDocument::ParseFile(sidecar, &failure);
+        if (!document || !document->Root().Read().IsMap() || !LoadGuidFromMeta(sidecar).IsRandomV4())
+        {
+            failure = "Texture sidecar must have a valid canonical UUIDv4 identity";
+            return false;
+        }
+        EditorAssetDatabase::WriteTextureImportSettings(document->Root(), settings);
+        const auto text = document->Dump();
+        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(text.data(), text.size())), PublishEncoding::Text))
+        {
+            failure = "Could not publish texture import settings";
+            return false;
+        }
+        return QueueTextureReimportLocked(source, failure, true);
+    }
+
+    std::string TextureImportStatus(const file::path& source)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        const auto key = source.lexically_normal();
+        const auto found = m_textureImports.find(key);
+        if (found == m_textureImports.end())
+        {
+            return "Save and Reimport creates a cooked texture generation";
+        }
+        auto& work = found->second;
+        if (work.dispatchFailed->load(std::memory_order_acquire))
+        {
+            return "Texture import scheduler job failed; save and reimport to retry";
+        }
+        if (!work.failure.empty())
+        {
+            return "Import failed; previous generation retained: " + work.failure;
+        }
+        if (work.cooking)
+        {
+            return "Cooking texture in the background...";
+        }
+        if (!work.publication)
+        {
+            return "Texture has no accepted cooked generation";
+        }
+        const auto state = work.publication->state.load(std::memory_order_acquire);
+        if (state == RuntimeTexturePublication::State::Queued)
+        {
+            return "Cook complete; waiting for frame-boundary publication...";
+        }
+        if (state == RuntimeTexturePublication::State::Failed)
+        {
+            return "Texture generation publication failed; see the editor log";
+        }
+        if (state == RuntimeTexturePublication::State::Superseded)
+        {
+            return "A newer import superseded this generation";
+        }
+        const auto request = work.publication->request.Snapshot();
+        if (request.status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            return "Cooked generation published; preparing the texture...";
+        }
+        if (request.status == AssetDepot::AssetRequestStatus::Ready
+            || request.status == AssetDepot::AssetRequestStatus::Stale
+            || request.status == AssetDepot::AssetRequestStatus::Cancelled)
+        {
+            const AssetDepot::AssetLink<Texture> link{ work.publication->manifest.entries.front().asset.key };
+            if (DataSystems->TryAcquire<Texture>(link))
+            {
+                return "Cooked generation ready. The current scene keeps its prior textures until Reload Saved Scene.";
+            }
+            // Other asset publications can advance the shared resolver while
+            // this preload runs. Reacquire through the existing nonblocking API.
+            const auto catalog = DataSystems->GetCookedCatalog();
+            const auto resolverRevision = catalog ? catalog->ResolverRevision() : 0u;
+            auto refresh = work.refreshRequest.Snapshot();
+            if (work.refreshRevision == 0u || work.refreshRevision != resolverRevision
+                || refresh.status == AssetDepot::AssetRequestStatus::Stale
+                || refresh.status == AssetDepot::AssetRequestStatus::Cancelled)
+            {
+                work.refreshRequest = DataSystems->RequestAsync<Texture>(link);
+                work.refreshRevision = resolverRevision;
+                refresh = work.refreshRequest.Snapshot();
+            }
+            if (refresh.status == AssetDepot::AssetRequestStatus::Failed)
+            {
+                return "Cooked texture preparation failed: " + refresh.message;
+            }
+            return "Preparing the texture against the current asset generation...";
+        }
+        return "Cooked texture preparation failed: " + request.message;
+    }
+
+    bool TextureImportReady(const file::path& source)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        const auto found = m_textureImports.find(source.lexically_normal());
+        if (found == m_textureImports.end() || found->second.cooking || !found->second.failure.empty()
+            || found->second.dispatchFailed->load(std::memory_order_acquire) || !found->second.publication)
+        {
+            return false;
+        }
+        const auto& publication = found->second.publication;
+        return publication->state.load(std::memory_order_acquire) == RuntimeTexturePublication::State::Loading
+            && bool(DataSystems->TryAcquire<Texture>(AssetDepot::AssetLink<Texture>{
+                publication->manifest.entries.front().asset.key }));
+    }
+
+    bool QueueTextureReimportLocked(const file::path& source, std::string& failure, bool force = false)
+    {
+        if (m_stopping)
+        {
+            failure = "Editor authoring is stopping";
+            return false;
+        }
+        const auto key = source.lexically_normal();
+        const std::array stamps{ ReadModelSourceStamp(source),
+            ReadModelSourceStamp(source.string() + ".meta") };
+        if (!stamps[0].present || !stamps[1].present)
+        {
+            failure = "Texture source or sidecar is missing";
+            return false;
+        }
+        auto& work = m_textureImports[key];
+        if (!force && !work.dispatchFailed->load(std::memory_order_acquire)
+            && work.stamps == stamps && (work.cooking || work.publication))
+        {
+            return true;
+        }
+        work.stamps = stamps;
+        work.failure.clear();
+        work.cooking = true;
+        work.dispatchFailed = std::make_shared<std::atomic<bool>>(false);
+        const auto revision = work.latestRevision->fetch_add(1u, std::memory_order_acq_rel) + 1u;
+        const auto self = shared_from_this();
+        job_group jobs;
+        jobs.add([self, key, stamps, revision]
+        {
+            self->CookTextureGeneration(key, stamps, revision);
+        });
+        // Every accepted scheduler path, including dispatch failure, terminates
+        // the status. A stale job cannot clear a newer request's pending state.
+        jobs.on_complete([failed = work.dispatchFailed](std::exception_ptr error)
+        {
+            // Submission failure can invoke this inline under the authoring
+            // lock. The terminal signal must never re-enter that lock.
+            failed->store(bool(error), std::memory_order_release);
+        });
+        try
+        {
+            const std::array dependencies{ m_textureCookTail };
+            const auto preceding = m_textureCookTail.valid() && !m_textureCookTail.is_complete()
+                ? std::span<const job_handle>(dependencies) : std::span<const job_handle>{};
+            work.completion = ce::get_job_scheduler().submit_after(preceding, std::move(jobs));
+            m_textureCookTail = work.completion;
+            return true;
+        }
+        catch (const std::exception& exception)
+        {
+            work.cooking = false;
+            work.failure = exception.what();
+            failure = work.failure;
+            return false;
+        }
+    }
+
+    void CookTextureGeneration(const file::path& source,
+        const std::array<ModelSourceStamp, 2>& stamps, std::uint64_t revision)
+    {
+        namespace cooked = experiment::cooked;
+        {
+            std::lock_guard lock(m_authoringMutex);
+            const auto& work = m_textureImports.at(source);
+            if (m_stopping || work.latestRevision->load(std::memory_order_acquire) != revision)
+            {
+                return;
+            }
+        }
+        auto result = cooked::BuildTextureCookProduct({ source, m_root });
+        std::string failure;
+        ScopedPathCleanup generationCleanup;
+        own::shared_owner<RuntimeTexturePublication> publication;
+        file::path generation;
+        if (result.Succeeded())
+        {
+            const auto& product = *result.product;
+            generation = m_root.parent_path() / "Library" / "TextureAssetGenerations"
+                / FileGuid(product.textureAssetId.value).ToString() / FileGuid::CreateRandomV4().ToString();
+            generationCleanup.target = generation;
+            // This directory is unique and never overwritten after publication.
+            // Failed/stale generations are removed before any locator escapes.
+            if (!WriteBinaryFileLocked(generation / product.artifactPath, product.artifactBytes))
+            {
+                failure = "Could not write the immutable texture artifact";
+            }
+            else
+            {
+                publication = own::make_shared<RuntimeTexturePublication>();
+                auto& manifest = publication->manifest;
+                manifest.assetSetId = product.textureAssetId;
+                manifest.revision = revision;
+                manifest.targetPlatform = "win-x64";
+                manifest.targetAbi = CreatorContentAbi::Token;
+                const cooked::TypedAssetReference reference{ { product.textureAssetId, {} }, cooked::CookedAssetKind::Texture };
+                manifest.entries.push_back({ reference, 0u, {} });
+                manifest.roots.push_back(reference);
+                cooked::AssetBlobRecord blob;
+                blob.contentSha256 = product.manifestEntry.contentSha256;
+                blob.byteSize = product.artifactBytes.size();
+                blob.kind = cooked::CookedAssetKind::Texture;
+                blob.representation = cooked::kCookedTextureRepresentationVersion;
+                blob.schemaVersion = product.manifestEntry.formatVersion;
+                blob.targetPlatform = manifest.targetPlatform;
+                blob.targetAbi = manifest.targetAbi;
+                blob.artifactPath = product.artifactPath;
+                manifest.blobs.push_back(std::move(blob));
+                auto written = cooked::WriteAssetSetManifest(manifest);
+                if (!written.Succeeded())
+                {
+                    failure = "Texture generation manifest validation failed";
+                }
+                else
+                {
+                    publication->manifestBytes = std::move(written.bytes);
+                    publication->byteSource = own::make_shared<const cooked::LooseArtifactByteSource>(generation);
+                    if (!cooked::CaptureArtifactSource(publication->byteSource, product.artifactPath, failure))
+                    {
+                        publication.reset();
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (const auto& issue : result.issues)
+            {
+                failure += (failure.empty() ? "" : "; ") + issue.context + ": " + issue.message;
+            }
+        }
+        const std::array after{ ReadModelSourceStamp(source),
+            ReadModelSourceStamp(source.string() + ".meta") };
+        {
+            std::lock_guard lock(m_authoringMutex);
+            auto& work = m_textureImports.at(source);
+            const bool current = !m_stopping
+                && work.latestRevision->load(std::memory_order_acquire) == revision;
+            if (current && failure.empty() && after == stamps && publication)
+            {
+                publication->latestRevision = work.latestRevision;
+                publication->revision = revision;
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                    RuntimeAssetType::Texture, FileGuid(result.product->textureAssetId.value), source, publication });
+                generationCleanup.Release();
+                work.publication = publication;
+                work.refreshRequest = {};
+                work.refreshRevision = 0u;
+                work.cooking = false;
+                return;
+            }
+            if (current)
+            {
+                work.cooking = false;
+                work.failure = failure.empty() ? "Source changed during import; save or reimport again" : failure;
+                Debug::PrintLog(spdlog::level::err, "Texture import failed: " + source.string() + ": " + work.failure);
+            }
+        }
+        // Release the pinned byte source before removing an unpublished tree.
+        publication.reset();
+    }
+
+    void InvalidateTextureImportLocked(const file::path& source)
+    {
+        if (const auto found = m_textureImports.find(source.lexically_normal()); found != m_textureImports.end())
+        {
+            found->second.latestRevision->fetch_add(1u, std::memory_order_release);
+            found->second.stamps = {};
+            found->second.cooking = false;
+            found->second.publication.reset();
+            found->second.refreshRequest = {};
+            found->second.refreshRevision = 0u;
+        }
+    }
+
+    void ReloadChangedTexture(const file::path& source, bool force = false)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        std::string failure;
+        if (!QueueTextureReimportLocked(source, failure, force))
+        {
+            Debug::PrintLog(spdlog::level::err, "Cannot schedule texture import: " + failure);
+        }
+    }
 
 	bool SetModelMeshletsAndReimport(const file::path& requestedSource, bool enabled)
 	{
@@ -1050,6 +1391,15 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			return {};
 		}
 
+        if (EditorAssetDatabase::IsTextureSource(sourcePath))
+        {
+            InvalidateTextureImportLocked(sourcePath);
+            std::string failure;
+            if (!QueueTextureReimportLocked(destinationPath, failure))
+            {
+                Debug::PrintLog(spdlog::level::err, "Renamed texture import failed: " + failure);
+            }
+        }
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
 			RuntimeAssetType::Auto, guid, sourcePath });
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
@@ -1258,9 +1608,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 				bytes[index * 4 + 2] = static_cast<uint8_t>(bits >> 8);
 				bytes[index * 4 + 3] = static_cast<uint8_t>(bits);
 			}
-			const std::string path = WstringToString(destination.wstring());
-			return 0 != stbi_write_png(path.c_str(), request.width,
-				request.height, 4, bytes.data(), request.width * 4);
+			// Every RGBA channel stores float bits, including alpha. The native
+			// PNG encoder accepts straight BGRA8; WIC only swaps R/B on write.
+			// Requiring that format prevents opaque/premultiplied substitution.
+			const DirectX::Image image{ width, height, DXGI_FORMAT_R8G8B8A8_UNORM,
+				width * 4, bytes.size(), bytes.data() };
+			return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str(),
+				&GUID_WICPixelFormat32bppBGRA));
 		};
 
 		auto WriteSplatPng = [&](const file::path& destination,
@@ -1272,9 +1627,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 				bytes[index] = static_cast<uint8_t>(
 					std::clamp(weights[index], 0.0f, 1.0f) * 255.0f);
 			}
-			const std::string path = WstringToString(destination.wstring());
-			return 0 != stbi_write_png(path.c_str(), request.width,
-				request.height, 1, bytes.data(), request.width);
+			const DirectX::Image image{ width, height, DXGI_FORMAT_R8_UNORM,
+				width, bytes.size(), bytes.data() };
+			return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str(),
+				&GUID_WICPixelFormat8bppGray));
 		};
 
 		const file::path stagedHeight = stagingDirectory / "HeightMap.png";
@@ -1863,6 +2220,11 @@ private:
 			const file::path metaPath = entry.path().string() + ".meta";
 			if (file::exists(metaPath))
 			{
+                if (EditorAssetDatabase::IsTextureSource(entry.path()))
+                {
+                    (void)CreateMeta(entry.path());
+                    continue;
+                }
 				// Existing GUID-only audio sidecars predate the import policy.
 				// Migrate them through the normal validated importer, preserving
 				// their identity; malformed/current policies still fail closed.
@@ -2083,6 +2445,18 @@ private:
 		}
 		const Authoring::WriteNode root = document.Root();
 		root.SetMap();
+        const bool textureSource = EditorAssetDatabase::IsTextureSource(targetFile);
+        experiment::cooked::TextureImportSettings textureSettings;
+        if (textureSource)
+        {
+            std::string failure;
+            if (!experiment::cooked::ParseTextureImportSettings(document.Dump(), textureSettings, failure))
+            {
+                Debug::PrintLog(spdlog::level::err, "Texture import settings rejected: " + metaPath.string() + ": " + failure);
+                return {};
+            }
+            EditorAssetDatabase::WriteTextureImportSettings(root, textureSettings);
+        }
 		std::string audioLoadMode = "Auto";
 		std::string audioSpatialKind = "NonSpatial";
 		if (audioSource)
@@ -2186,6 +2560,14 @@ private:
         {
             m_audioRevision.fetch_add(1u, std::memory_order_release);
         }
+        if (textureSource)
+        {
+            std::string failure;
+            if (!QueueTextureReimportLocked(targetFile, failure))
+            {
+                Debug::PrintLog(spdlog::level::err, "Cannot schedule texture import: " + failure);
+            }
+        }
 		return guid;
 	}
 
@@ -2260,11 +2642,22 @@ private:
         }
 		if (filepath.extension() == ".meta")
 		{
-			RegisterMetaFile(filepath);
-			return;
+            RegisterMetaFile(filepath);
+            const auto source = RemoveMetaExtension(filepath);
+            if (EditorAssetDatabase::IsTextureSource(source))
+            {
+                ReloadChangedTexture(source);
+            }
+            return;
 		}
-		if (assets::IsModelAuthoringSource(filepath)) ReloadChangedModel(filepath);
-		else if (IsTargetFile(filepath)) CreateMeta(filepath);
+        if (assets::IsModelAuthoringSource(filepath))
+        {
+            ReloadChangedModel(filepath);
+        }
+        else if (IsTargetFile(filepath))
+        {
+            CreateMeta(filepath);
+        }
 	}
 
 	void HandleMoved(const file::path& directory, const std::string& oldName,
@@ -2276,17 +2669,34 @@ private:
         {
             return;
         }
-		if (newPath.extension() == ".meta")
+        const auto oldSource = oldPath.extension() == ".meta" ? RemoveMetaExtension(oldPath) : oldPath;
+        if (EditorAssetDatabase::IsTextureSource(oldSource) && !ContainsTemporaryPath(oldPath))
+        {
+            std::lock_guard lock(m_authoringMutex);
+            InvalidateTextureImportLocked(oldSource);
+        }
+        if (newPath.extension() == ".meta")
 		{
-			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
-				RuntimeAssetType::Auto, {}, RemoveMetaExtension(oldPath) });
-			RegisterMetaFile(newPath);
-			return;
+            if (!ContainsTemporaryPath(oldPath))
+            {
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
+                    RuntimeAssetType::Auto, {}, RemoveMetaExtension(oldPath) });
+            }
+            RegisterMetaFile(newPath);
+            const auto newSource = RemoveMetaExtension(newPath);
+            if (EditorAssetDatabase::IsTextureSource(newSource))
+            {
+                ReloadChangedTexture(newSource);
+            }
+            return;
 		}
 
-		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
 			RuntimeAssetType::Auto, {}, oldPath });
-		if (!IsTargetFile(newPath)) return;
+        if (!IsTargetFile(newPath))
+        {
+            return;
+        }
 
 		const file::path oldMeta = oldPath.string() + ".meta";
 		const file::path newMeta = newPath.string() + ".meta";
@@ -2294,13 +2704,28 @@ private:
 		{
 			std::error_code error;
 			file::rename(oldMeta, newMeta, error);
-			if (error)
-				Debug::PrintLog(spdlog::level::warn, "Failed to move asset meta: " + error.message());
+            if (error)
+            {
+                Debug::PrintLog(spdlog::level::warn, "Failed to move asset meta: " + error.message());
+            }
 		}
 
-		if (assets::IsModelAuthoringSource(newPath)) ReloadChangedModel(newPath);
-		else if (file::exists(newMeta)) RegisterMetaFile(newMeta);
-		else CreateMeta(newPath);
+        if (assets::IsModelAuthoringSource(newPath))
+        {
+            ReloadChangedModel(newPath);
+        }
+        else if (file::exists(newMeta))
+        {
+            RegisterMetaFile(newMeta);
+            if (EditorAssetDatabase::IsTextureSource(newPath))
+            {
+                ReloadChangedTexture(newPath);
+            }
+        }
+        else
+        {
+            CreateMeta(newPath);
+        }
 	}
 
 	// 본문이 아직 살아 있으면 이 Delete 알림은 삭제가 아니라 **게시**다.
@@ -2343,6 +2768,12 @@ private:
 		}
 
 		if (TargetStillExists(deletedPath)) return;
+        if (EditorAssetDatabase::IsTextureSource(deletedPath))
+        {
+            std::lock_guard lock(m_authoringMutex);
+            InvalidateTextureImportLocked(deletedPath);
+        }
+
 		if (assets::IsModelAuthoringSource(deletedPath))
 		{
 			// A restored file may retain the deleted file's size and timestamp.
@@ -2391,6 +2822,12 @@ private:
         {
             return;
         }
+        const auto textureSource = filepath.extension() == ".meta" ? RemoveMetaExtension(filepath) : filepath;
+        if (EditorAssetDatabase::IsTextureSource(textureSource))
+        {
+            ReloadChangedTexture(textureSource, true);
+            return;
+        }
 		if (assets::IsModelAuthoringSource(filepath))
 		{
 			ReloadChangedModel(filepath);
@@ -2428,6 +2865,9 @@ private:
     std::atomic<std::uint64_t> m_audioRevision{ 1u };
 	file::path m_root;
 	std::mutex m_authoringMutex;
+    bool m_stopping{};
+    std::map<file::path, TextureImportWork> m_textureImports;
+    job_handle m_textureCookTail;
     std::map<file::path, std::optional<Hash::Sha256Digest>> m_materialAuthoringWrites;
 	std::map<file::path, std::array<ModelSourceStamp, 3>> m_failedModelRecovery;
 	std::map<file::path, ModelSourceStamp> m_modelSourceImports;
@@ -2459,6 +2899,56 @@ EditorAssetDatabase& EditorAssetDatabase::Get() noexcept
 	return instance;
 }
 
+bool EditorAssetDatabase::IsTextureSource(const file::path& source)
+{
+    return experiment::cooked::IsSupportedTextureExtension(ToLower(source.extension().string()));
+}
+
+void EditorAssetDatabase::WriteTextureImportSettings(Authoring::WriteNode root,
+    const experiment::cooked::TextureImportSettings& settings)
+{
+    std::string failure;
+    if (!experiment::cooked::ValidateTextureImportSettings(settings, failure))
+    {
+        return;
+    }
+    constexpr std::array colorSpaces{ "Source", "Linear", "Srgb" };
+    constexpr std::array compressionModes{ "None", "Auto", "BC1", "BC3", "BC5", "BC7" };
+    constexpr std::array mipPolicies{ "PreserveAuthored", "GenerateFull" };
+    constexpr std::array qualities{ "Fast", "Normal", "High" };
+    const auto node = root.Child("importSettings");
+    node.Child("importerVersion").SetScalar(experiment::cooked::kTextureImporterVersion);
+    node.Child("colorSpace").SetScalar(colorSpaces[static_cast<std::size_t>(settings.colorSpace)]);
+    node.Child("compression").SetScalar(compressionModes[static_cast<std::size_t>(settings.compression)]);
+    node.Child("mipPolicy").SetScalar(mipPolicies[static_cast<std::size_t>(settings.mipPolicy)]);
+    node.Child("maxDimension").SetScalar(settings.maxDimension);
+    node.Child("normalMap").SetScalar(settings.normalMap);
+    node.Child("preserveAlphaCoverage").SetScalar(settings.preserveAlphaCoverage);
+    node.Child("alphaCutoff").SetScalar(settings.alphaCutoff);
+    node.Child("compressionQuality").SetScalar(qualities[static_cast<std::size_t>(settings.compressionQuality)]);
+}
+
+bool EditorAssetDatabase::SetTextureImportSettingsAndReimport(const file::path& source,
+    const experiment::cooked::TextureImportSettings& settings, std::string& error)
+{
+    if (!m_impl)
+    {
+        error = "Editor asset database is unavailable";
+        return false;
+    }
+    return m_impl->SetTextureImportSettingsAndReimport(source, settings, error);
+}
+
+std::string EditorAssetDatabase::TextureImportStatus(const file::path& source) const
+{
+    return m_impl ? m_impl->TextureImportStatus(source) : "Editor asset database is unavailable";
+}
+
+bool EditorAssetDatabase::TextureImportReady(const file::path& source) const
+{
+    return m_impl && m_impl->TextureImportReady(source);
+}
+
 EditorAssetDatabase::~EditorAssetDatabase()
 {
 	Shutdown();
@@ -2466,11 +2956,36 @@ EditorAssetDatabase::~EditorAssetDatabase()
 
 bool EditorAssetDatabase::Initialize()
 {
-	if (m_impl) return true;
-	if (!PathFinder::IsAssetAuthoringEnabled()) return false;
+    if (m_impl)
+    {
+        return true;
+    }
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        return false;
+    }
 
-	auto implementation = std::make_unique<Impl>(PathFinder::Relative());
-	if (!implementation->Start()) return false;
+    Authoring::InstallTextureSourceProcessing();
+    std::shared_ptr<Impl> implementation;
+    try
+    {
+        implementation = std::make_shared<Impl>(PathFinder::Relative());
+        if (!implementation->Start())
+        {
+            implementation->Stop();
+            Authoring::UninstallTextureSourceProcessing();
+            return false;
+        }
+    }
+    catch (...)
+    {
+        if (implementation)
+        {
+            implementation->Stop();
+        }
+        Authoring::UninstallTextureSourceProcessing();
+        throw;
+    }
 	m_impl = std::move(implementation);
 	AssetAuthoringPort::InstallModelRecovery(&RecoverModelThroughEditor);
 	AssetAuthoringPort::Install(&CreateMetaThroughEditor);
@@ -2509,8 +3024,12 @@ void EditorAssetDatabase::Shutdown() noexcept
 	AssetAuthoringPort::UninstallTextAssetWriter(
 		&WriteTextAssetWithMetaThroughEditor);
 	AssetAuthoringPort::Uninstall(&CreateMetaThroughEditor);
-	if (m_impl) m_impl->Stop();
-	m_impl.reset();
+    if (m_impl)
+    {
+        m_impl->Stop();
+    }
+    m_impl.reset();
+    Authoring::UninstallTextureSourceProcessing();
 }
 
 bool EditorAssetDatabase::IsInitialized() const noexcept

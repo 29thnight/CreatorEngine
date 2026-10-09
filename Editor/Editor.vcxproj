@@ -32,6 +32,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\SoundGraphEditor.h" />
+    <ClCompile Include="EngineEntry\TerrainSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="EngineEntry\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="..\Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="EngineGUIWindow\SoundGraphEditor.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h" />
     <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp" />
@@ -80,6 +83,7 @@
     <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h" />
     <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
+    <ClInclude Include="EngineEntry\TextureSourceProcessing.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
     <ClInclude Include="EngineEntry\EditorModelCollisionAsset.h" />
     <ClInclude Include="EngineEntry\EditorModelCollisionGeometry.h" />

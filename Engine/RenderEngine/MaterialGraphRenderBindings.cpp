@@ -35,6 +35,33 @@ namespace material_graph
             return true;
         }
 
+        bool MatchesInstanceUniforms(const BindingLayout& layout, std::span<const std::uint8_t> prepared,
+            std::span<const std::uint8_t> instance)
+        {
+            if (prepared.size() != instance.size())
+            {
+                return false;
+            }
+            // PrepareResources has already validated these ranges and written
+            // them from exact uploaded formats. Every other byte must still
+            // match the immutable instance, including padding and parameters.
+            for (std::size_t index = 0; index < prepared.size(); ++index)
+            {
+                if (prepared[index] == instance[index])
+                {
+                    continue;
+                }
+                const bool encoding = std::ranges::any_of(layout.textureEncodings, [index](const auto& binding) {
+                    return index >= binding.offset && index < static_cast<std::uint64_t>(binding.offset) + 4u;
+                });
+                if (!encoding)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool MatchingSlots(const PassLayout& layout)
         {
             std::uint32_t next = layout.hostParameterCount;
@@ -217,8 +244,8 @@ namespace material_graph
         const bool prepared = candidate->instance->generation->cooked.product.materialShader
             ? PrepareResourcesWithUniforms(layout.material, candidate->instance->uniforms, uploaded, candidate->resources, diagnostics)
             : PrepareResources(layout.material, candidate->instance->description.parameters, uploaded, candidate->resources, diagnostics);
-        if (!prepared ||
-            candidate->resources.uniforms != candidate->instance->uniforms)
+        if (!prepared || !MatchesInstanceUniforms(layout.material,
+            candidate->resources.uniforms, candidate->instance->uniforms))
         {
             return Fail(error, diagnostics.empty() ? "Material instance differs from its reflected uniform layout."
                                                    : diagnostics.front().message);

@@ -37,8 +37,8 @@ namespace CommandCore
             { "animation.visual.probe", CommandCost::Long, "<setup model-path|pose>", "Stage deterministic product animation frames for pixel regression", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animator.param", CommandCost::Frames, "<오브젝트> <파라미터> <bool|float|int|trigger>", "Animator 파라미터를 저작한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,name,type", true },
             { "animator.status", CommandCost::Frames, "", "Read live Animator palettes and product publication metrics", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
-            { "assets.decodeab", CommandCost::Long, "[root] [limit]", "Compare PNG decoder bytes", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
-            { "assets.decodeabhdr", CommandCost::Long, "[root]", "Compare HDR decoder values", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "assets.decodeab", CommandCost::Long, "[root] [limit]", "Validate DirectXTex RGBA8 PNG roundtrip", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "assets.decodeabhdr", CommandCost::Long, "[root]", "Validate DirectXTex HDR float DDS roundtrip", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             // PBR-W8 — 호출자 0 이던 `RunModelAssetGenerationSelfTest` 의 창구.
             // fixture 는 살아 있는 프로젝트가 아니라 추적되는 트리라 인자로 받는다.
             { "assets.generation", CommandCost::Long, "<프로젝트 루트>", "generation 1→2 원자 교체와 tamper 거부 뒤 current 불변을 잰다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "root", false, true },
@@ -235,7 +235,6 @@ namespace CommandCore
             { "render.environment", CommandCost::Immediate, "<HDR-or-ceibl-path> | status | background on|off", "Select environment; reuse cooked maps or generate and cache once", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "path", true },
             { "render.graph", CommandCost::Immediate, "[scene|game|preview] | view <scene|game|preview>", "Read an immutable compiled graph or select the read-only viewer target", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.capture", CommandCost::Long, "<new-absolute-directory> [game|editor|material] [controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]", "Capture actual product attachments through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
-            { "render.queue.mode", CommandCost::Long, "0|1|2", "Switch live DX12 queue mode at the next frame boundary without rebuilding the pipeline", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.fence", CommandCost::Long, "[timeout-seconds]", "Wait for a product frame through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.wait", CommandCost::Long, "[timeout-seconds]", "라이브 렌더러가 이 명령 뒤 발행된 프레임을 끝낼 때까지 다음 명령을 미룬다(프레임 수 대기 대신 예열 판정)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.livecheck", CommandCost::Immediate, "[너비 높이]", "resize·다중 뷰·표시 슬롯 회전 회귀 판정", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
@@ -253,6 +252,7 @@ namespace CommandCore
             { "render.pbr.sealstatus", CommandCost::Immediate, "", "라이브 프레임의 세대 밀봉 진단 수치", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.transform", CommandCost::Long, "", "PBR transform verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.uv", CommandCost::Long, "", "PBR uv verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "render.queue.mode", CommandCost::Long, "0|1|2", "Switch live DX12 queue mode at the next frame boundary without rebuilding the pipeline", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.rtinfo", CommandCost::Immediate, "", "창·뷰포트·추종 텍스처 크기를 나란히 찍는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "render.shadowinfo", CommandCost::Immediate, "", "그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "scene.bonedump", CommandCost::Frames, "[개수]", "대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)", CommandClass::EngineService, CommandLiveness::Live },

@@ -35,6 +35,8 @@ cbuffer DecalFrame : register(b0)
 #define USE_DIFFUSE (1 << 0)
 #define USE_NORMAL  (1 << 1)
 #define USE_ORM     (1 << 2)
+#define NORMAL_BC5 (1 << 3)
+#define DIFFUSE_LINEAR_SAMPLE (1 << 4)
 
 // 원본 DecalPass 생성자의 정점 배열과 인덱스 배열 그대로다.
 static const float3 kCubePositions[24] =
@@ -136,9 +138,18 @@ PSOut PSMain(VSOut input)
     decalUV = (decalUV + sliceIndex) * sliceSize;
 
     float4 decalSample = gDecalDiffuse.Sample(gLinearSampler, decalUV);
-    decalSample.rgb = pow(decalSample.rgb, 2.2f);
+    if ((instance.useFlags & DIFFUSE_LINEAR_SAMPLE) == 0u)
+    {
+        // Preserve only the legacy encoded-UNORM path. Native sRGB SRVs and
+        // locked cooked Linear inputs already return the intended linear value.
+        decalSample.rgb = pow(decalSample.rgb, 2.2f);
+    }
 
-    const float3 normalTexel = gDecalNormal.Sample(gLinearSampler, decalUV).xyz * 2.0f - 1.0f;
+    float3 normalTexel = gDecalNormal.Sample(gLinearSampler, decalUV).xyz * 2.0f - 1.0f;
+    if ((instance.useFlags & NORMAL_BC5) != 0u)
+    {
+        normalTexel.z = sqrt(saturate(1.0f - dot(normalTexel.xy, normalTexel.xy)));
+    }
     const float3 normalWorld = normalize(mul(normalTexel, tbn));
 
     const float3 decalOrm = gDecalOrm.Sample(gLinearSampler, decalUV).xyz;

@@ -392,11 +392,15 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
     representativeEmission = materialInputs.emissionColor * materialInputs.emissionStrength
         * float3(0.08f, 0.65f, 0.14f) * windResponse;
 #endif
-    const bool useNormalMap = hasTextures && input.material.z != 0.0f;
+    const uint normalMapEncoding = hasTextures ? uint(input.material.z) : 0u;
+    const bool useNormalMap = (normalMapEncoding & 1u) != 0u;
     float3 normalSample = float3(0.5f, 0.5f, 1.0f);
-    if (useNormalMap) normalSample = normalMap.Sample(gSampler, MaterialUv(17, resolvedUv, resolvedUv1)).rgb;
+    if (useNormalMap)
+    {
+        normalSample = normalMap.Sample(gSampler, MaterialUv(17, resolvedUv, resolvedUv1)).rgb;
+    }
     const float3 normal = EvaluatePbrNormal(input.normal, input.tangent,
-        input.bitangent, normalSample, resolvedNormalScale, useNormalMap,
+        input.bitangent, normalSample, resolvedNormalScale, normalMapEncoding,
         SHADING_QUALITY == 1);
     materialInputs.normal = OrientPbrNormal(normal, input.coverageFlags, frontFace);
     if (gHasIbl != 0u)

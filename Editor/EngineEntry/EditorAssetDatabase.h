@@ -17,6 +17,8 @@ struct TextAssetAuthoringRequest;
 struct TextAssetAuthoringResult;
 struct UncatalogedAuthoringRequest;
 namespace ce::physics { struct CollisionGeometrySource; }
+namespace experiment::cooked { struct TextureImportSettings; }
+namespace Authoring { class WriteNode; }
 
 // Editor-owned source asset database. It owns watcher/meta generation and all
 // authoring writes extracted from DataSystem; Core retains read-only catalog use.
@@ -74,6 +76,14 @@ public:
 	bool RecoverModel(const file::path& source, FileGuid expectedId);
 	bool SetModelMeshletsAndReimport(const file::path& source, bool enabled);
 	bool SetModelLodsAndReimport(const file::path& source, std::uint32_t levels);
+    [[nodiscard]] static bool IsTextureSource(const file::path& source);
+    // Typed settings only; GUID and source provenance remain importer-owned.
+    static void WriteTextureImportSettings(Authoring::WriteNode root,
+        const experiment::cooked::TextureImportSettings& settings);
+    [[nodiscard]] bool SetTextureImportSettingsAndReimport(const file::path& source,
+        const experiment::cooked::TextureImportSettings& settings, std::string& error);
+    [[nodiscard]] std::string TextureImportStatus(const file::path& source) const;
+    [[nodiscard]] bool TextureImportReady(const file::path& source) const;
 	struct ModelRecoveryStats
 	{
 		std::uint64_t attempts{}, succeeded{}, suppressed{}, declined{}, sourceReloads{};
@@ -95,5 +105,6 @@ private:
 	EditorAssetDatabase& operator=(const EditorAssetDatabase&) = delete;
 
 	struct Impl;
-	std::unique_ptr<Impl> m_impl;
+    // Accepted scheduler work retains the authoring state without a GT wait.
+    std::shared_ptr<Impl> m_impl;
 };

@@ -77,7 +77,7 @@ void Run(const std::filesystem::path& repo, const std::filesystem::path& work)
     };
     // Independent Slang declarations exercise all supported physical types.
     program.slang = R"(
-struct LXMaterialParameters { bool lx_p11; int lx_p12; float lx_p13; float3 lx_p14; float3 lx_p15; float4 lx_p16; };
+struct LXMaterialParameters { bool lx_p11; int lx_p12; float lx_p13; float3 lx_p14; float3 lx_p15; float4 lx_p16; uint lx_texture_0_encoding; uint lx_texture_1_encoding; };
 LXMaterialParameters LXDefaultMaterialParameters() { return (LXMaterialParameters)0; }
 Texture2D<float4> lx_texture_0 : register(t0, space1);
 Texture2D<float4> lx_texture_1 : register(t1, space1);
@@ -89,7 +89,8 @@ RWStructuredBuffer<float4> result : register(u0);
     LXMaterialParameters p = LXBoundMaterialParameters();
     result[0] = float4(p.lx_p14 + p.lx_p15, float(p.lx_p11) + p.lx_p12 + p.lx_p13) + p.lx_p16
         + lx_texture_0.SampleLevel(lx_sampler_0,float2(0.5),0)
-        + lx_texture_1.SampleLevel(lx_sampler_0,float2(0.5),0);
+        + lx_texture_1.SampleLevel(lx_sampler_0,float2(0.5),0)
+        + float4(float(p.lx_texture_0_encoding + p.lx_texture_1_encoding));
 }
 )";
     const auto sourcePath = work / "fixture.slang";
@@ -127,6 +128,47 @@ RWStructuredBuffer<float4> result : register(u0);
     BindingLayout legacy;
     std::vector<LXMaterialDiagnostic> diagnostics;
     Check(ResolveBindings(program, reflections[0], {}, legacy, diagnostics), "Prior product reflected layout");
+    Check(legacy.textureEncodings.size() == 2 &&
+        accepted.layout.constantBufferByteSize == legacy.uniformBytes,
+        "Private per-texture encoding fields retain the complete common uniform block");
+    auto textureOnly = program;
+    std::erase_if(textureOnly.parameters, [](const auto& parameter) {
+        return parameter.type != PinType::Texture && parameter.type != PinType::Sampler;
+    });
+    textureOnly.slang = R"(
+struct LXMaterialParameters { uint lx_texture_0_encoding; uint lx_texture_1_encoding; };
+LXMaterialParameters LXDefaultMaterialParameters() { return (LXMaterialParameters)0; }
+Texture2D<float4> lx_texture_0 : register(t0, space1);
+Texture2D<float4> lx_texture_1 : register(t1, space1);
+SamplerState lx_sampler_0 : register(s0, space1);
+)";
+    RHIShaderReflection textureOnlyReflection;
+    textureOnlyReflection.stage = RHIShaderStage::Compute;
+    for (const auto& resource : reflections[0].resources)
+    {
+        if (resource.name == "LXMaterialProperties")
+        {
+            RHIShaderResourceReflection uniforms;
+            uniforms.name = "LXMaterialProperties";
+            uniforms.registerIndex = UniformRegister;
+            uniforms.byteSize = 16;
+            uniforms.fields = {
+                {TextureEncodingUniformName(0), {RHIShaderScalarKind::UInt32, 1, 1, 1}, 0, 4},
+                {TextureEncodingUniformName(1), {RHIShaderScalarKind::UInt32, 1, 1, 1}, 4, 4}};
+            textureOnlyReflection.resources.push_back(std::move(uniforms));
+        }
+        else
+        {
+            textureOnlyReflection.resources.push_back(resource);
+        }
+    }
+    GeneratedMaterialShader textureOnlyMeta;
+    Check(PublishMaterialShaderMeta(textureOnly, guid, BuildBoundSource(textureOnly), passes,
+        std::span(&textureOnlyReflection, 1), publishedRoot, textureOnlyMeta, error) &&
+        textureOnlyMeta.layout.properties.size() == 2 &&
+        textureOnlyMeta.layout.constantBufferName == "LXMaterialProperties" &&
+        textureOnlyMeta.layout.constantBufferByteSize == 16,
+        "Texture-only generated metadata allocates private encoding uniforms without exposed properties");
     std::vector<std::uint8_t> expected;
     Check(PrepareUniforms(legacy, {}, expected, diagnostics), "Prior default uniform packing");
     std::vector<std::uint8_t> packed(accepted.layout.constantBufferByteSize);

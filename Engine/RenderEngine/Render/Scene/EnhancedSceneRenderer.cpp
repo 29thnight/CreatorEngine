@@ -1396,6 +1396,7 @@ namespace
         file::path shaders;
         file::path cache;
         file::path project;
+        bool allowSourceProcessing{};
         bool updateSelection{ true };
     };
 
@@ -1463,21 +1464,36 @@ namespace
             {
                 return false;
             }
-            Hash::Sha256Digest recipe;
-            if (!assets::EnvironmentRecipeIdentity(request.shaders,
-                    cooked.cubeSize, cooked.brdfSize, recipe, error))
+            // Player validates the self-contained cooked payload below. Its
+            // source-free package does not contain the shader recipe inputs.
+            if (request.allowSourceProcessing)
             {
-                return false;
+                Hash::Sha256Digest recipe;
+                if (!assets::EnvironmentRecipeIdentity(request.shaders,
+                        cooked.cubeSize, cooked.brdfSize, recipe, error))
+                {
+                    return false;
+                }
+                if (cooked.identity.recipe != recipe)
+                {
+                    error = "Cooked environment recipe changed; recook the selected environment";
+                    return false;
+                }
             }
-            if (cooked.identity.recipe != recipe)
+            else if (!cooked.importancePersisted || !cooked.source.IsValid())
             {
-                error = "Cooked environment recipe changed; recook the selected environment";
+                error = "Player requires a complete cooked environment; recook the selected .ceibl";
                 return false;
             }
             result.cooked = EnhancedIBLGenerator::PrepareCooked(std::move(cooked), error);
             return bool(result.cooked);
         }
 
+        if (!request.allowSourceProcessing)
+        {
+            error = "Player requires a prebuilt .ceibl environment; raw HDR processing is authoring-only";
+            return false;
+        }
         assets::EnvironmentIdentity identity;
         if (!assets::EnvironmentSourceIdentity(request.source, identity.source, error)
             || !assets::EnvironmentRecipeIdentity(request.shaders, 512, 512, identity.recipe, error))
@@ -1621,6 +1637,7 @@ namespace
         request.shaders = PathFinder::ShaderPath() / "DefaultPassShader";
         request.cache = PathFinder::CachePath() / "Environment";
         request.project = PathFinder::BaseProjectPath();
+        request.allowSourceProcessing = PathFinder::IsAssetAuthoringEnabled();
         EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
         progress.activeRequests = 1;
         progress.phase = "Queued";
@@ -3035,7 +3052,7 @@ namespace
             // ── 블루 노이즈 — 프록셀 지터의 씨앗 ──
             if (!fogBlueNoise)
             {
-                outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
+                outError = "Cooked blue noise is not ready: Resources/VolumetricFog/blueNoise.cetex";
                 return false;
             }
 
@@ -3074,7 +3091,7 @@ namespace
 
             if (!fogBlueNoise)
             {
-                outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
+                outError = "Cooked blue noise is not ready: Resources/VolumetricFog/blueNoise.cetex";
                 return false;
             }
 
@@ -4986,8 +5003,13 @@ namespace
                 }
                 preparation->started = true;
             }
-            // Capture the source path on RT; all opening/decoding is worker-only.
-            const auto path = PathFinder::Relative("VolumetricFog\\blueNoise.dds");
+            // The offline engine-resource producer preserves the authored DDS
+            // blocks/mips in this exact CECT payload. Only an authoring host may
+            // use its original source before the first development-resource cook.
+            const auto path = PathFinder::EngineResourcePath("VolumetricFog/blueNoise.cetex");
+            const bool allowSourceProcessing = PathFinder::IsAssetAuthoringEnabled();
+            const auto authoringSource = allowSourceProcessing
+                ? PathFinder::Relative("VolumetricFog/blueNoise.dds") : file::path{};
             const auto finish = [preparation](std::exception_ptr failure)
             {
                 std::lock_guard lock(preparation->mutex);
@@ -5008,18 +5030,37 @@ namespace
                 }
                 if (!preparation->texture && preparation->error.empty())
                 {
-                    preparation->error = "Blue noise image is unavailable";
+                    preparation->error = "Cooked blue noise is unavailable; rebuild Resources/VolumetricFog/blueNoise.cetex";
                 }
                 preparation->complete = true;
             };
             try
             {
                 job_group work;
-                work.add([preparation, path]
+                work.add([preparation, path, allowSourceProcessing, authoringSource]
                 {
-                    auto texture = Texture::LoadSharedFromPath(path);
+                    auto inputPath = path;
+                    std::error_code pathError;
+                    if (allowSourceProcessing && !file::exists(path, pathError) && !pathError)
+                    {
+                        inputPath = authoringSource;
+                    }
+                    auto texture = Texture::LoadSharedFromPath(inputPath);
+                    std::string failure;
+                    if (texture)
+                    {
+                        const auto image = texture->GetImageDescription();
+                        if (image.IsEmpty() || image.IsCube() || image.ArraySize() != 1u
+                            || image.Width() != 128u || image.Height() != 128u
+                            || image.MipLevels() != 8u || image.Format() != RHIFormat::BC3Unorm)
+                        {
+                            failure = "Cooked blue noise must preserve the authored 128x128 linear BC3 image and all 8 mips";
+                            texture.reset();
+                        }
+                    }
                     std::lock_guard lock(preparation->mutex);
                     preparation->texture = std::move(texture);
+                    preparation->error = std::move(failure);
                 });
                 work.on_complete(finish);
                 ce::get_job_scheduler().submit(std::move(work));
@@ -5043,10 +5084,10 @@ namespace
             const auto fog = AdmitFogImage(fogError);
             if (fog == ImageAdmission::Failed)
             {
-                // Preserve the existing optional-fog failure policy.
-                lastError = "Volumetric fog disabled: " + fogError;
-                fogEnabled = false;
-                fogTeardownPending = true;
+                // Missing packaged data is an admission error, not permission
+                // to silently change the user's fog setting and render without it.
+                error = "Volumetric fog preparation failed: " + fogError;
+                return ImageAdmission::Failed;
             }
             const auto images = AdmitImagePayloads(cache, false, error);
             if (images == ImageAdmission::Failed)

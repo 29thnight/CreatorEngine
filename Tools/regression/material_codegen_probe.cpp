@@ -324,6 +324,39 @@ std::vector<Case> Cases(const LXMaterialDefinitions& definitions)
         cases.push_back(normal);
     }
 
+    // Exercise the storage decoder at the post-sample boundary with the same
+    // floating-point XY fixture. Runtime BC5 format selection is covered by the
+    // product probe; this isolates normal reconstruction from BC compression.
+    for (const bool bc5 : {false, true})
+    {
+        auto normalImage = Surface(definitions, bc5 ? "normal-image-bc5-encoding" : "normal-image-rgba-encoding");
+        normalImage.image = normalImage.asset.CreateNode("ShaderNodeTexImage", 0, 0);
+        auto& graph = normalImage.asset.graph;
+        Check(graph.SetProperty(normalImage.image, "image", "asset://fixture/image"), "Normal image reference");
+        Check(graph.SetProperty(normalImage.image, "colorSpace", "data"), "Normal image data encoding");
+        Check(graph.SetProperty(normalImage.image, "interpolation", "Linear"), "Normal image filter");
+        Check(graph.SetProperty(normalImage.image, "extension", "REPEAT"), "Normal image address");
+        const auto normalNode = normalImage.asset.CreateNode("ShaderNodeNormalMap", 100, 0);
+        Set(graph, normalNode, "Strength", 1.0);
+        Connect(graph, normalImage.image, "Color", normalNode, "Color");
+        Connect(graph, normalNode, "Normal", normalImage.surface, "Normal");
+        Connect(graph, normalImage.image, "Color", normalImage.surface, "Base Color");
+        Connect(graph, normalImage.image, "Alpha", normalImage.surface, "Alpha");
+        normalImage.overrides = std::string("    parameters.lx_texture_0_encoding = ") + (bc5 ? "1u;" : "0u;");
+        normalImage.expected = [bc5](auto& fields, const auto& input) {
+            auto value = Sample(input.uv, true, true, false);
+            if (bc5)
+            {
+                const float x = value.x * 2.0f - 1.0f;
+                const float y = value.y * 2.0f - 1.0f;
+                value.z = std::sqrt(std::clamp(1.0f - x * x - y * y, 0.0f, 1.0f)) * 0.5f + 0.5f;
+            }
+            fields[0] = value;
+            fields[2] = Normal(1.0f, value, input, false);
+        };
+        cases.push_back(std::move(normalImage));
+    }
+
     auto dead = Surface(definitions, "dead-lobes");
     dead.image = dead.asset.CreateNode("ShaderNodeTexImage", 0, 0);
     dead.asset.graph.SetProperty(dead.image, "interpolation", "Cubic");

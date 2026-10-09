@@ -155,7 +155,8 @@ namespace code_material_runtime_probe
                 "Native-sRGB fixture must retain its Source sampling variant");
             const auto format = texture->GetImageDescription().Format();
             Require(format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
-                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb,
+                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb
+                || format == RHIFormat::BC7UnormSrgb,
                 "Native-sRGB fixture has a linear descriptor format");
             Material clone(original);
             std::string error;
@@ -200,12 +201,8 @@ namespace code_material_runtime_probe
                 const auto texture = std::ranges::find(resolved.textures, propertyName, &experiment::ResolvedMaterialTexture::propertyName);
                 Require(texture != resolved.textures.end() && texture->owner, "Prepared override owner was lost");
                 const auto origin = texture->owner->GetAssetOrigin();
-                if (origin->imageKey.recipe.mipPolicy == AssetDepot::TextureMipPolicy::GenerateFull)
-                {
-                    Require(origin->imageKey.recipe.mipColorSpace == (color == experiment::TextureColorSpace::Srgb
-                        ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear),
-                        "A different material's mip-filtering recipe leaked into this color override");
-                }
+                Require(origin && origin->imageKey == raw->GetAssetOrigin()->imageKey,
+                    "A sampling descriptor hint split or reprocessed the authoritative cooked image");
                 // Ref-style callers pass their still-typed overrides to rebuilding;
                 // the dedicated host separately exercises serialized scene refs.
                 std::vector<std::uint8_t> propertyBytes;

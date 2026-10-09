@@ -272,7 +272,12 @@ Material& Material::UseTextureMap(
 	}
 	else if (property == standard_material::property::NormalMap)
 	{
-		m_materialInfo.m_useNormalMap = hasTexture ? kUseNormalMap : 0;
+		const auto& normal = GetTextureMapShared(property);
+        m_materialInfo.m_useNormalMap = hasTexture ? kUseNormalMap : 0;
+        if (normal && normal->GetImageDescription().Format() == RHIFormat::BC5Unorm)
+        {
+            m_materialInfo.m_useNormalMap |= kNormalMapReconstructZ;
+        }
 	}
 	else if (property == standard_material::property::OrmMap)
 	{

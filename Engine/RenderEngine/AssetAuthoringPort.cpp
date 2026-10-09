@@ -1,4 +1,4 @@
-﻿#include "Interfaces/AssetAuthoringPort.h"
+#include "Interfaces/AssetAuthoringPort.h"
 
 #include <atomic>
 #include <mutex>
@@ -6,6 +6,12 @@
 
 namespace
 {
+    // Stateless callbacks point into the authoring executable, whose lifetime
+    // exceeds all accepted work. No database lock is required around decoding.
+    std::atomic<AssetAuthoringPort::SourceTextureLoader> g_sourceTextureLoader{};
+    std::atomic<AssetAuthoringPort::SourceTextureMipGenerator> g_sourceTextureMipGenerator{};
+    std::atomic<AssetAuthoringPort::SourceTextureRgbaDecoder> g_sourceTextureRgbaDecoder{};
+    std::atomic<AssetAuthoringPort::TerrainSourceImageReader> g_terrainSourceImageReader{};
 	std::atomic<AssetAuthoringPort::CreateMetaHandler> g_createMetaHandler{};
 	std::atomic<AssetAuthoringPort::WriteTextAssetWithMetaHandler>
 		g_writeTextAssetWithMetaHandler{};
@@ -363,4 +369,120 @@ bool AssetAuthoringPort::WriteInputActionMap(
 bool AssetAuthoringPort::IsInstalled() noexcept
 {
 	return nullptr != g_createMetaHandler.load(std::memory_order_acquire);
+}
+
+void AssetAuthoringPort::InstallSourceTextureLoader(SourceTextureLoader handler) noexcept
+{
+    g_sourceTextureLoader.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallSourceTextureLoader(SourceTextureLoader handler) noexcept
+{
+    g_sourceTextureLoader.compare_exchange_strong(handler, nullptr, std::memory_order_acq_rel);
+}
+
+own::shared_owner<const Texture::CodecImage> AssetAuthoringPort::LoadSourceTexture(
+    const file::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression) noexcept
+{
+    const auto handler = g_sourceTextureLoader.load(std::memory_order_acquire);
+    if (!handler)
+    {
+        return {};
+    }
+    try
+    {
+        return handler(path, bytes, compression);
+    }
+    catch (...)
+    {
+        return {};
+    }
+}
+
+void AssetAuthoringPort::InstallSourceTextureMipGenerator(SourceTextureMipGenerator handler) noexcept
+{
+    g_sourceTextureMipGenerator.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallSourceTextureMipGenerator(SourceTextureMipGenerator handler) noexcept
+{
+    g_sourceTextureMipGenerator.compare_exchange_strong(handler, nullptr, std::memory_order_acq_rel);
+}
+
+own::shared_owner<const Texture::CodecImage> AssetAuthoringPort::GenerateSourceTextureMips(
+    const TextureImageView& image, std::string& failure) noexcept
+{
+    const auto handler = g_sourceTextureMipGenerator.load(std::memory_order_acquire);
+    if (!handler)
+    {
+        failure = "Source texture mip generation requires an authoring host; recook the asset.";
+        return {};
+    }
+    try
+    {
+        return handler(image, failure);
+    }
+    catch (...)
+    {
+        failure = "Authoring image processing failed.";
+        return {};
+    }
+}
+
+void AssetAuthoringPort::InstallSourceTextureRgbaDecoder(SourceTextureRgbaDecoder handler) noexcept
+{
+    g_sourceTextureRgbaDecoder.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallSourceTextureRgbaDecoder(SourceTextureRgbaDecoder handler) noexcept
+{
+    g_sourceTextureRgbaDecoder.compare_exchange_strong(handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::DecodeSourceTextureRgba8(
+    std::span<const std::byte> bytes, TextureImage& image, std::string& failure) noexcept
+{
+    const auto handler = g_sourceTextureRgbaDecoder.load(std::memory_order_acquire);
+    if (!handler)
+    {
+        failure = "Source image decoding requires an authoring host; Player accepts cooked textures only.";
+        return false;
+    }
+    try
+    {
+        return handler(bytes, image, failure);
+    }
+    catch (...)
+    {
+        failure = "Authoring image processing failed.";
+        return false;
+    }
+}
+
+void AssetAuthoringPort::InstallTerrainSourceImageReader(TerrainSourceImageReader handler) noexcept
+{
+    g_terrainSourceImageReader.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallTerrainSourceImageReader(TerrainSourceImageReader handler) noexcept
+{
+    g_terrainSourceImageReader.compare_exchange_strong(handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::ReadTerrainSourceImage(
+    const file::path& path, TerrainSourceImageKind kind, TerrainSourceImage& result) noexcept
+{
+    const auto handler = g_terrainSourceImageReader.load(std::memory_order_acquire);
+    if (!handler)
+    {
+        return false;
+    }
+    try
+    {
+        return handler(path, kind, result);
+    }
+    catch (...)
+    {
+        return false;
+    }
 }

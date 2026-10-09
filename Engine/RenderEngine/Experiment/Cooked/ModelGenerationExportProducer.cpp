@@ -1,10 +1,13 @@
 #include "ModelGenerationExportProducer.h"
+#include "CookedTexture.h"
+#include "TextureImportSettings.h"
 
 #include "../../Assets/ModelAssetGeneration.h"
 #include "../../Assets/ModelSidecarV2.h"
 #include "../../Assets/ModelMaterialGraph.h"
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
 #include "Sha256.h"
 
 #include <algorithm>
@@ -25,7 +28,10 @@ namespace experiment::cooked
         [[nodiscard]] bool ReadFileText(const std::filesystem::path& path, std::string& out)
         {
             std::ifstream stream(path, std::ios::binary);
-            if (!stream) return false;
+            if (!stream)
+            {
+                return false;
+            }
             out.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
             return true;
         }
@@ -34,7 +40,10 @@ namespace experiment::cooked
             std::vector<std::byte>& out)
         {
             std::ifstream stream(path, std::ios::binary);
-            if (!stream) return false;
+            if (!stream)
+            {
+                return false;
+            }
             std::vector<char> buffer((std::istreambuf_iterator<char>(stream)),
                 std::istreambuf_iterator<char>());
             out.resize(buffer.size());
@@ -72,9 +81,13 @@ namespace experiment::cooked
         if (!assets::ReadModelSidecarV2(sidecarText, sidecar, sidecarIssues))
         {
             for (const assets::SidecarIssue& issue : sidecarIssues)
+            {
                 AddIssue(result, "model.meta." + issue.context, issue.message);
+            }
             if (sidecarIssues.empty())
+            {
                 AddIssue(result, "model.meta", "schema v2 sidecar가 아니다.");
+            }
             return result;
         }
 
@@ -95,14 +108,19 @@ namespace experiment::cooked
         load.canonicalSidecarPath = sidecarPath;
         load.expectedModelId = sidecar.assetId;
         load.expectedGeneration = sidecar.generation;
+        load.allowSourceTextureProcessing = true; // Explicit offline export, never a Player fallback.
         const assets::ModelAssetGenerationLoadResult loaded =
             assets::LoadModelAssetGeneration(load);
         if (!loaded.Succeeded())
         {
             for (const auto& issue : loaded.issues)
+            {
                 AddIssue(result, "generation." + issue.context, issue.message);
+            }
             if (loaded.issues.empty())
+            {
                 AddIssue(result, "generation", "generation 검증이 실패했다.");
+            }
             return result;
         }
 
@@ -132,7 +150,10 @@ namespace experiment::cooked
         for (std::filesystem::recursive_directory_iterator it(generationPath, error), end;
             !error && it != end; it.increment(error))
         {
-            if (it->is_regular_file(error)) files.push_back(it->path());
+            if (it->is_regular_file(error))
+            {
+                files.push_back(it->path());
+            }
         }
         if (error)
         {
@@ -154,7 +175,9 @@ namespace experiment::cooked
                 return result;
             }
             if (relative.generic_string().rfind("textures/", 0) == 0)
+            {
                 product.embeddedTextureBytes += exported.bytes.size();
+            }
             if (relative == std::filesystem::path("generation.asset"))
             {
                 product.recordArtifactPath = exported.artifactPath;
@@ -196,7 +219,10 @@ namespace experiment::cooked
         const std::string sidecarSource{
             reinterpret_cast<const char*>(generationSidecar->bytes.data()),
             generationSidecar->bytes.size() };
-        if (!encode(sidecarSource, generationSidecar->bytes, "sidecar.meta")) return result;
+        if (!encode(sidecarSource, generationSidecar->bytes, "sidecar.meta"))
+        {
+            return result;
+        }
         Sha256Digest sidecarDigest{};
         std::string hashError;
         if (!ComputeSha256(generationSidecar->bytes, sidecarDigest, hashError))
@@ -204,24 +230,86 @@ namespace experiment::cooked
             AddIssue(result, "sidecar.meta", "SHA-256 계산 실패: " + hashError);
             return result;
         }
-        std::string recordSource{
+        const std::string recordSource{
             reinterpret_cast<const char*>(record->bytes.data()), record->bytes.size() };
-        constexpr std::string_view key = "sidecarFingerprint: ";
-        const std::size_t field = recordSource.find(key);
-        const std::size_t value = field == std::string::npos ? field : field + key.size();
-        const std::size_t end = field == std::string::npos ? field
-            : recordSource.find_first_of("\r\n", value);
-        if (field == std::string::npos || end == std::string::npos
-            || recordSource.find(key, end) != std::string::npos)
+        std::string recordFailure;
+        auto recordDocument = Authoring::WriteDocument::ParseText(recordSource, &recordFailure);
+        if (!recordDocument || !recordDocument->Root().Read().IsMap())
         {
-            AddIssue(result, "generation.asset", "sidecarFingerprint 필드가 유일하지 않다.");
+            AddIssue(result, "generation.asset", "Cannot read packaged generation record: " + recordFailure);
             return result;
         }
-        recordSource.replace(value, end - value, "sha256:" + Hash::ToHex(sidecarDigest));
-        if (!encode(recordSource, record->bytes, "generation.asset")) return result;
+        const auto recordRoot = recordDocument->Root();
+        recordRoot.Child("sidecarFingerprint").SetScalar("sha256:" + Hash::ToHex(sidecarDigest));
+        const auto subAssets = recordRoot.Child("subAssets");
+        std::size_t cookedTextures{};
+        for (std::size_t index = 0; index < subAssets.Size(); ++index)
+        {
+            const auto entry = subAssets.At(index);
+            if (entry.Read()["kind"].AsString() != "texture")
+            {
+                continue;
+            }
+            const auto textureId = entry.Read()["assetId"].AsString();
+            const auto texture = std::ranges::find_if(loaded.generation->Textures(), [&](const auto& value)
+            {
+                return Uuid::ToString(value.textureId) == textureId;
+            });
+            const auto originalPath = entry.Read()["artifactPath"].AsString();
+            const auto originalFingerprint = entry.Read()["artifactFingerprint"].AsString();
+            const auto textureFile = std::ranges::find_if(product.files, [&](const auto& value)
+            {
+                return value.artifactPath == prefix + originalPath;
+            });
+            Sha256Digest sourceDigest{};
+            if (texture == loaded.generation->Textures().end() || textureFile == product.files.end() ||
+                !ComputeSha256(textureFile->bytes, sourceDigest, recordFailure) ||
+                originalFingerprint != "sha256:" + Hash::ToHex(sourceDigest))
+            {
+                AddIssue(result, "generation.textures", "Generation texture snapshot/identity mismatch: " + textureId);
+                return result;
+            }
+            TextureImportSettings settings;
+            settings.mipPolicy = TextureMipPolicy::GenerateFull;
+            settings.colorSpace = texture->colorSpace == assets::ModelTextureColorSpace::Srgb
+                ? TextureColorSpace::Srgb : TextureColorSpace::Linear;
+            std::vector<std::byte> cookedBytes;
+            if (!ParseTextureImportSettings(sidecarText, settings, recordFailure) ||
+                !CookTexture(textureFile->bytes, settings, cookedBytes, recordFailure))
+            {
+                AddIssue(result, "generation.textures", "Texture cook failed: " + textureId + ": " + recordFailure);
+                return result;
+            }
+            const auto cookedPath = "textures/" + textureId + ".cetex";
+            Sha256Digest cookedDigest{};
+            if (!ComputeSha256(cookedBytes, cookedDigest, recordFailure))
+            {
+                AddIssue(result, "generation.textures", "Cannot hash cooked texture: " + recordFailure);
+                return result;
+            }
+            textureFile->artifactPath = prefix + cookedPath;
+            textureFile->bytes = std::move(cookedBytes);
+            entry.Child("artifactPath").SetScalar(cookedPath);
+            entry.Child("artifactFingerprint").SetScalar("sha256:" + Hash::ToHex(cookedDigest));
+            ++cookedTextures;
+        }
+        if (cookedTextures != product.embeddedTextureCount ||
+            !Authoring::EncodeCookedDocument(recordRoot.Read(), record->bytes, recordFailure))
+        {
+            AddIssue(result, "generation.asset", "Cooked generation texture closure/record is invalid: " + recordFailure);
+            return result;
+        }
 
         product.artifactBytes = 0;
-        for (const auto& file : product.files) product.artifactBytes += file.bytes.size();
+        product.embeddedTextureBytes = 0;
+        for (const auto& file : product.files)
+        {
+            product.artifactBytes += file.bytes.size();
+            if (file.artifactPath.starts_with(prefix + "textures/"))
+            {
+                product.embeddedTextureBytes += file.bytes.size();
+            }
+        }
         const std::vector<std::byte>& recordBytes = record->bytes;
 
         Sha256Digest digest{};

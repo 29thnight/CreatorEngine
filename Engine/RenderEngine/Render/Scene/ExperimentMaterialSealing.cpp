@@ -32,9 +32,15 @@ namespace ExperimentMaterialSealing
     {
         for (const SealTextureOwner& texture : textures)
         {
-            if (texture.propertyName
-                != standard_material::property::NormalMap) continue;
-            return (nullptr != texture.owner) ? 1u : 0u;
+            if (texture.propertyName != standard_material::property::NormalMap)
+            {
+                continue;
+            }
+            if (!texture.owner)
+            {
+                return 0u;
+            }
+            return texture.owner->GetImageDescription().Format() == RHIFormat::BC5Unorm ? 3u : 1u;
         }
         return 0u;
     }

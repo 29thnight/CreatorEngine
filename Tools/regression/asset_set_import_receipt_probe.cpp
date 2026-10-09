@@ -1,6 +1,8 @@
 // Source-only opt-in Windows regression harness. NOT built or run in this change.
 // Compile this translation unit INSTEAD OF AssetSetBuild.cpp and link the
-// AssetCooker native dependencies; including it exposes only local test seams.
+// AssetCooker native dependencies plus the offline TextureCooker.cpp object;
+// RenderEngine.lib deliberately contains no image SDK cooker. Including this
+// file exposes only local test seams.
 #include "../AssetCooker/AssetSetBuild.cpp"
 #include <objbase.h>
 
@@ -44,7 +46,7 @@ assetSetId: 22222222-2222-4222-8222-222222222222
 revision: 1
 inclusion: HardAndLoadable
 target: { platform: win-x64, abi: receipt-probe-v1 }
-settings: { textureEncoding: Source }
+settings: { textureEncoding: GPUReady }
 roots:
   - { assetId: 11111111-1111-4111-8111-111111111111, kind: Texture }
   - { assetId: 33333333-3333-4333-8333-333333333333, kind: Texture }
@@ -63,6 +65,32 @@ assets:
         const auto cold = build("cold");
         Require(cold.succeeded && cold.recookedImports == 2u && cold.reusedImports == 0u && cold.blobs == 1u,
             "Cold source import/deduplication: " + cold.failure);
+        {
+            std::size_t textureBlobs{};
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(request.artifactCache / "Derived"))
+            {
+                if (entry.is_regular_file())
+                {
+                    ++textureBlobs;
+                    const auto bytes = Read(entry.path());
+                    Require(entry.path().extension() == ".cetex", "Source image extension leaked into CAS");
+                    ValidateTexture(bytes, ".cetex", ck::kCookedTextureRepresentationVersion, ck::kCookedTextureSchemaVersion);
+                    Require(bytes != std::vector<std::byte>(std::as_bytes(std::span(kRed)).begin(),
+                        std::as_bytes(std::span(kRed)).end()), "Texture CAS still contains encoded source bytes");
+                }
+            }
+            Require(textureBlobs == 1u, "Equal texture payloads lost physical deduplication");
+            bool rejected{};
+            try
+            {
+                ValidateTexture(std::as_bytes(std::span(kRed)), ".png", 1u, 1u);
+            }
+            catch (const std::exception&)
+            {
+                rejected = true;
+            }
+            Require(rejected, "Source-image representation was accepted as a cooked texture");
+        }
         // Killed-process debris must never be interpreted as a committed receipt.
         std::filesystem::create_directories(request.artifactCache / ".asset-set-work-killed.incomplete");
         Replace(request.artifactCache / ".asset-set-work-killed.incomplete" / "import-receipt.tmp", "partial");
@@ -81,6 +109,14 @@ assets:
         const auto sidecar = build("sidecar");
         Require(sidecar.succeeded && sidecar.reusedImports == 1u && sidecar.recookedImports == 1u,
             "One sidecar change did not isolate source import invalidation");
+        Replace(assets / "a.png.meta", "guid: 11111111-1111-4111-8111-111111111111\n"
+            "importSettings: { colorSpace: Linear, compression: BC7, compressionQuality: Fast }\n");
+        const auto settings = build("settings");
+        Require(settings.succeeded && settings.reusedImports == 1u && settings.recookedImports == 1u,
+            "Byte-affecting texture settings did not invalidate exactly one import: " + settings.failure);
+        const auto settingsWarm = build("settings-warm");
+        Require(settingsWarm.succeeded && settingsWarm.reusedImports == 2u && settingsWarm.recookedImports == 0u,
+            "Canonical cooked settings recipe did not reuse both imports");
         Replace(assets / "a.png", std::as_bytes(std::span(kBlue)));
         const auto changed = build("changed");
         Require(changed.succeeded && changed.reusedImports == 1u && changed.recookedImports == 1u,
@@ -108,10 +144,20 @@ assets:
             CloseHandle(writer);
             Require(rejected, "Capture accepted a preexisting writer");
         }
+        std::vector<std::byte> activeTexture;
+        std::string cookFailure;
+        Require(ck::CookTexture(std::as_bytes(std::span(kRed)), ck::TextureImportSettings{}, activeTexture, cookFailure),
+            "Cannot prepare unchanged b.png active blob: " + cookFailure);
         std::filesystem::path blob;
         for (const auto& entry : std::filesystem::recursive_directory_iterator(request.artifactCache / "Derived"))
-            if (entry.is_regular_file()) { blob = entry.path(); break; }
-        Require(!blob.empty(), "No immutable test blob");
+        {
+            if (entry.is_regular_file() && Read(entry.path()) == activeTexture)
+            {
+                blob = entry.path();
+                break;
+            }
+        }
+        Require(!blob.empty(), "No active immutable test blob");
         const auto original = Read(blob);
         auto damaged = original;
         damaged.back() ^= std::byte{ 1u };

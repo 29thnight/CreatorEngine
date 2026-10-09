@@ -39,6 +39,9 @@ inline VkFormat ToVulkan(RHIFormat format)
     case RHIFormat::BC1UnormSrgb:   return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
     case RHIFormat::BC3Unorm:       return VK_FORMAT_BC3_UNORM_BLOCK;
     case RHIFormat::BC3UnormSrgb:       return VK_FORMAT_BC3_SRGB_BLOCK;
+    case RHIFormat::BC5Unorm:           return VK_FORMAT_BC5_UNORM_BLOCK;
+    case RHIFormat::BC7Unorm:           return VK_FORMAT_BC7_UNORM_BLOCK;
+    case RHIFormat::BC7UnormSrgb:       return VK_FORMAT_BC7_SRGB_BLOCK;
     case RHIFormat::BGRA8Unorm:     return VK_FORMAT_B8G8R8A8_UNORM;
     case RHIFormat::BGRA8UnormSrgb: return VK_FORMAT_B8G8R8A8_SRGB;
     default:                        return VK_FORMAT_UNDEFINED;

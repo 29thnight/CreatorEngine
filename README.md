@@ -80,7 +80,7 @@ PHASE 4.25의 현재 완료 공수는 **32/34일**입니다. [동일 입력 Blen
 | 플랫폼·네이티브 | Windows x64, Win32, C++23 (`stdcpp23` / `/std:c++23preview`), MSVC v145, MSBuild |
 | 렌더링·에디터 | DirectX 12, Vulkan, Slang, Dear ImGui, ImGuizmo·ImViewGuizmo |
 | 관리 코드·빌드 도구 | .NET 10, C#, CoreCLR hosting API, Roslyn |
-| 모델·텍스처 | fastgltf + simdjson, ufbx, MikkTSpace, meshoptimizer, DirectXTex, stb |
+| 모델·텍스처 | fastgltf + simdjson, ufbx, MikkTSpace, meshoptimizer, DirectXTex |
 | 작업 실행 | enkiTS, 엔진 공용 `thread_pool`·`job_scheduler` |
 | 물리·오디오 | NVIDIA PhysX, 소스 벤더링한 miniaudio 0.11.25 (MIT-0) |
 | 직렬화·패키징 | ryml 기반 저작 YAML, 도구·명령용 JSON, `.creator`·`.prefab`·`.meta`, 쿠킹된 런타임 문서, PAK |

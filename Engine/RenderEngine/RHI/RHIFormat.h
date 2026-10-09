@@ -90,6 +90,11 @@ enum class RHIFormat : uint16_t
     BGRA8Unorm,
     BGRA8UnormSrgb,
     BC3UnormSrgb,
+
+    // PHASE 12 GPU-ready desktop texture artifacts. Append-only wire values.
+    BC5Unorm,
+    BC7Unorm,
+    BC7UnormSrgb,
 };
 
 /// 픽셀 하나의 바이트 수. 0이면 이 포맷을 모르는 것이다.
@@ -181,7 +186,10 @@ constexpr bool RHIFormatIsBlockCompressed(RHIFormat format)
     case RHIFormat::BC1Unorm:
     case RHIFormat::BC1UnormSrgb:
     case RHIFormat::BC3Unorm:
-    case RHIFormat::BC3UnormSrgb:   return true;
+    case RHIFormat::BC3UnormSrgb:
+    case RHIFormat::BC5Unorm:
+    case RHIFormat::BC7Unorm:
+    case RHIFormat::BC7UnormSrgb:   return true;
     default:                        return false;
     }
 }
@@ -200,7 +208,10 @@ constexpr uint32_t RHIFormatBlockBytes(RHIFormat format)
     case RHIFormat::BC1Unorm:
     case RHIFormat::BC1UnormSrgb:   return 8;
     case RHIFormat::BC3Unorm:
-    case RHIFormat::BC3UnormSrgb:   return 16;
+    case RHIFormat::BC3UnormSrgb:
+    case RHIFormat::BC5Unorm:
+    case RHIFormat::BC7Unorm:
+    case RHIFormat::BC7UnormSrgb:   return 16;
     default:                        return RHIFormatBytes(format);
     }
 }

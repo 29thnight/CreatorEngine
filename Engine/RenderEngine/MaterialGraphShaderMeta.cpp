@@ -178,6 +178,44 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
     return out.str();
 }
 
+        bool ResolveGeneratedBindings(const LX::LXMaterialProgram& program, const ShaderMeta& meta,
+            std::span<const RHIShaderReflection> reflections, ShaderMetaBindingLayout& result, std::string& error)
+        {
+            ShaderMetaBindingLayout candidate;
+            if (!ShaderMetaReflection::Resolve(meta, reflections, candidate, error))
+            {
+                return false;
+            }
+            std::vector<const RHIShaderReflection*> stages;
+            for (const auto& reflection : reflections)
+            {
+                stages.push_back(&reflection);
+            }
+            RHIShaderReflection merged;
+            BindingLayout bindings;
+            Budget reflectedBudget;
+            reflectedBudget.textures = 112;
+            reflectedBudget.samplers = 125;
+            std::vector<LX::LXMaterialDiagnostic> diagnostics;
+            if (!MergeMaterialReflections(stages, merged, diagnostics) ||
+                !ResolveBindings(program, merged, reflectedBudget, bindings, diagnostics))
+            {
+                error = diagnostics.empty() ? "Invalid generated internal binding layout." : diagnostics.front().message;
+                return false;
+            }
+            // Encoding uniforms are private runtime fields. A texture-only graph still
+            // needs the common packer to allocate the entire validated constant buffer.
+            if (bindings.uniformBytes != 0)
+            {
+                candidate.constantBufferName = "LXMaterialProperties";
+                candidate.constantBufferRegister = UniformRegister;
+                candidate.constantBufferSpace = 0;
+                candidate.constantBufferByteSize = bindings.uniformBytes;
+            }
+            result = std::move(candidate);
+            return true;
+        }
+
 bool Write(const std::filesystem::path& path, std::string_view text)
 {
     std::ofstream file(path, std::ios::binary | std::ios::trunc);
@@ -222,7 +260,7 @@ bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid gr
         const auto validate = [&](const std::filesystem::path& folder) {
             candidate.metaPath = folder / "material.shadermeta";
             return ShaderMetaLoader::LoadFile(candidate.metaPath, graphGuid, candidate.meta, error) &&
-                ShaderMetaReflection::Resolve(candidate.meta, reflections, candidate.layout, error);
+                ResolveGeneratedBindings(program, candidate.meta, reflections, candidate.layout, error);
         };
         if (std::filesystem::exists(directory))
         {
@@ -416,7 +454,15 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             }
             uniforms.fields.push_back(std::move(field));
         }
-        if (!uniforms.fields.empty()) reflection.resources.push_back(std::move(uniforms));
+        for (const auto& binding : product.layout.textureEncodings)
+        {
+            uniforms.fields.push_back({TextureEncodingUniformName(binding.slot),
+                {RHIShaderScalarKind::UInt32, 1, 1, 1}, binding.offset, 4u});
+        }
+        if (!uniforms.fields.empty())
+        {
+            reflection.resources.push_back(std::move(uniforms));
+        }
         for (const auto& resource : product.layout.textures)
         {
             RHIShaderResourceReflection texture;
@@ -433,8 +479,10 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             sampler.registerIndex = SamplerRegister + resource.slot;
             reflection.resources.push_back(std::move(sampler));
         }
-        if (!ShaderMetaReflection::Resolve(candidate.meta, std::span(&reflection, 1), candidate.layout, error))
+        if (!ResolveGeneratedBindings(program, candidate.meta, std::span(&reflection, 1), candidate.layout, error))
+        {
             return false;
+        }
         candidate.document = document;
         candidate.source = source;
         candidate.cookedContract.assign(cookedContract.begin(), cookedContract.end());

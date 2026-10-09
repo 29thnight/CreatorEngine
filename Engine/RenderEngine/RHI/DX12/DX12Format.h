@@ -37,6 +37,9 @@ inline DXGI_FORMAT ToDXGI(RHIFormat format)
     case RHIFormat::BC1UnormSrgb:   return DXGI_FORMAT_BC1_UNORM_SRGB;
     case RHIFormat::BC3Unorm:       return DXGI_FORMAT_BC3_UNORM;
     case RHIFormat::BC3UnormSrgb:       return DXGI_FORMAT_BC3_UNORM_SRGB;
+    case RHIFormat::BC5Unorm:           return DXGI_FORMAT_BC5_UNORM;
+    case RHIFormat::BC7Unorm:           return DXGI_FORMAT_BC7_UNORM;
+    case RHIFormat::BC7UnormSrgb:       return DXGI_FORMAT_BC7_UNORM_SRGB;
     case RHIFormat::BGRA8Unorm:     return DXGI_FORMAT_B8G8R8A8_UNORM;
     case RHIFormat::BGRA8UnormSrgb: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
     default:                        return DXGI_FORMAT_UNKNOWN;
@@ -67,6 +70,9 @@ inline RHIFormat FromDXGI(DXGI_FORMAT format)
     case DXGI_FORMAT_BC1_UNORM_SRGB:        return RHIFormat::BC1UnormSrgb;
     case DXGI_FORMAT_BC3_UNORM:             return RHIFormat::BC3Unorm;
     case DXGI_FORMAT_BC3_UNORM_SRGB:             return RHIFormat::BC3UnormSrgb;
+    case DXGI_FORMAT_BC5_UNORM:                  return RHIFormat::BC5Unorm;
+    case DXGI_FORMAT_BC7_UNORM:                  return RHIFormat::BC7Unorm;
+    case DXGI_FORMAT_BC7_UNORM_SRGB:             return RHIFormat::BC7UnormSrgb;
     case DXGI_FORMAT_B8G8R8A8_UNORM:        return RHIFormat::BGRA8Unorm;
     case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:   return RHIFormat::BGRA8UnormSrgb;
     default:                                return RHIFormat::Unknown;

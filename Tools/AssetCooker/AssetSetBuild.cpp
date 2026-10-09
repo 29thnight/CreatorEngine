@@ -7,12 +7,13 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookSupport.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
+#include "Experiment/Cooked/CookedTexture.h"
+#include "Experiment/Cooked/TextureImportSettings.h"
 #include "Experiment/Cooked/ModelAssetSetProducer.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/CookedShaderMeta.h"
 #include "Experiment/Cooked/MaterialAssetSetProducer.h"
 #include "Assets/AssetIdentityProfile.h"
-#include "Texture.h"
 
 #include <algorithm>
 #include <charconv>
@@ -43,15 +44,14 @@ namespace AssetCooking
         constexpr std::size_t kMaxAssets = 65536u;
         constexpr std::size_t kMaxEdges = 262144u;
         // Bump for producer/decoder behavior or normalization changes.
-        constexpr std::string_view kTextureImporterVersion = "texture-source-image-v1";
-        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v3";
+        constexpr std::string_view kTextureImporterVersion = "texture-gpu-ready-v2";
+        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v4";
         constexpr std::string_view kShaderMetaImporterVersion = "shadermeta-source-document-v1";
         constexpr std::string_view kMaterialImporterVersion = "lattice-material-source-document-v1";
         constexpr std::string_view kMaterialProgramImporterVersion = "lattice-source-verified-program-v1";
         constexpr std::string_view kAuthoredMaterialImporterVersion = "authored-material-source-document-v1";
         constexpr std::string_view kCodeProgramImporterVersion = "code-source-verified-program-v1";
-        constexpr std::string_view kBuildVersion = "asset-set-build-v4";
-        constexpr std::uint32_t kTextureSourceImage = 1u;
+        constexpr std::string_view kBuildVersion = "asset-set-build-v5";
 
         struct AssetSource final
         {
@@ -446,10 +446,13 @@ namespace AssetCooking
                 Fail("AssetSet target requires win-x64 and an explicit compatible ABI token");
             }
             RequireMap(root["settings"], { "textureEncoding" }, "settings");
-            if (Text(root["settings"], "textureEncoding") != "Source")
+            const auto textureEncoding = Text(root["settings"], "textureEncoding");
+            if (textureEncoding != "GPUReady" && textureEncoding != "Source")
             {
-                Fail("Only textureEncoding Source is implemented; no transcoding or mip generation is implied");
+                Fail("textureEncoding must be GPUReady (legacy Source spelling is an input recipe alias)");
             }
+            // Existing source definitions remain readable; both spellings now
+            // produce CECT. Source-image blobs are never a valid output format.
             const auto roots = root["roots"];
             const auto sources = root["assets"];
             if (!roots.IsSequence() || roots.Size() == 0 || roots.Size() > kMaxAssets ||
@@ -683,17 +686,19 @@ namespace AssetCooking
             }
         }
 
-        void ValidateTexture(std::span<const std::byte> bytes, const std::string& extension)
+        void ValidateTexture(std::span<const std::byte> bytes, const std::string& extension,
+            std::uint32_t representation, std::uint32_t schema)
         {
-            if (ck::SniffTextureExtension(bytes) != extension)
+            if (extension != ".cetex" || representation != ck::kCookedTextureRepresentationVersion ||
+                schema != ck::kCookedTextureSchemaVersion)
             {
-                Fail("Texture container signature does not match its declared source extension " + extension);
+                Fail("Texture artifact requires GPU-ready CECT representation/schema 2 and .cetex");
             }
             TextureImage image;
             std::string failure;
-            if (!Texture::DecodeToRgba8(bytes, image, failure))
+            if (!ck::DecodeCookedTexture(bytes, image, failure))
             {
-                Fail("Texture format validation failed: " + failure);
+                Fail("GPU-ready texture artifact validation failed: " + failure);
             }
         }
 
@@ -706,7 +711,7 @@ namespace AssetCooking
             switch (asset.kind)
             {
             case ck::CookedAssetKind::Texture:
-                ValidateTexture(bytes, extension);
+                ValidateTexture(bytes, extension, representation, schema);
                 return;
             case ck::CookedAssetKind::ShaderMeta:
             {
@@ -893,11 +898,12 @@ namespace AssetCooking
             std::string inputDigest{};
             std::string importKey{};
             std::string importer{};
+            std::string textureRecipe{};
             std::uint32_t representation{};
             std::uint32_t schema{};
         };
 
-        constexpr std::string_view kImportReceiptVersion = "asset-set-import-receipt-v1";
+        constexpr std::string_view kImportReceiptVersion = "asset-set-import-receipt-v2";
         constexpr std::size_t kMaxReceiptBytes = 64u * 1024u * 1024u;
 
         // Length framing, including every string, makes source-authored path
@@ -953,13 +959,20 @@ namespace AssetCooking
             switch (source.asset.kind)
             {
             case ck::CookedAssetKind::Texture:
-                value.representation = kTextureSourceImage; value.schema = ck::kTextureArtifactVersion;
+                value.representation = ck::kCookedTextureRepresentationVersion;
+                value.schema = ck::kCookedTextureSchemaVersion;
+                value.extension = ".cetex";
                 if (!model)
                 {
-                    value.extension = std::filesystem::u8path(source.source).extension().string();
-                    std::ranges::transform(value.extension, value.extension.begin(), [](unsigned char ch)
-                    { return static_cast<char>(ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch); });
-                    if (!ck::IsSupportedTextureExtension(value.extension)) Fail("Unsupported receipt texture source extension");
+                    auto sourceExtension = std::filesystem::u8path(source.source).extension().string();
+                    std::ranges::transform(sourceExtension, sourceExtension.begin(), [](unsigned char ch)
+                    {
+                        return static_cast<char>(ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch);
+                    });
+                    if (!ck::IsSupportedTextureExtension(sourceExtension))
+                    {
+                        Fail("Unsupported receipt texture source extension");
+                    }
                 }
                 break;
             case ck::CookedAssetKind::ShaderMeta:
@@ -1032,7 +1045,8 @@ namespace AssetCooking
             ReceiptText(bytes, toolFingerprint); // verified binary/compiler/native dependency closure
             ReceiptText(bytes, definition.targetPlatform);
             ReceiptText(bytes, definition.targetAbi);
-            ReceiptText(bytes, "textureEncoding=Source;materialBudget=default-v1;resolver=strict-captured-v1");
+            ReceiptText(bytes, "textureEncoding=CECT2;materialBudget=default-v1;resolver=strict-captured-v1");
+            ReceiptText(bytes, ck::TextureImportRecipe(ck::TextureImportSettings{}));
             ReceiptNumber(bytes, ck::kAssetSetManifestVersion);
             ReceiptNumber(bytes, selections.size());
             for (const auto& selection : selections)
@@ -1048,6 +1062,30 @@ namespace AssetCooking
                 ReceiptNumber(bytes, expected.representation);
                 ReceiptNumber(bytes, expected.schema);
                 ReceiptText(bytes, expected.extension);
+                if (selection.kind == ck::CookedAssetKind::Texture)
+                {
+                    auto metaPath = Canonical(initial.root / std::filesystem::u8path(source.source));
+                    metaPath += ".meta";
+                    const auto found = initial.files.find(Canonical(metaPath));
+                    if (found == initial.files.end())
+                    {
+                        Fail("Texture recipe lacks captured metadata");
+                    }
+                    const auto& meta = found->second.bytes;
+                    ck::TextureImportSettings settings;
+                    std::string failure;
+                    if (!ck::ParseTextureImportSettings(
+                        { reinterpret_cast<const char*>(meta.data()), meta.size() }, settings, failure))
+                    {
+                        Fail("Texture import settings: " + failure);
+                    }
+                    ReceiptText(bytes, ck::TextureImportRecipe(settings));
+                    // A model usage default is source-derived. The canonical
+                    // source hash plus this policy pins it without re-importing
+                    // the model just to find a receipt; explicit .meta wins.
+                    ReceiptText(bytes, assets::IsUuidV8(selection.key.assetId.value)
+                        ? "modelTexture=single-role-GenerateFull;mixed-role-Source-PreserveAuthored-None;meta-wins-v2" : "colorSpace=source-then-meta-v1");
+                }
                 ReceiptNumber(bytes, source.dependencies.size());
                 for (const auto& edge : source.dependencies)
                 {
@@ -1150,10 +1188,18 @@ namespace AssetCooking
                             reader.Text() != value.importer || reader.Number() != value.representation || reader.Number() != value.schema)
                             Fail("Import receipt typed identity/importer/schema mismatch");
                         const auto extension = reader.Text(32u);
-                        if ((!value.extension.empty() && value.extension != extension) ||
-                            (value.extension.empty() && !ck::IsSupportedTextureExtension(extension)))
+                        if (value.extension != extension)
+                        {
                             Fail("Import receipt representation extension mismatch");
+                        }
                         value.extension = extension;
+                        value.textureRecipe = reader.Text();
+                        if ((selection.kind == ck::CookedAssetKind::Texture &&
+                            !value.textureRecipe.starts_with(ck::TextureCookerFingerprint() + ";colorSpace=")) ||
+                            (selection.kind != ck::CookedAssetKind::Texture && !value.textureRecipe.empty()))
+                        {
+                            Fail("Import receipt effective texture settings fingerprint mismatch");
+                        }
                         value.inputDigest = reader.Text(64u);
                         const auto digest = reader.Text(64u);
                         const auto size = reader.Number();
@@ -1207,14 +1253,23 @@ namespace AssetCooking
                 value.importKey = importKey;
                 const auto expected = ExpectedFormat(authored);
                 if (value.importer != expected.importer || value.representation != expected.representation ||
-                    value.schema != expected.schema || (!expected.extension.empty() && value.extension != expected.extension))
+                    value.schema != expected.schema || value.extension != expected.extension)
+                {
                     Fail("Produced recipe format disagrees with import receipt schema");
+                }
+                if ((selection.kind == ck::CookedAssetKind::Texture &&
+                    !value.textureRecipe.starts_with(ck::TextureCookerFingerprint() + ";colorSpace=")) ||
+                    (selection.kind != ck::CookedAssetKind::Texture && !value.textureRecipe.empty()))
+                {
+                    Fail("Produced effective texture recipe disagrees with its product kind");
+                }
                 ReceiptText(receipt.bytes, Label(selection.key));
                 ReceiptNumber(receipt.bytes, static_cast<unsigned>(selection.kind));
                 ReceiptText(receipt.bytes, value.importer);
                 ReceiptNumber(receipt.bytes, value.representation);
                 ReceiptNumber(receipt.bytes, value.schema);
                 ReceiptText(receipt.bytes, value.extension);
+                ReceiptText(receipt.bytes, value.textureRecipe);
                 ReceiptText(receipt.bytes, value.inputDigest);
                 ReceiptText(receipt.bytes, Hash(value.bytes));
                 ReceiptNumber(receipt.bytes, value.bytes.size());
@@ -1494,7 +1549,22 @@ namespace AssetCooking
                 {
                     Fail("Captured texture sidecar differs from declared identity: " + authored.source);
                 }
-                auto cooked = ck::BuildTextureCookProduct({ source, assetRoot });
+                ck::TextureCookProductRequest textureRequest{ source, assetRoot };
+                textureRequest.captureSource = [&](const std::filesystem::path& path,
+                    std::vector<std::byte>& bytes, std::string& failure)
+                {
+                    try
+                    {
+                        bytes = capture.Capture(path).bytes;
+                        return true;
+                    }
+                    catch (const std::exception& error)
+                    {
+                        failure = error.what();
+                        return false;
+                    }
+                };
+                auto cooked = ck::BuildTextureCookProduct(textureRequest);
                 if (!cooked.Succeeded())
                 {
                     std::string failure = "Texture source cook failed: " + authored.source;
@@ -1505,18 +1575,28 @@ namespace AssetCooking
                     Fail(failure);
                 }
                 auto& product = *cooked.product;
-                if (product.textureAssetId != identity.assetId || product.artifactBytes != sourceInput ||
-                    Read(metaPath, kMaxDefinitionBytes) != metaInput || Read(source) != sourceInput)
+                ck::Sha256Digest sourceDigest{};
+                ck::Sha256Digest metaDigest{};
+                std::string hashFailure;
+                if (!ck::ComputeSha256(sourceInput, sourceDigest, hashFailure) ||
+                    !ck::ComputeSha256(metaInput, metaDigest, hashFailure) ||
+                    product.textureAssetId != identity.assetId ||
+                    product.sourceContentSha256 != sourceDigest || product.sourceMetaSha256 != metaDigest)
                 {
-                    Fail("Source/meta changed during cook or definition assetId differs from sidecar: " + authored.source);
+                    Fail("Producer consumed a different texture snapshot/identity: " + authored.source + ": " + hashFailure);
                 }
+                capture.Verify();
+                ValidateTexture(product.artifactBytes, ".cetex", ck::kCookedTextureRepresentationVersion,
+                    ck::kCookedTextureSchemaVersion);
                 PreparedArtifact value;
                 value.bytes = std::move(product.artifactBytes);
-                value.extension = product.sourceExtension;
-                value.inputDigest = Hash("source=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) + "\n");
+                value.extension = ".cetex";
+                value.inputDigest = Hash("source=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) +
+                    "\nsettings=" + product.importRecipe + "\n");
                 value.importer = kTextureImporterVersion;
-                value.representation = kTextureSourceImage;
-                value.schema = ck::kTextureArtifactVersion;
+                value.textureRecipe = product.importRecipe;
+                value.representation = ck::kCookedTextureRepresentationVersion;
+                value.schema = ck::kCookedTextureSchemaVersion;
                 result.emplace(identity, std::move(value));
                 receipts.push_back(MakeReceipt(definition, selections, capture, cache, recipeKey, result));
             }
@@ -1582,6 +1662,7 @@ namespace AssetCooking
                     value.extension = product.extension;
                     value.inputDigest = Hash(std::as_bytes(std::span(cooked.sourceInputsSha256)));
                     value.importer = kModelImporterVersion;
+                    value.textureRecipe = std::move(product.textureImportRecipe);
                     value.representation = product.representation;
                     value.schema = product.schemaVersion;
                     result.emplace(product.asset.key, std::move(value));
@@ -1848,7 +1929,8 @@ namespace AssetCooking
                     ? product.inputDigest : digest;
                 const auto buildKey = Hash(std::string(kBuildVersion) + "\nimporter=" + product.importer +
                     "\ntool=" + request.toolFingerprint + "\n" + compatibility +
-                    "textureEncoding=Source\nextension=" + product.extension +
+                    "textureEncoding=CECT2\ntextureSettings=" + product.textureRecipe +
+                    "\nimportKey=" + importKey + "\nextension=" + product.extension +
                     "\nselectedInput=" + artifactInput + "\nselection=" + Label(identity) + "\n");
                 const auto relative = "Derived/AssetBlobs/" + Hash(compatibility) + "/" + digest + product.extension;
                 const auto record = "buildKey=" + buildKey + "\ncontentSha256=" + digest +

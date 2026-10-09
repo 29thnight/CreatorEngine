@@ -38,9 +38,9 @@
 //   버린다. 뷰를 멤버로 들거나 프레임을 넘기면 그 순간 규약이 깨진다.
 //   컨테이너 방식에는 없던 위험이고, 복사를 없앤 대가다.
 //
-// ★ 디코더(WIC·DDS·TGA·HDR)와 BC 압축기는 여전히 DirectXTex 가 한다. 그것이
-//   DirectXTex 를 못 걷는 진짜 이유이고, 이 타입이 답할 문제가 아니다.
-//   지금 그쪽은 Texture.cpp 안에만 있다 — 교체하려면 그 파일 하나만 보면 된다.
+// Source decoding and BC processing live only in Editor/offline translation
+// units. Their derived CodecImage keeps SDK storage without a pixel copy.
+// Runtime reads validated GPU-ready artifacts into this neutral owned image.
 //
 // ── 왜 RHI 폴더가 아닌가 ──
 //

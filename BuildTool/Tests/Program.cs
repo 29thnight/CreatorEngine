@@ -58,11 +58,22 @@ try
     File.WriteAllText(setKeys, "fixture");
     var blobBytes = new byte[] { 12, 34, 56 };
     var blobHash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(blobBytes));
-    var setBlob = Paths.Child(assetSet, "Derived/AssetBlobs/" + new string('0', 64) + "/" + blobHash + ".png");
+    var setBlob = Paths.Child(assetSet, "Derived/AssetBlobs/" + new string('0', 64) + "/" + blobHash + ".cetex");
     Directory.CreateDirectory(Path.GetDirectoryName(setBlob)!);
     File.WriteAllBytes(setBlob, blobBytes);
     File.WriteAllText(Paths.Child(assetSet, "build-report.txt"), "format=CEMF3\nassets=1\nblobs=1\nmanifestSha256="
         + Metadata.Hash(setManifest) + "\nbuildKeysSha256=" + Metadata.Hash(setKeys) + "\n");
+    Check(AssetSetBuilding.ValidateOutput(assetSet) == (1, 1), "Cooked texture CAS envelope rejected");
+    var rawSetBlob = Path.ChangeExtension(setBlob, ".png");
+    File.Move(setBlob, rawSetBlob);
+    try
+    {
+        Reject(() => AssetSetBuilding.ValidateOutput(assetSet), "Raw PNG CAS blob accepted");
+    }
+    finally
+    {
+        File.Move(rawSetBlob, setBlob);
+    }
     var setList = Path.Combine(root, "sets.txt");
     File.WriteAllText(setList, "standalone-set\n");
     var packagedAssets = Path.Combine(root, "asset-set-package/Assets");
@@ -130,7 +141,7 @@ try
     Directory.CreateDirectory(modelTextures);
     File.WriteAllText(Path.Combine(textureDerived, "asset-manifest.cemf"), "fixture");
 
-    foreach (var extension in new[] { "png", "jpg" })
+    foreach (var extension in new[] { "cetex" })
     {
         var texture = Path.Combine(modelTextures, "22222222-2222-8222-8222-222222222222." + extension);
         File.WriteAllText(texture, "payload");
@@ -138,8 +149,10 @@ try
         File.Delete(texture);
     }
 
-    foreach (var relative in new[] { "Models/11/11111111-1111-4111-8111-111111111111/1/textures/name.jpg",
-        "Models/ff/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.jpg",
+    foreach (var relative in new[] { "Models/11/11111111-1111-4111-8111-111111111111/1/textures/name.cetex",
+        "Models/ff/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.cetex",
+        "Models/11/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.png",
+        "Models/11/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.jpg",
         "Models/11/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.exe" })
     {
         var texture = Paths.Child(textureDerived, relative);

@@ -48,6 +48,11 @@ namespace experiment::cooked
 //   다시 들여오는 것이다. D5-c 의 "source path 탐색 없이"는 이 수가 0 이
 //   되어야 성립한다 — 그건 저작 데이터 이주이지 쿠킹의 일이 아니다.
 //
+// Decal's three existing texture-name strings are the narrow exception: cook
+// resolves their exact Assets/Textures filename+sidecar, emits canonical GUID
+// strings in the same fields, and adds typed Texture edges. Prefab overrides
+// receive the same lowering. Other legacy material-name rejection is unchanged.
+//
 // ★ BT/blackboard GUID 도 마찬가지로 세기만 한다. producer 가 없어서
 //   간선을 그리면 해소되지 않는다.
 
@@ -56,6 +61,9 @@ struct SceneCookProductRequest final
     std::filesystem::path sourcePath{};
     std::filesystem::path assetRoot{};
     bool bootstrapReferences{};
+    // Optional offline metadata-only source root for a documents-only bootstrap.
+    // Only exact Textures/<filename>.meta identities are read, never source pixels.
+    std::filesystem::path textureIdentityRoot{};
 };
 
 struct SceneCookProduct final

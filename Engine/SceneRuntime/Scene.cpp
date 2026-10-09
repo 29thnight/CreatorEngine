@@ -2153,6 +2153,13 @@ void Scene::CommitRenderProxies()
             renderer->EnsureMeshBinding();
         }
     }
+    for (DecalComponent* decal : registry.decals)
+    {
+        if (decal && !decal->IsDestroyMark())
+        {
+            decal->PollTextureRequests();
+        }
+    }
 
     // Material Apply publishes immutable accepted bases on the game thread.
     // One revision read skips the entire scan in unchanged frames, and rebinding

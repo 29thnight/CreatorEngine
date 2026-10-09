@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -180,6 +180,15 @@
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Experiment\Cooked\MaterialAssetSetProducer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedTerrain.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedTexture.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\TextureImportSettings.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
@@ -626,6 +635,9 @@
     <ClInclude Include="Experiment\Cooked\MaterialAssetSetCodec.h" />
     <ClInclude Include="Experiment\Cooked\CookedCodeMaterial.h" />
     <ClInclude Include="Experiment\Cooked\MaterialAssetSetProducer.h" />
+    <ClInclude Include="Experiment\Cooked\CookedTerrain.h" />
+    <ClInclude Include="Experiment\Cooked\CookedTexture.h" />
+    <ClInclude Include="Experiment\Cooked\TextureImportSettings.h" />
     <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
     <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
     <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
@@ -819,6 +831,7 @@
     <ClInclude Include="Experiment\ModelLoader.h" />
     <ClInclude Include="RenderScene.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="TextureCodecImage.h" />
     <ClInclude Include="UIRenderProxy.h" />
     <ClInclude Include="Interfaces\VignettePassSetting.h" />
     <ClInclude Include="Interfaces\VolumetricFogPassSetting.h" />

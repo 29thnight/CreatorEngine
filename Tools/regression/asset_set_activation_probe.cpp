@@ -1,6 +1,7 @@
 // Unrun source fixture for the RenderEngine-linked metadata activation boundary.
 // It performs no shader compilation, texture decode or GPU submission.
 #include "../../Engine/RenderEngine/AssetDepot/AssetSetActivation.h"
+#include "../../Engine/RenderEngine/Experiment/Cooked/CookedTexture.h"
 #include "../../Engine/Utility_Framework/ContentAbi.h"
 
 #include <chrono>
@@ -64,7 +65,9 @@ namespace
         std::vector<cooked::AssetSetMountInput> inputs;
         Require(AssetDepot::ReadConfiguredAssetSets(root, inputs, failure) && inputs.empty(),
             "Legacy absent activation policy failed");
-        const std::vector<std::byte> payload{ std::byte{ 0x12 } };
+        const auto image = TextureImage::Allocate(RHIFormat::RGBA8Unorm, 1u, 1u, 1u, 1u);
+        std::vector<std::byte> payload;
+        Require(cooked::EncodeCookedTexture(image.View(), payload, failure, { true }), "Texture fixture encode failed");
         const auto payloadHash = Hash(payload);
         cooked::AssetSetManifest manifest;
         manifest.assetSetId = Id(1u);
@@ -75,11 +78,11 @@ namespace
         Require(cooked::ComputeSha256(payload, blob.contentSha256, failure), "Blob hash failed");
         blob.byteSize = payload.size();
         blob.kind = cooked::CookedAssetKind::Texture;
-        blob.representation = 1u;
-        blob.schemaVersion = 1u;
+        blob.representation = cooked::kCookedTextureRepresentationVersion;
+        blob.schemaVersion = cooked::kCookedTextureSchemaVersion;
         blob.targetPlatform = manifest.targetPlatform;
         blob.targetAbi = manifest.targetAbi;
-        blob.artifactPath = "Derived/AssetBlobs/" + std::string(64u, '0') + "/" + payloadHash + ".png";
+        blob.artifactPath = "Derived/AssetBlobs/" + std::string(64u, '0') + "/" + payloadHash + ".cetex";
         manifest.blobs.push_back(blob);
         const cooked::TypedAssetReference asset{ { Id(2u), {} }, cooked::CookedAssetKind::Texture };
         manifest.entries.push_back({ asset, 0u, {} });
@@ -88,6 +91,11 @@ namespace
         Require(AssetDepot::ValidateAssetSetRuntimeCompatibility(manifest, issues),
             "Supported Texture schema was rejected before mount");
         auto incompatible = manifest;
+        incompatible.blobs.front().representation = 1u;
+        incompatible.blobs.front().schemaVersion = 1u;
+        Require(!AssetDepot::ValidateAssetSetRuntimeCompatibility(incompatible, issues),
+            "Legacy source-image texture representation passed mount preflight");
+        incompatible = manifest;
         ++incompatible.blobs.front().schemaVersion;
         Require(!AssetDepot::ValidateAssetSetRuntimeCompatibility(incompatible, issues) && !issues.empty(),
             "Unknown decoder schema passed mount preflight");

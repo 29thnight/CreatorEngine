@@ -33,6 +33,7 @@ namespace CreatorBuildTool
         {
             var options = context.Options;
             var engine = EngineDistribution.Load(options.Required("engine-distribution"), context);
+            BlueNoiseResource.Validate(Paths.Child(engine.BinaryRoot, BlueNoiseResource.RelativePath));
             var abi = engine.RequireContentAbi(context);
             var project = Paths.Canonical(options.Required("project"), true);
             engine.AssertProject(project);
@@ -59,7 +60,18 @@ namespace CreatorBuildTool
                     async (from, to) => { await context.Run(cooker, ["--copy-asset-set", "--asset-root", from, "--output", to], engine.Root); }, abi);
                 await context.Run(cooker, ["--validate-asset-set-activation", "--asset-root", activated], engine.Root);
                 Directory.CreateDirectory(Path.GetDirectoryName(generated)!);
-                var cook = await AssetCooking.Cook(context, cooker, Path.Combine(source, "Assets"), generated, "", activated);
+                var textureIdentityRoot = Path.Combine(project, "Assets");
+                var textureDirectory = Path.Combine(textureIdentityRoot, "Textures");
+                string[] TextureSidecars() => Directory.Exists(textureDirectory)
+                    ? Paths.Files(textureDirectory).Where(path => path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                        .Select(path => Paths.Relative(textureIdentityRoot, path)).ToArray() : [];
+                var textureIdentityEntries = Metadata.Entries(textureIdentityRoot, TextureSidecars());
+                var cook = await AssetCooking.Cook(context, cooker, Path.Combine(source, "Assets"), generated, "", activated, textureIdentityRoot);
+                Metadata.Verify(textureIdentityRoot, textureIdentityEntries, context.Cancellation);
+                if (Metadata.Digest(Metadata.Entries(textureIdentityRoot, TextureSidecars())) != Metadata.Digest(textureIdentityEntries))
+                {
+                    throw new BuildException("Texture identity sidecars changed during bootstrap compilation.");
+                }
                 foreach (var mount in new[] { "Assets", "ProjectSetting" })
                     Paths.CopyTree(Path.Combine(source, mount), Path.Combine(candidate, mount), context.Cancellation);
                 Paths.CopyTree(generated, Path.Combine(candidate, "Assets"), context.Cancellation);
@@ -69,7 +81,7 @@ namespace CreatorBuildTool
                 var preflight = PackageInputs.Validate(candidate, settings);
                 PackageInputs.RemoveGeometrySources(candidate);
                 PackageInputs.RemoveAudioSources(candidate);
-                var documents = await AssetCooking.Documents(context, cooker, candidate);
+                var documents = await AssetCooking.Documents(context, cooker, candidate, Path.Combine(project, "Assets/Terrain"));
                 // Sidecars and editor pins were inputs, never runtime documents.
                 foreach (var mount in new[] { "Assets", "ProjectSetting" })
                     foreach (var file in Paths.Files(Path.Combine(candidate, mount)).Where(PackageInputs.Excluded).ToArray()) File.Delete(file);
@@ -88,6 +100,7 @@ namespace CreatorBuildTool
                     contentAbiVersion = engine.Manifest.Int("contentAbiVersion"), engineBuildId = engine.Manifest.Text("buildId"),
                     enginePayloadDigest = engine.Manifest.Text("payloadDigest"), assetSetManifests = sets,
                     sourceInputDigest = Metadata.Digest(sourceEntries), sourceEntries, baseFileCount = copied,
+                    textureIdentityInputDigest = Metadata.Digest(textureIdentityEntries), textureIdentityEntries,
                     contentDigest = Metadata.Digest(entries), entries, preflight, documents,
                     settingsTemplateSha256 = Metadata.Hash(template), runtimeSettingsSha256 = Metadata.Hash(settings),
                     startupSceneSha256 = Metadata.Hash(Path.Combine(candidate, "Assets/Scenes/" + preflight.StartupScene)),

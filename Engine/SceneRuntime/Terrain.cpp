@@ -3,24 +3,15 @@
 #include "Terrain.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "Experiment/Cooked/CookedTerrain.h"
 #include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-#pragma pack(push, 1) // 1 byte alignment for DirectX structures
-struct TerrainBinHeader {
-	uint32_t magic; // 'TRBN'
-	uint32_t version; // 1
-	uint32_t terrainID; // Unique ID for the terrain
-	uint32_t width; // Width of the terrain
-	uint32_t height; // Height of the terrain
-	float minHeight; // Minimum height value
-	float maxHeight; // Maximum height value
-	uint32_t layers; // Number of layers in the terrain
-};
-#pragma pack(pop) // Restore previous alignment
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstring>
+#include <limits>
 
 static std::string Utf8Encode(const std::wstring& wstr)
 {
@@ -442,6 +433,19 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		return false;
 	}
 
+    std::ifstream kindStream(descriptorPath, std::ios::binary);
+    std::array<unsigned char, 4> magic{};
+    kindStream.read(reinterpret_cast<char*>(magic.data()), magic.size());
+    if (kindStream && magic == std::array<unsigned char, 4>{ 0x4eu, 0x52u, 0x42u, 0x54u })
+    {
+        return LoadRunTimeTerrain(filePath);
+    }
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        Debug::PrintLog(spdlog::level::err, "Terrain requires its neutral v2 package artifact; recook: " + descriptorPath.string());
+        return false;
+    }
+
 	std::string parseError;
 	const Authoring::ParsedDocument document =
 		Authoring::ParsedDocument::ParseFile(descriptorPath.string(), parseError);
@@ -642,90 +646,34 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 
 bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out)
 {
-
-	int width, height, channels;
-	auto pathUtf8 = pngPath.string();
-
-	// comp=4 for RGBA8
-	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 4);
-	if (!data || width != static_cast<int>(dataWidth)
-		|| height != static_cast<int>(dataHeight))
-	{
-		if (data) stbi_image_free(data);
-		return false;
-	}
-
-	size_t N = static_cast<size_t>(width) * height;
-	out.resize(N);
-
-	for (size_t i = 0; i < N; ++i)
-	{
-		uint32_t b0 = data[i * 4 + 0];
-		uint32_t b1 = data[i * 4 + 1];
-		uint32_t b2 = data[i * 4 + 2];
-		uint32_t b3 = data[i * 4 + 3];
-		uint32_t bits = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
-
-		float f;
-		std::memcpy(&f, &bits, sizeof(f));
-		out[i] = f;
-	}
-
-	//float normalized = (static_cast<float>(data[i * channels + c]) / 100.0f) + minH; // 0 ~ 1 범위로 정규화
-	//out[i] = normalized;
-
-	stbi_image_free(data);
-	return true;
-
+    TerrainSourceImage image;
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(pngPath, TerrainSourceImageKind::HeightBits, image)
+        || static_cast<float>(image.width) != dataWidth || static_cast<float>(image.height) != dataHeight)
+    {
+        return false;
+    }
+    out = std::move(image.heights);
+    return true;
 }
 
-//bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out)
-//{
-//	int width, height, channels;
-//	auto path = pngPath.string();
-//	unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-//	if (!data || width != dataWidth || height != dataHeight) {
-//		Debug::PrintLog(spdlog::level::err, "Failed to load splat map from PNG: " + path);
-//		if (data) {
-//			stbi_image_free(data);
-//		}
-//		return false;
-//	}
-//	out.resize(4);
-//	for (size_t i = 0; i < 4; ++i) {
-//		out[i].resize(width * height, 0.0f);
-//
-//		for (int y = 0; y < height; ++y) {
-//			for (int x = 0; x < width; ++x) {
-//				int idx = y * width + x;
-//				unsigned char* pixel = &data[(y * width + x) * channels];
-//				if (i < channels) {
-//					out[i][idx] = pixel[i] / 255.0f; // R, G, B, A 채널에 가중치 저장
-//				}
-//			}
-//		}
-//
-//	}
-//
-//	stbi_image_free(data);
-//	return true;
-//
-//
-//}
-
-// 신규: 단일 흑백 PNG를 읽어 특정 레이어의 가중치 맵으로 로드
 bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out)
 {
-	int width, height, channels;
-	unsigned char* data = stbi_load(pngPath.string().c_str(), &width, &height, &channels, 1); // 1 = Grayscale
-	if (!data || width != dataWidth || height != dataHeight) { /* ... 에러 처리 ... */ return false; }
-
-	out[layerIndex].resize(width * height);
-	for (int i = 0; i < width * height; ++i) {
-		out[layerIndex][i] = data[i] / 255.0f;
-	}
-	stbi_image_free(data);
-	return true;
+    if (dataWidth <= 0 || dataHeight <= 0 || layerIndex < 0 || static_cast<size_t>(layerIndex) >= out.size())
+    {
+        return false;
+    }
+    TerrainSourceImage image;
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(pngPath, TerrainSourceImageKind::Gray8, image)
+        || image.width != static_cast<uint32_t>(dataWidth) || image.height != static_cast<uint32_t>(dataHeight))
+    {
+        return false;
+    }
+    out[layerIndex].resize(image.gray.size());
+    for (size_t index = 0; index < image.gray.size(); ++index)
+    {
+        out[layerIndex][index] = image.gray[index] / 255.0f;
+    }
+    return true;
 }
 
 void TerrainComponent::UpdateLayerDesc()
@@ -918,6 +866,10 @@ void TerrainComponent::ClearLayers()
 
 void TerrainComponent::RefreshTexture()
 {
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        return;
+    }
 	for (auto& layer : m_layers) {
 		layer.diffuseTexture = Texture::LoadFormPath(layer.diffuseTexturePath);
 	}
@@ -927,21 +879,15 @@ void TerrainComponent::RefreshTexture()
 /// 브러쉬 마스크 텍스쳐 로드
 bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight)
 {
-	auto pathUtf8 = Utf8Encode(path);
-
-	int width, height, channels;
-	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 1);
-	if (!data)
-		return false;
-
-	size_t N = static_cast<size_t>(width) * height;
-	outMask.assign(data, data + N);
-
-	stbi_image_free(data);
-	dataWidth = width;
-	dataHeight = height;
-
-	return true;
+    TerrainSourceImage image;
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(file::path(path), TerrainSourceImageKind::Gray8, image))
+    {
+        return false;
+    }
+    outMask = std::move(image.gray);
+    dataWidth = static_cast<int>(image.width);
+    dataHeight = static_cast<int>(image.height);
+    return true;
 }
 
 void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path)
@@ -977,92 +923,116 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 
 bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 {
-	//debug용
-	Debug::PrintLog(spdlog::level::debug, "Loading runtime terrain from: " + Utf8Encode(filePath));
-	namespace fs = std::filesystem;
-	fs::path terrainPath = filePath;
-	if (!fs::exists(terrainPath)) {
-		Debug::PrintLog(spdlog::level::err, "Terrain file does not exist: " + Utf8Encode(terrainPath.wstring()));
-		return false;
-	}
-	std::ifstream ifs(terrainPath, std::ios::binary);
-	if (!ifs) {
-		Debug::PrintLog(spdlog::level::err, "Failed to open terrain file for reading: " + Utf8Encode(terrainPath.wstring()));
-		return false;
-	}
-
-	//파일 헤더 읽기
-	TerrainBinHeader header;
-	ifs.read(reinterpret_cast<char*>(&header), sizeof(header));
-	if (header.magic != 0x5442524E || header.version != 1) {
-		Debug::PrintLog(spdlog::level::err, "Invalid terrain file format: " + Utf8Encode(terrainPath.wstring()));
-		return false;
-	}
-	m_terrainID = header.terrainID;
-	m_width = header.width;
-	m_height = header.height;
-	m_minHeight = header.minHeight;
-	m_maxHeight = header.maxHeight;
-	size_t N = size_t(m_width) * size_t(m_height);
-
-	//높이맵
-	m_heightMap.assign(N, 0.0f);
-	ifs.read(reinterpret_cast<char*>(m_heightMap.data()), sizeof(float) * N);
-
-	//스플렛맵
-	std::vector<uint8_t> splatMapData(N * 4); // RGBA 4채널
-	ifs.read(reinterpret_cast<char*>(splatMapData.data()), splatMapData.size());
-	m_layerHeightMap.assign(header.layers, std::vector<float>(N));
-	for (size_t i = 0; i < N; ++i) {
-		for (int c = 0; c < header.layers; ++c) {
-			m_layerHeightMap[c][i] = splatMapData[i * 4 + c] / 255.0f; // RGBA 채널에서 가중치 추출
-		}
-	}
-
-	//path offset
-	std::vector<uint32_t> textureOffsets(header.layers);
-	ifs.read(reinterpret_cast<char*>(textureOffsets.data()), sizeof(uint32_t) * header.layers);
-
-	//텍스쳐 이름 읽기
-	std::streampos cur = ifs.tellg();
-	ifs.seekg(0, std::ios::end);
-	size_t remain = static_cast<size_t>(ifs.tellg() - cur);
-	ifs.seekg(cur);
-
-	std::vector<char> namesBuf(remain);
-	ifs.read(namesBuf.data(), remain);
-
-	std::vector<std::string> textureNames(header.layers);
-
-	m_layers.clear();
-	for (uint32_t i = 0; i < header.layers; ++i) {
-		uint32_t offset = textureOffsets[i];
-		const char* namePtr = namesBuf.data() + offset;
-		textureNames[i] = std::string(namePtr); // null terminator로 자동 종료됨
-	}
-
-	// ★ 여기 있던 DX11 레이어 텍스처 배열 조립을 걷었다(PHASE 11 착수,
-	//   2026-08-08). 512×512 배열을 만들고 CopySubresourceRegion으로 슬라이스를
-	//   채운 뒤 m_pMaterial->m_layerSRV에 꽂던 자리인데, 그 SRV를 읽는 코드가
-	//   0이었다 — DX12에 지형 렌더 경로가 없다.
-	//
-	//   대신 레이어를 CPU 자료로 세운다. 배열을 굽는 것은 새 지형 패스의 몫이고
-	//   그때 필요한 입력이 바로 이 목록이다. 예전에는 m_layers를 비우기만 하고
-	//   채우지 않아, 로드 직후 레이어 정보가 어디에도 남지 않았다.
-	for (uint32_t i = 0; i < header.layers; ++i)
-	{
-		TerrainLayer layer;
-		layer.m_layerID = m_nextLayerID++;
-		layer.layerName = textureNames[i];
-		layer.diffuseTexturePath = std::wstring(textureNames[i].begin(), textureNames[i].end());
-		layer.diffuseTexture = DataSystems->LoadTexture(textureNames[i]);
-		layer.tilling = 1.0f;
-		m_layers.push_back(layer);
-	}
-
-	m_layerHeightMap.resize(m_layers.size(),
-		std::vector<float>(static_cast<size_t>(m_width) * m_height, 0.0f));
-	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
+    namespace ck = experiment::cooked;
+    static_assert(sizeof(Vertex) == ck::kCookedTerrainVertexBytes, "Update terrain working-set admission when the vertex layout changes");
+    try
+    {
+        std::ifstream input(file::path(filePath), std::ios::binary | std::ios::ate);
+        const auto size = input.tellg();
+        if (!input || size <= 0 || static_cast<std::uint64_t>(size) > ck::kCookedTerrainMaxBytes)
+        {
+            return false;
+        }
+        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        input.seekg(0);
+        input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        ck::CookedTerrainView terrain;
+        std::string failure;
+        if (!input || input.peek() != std::char_traits<char>::eof() || !ck::ReadCookedTerrain(bytes, terrain, failure))
+        {
+            Debug::PrintLog(spdlog::level::err, "Terrain artifact rejected: " + failure);
+            return false;
+        }
+        // All offsets, dimensions, scalar values and trailing bytes are checked
+        // before image/vector allocation. No source callback participates here.
+        const auto pixels = static_cast<std::size_t>(terrain.width) * terrain.height;
+        std::vector<float> heights(pixels);
+        for (std::size_t index = 0u; index < pixels; ++index)
+        {
+            heights[index] = ck::CookedTerrainHeight(terrain.heights, index);
+        }
+        std::vector<std::vector<float>> weights(terrain.layerCount);
+        std::vector<TerrainLayer> layers;
+        layers.reserve(terrain.layerCount);
+        std::uint32_t nextLayerId{};
+        for (std::size_t index = 0u; index < terrain.layerCount; ++index)
+        {
+            const auto& source = terrain.layers[index];
+            TerrainLayer layer;
+            layer.m_layerID = source.id;
+            layer.layerName = std::string(source.name);
+            layer.diffuseTexturePath = file::u8path(source.diffuseReference).wstring();
+            layer.tilling = source.tiling;
+            layer.diffuseTexture = Texture::LoadSharedFromMemory(source.texture);
+            if (!layer.diffuseTexture)
+            {
+                Debug::PrintLog(spdlog::level::err, "Terrain contains an invalid cooked diffuse texture: " + layer.layerName);
+                return false;
+            }
+            weights[index].resize(pixels);
+            for (std::size_t pixel = 0u; pixel < pixels; ++pixel)
+            {
+                weights[index][pixel] = static_cast<std::uint8_t>(source.gray[pixel]) / 255.0f;
+            }
+            nextLayerId = (std::max)(nextLayerId, source.id + 1u);
+            layers.push_back(std::move(layer));
+        }
+        // Build replacement render inputs before publishing any live state.
+        const auto width = static_cast<int>(terrain.width);
+        const auto height = static_cast<int>(terrain.height);
+        std::vector<math::vector3> normals(pixels);
+        std::vector<Vertex> vertices;
+        vertices.reserve(pixels);
+        std::vector<std::uint32_t> indices;
+        indices.reserve(static_cast<std::size_t>(width - 1) * (height - 1) * 6u);
+        for (int row = 0; row < height; ++row)
+        {
+            for (int column = 0; column < width; ++column)
+            {
+                const auto index = static_cast<std::size_t>(row) * width + column;
+                const double left = heights[column > 0 ? index - 1u : index];
+                const double right = heights[column + 1 < width ? index + 1u : index];
+                const double down = heights[row > 0 ? index - width : index];
+                const double up = heights[row + 1 < height ? index + width : index];
+                const double x = left - right;
+                const double z = down - up;
+                const double length = std::sqrt(x * x + 4.0 + z * z);
+                normals[index] = { float(x / length), float(2.0 / length), float(z / length) };
+                vertices.emplace_back(math::vector3{ float(column), heights[index], float(row) },
+                    normals[index], math::vector2{ float(column) / width, float(row) / height });
+                if (column + 1 < width && row + 1 < height)
+                {
+                    const auto top = static_cast<std::uint32_t>(index);
+                    const auto bottom = top + terrain.width;
+                    indices.insert(indices.end(), { top, bottom, top + 1u, bottom, bottom + 1u, top + 1u });
+                }
+            }
+        }
+        auto mesh = std::make_shared<TerrainMesh>(m_name.ToString(), vertices, indices, terrain.width);
+        auto material = std::make_shared<TerrainMaterial>();
+        material->MateialDataUpdate(width, height, layers, weights);
+        std::wstring targetPath = filePath;
+        m_width = width;
+        m_height = height;
+        m_terrainID = terrain.terrainId;
+        m_minHeight = terrain.minHeight;
+        m_maxHeight = terrain.maxHeight;
+        m_heightMap = std::move(heights);
+        m_vNormalMap = std::move(normals);
+        m_layerHeightMap = std::move(weights);
+        m_layers = std::move(layers);
+        m_nextLayerID = nextLayerId;
+        m_pTerrainMesh = std::move(mesh);
+        m_pMaterial = std::move(material);
+        m_terrainTargetPath = std::move(targetPath);
+        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        return true;
+    }
+    catch (const std::exception& error)
+    {
+        Debug::PrintLog(spdlog::level::err, "Terrain artifact load failed: " + std::string(error.what()));
+        return false;
+    }
 }
 
 

@@ -141,6 +141,11 @@ internal static class EnginePublisher
             }
             RuntimeFonts.Require(binarySource);
             Tree(Path.Combine(binarySource, "Resources"), Path.Combine(binaryTarget, "Resources"));
+            // Cook the tracked engine-owned DDS explicitly; it has no GUID
+            // sidecar and must never rely on a project's source-image decoder.
+            await BlueNoiseResource.Cook(context, Path.Combine(binaryTarget, "Tools/AssetCooker/AssetCooker.exe"),
+                Path.Combine(repository, "Dynamic_CPP/Assets", BlueNoiseResource.SourceRelativePath),
+                Paths.Child(binaryTarget, BlueNoiseResource.RelativePath));
             var dotnetRoot = Path.GetDirectoryName(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory().TrimEnd(Path.DirectorySeparatorChar))!;
             dotnetRoot = Directory.GetParent(dotnetRoot)!.Parent!.FullName;
             string Latest(string relative) => Directory.GetDirectories(Path.Combine(dotnetRoot, relative))

@@ -85,11 +85,15 @@ $probeSources = @($probe) + (@(
     'ExperimentSamplerSelfTest'
     'ExperimentShaderMetaCookSelfTest'
     'ExperimentTextureCookSelfTest'
+    'ExperimentTexturePipelineSelfTest'
     'ExperimentVertexLayoutSelfTest'
     'ExperimentWeldSelfTest'
 ) | ForEach-Object {
     Join-Path $repoRoot ("Editor\RenderTests\ExperimentParity\{0}.cpp" -f $_)
 })
+# SDK source processing is intentionally absent from RenderEngine.lib. This
+# offline probe owns the cooker object explicitly, just like Editor/AssetCooker.
+$probeSources += Join-Path $repoRoot 'Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp'
 foreach ($source in $probeSources) {
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
         throw "원본이 없다: $source"
