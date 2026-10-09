@@ -2,7 +2,7 @@
 
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
-#include "Texture.h"
+#include "../Texture.h"
 
 #include <cstddef>
 #include <span>
