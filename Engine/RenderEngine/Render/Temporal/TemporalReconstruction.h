@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <span>
+#include <memory>
 #include <string>
 
 // Shared TU/FG values. Native resources, SDK contexts and command objects live
@@ -131,6 +132,10 @@ struct TemporalFrameGenerationInputs
     RHITextureHandle uiColor; // Separate UI, never baked into interpolation input.
     RHITextureHandle depth;
     RHITextureHandle motionVectors;
+    // Reuse the existing graph/recorded-batch lifetime owner. Native resource
+    // references alone do not prevent placed-memory aliasing or pool reuse.
+    // The FG bridge retains this through SDK final consumption, not CPU Present.
+    std::shared_ptr<const void> lifetimeToken;
 };
 
 struct TemporalCapabilities
@@ -166,6 +171,9 @@ TemporalResult ValidateTemporalFrame(const TemporalFrame& frame);
 TemporalResult ValidateTemporalCamera(const TemporalCamera& camera);
 TemporalResult ValidateTemporalUpscaleInputs(const TemporalUpscaleInputs& inputs);
 TemporalResult ValidateTemporalFrameGenerationConfig(const TemporalFrameGenerationConfig& config);
+TemporalResult ValidateTemporalFrameGenerationInputs(const TemporalFrameGenerationInputs& inputs);
+// Supply current snapshots for the same active device. Independent TU/FG
+// snapshots may share a provider/backend; conflicting queried answers are invalid.
 TemporalSelection SelectTemporalProviders(TemporalProvider requestedUpscaler,
     TemporalProvider requestedFrameGenerator, TemporalBackend backend,
     std::span<const TemporalCapabilities> capabilities);

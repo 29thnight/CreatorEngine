@@ -156,6 +156,30 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="RHI\Temporal\DlssTemporalAdapter.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\XeSSUpscaler.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\XeSSFrameGeneration.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackend.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackendDX12.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackendVulkan.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Render\Temporal\TemporalReconstruction.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -877,6 +901,13 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />
+    <ClInclude Include="RHI\Temporal\DlssTemporalAdapter.h" />
+    <ClInclude Include="RHI\Temporal\XeSSSdkPrivate.h" />
+    <ClInclude Include="RHI\Temporal\XeSSUpscaler.h" />
+    <ClInclude Include="RHI\Temporal\XeSSFrameGeneration.h" />
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackend.h" />
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackendDX12.h" />
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackendVulkan.h" />
     <ClInclude Include="Render\Temporal\TemporalReconstruction.h" />
     <ClInclude Include="Render\Temporal\ITemporalUpscaler.h" />
     <ClInclude Include="Render\Temporal\ITemporalFrameGenerator.h" />
@@ -903,6 +934,7 @@
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup><None Include="RHI\Temporal\TemporalSdk.props" /></ItemGroup>
   <Import Project="RHI\Temporal\TemporalSdk.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

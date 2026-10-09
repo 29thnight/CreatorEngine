@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="RHI\Temporal"><UniqueIdentifier>{4D213E9B-7064-41BB-ACAB-23370295E2C3}</UniqueIdentifier></Filter>
     <Filter Include="Render\Temporal"><UniqueIdentifier>{E7C8CB36-15D0-4658-AF3A-0E0E99AE0D6D}</UniqueIdentifier></Filter>
     <Filter Include="Asset">
       <UniqueIdentifier>{4a8a014e-3971-482b-bafe-54c2f3c2ff33}</UniqueIdentifier>
@@ -1271,5 +1272,21 @@
     <ClInclude Include="Render\Temporal\TemporalReconstruction.h"><Filter>Render\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Temporal\ITemporalUpscaler.h"><Filter>Render\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Temporal\ITemporalFrameGenerator.h"><Filter>Render\Temporal</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RHI\Temporal\DlssTemporalAdapter.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClCompile Include="RHI\Temporal\XeSSUpscaler.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClCompile Include="RHI\Temporal\XeSSFrameGeneration.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackend.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackendDX12.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClCompile Include="RHI\Temporal\Fsr\FsrBackendVulkan.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
+    <ClInclude Include="RHI\Temporal\DlssTemporalAdapter.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\XeSSSdkPrivate.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\XeSSUpscaler.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\XeSSFrameGeneration.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackend.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackendDX12.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <ClInclude Include="RHI\Temporal\Fsr\FsrBackendVulkan.h"><Filter>RHI\Temporal</Filter></ClInclude>
+    <None Include="RHI\Temporal\TemporalSdk.props"><Filter>RHI\Temporal</Filter></None>
   </ItemGroup>
 </Project>

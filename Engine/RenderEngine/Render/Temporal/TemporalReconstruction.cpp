@@ -14,12 +14,20 @@ namespace
         std::span<const TemporalCapabilities> capabilities, bool frameGeneration)
     {
         if (provider == TemporalProvider::None) return { TemporalStatus::Success };
+        TemporalResult result{ TemporalStatus::NotQueried };
         for (const auto& capability : capabilities)
         {
-            if (capability.provider == provider && capability.backend == backend)
-                return frameGeneration ? capability.frameGeneration : capability.upscaling;
+            if (capability.provider != provider || capability.backend != backend) continue;
+            const auto candidate = frameGeneration ? capability.frameGeneration : capability.upscaling;
+            // TU and FG adapters can contribute independent snapshots for one
+            // provider. An unknown other axis must not hide a real query result.
+            if (candidate.status == TemporalStatus::NotQueried) continue;
+            if (result.status != TemporalStatus::NotQueried &&
+                (result.status != candidate.status || result.nativeCode != candidate.nativeCode))
+                return { TemporalStatus::InvalidInput }; // Conflicting/stale snapshots fail closed.
+            result = candidate;
         }
-        return { TemporalStatus::NotQueried };
+        return result;
     }
 
     TemporalProvider SelectProvider(TemporalProvider requested, TemporalBackend backend,
@@ -117,6 +125,19 @@ TemporalResult ValidateTemporalFrameGenerationConfig(const TemporalFrameGenerati
         config.interpolatedFrameCount == 0 || !std::isfinite(config.minLuminance) ||
         config.minLuminance < 0.0f || !IsPositiveFinite(config.maxLuminance) ||
         config.maxLuminance <= config.minLuminance)
+        return { TemporalStatus::InvalidInput };
+    return { TemporalStatus::Success };
+}
+
+TemporalResult ValidateTemporalFrameGenerationInputs(const TemporalFrameGenerationInputs& inputs)
+{
+    const auto frameResult = ValidateTemporalFrame(inputs.frame);
+    if (!frameResult.IsSuccess()) return frameResult;
+    if (!inputs.lifetimeToken || !inputs.hudlessColor.IsValid() || !inputs.depth.IsValid() ||
+        !inputs.motionVectors.IsValid() || inputs.hudlessColor == inputs.depth ||
+        inputs.hudlessColor == inputs.motionVectors || inputs.depth == inputs.motionVectors ||
+        inputs.uiColor == inputs.hudlessColor || inputs.uiColor == inputs.depth ||
+        inputs.uiColor == inputs.motionVectors)
         return { TemporalStatus::InvalidInput };
     return { TemporalStatus::Success };
 }
