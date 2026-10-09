@@ -7,7 +7,31 @@
 
 // Commands submit intent. Only a live renderer/presenter publishes observations;
 // requesting a provider never manufactures support, activation or GPU completion.
-enum class TemporalTestFaultMode : uint8_t { None, Capability, Dispatch };
+enum class TemporalTestFaultMode : uint8_t
+{
+    None = 0, Capability = 1, Dispatch = 2, FrameGenerationCapability = 3, FrameGenerationConfigure = 4,
+    FrameGenerationPrepare = 5, FrameGenerationEvaluate = 6, FrameGenerationPresent = 7, FrameGenerationFinalConsumption = 8
+};
+inline const char* TemporalTestFaultModeName(TemporalTestFaultMode mode)
+{
+    switch (mode)
+    {
+    case TemporalTestFaultMode::None: return "none";
+    case TemporalTestFaultMode::Capability: return "capability";
+    case TemporalTestFaultMode::Dispatch: return "dispatch";
+    case TemporalTestFaultMode::FrameGenerationCapability: return "fg-capability";
+    case TemporalTestFaultMode::FrameGenerationConfigure: return "fg-configure";
+    case TemporalTestFaultMode::FrameGenerationPrepare: return "fg-prepare";
+    case TemporalTestFaultMode::FrameGenerationEvaluate: return "fg-evaluate";
+    case TemporalTestFaultMode::FrameGenerationPresent: return "fg-present";
+    case TemporalTestFaultMode::FrameGenerationFinalConsumption: return "fg-final-consumption";
+    }
+    return "unknown";
+}
+inline int64_t TemporalTestFaultNativeCode(TemporalTestFaultMode mode)
+{
+    return mode == TemporalTestFaultMode::None ? 0 : -45000 - static_cast<int64_t>(mode);
+}
 struct TemporalTestFaultSettings
 {
     TemporalTestFaultMode mode{ TemporalTestFaultMode::None };
@@ -44,6 +68,7 @@ uint32_t TemporalSupportedInterpolatedFrameCount(TemporalProvider provider, Temp
 // an individual generated-frame identity, physical display event or timestamp.
 struct TemporalPresenterObservation
 {
+    uint64_t observedQpc{ 0 }, sequence{ 0 }; // Owner-observed wrapper return, never display time.
     uint64_t realFrameId{ 0 }, publicationFrameId{ 0 }, viewId{ 0 }, sceneEpoch{ 0 };
     uint64_t requestGeneration{ 0 }, playerObservedGeneration{ 0 };
     TemporalProvider provider{ TemporalProvider::None };
@@ -61,6 +86,8 @@ struct TemporalRuntimeSnapshot
     TemporalRuntimeSettings requestedSettings; // Unmodified user intent, including during a capture.
     uint64_t testFaultConsumedRevision{ 0 }, testFaultConsumedCount{ 0 }, testFaultRealFrameId{ 0 };
     uint64_t testFaultViewId{ 0 }, testFaultSceneEpoch{ 0 };
+    TemporalTestFaultMode testFaultConsumedMode{ TemporalTestFaultMode::None };
+    TemporalResult testFaultResult; // Deliberate rejection, never an SDK/native return code.
     bool nativeCaptureExclusionActive{ false };
     bool playerLatencyHostRegistered{ false }; // Explicit host capability, not SDK/hardware support.
     uint64_t viewId{ 0 }, sceneEpoch{ 0 };

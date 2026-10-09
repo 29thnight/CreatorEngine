@@ -531,7 +531,8 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
-    parse_result parse_render_measurements(byte_reader in, std::vector<frame_record>& frames)
+    parse_result parse_render_measurements(byte_reader in, std::vector<frame_record>& frames,
+                                            bool allow_presenter)
     {
         std::uint32_t count = 0;
         if (!in.get(count) || count != frames.size() || !in.can_hold(count, 8))
@@ -549,7 +550,7 @@ namespace ce::detail::capture_file_impl
             frame.render_measurements.resize(samples);
             for (auto& sample : frame.render_measurements)
             {
-                if (!decode_render_measurement(in, sample) || sample.engine_frame != frame.engine_frame)
+                if (!decode_render_measurement(in, sample, allow_presenter) || sample.engine_frame != frame.engine_frame)
                 {
                     return std::unexpected(capture_file_error::malformed);
                 }
@@ -588,7 +589,7 @@ namespace ce::detail::capture_file_impl
         {
             return std::unexpected(capture_file_error::truncated);
         }
-        if (version != 1 && version != 2 && version != kCaptureFileVersion)
+        if (version != 1 && version != 2 && version != 4 && version != kCaptureFileVersion)
         {
             return std::unexpected(capture_file_error::unsupported_version);
         }
@@ -670,7 +671,8 @@ namespace ce
         for (const auto& [type, body] : chunks)
         {
             out.put(static_cast<std::uint32_t>(type));
-            out.put((type == chunk_type::frames || type == chunk_type::threads || type == chunk_type::counters) ? std::uint32_t{2} : kChunkVersion);
+            out.put((type == chunk_type::frames || type == chunk_type::threads || type == chunk_type::counters ||
+                     type == chunk_type::render_measurements) ? std::uint32_t{2} : kChunkVersion);
             out.put(offset);
             out.put(static_cast<std::uint64_t>(body.size()));
             out.put(crc32(body));
@@ -901,7 +903,15 @@ namespace ce
             {
                 return std::unexpected(capture_file_error::checksum_mismatch);
             }
-            if (entry.version == 0 || entry.version > ((entry.type == static_cast<std::uint32_t>(chunk_type::frames) || entry.type == static_cast<std::uint32_t>(chunk_type::threads) || entry.type == static_cast<std::uint32_t>(chunk_type::counters)) ? 2u : kChunkVersion))
+            const bool measurementChunk = entry.type == static_cast<std::uint32_t>(chunk_type::render_measurements);
+            const bool measurementVersionSupported =
+                (formatVersion == 4 && entry.version == 1) ||
+                (formatVersion == kCaptureFileVersion && entry.version == 2);
+            if ((measurementChunk && !measurementVersionSupported) ||
+                (!measurementChunk && (entry.version == 0 || entry.version >
+                    ((entry.type == static_cast<std::uint32_t>(chunk_type::frames) ||
+                      entry.type == static_cast<std::uint32_t>(chunk_type::threads) ||
+                      entry.type == static_cast<std::uint32_t>(chunk_type::counters)) ? 2u : kChunkVersion))))
             {
                 return std::unexpected(capture_file_error::unsupported_version);
             }
@@ -942,13 +952,14 @@ namespace ce
         {
             return std::unexpected(capture_file_error::malformed);
         }
-        if ((formatVersion == kCaptureFileVersion) != ((seen & (1u << 7)) != 0))
+        if ((formatVersion == 4 || formatVersion == kCaptureFileVersion) != ((seen & (1u << 7)) != 0))
         {
             return std::unexpected(capture_file_error::malformed);
         }
         if ((seen & (1u << 7)) != 0)
         {
-            if (const auto parsed = parse_render_measurements(byte_reader(measurementsBody), frames); !parsed)
+            if (const auto parsed = parse_render_measurements(byte_reader(measurementsBody), frames,
+                                                              formatVersion == kCaptureFileVersion); !parsed)
             {
                 return std::unexpected(parsed.error());
             }
@@ -1070,7 +1081,7 @@ namespace ce
         std::uint32_t version = 0;
         std::memcpy(&version, header.data() + 8, sizeof(version));
         const auto count = (*recording)->frame_count();
-        if (version == 3 || version == kRecordingFileVersion)
+        if (version == 3 || version == 5 || version == kRecordingFileVersion)
         {
             const auto selected = static_cast<std::uint32_t>((std::min)(count, std::uint64_t{kDefaultRetainedFrames}));
             return (*recording)->load_range(count - selected, selected);

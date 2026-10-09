@@ -1,4 +1,7 @@
 #pragma once
+#if CE_DEVELOPMENT && !CE_SHIPPING
+#include <functional>
+#endif
 
 #include "../../../Render/Temporal/TemporalReconstruction.h"
 
@@ -161,6 +164,10 @@ public:
     // Published only after callback/presentation drain. Counts SDK generation
     // output, not physical display scan-out or a requested interpolation count.
     uint32_t GetCompletedGeneratedFrameCount() const { return m_completedGeneratedFrameCount; }
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    // Set only between drained frames. No callback/global lookup in normal use.
+    void SetDevelopmentEvaluationFailure(std::function<bool()> reject) { m_developmentEvaluationFailure = std::move(reject); }
+#endif
 
 private:
     static FfxErrorCode Generate(const FfxFrameGenerationDispatchDescription*, void*);
@@ -190,6 +197,9 @@ private:
     bool m_generated{ false };
     uint32_t m_completedGeneratedFrameCount{ 0 };
     FfxErrorCode m_generationError{ FFX_OK };
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    std::function<bool()> m_developmentEvaluationFailure;
+#endif
     bool m_reset{ true };
     bool m_initialized{ false };
     std::mutex m_mutex;

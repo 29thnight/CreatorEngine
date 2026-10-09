@@ -211,7 +211,7 @@ namespace editor::profiler_view
             }
             ImGui::Text("CPU engine frame %u: %zu measured render samples", frame->engine_frame,
                 frame->render_measurements.size());
-            ImGui::TextDisabled("Render-submit CPU and GPU-pass axes; no generated display cadence is inferred.");
+            ImGui::TextDisabled("CPU submit / GPU pass / CPU presenter outcome; no display cadence is inferred.");
             constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                 ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit;
             if (!ImGui::BeginTable("RecordedRenderMeasurements", 7, flags))
@@ -237,6 +237,35 @@ namespace editor::profiler_view
                 for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
                 {
                     const auto& sample = frame->render_measurements[static_cast<std::size_t>(index)];
+                    if (sample.axis == ce::profile_render_axis::cpu_presenter_return)
+                    {
+                        const auto& p = sample.presenter;
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted("CPU presenter wrapper return (observed)");
+                        ImGui::TableNextColumn();
+                        ImGui::Text("QPC %llu (point, not cost)", static_cast<unsigned long long>(p.observed_tick));
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted("Display / generated timestamps unavailable");
+                        ImGui::TableNextColumn();
+                        ImGui::Text("real #%llu / pub #%llu / sequence %llu",
+                            static_cast<unsigned long long>(p.real_frame_id),
+                            static_cast<unsigned long long>(p.publication_frame_id),
+                            static_cast<unsigned long long>(p.sequence));
+                        ImGui::TableNextColumn();
+                        ImGui::Text("view %llu / scene %llu", static_cast<unsigned long long>(p.view_id),
+                            static_cast<unsigned long long>(p.scene_epoch));
+                        ImGui::TableNextColumn();
+                        ImGui::Text("FG %s x%u / status %u / native %lld", providers[p.provider],
+                            p.interpolated_frame_count, static_cast<unsigned>(p.status),
+                            static_cast<long long>(p.native_code));
+                        ImGui::TableNextColumn();
+                        ImGui::Text("identity %s / fault %u / generation %llu:%llu",
+                            p.identity_valid ? "known" : "unknown", static_cast<unsigned>(p.fault_mode),
+                            static_cast<unsigned long long>(p.request_generation),
+                            static_cast<unsigned long long>(p.presenter_generation));
+                        continue;
+                    }
                     const auto& p = sample.provenance;
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();

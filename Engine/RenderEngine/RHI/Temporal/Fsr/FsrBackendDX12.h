@@ -41,6 +41,12 @@ public:
     TemporalResult Shutdown() override;
     IDXGISwapChain4* GetSwapchain() const { return m_swapchain.Get(); } // Borrowed.
     uint32_t GetCompletedGeneratedFrameCount() const { return m_generator->GetCompletedGeneratedFrameCount(); }
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    void SetDevelopmentEvaluationFailure(std::function<bool()> reject)
+    {
+        m_generator->SetDevelopmentEvaluationFailure(std::move(reject));
+    }
+#endif
 
 private:
     DX12DeviceResources* m_resources{ nullptr };

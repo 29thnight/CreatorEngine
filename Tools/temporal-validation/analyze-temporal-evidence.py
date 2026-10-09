@@ -55,6 +55,30 @@ def load_profiler():
     return module
 
 
+def recorded_presenters(profile, summary):
+    """Continuous owner observations; never substitute renderer or display data."""
+    require(summary['presenterReturns']['completeWithinObservedBounds'],
+            'Continuous presenter stream is absent, lost, nonmonotonic or incomplete')
+    providers = ('none', 'fsr', 'dlss', 'xess')
+    faults = ('none', 'capability', 'dispatch', 'fg-capability', 'fg-configure', 'fg-prepare',
+              'fg-evaluate', 'fg-present', 'fg-final-consumption')
+    result = {}
+    for frame in profile['frames']:
+        for sample in frame['measurements']:
+            if sample['axis'] != 3 or not sample['valid']:
+                continue
+            observed = dict(sample, provider=providers[sample['provider']], faultMode=faults[sample['faultMode']],
+                            nativeGateActive=bool(sample['nativeGateActive']), valid=True,
+                            result=dict(status='success' if sample['status'] == 0 else 'not_success',
+                                        nativeCode=sample['nativeCode']))
+            key = identity(observed)
+            # Multiple attempts on one source cannot be collapsed into latest.
+            require(key not in result, 'Ambiguous repeated presenter attempt for one real-frame identity')
+            result[key] = observed
+    require(result, 'No identified continuous presenter observations')
+    return result
+
+
 def analyze(path):
     root = path.resolve().parent
     manifest = json.loads(path.read_text(encoding='utf-8-sig'))
@@ -91,21 +115,24 @@ def analyze(path):
         require(summary['realFramePerformanceGateEligible'], 'Run profile has incomplete/ambiguous/non-real provenance')
         profile = profiler.read_capture(profile_path)
         observation_path = artifact(root, run['presenterObservations'])
-        presenter = {}
-        for line in observation_path.read_text(encoding='utf-8-sig').splitlines():
-            receipt = json.loads(line)
-            if receipt.get('command') != 'temporal.status' or receipt['result']['status'] != 'succeeded':
-                continue
-            observed = receipt['result']['data'].get('presenterObservation')
-            if not observed or observed['valid'] is not True:
-                continue
-            key = identity(observed)
-            require(key not in presenter or presenter[key] == observed,
-                    'Conflicting immutable presenter observations for one source frame')
-            presenter[key] = observed
+        presenter = recorded_presenters(profile, summary) if profile['version'] in (6, 7) else {}
+        if profile['version'] not in (6, 7):
+            for line in observation_path.read_text(encoding='utf-8-sig').splitlines():
+                receipt = json.loads(line)
+                if receipt.get('command') != 'temporal.status' or receipt['result']['status'] != 'succeeded':
+                    continue
+                observed = receipt['result']['data'].get('presenterObservation')
+                if not observed or observed['valid'] is not True:
+                    continue
+                key = identity(observed)
+                require(key not in presenter or presenter[key] == observed,
+                        'Conflicting immutable presenter observations for one source frame')
+                presenter[key] = observed
         real = {}
         for frame in profile['frames']:
             for sample in frame['measurements']:
+                if sample['axis'] == 3:
+                    continue
                 key = identity(sample)
                 signature = tuple(sample[key] for key in ('renderWidth', 'renderHeight', 'displayWidth', 'displayHeight',
                                                           'upscaler', 'resolutionState', 'spatialMode', 'deepDvcApplied'))
@@ -127,7 +154,7 @@ def analyze(path):
             sample_ids.add(sample_id)
             key = identity(row)
             require(key in real, 'External sample is not linked to this run\'s recorded real frame')
-            require(key in presenter, 'External sample has no exact immutable presenter observation; polling gaps are unavailable')
+            require(key in presenter, 'External sample has no exact immutable presenter observation; gaps are unavailable')
             present = presenter[key]
             require(present['result']['status'] == 'success' and int(present['result']['nativeCode']) == 0 and
                     present['faultMode'] == 'none' and
@@ -173,6 +200,8 @@ def analyze(path):
         reports[label] = dict(distributionMs=distribution(values), profileSha256=summary['sha256'],
                               samplesSha256=run['samples']['sha256'], rawSha256=run['rawArtifact']['sha256'],
                               presenterObservationsSha256=run['presenterObservations']['sha256'],
+                              presenterSource='continuous-ceprof' if profile['version'] in (6, 7) else 'legacy-sampled-jsonl',
+                              presenterStream=summary['presenterReturns'],
                               presenterCondition=dict(zip(('provider', 'interpolatedFrameCount', 'requestGeneration', 'faultRevision'),
                                                           next(iter(conditions)))),
                               rawArtifact=str(raw_path), profile=str(profile_path), samples=str(csv_path),

@@ -2,11 +2,11 @@
 
 ## 2026-10-09 제품 설정·히스토리·profiler 소스 보완
 
-Editor `editorRenderFeatures` / Player `build.renderFeatures`의 portable 기본값과 cook 후 `renderFeatures`·device 생성 전 소비, 저장값→명시적 환경 override→세션 CLI 우선순위, 요청/지원/설정/활성 MFG count 분리를 소스로 연결했다. 명시적 camera cut·unjittered projection 변경은 마지막 제출 history와 비교한다. CPU profiler frame owner와 render publication/real-frame/submission 신원을 분리하고, CPU render-submit/GPU-pass provenance sidecar를 `.ceprof` snapshot v4·stream v5 및 viewer/summary로 운반한다. live PLRD는 v3이며 legacy 기록의 provenance는 unknown으로 남긴다. development-only TU fault와 결함 활성 측정의 fail-closed 경로도 소스 범위다.
+Editor `editorRenderFeatures` / Player `build.renderFeatures`의 portable 기본값과 cook 후 `renderFeatures`·device 생성 전 소비, 저장값→명시적 환경 override→세션 CLI 우선순위, 요청/지원/설정/활성 MFG count 분리를 소스로 연결했다. 명시적 camera cut·unjittered projection 변경은 마지막 제출 history와 비교한다. CPU profiler frame owner와 render publication/real-frame/submission 신원을 분리하고, CPU render-submit/GPU-pass provenance sidecar를 `.ceprof` snapshot v6·stream v7 (기존 v4/v5 읽기 유지) 및 viewer/summary로 운반한다. live PLRD는 v3이며 legacy 기록의 provenance는 unknown으로 남긴다. development-only TU/FG fault와 결함 활성 측정의 fail-closed, CPU presenter-return 연속 기록도 소스 범위다. QPC 반환 관측은 물리 표시 시각이 아니다.
 
 Presenter observation은 정확한 source identity를 가진 CPU Present 결과이며 물리 display timestamp·개별 generated identity·GPU/SDK 최종 소비 증거가 아니다. 외부 latency/pacing 수집·분석 소스는 작성되었으나 실행 수용은 전부 남는다. raw motion capture와 독립 analytic oracle은 있지만 **전체 route 씬 생성/제출 sequencing·probe pixel 소유권 driver는 미구현이고 TR1 checker는 INCOMPLETE**다. 수치 일치만으로 PASS하지 않는다. 단순 미실행 항목으로 축소하지 않는다.
 
-FG fault injection/staging도 아직 미구현이며 TU capability/dispatch seam으로 전체 실패 행렬을 완료했다고 볼 수 없다. 상세 범위는 [통합 기록](TemporalVendorIntegration20261009.md#product-defaults-history-and-profiler-gap-closure--source-only-checkpoint)에 둔다. W9는 temporal/render-feature 설정 부분만 보완했으며 전체 설정/품질/제품 수용 완료가 아니다. 빌드·테스트·스크립트·native 실행 없이 정적 검토만 했고 **16행/71일·기성 0 및 모든 DX12 Debug/Release 실행 수용 미완료**를 유지한다.
+FG capability/configure/prepare/Present 및 실제 drain 이후 host acknowledgement fault, FSR 전용 evaluate callback fault/staging은 소스로 작성했다. DLSS/XeSS의 별도 evaluate 주입은 명시적으로 미지원이며 실제 device-loss·소비 지연·물리 표시 행렬 수용을 대신하지 않는다. 상세 범위는 [통합 기록](TemporalVendorIntegration20261009.md#product-defaults-history-and-profiler-gap-closure--source-only-checkpoint)에 둔다. W9는 temporal/render-feature 설정 부분만 보완했으며 전체 설정/품질/제품 수용 완료가 아니다. 빌드·테스트·스크립트·native 실행 없이 정적 검토만 했고 **16행/71일·기성 0 및 모든 DX12 Debug/Release 실행 수용 미완료**를 유지한다.
 
 ## 2026-10-09 실제 입력·렌더 그래프·Player 배선 확장
 

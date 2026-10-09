@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
+#include <type_traits>
 #include <utility>
 
 namespace profiler_render_measurement_tests
@@ -47,11 +48,12 @@ namespace profiler_render_measurement_tests
             {
                 return false;
             }
-            value = 0;
+            std::make_unsigned_t<T> bits = 0;
             for (std::size_t index = 0; index < sizeof(T); ++index)
             {
-                value |= static_cast<T>(std::to_integer<unsigned>(bytes[at++])) << (index * 8);
+                bits |= static_cast<std::make_unsigned_t<T>>(std::to_integer<unsigned>(bytes[at++])) << (index * 8);
             }
+            std::memcpy(&value, &bits, sizeof(value));
             return true;
         }
     };
@@ -121,6 +123,30 @@ namespace profiler_render_measurement_tests
         return value;
     }
 
+    ce::profile_render_measurement presenter(std::uint32_t containerFrame, std::uint64_t sequence)
+    {
+        ce::profile_render_measurement value;
+        value.engine_frame = containerFrame;
+        value.axis = ce::profile_render_axis::cpu_presenter_return;
+        auto& p = value.presenter;
+        p.observed_tick = containerFrame * 1000ull + 900;
+        p.sequence = sequence;
+        p.real_frame_id = 0x100000001ull + sequence;
+        p.publication_frame_id = 0x200000001ull + sequence;
+        p.view_id = 0x300000001ull;
+        p.scene_epoch = 0x400000001ull;
+        p.request_generation = p.presenter_generation = 0x500000001ull;
+        p.fault_revision = 0x600000001ull;
+        p.native_code = -45008;
+        p.provider = 2;
+        p.interpolated_frame_count = 3;
+        p.status = 10;
+        p.fault_mode = 8;
+        p.identity_valid = true;
+        assert(value.valid());
+        return value;
+    }
+
     ce::capture_session_ptr capture(std::uint32_t count)
     {
         std::vector<ce::frame_record> frames;
@@ -133,6 +159,7 @@ namespace profiler_render_measurement_tests
             frame.render_measurements.push_back(sample(number, ce::profile_render_axis::cpu_render_submit));
             const auto gpu = sample(number, ce::profile_render_axis::gpu_pass);
             frame.render_measurements.push_back(gpu);
+            frame.render_measurements.push_back(presenter(number, number));
             frame.events.push_back(event(gpu));
             frames.push_back(std::move(frame));
         }
@@ -249,9 +276,10 @@ namespace profiler_render_measurement_tests
         for (std::size_t index = 0; index < 3; ++index)
         {
             const auto& frame = (*decoded)->frames()[index];
-            assert(frame.render_measurements.size() == 2);
+            assert(frame.render_measurements.size() == 3);
             same(original->frames()[index].render_measurements[0], frame.render_measurements[0]);
             same(original->frames()[index].render_measurements[1], frame.render_measurements[1]);
+            same(original->frames()[index].render_measurements[2], frame.render_measurements[2]);
             assert(frame.render_measurement_for(frame.events[0]) != nullptr);
         }
         assert(!ce::encode_capture_bounded(*original, encoded->size() - 1));
@@ -295,6 +323,24 @@ namespace profiler_render_measurement_tests
         assert(ce::decode_render_measurement(unknownInput, unknown));
         same(value, unknown);
         assert(unknown.provenance.frame_kind == 0 && !unknown.provenance.native_quality_eligible());
+        wire presenterBytes;
+        const auto observed = presenter(9, 100);
+        ce::encode_render_measurement(presenterBytes, observed);
+        assert(presenterBytes.bytes.size() == 100);
+        reader presenterInput{ presenterBytes.bytes };
+        ce::profile_render_measurement reopened;
+        assert(ce::decode_render_measurement(presenterInput, reopened, true));
+        same(observed, reopened);
+        reader legacyPresenterInput{ presenterBytes.bytes };
+        assert(!ce::decode_render_measurement(legacyPresenterInput, reopened, false));
+        for (std::size_t cut = 0; cut < presenterBytes.bytes.size(); ++cut)
+        {
+            reader truncated{ std::span(presenterBytes.bytes).first(cut) };
+            assert(!ce::decode_render_measurement(truncated, reopened, true));
+        }
+        presenterBytes.bytes.back() = std::byte{1};
+        reader badReserved{ presenterBytes.bytes };
+        assert(!ce::decode_render_measurement(badReserved, reopened, true));
     }
 
     void streaming_and_selected_windows()
@@ -312,7 +358,7 @@ namespace profiler_render_measurement_tests
             }
         } files{ directory };
         const auto original = capture(705);
-        const auto streamPath = directory / "continuous5.ceprof";
+        const auto streamPath = directory / "continuous7.ceprof";
         auto writer = ce::continuous_capture_writer::start(streamPath);
         assert(writer && (*writer)->append_final(original));
         (*writer)->request_finalize(true, 0);
@@ -326,13 +372,16 @@ namespace profiler_render_measurement_tests
         const auto first = (*streaming)->load_range(0, 1);
         assert(first && (*first)->frames()[0].engine_frame == 1);
         same(original->frames()[0].render_measurements[1], (*first)->frames()[0].render_measurements[1]);
-        const auto snapshotPath = directory / "snapshot4.ceprof";
+        same(original->frames()[0].render_measurements[2], (*first)->frames()[0].render_measurements[2]);
+        same(original->frames()[704].render_measurements[2], (*tail)->frames().back().render_measurements[2]);
+        const auto snapshotPath = directory / "snapshot6.ceprof";
         write_file(snapshotPath, ce::encode_capture(*original));
         const auto snapshot = ce::open_capture_recording(snapshotPath);
         assert(snapshot && (*snapshot)->frame_count() == 705);
         const auto selection = (*snapshot)->load_range(601, 3);
         assert(selection && (*selection)->frames()[0].engine_frame == 602);
         same(original->frames()[601].render_measurements[1], (*selection)->frames()[0].render_measurements[1]);
+        same(original->frames()[601].render_measurements[2], (*selection)->frames()[0].render_measurements[2]);
         assert(!(*snapshot)->load_range(601, 3, 1));
         const auto oldPath = directory / "continuous3.ceprof";
         write_file(oldPath, old_stream());
@@ -377,6 +426,32 @@ namespace profiler_render_measurement_tests
         ring.ingest(pool->take_sealed(), pool, 7, 14000);
         assert(ring.late_spans_dropped() != 0 && ring.dropped_events() != 0);
         same(value, frozen->find_frame(11)->render_measurements[0]);
+    }
+
+    void presenter_cpu_admission_and_bounded_loss()
+    {
+        auto pool = std::make_shared<ce::chunk_pool>();
+        pool->initialize(1, 1);
+        ce::thread_stream stream(*pool, { "Presenter", 0, 0, ce::track_kind::other, 0 });
+        stream.set_generation(7);
+        ce::capture_ring ring;
+        ring.configure(2, ce::kDefaultMemoryBudget);
+        const auto observed = presenter(41, 900);
+        stream.write_presenter_return(observed, 7);
+        stream.publish_frame();
+        // The only bounded page is sealed, not silently replaced/expanded.
+        stream.write_presenter_return(presenter(41, 901), 7);
+        assert(stream.dropped_events() != 0);
+        ring.ingest(pool->take_sealed(), pool, 7, 41000);
+        ring.close_frame(41, 41000, 42000);
+        auto frozen = ring.freeze({}, {1000000}, true, 0);
+        assert(frozen->find_frame(41)->render_measurements.size() == 1);
+        same(observed, frozen->find_frame(41)->render_measurements[0]);
+        assert(observed.presenter.real_frame_id != observed.engine_frame);
+        stream.request_freeze(42000);
+        stream.write_presenter_return(presenter(42, 902), 7);
+        stream.publish_frame();
+        assert(pool->take_sealed() == nullptr); // No CPU admission after Stop.
     }
 
     void zero_frame_multiple_views_and_submissions()
@@ -424,4 +499,5 @@ int main()
     profiler_render_measurement_tests::streaming_and_selected_windows();
     profiler_render_measurement_tests::producer_and_late_frame_ownership();
     profiler_render_measurement_tests::zero_frame_multiple_views_and_submissions();
+    profiler_render_measurement_tests::presenter_cpu_admission_and_bounded_loss();
 }

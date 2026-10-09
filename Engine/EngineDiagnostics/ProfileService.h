@@ -261,6 +261,10 @@ namespace ce
         void submit_gpu_span(marker_id id, profile_tick begin, profile_tick end,
                              std::uint32_t frame, const gpu_span_context& gpu);
         void submit_render_measurement(const profile_render_measurement& sample, std::uint64_t generation);
+        // CPU owner path, admitted only in this recording generation. Stored
+        // under the current container frame, never the old source frame.
+        void publish_presenter_return(const profile_presenter_return& observation,
+                                      std::uint64_t expected_generation);
         void report_gpu_issue(std::uint32_t frame, std::uint32_t lost_passes,
                               bool collect_failed, const char* reason, std::uint64_t generation = 0);
 

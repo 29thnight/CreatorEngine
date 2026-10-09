@@ -299,7 +299,7 @@ namespace CommandCore
             { "temporal.deepdvc", CommandCost::Immediate, "[off|on] [intensity:0..1] [saturation-boost:0..1]", "Request SDR-only pre-UI DeepDVC digital vibrance; default off", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
             { "temporal.fallback", CommandCost::Immediate, "", "Read requested/effective temporal providers and actual fallback reasons", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
 #if CE_DEVELOPMENT && !CE_SHIPPING
-            { "temporal.fault", CommandCost::Immediate, "[clear|capability|dispatch fsr|dlss|xess <view-id>]", "Inject a development-only TU failure after real SDK readiness; clear restores normal retries", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
+            { "temporal.fault", CommandCost::Immediate, "[clear | <capability|dispatch|fg-capability|fg-configure|fg-prepare|fg-evaluate|fg-present|fg-final-consumption> <fsr|dlss|xess> <view-id>]", "Inject a development-only TU/Player FG failure after real SDK readiness; fg-evaluate is FSR-only", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
 #endif
             { "temporal.fg", CommandCost::Immediate, "[none|fsr|dlss|xess] [interpolated-frame-count]", "Request independent Player frame generation; receipt is not activation", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
             { "temporal.latency", CommandCost::Immediate, "", "Read real-frame latency markers without claiming input-to-photon latency", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },

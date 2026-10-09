@@ -316,8 +316,14 @@ namespace ce::detail::recording_file_impl
     // 전체 개요 검증은 스택의 이벤트 하나만 재사용한다. 전체 이벤트 벡터를 만들지 않는다.
     std::expected<recording_overview_bin, capture_file_error>
     parse_frame(std::span<const std::byte> payload, const capture_session& metadata,
-                bool has_render_measurements, frame_record* decoded = nullptr)
+                std::uint32_t file_version, frame_record* decoded = nullptr)
     {
+        if (file_version != 3 && file_version != 5 && file_version != kRecordingFileVersion)
+        {
+            return std::unexpected(capture_file_error::unsupported_version);
+        }
+        const bool has_render_measurements = file_version == 5 || file_version == kRecordingFileVersion;
+        const bool allow_presenter = file_version == kRecordingFileVersion;
         bytes_reader input{payload};
         std::bitset<65536> thread_slots;
         for (const auto& thread : metadata.threads())
@@ -421,7 +427,7 @@ namespace ce::detail::recording_file_impl
             for (std::uint32_t index = 0; index < count; ++index)
             {
                 profile_render_measurement sample;
-                if (!decode_render_measurement(input, sample) ||
+                if (!decode_render_measurement(input, sample, allow_presenter) ||
                     sample.engine_frame != summary.first_engine_frame ||
                     (sample.axis == profile_render_axis::gpu_pass && sample.marker >= metadata.marker_count()))
                 {
@@ -436,7 +442,8 @@ namespace ce::detail::recording_file_impl
         return summary;
     }
 
-    std::expected<capture_session_ptr, capture_file_error> decode_metadata(std::span<const std::byte> payload)
+    std::expected<capture_session_ptr, capture_file_error>
+    decode_metadata(std::span<const std::byte> payload, std::uint32_t file_version)
     {
         if (payload.size() < 16 || payload.size() > kMaximumMetadataBytes ||
             std::memcmp(payload.data(), kMagic.data(), kMagic.size()) != 0)
@@ -445,7 +452,13 @@ namespace ce::detail::recording_file_impl
         }
         bytes_reader header{payload.subspan(8)};
         std::uint32_t version = 0, count = 0;
-        if (!header.get(version) || !header.get(count) || (version != 2 && version != kCaptureFileVersion) ||
+        const std::uint32_t expected_version = file_version == 3 ? 2u :
+            file_version == 5 ? 4u : file_version == kRecordingFileVersion ? kCaptureFileVersion : 0u;
+        if (expected_version == 0)
+        {
+            return std::unexpected(capture_file_error::unsupported_version);
+        }
+        if (!header.get(version) || !header.get(count) || version != expected_version ||
             count != (version == 2 ? 6u : 7u) ||
             payload.size() < 16 + count * 32)
         {
@@ -464,7 +477,8 @@ namespace ce::detail::recording_file_impl
             {
                 return std::unexpected(capture_file_error::malformed);
             }
-            if (chunk_version != ((type == 3 || type == 4 || type == 5) ? 2u : 1u))
+            if (chunk_version != ((type == 3 || type == 4 || type == 5 ||
+                                  (type == 7 && version == kCaptureFileVersion)) ? 2u : 1u))
             {
                 return std::unexpected(capture_file_error::unsupported_version);
             }
@@ -547,6 +561,8 @@ namespace ce::detail::recording_file_impl
                status.source_losses.late_gpu_spans != 0;
     }
 
+    // Continuous v3/v5/v7 share this exact footer; presenter evidence changes
+    // only the frame's tagged measurement records, never finalization/loss counts.
     bool parse_footer(std::span<const std::byte> payload, recording_status& status, bool& complete,
                       std::uint32_t& unacked)
     {
@@ -1005,7 +1021,7 @@ namespace ce
         bool complete = false;
         std::uint32_t unacked = 0;
         std::uint32_t file_version = 0;
-        // Snapshot v1/v2/v4 uses separate frame, counter and provenance chunks.
+        // Snapshot v1/v2/v4/v6 uses separate frame, counter and provenance chunks.
         // Each index stays proportional to overview bins, not recording length.
         std::uint32_t legacy_frame_version = 0;
         std::uint32_t legacy_counter_version = 0;
@@ -1104,11 +1120,12 @@ namespace ce::detail::recording_file_impl
             {
                 return std::unexpected(capture_file_error::truncated);
             }
-            if (chunk.version == 0 || chunk.version > ((chunk.type == 3 || chunk.type == 4 || chunk.type == 5) ? 2u : 1u))
-            {
-                return std::unexpected(capture_file_error::unsupported_version);
-            }
-            if (chunk.type == 7 && format_version < 4)
+            const bool measurement_version_supported =
+                (format_version == 4 && chunk.version == 1) ||
+                (format_version == kCaptureFileVersion && chunk.version == 2);
+            if ((chunk.type == 7 && !measurement_version_supported) ||
+                (chunk.type != 7 && (chunk.version == 0 ||
+                    chunk.version > ((chunk.type == 3 || chunk.type == 4 || chunk.type == 5) ? 2u : 1u))))
             {
                 return std::unexpected(capture_file_error::unsupported_version);
             }
@@ -1153,7 +1170,8 @@ namespace ce::detail::recording_file_impl
             }
             chunks.push_back(chunk);
         }
-        if ((seen & 0x1Eu) != 0x1Eu || (format_version >= 4 && (seen & (1u << 7)) == 0))
+        if ((seen & 0x1Eu) != 0x1Eu ||
+            ((format_version == 4 || format_version == kCaptureFileVersion) && (seen & (1u << 7)) == 0))
         {
             return std::unexpected(capture_file_error::malformed);
         }
@@ -1195,7 +1213,7 @@ namespace ce::detail::recording_file_impl
         std::vector<std::byte> empty_frames(4);
         metadata.push_back({legacy_chunk{4, 2, 0, 4, crc(empty_frames)}, std::move(empty_frames)});
         std::vector<std::byte> empty_measurements(4);
-        metadata.push_back({legacy_chunk{7, 1, 0, 4, crc(empty_measurements)}, std::move(empty_measurements)});
+        metadata.push_back({legacy_chunk{7, 2, 0, 4, crc(empty_measurements)}, std::move(empty_measurements)});
         bytes_writer result;
         for (char value : kMagic)
         {
@@ -1308,7 +1326,8 @@ namespace ce::detail::recording_file_impl
     std::expected<void, capture_file_error>
     read_render_measurements(std::ifstream& input, std::uint64_t offset, std::uint32_t count,
                              std::uint32_t engine_frame, const capture_session& metadata,
-                             std::stop_token cancel, std::vector<profile_render_measurement>* decoded = nullptr)
+                             bool allow_presenter, std::stop_token cancel,
+                             std::vector<profile_render_measurement>* decoded = nullptr)
     {
         constexpr std::size_t batch_samples = 256;
         std::array<std::byte, batch_samples * kRenderMeasurementWireBytes> buffer{};
@@ -1332,7 +1351,7 @@ namespace ce::detail::recording_file_impl
             for (std::uint32_t index = 0; index < amount; ++index)
             {
                 profile_render_measurement sample;
-                if (!decode_render_measurement(reader, sample) || sample.engine_frame != engine_frame ||
+                if (!decode_render_measurement(reader, sample, allow_presenter) || sample.engine_frame != engine_frame ||
                     (sample.axis == profile_render_axis::gpu_pass && sample.marker >= metadata.marker_count()))
                 {
                     return std::unexpected(capture_file_error::malformed);
@@ -1430,8 +1449,8 @@ namespace ce
             std::uint32_t version = 0, count = 0;
             reader.get(version);
             reader.get(count);
-            const bool snapshot = version == 1 || version == 2 || version == kCaptureFileVersion;
-            const bool continuous = version == 3 || version == kRecordingFileVersion;
+            const bool snapshot = version == 1 || version == 2 || version == 4 || version == kCaptureFileVersion;
+            const bool continuous = version == 3 || version == 5 || version == kRecordingFileVersion;
             if (!snapshot && !continuous)
             {
                 return std::unexpected(capture_file_error::unsupported_version);
@@ -1609,7 +1628,8 @@ namespace ce
                             return std::unexpected(capture_file_error::malformed);
                         }
                         if (const auto parsed = read_render_measurements(input, offset, samples, engine_frame,
-                                                                         *state->metadata, cancel); !parsed)
+                                                                         *state->metadata,
+                                                                         version == kCaptureFileVersion, cancel); !parsed)
                         {
                             return std::unexpected(parsed.error());
                         }
@@ -1670,7 +1690,7 @@ namespace ce
                     }
                     if (record->type == kMetadataRecord)
                     {
-                        const auto metadata = decode_metadata(record->payload);
+                        const auto metadata = decode_metadata(record->payload, version);
                         if (!metadata || (*metadata)->frame_count() != 0 ||
                             (state->metadata && !compatible_metadata(*state->metadata, **metadata)))
                         {
@@ -1684,7 +1704,7 @@ namespace ce
                         {
                             return std::unexpected(capture_file_error::malformed);
                         }
-                        const auto frame = parse_frame(record->payload, *state->metadata, version >= 5);
+                        const auto frame = parse_frame(record->payload, *state->metadata, version);
                         if (!frame || (!state->bins.empty() &&
                             (frame->first_engine_frame <= state->bins.back().last_engine_frame ||
                              frame->tick_begin < state->bins.back().tick_end)))
@@ -1834,7 +1854,7 @@ namespace ce
                             remaining -= bytes;
                             frame_record frame;
                             if (const auto parsed = parse_frame(record->payload, *state.metadata,
-                                                                state.file_version >= 5, &frame); !parsed)
+                                                                state.file_version, &frame); !parsed)
                             {
                                 return std::unexpected(parsed.error());
                             }
@@ -1941,7 +1961,9 @@ namespace ce
                             }
                             remaining -= bytes;
                             if (const auto parsed = read_render_measurements(input, sample_offset, samples, engine_frame,
-                                                                             *state.metadata, cancel, &frame.render_measurements); !parsed)
+                                                                             *state.metadata,
+                                                                             state.file_version == kCaptureFileVersion,
+                                                                             cancel, &frame.render_measurements); !parsed)
                             {
                                 return std::unexpected(parsed.error());
                             }

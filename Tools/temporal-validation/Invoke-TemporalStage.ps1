@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$EndpointFile,
-    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','fault-fallback','golden-baseline')]
+    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','fault-fallback','fg-fault-fallback','golden-baseline')]
     [string]$Stage = 'support',
     [ValidateSet('none','fsr','dlss','xess')][string]$Provider = 'fsr',
     [uint32]$InterpolatedFrameCount = 1,
-    [ValidateSet('capability','dispatch')][string]$FaultMode = 'dispatch',
+    [ValidateSet('capability','dispatch','fg-capability','fg-configure','fg-prepare','fg-evaluate','fg-present','fg-final-consumption')][string]$FaultMode = 'dispatch',
     [ValidateSet('none','fsr')][string]$ExpectedFallback = 'none',
     [ValidateSet('native-aa','quality','balanced','performance','ultra-performance')][string]$Quality = 'quality',
     [ValidateSet('off','scale','sharpen')][string]$NisMode = 'scale',
@@ -401,7 +401,75 @@ try {
             Require-RealMetadata $data
             $report.scope = 'fallback-diagnostic-only-no-fault-injected'
         }
+        'fg-fault-fallback' {
+            if (!$before.faultInjection.available -or $before.faultInjection.mode -ne 'none' -or
+                !$before.playerObserved -or $before.observedPresentationTarget -ne 'player_swapchain') {
+                throw 'An unfaulted development DX12 Player with live presenter observations is required'
+            }
+            $codes = @{'fg-capability'=-45003; 'fg-configure'=-45004; 'fg-prepare'=-45005;
+                'fg-evaluate'=-45006; 'fg-present'=-45007; 'fg-final-consumption'=-45008}
+            if (!$codes.ContainsKey($FaultMode) -or $Provider -eq 'none' -or $ExpectedFallback -eq $Provider -or
+                ($FaultMode -eq 'fg-evaluate' -and $Provider -ne 'fsr')) {
+                throw 'Choose a supported FG fault stage and a different expected fallback; fg-evaluate is FSR-only'
+            }
+            $receipt = Invoke-TemporalCommand 'temporal.fg' @($Provider,[string]$InterpolatedFrameCount)
+            $baselineGeneration = [string]$receipt.data.receiptGeneration
+            $counter = if ($Provider -eq 'fsr') { 'generatedSubmissionCount' } else { 'generatedPresentationCount' }
+            $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            do {
+                $baseline = (Invoke-TemporalCommand 'temporal.status' @($baselineGeneration)).data
+                if ($baseline.requestState -eq 'superseded') { throw 'FG baseline was superseded' }
+                $present = $baseline.presenterObservation
+                $ready = $baseline.acknowledged -and $baseline.activeFrameGenerator -eq $Provider -and
+                    $baseline.frameGenerationResult.status -eq 'success' -and $present.valid -and
+                    $present.result.status -eq 'success' -and $present.provider -eq $Provider -and
+                    [string]$present.requestGeneration -eq $baselineGeneration -and
+                    [string]$present.playerObservedGeneration -eq $baselineGeneration -and
+                    $baseline.activeInterpolatedFrameCount -eq $InterpolatedFrameCount -and
+                    [uint64]$baseline.$counter -gt [uint64]$before.$counter
+                if ($ready) { break }
+                if ([DateTime]::UtcNow -ge $limit) { throw 'No real generated-output baseline; SDK absence is not a fault pass' }
+                Start-Sleep -Milliseconds 100
+            } while ($true)
+            $receipt = Invoke-TemporalCommand 'temporal.fault' @($FaultMode,$Provider,[string]$present.viewId)
+            $generation = [string]$receipt.data.receiptGeneration
+            $ownedFaultRevision = [string]$receipt.data.faultInjection.revision
+            $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            do {
+                $data = (Invoke-TemporalCommand 'temporal.status' @($generation)).data
+                if ($data.requestState -eq 'superseded') { throw 'FG fault request was superseded' }
+                $fault = $data.faultInjection
+                $fallback = $data.presenterObservation
+                $ready = $data.acknowledged -and [string]$fault.consumedRevision -eq $ownedFaultRevision -and
+                    $fault.consumedMode -eq $FaultMode -and [uint64]$fault.consumedCount -gt [uint64]$baseline.faultInjection.consumedCount -and
+                    [string]$fault.viewId -eq [string]$present.viewId -and [string]$fault.sceneEpoch -eq [string]$present.sceneEpoch -and
+                    $fault.injectedResult.status -eq 'setup_or_execution_failed' -and $fault.injectedResult.nativeCode -eq $codes[$FaultMode] -and
+                    $data.requestedFrameGenerator -eq $Provider -and $data.requestedFrameGenerationResult.nativeCode -eq $codes[$FaultMode] -and
+                    $fallback.valid -and $fallback.result.status -eq 'success' -and $fallback.provider -eq $ExpectedFallback -and
+                    [string]$fallback.requestGeneration -eq $generation -and [string]$fallback.playerObservedGeneration -eq $generation -and
+                    [string]$fallback.viewId -eq [string]$present.viewId -and [string]$fallback.sceneEpoch -eq [string]$present.sceneEpoch -and
+                    [uint64]$fallback.realFrameId -gt [uint64]$present.realFrameId -and
+                    [uint64]$fallback.realFrameId -gt [uint64]$fault.realFrameId -and
+                    $fallback.faultMode -eq $FaultMode -and [string]$fallback.faultRevision -eq $ownedFaultRevision
+                if ($ready -and $ExpectedFallback -eq 'fsr') {
+                    $ready = $data.activeFrameGenerator -eq 'fsr' -and
+                        [uint64]$data.sdkFinalConsumedFrameId -ge [uint64]$fallback.realFrameId -and
+                        [uint64]$data.generatedSubmissionCount -gt [uint64]$baseline.generatedSubmissionCount
+                }
+                if ($ready) { break }
+                if ([DateTime]::UtcNow -ge $limit) { throw 'No exact consumed-stage failure followed by a fresh successful fallback Present' }
+                Start-Sleep -Milliseconds 100
+            } while ($true)
+            if ($FaultMode -notin @('fg-capability','fg-configure') -and [uint64]$fault.realFrameId -eq 0) {
+                throw 'Frame-stage fault did not identify its actual source real frame'
+            }
+            $report.scope = 'live-FG-host-failure-recovery-only-not-device-loss-pixel-display-or-lifetime-race-acceptance'
+            $report.faultEvidence = $fault
+            $report.baseline = $baseline
+            $report.finalConsumptionSemantics = 'post-genuine-drain acknowledgement rejection; no manufactured fence completion'
+        }
         'fault-fallback' {
+            if ($FaultMode -notin @('capability','dispatch')) { throw 'TU fault stage accepts only capability or dispatch' }
             if (!$before.faultInjection.available -or $before.faultInjection.mode -ne 'none') {
                 throw 'A development build with no already-active test injection is required'
             }

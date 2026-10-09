@@ -11,6 +11,32 @@ namespace ce
     {
         cpu_render_submit = 1,
         gpu_pass = 2,
+        cpu_presenter_return = 3,
+    };
+
+    // Point sampled by the presentation owner after its native/SDK wrapper
+    // returns. Not an exact native-call endpoint, GPU completion, SDK input
+    // consumption, OS displayed event, or physical photon timestamp. The clock
+    // is the capture's QPC ticks_per_second (clock_domain == 1).
+    struct profile_presenter_return
+    {
+        std::uint64_t observed_tick = 0, sequence = 0;
+        std::uint64_t real_frame_id = 0, publication_frame_id = 0, view_id = 0, scene_epoch = 0;
+        std::uint64_t request_generation = 0, presenter_generation = 0, fault_revision = 0;
+        std::int64_t native_code = 0;
+        std::uint32_t interpolated_frame_count = 0;
+        std::uint8_t provider = 0, status = 1, fault_mode = 0;
+        bool native_gate_active = false, identity_valid = false;
+        std::uint8_t clock_domain = 1;
+
+        bool valid() const
+        {
+            return observed_tick != 0 && sequence != 0 && provider <= 3 && status <= 13 &&
+                fault_mode <= 8 && clock_domain == 1 &&
+                (provider != 0 || interpolated_frame_count == 0) &&
+                (!identity_valid || (real_frame_id != 0 && publication_frame_id != 0 &&
+                    view_id != 0 && scene_epoch != 0));
+        }
     };
 
     // Value-only boundary: no renderer dependency, process pointers or globals.
@@ -75,7 +101,9 @@ namespace ce
         }
     };
 
-    // Stable portable wire size: 40-byte sample key + 60-byte provenance.
+    // Stable portable wire size: axes 1/2 use a 40-byte sample key + 60-byte
+    // provenance. Axis 3 uses a distinct 95-byte payload after frame/axis and
+    // is admitted only by snapshot v6 / stream v7 and newer readers.
     // The full submission/view/publication identities survive narrowing in the
     // legacy event key. A lookup must reject ambiguous keys, never pick latest.
     inline constexpr std::size_t kRenderMeasurementWireBytes = 100;
@@ -91,9 +119,14 @@ namespace ce
         std::uint64_t tick_begin = 0;
         std::uint64_t tick_end = 0;
         profile_render_provenance provenance;
+        profile_presenter_return presenter;
 
         bool valid() const
         {
+            if (axis == profile_render_axis::cpu_presenter_return)
+            {
+                return presenter.valid();
+            }
             return (axis == profile_render_axis::cpu_render_submit || axis == profile_render_axis::gpu_pass) &&
                 tick_end >= tick_begin && provenance.valid() &&
                 (axis != profile_render_axis::gpu_pass ||
@@ -109,6 +142,21 @@ namespace ce
     {
         out.put(value.engine_frame);
         out.put(static_cast<std::uint8_t>(value.axis));
+        if (value.axis == profile_render_axis::cpu_presenter_return)
+        {
+            const auto& p = value.presenter;
+            out.put(p.observed_tick); out.put(p.sequence);
+            out.put(p.real_frame_id); out.put(p.publication_frame_id);
+            out.put(p.view_id); out.put(p.scene_epoch);
+            out.put(p.request_generation); out.put(p.presenter_generation);
+            out.put(p.fault_revision); out.put(p.native_code);
+            out.put(p.interpolated_frame_count);
+            out.put(p.provider); out.put(p.status); out.put(p.fault_mode);
+            out.put(static_cast<std::uint8_t>(p.native_gate_active));
+            out.put(static_cast<std::uint8_t>(p.identity_valid)); out.put(p.clock_domain);
+            out.put(std::uint32_t{0}); out.put(std::uint8_t{0});
+            return;
+        }
         out.put(value.queue);
         out.put(value.event_view);
         out.put(value.event_submission);
@@ -137,11 +185,41 @@ namespace ce
     }
 
     template<typename Reader>
-    bool decode_render_measurement(Reader& in, profile_render_measurement& value)
+    bool decode_render_measurement(Reader& in, profile_render_measurement& value, bool allow_presenter = true)
     {
         std::uint8_t axis = 0, native = 0, spatial = 0, deep = 0;
+        if (!in.get(value.engine_frame) || !in.get(axis))
+        {
+            return false;
+        }
+        value.axis = static_cast<profile_render_axis>(axis);
+        if (value.axis == profile_render_axis::cpu_presenter_return)
+        {
+            if (!allow_presenter)
+            {
+                return false;
+            }
+            auto& p = value.presenter;
+            std::uint8_t identity = 0, reserved8 = 0;
+            std::uint32_t reserved32 = 0;
+            if (!in.get(p.observed_tick) || !in.get(p.sequence) ||
+                !in.get(p.real_frame_id) || !in.get(p.publication_frame_id) ||
+                !in.get(p.view_id) || !in.get(p.scene_epoch) ||
+                !in.get(p.request_generation) || !in.get(p.presenter_generation) ||
+                !in.get(p.fault_revision) || !in.get(p.native_code) ||
+                !in.get(p.interpolated_frame_count) || !in.get(p.provider) || !in.get(p.status) ||
+                !in.get(p.fault_mode) || !in.get(native) || !in.get(identity) ||
+                !in.get(p.clock_domain) || !in.get(reserved32) || !in.get(reserved8) ||
+                native > 1 || identity > 1 || reserved32 != 0 || reserved8 != 0)
+            {
+                return false;
+            }
+            p.native_gate_active = native != 0;
+            p.identity_valid = identity != 0;
+            return value.valid();
+        }
         auto& p = value.provenance;
-        if (!in.get(value.engine_frame) || !in.get(axis) || !in.get(value.queue) ||
+        if (!in.get(value.queue) ||
             !in.get(value.event_view) || !in.get(value.event_submission) || !in.get(value.marker) ||
             !in.get(value.submission_id) || !in.get(value.tick_begin) || !in.get(value.tick_end) ||
             !in.get(p.frame_kind) || !in.get(p.resolution_state) || !in.get(p.upscaler) ||

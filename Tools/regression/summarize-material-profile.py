@@ -72,13 +72,30 @@ def counter(reader, version):
     return cid, value, owner
 
 
-def measurement(reader):
+def measurement(reader, allow_presenter=False):
+    engine_frame, axis = reader.get('IB')
+    if axis == 3:
+        require(allow_presenter, 'Presenter axis requires snapshot v6 / stream v7')
+        keys = ('observedQpc', 'sequence', 'realFrameId', 'publicationFrameId', 'viewId', 'sceneEpoch',
+                'requestGeneration', 'playerObservedGeneration', 'faultRevision', 'nativeCode',
+                'interpolatedFrameCount', 'provider', 'status', 'faultMode', 'nativeGateActive',
+                'valid', 'clockDomain', 'reserved32', 'reserved8')
+        value = dict(zip(keys, reader.get('QQQQQQQQQqIBBBBBBIB')))
+        value.update(engineFrame=engine_frame, axis=axis)
+        require(value['observedQpc'] > 0 and value['sequence'] > 0 and value['provider'] <= 3 and
+                value['status'] <= 13 and value['faultMode'] <= 8 and value['clockDomain'] == 1 and
+                value['reserved32'] == value['reserved8'] == 0 and
+                value['nativeGateActive'] in (0, 1) and value['valid'] in (0, 1), 'Invalid presenter record')
+        require(value['provider'] != 0 or value['interpolatedFrameCount'] == 0, 'Native presenter has generated count')
+        require(not value['valid'] or all(value[k] > 0 for k in
+                ('realFrameId', 'publicationFrameId', 'viewId', 'sceneEpoch')), 'Invalid presenter identity')
+        return value
     keys = ('engineFrame', 'axis', 'queue', 'eventView', 'eventSubmission', 'marker',
             'submissionId', 'begin', 'end', 'frameKind', 'resolutionState', 'upscaler',
             'frameGenerator', 'realFrameId', 'viewId', 'sceneEpoch', 'publicationFrameId',
             'generatedOrdinal', 'renderWidth', 'renderHeight', 'displayWidth', 'displayHeight',
             'nativeGateActive', 'spatialProvenanceAvailable', 'spatialMode', 'deepDvcApplied')
-    value = dict(zip(keys, reader.get('IBBHIIQQQBBBBQQQQIIIIIBBBB')))
+    value = dict(zip(keys, (engine_frame, axis) + reader.get('BHIIQQQBBBBQQQQIIIIIBBBB')))
     require(value['axis'] in (1, 2) and value['end'] >= value['begin'], 'Invalid measurement axis/time')
     require(value['frameKind'] <= 2 and value['resolutionState'] <= 4 and
             value['upscaler'] <= 3 and value['frameGenerator'] <= 3 and value['spatialMode'] <= 2 and
@@ -115,11 +132,11 @@ def snapshot(data):
     reader = Reader(data)
     require(bytes(reader.take(8)) == b'CEPROF\0\0', 'Not a CEPROF capture')
     version, count = reader.get('II')
-    require(version in (1, 2, 4) and 4 <= count <= 64, 'Unsupported snapshot layout')
+    require(version in (1, 2, 4, 6) and 4 <= count <= 64, 'Unsupported snapshot layout')
     chunks, ranges = {}, []
     for _ in range(count):
         kind, chunk_version, offset, size, checksum, reserved = reader.get('IIQQII')
-        supported = {1: (1,), 2: (1,), 3: (1, 2), 4: (1, 2), 5: (1, 2), 6: (1,), 7: (1,)}
+        supported = {1: (1,), 2: (1,), 3: (1, 2), 4: (1, 2), 5: (1, 2), 6: (1,), 7: (1, 2)}
         require(kind in supported and chunk_version in supported[kind] and kind not in chunks and reserved == 0,
                 'Unknown/duplicate snapshot chunk')
         require(offset >= 16 + 32 * count and offset + size <= len(data) and
@@ -128,8 +145,10 @@ def snapshot(data):
         require(zlib.crc32(payload) == checksum, 'Chunk checksum mismatch')
         chunks[kind] = chunk_version, Reader(payload)
         ranges.append((offset, offset + size))
-    require(all(key in chunks for key in (1, 2, 3, 4)) and (version != 4 or 7 in chunks), 'Missing required chunk')
-    require(version == 4 or 7 not in chunks, 'Legacy capture cannot carry new provenance')
+    require(all(key in chunks for key in (1, 2, 3, 4)) and (version < 4 or 7 in chunks), 'Missing required chunk')
+    require(version >= 4 or 7 not in chunks, 'Legacy capture cannot carry new provenance')
+    if 7 in chunks:
+        require(chunks[7][0] == (2 if version >= 6 else 1), 'Measurement chunk/version mismatch')
     env = chunks[1][1]
     hz, complete, unacked = env.get('QBI')
     require(hz > 0 and complete in (0, 1), 'Invalid capture environment')
@@ -178,7 +197,7 @@ def snapshot(data):
         require(r.get('I') == len(frames), 'Provenance/frame count mismatch')
         for frame in frames:
             require(r.get('I') == frame['id'], 'Provenance/frame identity mismatch')
-            frame['measurements'] = [measurement(r) for _ in range(r.count(100))]
+            frame['measurements'] = [measurement(r, version >= 6) for _ in range(r.count(100))]
         r.end()
     return dict(version=version, hz=hz, complete=bool(complete), unacked=unacked, frames=frames,
                 markers=markers, threads=threads, descriptors=descriptors, droppedCounters=dropped_counters,
@@ -190,10 +209,10 @@ def read_capture(path):
     data = path.read_bytes()
     require(len(data) >= 16 and data[:8] == b'CEPROF\0\0', 'Not a CEPROF capture')
     version, count = struct.unpack_from('<II', data, 8)
-    if version in (1, 2, 4):
+    if version in (1, 2, 4, 6):
         result = snapshot(data)
     else:
-        require(version in (3, 5) and count == 0, 'Unsupported CEPROF recording version')
+        require(version in (3, 5, 7) and count == 0, 'Unsupported CEPROF recording version')
         r, sequence, metadata, frames, footer = Reader(data[16:]), 0, None, [], None
         while r.pos < len(r.data):
             header = r.take(32)
@@ -205,7 +224,7 @@ def read_capture(path):
             sequence += 1
             if kind == 1:
                 new = snapshot(payload)
-                require(not new['frames'] and new['version'] == (4 if version == 5 else 2), 'Invalid metadata record')
+                require(not new['frames'] and new['version'] == version - 1, 'Invalid metadata record')
                 if metadata is not None:
                     require(new['hz'] == metadata['hz'] and new['markers'][:len(metadata['markers'])] == metadata['markers'] and
                             all(new['threads'].get(k) == v for k, v in metadata['threads'].items()), 'Metadata identity changed')
@@ -219,8 +238,8 @@ def read_capture(path):
                 frame = dict(id=fid, begin=begin, end=end, dropped=dropped,
                              events=[event(body, 2) for _ in range(events)],
                              counters=[counter(body, 2) for _ in range(counters)], measurements=[])
-                if version == 5:
-                    frame['measurements'] = [measurement(body) for _ in range(body.count(100))]
+                if version >= 5:
+                    frame['measurements'] = [measurement(body, version >= 7) for _ in range(body.count(100))]
                 body.end()
                 frames.append(frame)
             elif kind == 3:
@@ -255,12 +274,15 @@ def analyze(path):
     events, counters = collections.defaultdict(list), collections.defaultdict(list)
     cpu_sessions, cpu_ticks, cpu_tasks, counter_owners = set(), set(), set(), set()
     boundary, gpu_events, matched_gpu, invalid_provenance = 0, 0, 0, 0
-    measurements, groups = [], collections.defaultdict(lambda: {'cpu': [], 'gpu': [], 'realFrames': set()})
+    measurements, presenter, groups = [], [], collections.defaultdict(lambda: {'cpu': [], 'gpu': [], 'realFrames': set()})
     for frame in frames:
         gpu_keys = collections.Counter(sample_key(m) for m in frame['measurements'] if m['axis'] == 2)
         used_keys = collections.Counter()
         for m in frame['measurements']:
             require(m['engineFrame'] == frame['id'], 'Stored provenance belongs to another engine frame')
+            if m['axis'] == 3:
+                presenter.append(m)
+                continue
             measurements.append(m)
             available = m['frameKind'] in (1, 2) and m['viewId'] > 0 and m['sceneEpoch'] > 0 and m['spatialProvenanceAvailable']
             invalid_provenance += not available
@@ -306,7 +328,11 @@ def analyze(path):
                                  lastTick=values[-1][1], lastFrame=values[-1][0]))
     clean = (capture['complete'] and capture['unacked'] == 0 and not any(capture['losses'].values()) and
              capture['droppedCounters'] == 0 and not any(f['dropped'] for f in frames))
-    eligible = bool(clean and capture['version'] in (4, 5) and measurements and gpu_events and
+    presenter.sort(key=lambda p: p['sequence'])
+    require(len({p['sequence'] for p in presenter}) == len(presenter), 'Duplicate presenter sequence')
+    presenter_gaps = sum(b['sequence'] - a['sequence'] - 1 for a, b in zip(presenter, presenter[1:]))
+    presenter_monotonic = all(a['observedQpc'] <= b['observedQpc'] for a, b in zip(presenter, presenter[1:]))
+    eligible = bool(clean and capture['version'] in (4, 5, 6, 7) and measurements and gpu_events and
                     matched_gpu == gpu_events and invalid_provenance == 0)
     real = eligible and all(m['frameKind'] == 1 for m in measurements)
     native = real and all(m['resolutionState'] == 1 and m['upscaler'] == m['frameGenerator'] == 0 and
@@ -333,6 +359,15 @@ def analyze(path):
                 spatialProvenanceStatus='recorded-per-measurement' if eligible else 'unavailable-or-incomplete',
                 gpuEvents=gpu_events, matchedGpuEvents=matched_gpu, invalidProvenanceSamples=invalid_provenance,
                 renderMeasurementCount=len(measurements), renderGroups=group_rows,
+                presenterReturns=dict(samples=len(presenter), missingSequences=presenter_gaps,
+                    unknownIdentities=sum(not p['valid'] for p in presenter),
+                    unsuccessfulOutcomes=sum(p['status'] != 0 or p['nativeCode'] != 0 for p in presenter),
+                    clockDomain='qpc', ticksPerSecond=hz, monotonic=presenter_monotonic,
+                    completeWithinObservedBounds=bool(presenter and clean and not presenter_gaps and presenter_monotonic),
+                    firstSequence=presenter[0]['sequence'] if presenter else None,
+                    lastSequence=presenter[-1]['sequence'] if presenter else None,
+                    axis='cpu-presenter-wrapper-return-observed', generatedOutputTimestampsAvailable=False,
+                    osDisplayedTimestampsAvailable=False, physicalPhotonTimestampsAvailable=False),
                 renderAxis='per-view-cpu-submission-and-gpu-pass-costs-not-display-or-input-to-photon')
 
 

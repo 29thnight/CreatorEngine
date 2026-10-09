@@ -605,6 +605,15 @@ FfxErrorCode FsrFrameGenerator::DispatchGeneratedFrame(const FfxFrameGenerationD
     dispatch.dilatedMotionVectors = Resource(m_sharedBackend, m_shared[1]);
     dispatch.reconstructedPrevDepth = Resource(m_sharedBackend, m_shared[2]);
     error = ffxFrameInterpolationDispatch(m_interpolation.get(), &dispatch);
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    if (error == FFX_OK && m_developmentEvaluationFailure && m_developmentEvaluationFailure())
+    {
+        // Exercise the genuine callback-error path. Generate clears the pinned
+        // SDK descriptor's output count so discarded commands cannot present a
+        // stale/unwritten interpolation target; FinishFrame still drains first.
+        error = FFX_ERROR_BACKEND_API_ERROR;
+    }
+#endif
     m_generated = error == FFX_OK;
     return error;
 }

@@ -25,9 +25,12 @@ $session = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
 $responses = Join-Path $OutputDirectory 'presenter-responses.jsonl'
 $profile = Join-Path $OutputDirectory 'actual.ceprof'
 $recording = $false
-$report = [ordered]@{ schema='temporal.observation-capture.v1'; complete=$false;
+$report = [ordered]@{ schema='temporal.observation-capture.v2'; complete=$false;
     physicalLatencyMeasured=$false; displayIntervalsMeasured=$false; pollMilliseconds=$PollMilliseconds;
-    note='Sampled actual presenter observations; missing frame identities are unavailable, not interpolated' }
+    presenterSource='actual.ceprof:axis3'; generatedOutputTimestampsAvailable=$false;
+    presenterStreamValidated=$false;
+    timestampAxis='cpu-presenter-wrapper-return-observed'; clockDomain='qpc';
+    note='Continuous owner observations in CEPROF; JSONL polls audit controls only. Run summarize-material-profile.py/analyze-temporal-evidence.py to validate record presence and sequence/loss bounds. complete means the recording operation completed, not display/photon acceptance' }
 
 function Invoke-EvidenceCommand([string]$Command, [string[]]$Arguments = @()) {
     $body = @{ command=$Command; args=@($Arguments); mode='sync' } | ConvertTo-Json -Compress
@@ -90,6 +93,13 @@ try {
         $saved = Invoke-EvidenceCommand 'profile.save' @('status')
     }
     if (!$saved.complete -or $saved.frames -le 0) { throw 'Saved recording is incomplete or empty' }
+    $input = [IO.File]::OpenRead($profile)
+    try {
+        $header = [byte[]]::new(16)
+        if ($input.Read($header, 0, 16) -ne 16 -or [BitConverter]::ToUInt32($header, 8) -ne 7) {
+            throw 'Continuous presenter evidence requires CEPROF stream v7; sampled status is insufficient'
+        }
+    } finally { $input.Dispose() }
     $report.complete = $true
     $report.requestGeneration = $generation
     $report.profile = @{ path='actual.ceprof'; sha256=(Get-FileHash -LiteralPath $profile -Algorithm SHA256).Hash.ToLowerInvariant() }

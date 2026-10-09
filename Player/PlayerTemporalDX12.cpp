@@ -6,8 +6,10 @@
 #include "RHI/Temporal/Fsr/FsrBackendDX12.h"
 #include "RHI/Temporal/XeSSFrameGeneration.h"
 #include "Render/Temporal/TemporalRuntimeControl.h"
+#include "ProfileScope.h"
 
 #include <array>
+#include <atomic>
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
@@ -72,6 +74,32 @@ struct TemporalDX12::State
         std::array<RHITextureHandle, 4> handles{};
     };
     std::shared_ptr<Pins> pins;
+
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    bool RejectDevelopmentStage(TemporalTestFaultMode mode, TemporalProvider provider,
+        uint64_t frameId, uint64_t viewId, uint64_t sceneEpoch)
+    {
+        if (settings.testFault.mode != mode) { return false; }
+        if (mode >= TemporalTestFaultMode::FrameGenerationPrepare &&
+            (!pins || pins->packet.provenance.realFrameId != frameId ||
+                pins->packet.provenance.requestedGeneration != generation ||
+                pins->packet.provenance.testFaultMode != static_cast<uint8_t>(mode) ||
+                pins->packet.provenance.testFaultRevision != settings.testFault.revision))
+        {
+            return false; // Never inject into an older, untagged source packet.
+        }
+        if (!TemporalRuntimeControl::Get().ConsumeTestFault(settings.testFault, mode,
+            provider, frameId, viewId, sceneEpoch))
+        {
+            return false;
+        }
+        if (provider == settings.requestedFrameGenerator)
+        {
+            requestedResult = { TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(mode) };
+        }
+        return true;
+    }
+#endif
 
     bool UsesDlssToken() const
     {
@@ -187,6 +215,16 @@ struct TemporalDX12::State
         TemporalResult result, uint64_t presenterGeneration)
     {
         TemporalPresenterObservation observation;
+        static std::atomic<uint64_t> sequence{0};
+        auto& profiler = ce::profiler();
+        // Eligibility identity only, not an admission reservation. Sample the
+        // generation before state and time: a delayed publication must not
+        // relabel an old point into a restarted recording (or its Start gap).
+        const auto sampledGeneration = profiler.capture_generation();
+        const auto expectedGeneration = profiler.state() == ce::recorder_state::recording
+            ? sampledGeneration : 0;
+        observation.observedQpc = ce::profiler_service::now();
+        observation.sequence = sequence.fetch_add(1, std::memory_order_relaxed) + 1;
         observation.realFrameId = frameId;
         observation.publicationFrameId = source.publicationFrameId;
         observation.viewId = source.viewId;
@@ -203,7 +241,25 @@ struct TemporalDX12::State
         // still identifies real rendered pixels and must not block presentation.
         observation.valid = frameId != 0 && frameId == source.realFrameId &&
             source.publicationFrameId != 0 && source.viewId != 0 && source.sceneEpoch != 0 &&
-            source.testFaultMode <= static_cast<uint8_t>(TemporalTestFaultMode::Dispatch);
+            source.testFaultMode <= static_cast<uint8_t>(TemporalTestFaultMode::FrameGenerationFinalConsumption);
+        ce::profile_presenter_return measured;
+        measured.observed_tick = observation.observedQpc;
+        measured.sequence = observation.sequence;
+        measured.real_frame_id = observation.realFrameId;
+        measured.publication_frame_id = observation.publicationFrameId;
+        measured.view_id = observation.viewId;
+        measured.scene_epoch = observation.sceneEpoch;
+        measured.request_generation = observation.requestGeneration;
+        measured.presenter_generation = observation.playerObservedGeneration;
+        measured.fault_revision = observation.faultRevision;
+        measured.native_code = result.nativeCode;
+        measured.interpolated_frame_count = observation.interpolatedFrameCount;
+        measured.provider = static_cast<uint8_t>(provider);
+        measured.status = static_cast<uint8_t>(result.status);
+        measured.fault_mode = static_cast<uint8_t>(observation.faultMode);
+        measured.native_gate_active = nativeGateActive;
+        measured.identity_valid = observation.valid;
+        profiler.publish_presenter_return(measured, expectedGeneration);
         TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
         {
             snapshot.presenterObservation = observation;
@@ -358,6 +414,14 @@ bool TemporalDX12::RequiresReconfigure()
     {
         return true;
     }
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    if (settings.testFault != state.settings.testFault &&
+        (settings.testFault.mode >= TemporalTestFaultMode::FrameGenerationCapability ||
+            state.settings.testFault.mode >= TemporalTestFaultMode::FrameGenerationCapability))
+    {
+        return true; // Fault revisions/clear retry through the ordinary drained configuration path.
+    }
+#endif
     // Options-only changes are serialized between real-frame tokens. They do
     // not rebuild the proxy, wait for GPU idle, or invalidate temporal history.
     state.settings = settings;
@@ -389,6 +453,9 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
         state.failedProviders = {};
         state.reflexFaulted = false;
         state.failureReason.clear();
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        state.requestedResult = {};
+#endif
     }
     state.window = window;
     state.settings = snapshot.settings;
@@ -466,9 +533,26 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     state.capabilities.push_back(xess);
     for (auto& candidate : state.capabilities)
     {
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        if (!snapshot.nativeCaptureExclusionActive && candidate.frameGeneration.IsSuccess() &&
+            state.RejectDevelopmentStage(TemporalTestFaultMode::FrameGenerationCapability,
+                candidate.provider, 0, snapshot.viewId, snapshot.sceneEpoch))
+        {
+            candidate.frameGeneration = { TemporalStatus::SdkFailure,
+                TemporalTestFaultNativeCode(TemporalTestFaultMode::FrameGenerationCapability) };
+            state.failedProviders[static_cast<size_t>(candidate.provider)] = true;
+        }
+#endif
         if (state.failedProviders[static_cast<size_t>(candidate.provider)])
         {
             candidate.frameGeneration = {TemporalStatus::SdkFailure};
+#if CE_DEVELOPMENT && !CE_SHIPPING
+            if (candidate.provider == state.settings.requestedFrameGenerator &&
+                state.requestedResult.nativeCode <= -45003 && state.requestedResult.nativeCode >= -45008)
+            {
+                candidate.frameGeneration = state.requestedResult;
+            }
+#endif
         }
     }
     auto eligibleCapabilities = state.capabilities;
@@ -600,7 +684,14 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
         }
         return {TemporalStatus::SdkNotBuilt};
     };
-    const auto created = create(state.selected);
+    auto created = create(state.selected);
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    if (!snapshot.nativeCaptureExclusionActive && created.IsSuccess() && state.RejectDevelopmentStage(TemporalTestFaultMode::FrameGenerationConfigure,
+        state.selected, 0, snapshot.viewId, snapshot.sceneEpoch))
+    {
+        created = { TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(TemporalTestFaultMode::FrameGenerationConfigure) };
+    }
+#endif
     if (!created.IsSuccess())
     {
         if (state.selected == requested) state.requestedResult = created;
@@ -611,6 +702,20 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
             state.failed = true;
             return Report(created, "Failed to drain partial temporal proxy", error);
         }
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        if (created.nativeCode == TemporalTestFaultNativeCode(TemporalTestFaultMode::FrameGenerationConfigure))
+        {
+            // Successful FSR construction may already have installed an
+            // Anti-Lag swapchain reference. Retire it only after the real SDK
+            // shutdown above, before attaching a replacement/native swapchain.
+            if (!Report(state.antiLag.Shutdown(), "Retire rejected configuration latency owner", error))
+            {
+                state.failed = true;
+                return false;
+            }
+            state.antiLagActive = false;
+        }
+#endif
         state.generator.reset();
         state.xess = nullptr;
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
@@ -988,7 +1093,33 @@ bool TemporalDX12::Prepare(std::string& error)
     inputs.motionVectors = state.pins->handles[3];
     inputs.lifetimeToken = state.pins;
     DX12Encoder encoder(commands, &state.resources);
-    const auto result = state.generator->Prepare(inputs, encoder);
+#if CE_DEVELOPMENT && !CE_SHIPPING && CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
+    if (state.fsr)
+    {
+        // Copied identity only: the SDK callback must never lock the Player state
+        // while Present holds it and waits for that same callback to retire.
+        const auto fault = state.settings.testFault;
+        const auto provenance = state.pins->packet.provenance;
+        state.fsr->SetDevelopmentEvaluationFailure(fault.mode == TemporalTestFaultMode::FrameGenerationEvaluate &&
+            provenance.requestedGeneration == state.generation && provenance.testFaultRevision == fault.revision &&
+            provenance.testFaultMode == static_cast<uint8_t>(fault.mode)
+            ? std::function<bool()>{[fault, provenance]()
+                {
+                    return TemporalRuntimeControl::Get().ConsumeTestFault(fault,
+                        TemporalTestFaultMode::FrameGenerationEvaluate, TemporalProvider::Fsr,
+                        provenance.realFrameId, provenance.viewId, provenance.sceneEpoch);
+                }} : std::function<bool()>{});
+    }
+#endif
+    auto result = state.generator->Prepare(inputs, encoder);
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    const auto& provenance = state.pins->packet.provenance;
+    if (result.IsSuccess() && state.RejectDevelopmentStage(TemporalTestFaultMode::FrameGenerationPrepare,
+        state.selected, inputs.frame.realFrameId, provenance.viewId, provenance.sceneEpoch))
+    {
+        result = { TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(TemporalTestFaultMode::FrameGenerationPrepare) };
+    }
+#endif
     state.prepared = result.IsSuccess();
     state.Publish(result);
     return Report(result, "Prepare actual temporal display inputs", error);
@@ -1052,11 +1183,43 @@ bool TemporalDX12::Present(std::string& error)
         state.PublishLatency(latency);
     }
     state.sdkPresented = true;
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    if (!packet.nativeGateActive && result.IsSuccess() &&
+        state.RejectDevelopmentStage(TemporalTestFaultMode::FrameGenerationPresent, state.selected,
+            frameId, packet.provenance.viewId, packet.provenance.sceneEpoch))
+    {
+        // Raw Present observation above remains the actual SDK/native return.
+        result = { TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(TemporalTestFaultMode::FrameGenerationPresent) };
+    }
+    if (!result.IsSuccess() && state.settings.testFault.mode == TemporalTestFaultMode::FrameGenerationEvaluate)
+    {
+        const auto fault = TemporalRuntimeControl::Get().Snapshot();
+        if (fault.testFaultConsumedRevision == state.settings.testFault.revision && fault.testFaultRealFrameId == frameId &&
+            fault.testFaultConsumedMode == TemporalTestFaultMode::FrameGenerationEvaluate)
+        {
+            result = fault.testFaultResult;
+            if (state.selected == state.settings.requestedFrameGenerator) { state.requestedResult = result; }
+        }
+    }
+#endif
     state.Publish(result);
     if (!Report(result, "SDK proxy Present", error) || !state.Drain(error))
     {
         return false; // PT attempts drained fallback before releasing GT admission.
     }
+#if CE_DEVELOPMENT && !CE_SHIPPING
+    if (!packet.nativeGateActive && state.RejectDevelopmentStage(TemporalTestFaultMode::FrameGenerationFinalConsumption,
+        state.selected, frameId, packet.provenance.viewId, packet.provenance.sceneEpoch))
+    {
+        // The actual SDK/fence drain above already succeeded. Reject its host
+        // acknowledgement, retain every pin and require ordinary shutdown/drain
+        // recovery. Never manufacture completion or release a lease early.
+        const TemporalResult rejected{ TemporalStatus::SdkFailure,
+            TemporalTestFaultNativeCode(TemporalTestFaultMode::FrameGenerationFinalConsumption) };
+        state.Publish(rejected);
+        return Report(rejected, "Injected post-drain final-consumption acknowledgement failure", error);
+    }
+#endif
     state.sdkConsumed = true;
     state.lastPresented = frameId;
     uint64_t generated = 0;
@@ -1140,7 +1303,19 @@ void TemporalDX12::LatchFailure(const std::string& reason, bool recordingAborted
     auto& state = *m_state;
     std::lock_guard lock(state.mutex);
     state.failedProviders[static_cast<size_t>(state.selected)] = true;
-    if (state.selected == state.settings.requestedFrameGenerator) state.requestedResult = {TemporalStatus::SdkFailure};
+    if (state.selected == state.settings.requestedFrameGenerator)
+    {
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        if (state.requestedResult.nativeCode <= -45003 && state.requestedResult.nativeCode >= -45008)
+        {
+            // Preserve the exact injected stage through production fallback.
+        }
+        else
+#endif
+        {
+            state.requestedResult = {TemporalStatus::SdkFailure};
+        }
+    }
     state.failureReason = reason;
     // Aborted-before-enqueue is distinct from a submission failure: only the
     // former proves that the recorded COPY_DEST->SRV barriers never executed.

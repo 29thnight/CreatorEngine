@@ -23,7 +23,7 @@ struct TemporalMeasurementProvenance
     // Runtime-only source controls travel with the displayed image. These are
     // not inferred from newer global settings or serialized in profiler PLRD.
     uint64_t requestedGeneration{ 0 }, testFaultRevision{ 0 };
-    uint8_t testFaultMode{ 0 }; // 0 none, 1 capability, 2 dispatch.
+    uint8_t testFaultMode{ 0 }; // TemporalTestFaultMode wire value; zero alone is acceptance-eligible.
     bool IsValid() const
     {
         return !testFaultActive && realFrameId != 0 && renderExtent.IsValid() && displayExtent.IsValid() &&

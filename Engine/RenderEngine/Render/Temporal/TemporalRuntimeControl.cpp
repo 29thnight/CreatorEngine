@@ -238,9 +238,10 @@ uint64_t TemporalRuntimeControl::Request(const TemporalRuntimeSettings& settings
 uint64_t TemporalRuntimeControl::RequestTestFault(TemporalTestFaultMode mode, TemporalProvider provider, uint64_t viewId)
 {
 #if CE_DEVELOPMENT && !CE_SHIPPING
-    if (mode > TemporalTestFaultMode::Dispatch || provider > TemporalProvider::XeSS ||
+    if (mode > TemporalTestFaultMode::FrameGenerationFinalConsumption || provider > TemporalProvider::XeSS ||
         (mode == TemporalTestFaultMode::None) != (provider == TemporalProvider::None) ||
-        (mode != TemporalTestFaultMode::None && viewId == 0))
+        (mode != TemporalTestFaultMode::None && viewId == 0) ||
+        (mode == TemporalTestFaultMode::FrameGenerationEvaluate && provider != TemporalProvider::Fsr))
     {
         return 0;
     }
@@ -267,7 +268,9 @@ bool TemporalRuntimeControl::ConsumeTestFault(const TemporalTestFaultSettings& f
     // Off is the normal render hot path; no mutex or global lookup is needed.
     if (fault.revision == 0 || fault.mode != mode || mode == TemporalTestFaultMode::None || fault.provider != provider ||
         fault.viewId != viewId || viewId == 0 || sceneEpoch == 0 ||
-        (mode == TemporalTestFaultMode::Dispatch && realFrameId == 0))
+        mode > TemporalTestFaultMode::FrameGenerationFinalConsumption ||
+        (mode == TemporalTestFaultMode::FrameGenerationEvaluate && provider != TemporalProvider::Fsr) ||
+        ((mode == TemporalTestFaultMode::Dispatch || mode >= TemporalTestFaultMode::FrameGenerationPrepare) && realFrameId == 0))
     {
         return false;
     }
@@ -277,8 +280,10 @@ bool TemporalRuntimeControl::ConsumeTestFault(const TemporalTestFaultSettings& f
         return false;
     }
     m_snapshot.testFaultConsumedRevision = fault.revision;
+    m_snapshot.testFaultConsumedMode = mode;
+    m_snapshot.testFaultResult = { TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(mode) };
     ++m_snapshot.testFaultConsumedCount;
-    // Capability rejection occurs before a real frame exists. Zero explicitly
+    // Capability/configure rejection occurs before a real frame exists. Zero explicitly
     // means no frame identity for that configuration-time observation.
     m_snapshot.testFaultRealFrameId = realFrameId;
     m_snapshot.testFaultViewId = viewId;

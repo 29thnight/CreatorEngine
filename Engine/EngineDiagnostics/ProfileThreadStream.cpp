@@ -664,8 +664,31 @@ namespace ce
         }
     }
 
+    void thread_stream::write_presenter_return(const profile_render_measurement& sample,
+                                              std::uint64_t generation)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        // Match CPU instant admission: Stop sees in-flight ownership, and an
+        // already frozen generation cannot admit a new observation afterward.
+        m_pendingState.fetch_or(kPendingAdmission, std::memory_order_seq_cst);
+        honor_seal_request();
+        if (generation == m_generation.load(std::memory_order_acquire) &&
+            generation != m_frozenGeneration.load(std::memory_order_seq_cst))
+        {
+            // Share the owner's ordinary CPU page. Existing frame/Stop seal
+            // requests flush it at the next owner safe point; no per-Present
+            // page allocation or blocking collector handoff is introduced.
+            write_render_measurement(sample, generation, false);
+        }
+        honor_seal_request();
+        m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+    }
+
     void thread_stream::write_render_measurement(const profile_render_measurement& sample,
-                                                std::uint64_t generation)
+                                                std::uint64_t generation, bool late_ingest)
     {
         if (!owned_by_caller())
         {
@@ -682,7 +705,7 @@ namespace ce
             m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
             return;
         }
-        if (m_writer && !m_writer->late_ingest)
+        if (m_writer && m_writer->late_ingest != late_ingest)
         {
             seal_current(true);
         }
@@ -691,7 +714,7 @@ namespace ce
             m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
             return;
         }
-        m_writer->late_ingest = true;
+        m_writer->late_ingest = late_ingest;
         m_writer->render_measurements[m_writer->render_measurement_count++] = sample;
         ++m_sequence;
     }

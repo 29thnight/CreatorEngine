@@ -739,6 +739,34 @@ namespace ce
         }
     }
 
+    void profiler_service::publish_presenter_return(const profile_presenter_return& observation,
+                                                  std::uint64_t expected_generation)
+    {
+        if (!m_initialized.load(std::memory_order_acquire))
+        {
+            return;
+        }
+        // Register before sampling admission. Stop enumerates registered
+        // streams under m_streamLock; registering afterward could leave a new
+        // owner's pending page outside its freeze requests and loss accounting.
+        auto* stream = current_stream();
+        if (!stream)
+        {
+            return;
+        }
+        const auto generation = m_generation.load(std::memory_order_acquire);
+        if (expected_generation == 0 || expected_generation != generation ||
+            m_state.load(std::memory_order_acquire) != recorder_state::recording)
+        {
+            return;
+        }
+        profile_render_measurement sample;
+        sample.engine_frame = current_frame();
+        sample.axis = profile_render_axis::cpu_presenter_return;
+        sample.presenter = observation;
+        stream->write_presenter_return(sample, generation);
+    }
+
     void profiler_service::retire_gpu_lane()
     {
         thread_stream* stream = m_gpuStream.load(std::memory_order_acquire);

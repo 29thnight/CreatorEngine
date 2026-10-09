@@ -167,6 +167,10 @@ namespace CommandCore
         inline CommandData PresenterObservationData(const TemporalPresenterObservation& observation)
         {
             auto data = CommandData::Object();
+            data.Set("observedQpc", Identity(observation.observedQpc));
+            data.Set("sequence", Identity(observation.sequence));
+            data.Set("timestampAxis", CommandData::String("cpu_presenter_wrapper_return_observed"));
+            data.Set("clockDomain", CommandData::String("qpc"));
             data.Set("realFrameId", Identity(observation.realFrameId));
             data.Set("publicationFrameId", Identity(observation.publicationFrameId));
             data.Set("viewId", Identity(observation.viewId));
@@ -175,9 +179,7 @@ namespace CommandCore
             data.Set("playerObservedGeneration", Identity(observation.playerObservedGeneration));
             data.Set("provider", CommandData::String(ProviderName(observation.provider)));
             data.Set("interpolatedFrameCount", CommandData::Int(observation.interpolatedFrameCount));
-            data.Set("faultMode", CommandData::String(observation.faultMode == TemporalTestFaultMode::None
-                ? "none" : observation.faultMode == TemporalTestFaultMode::Capability ? "capability"
-                : observation.faultMode == TemporalTestFaultMode::Dispatch ? "dispatch" : "unknown"));
+            data.Set("faultMode", CommandData::String(TemporalTestFaultModeName(observation.faultMode)));
             data.Set("faultRevision", Identity(observation.faultRevision));
             data.Set("nativeGateActive", CommandData::Bool(observation.nativeGateActive));
             data.Set("valid", CommandData::Bool(observation.valid));
@@ -359,8 +361,9 @@ namespace CommandCore
             fault.Set("available", CommandData::Bool(false));
 #endif
             const auto& requestedFault = snapshot.requestedSettings.testFault;
-            fault.Set("mode", CommandData::String(requestedFault.mode == TemporalTestFaultMode::Capability ? "capability" :
-                requestedFault.mode == TemporalTestFaultMode::Dispatch ? "dispatch" : "none"));
+            fault.Set("mode", CommandData::String(TemporalTestFaultModeName(requestedFault.mode)));
+            fault.Set("consumedMode", CommandData::String(TemporalTestFaultModeName(snapshot.testFaultConsumedMode)));
+            fault.Set("injectedResult", ResultData(snapshot.testFaultResult));
             fault.Set("provider", CommandData::String(ProviderName(requestedFault.provider)));
             fault.Set("revision", Identity(requestedFault.revision));
             fault.Set("targetViewId", Identity(requestedFault.viewId));
@@ -369,7 +372,7 @@ namespace CommandCore
             fault.Set("realFrameId", Identity(snapshot.testFaultRealFrameId));
             fault.Set("viewId", Identity(snapshot.testFaultViewId));
             fault.Set("sceneEpoch", Identity(snapshot.testFaultSceneEpoch));
-            fault.Set("scope", CommandData::String("developer-TU-only; capability consumption precedes a real-frame identity"));
+            fault.Set("scope", CommandData::String("developer TU/Player FG; capability/configure precede a frame; final-consumption rejects only after genuine drain"));
             data.Set("faultInjection", std::move(fault));
             data.Set("inputToPhotonMilliseconds", CommandData{});
             data.Set("completionNote", CommandData::String("zero means unobserved; CPU present return, GPU completion and SDK final consumption are distinct"));
@@ -411,7 +414,7 @@ namespace CommandCore
 #if CE_DEVELOPMENT && !CE_SHIPPING
             if (parts.size() == 1)
             {
-                return Ok("Developer TU fault state; consumption is separate from requested injection", SnapshotData(snapshot, target));
+                return Ok("Developer TU/FG fault state; consumption is separate from requested injection", SnapshotData(snapshot, target));
             }
             TemporalTestFaultMode mode{ TemporalTestFaultMode::None };
             TemporalProvider provider{ TemporalProvider::None };
@@ -419,8 +422,7 @@ namespace CommandCore
             {
                 generation = control.RequestTestFault(mode, provider);
             }
-            else if (parts.size() == 4 && (parts[1] == "capability" || parts[1] == "dispatch") &&
-                ParseProvider(parts[2], provider) && provider != TemporalProvider::None)
+            else if (parts.size() == 4 && ParseProvider(parts[2], provider) && provider != TemporalProvider::None)
             {
                 uint64_t viewId = 0;
                 const auto& text = parts[3];
@@ -429,12 +431,29 @@ namespace CommandCore
                 {
                     return InvalidArguments("Fault injection requires the positive viewId from temporal.status");
                 }
-                mode = parts[1] == "capability" ? TemporalTestFaultMode::Capability : TemporalTestFaultMode::Dispatch;
+                for (uint8_t value = 1; value <= static_cast<uint8_t>(TemporalTestFaultMode::FrameGenerationFinalConsumption); ++value)
+                {
+                    const auto candidate = static_cast<TemporalTestFaultMode>(value);
+                    if (parts[1] == TemporalTestFaultModeName(candidate)) { mode = candidate; break; }
+                }
+                if (mode == TemporalTestFaultMode::None)
+                {
+                    return InvalidArguments("Unknown temporal fault stage");
+                }
+                if (mode >= TemporalTestFaultMode::FrameGenerationCapability && target != TemporalPresentationTarget::PlayerSwapchain)
+                {
+                    return PreconditionFailed("temporal.player_required", "FG fault injection requires the DX12 Player presenter");
+                }
+                if (mode == TemporalTestFaultMode::FrameGenerationEvaluate && provider != TemporalProvider::Fsr)
+                {
+                    return PreconditionFailed("temporal.fault_stage_unavailable",
+                        "Only FSR exposes an application-owned generation evaluation callback; DLSS/XeSS evaluation is inside Present");
+                }
                 generation = control.RequestTestFault(mode, provider, viewId);
             }
             else
             {
-                return InvalidArguments("temporal.fault clear | capability|dispatch fsr|dlss|xess <view-id>");
+                return InvalidArguments("temporal.fault clear | capability|dispatch|fg-capability|fg-configure|fg-prepare|fg-evaluate|fg-present|fg-final-consumption fsr|dlss|xess <view-id>");
             }
 #else
             return PreconditionFailed("temporal.development_required", "Temporal fault injection is disabled outside development builds");
