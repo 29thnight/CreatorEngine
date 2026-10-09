@@ -189,19 +189,52 @@ struct LXSceneVertex
     nointerpolation uint owner : TEXCOORD5;
 };
 
-[shader("vertex")]
-LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
+LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection)
 {
     const LXSurfacePoint source = lx_vertices[index];
     LXSceneVertex output;
-    output.clip = mul(float4(source.position.xyz, 1), lx_viewProjection);
+    output.clip = mul(float4(source.position.xyz, 1), viewProjection);
     output.position = source.position.xyz;
     output.normal = source.normal.xyz;
     output.tangent = source.tangent.xyz;
     output.bitangent = source.bitangent.xyz;
     output.uv = source.uvLod.xy;
-    output.owner = lx_visibleOwners[instanceId];
+    output.owner = owner;
     return output;
+}
+
+[shader("vertex")]
+LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    return LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection);
+}
+
+// Chunk-local topology over the same transformed vertices used by LXSceneVS.
+// Scene preparation pins this immutable stream through submission completion.
+StructuredBuffer<uint> lx_meshlets : register(t155);
+
+[shader("mesh")]
+[numthreads(64, 1, 1)]
+[outputtopology("triangle")]
+void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
+    out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
+{
+    const uint descriptor = lx_meshlets[1] + group.x * 4u;
+    const uint remap = lx_meshlets[2] + lx_meshlets[descriptor];
+    const uint indices = lx_meshlets[3] + lx_meshlets[descriptor + 1u];
+    const uint vertexCount = lx_meshlets[descriptor + 2u];
+    const uint triangleCount = lx_meshlets[descriptor + 3u];
+    SetMeshOutputCounts(vertexCount, triangleCount);
+    if (lane < vertexCount)
+    {
+        LXSceneVertex vertex = LXSceneVertexAt(lx_meshlets[remap + lane], lx_drawOwner, lx_viewProjection);
+        vertices[lane] = vertex;
+    }
+    for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
+    {
+        const uint index = indices + triangle * 3u;
+        triangles[triangle] = uint3(lx_meshlets[index], lx_meshlets[index + 1u], lx_meshlets[index + 2u]);
+    }
 }
 
 // Hardware coverage uses snapped subpixel vertices. Reconstruct attributes at
@@ -248,16 +281,30 @@ cbuffer LXSceneShadowConstants : register(b4)
 [shader("vertex")]
 LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
 {
-    const LXSurfacePoint source = lx_vertices[index];
-    LXSceneVertex output;
-    output.clip = mul(float4(source.position.xyz, 1), lx_shadowViewProjection);
-    output.position = source.position.xyz;
-    output.normal = source.normal.xyz;
-    output.tangent = source.tangent.xyz;
-    output.bitangent = source.bitangent.xyz;
-    output.uv = source.uvLod.xy;
-    output.owner = 0u;
-    return output;
+    return LXSceneVertexAt(index, 0u, lx_shadowViewProjection);
+}
+
+[shader("mesh")]
+[numthreads(64, 1, 1)]
+[outputtopology("triangle")]
+void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
+    out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
+{
+    const uint descriptor = lx_meshlets[1] + group.x * 4u;
+    const uint remap = lx_meshlets[2] + lx_meshlets[descriptor];
+    const uint indices = lx_meshlets[3] + lx_meshlets[descriptor + 1u];
+    const uint vertexCount = lx_meshlets[descriptor + 2u];
+    const uint triangleCount = lx_meshlets[descriptor + 3u];
+    SetMeshOutputCounts(vertexCount, triangleCount);
+    if (lane < vertexCount)
+    {
+        vertices[lane] = LXSceneVertexAt(lx_meshlets[remap + lane], 0u, lx_shadowViewProjection);
+    }
+    for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
+    {
+        const uint index = indices + triangle * 3u;
+        triangles[triangle] = uint3(lx_meshlets[index], lx_meshlets[index + 1u], lx_meshlets[index + 2u]);
+    }
 }
 
 [shader("fragment")]

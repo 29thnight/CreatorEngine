@@ -443,6 +443,7 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
         const std::string backend = target.binary == RHIShaderBinary::Dxil ? "dxil" : "spirv";
         const unsigned stage = target.profile.starts_with("vs_")   ? 1u
                                : target.profile.starts_with("ps_") ? 2u
+                               : target.profile.starts_with("ms_") ? 8u
                                : target.profile.starts_with("cs_") ? 4u
                                                                    : 0u;
         if (stage == 0 || target.entry.empty() || target.entry.size() > 128 || target.profile.size() > 128 ||
@@ -683,7 +684,8 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
             return Fail(diagnostics, "product.target", "Unknown or duplicate backend/entry target.");
         unsigned stage = target.profile.starts_with("vs_")   ? 1u
                          : target.profile.starts_with("ps_") ? 2u
-                         : target.profile.starts_with("cs_") ? 4u
+                         : target.profile.starts_with("ms_") ? 8u
+                               : target.profile.starts_with("cs_") ? 4u
                                                              : 0u;
         if (stage == 0)
             return Fail(diagnostics, "product.target", "Unknown stage in a material specialization.");

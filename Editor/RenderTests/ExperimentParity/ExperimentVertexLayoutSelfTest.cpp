@@ -1,6 +1,7 @@
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 
 #include "RHI/ModelVertexInputLayout.h"
+#include "MaterialGraphMeshletTopology.h"
 #include "Mesh.h" // legacy ::Vertex — 전환표 단정용
 
 #include <algorithm>
@@ -181,6 +182,81 @@ namespace RenderTest
                 && assets::OffsetOf(assets::kCoreColorSkinVertexAttributes,
                     assets::VertexAttribute::BoneWeights) == 68u,
                 "SU full mask stride 84/bone offsets 64,68");
+        }
+
+        // Decode the actual packed stream as the mesh shader will. Check an
+        // ordered triangle stream: never reorder, lose, duplicate or rotate
+        // a triangle across sealed chunk-local remaps.
+        {
+            std::vector<std::array<float, 12>> vertices(16 * 12);
+            for (unsigned y = 0; y < 12; ++y)
+            {
+                for (unsigned x = 0; x < 16; ++x)
+                {
+                    vertices[y * 16 + x] = {float(x), float(y), 0, 0, 0, 1, 1, 0, 0, 1, 0, 0};
+                }
+            }
+            std::vector<uint32_t> indices;
+            for (unsigned y = 0; y < 11; ++y)
+            {
+                for (unsigned x = 0; x < 15; ++x)
+                {
+                    const unsigned a = y * 16 + x;
+                    indices.insert(indices.end(), {a, a + 1, a + 16, a + 1, a + 17, a + 16});
+                }
+            }
+            RHIModelMeshView geometry;
+            geometry.vertexData = vertices.data();
+            geometry.vertexBytes = vertices.size() * sizeof(vertices[0]);
+            geometry.vertexStride = sizeof(vertices[0]);
+            geometry.vertexAttributeMask = assets::kCoreVertexAttributes;
+            geometry.indexData = indices.data();
+            geometry.indexCount = static_cast<uint32_t>(indices.size());
+            std::vector<uint32_t> words;
+            const bool built = material_graph::BuildSceneMeshletTopology(geometry, words, error);
+            check.Check(built, "LX meshlet topology build: " + error);
+            if (built)
+            {
+                std::vector<std::array<uint32_t, 3>> expected, actual;
+                for (size_t i = 0; i < indices.size(); i += 3)
+                {
+                    expected.push_back({indices[i], indices[i + 1], indices[i + 2]});
+                }
+                bool valid = words.size() >= 4 && words[0] > 1;
+                for (uint32_t m = 0; valid && m < words[0]; ++m)
+                {
+                    const auto d = words[1] + m * 4;
+                    valid = d + 3 < words.size();
+                    if (!valid)
+                    {
+                        break;
+                    }
+                    const auto v = words[2] + words[d], t = words[3] + words[d + 1];
+                    const auto vc = words[d + 2], tc = words[d + 3];
+                    valid = vc <= 64 && tc <= 126 && v + vc <= words.size() && t + tc * 3 <= words.size();
+                    for (uint32_t tri = 0; valid && tri < tc; ++tri)
+                    {
+                        std::array<uint32_t, 3> decoded{};
+                        for (uint32_t corner = 0; corner < 3; ++corner)
+                        {
+                            const auto local = words[t + tri * 3 + corner];
+                            valid = valid && local < vc;
+                            if (valid)
+                            {
+                                decoded[corner] = words[v + local];
+                            }
+                        }
+                        if (valid)
+                        {
+                            actual.push_back(decoded);
+                        }
+                    }
+                }
+                check.Check(valid && actual == expected, "LX meshlet stream preserves every oriented source triangle");
+            }
+            geometry.vertexStride = 0;
+            check.Check(!material_graph::BuildSceneMeshletTopology(geometry, words, error),
+                "LX meshlet topology rejects an invalid sealed layout");
         }
 
         char summary[120]{};

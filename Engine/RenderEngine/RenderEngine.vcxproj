@@ -730,6 +730,7 @@
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
+    <ClInclude Include="MaterialGraphMeshletTopology.h" />
     <ClInclude Include="MaterialGraphRasterSurface.h" />
     <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />

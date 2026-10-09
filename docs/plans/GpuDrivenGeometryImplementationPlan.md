@@ -7,6 +7,14 @@ or broadly runtime-validated feature.
 
 ## Goal and boundaries
 
+2026-10-09 lattice follow-up: opaque/masked SceneHost camera/shadow consumers now
+have a capability-gated mesh shader route with the existing GPU draw visibility.
+Release DX12 TestShadow produced 64 byte-identical indexed/mesh attachment comparisons
+and mesh-route GPU validation reported zero problems. See
+[implementation and exact acceptance scope](../analysis/LatticeMeshletRendering20261009.md).
+Lattice meshlet-level compaction/culling, LOD, broader backend/material acceptance and
+performance remain unearned; this does not close GPU-1.
+
 For supported production opaque/masked geometry, the GPU selects visibility and LOD,
 compacts bounded work, and produces draw/dispatch arguments. CPU scene publication,
 material/PSO bins and command submission remain explicit responsibilities. Existing

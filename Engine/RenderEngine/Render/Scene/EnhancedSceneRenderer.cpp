@@ -2582,6 +2582,7 @@ namespace
                 addVisibility(source.decal.GetGpuVisibilityStats());
                 addVisibility(source.sprite.GetGpuVisibilityStats());
                 addVisibility(source.graphMaterials.CameraVisibilityStats());
+                debugSnapshot.preparedMeshletBatchCount += source.graphMaterials.PreparedMeshletDrawCount();
             };
             if (pipeline)
             {

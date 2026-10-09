@@ -11,6 +11,7 @@ struct SceneShaderSet
 {
     BindingLayout layout;
     RHIShaderCompiler::VerifiedShader vertex, gbuffer, color, lookup0, lookup1;
+    RHIShaderCompiler::VerifiedShader mesh, shadowMesh;
     RHIShaderCompiler::VerifiedShader shadowVertex, shadow, subsurface, refraction, volume, runtimeEffects0, runtimeEffects1;
 };
 

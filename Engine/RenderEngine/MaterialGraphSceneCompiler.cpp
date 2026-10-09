@@ -112,6 +112,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
     {
         if (only && *only != backend) continue;
         targets.push_back({backend, "LXSceneVS", "vs_6_0"});
+        targets.push_back({backend, "LXSceneMS", "ms_6_5"});
         for (const auto entry : {"LXSceneGBufferPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
             targets.push_back({backend, entry, "ps_6_0"});
@@ -119,6 +120,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
         if (program.surface)
         {
             targets.push_back({backend, "LXSceneShadowVS", "vs_6_0"});
+            targets.push_back({backend, "LXSceneShadowMS", "ms_6_5"});
             targets.push_back({backend, "LXSceneShadowPS", "ps_6_0"});
         }
         if ((program.features & 0x1000u) != 0)
@@ -268,6 +270,8 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         }
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
         const std::pair<std::string_view, Member> members[]{{"LXSceneVS", &SceneShaderSet::vertex},
+                                                            {"LXSceneMS", &SceneShaderSet::mesh},
+                                                            {"LXSceneShadowMS", &SceneShaderSet::shadowMesh},
                                                             {"LXSceneGBufferPS", &SceneShaderSet::gbuffer},
                                                             {"LXSceneColorPS", &SceneShaderSet::color},
                                                             {"LXSceneLookup0PS", &SceneShaderSet::lookup0},

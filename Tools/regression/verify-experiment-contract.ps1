@@ -116,7 +116,7 @@ $engineLibNames = @('RenderEngine', 'SceneRuntime', 'Physics', 'EngineDiagnostic
 $physicsVendorLibNames = @(
     'PhysX_64', 'PhysXCommon_64', 'PhysXFoundation_64', 'PhysXCooking_64',
     'PhysXExtensions_static_64', 'PhysXCharacterKinematic_static_64', 'PhysXPvdSDK_static_64',
-    'gameinput')
+    'gameinput', 'enkiTS')
 $vendorLibNamesByConfig = @{
     Debug   = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4d', 'fmtd', 'spdlogd') + $physicsVendorLibNames
     Release = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4',  'fmt',  'spdlog') + $physicsVendorLibNames

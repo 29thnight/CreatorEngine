@@ -62,6 +62,8 @@ namespace material_graph
         SceneProgramStats ProgramStats() const;
         // Submitted commands, not a GPU-visible draw count.
         uint32_t ShadowDrawCount() const;
+        // Prepared lattice mesh draw bins, before GPU visibility rejection.
+        uint32_t PreparedMeshletDrawCount() const;
         // GPU candidates per cascade (direct compatibility uses CPU-visible
         // casters). No GPU visibility counter is read back here.
         std::array<uint32_t, 3> ShadowCasterCounts() const;

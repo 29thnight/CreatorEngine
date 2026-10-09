@@ -1,4 +1,5 @@
 #include "MaterialGraphMeshSurface.h"
+#include "MaterialGraphMeshletTopology.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 
 #include <algorithm>
@@ -51,11 +52,12 @@ namespace material_graph
     {
         IRenderDeviceServices& device;
         std::shared_ptr<const MeshSurfaceInput> identity;
-        RHIBufferSlice vertices, indices, lods;
-        std::array<RHIBufferSlice, 3> staging;
+        RHIBufferSlice vertices, indices, lods, meshlets;
+        uint32_t meshletCount{};
+        std::array<RHIBufferSlice, 4> staging;
         const EnhancedRenderGraph* graph{};
         std::uint64_t graphEpoch{};
-        std::array<RGHandle, 3> graphBuffers;
+        std::array<RGHandle, 4> graphBuffers;
         std::uint64_t bytes{}, recording{}, completion{};
         RHIUploadTransactionState state{RHIUploadTransactionState::Recording};
         bool prepared{};
@@ -65,7 +67,7 @@ namespace material_graph
         }
         ~MeshSurfaceStaticBuffers()
         {
-            for (auto buffer : {vertices.buffer, indices.buffer, lods.buffer})
+            for (auto buffer : {vertices.buffer, indices.buffer, lods.buffer, meshlets.buffer})
             {
                 if (buffer.IsValid())
                 {
@@ -215,10 +217,11 @@ namespace material_graph
         {
             const auto recording = device.GetCurrentUploadRecordingId();
             const auto& geometry = identity->Geometry();
-            const std::uint64_t sizes[]{geometry.vertexBytes,
+            std::vector<uint32_t> topology{0, 0, 0, 0};
+            std::uint64_t sizes[]{geometry.vertexBytes,
                                         std::uint64_t(geometry.indexCount) * sizeof(std::uint32_t),
-                                        identity->Lods().size_bytes()};
-            const auto bytes = sizes[0] + sizes[1] + sizes[2];
+                                        identity->Lods().size_bytes(), topology.size() * sizeof(uint32_t)};
+            auto bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
             {
                 std::lock_guard lock(mutex);
                 for (const auto& entry : entries)
@@ -232,6 +235,15 @@ namespace material_graph
                         result = entry;
                         return true;
                     }
+                }
+                if (device.GetMeshShaderCapabilities().meshShader)
+                {
+                    if (!BuildSceneMeshletTopology(geometry, topology, error))
+                    {
+                        return false;
+                    }
+                    sizes[3] = topology.size() * sizeof(uint32_t);
+                    bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
                 }
                 if (bytes > maxBytes)
                 {
@@ -261,10 +273,11 @@ namespace material_graph
             entry->identity = std::move(identity);
             entry->bytes = bytes;
             entry->recording = recording;
-            RHIBufferSlice* destinations[]{&entry->vertices, &entry->indices, &entry->lods};
-            const wchar_t* names[]{L"LX.Mesh.StaticVertices", L"LX.Mesh.StaticIndices", L"LX.Mesh.StaticLods"};
-            RHIUploadRequest requests[3];
-            for (std::size_t i = 0; i < 3; ++i)
+            entry->meshletCount = topology[0];
+            RHIBufferSlice* destinations[]{&entry->vertices, &entry->indices, &entry->lods, &entry->meshlets};
+            const wchar_t* names[]{L"LX.Mesh.StaticVertices", L"LX.Mesh.StaticIndices", L"LX.Mesh.StaticLods", L"LX.Mesh.Meshlets"};
+            RHIUploadRequest requests[4];
+            for (std::size_t i = 0; i < 4; ++i)
             {
                 RHIBufferDesc description;
                 description.bytes = sizes[i];
@@ -281,8 +294,8 @@ namespace material_graph
             {
                 return false;
             }
-            const void* sources[]{geometry.vertexData, geometry.indexData, entry->identity->Lods().data()};
-            for (std::size_t i = 0; i < 3; ++i)
+            const void* sources[]{geometry.vertexData, geometry.indexData, entry->identity->Lods().data(), topology.data()};
+            for (std::size_t i = 0; i < 4; ++i)
             {
                 if (!entry->staging[i].IsWritable())
                 {
@@ -310,6 +323,25 @@ namespace material_graph
     RHIBufferSlice MeshSurfaceBatch::Indices() const
     {
         return staticBuffers_ ? staticBuffers_->indices : RHIBufferSlice{};
+    }
+
+    RHIBufferSlice MeshSurfaceBatch::Meshlets() const
+    {
+        return staticBuffers_ ? staticBuffers_->meshlets : RHIBufferSlice{};
+    }
+
+    RGHandle MeshSurfaceBatch::GraphMeshlets(const EnhancedRenderGraph& graph) const
+    {
+        if (!staticBuffers_ || staticBuffers_->graph != &graph || staticBuffers_->graphEpoch != graphEpoch_)
+        {
+            throw std::runtime_error("LX meshlet topology has no current graph declaration.");
+        }
+        return staticBuffers_->graphBuffers[3];
+    }
+
+    uint32_t MeshSurfaceBatch::MeshletCount() const
+    {
+        return staticBuffers_ ? staticBuffers_->meshletCount : 0;
     }
 
     MeshSurfaceCacheStats MeshSurfaceEvaluator::CacheStats() const
@@ -1174,8 +1206,8 @@ namespace material_graph
                 buffers.graph = &graph;
                 buffers.graphEpoch = graphEpoch_;
                 const bool needsCopy = !buffers.usable;
-                const RHIBufferHandle handles[]{buffers.vertices.buffer, buffers.indices.buffer, buffers.lods.buffer};
-                for (unsigned i = 0; i < 3; ++i)
+                const RHIBufferHandle handles[]{buffers.vertices.buffer, buffers.indices.buffer, buffers.lods.buffer, buffers.meshlets.buffer};
+                for (unsigned i = 0; i < 4; ++i)
                 {
                     buffers.graphBuffers[i] = graph.ImportBuffer(
                         handles[i],
@@ -1199,11 +1231,12 @@ namespace material_graph
                     graph.AddPass("LX.MeshInputUpload",
                                   {{buffers.graphBuffers[0], RHIResourceState::CopyDest, writeAccess},
                                    {buffers.graphBuffers[1], RHIResourceState::CopyDest, writeAccess},
-                                   {buffers.graphBuffers[2], RHIResourceState::CopyDest, writeAccess}},
+                                   {buffers.graphBuffers[2], RHIResourceState::CopyDest, writeAccess},
+                                   {buffers.graphBuffers[3], RHIResourceState::CopyDest, writeAccess}},
                                   [retained = staticBuffers_](const auto& context) {
                                       const RHIBufferSlice destinations[]{retained->vertices, retained->indices,
-                                                                          retained->lods};
-                                      for (unsigned i = 0; i < 3; ++i)
+                                                                          retained->lods, retained->meshlets};
+                                      for (unsigned i = 0; i < 4; ++i)
                                       {
                                           if (!context.encoder->CopyBuffer(destinations[i], retained->staging[i]))
                                           {
@@ -1216,7 +1249,7 @@ namespace material_graph
             }
             // Index reads are represented as well: downstream raster passes depend
             // on this world output, so their index buffer is ready on every backend.
-            for (unsigned i = 0; i < 3; ++i)
+            for (unsigned i = 0; i < 4; ++i)
             {
                 inputs.push_back({buffers.graphBuffers[i],
                                   i == 1 ? RHIResourceState::IndexBuffer : RHIResourceState::ShaderResource,
