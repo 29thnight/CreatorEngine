@@ -841,6 +841,7 @@
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />
+    <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSAOPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIPass.h" />
@@ -856,6 +857,7 @@
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
+    <ClInclude Include="RHI\RHICommandRecordingJobs.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />
     <ClInclude Include="RHI\RHISubmissionThread.h" />
     <ClInclude Include="TextureImage.h" />

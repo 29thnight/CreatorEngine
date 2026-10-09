@@ -960,6 +960,9 @@
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
@@ -1121,6 +1124,9 @@
     </ClInclude>
     <ClInclude Include="RHI\RHIParallelCommandPool.h">
       <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHICommandRecordingJobs.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIPersistentHeapPolicy.h">
       <Filter>RHI\Core</Filter>

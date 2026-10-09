@@ -83,6 +83,62 @@ namespace
         }
     };
 
+    class DX12QueueRecording final : public IRHIQueueRecording
+    {
+    public:
+        std::shared_ptr<IRHICommandQueue> queue;
+        std::shared_ptr<std::vector<std::shared_ptr<DX12QueueRecordingLease>>> leases{
+            std::make_shared<std::vector<std::shared_ptr<DX12QueueRecordingLease>>>()};
+        std::vector<std::unique_ptr<DX12Encoder>> encoders;
+        bool finished{false};
+
+        RHIEncoder& AcquireEncoder(uint32_t target) override
+        {
+            if (finished || target >= encoders.size())
+            {
+                throw std::logic_error("Queue recording target is unavailable.");
+            }
+            auto& encoder = *encoders[target];
+            if (encoder.GetDroppedCount() != 0)
+            {
+                throw std::runtime_error("Queue encoder dropped a command.");
+            }
+            encoder.ResetState((*leases)[target]->storage->list.Get());
+            return encoder;
+        }
+
+        bool Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) override
+        {
+            batch.reset();
+            if (finished)
+            {
+                error = "Queue recording was already sealed.";
+                return false;
+            }
+            finished = true;
+            std::vector<ID3D12CommandList*> lists;
+            lists.reserve(leases->size());
+            for (size_t target = 0; target < leases->size(); ++target)
+            {
+                auto& lease = (*leases)[target];
+                if (encoders[target]->GetDroppedCount() != 0)
+                {
+                    error = "Queue encoder dropped a command.";
+                    return false;
+                }
+                if (FAILED(lease->storage->list->Close()))
+                {
+                    error = "Queue recording Close failed.";
+                    return false;
+                }
+                lease->closed = true;
+                lists.push_back(lease->storage->list.Get());
+            }
+            // One retirement owns all targets, in their original contiguous order.
+            return DX12SealQueueRecording(queue, lists, leases, batch, error);
+        }
+    };
+
     bool QueueOperation(const std::shared_ptr<DX12QueueServiceState>& state,
         const std::function<HRESULT()>& operation, std::string& error)
     {
@@ -101,6 +157,24 @@ namespace
             return false;
         }
         return SUCCEEDED(result);
+    }
+
+    bool DispatchQueueOperation(const std::shared_ptr<DX12QueueServiceState>& state,
+        const std::function<bool()>& operation, std::string& error)
+    {
+        bool accepted = false;
+        std::string dispatchError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(state.get(), "Q0 queue admission",
+            [&](std::string&)
+            {
+                accepted = operation();
+                return true; // Native failure is tracked by the queue service.
+            }, dispatchError);
+        if (!dispatched)
+        {
+            error = std::move(dispatchError);
+        }
+        return dispatched && accepted;
     }
 
     class DX12ServiceBatch final : public IRHIQueueCommandBatch
@@ -165,6 +239,10 @@ namespace
         {
             point = {};
             error.clear();
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                return DispatchQueueOperation(timeline->state, [&] { return Signal(value, point, error); }, error);
+            }
             std::lock_guard lock(timeline->state->admission);
             if (!timeline->state->active.load() || faulted || value == 0 || value == UINT64_MAX ||
                 value <= timeline->issued.load() ||
@@ -187,6 +265,10 @@ namespace
         }
         bool Wait(const RHITimelinePoint& point, std::string& error) override
         {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                return DispatchQueueOperation(timeline->state, [&] { return Wait(point, error); }, error);
+            }
             error.clear();
             std::lock_guard lock(timeline->state->admission);
             if (!timeline->state->active.load() || faulted ||
@@ -223,6 +305,10 @@ namespace
         {
             point = {};
             error.clear();
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                return DispatchQueueOperation(timeline->state, [&] { return Submit(batch, value, point, error); }, error);
+            }
             std::lock_guard lock(timeline->state->admission);
             const auto recording = std::dynamic_pointer_cast<DX12ServiceBatch>(batch);
             if (!timeline->state->active.load() || faulted || !recording ||
@@ -328,11 +414,6 @@ namespace
         state->primaryTimeline.reset();
         state->primaryWaits.clear();
         state->primaryQueue.Reset();
-        if (state->submissionClient)
-        {
-            GetRHISubmissionThread().ReleaseClient(state.get());
-            state->submissionClient = false;
-        }
     }
 }
 
@@ -436,6 +517,56 @@ bool DX12QueueService::ImportPrimaryCompletion(ID3D12Fence* fence, uint64_t valu
     return true;
 }
 
+bool DX12QueueService::GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
+    std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+{
+    queue.reset();
+    error.clear();
+    std::lock_guard lock(state_->admission);
+    ComPtr<ID3D12Device> device;
+    if (!state_->active.load() || !primary || primary->GetDesc().Type != D3D12_COMMAND_LIST_TYPE_DIRECT ||
+        FAILED(primary->GetDevice(IID_PPV_ARGS(&device))) || device.Get() != state_->device.Get() ||
+        FAILED(state_->device->GetDeviceRemovedReason()) ||
+        (state_->primaryQueue && state_->primaryQueue.Get() != primary))
+    {
+        error = "Primary graphics endpoint requires this device's live presentation queue.";
+        return false;
+    }
+    for (const auto& endpoint : state_->queues)
+    {
+        if (endpoint->native.Get() == primary)
+        {
+            if (endpoint->faulted)
+            {
+                error = "Primary graphics endpoint requires recovery after an unfenced submission.";
+                return false;
+            }
+            queue = endpoint;
+            return true;
+        }
+    }
+    if (state_->nextQueue == 0)
+    {
+        error = "Queue identity range is exhausted.";
+        return false;
+    }
+    auto endpoint = std::make_shared<DX12ServiceQueue>();
+    endpoint->native = primary;
+    endpoint->timeline = std::make_shared<DX12ServiceTimeline>();
+    endpoint->timeline->state = state_;
+    endpoint->timeline->identity = {state_->incarnation, state_->nextQueue++, RHIQueueKind::Graphics};
+    if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+        IID_PPV_ARGS(&endpoint->timeline->native))))
+    {
+        error = "Primary graphics timeline creation failed.";
+        return false;
+    }
+    state_->queues.push_back(endpoint);
+    state_->primaryQueue = primary;
+    queue = std::move(endpoint);
+    return true;
+}
+
 ID3D12CommandQueue* DX12QueueService::NativeQueue(const std::shared_ptr<IRHICommandQueue>& queue)
 {
     const auto native = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
@@ -449,7 +580,7 @@ ID3D12CommandQueue* DX12QueueService::NativeQueue(const std::shared_ptr<IRHIComm
 bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
     const RHITimelinePoint& point, std::string& error)
 {
-    std::lock_guard lock(state_->admission);
+    std::unique_lock lock(state_->admission);
     const auto producer = std::dynamic_pointer_cast<DX12ServiceTimeline>(point.fence);
     ComPtr<ID3D12Device> device;
     if (!state_->active.load() || !queue || queue->GetDesc().Type != D3D12_COMMAND_LIST_TYPE_DIRECT ||
@@ -462,11 +593,21 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
         return false;
     }
     state_->primaryQueue = queue;
+    for (const auto& endpoint : state_->queues)
+    {
+        if (endpoint->native.Get() == queue && endpoint->timeline == producer)
+        {
+            // Graph epilogue already joined compute. The primary frame suffix
+            // follows it in FIFO order and retains the ordinary frame-slot fence.
+            return true;
+        }
+    }
     if (std::find_if(state_->primaryWaits.begin(), state_->primaryWaits.end(),
         [&](const auto& fence) { return fence.Get() == producer->native.Get(); }) == state_->primaryWaits.end())
     {
         state_->primaryWaits.push_back(producer->native);
     }
+    lock.unlock(); // Never hold admission while waiting behind an RHI-owned plan.
     if (!QueueOperation(state_, [&] { return queue->Wait(producer->native.Get(), point.value); }, error))
     {
         error = "Primary queue GPU wait failed.";
@@ -479,19 +620,38 @@ bool DX12QueueService::Shutdown(std::string& error)
 {
     error.clear();
     std::vector<std::shared_ptr<DX12ServiceBatch>> released;
-    std::lock_guard lock(state_->admission);
-    state_->active.store(false);
+    std::vector<std::shared_ptr<DX12ServiceQueue>> queues;
+    ComPtr<ID3D12CommandQueue> primary;
+    {
+        std::lock_guard lock(state_->admission);
+        state_->active.store(false);
+        queues = state_->queues;
+        primary = state_->primaryQueue;
+    }
+    const auto release = [&]
+    {
+        bool releaseClient = false;
+        {
+            std::lock_guard lock(state_->admission);
+            ReleaseServiceOwners(state_, released);
+            releaseClient = std::exchange(state_->submissionClient, false);
+        }
+        if (releaseClient)
+        {
+            GetRHISubmissionThread().ReleaseClient(state_.get());
+        }
+        return true;
+    };
     // Final markers cover waits accepted after the last public Signal. Public
     // waits only accept already-issued signals, so this primitive API cannot
     // create a wait on a future, unissued value.
     std::vector<std::pair<ComPtr<ID3D12Fence>, uint64_t>> markers;
-    markers.reserve(state_->queues.size());
-    for (const auto& queue : state_->queues)
+    markers.reserve(queues.size());
+    for (const auto& queue : queues)
     {
         if (FAILED(state_->device->GetDeviceRemovedReason()))
         {
-            ReleaseServiceOwners(state_, released);
-            return true;
+            return release();
         }
         ComPtr<ID3D12Fence> marker;
         if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&marker))) ||
@@ -499,8 +659,7 @@ bool DX12QueueService::Shutdown(std::string& error)
         {
             if (FAILED(state_->device->GetDeviceRemovedReason()))
             {
-                ReleaseServiceOwners(state_, released);
-                return true;
+                return release();
             }
             error = "Queue service teardown Signal failed without device-loss proof.";
             return false;
@@ -508,16 +667,15 @@ bool DX12QueueService::Shutdown(std::string& error)
         markers.emplace_back(marker, 1);
     }
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-    if (state_->primaryQueue && SUCCEEDED(state_->device->GetDeviceRemovedReason()))
+    if (primary && SUCCEEDED(state_->device->GetDeviceRemovedReason()))
     {
         ComPtr<ID3D12Fence> marker;
         if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&marker))) ||
-            !QueueOperation(state_, [&] { return state_->primaryQueue->Signal(marker.Get(), 1); }, error))
+            !QueueOperation(state_, [&] { return primary->Signal(marker.Get(), 1); }, error))
         {
             if (FAILED(state_->device->GetDeviceRemovedReason()))
             {
-                ReleaseServiceOwners(state_, released);
-                return true;
+                return release();
             }
             error = "Primary queue join teardown Signal failed.";
             return false;
@@ -530,8 +688,7 @@ bool DX12QueueService::Shutdown(std::string& error)
         {
             if (FAILED(state_->device->GetDeviceRemovedReason()))
             {
-                ReleaseServiceOwners(state_, released);
-                return true;
+                return release();
             }
             if (std::chrono::steady_clock::now() >= deadline)
             {
@@ -541,8 +698,7 @@ bool DX12QueueService::Shutdown(std::string& error)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
-    ReleaseServiceOwners(state_, released);
-    return true;
+    return release();
 }
 
 bool DX12QueueService::RecordBufferCopy(const std::shared_ptr<IRHICommandQueue>& queue,
@@ -683,59 +839,19 @@ bool DX12QueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,
 {
     batch.reset();
     error.clear();
-    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
-    if (!target || !commands || !token || target->timeline->state->device.Get() != resources_.GetDevice() ||
-        (queue->GetIdentity().kind != RHIQueueKind::Graphics && queue->GetIdentity().kind != RHIQueueKind::Compute))
+    if (!commands)
     {
-        error = "Queue encoder requires a matching graphics/compute device and pinned callback storage.";
+        error = "Queue recording requires a command callback.";
         return false;
     }
-    auto lease = std::make_shared<DX12QueueRecordingLease>();
-    lease->owner = std::move(token);
-    lease->pool = target->recordingPool;
-    bool reused = false;
+    std::shared_ptr<IRHIQueueRecording> recording;
+    if (!BeginRecording(queue, 1, std::move(token), recording, error))
     {
-        std::lock_guard lock(lease->pool->mutex);
-        if (!lease->pool->active)
-        {
-            error = "Queue recording pool is unavailable.";
-            return false;
-        }
-        if (!lease->pool->free.empty())
-        {
-            lease->storage = std::move(lease->pool->free.back());
-            lease->pool->free.pop_back();
-            reused = true;
-            ++lease->pool->reused;
-        }
-        else
-        {
-            lease->storage = std::make_unique<DX12QueueRecordingStorage>();
-            ++lease->pool->created;
-        }
-        ++lease->pool->leased;
-    }
-    auto& storage = lease->storage;
-    const auto type = target->native->GetDesc().Type;
-    auto* device = resources_.GetDevice();
-    const bool ready = reused
-        ? SUCCEEDED(storage->allocator->Reset()) && SUCCEEDED(storage->list->Reset(storage->allocator.Get(), nullptr))
-        : SUCCEEDED(device->CreateCommandAllocator(type, IID_PPV_ARGS(&storage->allocator))) &&
-            SUCCEEDED(device->CreateCommandList(0, type, storage->allocator.Get(), nullptr, IID_PPV_ARGS(&storage->list)));
-    if (!ready)
-    {
-        error = "Queue allocator/list creation failed.";
         return false;
     }
     try
     {
-        DX12Encoder encoder(storage->list.Get(), &resources_);
-        commands(encoder);
-        if (encoder.GetDroppedCount() != 0)
-        {
-            error = "Queue encoder dropped a command.";
-            return false;
-        }
+        commands(recording->AcquireEncoder(0));
     }
     catch (const std::exception& exception)
     {
@@ -747,14 +863,106 @@ bool DX12QueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,
         error = "Queue recording callback threw an unknown exception.";
         return false;
     }
-    if (FAILED(storage->list->Close()))
+    return recording->Finish(batch, error);
+}
+
+bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& queue,
+    uint32_t targetCount, std::shared_ptr<const void> token,
+    std::shared_ptr<IRHIQueueRecording>& recording, std::string& error)
+{
+    recording.reset();
+    error.clear();
+    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
+    if (!target || !token || targetCount == 0 || targetCount > workers_ ||
+        target->timeline->state->device.Get() != resources_.GetDevice() ||
+        (queue->GetIdentity().kind != RHIQueueKind::Graphics && queue->GetIdentity().kind != RHIQueueKind::Compute))
     {
-        error = "Queue recording Close failed.";
+        error = "Queue encoder requires a matching graphics/compute device and pinned callback storage.";
         return false;
     }
-    lease->closed = true;
-    ID3D12CommandList* lists[]{storage->list.Get()};
-    return DX12SealQueueRecording(queue, lists, lease, batch, error);
+    auto result = std::make_shared<DX12QueueRecording>();
+    result->queue = queue;
+    result->leases->reserve(targetCount);
+    result->encoders.reserve(targetCount);
+    for (uint32_t index = 0; index < targetCount; ++index)
+    {
+        auto lease = std::make_shared<DX12QueueRecordingLease>();
+        lease->owner = token;
+        lease->pool = target->recordingPool;
+        bool reused = false;
+        {
+            std::lock_guard lock(lease->pool->mutex);
+            if (!lease->pool->active)
+            {
+                error = "Queue recording pool is unavailable.";
+                return false;
+            }
+            if (!lease->pool->free.empty())
+            {
+                lease->storage = std::move(lease->pool->free.back());
+                lease->pool->free.pop_back();
+                reused = true;
+                ++lease->pool->reused;
+            }
+            else
+            {
+                lease->storage = std::make_unique<DX12QueueRecordingStorage>();
+                ++lease->pool->created;
+            }
+            ++lease->pool->leased;
+        }
+        auto& storage = lease->storage;
+        const auto type = target->native->GetDesc().Type;
+        auto* device = resources_.GetDevice();
+        const bool ready = reused
+            ? SUCCEEDED(storage->allocator->Reset()) && SUCCEEDED(storage->list->Reset(storage->allocator.Get(), nullptr))
+            : SUCCEEDED(device->CreateCommandAllocator(type, IID_PPV_ARGS(&storage->allocator))) &&
+                SUCCEEDED(device->CreateCommandList(0, type, storage->allocator.Get(), nullptr, IID_PPV_ARGS(&storage->list)));
+        if (!ready)
+        {
+            error = "Queue allocator/list creation failed.";
+            return false;
+        }
+        result->encoders.push_back(std::make_unique<DX12Encoder>(storage->list.Get(), &resources_));
+        result->leases->push_back(std::move(lease));
+    }
+    recording = std::move(result);
+    return true;
+}
+
+bool DX12QueueRecorder::ExecuteSubmission(const std::function<bool(std::string&)>& submit,
+    std::string& error)
+{
+    if (GetRHISubmissionThread().IsCurrentThread())
+    {
+        return submit(error);
+    }
+    // One CPU ticket covers the whole already-recorded queue plan. Native waits
+    // and signals then run inline on the RHI owner, preserving issued-point and
+    // unfenced-failure rules without a render-thread rendezvous per operation.
+    bool accepted = false;
+    std::string submissionError;
+    const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(&resources_, "RG8 queue plan", [&](std::string&)
+    {
+        try
+        {
+            accepted = submit(submissionError);
+        }
+        catch (const std::exception& exception)
+        {
+            submissionError = exception.what();
+        }
+        catch (...)
+        {
+            submissionError = "Queue submission threw an unknown exception.";
+        }
+        return true; // Queue failure/quarantine belongs to the service, not the frame owner.
+    }, error);
+    if (dispatched && !accepted)
+    {
+        error = std::move(submissionError);
+    }
+    return dispatched && accepted;
 }
 
 DX12QueueService::RecordingPoolStats DX12QueueService::QueryRecordingPool(
@@ -774,6 +982,10 @@ DX12QueueService::RecordingPoolStats DX12QueueService::QueryRecordingPool(
 bool DX12QueueService::EnqueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue,
     ID3D12Fence* fence, uint64_t value, std::string& error)
 {
+    if (!GetRHISubmissionThread().IsCurrentThread())
+    {
+        return DispatchQueueOperation(state_, [&] { return EnqueueTestGate(queue, fence, value, error); }, error);
+    }
     std::lock_guard lock(state_->admission);
     const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
     if (!state_->active.load() || !target || target->timeline->state != state_ || !fence)

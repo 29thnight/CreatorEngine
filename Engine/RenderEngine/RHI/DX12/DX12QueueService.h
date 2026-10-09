@@ -13,6 +13,9 @@ public:
     RHIQueueCapabilities QueryQueueCapabilities() const override;
     bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue,
         std::string& error) override;
+    // Reuse the presentation queue, with a service-owned retirement timeline.
+    bool GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
+        std::shared_ptr<IRHICommandQueue>& queue, std::string& error);
     // Revoke admission, then drain accepted primitive operations before releasing queues.
     bool Shutdown(std::string& error);
     // Publish only after the primary submission's CPU ticket has succeeded.

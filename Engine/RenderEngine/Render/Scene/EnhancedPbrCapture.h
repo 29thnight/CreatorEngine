@@ -41,23 +41,62 @@ struct EnhancedPbrCapture
     std::vector<uint8_t> latticeInputBytes;
     ryml::Tree manifest;
     std::array<RHIReadback, 7> readbacks{};
-    struct StageReadback { std::string name; RHIReadback readback; };
-    std::vector<StageReadback> stages;
+    struct StageReadback
+    {
+        std::string name;
+        RGHandle source;
+        RHIReadback readback;
+    };
+    struct StageDiagnostic
+    {
+        std::string name;
+        size_t readbackIndex{};
+    };
+    std::vector<StageReadback> stageReadbacks;
+    std::vector<StageDiagnostic> stages;
 
     bool DeclareStage(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         const LiveBlackboard& blackboard, const LivePassNode& node,
         uint32_t width, uint32_t height, std::string& error)
     {
+        graph.SetMeasurementDomain(RGMeasurementDomain::Capture);
         const auto affectsHdr = [](const auto& slots) {
             return std::find(slots.begin(), slots.end(), LiveSlots::kLitColor) != slots.end();
         };
-        if (!affectsHdr(node.writes) && !affectsHdr(node.modifies)) return true;
+        if (!affectsHdr(node.writes) && !affectsHdr(node.modifies))
+        {
+            return true;
+        }
         const auto handle = blackboard.Get(LiveSlots::kLitColor);
-        if (!handle.IsValid()) { error = "missing stage HDR: " + node.name; return false; }
+        if (!handle.IsValid())
+        {
+            error = "missing stage HDR: " + node.name;
+            return false;
+        }
+        const auto name = "hdr-" + std::to_string(stages.size()) + "-" + node.name;
+        // Disabled stages may forward the same image without modifying it. A
+        // versioned handle proves image identity; legacy handles do not, because
+        // later writes may retain version zero. Keep every named association.
+        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+        {
+            for (size_t index = 0; index < stageReadbacks.size(); ++index)
+            {
+                const auto& source = stageReadbacks[index].source;
+                if (source.index == handle.index && source.version == handle.version &&
+                    source.kind == handle.kind && source.epoch == handle.epoch)
+                {
+                    stages.push_back({name, index});
+                    return true;
+                }
+            }
+        }
         RHIReadback readback{};
         if (!resources.CreateReadback(width, height, RHIFormat::RGBA16Float, 1, readback, error))
+        {
             return false;
-        stages.push_back({ "hdr-" + std::to_string(stages.size()) + "-" + node.name, readback });
+        }
+        stages.push_back({name, stageReadbacks.size()});
+        stageReadbacks.push_back({name, handle, readback});
         graph.AddPass("PBR.Stage." + node.name, { { handle, RHIResourceState::CopySource,
                 graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
                     ? RGAccessMode::Read : RGAccessMode::LegacyState } },
@@ -369,6 +408,11 @@ struct EnhancedPbrCapture
         auto queue = node["queueExecution"];
         queue |= ryml::MAP;
         queue["schemaVersion"] << 2;
+        queue["mode"] << diagnostics.requestedExecutionMode;
+        queue["requestedExecutionMode"] << diagnostics.requestedExecutionMode;
+        queue["effectiveExecutionMode"] << diagnostics.effectiveExecutionMode;
+        queue["measurementDomain"] << RGMeasurementDomainName(graph.GetMeasurementDomain());
+        queue["fallbackReason"] << RGQueueFallbackReasonName(diagnostics.schedule.fallbackReason);
         queue["specialized"] << diagnostics.specialized;
         queue["predictionCalibrated"] << false;
         auto execution = queue["execution"];
@@ -377,6 +421,10 @@ struct EnhancedPbrCapture
         execution["recordingMilliseconds"] << diagnostics.execution.recordingMilliseconds;
         execution["submissionMilliseconds"] << diagnostics.execution.submissionMilliseconds;
         execution["totalMilliseconds"] << diagnostics.execution.totalMilliseconds;
+        execution["recordedLists"] << graph.GetStats().recordedLists;
+        execution["recordWorkers"] << graph.GetStats().recordWorkers;
+        execution["recordUnits"] << graph.GetStats().recordUnits;
+        execution["recordingWaveCount"] << graph.GetStats().recordingWaveCount;
         execution["plannedBatches"] << diagnostics.execution.plannedBatches;
         execution["plannedComputeBatches"] << diagnostics.execution.plannedComputeBatches;
         execution["plannedWaits"] << diagnostics.execution.plannedWaits;
@@ -397,6 +445,11 @@ struct EnhancedPbrCapture
         schedule["usesCompute"] << diagnostics.schedule.usesCompute;
         schedule["predictionComplete"] << diagnostics.schedule.predictionComplete;
         schedule["predictionCalibrated"] << diagnostics.schedule.predictionCalibrated;
+        schedule["fallbackReason"] << RGQueueFallbackReasonName(diagnostics.schedule.fallbackReason);
+        schedule["eligibleComputePasses"] << diagnostics.schedule.eligibleComputePasses;
+        schedule["rejectedStatePasses"] << diagnostics.schedule.rejectedStatePasses;
+        schedule["measuredPasses"] << diagnostics.schedule.measuredPasses;
+        schedule["missingMeasurementPasses"] << diagnostics.schedule.missingMeasurementPasses;
         schedule["entries"] |= ryml::SEQ;
         for (const auto& entry : diagnostics.schedule.entries)
         {
@@ -578,6 +631,8 @@ struct EnhancedPbrCapture
         heaps["cachedHeaps"] << heapMemory.cachedHeaps;
         heaps["leasedHeaps"] << heapMemory.leasedHeaps;
         root["measurement"]["scope"] << "capture-submission-including-readbacks";
+        root["measurement"]["domain"] << RGMeasurementDomainName(graph.GetMeasurementDomain());
+        root["measurement"]["normalFrameComparable"] << false;
         root["measurement"]["gpuStatus"] << "unsupported";
         root["measurement"]["gpuReason"] << "backend has no product pass timestamp collector";
         return true;
@@ -649,6 +704,7 @@ struct EnhancedPbrCapture
         const LiveBlackboard& blackboard, uint32_t width, uint32_t height,
         std::string& error)
     {
+        graph.SetMeasurementDomain(RGMeasurementDomain::Capture);
         constexpr const char* slots[] = { LiveSlots::kGBufferDiffuse,
             LiveSlots::kGBufferMetalRough, LiveSlots::kGBufferNormal,
             LiveSlots::kGBufferEmissive, LiveSlots::kGBufferDepth,
@@ -728,38 +784,69 @@ struct EnhancedPbrCapture
                 attachment["rgbMax"] << rgbMaximum;
                 finite &= nonfinite == 0;
             }
-            rootNode["diagnosticStages"] |= ryml::SEQ;
-            for (const auto& stage : stages)
+            struct StageImage
+            {
+                uint32_t width{}, height{};
+                uint64_t nonfinite{};
+            };
+            std::vector<StageImage> stageImages;
+            stageImages.reserve(stageReadbacks.size());
+            for (const auto& stage : stageReadbacks)
             {
                 RHIReadbackImage image;
-                if (!resources.MapReadback(stage.readback, image, error)) return false;
+                if (!resources.MapReadback(stage.readback, image, error))
+                {
+                    return false;
+                }
                 std::vector<float> pixels;
                 pixels.reserve(static_cast<size_t>(image.width) * image.height * 4);
                 uint64_t nonfinite = 0;
                 for (uint32_t y = 0; y < image.height; ++y)
+                {
                     for (uint32_t x = 0; x < image.width; ++x)
+                    {
                         for (uint32_t c = 0; c < 4; ++c)
                         {
                             const float value = image.At(x, y, c);
                             pixels.push_back(value);
                             nonfinite += !std::isfinite(value);
                         }
+                    }
+                }
                 const auto file = stage.name + ".f32";
                 std::ofstream output(root / file, std::ios::binary | std::ios::trunc);
                 output.write(reinterpret_cast<const char*>(pixels.data()),
                     static_cast<std::streamsize>(pixels.size() * sizeof(float)));
                 output.close();
-                if (!output) { error = "stage capture write failed: " + file; return false; }
+                if (!output)
+                {
+                    error = "stage capture write failed: " + file;
+                    return false;
+                }
+                stageImages.push_back({image.width, image.height, nonfinite});
+                finite &= nonfinite == 0;
+            }
+            rootNode["diagnosticStageReadbackCount"] << stageReadbacks.size();
+            rootNode["diagnosticStages"] |= ryml::SEQ;
+            for (const auto& stage : stages)
+            {
+                const auto& readback = stageReadbacks[stage.readbackIndex];
+                const auto& image = stageImages[stage.readbackIndex];
                 auto item = rootNode["diagnosticStages"].append_child();
                 item |= ryml::MAP;
                 item["name"] << stage.name;
-                item["file"] << file;
+                item["file"] << readback.name + ".f32";
+                item["readbackStage"] << readback.name;
+                item["sharedReadback"] << (stage.name != readback.name);
+                item["resource"] << readback.source.index;
+                item["version"] << readback.source.version;
+                item["kind"] << static_cast<uint32_t>(readback.source.kind);
+                item["graphEpoch"] << readback.source.epoch;
                 item["encoding"] << "float32-le-row-major";
                 item["width"] << image.width;
                 item["height"] << image.height;
                 item["channels"] << 4;
-                item["nonfinite"] << nonfinite;
-                finite &= nonfinite == 0;
+                item["nonfinite"] << image.nonfinite;
             }
             auto graphNode = rootNode["graph"];
             graphNode |= ryml::MAP;
@@ -816,13 +903,20 @@ struct EnhancedPbrCapture
                 return true;
             }
         }
-        return !stages.empty();
+        return !stageReadbacks.empty();
     }
 
     void Release(IRenderDeviceServices& resources)
     {
-        for (auto& readback : readbacks) resources.ReleaseReadback(readback);
-        for (auto& stage : stages) resources.ReleaseReadback(stage.readback);
+        for (auto& readback : readbacks)
+        {
+            resources.ReleaseReadback(readback);
+        }
+        for (auto& stage : stageReadbacks)
+        {
+            resources.ReleaseReadback(stage.readback);
+        }
+        stageReadbacks.clear();
         stages.clear();
     }
     void Fail(const std::string& error)

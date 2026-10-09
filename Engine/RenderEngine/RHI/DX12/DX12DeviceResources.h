@@ -149,6 +149,7 @@ public:
     // service. Queue execution then needs backend reinitialization; legacy frames
     // remain usable. Prefix reservations retire with EndFrame, never prefix alone.
     bool BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError);
+    bool GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue, std::string& outError);
     bool JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError);
     bool WaitForLastFrameSubmission(std::string& outError);
     bool ShutdownQueueService(std::string& outError);
