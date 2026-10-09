@@ -2,6 +2,7 @@
 #include "AuthoringReadNode.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <span>
 #include <string>
 #include <string_view>
@@ -42,6 +43,11 @@ namespace Authoring
 		// 이유를 담는다 — **예외를 던지지 않는다.** 호출부가 "파일 없음"과 "파싱
 		// 실패"를 각자의 방식으로 다뤄 왔으므로 그 선택을 빼앗지 않는다.
 		[[nodiscard]] static ParsedDocument ParseFile(const std::string& utf8Path,
+			std::string& error);
+
+		// Windows의 native 경로를 좁은 문자열로 바꾸면 Unicode cache 경로를 열 수 없다.
+		// 별도 이름을 써서 기존 문자열 리터럴 호출과 overload가 모호해지지 않게 한다.
+		[[nodiscard]] static ParsedDocument ParseFilePath(const std::filesystem::path& path,
 			std::string& error);
 
 		// 이미 읽어 둔 텍스트를 파싱한다(임베디드 payload 등).

@@ -255,6 +255,7 @@ namespace CommandCore
             { "render.queue.mode", CommandCost::Long, "0|1|2", "Switch live DX12 queue mode at the next frame boundary without rebuilding the pipeline", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.rtinfo", CommandCost::Immediate, "", "창·뷰포트·추종 텍스처 크기를 나란히 찍는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "render.shadowinfo", CommandCost::Immediate, "", "그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "render.temporal.motion.fixture", CommandCost::Long, "<new-absolute-directory>", "Record real seven-route motion fixtures and disabled controls; independent oracle required", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "directory", false, false },
             { "scene.bonedump", CommandCost::Frames, "[개수]", "대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.ddol", CommandCost::Frames, "<이름>", "오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.dump", CommandCost::Immediate, "[라벨]", "활성 씬의 오브젝트 계층을 로그에 남긴다", CommandClass::EngineService, CommandLiveness::Live },

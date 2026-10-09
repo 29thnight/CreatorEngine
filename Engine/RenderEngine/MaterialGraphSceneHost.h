@@ -15,6 +15,7 @@
 #include <map>
 #include <mutex>
 #include <tuple>
+#include <vector>
 
 namespace material_graph
 {
@@ -45,6 +46,18 @@ namespace material_graph
         std::string lastError;
     };
 
+    struct SceneGeometryRouteAudit
+    {
+        struct Draw
+        {
+            std::uint64_t geometryKey{}, temporalObjectId{}, temporalInstanceId{};
+            std::uint32_t sourcePipeline{}, recordedPipeline{}, meshletCount{};
+            bool meshShader{}, indirect{};
+        };
+        std::uint64_t sourceFrameId{}, sceneEpoch{}, viewId{};
+        std::vector<Draw> draws;
+    };
+
     class SceneHost final : private IRHIUploadTransactionListener
     {
       public:
@@ -64,6 +77,11 @@ namespace material_graph
         uint32_t ShadowDrawCount() const;
         // Prepared lattice mesh draw bins, before GPU visibility rejection.
         uint32_t PreparedMeshletDrawCount() const;
+        // Read only after graph recording joins. Entries are appended by the
+        // one LX.Scene.GBuffer callback after its exact draw/dispatch succeeds;
+        // shadow, occluder and temporal replay draws are deliberately excluded.
+        void EnableGeometryRouteAudit(bool enabled) const;
+        SceneGeometryRouteAudit RecordedGeometryRoutes() const;
         // GPU candidates per cascade (direct compatibility uses CPU-visible
         // casters). No GPU visibility counter is read back here.
         std::array<uint32_t, 3> ShadowCasterCounts() const;
@@ -87,7 +105,7 @@ namespace material_graph
                      RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                      const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
                      std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance = {},
-                     RHITextureHandle source = {});
+                     RHITextureHandle source = {}, bool allowMeshlets = true);
         bool PreparationDeferred() const
         {
             return selectionDeferred_ || lookup_.PreparationDeferred() || runtimeEffects_.PreparationDeferred();

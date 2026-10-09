@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$EndpointFile,
-    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','fault-fallback','fg-fault-fallback','golden-baseline')]
+    [ValidateSet('discover','support','metadata','motion','motion-fixture','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','fault-fallback','fg-fault-fallback','golden-baseline')]
     [string]$Stage = 'support',
     [ValidateSet('none','fsr','dlss','xess')][string]$Provider = 'fsr',
     [uint32]$InterpolatedFrameCount = 1,
@@ -17,6 +17,7 @@ param(
     [ValidateSet('off','on','on-boost')][string]$ReflexMode = 'on',
     [string]$RuntimeDirectory,
     [string]$DlssProjectId,
+    [string]$PythonExecutable = 'python',
     [ValidateRange(1,600)][int]$TimeoutSeconds = 60,
     [string]$OutputDirectory = (Join-Path $PSScriptRoot ('results/' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')))
 )
@@ -169,6 +170,27 @@ try {
                 if (!$data.motionCoverage.$path) { throw "Production motion coverage is missing for $path" }
             }
             if (!$data.motionVectorsValid) { throw 'Production motion inputs are not valid' }
+        }
+        'motion-fixture' {
+            if ($TimeoutSeconds -lt 300) {
+                throw 'Use -TimeoutSeconds 300 or more for the explicit shader/asset preparation and seven-route capture session'
+            }
+            $fixtureDirectory = [IO.Path]::GetFullPath((Join-Path $OutputDirectory 'motion-fixture'))
+            $recording = Invoke-TemporalCommand 'render.temporal.motion.fixture' @($fixtureDirectory)
+            $oraclePath = Join-Path $OutputDirectory 'motion-oracle.json'
+            & $PythonExecutable (Join-Path $PSScriptRoot 'Compare-TemporalMotion.py') `
+                --capture $fixtureDirectory --fixture (Join-Path $fixtureDirectory 'fixture.json') --output $oraclePath
+            $oracleExit = $LASTEXITCODE
+            if (!(Test-Path -LiteralPath $oraclePath)) { throw 'Motion oracle did not produce a report' }
+            $oracle = Get-Content -LiteralPath $oraclePath -Raw | ConvertFrom-Json
+            $report.motionFixture = $recording.data
+            $report.motionOracle = $oracle
+            $report.scope = 'native-real-submission-seven-route-motion-and-ownership-pixels'
+            if ($oracleExit -ne 0 -or !$oracle.routeCoverageValidated -or $oracle.acceptanceStatus -ne 'PASS') {
+                throw "Motion fixture acceptance is $($oracle.acceptanceStatus); recording completion is not PASS"
+            }
+            $report.pixelAcceptance = $true
+            $data = $recording.data
         }
         'reset' {
             $data = Set-Temporal 'temporal.reset'

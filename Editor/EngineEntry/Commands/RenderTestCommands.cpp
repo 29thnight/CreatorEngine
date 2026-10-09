@@ -66,6 +66,7 @@
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
 #include "FoliageComponent.h"      // I5: Foliage 게이트
+#include "TemporalMotionFixture.h"
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
 #include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
@@ -809,6 +810,37 @@ namespace ConsoleCmd
             : CommandCore::Fail("render.pbr.mip.failed", "PBR verification failed", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_temporal_motion_fixture(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2)
+        {
+            return InvalidArguments("render.temporal.motion.fixture <new-absolute-directory>");
+        }
+        std::string error;
+        if (!TemporalMotionFixture::Begin(ctx.parts[1], error))
+        {
+            return Fail("render.temporal.motion.fixture.rejected", error);
+        }
+        ctx.system.WaitForResult([]() -> std::optional<CommandResult>
+        {
+            const auto status = TemporalMotionFixture::GetStatus();
+            if (status.state == TemporalMotionFixtureState::Preparing || status.state == TemporalMotionFixtureState::Running)
+            {
+                return std::nullopt;
+            }
+            auto data = CommandData::Object();
+            data.Set("directory", CommandData::String(status.directory));
+            data.Set("acceptance", CommandData::String("unverified-requires-independent-oracle"));
+            if (status.state != TemporalMotionFixtureState::Complete)
+            {
+                return Fail("render.temporal.motion.fixture.failed", status.error, std::move(data));
+            }
+            return Ok("Recorded seven route/control pairs; run the independent motion oracle", std::move(data));
+        });
+        return Ok();
+    }
+
     static CommandCore::CommandResult Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1359,6 +1391,7 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
         reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
         reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
+        reg.Result({ "render.temporal.motion.fixture" }, &Cmd_render_temporal_motion_fixture, SceneAccess::BorrowLiveState);
         reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
         reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);

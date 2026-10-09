@@ -1670,8 +1670,29 @@ void Scene::AddRootEntity(std::string_view name)
 
 void Scene::OnBeforeSerialize() const
 {
+    for (const auto root : m_transientDiagnosticRoots)
+    {
+        if (Resolve(root))
+        {
+            throw std::runtime_error("A transient diagnostic is active or awaiting scene cleanup. Save after cleanup completes.");
+        }
+    }
     if (m_incrementalConstructions != 0)
         throw std::runtime_error("Model placement is still in progress. Save after it completes or cancel the load.");
+}
+
+void Scene::ProtectTransientDiagnosticRoot(EntityHandle root)
+{
+    RequireManagedMutable();
+    if (!Resolve(root))
+    {
+        throw std::logic_error("Transient diagnostic root does not belong to this live scene");
+    }
+    std::erase_if(m_transientDiagnosticRoots, [this](EntityHandle previous)
+    {
+        return Resolve(previous) == nullptr;
+    });
+    m_transientDiagnosticRoots.push_back(root);
 }
 
 Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::Index parentIndex)

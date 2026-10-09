@@ -122,6 +122,7 @@ namespace material_graph
             std::size_t inputIndex{};
         };
         IRenderDeviceServices* device{};
+        bool allowMeshlets{ true };
         std::uint64_t recording{}, descriptors{};
         own::shared_owner<const SceneViewInput> input;
         std::vector<Draw> draws;
@@ -145,6 +146,10 @@ namespace material_graph
         RHITextureHandle environment;
         bool shadow{};
         mutable std::atomic<uint32_t> shadowDrawCount{};
+        // One writer: LX.Scene.GBuffer recording. Consumers read after the
+        // graph's recording join and native submission, never while recording.
+        mutable std::vector<SceneGeometryRouteAudit::Draw> recordedGeometryRoutes;
+        mutable bool geometryRouteAuditEnabled{};
         std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
         std::shared_ptr<const SceneRuntimeEffectsFrame> runtimeEffects;
         mutable bool alphaInputsDeclared{};
@@ -298,7 +303,7 @@ namespace material_graph
 
         bool UsesMeshlets(const Draw& draw) const
         {
-            return draw.program->meshEnabled && !draw.blended && draw.geometry->MeshletCount() > 0 &&
+            return allowMeshlets && draw.program->meshEnabled && !draw.blended && draw.geometry->MeshletCount() > 0 &&
                 device->GetMeshShaderCapabilities().SupportsDispatch(draw.geometry->MeshletCount(), 1, 1);
         }
 
@@ -1246,7 +1251,7 @@ namespace material_graph
                             RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                             const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
                             std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance,
-                            RHITextureHandle source)
+                            RHITextureHandle source, bool allowMeshlets)
     {
         ce::profile_scope profile{ce::marker<"MaterialGraphScenePrepare">()};
         lookup_.ResetPreparationStatus();
@@ -1284,6 +1289,7 @@ namespace material_graph
         }
         auto candidate = own::make_shared<Frame>();
         candidate->device = device_;
+        candidate->allowMeshlets = allowMeshlets;
         candidate->recording = device_->GetCurrentUploadRecordingId();
         candidate->descriptors = device_->GetDescriptorVersionToken();
         candidate->input = std::move(input);
@@ -1766,6 +1772,27 @@ namespace material_graph
             [&](const auto& draw) { return frame_->UsesMeshlets(draw); }));
     }
 
+    void SceneHost::EnableGeometryRouteAudit(bool enabled) const
+    {
+        if (frame_)
+        {
+            frame_->geometryRouteAuditEnabled = enabled;
+        }
+    }
+
+    SceneGeometryRouteAudit SceneHost::RecordedGeometryRoutes() const
+    {
+        SceneGeometryRouteAudit result;
+        if (frame_ && frame_->input)
+        {
+            result.sourceFrameId = frame_->input->View().frameId;
+            result.sceneEpoch = frame_->input->View().sceneEpoch;
+            result.viewId = frame_->input->View().viewId;
+            result.draws = frame_->recordedGeometryRoutes;
+        }
+        return result;
+    }
+
     uint32_t SceneHost::ShadowDrawCount() const
     {
         return frame_ ? frame_->shadowDrawCount.load(std::memory_order_relaxed) : 0;
@@ -2152,6 +2179,7 @@ namespace material_graph
         NormalizeSceneReads(graph, uses);
         graph.AddPass("LX.Scene.GBuffer", uses, [frame, inputs](const auto& execution) {
             frame->CheckCurrent(execution.graph);
+            frame->recordedGeometryRoutes.clear();
             auto& encoder = *execution.encoder;
             std::array<RHITextureHandle, 5> colors;
             const auto handles = Colors(inputs);
@@ -2179,7 +2207,9 @@ namespace material_graph
                 {
                     continue;
                 }
-                encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->gbuffer[draw.doubleSided].GetHandle()));
+                const auto sourcePipeline = draw.program->gbuffer[draw.doubleSided].GetHandle();
+                const auto recordedPipeline = frame->RasterPipeline(draw, sourcePipeline);
+                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
                 std::string error;
                 if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
                 {
@@ -2188,6 +2218,15 @@ namespace material_graph
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
                 frame->BindGeometry(encoder, draw);
                 frame->DrawGeometry(encoder, draw);
+                if (frame->geometryRouteAuditEnabled)
+                {
+                    const auto& source = frame->input->Draws()[draw.inputIndex];
+                    const bool meshShader = frame->UsesMeshlets(draw);
+                    frame->recordedGeometryRoutes.push_back({source.geometryKey,
+                        source.temporalObjectId, source.temporalInstanceId,
+                        sourcePipeline.id, recordedPipeline.id,
+                        meshShader ? draw.geometry->MeshletCount() : 0u, meshShader, indirect});
+                }
             }
         });
         frame->gbufferDeclared = true;

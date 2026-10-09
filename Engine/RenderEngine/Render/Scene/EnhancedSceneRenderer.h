@@ -77,6 +77,57 @@ struct EnhancedLiveViewKey
     bool IsValid() const { return 0 != viewId; }
 };
 
+// Published by the fixture driver only after its GT pose update. The frame seal
+// copies this value alongside the camera and queued scene-proxy updates.
+struct EnhancedTemporalFixtureStamp
+{
+    uint64_t sessionId{};
+    uint64_t stepId{};
+    uint64_t predecessorStepId{};
+    std::string inputSha256;
+    std::string predecessorInputSha256;
+    bool allowMeshlets{ true }; // Fixture route choice, sealed with the pose.
+
+    bool IsValid() const
+    {
+        const auto isSha256 = [](const std::string& hash)
+        {
+            return hash.size() == 64 && std::all_of(hash.begin(), hash.end(),
+                [](char value)
+                {
+                    return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
+                });
+        };
+        return sessionId != 0 && stepId != 0 && predecessorStepId < stepId &&
+            isSha256(inputSha256) && (predecessorStepId == 0
+                ? predecessorInputSha256.empty() : isSha256(predecessorInputSha256));
+    }
+
+    bool operator==(const EnhancedTemporalFixtureStamp&) const = default;
+};
+
+// CPU-native-submission acknowledgement, never GPU completion. A baseline
+// (predecessorStepId == 0) can be held until non-reset history is established.
+// A measured step is valid only against its exact immediately submitted predecessor.
+struct EnhancedTemporalFixtureSubmission
+{
+    EnhancedTemporalFixtureStamp stamp;
+    uint64_t viewId{};
+    uint64_t sceneEpoch{};
+    uint64_t historyRevision{};
+    uint64_t historyGeneration{};
+    uint64_t sourceFrameId{};
+    uint64_t realFrameId{};
+    uint64_t predecessorSourceFrameId{};
+    uint64_t predecessorRealFrameId{};
+    uint64_t predecessorStepId{};
+    std::string predecessorInputSha256;
+    bool historyReset{ true };
+    bool coalesced{};
+    bool sourceVerified{}; // Exact tagged pose submitted; independent of its incoming pair.
+    bool valid{};
+};
+
 inline bool operator==(const EnhancedLiveViewKey& left,
     const EnhancedLiveViewKey& right)
 {
@@ -200,6 +251,9 @@ struct EnhancedRequiredAssetPacket
 struct EnhancedLiveFramePacket
 {
     uint64_t frameId{ 0 };
+    EnhancedTemporalFixtureStamp temporalFixture;
+    // Queue coalescing cannot prove that this is the first exact posed step.
+    bool temporalFixtureCoalesced{ false };
     // Host CPU-profiler boundary, independent from render publication and SDK
     // simulation identities. A repeated publication can retain the same source.
     uint32_t sourceEngineFrame{ 0 };
@@ -826,6 +880,7 @@ struct EnhancedLivePbrCaptureStatus
     uint64_t frameId{};
     std::string directory;
     std::string error;
+    EnhancedTemporalFixtureStamp fixture;
 };
 
 namespace EnhancedSceneRenderer
@@ -836,9 +891,29 @@ namespace EnhancedSceneRenderer
         EnhancedLiveDisplayTarget target, std::string& outError, bool controlled = false,
         const std::string& cameraReplayPath = {}, const std::string& drawReplayPath = {},
         const std::string& latticeReplayPath = {}, bool replayExtensions = false,
-        bool latticeReplayExtension = false, bool motionValidation = false);
+        bool latticeReplayExtension = false, bool motionValidation = false,
+        const EnhancedTemporalFixtureStamp& expectedFixture = {}, bool* busy = nullptr);
     EnhancedLivePbrCaptureStatus GetLivePbrCaptureStatus();
-    void CancelLivePbrCapture();
+    void CancelLivePbrCapture(const EnhancedTemporalFixtureStamp& expectedFixture = {});
+    // GT fixture polling must not wait behind RT capture readback/file output.
+    // A non-null busy argument above selects try-lock request admission; on
+    // contention it returns false with *busy == true and no request is created.
+    // TryGet leaves the caller's snapshot untouched while busy. TryCancel false
+    // means retain the fixture pose/native exclusion and try on a later GT tick.
+    // Nonempty expectations are ownership guards. A status mismatch returns a
+    // Failed snapshot without changing the other capture; cancellation mismatch
+    // is a successful no-op. Pass the exact stamp of the request that was armed.
+    bool TryGetLivePbrCaptureStatus(EnhancedLivePbrCaptureStatus& status,
+        const EnhancedTemporalFixtureStamp& expectedFixture = {});
+    bool TryCancelLivePbrCapture(const EnhancedTemporalFixtureStamp& expectedFixture = {});
+
+    // GT calls Publish only after applying the matching pose under the scene
+    // lock. BuildLiveFramePacket seals the stamp before that lock is released.
+    // Keep one TemporalNativeCaptureExclusion alive for the entire session.
+    void PublishTemporalFixtureStep(const EnhancedTemporalFixtureStamp& stamp);
+    void ClearTemporalFixtureSession(uint64_t sessionId);
+    EnhancedTemporalFixtureSubmission GetTemporalFixtureSubmission(
+        EnhancedLiveDisplayTarget target);
 
     // ── 메인 런타임 렌더러 (PHASE 3-9 승격) ──
     //

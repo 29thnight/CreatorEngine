@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	148
-# names	157
+# commands	149
+# names	158
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -100,6 +100,7 @@ render.backend	-	immediate	editor	engine_service	live	no	yes	status	Editor scene
 render.matmode	-	immediate	editor	editor_operation	live	no	yes	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
 render.rtinfo	-	immediate	editor	engine_service	live	no	yes	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
 render.shadowinfo	-	immediate	editor	engine_service	live	no	yes	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
+render.temporal.motion.fixture	-	long	editor	probe	live	no	yes	<new-absolute-directory>	Record real seven-route motion fixtures and disabled controls; independent oracle required
 scene.bonedump	-	frames	editor	engine_service	live	no	yes	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
 scene.ddol	-	frames	editor	engine_service	live	no	yes	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
 scene.dump	-	immediate	editor	engine_service	live	no	yes	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다

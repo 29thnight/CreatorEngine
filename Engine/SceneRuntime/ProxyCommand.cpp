@@ -197,6 +197,7 @@ ProxyCommand::ProxyCommand(TerrainComponent* component, uint64_t sceneEpoch) :
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
 	TerrainUpdate update{};
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();
 	update.worldPosition = owner->Transform_().GetRenderWorldPosition();
 	update.terrainMesh = component->GetMesh();
@@ -214,6 +215,7 @@ ProxyCommand::ProxyCommand(FoliageComponent* component, uint64_t sceneEpoch) :
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
 	FoliageUpdate update{};
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();
 	update.worldPosition = owner->Transform_().GetRenderWorldPosition();
 	update.foliageTypes = component->GetFoliageTypes();
@@ -236,6 +238,7 @@ ProxyCommand::ProxyCommand(DecalComponent* component, uint64_t sceneEpoch) :
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
 	DecalUpdate update{};
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();
 	update.diffuse = component->GetDecalTextureShared();
 	update.normal = component->GetNormalTextureShared();
@@ -546,6 +549,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<TerrainRenderProxy>())
 			{
+				proxy->m_isEnabled = update->isEnabled;
 				proxy->m_worldMatrix = update->worldMatrix;
 				proxy->m_worldPosition = update->worldPosition;
 				proxy->m_terrainMesh = std::move(update->terrainMesh);
@@ -562,6 +566,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<FoliageRenderProxy>())
 			{
+				proxy->m_isEnabled = update->isEnabled;
 				proxy->m_foliageTypes = std::move(update->foliageTypes);
 				proxy->m_foliageInstances = std::move(update->foliageInstances);
 				proxy->m_worldMatrix = update->worldMatrix;
@@ -579,6 +584,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<DecalRenderProxy>())
 			{
+				proxy->m_isEnabled = update->isEnabled;
 				proxy->m_diffuseTexture = update->diffuse;
 				proxy->m_normalTexture = update->normal;
 				proxy->m_occluroughmetalTexture = update->orm;

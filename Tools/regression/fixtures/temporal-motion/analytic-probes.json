@@ -1,6 +1,6 @@
 {
   "schema": "temporal.motion.analytic-fixture.v1",
-  "status": "authored-unexecuted-scene-driver-unauthored",
+  "status": "authored-unexecuted-legacy-numeric-only",
   "extent": [256, 256],
   "previousCamera": {"projection": "orthographic", "position": [0, 0, 0], "width": 16, "height": 16},
   "currentCamera": {"projection": "orthographic", "position": [0, 0, 0], "width": 16, "height": 16},
