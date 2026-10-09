@@ -408,7 +408,7 @@
       <div class="why">EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지.</div></div>
     <div class="doc"><a href="plans/ModelGeometryTextureImprovementPlan.md">ModelGeometryTextureImprovementPlan.md</a><span class="tie">비동기 배치 완료 · G2 텍스처 캐시 경로 키 완료 · 나머지 구조 개선 제안</span>
       <div class="why">모델·Vertex·Mesh·Texture 경계와 로딩 개선. 기존 PHASE를 대체하거나 새 공수로 합산하지 않는다.</div></div>
-    <div class="doc"><a href="plans/TexturePipelinePlan.md">TexturePipelinePlan.md</a><span class="tie">PHASE 12 · 미착수</span>
+    <div class="doc"><a href="plans/TexturePipelinePlan.md">TexturePipelinePlan.md</a><span class="tie">PHASE 12 · T0~T2 구현 중 · 실행 검증 전</span>
       <div class="why">텍스처 import 설정·mip·cook 트랜스코딩·런타임 소비.</div></div>
     <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12.5 · 진행</span>
       <div class="why">게임 빌드·cook·stage·managed·CI 파이프라인. B/L 잔여 유지.</div></div>
@@ -1141,38 +1141,21 @@
 <!-- ===== PHASE 12 ===== -->
 <section class="phase" id="phase-12">
   <h2 class="sec"><span class="no">PHASE 12</span>텍스처 파이프라인 — 임포트 · cook · 런타임 소비 <span class="phase-pct" data-phase-pct="12"></span></h2>
-  <div class="phase-meta">신설 2026-09-04 · 선행: TextureCodecBoundaryDesign(축 A, 완료) · 설계 문서: <a href="plans/TexturePipelinePlan.md" style="color:var(--accent)">TexturePipelinePlan.md</a> · 병행: PHASE 12.5 빌드 파이프라인(패키징 산출물 계약)</div>
-  <div class="phase-goal"><b>목표:</b> 상용 엔진의 표준 구도를 세운다 — <b>cook 시점에 굽고, 런타임은 구운 것을 읽는다.</b>
-  <br><br>
-  <b>★ 착수 근거(2026-09-04 실측):</b> 파이프라인의 절반은 이미 서 있다. <code>TextureCookProducer</code> 가 GUID 주소·내용 해시·manifest 등재를 갖추고 있고,
-  트랜스코딩 자리를 <code>formatVersion</code> 1 로 <b>예약해 뒀다</b>("트랜스코딩이 들어오는 날 2 가 되고 구버전 artifact 는 자동으로 거부된다").
-  없는 것은 넷이다 — ① <code>.meta</code> 의 importSettings 가 <code>extension</code>·<code>timestamp</code> 둘뿐이라 자산별 정책이 불가능하고(지금은 코드가 baseColorMap 에만 <code>compress=true</code> 를 박는다),
-  ② <code>GenerateMipMaps</code> 호출 0건, ③ cook 이 pass-through 이며 독립 텍스처 저작분 0건, ④ 런타임이 원본 PNG 를 직독·디코드한다.
-  <br><br>
-  <b>★ 실측 수치(Release · 99장):</b> 런타임 로드 <b>5.34 ms/장</b>(디코드 3.52) · cook 34.1 ms/장(<b>BC1 압축이 65%</b>) · artifact 로드 하한 0.58 ms/장.
-  VRAM 은 현재 RGBA8 무밉 <b>420 MB</b> → BC1+밉 <b>70 MB</b>(0.17x). 저작 코퍼스는 PNG 583(전부 8비트) · HDR 19(장당 128 MB) · DDS 1 · TGA/JPEG/BMP/EXR <b>0</b>.
-  <br><br>
-  <b>★ 라이브러리 구성:</b> 크로스플랫폼이 로드맵이므로 <code>stb_image</code> 도입은 확장 대비가 아니라 필수 조건이다 — DirectXTex 의 WIC 부분만 Windows 전용인데 그것이 하필 자산의 99%(PNG)를 막는다.
-  구성은 <code>stb_image</code> + <code>stb_image_resize2</code>(둘 다 이미 설치) + <code>bc7enc_rdo</code> + DDS 미니 파서이고, 그러면 <b>WIC 종속이 0</b>이 된다.
-  <b>PNG 685장 A/B 바이트 대조는 2026-09-04 전수 통과했다</b>(불일치 0 · BGRA 419장은 정규화 후, 266장은 원본끼리 — 양쪽 다 일치).
-  다만 <b>HDR 은 갈지 않는다</b> — 같은 대조에서 19장 전부 값이 달랐다(mantissa 1 차이 · 비율 59/58 로 일정 · RGBE 반올림 규약 차이).
-  IBL 프리필터 결과가 바뀌고 픽셀 골든이 깨지는데, DirectXTex 의 HDR 로더는 WIC 이 아니라 이식 가능하므로 갈아서 얻을 것이 없다.
-  DirectXTex 는 HDR·DDS 로더로 남는다 — "제거"는 목표가 아니었고 침투 차단은 축 A 가 이미 끝냈다.
-  ISPC 는 BC 블록이 SPMD 에 완벽히 맞지만 빌드에 언어가 하나 늘어나는 대가가 있어 우리 규모(510장·17초)에서는 값을 못 한다 — T1b 의 열린 항목.
-  <br><br>
-  <b>★ 경량 · 선택집중:</b> 매크로가 아니라 <b>프로젝트 분리</b>다(<code>EngineLayerSeparationPlan</code> §8 — "해당 코드가 Core 프로젝트에서 컴파일되지 않아야 한다").
-  <code>TextureCodec.*</code> 를 프로젝트로 쪼개 링크 여부가 곧 포함 여부가 되게 하고, 등록은 호스트가 명시 호출한다(자동 등록을 쓰면 누락이 조용해진다).
-  <b>게임 런타임은 T2 후 자동으로 코덱 0개</b>이고, 툴 빌드만 타깃별로 조합한다.</div>
+  <div class="phase-meta">신설 2026-09-04 · 방향 개정 2026-10-09 · <b>T0~T2 구현 중, 실행 검증 전</b> · 선행: TextureCodecBoundaryDesign · 정본: <a href="plans/TexturePipelinePlan.md" style="color:var(--accent)">TexturePipelinePlan.md</a> · 병행: PHASE 12.5</div>
+  <div class="phase-goal"><b>목표:</b> cook에서 이미지 처리하고 cooked 런타임 경로는 GPU-ready 바이트를 검증·업로드한다.
+  <br><br><b>현재 결정:</b> <b>DirectXTex를 유일한 엔진 직접 이미지 처리 의존성으로 유지</b>한다. stb 직접 사용을 제거하며 bc7enc, 자체 DDS 파서, 미사용 TextureCodec 프로젝트를 도입하지 않는다. ImGui 내장 stb 폰트 구현은 건드리지 않는다.
+  <br><br><b>현황 정정:</b> 런타임 밉 생성은 이미 있다. 이번 작업은 import 정책·cook artifact·실제 소비 연결이다. T0~T2는 구현 중이고 T3는 실제 모바일/Web 타깃 확정 후에만 착수한다. WIC의 플랫폼 제약을 해소했다고 주장하지 않는다.
+  <br><br><b>역사적 기준선(2026-09-04):</b> PNG 99장 Release 런타임 5.34 ms/장, cook 34.1 ms/장, RGBA8 무밉 VRAM 420 MB 및 BC1+밉 70 MB 계산값은 당시 기록이다. PNG 685장/HDR 19장 stb A/B는 종료된 조사이며 현재 검사 통과나 현재 코퍼스가 아니다.
+  <br><br><b>보존 계약:</b> Terrain 높이 RGBA8의 네 바이트 모두 float 비트 데이터다. 알파 제거·감마·premultiply를 금지하고 splat gray8 절삭 및 brush 정수 회색 변환을 유지한다. cooked 소비 일부를 연결했다고 전체 런타임 코덱 링크가 0이 됐다고 선언하지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="12"><!-- JS 생성 --></table></div>
   <div class="verify">
-    <div class="vt">페이즈 완료 기준 (TexturePipelinePlan.md §8)</div>
+    <div class="vt">페이즈 완료 기준 · 현재 실행 검증 전</div>
     <ul>
-      <li>런타임 텍스처 로드 <b>&lt; 1 ms/장</b> (현재 5.34) · 텍스처 VRAM <b>&lt; 120 MB</b> (현재 420)</li>
-      <li>cook <b>&lt; 50 ms/장</b> (현재 34) · 에디터 저장 → 화면 반영 <b>+50 ms 이내</b></li>
-      <li>게임 런타임 산출물의 이미지 라이브러리 <b>0개</b> · 런타임 → <code>TextureCodec.*</code> 의존 간선 <b>0</b>(CI 래칫)</li>
-      <li><s>PNG A/B 바이트 대조 통과 — DirectXTex 와 stb_image 가 같은 PNG 를 같은 픽셀로 디코드</s> <b>2026-09-04 확인: 685장 전수 일치</b></li>
-      <li>HDR A/B 대조는 <b>회귀 감시용</b>으로 유지 — 19장 전부 불일치가 현재 값이고, 0이 되면 누군가 HDR 디코더를 바꾼 것이다</li>
-      <li>artifact 로드 픽셀 = 원본 직독 픽셀(같은 자산, 두 경로) · 기존 <code>vk.texturecodec</code> A/B 다이제스트 유지</li>
+      <li>import 설정 보존·기본값·정책 key → DirectXTex cook → 독립/모델 cooked 실제 소비</li>
+      <li>밉 정책별 피치·버전·해시·손상 거부 및 소스 없는 패키지 소비; PreserveAuthored 부분 chain 보존</li>
+      <li>Terrain float 비트/알파·gray8·brush 패리티, DirectXTex PNG/float DDS 정본 왕복</li>
+      <li>엔진 직접 stb include/심볼 0; ImGui 내장 헤더 유지. Player 실제 소스/링크에서 코덱 의존 제거는 열린 T2 완료 조건</li>
+      <li><b>이번 작업에서 빌드·테스트·컴파일러·셰이더·바이너리·벤치마크는 실행하지 않는다</b>. 과거 성능 목표는 현재 코퍼스에서 향후 재측정한다</li>
     </ul>
   </div>
 </section>
@@ -2273,26 +2256,26 @@ const TASKS = [
     note: "발단: NotifySceneUnload가 정의·선언·필수 바인딩까지 있는데 <b>호출자가 0개</b>였다. 이력을 보니 PHASE 9가 깬 것이 아니라 도입 커밋(045b0a56, 2026-07-31 CoreCLR 계층)부터 한 번도 불린 적이 없다 — 태어날 때부터 죽어 있었다. 필수 바인딩(실패 시 초기화 중단)이라 '중요해 보이는데 아무 일도 안 하는' 상태였다. ★ 계획대로 붙였으면 조용한 오작동이 됐다. sceneUnloadedEvent에 붙이는 것이 자연스러워 보이지만, 발화 지점 5곳 전부가 <code>Broadcast(); AllDestroyMark(); OnDisable(); OnDestroy();</code> 순서라 <b>파괴 앞</b>이다. 게다가 관리 측 OnSceneUnload가 부르던 Clear는 목록을 통째로 돌며 OnDisable·OnDestroy를 부르는데, Scene::AllDestroyMark가 <b>DontDestroyOnLoad를 건너뛰므로</b> DDOL 오브젝트의 스크립트는 파괴 표시조차 안 된 채 목록에 남아 있다 — 통째로 비우면 오브젝트는 살아서 다음 씬으로 가는데 스크립트만 죽는다. 크래시가 아니라 '저 오브젝트만 스크립트가 안 돈다'로 나타난다. ★ 그래서 형태를 바꿨다: Clear가 아니라 <b>SweepOrphans</b>(소유자가 죽은 것만 거둔다, 세대 핸들 비교라 슬롯 재사용에 속지 않음)이고, 이미 파괴 표시된 것은 건드리지 않는다(정상 경로가 Flush에서 OnDestroy를 부를 예정이라 두 번 불린다). 호출은 파괴 <b>뒤</b> 5곳(SceneManager 4 + PrefabEditor 1). Clear는 어셈블리 리로드 전용으로 용도를 좁히고 주석에 명시. ★ 실측: 씬 왕복 2회에 트리·스크립트 모두 기준선 복귀 — <b>누수가 애초에 없다</b>. 즉 이것은 청소부가 아니라 그물이고, 걸리면 로그를 남긴다. 그물이 실제로 던져지는지는 임시 무조건 로그로 확인(6회 발화 · 매번 0건) — 0건 로그는 함수가 도는지 모르면 아무 의미가 없다. ★ <b>조사 중 진짜 결함 발견</b>: ScriptAssemblyLoader.Unload가 BehaviourRegistry와 팩토리 표 3종은 비우면서 <b>BehaviorTreeRegistry를 빠뜨렸다</b>. 팩토리를 비우는 것은 '앞으로 만들지 않겠다'일 뿐, 이미 만들어진 노드 인스턴스가 스크립트 타입을 붙든다. A/B 실측 — 수정 없음: 리로드 후 트리 2개 잔존 · <b>이전 어셈블리 잔존(참조 누수)</b> / 수정 적용: 트리 0개 · 정리됨. 원 지시가 우려한 '어셈블리 언로드를 막는다'가 씬 언로드가 아니라 여기서 실제로 일어나고 있었다. ── 부수: 다른 세션 커밋 3128a48f가 DX12MeshCache.h·DX12TextureCache.h에서 HashedGuid를 include 없이 써서 빌드가 깨져 있었다(유니티 빌드가 전이로 공급하던 것). 검증이 막혀 TypeTrait.h include 2줄로 풀었다 — 이 커밋의 주제는 아니다." },
 
   // ---------- PHASE 12: 텍스처 파이프라인 — 임포트 · cook · 런타임 소비 ----------
-  { phase: 12, id: "12-0", title: "T0 — 임포트 설정 어휘 (.meta importSettings)",
-    detail: "색공간(sRGB/Linear) · 압축(None/BC1/BC3/BC7/Auto) · 밉 생성 · 최대 크기 · wrap · filter · 노멀맵 여부를 자산마다 정한다. 지금 하드코딩된 compress=true(baseColorMap)를 이 설정으로 대체하고 에디터 인스펙터에서 편집한다. ★ 기본값은 기존 동작을 재현해야 한다 — baseColorMap 만 BC1_SRGB, 나머지 무압축. 그래야 T0 이 그림을 바꾸지 않는다.",
-    refs: "TexturePipelinePlan §5 T0", priority: "P0", days: 3, status: "todo",
-    note: "먼저인 이유: 없으면 T1 의 모든 정책이 코드에 박힌다. DataSystem::FinalizeMaterialRuntime 이 슬롯 이름으로 압축을 정하는 것이 그 증상이다. 미검증 전제 — .meta 스키마 확장이 기존 자산 583개의 재임포트를 요구하는지 확인하지 않았다." },
-  { phase: 12, id: "12-1", title: "T1a — cook 트랜스코딩 (TexturePipeline · TextureCodec.Stb · TextureCodec.Bc7Enc 신설)",
-    detail: "TextureCookProducer 가 pass-through 를 그만두고 굽는다. 처리 순서: 디코드 → 색공간 확정 → 리사이즈 → 밉 생성 → 채널 처리 → 압축. artifact 는 헤더(포맷·치수·밉·배열) + 서브리소스 바이트 — TextureImage 의 직렬화형이다. formatVersion 1 → 2. ITextureDecoder/ITextureEncoder 를 세우되 구현체는 실제로 도는 것만. ★ 압축을 한 함수(EncodeBlocks)로 가둬 T1b 의 교체가 그 함수 교체로 끝나게 한다.",
-    refs: "TexturePipelinePlan §5 T1a·§4", priority: "P0", days: 8, status: "todo",
-    note: "게이트: PNG 전수 A/B 바이트 대조(assets.decodeab) · 밉 체인 자기 대조(치수·바이트가 RHIFormatSlicePitch 와 일치). ★ <b>착수 조건이 해소됐다(2026-09-04)</b> — PNG 685장 전수 일치(픽셀 불일치 0 · 치수 불일치 0 · 실패 0). WIC 이 BGRA 로 낸 419장은 RGBA8 정규화 후, 나머지 266장은 원본끼리 비교했고 양쪽 다 일치했다(정규화가 결과를 만든 것이 아니다). ★ <b>다만 HDR 은 갈지 않는다</b> — 같은 측정에서 19장 전부 값이 달랐다(0.057617 vs 0.056641 = mantissa 1 차이 · 비율 59/58 로 일정 · 알파만 일치). RGBE 반올림 규약 차이이고, 밝기 0.86% 라 눈에는 안 띄지만 IBL 프리필터와 픽셀 골든이 깨진다. 잔여 미확인: bc7enc_rdo 의 vcpkg 포트 유무(없으면 ThirdParty 벤더링)." },
-  { phase: 12, id: "12-2", title: "T2 — 런타임 소비 전환 (artifact 직독 · 디코드 0)",
-    detail: "DataSystem 이 원본 PNG 대신 artifact 를 읽는다. 로드 = 파일 읽기 + 헤더 파싱. ★ 에디터는 원본 직독 경로를 남긴다 — 아직 안 구워진 자산도 보여야 하고 상용 엔진도 같다. 이 지점이 성능의 본체이고(5.34 → 0.6 ms/장), 게임 런타임의 코덱 0개도 여기서 자동으로 달성된다.",
-    refs: "TexturePipelinePlan §5 T2·§6", priority: "P0", days: 5, status: "todo",
-    note: "게이트: 런타임 → TextureCodec.* 간선 0 (CI 래칫) · artifact 로드 픽셀 = 원본 직독 픽셀. ★ dead-produce-only-pipeline 의 둘째 사례가 정확히 이 자리였다 — 'cooked 파이프라인은 지울 게 아니라 이을 것이었고, 잇는 순간 첫 소비에서 결함이 나왔다'. 잇는 슬라이스는 결함을 기대하고 들어간다." },
-  { phase: 12, id: "12-3", title: "T1b — DirectXTex 잔여 청산 · 압축기 재검토",
-    detail: "DDS 미니 파서(헤더 128B + 블록 데이터, ~100줄)로 마지막 DirectXTex 소비를 걷는다. BC7·BC5 도입 판단(품질)과 BC6H 판단(HDR 128MB 압축). 압축이 빌드 시간을 지배하기 시작하면 ISPC 재검토.",
-    refs: "TexturePipelinePlan §5 T1b·§4.4", priority: "P1", days: 4, status: "todo",
-    note: "stb_image 는 DDS 를 읽지 못한다(JPEG·PNG·TGA·BMP·PSD·GIF·HDR·PIC·PNM). 자산은 blueNoise.dds 하나뿐이지만 파서가 필요하다. ★ 압축 품질은 게이트가 못 잡는다 — BC1 이 BC7 보다 나쁜지는 사람이 화면을 봐야 한다." },
-  { phase: 12, id: "12-4", title: "T3 — 모바일 · Web (TextureCodec.Astc · .Basis)",
-    detail: "플랫폼별 압축 정책을 CompressionPolicy 에 넣는다 — Windows/Linux: Albedo BC7 sRGB · Normal BC5 Linear · ORM BC1/BC7 · HDR BC6H. Android/iOS: ASTC 전면. Web: KTX2 → Basis 트랜스코딩.",
+  { phase: 12, id: "12-0", title: "T0 — 임포트 설정과 저작 연결",
+    detail: "기존 .meta importSettings에 색공간·압축·밉·최대 크기·노멀 정책을 저장하고 에디터 편집·재cook/재로드에 연결한다. 필드가 없는 기존 자산의 기본값과 기존 metadata를 보존한다. wrap/filter는 참조별 TextureSampler 소유이며 image recipe/cache key에서 제외한다.",
+    refs: "TexturePipelinePlan §5 T0", priority: "P0", days: 3, status: "progress", earnedDays: 0,
+    note: "2026-10-09 구현 중. material slot 추론과 명시 설정 우선순위, policy key 반영을 함께 다룬다. 실행 검증 전이며 이번 작업은 빌드·테스트를 실행하지 않는다." },
+  { phase: 12, id: "12-1", title: "T1a — DirectXTex cook 트랜스코딩",
+    detail: "기존 producer에서 디코드·리사이즈·밉·압축·GPU-ready artifact 기록을 수행한다. 버전/producer 식별자를 갱신하고 독립 및 모델 임베디드 텍스처에 같은 정책을 적용한다. DirectXTex만 사용하며 새로운 코덱 프로젝트를 만들지 않는다.",
+    refs: "TexturePipelinePlan §5 T1a·§4", priority: "P0", days: 8, status: "progress", earnedDays: 0,
+    note: "런타임 mipgen은 이미 구현돼 있다. stb 이관·bc7enc·자체 DDS 파서 방향을 철회했다. PNG/HDR 옛 A/B 결과는 2026-09-04 기록일 뿐 신규 정본 왕복 검사의 통과가 아니다. Terrain 높이 알파도 데이터로 보존한다." },
+  { phase: 12, id: "12-2", title: "T2 — cooked 런타임 소비 연결",
+    detail: "독립 텍스처와 모델 generation의 GPU-ready artifact를 검증·업로드한다. cooked 오류를 원본 fallback으로 숨기지 않으며 에디터 원본 경로를 명시적으로 구분한다. 밉·피치·포맷·버전·해시 검증과 참조별 TextureSampler 분리를 유지한다.",
+    refs: "TexturePipelinePlan §5 T2·§6", priority: "P0", days: 5, status: "progress", earnedDays: 0,
+    note: "2026-10-09 구현 중, 실행 검증 전. cooked 경로의 디코드/밉 생성/압축 0은 중간 단계다. Player 실제 소스/링크에서 코덱 의존 제거까지 T2의 열린 완료 조건으로 유지한다. 다른 source/editor/Terrain 소비가 남는 동안 코덱 0개나 T2 완료를 선언하지 않는다." },
+  { phase: 12, id: "12-3", title: "T1b — DirectXTex 품질·추가 포맷 판단",
+    detail: "BC5/BC7 구조적 형식·백엔드·노멀 Z 복원 지원은 T0~T2 구현에 포함해 진행한다. 품질 튜닝·메모리·시간 측정과 BC6H 판단은 보류한다. DirectXTex 청산이나 다른 압축기 도입은 범위가 아니다.",
+    refs: "TexturePipelinePlan §5 T1b", priority: "P1", days: 4, status: "todo",
+    note: "보류. 과거 성능 수치를 현재 병목이나 압축기 교체 승인 근거로 쓰지 않는다. 픽셀 바이트 왕복은 사람의 품질 판단을 대체하지 않는다." },
+  { phase: 12, id: "12-4", title: "T3 — 실제 모바일/Web 타깃 후 확장",
+    detail: "실제 타깃·툴체인·GPU 형식·호스트 이미지 입력 요구가 확정된 다음 플랫폼 정책과 필요한 구현을 결정한다.",
     refs: "TexturePipelinePlan §5 T3", priority: "P2", days: 10, status: "todo",
-    note: "★ 착수 조건이 붙는다 — 해당 플랫폼 타깃이 실제로 생겼을 때. 지금 vcxproj 는 Win32/x64 뿐이고 EXR 자산도 0개다(tinyexr 보류). 빈 프로젝트를 미리 만들면 그것이 곧 죽은 코드다. 확장 대비의 실체는 구현체가 아니라 ITextureEncoder 가 그 모양을 받아들이는가이고, 그것은 T1a 의 시그니처 설계로 충족된다." },
+    note: "착수 조건 미충족. ASTC/Basis 의존성·프로젝트·등록 코드를 미리 만들지 않는다. 현재 WIC의 플랫폼 제약은 그대로 명시한다." },
   // ---------- PHASE 12.5: 빌드 파이프라인 신설과 계층 전면 개편 ----------
   { phase: 12.5, id: "12.5-0", title: "B0 — 플레이어 재건 (유니티식 전환: TrainAsis·GameBuild.sln 제거)",
     detail: "가장 먼저이고 트랙 B 최대 슬라이스. 소생이 아니라 교체다. ① 런타임 모드 도입(EngineMode: Editor|Player — BUILD_FLAG 행동 가드 ~17곳 전환, 진입점에서 한 번·불변·assert) ② Player 프로젝트 신설(CreatorEngine.sln 소속, Debug/Release 라이브러리 링크, 전용 구성 없음. main은 Dx11Main 참조해 새로 쓰되 Dx11Main은 수정 안 함 — R5 충돌 회피. 명세: DX12 InitializeRuntime+SetRenderScene · 씬 델리게이트 2종 · ShaderSystem->Initialize · ClrHost+프레임별 TickScripts · ScreenResizeBus · WinProcProxy 드레인 · --smoke N. ImGuiRenderer는 얹지 않는 것이 기본) ③ TrainAsis·GameBuild.sln 삭제 + 참조 정리(build.yml·check_include_boundary.py) + TRAIN_ASIS 하드코딩 잠정 상수화 ④ 시작 씬 정합(EngineSettings.asset이 없는 씬을 가리킨다).",
