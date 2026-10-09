@@ -126,7 +126,7 @@ void EditorAssetPresentation::OpenMaterialPicker()
 	editor::open_window(kMaterialPicker);
 }
 
-std::shared_ptr<Material> EditorAssetPresentation::TakeSelectedMaterial() noexcept
+own::shared_owner<const Material> EditorAssetPresentation::TakeSelectedMaterial() noexcept
 {
 	return std::exchange(m_selectedMaterial, {});
 }

@@ -37,7 +37,6 @@
 #include <functional>
 #include <limits>
 #include <stdexcept>
-#include <sstream>
 #include <string_view>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -55,14 +54,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string FwdHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 광원 컬링 ──
     //
     // 스레드 그룹 하나가 타일 하나다(16x16 = 256스레드). 세 단계:
@@ -176,7 +167,7 @@ namespace
         }
 
         std::filesystem::path shaderPath = meta.source;
-        if (!meta.originPath.empty())
+        if (!meta.codeProgram && !meta.originPath.empty())
         {
             std::error_code pathError;
             shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
@@ -211,6 +202,10 @@ namespace
     // 직렬 경로가 같은 오류를 보고한다.
     void FwdPrecompileMetaVariants(const ShaderMeta& meta, std::span<const std::uint16_t> keywordSelections)
     {
+        if (meta.assetOrigin || meta.codeProgram)
+        {
+            return; // Mounted variants are already carried by their CPU program.
+        }
         const ShaderPassDesc* pass = nullptr;
         ShaderMetaPermutation materialPermutation;
         std::string shaderFile;
@@ -437,7 +432,7 @@ namespace
 bool EnhancedForwardPass::MaterialKey::operator==(const MaterialKey& other) const
 {
     if (coordinates != other.coordinates || sampler != other.sampler
-        || textures != other.textures
+        || textureIds != other.textureIds
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -474,8 +469,7 @@ bool EnhancedForwardPass::MaterialKey::operator<(const MaterialKey& other) const
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
     if (sampler != other.sampler) return sampler < other.sampler;
-    return std::lexicographical_compare(textures.begin(), textures.end(),
-        other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+    return textureIds < other.textureIds;
 }
 
 RHISamplerTable EnhancedForwardPass::SamplerTableFor(
@@ -545,6 +539,11 @@ EnhancedForwardPass::MaterialKey EnhancedForwardPass::MakeMaterialKey(
     {
         key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
     }
+    key.textureIds.reserve(key.textures.size());
+    for (const Texture* texture : key.textures)
+    {
+        key.textureIds.push_back(TextureFramePins::Identity(texture));
+    }
     return key;
 }
 
@@ -594,7 +593,7 @@ bool EnhancedForwardPass::ResolveShaderVariant(
     if (!shade || !reference) return false;
     outShadePipeline = shade->pipeline.GetHandle();
     outReferencePipeline = reference->pipeline.GetHandle();
-    outLayout = {shade->shader.shader, &shade->shader.shader->layout};
+    outLayout = {shade, &shade->shader.shader->layout};
     return true;
 }
 RHIPipelineHandle EnhancedForwardPass::GetShaderVariantPipeline(
@@ -629,7 +628,18 @@ bool EnhancedForwardPass::Initialize(const EnhancedFrameContext& context, std::s
     return CreatePipelines(context, outError);
 }
 
-bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedForwardPass::InitializeGraphLighting(const EnhancedFrameContext& context, std::string& outError)
+{
+    if (!context.resources || !context.psoManager || !context.rootSignatures)
+    {
+        outError = "Graph Forward+ requires device, pipeline and layout services.";
+        return false;
+    }
+    return CreatePipelines(context, outError, false);
+}
+
+bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError,
+    bool nativeMaterials)
 {
     const auto traceForward = [](const char* phase, uint32_t mask = 0, bool reference = false) {
         static const bool trace = [] {
@@ -682,6 +692,12 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     traceForward("cull.pso.begin");
     LX::Runtime::ComputePipeline cullCandidate;
     if (!cullCandidate.Create(*context.psoManager, desc, std::move(blob.description), outError)) return false;
+
+    if (!nativeMaterials)
+    {
+        m_cullPSO = std::move(cullCandidate);
+        return true;
+    }
 
     traceForward("texture.reflect.begin");
     if (!MaterialTextureTable::Reflect(kShadeShaderFile, "PSMain", forwardPermutation,
@@ -773,7 +789,8 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     const ShaderRenderState* renderState,
     const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
-    RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled)
+    RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled,
+    const LX::Runtime::CompiledGraphics* prepared)
 {
     // I5-D34c: experiment 짝은 퍼뮤테이션 위에 레이아웃 매크로를 얹는다 —
     // 호출자마다 얹게 하면 하나가 빠뜨렸을 때 화면이 조용히 틀린다.
@@ -789,8 +806,23 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     }
 
     LX::Runtime::CompiledGraphics verified;
-    if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
-            *effectivePermutation, {}, verified, outError)) return false;
+    if (prepared)
+    {
+        if (prepared->identity.backend != RHIShaderCompiler::GetOutput()
+            || prepared->identity.vertexEntry != vertexEntry || prepared->identity.pixelEntry != pixelEntry
+            || prepared->identity.permutation.Entries() != effectivePermutation->Entries()
+            || prepared->identity.sealedProgramIdentity.empty())
+        {
+            outError = "Prepared code graphics does not match the exact pipeline request.";
+            return false;
+        }
+        verified = *prepared;
+    }
+    else if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
+        *effectivePermutation, {}, verified, outError))
+    {
+        return false;
+    }
     verified.identity.vertexAttributeMask = modelVertexMask;
     outVs = std::move(verified.vertex.bytecode);
     outPs = std::move(verified.pixel.bytecode);
@@ -883,11 +915,23 @@ bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
     }
     const ShaderPassDesc& pass = *passPointer;
 
+    if (meta.assetOrigin && !meta.codeProgram)
+    {
+        outError = "Mounted ShaderMeta descriptor has no prepared code program.";
+        return false;
+    }
+    const auto passIndex = static_cast<std::uint32_t>(passPointer - meta.passes.data());
+    LX::Runtime::CompiledGraphics prepared;
+    if (meta.codeProgram && !LX::Runtime::RestoreCodeGraphics(meta, passIndex, keywordSelections,
+        modelVertexMask, referencePath, prepared, outError))
+    {
+        return false;
+    }
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildShadePipelineDesc(context, shaderFile.c_str(),
             pass.vertex->entry.c_str(), pass.pixel->entry.c_str(), &pass.state,
             compilePermutation, modelVertexMask, outDesc, outVs, outPs,
-            outError, &compiled))
+            outError, &compiled, meta.codeProgram ? &prepared : nullptr))
     {
         return false;
     }
@@ -1263,11 +1307,16 @@ std::uint32_t EnhancedForwardPass::CommitShaderMetaFrame(
 bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     std::string& outError)
 {
+    if (!context.resources || !m_resourceRetirement.Attach(*context.resources))
+    {
+        outError = "Forward tile buffers require their owning device.";
+        return false;
+    }
     const uint32_t tileTotal = m_tileCountX * m_tileCountY;
     if (0 == tileTotal) return true;
 
     // 크기가 그대로면 다시 만들지 않는다(SSGI 히스토리와 같은 계약).
-    if (m_tileCountBuffer.IsValid())
+    if (m_tileCountBuffer.IsValid() && m_tileListBuffer.IsValid())
     {
         if (m_allocatedTiles >= tileTotal) return true;
     }
@@ -1282,20 +1331,34 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     // UAV를 초기 상태로 주면 검증 레이어가 '무시한다'고 경고만 남긴다.
     desc.bytes = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
     desc.debugName = L"Forward+.TileCount";
-    if (!context.resources->CreateBuffer(desc, m_tileCountBuffer, outError))
+    RHIBufferHandle count{}, list{};
+    if (!context.resources->CreateBuffer(desc, count, outError))
     {
+        if (count.IsValid())
+        {
+            context.resources->ReleaseBuffer(count);
+        }
         outError = "타일 카운트 버퍼 — " + outError;
         return false;
     }
 
     desc.bytes = static_cast<uint64_t>(tileTotal) * kMaxLightsPerTile * sizeof(uint32_t);
     desc.debugName = L"Forward+.TileList";
-    if (!context.resources->CreateBuffer(desc, m_tileListBuffer, outError))
+    if (!context.resources->CreateBuffer(desc, list, outError))
     {
+        context.resources->ReleaseBuffer(count);
+        if (list.IsValid())
+        {
+            context.resources->ReleaseBuffer(list);
+        }
         outError = "타일 목록 버퍼 — " + outError;
         return false;
     }
 
+    m_resourceRetirement.Retire(m_tileCountBuffer);
+    m_resourceRetirement.Retire(m_tileListBuffer);
+    m_tileCountBuffer = count;
+    m_tileListBuffer = list;
     m_allocatedTiles = tileTotal;
 
     // 새 리소스는 COMMON이다. 상태 멤버가 이전 버퍼의 끝 상태를 들고 있으면
@@ -1322,6 +1385,12 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     // W8: GBuffer와 같은 장부를 같은 자리에서 연다.
     m_sealLedger.Begin(context.frameId, context.sceneEpoch);
     m_rejectedSnapshots.clear();
+
+    if (!context.forwardLightingConsumer)
+    {
+        outError.clear();
+        return true;
+    }
 
     if (nullptr != context.forwardDraws)
     {
@@ -1382,6 +1451,10 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_drawGeometry.clear();
     if (nullptr != context.meshCache && nullptr != context.forwardDraws)
     {
+        if (!enhanced_draw::ValidateGeometryIdentities(*context.forwardDraws, outError))
+        {
+            return false;
+        }
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
             if (0 == enhanced_draw::GeometryKey(draw)
@@ -1389,7 +1462,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
             std::string uploadError;
             // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
-            const RHIMeshBinding entry = draw.modelMeshView.IsComplete()
+            const RHIMeshBinding entry = draw.modelMeshView.handle.IsValid()
                 ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
@@ -1426,7 +1499,11 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                     key.snapshot->bindingLayout, schema, outError)) return false;
             MaterialTextures textures;
             if (!MaterialTextureTable::Upload(*context.textureCache, schema,
-                    key.textures, textures.views, outError, !key.snapshot)) return false;
+                    key.textures, textures.views, outError, !key.snapshot,
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
+            {
+                return false;
+            }
             m_materialTextures.emplace(key, std::move(textures));
         }
     }
@@ -1551,7 +1628,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             "Forward+ Graph stream requires ExplicitVersioned resource declarations.");
     }
 
-    if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
+    if (!context.forwardLightingConsumer || !m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
     {
         return;
     }
@@ -2306,6 +2383,18 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
 
 void EnhancedForwardPass::Shutdown()
 {
+    if (auto* device = m_resourceRetirement.Device())
+    {
+        if (m_tileCountBuffer.IsValid())
+        {
+            device->ReleaseBuffer(m_tileCountBuffer);
+        }
+        if (m_tileListBuffer.IsValid())
+        {
+            device->ReleaseBuffer(m_tileListBuffer);
+        }
+    }
+    m_resourceRetirement.ClearAfterIdle();
     m_visibility.ShutdownAfterIdle();
     m_visibilityStats = {};
     m_graphMaterials = nullptr;
@@ -2318,8 +2407,6 @@ void EnhancedForwardPass::Shutdown()
     m_tileListState = RHIResourceState::Common;
     m_tileCountX = 0;
     m_tileCountY = 0;
-    m_lastCulledLights = 0;
-    m_lastOverflowTiles = 0;
     m_lastDrawCount = 0;
     m_lastMaterialCount = 0;
     m_lastBatchCount = 0;

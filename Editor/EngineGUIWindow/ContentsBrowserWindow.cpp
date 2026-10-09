@@ -136,7 +136,7 @@ namespace
 
     // Draw inside the tree item's hit rectangle, keeping its ID and interaction
     // state intact for navigation, context menus and prefab drop targets.
-    void browser_tree_label(const std::string& name, Texture* texture, const char* fallbackIcon)
+    void browser_tree_label(const std::string& name, const Texture* texture, const char* fallbackIcon)
     {
         const auto minimum = ImGui::GetItemRectMin();
         const auto maximum = ImGui::GetItemRectMax();
@@ -185,7 +185,7 @@ namespace
     // W7 썸네일: `badgeIcon` 은 그림 오른쪽 아래의 **작은 유형 기호**다. 썸네일이
     // 붙은 타일에서만 준다 — 계약이 *"실제 에셋 썸네일 + 작은 유형 배지"* 로
     // 적었고, 그림만 남으면 그 파일이 무엇인지가 사라지기 때문이다.
-    void browser_item_artwork(Texture* texture, const char* fallbackIcon,
+    void browser_item_artwork(const Texture* texture, const char* fallbackIcon,
         const std::string& name, bool listView, float tileIconSize = 40.f,
         const char* badgeIcon = nullptr)
     {
@@ -231,7 +231,7 @@ namespace
         draw->PopClipRect();
     }
 
-    bool browser_icon_button(const char* icon, const char* tip, bool enabled = true, Texture* texture = nullptr)
+    bool browser_icon_button(const char* icon, const char* tip, bool enabled = true, const Texture* texture = nullptr)
     {
         ImGui::BeginDisabled(!enabled);
         const std::string label = texture ? std::string("###") + icon : icon;
@@ -1132,7 +1132,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	// W7 썸네일: 준비된 것이 있으면 그것을, 아니면 nullptr 이라 유형 아이콘이
 	// 그대로 간다. 조회는 디스크를 만지지 않는다 — `revision` 은 목록 스캔이
 	// 담아 둔 값이고, 캐시는 표 하나를 볼 뿐이다.
-	Texture* thumbnail = nullptr;
+	const Texture* thumbnail = nullptr;
 	if (0 != revision)
 	{
 		thumbnail = editor::thumbnail_acquire(

@@ -37,6 +37,18 @@ float DistanceSquared(ImVec2 a, ImVec2 b)
     const auto d = Sub(a, b);
     return d.x * d.x + d.y * d.y;
 }
+
+LXNodeItemRect HeaderDecorationRect(ImVec2 top, ImVec2 bottom, float headerHeight, const LXNodeStyle& style,
+                                    const LXNodeItemRegistry& items, float scale)
+{
+    const float width = items.HeaderDecorationWidth();
+    const float height = std::min(width, headerHeight);
+    // Leave room for the hit radius of compact nodes' right-side sockets.
+    const float right = bottom.x - std::max(style.textPaddingX, 12.0f) * scale;
+    const float y = top.y + (headerHeight - height) * 0.5f * scale;
+    return {{right - width * scale, y}, {right, y + height * scale}};
+}
+
 ImVec2 ToScreen(ImVec2 origin, const CanvasState& state, ImVec2 graphPoint, float scale)
 {
     return Add(Add(origin, state.pan), Mul(graphPoint, scale));
@@ -685,15 +697,43 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
 {
     assert(!document || &graph == &document->GraphForCanvas());
     const LXNodeItemRegistry::RowCacheScope rowCache(items);
+    if (state.pendingPin &&
+        (!graph.FindPin(state.pendingPin) ||
+         (document && (state.pendingDocument != document->DocumentId() ||
+                       state.pendingRevision != document->Revision()))))
+    {
+        state.pendingPin = 0;
+    }
+    if (state.disconnectPin &&
+        (!graph.FindPin(state.disconnectPin) ||
+         (document && (state.disconnectDocument != document->DocumentId() ||
+                       state.disconnectRevision != document->Revision()))))
+    {
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
+    }
     const auto connect = [&](Id first, Id second, std::string* reason) -> std::optional<Id> {
+        const Pin* firstPin = graph.FindPin(first);
+        const Pin* secondPin = graph.FindPin(second);
+        const Pin* input = firstPin && firstPin->direction == Direction::Input ? firstPin : secondPin;
+        const bool replacing = input && input->direction == Direction::Input && !input->multiple &&
+                               std::any_of(graph.Links().begin(), graph.Links().end(),
+                                           [&](const Link& link) { return link.input == input->id; });
         if (!document)
         {
-            return graph.Connect(first, second, reason);
+            const auto result = graph.ReplaceInputConnection(first, second, reason);
+            if (result && reason)
+            {
+                *reason = replacing ? "Link replaced" : "Link created";
+            }
+            return result;
         }
-        const LXCommandResult result = document->Execute(LXConnectPins{first, second}, document->Revision());
+        const LXCommandResult result =
+            document->Execute(LXReplaceInputConnection{first, second}, state.pendingRevision);
         if (reason)
         {
-            *reason = result.message;
+            *reason = result.applied ? (replacing ? "Link replaced" : "Link created")
+                                    : (result.message.empty() ? result.code : result.message);
         }
         return result.applied ? std::optional<Id>{result.created} : std::nullopt;
     };
@@ -772,6 +812,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
     };
     ImGui::Dummy(size);
     const bool hovered = ImGui::IsItemHovered();
+    const bool decorationCanvasHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
     const ImVec2 cursorAfterCanvas = ImGui::GetCursorScreenPos();
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -809,6 +850,8 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
     {
         state.pan = Add(state.pan, ImGui::GetIO().MouseDelta);
         state.panning = true;
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
     }
     if (state.panning &&
         (ImGui::IsMouseReleased(ImGuiMouseButton_Middle) || ImGui::IsMouseReleased(ImGuiMouseButton_Right)))
@@ -901,6 +944,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
     }
 
     Id hoveredPin = 0, hoveredNode = 0, hoveredCollapse = 0, hoveredFrame = 0;
+    Id hoveredHeaderDecoration = 0;
     ImVec2 hoveredPinPosition{};
     float hoveredPinDistance = std::numeric_limits<float>::max();
     bool hoveredWidget = false;
@@ -914,7 +958,17 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         if (mouse.x >= top.x && mouse.x <= bottom.x && mouse.y >= top.y && mouse.y <= bottom.y)
         {
             hoveredNode = node.id;
+            hoveredHeaderDecoration = 0;
             const float headerHitHeight = layout.collapsed || style.headerOnly ? geometry.height : style.headerHeight;
+            if (items.HeaderDecorationWidth() > 0.0f)
+            {
+                const auto rect = HeaderDecorationRect(top, bottom, headerHitHeight, style, items, scale);
+                if (mouse.x >= rect.minimum.x && mouse.x <= rect.maximum.x && mouse.y >= rect.minimum.y &&
+                    mouse.y <= rect.maximum.y)
+                {
+                    hoveredHeaderDecoration = node.id;
+                }
+            }
             if (!style.headerOnly && mouse.x <= top.x + 21.0f * scale && mouse.y <= top.y + headerHitHeight * scale)
             {
                 hoveredCollapse = node.id;
@@ -988,8 +1042,74 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         }
     }
 
-    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape))
     {
+        state.pendingPin = 0;
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
+    }
+    if (state.disconnectPin &&
+        (!hovered || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0) ||
+         ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsAnyItemActive()))
+    {
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
+    }
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+    {
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
+        if (state.pendingPin)
+        {
+            state.pendingPin = 0;
+        }
+        else if (hovered && !state.panning && !state.draggingNode && !state.draggingFrame &&
+                 !ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive())
+        {
+            const Pin* pin = graph.FindPin(hoveredPin);
+            if (pin && pin->direction == Direction::Input && !pin->multiple)
+            {
+                const auto link = std::find_if(graph.Links().begin(), graph.Links().end(),
+                                               [&](const Link& candidate) { return candidate.input == pin->id; });
+                if (link != graph.Links().end())
+                {
+                    state.disconnectPin = pin->id;
+                    state.disconnectLink = link->id;
+                    state.disconnectDocument = document ? document->DocumentId() : 0;
+                    state.disconnectRevision = document ? document->Revision() : 0;
+                }
+            }
+        }
+    }
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+    {
+        if (hovered && state.disconnectPin && state.disconnectPin == hoveredPin && !state.draggingNode &&
+            !state.draggingFrame && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            const auto link = std::find_if(graph.Links().begin(), graph.Links().end(), [&](const Link& candidate) {
+                return candidate.id == state.disconnectLink && candidate.input == state.disconnectPin;
+            });
+            if (link != graph.Links().end())
+            {
+                const bool disconnected =
+                    document ? document->Execute(LXDisconnectLink{link->id}, state.disconnectRevision).applied
+                             : graph.Disconnect(link->id);
+                if (disconnected)
+                {
+                    state.dirty = true;
+                }
+                state.message = disconnected ? "Link disconnected" : "Link could not be disconnected";
+            }
+        }
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
+    }
+
+    if (hovered && (!hoveredHeaderDecoration || hoveredPin) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        !ImGui::IsMouseDown(ImGuiMouseButton_Right))
+    {
+        state.disconnectPin = 0;
+        state.disconnectLink = 0;
         if (hoveredPin)
         {
             state.selectedFrame = 0;
@@ -999,17 +1119,15 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                 if (connect(state.pendingPin, hoveredPin, &reason))
                 {
                     state.dirty = true;
-                    state.message = "Link created";
                 }
-                else
-                {
-                    state.message = reason;
-                }
+                state.message = reason;
                 state.pendingPin = 0;
             }
             else
             {
                 state.pendingPin = hoveredPin;
+                state.pendingDocument = document ? document->DocumentId() : 0;
+                state.pendingRevision = document ? document->Revision() : 0;
                 state.pendingStartMouse = mouse;
                 state.pendingAnchor = hoveredPinPosition;
                 state.message = "Select a compatible port";
@@ -1094,19 +1212,19 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
             state.pendingPin = 0;
         }
     }
-    if (state.pendingPin && hoveredPin && hoveredPin != state.pendingPin &&
+    if (state.pendingPin && hovered && hoveredPin && hoveredPin != state.pendingPin &&
         ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
         std::string reason;
         if (connect(state.pendingPin, hoveredPin, &reason))
         {
             state.dirty = true;
-            state.message = "Link created";
         }
-        else
-        {
-            state.message = reason;
-        }
+        state.message = reason;
+        state.pendingPin = 0;
+    }
+    if (state.pendingPin && !hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+    {
         state.pendingPin = 0;
     }
     if (state.pendingPin && hovered && !hoveredPin && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
@@ -1316,10 +1434,29 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
             const float titleWidth = ImGui::GetFont()->CalcTextSizeA(textSize, FLT_MAX, 0.0f, node.title.c_str()).x;
             titleX = std::max(style.textPaddingX, (geometry.width - titleWidth / scale) * 0.5f);
         }
-        const ImVec4 headerClip{top.x + titleX * scale, top.y, bottom.x - style.textPaddingX * scale,
-                                top.y + headerHeight * scale};
+        const auto decorationRect = HeaderDecorationRect(top, bottom, headerHeight, style, items, scale);
+        const bool hasHeaderDecoration = items.HeaderDecorationWidth() > 0.0f;
+        const float titleRight = hasHeaderDecoration ? decorationRect.minimum.x - 4.0f * scale
+                                                    : bottom.x - style.textPaddingX * scale;
+        const ImVec4 headerClip{top.x + titleX * scale, top.y, titleRight, top.y + headerHeight * scale};
         draw->AddText(ImGui::GetFont(), textSize, Add(top, Mul({titleX, textY}, scale)), Color(style.text),
                       node.title.c_str(), nullptr, 0.0f, &headerClip);
+        if (hasHeaderDecoration)
+        {
+            const std::string nodeKey = std::to_string(node.id);
+            ImGui::PushID(nodeKey.c_str());
+            ImGui::PushID("##header_decoration");
+            const bool decorationHovered = decorationCanvasHovered && hoveredHeaderDecoration == node.id &&
+                !hoveredPin &&
+                                           !state.panning && !state.draggingNode && !state.draggingFrame &&
+                                           !state.pendingPin && !ImGui::IsAnyItemActive() &&
+                                           !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                                           !ImGui::IsMouseDown(ImGuiMouseButton_Right);
+            items.DrawHeaderDecoration(node, Mul(Add(decorationRect.minimum, decorationRect.maximum), 0.5f),
+                                       scale, decorationHovered);
+            ImGui::PopID();
+            ImGui::PopID();
+        }
 
         if (style.showPropertyPreview && !compact)
         {
@@ -1688,6 +1825,17 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         {
             ImGui::BeginTooltip();
             ImGui::Text("%s: %s", pin->name.c_str(), PinTypeName(pin->type));
+            if (pin->direction == Direction::Input && !pin->multiple &&
+                std::any_of(graph.Links().begin(), graph.Links().end(),
+                            [&](const Link& link) { return link.input == pin->id; }))
+            {
+                ImGui::TextUnformatted("Right-click to disconnect");
+                ImGui::TextUnformatted("Connect another output to replace");
+            }
+            if (state.pendingPin)
+            {
+                ImGui::TextUnformatted("Esc or right-click to cancel");
+            }
             ImGui::EndTooltip();
         }
     }

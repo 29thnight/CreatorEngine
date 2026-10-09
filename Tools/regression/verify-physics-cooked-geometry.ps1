@@ -1,12 +1,16 @@
 param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All', [switch]$RequireGpu, [string]$ConvexPoints='')
 
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'GCCEProbe.ps1')
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $deps=Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
 $vcvars='C:/Program Files/Microsoft Visual Studio/18/Community/VC/Auxiliary/Build/vcvars64.bat'
 $configs=if($Configuration -eq 'All'){@('Debug','Release','Shipping','ASan')}else{@($Configuration)}
 
 foreach($config in $configs){
+    # Shipping/ASan probes use the Release CRT and GCCE debug-check layout.
+    $gcceConfig = if ($config -eq 'Debug') { 'Debug' } else { 'Release' }
+    $gcce = Get-GCCEProbeSettings -Repository $repo -Configuration $gcceConfig
     $out=Join-Path $repo "Build/Obj/Phase19CookedGeometry/$config"
     New-Item -ItemType Directory -Force $out|Out-Null
     $lib=if($config -eq 'Debug'){Join-Path $deps 'debug'}else{$deps}
@@ -23,6 +27,8 @@ foreach($config in $configs){
     $sources+=@('Engine/RenderEngine/MaterialGraphProduct.cpp','Engine/RenderEngine/RHI/RHIShaderCompiler.cpp','Engine/RenderEngine/RHI/RHIShaderSource.cpp','Engine/RenderEngine/RHI/RHIShaderReflection.cpp','Engine/RenderEngine/RHI/RHIShaderPermutation.cpp')
     $sourceArgs=($sources | ForEach-Object {'"'+(Join-Path $repo $_)+'"'}) -join ' '
     $cmd='call "'+$vcvars+'" >nul && cl /nologo /MP4 /EHsc /Gy /DNOMINMAX /std:c++latest /Zc:__cplusplus /utf-8 /W4 '+$flags+' /DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1 /I"'+$repo+'/ThirdParty/Slang/include" /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:I"'+$deps+'/include/physx" /I"C:/Users/idene/source/repos/CreatorEngine/Engine/Utility_Framework" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" '+$sourceArgs+' /link /OPT:REF /LIBPATH:"'+$lib+'/lib" d3d12.lib dxgi.lib ole32.lib ryml.lib c4core.lib PhysX_64.lib PhysXCommon_64.lib PhysXFoundation_64.lib PhysXCooking_64.lib PhysXCharacterKinematic_static_64.lib PhysXExtensions_static_64.lib PhysXPvdSDK_static_64.lib'
+    $cmd += ' ' + $gcce.LinkArguments
+    $cmd = $cmd.Replace('cl /nologo ', 'cl ' + $gcce.CompileArguments + ' /nologo ')
     if($config -eq 'Shipping'){$cmd=$cmd.Replace('/DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1','/DCE_SHIPPING=1')}
     & $env:ComSpec /d /s /c $cmd *> "$out/build.log"
     if($LASTEXITCODE){Get-Content "$out/build.log" -Tail 30; throw "$config cooked geometry compile failed"}
@@ -37,7 +43,13 @@ foreach($config in $configs){
     $fixture=Join-Path $out ('fixture-'+[guid]::NewGuid().ToString('N'))
     $arguments = @('"'+$fixture+'"')
     if($ConvexPoints){$arguments += '"'+[IO.Path]::GetFullPath($ConvexPoints)+'"'}
-    $process=Start-Process $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
+    $previousPath = $env:PATH
+    try {
+        $env:PATH = $gcce.RuntimeDirectory + ';' + $previousPath
+        $process=Start-Process $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
+    } finally {
+        $env:PATH = $previousPath
+    }
     $handle=$process.Handle
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw 'Cooked geometry timeout'}
     $process.WaitForExit()

@@ -6,6 +6,12 @@
 
 ## 1. 수행 순서
 
+### 2026-10-07 graph-only 재질 전환 인계
+
+live Shadow/GBuffer/Forward의 native 재질 대체와 이전 graph instance 선택을 제거했다. DX12 D/R 장면 검사와 Release 전체 raster·shadow/decal·refraction·SSS·volume 검사는 통과했다. [변경 및 증거](../analysis/GraphOnlyMaterialPasses20261007.md). Release Vulkan probe는 빌드를 통과했지만 `--scene-only` 최초 재질의 `WaitSceneProgram` 준비 단계에서 `Scene asynchronous preparation`으로 exit 1, 첫 장면 fixture 실행 전에 종료했다. 이 검사의 SPIR-V 준비 제한은 600초이며 구체적인 shader/driver 오류 문자열은 비어 있다. 실행·픽셀·validation 수용은 미완료다. 실패 로그는 `Build/Verification/GraphOnlyMaterials20261007/scene-Vulkan-Release.log`에 보존한다.
+
+BP-0/1에서 같은 입력의 cold pipeline 준비 위치와 worker/PSO 단계별 시간을 분리하고 재현한다. 준비 실패/제한 초과를 구분한 뒤, 준비 완료 상태에서 새 Shadow/GBuffer clear와 exact-generation 거부·graph 재질의 실제 리소스/픽셀을 검사한다. 타임아웃 증가나 native/이전 재질 fallback 복원으로 수용하지 않는다. 이 Vulkan 잔여를 RG6의 기존 DX12 수용 선행으로 역연결하지 않는다.
+
 1. 동일 입력을 밀봉한다. 정지 fixture는 BASE-0의 자산·카메라·광원·재질·샘플·히스토리 초기화 계약을 재사용한다. 움직이는 fixture는 simulation tick, delta, jitter seed, 애니메이션 pose, 이전 프레임과 history warmup 길이까지 기록한다. 재현 불가 입력은 비교 전에 거부한다.
 2. **RenderDoc으로 DX12와 Vulkan의 실제 제품 프레임을 각각 캡처한다.** 사용한 RenderDoc 버전·GPU·driver·binary와 `.rdc`를 보존한다. 두 backend의 event 번호는 같다고 가정하지 않고 Pass 이름/역할/입출력으로 대응표를 만든다. 캡처 파일을 열어 재생할 수 있어야 한다.
 3. **리소스를 먼저 확인한다.** 대응 event의 geometry/index/vertex 입력, constant buffer 값·layout, texture format/extent/mip/layer/색공간/초기값, SRV/UAV/RT/depth binding, sampler, PSO, blend/cull/depth, 이전 history·barrier/ownership을 추적한다. 잘못된 리소스나 입력을 이미지 허용치로 덮지 않는다.
@@ -29,6 +35,8 @@
 
 ## 3. 이관 목록
 
+2026-10-08 신설 [PHASE 4.85](PathTracingHybridPipelinePlan.md)의 RT/PT/Hybrid·ReSTIR PT Enhanced·tetrahedral cages는 지원 가능한 구현이 DX12 기준선·fixture·raw radiance/history/AS 신원을 확보한 뒤 비교 대상으로 인계한다. 본 문서의 기존 22인일에 신규 RT 연구/기능 구현이나 미확인 교차 비교 비용을 포함한 것으로 해석하지 않는다. 지원 행렬·캡처 도구 제약·추가 비교 범위를 BP-0에서 확인하고 필요 공수를 별도 산정한다. 4.9 완료는 4.85 DX12 착수/수용의 선행이 아니다.
+
 | 인계하는 페이즈 | 4.9에서 비교할 대상 | 원 페이즈 완료 조건 |
 |---|---|---|
 | 4 / 4.25 | PBR, Standard/LX, GBuffer/Deferred/Forward, material routes, SSS·투과·volume, `vk.shadow/gbuffer/forward/deferred` | DX12 배선·Blender/reference 의미·품질·성능. Blender 비교를 Vulkan 비교와 혼동하지 않음 |
@@ -38,6 +46,7 @@
 | 4.7 | bake 입력·UV1/geometry·직접/간접광 출력·큐 | DX12 베이크 정확도·취소/재개·Editor 비차단 |
 | 4.75 / ENV | probe/AO·shadow·post/display·환경의 background/IBL 의미·package | DX12 기능별 golden·성능 |
 | 4.8 후속 구현 | GPU Scene·indirect·meshlet·RT capability/fallback과 실제 출력 | 설계는 중립 계약과 구현 공수; 실제 기능은 별도 DX12 구현 게이트 |
+| 4.85 | RT scene/AS·hit material·Hybrid/PT radiance·denoise/reservoir·cage geometry·지원/fallback | 두 파이프라인 DX12 수용과 연구별 판정; Vulkan 실행 비교는 본 페이즈에만 인계 |
 | Editor/기타 렌더 소비 페이즈 | viewport/UI·DPI/resize·present의 Vulkan 화면/리소스 차이 | 각 페이즈의 DX12 제품 게이트 |
 
 기존 자동 비교기와 `vk.*` 검사는 보조 자료로 재사용한다. 원 페이즈의 기본 실행을 `dx12,vulkan`으로 되돌리지 않는다. `.f32` 자동 비교만으로 이 계획의 RenderDoc 리소스 확인을 통과시킬 수 없다.

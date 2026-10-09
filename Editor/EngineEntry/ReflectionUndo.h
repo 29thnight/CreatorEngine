@@ -10,6 +10,7 @@
 // 링크 사슬에는 이 타입이 없다.
 #include "MetaStateCommand.h"
 #include "UndoHistoryTransaction.h"
+#include "ConsoleCommandSystem.h"
 #include "ClassProperty.h"
 #include <stack>
 #include <memory>
@@ -26,6 +27,10 @@ namespace Meta
     public:
         void Execute(std::unique_ptr<IUndoableCommand> cmd)
         {
+            // Structural commands must enter through a GameThread-dispatched
+            // editor operation. Value-only UI commits stay synchronous so
+            // callers can consume their accepted state in the same gesture.
+            // Undo/Redo below always replay on the GameThread.
             auto& undo = m_isGameMode ? m_gameModeUndoStack : m_undoStack;
             auto& redo = m_isGameMode ? m_gameModeRedoStack : m_redoStack;
 
@@ -34,12 +39,30 @@ namespace Meta
 
         void Undo()
         {
+            if (!ConsoleCommandSystem::Get().IsGameThread())
+            {
+                ConsoleCommandSystem::Get().EnqueueEditorMutation([]
+                {
+                    UndoManager::GetInstance()->Undo();
+                    return CommandCore::Ok();
+                });
+                return;
+            }
             Transfer(m_isGameMode ? m_gameModeUndoStack : m_undoStack,
                      m_isGameMode ? m_gameModeRedoStack : m_redoStack, true);
         }
 
         void Redo()
         {
+            if (!ConsoleCommandSystem::Get().IsGameThread())
+            {
+                ConsoleCommandSystem::Get().EnqueueEditorMutation([]
+                {
+                    UndoManager::GetInstance()->Redo();
+                    return CommandCore::Ok();
+                });
+                return;
+            }
             Transfer(m_isGameMode ? m_gameModeRedoStack : m_redoStack,
                      m_isGameMode ? m_gameModeUndoStack : m_undoStack, false);
         }

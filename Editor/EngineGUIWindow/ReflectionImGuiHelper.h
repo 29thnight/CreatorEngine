@@ -5,7 +5,10 @@
 // 이 헤더는 Utility_Framework 소속이라 RenderEngine 헤더를 못 끌어온다 —
 // 전방 선언으로 계층을 지키고 링크가 잇는다.
 class Texture;
-namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
+namespace EditorImGuiTexture
+{
+    unsigned long long From(const Texture* texture);
+}
 #include "ReflectionFunction.h"
 // ReflectionFunction.h가 imgui를 대신 끌어와 주고 있었다 — 정작 그쪽은
 // ImGui 심볼을 하나도 쓰지 않으면서 UF 전체를 imgui에 묶고 있었다.

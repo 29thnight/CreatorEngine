@@ -5,11 +5,10 @@
 
 #include "ModelSidecarV2.h"
 #include "ModelMaterialGraph.h"
+#include "ModelSourcePreparation.h"
 #include "../Experiment/Cooked/CookSupport.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/Cooked/TextureCookProducer.h"
-#include "../Experiment/Import/FbxImporter.h"
-#include "../Experiment/Import/GltfImporter.h"
 #include "../Experiment/Import/SceneToModelDraft.h"
 
 #include "AuthoringParsedDocument.h"
@@ -23,7 +22,6 @@
 #include <fstream>
 #include <limits>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <process.h>
 #include <ranges>
@@ -293,32 +291,6 @@ namespace assets
                 text.remove_prefix(newline + 1u);
             }
             return false;
-        }
-
-        [[nodiscard]] std::unique_ptr<im::IAssetImporter> Mbc3CreateImporter(
-            const std::filesystem::path& source)
-        {
-            auto gltf = std::make_unique<im::GltfImporter>();
-            if (gltf->CanImport(source)) return gltf;
-            auto fbx = std::make_unique<im::FbxImporter>();
-            if (fbx->CanImport(source)) return fbx;
-            return {};
-        }
-
-        [[nodiscard]] bool Mbc3NormalizeStableInputs(
-            std::vector<StableKeyElement>& elements, std::string& failure)
-        {
-            for (StableKeyElement& element : elements)
-            {
-                for (std::string* value : { &element.persistentId, &element.name })
-                {
-                    if (value->empty()) continue;
-                    std::string normalized;
-                    if (!NormalizeUtf8Nfc(*value, normalized, failure)) return false;
-                    *value = std::move(normalized);
-                }
-            }
-            return true;
         }
 
         [[nodiscard]] bool Mbc3ReadExternalAssetId(
@@ -873,46 +845,18 @@ namespace assets
             return result;
         }
 
-        bool buildMeshlets = false;
-        std::uint32_t lodLevels = 0;
+        ModelGeometryImportSettings geometrySettings;
         if (hadSidecar)
         {
             std::string settingsError;
-            const auto document = Authoring::ParsedDocument::ParseText(originalSidecar, settingsError);
-            const auto settings = document ? document.Root()["importSettings"] : Authoring::ReadNode{};
-            if (settings && !settings.IsMap())
+            if (!ReadModelGeometryImportSettings(originalSidecar, geometrySettings, settingsError))
             {
-                Mbc3AddIssue(result, "importSettings", "Expected an import settings map.");
+                Mbc3AddIssue(result, "importSettings", std::move(settingsError));
                 return result;
             }
-            const auto enabled = settings ? settings["buildMeshlets"] : Authoring::ReadNode{};
-            if (enabled)
-            {
-                const std::string value = enabled.IsScalar() ? enabled.AsString() : std::string{};
-                if (value != "true" && value != "false")
-                {
-                    Mbc3AddIssue(result, "importSettings.buildMeshlets", "Expected true or false.");
-                    return result;
-                }
-                buildMeshlets = value == "true";
-            }
         }
-        if (hadSidecar)
-        {
-            std::string settingsError;
-            const auto document = Authoring::ParsedDocument::ParseText(originalSidecar, settingsError);
-            const auto levels = document ? document.Root()["importSettings"]["lodLevels"] : Authoring::ReadNode{};
-            if (levels)
-            {
-                const std::string value = levels.IsScalar() ? levels.AsString() : std::string{};
-                if (value.size() != 1u || value[0] < '0' || value[0] > '7')
-                {
-                    Mbc3AddIssue(result, "importSettings.lodLevels", "Expected an integer from 0 to 7.");
-                    return result;
-                }
-                lodLevels = static_cast<std::uint32_t>(value[0] - '0');
-            }
-        }
+        bool buildMeshlets = geometrySettings.buildMeshlets;
+        std::uint32_t lodLevels = geometrySettings.lodLevels;
         if (request.buildMeshlets.has_value())
         {
             buildMeshlets = *request.buildMeshlets;
@@ -997,7 +941,7 @@ namespace assets
             : std::filesystem::last_write_time(source, sourceStat);
         const bool sourceStamped = !sourceStat;
 
-        std::unique_ptr<im::IAssetImporter> importer = Mbc3CreateImporter(source);
+        auto importer = CreateModelSourceImporter(source);
         if (!importer)
         {
             Mbc3AddIssue(result, "source.decode",
@@ -1022,7 +966,7 @@ namespace assets
 
         std::vector<StableKeyElement> elements =
             CollectStableKeyElements(*imported.scene);
-        if (!Mbc3NormalizeStableInputs(elements, failure))
+        if (!NormalizeModelStableInputs(elements, failure))
         {
             Mbc3AddIssue(result, "identity.normalize", std::move(failure));
             return result;

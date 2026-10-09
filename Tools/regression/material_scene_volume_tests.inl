@@ -217,15 +217,15 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 
 void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                    const std::shared_ptr<Texture>& image, const std::shared_ptr<Texture>& cube,
-                    const std::shared_ptr<const Instance>& background)
+                    const own::shared_owner<const Texture>& image, const own::shared_owner<const Texture>& cube,
+                    const own::shared_owner<const Instance>& background)
 {
     const std::array products{VolumeProduct(root, false), VolumeProduct(root, true)};
     GenerationStore store;
     experiment::AssetId graphId;
     Check(Uuid::TryParse("BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB", graphId.value), "Volume graph identity");
     std::string error;
-    std::array<std::shared_ptr<const Generation>, 2> generations;
+    std::array<own::shared_owner<const Generation>, 2> generations;
     for (unsigned i = 0; i < 2; ++i)
     {
         generations[i] = store.Load(
@@ -257,8 +257,9 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     context.camera = &camera;
     VolumeReflectionContracts();
     VolumeContextProgram(false);
-    auto spatial = std::make_shared<Generation>(*generations[0]);
-    spatial->cooked.product.program = VolumeContextProgram(true);
+    Generation spatialValue(*generations[0]);
+    spatialValue.cooked.product.program = VolumeContextProgram(true);
+    const auto spatial = own::make_shared<const Generation>(std::move(spatialValue));
     SceneHost rejectedHost;
     Check(!rejectedHost.RequestProgram(context, spatial, error) && error.find("homogeneous") != std::string::npos,
           "Spatial Volume is rejected before native preparation");
@@ -290,7 +291,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const double density = fixture == 9 ? 0 : 2;
             const double color = fixture == 6 || fixture == 7 || fixture == 10 ? .6 : 0;
             const auto instance = [&](double scale) {
-                std::shared_ptr<const Instance> value;
+                own::shared_owner<const Instance> value;
                 Check(BuildInstance(
                           generations[hybrid],
                           {graphId,
@@ -373,7 +374,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             {
                 sealBudget.mesh.maxChunkPoints = 3;
             }
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             const bool sealed = SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
                                                      draws, sealBudget, input, error);
             Check(sealed, "Volume seal " + error);
@@ -381,7 +382,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
             const auto environment =
-                fixture != 6 && fixture != 10 ? textures.GetOrUpload(cube.get(), error).handle : RHITextureHandle{};
+                fixture != 6 && fixture != 10 ? textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle : RHITextureHandle{};
             Check(host.PrepareResidency(context, input, error), "Volume residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "Volume Scene prepare " + error);
@@ -440,7 +441,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 auto open = volume.draw;
                 open.modelMeshView.indexCount -= 3;
                 open.geometryKey += 100;
-                std::shared_ptr<const SceneViewInput> invalid;
+                own::shared_owner<const SceneViewInput> invalid;
                 Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera}, {&open, 1}, {},
                                            invalid, error),
                       "Open boundary input remains structurally valid");

@@ -204,7 +204,7 @@ namespace RenderTest
 
             const auto clone =
                 MaterialScriptBinding::InstantiateOwned(origin, {});
-            check.Check(nullptr != clone && clone.get() != &origin,
+            check.Check(nullptr != clone && clone->m_materialGuid != origin.m_materialGuid,
                 "클론이 별개 인스턴스다");
             check.Check(clone && clone->m_name == "ScriptOrigin_Instance",
                 "기본 이름 규칙");

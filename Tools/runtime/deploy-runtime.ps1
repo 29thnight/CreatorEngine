@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory)][string]$HostPath,
     [Parameter(Mandatory)][ValidateSet('CreatorEditor','Player','AssetCooker','AssetPacker')][string]$HostName,
     [Parameter(Mandatory)][ValidateSet('Debug','Release')][string]$Config,
+    [Parameter(Mandatory)][string]$GcceRuntimePath,
     [Parameter(Mandatory)][string]$VcpkgDirectory,
     [Parameter(Mandatory)][string]$VcToolsDirectory,
     [Parameter(Mandatory)][string]$VcRedistDirectory
@@ -32,6 +33,11 @@ try {
     foreach ($dir in $roots) {
         foreach ($file in @(Get-ChildItem -LiteralPath $dir -Filter '*.dll' -File)) { $lookup[$file.Name] = $file.FullName }
     }
+    # GCCE is built once per architecture/configuration. A Shipping Player
+    # stages the same DLL as the Development Editor, preserving shared hashes.
+    if (Test-Path -LiteralPath $GcceRuntimePath -PathType Leaf) {
+        $lookup['gcce.dll'] = [IO.Path]::GetFullPath($GcceRuntimePath)
+    }
     $asan = Join-Path $VcToolsDirectory 'bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll'
     if (Test-Path -LiteralPath $asan) { $lookup['clang_rt.asan_dynamic-x86_64.dll'] = $asan }
     if (-not (Test-Path -LiteralPath (Join-Path $VcRedistDirectory 'x64'))) {
@@ -53,7 +59,7 @@ try {
     $queue = [Collections.Generic.Queue[string]]::new()
     foreach ($name in @(Get-EnginePeImports $HostPath)) { $queue.Enqueue($name) }
     if ($HostName -in @('CreatorEditor','Player')) {
-        foreach ($name in @('slang-compiler.dll','dxcompiler.dll','dxil.dll','PhysXGpu_64.dll','PhysXDevice64.dll')) { $queue.Enqueue($name) }
+        foreach ($name in @('gcce.dll','slang-compiler.dll','dxcompiler.dll','dxil.dll','PhysXGpu_64.dll','PhysXDevice64.dll')) { $queue.Enqueue($name) }
     }
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $paths = [Collections.Generic.List[string]]::new()

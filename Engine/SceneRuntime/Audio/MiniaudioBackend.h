@@ -95,6 +95,11 @@ namespace wave
         [[nodiscard]] bool Render(float* interleaved, std::uint32_t frames);
         [[nodiscard]] std::uint64_t StreamReadFailures() const noexcept;
         [[nodiscard]] std::uint64_t StreamBytesRead() const noexcept;
+        [[nodiscard]] std::uint64_t StreamPcmReads() const noexcept;
+        [[nodiscard]] std::uint64_t StreamStarvationReads() const noexcept;
+#if defined(WAVE_AUDIO_PROBE)
+        [[nodiscard]] static bool ValidateStreamReadObservation();
+#endif
 
     private:
         struct Implementation;

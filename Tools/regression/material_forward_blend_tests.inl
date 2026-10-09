@@ -1,7 +1,7 @@
 // Pixel-level alpha composition across the real Code and cooked Graph consumers.
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
-                     std::array<std::shared_ptr<const Instance>, 2> instances, std::shared_ptr<Texture> cube)
+                     std::array<own::shared_owner<const Instance>, 2> instances, own::shared_owner<const Texture> cube)
 {
     std::string error;
     for (unsigned tier = 0; tier < 2; ++tier)
@@ -12,10 +12,11 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                   root / "Build/Obj/MaterialProductProbe" / (tier ? "alpha-layered.slang" : "alpha-core.slang"),
                   {}, cooked, error, instances[tier]->description.graphId.value);
         Check(compiled, "Compile complete alpha product " + error);
-        auto generation = std::make_shared<Generation>();
-        generation->assetId = instances[tier]->description.graphId;
-        generation->generation = tier + 1;
-        generation->cooked = {std::move(cooked), {}, {}};
+        Generation generationValue;
+        generationValue.assetId = instances[tier]->description.graphId;
+        generationValue.generation = tier + 1;
+        generationValue.cooked = {std::move(cooked), {}, {}};
+        const auto generation = own::make_shared<const Generation>(std::move(generationValue));
         Check(BuildInstance(generation, instances[tier]->description,
                   [&](const experiment::AssetId&, LXColorSpace, std::string&) { return instances[tier]->textures[0].owner; },
                   instances[tier], error), "Cooked alpha instance " + error);
@@ -133,14 +134,14 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         const std::vector<EnhancedDrawItem> empty;
         context.draws = &empty;
         SceneInputView view{context.frameId, context.sceneEpoch, 99, 1, 16, 16, camera};
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         Check(SceneViewInput::Seal(view, graphDraws, {}, input, error) &&
                   host.SelectReadyInput(context, input, input, error), "Mixed sealed input " + error);
         Check(input->Draws().size() == graphDraws.size(), "No ready alpha graph omitted");
         Check(device.BeginFrame(error), "Mixed begin " + error);
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
-        const auto environment = textures.GetOrUpload(cube.get(), error);
+        const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
         Check(environment.IsValid(), "Alpha environment upload");
         Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error), "Mixed preparation " + error);

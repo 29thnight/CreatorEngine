@@ -26,7 +26,7 @@ namespace
             return false;
         }
         const uint32_t white = 0xffffffff;
-        std::unique_ptr<Texture> texture(
+        own::shared_owner<const Texture> texture(
             Texture::CreateFromPixels(1, 1, "RG5.Sprite.White", RHIFormat::RGBA8Unorm, &white));
         if (!texture)
         {
@@ -130,7 +130,7 @@ namespace
                         true);
                 }
                 std::vector<EnhancedSpritePass::Item> items(2);
-                items[0].texture = texture.get();
+                items[0].texture = (texture ? &*texture.borrow() : nullptr);
                 items[0].color = {0.125f, 0.25f, 0.375f, 1.f};
                 items[1] = items[0];
                 items[1].color = {0.25f, 0.5f, 0.75f, 1.f};
@@ -139,7 +139,7 @@ namespace
                 items[1].world(3, 2) = 0.5f;
                 sprite.SetItems(&items);
                 sprite.SetInputs({inputColor, depth});
-                if (!sprite.PrepareFrame(frame, error))
+                if (!sprite.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))
                 {
                     return false;
                 }

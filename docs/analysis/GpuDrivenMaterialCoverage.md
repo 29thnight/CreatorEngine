@@ -2,7 +2,9 @@
 
 This source checkpoint extends the GPU geometry milestone without replacing material
 programs, disabling effects, or changing the globally merged Code/Graph depth order.
-Execution and shader compilation remain unverified.
+Merged in PR #123. The merge-time DX12 checks covered the opaque meshlet/HZB path only
+(see the [implementation plan](../plans/GpuDrivenGeometryImplementationPlan.md#merge-and-first-execution-2026-10-06));
+the material routes below still have no executed parity check.
 
 ## Supported geometry routing
 

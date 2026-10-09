@@ -24,19 +24,10 @@
 #include <cstring>
 #include <functional>
 #include <limits>
-#include <sstream>
 #include <stdexcept>
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string GBufferHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // 첫 슬라이스의 셰이더는 소스에 담는다. 재질 셰이더 연결은 씬 연결
     // 슬라이스에서 ShaderSystem·PSOManager와 함께 붙인다.
     //
@@ -87,6 +78,8 @@ namespace
         const auto& identity = source.shader.compile;
         const auto& indexed = source.pipeline.GetDesc();
         return source.pipeline.IsValid() && identity.visibleInstanceIds && !identity.referencePath
+            && identity.sealedProgramIdentity.empty()
+            && !(source.shader.shader && source.shader.shader->codeProgram)
             && identity.geometryVisibility == ShaderGeometryVisibility::IndexedInstanceV1
             && assets::IsSupportedModelVertexLayout(identity.vertexAttributeMask)
             && std::filesystem::path(identity.source).lexically_normal() == std::filesystem::path(kGBufferShaderFile)
@@ -188,7 +181,7 @@ namespace
 bool EnhancedGBufferPass::MaterialKey::operator==(const MaterialKey& other) const
 {
     if (coordinates != other.coordinates || sampler != other.sampler
-        || textures != other.textures
+        || textureIds != other.textureIds
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -223,8 +216,7 @@ bool EnhancedGBufferPass::MaterialKey::operator<(const MaterialKey& other) const
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
     if (sampler != other.sampler) return sampler < other.sampler;
-    return std::lexicographical_compare(textures.begin(), textures.end(),
-        other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+    return textureIds < other.textureIds;
 }
 
 EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
@@ -241,6 +233,11 @@ EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
     else
     {
         key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
+    }
+    key.textureIds.reserve(key.textures.size());
+    for (const Texture* texture : key.textures)
+    {
+        key.textureIds.push_back(TextureFramePins::Identity(texture));
     }
     return key;
 }
@@ -282,7 +279,7 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
         snapshot.shaderMetaHandle, snapshot.permutationKey, snapshot.bindingLayout, vertexAttributeMask, false);
     if (!generation) return false;
     outPipeline = generation->pipeline.GetHandle();
-    outLayout = {generation->shader.shader, &generation->shader.shader->layout};
+    outLayout = {generation, &generation->shader.shader->layout};
     return true;
 }
 RHIPipelineHandle EnhancedGBufferPass::GetShaderVariantPipeline(
@@ -347,6 +344,10 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     //
     // 예전에는 메시 중복 제거 블록 안에서 재질까지 올렸는데, 그러면 같은 메시를
     // 다른 재질로 두 번 그릴 때 두 번째 재질이 통째로 건너뛰어진다. 중복 제거의
+    if (!enhanced_draw::ValidateGeometryIdentities(*context.draws, outError))
+    {
+        return false;
+    }
     // 단위가 둘이 다르다 — 지오메트리는 메시별로, 재질은 재질별로 한 번이다.
     for (const auto& draw : *context.draws)
     {
@@ -393,7 +394,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             // I5-D4b: 핸들이 실린 아이템은 legacy Mesh 없이 완결되는 핸들
             // 진입점으로 올린다(키=experiment 자산 신원). mesh 포인터는 정렬·
             // 지오메트리 맵 키로 남는다(은퇴는 D4f).
-            const auto entry = draw.modelMeshView.IsComplete()
+            const auto entry = draw.modelMeshView.handle.IsValid()
                 ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
@@ -421,7 +422,11 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                         key.snapshot->bindingLayout, schema, outError)) return false;
                 DrawTextures textures;
                 if (!MaterialTextureTable::Upload(*context.textureCache, schema,
-                        key.textures, textures.views, outError, !key.snapshot)) return false;
+                        key.textures, textures.views, outError, !key.snapshot,
+                        context.textureFramePins ? &*context.textureFramePins : nullptr))
+                {
+                    return false;
+                }
                 m_drawTextures.emplace(key, std::move(textures));
             }
         }
@@ -912,7 +917,10 @@ bool EnhancedGBufferPass::HasSafeSkinningBounds(
     auto& contract = found->second;
     if (inserted)
     {
-        contract.vertices = mesh.vertexData;
+        // Granular storage can be evicted and rehydrated at a different address.
+        // SourceMesh has already matched the exact descriptor and raw payload;
+        // only the legacy aggregate adapter needs persistent address equality.
+        contract.vertices = mesh.sourceDescriptor ? nullptr : mesh.vertexData;
         contract.bytes = mesh.vertexBytes;
         contract.mask = mesh.vertexAttributeMask;
         contract.stride = mesh.vertexStride;
@@ -946,7 +954,8 @@ bool EnhancedGBufferPass::HasSafeSkinningBounds(
             }
         }
     }
-    if (contract.vertices != mesh.vertexData || contract.bytes != mesh.vertexBytes ||
+    if ((!mesh.sourceDescriptor && contract.vertices != mesh.vertexData) ||
+        contract.bytes != mesh.vertexBytes ||
         contract.mask != mesh.vertexAttributeMask || contract.stride != mesh.vertexStride ||
         contract.requiredBones > draw.boneCount)
     {
@@ -1102,7 +1111,7 @@ bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std:
         const auto& coverage = key.snapshot ? key.snapshot->coverage : draw.coverage;
         RHIPipelineHandle meshletPipeline;
         math::vector4 meshletLocalSphere{};
-        const auto* authoredMeshlets = draw.modelMeshView.Meshlets();
+        const bool authoredMeshlets = draw.modelMeshView.HasMeshlets();
         if (safePose && draw.boneCount == 0 && geometry->second.meshlets.IsValid()
             && authoredMeshlets && draw.modelMeshView.sourceLodIndex == 0
             && geometry->second.meshlets.profileVersion == experiment::kMeshletProfileVersion
@@ -1121,7 +1130,14 @@ bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std:
                 auto [bounds, inserted] = m_meshletLocalBounds.try_emplace(draw.modelMeshView.handle);
                 if (inserted)
                 {
-                    bounds->second = GBufferMeshletLocalBounds(*authoredMeshlets);
+                    if (draw.modelMeshView.sourceDescriptor)
+                    {
+                        bounds->second = draw.modelMeshView.sourceDescriptor->meshlets.localBoundsSphere;
+                    }
+                    else if (const auto* payload = draw.modelMeshView.Meshlets())
+                    {
+                        bounds->second = GBufferMeshletLocalBounds(*payload);
+                    }
                 }
                 meshletLocalSphere = bounds->second;
             }
@@ -1136,7 +1152,7 @@ bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std:
             occlusionEligible = GBufferStandardDepthSource(*sourceGeneration)
                 && (coverage.flags & EnhancedMaterialCoverage::Blended) == 0;
         }
-        if ((gpuEligible || meshletPipeline.IsValid()) && safePose && draw.modelMeshView.SourceMesh()
+        if ((gpuEligible || meshletPipeline.IsValid()) && safePose && draw.modelMeshView.HasSourceMetadata()
             && (coverage.flags & (EnhancedMaterialCoverage::Masked | EnhancedMaterialCoverage::Blended)) == 0)
         {
             std::string diagnostic;
@@ -1293,7 +1309,8 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     const RHIShaderPermutation& permutation, uint32_t experimentMask,
     RHIGraphicsPipelineDesc& outDesc,
     RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError,
-    LX::Runtime::CompiledGraphics* compiled, ShaderGeometryVisibility visibilityContract)
+    LX::Runtime::CompiledGraphics* compiled, ShaderGeometryVisibility visibilityContract,
+    const LX::Runtime::CompiledGraphics* prepared)
 {
     // I5-D34a/b: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를
     // 얹는다. 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다
@@ -1312,8 +1329,23 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     }
 
     LX::Runtime::CompiledGraphics verified;
-    if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
-            *effectivePermutation, {}, verified, outError)) return false;
+    if (prepared)
+    {
+        if (prepared->identity.backend != RHIShaderCompiler::GetOutput()
+            || prepared->identity.vertexEntry != vertexEntry || prepared->identity.pixelEntry != pixelEntry
+            || prepared->identity.permutation.Entries() != effectivePermutation->Entries()
+            || prepared->identity.sealedProgramIdentity.empty())
+        {
+            outError = "Prepared code graphics does not match the exact pipeline request.";
+            return false;
+        }
+        verified = *prepared;
+    }
+    else if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
+        *effectivePermutation, {}, verified, outError))
+    {
+        return false;
+    }
     verified.identity.vertexAttributeMask = experimentMask;
     outVs = std::move(verified.vertex.bytecode);
     outPs = std::move(verified.pixel.bytecode);
@@ -1521,7 +1553,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     }
 
     std::filesystem::path shaderPath = meta.source;
-    if (!meta.originPath.empty())
+    if (!meta.codeProgram && !meta.originPath.empty())
     {
         std::error_code pathError;
         shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
@@ -1542,10 +1574,21 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
         return false;
     }
 
+    if (meta.assetOrigin && !meta.codeProgram)
+    {
+        outError = "Mounted ShaderMeta descriptor has no prepared code program.";
+        return false;
+    }
+    LX::Runtime::CompiledGraphics prepared;
+    if (meta.codeProgram && !LX::Runtime::RestoreCodeGraphics(meta, passIndex, keywordSelections,
+        experimentMask, false, prepared, outError))
+    {
+        return false;
+    }
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
             pass.pixel->entry.c_str(), &pass.state, permutation.defines,
-            experimentMask, outDesc, outVs, outPs, outError, &compiled, pass.geometryVisibility))
+            experimentMask, outDesc, outVs, outPs, outError, &compiled, pass.geometryVisibility, meta.codeProgram ? &prepared : nullptr))
     {
         return false;
     }
@@ -1842,6 +1885,65 @@ RHISamplerTable EnhancedGBufferPass::SamplerTableFor(
     if (!table.IsValid()) return m_sampler;
     m_samplerTables.emplace(sampler, table);
     return table;
+}
+
+void EnhancedGBufferPass::DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
+{
+    static const char* names[kRenderTargetCount] = {
+        "GBuffer.Diffuse", "GBuffer.MetalRough", "GBuffer.Normal",
+        "GBuffer.Emissive", "GBuffer.Bitmask"};
+    std::array<RGHandle, kRenderTargetCount> colors{};
+    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+        ? RGAccessMode::LegacyState : RGAccessMode::Write;
+    for (uint32_t index = 0; index < kRenderTargetCount; ++index)
+    {
+        RGTextureDesc desc{};
+        desc.width = context.width;
+        desc.height = context.height;
+        desc.format = GetRenderTargetFormat(index);
+        desc.allowRenderTarget = true;
+        desc.name = names[index];
+        colors[index] = graph.CreateTexture(desc);
+        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+        {
+            colors[index] = graph.Write(colors[index]);
+        }
+        usages.push_back({colors[index], RHIResourceState::RenderTarget, access});
+    }
+    RGTextureDesc desc{};
+    desc.width = context.width;
+    desc.height = context.height;
+    desc.format = kDepthFormat;
+    desc.allowDepthStencil = true;
+    desc.name = "GBuffer.Depth";
+    auto depth = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        depth = graph.Write(depth);
+    }
+    usages.push_back({depth, RHIResourceState::DepthWrite, access});
+    m_outputs = {colors[0], colors[1], colors[2], colors[3], colors[4], depth};
+    graph.AddPass("GBuffer.Clear", usages,
+        [colors, depth, &context](const EnhancedRenderGraph::ExecuteContext& execution)
+        {
+            std::array<RHITextureHandle, kRenderTargetCount> handles{};
+            for (uint32_t index = 0; index < kRenderTargetCount; ++index)
+            {
+                handles[index] = execution.ResolveHandle(colors[index]);
+            }
+            const auto depthTarget = RHIDepthTargetDesc::Depth(execution.ResolveHandle(depth), kDepthFormat);
+            const auto targets = context.resources->CreateRenderTargets(handles, &depthTarget);
+            if (!targets.IsValid())
+            {
+                throw std::runtime_error("Graph GBuffer clear targets are unavailable.");
+            }
+            auto& encoder = *execution.encoder;
+            encoder.BindRenderTargets(targets);
+            constexpr float zero[4]{};
+            encoder.ClearRenderTargets(targets, zero);
+            encoder.ClearDepthTarget(targets, 1.f);
+        });
 }
 
 void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)

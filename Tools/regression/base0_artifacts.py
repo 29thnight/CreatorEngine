@@ -1,7 +1,7 @@
 """BASE-0 artifact gate. Standard-library only; reads actual product captures.
 
-Legacy reachability is audited separately from execution order. This does not
-invent versions or claim that the current graph is a dependency scheduler.
+Legacy and explicit versioned captures retain separate access/order contracts.
+The current schema audits exported producer/consumer versions and dependencies.
 """
 import argparse
 import array
@@ -31,7 +31,9 @@ def truth(value):
 
 
 def audit_graph(graph):
-    require(graph["schemaVersion"] == 1, "graph schema")
+    if graph["schemaVersion"] == 3 and graph["accessContract"] == "explicit-access":
+        return audit_versioned_graph(graph)
+    require(graph["schemaVersion"] in (1, 3), "graph schema")
     require(graph["orderContract"] == "legacy-declaration-order", "unsupported graph contract")
     require(graph["accessContract"] == "inferred-from-state" and
             not truth(graph["versionsSupported"]), "legacy version contract")
@@ -47,7 +49,8 @@ def audit_graph(graph):
                 "compiled index")
         for u in p["usages"]:
             require(0 <= u["resource"] < len(resources), "out-of-range usage")
-            require(truth(u["inferredWrite"]) == (u["state"] in (1, 2, 7, 9)),
+            write = u["state"] in (1, 2, 7, 9) if u.get("access", 0) == 0 else u["access"] in (2, 3)
+            require(truth(u["inferredWrite"]) == write,
                     "state/access inference mismatch")
             if not truth(u["inferredWrite"]):
                 for producer, writer in enumerate(passes):
@@ -87,14 +90,164 @@ def audit_graph(graph):
             require((r["firstUse"], r["lastUse"]) == (min(positions), max(positions)), "lifetime")
     # Pool-dependent initial states/barriers are audited, but not a topology identity.
     topology = copy.deepcopy(graph)
+    topology.pop("generation", None)
+    topology.pop("graphEpoch", None)
     for p in topology["passes"]:
         p.pop("barriers")
+        for phase in p.get("phases", []):
+            phase.pop("firstBarriers")
+            phase.pop("repeatBarriers")
+    for resource in topology["resources"]:
+        resource.pop("initialState", None)
+        resource.pop("finalState", None)
+        resource.pop("aliasGroup", None)
+        resource.pop("allocationBytes", None)
+    return digest(topology)
+
+
+def audit_aliasing(graph):
+    resources = graph['resources']
+    groups, activations = {}, {}
+    for resource in resources:
+        group = resource.get('aliasGroup', 0xffffffff)
+        require(resource.get('allocationBytes', 0) >= 0, 'negative allocation size')
+        if group != 0xffffffff:
+            require(group >= 0 and truth(resource['used']) and not truth(resource['imported']) and
+                    resource.get('allocationBytes', 0) > 0, 'invalid shared heap member')
+            groups.setdefault(group, []).append(resource)
+    for position, index in enumerate(graph['executeOrder']):
+        for barrier in graph['passes'][index]['barriers']:
+            if truth(barrier.get('aliasing', False)):
+                resource = resources[barrier['resource']]
+                require(resource.get('aliasGroup', 0xffffffff) in groups and
+                        resource['firstUse'] == position and barrier['before'] == barrier['after'] == 0 and
+                        not truth(barrier['uav']) and not truth(barrier.get('afterPass', False)),
+                        'invalid heap activation')
+                require(any(u['resource'] == resource['id'] and u['access'] == 2
+                            for u in graph['passes'][index]['usages']), 'activation without explicit write')
+                activations[resource['id']] = activations.get(resource['id'], 0) + 1
+    for members in groups.values():
+        require(len(members) >= 2, 'single-member shared heap')
+        require(len({r['kind'] for r in members}) == 1, 'mixed buffer/texture heap')
+        ordered = sorted(members, key=lambda r: r['firstUse'])
+        require(all(a['lastUse'] < b['firstUse'] for a, b in zip(ordered, ordered[1:])),
+                'overlapping shared heap lifetimes')
+        require(all(activations.get(r['id'], 0) == 1 for r in members), 'missing/repeated heap activation')
+
+
+def audit_versioned_graph(graph):
+    """Audit the serialized versioned producer/consumer contract, including dead work."""
+    require(truth(graph["versionsSupported"]), "explicit version contract")
+    require(graph["orderContract"] in ("dependency-order", "preserve-declaration-order"), "versioned order contract")
+    require(graph["generation"] > 0 and graph["graphEpoch"] > 0 and graph["dependencyHash"] > 0, "compiled identity")
+    passes, resources, order = graph["passes"], graph["resources"], graph["executeOrder"]
+    require(passes and resources and order, "empty compiled graph")
+    require([p["authoredIndex"] for p in passes] == list(range(len(passes))), "pass IDs")
+    require([r["id"] for r in resources] == list(range(len(resources))), "resource IDs")
+    require(len(order) == len(set(order)) and set(order) == {i for i, p in enumerate(passes) if not truth(p["culled"])}, "compiled order/culling")
+    if graph["orderContract"] == "preserve-declaration-order":
+        require(order == sorted(order), "preserved order changed")
+    position = {p: i for i, p in enumerate(order)}
+    producers = [[None] * r["versionCount"] for r in resources]
+    readers = [[[] for _ in versions] for versions in producers]
+    for index, p in enumerate(passes):
+        require(p["compiledIndex"] == position.get(index, -1), "compiled index")
+        seen = set()
+        for u in p["usages"]:
+            r, v, access = u["resource"], u["version"], u["access"]
+            require(0 <= r < len(resources) and 0 <= v < len(producers[r]), "resource version range")
+            require(r not in seen, "duplicate pass resource")
+            seen.add(r)
+            require(access in (1, 2, 3), "implicit versioned access")
+            require(u["kind"] == (1 if resources[r]["kind"] == "buffer" else 0), "resource kind")
+            require(truth(u["inferredWrite"]) == (access in (2, 3)), "explicit write diagnostic")
+            require(u["state"] in range(13), "unknown resource state")
+            if access in (2, 3):
+                require(u["state"] in (1, 2, 7, 9), "write state")
+                require(not truth(resources[r]["imported"]) or v > 0, "overwrite imported initial version")
+                require(producers[r][v] is None, "multiple version producers")
+                producers[r][v] = index
+                if access == 3:
+                    require(v > 0, "Modify without parent")
+                    readers[r][v - 1].append(index)
+            else:
+                require(u["state"] not in (1, 2, 9), "read state")
+                readers[r][v].append(index)
+    for r, versions in enumerate(producers):
+        for v, writer in enumerate(versions):
+            require(writer is not None or v == 0 and truth(resources[r]["imported"]), "missing version producer")
+    live = {i for i, p in enumerate(passes) if truth(p["sideEffect"])}
+    for r, versions in enumerate(producers):
+        if truth(resources[r]["imported"]) and len(versions) > 1:
+            live.add(versions[-1])
+    while True:
+        expanded = set(live)
+        for p in live:
+            for u in passes[p]["usages"]:
+                if u["access"] in (1, 3):
+                    writer = producers[u["resource"]][u["version"] - (u["access"] == 3)]
+                    if writer is not None:
+                        expanded.add(writer)
+        if expanded == live:
+            break
+        live = expanded
+    require(live == set(order), "versioned culling/reachability")
+    expected = []
+    def edge(writer, reader, resource, version, reason):
+        if writer is not None and writer != reader:
+            expected.append(dict(producer=writer, consumer=reader, resource=resource, version=version, reason=reason))
+    for r, versions in enumerate(producers):
+        previous, previous_version, pending = None, 0, []
+        for v, writer in enumerate(versions):
+            if writer in live:
+                edge(previous, writer, r, previous_version, 2)
+                for reader, read_version in pending:
+                    edge(reader, writer, r, read_version, 1)
+                previous, previous_version, pending = writer, v, []
+            for reader in readers[r][v]:
+                if reader in live:
+                    edge(writer, reader, r, v, 0)
+                    pending.append((reader, v))
+    require(graph["versionEdges"] == expected, "missing/extra version edge")
+    require(graph["reachabilityEdges"] == [{k: e[k] for k in ("producer", "consumer", "resource")} for e in expected if e["reason"] == 0], "missing/extra reachability edge")
+    require(all(position[e["producer"]] < position[e["consumer"]] for e in expected), "dependency order violation")
+    uses = [[] for _ in resources]
+    for i in order:
+        for u in passes[i]["usages"]:
+            uses[u["resource"]].append(position[i])
+        for b in passes[i]["barriers"]:
+            require(0 <= b["resource"] < len(resources), "barrier resource")
+            require(any(u["resource"] == b["resource"] for u in passes[i]["usages"]), "orphan barrier")
+            require(not truth(b["uav"]) or b["before"] == b["after"] == 7, "UAV barrier state")
+    for r, positions in zip(resources, uses):
+        require(truth(r["used"]) == bool(positions), "resource used flag")
+        if positions:
+            require((r["firstUse"], r["lastUse"]) == (min(positions), max(positions)), "lifetime")
+    waves = graph["dependencyWaves"]
+    require(len(waves) == len(passes), "dependency wave count")
+    require(all(waves[i] >= 0 if i in live else waves[i] == -1 for i in range(len(passes))), "dependency wave liveness")
+    require(all(waves[e["producer"]] < waves[e["consumer"]] for e in expected), "dependency wave order")
+    audit_aliasing(graph)
+    topology = copy.deepcopy(graph)
+    topology.pop("generation")
+    topology.pop("graphEpoch")
+    for p in topology["passes"]:
+        p.pop("barriers")
+        for phase in p["phases"]:
+            phase.pop("firstBarriers")
+            phase.pop("repeatBarriers")
+    for resource in topology["resources"]:
+        resource.pop("initialState")
+        resource.pop("finalState")
+        resource.pop("aliasGroup", None)
+        resource.pop("allocationBytes", None)
     return digest(topology)
 
 
 def input_identity(m):
     draws = []
     for d in m["draws"]:
+        require(d["route"] in ("gbuffer", "forward", "lattice"), "pending/unknown material route")
         require("missing" not in d and d["modelGeneration"] > 0, "missing draw identity")
         entry = {k: d[k] for k in ("route", "modelId", "meshId", "modelGeneration", "world")}
         if d["route"] == "lattice":
@@ -245,13 +398,44 @@ def load_capture(directory):
     return m, identity, images
 
 
-def compare(left, right, output):
+def graph_roles(graph):
+    return digest(dict(resources=[{k: r[k] for k in ('id', 'name', 'kind', 'imported', 'used')} for r in graph['resources']],
+                       passes=[dict(name=p['name'], sideEffect=p['sideEffect'], culled=p['culled'],
+                                    usages=[{k: u[k] for k in ('resource', 'state', 'inferredWrite')} for u in p['usages']])
+                               for p in graph['passes']]))
+
+
+def determinism(directory, output):
+    captures = sorted(directory.glob('capture-*/manifest.json'), key=lambda p: int(p.parent.name.split('-')[-1]))
+    require(len(captures) >= 2, 'multiple compile samples required')
+    identities = []
+    for path in captures:
+        m = json.loads(path.read_text(encoding='utf-8-sig'))
+        identity = audit_manifest(m)
+        identity['dependencyHash'] = m['compiledGraph'].get('dependencyHash')
+        identity['executeOrder'] = m['compiledGraph']['executeOrder']
+        require(all(a['nonfinite'] == 0 for a in m['attachments'] + m.get('diagnosticStages', [])), 'nonfinite sample')
+        identities.append(identity)
+    require(all(i == identities[0] for i in identities), 'compile identity changed under sealed inputs')
+    result = dict(passed=True, samples=len(captures), **identities[0])
+    output.write_text(json.dumps(result, indent=2), encoding='utf-8')
+    return result
+
+
+def compare(left, right, output, rg6=False):
     require(left.resolve() != right.resolve(), "independent captures required")
     a, aid, ap = load_capture(left)
     b, bid, bp = load_capture(right)
     require(aid["inputHash"] == bid["inputHash"], "sealed input identity mismatch")
     same_backend = a["backend"] == b["backend"]
-    if same_backend:
+    if rg6:
+        require(same_backend and a['backend'] == 'dx12', 'RG6 requires same DX12 backend')
+        require(a['compiledGraph']['orderContract'] == 'legacy-declaration-order' and
+                b['compiledGraph']['orderContract'] == 'dependency-order', 'RG6 reference/product contracts')
+        logical_hash = graph_roles(a['compiledGraph'])
+        require(logical_hash == graph_roles(b['compiledGraph']), 'RG6 authored resource/pass roles differ')
+        graph_contract = 'same-authored-physical-roles-legacy-to-versioned-v1'
+    elif same_backend:
         require(aid["graphHash"] == bid["graphHash"], "same-backend graph identity mismatch")
         graph_contract = "full-topology"
         logical_hash = aid["graphHash"]
@@ -320,6 +504,15 @@ def mutations(directory, output):
     c = copy.deepcopy(m)
     require(c["compiledGraph"]["reachabilityEdges"], "edge mutation requires nonempty graph")
     c["compiledGraph"]["reachabilityEdges"].pop(); reject("missing-edge", c)
+    if m["compiledGraph"]["schemaVersion"] == 3 and m['compiledGraph']['accessContract'] == 'explicit-access':
+        c = copy.deepcopy(m); c["compiledGraph"]["versionEdges"].pop(); reject("missing-version-edge", c)
+        c = copy.deepcopy(m); c["compiledGraph"]["passes"][0]["usages"][0]["access"] = 0; reject("implicit-access", c)
+        c = copy.deepcopy(m); c["compiledGraph"]["passes"][0]["usages"][0]["kind"] = 9; reject("wrong-resource-kind", c)
+        c = copy.deepcopy(m)
+        capture = next(p for p in c["compiledGraph"]["passes"] if p["name"] == "PBR.Capture.Display.LDR")
+        require(capture["usages"][0]["version"] > 0, "display capture requires produced version")
+        capture["usages"][0]["version"] -= 1
+        reject("stale-display-version", c)
     c = copy.deepcopy(m); c["compiledGraph"]["resources"][0]["lastUse"] += 1; reject("lifetime", c)
     c = copy.deepcopy(m); c["measurement"]["gpuStatus"] = "failed"; reject("GPU-unavailable", c)
     c = copy.deepcopy(m); c["ibl"]["reflectionSamples"] = 1024; reject("quality-reduction", c)
@@ -351,14 +544,16 @@ def mutations(directory, output):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=("compare", "mutations"))
+    parser.add_argument("operation", choices=("compare", "rg6-compare", "determinism", "mutations"))
     parser.add_argument("left", type=Path)
     parser.add_argument("right_or_output", type=Path)
     parser.add_argument("output", type=Path, nargs="?")
     args = parser.parse_args()
-    if args.operation == "compare":
+    if args.operation in ("compare", "rg6-compare"):
         require(args.output is not None, "comparison output required")
-        result = compare(args.left, args.right_or_output, args.output)
+        result = compare(args.left, args.right_or_output, args.output, args.operation == 'rg6-compare')
+    elif args.operation == 'determinism':
+        result = determinism(args.left, args.right_or_output)
     else:
         result = mutations(args.left, args.right_or_output)
     print(json.dumps(result))

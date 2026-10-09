@@ -636,6 +636,7 @@ namespace ce
         std::lock_guard<std::mutex> guard(m_workLock);
         if (!m_initialized.load(std::memory_order_acquire) || m_stopWorker ||
             m_state.load(std::memory_order_acquire) != recorder_state::recording ||
+            !m_gpuFrameRangeReady.load(std::memory_order_acquire) ||
             frame < m_recordStartFrame.load(std::memory_order_acquire))
         {
             return 0;
@@ -1018,6 +1019,10 @@ namespace ce
             // Only the first boundary actually collected defines the capture start.
             m_recordStartFrame.store(engine_frame, std::memory_order_release);
             m_ring.discard_deferred_counters_before(engine_frame);
+            // Admission must use the actual capture range, not the stale frame
+            // supplied by the asynchronous Record request. Already admitted GPU
+            // results still retain the ordinary drain/loss accounting contract.
+            m_gpuFrameRangeReady.store(true, std::memory_order_release);
             m_firstRecordBoundaryPending = false;
         }
         const profile_tick started = now();
@@ -1395,6 +1400,7 @@ namespace ce
         recording_batch_bytes_ = 0;
         m_engineFrame.store(first_frame, std::memory_order_relaxed);
         m_recordStartFrame.store(first_frame, std::memory_order_release);
+        m_gpuFrameRangeReady.store(false, std::memory_order_release);
         m_firstRecordBoundaryPending = true;
         m_frameBeginTick = now();
         m_lastProcessSampleTick = 0;

@@ -4,8 +4,9 @@ Baseline: `ef829373c41138b8f47dd4011b076e1ec4d5829f`.
 
 ## Integrated source paths
 
-- Opt-in meshlets/LOD are built before CEMC hashing/staging. CEMC v11 retains explicit
-  v9/v10 readers, and model generation publication remains atomic
+- Opt-in meshlets/LOD are built before CEMC hashing/staging, and model generation
+  publication remains atomic. (At review time v11 kept v9/v10 readers; `bf3fe4f3` removed
+  them before merge, so only v11 is accepted.)
 - DX12/Vulkan expose optional mesh pipelines, capability limits, generation-owned uploads,
   typed dispatch checks and completion-owned resource retirement
 - Standard static opaque GBuffer uses GPU meshlet visibility, projected-error LOD and

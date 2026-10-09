@@ -1,4 +1,5 @@
 #include "Render/Passes/UI/EnhancedUIPass.h"
+#include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -314,24 +315,22 @@ bool DX12Test::RunUITest(std::string& outLog)
     // 않는다. 텍스처를 번갈아 두면 배치가 늘어야 한다.
     if (passed)
     {
-        // 흰색과 '흰색이 아닌 것'을 번갈아 두려면 텍스처가 둘 필요한데,
-        // 이 검증에는 텍스처 자원이 없다. 대신 포인터만 다르게 둔 가짜
-        // 주소로 '텍스처가 다르다'는 판단만 확인한다 — 배칭이 보는 것은
-        // 포인터의 같고 다름뿐이라 이것으로 충분하고, 실제 업로드는
-        // 씬 연결(2단계)에서 확인한다.
-        Texture* const fakeA = reinterpret_cast<Texture*>(0x1);
-        Texture* const fakeB = reinterpret_cast<Texture*>(0x2);
+        // Distinct CPU-only owners supply valid resource identities.
+        // This probe tests batching; other fixtures cover texture upload.
+        const auto batchTextureA = own::make_shared<const Texture>();
+        const auto batchTextureB = own::make_shared<const Texture>();
+        const Texture* const textureA = (batchTextureA ? &*batchTextureA.borrow() : nullptr);
+        const Texture* const textureB = (batchTextureB ? &*batchTextureB.borrow() : nullptr);
 
         std::vector<EnhancedUIPass::Rect> mixed = rects;
-        mixed[0].texture = fakeA;
-        mixed[1].texture = fakeB;
-        mixed[2].texture = fakeA;
-        mixed[3].texture = fakeB;
+        mixed[0].texture = textureA;
+        mixed[1].texture = textureB;
+        mixed[2].texture = textureA;
+        mixed[3].texture = textureB;
 
         ui.SetRects(&mixed);
-        // 가짜 주소는 배치 경계만 검사하는 표식이다. PrepareFrame이 텍스처
-        // 업로드까지 책임지므로 이 CPU-only 판정 동안에는 캐시를 떼어 둔다.
-        // 실제 업로드는 위 렌더와 vk.ui의 실제 두 텍스처 fixture가 검증한다.
+        // Disable upload for this CPU-only identity probe. Both owners remain
+        // alive until every borrowed item has been consumed.
         IRenderTextureCache* const savedTextureCache = frameContext.textureCache;
         frameContext.textureCache = nullptr;
         const bool preparedMixed = ui.PrepareFrame(frameContext, error);

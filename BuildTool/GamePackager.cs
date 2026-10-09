@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace CreatorBuildTool;
 
@@ -6,12 +7,18 @@ internal static class GamePackager
 {
     public static async Task Build(BuildContext context)
     {
-        var options = context.Options; var config = options.Choice("config", "Debug", "Debug", "Release");
+        var options = context.Options;
+        var contentMode = RuntimeBootstrap.ContentMode(options);
+        var prebuiltContent = contentMode == "PrebuiltAssetSets";
+        var config = options.Choice("config", "Debug", "Debug", "Release");
         _ = options.Choice("target", "Game", "Game");
         var mode = options.Choice("input-mode", "Project", "Project", "Workspace", "Tracked"); var shipping = options.Flag("shipping");
         var frames = options.Number("smoke-frames", 120, 1, 1000000); var timeout = options.Number("smoke-timeout-sec", 180, 10, 3600);
         var repository = Paths.Repository(options.Get("repository"));
         var project = Paths.Canonical(options.Get("project", Path.Combine(repository, "Dynamic_CPP")), true);
+        if (mode != "Project" && options.Get("asset-list").Length > 0)
+            throw new BuildException("--asset-list supports only Project input mode.");
+        var selectedAssets = PackageInputs.ReadAssetList(project, options.Get("asset-list"), options.Get("startup-scene"));
         var stageDefault = File.Exists(Path.Combine(repository, "engine.manifest.json")) ? Path.Combine(project, "Build/Staging") : Path.Combine(repository, "Build/Staging");
         var stage = Paths.Canonical(options.Get("stage-root", stageDefault));
         var assets = Paths.Canonical(Path.Combine(project, "Assets"), true); var settings = Paths.Canonical(Path.Combine(project, "ProjectSetting"), true);
@@ -21,6 +28,8 @@ internal static class GamePackager
         var engine = EngineDistribution.Load(distributionRoot, context);
         if (engine.Configuration != config || engine.Manifest.Bool("shipping") != shipping) throw new BuildException("Requested game configuration differs from selected engine.");
         engine.AssertProject(project); Paths.Disjoint(stage, engine.Root);
+        var contentAbi = options.Get("asset-set-list").Length == 0 ? "" : engine.RequireContentAbi(context);
+        if (prebuiltContent) Paths.Disjoint(stage, Paths.Canonical(options.Required("bootstrap-root"), true));
         var template = Paths.Child(engine.Root, "Tools/packaging/templates/EngineSettings.runtime.yml");
         var gitCommit = engine.Manifest["source"]!.Text("revision"); var dirty = engine.Manifest["source"]!.Bool("dirty");
         if (mode == "Tracked") gitCommit = (await context.Run("git", ["-C", repository, "rev-parse", "HEAD"], echo: false)).Output.Trim();
@@ -44,23 +53,35 @@ internal static class GamePackager
             var work = Paths.Child(candidate, ".package-input"); var managed = Path.Combine(work, "Managed");
             context.Log("[2/6 BuildManaged]", "stage");
             await GameCompiler.Compile(context, engine, project, managed, config, options.Get("game-scripts-assembly"));
-            context.Log("[3/6 Cook]", "stage");
+            context.Log(prebuiltContent ? "[3/6 Prebuilt content]" : "[3/6 Cook]", "stage");
             var baseRoot = Path.Combine(work, "Base"); var generated = Path.Combine(work, "Generated"); var merged = Path.Combine(work, "Merged");
             foreach (var directory in new[] { baseRoot, generated, merged }) Directory.CreateDirectory(directory);
             var packageRevision = "WORKTREE"; int baseCount;
-            if (mode == "Tracked")
+            BootstrapResult? bootstrap = null;
+            CookResult? cook = null;
+            GenerationResult? generation = null;
+            if (prebuiltContent)
             {
-                var snapshot = await PackageInputs.Snapshot(context, repository, project, Path.Combine(work, "TrackedSnapshot"), gitCommit);
-                template = Path.Combine(snapshot, "Tools/packaging/templates/EngineSettings.runtime.yml"); packageRevision = gitCommit;
-                baseCount = PackageInputs.CopyProject(Path.Combine(snapshot, "Dynamic_CPP"), baseRoot, context.Cancellation);
+                bootstrap = RuntimeBootstrap.Copy(options.Required("bootstrap-root"), merged, engine, context);
+                packageRevision = "BOOTSTRAP:" + bootstrap.Report.Text("contentDigest");
+                baseCount = bootstrap.Entries.Length;
             }
-            else if (mode == "Workspace") baseCount = await PackageInputs.CopyWorkspace(context, repository, project, baseRoot);
-            else baseCount = PackageInputs.CopyProject(project, baseRoot, context.Cancellation);
-            var packageAssets = Path.Combine(baseRoot, "Assets");
-            if (Directory.Exists(Path.Combine(packageAssets, "Derived"))) throw new BuildException("Package source contains a stale/authored Derived tree.");
-            var generation = await AssetCooking.Generations(context, cooker, packageAssets, generations, mode == "Tracked" ? "" : Path.Combine(project, "Library/ModelAssetGenerations"));
-            var cook = await AssetCooking.Cook(context, cooker, packageAssets, Path.Combine(generated, "Assets"), generations);
-            context.Log($"Cooked {cook.ModelCount} models, {cook.ArtifactCount} artifacts; legacy texture references={cook.LegacyTextureNameRefs}, legacy model caches={cook.LegacyModelCookCaches}");
+            else
+            {
+                if (mode == "Tracked")
+                {
+                    var snapshot = await PackageInputs.Snapshot(context, repository, project, Path.Combine(work, "TrackedSnapshot"), gitCommit);
+                    template = Path.Combine(snapshot, "Tools/packaging/templates/EngineSettings.runtime.yml"); packageRevision = gitCommit;
+                    baseCount = PackageInputs.CopyProject(Path.Combine(snapshot, "Dynamic_CPP"), baseRoot, context.Cancellation);
+                }
+                else if (mode == "Workspace") baseCount = await PackageInputs.CopyWorkspace(context, repository, project, baseRoot);
+                else baseCount = PackageInputs.CopyProject(project, baseRoot, context.Cancellation, selectedAssets);
+                var packageAssets = Path.Combine(baseRoot, "Assets");
+                if (Directory.Exists(Path.Combine(packageAssets, "Derived"))) throw new BuildException("Package source contains a stale/authored Derived tree.");
+                generation = await AssetCooking.Generations(context, cooker, packageAssets, generations, mode == "Tracked" ? "" : Path.Combine(project, "Library/ModelAssetGenerations"));
+                cook = await AssetCooking.Cook(context, cooker, packageAssets, Path.Combine(generated, "Assets"), generations);
+                context.Log($"Cooked {cook.ModelCount} models, {cook.ArtifactCount} artifacts; legacy texture references={cook.LegacyTextureNameRefs}, legacy model caches={cook.LegacyModelCookCaches}");
+            }
             context.Log("[4/6 Stage]", "stage");
             var runtimeRecord = Metadata.Read(Path.Combine(engine.BinaryRoot, "Runtime/Manifests/Player.json"));
             var runtimeSources = Metadata.ParseEntries(runtimeRecord.Array("entries")); Metadata.Verify(engine.BinaryRoot, runtimeSources, context.Cancellation);
@@ -105,6 +126,7 @@ internal static class GamePackager
             }
             var runtimeMetadata = Metadata.Object(new { schemaVersion = 1, version = engine.Manifest.Text("version"), buildId = engine.Manifest.Text("buildId"),
                 productName = engine.Manifest.Text("productName"), featureRelease = engine.Manifest.Text("featureRelease"), channel = engine.Manifest.Text("channel"),
+                contentAbi, contentAbiVersion = contentAbi.Length == 0 ? (int?)null : engine.Manifest.Int("contentAbiVersion"),
                 localDevelopment = engine.Manifest.Bool("localDevelopment"), payloadDigest = engine.Manifest.Text("payloadDigest"), hostAbi = engine.Manifest.Int("hostAbi"), scriptApi = engine.Manifest.Int("scriptApi"), configuration = config, shipping, developmentBuild = !shipping });
             Metadata.Write(Path.Combine(candidate, "engine.runtime.json"), runtimeMetadata); rootFiles.Add("engine.runtime.json");
             File.WriteAllText(Path.Combine(candidate, "engine.runtime.info"), Metadata.Info(engine.Manifest)); rootFiles.Add("engine.runtime.info");
@@ -112,34 +134,50 @@ internal static class GamePackager
             var runtimePaths = rootFiles.Concat(Paths.Files(Path.Combine(candidate, "Managed")).Select(p => Paths.Relative(candidate, p))).ToArray();
             var runtimeEntries = Metadata.Entries(candidate, runtimePaths); var runtimeDigest = Metadata.Digest(runtimeEntries);
             context.Log("[5/6 Pak]", "stage");
-            PackageInputs.Materialize(template, Path.Combine(generated, "ProjectSetting/EngineSettings.asset"), options.Get("startup-scene"), options.Get("render-backend"));
-            // Automatic graph compilation also creates a private Library cache
-            // below Base. Only the two package mounts belong to runtime content.
-            foreach (var mount in new[] { "Assets", "ProjectSetting" })
-                Paths.CopyTree(Path.Combine(baseRoot, mount), Path.Combine(merged, mount), context.Cancellation);
-            Paths.CopyTree(generated, merged, context.Cancellation);
-            PackageInputs.RemoveGeometrySources(merged);
-            PackageInputs.RemoveAudioSources(merged);
-            var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook.ArtifactCount);
-            if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
+            if (!prebuiltContent)
+            {
+                PackageInputs.Materialize(template, Path.Combine(generated, "ProjectSetting/EngineSettings.asset"), options.Get("startup-scene"), options.Get("render-backend"));
+                // Automatic graph compilation also creates a private Library cache
+                // below Base. Only the two package mounts belong to runtime content.
+                foreach (var mount in new[] { "Assets", "ProjectSetting" })
+                    Paths.CopyTree(Path.Combine(baseRoot, mount), Path.Combine(merged, mount), context.Cancellation);
+                Paths.CopyTree(generated, merged, context.Cancellation);
+                PackageInputs.RemoveGeometrySources(merged);
+                PackageInputs.RemoveAudioSources(merged);
+                var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook!.ArtifactCount);
+                if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
+            }
+            var assetSetManifests = await AssetSetPackaging.CopyConfiguredSets(context, Path.Combine(merged, "Assets"),
+                async (source, destination) =>
+                {
+                    await context.Run(cooker, ["--copy-asset-set", "--asset-root", source, "--output", destination], engine.Root);
+                }, contentAbi);
+            if (assetSetManifests.Length != 0)
+            {
+                await context.Run(cooker, ["--validate-asset-set-activation", "--asset-root", Path.Combine(merged, "Assets")], engine.Root);
+            }
             var settingsFile = Path.Combine(merged, "ProjectSetting/EngineSettings.asset"); var settingsHash = Metadata.Hash(settingsFile);
-            var preflight = PackageInputs.Validate(merged, settingsFile);
-            var documents = await AssetCooking.Documents(context, cooker, merged);
+            var preflight = bootstrap?.Preflight ?? PackageInputs.Validate(merged, settingsFile);
+            var documents = bootstrap == null ? await AssetCooking.Documents(context, cooker, merged)
+                : bootstrap.Report["documents"]!.Deserialize<DocumentResult>(Metadata.Format)
+                    ?? throw new BuildException("Bootstrap runtime document inventory missing.");
             var entries = Metadata.Entries(merged, Paths.Files(merged).Where(p => !PackageInputs.Excluded(p)).Select(p => Paths.Relative(merged, p)));
             if (entries.Length == 0) throw new BuildException("Package content is empty.");
             var contentDigest = Metadata.Digest(entries); var distributionDigest = Metadata.Digest(runtimeEntries.Append(new("GameAssets.logical", 0, contentDigest)));
             var manifest = Metadata.Object(new { schemaVersion = 2, workspaceHead = gitCommit, workspaceDirty = dirty, packageInputRevision = packageRevision,
                 nativeSource = "ENGINE_DISTRIBUTION", engineVersion = engine.Manifest.Text("version"), engineBuildId = engine.Manifest.Text("buildId"), nativeBuildRequested = options.Flag("build-native"),
-                config, shipping, developmentBuild = !shipping, inputMode = mode, baseFileCount = baseCount, generatedFileCount = 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
-                settingsTemplateSha256 = Metadata.Hash(template), runtimeSettingsSha256 = Metadata.Hash(settingsFile), authoringRuntimeSettingsSha256 = settingsHash,
+                config, shipping, developmentBuild = !shipping, inputMode = mode, contentMode, selectedAssetPaths = selectedAssets?.Order(StringComparer.Ordinal).ToArray(), baseFileCount = baseCount, generatedFileCount = cook == null ? 0 : 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
+                assetSetManifests, assetSetAbi = contentAbi, contentAbiVersion = contentAbi.Length == 0 ? (int?)null : engine.Manifest.Int("contentAbiVersion"),
+                bootstrap = bootstrap?.Report, runtimeDocuments = documents,
+                settingsTemplateSha256 = bootstrap?.Report.Text("settingsTemplateSha256") ?? Metadata.Hash(template), runtimeSettingsSha256 = Metadata.Hash(settingsFile), authoringRuntimeSettingsSha256 = settingsHash,
                 startupScene = preflight.StartupScene, renderBackend = preflight.RuntimeBackend, startupSceneSha256 = Metadata.Hash(Path.Combine(merged, "Assets/Scenes/" + preflight.StartupScene)),
                 startupSceneScriptComponentCount = preflight.SceneCounts["Script"], managedLifecycleRequired = preflight.RequiresManagedLifecycle,
                 distributionPolicy = config == "Release" ? "bundled-runtime" : "development-only",
                 runtimePrerequisites = new[] { new { name = ".NET 10 x64 runtime", bundled = true }, new { name = config == "Release" ? "Microsoft Visual C++ Redistributable x64" : "Microsoft Visual C++ Debug Runtime x64", bundled = true } },
                 runtimeEntryCount = runtimeEntries.Length, runtimeDigest, distributionDigest, runtimeEntries,
-                cook = new { schemaVersion = 1, producer = "AssetCooker", source = "package-base/Assets", artifactRoot = "Assets/Derived", cook.ModelCount, cook.ArtifactCount, cook.ArtifactBytes,
+                cook = cook == null ? null : new { schemaVersion = 1, producer = "AssetCooker", source = "package-base/Assets", artifactRoot = "Assets/Derived", cook.ModelCount, cook.ArtifactCount, cook.ArtifactBytes,
                     cook.ManifestBytes, cook.ManifestSha256, cook.DerivedFileCount, byFolder = cook.ByFolder, cook.SourceCounts, cook.LegacyTextureNameRefs, cook.LegacyModelCookCaches,
-                    modelGenerationsCopied = generation.Copied, modelGenerationsAuthored = generation.Authored,
+                    modelGenerationsCopied = generation!.Copied, modelGenerationsAuthored = generation.Authored,
                     runtimeDocumentCount = documents.DocumentCount, runtimeDocumentBytes = documents.DocumentBytes, runtimeDocumentFormat = documents.Format },
                 verification = "pending", entries });
             var manifestPath = Path.Combine(candidate, "package-manifest.json"); Metadata.Write(manifestPath, manifest);

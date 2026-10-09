@@ -28,7 +28,7 @@ void RunCsmLegacyBatches(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             // Spatially distinct groups make a missing partition visible in readback.
             draw.worldMatrix.m[3][0] = (float(group % 8) - 3.5f) * 2.f;
             draw.worldMatrix.m[3][1] = (float(group / 8) - 1.5f) * 2.f;
-            draw.baseColor = instance % 2 ? alphaB.get() : alphaA.get();
+            draw.baseColor = instance % 2 ? &*alphaB.borrow() : &*alphaA.borrow();
             draw.coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Masked
                 | EnhancedMaterialCoverage::DoubleSided;
             draws.push_back(draw); // A/B/A/B must become exactly two complete groups.

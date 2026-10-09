@@ -63,7 +63,7 @@ namespace
 
 // ── 불변 글리프 배치를 화면/Canvas 사각형으로 ──
 bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
-    std::vector<Rect>& outRects, float offsetX, float offsetY)
+    std::vector<Rect>& outRects, TextureFramePins& texturePins, float offsetX, float offsetY)
 {
     if (!text.layout || !std::isfinite(offsetX) || !std::isfinite(offsetY) ||
         !std::isfinite(text.position.x) || !std::isfinite(text.position.y) ||
@@ -103,7 +103,7 @@ bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
     {
         // Append-only atlas pages may publish a newer CPU texture; this frame
         // seals one owner while older frames keep their previous texture alive.
-        const std::shared_ptr<Texture> texture = glyph.GetTexture();
+        const auto texture = glyph.GetTexture();
         if (!texture || !std::isfinite(glyph.left) ||
             !std::isfinite(glyph.top) || !std::isfinite(glyph.right) ||
             !std::isfinite(glyph.bottom) || !std::isfinite(glyph.uvLeft) ||
@@ -135,8 +135,8 @@ bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
         rect.color = text.color;
         rect.canvasOrder = text.canvasOrder;
         rect.layerOrder = text.layerOrder;
-        rect.texture = texture.get();
-        rect.textureOwner = texture;
+        rect.texturePinIndex = texturePins.Retain(texture);
+        rect.texture = texturePins.Borrow(rect.texturePinIndex);
         rect.signedDistance = true;
         outRects.push_back(std::move(rect));
     }
@@ -145,7 +145,7 @@ bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
 
 uint32_t EnhancedUIPass::BuildRectsFromQueue(
     UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects,
-    float screenWidth, float screenHeight)
+    float screenWidth, float screenHeight, TextureFramePins* texturePins)
 {
     outRects.clear();
     outRects.reserve(count);
@@ -169,12 +169,12 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
 
         if (const auto* text = std::get_if<UIRenderProxy::TextData>(&proxy->GetData()))
         {
-            if (CanvasRenderMode::ScreenSpaceOverlay != text->renderMode || !text->layout)
+            if (CanvasRenderMode::ScreenSpaceOverlay != text->renderMode || !text->layout || !texturePins)
             {
                 ++skipped;
                 continue;
             }
-            if (!AppendTextRects(*text, outRects, offsetX, offsetY))
+            if (!AppendTextRects(*text, outRects, *texturePins, offsetX, offsetY))
             {
                 ++skipped;
             }
@@ -249,8 +249,9 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         rect.rotation = image->rotation;
         rect.canvasOrder = image->canvasOrder;
         rect.layerOrder = image->layerOrder;
-        rect.texture = image->texture.get();
-        rect.textureOwner = image->texture;
+        rect.texturePinIndex = texturePins ? texturePins->Retain(image->texture)
+            : TextureFramePins::InvalidIndex;
+        rect.texture = (image->texture ? &*image->texture.borrow() : nullptr);
 
         outRects.push_back(std::move(rect));
     }
@@ -383,23 +384,19 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
         m_instances.push_back(instance);
 
         // 앞 배치와 텍스처가 같으면 이어 붙인다.
-        Texture* const texture = rect.textureOwner ? rect.textureOwner.get() : rect.texture;
-        if (!m_batches.empty() && m_batches.back().texture == texture)
+        if (!m_batches.empty() && m_batches.back().textureId == TextureFramePins::Identity(rect.texture))
         {
             ++m_batches.back().count;
-            if (!m_batches.back().textureOwner)
-            {
-                m_batches.back().textureOwner = rect.textureOwner;
-            }
         }
         else
         {
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
-            batch.texture = texture;
-            batch.textureOwner = rect.textureOwner;
-            m_batches.push_back(std::move(batch));
+            batch.texturePinIndex = rect.texturePinIndex;
+            batch.texture = rect.texture;
+            batch.textureId = TextureFramePins::Identity(rect.texture);
+            m_batches.push_back(batch);
         }
     }
 
@@ -417,8 +414,8 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
             std::string uploadError;
             // nullptr은 캐시의 1x1 흰색으로 해석된다 — 단색 사각형 계약.
             batch.uploaded =
-                context.textureCache->GetOrUpload(batch.texture, uploadError);
-            if (!batch.uploaded.IsValid() && !uploadError.empty())
+                context.textureCache->GetOrUpload(batch.texture, context.TextureImage(batch.texture), uploadError);
+            if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "UI 텍스처 업로드 실패: " + uploadError;
                 return false;
@@ -569,6 +566,7 @@ void EnhancedUIPass::Shutdown()
 {
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     m_lastRectCount = 0;
     m_lastBatchCount = 0;
     m_width = 0;

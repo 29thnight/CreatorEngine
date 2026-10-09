@@ -34,13 +34,21 @@ namespace
         return std::abs(left - right) < 0.01f;
     }
 
-    std::vector<std::byte> copy_pixels(const std::shared_ptr<Texture>& texture)
+    bool same_texture(const own::shared_owner<const Texture>& left,
+        const own::shared_owner<const Texture>& right)
+    {
+        // The owners pin both snapshots throughout the borrowed comparison.
+        return left && right ? &*left.borrow() == &*right.borrow() : !left && !right;
+    }
+
+    std::vector<std::byte> copy_pixels(const own::shared_owner<const Texture>& texture)
     {
         if (!texture)
         {
             return {};
         }
-        const auto view = texture->GetImageView();
+        const auto pixels = texture->NonRehydratableImage();
+        const auto view = texture->GetImageView(pixels);
         const auto* image = view.At(0);
         if (!image || !image->pixels)
         {
@@ -91,7 +99,7 @@ int wmain(int argc, wchar_t** argv)
     const auto oldPixels = copy_pixels(oldTexture);
     const auto added = build("B");
     checker.Check(added && !oldPixels.empty() && oldPixels == copy_pixels(oldTexture), "old frame atlas bytes immutable");
-    checker.Check(single->glyphs.front().GetTexture() != oldTexture, "static layout observes append-only latest atlas");
+    checker.Check(!same_texture(single->glyphs.front().GetTexture(), oldTexture), "static layout observes append-only latest atlas");
     checker.Check(single->glyphs.front().atlasPage && !single->glyphs.front().texture,
         "real glyph layout retains stable page rather than a stale Texture");
     oldTexture.reset();
@@ -151,7 +159,7 @@ int wmain(int argc, wchar_t** argv)
         checker.Check(allRendered && labels.size() > FontAsset::kMaxLiveAtlasSnapshots,
             "94 persistent distinct labels do not exhaust atlas snapshot budget");
         checker.Check(labels.front() && labels.back() && !labels.front()->glyphs.empty() && !labels.back()->glyphs.empty()
-            && labels.front()->glyphs.front().GetTexture() == labels.back()->glyphs.front().GetTexture(),
+            && same_texture(labels.front()->glyphs.front().GetTexture(), labels.back()->glyphs.front().GetTexture()),
             "old and new labels resolve the same latest page snapshot");
     }
 
@@ -162,7 +170,7 @@ int wmain(int argc, wchar_t** argv)
     char blockedCharacter = 0;
     if (pressureFont)
     {
-        std::vector<std::shared_ptr<Texture>> frames;
+        std::vector<own::shared_owner<const Texture>> frames;
         for (char character = '!'; character <= '~'; ++character)
         {
             const auto label = pressureFont->BuildLayout(std::string(1, character), 32.0f, 0.0f, TextAlignment::Left, error);

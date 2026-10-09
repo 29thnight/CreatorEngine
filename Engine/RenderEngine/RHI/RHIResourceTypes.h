@@ -86,6 +86,7 @@ struct RHITextureEntry
     uint32_t         mipLevels{ 0 };
     uint32_t         arraySize{ 1 };
     bool             isCube{ false };
+    bool             preparationNeeded{ false };
 
     bool IsValid() const { return handle.IsValid(); }
 };

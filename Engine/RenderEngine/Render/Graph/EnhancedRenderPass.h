@@ -1,4 +1,6 @@
 #pragma once
+#include "Ownership.h"
+#include "../../TextureFramePins.h"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -22,7 +24,14 @@
 #include "EnhancedMaterialSealIdentity.h"
 #include "../../LXMaterialRuntime.h"
 
-namespace LX::Runtime { struct GraphicsGeneration; }
+namespace LX::Runtime
+{
+    struct GraphicsGeneration;
+}
+namespace material_graph
+{
+    class SceneViewInput;
+}
 #include "PackedBoneMatrix.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
@@ -39,10 +48,10 @@ class Mesh;
 class Texture;
 namespace material_graph
 {
-struct Instance;
+    struct Instance;
 }
 
-// M6-P1b2a: Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
+// M6-P1b2a: const Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
 // ShaderMeta reflection이 해석한 논리 property/GUID/register와 CPU generation owner를
 // 한 레코드로 밀봉한다. 실제 backend binding은 register를 검증한 뒤 owner의 view를 쓴다.
 struct EnhancedMaterialTextureBinding
@@ -51,7 +60,7 @@ struct EnhancedMaterialTextureBinding
     FileGuid textureGuid{};
     std::uint32_t registerIndex{};
     std::uint32_t registerSpace{};
-    std::shared_ptr<Texture> textureOwner{};
+    own::shared_owner<const Texture> textureOwner{};
     assets::TextureCoordinates coordinates{};
     // W7 — coordinates 와 같은 출처(저작 TextureReference)에서 온다. 이 값이
     // 여기 없던 동안 패스는 Initialize 에서 만든 샘플러 하나를 모든 재질에
@@ -118,7 +127,7 @@ struct EnhancedMaterialCoverage
 
 struct EnhancedForwardMaterialDrawSnapshot
 {
-    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
     std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
     // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
@@ -155,7 +164,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 // 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
 struct EnhancedMaterialDrawSnapshot
 {
-    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
     std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
     EnhancedMaterialSealIdentity seal{};
@@ -247,10 +256,10 @@ struct EnhancedDrawItem
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —
     // 렌더가 게임 자료구조를 들고 다니면 수명과 스레드 규약이 다시 얽힌다.
-    Texture*       baseColor{ nullptr };
-    Texture*       normalMap{ nullptr };
-    Texture*       occRoughMetal{ nullptr };
-    Texture*       emissive{ nullptr };
+    const Texture*       baseColor{ nullptr };
+    const Texture*       normalMap{ nullptr };
+    const Texture*       occRoughMetal{ nullptr };
+    const Texture*       emissive{ nullptr };
 
     math::color    baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
     float          metallic{ 0.f };
@@ -268,9 +277,15 @@ struct EnhancedDrawItem
     std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>
         forwardMaterialSnapshot{};
 
-    // Scene input sealing retains the exact typed LX generation/instance.
-    // A graph draw is selected separately from the ShaderMeta queues.
-    std::shared_ptr<const material_graph::Instance> materialGraphInstance{};
+    // Fixture/producer transfer slot. Product frame records empty this owner
+    // into a deduplicated InstanceFramePins table before copying draw records.
+    own::shared_owner<const material_graph::Instance> materialGraphInstance{};
+    own::local_view<const material_graph::Instance> materialGraphView;
+    std::size_t materialGraphPinIndex{ (std::numeric_limits<std::size_t>::max)() };
+    own::local_view<const material_graph::Instance> GraphInstance() const
+    {
+        return materialGraphInstance ? materialGraphInstance.borrow() : materialGraphView;
+    }
     // Runtime Material identity, stable across instance/generation replacement.
     std::uint64_t materialGraphSlot{};
 
@@ -529,11 +544,21 @@ private:
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
 {
+    uint32_t viewFlags{};
+    bool forwardLightingConsumer{true}; // Isolated cull/readback fixtures remain explicit consumers.
+    own::shared_owner<const material_graph::SceneViewInput> graphSceneInput;
     IRenderDeviceServices*     resources{ nullptr };
     IRenderPipelineCache*      psoManager{ nullptr };
     IRenderRootSignatureCache* rootSignatures{ nullptr };
     IRenderMeshCache*          meshCache{ nullptr };
     IRenderTextureCache*       textureCache{ nullptr };
+    own::shared_owner<TextureFramePins> textureFramePins;
+
+    own::shared_owner<const Texture::CodecImage> TextureImage(const Texture* texture) const
+    {
+        return textureFramePins ? textureFramePins->Image(texture)
+            : (texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{});
+    }
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };

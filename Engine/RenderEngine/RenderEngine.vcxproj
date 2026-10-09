@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -156,10 +156,63 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ShaderMetadataRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Assets\ModelSourcePreparation.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedModelSubAssetCodec.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\ModelAssetSetProducer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\MaterialAssetSetCodec.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedCodeMaterial.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\MaterialAssetSetProducer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedShaderMeta.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\MaterialAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\ModelAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\RuntimeBootstrap.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AssetDepot\AssetSetActivation.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\AssetDepot.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\DX12\DX12QueueService.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
@@ -185,9 +238,6 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="MaterialGraphRasterSurface.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="MaterialGraphScenePacket.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="MaterialGraphSceneInput.cpp">
@@ -268,6 +318,7 @@
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp" />
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -295,6 +346,7 @@
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PreprocessorDefinitions Condition="'$(CreatorRg6ReferenceBuild)' == 'true'">CE_RG6_REFERENCE_DECLARATION_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="Render\Scene\ExperimentMaterialSealing.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
@@ -558,6 +610,32 @@
     <ClCompile Include="UIRenderProxy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Assets\ModelSourcePreparation.h" />
+    <ClInclude Include="Experiment\Cooked\CookedModelSubAssetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\ModelAssetSetProducer.h" />
+    <ClInclude Include="Assets\ModelSkeletonPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationPayload.h" />
+    <ClInclude Include="Assets\ModelMeshDescriptor.h" />
+    <ClInclude Include="Assets\ModelSceneAssetInputs.h" />
+    <ClInclude Include="Assets\ModelGeometryPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationDescriptor.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCache.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCharges.h" />
+    <ClInclude Include="TextureFramePins.h" />
+    <ClInclude Include="MaterialGraphInstancePins.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialAssetSetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\CookedCodeMaterial.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialAssetSetProducer.h" />
+    <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
+    <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetSetActivation.h" />
+    <ClInclude Include="AssetDepot\RuntimeBootstrap.h" />
+    <ClInclude Include="AssetDepot\AssetLink.h" />
+    <ClInclude Include="AssetDepot\AssetRequest.h" />
+    <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetMountId.h" />
+    <ClInclude Include="Experiment\Cooked\ArtifactByteSource.h" />
     <ClInclude Include="Interfaces\LightProperty.h" />
     <ClInclude Include="Interfaces\Navigation.h" />
     <ClInclude Include="Interfaces\RenderBackend.h" />
@@ -594,6 +672,8 @@
     <ClInclude Include="PrimitiveRenderProxy.h" />
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueService.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueBatchAdapter.h" />
     <ClInclude Include="RHI\RHIShaderCompiler.h" />
     <ClInclude Include="RHI\RHIShaderPermutation.h" />
     <ClInclude Include="RHI\RHIShaderReflection.h" />
@@ -636,6 +716,9 @@
     <ClInclude Include="RHI\IDisplayPresentationSink.h" />
     <ClInclude Include="RHI\RHIDisplayFrame.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />
+    <ClInclude Include="RHI\RHIQueueContract.h" />
+    <ClInclude Include="RHI\RHIQueueRecorder.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueRecorder.h" />
     <ClInclude Include="RHI\RHIDescriptorVersionPolicy.h" />
     <ClInclude Include="RHI\RHIAssetEvictionPolicy.h" />
     <ClInclude Include="RHI\RHIDeviceMemoryBudgetCoordinator.h" />
@@ -652,9 +735,11 @@
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
+    <ClInclude Include="MaterialGraphMeshletTopology.h" />
     <ClInclude Include="MaterialGraphRasterSurface.h" />
-    <ClInclude Include="MaterialGraphScenePacket.h" />
+    <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
+    <ClInclude Include="MaterialGraphSceneLod.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
     <ClInclude Include="GpuGeometryVisibility.h" />
     <ClInclude Include="MaterialGraphSceneCompiler.h" />
@@ -762,6 +847,7 @@
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />
+    <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSAOPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIPass.h" />
@@ -777,12 +863,14 @@
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
+    <ClInclude Include="RHI\RHICommandRecordingJobs.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />
     <ClInclude Include="RHI\RHISubmissionThread.h" />
     <ClInclude Include="TextureImage.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\IRenderDeviceServices.h" />
-    <ClInclude Include="RHI\DX12\RenderFrameServices.h" />
+    <ClInclude Include="RHI\RHITransientHeap.h" />
+    <ClInclude Include="Render\Core\PassResourceRetirement.h" />
     <ClInclude Include="RHI\IRHIDeviceResources.h" />
     <ClInclude Include="RHI\ScreenSizedResource.h" />
     <ClInclude Include="UIClipping.h" />

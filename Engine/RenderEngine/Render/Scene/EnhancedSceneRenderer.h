@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include <algorithm>
@@ -11,6 +12,7 @@
 
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/TypeTrait.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
@@ -18,6 +20,7 @@
 class RenderScene;
 class Scene;
 class Material;
+class TextureFramePins;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
@@ -96,8 +99,8 @@ struct EnhancedLiveViewPacket
     std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -108,8 +111,8 @@ struct EnhancedLiveViewRequest
     FrameCameraSnapshot camera{};
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
@@ -119,7 +122,7 @@ struct EnhancedShaderMetaFrameSnapshot
 {
     FileGuid guid{};
     ShaderMetaHandle handle{};
-    std::shared_ptr<const ShaderMeta> value;
+    own::shared_owner<const ShaderMeta> value;
     std::string error;
 
     bool IsValid() const
@@ -210,6 +213,9 @@ struct EnhancedLiveFramePacket
     // M6-P2d-d: Host가 실제 Scene material에서 수집해 넘긴 추가 의존성.
     // 아래 ShaderMeta owner 배열은 이 선언과 primary/cache 입력을 resolve한 결과다.
     EnhancedRequiredAssetPacket requiredAssets;
+    // One-shot scene preparation result. The queue and RT preserve this owner
+    // until the first relevant staging copy, including coalesced/pending frames.
+    own::shared_owner<TextureFramePins> preparedTextureImages;
     // 첫 항목은 제품 GBuffer primary meta다. 뒤에는 GT가 DataSystem의 material
     // generation 집합에서 함께 밀봉한 material별 meta가 GUID 순서로 붙는다.
     std::vector<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;
@@ -300,6 +306,14 @@ struct EnhancedLivePacing
     bool operator==(const EnhancedLivePacing&) const = default;
 };
 
+// Runtime queue-mode requests cross to the render owner at a frame boundary.
+// Applied means submitted, not completed on the GPU or proof of compute overlap.
+struct EnhancedLiveQueueExecutionStatus
+{
+    uint64_t requestId{0}, appliedRequestId{0}, appliedFrame{0};
+    uint32_t requestedMode{0}, appliedMode{0};
+};
+
 /// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이
 /// RuntimeSettings의 백엔드를 이 값으로 변환하고, 같은 선택을 ImGuiHost에도 적용한다.
 enum class EnhancedLiveBackend : uint8_t
@@ -346,6 +360,16 @@ struct EnhancedLiveDisplayEntrySnapshot
     bool active{ false };
     bool ready{ false };
 };
+
+// A sampled submitted graph can be older than the displayed frame, but never belong to another view/extent/history.
+inline bool EnhancedGraphSnapshotMatchesView(const EnhancedRenderGraph::DiagnosticSnapshot& graph,
+    const EnhancedLiveDisplayEntrySnapshot& view)
+{
+    return view.active && view.ready && graph.frameId != 0 && graph.viewId == view.key.viewId &&
+        graph.historyRevision == view.key.historyRevision && graph.sceneEpoch == view.completedSceneEpoch &&
+        graph.width == view.completedWidth &&
+        graph.height == view.completedHeight;
+}
 
 /// RenderThread -> Host presentation의 불변 출력 경계. sourceFrameId의 입력 역할과
 /// GPU 완료된 표시 결과를 함께 담되 Camera*, DX12/Vulkan 객체는 담지 않는다.
@@ -397,6 +421,13 @@ struct EnhancedLiveGpuSpan
     double   queueSpanMs{ 0.0 };
     double   busyMs{ 0.0 };
     uint32_t sliceCount{ 0 };
+    uint32_t computeSliceCount{ 0 };
+    // Intersection of queue-local pass interval unions in calibrated QPC time.
+    // Compute submission alone is not evidence of concurrent GPU execution.
+    double measuredOverlapMilliseconds{ 0.0 };
+    double overlapClockErrorMilliseconds{ 0.0 };
+    uint64_t cpuTicksPerSecond{ 0 };
+    bool overlapClockValid{ false };
     uint32_t queryOverflowPasses{ 0 };
     uint32_t droppedSlices{ 0 };
 
@@ -444,6 +475,8 @@ struct EnhancedLiveGpuSlice
     std::string name;
     uint64_t    beginCpuTick{ 0 };
     uint64_t    endCpuTick{ 0 };
+    uint8_t     queueId{ 0 }; // 0 graphics, 1 compute; timestamps already in QPC domain.
+    uint32_t    passIndex{ UINT32_MAX }; // Authored graph index, never the display name.
 };
 
 /// GPU 구간을 밖으로 흘리는 자리(§7.3 의 GPU Graphics queue).
@@ -890,7 +923,7 @@ namespace EnhancedSceneRenderer
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
     inline constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
     EnhancedRequiredAssetPacket BuildRequiredAssetPacket(
-        std::span<const std::shared_ptr<Material>> materials);
+        std::span<const own::shared_owner<const Material>> materials);
 
     EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
         const EnhancedLiveViewRequest* views, uint32_t viewCount,
@@ -1050,6 +1083,9 @@ namespace EnhancedSceneRenderer
     /// 게임 스레드가 수행한다 — 창이 패스를 직접 만지지 않는 이유는
     /// EnhancedLiveTuning 주석 참조.
     void SetLiveTuning(const EnhancedLiveTuning& tuning);
+
+    bool RequestLiveQueueExecutionMode(uint32_t mode, uint64_t& requestId, std::string& error);
+    EnhancedLiveQueueExecutionStatus GetLiveQueueExecutionStatus();
 
     /// 최종 정리. 렌더 스레드 join 이후에만 부른다.
     void ShutdownLive();

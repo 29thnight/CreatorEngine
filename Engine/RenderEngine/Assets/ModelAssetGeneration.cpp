@@ -1,4 +1,5 @@
 #include "ModelAssetGeneration.h"
+#include "ModelMeshDescriptor.h"
 #include "ModelAnimationSampler.h"
 
 #include <chrono>
@@ -14,16 +15,32 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <fstream>
 #include <limits>
 #include <optional>
 #include <ranges>
 #include <set>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace assets
 {
+    ModelMeshHandle MakeModelMeshHandle(const ModelMeshDescriptor& descriptor)
+    {
+        ModelMeshHandle result{};
+        result.domain = ModelMeshDomain::Granular;
+        result.meshId = descriptor.meshId;
+        result.asset = descriptor.origin.entry.asset;
+        result.blob = descriptor.origin.blob;
+        result.resolverRevision = descriptor.origin.resolverRevision;
+        result.mountId = descriptor.origin.mountId.value;
+        result.assetSetId = descriptor.origin.assetSetId;
+        result.manifestRevision = descriptor.origin.manifestRevision;
+        return result;
+    }
+
     namespace
     {
         namespace ck = experiment::cooked;
@@ -287,7 +304,8 @@ namespace assets
             owner = Texture::WithColorSpace(owner, colorSpace == ModelTextureColorSpace::Srgb);
             owner = Texture::WithMipChain(owner, failure);
             if (!owner) return false;
-            const auto image = owner->GetImageView();
+            const auto imagePayload = owner->NonRehydratableImage();
+            const auto image = owner->GetImageView(imagePayload);
 
             out.colorSpace = colorSpace;
             out.format = colorSpace == ModelTextureColorSpace::Srgb
@@ -485,7 +503,7 @@ namespace assets
         }
     }
 
-    ModelAssetGeneration::ModelAssetGeneration(ModelAssetGenerationIdentity identity,
+    ModelAssetGeneration::ModelAssetGeneration(LoadKey, ModelAssetGenerationIdentity identity,
         std::string name, std::filesystem::path sourcePath,
         std::vector<ModelNodeAsset> nodes,
         std::vector<ModelMeshAsset> meshes,
@@ -502,10 +520,15 @@ namespace assets
         animations_(std::move(animations)), animator_(std::move(animator)),
         gpuDescriptors_(std::move(gpuDescriptors))
     {
-        if (!skeleton_) return;
+        if (!skeleton_)
+        {
+            return;
+        }
         m_animationTracks.resize(animations_.size());
         for (std::size_t clip = 0; clip < animations_.size(); ++clip)
+        {
             animation::BuildTrackTable(animations_[clip], skeleton_->bones.size(), m_animationTracks[clip]);
+        }
     }
 
     const ModelAssetGenerationIdentity& ModelAssetGeneration::Identity() const noexcept
@@ -516,6 +539,126 @@ namespace assets
     ModelAssetGenerationHandle ModelAssetGeneration::Handle() const noexcept
     {
         return { identity_.modelId, identity_.generation };
+    }
+
+    std::size_t ModelAssetGeneration::EstimatedCpuBytes() const noexcept
+    {
+        // Transitional aggregate charge: geometry/LOD, embedded pixels, skeleton
+        // and every clip remain physically owned together until payload splitting.
+        std::size_t bytes = sizeof(*this);
+        const auto add = [&bytes](std::size_t count, std::size_t width = 1)
+        {
+            const auto maximum = (std::numeric_limits<std::size_t>::max)();
+            if (width != 0 && count > (maximum - bytes) / width)
+            {
+                bytes = maximum;
+            }
+            else
+            {
+                bytes += count * width;
+            }
+        };
+        const auto addString = [&add](const auto& value)
+        {
+            using Character = typename std::decay_t<decltype(value)>::value_type;
+            add(value.capacity(), sizeof(Character));
+        };
+        const auto addVector = [&add](const auto& values)
+        {
+            using Element = typename std::decay_t<decltype(values)>::value_type;
+            add(values.capacity(), sizeof(Element));
+        };
+        const auto addMeshlets = [&addVector](const experiment::MeshletPayload& meshlets)
+        {
+            addVector(meshlets.descriptors);
+            addVector(meshlets.vertexRemap);
+            addVector(meshlets.triangleIndices);
+            addVector(meshlets.primitiveRemap);
+        };
+        addString(identity_.identityProfile);
+        addString(identity_.identityEpoch);
+        addString(identity_.sourceFingerprint);
+        addString(name_);
+        addString(sourcePath_.native());
+        addVector(nodes_);
+        for (const auto& node : nodes_)
+        {
+            addString(node.name);
+            addVector(node.meshes);
+        }
+        addVector(meshes_);
+        for (const auto& mesh : meshes_)
+        {
+            addString(mesh.name);
+            addVector(mesh.vertexBytes);
+            addVector(mesh.indices);
+            addMeshlets(mesh.meshlets);
+            addVector(mesh.coarseLods.levels);
+            for (const auto& lod : mesh.coarseLods.levels)
+            {
+                addVector(lod.indices);
+                addMeshlets(lod.meshlets);
+            }
+        }
+        addVector(materials_);
+        for (const auto& material : materials_)
+        {
+            addString(material.name);
+            addVector(material.properties);
+            for (const auto& property : material.properties)
+            {
+                addString(property.name);
+                if (const auto* text = std::get_if<std::string>(&property.value))
+                {
+                    addString(*text);
+                }
+            }
+            addVector(material.keywords);
+            for (const auto& keyword : material.keywords)
+            {
+                addString(keyword);
+            }
+            addVector(material.keywordSelections);
+        }
+        addVector(textures_);
+        for (const auto& texture : textures_)
+        {
+            addString(texture.name);
+            addVector(texture.subresources);
+            addVector(texture.pixels);
+        }
+        if (skeleton_)
+        {
+            addVector(skeleton_->bones);
+            for (const auto& bone : skeleton_->bones)
+            {
+                addString(bone.name);
+            }
+        }
+        addVector(animations_);
+        for (const auto& animation : animations_)
+        {
+            addString(animation.name);
+            addVector(animation.tracks);
+            for (const auto& track : animation.tracks)
+            {
+                addVector(track.translations);
+                addVector(track.rotations);
+                addVector(track.scales);
+            }
+            addVector(animation.events);
+            for (const auto& event : animation.events)
+            {
+                addString(event.name);
+            }
+        }
+        addVector(m_animationTracks);
+        for (const auto& tracks : m_animationTracks)
+        {
+            addVector(tracks);
+        }
+        addVector(gpuDescriptors_);
+        return bytes;
     }
 
     const std::string& ModelAssetGeneration::Name() const noexcept { return name_; }
@@ -1083,73 +1226,178 @@ namespace assets
 
         markPhase("assemble");
         phaseProfile.reset();
-        result.generation = ModelAssetGeneration::Shared(
-            new ModelAssetGeneration(std::move(identity),
+        result.generation = own::make_shared<const ModelAssetGeneration>(
+                ModelAssetGeneration::LoadKey{}, std::move(identity),
                 std::move(draft.metadata.name),
                 std::move(draft.metadata.sourcePath), std::move(nodes),
                 std::move(meshes), std::move(materials), std::move(textures),
                 std::move(skeleton), std::move(animations), std::move(animator),
-                std::move(descriptors)));
+                std::move(descriptors));
         return result;
+    }
+
+    ModelAssetGeneration::Shared ModelAssetGenerationCache::AcquireLocked(
+        const Key& key, Entry& entry) const
+    {
+        auto generation = entry.live.lock();
+        if (!generation || generation->Handle() != key
+            || generation->Identity().identityProfile != entry.identity.identityProfile
+            || generation->Identity().identityEpoch != entry.identity.identityEpoch
+            || generation->Identity().sourceFingerprint != entry.identity.sourceFingerprint)
+        {
+            return {};
+        }
+        if (accessSerial_ != (std::numeric_limits<std::uint64_t>::max)())
+        {
+            ++accessSerial_;
+        }
+        entry.lastAccess = accessSerial_;
+        return generation;
+    }
+
+    void ModelAssetGenerationCache::TrimRetainedLocked(std::size_t budget,
+        std::vector<ModelAssetGeneration::Shared>& released) const
+    {
+        while (retainedBytes_ > budget)
+        {
+            auto oldest = generations_.end();
+            for (auto entry = generations_.begin(); entry != generations_.end(); ++entry)
+            {
+                if (entry->second.retained && (oldest == generations_.end()
+                    || entry->second.lastAccess < oldest->second.lastAccess))
+                {
+                    oldest = entry;
+                }
+            }
+            if (oldest == generations_.end())
+            {
+                break;
+            }
+            released.push_back(std::move(oldest->second.retained));
+            retainedBytes_ -= oldest->second.estimatedBytes;
+            ++stats_.retentionEvictions;
+        }
+    }
+
+    void ModelAssetGenerationCache::RetainLocked(Entry& entry,
+        const ModelAssetGeneration::Shared& generation,
+        std::vector<ModelAssetGeneration::Shared>& released) const
+    {
+        if (entry.retained || entry.estimatedBytes > retentionBudgetBytes_)
+        {
+            return;
+        }
+        // Allocate before transferring any cache pins or changing accounting.
+        released.reserve(released.size() + generations_.size());
+        // Make room before addition so even a caller's SIZE_MAX budget cannot
+        // overflow accounting. A too-large aggregate remains consumer-owned.
+        TrimRetainedLocked(retentionBudgetBytes_ - entry.estimatedBytes, released);
+        entry.retained = generation;
+        retainedBytes_ += entry.estimatedBytes;
     }
 
     ModelAssetPublishResult ModelAssetGenerationCache::Publish(
         ModelAssetGeneration::Shared generation)
     {
         ModelAssetPublishResult result;
-        if (!generation || !generation->Handle().IsValid()) return result;
-
-        std::lock_guard lock(mutex_);
-        const Key incoming = generation->Handle();
-        const auto currentPosition = currentByAsset_.find(incoming.modelId);
-        if (currentPosition == currentByAsset_.end())
+        if (!generation || !generation->Handle().IsValid())
         {
-            generations_.emplace(incoming, generation);
-            currentByAsset_.emplace(incoming.modelId, incoming);
-            ++stats_.publishes;
-            stats_.currentAssets = currentByAsset_.size();
-            stats_.addressableGenerations = generations_.size();
-            result.outcome = ModelAssetPublishOutcome::Published;
-            result.current = std::move(generation);
             return result;
         }
 
-        const Key currentKey = currentPosition->second;
-        const auto currentGeneration = generations_.find(currentKey);
-        if (currentGeneration == generations_.end())
+        // All candidate allocations precede publication. A failed candidate
+        // must leave the prior current index, live owner and cache pin intact.
+        Entry candidate;
+        candidate.identity = generation->Identity();
+        candidate.live = generation;
+        candidate.estimatedBytes = generation->EstimatedCpuBytes();
+        std::vector<ModelAssetGeneration::Shared> released;
+        std::lock_guard lock(mutex_);
+        released.reserve(generations_.size() + 2);
+        const Key incoming = generation->Handle();
+        auto currentPosition = currentByAsset_.find(incoming.modelId);
+        auto currentGeneration = generations_.end();
+        if (currentPosition != currentByAsset_.end())
+        {
+            const Key currentKey = currentPosition->second;
+            currentGeneration = generations_.find(currentKey);
+            if (currentGeneration == generations_.end())
+            {
+                result.outcome = ModelAssetPublishOutcome::RejectedInvalid;
+                return result;
+            }
+            Entry& entry = currentGeneration->second;
+            result.current = AcquireLocked(currentKey, entry);
+            if (incoming.generation < currentKey.generation)
+            {
+                result.outcome = ModelAssetPublishOutcome::RejectedStale;
+                return result;
+            }
+            if (incoming.generation == currentKey.generation)
+            {
+                const auto& identity = generation->Identity();
+                if (identity.sourceFingerprint != entry.identity.sourceFingerprint
+                    || identity.identityProfile != entry.identity.identityProfile
+                    || identity.identityEpoch != entry.identity.identityEpoch)
+                {
+                    result.outcome = ModelAssetPublishOutcome::RejectedGenerationCollision;
+                    return result;
+                }
+                // An expired weak current may be reloaded only at the exact
+                // published identity; never expose an old generation again.
+                if (!result.current)
+                {
+                    entry.live = generation;
+                    entry.estimatedBytes = candidate.estimatedBytes;
+                    result.current = std::move(generation);
+                    (void)AcquireLocked(incoming, entry);
+                }
+                RetainLocked(entry, result.current, released);
+                result.outcome = ModelAssetPublishOutcome::AlreadyCurrent;
+                return result;
+            }
+        }
+
+        const auto [position, inserted] = generations_.emplace(incoming, std::move(candidate));
+        if (!inserted)
         {
             result.outcome = ModelAssetPublishOutcome::RejectedInvalid;
             return result;
         }
-        if (incoming.generation < currentKey.generation)
+        if (currentPosition == currentByAsset_.end())
         {
-            result.outcome = ModelAssetPublishOutcome::RejectedStale;
-            result.current = currentGeneration->second;
-            return result;
-        }
-        if (incoming.generation == currentKey.generation)
-        {
-            if (generation->Identity().sourceFingerprint
-                != currentGeneration->second->Identity().sourceFingerprint)
+            try
             {
-                result.outcome = ModelAssetPublishOutcome::RejectedGenerationCollision;
-                result.current = currentGeneration->second;
-                return result;
+                currentByAsset_.emplace(incoming.modelId, incoming);
             }
-            result.outcome = ModelAssetPublishOutcome::AlreadyCurrent;
-            result.current = currentGeneration->second;
-            return result;
+            catch (...)
+            {
+                generations_.erase(position);
+                throw;
+            }
+            result.outcome = ModelAssetPublishOutcome::Published;
+        }
+        else
+        {
+            result.retired = std::move(result.current);
+            result.retiredHandle = currentPosition->second;
+            Entry& previous = currentGeneration->second;
+            if (previous.retained)
+            {
+                released.push_back(std::move(previous.retained));
+                retainedBytes_ -= previous.estimatedBytes;
+            }
+            currentPosition->second = incoming;
+            generations_.erase(currentGeneration);
+            ++stats_.replacements;
+            ++stats_.retires;
+            result.outcome = ModelAssetPublishOutcome::Replaced;
         }
 
-        result.retired = currentGeneration->second;
-        generations_.erase(currentGeneration);
-        generations_.emplace(incoming, generation);
-        currentPosition->second = incoming;
+        // Release capacity was reserved before either index was changed.
+        (void)AcquireLocked(incoming, position->second);
+        RetainLocked(position->second, generation, released);
         ++stats_.publishes;
-        ++stats_.replacements;
-        ++stats_.retires;
-        stats_.addressableGenerations = generations_.size();
-        result.outcome = ModelAssetPublishOutcome::Replaced;
         result.current = std::move(generation);
         return result;
     }
@@ -1157,67 +1405,123 @@ namespace assets
     ModelAssetGeneration::Shared ModelAssetGenerationCache::ResolveCurrent(
         const Uuid::Uuid16& modelId) const
     {
+        std::vector<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         const auto current = currentByAsset_.find(modelId);
-        if (current == currentByAsset_.end())
+        if (current != currentByAsset_.end())
         {
-            ++stats_.misses;
-            return {};
+            const auto entry = generations_.find(current->second);
+            if (entry != generations_.end())
+            {
+                auto generation = AcquireLocked(current->second, entry->second);
+                if (generation)
+                {
+                    RetainLocked(entry->second, generation, released);
+                    ++stats_.hits;
+                    return generation;
+                }
+            }
         }
-        const auto generation = generations_.find(current->second);
-        if (generation == generations_.end())
-        {
-            ++stats_.misses;
-            return {};
-        }
-        ++stats_.hits;
-        return generation->second;
+        ++stats_.misses;
+        return {};
     }
 
     ModelAssetGeneration::Shared ModelAssetGenerationCache::Resolve(
         ModelAssetGenerationHandle handle) const
     {
+        std::vector<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
-        const auto found = generations_.find(handle);
-        if (found == generations_.end())
+        const auto current = currentByAsset_.find(handle.modelId);
+        if (current != currentByAsset_.end() && current->second == handle)
         {
-            ++stats_.misses;
-            return {};
+            const auto entry = generations_.find(handle);
+            if (entry != generations_.end())
+            {
+                auto generation = AcquireLocked(handle, entry->second);
+                if (generation)
+                {
+                    RetainLocked(entry->second, generation, released);
+                    ++stats_.hits;
+                    return generation;
+                }
+            }
         }
-        ++stats_.hits;
-        return found->second;
+        ++stats_.misses;
+        return {};
     }
 
     const ModelMeshAsset* ModelAssetGenerationCache::ResolveMesh(
         ModelMeshHandle handle, ModelAssetGeneration::Shared& outOwner) const
     {
+        if (handle.domain != ModelMeshDomain::LegacyAggregate)
+        {
+            outOwner.reset();
+            return nullptr;
+        }
         outOwner = Resolve({ handle.modelId, handle.generation });
         return outOwner ? outOwner->FindMesh(handle.meshId) : nullptr;
     }
 
     ModelAssetGeneration::Shared ModelAssetGenerationCache::Retire(
-        const Uuid::Uuid16& modelId)
+        const Uuid::Uuid16& modelId, ModelAssetGenerationHandle* outRetiredHandle)
     {
+        if (outRetiredHandle)
+        {
+            *outRetiredHandle = {};
+        }
+        std::vector<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         const auto current = currentByAsset_.find(modelId);
-        if (current == currentByAsset_.end()) return {};
-        const auto generation = generations_.find(current->second);
-        ModelAssetGeneration::Shared retired = generation != generations_.end()
-            ? generation->second : ModelAssetGeneration::Shared{};
-        if (generation != generations_.end()) generations_.erase(generation);
+        if (current == currentByAsset_.end())
+        {
+            return {};
+        }
+        if (outRetiredHandle)
+        {
+            *outRetiredHandle = current->second;
+        }
+        const auto entry = generations_.find(current->second);
+        ModelAssetGeneration::Shared retired;
+        if (entry != generations_.end())
+        {
+            retired = AcquireLocked(current->second, entry->second);
+            if (entry->second.retained)
+            {
+                released.push_back(std::move(entry->second.retained));
+                retainedBytes_ -= entry->second.estimatedBytes;
+            }
+            generations_.erase(entry);
+        }
         currentByAsset_.erase(current);
         ++stats_.retires;
-        stats_.currentAssets = currentByAsset_.size();
-        stats_.addressableGenerations = generations_.size();
         return retired;
+    }
+
+    void ModelAssetGenerationCache::SetRetentionBudgetBytes(std::size_t bytes)
+    {
+        std::vector<ModelAssetGeneration::Shared> released;
+        std::lock_guard lock(mutex_);
+        released.reserve(generations_.size());
+        retentionBudgetBytes_ = bytes;
+        TrimRetainedLocked(retentionBudgetBytes_, released);
+    }
+
+    void ModelAssetGenerationCache::DetachAll(RetiredEntries& retired) noexcept
+    {
+        assert(retired.generations_.empty());
+        assert(retired.currentByAsset_.empty());
+        std::lock_guard lock(mutex_);
+        retired.generations_.swap(generations_);
+        retired.currentByAsset_.swap(currentByAsset_);
+        retainedBytes_ = 0;
+        accessSerial_ = 0;
+        stats_ = {};
     }
 
     void ModelAssetGenerationCache::Clear()
     {
-        std::lock_guard lock(mutex_);
-        generations_.clear();
-        currentByAsset_.clear();
-        stats_ = {};
+        RetiredEntries retired;
+        DetachAll(retired);
     }
 
     ModelAssetGenerationCacheSnapshot ModelAssetGenerationCache::Snapshot() const
@@ -1225,7 +1529,20 @@ namespace assets
         std::lock_guard lock(mutex_);
         ModelAssetGenerationCacheSnapshot snapshot = stats_;
         snapshot.currentAssets = currentByAsset_.size();
-        snapshot.addressableGenerations = generations_.size();
+        snapshot.retentionBudgetBytes = retentionBudgetBytes_;
+        snapshot.retainedBytes = retainedBytes_;
+        for (const auto& [key, entry] : generations_)
+        {
+            const auto generation = entry.live.lock();
+            if (generation && generation->Handle() == key)
+            {
+                ++snapshot.addressableGenerations;
+            }
+            if (entry.retained)
+            {
+                ++snapshot.retainedGenerations;
+            }
+        }
         return snapshot;
     }
 
@@ -1236,8 +1553,15 @@ namespace assets
         current.reserve(currentByAsset_.size());
         for (const auto& [modelId, key] : currentByAsset_)
         {
-            const auto found = generations_.find(key);
-            if (found != generations_.end() && found->second) current.push_back(found->second);
+            const auto entry = generations_.find(key);
+            if (entry != generations_.end())
+            {
+                auto generation = AcquireLocked(key, entry->second);
+                if (generation)
+                {
+                    current.push_back(std::move(generation));
+                }
+            }
         }
         return current;
     }

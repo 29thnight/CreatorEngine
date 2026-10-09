@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
@@ -25,8 +26,8 @@ class UIRenderProxy : public std::enable_shared_from_this<UIRenderProxy>
 public:
     struct ImageData 
     {
-		std::vector<std::shared_ptr<Texture>>   textures;
-        std::shared_ptr<Texture>                texture{ nullptr };
+		std::vector<own::shared_owner<const Texture>>   textures;
+        own::shared_owner<const Texture>                texture{ nullptr };
 		math::vector2                           origin{};
         math::vector3                          position{};
         float                                   rotation{ 0.f };
@@ -115,7 +116,7 @@ public:
 private:
 	friend class ProxyCommand;
     std::variant<ImageData, TextData, SpriteSheetData>   m_data;
-    std::shared_ptr<Texture>                             m_texture{ nullptr };
+    own::shared_owner<const Texture>                             m_texture{ nullptr };
     std::shared_ptr<SpriteSheet>                         m_spriteSheet{ nullptr };
     mutable SpriteSheet::SequenceState                   m_sequenceState{};
     HashedGuid			                                 m_instancedID{};

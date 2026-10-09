@@ -1,9 +1,28 @@
 # GPU-driven geometry implementation slices
 
 Baseline: `ef829373c41138b8f47dd4011b076e1ec4d5829f` (2026-10-06).
-This is implementation work in progress, not a completed or runtime-validated feature.
+Merged to master by PR #123 (`5ca4e82a`, 2026-10-06). Only the narrow DX12 checks listed in
+[merge and first execution](#merge-and-first-execution-2026-10-06) ran; it is not a completed
+or broadly runtime-validated feature.
 
 ## Goal and boundaries
+
+2026-10-09 lattice follow-up: opaque/masked SceneHost camera/shadow consumers now
+have a capability-gated mesh shader route with the existing GPU draw visibility.
+Release DX12 TestShadow produced 64 byte-identical indexed/mesh attachment comparisons
+and mesh-route GPU validation reported zero problems. See
+[implementation and exact acceptance scope](../analysis/LatticeMeshletRendering20261009.md).
+Lattice meshlet-level compaction/culling, LOD, broader backend/material acceptance and
+performance remain unearned; this does not close GPU-1.
+
+Later on 2026-10-09, LX gained posed-vertex per-meshlet frustum rejection,
+CPU selection/submission of authored geometric LODs, independent LOD0 shadow
+geometry, current-frame LX depth followed by draw HZB, and cache admission before
+topology construction. Debug/Release passed 8 combinations / 192 frames with GPU
+validation 0; Release TestShadow had 32 byte-identical attachment comparisons.
+GPU LOD selection, visible-meshlet compaction, per-meshlet HZB, light-space LOD,
+LOD-scene quality and pressure/performance/Vulkan gates remain unearned. See
+[LX integration and evidence](../analysis/LatticeGeometryIntegration20261009.md).
 
 For supported production opaque/masked geometry, the GPU selects visibility and LOD,
 compacts bounded work, and produces draw/dispatch arguments. CPU scene publication,
@@ -44,13 +63,14 @@ The existing design document is a proposal and includes stale pre-indirect obser
 - The pinned vcpkg baseline `9e593bb18ea69cc5095e012465dcd675a822ed0d`
   selects meshoptimizer 1.2. Its API supports the 64-vertex/126-triangle profile
 - Bad or unavailable derived meshlet data must never be interpreted as valid GPU work
-- CEMC v9 remains indexed-only, v10 retains meshlets, and v11 appends coarse LODs
-  without changing base mesh records. No source fallback at runtime or silent replacement
-  of an immutable published generation is introduced
+- CEMC v11 is the only accepted cooked model format. The v9 (indexed-only) and v10
+  (meshlet) readers were removed in `bf3fe4f3`; older generations are rejected as
+  "reimport required". No source fallback at runtime or silent replacement of an
+  immutable published generation is introduced
 
 ## Verification status
 
-Only source inspection and static diff/contract reviews are authorized for this task.
+Historical (before merge; superseded by the merge section below). Only source inspection and static diff/contract reviews are authorized for this task.
 Builds, shader compilation, automated tests, executable probes, GPU captures and runtime
 measurements are deliberately unrun. Review findings and these unrun acceptance gates
 must accompany each published slice. No merge or runtime verification is implied.
@@ -58,6 +78,9 @@ must accompany each published slice. No merge or runtime verification is implied
 ## Initial meshlet authoring usage
 
 Meshlet generation is explicitly opt-in and defaults off for existing and new assets.
+At merge, all 11 tracked model sidecars were republished with `buildMeshlets=true` and
+`lodLevels=3` (`bf3fe4f3`); skinned meshes skip coarse levels and unreducible meshes keep
+LOD0 with a cooker warning.
 The choice is persisted as `importSettings.buildMeshlets` in the model sidecar. In the
 Content Browser, a model source offers `Model import / Enable meshlets and reimport`
 and the corresponding disable action. Both use the game-thread command service and
@@ -155,3 +178,44 @@ capable backends while preserving original shaders, order and effects. Unknown s
 use conservative preserved-stream indirect commands. Hardware compatibility remains.
 See [material coverage](../analysis/GpuDrivenMaterialCoverage.md) for exact route semantics,
 pre-existing unsupported features, diagnostics and deliberately unrun acceptance.
+
+## Merge and first execution (2026-10-06)
+
+PR #123 merged the six reviewed slices plus `bf3fe4f3` (v9/v10 reader removal and a
+meshlet/LOD recook of every tracked model) as `5ca4e82a`. The checks recorded at merge are
+the first executed evidence for this milestone:
+
+- `experiment.cooked` 466/466 passed on the v11-only codec
+- Editor with the native route forced, DX12: meshlet GBuffer is bit-identical to the indexed
+  route on the tested scene, distant geometry switches to coarse LODs, and HZB on/off images
+  match. DX12 debug-layer validation errors: 0
+
+Historical red at merge (resolved by the 2026-10-07 fixture repair below): the `dx12.decal` and `dx12.rendergraph` checks drive passes
+directly without GPU visibility preparation and end in an exception.
+
+Mapping to the design slices in [GpuDrivenMeshletDxrWiring.md](../design/GpuDrivenMeshletDxrWiring.md#11-구현-슬라이스와-회귀-게이트):
+
+| Slice | Source | Executed evidence | Still open |
+|---|---|---|---|
+| GD0 | Integrated | DX12 runs the capability-gated path; validation 0 | Unsupported-combination/bad-slice rejection tests; Vulkan run |
+| GD1 | Integrated | Bit-identical meshlet vs indexed GBuffer (one scene, DX12) | Depth/coverage/material comparison over the required fixture set |
+| GD2 | Integrated | Implied by GD1 image only | CPU oracle visible set, capacity limit/overflow fallback |
+| GD3 | Integrated (current-frame HZB) | HZB on/off image identical (static view) | Camera cut, resize, moving occluder, near plane: zero missing geometry |
+| HY1 | Partial: static LOD, indexed skinned visibility | Coarse LOD switch observed | LOD error budget, skinned mesh-shader LOD, masked mesh shading, deformation |
+| RT0, RT1, HY0 | Not started | none | all |
+
+Material coverage routes (transparent, refraction, special captures, decals, sprites,
+independent shadows) have no executed parity check beyond the scenes above.
+
+Next work, in order:
+
+1. Completed 2026-10-07: direct pass fixtures prepare GPU visibility; `dx12.decal` and
+   `dx12.rendergraph` pass in Debug/Release with GPU validation 0 and normal exit.
+   See [RG5 closure inspection](../analysis/RenderRg5Closure20261007.md). This repairs the
+   harness; it does not close GPU-driven material parity or the full RG5 migration
+2. Fixture-backed GD2/GD3 acceptance: CPU-oracle visible set, capacity overflow, cut/resize/
+   moving occluder, multiple views and two in-flight frames
+3. Material route parity for transparency/refraction/decal/sprite/shadow scenes
+4. Release performance and memory: CPU prepare/record, cull/bin, prepass and raster p50/p95,
+   peak VRAM, upload bytes, against the indexed route on the same binary and assets
+5. Vulkan execution belongs to PHASE 4.9 (the editor is DX12-only)

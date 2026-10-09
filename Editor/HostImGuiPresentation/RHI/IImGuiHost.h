@@ -4,12 +4,12 @@
 #endif
 
 #include "RHI/RHIDisplayFrame.h"
+#include "Texture.h"
 #include <functional>
 #include <memory>
 #include <cstdint>
 #include <string>
 
-class Texture;
 
 // Editor 전용 ImGui 표시 호스트. Win32 입력과 ImGui 컨텍스트를 소유하고,
 // GPU 표시는 concrete ImGuiDx12Shell만 사용한다. Scene/Game/material preview도
@@ -52,13 +52,16 @@ public:
     /// ImGui::Image가 소비할 DX12 텍스처 ID. 상위 에디터 코드는 descriptor의
     /// 저장 방식에 의존하지 않는다.
     /// ID를 영구 캐시하지 말고 실제 표시 프레임마다 호출해 수명 표식을 남긴다.
-    virtual uint64_t RegisterTexture(Texture* texture) = 0;
+    /// GPU hits need no image; misses require a prepared owner through row copy.
+    /// This boundary never reads, decodes, schedules, or waits for source pixels.
+    virtual uint64_t RegisterTexture(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image) = 0;
 
     /// 그 텍스처의 픽셀이 실제로 GPU에 올라가 있는가(PHASE 21 W7 비동기 썸네일).
     /// RegisterTexture의 반환값은 이것을 말하지 않는다 — 업로드 전에도 0이 아닌
     /// ID가 나온다. 부수 효과가 없으며, 올리는 일은 표시 프레임의
     /// RegisterTexture가 한다. 프레임 밖 등록은 null SRV 슬롯만 예약한다.
-    virtual bool IsTextureReady(Texture* texture) const = 0;
+    virtual bool IsTextureReady(const Texture* texture) const = 0;
 
     virtual uint64_t OpenSharedTexture(void* sharedHandle,
         std::shared_ptr<RHIDisplayConsumerLease> consumerLease) = 0;

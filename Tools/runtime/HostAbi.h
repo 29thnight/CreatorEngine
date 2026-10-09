@@ -20,3 +20,14 @@ struct CreatorHostInfoV1
 };
 using CreatorHostRun = int(__cdecl*)(int, wchar_t**, int);
 using CreatorHostGetInfo = const CreatorHostInfoV1*(__cdecl*)();
+
+// Additive content identity. Never extend CreatorHostInfoV1 or the script API
+// table to report a content format change.
+struct CreatorHostContentInfoV1
+{
+    std::uint32_t size;
+    std::uint32_t contentAbiVersion;
+    // Static storage in the host, borrowed for this process lifetime.
+    const char* contentAbi;
+};
+using CreatorHostGetContentInfo = const CreatorHostContentInfoV1*(__cdecl*)();

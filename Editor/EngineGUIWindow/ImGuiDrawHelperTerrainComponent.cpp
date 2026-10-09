@@ -275,7 +275,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
 	if (!foliage)
 	{
-		foliage = owner->AddComponent<FoliageComponent>();
+        EditorObjectOperations::AddComponent(owner->GetScene()->HandleOf(owner->m_index), "FoliageComponent");
+        ImGui::TextDisabled("Preparing foliage component...");
+        return;
 	}
 
 	std::vector<const char*> typeNames;
@@ -299,24 +301,20 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 		{
 			const file::path filepath = editor::asset_drag::path_of(*payload);
-			// 폴리지는 모델을 stem 으로 저장하고 GetStemToGuid 로 다시 찾는다.
-			// 그 stem 이 끌어 온 파일로 돌아오지 않으면(같은 이름이 다른 폴더에
-			// 있으면) 다른 모델이 묶이므로 받지 않는다.
-			const FileGuid droppedGuid = DataSystems->GetFileGuid(filepath);
-			if (droppedGuid == nullFileGuid
-				|| DataSystems->GetStemToGuid(filepath.stem().string()) != droppedGuid)
-			{
-				Debug::PrintLog(spdlog::level::err, "Foliage model drop: '" + filepath.string()
-					+ "' is not the model its name resolves to — rename it or remove the duplicate");
-			}
-			else if (auto generation = DataSystems->LoadModelAssetGenerationByPath(filepath.string()))
-			{
-				// MBC9 — Foliage 자산은 모델을 이름(stem)으로 적고, 런타임 바인딩은
-				// AddFoliageType(BindModelGeneration)이 잇는다.
-				FoliageType type(generation->SourcePath().stem().string(), true);
-				foliage->AddFoliageType(type);
-				g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
-			}
+            const FileGuid droppedGuid = DataSystems->GetFileGuid(filepath);
+            if (droppedGuid == nullFileGuid)
+            {
+                Debug::PrintLog(spdlog::level::err, "Foliage model drop has no registered stable ID: " + filepath.string());
+            }
+            else
+            {
+                // No source decode/import on the UI thread. The component admits
+                // a typed mounted request, or explicit unmounted authoring work.
+                FoliageType type(filepath.stem().string(), true);
+                type.m_modelGuid = droppedGuid;
+                foliage->AddFoliageType(type);
+                g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
+            }
 		}
 		ImGui::EndDragDropTarget();
 	}

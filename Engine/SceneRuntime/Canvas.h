@@ -14,6 +14,12 @@ namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	Canvas();
 	~Canvas() = default;

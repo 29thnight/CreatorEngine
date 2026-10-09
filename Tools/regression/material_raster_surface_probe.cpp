@@ -1,8 +1,10 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphRasterSurface.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "Render/Graph/ShadowCasterBounds.h"
-#include "MaterialGraphScenePacket.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "MaterialGraphSceneInput.h"
+#include "MaterialGraphSceneLod.h"
 #include "MaterialGraphSceneHost.h"
 #include "MaterialGraphSceneCompiler.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
@@ -12,6 +14,10 @@
 #include "Render/Scene/ExperimentMaterialSealing.h"
 #include "Render/Graph/EnhancedMaterialSealHash.h"
 #include "Render/Passes/Geometry/EnhancedDecalPass.h"
+#include "Render/Passes/Lighting/EnhancedSSGIPass.h"
+#include "Render/Passes/Lighting/EnhancedVolumetricFogPass.h"
+#include "RHI/DX12/EnhancedIBLGenerator.h"
+#include <set>
 #include "RHI/DX12/DX12MeshCache.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -35,6 +41,8 @@
 #include <limits>
 #include <optional>
 #include <thread>
+#include <type_traits>
+#include <utility>
 #ifdef _DEBUG
 #include <crtdbg.h>
 #include <DbgHelp.h>
@@ -121,6 +129,7 @@ void Check(bool condition, const std::string& message)
     ++checks;
     if (!condition)
     {
+        std::cerr << "PROBE_CHECK_FAIL " << message << std::endl;
         throw std::runtime_error(message);
     }
 }
@@ -307,7 +316,7 @@ constexpr std::array<Texel, 8> kTexels{{{64, 128, 192, 0},
                                         {192, 192, 128, 0}}};
 constexpr std::array<Texel, 2> kMip{{{96, 160, 224, 96}, {224, 96, 160, 160}}};
 
-std::shared_ptr<Texture> Image()
+own::shared_owner<const Texture> Image()
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
@@ -335,7 +344,7 @@ Texel FootprintTexel(bool second, unsigned mip, unsigned x, unsigned y, unsigned
             std::uint8_t(135 + 8 * mip + u(30)), std::uint8_t(55 + 8 * mip + u(32) + v(20))};
 }
 
-std::shared_ptr<Texture> FootprintImage(bool second, bool resized = false)
+own::shared_owner<const Texture> FootprintImage(bool second, bool resized = false)
 {
     const auto extent = ImageExtent(second, resized);
     auto image = TextureImage::Allocate(second ? RHIFormat::RGBA8Unorm : RHIFormat::RGBA8UnormSrgb, extent.width,
@@ -405,7 +414,7 @@ std::array<float, 4> ReferenceImage(bool second, bool resized, double u, double 
     return result;
 }
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -591,7 +600,58 @@ class RecordingChangeDevice : public ProbeDevice
 {
   public:
     bool flushOnUpload{};
-    bool forbidAllocations{}, forbidImmediate{};
+      bool forbidAllocations{}, forbidImmediate{};
+      bool trackOwnedResources{};
+      unsigned textureAttempt{}, bufferAttempt{}, failTextureAt{}, failBufferAt{};
+      std::set<std::uint32_t> ownedTextures, ownedBuffers;
+      IRHIUploadTransactionListener* lastListener{};
+      IRHIUploadTransactionListener* firstListener{};
+      void RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+      {
+          lastListener = listener;
+          if (!firstListener) firstListener = listener;
+          ProbeDevice::RegisterUploadTransactionListener(listener);
+      }
+      bool CreateTexture(const RHITextureDesc& desc, RHITextureHandle& result, std::string& error) override
+      {
+          if (trackOwnedResources && ++textureAttempt == failTextureAt)
+          {
+              result = {};
+              error = "Injected texture allocation failure";
+              return false;
+          }
+          const bool success = ProbeDevice::CreateTexture(desc, result, error);
+          if (trackOwnedResources && result.IsValid())
+          {
+              ownedTextures.insert(result.id);
+          }
+          return success;
+      }
+      bool CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandle& result, std::string& error) override
+      {
+          if (trackOwnedResources && ++bufferAttempt == failBufferAt)
+          {
+              result = {};
+              error = "Injected buffer allocation failure";
+              return false;
+          }
+          const bool success = ProbeDevice::CreateBuffer(desc, result, error);
+          if (trackOwnedResources && result.IsValid())
+          {
+              ownedBuffers.insert(result.id);
+          }
+          return success;
+      }
+      void ReleaseTexture(RHITextureHandle texture) override
+      {
+          ownedTextures.erase(texture.id);
+          ProbeDevice::ReleaseTexture(texture);
+      }
+      void ReleaseBuffer(RHIBufferHandle buffer) override
+      {
+          ownedBuffers.erase(buffer.id);
+          ProbeDevice::ReleaseBuffer(buffer);
+      }
     RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override
     {
         if (forbidAllocations)
@@ -640,23 +700,46 @@ struct Drain
 };
 
 unsigned graphFrames{}, graphLists{}, graphFailures{};
+void CheckReferenceDeclarations(const EnhancedRenderGraph& graph)
+{
+    if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+    {
+        return;
+    }
+    EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+    Check(graph.CaptureDiagnosticSnapshot(snapshot), "Reference compiled diagnostic snapshot");
+    for (const auto& pass : snapshot.passes)
+    {
+        for (const auto& usage : pass.usages)
+        {
+            Check(usage.access == RGAccessMode::Read || usage.access == RGAccessMode::Write,
+                  "Reference graph has no implicit accesses");
+            Check(usage.access != RGAccessMode::Write || usage.version == 1,
+                  "Reference outputs use their produced version");
+        }
+    }
+    Check(!snapshot.versionEdges.empty(), "Reference producer/consumer version dependencies are present");
+}
 void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                    MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings, RasterSurfaceCollector& collector,
-                   SurfaceEvaluator& evaluator, IblBaker& baker, std::shared_ptr<const Instance> instance,
-                   std::shared_ptr<Texture> cube, const RasterSurfaceRequest& request,
+                   SurfaceEvaluator& evaluator, IblBaker& baker, own::shared_owner<const Instance> instance,
+                   own::shared_owner<const Texture> cube, const RasterSurfaceRequest& request,
                    std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources,
                    std::span<const SurfacePoint> expectedGeometry, std::span<const IblBakePoint> expectedSurface,
-                   std::span<const IblBakeSample> expectedBake, unsigned workers)
+                   std::span<const IblBakeSample> expectedBake, unsigned workers,
+                   RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
+                   RGOrderPolicy order = RGOrderPolicy::DependencyOrder)
 {
     std::string error;
     const auto count = request.width * request.height;
-    std::shared_ptr<const RenderBindings> material;
+    own::shared_owner<const RenderBindings> material;
     std::shared_ptr<const RasterSurfaceBatch> raster;
     std::shared_ptr<const SurfaceBatch> surface;
     std::shared_ptr<const IblBakeResult> baked;
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> currentSources;
     std::vector<RHIReadback> meshReadbacks(sources.size());
-    auto graph = std::make_shared<EnhancedRenderGraph>(device);
+    auto graph = std::make_shared<EnhancedRenderGraph>(device, scheduling, order);
+    const auto read = scheduling == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
     std::array<RHIReadback, 3> readbacks;
     Check(device.CreateBufferReadback(expectedGeometry.size_bytes(), readbacks[0], error), "Graph geometry readback");
     Check(device.CreateBufferReadback(expectedSurface.size_bytes(), readbacks[1], error), "Graph surface readback");
@@ -671,10 +754,10 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     textures.BeginFrame(100 + graphFrames);
     // Touch/upload before the prefix. Current-pose mesh packets, rather than
     // previously submitted geometry buffers, are prepared after this boundary.
-    const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     for (const auto& texture : instance->textures)
     {
-        Check(textures.GetOrUpload(texture.owner.get(), error).IsValid(), "Touch graph material texture");
+        Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), texture.owner ? texture.owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).IsValid(), "Touch graph material texture");
     }
     if (workers)
     {
@@ -723,7 +806,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
         Check(handles[i].IsValid() && graph->ResolveBufferHandle(handles[i]) == owners[i],
               "Exact graph buffer identity");
         graph->AddPass(
-            "Probe.Readback", {{handles[i], RHIResourceState::CopySource}},
+            "Probe.Readback", {{handles[i], RHIResourceState::CopySource, read}},
             [readback = readbacks[i], buffer = owners[i]](const auto& context) {
                 context.encoder->CopyBufferToReadback(readback, buffer);
             },
@@ -733,13 +816,14 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     {
         const auto source = currentSources[i];
         graph->AddPass(
-            "Probe.MeshReadback", {{source->GraphOutput(*graph), RHIResourceState::CopySource}},
+            "Probe.MeshReadback", {{source->GraphOutput(*graph), RHIResourceState::CopySource, read}},
             [source, readback = meshReadbacks[i]](const auto& context) {
                 context.encoder->CopyBufferToReadback(readback, source->Buffer());
             },
             true);
     }
     Check(graph->Compile(error), "Graph chain compile " + error);
+    CheckReferenceDeclarations(*graph);
     Check(graph->GetStats().passesExecuted == 10 + 3 * currentSources.size(),
           "Current mesh and all consumer/readback passes are retained");
     device.forbidAllocations = true;
@@ -788,8 +872,10 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
         surface.reset();
         baked.reset();
         material.reset();
-        Check(ticket.GetRecordedBatch() && ticket.GetRecordedBatch()->HasLifetimeToken(), "Submission retained graph");
+        // Enqueue transfers the token from the ticket's batch to GPU retirement.
+        Check(!ownedByGraph.expired(), "GPU retirement retained graph");
         ticket = {};
+        Check(!ownedByGraph.expired(), "Graph lifetime is independent of submission ticket");
     }
     Check(device.EndFrame(error), "Graph chain frame submit " + error);
     Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Graph chain native submission " + error);
@@ -844,13 +930,18 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
 unsigned sharedDepthFrames{}, sharedDepthPixels{}, coplanarPixels{}, skinnedDepthFrames{}, meshFailures{};
 unsigned sceneInputFrames{}, sceneInputFailures{};
 
-void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>& instances)
+static_assert(std::is_same_v<decltype(SceneMaterialSource::Capture(
+    std::declval<own::shared_owner<const Instance>>(), SceneCoverage::Opaque, false)),
+    own::shared_owner<const SceneMaterialSource>>);
+static_assert(!std::is_default_constructible_v<SceneViewInput>);
+
+void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2>& instances)
 {
     auto currentInstance = instances[0];
     auto source = SceneMaterialSource::Capture(currentInstance, SceneCoverage::Opaque, true);
     currentInstance = instances[1];
     const auto replacement = SceneMaterialSource::Capture(currentInstance, SceneCoverage::Masked, false);
-    Check(source && replacement && source->instance == instances[0] && replacement->instance == instances[1] &&
+    Check(source && replacement && material_graph_test::SamePinnedObject(source->instance, instances[0]) && material_graph_test::SamePinnedObject(replacement->instance, instances[1]) &&
               (source->coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0 &&
               (replacement->coverage.flags & EnhancedMaterialCoverage::Masked) != 0 &&
               (replacement->coverage.flags & EnhancedMaterialCoverage::DoubleSided) == 0,
@@ -858,7 +949,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
     Check(!SceneMaterialSource::Capture({}, SceneCoverage::Opaque, false),
           "Producer graph removal explicitly clears the source");
     const auto invalidSource = SceneMaterialSource::Capture(instances[0], static_cast<SceneCoverage>(255), false);
-    Check(invalidSource && invalidSource->instance == instances[0] && !invalidSource->coverage.flags,
+    Check(invalidSource && material_graph_test::SamePinnedObject(invalidSource->instance, instances[0]) && !invalidSource->coverage.flags,
           "Invalid producer coverage keeps graph ownership and cannot choose legacy");
     auto geometry = MakeGeometry(false, false);
     auto& draw = geometry.draw;
@@ -874,10 +965,50 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
     view.width = view.height = 32;
     view.camera.view = view.camera.projection = math::matrix4x4::identity();
     view.camera.eyePosition = {0, 0, 2};
-    std::shared_ptr<const SceneViewInput> accepted;
+    own::shared_owner<const SceneViewInput> accepted;
     std::string error;
     Check(SceneViewInput::Seal(view, {&draw, 1}, {}, accepted, error), "Scene input seal " + error);
-    Check(accepted->Draws().size() == 1 && accepted->Draws()[0].material == instances[0] &&
+    {
+        // The producer, queued source, sealed view, and render binding each
+        // hand off actual ownership. A weak lookup is never the durable anchor.
+        auto independent = own::make_shared<const Instance>(*instances[0]);
+        own::weak_owner<const Instance> instanceLookup(independent);
+        auto queuedSource = SceneMaterialSource::Capture(std::move(independent), SceneCoverage::Opaque, true);
+        own::weak_owner<const SceneMaterialSource> sourceLookup(queuedSource);
+        auto queuedDraw = draw;
+        queuedDraw.materialGraphInstance = queuedSource->instance;
+        queuedDraw.coverage = queuedSource->coverage;
+        own::shared_owner<const SceneViewInput> queuedView;
+        Check(SceneViewInput::Seal(view, {&queuedDraw, 1}, {}, queuedView, error),
+              "Queued CPU ownership fixture seals " + error);
+        own::weak_owner<const SceneViewInput> viewLookup(queuedView);
+        queuedSource.reset();
+        queuedDraw.materialGraphInstance.reset();
+        Check(sourceLookup.expired() && !instanceLookup.expired() &&
+                  queuedView->MaterialPins()->Size() == 1 && queuedView->Draws()[0].material,
+              "Producer/source destruction leaves the sealed view's exact instance borrow alive");
+        RenderBindings bindingValue;
+        bindingValue.instancePins = queuedView->MaterialPins();
+        bindingValue.instancePinIndex = queuedView->Draws()[0].materialPinIndex;
+        bindingValue.instance = bindingValue.instancePins->Borrow(bindingValue.instancePinIndex);
+        auto retainedBinding = own::make_shared<const RenderBindings>(std::move(bindingValue));
+        own::weak_owner<const RenderBindings> bindingLookup(retainedBinding);
+        queuedView.reset();
+        Check(viewLookup.expired() && !instanceLookup.expired() && retainedBinding->instance,
+              "Binding closure survives view replacement with its own frame pin table");
+        retainedBinding.reset();
+        Check(bindingLookup.expired() && instanceLookup.expired(),
+              "Last CPU binding owner releases the instance; weak lookup does not retain it");
+    }
+    {
+        const std::array repeated{draw, draw};
+        own::shared_owner<const SceneViewInput> sharedInput;
+        Check(SceneViewInput::Seal(view, repeated, {}, sharedInput, error) &&
+            sharedInput->MaterialPins()->Size() == 1 &&
+            sharedInput->Draws()[0].materialPinIndex == sharedInput->Draws()[1].materialPinIndex,
+            "Repeated Scene draws share one immutable instance pin and store only indices/views");
+    }
+    Check(accepted->Draws().size() == 1 && material_graph_test::SamePinnedObject(accepted->Draws()[0].material, instances[0]) &&
               accepted->View().frameId == 10 && accepted->View().sceneEpoch == 2,
           "Scene frame retains its exact typed instance and identity");
     const auto& firstMesh = accepted->Draws()[0].geometry->Chunks()[0].input;
@@ -889,7 +1020,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
     otherView.historyRevision = 7;
     otherView.camera.eyePosition.x = .3f;
     otherView.camera.projection.m[0][0] = 2;
-    std::shared_ptr<const SceneViewInput> second;
+    own::shared_owner<const SceneViewInput> second;
     Check(SceneViewInput::Seal(otherView, {&draw, 1}, {}, second, error), "Second Scene view");
     Check(second->Surface().viewRevision != accepted->Surface().viewRevision &&
               second->Surface().geometryRevision != accepted->Surface().geometryRevision &&
@@ -898,10 +1029,10 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
           "Same-frame Scene/Game camera and geometry revisions cannot mix");
     draw.worldMatrix.m[3][0] = 3;
     draw.materialGraphInstance = instances[1];
-    std::shared_ptr<const SceneViewInput> changed;
+    own::shared_owner<const SceneViewInput> changed;
     Check(SceneViewInput::Seal(view, {&draw, 1}, {}, changed, error), "Changed world/instance seal");
     Check(changed->Surface().geometryRevision != accepted->Surface().geometryRevision &&
-              changed->Draws()[0].material == instances[1] && accepted->Draws()[0].material == instances[0] &&
+              material_graph_test::SamePinnedObject(changed->Draws()[0].material, instances[1]) && material_graph_test::SamePinnedObject(accepted->Draws()[0].material, instances[0]) &&
               changed->Draws()[0].geometry->Chunks()[0].input->World().m[3][0] == 3 && firstMesh->World().m[3][0] == 0,
           "World or instance replacement does not relabel the previous snapshot");
     std::fill(geometry.vertices.begin(), geometry.vertices.end(), std::byte{});
@@ -956,15 +1087,15 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
             invalid.materialGraphInstance.reset();
             break;
         case 11: {
-            auto instance = std::make_shared<Instance>(*instances[0]);
-            instance->generation.reset();
-            invalid.materialGraphInstance = std::move(instance);
+            Instance instanceValue(*instances[0]);
+            instanceValue.generation.reset();
+            invalid.materialGraphInstance = own::make_shared<const Instance>(std::move(instanceValue));
             break;
         }
         case 12: {
-            auto instance = std::make_shared<Instance>(*instances[0]);
-            instance->description.graphId = {};
-            invalid.materialGraphInstance = std::move(instance);
+            Instance instanceValue(*instances[0]);
+            instanceValue.description.graphId = {};
+            invalid.materialGraphInstance = own::make_shared<const Instance>(std::move(instanceValue));
             break;
         }
         case 13:
@@ -1004,7 +1135,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
             break;
         }
         const auto previous = accepted;
-        Check(!SceneViewInput::Seal(invalidView, invalidDraws, budget, accepted, error) && accepted == previous &&
+        Check(!SceneViewInput::Seal(invalidView, invalidDraws, budget, accepted, error) && material_graph_test::SamePinnedObject(accepted, previous) &&
                   !error.empty(),
               "Scene input failure preserves the complete previous view fixture=" + std::to_string(failure));
         ++sceneInputFailures;
@@ -1028,7 +1159,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
         }
         const auto previous = accepted;
         Check(!SceneViewInput::Seal(view, {&invalid, 1}, {}, accepted, error)
-                  && accepted == previous && !error.empty(),
+                  && material_graph_test::SamePinnedObject(accepted, previous) && !error.empty(),
               "Malformed shadow bounds input rejected before dereference");
     }
     FrameCameraSnapshot selectionCamera;
@@ -1049,23 +1180,23 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
         if (shadow_math::RelevantToView(i == 0, shadow_math::WorldBounds(candidate), receivers, selectionDirection, true))
             selectedDraws.push_back(candidate);
     }
-    std::shared_ptr<const SceneViewInput> selectedInput;
+    own::shared_owner<const SceneViewInput> selectedInput;
     Check(selectedDraws.size() == 2 && SceneViewInput::Seal(view, selectedDraws, {}, selectedInput, error)
               && selectedInput->Draws().size() == 2,
           "Pre-budget union keeps visible/offscreen caster but rejects 4098 unrelated graph draws");
     std::cout << "CSM_SELECTION_BUDGET_OK candidates=4100 sealed=2\n";
     auto coverageDraw = geometry.draw;
     coverageDraw.coverage.flags |= EnhancedMaterialCoverage::Masked;
-    std::shared_ptr<const SceneViewInput> masked;
+    own::shared_owner<const SceneViewInput> masked;
     Check(SceneViewInput::Seal(view, {&coverageDraw, 1}, {}, masked, error) &&
               masked->Draws()[0].queue == SceneCoverage::Masked,
           "Input capture preserves masked coverage without declaring a raster transport");
     coverageDraw.coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended;
-    std::shared_ptr<const SceneViewInput> blended;
+    own::shared_owner<const SceneViewInput> blended;
     Check(SceneViewInput::Seal(view, {&coverageDraw, 1}, {}, blended, error) &&
               blended->Draws()[0].queue == SceneCoverage::Blended,
           "Input coverage queue is independent of physical material route");
-    std::shared_ptr<const SceneViewInput> empty;
+    own::shared_owner<const SceneViewInput> empty;
     ++view.sceneEpoch;
     Check(SceneViewInput::Seal(view, {}, {}, empty, error) && empty->Draws().empty() && empty->Cost().chunks == 0 &&
               empty->View().sceneEpoch == 3,
@@ -1074,9 +1205,11 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
 void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                          MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings,
                          RasterSurfaceCollector& collector, std::array<SurfaceEvaluator, 2>& evaluators,
-                         IblBaker& baker, const std::array<std::shared_ptr<const Instance>, 2>& instances,
-                         std::shared_ptr<Texture> cube, const Environment& colors, const SheenTable& table,
-                         unsigned fixture, bool reverseOrder, unsigned workers)
+                         IblBaker& baker, const std::array<own::shared_owner<const Instance>, 2>& instances,
+                         own::shared_owner<const Texture> cube, const Environment& colors, const SheenTable& table,
+                         unsigned fixture, bool reverseOrder, unsigned workers,
+                         RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
+                         RGOrderPolicy order = RGOrderPolicy::DependencyOrder)
 {
     std::string error;
     auto geometry = MakeGeometry(fixture == 1, false);
@@ -1159,7 +1292,7 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         sourceDraws[i].materialGraphInstance = instances[i];
         sourceDraws[i].coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::DoubleSided;
     }
-    std::shared_ptr<const SceneViewInput> sceneInput;
+    own::shared_owner<const SceneViewInput> sceneInput;
     Check(SceneViewInput::Seal(selectedView, sourceDraws, {}, sceneInput, error), "Selected Scene view seal " + error);
     Check(sceneInput->Draws().size() == 2 && sceneInput->Cost().chunks == 2,
           "Selected Scene view retains both material partitions");
@@ -1168,7 +1301,7 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     for (unsigned i = 0; i < inputs.size(); ++i)
     {
         inputs[i] = sceneInput->Draws()[i].geometry->Chunks()[0].input;
-        Check(sceneInput->Draws()[i].material == instances[i] && inputs[i]->Count() == 3,
+        Check(material_graph_test::SamePinnedObject(sceneInput->Draws()[i].material, instances[i]) && inputs[i]->Count() == 3,
               "Scene instance identity and referenced triangle partition");
     }
     ++sceneInputFrames;
@@ -1204,24 +1337,25 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         Check(device.CreateReadback(request.width, request.height, RHIFormat::D32Float, 1, readback, error),
               "Shared depth readback " + error);
     }
-    auto graph = std::make_shared<EnhancedRenderGraph>(device);
+    auto graph = std::make_shared<EnhancedRenderGraph>(device, scheduling, order);
+    const auto read = scheduling == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
     std::array<std::shared_ptr<const MeshSurfaceBatch>, 2> meshes;
     std::array<std::shared_ptr<const RasterSurfaceBatch>, 2> raster;
     std::array<std::shared_ptr<const SurfaceBatch>, 2> surface;
     std::array<std::shared_ptr<const IblBakeResult>, 2> bake;
-    std::array<std::shared_ptr<const RenderBindings>, 2> material;
+    std::array<own::shared_owner<const RenderBindings>, 2> material;
     std::shared_ptr<const RasterSurfaceBatch> depth;
     std::array materialRequests{request, request};
     materialRequests[0].texture.bias = 0;
     Drain drain{device};
     Check(device.BeginFrame(error), "Shared graph begin");
     textures.BeginFrame(300 + sharedDepthFrames);
-    const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     for (const auto& instance : instances)
     {
         for (const auto& texture : instance->textures)
         {
-            Check(textures.GetOrUpload(texture.owner.get(), error).IsValid(), "Shared texture residency");
+            Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), texture.owner ? texture.owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).IsValid(), "Shared texture residency");
         }
     }
     if (workers)
@@ -1273,9 +1407,9 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         Check(mesh->Declare(*graph, error), "Shared current mesh declaration");
     }
     Check(depth->Declare(*graph, error), "Shared depth declaration");
-    const auto depthHandle = graph->FindImportedTexture(depth->Depth());
+    const auto depthHandle = depth->GraphDepth(*graph);
     graph->AddPass(
-        "Probe.DepthBefore", {{depthHandle, RHIResourceState::CopySource}},
+        "Probe.DepthBefore", {{depthHandle, RHIResourceState::CopySource, read}},
         [depth, readback = depthReadbacks[0]](const auto& context) {
             context.encoder->CopyToReadback(readback, depth->Depth());
         },
@@ -1292,22 +1426,26 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     const std::array buffers{meshes[0]->Buffer(),  meshes[1]->Buffer(), depth->Buffer(),
                              raster[0]->Buffer(),  raster[1]->Buffer(), surface[0]->Buffer(),
                              surface[1]->Buffer(), bake[0]->Buffer(),   bake[1]->Buffer()};
+    const std::array handles{meshes[0]->GraphOutput(*graph), meshes[1]->GraphOutput(*graph), depth->GraphOutput(*graph),
+                            raster[0]->GraphOutput(*graph), raster[1]->GraphOutput(*graph), surface[0]->GraphOutput(*graph),
+                            surface[1]->GraphOutput(*graph), bake[0]->GraphOutput(*graph), bake[1]->GraphOutput(*graph)};
     for (unsigned i = 0; i < buffers.size(); ++i)
     {
         graph->AddPass(
-            "Probe.SharedReadback", {{graph->FindImportedBuffer(buffers[i]), RHIResourceState::CopySource}},
+            "Probe.SharedReadback", {{handles[i], RHIResourceState::CopySource, read}},
             [buffer = buffers[i], readback = readbacks[i]](const auto& context) {
                 context.encoder->CopyBufferToReadback(readback, buffer);
             },
             true);
     }
     graph->AddPass(
-        "Probe.DepthAfter", {{depthHandle, RHIResourceState::CopySource}},
+        "Probe.DepthAfter", {{depthHandle, RHIResourceState::CopySource, read}},
         [depth, readback = depthReadbacks[1]](const auto& context) {
             context.encoder->CopyToReadback(readback, depth->Depth());
         },
         true);
     Check(graph->Compile(error), "Shared graph compile " + error);
+    CheckReferenceDeclarations(*graph);
     device.forbidAllocations = true;
     device.forbidImmediate = workers != 0;
     RHISubmissionTicket ticket;
@@ -1493,14 +1631,14 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
 
 void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                           RenderBindingCache& bindings, RasterSurfaceCollector& collector, SurfaceEvaluator& evaluator,
-                          IblBaker& baker, std::shared_ptr<const Instance> instance, std::shared_ptr<Texture> cube,
+                          IblBaker& baker, own::shared_owner<const Instance> instance, own::shared_owner<const Texture> cube,
                           const RasterSurfaceRequest& request,
                           std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources)
 {
     for (unsigned failure = 0; failure < 6; ++failure)
     {
         std::string error;
-        std::shared_ptr<const RenderBindings> material;
+        own::shared_owner<const RenderBindings> material;
         std::shared_ptr<const RasterSurfaceBatch> raster;
         std::shared_ptr<const SurfaceBatch> surface;
         std::shared_ptr<const IblBakeResult> baked;
@@ -1508,7 +1646,7 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
         Drain drain{device};
         Check(device.BeginFrame(error), "Failure graph begin");
         textures.BeginFrame(200 + failure);
-        const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         pool.BeginFrame(failure);
         if (failure != 3)
         {
@@ -1594,7 +1732,7 @@ unsigned sceneLookupFullFrames{}, sceneLookupFullPixels{}, sceneLookupMutationFr
 unsigned sceneLookupApproximateFrames{}, sceneLookupApproximatePixels{};
 std::uint64_t sceneLookupApproximated{};
 unsigned sceneTextureFrames{}, sceneTexturePixels{}, sceneTextureFractionalLods{}, sceneTextureClampedLods{};
-unsigned sceneGenerationFrames{}, sceneGenerationFallbacks{}, sceneGenerationAborts{},
+unsigned sceneGenerationFrames{}, sceneGenerationFallbacks{}, sceneGenerationRejectedRequests{}, sceneGenerationAborts{},
     sceneGenerationPendingSubmissions{};
 std::uint64_t sceneGenerationStale{}, sceneGenerationCompiles{}, sceneGenerationWorkers{}, sceneGenerationPsoWorkers{};
 double maxTextureFilterError{};
@@ -1696,22 +1834,27 @@ struct SceneSubmissionGate
     ~SceneSubmissionGate() { Release(); }
 };
 
-std::shared_ptr<const Instance> SceneReload(const std::shared_ptr<const Instance>& original, double offset,
+own::shared_owner<const Instance> SceneReload(const own::shared_owner<const Instance>& original, double offset,
                                             bool invalid = false)
 {
-    auto generation = std::make_shared<Generation>(*original->generation);
-    generation->generation += 1000 + unsigned(offset * 100);
-    auto& program = generation->cooked.product.program;
-    const std::string needle = ".ior = parameters.lx_p900;";
-    const auto position = program.slang.find(needle);
-    Check(position != std::string::npos, "Reload fixture owns the IOR expression");
-    program.slang.replace(position, needle.size(), ".ior = parameters.lx_p900 + " + std::to_string(offset) + ";");
-    if (invalid)
-        program.slang += "\nthis is an invalid Scene shader;\n";
-    program.semanticKey += "|scene-reload:" + std::to_string(offset) + (invalid ? ":invalid" : "");
-    generation->cooked.boundSource = BuildBoundSource(program);
-    generation->cooked.metadata = WriteMaterialProgramMetadata(program);
-    std::shared_ptr<const Instance> result;
+    Generation generationValue(*original->generation);
+    generationValue.generation += 1000 + unsigned(offset * 100);
+    {
+        auto& program = generationValue.cooked.product.program;
+        const std::string needle = ".ior = parameters.lx_p900;";
+        const auto position = program.slang.find(needle);
+        Check(position != std::string::npos, "Reload fixture owns the IOR expression");
+        program.slang.replace(position, needle.size(), ".ior = parameters.lx_p900 + " + std::to_string(offset) + ";");
+        if (invalid)
+        {
+            program.slang += "\nthis is an invalid Scene shader;\n";
+        }
+        program.semanticKey += "|scene-reload:" + std::to_string(offset) + (invalid ? ":invalid" : "");
+        generationValue.cooked.boundSource = BuildBoundSource(program);
+        generationValue.cooked.metadata = WriteMaterialProgramMetadata(program);
+    }
+    const auto generation = own::make_shared<const Generation>(std::move(generationValue));
+    own::shared_owner<const Instance> result;
     std::string error;
     Check(BuildInstance(
               generation, original->description,
@@ -1719,7 +1862,7 @@ std::shared_ptr<const Instance> SceneReload(const std::shared_ptr<const Instance
                   const auto found = std::ranges::find_if(original->textures, [&](const auto& texture) {
                       return texture.assetId == id && texture.colorSpace == space;
                   });
-                  return found == original->textures.end() ? std::shared_ptr<Texture>{} : found->owner;
+                  return found == original->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
               },
               result, error),
           "Reload immutable instance " + error);
@@ -1727,7 +1870,7 @@ std::shared_ptr<const Instance> SceneReload(const std::shared_ptr<const Instance
 }
 
 void WaitSceneFailure(SceneHost& host, const EnhancedFrameContext& context,
-                      const std::shared_ptr<const Generation>& generation, std::uint64_t previousFailures)
+                      const own::shared_owner<const Generation>& generation, std::uint64_t previousFailures)
 {
     std::string error;
     host.RequestProgram(context, generation, error);
@@ -1744,7 +1887,7 @@ void WaitSceneFailure(SceneHost& host, const EnhancedFrameContext& context,
 }
 
 void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
-                      const std::shared_ptr<const Generation>& generation)
+                      const own::shared_owner<const Generation>& generation)
 {
     std::string error;
     Check(host.RequestProgram(context, generation, error), "Scene asynchronous request " + error);
@@ -1764,8 +1907,9 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
 
 void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                          ProbeTextures& textures, ProbePool& pool,
-                         const std::array<std::shared_ptr<const Instance>, 2>& instances, std::shared_ptr<Texture> cube,
-                         const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0)
+                         const std::array<own::shared_owner<const Instance>, 2>& instances, own::shared_owner<const Texture> cube,
+                         const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0,
+                         bool currentFrameDepth = false)
 {
     std::string error;
     ProbeMeshes meshes;
@@ -1775,6 +1919,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     if (expanded == 4)
         controlledJobs.start(1);
     SceneHost host(expanded == 4 ? controlledJobs : ce::get_job_scheduler());
+    IRHIUploadTransactionListener* hostListener{};
     const auto psoWorkerBaseline = NativePsoWorkers(pipelines);
     FailingScenePipelines failingPipelines(pipelines);
     EnhancedGBufferPass gbuffer;
@@ -1798,7 +1943,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         WaitSceneProgram(host, context, instance->generation);
     Check(host.ProgramStats().workerExecutions == (PathFinder::IsAssetAuthoringEnabled() ? 2u : 0u),
           "Editor uses workers and cooked Player skips Scene shader compilation");
-    std::shared_ptr<const Instance> reloadB, reloadC, badShader, badPso, changedReload;
+    own::shared_owner<const Instance> reloadB, reloadC, badShader, badPso, changedReload;
     std::unique_ptr<SceneWorkerGate> preparationGate;
     if (expanded == 4)
     {
@@ -1830,22 +1975,73 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         coldLayered.draw.materialGraphSlot = 12;
         std::array coldDraws{coldCore.draw, coldLayered.draw};
         SceneInputView coldView{context.frameId, context.sceneEpoch, 71, 1, context.width, context.height, camera};
-        std::shared_ptr<const SceneViewInput> cold;
+        own::shared_owner<const SceneViewInput> cold;
         const auto coldSealed = SceneViewInput::Seal(coldView, coldDraws, {}, cold, error);
         Check(coldSealed, "Cold pending slot seal " + error);
-        Check(host.SelectReadyInput(context, cold, cold, error) && cold->Draws().empty() &&
-                  host.ProgramStats().activeSlots == 0,
-              "Cold pending material keeps the entire model hidden until all slots are ready");
+        // Target initialization must work without any native material pipeline.
+        Check(device.BeginFrame(error), "Graph-only target frame begin");
+        EnhancedGBufferPass graphTargets;
+        EnhancedShadowPass graphShadow;
+        std::vector<EnhancedDrawItem> graphCasters(coldDraws.begin(), coldDraws.end());
+        const auto previousCasters = context.shadowDraws;
+        context.shadowDraws = &graphCasters;
+        Check(graphShadow.PrepareGraphFrame(context, error), "Graph-only cascade preparation");
+        EnhancedRenderGraph clearGraph(device, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+        graphTargets.DeclareGraphTargets(clearGraph, context);
+        graphShadow.DeclareGraphTargets(clearGraph, context);
+        std::array<RHIReadback, 2> cleared;
+        Check(device.CreateReadback(context.width, context.height, RHIFormat::D32Float, 1, cleared[0], error) &&
+                  device.CreateReadback(EnhancedShadowPass::kShadowMapSize, EnhancedShadowPass::kShadowMapSize,
+                      RHIFormat::D32Float, 3, cleared[1], error), "Graph-only depth readbacks");
+        const std::array clearHandles{graphTargets.GetOutputs().depth, graphShadow.GetShadowMap()};
+        for (unsigned index = 0; index < clearHandles.size(); ++index)
+        {
+            const auto handle = clearHandles[index];
+            clearGraph.AddPass("Probe.GraphOnly.Clear", {{handle, RHIResourceState::CopySource, RGAccessMode::Read}},
+                [handle, target = cleared[index]](const auto& execution)
+                {
+                    for (unsigned layer = 0; layer < target.sliceCount; ++layer)
+                    {
+                        execution.encoder->CopyToReadback(target, execution.ResolveHandle(handle), layer, layer);
+                    }
+                }, true);
+        }
+        Check(clearGraph.Compile(error) && clearGraph.Execute(error) && device.EndFrame(error) &&
+                  GetRHISubmissionThread().DrainSubmissions(&device, error), "Graph-only target submission");
+        device.WaitForGpu();
+        Check(GetRHISubmissionThread().Drain(&device, error), "Graph-only target retirement");
+        for (unsigned index = 0; index < cleared.size(); ++index)
+        {
+            RHIReadbackImage image;
+            Check(device.MapReadback(cleared[index], image, error) && image.sliceCount == (index ? 3u : 1u),
+                  "Graph-only cleared depth layers");
+            for (unsigned layer = 0; layer < image.sliceCount; ++layer)
+            {
+                float depth{};
+                std::memcpy(&depth, image.data.data() + layer * image.sliceBytes, sizeof(depth));
+                Check(depth == 1.f, "Each graph-only depth layer starts neutral index=" + std::to_string(index) +
+                      " layer=" + std::to_string(layer) + " depth=" + std::to_string(depth));
+            }
+            device.ReleaseReadback(cleared[index]);
+        }
+        std::string clearValidation;
+        Check(device.DrainDebugMessages(clearValidation) == 0,
+              "Graph-only clear needs no native PSO and emits no validation errors " + clearValidation);
+        context.shadowDraws = previousCasters;
+        const auto requestedCold = cold;
+        Check(!host.SelectReadyInput(context, cold, cold, error) && host.SelectionDeferred() &&
+                  material_graph_test::SamePinnedObject(cold, requestedCold) && host.ProgramStats().activeSlots == 0,
+              "Cold pending material defers the frame without substituting or dropping requested draws");
     }
     const auto loadExisting = [&](const experiment::AssetId& id, LXColorSpace space, std::string&) {
         const auto found = std::ranges::find_if(instances[0]->textures, [&](const auto& texture) {
             return texture.assetId == id && texture.colorSpace == space;
         });
-        return found == instances[0]->textures.end() ? std::shared_ptr<Texture>{} : found->owner;
+        return found == instances[0]->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
     };
     auto maskedDescription = instances[0]->description;
     maskedDescription.parameters.push_back({902, 0.0});
-    std::shared_ptr<const Instance> maskedCore;
+    own::shared_owner<const Instance> maskedCore;
     Check(BuildInstance(instances[0]->generation, maskedDescription, loadExisting, maskedCore, error),
           "Scene masked alpha override");
     auto changedDescription = instances[0]->description;
@@ -1855,10 +2051,10 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     {
         changedDescription.parameters = {{903, std::array<double, 3>{.73, .82, 0}}};
     }
-    std::shared_ptr<const Instance> changedCore;
+    own::shared_owner<const Instance> changedCore;
     Check(BuildInstance(instances[0]->generation, changedDescription, loadExisting, changedCore, error),
           "Scene lookup parameter mutation");
-    std::shared_ptr<const Instance> resizedCore;
+    own::shared_owner<const Instance> resizedCore;
     if (expanded == 3)
     {
         const auto resized = FootprintImage(true, true);
@@ -1879,7 +2075,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     for (unsigned fixture = 0; fixture < (expanded ? 1u : 8u); ++fixture)
     {
         unsigned step = 0;
-        std::shared_ptr<const Instance> previousSelectedCore;
+        own::shared_owner<const Instance> previousSelectedCore;
         for (unsigned workers : workerModes)
         {
             std::cerr << "LX_SCENE_LOOKUP_FRAME expanded=" << expanded << " fixture=" << fixture << " step=" << step
@@ -1891,6 +2087,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             {
                 preparationGate->Release();
                 WaitSceneProgram(host, context, reloadB->generation);
+                WaitSceneProgram(host, context, reloadC->generation);
             }
             if (expanded == 4 && step == 5)
                 WaitSceneProgram(host, context, reloadC->generation);
@@ -2003,58 +2200,46 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             std::array<EnhancedDrawItem, 2> graphDraws{core.draw, layered.draw};
             if (fixture == 4)
                 std::swap(graphDraws[0], graphDraws[1]);
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             Check(SceneViewInput::Seal(view, graphDraws, {}, input, error), "Scene composition seal " + error);
-            std::shared_ptr<const Instance> selectedCore;
+            own::shared_owner<const Instance> selectedCore;
             if (expanded == 4)
             {
                 auto conflicting = graphDraws;
                 conflicting[1].materialGraphSlot = 11;
-                std::shared_ptr<const SceneViewInput> conflict;
+                own::shared_owner<const SceneViewInput> conflict;
                 Check(SceneViewInput::Seal(view, conflicting, {}, conflict, error),
                       "Conflicting slot input remains sealed");
                 auto retained = input;
-                Check(!host.SelectReadyInput(context, conflict, retained, error) && retained == input,
+                Check(!host.SelectReadyInput(context, conflict, retained, error) && material_graph_test::SamePinnedObject(retained, input),
                       "Conflicting Material identities preserve the selected view");
                 auto staleView = view;
                 ++staleView.frameId;
-                std::shared_ptr<const SceneViewInput> staleEmpty;
+                own::shared_owner<const SceneViewInput> staleEmpty;
                 Check(SceneViewInput::Seal(staleView, {}, {}, staleEmpty, error) &&
-                          !host.SelectReadyInput(context, staleEmpty, retained, error) && retained == input,
+                          !host.SelectReadyInput(context, staleEmpty, retained, error) && material_graph_test::SamePinnedObject(retained, input),
                       "A stale empty view cannot clear current Material slots");
-                Check(host.SelectReadyInput(context, input, input, error),
-                      "Select async ready/fallback input " + error);
+                const auto requestedInput = input;
+                const bool accepted = host.SelectReadyInput(context, input, input, error);
+                if (!accepted)
+                {
+                    const bool pending = step >= 1 && step <= 3;
+                    Check(material_graph_test::SamePinnedObject(input, requestedInput) && host.SelectionDeferred() == pending && !error.empty(),
+                          "Pending or failed request cannot substitute a previously submitted material step=" + std::to_string(step) +
+                          " selectionDeferred=" + std::to_string(host.SelectionDeferred()) + " error=" + error);
+                    Check(step == 1 || step == 2 || step == 3 || step == 6 || step == 7 || step == 9 || step == 11,
+                          "Only known pending/failed fixtures defer recording");
+                    ++sceneGenerationRejectedRequests;
+                    ++step;
+                    continue;
+                }
                 const auto coreInput =
                     std::ranges::find_if(input->Draws(), [](const auto& draw) { return draw.materialSlot == 11; });
-                if (coreInput != input->Draws().end()) selectedCore = coreInput->material;
-                const auto expected = step == 5 || step == 8 || step == 9 ? reloadC
-                                      : step == 10                        ? changedReload
-                                                                          : instances[0];
-                if (step == 11)
-                    Check(coreInput == input->Draws().end(),
-                          "A new Scene epoch cannot fall back to the previous epoch's material");
-                else
-                {
-                    const bool requestedReady = coreInput != input->Draws().end() &&
-                                                coreInput->material == core.draw.materialGraphInstance;
-                    const bool submittedFallback = coreInput != input->Draws().end() &&
-                        (coreInput->material == expected ||
-                         (step >= 5 && coreInput->material == reloadC) ||
-                         (step >= 3 && coreInput->material == reloadB));
-                    Check(requestedReady || submittedFallback,
-                          "Current request selects its ready instance or an exact submitted fallback step=" +
-                              std::to_string(step) + " selected=" + std::to_string(input->Draws().size()) +
-                              " active=" + std::to_string(host.ProgramStats().activeSlots));
-                    if (!requestedReady)
-                        ++sceneGenerationFallbacks;
-                    const auto expectedCoverage = requestedReady ? core.draw.coverage.flags :
-                        (EnhancedMaterialCoverage::Enabled |
-                         (coreInput->material == reloadC || coreInput->material == changedReload
-                              ? EnhancedMaterialCoverage::DoubleSided
-                              : coreInput->material == reloadB ? EnhancedMaterialCoverage::Masked : 0u));
-                    Check(coreInput->coverage.flags == expectedCoverage,
-                          "Fallback preserves submitted coverage with its exact generation");
-                }
+                Check(coreInput != input->Draws().end() &&
+                          material_graph_test::SamePinnedObject(coreInput->material, core.draw.materialGraphInstance) &&
+                          coreInput->coverage.flags == core.draw.coverage.flags,
+                      "Every accepted pass uses the exact requested material and coverage");
+                selectedCore = input->MaterialOwner(*coreInput);
                 if (step == 8)
                 {
                     Check(device.BeginFrame(error), "Unsubmitted replacement begin");
@@ -2071,32 +2256,32 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     error.clear();
                 }
             }
-            if (expanded == 4 && step == 11)
-            {
-                Check(input->Draws().empty(), "A new Scene epoch with one pending material hides the whole model");
-                ++step;
-                continue;
-            }
             Check(device.BeginFrame(error), "Scene composition begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
-            const auto environment = textures.GetOrUpload(cube.get(), error);
+            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(environment.IsValid(), "Scene reference environment");
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "Actual Scene pass preparation " + error);
             const auto resident = host.PrepareResidency(context, input, error);
             Check(resident, "Scene texture residency " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device,
+                currentFrameDepth ? RGSchedulingMode::ExplicitVersioned : RGSchedulingMode::DeclarationOrder);
             if (workers)
             {
                 pool.BeginFrame(static_cast<std::uint32_t>(context.frameId));
                 Check(graph->PrepareParallel(pool, error), "Scene native prefix " + error);
             }
+            // SceneHost registers before preparing its lookup/geometry caches.
+            // Capture that real listener for the final CPU-retention fault fixture.
+            if (!hostListener) device.firstListener = nullptr;
             const auto hostPrepared =
                 host.Prepare(context, input, fixture == 7 ? RHITextureHandle{} : environment.handle, {}, {}, {},
                              SceneHostBudget{.lookupApproximate = expanded == 5},
                              error, expanded == 1 && step >= 7 ? 2 : 1);
             Check(hostPrepared, "Scene host prepare " + error);
+            if (!hostListener) hostListener = device.firstListener;
+            Check(hostListener != nullptr, "Scene host installs its recording owner listener");
             for (unsigned failure = 0; failure < (expanded ? 4u : 3u); ++failure)
             {
                 auto wrong = context;
@@ -2114,8 +2299,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 ++sceneCompositionFailures;
             }
             gbuffer.Declare(*graph, context);
-            const auto outputs = gbuffer.GetOutputs();
-            host.DeclareGBuffer(*graph, outputs);
+            const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs(), !currentFrameDepth);
             RGTextureDesc aoDesc;
             aoDesc.width = context.width;
             aoDesc.height = context.height;
@@ -2123,8 +2307,13 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             aoDesc.allowRenderTarget = true;
             const float occlusion = fixture == 1 ? .5f : 1.f;
             aoDesc.clearColor[0] = occlusion;
-            const auto ao = graph->CreateTexture(aoDesc);
-            graph->AddPass("Probe.Scene.AO", {{ao, RHIResourceState::RenderTarget}},
+            auto ao = graph->CreateTexture(aoDesc);
+            if (currentFrameDepth)
+            {
+                ao = graph->Write(ao);
+            }
+            graph->AddPass("Probe.Scene.AO", {{ao, RHIResourceState::RenderTarget,
+                currentFrameDepth ? RGAccessMode::Write : RGAccessMode::LegacyState}},
                            [&device, ao, occlusion](const auto& execution) {
                                const auto handle = execution.ResolveHandle(ao);
                                const auto target = device.CreateRenderTargets({&handle, 1}, nullptr);
@@ -2144,7 +2333,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                       "Scene readback allocation");
             const auto copy = [&](unsigned index, RGHandle handle) {
                 graph->AddPass(
-                    "Probe.Scene.Readback", {{handle, RHIResourceState::CopySource}},
+                    "Probe.Scene.Readback", {{handle, RHIResourceState::CopySource,
+                        currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
                     [readback = readbacks[index], handle](const auto& execution) {
                         execution.encoder->CopyToReadback(readback, execution.ResolveHandle(handle));
                     },
@@ -2173,7 +2363,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     true);
             }
 #endif
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
+            const auto sceneLighting = host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
             std::array<RHIReadback, 11> pointReadbacks;
             RHIReadback sampleReadback;
             if (inspectPoint)
@@ -2225,7 +2415,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                   "Scene lookup stats allocation");
             const auto statistics = host.GraphLookupStatistics(*graph);
             graph->AddPass(
-                "Probe.Scene.LookupStatistics", {{statistics, RHIResourceState::CopySource}},
+                "Probe.Scene.LookupStatistics", {{statistics, RHIResourceState::CopySource,
+                    currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
                 [lookupReadback, buffer = host.LookupStatistics()](const auto& execution) {
                     execution.encoder->CopyBufferToReadback(lookupReadback, buffer);
                 },
@@ -2245,12 +2436,14 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(rejected, "Scene color rejects duplicate/cross-graph declaration");
                 ++sceneCompositionFailures;
             }
-            copy(1, deferred.GetOutput());
+            copy(1, sceneLighting);
             copy(2, outputs.bitmask);
             copy(4, outputs.depth);
             Check(!host.PublishSubmittedCache(context.frameId, {UINT64_MAX}, error),
                   "Unrecorded cache cannot be published");
-            Check(graph->Compile(error), "Scene composition graph compile " + error);
+            error.clear();
+            const bool graphCompiled = graph->Compile(error);
+            Check(graphCompiled, "Scene composition graph compile " + error);
             RHICompletionPoint graphCompletion;
             RHISubmissionTicket graphTicket;
             std::unique_ptr<SceneSubmissionGate> submissionGate;
@@ -2277,10 +2470,10 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             {
                 auto newerDraws = graphDraws;
                 newerDraws[0].materialGraphInstance = badShader;
-                std::shared_ptr<const SceneViewInput> newer;
+                own::shared_owner<const SceneViewInput> newer;
                 Check(SceneViewInput::Seal(view, newerDraws, {}, newer, error) &&
-                          host.SelectReadyInput(context, newer, newer, error),
-                      "A newer request supersedes an already recorded replacement");
+                          !host.SelectReadyInput(context, newer, newer, error),
+                      "An unready newer request supersedes publication without selecting a fallback");
             }
             // Worker submission already happened above. Sequential recording
             // must not be authorized by a previous frame's completed fence.
@@ -2357,7 +2550,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             }
             const bool warm = approximate     ? false
                               : expanded == 4 ? step > 0 && step != 2 && step != 3 && step != 11 &&
-                                                  selectedCore == previousSelectedCore
+                                                  material_graph_test::SamePinnedObject(selectedCore, previousSelectedCore)
                               : expanded == 1 ? step == 1 || step == 3 || step == 6 || step == 8
                               : expanded == 3 ? step == 1 || step == 2 || step == 4 || step == 7
                                               : step > 0;
@@ -2372,7 +2565,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (expanded == 3 && (step == 3 || step == 5))
                 Check(stats.baked > 0 && stats.reused > 0, "Per-image Vector/extent updates affect only owning pixels");
             if (expanded == 4 && selectedCore && previousSelectedCore &&
-                selectedCore != previousSelectedCore && step != 2 && step != 3)
+                !material_graph_test::SamePinnedObject(selectedCore, previousSelectedCore) && step != 2 && step != 3)
                 Check(stats.baked > 0 && stats.reused > 0,
                       "Generation or instance replacement preserves the other slot's exact lookup");
             if (expanded == 4) previousSelectedCore = selectedCore;
@@ -2442,9 +2635,9 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                         float((x + .5) / context.width * 2 - 1), float(1 - (y + .5) / context.height * 2),
                         (tier == 0 || coplanar ? .3f : .4f) + (expanded == 1 && step >= 9 ? .02f : 0.f), 0};
                     spatial.uvLod = {expanded == 1 && tier == 0 && step >= 5 ? .7f : .1f, .2f, 0, 0};
-                    const float ior = expanded == 4 && tier == 0                ? (selectedCore == changedReload ? 2.2f
-                                                                                   : selectedCore == reloadC    ? 1.9f
-                                                                                   : selectedCore == reloadB    ? 1.7f
+                    const float ior = expanded == 4 && tier == 0                ? (material_graph_test::SamePinnedObject(selectedCore, changedReload) ? 2.2f
+                                                                                   : material_graph_test::SamePinnedObject(selectedCore, reloadC)    ? 1.9f
+                                                                                   : material_graph_test::SamePinnedObject(selectedCore, reloadB)    ? 1.7f
                                                                                                                 : 1.3f)
                                       : expanded == 1 && tier == 0 && step >= 4 ? 1.7f
                                                                                 : 1.3f;
@@ -2615,6 +2808,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         Check(stats.stalePublications == 1 && stats.failedSubmissions == 0 && stats.activeSlots == 0 &&
                   stats.retainedRecordings == 0,
               "Stale submission cannot replace an active slot and completion releases owners");
+        Check(sceneGenerationFallbacks == 0 && sceneGenerationRejectedRequests == 7,
+              "All seven pending/failed requests are rejected with zero material fallbacks");
         sceneGenerationCompiles = stats.compileSubmissions;
         sceneGenerationWorkers = stats.workerExecutions;
         sceneGenerationStale = stats.stalePublications;
@@ -2626,7 +2821,51 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         Check(host.ProgramStats().compileSubmissions == 0 && host.ProgramStats().workerExecutions == 0,
               "Cooked Scene runs and retires without a compiler job");
     }
-    host.ShutdownAfterIdle();
+    if (expanded == 0)
+    {
+        // Inject only SceneHost notifications. No native command is submitted
+        // by this fixture; AbortFrame and prior GPU idle make teardown safe.
+        // Admission with no trustworthy completion must keep the CPU Frame even
+        // after a tail rejection/abort, view replacement, and arbitrary completion.
+        ++context.frameId;
+        context.lights = nullptr; // The previous iteration's light vector is gone.
+        auto geometry = MakeGeometry(false, true);
+        geometry.draw.geometryKey = 8001;
+        geometry.draw.modelMeshView.indexData = geometry.indices.data();
+        geometry.draw.materialGraphInstance = instances[0];
+        geometry.draw.coverage.flags = EnhancedMaterialCoverage::Enabled;
+        SceneInputView view{context.frameId, context.sceneEpoch, 701, 1,
+                            context.width, context.height, camera};
+        own::shared_owner<const SceneViewInput> retained;
+        Check(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, retained, error),
+              "Quarantine input seals " + error);
+        Check(device.BeginFrame(error), "Quarantine recording opens");
+        textures.BeginFrame(context.frameId);
+        Check(host.PrepareResidency(context, retained, error) &&
+                  host.Prepare(context, retained, {}, {}, {}, {}, {}, error, 1),
+              "Quarantine candidate preparation " + error);
+        const auto recording = device.GetCurrentUploadRecordingId();
+        own::weak_owner<const SceneViewInput> retainedLookup(retained);
+        retained.reset();
+        Check(host.Prepare(context, {}, {}, {}, {}, {}, {}, error, 1) && !host.HasDraws(),
+              "Replacing current view releases only its own frame pin");
+        Check(!retainedLookup.expired(), "Recording owns frame after caller and current view release");
+        hostListener->OnUploadSubmitted(recording, {700});
+        hostListener->OnUploadAccepted(recording, {});
+        hostListener->OnUploadSubmissionRejected(recording, {700});
+        hostListener->OnUploadAborted(recording);
+        hostListener->OnUploadAccepted(recording, {701});
+        hostListener->OnUploadCompleted(UINT64_MAX);
+        Check(!retainedLookup.expired() && host.ProgramStats().retainedRecordings != 0,
+              "Accepted zero completion stays quarantined through tail failure and later known tokens");
+        device.AbortFrame();
+        host.ShutdownAfterIdle();
+        Check(retainedLookup.expired(), "Confirmed idle teardown releases the quarantined CPU frame");
+    }
+    else
+    {
+        host.ShutdownAfterIdle();
+    }
     gbuffer.Shutdown();
     deferred.Shutdown();
     meshes.Shutdown();
@@ -2641,8 +2880,338 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 #include "material_forward_blend_tests.inl"
 #include "material_forward_transport_tests.inl"
 
+void RunIssueAdmission(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
+                       const own::shared_owner<const Generation>& generation)
+{
+    EnhancedFrameContext context{};
+    context.resources = &device;
+    context.rootSignatures = &roots;
+    context.psoManager = &pipelines;
+    std::string error;
+    {
+        SceneHost host;
+        for (unsigned revision = 0; revision < 80; ++revision)
+        {
+            auto invalidValue = *generation;
+            invalidValue.generation = generation->generation + revision + 1;
+            invalidValue.cooked.product.program.volume = true;
+            invalidValue.cooked.product.program.slang.clear();
+            const auto invalid = own::make_shared<const Generation>(std::move(invalidValue));
+            Check(!host.RequestProgram(context, invalid, error), "Invalid volume revision is rejected");
+            const auto failed = host.ProgramStats().failedPreparations;
+            Check(!host.RequestProgram(context, invalid, error)
+                      && host.ProgramStats().failedPreparations == failed,
+                  "Repeated failed revision preserves its memoized error");
+        }
+        const bool correctedEntered = host.RequestProgram(context, generation, error);
+        Check(correctedEntered, "Corrected generation enters after 80 failures: " + error);
+        const auto failures = host.ProgramStats().failedPreparations;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
+        while (!host.IsProgramReady(generation, RHIShaderCompiler::GetOutput()))
+        {
+            host.PollPrograms(context);
+            Check(host.ProgramStats().failedPreparations == failures,
+                  "Corrected generation introduces no new preparation failure");
+            Check(std::chrono::steady_clock::now() < deadline, "Corrected generation completes preparation");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        Check(host.IsProgramReady(generation, RHIShaderCompiler::GetOutput()),
+              "Corrected generation prepares without recreating host");
+        host.ShutdownAfterIdle();
+    }
+    {
+        SceneHost host;
+        for (unsigned request = 0; request < 64; ++request)
+        {
+            auto pendingValue = *generation;
+            pendingValue.generation = generation->generation + request + 1;
+            Check(host.RequestProgram(context, own::make_shared<const Generation>(std::move(pendingValue)), error),
+                  "Pending request fits admission budget");
+        }
+        auto overflowValue = *generation;
+        overflowValue.generation = generation->generation + 65;
+        const auto overflow = own::make_shared<const Generation>(std::move(overflowValue));
+        Check(!host.RequestProgram(context, overflow, error) && host.ProgramStats().compileSubmissions > 0,
+              "Admission overflow starts existing jobs instead of deadlocking before PollPrograms");
+        host.ShutdownAfterIdle();
+    }
+    std::cout << "ISSUE_ADMISSION_OK failedRevisions=80 pendingRequests=64 overflowProgress=1\n";
+}
+
+void RunIssueResourceLifetime(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
+                             ProbeTextures& textures, ProbePool& pool)
+{
+    std::string error;
+    EnhancedFrameContext context{};
+    context.resources = &device;
+    context.rootSignatures = &roots;
+    context.psoManager = &pipelines;
+    context.textureCache = &textures;
+    context.width = context.height = 64;
+    device.trackOwnedResources = true;
+    {
+        RHIBufferHandle buffer;
+        RHIBufferDesc desc{};
+        desc.bytes = 64;
+        Check(device.CreateBuffer(desc, buffer, error), "Graph state test buffer");
+        RHIResourceState state = RHIResourceState::Common;
+        for (unsigned decision = 0; decision < 4; ++decision)
+        {
+            const auto initial = state;
+            const auto finalState = decision == 3 ? RHIResourceState::ShaderResource : RHIResourceState::CopyDest;
+            Check(device.BeginFrame(error), "Graph state recording opens");
+            EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitSingleWriter);
+            if (decision == 3)
+            {
+                pool.BeginFrame(0);
+                Check(graph.PrepareParallel(pool, error), "Graph state parallel preparation");
+            }
+            const auto imported = graph.ImportBuffer(buffer, state, "StateAcceptance", &state);
+            graph.AddPass("StateAcceptance", {{imported, finalState,
+                decision == 3 ? RGAccessMode::Read : RGAccessMode::Write}},
+                [decision](const EnhancedRenderGraph::ExecuteContext&)
+                {
+                    if (decision == 1)
+                    {
+                        throw std::runtime_error("Injected graph recording failure");
+                    }
+                }, true);
+            Check(graph.Compile(error) && state == initial,
+                  "Compile never commits planned external resource state decision=" + std::to_string(decision)
+                      + " error=" + error);
+            if (decision == 0)
+            {
+                device.AbortFrame();
+            }
+            else if (decision == 1)
+            {
+                Check(!graph.Execute(error), "Callback failure is reported");
+                device.AbortFrame();
+            }
+            else
+            {
+                if (decision == 3)
+                {
+                    graph.SetParallelRecordCostThreshold(0);
+                    RHIRecordedBatch batch;
+                    RHIRecordedBatchDesc description;
+                    description.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&device);
+                    Check(graph.RecordParallel(pool, 2, description, batch, error) && state == initial,
+                          "Parallel recording alone never commits external state");
+                    RHISubmissionTicket ticket;
+                    Check(GetRHISubmissionThread().EnqueueRecordedBatch(&device, device, std::move(batch), ticket, error)
+                              && state == finalState, "Parallel queue acceptance commits external state");
+                }
+                else
+                {
+                    Check(graph.Execute(error) && state == initial,
+                          "Recording alone never commits external resource state");
+                }
+                Check(device.EndFrame(error) && state == finalState,
+                      "Queue acceptance commits external resource state");
+                Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Graph state submission");
+                device.WaitForGpu();
+                Check(GetRHISubmissionThread().Drain(&device, error), "Graph state retirement");
+            }
+            if (decision < 2)
+            {
+                Check(state == RHIResourceState::Common, "Aborted graph preserves initial external state");
+            }
+        }
+        device.ReleaseBuffer(buffer);
+    }
+    for (unsigned fail = 2; fail <= 4; ++fail)
+    {
+        EnhancedSSGIPass pass;
+        device.textureAttempt = 0;
+        device.failTextureAt = fail;
+        Check(!pass.PrepareFrame(context, error) && device.ownedTextures.empty(),
+              "SSGI partial allocation is rolled back");
+        device.failTextureAt = 0;
+        Check(pass.PrepareFrame(context, error) && device.ownedTextures.size() == 4,
+              "SSGI retries the complete four-texture set");
+        pass.Shutdown();
+        Check(device.ownedTextures.empty(), "SSGI shutdown releases owned textures");
+    }
+    for (unsigned fail = 2; fail <= 3; ++fail)
+    {
+        EnhancedVolumetricFogPass pass;
+        device.textureAttempt = 0;
+        device.failTextureAt = fail;
+        Check(!pass.Initialize(context, error) && device.ownedTextures.empty(),
+              "Fog partial allocation is rolled back");
+        device.failTextureAt = 0;
+        for (unsigned cycle = 0; cycle < 3; ++cycle)
+        {
+            Check(pass.Initialize(context, error) && device.ownedTextures.size() == 3,
+                  "Fog on/off creates exactly three owned volumes");
+            pass.Shutdown();
+            Check(device.ownedTextures.empty(), "Fog off releases all owned volumes");
+        }
+    }
+    {
+        EnhancedForwardPass pass;
+        auto opaqueOnly = context;
+        opaqueOnly.forwardLightingConsumer = false;
+        Check(pass.PrepareFrame(opaqueOnly, error) && device.ownedBuffers.empty(),
+              "Opaque graph-only view does not allocate Forward light-culling buffers");
+        EnhancedRenderGraph graph(device);
+        pass.Declare(graph, opaqueOnly);
+        Check(device.ownedBuffers.empty(), "Opaque graph-only view does not declare Forward culling work");
+        pass.Shutdown();
+    }
+    for (unsigned fail = 1; fail <= 2; ++fail)
+    {
+        EnhancedForwardPass pass;
+        device.bufferAttempt = 0;
+        device.failBufferAt = fail;
+        Check(!pass.PrepareFrame(context, error) && device.ownedBuffers.empty(),
+              "Forward partial buffer allocation is rolled back");
+        device.failBufferAt = 0;
+        Check(pass.PrepareFrame(context, error) && device.ownedBuffers.size() == 2,
+              "Forward retries the complete tile-buffer pair");
+        Check(device.BeginFrame(error), "Forward growth recording opens");
+        context.width = context.height = 128;
+        Check(pass.PrepareFrame(context, error) && device.ownedBuffers.size() == 4,
+              "Forward growth retains previous buffers until recording decision");
+        device.AbortFrame();
+        Check(device.ownedBuffers.size() == 2, "Aborted unused recording releases retired pair");
+        pass.Shutdown();
+        Check(device.ownedBuffers.empty(), "Forward shutdown releases tile buffers");
+        context.width = context.height = 64;
+    }
+    {
+        PassResourceRetirement retirement;
+        Check(retirement.Attach(device), "Retirement attaches to owning device");
+        auto* listener = device.lastListener;
+        RHIBufferHandle buffer{};
+        RHIBufferDesc desc{};
+        desc.bytes = 64;
+        Check(device.CreateBuffer(desc, buffer, error), "Retirement test buffer");
+        Check(device.BeginFrame(error), "Retirement test recording");
+        const auto recording = device.GetCurrentUploadRecordingId();
+        unsigned acceptedMetadata{}, rejectedMetadata{};
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.Retire(buffer);
+        listener->OnUploadSubmitted(recording, RHICompletionPoint{100});
+        Check(acceptedMetadata == 0 && rejectedMetadata == 0,
+              "Submission reservation cannot publish temporal metadata");
+        listener->OnUploadAccepted(recording, RHICompletionPoint{100});
+        Check(acceptedMetadata == 2 && rejectedMetadata == 0,
+              "Acceptance commits every metadata transaction in its recording");
+        listener->OnUploadCompleted(99);
+        Check(device.ownedBuffers.size() == 1, "In-flight retirement waits for exact completion");
+        listener->OnUploadCompleted(100);
+        Check(device.ownedBuffers.empty(), "Completed retirement releases its resource");
+        device.AbortFrame();
+        listener->OnUploadSubmitted(999, RHICompletionPoint{200});
+        listener->OnUploadAccepted(999, RHICompletionPoint{200});
+        Check(device.CreateBuffer(desc, buffer, error), "Rejected recording retirement buffer");
+        Check(device.BeginFrame(error), "Rejected retirement recording");
+        const auto rejectedRecording = device.GetCurrentUploadRecordingId();
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.Retire(buffer);
+        listener->OnUploadSubmissionRejected(rejectedRecording, RHICompletionPoint{201});
+        Check(acceptedMetadata == 2 && rejectedMetadata == 2,
+              "Rejection rolls back initialization and temporal metadata together");
+        listener->OnUploadCompleted(199);
+        Check(device.ownedBuffers.size() == 1, "Rejected recording still preserves prior in-flight use");
+        listener->OnUploadCompleted(200);
+        Check(device.ownedBuffers.empty(), "Prior completion releases rejected-recording retirement");
+        device.AbortFrame();
+        retirement.ClearAfterIdle();
+    }
+    device.trackOwnedResources = false;
+    {
+        const auto cooked = []
+        {
+            assets::CookedEnvironment value;
+            value.cubeSize = value.brdfSize = 1;
+            for (unsigned image = 0; image < value.images.size(); ++image)
+            {
+                value.images[image] = TextureImage::Allocate(EnhancedIBLGenerator::CookedImageFormat(image),
+                    1, 1, image < 3 ? 6 : 1, 1, image < 3);
+            }
+            for (auto& importance : value.importance)
+            {
+                importance = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1);
+            }
+            value.source = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1);
+            return value;
+        };
+        EnhancedIBLGenerator generator;
+        Check(generator.Initialize(context, error), "IBL transaction initialization");
+        Check(device.BeginFrame(error), "IBL initial cooked recording");
+        Check(generator.InstallCooked(context, cooked(), error), "IBL initial cooked preparation: " + error);
+        Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error),
+              "IBL initial environment accepted");
+        device.WaitForGpu();
+        const auto previousCube = generator.GetCubeMap();
+        const auto previousGeneration = generator.GetGeneration();
+        Check(device.BeginFrame(error), "IBL replacement recording");
+        Check(generator.InstallCooked(context, cooked(), error), "IBL replacement preparation");
+        bool prepared = true;
+        generator.WatchPreparationRejected([&prepared] { prepared = false; });
+        const auto capturePath = std::filesystem::path("Build/Verification/GitHubIssueAudit20261008/aborted-ibl.ceibl");
+        Check(generator.QueueCookedCapture(capturePath, {}, error) && generator.HasPendingCookedCapture(),
+              "IBL replacement capture is recorded");
+        device.AbortFrame();
+        Check(!prepared && generator.GetCubeMap() == previousCube
+                  && generator.GetGeneration() == previousGeneration && !generator.HasPendingCookedCapture(),
+              "Aborted IBL restores previous environment and discards unsubmitted capture");
+        Check(!std::filesystem::exists(capturePath), "Aborted IBL capture is never published");
+        Check(device.BeginFrame(error), "IBL partial preparation recording");
+        auto invalid = cooked();
+        invalid.images[3] = {};
+        Check(!generator.InstallCooked(context, std::move(invalid), error)
+                  && generator.GetCubeMap() == previousCube && generator.GetGeneration() == previousGeneration,
+              "Partial IBL preparation preserves previous environment");
+        device.AbortFrame();
+        generator.Shutdown();
+    }
+    std::string validation;
+    Check(device.DrainDebugMessages(validation) == 0, "Resource lifetime GPU validation: " + validation);
+    std::cout << "ISSUE_RESOURCE_LIFETIME_OK ssgiFailurePoints=3 fogFailurePoints=2 fogCycles=6 forwardFailurePoints=2 validation=0\n";
+}
+
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
 {
+    {
+        SceneInputView view;
+        view.width = view.height = 100;
+        view.camera.view = view.camera.projection = math::matrix4x4::identity();
+        const auto world = math::matrix4x4::identity();
+        const shadow_math::Sphere sphere{{0, 0, 10}, 1};
+        std::array<experiment::MeshLodLevel, 2> levels;
+        levels[0].indices = {0, 1, 2};
+        levels[0].geometricError = 0.001f;
+        levels[1].indices = {0, 2, 3};
+        levels[1].geometricError = 0.01f;
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 1,
+            "Orthographic projected error chooses actual authored LOD1");
+        view.width = view.height = 10;
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 2,
+            "Smaller screen footprint chooses LOD2");
+        view.width = view.height = 1000;
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 0,
+            "High screen error retains original geometry");
+        Check(SelectSceneGeometryLod(levels, world, {{0, 0, 0}, 1}, view, 1) == 0,
+            "Near-plane crossing retains original geometry");
+        view.camera.projection.m[2][3] = 1;
+        view.width = view.height = 100;
+        const auto close = SelectSceneGeometryLod(levels, world, {{0, 0, 2}, 1}, view, 1);
+        const auto distantLod = SelectSceneGeometryLod(levels, world, {{0, 0, 100}, 1}, view, 1);
+        Check(distantLod == 2 && close < distantLod, "Perspective distance reduces submitted geometry detail");
+        auto scaled = world;
+        scaled.m[0][0] = 100;
+        Check(SelectSceneGeometryLod(levels, scaled, sphere, view, 1) < 2,
+            "Nonuniform world scale preserves the projected-error budget");
+        levels[1].geometricError = std::numeric_limits<float>::quiet_NaN();
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 0,
+            "Invalid authored error retains original geometry");
+    }
 #ifdef LX_PROBE_VULKAN
     RHIShaderCompiler::ScopedOutput nativeOutput(RHIShaderBinary::SpirV);
 #endif
@@ -2668,8 +3237,8 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graphId.value), "Graph GUID");
     GenerationStore store;
     std::string error;
-    std::array<std::shared_ptr<const Instance>, 2> instances;
-    std::array<std::shared_ptr<const Instance>, 2> footprintInstances;
+    std::array<own::shared_owner<const Instance>, 2> instances;
+    std::array<own::shared_owner<const Instance>, 2> footprintInstances;
     for (unsigned tier = 0; tier < 2; ++tier)
     {
         const auto generation = store.Load(
@@ -2727,6 +3296,18 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
 #endif
           "Native caches " + error);
     Check(pool.Initialize(device, 4, ProbeDevice::kFrameCount, error), "Native command pool " + error);
+    if (mode == "--issue-resource-lifetime")
+    {
+        RunIssueResourceLifetime(device, roots, pipelines, textures, pool);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--issue-admission")
+    {
+        RunIssueAdmission(device, roots, pipelines, instances[0]->generation);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
     if (mode == "--forward-blend")
     {
         RunForwardBlend(root, device, roots, pipelines, textures, pool, instances, cube);
@@ -2791,10 +3372,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             Check(!LoadSceneShaders(incomplete, RHIShaderBinary::Dxil, accepted, error) &&
                       accepted.color.bytecode.Size() == acceptedSize,
                   "Incomplete cooked stage set preserves accepted shaders");
-            auto generation = std::make_shared<Generation>();
-            generation->assetId = id;
-            generation->generation = 1;
-            generation->cooked = std::move(packed);
+            Generation generationValue;
+            generationValue.assetId = id;
+            generationValue.generation = 1;
+            generationValue.cooked = std::move(packed);
+            const auto generation = own::make_shared<const Generation>(std::move(generationValue));
             Check(BuildInstance(
                       generation, {id, {}, {}},
                       [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; }, instances[tier],
@@ -2808,6 +3390,16 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         ShutdownNative(device, roots, pipelines, textures, pool);
         std::cout << "LX_MATERIAL_COOKED_SCENE_OK frames=" << sceneCompositionFrames << " checks=" << checks
                   << " gpuComponents=" << gpuComponents << " sceneCompiles=0 validation=0 pak=encrypted\n";
+        return;
+    }
+    if (mode == "--lx-meshlet-only")
+    {
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 0, true);
+        std::string validation;
+        Check(device.DrainDebugMessages(validation) == 0, "LX meshlet/depth/HZB validation " + validation);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        std::cout << "LX_MESHLET_CULL_LOD_HZB_OK frames=" << sceneCompositionFrames
+            << " checks=" << checks << " gpuComponents=" << gpuComponents << " validation=0\n";
         return;
     }
     if (mode == "--scene-only" || mode == "--scene-full-only")
@@ -2829,7 +3421,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                   << " fallbacks=" << sceneGenerationFallbacks << " aborts=" << sceneGenerationAborts << '\n';
         return;
     }
-    if (!mode.empty())
+    if (!mode.empty() && mode != "--rg5-reference")
     {
         if (mode == "--refraction-only")
         {
@@ -2860,13 +3452,13 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     }
     {
         const auto before = textures.GetCachedCount();
-        std::array<std::shared_ptr<Texture>, 3> abortedImages{Image(), Image(), Image()};
+        std::array<own::shared_owner<const Texture>, 3> abortedImages{Image(), Image(), Image()};
         std::array<RHITextureHandle, 3> handles;
         Check(device.BeginFrame(error), "Texture abort regression begin");
         textures.BeginFrame(800);
         for (unsigned i = 0; i < handles.size(); ++i)
         {
-            const auto uploaded = textures.GetOrUpload(abortedImages[i].get(), error);
+            const auto uploaded = textures.GetOrUpload((abortedImages[i] ? &*abortedImages[i].borrow() : nullptr), abortedImages[i] ? abortedImages[i]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(uploaded.IsValid(), "Fresh texture upload before abort");
             handles[i] = uploaded.handle;
         }
@@ -2878,18 +3470,20 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         Check(device.BeginFrame(error), "Texture retry regression begin");
         textures.BeginFrame(801);
         for (const auto& owner : abortedImages)
-            Check(textures.GetOrUpload(owner.get(), error).IsValid(), "Aborted texture retries on fresh recording");
+            Check(textures.GetOrUpload((owner ? &*owner.borrow() : nullptr), owner ? owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).IsValid(), "Aborted texture retries on fresh recording");
         Check(device.EndFrame(error), "Texture retry submit");
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Texture retry drain");
         device.WaitForGpu();
     }
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 4);
-    RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors, table,
-                        3);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 1);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 5);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 2);
+    if (mode != "--rg5-reference")
+    {
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 4);
+        RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors, table, 3);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 1);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 5);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 2);
+    }
     RHIShaderBlob transform, vertex, pixel, sharedPixel, resolve, bake;
     for (auto backend : {RHIShaderBinary::SpirV, RHIShaderBinary::Dxil})
     {
@@ -2988,14 +3582,14 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         Drain drain{device};
         Check(device.BeginFrame(error), "Raster begin");
         textures.BeginFrame(frame);
-        std::shared_ptr<const RenderBindings> materialBindings;
+        own::shared_owner<const RenderBindings> materialBindings;
         Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings, error),
               "Raster material bindings " + error);
-        const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         auto& encoder = device.GetImmediateEncoder();
         if (frame == 0)
         {
-            const auto texture = textures.GetOrUpload(image.get(), error);
+            const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             const RHITransition transitions[]{
                 {texture.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource},
                 {environment.cube.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource}};
@@ -3181,9 +3775,14 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
               "Background payload corruption is rejected without erasing accepted coverage");
         for (const unsigned workers : {0u, 1u, 4u})
         {
-            RunGraphChain(device, pool, textures, meshEvaluator, bindings, collector, evaluators[tier], baker,
-                          instances[tier], cube, request, sources, {actual, count}, {actualMaterial, count},
-                          {actualBake, count}, workers);
+            for (unsigned policy = 0; policy < (mode == "--rg5-reference" ? 3u : 1u); ++policy)
+            {
+                RunGraphChain(device, pool, textures, meshEvaluator, bindings, collector, evaluators[tier], baker,
+                              instances[tier], cube, request, sources, {actual, count}, {actualMaterial, count},
+                              {actualBake, count}, workers,
+                              policy == 0 ? RGSchedulingMode::DeclarationOrder : RGSchedulingMode::ExplicitVersioned,
+                              policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
+            }
         }
         if (frame == 6)
         {
@@ -3206,8 +3805,13 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         {
             for (unsigned workers : {0u, 1u, 4u})
             {
-                RunSharedDepthChain(device, pool, textures, meshEvaluator, bindings, collectors[0], evaluators, baker,
-                                    instances, cube, environmentColors, table, fixture, reverseOrder, workers);
+                for (unsigned policy = 0; policy < (mode == "--rg5-reference" ? 3u : 1u); ++policy)
+                {
+                    RunSharedDepthChain(device, pool, textures, meshEvaluator, bindings, collectors[0], evaluators, baker,
+                                        instances, cube, environmentColors, table, fixture, reverseOrder, workers,
+                                        policy == 0 ? RGSchedulingMode::DeclarationOrder : RGSchedulingMode::ExplicitVersioned,
+                                        policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
+                }
             }
         }
     }
@@ -3274,6 +3878,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
               << " maxTextureFilterError=" << maxTextureFilterError
               << " sceneGenerationFrames=" << sceneGenerationFrames
               << " sceneGenerationFallbacks=" << sceneGenerationFallbacks
+               << " sceneGenerationRejectedRequests=" << sceneGenerationRejectedRequests
               << " sceneGenerationAborts=" << sceneGenerationAborts
               << " sceneGenerationPendingSubmissions=" << sceneGenerationPendingSubmissions
               << " sceneGenerationStale=" << sceneGenerationStale
@@ -3318,7 +3923,10 @@ int main(int argc, char** argv)
         }
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
-                   (std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                   (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                    std::string_view(argv[2]) == "--lx-meshlet-only" ||
+                    std::string_view(argv[2]) == "--issue-resource-lifetime" ||
+                    std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
                     std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),

@@ -63,6 +63,11 @@ GT에서 재시도한다. 영구적인 글리프/문자 수 상한은 매 프레
   등록된 폰트 GUID로 바꾸며, 미해결/다른 자산 타입/Assets 밖의 참조는 실패시킨다
 - 기본 폰트는 고정 engine resource 경로로 해석하므로 현재 작업 폴더나 개발 PC의 시스템 폰트에 의존하지 않는다
 
+최신 `PrebuiltAssetSets`의 source-free bootstrap은 프로젝트 raw `.ttf`/`.otf`를 허용하지 않고,
+AssetSet에도 Font kind가 아직 없다. 따라서 프로젝트 폰트 패키징은 기존 프로젝트 소스 포함
+경로에 한정한다. source-free bootstrap의 프로젝트 폰트 참조는 허용 범위를 넓히지 않고
+cooker/입력 경계에서 실패시킨다. 번들 Inter/Nanum runtime resource 배포는 그대로 지원한다.
+
 이 단계에서 atlas/metrics를 디스크에 미리 굽는 별도 cooked-font 형식은 만들지 않았다.
 Player는 패키지의 원본 TTF/OTF를 읽고 첫 사용 시 직렬로 SDF를 만든다.
 `stb_truetype`는 보안 경계용 폰트 파서가 아니다. 파일/테이블 범위 검사는 포함하지만,

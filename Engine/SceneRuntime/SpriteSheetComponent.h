@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
@@ -11,6 +12,12 @@ class Canvas;
 class [[reflgen::reflect]] SpriteSheetComponent : public meta::identity<SpriteSheetComponent, UIComponent>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        UIComponent::gc_trace(tracer);
+    }
+
 public:
 	SpriteSheetComponent() = default;
 
@@ -38,7 +45,7 @@ public:
 	ImageInfo				 uiinfo{};
 
 	[[reflgen::ignore]]
-	std::shared_ptr<Texture> m_spriteSheetTexture{};
+	own::shared_owner<const Texture> m_spriteSheetTexture{};
 
 	std::string				 m_spriteSheetPath{};
 	float                    m_frameDuration{ 0.1f };

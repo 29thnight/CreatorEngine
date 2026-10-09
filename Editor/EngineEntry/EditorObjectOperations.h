@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "LayerTypes.h"
 #include "CommandCore/CommandResult.h"
 #include "EntityHandle.h"
@@ -20,6 +21,12 @@ enum class GameObjectType;
 
 namespace EditorObjectOperations
 {
+    // Structural operations called from presentation enqueue owned values for
+    // the GameThread and return code "editor.queued" (admission only). Their
+    // terminal failures go to Output Log. GameThread callers receive the real
+    // synchronous result; dependent create/configure work must share one queued
+    // operation rather than dereference a queued result. Value-only gestures
+    // remain synchronous under the scene borrow fence.
     // Runtime identity: @scene:index:generation. Names are lookup input, not identity.
     std::string ObjectId(EntityHandle target);
     CommandCore::CommandResult ResolveTarget(const std::string& nameOrId, EntityHandle& target);
@@ -54,6 +61,7 @@ namespace EditorObjectOperations
     CommandCore::CommandResult Delete(EntityHandle target);
     CommandCore::CommandResult Duplicate(EntityHandle target, const std::string& name = {});
     CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent);
+    CommandCore::CommandResult MoveRelative(EntityHandle target, EntityHandle sibling, bool after);
     CommandCore::CommandResult Transform(EntityHandle target, math::vector3 position, math::quaternion rotation, math::vector3 scale);
     // A GUI drag keeps handles and owned values, never component pointers. One
     // commit groups all affected objects into a single Undo entry.
@@ -76,7 +84,7 @@ namespace EditorObjectOperations
     CommandCore::CommandResult NavigateSelection(Scene* scene, int direction);
     CommandCore::CommandResult InstantiatePrefab(const std::string& prefab, const std::string& name);
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name);
-    CommandCore::CommandResult MaterialMode(const std::vector<std::shared_ptr<Material>>& materials, MaterialRenderingMode mode);
+    CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);
     CommandCore::CommandResult MaterialMode(EntityHandle target, MaterialRenderingMode mode);
 
     // PBR-W8 — 렌더러별 MaterialInstance override 를 헤드리스로 얹는다.

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Ownership.h"
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -20,18 +22,22 @@ enum class TextAlignment : std::uint8_t;
 class TextAtlasPage final
 {
 public:
-    std::shared_ptr<Texture> GetTexture() const noexcept
+    own::shared_owner<const Texture> GetTexture() const
     {
-        return m_texture.load(std::memory_order_acquire);
+        std::lock_guard lock(m_mutex);
+        return m_texture;
     }
 
 private:
     friend class FontAsset;
-    void Publish(std::shared_ptr<Texture> texture) noexcept
+    void Publish(own::shared_owner<const Texture> texture)
     {
-        m_texture.store(std::move(texture), std::memory_order_release);
+        std::lock_guard lock(m_mutex);
+        // Retire the previous snapshot after releasing the page lock.
+        m_texture.swap(texture);
     }
-    std::atomic<std::shared_ptr<Texture>> m_texture{};
+    mutable std::mutex m_mutex;
+    own::shared_owner<const Texture> m_texture;
 };
 
 // Immutable GT-produced geometry. Atlas publication is separate and append-only.
@@ -41,8 +47,8 @@ struct TextGlyph
     float uvLeft{}, uvTop{}, uvRight{}, uvBottom{};
     std::shared_ptr<TextAtlasPage> atlasPage;
     // Synthetic CPU/RHI fixtures may supply a standalone immutable texture.
-    std::shared_ptr<Texture> texture;
-    std::shared_ptr<Texture> GetTexture() const noexcept
+    own::shared_owner<const Texture> texture;
+    own::shared_owner<const Texture> GetTexture() const
     {
         return atlasPage ? atlasPage->GetTexture() : texture;
     }

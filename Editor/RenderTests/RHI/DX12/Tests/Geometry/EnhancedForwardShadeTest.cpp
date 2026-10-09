@@ -1,3 +1,4 @@
+#include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/Geometry/EnhancedForwardPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12MeshCache.h"
@@ -215,17 +216,16 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
     };
 
     ShaderMetaHandle primaryHandle{}, waterHandle{}, windHandle{};
-    std::shared_ptr<const ShaderMeta> primaryMetaOwner;
-    std::shared_ptr<const ShaderMeta> waterMetaOwner;
-    std::shared_ptr<const ShaderMeta> windMetaOwner;
+    own::shared_owner<const ShaderMeta> primaryMetaOwner;
+    own::shared_owner<const ShaderMeta> waterMetaOwner;
+    own::shared_owner<const ShaderMeta> windMetaOwner;
     const auto loadCatalog = [&](std::string_view fileName,
-        ShaderMetaHandle& handle, std::shared_ptr<const ShaderMeta>& owner)
+        ShaderMetaHandle& handle, own::shared_owner<const ShaderMeta>& owner)
     {
         const FileGuid guid = DataSystems->GetFileGuid(
             RHIShaderSource::Resolve(std::string(fileName)));
         if (FileGuid{} == guid) return false;
-        handle = DataSystems->LoadShaderMetaHandle(guid, error);
-        owner = DataSystems->ResolveShaderMeta(handle);
+        owner = DataSystems->LoadShaderMetaOwner(guid, handle, error);
         return handle.IsValid() && nullptr != owner && owner->guid == guid;
     };
     if (!loadCatalog("Forward.shadermeta", primaryHandle, primaryMetaOwner)
@@ -236,9 +236,9 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
             ? "catalog GUID/generation resolve 실패" : error);
     }
 
-    const std::shared_ptr<Material> waterAsset =
+    const own::shared_owner<const Material> waterAsset =
         DataSystems->LoadMaterialShared("ForwardWater");
-    const std::shared_ptr<Material> windAsset =
+    const own::shared_owner<const Material> windAsset =
         DataSystems->LoadMaterialShared("ForwardWind");
     if (!waterAsset || !windAsset
         || waterAsset->m_shaderMetaGuid != waterMetaOwner->guid
@@ -249,7 +249,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         return failRepresentative("actual material GUID/mode 선택 불일치");
     }
 
-    const std::vector<std::shared_ptr<Material>> requiredMaterials{
+    const std::vector<own::shared_owner<const Material>> requiredMaterials{
         windAsset, waterAsset, windAsset };
     const EnhancedRequiredAssetPacket requiredAssets =
         EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
@@ -499,12 +499,12 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         mutatedWindPacket;
 
     EnhancedLiveFramePacket ownerFrame{};
-    std::array<std::shared_ptr<const ShaderMeta>, 3> copiedMetaOwners{
-        std::make_shared<const ShaderMeta>(*primaryMetaOwner),
-        std::make_shared<const ShaderMeta>(*waterMetaOwner),
-        std::make_shared<const ShaderMeta>(*windMetaOwner),
+    std::array<own::shared_owner<const ShaderMeta>, 3> copiedMetaOwners{
+        own::make_shared<const ShaderMeta>(*primaryMetaOwner),
+        own::make_shared<const ShaderMeta>(*waterMetaOwner),
+        own::make_shared<const ShaderMeta>(*windMetaOwner),
     };
-    std::array<std::weak_ptr<const ShaderMeta>, 3> copiedMetaLifetimes{
+    std::array<own::weak_owner<const ShaderMeta>, 3> copiedMetaLifetimes{
         copiedMetaOwners[0], copiedMetaOwners[1], copiedMetaOwners[2] };
     const std::array<ShaderMetaHandle, 3> catalogHandles{
         primaryHandle, waterHandle, windHandle };
@@ -519,7 +519,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
     copiedMetaOwners = {};
     const bool frameOwnsMetaCopies = std::all_of(
         copiedMetaLifetimes.begin(), copiedMetaLifetimes.end(),
-        [](const std::weak_ptr<const ShaderMeta>& owner)
+        [](const own::weak_owner<const ShaderMeta>& owner)
         {
             return !owner.expired();
         });
@@ -961,7 +961,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         && mutatedPacketLifetime.expired();
     const bool metaCopiesReleased = std::all_of(
         copiedMetaLifetimes.begin(), copiedMetaLifetimes.end(),
-        [](const std::weak_ptr<const ShaderMeta>& owner)
+        [](const own::weak_owner<const ShaderMeta>& owner)
         {
             return owner.expired();
         });

@@ -10,6 +10,7 @@
 #include "Windows/EditorToolboxWindows.h"
 
 #include <iterator>
+#include <atomic>
 
 // 익명 네임스페이스가 아니라 이름을 준다. 이 프로젝트는 유니티 빌드라
 // (EnableUnitySupport) 여러 .cpp가 한 TU로 합쳐지는데, ResourceCounterWindow.cpp도
@@ -192,7 +193,8 @@ namespace EnhancedRenderDebugUi
                             ImGui::BulletText("%s r%u %s: %s -> %s%s",
                                 barrier.afterPass ? "After" : "Before", barrier.resource,
                                 resourceName(barrier.resource), GraphStateName(barrier.before),
-                                GraphStateName(barrier.after), barrier.uav ? " (UAV ordering)" : "");
+                                GraphStateName(barrier.after), barrier.aliasing ? " (heap activation)" :
+                                (barrier.uav ? " (UAV ordering)" : ""));
                         }
                     }
                     if (!pass.phases.empty())
@@ -569,8 +571,34 @@ void editor::OpenRenderLiveDiagnostics()
     request_profiler_viewer(true);
 }
 
+namespace
+{
+    std::atomic<uint64_t> graphViewerFrames{}, graphViewerMatchingFrames{}, graphViewerStaleFrames{};
+    std::atomic<int> graphViewerRequestedTarget{-1};
+    std::atomic<uint32_t> graphViewerTarget{};
+}
+
+editor::CompiledGraphViewerStats editor::ReadCompiledGraphViewerStats()
+{
+    return {graphViewerFrames.load(), graphViewerMatchingFrames.load(), graphViewerStaleFrames.load(),
+        graphViewerTarget.load()};
+}
+
+void editor::RequestCompiledGraphViewerTarget(EnhancedLiveDisplayTarget target)
+{
+    graphViewerRequestedTarget.store(static_cast<int>(target));
+}
+
 void EnhancedRenderDebugWindow::Draw()
 {
+    ++graphViewerFrames;
+    const int requested = graphViewerRequestedTarget.exchange(-1);
+    if (requested >= 0 && requested < static_cast<int>(kEnhancedLiveDisplayTargetCount) && requested != m_graphTarget)
+    {
+        m_graphTarget = requested;
+        m_graphSnapshot.reset();
+        m_graphLastRefresh = -1.0;
+    }
     ImGui::TextUnformatted("RenderPass - compiled graph");
     constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
     if (ImGui::Combo("View", &m_graphTarget, targets, 3))
@@ -578,6 +606,7 @@ void EnhancedRenderDebugWindow::Draw()
         m_graphSnapshot.reset();
         m_graphLastRefresh = -1.0;
     }
+    graphViewerTarget.store(static_cast<uint32_t>(m_graphTarget));
     const double now = ImGui::GetTime();
     if (m_graphLastRefresh < 0.0 || now - m_graphLastRefresh >= kRefreshIntervalSeconds)
     {
@@ -606,16 +635,31 @@ void EnhancedRenderDebugWindow::Draw()
         return;
     }
     const auto& snapshot = *m_graphSnapshot;
+    const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+    if (!EnhancedGraphSnapshotMatchesView(snapshot,
+        display.Get(static_cast<EnhancedLiveDisplayTarget>(m_graphTarget))))
+    {
+        ++graphViewerStaleFrames;
+        ImGui::TextDisabled("Previous graph belongs to an inactive or changed view. Waiting for a matching compiled frame.");
+        m_graphSnapshot.reset();
+        m_graphLastRefresh = -1.0;
+        return;
+    }
+    ++graphViewerMatchingFrames;
     ImGui::Text("Generation %llu | epoch %llu | frame %llu | view %llu | %u x %u",
         static_cast<unsigned long long>(snapshot.generation), static_cast<unsigned long long>(snapshot.graphEpoch),
         static_cast<unsigned long long>(snapshot.frameId), static_cast<unsigned long long>(snapshot.viewId),
         snapshot.width, snapshot.height);
+    ImGui::Text("Scene epoch %llu | view history %llu",
+        static_cast<unsigned long long>(snapshot.sceneEpoch),
+        static_cast<unsigned long long>(snapshot.historyRevision));
     ImGui::Text("Dependency hash %016llx | %zu declared / %zu executed / %zu resources",
         static_cast<unsigned long long>(snapshot.dependencyHash), snapshot.passes.size(),
         snapshot.executeOrder.size(), snapshot.resources.size());
     ImGui::TextDisabled("Native C++ source | %s | %s | read-only compiled snapshot",
         snapshot.scheduling == RGSchedulingMode::ExplicitVersioned ? "versioned" : "legacy/single writer",
         snapshot.orderPolicy == RGOrderPolicy::DependencyOrder ? "dependency order" : "authored order");
+    ImGui::TextDisabled("Sampled submitted frame | alias / queue / subresource ranges: not implemented");
     m_graphFilter.Draw("Filter passes/resources");
     DrawCompiledGraph(snapshot, m_graphFilter);
 }

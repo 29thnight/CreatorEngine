@@ -343,7 +343,7 @@ public:
 	// 관리 객체의 필드 주소를 직접 잡지 않는 이유는 ScriptCore의 Component 주석 참고.
 	enum class ScriptFieldType : int
 	{
-		Unknown = 0, Float = 1, Int32 = 2, Bool = 3, Float3 = 4, String = 5, Object = 6, Float2 = 7
+		Unknown = 0, Float = 1, Int32 = 2, Bool = 3, Float3 = 4, String = 5, Object = 6, Float2 = 7, AssetLink = 8
 	};
 
 
@@ -458,6 +458,9 @@ public:
 
 	std::string GetFieldString(int instanceId, int index);
 	void        SetFieldString(int instanceId, int index, const std::string& value);
+    // Validated through the statically generated managed AssetLink parser.
+    // Invalid text/type preserves the old field and reports failure.
+    [[nodiscard]] bool SetFieldAssetLink(int instanceId, int index, const std::string& value);
 
 	ScriptFloat2 GetFieldFloat2(int instanceId, int index);
 	void         SetFieldFloat2(int instanceId, int index, ScriptFloat2 value);

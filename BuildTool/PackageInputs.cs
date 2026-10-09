@@ -11,7 +11,26 @@ internal static class PackageInputs
     // Script identities belong to the managed assembly. Keeping their sidecars
     // in cook input would create CEMF entries for source files omitted from PAK.
     private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase);
-    public static int CopyProject(string project, string destination, CancellationToken token)
+    public static HashSet<string>? ReadAssetList(string project, string listFile, string startupScene)
+    {
+        if (listFile.Length == 0) return null;
+        Paths.NoReparseAncestors(listFile);
+        var assets = Path.Combine(project, "Assets");
+        var selected = new HashSet<string>(Paths.Comparer);
+        foreach (var line in File.ReadAllLines(listFile))
+        {
+            var relative = line.Trim().Replace('\\', '/');
+            if (relative.Length == 0) continue;
+            var source = Paths.Child(assets, relative);
+            if (!File.Exists(source)) throw new BuildException($"Selected asset missing: {relative}");
+            selected.Add(Paths.Relative(assets, source));
+            if (File.Exists(source + ".meta")) selected.Add(Paths.Relative(assets, source + ".meta"));
+        }
+        if (startupScene.Length == 0 || !selected.Contains("Scenes/" + startupScene))
+            throw new BuildException("--asset-list requires an explicitly selected --startup-scene included in the list.");
+        return selected;
+    }
+    public static int CopyProject(string project, string destination, CancellationToken token, HashSet<string>? selectedAssets = null)
     {
         ProjectLayerAsset.Require(project);
 
@@ -24,8 +43,43 @@ internal static class PackageInputs
                 token.ThrowIfCancellationRequested(); var relative = Paths.Relative(root, file);
                 if (name == "ProjectSetting" && Generated(relative)) continue;
                 if (name == "Assets" && ScriptSource(relative)) continue;
+                if (name == "Assets" && selectedAssets != null && !selectedAssets.Contains(relative)) continue;
                 Paths.Copy(file, Paths.Child(destination, name + "/" + relative)); ++count;
             }
+        }
+        return count;
+    }
+    public static int CopyBootstrapProject(string project, string destination, CancellationToken token, HashSet<string>? selectedAssets = null)
+    {
+        ProjectLayerAsset.Require(project);
+        var count = 0;
+        var assets = Paths.Child(project, "Assets");
+        bool Document(string relative)
+        {
+            var extension = Path.GetExtension(relative).ToLowerInvariant();
+            return extension is ".creator" or ".prefab" or ".inputmap" or ".bt" or ".blackboard" or ".renderprofile"
+                or ".terrain" or ".foliage" or ".cegeometry" or ".wav" or ".mp3" or ".flac" or ".soundgraph" or ".soundpreset"
+                || relative.StartsWith("Shaders/", StringComparison.Ordinal) && extension is ".slang" or ".hlsl" or ".hlsli";
+        }
+        if (selectedAssets != null)
+            foreach (var relative in selectedAssets.Where(path => !path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)))
+                if (!Document(relative)) throw new BuildException("Bootstrap asset-list contains a non-document source: " + relative);
+        foreach (var file in Paths.Files(assets))
+        {
+            token.ThrowIfCancellationRequested();
+            var relative = Paths.Relative(assets, file);
+            if (!Document(relative) || selectedAssets != null && !selectedAssets.Contains(relative)) continue;
+            if (relative.StartsWith("Derived/", StringComparison.OrdinalIgnoreCase) || relative.StartsWith("AssetSets/", StringComparison.OrdinalIgnoreCase))
+                throw new BuildException("Bootstrap authoring root contains packaged/generated documents.");
+            Paths.Copy(file, Paths.Child(destination, "Assets/" + relative)); ++count;
+            if (File.Exists(file + ".meta")) { Paths.Copy(file + ".meta", Paths.Child(destination, "Assets/" + relative + ".meta")); ++count; }
+        }
+        foreach (var file in Paths.Files(Path.Combine(project, "ProjectSetting")))
+        {
+            token.ThrowIfCancellationRequested();
+            var relative = Paths.Relative(Path.Combine(project, "ProjectSetting"), file);
+            if (Generated(relative) || Path.GetExtension(relative).ToLowerInvariant() is not (".asset" or ".celayers")) continue;
+            Paths.Copy(file, Paths.Child(destination, "ProjectSetting/" + relative)); ++count;
         }
         return count;
     }

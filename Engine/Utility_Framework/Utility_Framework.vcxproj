@@ -19,6 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ArtifactStoreGuard.h" />
+    <ClInclude Include="Ownership.h" />
     <ClInclude Include="BaseTypeDef.h" />
     <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="BitFlag.h" />

@@ -151,23 +151,19 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         const auto sphere = shadow_math::WorldBounds(bounds);
         m_visibilitySpheres.push_back({sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius});
 
-        Texture* const texture = item.textureOwner ? item.textureOwner.get() : item.texture;
-        if (!m_batches.empty() && m_batches.back().texture == texture &&
+        if (!m_batches.empty() && m_batches.back().textureId == TextureFramePins::Identity(item.texture) &&
             m_batches.back().enableDepth == item.enableDepth)
         {
             ++m_batches.back().count;
-            if (!m_batches.back().textureOwner)
-            {
-                m_batches.back().textureOwner = item.textureOwner;
-            }
         }
         else
         {
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
-            batch.texture = texture;
-            batch.textureOwner = item.textureOwner;
+            batch.texturePinIndex = item.texturePinIndex;
+            batch.texture = item.texture;
+            batch.textureId = TextureFramePins::Identity(item.texture);
             batch.enableDepth = item.enableDepth;
             m_batches.push_back(std::move(batch));
         }
@@ -180,8 +176,8 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         for (Batch &batch : m_batches)
         {
             std::string uploadError;
-            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
-            if (!batch.uploaded.IsValid() && !uploadError.empty())
+            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, context.TextureImage(batch.texture), uploadError);
+            if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "스프라이트 텍스처 업로드 실패: " + uploadError;
                 return false;
@@ -432,6 +428,7 @@ void EnhancedSpritePass::Shutdown()
     m_visibilitySpheres.clear();
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     m_width = 0;
     m_height = 0;
     m_lastItemCount = 0;

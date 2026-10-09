@@ -446,11 +446,14 @@ namespace
 		{
 			ce::profile_scope scope{ service, marker };
 		}
+		// Inspect the grown frame before Pause closes an empty tail frame. With a
+		// one-page retention budget, that later boundary legitimately evicts it.
+		service.request_live_capture();
 		publish_frame_sync(service, 1);
-		pause_sync(service);
 		const ce::capture_session_ptr capture = service.capture();
 		check(capture && count_marker(*capture, marker) == kScopes,
 		      "pool-growth/events — 초기 페이지를 넘어도 모든 이벤트가 남는다");
+		pause_sync(service);
 		check(service.summary().chunk_count > 1,
 		      "pool-growth/pages — 필요할 때 페이지를 추가한다");
 		check_eq(service.summary().memory_budget, sizeof(ce::event_chunk),
@@ -628,6 +631,64 @@ namespace
 			sink += static_cast<std::uint64_t>(i);
 		}
 		(void)sink;
+	}
+
+	void test_aggregate_nested_ranges()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Nested");
+		record_sync(service, 1);
+		{
+			ce::profile_scope root{ service, ce::marker<"NestedRoot">() };
+			{
+				ce::profile_scope branch{ service, ce::marker<"NestedBranch">() };
+				{
+					ce::profile_scope leaf{ service, ce::marker<"NestedLeaf">() };
+					busy_ticks(2);
+				}
+			}
+			{
+				ce::profile_scope branch{ service, ce::marker<"NestedLastBranch">() };
+				{
+					ce::profile_scope child{ service, ce::marker<"NestedChild">() };
+					{
+						ce::profile_scope leaf{ service, ce::marker<"NestedGrandchild">() };
+						busy_ticks(1);
+					}
+				}
+			}
+		}
+		publish_frame_sync(service, 1);
+		pause_sync(service);
+		const auto capture = service.capture();
+		check(capture != nullptr, "aggregate/nested-capture");
+		if (!capture)
+		{
+			return;
+		}
+		const auto aggregate = ce::aggregate_frames(*capture, 1, 1);
+		const auto& rows = aggregate.hierarchy();
+		check_eq(rows.size(), std::size_t{ 6 }, "aggregate/nested-rows");
+		for (std::size_t i = 0; i < rows.size(); ++i)
+		{
+			std::size_t end = i + 1;
+			while (end < rows.size() && rows[end].depth > rows[i].depth)
+			{
+				++end;
+			}
+			check_eq(rows[i].child_begin, static_cast<std::uint32_t>(i + 1), "aggregate/nested-begin");
+			check_eq(rows[i].child_end, static_cast<std::uint32_t>(end), "aggregate/nested-end");
+		}
+		std::size_t roots = 0;
+		std::uint64_t rootTicks = 0;
+		for (std::size_t i = 0; i < rows.size(); i = rows[i].child_end)
+		{
+			++roots;
+			rootTicks += rows[i].total_ticks;
+		}
+		check_eq(roots, std::size_t{ 1 }, "aggregate/nested-root-traversal");
+		check_eq(rootTicks, rows[0].total_ticks, "aggregate/nested-flame-root-total");
 	}
 
 	void test_aggregate_tree()
@@ -3270,6 +3331,37 @@ void test_gpu_issue_diagnostics()
 
 void test_page_backed_snapshots()
 {
+    {
+        auto pool = std::make_shared<ce::chunk_pool>();
+        pool->initialize(1, 1);
+        ce::frame_events events;
+        for (std::uint32_t i = 0; i < 64; ++i)
+        {
+            auto* chunk = pool->acquire();
+            check(chunk != nullptr, "sparse-pages/reuse — retained events do not exhaust producer pages");
+            if (!chunk)
+            {
+                break;
+            }
+            chunk->count = 1;
+            chunk->events[0].tick_begin = i;
+            chunk->events[0].tick_end = i + 1;
+            std::shared_ptr<const ce::event_chunk> page(chunk, [pool](const ce::event_chunk* value)
+            {
+                pool->release(const_cast<ce::event_chunk*>(value));
+            });
+            events.append_page(std::move(page), 0, 1);
+        }
+        check(events.size() == 64 && pool->free_count() == 1,
+              "sparse-pages/retained — all events survive repeated reuse of one producer page");
+        for (std::size_t i = 0; i < events.size(); ++i)
+        {
+            check(events[i].tick_begin == i && events[i].tick_end == i + 1,
+                  "sparse-pages/order — recycling pages preserves event contents and order");
+        }
+        check(events.memory_bytes() < sizeof(ce::event_chunk),
+              "sparse-pages/compact — sparse retained data uses less than one producer page");
+    }
 	ce::profiler_config config;
 	config.live_capture_interval_ms = 0.0;
 	ce::profiler_service service;
@@ -4929,6 +5021,7 @@ namespace
         service.initialize(config);
         service.register_thread("GpuDrainMain");
         record_sync(service, 91);
+        publish_frame_sync(service, 91);
         ce::gpu_span_context old_context;
         old_context.generation = service.begin_gpu_submission(91);
         old_context.submission = 701;
@@ -4937,7 +5030,6 @@ namespace
         check(old_context.generation != 0, "gpu-drain/admitted — Record admits a tracked submission");
         const auto begin = ce::profiler_service::now();
         const auto end = ce::profiler_service::now();
-        publish_frame_sync(service, 91);
         service.pause();
         check(service.state() == ce::recorder_state::pausing,
               "gpu-drain/pending — Stop remains open while an admitted submission is outstanding");
@@ -4972,6 +5064,7 @@ namespace
         // Reuse the frame ID deliberately: generation, not frame-number filtering,
         // must reject an old callback even when its supplied timestamps are current.
         record_sync(service, 91);
+        publish_frame_sync(service, 91);
         ce::gpu_span_context new_context = old_context;
         new_context.generation = service.begin_gpu_submission(91);
         new_context.submission = 702;
@@ -4984,7 +5077,6 @@ namespace
         service.submit_gpu_span(ce::marker<"GpuFreshSession">(), fresh_begin, fresh_end, 91, new_context);
         service.publish_gpu_spans();
         service.finish_gpu_submission(new_context.generation, 91, true, nullptr);
-        publish_frame_sync(service, 91);
         pause_sync(service);
         const auto second = service.capture();
         check(second && second->complete(), "gpu-drain/old-completion-isolated — old failure cannot taint the fresh session");
@@ -5162,6 +5254,7 @@ namespace
             service.initialize(config);
             service.register_thread("GpuIncompleteMain");
             record_sync(service, 101);
+            publish_frame_sync(service, 101);
             ce::gpu_span_context context;
             context.generation = service.begin_gpu_submission(101);
             check(context.generation != 0, "gpu-incomplete/admitted");
@@ -5169,7 +5262,6 @@ namespace
             {
                 service.finish_gpu_submission(context.generation, 101, false, "probe query retrieval failed");
             }
-            publish_frame_sync(service, 101);
             pause_sync(service);
             const auto capture = service.capture();
             check(capture && !capture->complete(), "gpu-incomplete/flag — unresolved or failed GPU work is incomplete");
@@ -5319,18 +5411,25 @@ namespace
     void test_admitted_gpu_before_first_collected_frame_is_accounted()
     {
         ce::profiler_service service;
-        service.initialize();
+        ce::profiler_config config;
+        config.retained_frames = 1;
+        service.initialize(config);
         service.register_thread("GpuFirstBoundary");
         record_sync(service, 100);
+        check_eq(service.begin_gpu_submission(100), std::uint64_t{0},
+                 "gpu-first-boundary/not-ready — no admission before the actual capture range exists");
+        publish_frame_sync(service, 102);
+        check_eq(service.begin_gpu_submission(100), std::uint64_t{0},
+                 "gpu-first-boundary/outside — stale render frames remain outside this recording");
         ce::gpu_span_context context;
-        context.generation = service.begin_gpu_submission(100);
+        context.generation = service.begin_gpu_submission(102);
         check(context.generation != 0, "gpu-first-boundary/admitted");
         const auto begin = ce::profiler_service::now();
         const auto end = ce::profiler_service::now();
-        publish_frame_sync(service, 102); // First accepted boundary advances the retained frame range.
-        service.submit_gpu_span(ce::marker<"GpuBeforeFirstBoundary">(), begin, end, 100, context);
+        publish_frame_sync(service, 103); // Evict an actually admitted frame; this must still count as loss.
+        service.submit_gpu_span(ce::marker<"GpuBeforeFirstBoundary">(), begin, end, 102, context);
         service.publish_gpu_spans();
-        service.finish_gpu_submission(context.generation, 100, true, nullptr);
+        service.finish_gpu_submission(context.generation, 102, true, nullptr);
         pause_sync(service);
         const auto capture = service.capture();
         check(capture && !capture->complete(),
@@ -5400,6 +5499,7 @@ namespace
         service.initialize();
         service.register_thread("GpuInvalidInterval");
         record_sync(service, 151);
+        publish_frame_sync(service, 151);
         ce::gpu_span_context context;
         context.generation = service.begin_gpu_submission(151);
         check(context.generation != 0, "gpu-invalid/admitted");
@@ -5407,7 +5507,6 @@ namespace
         service.submit_gpu_span(ce::marker<"GpuInvalidAdmittedInterval">(), tick + 1, tick, 151, context);
         service.publish_gpu_spans();
         service.finish_gpu_submission(context.generation, 151, true, nullptr);
-        publish_frame_sync(service, 151);
         pause_sync(service);
         const auto first = service.capture();
         check(first && !first->complete() &&
@@ -5443,9 +5542,24 @@ namespace
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	silence_crt_dialogs();
+	if (argc == 2 && std::strcmp(argv[1], "--aggregate-only") == 0)
+	{
+		test_aggregate_tree();
+		test_aggregate_nested_ranges();
+		test_aggregate_range();
+		test_aggregate_threads();
+		test_aggregate_flat();
+		test_aggregate_truncated();
+		std::printf("profile aggregate probe: %d checks, %d failures\n", g_checks, g_failures);
+		if (g_failures == 0)
+		{
+			std::printf("PROFILE_CORE_OK=true scope=aggregate-only\n");
+		}
+		return g_failures == 0 ? 0 : 1;
+	}
 
 	test_marker_identity();
 	test_disabled_parent_enabled_child_pairing();
@@ -5475,6 +5589,7 @@ int main()
 	test_recorder_states();
 	test_rolling_retention();
 	test_aggregate_tree();
+	test_aggregate_nested_ranges();
 	test_aggregate_range();
 	test_aggregate_threads();
 	test_aggregate_flat();

@@ -87,6 +87,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AssetCooker.cpp" />
+    <ClCompile Include="AssetSetBuild.cpp" />
     <ClCompile Include="AudioDecodeValidation.cpp" />
     <ClCompile Include="..\..\Engine\SceneRuntime\Audio\SoundGraph.cpp" />
     <ClCompile Include="..\..\Engine\SceneRuntime\Audio\SoundAssetSerialization.cpp" />
@@ -102,7 +103,7 @@
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup><ClInclude Include="CollisionGeometryCookProducer.h" /><ClInclude Include="SoundAssetCookProducer.h" /><ClInclude Include="FontAssetCookSupport.h" /></ItemGroup>
+  <ItemGroup><ClInclude Include="AssetSetBuild.h" /><ClInclude Include="CollisionGeometryCookProducer.h" /><ClInclude Include="SoundAssetCookProducer.h" /><ClInclude Include="FontAssetCookSupport.h" /></ItemGroup>
     <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

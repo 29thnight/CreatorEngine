@@ -31,6 +31,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'GCCEProbe.ps1')
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $probe = Join-Path $PSScriptRoot 'experiment_contract_probe.cpp'
@@ -115,7 +116,7 @@ $engineLibNames = @('RenderEngine', 'SceneRuntime', 'Physics', 'EngineDiagnostic
 $physicsVendorLibNames = @(
     'PhysX_64', 'PhysXCommon_64', 'PhysXFoundation_64', 'PhysXCooking_64',
     'PhysXExtensions_static_64', 'PhysXCharacterKinematic_static_64', 'PhysXPvdSDK_static_64',
-    'gameinput')
+    'gameinput', 'enkiTS')
 $vendorLibNamesByConfig = @{
     Debug   = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4d', 'fmtd', 'spdlogd') + $physicsVendorLibNames
     Release = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4',  'fmt',  'spdlog') + $physicsVendorLibNames
@@ -129,6 +130,7 @@ $configurations = if ($Configuration -eq 'All') { @('Debug', 'Release') }
                   else { @($Configuration) }
 
 foreach ($current in $configurations) {
+    $gcce = Get-GCCEProbeSettings -Repository $repoRoot -Configuration $current
     $libDir = Join-Path $repoRoot ("Build\Lib\x64-{0}" -f $current)
     # ★ 2026-09-16 `Bin\x64-<구성>\Editor` 를 가리키고 있었는데 서드파티 DLL(PhysX ·
     #   meshoptimizer)은 이제 `Runtime\Common` 에 놓인다. 링크가 살아나자 실행이
@@ -176,7 +178,7 @@ foreach ($current in $configurations) {
     #   하지 않는다.
     $common = '/nologo /c /EHsc /std:c++latest /permissive- /Zc:__cplusplus ' +
         '/utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /Fd:"' + $outputDirectory +
-        '\experiment_contract.pdb" ' + $configurationArguments
+        '\experiment_contract.pdb" ' + $configurationArguments + ' ' + $gcce.CompileArguments
 
     Write-Host ("[EXPERIMENT CONTRACT] {0} 컴파일 (/W4 /WX)" -f $current)
     $probeCommand = 'call "' + $vcvars + '" >nul && cl.exe ' + $common +
@@ -194,7 +196,7 @@ foreach ($current in $configurations) {
         throw "링크할 obj 가 없다 ($current) — 컴파일이 조용히 아무것도 내지 않았다."
     }
 
-    $libArguments = @()
+    $libArguments = @($gcce.LinkArguments)
     foreach ($name in $engineLibNames) {
         $libArguments += '"' + (Join-Path $libDir ($name + '.lib')) + '"'
     }
@@ -236,7 +238,7 @@ foreach ($current in $configurations) {
     # 그 코드는 "무엇이 없는지" 를 말해 주지 않는다.
     Write-Host ("[EXPERIMENT CONTRACT] {0} 실행" -f $current)
     $previousPath = $env:PATH
-    $env:PATH = $dllDir + ';' + $previousPath
+    $env:PATH = $gcce.RuntimeDirectory + ';' + $dllDir + ';' + $previousPath
     try {
         if ([string]::IsNullOrWhiteSpace($Only)) { & $executable }
         else { & $executable $Only }

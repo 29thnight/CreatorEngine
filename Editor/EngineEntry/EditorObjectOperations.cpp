@@ -1,4 +1,5 @@
 #include "EditorObjectOperations.h"
+#include "ConsoleCommandSystem.h"
 #include "EditorEntityIcons.h"
 #include "EditorSessionState.h"
 #include "Scene.h"
@@ -447,6 +448,19 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            const auto parentHandle = scene ? scene->HandleOf(parent) : EntityHandle{};
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([parentHandle, name, type]
+            {
+                auto* owner = Resolve(parentHandle);
+                if (!owner)
+                {
+                    return CommandCore::PreconditionFailed("object.stale", "Creation parent no longer exists");
+                }
+                return Create(owner->GetScene(), name, type, parentHandle.index);
+            });
+        }
         using namespace CommandCore;
         if (!scene) return PreconditionFailed("scene.none", "No active scene");
         if (name.empty() || name.find('\0') != std::string::npos) return InvalidArguments("Invalid object name");
@@ -460,6 +474,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Delete(EntityHandle target)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target]
+            {
+                return Delete(target);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object || object->IsDestroyMark()) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -472,6 +493,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult Duplicate(EntityHandle target, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, name]
+            {
+                return Duplicate(target, name);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object || object->IsDestroyMark()) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -483,53 +511,217 @@ namespace EditorObjectOperations
         return Describe(scene->HandleOf(created->GetCreatedIndex()));
     }
 
-    CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent)
+    static CommandCore::CommandResult ParentAt(EntityHandle target, EntityHandle parent, Entity* anchor = nullptr, bool insertAfter = false)
     {
         using namespace CommandCore;
         Entity* object = Resolve(target);
         Entity* destination = Resolve(parent);
-        if (!object || !destination || target.sceneId != parent.sceneId) return PreconditionFailed("object.stale", "Both objects must belong to the same scene");
+        if (!object || !destination || target.sceneId != parent.sceneId)
+        {
+            return PreconditionFailed("object.stale", "Both objects must belong to the same scene");
+        }
         if (IsEditLocked(object, true) || IsEditLocked(destination))
+        {
             return PreconditionFailed("object.locked", "Unlock the entity hierarchy before reparenting");
-        if (!target.index) return InvalidArguments("Cannot reparent the scene root");
+        }
+        if (!target.index)
+        {
+            return InvalidArguments("Cannot reparent the scene root");
+        }
         for (Entity* ancestor = destination; ancestor; ancestor = ancestor->GetScene()->TryGetEntity(ancestor->GetParentIndex()))
         {
-            if (ancestor == object) return InvalidArguments("Parent would create a cycle", "object.parent.cycle");
-            if (!ancestor->m_index) break;
+            if (ancestor == object)
+            {
+                return InvalidArguments("Parent would create a cycle", "object.parent.cycle");
+            }
+            if (!ancestor->m_index)
+            {
+                break;
+            }
         }
-        const bool changed = object->GetParentIndex() != parent.index;
+        const auto oldParentIndex = Entity::IsValidIndex(object->GetParentIndex()) ? object->GetParentIndex() : 0;
+        const bool parentChanged = oldParentIndex != parent.index;
+        auto desiredOrder = destination->GetChildrenIndices();
+        if (anchor)
+        {
+            std::erase(desiredOrder, target.index);
+            auto position = std::ranges::find(desiredOrder, anchor->m_index);
+            if (position == desiredOrder.end())
+            {
+                return PreconditionFailed("object.order.stale", "Sibling no longer belongs to the destination");
+            }
+            if (insertAfter)
+            {
+                ++position;
+            }
+            desiredOrder.insert(position, target.index);
+        }
+        const bool reorder = anchor != nullptr;
+        const bool changed = parentChanged || (reorder && desiredOrder != destination->GetChildrenIndices());
         if (changed)
         {
-            Meta::EntityReference reference(object), before(object->GetScene()->TryGetEntity(object->GetParentIndex())), after(destination);
+            Meta::EntityReference reference(object), before(object->GetScene()->TryGetEntity(oldParentIndex)), after(destination);
+            const auto captureOrder = [](Entity* parentObject)
+            {
+                std::vector<Meta::EntityReference> order;
+                if (parentObject)
+                {
+                    for (auto index : parentObject->GetChildrenIndices())
+                    {
+                        if (auto* child = parentObject->GetScene()->TryGetEntity(index))
+                        {
+                            order.emplace_back(child);
+                        }
+                    }
+                }
+                return order;
+            };
+            const auto restoreOrder = [](Meta::EntityReference parentReference, const std::vector<Meta::EntityReference>& order)
+            {
+                auto* parentObject = parentReference.Resolve();
+                if (!parentObject)
+                {
+                    return;
+                }
+                auto remaining = parentObject->GetChildrenIndices();
+                std::vector<Entity::Index> restored;
+                for (const auto& reference : order)
+                {
+                    if (auto* child = reference.Resolve())
+                    {
+                        if (std::erase(remaining, child->m_index))
+                        {
+                            restored.push_back(child->m_index);
+                        }
+                    }
+                }
+                restored.insert(restored.end(), remaining.begin(), remaining.end());
+                std::vector<EntityHandle> handles;
+                for (auto index : restored)
+                {
+                    handles.push_back(parentObject->GetScene()->HandleOf(index));
+                }
+                if (!parentObject->GetScene()->ReorderChildren(parentObject->GetScene()->HandleOf(parentObject->m_index), handles))
+                {
+                    throw std::runtime_error("Cannot restore sibling order");
+                }
+                parentObject->GetScene()->MarkUILayoutDirty();
+            };
+            const auto oldOrder = captureOrder(before.Resolve());
+            const auto destinationOrder = captureOrder(destination);
+            auto newOldOrder = std::make_shared<std::vector<Meta::EntityReference>>();
+            auto newDestinationOrder = std::make_shared<std::vector<Meta::EntityReference>>();
+            auto orderCaptured = std::make_shared<bool>(false);
             auto beforeRect = std::make_shared<Authoring::WriteDocument>();
             auto afterRect = std::make_shared<Authoring::WriteDocument>();
             auto capturedAfter = std::make_shared<bool>(false);
             if (auto* rect = object->GetComponent<RectTransformComponent>())
+            {
                 *beforeRect = Meta::SerializeDocument(rect);
-            const auto apply = [reference, capturedAfter](Meta::EntityReference destination, const std::shared_ptr<Authoring::WriteDocument>& rectState, bool first)
+            }
+            const auto apply = [reference, capturedAfter, parentChanged](Meta::EntityReference destination, const std::shared_ptr<Authoring::WriteDocument>& rectState, bool first)
             {
                 auto* object = reference.Resolve(); auto* parent = destination.Resolve();
-                if (!object) return;
+                if (!object)
+                {
+                    return;
+                }
                 Scene* scene = object->GetScene();
                 const auto result = scene->Reparent(scene->HandleOf(object->m_index), scene->HandleOf(parent ? parent->m_index : 0));
-                if (result != ReparentResult::Success) throw std::runtime_error("Cannot reparent object");
-                if (auto* rect = object->GetComponent<RectTransformComponent>())
+                if (result != ReparentResult::Success && result != ReparentResult::NoChange)
+                {
+                    throw std::runtime_error("Cannot reparent object");
+                }
+                if (auto* rect = object->GetComponent<RectTransformComponent>(); rect && parentChanged)
                 {
                     if (first && !*capturedAfter)
                     {
                         rect->SetParentKeepWorldPosition(parent);
                         *rectState = Meta::SerializeDocument(rect); *capturedAfter = true;
                     }
-                    else Meta::Deserialize(rect, rectState->Root().Read());
+                    else
+                    {
+                        Meta::Deserialize(rect, rectState->Root().Read());
+                    }
                     scene->MarkUILayoutDirty();
                 }
             };
-            Meta::MakeCustomChangeCommand([=] { apply(before, beforeRect, false); }, [=] { apply(after, afterRect, true); });
+            Meta::MakeCustomChangeCommand([=]
+            {
+                apply(before, beforeRect, false);
+                restoreOrder(before, oldOrder);
+                restoreOrder(after, destinationOrder);
+            }, [=]
+            {
+                apply(after, afterRect, true);
+                if (!*orderCaptured)
+                {
+                    if (reorder)
+                    {
+                        if (auto* destinationObject = after.Resolve())
+                        {
+                            std::vector<EntityHandle> handles;
+                            for (auto index : desiredOrder)
+                            {
+                                handles.push_back(destinationObject->GetScene()->HandleOf(index));
+                            }
+                            if (!destinationObject->GetScene()->ReorderChildren(destinationObject->GetScene()->HandleOf(destinationObject->m_index), handles))
+                            {
+                                throw std::runtime_error("Cannot change sibling order");
+                            }
+                            destinationObject->GetScene()->MarkUILayoutDirty();
+                        }
+                    }
+                    *newOldOrder = captureOrder(before.Resolve());
+                    *newDestinationOrder = captureOrder(after.Resolve());
+                    *orderCaptured = true;
+                }
+                else
+                {
+                    restoreOrder(before, *newOldOrder);
+                    restoreOrder(after, *newDestinationOrder);
+                }
+            });
         }
         auto data = Snapshot(target, *object); data.Set("changed", CommandData::Bool(changed));
         return Ok("object.parent", std::move(data));
     }
 
+    CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent)
+    {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, parent]
+            {
+                return Parent(target, parent);
+            });
+        }
+        return ParentAt(target, parent);
+    }
+
+    CommandCore::CommandResult MoveRelative(EntityHandle target, EntityHandle sibling, bool after)
+    {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, sibling, after]
+            {
+                return MoveRelative(target, sibling, after);
+            });
+        }
+        Entity* object = Resolve(target);
+        Entity* anchor = Resolve(sibling);
+        if (!object || !anchor || target.sceneId != sibling.sceneId || object == anchor || sibling.index == 0)
+        {
+            return CommandCore::InvalidArguments("Move requires two distinct entities in the same scene");
+        }
+        if (IsEditLocked(anchor))
+        {
+            return CommandCore::PreconditionFailed("object.locked", "Unlock the destination sibling before moving");
+        }
+        Scene* scene = anchor->GetScene();
+        const auto parentIndex = anchor->GetParentIndex();
+        return ParentAt(target, scene->HandleOf(Entity::IsValidIndex(parentIndex) ? parentIndex : 0), anchor, after);
+    }
     CommandCore::CommandResult Transform(EntityHandle target, math::vector3 position, math::quaternion rotation, math::vector3 scale)
     {
         using namespace CommandCore;
@@ -810,6 +1002,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult AddComponent(EntityHandle target, const std::string& typeName)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, typeName]
+            {
+                return AddComponent(target, typeName);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -851,6 +1050,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult AddManagedScript(EntityHandle target, const std::string& typeName)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, typeName]
+            {
+                return AddManagedScript(target, typeName);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -906,6 +1112,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult RemoveComponent(EntityHandle target, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([target, name]
+            {
+                return RemoveComponent(target, name);
+            });
+        }
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
@@ -931,11 +1144,44 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult InstantiatePrefab(const std::string& prefabName, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            const auto* scene = SceneManagers->GetActiveScene();
+            const auto sceneId = scene ? scene->GetSceneId() : 0;
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([prefabName, name, sceneId]
+            {
+                auto* current = SceneManagers->GetActiveScene();
+                if (!current || current->GetSceneId() != sceneId)
+                {
+                    return CommandCore::PreconditionFailed("scene.stale", "Prefab destination changed");
+                }
+                return InstantiatePrefab(prefabName, name);
+            });
+        }
         return InstantiatePrefab(PrefabUtilitys->LoadPrefab(prefabName), name.empty() ? prefabName : name);
     }
 
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            if (!prefab)
+            {
+                return CommandCore::PreconditionFailed("prefab.not_found", "Prefab does not exist");
+            }
+            const auto guid = prefab->GetFileGuid();
+            const auto* scene = SceneManagers->GetActiveScene();
+            const auto sceneId = scene ? scene->GetSceneId() : 0;
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([guid, name, sceneId]
+            {
+                auto* current = SceneManagers->GetActiveScene();
+                if (!current || current->GetSceneId() != sceneId)
+                {
+                    return CommandCore::PreconditionFailed("scene.stale", "Prefab destination changed");
+                }
+                return InstantiatePrefab(PrefabUtilitys->LoadPrefabGuid(guid), name);
+            });
+        }
         using namespace CommandCore;
         if (!prefab) return PreconditionFailed("prefab.not_found", "Prefab does not exist");
         auto deletion = std::make_shared<std::unique_ptr<Meta::DeleteGameObjectCommand>>();
@@ -951,20 +1197,40 @@ namespace EditorObjectOperations
         return object ? Describe(object->GetScene()->HandleOf(object->m_index)) : Fail("prefab.instantiate_failed", "Cannot instantiate prefab");
     }
 
-    CommandCore::CommandResult MaterialMode(const std::vector<std::shared_ptr<Material>>& materials, MaterialRenderingMode mode)
+    CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode)
     {
         using namespace CommandCore;
         if (mode != MaterialRenderingMode::Opaque && mode != MaterialRenderingMode::Transparent)
             return InvalidArguments("Material mode must be opaque or transparent");
-        std::vector<std::pair<std::shared_ptr<Material>, MaterialRenderingMode>> changes;
-        std::unordered_set<Material*> seen;
+        std::vector<std::pair<own::shared_owner<Material>, MaterialRenderingMode>> changes;
+        std::unordered_set<std::size_t> seen;
         for (const auto& material : materials)
-            if (material && seen.insert(material.get()).second && material->m_renderingMode != mode)
+        {
+            if (material && seen.insert(material->m_materialGuid.m_ID_Data).second && material->m_renderingMode != mode)
+            {
                 changes.emplace_back(material, material->m_renderingMode);
-        if (seen.empty()) return PreconditionFailed("material.not_found", "No material in target hierarchy");
-        if (!changes.empty()) Meta::MakeCustomChangeCommand(
-            [changes] { for (const auto& [material, before] : changes) material->m_renderingMode = before; },
-            [changes, mode] { for (const auto& [material, before] : changes) material->m_renderingMode = mode; });
+            }
+        }
+        if (seen.empty())
+        {
+            return PreconditionFailed("material.not_found", "No material in target hierarchy");
+        }
+        if (!changes.empty())
+        {
+            Meta::MakeCustomChangeCommand(
+                [changes] {
+                    for (const auto& [material, before] : changes)
+                    {
+                        material->m_renderingMode = before;
+                    }
+                },
+                [changes, mode] {
+                    for (const auto& [material, before] : changes)
+                    {
+                        material->m_renderingMode = mode;
+                    }
+                });
+        }
         auto data = CommandData::Object();
         data.Set("materials", CommandData::Int(seen.size()));
         data.Set("changed", CommandData::Int(changes.size()));
@@ -977,7 +1243,7 @@ namespace EditorObjectOperations
         auto* object = Resolve(target);
         if (!object) return CommandCore::PreconditionFailed("object.stale", "Object no longer exists");
         if (IsEditLocked(object, true)) return CommandCore::PreconditionFailed("object.locked", "Unlock the entity hierarchy before editing");
-        std::vector<std::shared_ptr<Material>> materials;
+        std::vector<own::shared_owner<Material>> materials;
         std::function<void(Entity*)> collect = [&](Entity* node) {
             if (!node || node->IsDestroyMark()) return;
             for (const auto& component : node->m_components)
@@ -1037,7 +1303,7 @@ namespace EditorObjectOperations
                                       "Mesh renderer has no authored base — override는 저작 정본이 있어야 얹힌다");
 
         const auto previous = renderer->m_Material;
-        const auto edited = graphMaterial ? std::make_shared<Material>(*previous) : previous;
+        const auto edited = graphMaterial ? own::make_shared<Material>(*previous) : previous;
 
         if (1 == values.size())
         {
@@ -1071,7 +1337,7 @@ namespace EditorObjectOperations
         if (graphMaterial)
         {
             const auto apply = [handle = renderer->GetOwner()->GetScene()->HandleOf(renderer->GetOwner()->m_index),
-                                component = renderer->GetInstanceID()](const std::shared_ptr<Material>& material) {
+                                component = renderer->GetInstanceID()](const own::shared_owner<Material>& material) {
                 auto* scene = SceneManagers->GetActiveScene();
                 auto* entity = scene ? scene->Resolve(handle) : nullptr;
                 auto* renderer = entity ? entity->GetComponent<MeshRenderer>() : nullptr;
@@ -1120,12 +1386,17 @@ namespace EditorObjectOperations
             data.Set("meshId", D::String(FileGuid(meshHandle.meshId).ToString()));
         }
 
-        // ★ fixture 의 전제("주소가 실제로 공유됐다")를 값으로 돌려준다. 모델
+        // ★ fixture 의 전제("재질 세대가 실제로 공유됐다")를 값으로 돌려준다. 모델
         //   인스턴스화가 언젠가 사본을 주도록 바뀌면 이 수가 1 이 되고, 게이트는
         //   조용히 아무것도 재지 않는 대신 그 자리에서 붉어진다.
         int sharedWith = 0;
         for (const MeshRenderer* other : renderers)
-            if (other->m_Material.get() == renderer->m_Material.get()) ++sharedWith;
+        {
+            if (other->m_Material && other->m_Material->m_materialGuid == renderer->m_Material->m_materialGuid)
+            {
+                ++sharedWith;
+            }
+        }
         data.Set("sharedMaterialRenderers", D::Int(sharedWith));
         data.Set("changed", D::Bool(true));
         return Ok("material override applied", std::move(data));
@@ -1180,6 +1451,13 @@ namespace EditorObjectOperations
 
     CommandCore::CommandResult UndoRedo(bool redo)
     {
+        if (!ConsoleCommandSystem::Get().IsGameThread())
+        {
+            return ConsoleCommandSystem::Get().EnqueueEditorMutation([redo]
+            {
+                return UndoRedo(redo);
+            });
+        }
         using namespace CommandCore;
         auto* undo = Meta::UndoManager::GetInstance();
         const auto depth = redo ? (undo->m_isGameMode ? undo->GameRedoDepth() : undo->EditRedoDepth())

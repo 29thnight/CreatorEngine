@@ -36,5 +36,8 @@ public enum FieldType
 
     /// <summary>UI 좌표·오프셋. Float3와 같은 방식으로 오간다.</summary>
     Float2  = 7,
+
+    /// <summary>Versioned stable IDs and expected kind. Never a resident handle.</summary>
+    AssetLink = 8,
 }
 

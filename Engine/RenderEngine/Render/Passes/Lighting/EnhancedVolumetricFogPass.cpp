@@ -5,6 +5,7 @@
 #include "../../../RHI/RHIShaderCompiler.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -235,6 +236,15 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& context,
     std::string& outError)
 {
+    if (!context.resources || !m_resourceRetirement.Attach(*context.resources))
+    {
+        outError = "Fog volumes require their owning device.";
+        return false;
+    }
+    if (m_voxelTemp[0].IsValid() && m_voxelTemp[1].IsValid() && m_voxelFinal.IsValid())
+    {
+        return true;
+    }
     RHITextureDesc desc{};
     desc.dim = RHITextureDesc::Dim::Texture3D;
     desc.width = kVolumeWidth;
@@ -254,14 +264,32 @@ bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& contex
         return true;
     };
 
-    if (!makeVolume(m_voxelTemp[0], L"Fog.VoxelTemp0")) return false;
-    if (!makeVolume(m_voxelTemp[1], L"Fog.VoxelTemp1")) return false;
-    if (!makeVolume(m_voxelFinal, L"Fog.VoxelFinal")) return false;
+    std::array<RHITextureHandle, 3> candidate{};
+    if (!makeVolume(candidate[0], L"Fog.VoxelTemp0")
+        || !makeVolume(candidate[1], L"Fog.VoxelTemp1")
+        || !makeVolume(candidate[2], L"Fog.VoxelFinal"))
+    {
+        for (const auto texture : candidate)
+        {
+            if (texture.IsValid())
+            {
+                context.resources->ReleaseTexture(texture);
+            }
+        }
+        return false;
+    }
+    m_resourceRetirement.Retire(m_voxelTemp[0]);
+    m_resourceRetirement.Retire(m_voxelTemp[1]);
+    m_resourceRetirement.Retire(m_voxelFinal);
+    m_voxelTemp[0] = candidate[0];
+    m_voxelTemp[1] = candidate[1];
+    m_voxelFinal = candidate[2];
 
     m_voxelTempState[0] = RHIResourceState::Common;
     m_voxelTempState[1] = RHIResourceState::Common;
     m_voxelFinalState = RHIResourceState::Common;
     m_volumesCleared = false;
+    ResetHistory();
     m_readIndex = 0;
     return true;
 }
@@ -291,8 +319,6 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         m_useHistoryThisFrame = m_historyValid;
         m_previousViewProjectionSealed = m_historyValid
             ? m_previousViewProjection : m_viewProjection;
-        m_historyValid = true;
-        m_previousViewProjection = m_viewProjection;
     }
 
     m_lastLightCount = (nullptr != context.lights)
@@ -307,6 +333,16 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
     // 0을 주는 것이 보통이라 결과는 같고, '보통'에 기대지 않게 된다.
     if (!m_volumesCleared)
     {
+        const std::array previousStates{m_voxelTempState[0], m_voxelTempState[1]};
+        const auto previousFinalState = m_voxelFinalState;
+        m_resourceRetirement.WatchRecording([this, previousStates, previousFinalState]
+        {
+            m_voxelTempState[0] = previousStates[0];
+            m_voxelTempState[1] = previousStates[1];
+            m_voxelFinalState = previousFinalState;
+            m_volumesCleared = false;
+            ResetHistory();
+        });
         // A-3. 그래프 밖이라 executeContext 가 없다 — 예전에는 그래서 원시
         // 커맨드 리스트를 꺼내 서비스에 도로 넘겼는데, 받는 쪽이 이미 아는
         // 값을 인자로 넘기는 동어반복이었다. 즉시 인코더가 그 자리를 덮는다.
@@ -318,7 +354,7 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         for (uint32_t i = 0; i < 3; ++i)
         {
             toUav[i].texture = volumes[i];
-            toUav[i].before = RHIResourceState::Common;
+            toUav[i].before = i < 2 ? m_voxelTempState[i] : m_voxelFinalState;
             toUav[i].after = RHIResourceState::UnorderedAccess;
         }
         // ★ 이 전이는 인코더로 옮기지 않는다. 인코더에는 UavBarrier만 있고
@@ -377,6 +413,13 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
 
     const uint32_t readIndex = m_readIndex;
     const uint32_t writeIndex = 1u - m_readIndex;
+    const auto viewProjection = m_viewProjection;
+    m_resourceRetirement.WatchRecording([this] { ResetHistory(); }, [this, writeIndex, viewProjection]
+    {
+        m_readIndex = writeIndex;
+        m_previousViewProjection = viewProjection;
+        m_historyValid = true;
+    });
 
     // 격자 셋을 그래프에 들인다. 패스가 들고 있는 것이라 상태를 알려 줘야
     // 첫 전이를 맞게 만든다.
@@ -627,11 +670,21 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         m_keepAlive);
 
     // 다음 프레임은 이번에 쓴 것을 읽는다 — 그것이 시간축 히스토리다.
-    m_readIndex = writeIndex;
 }
 
 void EnhancedVolumetricFogPass::Shutdown()
 {
+    if (auto* device = m_resourceRetirement.Device())
+    {
+        for (const auto texture : {m_voxelTemp[0], m_voxelTemp[1], m_voxelFinal})
+        {
+            if (texture.IsValid())
+            {
+                device->ReleaseTexture(texture);
+            }
+        }
+    }
+    m_resourceRetirement.ClearAfterIdle();
     m_width = 0;
     m_height = 0;
     m_voxelTemp[0] = {};

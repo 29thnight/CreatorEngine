@@ -1,5 +1,7 @@
 # EnhancedSceneRenderer 기반 Meshlet·Mesh Shader·DXR 상세 배선 계약
 
+**2026-10-08 제품 범위 확장:** 실제 RT 구현은 [PHASE 4.85 Path Tracing·Hybrid RT](../plans/PathTracingHybridPipelinePlan.md)가 소유한다. 공통 RT scene/material 기반 위에 독립 PathTracing graph 구성과 기존 raster+RT Hybrid 구성을 같은 renderer 수명 아래 연결한다. 본 문서의 hard shadow는 첫 Hybrid 슬라이스이며 전체 목표가 아니다. RT0→RTP-1/2, RT1→RTP-4, HY0→RTP-12로 대응하고 구현 공수/완료를 중복 계상하지 않는다. ReSTIR PT Enhanced·tetrahedral cages는 신규 계획의 연구 구현/평가 트랙이다.
+
 **설계 결정 2026-10-01 · GPU-1/GPU-3 상세 계약 · 구현/빌드/GPU 런타임 미검증.**
 목표는 기존 Scene 렌더러의 프레임·뷰·표시 수명을 유지하면서 GPU-driven 래스터와
 DXR 직접광 그림자를 같은 RenderGraph에 연결하는 것이다. 이 문서의 새 타입·Pass·API는
@@ -283,6 +285,11 @@ trace의 ticket 완료까지 지연한다. memory pressure가 owner를 강제 �
 | HY0 | GD2+RT1 같은 frame/graph | mesh on/off × RT on/off 4조합, multiview·두 in-flight frame·reload/abort/retire | null |
 | GD3 | 안전 Hi-Z/history; GD2 | depth convention·near plane·cut/resize/moving occluder에서 누락 0 | null |
 | HY1 | 변형·Masked·LOD·RT update 후속 | 변형 세대 일치/alpha coverage/LOD 오차·AS update/rebuild 판정 | null |
+
+2026-10-06 진행: GD0~GD3과 HY1 의 정적 LOD·색인 스키닝 가시성은 PR #123 으로 소스가
+병합됐다. 실행 증거는 DX12 한 장면의 메시렛/색인 비트 동일·HZB 켬/끔 동일·검증 오류 0 뿐이며
+위 표의 완료 증거는 아직 어느 행도 채우지 않았다. RT0·RT1·HY0 은 미착수다. 슬라이스별 대응은
+[구현 계획](../plans/GpuDrivenGeometryImplementationPlan.md#merge-and-first-execution-2026-10-06)을 따른다.
 
 GD와 RT 가지는 공통 GD0/RG6 뒤 독립 착수할 수 있다. HY0에서 결합하며 GPU-2 완료나
 C# CSRP 전체 완료를 선행으로 묶지 않는다. RHI 인터페이스를 한 번에 전체 교체하지 않고

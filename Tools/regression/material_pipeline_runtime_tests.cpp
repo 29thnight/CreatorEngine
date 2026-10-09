@@ -1,4 +1,5 @@
 #include "LXMaterialPipeline.h"
+#include "material_owner_checks.h"
 #include "MaterialGraphProduct.h"
 #include "MaterialGraphShaderMeta.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
@@ -52,14 +53,18 @@ void RunCookedGraphicsIdentityTests(const material_graph::VerifiedProduct& produ
     {
         LX::Runtime::GraphicsShaderDescription shader;
         if (!material_graph::DescribeGraphicsShader(product, backend, "LXSceneVS", "LXSceneGBufferPS", shader, error) ||
-            shader.shader != product.materialShader || shader.compile.sealedProgramIdentity != product.program.semanticKey ||
+            !material_graph_test::SamePinnedObject(shader.shader, product.materialShader) || shader.compile.sealedProgramIdentity != product.program.semanticKey ||
             shader.compile.backend != backend || !shader.compile.options.strictMath ||
             !shader.compile.options.fineDerivatives || shader.compile.permutation.Empty())
+        {
             throw std::runtime_error("Source-free LX graphics identity: " + error);
+        }
         const auto accepted = shader;
         if (material_graph::DescribeGraphicsShader(product, backend, "missing", "LXSceneGBufferPS", shader, error) ||
-            shader.shader != accepted.shader || shader.compile.sealedProgramIdentity != accepted.compile.sealedProgramIdentity)
+            !material_graph_test::SamePinnedObject(shader.shader, accepted.shader) || shader.compile.sealedProgramIdentity != accepted.compile.sealedProgramIdentity)
+        {
             throw std::runtime_error("Bad cooked stage replaced accepted graphics identity");
+        }
     }
     std::cout << "MAT7_COOKED_GRAPHICS_OK checks=4 compilerFree=true\n";
 }

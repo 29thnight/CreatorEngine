@@ -638,7 +638,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     for (std::size_t i = 0; i < frameDraws->size(); ++i)
     {
         const auto& draw = (*frameDraws)[i];
-        if (draw.materialGraphInstance)
+        if (draw.GraphInstance())
         {
             continue;
         }
@@ -657,7 +657,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             outError = "Masked shadow needs texture cache";
             return false;
         }
-        Texture* texture = draw.baseColor;
+        const Texture* texture = draw.baseColor;
         if (draw.materialSnapshot)
         {
             const auto& bindings = draw.materialSnapshot->textureBindings;
@@ -675,25 +675,29 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             {
                 return false;
             }
-            texture = found->textureOwner.get();
+            texture = (found->textureOwner ? &*found->textureOwner.borrow() : nullptr);
         }
-        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, outError);
+        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, context.TextureImage(texture), outError);
         if (!m_alphaTextures[i].IsValid())
         {
             return false;
         }
     }
 
+    if (!enhanced_draw::ValidateGeometryIdentities(*frameDraws, outError))
+    {
+        return false;
+    }
     // Reuse the same LOD0 cache entry as the other geometry passes.
     for (const auto& draw : *frameDraws)
     {
-        if (draw.materialGraphInstance || 0 == enhanced_draw::GeometryKey(draw)
+        if (draw.GraphInstance() || 0 == enhanced_draw::GeometryKey(draw)
             || m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) != m_drawGeometry.end())
         {
             continue;
         }
         std::string uploadError;
-        const auto entry = draw.modelMeshView.IsComplete()
+        const auto entry = draw.modelMeshView.handle.IsValid()
             ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
             : context.meshCache->GetOrUpload(draw.mesh, uploadError);
         if (!entry.IsValid())
@@ -715,7 +719,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // local fixture route must reject conflicting ranges just like the shared owner.
     for (const auto& draw : *frameDraws)
     {
-        if (draw.materialGraphInstance || 0 == enhanced_draw::GeometryKey(draw) || draw.boneCount == 0)
+        if (draw.GraphInstance() || 0 == enhanced_draw::GeometryKey(draw) || draw.boneCount == 0)
         {
             continue;
         }
@@ -771,7 +775,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     for (size_t index = 0; index < frameDraws->size(); ++index)
     {
         const auto& draw = (*frameDraws)[index];
-        if (draw.materialGraphInstance)
+        if (draw.GraphInstance())
         {
             continue;
         }
@@ -817,6 +821,72 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     m_hasGpuVisibilityCandidates = context.shadowDraws && !m_sortedDraws.empty()
         && m_hasDirectionalLight && context.resources->GetIndirectDrawCapabilities().indexedDraw;
     return true;
+}
+
+bool EnhancedShadowPass::PrepareGraphFrame(const EnhancedFrameContext& context, std::string& outError)
+{
+    m_casterBounds.clear();
+    const auto* casters = context.shadowDraws;
+    if (!context.resources || !casters)
+    {
+        outError = "Graph shadow requires device services and the identified caster stream.";
+        return false;
+    }
+    for (const auto& draw : *casters)
+    {
+        if (!draw.GraphInstance())
+        {
+            outError = "Graph shadow caster has no material graph instance.";
+            return false;
+        }
+        m_casterBounds.push_back(shadow_math::WorldBounds(draw));
+    }
+    m_lastCasterCandidates = static_cast<uint32_t>(casters->size());
+    m_lastDrawCount = 0;
+    m_lastCulledCount = 0;
+    m_lastBatchCount = 0;
+    m_lastSkinnedDrawCount = 0;
+    m_lastGpuSubmittedCandidates = 0;
+    m_lastGpuSubmittedBins = 0;
+    ComputeCascades(context);
+    outError.clear();
+    return true;
+}
+
+void EnhancedShadowPass::DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
+{
+    RGTextureDesc desc{};
+    desc.width = kShadowMapSize;
+    desc.height = kShadowMapSize;
+    desc.arraySize = kCascadeCount;
+    desc.format = kShadowFormat;
+    desc.allowDepthStencil = true;
+    desc.name = "Shadow.Cascades";
+    m_shadowMap = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_shadowMap = graph.Write(m_shadowMap);
+    }
+    const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+        ? RGAccessMode::LegacyState : RGAccessMode::Write;
+    graph.AddPass("Shadow.Clear", {{m_shadowMap, RHIResourceState::DepthWrite, access}},
+        [this, &context](const EnhancedRenderGraph::ExecuteContext& execution)
+        {
+            auto& encoder = *execution.encoder;
+            for (uint32_t cascade = 0; cascade < kCascadeCount; ++cascade)
+            {
+                const auto depth = RHIDepthTargetDesc::DepthSlice(
+                    execution.ResolveHandle(m_shadowMap), kShadowFormat, cascade);
+                const auto targets = context.resources->CreateRenderTargets(
+                    std::span<const RHITextureHandle>{}, &depth);
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("Graph shadow clear target is unavailable.");
+                }
+                encoder.BindRenderTargets(targets);
+                encoder.ClearDepthTarget(targets, 1.f);
+            }
+        });
 }
 
 void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)

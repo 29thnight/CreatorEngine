@@ -452,7 +452,20 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     return true;
 }
 
-DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::string& outError)
+bool DX12TextureCache::IsResident(const Texture* texture) const
+{
+    if (!texture)
+    {
+        return true;
+    }
+    const auto resident = m_entries.find(texture->m_assetId);
+    return resident != m_entries.end()
+        && resident->second.uploadState != RHIUploadTransactionState::Quarantined
+        && m_descriptions.find(texture->m_assetId) != m_descriptions.end();
+}
+
+DX12TextureCache::Entry DX12TextureCache::GetOrUpload(const Texture* texture,
+    const own::shared_owner<const Texture::CodecImage>& image, std::string& outError)
 {
     if (nullptr == m_resources) return Entry{};
 
@@ -476,6 +489,11 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     const auto found = m_descriptions.find(assetId);
     if (found != m_descriptions.end())
     {
+        if (!IsResident(texture))
+        {
+            outError = "DX12 texture upload has no verified completion; native allocation is quarantined.";
+            return {};
+        }
         ++m_stats.hits;
         // 쓰였다고 찍는다(③). 이 값이 은퇴 판정의 전부다.
         const auto resident = m_entries.find(assetId);
@@ -491,7 +509,13 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     //   move해 왔는데, 그 전제인 "한 번 올리면 캐시가 영원히 들고 있다"를
     //   ③(미사용 기반 은퇴)이 깼다. 은퇴 뒤 재요청에서 픽셀이 비어 있어
     //   재업로드가 실패했다(실측 3102건 · 화면에 흰색).
-    const TextureImageView pixels = texture->GetImageView();
+    if (!image)
+    {
+        Entry pending;
+        pending.preparationNeeded = true;
+        return pending;
+    }
+    const TextureImageView pixels = texture->GetImageView(image);
     if (pixels.IsEmpty())
     {
         // ★ CPU 픽셀이 없는 텍스처가 여기 오면 그것 자체가 신호다.

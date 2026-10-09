@@ -91,6 +91,7 @@ public:
     bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
     bool HasGpuVisibilityCandidates() const;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
+    void DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
     void Shutdown() override;
 
     // Prepared CPU candidates, not the post-cull GPU-visible instance count.
@@ -172,8 +173,6 @@ public:
     }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     // I5-D34a/b: experimentMask가 0이 아니면 그 마스크에서 유도한 입력
     // 레이아웃 + 대응 퍼뮤테이션(core→EXPERIMENT_STATIC_VERTEX,
     // core|skin→EXPERIMENT_SKINNED_VERTEX)으로 desc를 만든다. 0이면 legacy 96B.
@@ -183,7 +182,8 @@ private:
         const RHIShaderPermutation& permutation, uint32_t experimentMask,
         RHIGraphicsPipelineDesc& outDesc,
         RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr,
-        ShaderGeometryVisibility visibilityContract = ShaderGeometryVisibility::Direct);
+        ShaderGeometryVisibility visibilityContract = ShaderGeometryVisibility::Direct,
+        const LX::Runtime::CompiledGraphics* prepared = nullptr);
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
@@ -219,7 +219,8 @@ private:
     // 다르면 b2/PSO 상태가 다르므로 한 draw로 합치지 않는다.
     struct MaterialKey
     {
-        std::vector<Texture*> textures{};
+        std::vector<const Texture*> textures{};
+        std::vector<std::uint64_t> textureIds{};
         std::vector<assets::TextureCoordinates> coordinates{};
         // W7 — 배치가 샘플러로도 갈려야 draw 마다 자기 것을 걸 수 있다.
         assets::TextureSampler sampler{};

@@ -1,4 +1,5 @@
 #include "SceneCookProducer.h"
+#include "../MaterialAuthoringCodec.h"
 
 #include "CookSupport.h"
 #include "../../Assets/AssetIdentityProfile.h" // PHASE 3.75 MBC8: UUIDv8 참조
@@ -164,8 +165,10 @@ struct Walk final
     std::string& failureValue;
     std::string& failureContext;
     bool failed{};
+    bool bootstrap{};
+    std::size_t bootstrapNodes{};
 
-    void AddEdge(const AssetId& id, std::size_t& counter)
+    void AddEdge(const AssetId& id, std::size_t& counter, CookedAssetKind kind)
     {
         // ★ 자기 자신은 의존이 아니라 **정체성**이다.
         //   프리팹은 자기 루트 엔티티에 `m_prefabFileGuid` 로 자기 GUID 를
@@ -174,6 +177,12 @@ struct Walk final
         if (id == self)
             return;
         ++counter;
+        if (bootstrap)
+        {
+            const TypedAssetReference reference{{id, {}}, kind};
+            if (std::ranges::find(product.bootstrapReferences, reference) == product.bootstrapReferences.end())
+                product.bootstrapReferences.push_back(reference);
+        }
         if (std::ranges::find(dependencies, id) == dependencies.end())
             dependencies.push_back(id);
     }
@@ -182,18 +191,31 @@ struct Walk final
     [[nodiscard]] bool HandleGuidKey(const std::string& key, const Authoring::ReadNode& value)
     {
         std::size_t* counter = nullptr;
+        CookedAssetKind kind{};
         // S2c-1: MeshRenderer가 모델 출처를 자기 m_modelGuid로 갖는다.
         // legacy 씬은 인라인 재질의 m_fileGuid가 모델 GUID를 나른다 —
         // 이주기 씬은 둘 다 실려 카운터는 중복될 수 있지만 dependencies
         // 는 AddEdge가 dedupe하므로 폐포는 정확하다.
-        if (key == "m_fileGuid" || key == "m_modelGuid")
-            counter = &product.modelEdges;
+        if (key == "m_fileGuid" || key == "m_modelGuid" || (bootstrap && key == "m_Motion"))
+        {
+            counter = &product.modelEdges; kind = CookedAssetKind::Model;
+        }
+        else if (bootstrap && key == "m_meshAssetId")
+        {
+            counter = &product.geometryEdges; kind = CookedAssetKind::Mesh;
+        }
         else if (key == "geometryAsset")
-            counter = &product.geometryEdges;
+        {
+            counter = &product.geometryEdges; kind = CookedAssetKind::CollisionGeometry;
+        }
         else if (key == "m_prefabFileGuid")
-            counter = &product.prefabEdges;
+        {
+            counter = &product.prefabEdges; kind = CookedAssetKind::Prefab;
+        }
         else if (key == "m_textureGuid")
-            counter = &product.textureEdges;
+        {
+            counter = &product.textureEdges; kind = CookedAssetKind::Texture;
+        }
         else if (std::ranges::find(kUnproducedGuidKeys, key) != kUnproducedGuidKeys.end())
         {
             if (value.IsScalar() && !IsNilGuidText(value.Scalar()))
@@ -235,17 +257,146 @@ struct Walk final
             failureContext = "scene.reference";
             return true;
         }
-        AddEdge(id, *counter);
+        AddEdge(id, *counter, kind);
         return true;
     }
 
-    void Visit(const Authoring::ReadNode& node)
+    void FoliageReference(const Authoring::ReadNode& node, const char* key,
+        CookedAssetKind kind, bool required, std::size_t& counter)
     {
+        const auto value = node[key];
+        if (!required && (!value || (value.IsScalar() && IsNilGuidText(value.Scalar()))))
+        {
+            return;
+        }
+        AssetId id;
+        if (!value.IsScalar() || (!TryParseCanonicalAssetId(value.Scalar(), id)
+            && !assets::TryParseCanonicalUuidV8(value.Scalar(), id.value)))
+        {
+            failed = true; failureKey = key;
+            failureValue = required ? "Source-free Foliage requires a nonnil typed Model identity; source-name fallback is unavailable"
+                : "Explicit Foliage identity must be a canonical typed UUID";
+            failureContext = "scene.bootstrapFoliageBinding";
+            return;
+        }
+        AddEdge(id, counter, kind);
+    }
+
+    void Visit(const Authoring::ReadNode& node, std::size_t depth = 0u,
+        bool materialContext = false, bool foliageContext = false)
+    {
+        if (bootstrap && (++bootstrapNodes > 65536u || depth > 256u))
+        {
+            failed = true;
+            failureKey = "bootstrap"; failureValue = "Document reference traversal limit exceeded";
+            failureContext = "scene.bootstrapLimit";
+            return;
+        }
         if (failed || !node)
             return;
 
         if (node.IsMap())
         {
+            // Named Foliage collections provide explicit context. A standalone
+            // inline FoliageType must carry the complete reflected link shape;
+            // a coincidental user-data flag alone is not a type declaration.
+            const bool foliageShape = node["m_allowLegacySource"] && node["m_modelGuid"]
+                && node["m_meshAssetId"] && node["m_materialAssetId"];
+            if (bootstrap && (foliageContext || foliageShape))
+            {
+                const auto allowLegacy = node["m_allowLegacySource"];
+                if (allowLegacy && (!allowLegacy.IsScalar()
+                    || (allowLegacy.Scalar() != "true" && allowLegacy.Scalar() != "false")))
+                {
+                    failed = true; failureKey = "m_allowLegacySource";
+                    failureValue = "Foliage legacy-source flag must be a boolean";
+                    failureContext = "scene.bootstrapFoliageBinding";
+                    return;
+                }
+                FoliageReference(node, "m_modelGuid", CookedAssetKind::Model, true, product.modelEdges);
+                if (!failed) FoliageReference(node, "m_meshAssetId", CookedAssetKind::Mesh, false, product.geometryEdges);
+                if (!failed) FoliageReference(node, "m_materialAssetId", CookedAssetKind::Material, false, product.bootstrapMaterialEdges);
+                return;
+            }
+            if (bootstrap && materialContext && node["ref"])
+            {
+                const auto reference = node["ref"];
+                AssetId materialId;
+                if (!reference.IsScalar()
+                    || (!TryParseCanonicalAssetId(reference.Scalar(), materialId)
+                        && !assets::TryParseCanonicalUuidV8(reference.Scalar(), materialId.value)))
+                {
+                    failed = true; failureKey = "m_Material.ref";
+                    failureValue = "Base material reference must be a nonnil canonical UUID";
+                    failureContext = "scene.bootstrapMaterialReference";
+                    return;
+                }
+                AddEdge(materialId, product.bootstrapMaterialEdges, CookedAssetKind::Material);
+                const auto overrides = node["overrides"];
+                if (overrides && !overrides.IsSequence())
+                {
+                    failed = true; failureKey = "m_Material.overrides";
+                    failureValue = "Material overrides must be a sequence";
+                    failureContext = "scene.bootstrapMaterialReference";
+                    return;
+                }
+                if (overrides)
+                {
+                    if (overrides.Size() > 65536u)
+                    {
+                        failed = true; failureKey = "m_Material.overrides";
+                        failureValue = "Material override count exceeds the document limit";
+                        failureContext = "scene.bootstrapLimit";
+                        return;
+                    }
+                    for (const auto propertyNode : overrides)
+                    {
+                        experiment::MaterialProperty property;
+                        std::string error;
+                        const auto name = propertyNode["name"];
+                        if (!propertyNode.IsMap() || !name.IsScalar()
+                            || !experiment::DeserializeMaterialPropertyValue(propertyNode, name.AsString(), property.value, error))
+                        {
+                            failed = true; failureKey = "m_Material.overrides";
+                            failureValue = error.empty() ? "Material override requires a typed value and scalar name" : error;
+                            failureContext = "scene.bootstrapMaterialReference";
+                            return;
+                        }
+                        if (const auto* texture = std::get_if<experiment::TextureReference>(&property.value);
+                            texture && texture->assetId.IsValid())
+                        {
+                            AddEdge(texture->assetId, product.textureEdges, CookedAssetKind::Texture);
+                        }
+                    }
+                }
+                return;
+            }
+            if (bootstrap && node["schema"] && node["shaderAssetId"])
+            {
+                experiment::Material material;
+                std::string error;
+                if (!experiment::DeserializeMaterialAuthoring(node, material, error))
+                {
+                    failed = true; failureKey = "shaderAssetId"; failureValue = error; failureContext = "scene.bootstrapMaterial";
+                    return;
+                }
+                if (!material.assetId.IsValid())
+                {
+                    failed = true; failureKey = "assetId";
+                    failureValue = "Source-free inline authored Material requires a nonnil mounted base Material identity for its Code program";
+                    failureContext = "scene.bootstrapMaterialBinding";
+                    return;
+                }
+                AddEdge(material.assetId, product.bootstrapMaterialEdges, CookedAssetKind::Material);
+                AddEdge(material.shaderAssetId, product.materialGraphEdges, CookedAssetKind::ShaderMeta);
+                for (const auto& property : material.properties)
+                {
+                    if (const auto* texture = std::get_if<experiment::TextureReference>(&property.value);
+                        texture && texture->assetId.IsValid())
+                        AddEdge(texture->assetId, product.textureEdges, CookedAssetKind::Texture);
+                }
+                return;
+            }
             if (node["lattice_material"])
             {
                 material_graph::InstanceDocument document;
@@ -258,10 +409,10 @@ struct Walk final
                     failureContext = "scene.materialGraph";
                     return;
                 }
-                AddEdge(document.description.graphId, product.materialGraphEdges);
+                AddEdge(document.description.graphId, product.materialGraphEdges, CookedAssetKind::MaterialProgram);
                 for (const auto& texture : document.description.textures)
                 {
-                    AddEdge(texture.assetId, product.textureEdges);
+                    AddEdge(texture.assetId, product.textureEdges, CookedAssetKind::Texture);
                 }
                 return;
             }
@@ -271,10 +422,37 @@ struct Walk final
                     return;
                 if (!pair.key.IsScalar())
                 {
-                    Visit(pair.value);
+                    Visit(pair.value, depth + 1u);
                     continue;
                 }
                 const std::string key = pair.key.AsString();
+                if (bootstrap && key == "m_foliageTypes")
+                {
+                    if (!pair.value.IsSequence())
+                    {
+                        failed = true; failureKey = key; failureValue = "Foliage types must be a sequence";
+                        failureContext = "scene.bootstrapFoliageBinding";
+                        return;
+                    }
+                    Visit(pair.value, depth + 1u, false, true);
+                    continue;
+                }
+                if (bootstrap && key == "m_modelGuid" && node["m_meshAssetId"].IsScalar()
+                    && !IsNilGuidText(node["m_meshAssetId"].Scalar())) continue;
+                if (bootstrap && key == "m_valueYaml" && pair.value.IsScalar() && !pair.value.Scalar().empty())
+                {
+                    std::string error;
+                    const auto nested = Authoring::ParsedDocument::ParseText(pair.value.AsString(), error);
+                    if (!nested)
+                    {
+                        failed = true; failureKey = key; failureValue = error; failureContext = "scene.bootstrapOverride";
+                        return;
+                    }
+                    const auto propertyName = node["m_propertyName"];
+                    Visit(nested.Root(), depth + 1u,
+                        propertyName.IsScalar() && propertyName.Scalar() == "m_Material");
+                    continue;
+                }
 
                 const auto legacy = std::ranges::find(kLegacyTextureNameKeys, key, &LegacyTextureKey::nameField);
                 if (legacy != kLegacyTextureNameKeys.end())
@@ -290,7 +468,7 @@ struct Walk final
                 }
                 if (HandleGuidKey(key, pair.value))
                     continue;
-                Visit(pair.value);
+                Visit(pair.value, depth + 1u, key == "m_Material");
             }
             return;
         }
@@ -300,12 +478,41 @@ struct Walk final
             {
                 if (failed)
                     return;
-                Visit(element);
+                if (bootstrap && foliageContext && !element.IsMap())
+                {
+                    failed = true; failureKey = "Types"; failureValue = "Foliage type must be a map";
+                    failureContext = "scene.bootstrapFoliageBinding";
+                    return;
+                }
+                Visit(element, depth + 1u, false, foliageContext);
             }
         }
     }
 };
 } // namespace
+
+bool CollectFoliageBootstrapReferences(const Authoring::ReadNode& root,
+    std::vector<TypedAssetReference>& outReferences, std::string& failure)
+{
+    failure.clear();
+    if (!root.IsMap() || !root["FoliageAsset"].IsMap() || !root["FoliageAsset"]["Types"].IsSequence())
+    {
+        failure = "Foliage bootstrap document requires FoliageAsset.Types sequence.";
+        return false;
+    }
+    SceneCookProduct product;
+    std::vector<AssetId> dependencies;
+    std::string key, value, context;
+    Walk walk{product, {}, dependencies, key, value, context, false, true};
+    walk.Visit(root["FoliageAsset"]["Types"], 0u, false, true);
+    if (walk.failed)
+    {
+        failure = context + ": " + key + ": " + value;
+        return false;
+    }
+    outReferences = std::move(product.bootstrapReferences);
+    return true;
+}
 
 SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& request)
 {
@@ -393,7 +600,7 @@ SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& requ
     std::string failureKey;
     std::string failureValue;
     std::string failureContext;
-    Walk walk{product, sceneAssetId, dependencies, failureKey, failureValue, failureContext};
+    Walk walk{product, sceneAssetId, dependencies, failureKey, failureValue, failureContext, false, request.bootstrapReferences};
     walk.Visit(root);
     if (walk.failed)
     {

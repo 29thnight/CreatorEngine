@@ -49,7 +49,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     Scene* activeScene = SceneManagers->GetActiveScene();
     if (nullptr == activeScene) return false;
 
-    // packet이 raw Texture*를 쓰는 pass 형식과 공유 소유권을 함께 싣는다.
+    // packet이 raw const Texture*를 쓰는 pass 형식과 공유 소유권을 함께 싣는다.
     // EditorAssetPresentation이 shutdown되어도 이미 발행된 packet은 안전하다.
     out.iconTextures = std::move(iconTextures);
     const EnhancedGizmoIconTextures* textures = out.iconTextures.get();
@@ -64,14 +64,14 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         {
             if (!object) continue;
 
-            Texture* iconTexture = nullptr;
+            const Texture* iconTexture = nullptr;
             bool isIconTarget = false;
 
             if (nullptr != object->GetComponent<CameraComponent>())
             {
                 // nullptr를 넘기면 캐시의 1x1 흰색 폴백이 알파 0.5인 아이콘
                 // 크기 사각형으로 보인다. Host가 주입한 실제 자산을 건넨다.
-                iconTexture = textures ? textures->camera.get() : nullptr;
+                iconTexture = textures ? (textures->camera ? &*textures->camera.borrow() : nullptr) : nullptr;
                 isIconTarget = true;
                 ++out.cameraIcons;
             }
@@ -83,14 +83,14 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 {
                 case DirectionalLight:
                     iconTexture = isMainLight
-                        ? (textures ? textures->mainLight.get() : nullptr)
-                        : (textures ? textures->directionalLight.get() : nullptr);
+                        ? (textures ? (textures->mainLight ? &*textures->mainLight.borrow() : nullptr) : nullptr)
+                        : (textures ? (textures->directionalLight ? &*textures->directionalLight.borrow() : nullptr) : nullptr);
                     break;
                 case PointLight:
-                    iconTexture = textures ? textures->pointLight.get() : nullptr;
+                    iconTexture = textures ? (textures->pointLight ? &*textures->pointLight.borrow() : nullptr) : nullptr;
                     break;
                 case SpotLight:
-                    iconTexture = textures ? textures->spotLight.get() : nullptr;
+                    iconTexture = textures ? (textures->spotLight ? &*textures->spotLight.borrow() : nullptr) : nullptr;
                     break;
                 default:
                     break;

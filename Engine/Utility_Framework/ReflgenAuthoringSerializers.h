@@ -21,6 +21,8 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <tuple>
+#include <utility>
 
 namespace Meta::Typed
 {
@@ -29,10 +31,63 @@ namespace Meta::Typed
 	concept ReflgenRecord = std::is_class_v<T> && reflgen::reflectable<T>;
 
 	template<class P>
-	concept PointerLike = std::is_pointer_v<P> || is_shared_ptr_v<P> || is_unique_ptr_v<P>;
+	concept PointerLike = std::is_pointer_v<P> || is_shared_ptr_v<P> || is_unique_ptr_v<P>
+        || is_gc_strong_ref_v<P>;
 
 	template<class C>
 	concept PointerSequence = SerializedAsSequence<C> && PointerLike<meta::container::ValueT<C>>;
+
+    // Standard containers may advertise a copy constructor whose body cannot
+    // copy an exclusive element. Inspect reflected fields/bases and nested
+    // container values before instantiating an immutable authoring snapshot.
+    // This checks visible structure, not arbitrary copy-constructor bodies or
+    // unreflected members. Resource copy contracts must separately guarantee
+    // that mutable hooks cannot mutate shared published children.
+    template<class T, class... Seen>
+    consteval bool CanSnapshotImmutable()
+    {
+        using V = std::remove_cvref_t<T>;
+        if constexpr ((std::is_same_v<V, Seen> || ...))
+        {
+            return true; // Recursive value containers already being inspected.
+        }
+        else if constexpr (!std::is_copy_constructible_v<V> || is_unique_ptr_v<V>)
+        {
+            return false;
+        }
+        else if constexpr (PointerLike<V>)
+        {
+            return true; // Copy the handle, never recursively copy its pointee.
+        }
+        else if constexpr (ReflgenRecord<V>)
+        {
+            const bool bases = []<class... Bases>(reflgen::type_list<Bases...>)
+            {
+                return (CanSnapshotImmutable<Bases, Seen..., V>() && ...);
+            }(reflgen::direct_bases_t<V>{});
+            const bool fields = std::apply([](const auto&... field)
+            {
+                return (CanSnapshotImmutable<
+                    typename std::remove_cvref_t<decltype(field)>::value_type, Seen..., V>() && ...);
+            }, reflgen::schema_of<V>.fields);
+            return bases && fields;
+        }
+        else if constexpr (requires { typename V::value_type; })
+        {
+            return CanSnapshotImmutable<typename V::value_type, Seen..., V>();
+        }
+        else if constexpr (requires { typename std::tuple_size<V>::type; })
+        {
+            return []<std::size_t... I>(std::index_sequence<I...>)
+            {
+                return (CanSnapshotImmutable<std::tuple_element_t<I, V>, Seen..., V>() && ...);
+            }(std::make_index_sequence<std::tuple_size_v<V>>{});
+        }
+        else
+        {
+            return true;
+        }
+    }
 
 	namespace ReflgenDetail
 	{
@@ -216,8 +271,26 @@ namespace Meta::Typed
 			{
 				if (nullptr != pointee)
 				{
-					reflgen::serialize(out, *pointee);
-					return;
+                    if constexpr (std::is_const_v<U>)
+                    {
+                        // Legacy record hooks may mutate serialization scratch.
+                        // Never run them through a published immutable asset.
+                        if constexpr (CanSnapshotImmutable<P>())
+                        {
+                            P snapshot(*pointee);
+                            reflgen::serialize(out, snapshot);
+                        }
+                        else
+                        {
+                            throw reflgen::serialization_error(
+                                "immutable noncopyable record needs a const-safe serializer");
+                        }
+                    }
+                    else
+                    {
+                        reflgen::serialize(out, *pointee);
+                    }
+                    return;
 				}
 			}
 			out.write_null();
@@ -231,7 +304,18 @@ namespace Meta::Typed
 			using P = std::remove_cv_t<U>;
 			if constexpr (ReflgenRecord<P>)
 			{
-				if constexpr (std::is_default_constructible_v<P>)
+				if constexpr (gc::managed_type<P>)
+                {
+                    // Scene/ComponentFactory restores graph identity in its
+                    // explicit domain. Never create a second unmanaged object
+                    // through a raw or legacy owning-pointer serializer.
+                    if (in.peek() == reflgen::value_kind::object)
+                    {
+                        throw reflgen::serialization_error(
+                            "managed graph references require the scene/component loader");
+                    }
+                }
+                else if constexpr (std::is_default_constructible_v<P>)
 				{
 					if (in.peek() == reflgen::value_kind::object)
 					{
@@ -241,6 +325,20 @@ namespace Meta::Typed
 							reflgen::deserialize(in, *fresh);
 							value = fresh;
 						}
+                        else if constexpr (std::is_same_v<Pointer, own::shared_owner<U>>)
+                        {
+                            auto fresh = own::make_shared<P>();
+                            reflgen::deserialize(in, *fresh);
+                            // Convert only the completed object. Failed parsing
+                            // leaves the previous value and its owner untouched.
+                            value = std::move(fresh);
+                        }
+                        else if constexpr (std::is_same_v<Pointer, own::unique_owner<U>>)
+                        {
+                            auto fresh = own::make_unique<P>();
+                            reflgen::deserialize(in, *fresh);
+                            value = std::move(fresh);
+                        }
 						else
 						{
 							Pointer fresh(new P());
@@ -262,7 +360,8 @@ template<class T>
 	requires Meta::Typed::ReflgenRecord<T>
 struct reflgen::serializer<T>
 {
-	// 훅(OnBeforeSerialize 등)이 비-const 를 요구한다 — 엔진 객체는 const 로 만들어지지 않는다(레거시도 T& 로 받았다).
+	// Legacy mutable record hooks remain here; immutable owning pointer serializers
+    // copy reflected values before reaching this adapter, preserving published assets.
 	static void write(reflgen::writer& out, const T& value)
 	{
 		Meta::Typed::ReflgenDetail::WriteRecord(out, const_cast<T&>(value));
@@ -318,6 +417,59 @@ struct reflgen::serializer<std::unique_ptr<U, D>>
 	}
 };
 
+template<class U>
+struct reflgen::serializer<own::shared_owner<U>>
+{
+    static void write(reflgen::writer& out, const own::shared_owner<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::WritePointee(out, value.borrow().unsafe_get());
+    }
+    static void read(reflgen::reader& in, own::shared_owner<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::ReadPointee<own::shared_owner<U>, U>(in, value);
+    }
+};
+
+template<class U>
+struct reflgen::serializer<own::unique_owner<U>>
+{
+    static void write(reflgen::writer& out, const own::unique_owner<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::WritePointee(out, value.borrow().unsafe_get());
+    }
+    static void read(reflgen::reader& in, own::unique_owner<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::ReadPointee<own::unique_owner<U>, U>(in, value);
+    }
+};
+
+template<class U>
+struct reflgen::serializer<gc::trace_ref<U>>
+{
+    static void write(reflgen::writer& out, const gc::trace_ref<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::WritePointee(out, value.get());
+    }
+    static void read(reflgen::reader& in, gc::trace_ref<U>&)
+    {
+        // Identity and ownership are restored only by scene/component loaders.
+        in.skip_value();
+    }
+};
+
+template<class U>
+struct reflgen::serializer<gc::root_ref<U>>
+{
+    static void write(reflgen::writer& out, const gc::root_ref<U>& value)
+    {
+        Meta::Typed::ReflgenDetail::WritePointee(out, value.get());
+    }
+    static void read(reflgen::reader& in, gc::root_ref<U>&)
+    {
+        in.skip_value();
+    }
+};
+
 template<class C>
 	requires Meta::Typed::PointerSequence<C>
 struct reflgen::serializer<C>
@@ -328,32 +480,43 @@ struct reflgen::serializer<C>
 		out.begin_array(std::size(value));
 		for (const auto& element : value)
 		{
-			auto* pointee = Meta::Typed::RawPtrOf(const_cast<meta::container::ValueT<C>&>(element));
+			auto* pointee = Meta::Typed::RawPtrOf(element);
 			if (nullptr == pointee)
 			{
 				out.write_null();
 			}
 			else if constexpr (Meta::Typed::IsComponentExact<U>())
-			{
-				// 원소 정적 타입이 Component 그 자체 → 실타입(typeID → 등록소의 서술자)으로 쓴다(레거시).
-				const reflgen::type_descriptor* type = Meta::Find(pointee->GetTypeID());
-				auto* authoring = dynamic_cast<Authoring::ReflgenWriter*>(&out);
-				if (nullptr == type)
-				{
-					out.write_null(); // unknown component
-				}
-				else if (nullptr == authoring)
-				{
-					throw reflgen::serialization_error("component lists are written only to authoring documents");
-				}
-				else
-				{
-					Meta::SerializeInto(Meta::MostDerived(pointee), *type, authoring->TakeValueNode());
-				}
-			}
+            {
+                if constexpr (std::is_const_v<std::remove_pointer_t<decltype(pointee)>>)
+                {
+                    // Component serialization dispatches through mutable virtual
+                    // hooks. A static copy would slice the derived component and
+                    // removing const would violate immutable ownership.
+                    throw reflgen::serialization_error(
+                        "immutable polymorphic component lists need a const-safe serializer");
+                }
+                else
+                {
+                    // 원소 정적 타입이 Component 그 자체 → 실타입(typeID → 등록소의 서술자)으로 쓴다(레거시).
+                    const reflgen::type_descriptor* type = Meta::Find(pointee->GetTypeID());
+                    auto* authoring = dynamic_cast<Authoring::ReflgenWriter*>(&out);
+                    if (nullptr == type)
+                    {
+                        out.write_null(); // unknown component
+                    }
+                    else if (nullptr == authoring)
+                    {
+                        throw reflgen::serialization_error("component lists are written only to authoring documents");
+                    }
+                    else
+                    {
+                        Meta::SerializeInto(Meta::MostDerived(pointee), *type, authoring->TakeValueNode());
+                    }
+                }
+            }
 			else if constexpr (Meta::Typed::ReflgenRecord<U>)
 			{
-				reflgen::serialize(out, *pointee);
+				Meta::Typed::ReflgenDetail::WritePointee(out, pointee);
 			}
 			else
 			{

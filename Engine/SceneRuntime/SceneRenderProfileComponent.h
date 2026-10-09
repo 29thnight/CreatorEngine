@@ -6,6 +6,12 @@
 class [[reflgen::reflect]] SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComponent, Component>
 {
   public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
     SceneRenderProfileComponent() = default;
 
     void OnInitialized() override;

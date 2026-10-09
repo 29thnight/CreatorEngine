@@ -2,11 +2,13 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../RHIEncoder.h"
 
+#include <cassert>
 #include <cstring>
 #include <string>
 #include "../RHIShaderCompiler.h"
 #include "../../Texture.h"
 #include "../IRenderTextureCache.h"
+#include "../RHISubmissionThread.h"
 
 namespace
 {
@@ -85,7 +87,17 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
         return false;
     }
 
-    m_resources = context.resources;
+    if (m_resources && m_resources != context.resources)
+    {
+        outError = "IBL generator must be shut down before changing devices";
+        return false;
+    }
+    if (!m_resources)
+    {
+        m_resources = context.resources;
+        m_retirement.Attach(*m_resources);
+        m_resources->RegisterUploadTransactionListener(this);
+    }
 
     // Cooked startup never needs generation shaders/PSOs.
     return true;
@@ -237,7 +249,7 @@ bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         !makeTarget(1,1,1,L"IBL.SceneImportanceMarginal",m_sceneImportanceMarginal,6*cubeSize,kImportanceFormat) ||
         !makeTarget(kSceneImportanceSampleCount,1,1,L"IBL.SceneImportanceSamples",m_sceneImportanceSamples,2,kImportanceFormat))
     {
-        ReleaseTargets();
+      ReleaseTargets();
         return false;
     }
 
@@ -262,6 +274,8 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     }
 
     if (!m_rectToCubePso.IsValid() && !CreatePipelines(context, outError)) return false;
+    if (!BeginReplacement(outError)) return false;
+    RHIRecordingAdmissionGuard replacement([this] { RollbackReplacement(); });
     m_cubeSize = cubeSize;
     m_brdfSize = brdfSize;
     m_importanceSize = cubeSize;
@@ -525,6 +539,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         {outError="Scene importance generation failed";return false;}
 
     ++m_generation;
+    replacement.Accept();
     return true;
 }
 
@@ -542,37 +557,247 @@ void EnhancedIBLGenerator::ReleaseTargets()
             (handle == &m_cubeMapHandle || handle == &m_irradianceHandle ||
              handle == &m_prefilteredHandle || handle == &m_brdfLutHandle ||
              handle == &m_sceneImportanceRows || handle == &m_sceneImportanceMarginal || handle == &m_sceneImportanceSamples || handle == &m_sourceHandle);
-        if (m_resources && !cookedHandle) m_resources->ReleaseTexture(*handle);
+        if (m_resources && !cookedHandle) m_retirement.Retire(*handle);
         *handle = {};
     }
     m_cookedTextures = {};
+    m_targetsWaitForIdle = false;
+}
+
+std::array<RHITextureHandle*, 12> EnhancedIBLGenerator::Targets()
+{
+    return {&m_cubeMapHandle, &m_cubeSourceHandle, &m_irradianceHandle, &m_prefilteredHandle,
+        &m_brdfLutHandle, &m_importanceRows, &m_importanceMarginal, &m_importanceSamples,
+        &m_sceneImportanceRows, &m_sceneImportanceMarginal, &m_sceneImportanceSamples, &m_sourceHandle};
+}
+
+bool EnhancedIBLGenerator::BeginReplacement(std::string& error)
+{
+    if (!m_resources || !m_resources->GetCurrentUploadRecordingId())
+    {
+        error = "Environment replacement requires an open recording";
+        return false;
+    }
+    if (m_previousTargets)
+    {
+        error = "Environment replacement is still awaiting its recording decision";
+        return false;
+    }
+    // Both possible outcomes have storage before live targets are moved: native
+    // handles for old targets on acceptance or partial/new targets on rollback,
+    // and CPU owners for the accepted snapshot. Acceptance itself cannot allocate.
+    m_retirement.ReserveRetirements(2 * Targets().size());
+    m_retiredOwners.reserve(m_retiredOwners.size() + 1);
+    TargetSnapshot snapshot;
+    const auto targets = Targets();
+    for (size_t i = 0; i < targets.size(); ++i)
+    {
+        snapshot.handles[i] = *targets[i];
+        *targets[i] = {};
+    }
+    snapshot.cooked = std::move(m_cookedTextures);
+    m_cookedTextures = {};
+    snapshot.generation = m_generation;
+    snapshot.recording = m_resources->GetCurrentUploadRecordingId();
+    snapshot.cube = m_cubeSize;
+    snapshot.brdf = m_brdfSize;
+    snapshot.importanceSize = m_importanceSize;
+    snapshot.importanceMip = m_importanceMip;
+    snapshot.waitForIdle = m_targetsWaitForIdle;
+    m_targetsWaitForIdle = false;
+    m_previousTargets = std::move(snapshot);
+    return true;
+}
+
+void EnhancedIBLGenerator::RetireSnapshot(const TargetSnapshot& snapshot) noexcept
+{
+    for (size_t i = 0; i < snapshot.handles.size(); ++i)
+    {
+        const bool cacheOwned = snapshot.cooked[0] && (i == 0 || i == 2 || i == 3 || i == 4 || i >= 8);
+        if (!cacheOwned)
+        {
+            m_retirement.RetireAccepted(snapshot.handles[i], RHICompletionPoint{snapshot.completion});
+        }
+    }
+}
+
+void EnhancedIBLGenerator::RollbackReplacement()
+{
+    if (!m_previousTargets)
+    {
+        return;
+    }
+    ReleaseTargets();
+    const auto targets = Targets();
+    for (size_t i = 0; i < targets.size(); ++i)
+    {
+        *targets[i] = m_previousTargets->handles[i];
+    }
+    m_cookedTextures = std::move(m_previousTargets->cooked);
+    m_generation = m_previousTargets->generation;
+    m_cubeSize = m_previousTargets->cube;
+    m_brdfSize = m_previousTargets->brdf;
+    m_importanceSize = m_previousTargets->importanceSize;
+    m_importanceMip = m_previousTargets->importanceMip;
+    m_targetsWaitForIdle = m_previousTargets->waitForIdle;
+    m_previousTargets.reset();
+}
+
+void EnhancedIBLGenerator::OnUploadAccepted(uint64_t recording, RHICompletionPoint completion) noexcept
+{
+    m_targetsWaitForIdle |= !completion.IsValid();
+    if (m_previousTargets && m_previousTargets->recording == recording)
+    {
+        m_previousTargets->completion = completion.value;
+        m_previousTargets->waitForIdle |= !completion.IsValid();
+        assert(m_retiredOwners.size() < m_retiredOwners.capacity());
+        m_retiredOwners.push_back(std::move(*m_previousTargets));
+        // This is no longer a rollback candidate before any retirement handoff.
+        m_previousTargets.reset();
+        m_preparationRejected = {};
+        RetireSnapshot(m_retiredOwners.back());
+    }
+    for (auto& capture : m_cookedCaptures)
+    {
+        if (capture.recording == recording && !capture.accepted)
+        {
+            capture.accepted = true;
+            capture.fence = completion.value;
+        }
+    }
+}
+
+void EnhancedIBLGenerator::OnUploadCompleted(uint64_t completion)
+{
+    std::erase_if(m_retiredOwners, [&](const auto& snapshot)
+    {
+        return !snapshot.waitForIdle && snapshot.completion && snapshot.completion <= completion;
+    });
+}
+
+void EnhancedIBLGenerator::OnUploadAborted(uint64_t recording)
+{
+    std::erase_if(m_cookedCaptures, [&](auto& capture)
+    {
+        if (capture.recording != recording || capture.accepted)
+        {
+            return false;
+        }
+        bool released = true;
+        for (auto& slice : capture.slices)
+        {
+            try { m_resources->ReleaseReadback(slice.readback); }
+            catch (...) { released = false; }
+        }
+        // Keep failed generational handles for a repeated abort or idle teardown,
+        // while still delivering the target rollback and remaining notifications.
+        return released;
+    });
+    if (m_previousTargets && m_previousTargets->recording == recording)
+    {
+        RollbackReplacement();
+        if (m_preparationRejected)
+        {
+            auto rejected = std::move(m_preparationRejected);
+            m_preparationRejected = {};
+            // Decision callbacks must not interrupt the device's rejection
+            // broadcast (which may itself be unwinding an admission guard).
+            try { rejected(); }
+            catch (...) {}
+        }
+    }
+}
+
+own::shared_owner<const EnhancedIBLGenerator::PreparedCookedEnvironment>
+EnhancedIBLGenerator::PrepareCooked(assets::CookedEnvironment value, std::string& error)
+{
+    error.clear();
+    if (!value.importance[0].IsValid() && !assets::BuildEnvironmentImportance(value, error))
+    {
+        return {};
+    }
+    PreparedCookedEnvironment prepared;
+    prepared.identity = value.identity;
+    prepared.cubeSize = value.cubeSize;
+    prepared.brdfSize = value.brdfSize;
+    for (size_t index = 0; index < 4; ++index)
+    {
+        prepared.textures[index] = Texture::CreateSharedFromImage(
+            "CookedEnvironment", std::move(value.images[index]));
+        if (!prepared.textures[index])
+        {
+            error = "Cooked environment image is invalid";
+            return {};
+        }
+    }
+    for (size_t index = 0; index < 3; ++index)
+    {
+        prepared.textures[index + 4] = Texture::CreateSharedFromImage(
+            "CookedEnvironmentImportance", std::move(value.importance[index]));
+        if (!prepared.textures[index + 4])
+        {
+            error = "Cooked importance image is invalid";
+            return {};
+        }
+    }
+    if (value.source.IsValid())
+    {
+        prepared.textures[7] = Texture::CreateSharedFromImage("CookedEnvironmentSource", std::move(value.source));
+        if (!prepared.textures[7])
+        {
+            error = "Cooked source image is invalid";
+            return {};
+        }
+    }
+    return own::make_shared<const PreparedCookedEnvironment>(std::move(prepared));
 }
 
 bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
     assets::CookedEnvironment value, std::string& error)
 {
+    const auto prepared = PrepareCooked(std::move(value), error);
+    return prepared && InstallCooked(context, *prepared, error);
+}
+
+bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
+    const PreparedCookedEnvironment& source, std::string& error)
+{
     ce::profile_scope profile{ ce::marker<"Environment.InstallCooked">() };
     if (!m_resources || m_resources != context.resources || !context.textureCache || m_generation == UINT64_MAX)
-    { error = "Cooked environment context is invalid"; return false; }
+    {
+        error = "Cooked environment context is invalid";
+        return false;
+    }
+    if (source.cubeSize == 0 || source.brdfSize == 0)
+    {
+        error = "Prepared cooked environment dimensions are invalid";
+        return false;
+    }
+    for (size_t index = 0; index < 7; ++index)
+    {
+        if (!source.textures[index] || source.textures[index]->GetImageDescription().IsEmpty())
+        {
+            error = "Prepared cooked environment image is missing";
+            return false;
+        }
+    }
+    if (!BeginReplacement(error))
+    {
+        return false;
+    }
+    RHIRecordingAdmissionGuard replacement([this] { RollbackReplacement(); });
     ReleaseTargets();
-    m_cubeSize = value.cubeSize; m_brdfSize = value.brdfSize;
-    if (!value.importance[0].IsValid() && !assets::BuildEnvironmentImportance(value,error)) return false;
-    for (size_t index=0; index<4; ++index)
+    m_cubeSize = source.cubeSize;
+    m_brdfSize = source.brdfSize;
+    // Only owner handles are copied. A failed partial upload rolls these targets
+    // back without consuming the caller's exact source or copying image bytes.
+    m_cookedTextures = source.textures;
+    if (!TouchCooked(context, error))
     {
-        m_cookedTextures[index] = Texture::CreateSharedFromImage("CookedEnvironment",std::move(value.images[index]));
-        if (!m_cookedTextures[index]) { error = "Cooked environment image is invalid"; return false; }
+        return false;
     }
-    for(size_t index=0;index<3;++index)
-    {
-        m_cookedTextures[index+4]=Texture::CreateSharedFromImage("CookedEnvironmentImportance",std::move(value.importance[index]));
-        if (!m_cookedTextures[index+4]) {error="Cooked importance image is invalid";return false;}
-    }
-    if (value.source.IsValid())
-    {
-        m_cookedTextures[7]=Texture::CreateSharedFromImage("CookedEnvironmentSource",std::move(value.source));
-        if (!m_cookedTextures[7]) {error="Cooked source image is invalid";return false;}
-    }
-    return TouchCooked(context,error);
+    replacement.Accept();
+    return true;
 }
 
 bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std::string& error)
@@ -585,8 +810,9 @@ bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std:
     for (size_t index=0; index<m_cookedTextures.size(); ++index)
     {
         if (!m_cookedTextures[index]) continue;
-        const auto entry = context.textureCache->GetOrUpload(m_cookedTextures[index].get(),error);
-        const auto image = m_cookedTextures[index]->GetImageView();
+        const auto payload = m_cookedTextures[index]->NonRehydratableImage();
+        const auto entry = context.textureCache->GetOrUpload(&*m_cookedTextures[index], payload, error);
+        const auto image = m_cookedTextures[index]->GetImageDescription();
         if (!error.empty() || !entry.IsValid() || entry.width!=image.Width() || entry.height!=image.Height() ||
             entry.mipLevels!=image.MipLevels() || entry.format!=image.Format() || entry.isCube!=image.IsCube())
         { error = "Cooked environment upload failed: " + error; return false; }
@@ -604,9 +830,24 @@ bool EnhancedIBLGenerator::QueueCookedCapture(const std::filesystem::path& file,
     const RHITextureHandle handles[]{m_cubeMapHandle,m_irradianceHandle,m_prefilteredHandle,m_brdfLutHandle,
         m_sceneImportanceRows,m_sceneImportanceMarginal,m_sceneImportanceSamples,m_sourceHandle};
     if (!m_sourceHandle.IsValid()) {error="Environment capture requires decoded source";return false;}
+    capture.path=file; capture.identity=identity;
+    capture.recording = m_resources->GetCurrentUploadRecordingId();
+    capture.cube=m_cubeSize; capture.brdf=m_brdfSize;
     const auto sourceDescription=m_resources->DescribeTexture(m_sourceHandle);
     capture.sourceWidth=sourceDescription.width; capture.sourceHeight=sourceDescription.height;
     capture.sampleCount=m_resources->DescribeTexture(m_sceneImportanceSamples).width;
+    size_t sliceCount = 0;
+    for (const auto handle : handles) sliceCount += m_resources->DescribeTexture(handle).mipLevels;
+    capture.slices.reserve(sliceCount);
+    m_cookedCaptures.reserve(m_cookedCaptures.size() + 1);
+    RHIRecordingAdmissionGuard captureAllocation([&]
+    {
+        for (auto& slice : capture.slices)
+        {
+            try { m_resources->ReleaseReadback(slice.readback); }
+            catch (...) {}
+        }
+    });
     for (uint32_t image=0; image<8; ++image)
     {
         const auto description=m_resources->DescribeTexture(handles[image]);
@@ -616,33 +857,29 @@ bool EnhancedIBLGenerator::QueueCookedCapture(const std::filesystem::path& file,
             if (!m_resources->CreateReadback(std::max(1u,description.width>>mip),std::max(1u,description.height>>mip),
                 description.format,image<3?6u:1u,slice.readback,error))
             {
-                for (auto& previous:capture.slices) m_resources->ReleaseReadback(previous.readback);
-                capture.slices.clear(); return false;
+                return false;
             }
             capture.slices.push_back(slice);
         }
     }
+    // Track every readback before recording copies. A recording exception must
+    // leave an abortable capture, and acceptance must not need to allocate.
+    m_cookedCaptures.push_back(std::move(capture));
+    captureAllocation.Accept();
+    auto& pendingCapture = m_cookedCaptures.back();
     auto& encoder=m_resources->GetImmediateEncoder();
     for (uint32_t image=0; image<8; ++image)
     {
         const RHITransition toCopy{handles[image],RHIResourceState::PixelShaderResource,RHIResourceState::CopySource};
         m_resources->TransitionResources({&toCopy,1});
         const auto description=m_resources->DescribeTexture(handles[image]);
-        for (const auto& slice:capture.slices) if (slice.image==image)
+        for (const auto& slice:pendingCapture.slices) if (slice.image==image)
             for (uint32_t face=0; face<slice.readback.sliceCount; ++face)
                 encoder.CopyToReadback(slice.readback,handles[image],face,face*description.mipLevels+slice.mip);
         const RHITransition toSample{handles[image],RHIResourceState::CopySource,RHIResourceState::PixelShaderResource};
         m_resources->TransitionResources({&toSample,1});
     }
-    capture.path=file; capture.identity=identity; capture.fence=0;
-    capture.cube=m_cubeSize; capture.brdf=m_brdfSize;
-    m_cookedCaptures.push_back(std::move(capture));
     error.clear(); return true;
-}
-
-void EnhancedIBLGenerator::MarkCookedCaptureSubmitted(uint64_t fence)
-{
-    for (auto& capture : m_cookedCaptures) if (!capture.fence) capture.fence=fence;
 }
 
 bool EnhancedIBLGenerator::FinishCookedCapture(uint64_t completedFence,std::string& error)
@@ -718,7 +955,13 @@ void EnhancedIBLGenerator::Shutdown()
     for (auto& capture:m_cookedCaptures)
         for (auto& slice:capture.slices) if (m_resources) m_resources->ReleaseReadback(slice.readback);
     m_cookedCaptures.clear();
+    RollbackReplacement();
     ReleaseTargets();
+    m_previousTargets.reset();
+    m_retiredOwners.clear();
+    m_preparationRejected = {};
+    if (m_resources) m_resources->UnregisterUploadTransactionListener(this);
+    m_retirement.ClearAfterIdle();
     m_resources = nullptr;
     m_sourceCopyPso = {};
     m_rectToCubePso = {};

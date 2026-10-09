@@ -173,7 +173,7 @@ struct FontAsset::Impl
     std::vector<Page> pages;
     // Weak bookkeeping imposes a live resource bound without retaining retired
     // owners. In-flight frames may hold old pages; they are never overwritten.
-    std::vector<std::weak_ptr<Texture>> snapshots;
+    std::vector<own::weak_owner<const Texture>> snapshots;
     bool snapshotAdmissionDenied{};
 
     Impl()
@@ -251,7 +251,7 @@ struct FontAsset::Impl
     {
         std::erase_if(snapshots, [](const auto& snapshot) { return snapshot.expired(); });
         // Count every prospective version conservatively. An RT reader can
-        // acquire the old atomic Texture concurrently, so use_count subtraction
+        // acquire the old published Texture concurrently, so use_count subtraction
         // would race and undercount. At most one publication batch is in flight.
         std::size_t required = snapshots.size();
         for (const auto& page : pages)
@@ -392,8 +392,8 @@ struct FontAsset::Impl
             {
                 std::fill_n(rgba.data() + index * 4u, 4u, page.pixels[index]);
             }
-            std::shared_ptr<Texture> texture(Texture::CreateFromPixels(kAtlasSize, kAtlasSize,
-                "SDF font atlas", RHIFormat::RGBA8Unorm, rgba.data(), std::size_t(kAtlasSize) * 4u));
+            auto texture = Texture::CreateFromPixels(kAtlasSize, kAtlasSize,
+                "SDF font atlas", RHIFormat::RGBA8Unorm, rgba.data(), std::size_t(kAtlasSize) * 4u);
             if (!texture)
             {
                 error = "Cannot create CPU SDF atlas texture.";

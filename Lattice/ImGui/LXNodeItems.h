@@ -62,6 +62,26 @@ class LXNodeItemRegistry
     using TextureResolver = std::function<ImTextureID(const std::string& assetId)>;
     using PinPredicate = std::function<bool(const Pin&)>;
     using ResourceEditor = std::function<std::optional<std::string>()>;
+    using HeaderDecoration = std::function<void(const Node&, ImVec2 center, float scale, bool hovered)>;
+
+    // A passive trailing header decoration. The canvas reserves its width and
+    // handles hover without adding a clickable item or changing node geometry.
+    // The callback receives a screen-space center, zoom/DPI scale and a node ID scope.
+    void SetHeaderDecoration(float width, HeaderDecoration decoration)
+    {
+        headerDecorationWidth_ = std::max(0.0f, width);
+        headerDecoration_ = std::move(decoration);
+    }
+
+    float HeaderDecorationWidth() const { return headerDecoration_ ? headerDecorationWidth_ : 0.0f; }
+
+    void DrawHeaderDecoration(const Node& node, ImVec2 center, float scale, bool hovered) const
+    {
+        if (headerDecoration_)
+        {
+            headerDecoration_(node, center, scale, hovered);
+        }
+    }
 
     // Pin geometry asks for the same visible rows repeatedly. Keep those rows
     // only for one canvas draw, so opaque predicates are reevaluated next frame.
@@ -272,6 +292,8 @@ class LXNodeItemRegistry
     std::map<std::string, std::map<std::string, LXNodeItemSpec>> definitions_;
     TextureResolver textureResolver_;
     ResourceEditor resourceEditor_;
+    HeaderDecoration headerDecoration_;
+    float headerDecorationWidth_ = 0.0f;
     std::map<std::string, std::vector<LXNodeRow>> rows_;
     mutable std::set<std::pair<Id, std::string>> openSections_;
     PinPredicate visible_, connected_;

@@ -1,5 +1,11 @@
 # GPU 기능 설계·구현 공수 확정 계획 (PHASE 4.8)
 
+## 2026-10-08 RT/PT/Hybrid 구현 페이즈 분리
+
+사용자 목표는 Path Tracing 환경과 기존 래스터에 RT 로직을 결합하는 Hybrid 환경의 구성이다. 실제 구현 정본은 [PHASE 4.85](PathTracingHybridPipelinePlan.md)로 신설하며 ReSTIR PT Enhanced와 AMD tetrahedral cages의 구현·평가·채택을 포함한다. 첫 directional hard shadow는 Hybrid의 초기 슬라이스로 유지한다. GPU-3는 두 환경의 공통 RT·재질·지원/fallback 설계를, GPU-9는 신규 RTP-0~13과 기존 RT0/RT1/HY0·EXP의 중복 없는 공수·지원·실행 순서 확정을 담당한다. GPU-2 확률 tile lighting은 ReSTIR PT와 별도 설계 축이다.
+
+14행 전부 미착수·기성 0이며 중앙 추정 208인일(기본 환경 116 + 효과 확장/연구 92)을 별도 구현 페이즈에 산정했다. 기존 설계 4행 9인일은 유지한다. RTP-0/첫 prototype 뒤 GPU-9에서 추정을 재검토하며 이 공수 산정만으로 GPU-9를 완료하지 않는다. 기본 두 환경 구축은 필수이고 연구의 제품 채택은 oracle·품질·전체 CPU/GPU/VRAM 비용으로 판정한다. 외부 Spartan 코드는 정확한 버전/라이선스·상업 허가를 확인한 경우만 도입한다.
+
 **2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
 
@@ -48,5 +54,18 @@ Meshlet/Mesh Shader raster와 BLAS/TLAS/DXR 직접광 그림자를 별도 native
 GPU-1/GPU-3는 상세 설계 작성 후 **진행**이다. 실제 capability probe와 baseline 수용은
 미검증이므로 완료 처리하지 않는다. GPU-2는 미착수, GPU-9는 교차 설계·실측 예산·구현
 공수 확정이 남는다. 후속 슬라이스의 공수는 `null`이며 현재 4행 9일·완료 0일을 유지한다.
+
+### 2026-10-06 GD 구현 병합(PR #123)
+
+GD0~GD3과 HY1 일부(정적 LOD·색인 스키닝 가시성)의 소스가 PR #123(`5ca4e82a`)으로
+master 에 들어갔다. 병합 때 실행한 확인은 DX12 한 장면뿐이다: 메시렛 GBuffer 가 색인
+경로와 비트 동일, 거친 LOD 전환, HZB 켬/끔 동일, DX12 검증 오류 0, `experiment.cooked`
+466/466. `dx12.decal`·`dx12.rendergraph` 검사는 GPU 가시성 준비가 없어 예외로 끝나는
+붉은 상태였으나 2026-10-07 visibility 준비·패스 수 fixture를 수정해 Debug/Release 두 명령 정상 종료·GPU validation 0으로 통과했다. 별도 재질 Decal probe도 각 3정책·342프레임 오차 0으로 통과했다. [검사 범위](../analysis/RenderRg5Closure20261007.md)는 전체 GPU-driven 수용과 구분한다. 슬라이스별 증거·잔여는
+[구현 계획](GpuDrivenGeometryImplementationPlan.md#merge-and-first-execution-2026-10-06)이 정본이다.
+
+이 병합은 GPU-1(설계)을 닫지 않는다. 기준선 성능·메모리 실측이 없고 GPU-9의 공수 산정
+전에 구현이 먼저 들어왔으므로, GPU-9는 GD 실제 투입분을 사후 기록하고 남은
+GD 수용·RT·HY 공수만 산정한다. 4행 9일·완료 0일은 그대로 둔다.
 
 2026-10-01 재산정: GPU-1 3 + GPU-2 2 + GPU-3 2 + GPU-9 2 = 9인일. 기존 5.5일은 역사 산정이며 실제 구현/실험은 여전히 별도 미산정이다. [공수 근거](RenderPhaseEffortEstimate.md).

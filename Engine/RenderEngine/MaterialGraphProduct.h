@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 
 #include "../../Lattice/Material/LXMaterialCompiler.h"
 #include "LXMaterialPipeline.h"
@@ -8,6 +9,8 @@
 #include <memory>
 #include <span>
 
+class Texture;
+
 namespace material_graph
 {
 // 호스트(Includes/MaterialGraphSceneHost.slang)나 그것이 포함하는 셰이더를
@@ -15,7 +18,7 @@ namespace material_graph
 // 13: 그림자 표본을 CascadedShadow.slang 으로 모으고 디버그 보기를 더했다.
 // 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
 // 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:16";
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:18";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
@@ -109,7 +112,7 @@ struct VerifiedProduct
     std::vector<LX::LXMaterialShaderArtifact> shaders;
     std::vector<CompileTarget> targets;
     // Meta, source, common binding layout and bytecode share this generation.
-    std::shared_ptr<const GeneratedMaterialShader> materialShader;
+    own::shared_owner<const GeneratedMaterialShader> materialShader;
     // Sorted union of the files every target compile read (root source excluded).
     // In memory only: the cooked product format does not carry it.
     std::vector<std::filesystem::path> dependencies;
@@ -142,8 +145,8 @@ struct TextureBinding
 {
     std::uint32_t slot{};
     RHITextureEntry texture;
-    // The owner must keep both the CPU generation and its RHI registration live.
-    std::shared_ptr<const void> owner;
+    // CPU representation pin; the texture cache separately retires native storage.
+    own::shared_owner<const Texture> owner;
     bool linearStorage = false;
 };
 
@@ -152,7 +155,8 @@ struct ResourcePacket
     std::vector<std::uint8_t> uniforms;
     std::vector<RHIBindingDesc> textures;
     std::vector<RHISamplerDesc> samplers;
-    std::vector<std::shared_ptr<const void>> owners;
+    // One pin per Texture representation, deduplicated by m_assetId.
+    std::vector<own::shared_owner<const Texture>> owners;
 };
 
 // CPU instance packing uses the same reflected layout as the render packet.
@@ -184,42 +188,4 @@ bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, st
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,
                        std::string& error);
 
-struct PipelineGeneration
-{
-    std::uint64_t generation{};
-    std::string semanticKey;
-    Selection selection;
-    BindingLayout layout;
-    ResourcePacket resources;
-    LX::Runtime::GraphicsPipeline pipeline;
-};
-
-// One render-thread owner publishes the PSO, route, uniform layout and texture
-// owners together. It must retire only handles exclusively owned by this slot.
-class PipelineSlot
-{
-  public:
-    // Bytecode is selected from the verified surface-only generation. Volume
-    // must be published with its composition pipeline by the owning renderer.
-    // The caller supplies fixed-function state, formats and the installed layout.
-    bool Publish(IRenderPipelineCache& cache, const VerifiedProduct& product, RHIShaderBinary backend,
-                 const Capabilities& capabilities, const Budget& budget, std::span<const ParameterOverride> parameters,
-                 std::span<const TextureBinding> textures, const RHIGraphicsPipelineDesc& pipeline,
-                 RHICompletionPoint retireAfter, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
-    const std::shared_ptr<const PipelineGeneration>& Active() const { return active_; }
-    // Called with the completed graphics timeline before retiring CPU texture
-    // owners. Zero fences retain owners until destruction after device idle.
-    // The slot must outlive all submitted generations or be drained idle.
-    void CollectRetired(RHICompletionPoint completed);
-    std::size_t RetiredGenerationCount() const { return retired_.size(); }
-
-  private:
-    struct RetiredGeneration
-    {
-        std::shared_ptr<const PipelineGeneration> owner;
-        RHICompletionPoint after;
-    };
-    std::shared_ptr<const PipelineGeneration> active_;
-    std::vector<RetiredGeneration> retired_;
-};
 } // namespace material_graph

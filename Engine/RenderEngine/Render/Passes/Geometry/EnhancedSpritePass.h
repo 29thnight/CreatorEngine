@@ -23,13 +23,12 @@ public:
         math::matrix4x4 world{ math::matrix4x4::identity() };
         math::vector4 uv{ 0.f, 0.f, 1.f, 1.f };
         math::color   color{ 1.f, 1.f, 1.f, 1.f };
-        Texture* texture{ nullptr };
-        // 소유자가 있으면 raw 포인터보다 우선한다. 프레임 배치가 복사해 보존한다.
-        std::shared_ptr<Texture> textureOwner;
+        const Texture* texture{ nullptr };
         int canvasOrder{ 0 };
         int layerOrder{ 0 };
         bool enableDepth{ false };
         bool signedDistance{ false };
+        std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
     };
 
     static_assert(std::is_same_v<decltype(Item::world), math::matrix4x4>);
@@ -55,7 +54,12 @@ public:
 
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
-    void SetItems(const std::vector<Item>* items) { m_items = items; }
+    void SetItems(const std::vector<Item>* items,
+        own::shared_owner<TextureFramePins> texturePins = {})
+    {
+        m_items = items;
+        m_texturePins = std::move(texturePins);
+    }
     RGHandle GetOutput() const { return m_output; }
     uint32_t GetLastItemCount() const { return m_lastItemCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
@@ -86,9 +90,10 @@ private:
     {
         uint32_t first{ 0 };
         uint32_t count{ 0 };
-        Texture* texture{ nullptr };
-        std::shared_ptr<Texture> textureOwner;
+        const Texture* texture{ nullptr };
         bool enableDepth{ false };
+        std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
+        std::uint64_t textureId{};
         RHITextureEntry uploaded;
     };
 
@@ -96,6 +101,7 @@ private:
     RHIFormat m_outputFormat{ kOutputFormat };
     RGHandle m_output;
     const std::vector<Item>* m_items{ nullptr };
+    own::shared_owner<TextureFramePins> m_texturePins;
     std::vector<Instance> m_instances;
     std::vector<Batch> m_batches;
     math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };

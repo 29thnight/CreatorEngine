@@ -5,6 +5,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'GCCEProbe.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -19,8 +20,9 @@ $dependencies = Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
 if (!(Test-Path -LiteralPath (Join-Path $dependencies 'include/reflgen/runtime/registry.h'))) {
     $dependencies = Join-Path $repo 'vcpkg_installed/x64-windows'
 }
-$sources = @('Tools/regression/material_product_probe.cpp', 'Engine/RenderEngine/MaterialGraphProduct.cpp',
+$sources = @('Tools/regression/material_product_probe.cpp', 'Tools/regression/support/MaterialPipelineSlot.cpp', 'Engine/RenderEngine/MaterialGraphProduct.cpp',
     'Engine/RenderEngine/LXMaterialRuntime.cpp',
+    'Engine/Utility_Framework/TypeTrait.cpp',
     'Engine/RenderEngine/MaterialGraphShaderMeta.cpp', 'Engine/RenderEngine/ShaderMeta.cpp',
     'Engine/RenderEngine/ShaderMetaReflection.cpp', 'Engine/RenderEngine/MaterialPropertyPacker.cpp',
     'Engine/Utility_Framework/AuthoringParsedDocument.cpp',
@@ -37,20 +39,21 @@ $sources += @('Engine/RenderEngine/Experiment/Cooked/CookedMaterialProgram.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.cpp',
     'Engine/RenderEngine/Assets/AssetIdentityProfile.cpp')
+$gcce = Get-GCCEProbeSettings -Repository $repo -Configuration Release
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '
-$compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /MP2 /EHsc /std:c++latest ' +
+$compile = 'call "' + $vcvars + '" >nul && cl.exe ' + $gcce.CompileArguments + ' /nologo /MP2 /EHsc /std:c++latest ' +
     '/permissive- /utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /wd4005 /wd4189 /wd4456 /wd5030 /MD ' +
     '/I"' + (Join-Path $repo 'ThirdParty/Slang/include') + '" /I"' +
     (Join-Path $repo 'Engine/Utility_Framework') + '" /I"' +
     (Join-Path $repo 'ThirdParty/Mathematics/include') + '" /I"' +
     (Join-Path $dependencies 'include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe + '" ' +
     $quoted + ' /link /LIBPATH:"' + (Join-Path $dependencies 'lib') +
-    '" ryml.lib c4core.lib d3d12.lib dxgi.lib ole32.lib'
+    '" ryml.lib c4core.lib d3d12.lib dxgi.lib ole32.lib' + ' ' + $gcce.LinkArguments
 & $env:ComSpec /d /s /c $compile
 if ($LASTEXITCODE -ne 0) { throw "Material product probe build failed: exit $LASTEXITCODE" }
 $previousPath = $env:PATH
 try {
-    $env:PATH = (Join-Path $dependencies 'bin') + ';' + $previousPath
+    $env:PATH = $gcce.RuntimeDirectory + ';' + (Join-Path $dependencies 'bin') + ';' + $previousPath
     $result = @(& $exe $repo 2>&1)
     $probeExit = $LASTEXITCODE
 } finally { $env:PATH = $previousPath }
@@ -88,8 +91,14 @@ if ($VerifyAssetCooker) {
         if ($exitCode -ne 0 -or !($cookOutput -match 'materialPrograms=1')) {
             throw "Actual $configuration AssetCooker failed: $($cookOutput -join "`n")"
         }
-        $consumer = @(& $exe --cooked-root $acceptedRoot 2>&1)
-        $exitCode = $LASTEXITCODE
+        $previousPath = $env:PATH
+        try {
+            $env:PATH = $gcce.RuntimeDirectory + ';' + (Join-Path $dependencies 'bin') + ';' + $previousPath
+            $consumer = @(& $exe --cooked-root $acceptedRoot 2>&1)
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $env:PATH = $previousPath
+        }
         $consumer | Set-Content -LiteralPath (Join-Path $caseRoot 'consumer.log') -Encoding utf8
         if ($exitCode -ne 0 -or !($consumer -match '^LX_MATERIAL_COOKED_PRODUCT_OK ')) {
             throw "Actual $configuration cooked consumer failed: $($consumer -join "`n")"

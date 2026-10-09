@@ -1,5 +1,13 @@
 # 오디오 백엔드 현대화 — FMOD Core 은퇴 · miniaudio 내재화 (PHASE 22)
 
+## 2026-10-07 최근 병합 반영
+
+PR #121(`c31ccb1c`)의 소비층·SoundGraph·FMOD 제거가 master에 적용됐다. §12와 cloud 검증 보고서의 Debug/Release/ASan+UBSan 각 3,825단정 및 retirement 1,732점검은 당시 검증 tree의 증거다. 후속 Windows 포인터 수정 `904ad55d`·Player 중복 종료 수정 `29024ddf`도 현재 HEAD에 포함되지만 이번 문서 감사에서 재빌드하지 않았다.
+
+2026-10-08 후속 검증으로 **AU0~AU9 및 PHASE22를 완료했다.** 최종 clean engine과 실제 Dynamic_CPP의 선택 씬 package, 수정 후 실제 Editor 30분, 유효한 stream/ETW 계측 및 Player 프로세스 종료 100회가 모두 통과했다. 최종 판정은 §12.13과 Windows 보고서가 정본이다. 전체 원본 콘텐츠의 미해결 GUID 12개, 원격 CI 게임 레그와 PHASE23 MSI는 별도 범위다. Null/software 장치 검증을 실제 하드웨어 통과로 승격하지 않는다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 - 수립일: 2026-08-24
 - 재검토일: 2026-08-27 — efsw 유지 결정과 소스 재감사 반영
 - 재검토일: 2026-09-16 — **사전 정찰로 §1 기준선 14건 정정**. 정정 목록과 근거는
@@ -1078,3 +1086,143 @@ SoundGraph는 Sound Cue 수준의 재생 조합이다. oscillator, sample-DSP gr
 - 별도 consumer gate는 실제 SoundComponent/SoundSystem/Listener/Playback/Graph와 추출한 native binding을 컴파일하되 Scene/Entity 의존은 stub이다. API 33의 native/managed table 187개 field와 audio binding 31개를 대조했다. C# 실행이나 실제 Windows Scene 통합 통과로 세지 않는다.
 - `verify-audio-retirement.py`는 source/project/deploy closure 1,732개 점검에서 실패 0. 새 Audio TU의 누락·중복 등록도 검사한다. `git diff --check`, 수정 project XML parsing, dashboard JavaScript syntax, miniaudio upstream blob 3종 대조도 통과했다.
 - 실제 장치가 없는 클라우드에서 동작한 세 경로(logical Null / miniaudio software device / no-device PCM)와 native Windows·하드웨어·실제 Pak·패키지·C# 제품·LeakSanitizer 미실행을 구분한다. **AU9 및 PHASE 22 최종 acceptance는 완료 처리하지 않는다.**
+
+### 12.8 Windows 제품 acceptance 후속 — 2026-10-07
+
+VS 2026(v18) MSVC v145 x64로 Windows 독립 core/decoder/PCM/software-device
+Debug·Release 각각 240/240, 실제 WASAPI 30분 resident 부하 307/307,
+장치 재개방 20회 및 runtime 시작·종료 100회가 통과했다. 사용자 요청으로 기본
+출력을 AirPods Max로 변경하고 별도 실제 WASAPI 실행도 307/307을 통과했다.
+실제 WAV/MP3/FLAC loose/Pak/암호화 cross-chunk gate는 Debug에서 통과했고,
+Windows loose mount의 파일 쓰기 차단과 수명 종료 후 쓰기 복구를 보강했다.
+
+2026-10-08 추가 정산: 실제 Dynamic_CPP Editor의 기존 GUID-only WAV 메타데이터를
+GUID 보존 방식으로 갱신했다. Windows 캐시 정리 함수의 매크로 재귀와 편집 모드에서
+native OnBeginSimulation을 조기 소비하던 결함을 수정했다. VS18 Editor Debug/Release
+build가 통과했고, Debug 실제 오디오 재생·정리 100회 및 Release 실제 smoke 1회,
+사용자 AirPods Max 청각 확인, 동일 재생 핸들 유지한 기본 출력 변경 20회가 통과했다.
+실제 Bluetooth 분리·재연결 1회는 사용자가 자동 출력 복구를 확인했다.
+
+장치 재개방 20회, 기본 출력 변경 20회, 물리 재연결 1회는 서로 다른 증거다.
+MP3 stream 30분 167/167, Debug/Release 실제 Pak gate, Release PE 67 images도
+통과했다. 별도 Phase22Player 폴더는 현재 존재하지 않는다. 제품 성능 예산과 소비자
+수명 검증은 아래 추가 결과로 정산했으나 package 전체 및 잔여 종료 조건은 닫지 않았다. 따라서 PHASE22 전체 완료로
+표시하지 않는다. [현재 Windows 검증 보고서](../analysis/Phase22AudioWindowsAcceptance20261007.md)의
+수치·미실행 경계를 완료 판정의 근거로 삼는다. 콜백 p99가 통과하더라도 관찰된 최대
+지연과 한 주기 초과 횟수를 숨기지 않고 실제 hardware underrun으로 오인하지 않는다.
+
+### 12.9 승인 예산 및 소비자 종료 정산 — 2026-10-08
+
+사용자가 Release 128 voice 기준으로 update p99 <= 1ms, 부하로 증가한 private
+memory <= 256MiB, 첫 재생 API 응답 <= 500ms를 승인했다. 실제 현재 프로젝트
+Editor의 resident/stream 혼합 0/1/32/128 voice·reverb on/off를 30분 실행해
+p99 상한 0.284ms는 전체 혼합 관찰치이고, 추가 메모리 73.46MiB 및 첫 재생 API 응답
+135.15ms는 승인 기준을 통과했다. 별도 물리 128 voice 구간 212,798프레임 중
+1ms 초과 33회(0.01551%)로 128 voice p99 <= 1ms도 확인했다.
+첫 응답은 HTTP queue/polling을 포함하며 DAC 첫 샘플 지연은 아니다.
+callback p99=3.60ms, 최대=13.764ms, 반 주기 초과=10회, read failures=0이다.
+실제 driver underrun은 미확정이다. ETW event 41 두 건은 측정 시작 전 audiodg에서
+발생했고 부하 구간에는 관찰되지 않았으나 전체 eventsLost=1,516이므로 0 판정으로 세지 않는다.
+
+AU5는 deterministic PCM/voice 정책 회귀와 실제 128 physical voice 및 PointMono
+호출, AU6는 deterministic dry/wet RMS·decay capture로 완료했다. AU7은 실제
+Release Play/Stop 100회, C# playback/completion 100회 및 GC/scope 호출,
+Scene/DDOL SoundComponent·component 제거·hot reload·SoundGraph presentation
+owner 저장/재열기/preview와 warm 후 최종 thread/handle 증가 0으로 완료했다.
+SoundGraph probe를 실제 마우스 클릭 검증으로 확대하지 않는다.
+
+VS18 Debug/Release full solution, Release PE 67 images와 engine publication은
+통과했다. Editor는 새 IntDir로 LNK4020=0을 확인했으며 MSB8028 경고가 남는다.
+retirement gate는 현재 source/binary 2,385점검 실패 0이다.
+현재 Dynamic_CPP package는 기존 OGG 자원 1개를 cook에서 명시 거부해 실패했고,
+2026-10-08 사용자 지시로 원본·meta를 Library에 보관하고 GUID 유지 WAV로 변환했다. decoded PCM hash 동일, Assets 내 OGG 0개이며 clean engine 오디오 cook 29 clips PASS. 전체 package는 재질·씬의 미해결 dependency GUID 12개로 cook exit 4이다. 독립 clean snapshot
+`b443aff5`의 VS18 Release full build·현재 프로젝트 Editor smoke·PE 53 images 및
+engine publication도 통과했지만 clean Game package/Player smoke는 아직 미완료다.
+실제 Release Editor 프로세스 시작·재생·정리·종료 100/100도 통과했다.
+Player 종료 100회는 아직 실행하지 않았다. AU4/AU8/AU9의 이 잔여 조건을 닫기 전까지
+전체 페이즈를 완료로 표시하지 않는다.
+
+### 12.10 2026-10-08 선택 씬 package 수용
+
+사용자 지시로 현재 프로젝트 Phase22ProductAcceptance.creator와 필요한 음원 4개·기본 pass shader만 선택한 package를 만들었다. BuildTool --asset-list는 Assets 상대경로의 명시적 목록과 기존 meta를 복사하며 dependency 실패는 계속 거부한다. 목록은 package manifest에 기록한다. Test1/Test2 및 기존 재질 원본을 변경하거나 별도 테스트 프로젝트를 만들지 않았다.
+
+clean engine distribution ad40df63의 native runtime/cooker/packer + 수정한 로컬 BuildTool로 Release package 및 Player smoke PASS: GT 654 / promotions 120 / parser 0 / exit 0, C# audio cycles/completions 각 100. 수정 후 Player 종료 canary 1회도 통과했다. 전체 Project package, 수정된 도구까지 포함한 clean snapshot 재검증, Player 프로세스 종료 100회 완료로 확대하지 않는다. 실제 underrun 유효 계측도 남아 있다. 증거는 Phase22AudioWindowsAcceptance20261007.md의 선택 씬 패키징 절과 package-audio-scene-console.log이다.
+
+### 12.11 최종 도구·스트림 계측 재검증 — 2026-10-08
+
+오디오 관련 수정과 선택 목록 BuildTool을 포함한 clean snapshot
+`3b64ea9621592a85e1e5c0cebf92a231846f0acb`의 VS18 Release 전체 solution build,
+PE import closure 53 images, publication/license/provenance가 통과했다.
+최종 engine build ID는 `aa012ebe-4428-467e-ab13-f49ee5b71999`이다.
+이 배포본의 BuildTool로 현재 Dynamic_CPP 선택 씬을 패키징한
+`FinalStage/Game-42be31c76b814dc9804220532d8c9d6e`도 verification=passed다.
+로컬 변경 도구를 섞었던 앞선 package와 구별한다.
+
+스트림 data source가 mixer에 반환하는 MA_BUSY/MA_NO_DATA_AVAILABLE을 직접
+계수하고 정상 EOF는 제외했다. 실제 read 경로의 busy→회복→EOF canary와
+VS18 Debug/Release 각각 240단정이 통과했다. 이 counter만으로 OS underrun을
+판정하지 않는다. Windows Audio ETW event 24~49만 수집하는 필터는 canary에서
+실제 audiodg event 33을 유실 없이 검출했다. 이 canary의 glitch는 그대로 기록하며
+30분 workload underrun 0 통과로 세지 않는다.
+
+배포본 Editor의 프로젝트 스크립트는 compile-game으로 프로젝트 Library에 빌드한
+뒤 --managed-root로 명시했다. 배포본 파일을 수정하거나 별도 프로젝트를 만들지
+않았다. 새 Editor의 30분 제품 부하 및 최종 native generation의 Player 종료
+100회는 현재 실행 중이며, 결과가 확정될 때 최종 완료를 판정한다.
+
+패키지의 압축 포맷 소비를 보완한 최종 선택 콘텐츠는 WAV 4개와 MP3 Stream,
+FLAC Resident 각 1개다. 같은 clean engine의 최종 package
+`FinalStage/Game-0c3e1057609742bca7b2f8df4fc57964`는 Player 624 GT frames,
+120 promotions, parser calls=0, exit 0이며 C# playback/completion 100회 중
+resident/stream 각 50회, MP3/FLAC 각 25회를 통과했다.
+
+최초 신규 soak는 Intro.wav의 Auto가 Stream을 선택해 resident/stream 혼합
+표시가 잘못된 것을 계측으로 발견하고 중단했다. `budget-061591...`는 수용에서
+제외했다. 명시적 Resident인 Phase22Spatial을 사용한 실제 Editor canary에서
+1 voice의 stream reads=0, 혼합 32 voices의 stream reads>0을 확인한 뒤
+새 프로세스에서 재실행했다. 과거 혼합이라고 기록한 Intro 기반 측정도 같은
+resident/stream 구성 증거로 재사용하지 않는다. CPU 관찰치 자체와 구성 주장은
+구별하며, 최종 AU4/AU9 판정은 수정 후 실행만 사용한다.
+
+### 12.12 수정 후 실제 Editor 30분 수용 — PASS
+
+`budget-b69f9f06dd2143cd8f20e84f7224925f`에서 새 최종 Editor를
+1800.827초 실행했다. 명시적 Resident/Stream 혼합 0/1/32/128 physical voices,
+reverb on/off, 실제 장치 출력과 각 단계의 voice/instance 수가 일치했다.
+스트림 PCM read 12,099,284회 중 MA_BUSY/MA_NO_DATA_AVAILABLE 0,
+I/O read failures 0, backend failures 0이다. EOF는 starvation에서 제외했다.
+
+128 voice만의 943,138프레임 중 1ms 초과 93회(약 0.00986%)로 p99 <= 1ms.
+무부하 최소 private memory부터 전체 peak까지의 보수적 증가 106.1758MiB,
+첫 재생 API 응답 127.9356ms로 승인 예산을 통과했다. 최초 순간 baseline의
+증가 1.875MiB 대신 무부하 최솟값 기준을 최종 memory 수용에 사용한다.
+callback 180,694회, p99 3.80ms, 최대 7.3796ms, 반 주기 초과 19회도
+보존한다. nearest-rank p99 < buffer duration 50%를 통과했다.
+
+`final-underrun-0ff2f487400f40758f1bfc361c194955`의 독립 Windows Audio ETW
+필터 캡처에서 event 26~49 glitch 관찰 0, capture/read/stop exit 0,
+eventsLost/logBuffersLost/realTimeBuffersLost 모두 0이다. 선택 Audio event 자체는
+0개이며, 같은 provider/filter가 실제 event 33을 검출한 앞선 canary와 함께
+계측 유효성을 판정했다. 관찰 범위 밖 오류가 존재하지 않는다는 보장은 아니다.
+Stop 후 voice/instance=0, Editor exit 0 및 PID 종료를 확인했다.
+AU4는 완료이며, AU9의 최종 Player 프로세스 종료 100회가 진행 중이다.
+
+### 12.13 PHASE22 최종 종료 — 2026-10-08
+
+최종 선택 씬 package `Game-0c3e1057609742bca7b2f8df4fc57964`에서 실제 Player
+프로세스 시작·검증·정상 종료 **100/100 PASS**. 매 회차 최소 600 GT frames,
+120 presentation promotions, cooked text parser calls=0, C# audio playback/completion
+100회(resident/stream 각 50, MP3/FLAC 각 25), exit code=0과 PID 종료를 확인했다.
+100개 ledger의 순서·개수·engine build ID를 재대조했고 최종 pak hash도 일치한다.
+이전 generation의 26회와 managed playback 횟수를 프로세스 종료 횟수에 합산하지 않았다.
+
+증거는 `Build/Validation/Phase22Closure/final-phase22-acceptance.json`,
+`final-editor-acceptance.json`, `player-exits-af8a3b956d3b4185955046accf67999f/summary.jsonl`.
+§12.12의 수정 후 30분 성능·stream/ETW 수용, 앞선 실제 Editor 종료 100회·warm
+thread/handle 증가 0, default-device 20회·물리 재연결 1회 및 clean build/package
+폐쇄와 함께 AU9를 완료했다. **AU0~AU9 done, PHASE22 완료**다.
+
+수용 범위는 사용자가 선택한 실제 프로젝트의 별도 오디오 씬과 최종 native generation이다.
+Test1/Test2·기존 재질의 12개 미해결 콘텐츠 참조는 별도 정리 항목으로 남는다.
+로컬 clean acceptance를 원격 CI 실행 완료 또는 PHASE23 설치 제품 수용으로
+확대하지 않는다. B5의 오디오 선행 차단은 해제하며 CI 게임 레그 자체는 후속이다.

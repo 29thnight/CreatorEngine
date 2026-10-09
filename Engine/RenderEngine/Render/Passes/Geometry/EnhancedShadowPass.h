@@ -59,6 +59,8 @@ public:
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    bool PrepareGraphFrame(const EnhancedFrameContext& context, std::string& outError);
+    void DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
     bool HasGpuVisibilityCandidates() const { return m_hasGpuVisibilityCandidates; }
     // Call after the upload prefix/PrepareParallel boundary, before Declare.
     // Optional GPU prerequisites may deliberately retain the CPU route.
@@ -150,8 +152,6 @@ public:
     DebugStats GetDebugStats() const;
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     // 월드 행렬은 여기서 빠졌다 — 인스턴스 버퍼(t0)로 옮겼다. 광원 행렬은
     // 캐스케이드마다 한 번만 바뀌므로 상수 버퍼에 남는다.
     struct ShadowConstants

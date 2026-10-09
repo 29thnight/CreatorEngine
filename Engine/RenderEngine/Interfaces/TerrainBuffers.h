@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "Core.Minimal.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
@@ -71,6 +72,6 @@ struct TerrainLayer
     uint32_t m_layerID{ 0 };
     std::string layerName;
     std::wstring diffuseTexturePath;
-    Texture* diffuseTexture{ nullptr };
+    own::shared_owner<const Texture> diffuseTexture;
     float tilling;
 };

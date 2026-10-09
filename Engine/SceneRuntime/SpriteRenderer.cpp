@@ -49,7 +49,7 @@ void SpriteRenderer::OnUninitializing()
 	}
 }
 
-void SpriteRenderer::SetSprite(const std::shared_ptr<Texture>& ptr)
+void SpriteRenderer::SetSprite(const own::shared_owner<const Texture>& ptr)
 {
 	m_Sprite = ptr;
 	if (m_Sprite)
@@ -76,7 +76,7 @@ void SpriteRenderer::OnDeserialized()
 		auto texture = DataSystems->LoadSharedTexture(m_SpritePath, DataSystem::TextureFileType::Texture);
 		if (texture)
 		{
-			SetSprite(std::shared_ptr<Texture>(texture));
+			SetSprite(texture);
 		}
 	}
 }

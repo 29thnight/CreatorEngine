@@ -368,6 +368,29 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
                 if (stage)
                     for (const auto backend : carried)
                         declared.emplace(backend, stage->entry, profile);
+        // Scene mesh frontends are fixed host alternatives to these vertex
+        // stages, with the same material pixel contract. Require their exact
+        // entry names for the current host generation; never accept arbitrary
+        // extra compiled stages or relax the authored pass equality below.
+        if (program.semanticKey.ends_with(SceneHostIdentity))
+        {
+            for (const auto& pass : candidate.meta.passes)
+            {
+                if (!pass.vertex)
+                {
+                    continue;
+                }
+                const char* meshEntry = pass.vertex->entry == "LXSceneVS" ? "LXSceneMS"
+                    : pass.vertex->entry == "LXSceneShadowVS" ? "LXSceneShadowMS" : nullptr;
+                if (meshEntry)
+                {
+                    for (const auto backend : carried)
+                    {
+                        declared.emplace(backend, meshEntry, "ms_");
+                    }
+                }
+            }
+        }
         if (declared != compiled) throw std::runtime_error("Generated passes differ from verified backend stages");
 
         RHIShaderReflection reflection;

@@ -36,6 +36,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'GCCEProbe.ps1')
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $probe = Join-Path $PSScriptRoot 'reflection_container_roundtrip_probe.cpp'
@@ -47,6 +48,7 @@ $vcpkgLib = Join-Path $vcpkgRoot 'debug\lib'
 $vcpkgBin = Join-Path $vcpkgRoot 'debug\bin'
 $engineLib = Join-Path $repoRoot 'Build\Lib\x64-Debug'
 $utilityLib = Join-Path $engineLib 'Utility_Framework.lib'
+$gcce = Get-GCCEProbeSettings -Repository $repoRoot -Configuration $Configuration
 
 foreach ($required in @($probe, $utilityInclude, $mathInclude, $vcpkgInclude, $vcpkgLib)) {
     if (-not (Test-Path -LiteralPath $required)) {
@@ -90,12 +92,12 @@ if (Test-Path -LiteralPath $executable -PathType Leaf) {
 # /wd4828: 엔진 헤더 주석 일부가 CP949 바이트로 남아 있다(별도 이관 대상).
 $command = 'call "' + $vcvars + '" >nul && cl.exe ' +
     '/nologo /TP /EHsc /std:c++latest /permissive- /Zc:__cplusplus ' +
-    '/Zc:preprocessor /utf-8 /W3 /wd4828 /MDd /Od /D_DEBUG ' +
+    '/Zc:preprocessor /utf-8 /W3 /wd4828 /MDd /Od /D_DEBUG ' + $gcce.CompileArguments + ' ' +
     '/I"' + $utilityInclude + '" /I"' + $mathInclude + '" ' +
     '/external:I"' + $vcpkgInclude + '" /external:W0 ' +
     '/Fo:"' + $outputDirectory + '\\" /Fe:"' + $executable + '" "' + $probe + '" ' +
     '/link /LIBPATH:"' + $vcpkgLib + '" /LIBPATH:"' + $engineLib + '" ' +
-    'Utility_Framework.lib ryml.lib c4core.lib spdlogd.lib fmtd.lib Ole32.lib'
+    'Utility_Framework.lib ryml.lib c4core.lib spdlogd.lib fmtd.lib Ole32.lib ' + $gcce.LinkArguments
 
 Write-Host '[REFLECTION ROUNDTRIP] compiling Debug'
 & $env:ComSpec /d /s /c $command
@@ -107,7 +109,7 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
 }
 
 $previousPath = $env:PATH
-$env:PATH = "$vcpkgBin;$previousPath"
+$env:PATH = $gcce.RuntimeDirectory + ";$vcpkgBin;$previousPath"
 try {
     $output = & $executable 2>&1
     $exitCode = $LASTEXITCODE

@@ -23,6 +23,11 @@
 
 namespace ConsoleCmd
 {
+    // Explicit handler contract, never inferred from command names. The default
+    // protects live scenes and presentation-owned registries. OwnedState means
+    // the handler only uses owned/thread-safe renderer, profiler, or value data.
+    enum class SceneAccess { BorrowLiveState, OwnedState };
+
     /// 도메인 TU 가 받는 등록 창구.
     ///
     /// 구현은 `ConsoleCommandSystem.cpp` 의 표 생성부에 있다. 이 헤더는 방향을
@@ -32,7 +37,8 @@ namespace ConsoleCmd
     public:
         /// Every command returns one terminal result, unless the process intentionally terminates.
         virtual void Result(std::initializer_list<const char*> names,
-                            ConsoleCommandResultHandler fn) = 0;
+                            ConsoleCommandResultHandler fn,
+                            SceneAccess access = SceneAccess::BorrowLiveState) = 0;
 
         /// 일부러 프로세스를 죽이는 명령. 예외 경계를 통과시킨다.
         ///

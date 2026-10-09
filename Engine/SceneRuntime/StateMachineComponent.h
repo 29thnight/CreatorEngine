@@ -14,6 +14,12 @@ namespace FSM
 class [[reflgen::reflect]] StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	using ConditionFunc = std::function<bool(const BlackBoard&)>;
 public:

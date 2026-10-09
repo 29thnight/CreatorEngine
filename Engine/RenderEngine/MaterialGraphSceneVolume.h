@@ -28,7 +28,7 @@ namespace material_graph
 
     struct SceneVolumeBinding
     {
-        std::shared_ptr<const RenderBindings> material;
+        own::shared_owner<const RenderBindings> material;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline;
         RHIBufferSlice constants;
     };

@@ -9,6 +9,7 @@
 #include <string_view>
 
 class Material;
+namespace LX { class LXMaterialAsset; }
 class SceneRenderProfile;
 struct TerrainAuthoringRequest;
 struct TerrainAuthoringResult;
@@ -80,6 +81,8 @@ public:
 	ModelRecoveryStats GetModelRecoveryStats() const;
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
+    bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph, const file::path& graphPath,
+                           FileGuid graphGuid, std::string& error);
 	bool CreateSceneRenderProfile(const file::path& directory, std::string_view name,
 		file::path& createdPath, std::string& error);
     bool CreateFolder(const file::path& parent, std::string_view name,

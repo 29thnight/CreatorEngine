@@ -20,6 +20,9 @@
 #include "../../Mesh.h"
 
 #include <cstddef>
+#include <map>
+#include <span>
+#include <string>
 
 namespace enhanced_draw
 {
@@ -35,6 +38,37 @@ namespace enhanced_draw
         return nullptr != draw.mesh
             ? static_cast<std::size_t>(draw.mesh->m_hashingMesh.m_ID_Data)
             : std::size_t{ 0 };
+    }
+
+    // geometryKey is a compact sorting/batching token, never proof of identity.
+    // Fail the candidate before any hash-keyed pass table can alias two meshes.
+    [[nodiscard]] inline bool ValidateGeometryIdentities(
+        std::span<const EnhancedDrawItem> draws, std::string& error)
+    {
+        std::map<std::size_t, const EnhancedDrawItem*> identities;
+        for (const auto& draw : draws)
+        {
+            const auto key = GeometryKey(draw);
+            if (key == 0u)
+            {
+                continue;
+            }
+            const auto [position, inserted] = identities.emplace(key, &draw);
+            if (inserted)
+            {
+                continue;
+            }
+            const auto& previous = *position->second;
+            const bool typed = draw.modelMeshView.handle.IsValid();
+            const bool previousTyped = previous.modelMeshView.handle.IsValid();
+            if (typed != previousTyped || (typed
+                && draw.modelMeshView.handle != previous.modelMeshView.handle))
+            {
+                error = "Geometry batching hash collides with a different complete mesh identity.";
+                return false;
+            }
+        }
+        return true;
     }
 
     [[nodiscard]] inline float BoundRadius(

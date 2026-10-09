@@ -17,7 +17,7 @@
 #pragma pop_macro("max")
 #pragma pop_macro("min")
 
-#include "RenderFrameServices.h"
+#include "../IRenderDeviceServices.h"
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIAssetEvictionPolicy.h"
 #include "DX12PersistentHeap.h"
@@ -49,7 +49,7 @@ class DX12MeshCache : public IRenderMeshCache, public IRHIUploadTransactionListe
 {
 public:
     /// A-4. `DX12MeshEntry`(D3D12 뷰 둘)를 대신한다 — 정의는
-    /// RenderFrameServices.h 에 있고 인코더의 중립 서명이 그대로 받는다.
+    /// RHIResourceTypes.h 에 있고 인코더의 중립 서명이 그대로 받는다.
     using Entry = RHIMeshBinding;
 
     struct Stats
@@ -101,6 +101,7 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
+    Entry FindModel(const assets::ModelMeshHandle& handle) const override;
     Entry GetOrUploadModel(
         const RHIModelMeshView& view, std::string& outError) override;
     uint32_t GetModelGenerationUploadCount() const override

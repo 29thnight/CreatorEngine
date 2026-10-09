@@ -214,7 +214,11 @@ if (-not (Test-Path -LiteralPath $EditorExe)) {
 }
 # Source-only evidence cannot bless a pre-cutover executable. The product probes
 # require a binary newer than the ownership and layer publication paths they exercise.
-$editorStamp = (Get-Item -LiteralPath $EditorExe).LastWriteTimeUtc
+$editorPayload = Join-Path (Split-Path $EditorExe -Parent) 'CreatorEditor.runtime.dll'
+if (-not (Test-Path -LiteralPath $editorPayload -PathType Leaf)) {
+    throw "Editor runtime payload is missing: $editorPayload"
+}
+$editorStamp = (Get-Item -LiteralPath $editorPayload).LastWriteTimeUtc
 foreach ($relative in @(
     "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
     "Engine/RenderEngine/AssetAuthoringPort.cpp",
@@ -755,7 +759,9 @@ finally {
         $verifiedAssets += $absoluteTarget
     }
     foreach ($target in $verifiedAssets) {
-        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $target -PathType Leaf) {
+            Remove-Item -LiteralPath $target -Force
+        }
     }
     foreach ($target in @($terrainDescriptor, ($terrainDescriptor + ".meta"))) {
         $absoluteTarget = [IO.Path]::GetFullPath($target)

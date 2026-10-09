@@ -38,6 +38,7 @@
 // 맵은 거부한다 — 시퀀스의 포인터 원소는 SceneManager 가 복원하지만 맵에는 그
 // 복원자가 없어 "적기만 하고 못 읽는" 한쪽 방향이 된다.
 #include "ReflectionYml.h"
+#include "../SceneRuntime/SceneGC.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "AuthoringReadNode.h" // D3-b-2b-1b
@@ -273,13 +274,28 @@ namespace Meta::Typed
     // K2 스테이지 A: Entity::m_components가 vector<std::unique_ptr<Component>>로
     // 바뀌며 shared_ptr 짝이 필요해졌다 — 삭제자 인자(D)는 무시(항상 default_delete).
     template<class U, class D> struct Pointee<std::unique_ptr<U, D>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<own::shared_owner<U>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<own::unique_owner<U>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<gc::trace_ref<U>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<gc::root_ref<U>> { using type = std::remove_cv_t<U>; };
     template<class T> using PointeeT = typename Pointee<std::remove_cv_t<T>>::type;
 
     template<class P>
     inline auto* RawPtrOf(P& p)
     {
-        if constexpr (std::is_pointer_v<std::remove_cv_t<P>>) { return p; }
-        else { return p.get(); }
+        if constexpr (std::is_pointer_v<std::remove_cv_t<P>>)
+        {
+            return p;
+        }
+        else if constexpr (requires { p.borrow(); })
+        {
+            // Borrow only the live lvalue owner; no raw adoption or const removal.
+            return p.borrow().unsafe_get();
+        }
+        else
+        {
+            return p.get();
+        }
     }
 
     // ── 타입 계열 판정 ─────────────────────────────────────────────────────

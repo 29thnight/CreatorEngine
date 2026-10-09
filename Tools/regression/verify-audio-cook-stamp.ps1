@@ -122,7 +122,8 @@ Copy-Item -LiteralPath $wav -Destination $audioOnlyWav
 Copy-Item -LiteralPath $wavMeta -Destination ($audioOnlyWav + '.meta')
 $audioOnlyOutput = Join-Path $run 'audio-only-output'
 $audioOnlyLines = & $AssetCooker --asset-root $audioOnlyAssets --output $audioOnlyOutput 2>&1
-if ($LASTEXITCODE -ne 0 -or ($audioOnlyLines -join "`n") -notmatch 'sourceIdentities=1' -or
+# Audio is resolved through cooked GUID entries; authoring path fallback is absent.
+if ($LASTEXITCODE -ne 0 -or ($audioOnlyLines -join "`n") -notmatch 'sourceIdentities=0' -or
     ($audioOnlyLines -join "`n") -notmatch 'audioClips=1') {
     throw "audio-only cook failed: $($audioOnlyLines -join "`n")"
 }
@@ -133,7 +134,7 @@ if (-not (Test-Path -LiteralPath $manifestA -PathType Leaf) -or
     -not (Test-Path -LiteralPath $manifestB -PathType Leaf) -or
     (Get-FileHash -LiteralPath $manifestA -Algorithm SHA256).Hash -ne
     (Get-FileHash -LiteralPath $manifestB -Algorithm SHA256).Hash -or
-    $first.Text -notmatch 'sourceIdentities=2') {
+    $first.Text -notmatch 'sourceIdentities=1') {
     throw 'valid cook source identity table is missing or nondeterministic'
 }
 
@@ -218,7 +219,7 @@ if (-not [string]::IsNullOrWhiteSpace($FormatFixtures)) {
         Write-FormatMeta $case $target
     }
     $complete = Invoke-Cook 'format-valid-output'
-    if ($complete.Code -ne 0 -or $complete.Text -notmatch 'sourceIdentities=5') {
+    if ($complete.Code -ne 0 -or $complete.Text -notmatch 'sourceIdentities=1') {
         throw "three-format cook failed: $($complete.Text)"
     }
     Assert-AudioArtifact $complete.Output '0ff53a5b-bdb0-438a-abab-645a99062fd8' $wav 0 1

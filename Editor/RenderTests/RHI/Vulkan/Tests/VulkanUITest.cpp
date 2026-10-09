@@ -33,9 +33,9 @@ namespace
 
     struct UiRhiFixture
     {
-        Texture* redTexture{ nullptr };
-        Texture* blueTexture{ nullptr };
-        std::shared_ptr<Texture> distanceTexture;
+        own::shared_owner<const Texture> redTexture;
+        own::shared_owner<const Texture> blueTexture;
+        own::shared_owner<const Texture> distanceTexture;
         std::vector<EnhancedUIPass::Rect> baseRects;
         std::vector<EnhancedUIPass::Rect> texturedRects;
         std::vector<EnhancedUIPass::Rect> distanceRects;
@@ -59,8 +59,8 @@ namespace
                     distancePixels[pixel * 4 + channel] = distances[pixel];
                 }
             }
-            distanceTexture.reset(Texture::CreateFromPixels(8, 1, "rhi_ui_distance",
-                RHIFormat::RGBA8Unorm, distancePixels.data()));
+            distanceTexture = Texture::CreateFromPixels(8, 1, "rhi_ui_distance",
+                RHIFormat::RGBA8Unorm, distancePixels.data());
 
             EnhancedUIPass::Rect redRect{};
             redRect.left = 10.f;
@@ -109,7 +109,8 @@ namespace
                 rect.right = rect.left + 40.f;
                 rect.bottom = 200.f;
                 rect.color = { 1.f, 1.f, 1.f, 1.f };
-                rect.texture = (0 == (i & 1u)) ? redTexture : blueTexture;
+                const auto& texture = (0 == (i & 1u)) ? redTexture : blueTexture;
+                rect.texture = texture ? &*texture.borrow() : nullptr;
                 texturedRects.push_back(rect);
             }
 
@@ -123,7 +124,7 @@ namespace
 
             EnhancedUIPass::Rect distanceRect = distanceBackground;
             distanceRect.color = { 1.f, 0.f, 0.f, 0.5f };
-            distanceRect.textureOwner = distanceTexture;
+            distanceRect.texture = distanceTexture ? &*distanceTexture.borrow() : nullptr;
             distanceRect.signedDistance = true;
             distanceRects.push_back(distanceRect);
 
@@ -135,12 +136,6 @@ namespace
             imageRect.color = { 0.f, 0.f, 1.f, 1.f };
             imageRect.signedDistance = false;
             distanceRects.push_back(imageRect);
-        }
-
-        ~UiRhiFixture()
-        {
-            delete redTexture;
-            delete blueTexture;
         }
 
         bool IsValid() const
@@ -324,9 +319,14 @@ namespace
         EnhancedUIPass ui;
         EnhancedFrameContext context{};
         std::vector<EnhancedUIPass::Rect> rects(1);
-        rects.front().textureOwner = std::make_shared<Texture>();
-        const std::weak_ptr<Texture> weakTexture = rects.front().textureOwner;
-        ui.SetRects(&rects);
+        auto texture = own::make_shared<const Texture>();
+        const own::weak_owner<const Texture> weakTexture = texture;
+        auto texturePins = own::make_shared<TextureFramePins>();
+        rects.front().texturePinIndex = texturePins->Retain(texture);
+        rects.front().texture = texturePins->Borrow(rects.front().texturePinIndex);
+        ui.SetRects(&rects, texturePins);
+        texture.reset();
+        texturePins.reset();
         // CPU-only: no texture cache, device or fake upload is involved.
         if (!ui.PrepareFrame(context, outError))
         {
@@ -335,7 +335,7 @@ namespace
         rects.clear();
         if (weakTexture.expired())
         {
-            outError = "UI batch did not retain the source texture owner";
+            outError = "UI frame pins did not retain the source texture owner";
             return false;
         }
         ui.Shutdown();
@@ -361,7 +361,7 @@ namespace
         glyph.uvTop = 0.2f;
         glyph.uvRight = 0.3f;
         glyph.uvBottom = 0.6f;
-        glyph.texture = std::make_shared<Texture>();
+        glyph.texture = own::make_shared<const Texture>();
         layout->glyphs.push_back(glyph);
         glyph.left = 50.f;
         glyph.right = 80.f;
@@ -373,33 +373,35 @@ namespace
         text.canvasOrder = 7;
         text.layerOrder = 3;
         std::vector<EnhancedUIPass::Rect> rects(1);
-        if (!EnhancedUIPass::AppendTextRects(text, rects, 20.f, 30.f) || rects.size() != 3 ||
+        TextureFramePins textPins;
+        if (!EnhancedUIPass::AppendTextRects(text, rects, textPins, 20.f, 30.f) || rects.size() != 3 ||
             rects[1].left != 180.f || rects[1].top != 114.f ||
             rects[1].right != 200.f || rects[1].bottom != 134.f ||
             rects[2].left != 220.f || rects[1].canvasOrder != 7 ||
             rects[1].layerOrder != 3 || !rects[1].signedDistance ||
-            rects[1].textureOwner != glyph.texture)
+            rects[1].texture != &*glyph.texture.borrow() ||
+            textPins.Borrow(rects[1].texturePinIndex) != rects[1].texture || textPins.Size() != 1)
         {
             outError = "Text rectangles lost center anchor, glyph order, append semantics or ownership";
             return false;
         }
         rects.clear();
         text.alignment = TextAlignment::Left;
-        if (!EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 2 || rects[0].left != 210.f)
+        if (!EnhancedUIPass::AppendTextRects(text, rects, textPins) || rects.size() != 2 || rects[0].left != 210.f)
         {
             outError = "Text left anchor is incorrect";
             return false;
         }
         rects.clear();
         text.alignment = TextAlignment::Right;
-        if (!EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 2 || rects[0].left != 110.f)
+        if (!EnhancedUIPass::AppendTextRects(text, rects, textPins) || rects.size() != 2 || rects[0].left != 110.f)
         {
             outError = "Text right anchor is incorrect";
             return false;
         }
         rects.clear();
         text.filpEffect = static_cast<UIEffects>(3);
-        if (!EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 2 ||
+        if (!EnhancedUIPass::AppendTextRects(text, rects, textPins) || rects.size() != 2 ||
             rects[0].left != 170.f || rects[0].top != 96.f ||
             rects[0].right != 190.f || rects[0].bottom != 116.f ||
             rects[0].uvLeft != 0.3f || rects[0].uvRight != 0.1f ||
@@ -410,28 +412,33 @@ namespace
         }
         rects.clear();
         text.position.x = (std::numeric_limits<float>::quiet_NaN)();
-        if (EnhancedUIPass::AppendTextRects(text, rects) || !rects.empty())
+        if (EnhancedUIPass::AppendTextRects(text, rects, textPins) || !rects.empty())
         {
             outError = "Text accepted a nonfinite anchor";
             return false;
         }
         text.position.x = 200.f;
         layout->glyphs.front().uvLeft = (std::numeric_limits<float>::infinity)();
-        if (EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 1)
+        if (EnhancedUIPass::AppendTextRects(text, rects, textPins) || rects.size() != 1)
         {
             outError = "Text accepted nonfinite UVs or discarded valid adjacent glyphs";
             return false;
         }
 
-        // Planar text uses the same owner and signed-distance fields, including
+        // Planar text uses the same frame pins and signed-distance fields, including
         // when the source list is rebuilt before graph recording.
         EnhancedSpritePass sprite;
         EnhancedFrameContext context{};
         std::vector<EnhancedSpritePass::Item> items(1);
-        items.front().textureOwner = std::make_shared<Texture>();
+        auto texture = own::make_shared<const Texture>();
+        const own::weak_owner<const Texture> weakTexture = texture;
+        auto texturePins = own::make_shared<TextureFramePins>();
+        items.front().texturePinIndex = texturePins->Retain(texture);
+        items.front().texture = texturePins->Borrow(items.front().texturePinIndex);
         items.front().signedDistance = true;
-        const std::weak_ptr<Texture> weakTexture = items.front().textureOwner;
-        sprite.SetItems(&items);
+        sprite.SetItems(&items, texturePins);
+        texture.reset();
+        texturePins.reset();
         if (!sprite.PrepareFrame(context, outError))
         {
             return false;
@@ -439,13 +446,13 @@ namespace
         items.clear();
         if (weakTexture.expired() || sprite.GetLastItemCount() != 1 || sprite.GetLastBatchCount() != 1)
         {
-            outError = "Planar text did not preserve batch ownership";
+            outError = "Planar text did not preserve frame-pin ownership";
             return false;
         }
         sprite.Shutdown();
         if (!weakTexture.expired())
         {
-            outError = "Planar text shutdown did not release batch ownership";
+            outError = "Planar text shutdown did not release frame-pin ownership";
             return false;
         }
         return true;

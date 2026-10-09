@@ -113,7 +113,7 @@ double SssDensity(const SceneSssProfile& profile, double distance, unsigned chan
 
 void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                        std::shared_ptr<Texture> image, std::shared_ptr<Texture> cube, const SheenTable& table)
+                        own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube, const SheenTable& table)
 {
     const auto product = SubsurfaceProduct(root);
     std::string error;
@@ -128,7 +128,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
         },
         true, error);
     Check(bool(generation), "SSS immutable generation " + error);
-    std::array<std::shared_ptr<const Instance>, 3> instances;
+    std::array<own::shared_owner<const Instance>, 3> instances;
     for (unsigned i = 0; i < instances.size(); ++i)
     {
         InstanceDescription description{graphId, {{904, i == 1 ? 0.0 : 1.0}, {905, i == 2 ? .45 : 0.0}}, {}};
@@ -157,9 +157,10 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     WaitSceneProgram(host, context, generation);
     for (unsigned features : {0x3000u})
     {
-        auto unsupported = std::make_shared<Generation>(*generation);
-        unsupported->cooked.product.program.features = features;
-        unsupported->cooked.product.program.volume = (features & 0x2000u) != 0;
+        Generation unsupportedValue(*generation);
+        unsupportedValue.cooked.product.program.features = features;
+        unsupportedValue.cooked.product.program.volume = (features & 0x2000u) != 0;
+        const auto unsupported = own::make_shared<const Generation>(std::move(unsupportedValue));
         Check(!host.RequestProgram(context, unsupported, error), "Uninstalled Volume remains rejected");
     }
     std::uint64_t pixels{}, spread{}, boundaries{}, maskedHoles{}, frames{};
@@ -216,12 +217,12 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             context.lights = &lights;
             const std::array draws{a.draw, b.draw};
             SceneInputView view{context.frameId, context.sceneEpoch, 91, 1, 24, 24, camera};
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             Check(SceneViewInput::Seal(view, draws, {}, input, error), "SSS Scene seal " + error);
             Check(device.BeginFrame(error), "SSS begin frame");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload(cube.get(), error).handle;
+            const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "SSS residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "SSS actual Scene pass preparation " + error);

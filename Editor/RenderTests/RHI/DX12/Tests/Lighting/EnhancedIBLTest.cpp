@@ -159,9 +159,10 @@ namespace
             !resources.EndFrame(error)) return fail();
         resources.WaitForGpu();
 
-        RHIReadback maps{}, mirrors{};
-        if (!resources.CreateReadback(grid, grid, RHIFormat::RGBA16Float, 30, maps, error) ||
-            !resources.CreateReadback(cubeSize, cubeSize, RHIFormat::RGBA16Float, 12, mirrors, error) ||
+        RHIReadback maps{}, mirrors{}, irradiance{};
+        if (!resources.CreateReadback(grid, grid, EnhancedIBLGenerator::kRadianceFormat, 30, maps, error) ||
+            !resources.CreateReadback(cubeSize, cubeSize, EnhancedIBLGenerator::kRadianceFormat, 12, mirrors, error) ||
+            !resources.CreateReadback(grid, grid, EnhancedIBLGenerator::kFormat, 6, irradiance, error) ||
             !resources.BeginFrame(error)) return fail();
         const RHITransition copyReady[] = {
             { generator.GetCubeMap(), RHIResourceState::PixelShaderResource, RHIResourceState::CopySource },
@@ -174,7 +175,7 @@ namespace
         for (uint32_t face = 0; face < 6; ++face)
         {
             encoder.CopyToReadback(maps, generator.GetCubeMap(), face, face * cubeMips + 1);
-            encoder.CopyToReadback(maps, generator.GetIrradianceMap(), 6 + face, face);
+            encoder.CopyToReadback(irradiance, generator.GetIrradianceMap(), face, face);
             encoder.CopyToReadback(mirrors, generator.GetCubeMap(), face, face * cubeMips);
             encoder.CopyToReadback(mirrors, generator.GetPrefilteredMap(), 6 + face, face * prefilterMips);
             for (uint32_t r = 0; r < 3; ++r)
@@ -183,9 +184,9 @@ namespace
         }
         if (!resources.EndFrame(error)) return fail();
         resources.WaitForGpu();
-        RHIReadbackImage image{}, mirror{};
+        RHIReadbackImage image{}, mirror{}, irradianceImage{};
         if (!resources.MapReadback(maps, image, error) ||
-            !resources.MapReadback(mirrors, mirror, error)) return fail();
+            !resources.MapReadback(mirrors, mirror, error) || !resources.MapReadback(irradiance, irradianceImage, error)) return fail();
         double mirrorError = 0.0, peak = 0.0;
         for (uint32_t f = 0; f < 6; ++f)
             for (uint32_t y = 0; y < cubeSize; ++y)
@@ -261,7 +262,7 @@ namespace
                             weight += w;
                         }
                         const double expected = test == 0 ? sum : sum / weight;
-                        const double actual = image.At(x,y,0,6 + test*6 + face);
+                        const double actual = test == 0 ? irradianceImage.At(x,y,0,face) : image.At(x,y,0,6 + test*6 + face);
                         if (!std::isfinite(actual)) { error = "non-finite convolution"; return fail(); }
                         const double delta = std::abs(actual - expected);
                         error2 += delta * delta; reference2 += expected * expected;
@@ -298,21 +299,21 @@ namespace
         resources.TransitionResources(blackCopy);
         for (uint32_t f=0; f<6; ++f)
         {
-            resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetIrradianceMap(), f, f);
+            resources.GetImmediateEncoder().CopyToReadback(irradiance, generator.GetIrradianceMap(), f, f);
             resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetPrefilteredMap(), f+6, f*prefilterMips);
             resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetPrefilteredMap(), f+12, f*prefilterMips+3);
             resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetPrefilteredMap(), f+18, f*prefilterMips+5);
         }
         if (!resources.EndFrame(error)) return fail();
         resources.WaitForGpu();
-        if (!resources.MapReadback(maps, image, error)) return fail();
+        if (!resources.MapReadback(maps, image, error) || !resources.MapReadback(irradiance, irradianceImage, error)) return fail();
         for (uint32_t slice=0; slice<24; ++slice)
         {
             const uint32_t size = slice < 12 ? 64 : slice < 18 ? 8 : 2;
             for (uint32_t y=0; y<size; ++y)
                 for (uint32_t x=0; x<size; ++x)
                     for (uint32_t c=0; c<3; ++c)
-                        passed &= image.At(x,y,c,slice) == 0.f; // NaN also fails.
+                        passed &= (slice < 6 ? irradianceImage.At(x,y,c,slice) : image.At(x,y,c,slice)) == 0.f; // NaN also fails.
         }
         resources.ReleaseTexture(black);
         outLog += "Black environment finite zero: " + std::string(passed ? "PASS\n" : "FAIL\n");
@@ -482,11 +483,13 @@ bool DX12Test::RunIBLTest(std::string& outLog)
     //   등차로 두고 행 간격을 면 것으로 통일해 두었다 — 즉 배치는 처음부터
     //   균일했고 크기만 달랐다. 작은 것은 장의 왼쪽 위 구석에 들어가고,
     //   그 둘을 읽는 자리도 (0,0)이라 읽는 쪽이 달라지지 않는다.
-    RHIReadback readback{};
+    RHIReadback readback{}, radianceReadback{};
     {
         std::string readbackError;
         if (!resources.CreateReadback(kIblCubeSize, kIblCubeSize,
-            EnhancedIBLGenerator::kFormat, kIblRegionCount, readback, readbackError))
+            EnhancedIBLGenerator::kFormat, kIblRegionCount, readback, readbackError) ||
+            !resources.CreateReadback(kIblCubeSize, kIblCubeSize,
+                EnhancedIBLGenerator::kRadianceFormat, kIblRegionCount, radianceReadback, readbackError))
         {
             outLog += "[3/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
@@ -524,7 +527,8 @@ bool DX12Test::RunIBLTest(std::string& outLog)
             uint32_t region)
         {
             resources.GetImmediateEncoder().CopyToReadback(
-                readback, source, region, subresource);
+                source == generator.GetCubeMap() || source == generator.GetPrefilteredMap() ? radianceReadback : readback,
+                source, region, subresource);
         };
 
         // 면 인덱스: +X 0 · -X 1 · +Y 2 · -Y 3. 서브리소스 = 밉 + 면 x 밉수.
@@ -556,10 +560,11 @@ bool DX12Test::RunIBLTest(std::string& outLog)
 
     bool passed = true;
 
-    RHIReadbackImage captured{};
+    RHIReadbackImage captured{}, capturedRadiance{};
     {
         std::string readbackError;
-        if (!resources.MapReadback(readback, captured, readbackError))
+        if (!resources.MapReadback(readback, captured, readbackError) ||
+            !resources.MapReadback(radianceReadback, capturedRadiance, readbackError))
         {
             outLog += "[3/5] 리드백 Map 실패: " + readbackError + "\n";
             resources.Shutdown();
@@ -570,7 +575,7 @@ bool DX12Test::RunIBLTest(std::string& outLog)
     // 구획 = 장. 디코드와 행 간격은 캡처가 안다.
     const auto region = [&](uint32_t index, uint32_t x, uint32_t y, uint32_t channel)
     {
-        return captured.At(x, y, channel, index);
+        return (index < 2 || (index >= 5 && index <= 8) ? capturedRadiance : captured).At(x, y, channel, index);
     };
     constexpr uint32_t kMid = kIblCubeSize / 2;
 

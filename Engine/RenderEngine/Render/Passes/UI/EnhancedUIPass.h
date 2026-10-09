@@ -91,11 +91,8 @@ public:
         int32_t layerOrder{ 0 };
 
         /// 없으면 1x1 흰색이 묶인다 — 단색 사각형이 그것으로 나온다.
-        Texture* texture{ nullptr };
-
-        /// 큐를 펼친 뒤 프록시·레이아웃이 바뀌어도 업로드까지 픽셀을 보존한다.
-        /// 소유자가 있으면 그 텍스처를 사용한다. raw 포인터는 기존 fixture용이다.
-        std::shared_ptr<Texture> textureOwner;
+        const Texture* texture{ nullptr };
+        std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
     };
 
     const char* GetName() const override { return "UI"; }
@@ -113,7 +110,12 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
-    void SetRects(const std::vector<Rect>* rects) { m_rects = rects; }
+    void SetRects(const std::vector<Rect>* rects,
+        own::shared_owner<TextureFramePins> texturePins = {})
+    {
+        m_rects = rects;
+        m_texturePins = std::move(texturePins);
+    }
 
     /// UI 큐를 사각형 목록으로 옮긴다.
     ///
@@ -129,16 +131,20 @@ public:
     /// '아직 안 되는 것'과 '되는데 안 나오는 것'이 구분된다.
     /// 컨테이너 종류를 묻지 않으려고 포인터와 개수로 받는다 — 엔진의 UI
     /// 큐는 concurrent_vector라, 그 타입을 이 헤더가 알 이유가 없다.
+    /// SDF 텍스트는 texturePins가 있어야 펼칠 수 있다.
     static uint32_t BuildRectsFromQueue(
         class UIRenderProxy* const* proxies, size_t count,
         std::vector<Rect>& outRects,
-        float screenWidth = 0.f, float screenHeight = 0.f);
+        float screenWidth = 0.f, float screenHeight = 0.f,
+        TextureFramePins* texturePins = nullptr);
 
     /// Canvas 모드와 무관한 글리프 배치. Overlay와 3D Canvas가 같은 앵커·
     /// 뒤집기·소유권 규약을 쓴다. 기존 목록은 유지하고 유효 글리프를 붙인다.
+    /// texturePins가 업로드까지 각 아틀라스 스냅샷을 보존한다.
     /// 잘못된 레이아웃/글리프가 있으면 false이며, 유효 글리프는 남긴다.
     static bool AppendTextRects(const UIRenderProxy::TextData& text,
-        std::vector<Rect>& outRects, float offsetX = 0.f, float offsetY = 0.f);
+        std::vector<Rect>& outRects, TextureFramePins& texturePins,
+        float offsetX = 0.f, float offsetY = 0.f);
 
     RGHandle GetOutput() const { return m_output; }
 
@@ -169,11 +175,13 @@ private:
     {
         uint32_t first{ 0 };
         uint32_t count{ 0 };
-        Texture* texture{ nullptr };
-        std::shared_ptr<Texture> textureOwner;
+        const Texture* texture{ nullptr };
+        std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
+        std::uint64_t textureId{};
         RHITextureEntry uploaded;
     };
 
+    own::shared_owner<TextureFramePins> m_texturePins;
     Inputs   m_inputs{};
     RHIFormat m_outputFormat{ kOutputFormat };
     RGHandle m_output;

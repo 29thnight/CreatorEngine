@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -19,6 +20,71 @@ namespace experiment::importer
 {
     namespace
     {
+        struct FbxCapturedSourceContext final
+        {
+            const ImportRequest* request{};
+            bool failed{};
+            std::string failure{};
+        };
+
+        // Never propagate C++ exceptions across the ufbx C callback boundary.
+        // ufbx's memory stream copies the captured bytes and bounds read/skip to
+        // their size; no open or stream operation falls back to the filesystem.
+        [[nodiscard]] bool OpenCapturedFbxSource(void* user, ufbx_stream* stream,
+            const char* path, std::size_t pathLength,
+            const ufbx_open_file_info* info) noexcept
+        {
+            if (user == nullptr)
+            {
+                return false;
+            }
+            auto& context = *static_cast<FbxCapturedSourceContext*>(user);
+            if (context.failed)
+            {
+                return false;
+            }
+            try
+            {
+                if (path == nullptr || stream == nullptr || info == nullptr
+                    || std::string_view(path, pathLength).find('\0') != std::string_view::npos)
+                {
+                    context.failed = true;
+                    context.failure = "FBX requested an invalid external source path.";
+                    return false;
+                }
+
+                const std::u8string encodedPath(path, path + pathLength);
+                std::filesystem::path resolvedPath(encodedPath);
+                if (!resolvedPath.is_absolute())
+                {
+                    resolvedPath = context.request->sourcePath.parent_path() / resolvedPath;
+                }
+                resolvedPath = resolvedPath.lexically_normal();
+                ImportSourceBytes bytes;
+                if (!context.request->readSourceDependency(resolvedPath, bytes,
+                    context.failure) || !bytes)
+                {
+                    context.failed = true;
+                    return false;
+                }
+
+                if (!ufbx_open_memory_ctx(stream, info->context,
+                    bytes->data(), bytes->size(), nullptr, nullptr))
+                {
+                    context.failed = true;
+                    context.failure = "Cannot open captured FBX dependency memory.";
+                    return false;
+                }
+                return true;
+            }
+            catch (...)
+            {
+                // No allocation in the catch path: even bad_alloc must not cross C.
+                context.failed = true;
+                return false;
+            }
+        }
+
         // 이름이 다른 TU 의 동류 헬퍼와 겹치면 안 된다 — 유니티 빌드가 두 TU 를
         // 합치면 같은 익명 네임스페이스로 병합돼 재정의가 된다. Fbx 접두사 유지.
         [[nodiscard]] std::string FbxText(const ufbx_string& text)
@@ -329,6 +395,16 @@ namespace experiment::importer
         ImportResult result;
         ImportNoteSink notes;
 
+        const bool capturedSource = static_cast<bool>(request.sourceBytes);
+        if (capturedSource != static_cast<bool>(request.readSourceDependency)
+            || (capturedSource && !request.sourcePath.is_absolute()))
+        {
+            notes.Error(ImportNoteCode::InvalidSceneStructure, "file",
+                "Captured imports require root bytes, a dependency reader, and an absolute source path.");
+            result.notes = notes.Release();
+            return result;
+        }
+
         ufbx_load_opts options{};
         // legacy 가 aiProcess_ConvertToLeftHanded 를 주므로 같은 좌표계로 받는다.
         // 손으로 z 를 뒤집던 glTF 경로와 달리 축 변환을 라이브러리에 맡긴다.
@@ -356,9 +432,38 @@ namespace experiment::importer
         options.load_external_files = true;
         options.ignore_missing_external_files = true;
 
+        FbxCapturedSourceContext sourceContext{ &request };
+        // Keep the UTF-8 backing string alive through parsing and animation baking.
+        std::string sourceFilename;
+        if (capturedSource)
+        {
+            const auto sourcePathUtf8 = request.sourcePath.generic_u8string();
+            sourceFilename.assign(sourcePathUtf8.begin(), sourcePathUtf8.end());
+            options.filename = { sourceFilename.data(), sourceFilename.size() };
+            options.path_separator = '/';
+            options.ignore_missing_external_files = false;
+            options.open_file_cb.fn = &OpenCapturedFbxSource;
+            options.open_file_cb.user = &sourceContext;
+        }
+
         ufbx_error error{};
-        ufbx_scene* loaded = ufbx_load_file(
-            request.sourcePath.string().c_str(), &options, &error);
+        ufbx_scene* loaded = capturedSource
+            ? ufbx_load_memory(request.sourceBytes->data(), request.sourceBytes->size(),
+                &options, &error)
+            : ufbx_load_file(request.sourcePath.string().c_str(), &options, &error);
+        if (sourceContext.failed)
+        {
+            if (loaded != nullptr)
+            {
+                ufbx_free_scene(loaded);
+            }
+            notes.Error(ImportNoteCode::InvalidSceneStructure, "source dependency",
+                sourceContext.failure.empty()
+                    ? "Cannot capture an FBX dependency."
+                    : sourceContext.failure);
+            result.notes = notes.Release();
+            return result;
+        }
         if (!loaded)
         {
             char description[512];

@@ -1,0 +1,103 @@
+CreatorWorkspace 3
+name "S&Box Compact"
+preset "sbox_compact"
+viewport "###Editor.Game"
+versions 1 19280
+geometry 1 640 525 204.889
+monitors "1920x1200+908+2160;3840x2160+0+0"
+panel "###Editor.About" 0
+panel "###Editor.AnimationControllers" 0
+panel "###Editor.AnimatorEvent" 0
+panel "###Editor.AssetBundle" 1
+panel "###Editor.AvatarMask" 0
+panel "###Editor.BehaviorTree" 0
+panel "###Editor.BlackBoard" 0
+panel "###Editor.BuildSceneSetting" 0
+panel "###Editor.CollisionMatrix" 0
+panel "###Editor.ContentBrowser" 1
+panel "###Editor.GamePreview" 0
+panel "###Editor.GridSettings" 0
+panel "###Editor.Hierarchy" 1
+panel "###Editor.InputActionMaps" 0
+panel "###Editor.Inspector" 1
+panel "###Editor.LightMap" 0
+panel "###Editor.MaterialGraph" 0
+panel "###Editor.MaterialPicker" 0
+panel "###Editor.OutputLog" 0
+panel "###Editor.Preferences" 0
+panel "###Editor.ProjectSettings" 0
+panel "###Editor.RenderPass" 0
+panel "###Editor.RenderPassDebug" 0
+panel "###Editor.ResourceCounter" 0
+panel "###Editor.SoundGraph" 0
+panel "###Editor.TextureImportSelector" 0
+panel "###Editor.Viewport" 1
+--ini--
+[Window][###Editor.Hierarchy]
+Pos=499,45
+Size=141,229
+Collapsed=0
+DockId=0x00000003,0
+
+[Window][###Editor.Inspector]
+Pos=499,276
+Size=141,188
+Collapsed=0
+DockId=0x00000004,0
+
+[Window][###Editor.AssetBundle]
+Pos=0,317
+Size=497,147
+Collapsed=0
+DockId=0x00000006,0
+
+[Window][###Editor.ContentBrowser]
+Pos=0,317
+Size=497,147
+Collapsed=0
+DockId=0x00000006,1
+
+[Window][###Editor.ResourceCounter]
+Collapsed=0
+DockId=0x00000006
+
+[Window][###Editor.Viewport]
+Pos=0,45
+Size=497,270
+Collapsed=0
+DockId=0x00000005,0
+
+[Window][###Editor.GamePreview]
+Collapsed=0
+DockId=0x00000006
+
+[Window][###Editor.MaterialGraph]
+Collapsed=0
+DockId=0x00000005
+
+[Window][###Editor.BehaviorTree]
+Collapsed=0
+DockId=0x00000005
+
+[Window][###Editor.BlackBoard]
+Collapsed=0
+DockId=0x00000005
+
+[Window][Main DockSpace Window]
+Pos=0,45
+Size=640,419
+Collapsed=0
+
+[Window][Debug##Default]
+Pos=60,60
+Size=400,400
+Collapsed=0
+
+[Docking][Data]
+DockSpace     ID=0x65F8FF92 Window=0x144A997C Pos=0,45 Size=640,419 Split=X
+  DockNode    ID=0x00000001 Parent=0x65F8FF92 SizeRef=497,525 Split=Y
+    DockNode  ID=0x00000005 Parent=0x00000001 SizeRef=497,376 CentralNode=1 NoTabBar=1 Selected=0xCAC93FCE
+    DockNode  ID=0x00000006 Parent=0x00000001 SizeRef=497,147 Selected=0x534E62CB
+  DockNode    ID=0x00000002 Parent=0x65F8FF92 SizeRef=141,525 Split=Y
+    DockNode  ID=0x00000003 Parent=0x00000002 SizeRef=141,287 Selected=0x604A59F3
+    DockNode  ID=0x00000004 Parent=0x00000002 SizeRef=141,236 Selected=0xEC2B6106

@@ -527,8 +527,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 
 	auto tmpLayerDescs = std::vector<TerrainLayer>();
 	tmpLayerDescs.reserve(layers.Size());
-	std::vector<std::unique_ptr<Texture>> tmpTextureOwners;
-	tmpTextureOwners.reserve(layers.Size());
 	float tmpNextLayerID = 0;
 	for (const Authoring::ReadNode layerData : layers)
 	{
@@ -554,16 +552,15 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 			Debug::PrintLog(spdlog::level::err, "Terrain layer value is invalid: " + desc.layerName);
 			return false;
 		}
-		std::unique_ptr<Texture> diffuseTexture{
+		own::shared_owner<const Texture> diffuseTexture{
 			Texture::LoadFormPath(desc.diffuseTexturePath) };
 		if (!diffuseTexture)
 		{
 			Debug::PrintLog(spdlog::level::err, "Failed to load diffuse texture: " + desc.layerName);
 			return false;
 		}
-		desc.diffuseTexture = diffuseTexture.get();
+		desc.diffuseTexture = std::move(diffuseTexture);
 		tmpLayerDescs.push_back(desc);
-		tmpTextureOwners.push_back(std::move(diffuseTexture));
 		++tmpNextLayerID;
 	}
 
@@ -605,7 +602,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	//InitSplatMapTexture(m_width, m_height); // 스플랫맵 텍스처 초기화
 	std::swap(m_layerHeightMap, tmpLayerHeightMap);
 	//UpdateSplatMapPatch(0, 0, m_width, m_height); // 스플랫맵 패치 업데이트
-	for (auto& texture : tmpTextureOwners) texture.release();
 	std::swap(m_layers, tmpLayerDescs);
 	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // 레이어 정보 업데이트
 	m_nextLayerID = tmpNextLayerID;
@@ -616,14 +612,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	//로드 완료 후 리소스 해제
 	tmpHeightMap.clear();
 	tmpLayerHeightMap.clear();
-	for (auto& layer : tmpLayerDescs) {
-		if (layer.diffuseTexture) {
-			//DeallocateResource<Texture>(layer.diffuseTexture);
-			delete layer.diffuseTexture;
-			//layer.diffuseTexture->Release();
-			layer.diffuseTexture = nullptr;
-		}
-	}
 	tmpLayerDescs.clear();
 	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 

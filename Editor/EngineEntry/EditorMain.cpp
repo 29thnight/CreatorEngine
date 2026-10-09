@@ -1,4 +1,4 @@
-﻿#include "EditorProjectLayerSettings.h"
+#include "EditorProjectLayerSettings.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
@@ -16,6 +16,7 @@
 #include "InputManager.h"
 #include "ImGui.h"
 #include "Audio/AudioHost.h"
+#include "ConsoleCommandSystem.h"
 #include "Audio/AudioProfileProvider.h"
 #include "Audio/MiniaudioBackend.h"
 #include "Audio/PlaybackService.h"
@@ -32,6 +33,7 @@
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
+#include "EditorImGuiTexture.h"
 #include "RegisterEditorWindowManual.h"
 #include "RegisterEditorMenuManual.h"
 #include "EditorModelPlacement.h"
@@ -284,6 +286,41 @@ void Editor::EditorMain::Initialize()
         Debug::PrintLog(spdlog::level::warn, "[audio.device.degraded] Output device unavailable; graph retained and output recovery will retry");
     }
     m_audioPlayback = std::make_unique<wave::PlaybackService>(*m_audioHost->Service());
+    ConsoleCommandSystem::Get().SetAudioDiagnosticsReader([this]
+    {
+        using CommandCore::CommandData;
+        const auto counters = m_audioHost->Counters();
+        auto data = CommandData::Object();
+        data.Set("available", CommandData::Bool(counters.backendCountersAvailable));
+        data.Set("outputMode", CommandData::Int(static_cast<int>(m_audioHost->Mode())));
+        data.Set("runtimeUpdateNs", CommandData::Int(counters.runtimeUpdateNanoseconds));
+        const auto rank = (m_audioUpdateSamples * 99u + 99u) / 100u;
+        std::uint64_t cumulative{};
+        std::uint64_t p99{};
+        for (std::size_t index = 0u; index < m_audioUpdateHistogram.size(); ++index)
+        {
+            cumulative += m_audioUpdateHistogram[index];
+            if (rank > 0u && cumulative >= rank)
+            {
+                p99 = index == m_audioUpdateHistogram.size() - 1u
+                    ? UINT64_MAX : (index + 1u) * 1000u;
+                break;
+            }
+        }
+        data.Set("runtimeUpdateSamples", CommandData::Int(m_audioUpdateSamples));
+        data.Set("runtimeUpdateP99UpperNs", CommandData::String(std::to_string(p99)));
+        data.Set("runtime128UpdateSamples", CommandData::Int(m_audio128UpdateSamples));
+        data.Set("runtime128UpdatesOverOneMillisecond", CommandData::Int(m_audio128UpdatesOverOneMillisecond));
+        data.Set("callbackCount", CommandData::Int(counters.callbackCount));
+        data.Set("callbackP99Ns", CommandData::Int(counters.callbackP99Nanoseconds));
+        data.Set("callbackMaxNs", CommandData::Int(counters.callbackMaxNanoseconds));
+        data.Set("callbackOverHalfPeriod", CommandData::Int(counters.callbackOverHalfPeriod));
+        data.Set("streamBytesRead", CommandData::Int(counters.streamBytesRead));
+        data.Set("streamReadFailures", CommandData::Int(counters.streamReadFailures));
+        data.Set("streamPcmReads", CommandData::Int(counters.streamPcmReads));
+        data.Set("streamStarvationReads", CommandData::Int(counters.streamStarvationReads));
+        return data;
+    });
     m_audioCatalog = std::make_unique<wave::AudioCatalog>(*m_audioHost->Service(), *m_audioPlayback);
     SceneManagers->BindAudioPlayback(m_audioPlayback.get(), [this](std::string_view key)
     {
@@ -594,20 +631,17 @@ void Editor::EditorMain::NotifyRenderFramePublished(uint64_t frameId)
 
 void Editor::EditorMain::Finalize()
 {
-	// 표시/렌더 소비자를 세우기 전에 관리 측을 먼저 정리한다.
-	// 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
+	// Stop admission first; logical scene cleanup needs CLR/audio services alive.
 	// ★ 단계마다 즉시 찍는다. 종료가 멈추는 자리를 찾는 데 로그가
 	//   없으면 어디까지 갔는지조차 알 수 없다.
-	std::printf("[SHUTDOWN] ClrHost 진입\n");
 	SceneManagers->SetDecommissioning();
 	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
-	ClrHost::Get().Shutdown();
-	std::printf("[SHUTDOWN] ClrHost 반환\n");
 
 	// 표시 소비자를 먼저 세운다. GT는 이미 메인 루프를 빠져나와 새 frame을
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
+	EditorImGuiTexture::Shutdown();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
     editor::shutdown_profiler_viewer();
     editor::sound_graph_editing::ShutdownPreview(m_audioPlayback.get());
@@ -617,6 +651,13 @@ void Editor::EditorMain::Finalize()
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 	Editor::ModelPlacement::Get().Shutdown();
 	EditorScriptAuthoring::Shutdown();
+	// Every PT/RT/job borrow is drained. Run hooks, invalidate handles and
+	// finish GC while managed callbacks and native services still exist.
+	SceneManagers->Decommissioning();
+	std::printf("[SHUTDOWN] SceneManagers 반환\n");
+	std::printf("[SHUTDOWN] ClrHost 진입\n");
+	ClrHost::Get().Shutdown();
+	std::printf("[SHUTDOWN] ClrHost 반환\n");
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
 
@@ -643,12 +684,11 @@ void Editor::EditorMain::Finalize()
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
     SceneManagers->BindAudioPlayback(nullptr);
+    ConsoleCommandSystem::Get().SetAudioDiagnosticsReader({});
     m_audioPlayback->Shutdown();
     m_audioCatalog->Clear();
     m_audioHost->Shutdown();
-	SceneManagers->Decommissioning();
     m_projectLayers.reset();
-	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 
 	EditorSettingsStore::Get().Save();
 	std::printf("[SHUTDOWN] EditorSettingsStore::Save 반환\n");
@@ -846,6 +886,7 @@ void Editor::EditorMain::Update()
 			ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
 			SceneManagers->DisableOrEnable();
 			SceneManagers->EndOfFrame();
+			SceneManagers->CollectManagedAtFrameBoundary();
 		}
 	}
 
@@ -864,6 +905,19 @@ void Editor::EditorMain::Update()
     }
     editor::sound_graph_editing::TickPreview(m_audioPlayback.get());
     m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
+    const auto audioCounters = m_audioHost->Counters();
+    const auto updateNanoseconds = audioCounters.runtimeUpdateNanoseconds;
+    const auto histogramIndex = std::min<std::size_t>(updateNanoseconds / 1000u, m_audioUpdateHistogram.size() - 1u);
+    ++m_audioUpdateHistogram[histogramIndex];
+    ++m_audioUpdateSamples;
+    if (audioCounters.voices.physical == 128u)
+    {
+        ++m_audio128UpdateSamples;
+        if (updateNanoseconds > 1000000u)
+        {
+            ++m_audio128UpdatesOverOneMillisecond;
+        }
+    }
     m_audioPlayback->Update();
     wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);
 
@@ -948,6 +1002,9 @@ void Editor::EditorMain::OnGui()
     }
     if (EditorSessionState::Get().IsGameViewHidden())
     {
+        // Hidden UI never reaches EditorRenderer's demand sweep. Drop only CPU
+        // preview subscribers here; native ImGui/GPU retirement is unchanged.
+        EditorImGuiTexture::Shutdown();
         if (auto* cameraRig = EditorSessionState::Get().CameraRig())
         {
             cameraRig->BeginPresentationFrame(false);

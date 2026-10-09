@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cmath>
+#include <stdexcept>
 
 static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(D3D12_DRAW_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==
@@ -440,8 +441,51 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
     if (nullptr == m_commandList || nullptr == m_resources || batch.IsEmpty()) return;
 
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    auto& barriers = m_barrierScratch;
+    barriers.clear();
     barriers.reserve(batch.GetBarrierCount());
+
+    const bool computeQueue = m_commandList->GetType() == D3D12_COMMAND_LIST_TYPE_COMPUTE;
+    const auto stateForQueue = [&](RHIResourceState state)
+    {
+        if (computeQueue)
+        {
+            switch (state)
+            {
+            case RHIResourceState::ShaderResource:
+                return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            case RHIResourceState::Common:
+            case RHIResourceState::UnorderedAccess:
+            case RHIResourceState::CopySource:
+            case RHIResourceState::CopyDest:
+            case RHIResourceState::IndirectArgument:
+                break;
+            default:
+                throw std::runtime_error("Graphics-only resource state on a compute queue");
+            }
+        }
+        return DX12DeviceResources::ToD3D12(state);
+    };
+
+    const auto activate = [&barriers](ID3D12Resource* resource)
+    {
+        if (!resource)
+        {
+            throw std::runtime_error("Aliasing activation refers to a stale resource");
+        }
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        barrier.Aliasing.pResourceAfter = resource;
+        barriers.push_back(barrier);
+    };
+    for (const auto texture : batch.aliasTextures)
+    {
+        activate(m_resources->Resolve(texture));
+    }
+    for (const auto buffer : batch.aliasBuffers)
+    {
+        activate(m_resources->Resolve(buffer));
+    }
 
     for (const RHITransition& transition : batch.textureTransitions)
     {
@@ -449,9 +493,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
         if (nullptr == resource) continue;
 
         const D3D12_RESOURCE_STATES before =
-            DX12DeviceResources::ToD3D12(transition.before);
+            stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after =
-            DX12DeviceResources::ToD3D12(transition.after);
+            stateForQueue(transition.after);
         if (before == after) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};
@@ -469,9 +513,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
         if (nullptr == resource) continue;
 
         const D3D12_RESOURCE_STATES before =
-            DX12DeviceResources::ToD3D12(transition.before);
+            stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after =
-            DX12DeviceResources::ToD3D12(transition.after);
+            stateForQueue(transition.after);
         if (before == after) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};

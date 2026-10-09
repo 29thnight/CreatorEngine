@@ -6,21 +6,12 @@
 #include "../../../RHI/RHIEncoder.h"
 
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string SkyBoxHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 Skybox.vs/ps의 이식. 바꾼 것은 정점 공급(SV_VertexID 테이블)과
     // 행렬 규약(전치 업로드 + mul(v, M))뿐이다.
     //

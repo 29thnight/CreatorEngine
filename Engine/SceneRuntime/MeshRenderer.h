@@ -1,21 +1,30 @@
 #pragma once
+#include "Ownership.h"
 #include "AuthoringNodeView.h"
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "Entity.h"
 #include "LightMapping.h"
+#include "AssetDepot/AssetRequest.h"
 #include <mathematics/bounds.hpp>
 
 namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1
-namespace assets { class ModelAssetGeneration; struct ModelMeshHandle; } // PHASE 3.75 MBC7
+namespace assets { class ModelAssetGeneration; struct ModelMeshHandle; struct ModelMeshDescriptor; } // PHASE 3.75 MBC7
 
 class Material;
+struct MaterialAssetReferenceState;
 class Animator;
 class Camera;
 // K2: 죽은 enable_shared_from_this<MeshRenderer> 제거 — shared_from_this() 호출부 0(확증).
 class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
    // shared_ptr·중첩 구조체·비트플래그 혼합 케이스의 대표. 멤버 선언 순서가 곧 직렬화 키 순서다
    // (reflgen 은 선언 순서로 서술한다) — 구 generated.h 의 순서(골든 전제)를 지킨다.
 public:
@@ -46,11 +55,27 @@ public:
    }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-	void SetMaterial(std::shared_ptr<Material> material)
+	void SetMaterial(own::shared_owner<Material> material)
 	{
 		m_Material = std::move(material);
 		PublishRenderProxyDirty(ProxyDirty::Material);
 	}
+
+    // A reference owns the accepted base used to identify instance edits. Keep
+    // that owner with undo snapshots; comparing against a newer base would
+    // accidentally turn inherited defaults into instance overrides.
+    void SetMaterialAssetReference(own::shared_owner<Material> material, FileGuid baseGuid,
+                                   own::shared_owner<const Material> acceptedBase = {},
+                                   own::shared_owner<const MaterialAssetReferenceState> referenceState = {});
+    [[nodiscard]] const own::shared_owner<const Material>& GetMaterialAssetBase() const
+    {
+        return m_materialBaseSnapshot;
+    }
+    [[nodiscard]] const own::shared_owner<const MaterialAssetReferenceState>& GetMaterialAssetReferenceState() const
+    {
+        return m_materialReferenceState;
+    }
+    bool RefreshMaterialAsset();
 	void SetLODEnabled(bool enabled)
 	{
 		m_isEnableLOD = enabled;
@@ -64,7 +89,7 @@ public:
     // MBC9: typed generation이 유일한 정본이다.
     [[nodiscard]] bool HasRenderableMesh() const noexcept
     {
-        return static_cast<bool>(m_modelGeneration);
+        return static_cast<bool>(m_meshDescriptor) || static_cast<bool>(m_modelGeneration);
     }
 
     // PHASE 3.75 MBC7 — typed 정본 창구. generation과 그 안의 메시 인덱스를 붙들고
@@ -76,9 +101,12 @@ public:
         return static_cast<bool>(m_modelGeneration);
     }
     bool BindModelGeneration(
-        std::shared_ptr<const assets::ModelAssetGeneration> generation,
+        own::shared_owner<const assets::ModelAssetGeneration> generation,
         std::uint32_t meshIndex);
     [[nodiscard]] assets::ModelMeshHandle GetModelMeshHandle() const;
+    bool BindMeshDescriptor(own::shared_owner<const assets::ModelMeshDescriptor> descriptor);
+    // Owner-thread resident lookup/request polling only. Never waits or decodes.
+    void EnsureMeshBinding();
 
 public:
     // 에셋을 공동 소유한다.
@@ -94,11 +122,24 @@ public:
     // 빼면 프리팹 재질 오버라이드가 조용히 소실된다. base 참조(ref) 표기의
     // 읽기/쓰기는 훅이 전담한다(typed는 ref 노드에서 기본값 재질을 만들고
     // postLoad가 교체).
-    std::shared_ptr<Material> m_Material{};
+    own::shared_owner<Material> m_Material{};
     LightMapping m_LightMapping;
     uint32 m_bitflag{ 0 };
 
 private:
+
+    [[reflgen::ignore]]
+    own::shared_owner<const Material> m_materialBaseSnapshot;
+
+    [[reflgen::ignore]]
+    own::shared_owner<const MaterialAssetReferenceState> m_materialReferenceState;
+
+    [[reflgen::ignore]]
+    std::string m_unresolvedMaterialReference;
+
+    [[reflgen::ignore]]
+    std::uint64_t m_materialAssetRevision = ~std::uint64_t{};
+
 	[[reflgen::ignore]]
 	bool m_isNeedUpdateCulling{ false };
 
@@ -131,11 +172,27 @@ public:
     // embedded texture는 이 generation closure에서 푼다. 비직렬화 — 영속 신원은
     // m_modelGuid + m_meshAssetId가 진다. null이면 legacy(v4)·해석 실패 모델이다.
     [[reflgen::ignore]]
-    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};
 
     [[reflgen::ignore]]
     std::uint32_t m_modelMeshIndex{ 0 };
 
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelMeshDescriptor> m_meshDescriptor{};
+
+private:
+    [[reflgen::ignore]]
+    AssetDepot::AssetRequest<assets::ModelMeshDescriptor> m_meshRequest{};
+    [[reflgen::ignore]]
+    FileGuid m_requestedMeshId{};
+    [[reflgen::ignore]]
+    bool m_granularMeshBinding{};
+    [[reflgen::ignore]]
+    bool m_meshRequested{};
+    [[reflgen::ignore]]
+    bool m_meshFailureReported{};
+
+public:
     // I5-D5c1 — 재질의 experiment 병행 표현(base 저작 원본 + 인스턴스
     // override). 저작 경계가 채운다: 새 정본 문서는 자기 authored 원본을,
     // ref 표기는 base 자산의 authored를 base로 삼고 씬의 diff를 override로
@@ -146,12 +203,16 @@ public:
     // 게이트다(M1 패리티와 같은 축). unique_ptr인 이유: MaterialInstance가
     // 전방선언 타입이라 값 멤버로 둘 수 없다.
     [[reflgen::ignore]]
-    std::unique_ptr<experiment::MaterialInstance> m_materialInstance{};
+    own::unique_owner<experiment::MaterialInstance> m_materialInstance{};
 
     void SetExperimentMaterialBase(
-        std::shared_ptr<const experiment::Material> base);
+        own::shared_owner<const experiment::Material> base);
     [[nodiscard]] experiment::MaterialInstance* GetMaterialInstance() const
     {
-        return m_materialInstance.get();
+        return (m_materialInstance ? &*m_materialInstance.borrow() : nullptr);
     }
+private:
+    [[reflgen::ignore]]
+    void ReleaseManagedResources() override;
+
 };

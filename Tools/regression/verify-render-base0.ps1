@@ -9,7 +9,11 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$Scene = 'LX_CookFixture.creator',
     [string]$Python = 'python',
-    [ValidateRange(1,100)][int]$WarmupFrames = 8
+    [ValidateRange(1,100)][int]$WarmupFrames = 8,
+    [string]$ExecutablePath = '',
+    [ValidateRange(2,128)][int]$GraphSamples = 2,
+    [ValidateRange(0,500)][int]$PerformanceSamples = 0,
+    [ValidateSet('dependency-order','legacy-declaration-order')][string]$ExpectedGraphContract = 'dependency-order'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -25,7 +29,9 @@ New-Item -ItemType Directory -Path $output | Out-Null
 # Always establish the baseline independently before attempting the extension.
 if ($ReplayExtensions -and !$ReplayDiagnosticsRun) {
     $baselineArgs=@{Configuration=$Configuration; Backend=$Backend; Phase49=$Phase49;
-        FixtureProject=$FixtureProject; Scene=$Scene; Python=$Python; WarmupFrames=$WarmupFrames}
+        FixtureProject=$FixtureProject; Scene=$Scene; Python=$Python; WarmupFrames=$WarmupFrames;
+        ExecutablePath=$ExecutablePath; GraphSamples=$GraphSamples; PerformanceSamples=$PerformanceSamples;
+        ExpectedGraphContract=$ExpectedGraphContract}
     & $PSCommandPath @baselineArgs -OutputDirectory "$output/baseline"
     $baselineNativeExitCode=Get-Variable LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue
     $baseline=Get-Content "$output/baseline/result.json" -Raw | ConvertFrom-Json
@@ -44,6 +50,7 @@ if ($ReplayExtensions -and !$ReplayDiagnosticsRun) {
     return
 }
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
+if ($ExecutablePath) { $exe=[IO.Path]::GetFullPath($ExecutablePath) }
 $artifactTool = Join-Path $PSScriptRoot 'base0_artifacts.py'
 $cameraReplayTool = Join-Path $PSScriptRoot 'base0_camera_replay.py'
 $drawReplayTool = Join-Path $PSScriptRoot 'base0_draw_replay.py'
@@ -70,6 +77,7 @@ $report = [ordered]@{
     warmupFrames=$WarmupFrames; validation='gpu'; frameKind='real'; iblBrdfSamples=1024; iblEnvironmentSamples=4096
     deferred=@('PHASE 4.9: RenderDoc capture, resource inspection, and cross-backend pixel comparison')
     completionContract='dx12-static-baseline-v2'; replayExtensionsRequested=[bool]$ReplayExtensions
+    expectedGraphContract=$ExpectedGraphContract; graphSamples=$GraphSamples; performanceSamples=$PerformanceSamples
     knownGaps=@('Optional generic sealed frame packet replay','MAT-9 SSS/transmission quality','MAT-9 texture/normal/route/area-light acceptance',
         'MAT-9 moving-camera/tier/cold-warm performance')
     runs=@(); failures=@(); complete=$false; graphFixturesPassed=$false; vulkanTimingFixturePassed=$false
@@ -121,7 +129,7 @@ try {
                     '--commandlet-script',$commands,'--result-file',"$case/graph-fixtures.results.jsonl") `
                     -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru `
                     -RedirectStandardOutput "$case/graph-fixtures.stdout.log" -RedirectStandardError "$case/graph-fixtures.stderr.log"
-                if (!$fixtureProcess.WaitForExit(120000)) {
+                if (!$fixtureProcess.WaitForExit(600000)) {
                     $fixtureProcess.Kill(); $fixtureProcess.WaitForExit()
                     throw 'Native graph fixture timeout'
                 }
@@ -166,9 +174,12 @@ try {
                 } until($endpoint -and $endpoint.pid -eq $proc.Id)
                 $base="http://127.0.0.1:$($endpoint.port)"
                 $headers=@{Authorization="Bearer $($endpoint.token)"}
+                # Reuse the loopback HTTP pool across repeated sample/capture requests.
+                # A new client per poll can exhaust Windows ephemeral sockets.
+                $commandSession=[Microsoft.PowerShell.Commands.WebRequestSession]::new()
                 function Cmd([string]$Name,[string[]]$Arguments=@(),[switch]$AllowFailure) {
                     $body=@{command=$Name;args=@($Arguments);mode='async'} | ConvertTo-Json -Compress
-                    $r=Invoke-RestMethod "$base/command" -Method Post -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 650
+                    $r=Invoke-RestMethod "$base/command" -Method Post -Headers $headers -WebSession $commandSession -ContentType 'application/json' -Body $body -TimeoutSec 650
                     if($Name -eq 'quit'){return}
                     # Immutable PSO readiness is outside capture timing.
                     $deadline=[DateTime]::UtcNow.AddSeconds(660)
@@ -176,7 +187,7 @@ try {
                         $poll=$r.poll
                         do {
                             Start-Sleep -Milliseconds 100
-                            $r=Invoke-RestMethod "$base$poll" -Headers $headers -TimeoutSec 650
+                            $r=Invoke-RestMethod "$base$poll" -Headers $headers -WebSession $commandSession -TimeoutSec 650
                             if([DateTime]::UtcNow -gt $deadline){throw "$Name operation timeout"}
                         }until($r.state -eq 'completed')
                     }
@@ -193,6 +204,45 @@ try {
                 Cmd 'render.environment' @('background','off') | Out-Null
                 Cmd 'profile.pause' | Out-Null
                 foreach($frame in 1..$WarmupFrames){Cmd 'render.live.fence' @('600') | Out-Null}
+                # A CPU packet fence does not establish asynchronous material/PSO readiness.
+                # Keep diagnostic fallback captures outside the accepted image set.
+                $readyDeadline=[DateTime]::UtcNow.AddSeconds(600)
+                $preparationCapture=0
+                do {
+                    $readyPath="$case/preparation-capture-$preparationCapture"
+                    Cmd 'render.live.capture' @($readyPath,'editor','controlled') | Out-Null
+                    $readyManifest=Get-Content "$readyPath/manifest.json" -Raw | ConvertFrom-Json
+                    $materialReady=$readyManifest.draws.Count -gt 0 -and
+                        @($readyManifest.draws | Where-Object { $_.route -notin @('gbuffer','forward','lattice') }).Count -eq 0
+                    if (!$materialReady) {
+                        if ([DateTime]::UtcNow -gt $readyDeadline) { throw 'Representative material preparation timeout; pending fallback is not an accepted baseline' }
+                        Start-Sleep -Seconds 5
+                        Cmd 'render.live.fence' @('600') | Out-Null
+                    }
+                    ++$preparationCapture
+                } until ($materialReady)
+                $run.preparationCaptureCount=$preparationCapture
+                if ($PerformanceSamples) {
+                    $samples=@()
+                    $sampleDeadline=[DateTime]::UtcNow.AddSeconds(300)
+                    $lastGpuFrame=-1
+                    while ($samples.Count -lt $PerformanceSamples) {
+                        $live=Cmd 'dx12.live'
+                        if ($live.gpu.frame -ne $lastGpuFrame -and $live.gpu.passes.Count -gt 0) {
+                            if ($live.status -notmatch 'Native record CPU — last ([0-9.]+) ms') { throw 'Native record CPU diagnostic missing' }
+                            $cpuRecord=[double]::Parse($Matches[1],[Globalization.CultureInfo]::InvariantCulture)
+                            if ($live.gpu.queryOverflowPasses -ne 0 -or $live.gpu.droppedTotal -ne 0 -or
+                                $live.gpu.mismatches -ne 0 -or $live.gpu.spanViolations -ne 0 -or
+                                $live.gpu.sliceUnderflows -ne 0) { throw 'Invalid live GPU timing window' }
+                            $samples+= [ordered]@{gpuFrame=$live.gpu.frame;cpuRecordMs=$cpuRecord;gpuMs=$live.gpu.ms;
+                                queryOverflow=$live.gpu.queryOverflowPasses;dropped=$live.gpu.droppedTotal;passes=$live.gpu.passes}
+                            $lastGpuFrame=$live.gpu.frame
+                        }
+                        if ([DateTime]::UtcNow -gt $sampleDeadline) { throw 'Unique live performance sample timeout' }
+                        Start-Sleep -Milliseconds 20
+                    }
+                    $samples | ConvertTo-Json -Depth 20 | Set-Content "$case/live-performance.json" -Encoding utf8
+                }
                 # Cold import may advance model sidecar generation. Freeze the
                 # current prepared input, while preserving raw source immutability.
                 $preparationChanges=@($inputs | Where-Object {
@@ -209,7 +259,8 @@ try {
                 $inputs | ConvertTo-Json -Depth 4 | Set-Content "$case/input-files.json" -Encoding utf8
                 $environment=Cmd 'render.environment' @('status')
                 $environment | ConvertTo-Json -Depth 5 | Set-Content "$case/environment.json" -Encoding utf8
-                foreach($shot in 0..1){
+                $shotCount=if($repeat -eq 0){$GraphSamples}else{2}
+                foreach($shot in 0..($shotCount-1)){
                     $captureMode=if($ReplayExtensions){'controlled-lattice-replay'}else{'controlled'}
                     $captureArgs=@("$case/capture-$shot",'editor',$captureMode)
                     $cameraSource=$null
@@ -220,6 +271,8 @@ try {
                         $captureArgs += (Join-Path $output 'dx12-0/capture-0/lattice-input.bin')
                     }
                     Cmd 'render.live.capture' $captureArgs | Out-Null
+                    $captureManifest=Get-Content "$case/capture-$shot/manifest.json" -Raw|ConvertFrom-Json
+                    if ($captureManifest.compiledGraph.orderContract -ne $ExpectedGraphContract) { throw 'Unexpected graph contract for this build' }
                     if($cameraSource){
                         $meta=Get-Content "$case/capture-$shot/manifest.json" -Raw | ConvertFrom-Json
                         if(([string]$meta.cameraInputReplayed -notin @('True','1')) -or
@@ -315,7 +368,7 @@ try {
                 }
                 Cmd 'log.flush' | Out-Null
                 Cmd 'quit' | Out-Null
-                if(!$proc.WaitForExit(30000)){throw 'Normal shutdown timeout'}
+                if(!$proc.WaitForExit(180000)){throw 'Normal shutdown timeout'}
                 if($proc.ExitCode -ne 0){throw "Normal shutdown failed: $($proc.ExitCode)"}
                 $changedInputs=@($inputs | Where-Object {
                     $inputPath=Join-Path $project $_.path
@@ -329,6 +382,8 @@ try {
                     Sort-Object path | ConvertTo-Json -Depth 4 -Compress)
                 & $Python $artifactTool compare "$case/capture-0" "$case/capture-1" "$case/repeatability" > "$case/comparison.stdout.json"
                 if($LASTEXITCODE -ne 0){throw 'Same-process artifact gate failed'}
+                & $Python $artifactTool determinism $case "$case/determinism.json" > "$case/determinism.stdout.json"
+                if($LASTEXITCODE -ne 0){throw 'Repeated graph compilation determinism gate failed'}
                 & $Python $artifactTool mutations "$case/capture-0" "$case/mutations.json" > "$case/mutations.stdout.json"
                 if($LASTEXITCODE -ne 0){throw 'Artifact mutation gate failed'}
                 $run.passed=$true
@@ -336,6 +391,7 @@ try {
                 $report.failures += "$api/$repeat`: $($_.Exception.Message)"
                 $run.error=$_.Exception.Message
             } finally {
+                if (Get-Variable commandSession -ErrorAction SilentlyContinue) { $commandSession.Dispose(); Remove-Variable commandSession }
                 if($proc){
                     $run.forcedTermination=!$proc.HasExited
                     if($run.forcedTermination){$proc.Kill();$proc.WaitForExit()}

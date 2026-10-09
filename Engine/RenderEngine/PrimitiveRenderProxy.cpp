@@ -2,6 +2,7 @@
 // ScriptBinder/PrimitiveProxyBridge.cpp에 있다 (PHASE 4-2 C1).
 #include "PrimitiveRenderProxy.h"
 #include "Mesh.h"
+#include "Assets/ModelMeshDescriptor.h"
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8: Foliage typed 뷰
 
 // ── DX11 드로우 경로를 걷었다 (PHASE 3-1 재정의, T5) ──
@@ -45,12 +46,13 @@ FoliageRenderProxy::CaptureDrawSources() const
 	for (std::size_t typeIndex = 0; typeIndex < m_foliageTypes.size(); ++typeIndex)
 	{
 		const FoliageType& type = m_foliageTypes[typeIndex];
-		// MBC9 — typed generation이 유일한 지오메트리 출처다.
-		if (!type.m_modelGeneration
-			|| type.m_modelMeshIndex >= type.m_modelGeneration->Meshes().size())
-		{
-			continue;
-		}
+        const auto* bounds = type.m_meshDescriptor ? &type.m_meshDescriptor->bounds
+            : type.m_modelGeneration && type.m_modelMeshIndex < type.m_modelGeneration->Meshes().size()
+                ? &type.m_modelGeneration->Meshes()[type.m_modelMeshIndex].bounds : nullptr;
+        if (!bounds)
+        {
+            continue;
+        }
 
 		const auto found = instanceMap.find(static_cast<uint32>(typeIndex));
 		if (found == instanceMap.end()) continue;
@@ -64,14 +66,9 @@ FoliageRenderProxy::CaptureDrawSources() const
 			}
 
 			DrawSource draw{};
-			draw.material = type.m_material;
-            draw.graphMaterialSource = type.m_graphMaterialSource;
-			draw.authoredMaterial = type.m_authoredMaterial; // I5-D5c4
-			draw.modelGeneration = type.m_modelGeneration;    // MBC8
-			draw.modelMeshIndex = type.m_modelMeshIndex;
 			draw.worldMatrix = instance->m_worldMatrix;
 			draw.worldBounds = math::transform(
-				type.m_modelGeneration->Meshes()[type.m_modelMeshIndex].bounds,
+				*bounds,
 				instance->m_worldMatrix);
 			draw.foliageTypeID = static_cast<uint32>(typeIndex);
 			draws.push_back(std::move(draw));

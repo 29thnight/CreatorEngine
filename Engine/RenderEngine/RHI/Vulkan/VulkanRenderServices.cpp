@@ -90,25 +90,22 @@ struct VulkanTextureCache::Impl
         uint64_t completionValue{ 0 };
         RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
     };
-    std::vector<Transaction> transactions;
+    std::unordered_map<uint32_t, Transaction> transactions;
 
     void Track(RHITextureHandle handle)
     {
         if (!handle.IsValid() || nullptr == resources) return;
-        transactions.push_back(Transaction{
+        transactions.insert_or_assign(handle.id, Transaction{
             handle, resources->GetCurrentUploadRecordingId(), 0,
             RHIUploadTransactionState::Recording });
     }
 
     bool IsUploadPending(RHITextureHandle handle) const
     {
-        for (const Transaction& transaction : transactions)
-        {
-            if (transaction.handle.id != handle.id) continue;
-            return transaction.state == RHIUploadTransactionState::Recording ||
-                transaction.state == RHIUploadTransactionState::Queued;
-        }
-        return false;
+        const auto found = transactions.find(handle.id);
+        return found != transactions.end() &&
+            (found->second.state == RHIUploadTransactionState::Recording ||
+             found->second.state == RHIUploadTransactionState::Queued);
     }
 
     // 여기 있던 FormatOf 와 BGRA 스위즐을 걷었다(축 A).
@@ -371,7 +368,24 @@ void VulkanTextureCache::Shutdown()
     m_impl->resources = nullptr;
 }
 
-RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& outError)
+bool VulkanTextureCache::IsResident(const Texture* texture) const
+{
+    if (!texture)
+    {
+        return true;
+    }
+    const auto resident = m_impl->entries.find(texture->m_assetId);
+    if (resident == m_impl->entries.end())
+    {
+        return false;
+    }
+    const auto transaction = m_impl->transactions.find(resident->second.entry.handle.id);
+    return transaction == m_impl->transactions.end()
+        || transaction->second.state != RHIUploadTransactionState::Quarantined;
+}
+
+RHITextureEntry VulkanTextureCache::GetOrUpload(const Texture* texture,
+    const own::shared_owner<const Texture::CodecImage>& image, std::string& outError)
 {
     if (nullptr == texture)
     {
@@ -384,12 +398,23 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
     const auto found = m_impl->entries.find(texture->m_assetId);
     if (m_impl->entries.end() != found)
     {
+        if (!IsResident(texture))
+        {
+            outError = "Vulkan texture upload has no verified completion; native allocation is quarantined.";
+            return {};
+        }
         ++m_impl->stats.hits;
         found->second.lastUsedFrame = m_impl->frameIndex;
         return found->second.entry;
     }
 
-    const TextureImageView pixels = texture->GetImageView();
+    if (!image)
+    {
+        RHITextureEntry pending;
+        pending.preparationNeeded = true;
+        return pending;
+    }
+    const TextureImageView pixels = texture->GetImageView(image);
     if (pixels.IsEmpty())
     {
         ++m_impl->stats.failures;
@@ -532,7 +557,7 @@ uint64_t VulkanTextureCache::SweepGraveyard(uint64_t completedValue)
 void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
     RHICompletionPoint completion)
 {
-    for (Impl::Transaction& transaction : m_impl->transactions)
+    for (auto& [id, transaction] : m_impl->transactions)
     {
         if (transaction.state != RHIUploadTransactionState::Recording ||
             transaction.recordingId != recordingId) continue;
@@ -545,12 +570,12 @@ void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
 
 void VulkanTextureCache::OnUploadCompleted(uint64_t completedValue)
 {
-    for (Impl::Transaction& transaction : m_impl->transactions)
+    std::erase_if(m_impl->transactions, [&](const auto& entry)
     {
-        if (transaction.state == RHIUploadTransactionState::Queued &&
-            transaction.completionValue <= completedValue)
-            transaction.state = RHIUploadTransactionState::Resident;
-    }
+        const auto& transaction = entry.second;
+        return transaction.state == RHIUploadTransactionState::Queued &&
+            transaction.completionValue <= completedValue;
+    });
 }
 
 void VulkanTextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
@@ -559,7 +584,7 @@ void VulkanTextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICom
     {
         return;
     }
-    for (Impl::Transaction& transaction : m_impl->transactions)
+    for (auto& [id, transaction] : m_impl->transactions)
     {
         if (transaction.recordingId == recordingId && transaction.completionValue == completion.value &&
             (transaction.state == RHIUploadTransactionState::Queued ||
@@ -576,14 +601,14 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
     auto transaction = m_impl->transactions.begin();
     while (transaction != m_impl->transactions.end())
     {
-        if (transaction->state != RHIUploadTransactionState::Recording ||
-            transaction->recordingId != recordingId)
+        if (transaction->second.state != RHIUploadTransactionState::Recording ||
+            transaction->second.recordingId != recordingId)
         {
             ++transaction;
             continue;
         }
 
-        const RHITextureHandle handle = transaction->handle;
+        const RHITextureHandle handle = transaction->second.handle;
         m_impl->resources->ReleaseTexture(handle);
         for (auto entry = m_impl->entries.begin(); entry != m_impl->entries.end();)
         {
@@ -830,19 +855,39 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         static_cast<uint32_t>(indices.size()), outError);
 }
 
+RHIMeshBinding VulkanMeshCache::FindModel(const assets::ModelMeshHandle& handle) const
+{
+    if (!m_impl || !m_impl->resources || !handle.IsValid())
+    {
+        return {};
+    }
+    const auto found = m_impl->modelEntries.find(handle);
+    return found != m_impl->modelEntries.end() &&
+        found->second.state == RHIUploadTransactionState::Resident
+        ? found->second.binding : RHIMeshBinding{};
+}
+
 RHIMeshBinding VulkanMeshCache::GetOrUploadModel(
     const RHIModelMeshView& view, std::string& outError)
 {
-    RHIMeshBinding empty{};
-    if (view.sourceLodIndex != 0)
+    if (!m_impl || !m_impl->resources || !view.IsMetadataComplete() || view.sourceLodIndex != 0)
     {
-        outError = "Vulkan model mesh cache requires the base LOD view.";
-        return empty;
+        outError = "Vulkan mesh cache requires valid base-LOD model metadata.";
+        return {};
     }
-    if (!m_impl || nullptr == m_impl->resources || !view.IsComplete())
+    // The immutable descriptor is enough to reuse GPU bytes after CPU eviction.
+    const auto found = m_impl->modelEntries.find(view.handle);
+    if (found != m_impl->modelEntries.end())
     {
-        outError = "Vulkan 메시 캐시: ModelAssetGeneration 뷰가 완비되지 않았다";
-        return empty;
+        ++m_impl->stats.hits;
+        found->second.lastUsedFrame = m_impl->frameIndex;
+        outError.clear();
+        return found->second.binding;
+    }
+    if (!view.IsComplete())
+    {
+        outError = "Vulkan mesh geometry preparation is required before upload: no compatible CPU payload is pinned.";
+        return {};
     }
     return UploadResolved(0, &view.handle, view.vertexData, view.vertexBytes,
         view.vertexStride, view.vertexAttributeMask, view.indexData,
@@ -2062,17 +2107,15 @@ VkImageView VulkanDeviceResources::ResolveDepthView(const RHIDepthTargetDesc& de
 
 RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
 {
-    // ★ 커맨드 버퍼가 슬롯마다 다른 객체라 **갈아 끼운다**. `DX12Encoder` 는
-    //   제자리 되감기(`ResetState`)로 힙 할당을 피하는데, 이쪽은 되감을 것이
-    //   아니라 바꿀 것이라 그 최적화가 성립하지 않는다.
-    //
-    //   프레임당 한 번이면 무해하다. 프레임마다 여러 번 부르면 그때 재사용을
-    //   넣는다 — 지금 넣으면 어떤 조건에서 갈아야 하는지를 소비자 없이 정한다.
     const VkCommandBuffer current = m_frameOpen
         ? GetCommandBuffer() : VK_NULL_HANDLE;
 
     AccumulateEncoderDiagnostics();
-    m_encoder = std::make_unique<VulkanEncoder>(
+    if (!m_encoder)
+    {
+        m_encoder = std::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
+    }
+    m_encoder->Rebind(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],
         m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable,
         GetIndirectDrawCapabilities(), m_viewportLimits, GetMeshShaderCapabilities());

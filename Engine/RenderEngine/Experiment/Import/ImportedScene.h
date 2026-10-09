@@ -1,10 +1,12 @@
 #pragma once
 
 #include "../ModelData.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -43,6 +45,10 @@ namespace experiment::importer
     using experiment::RotationKey;
     using experiment::ScaleKey;
     using experiment::MaxBoneInfluences;
+
+    // A request-owned source snapshot. Importers consume these exact bytes instead
+    // of reopening a path after its content fingerprint has been calculated.
+    using ImportSourceBytes = own::shared_owner<const std::vector<std::byte>>;
 
     struct SceneNodeTag;
     struct ImportMeshTag;
@@ -332,6 +338,10 @@ namespace experiment::importer
         TextureColorSpace colorSpace{ TextureColorSpace::Linear };
         std::string persistentId{};
 
+        // Captured external image bytes stay external for stable-key purposes.
+        // A snapshot-aware consumer can use them without reopening sourcePath.
+        ImportSourceBytes capturedSourceBytes{};
+
         [[nodiscard]] bool IsEmbedded() const noexcept
         {
             return !embeddedBytes.empty();
@@ -501,6 +511,16 @@ namespace experiment::importer
     {
         std::filesystem::path sourcePath{};
         ImportOptions options{};
+
+        // Supply both fields for captured-source imports, or neither for the
+        // legacy filesystem path. sourcePath must be absolute in captured mode.
+        ImportSourceBytes sourceBytes{};
+        // The callback receives the absolute, lexically normalized path that the
+        // importer would otherwise open. It must enforce the source-root/reparse
+        // boundary, pin immutable bytes, and record their path and digest. False
+        // (including a missing file) fails the import, without a filesystem retry.
+        std::function<bool(const std::filesystem::path&, ImportSourceBytes&,
+            std::string&)> readSourceDependency{};
     };
 
     struct ImportResult final

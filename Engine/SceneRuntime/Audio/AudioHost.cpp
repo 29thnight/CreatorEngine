@@ -107,6 +107,8 @@ namespace wave
                 result.callbackOverHalfPeriod = callback.overHalfPeriod;
                 result.streamBytesRead = backend->StreamBytesRead();
                 result.streamReadFailures = backend->StreamReadFailures();
+                result.streamPcmReads = backend->StreamPcmReads();
+                result.streamStarvationReads = backend->StreamStarvationReads();
             }
         }
         return result;

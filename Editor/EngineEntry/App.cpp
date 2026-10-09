@@ -289,6 +289,8 @@ void Core::App::Finalize()
 	ConsoleCommandSystem::Get().Shutdown();
 	std::printf("[SHUTDOWN] CLI Shutdown 반환\n");
 
+    editor::material_editing::Shutdown();
+
 	m_main->Finalize();
 	std::printf("[SHUTDOWN] EditorMain Finalize 반환\n");
 
@@ -440,7 +442,7 @@ uint32_t Core::App::PublishRenderFrame()
 	::editor::windows::note_view_submission(
 		!editorDemanded && nullptr != editorCamera,
 		!gameDemanded && nullptr != gameCamera);
-	const std::vector<std::shared_ptr<Material>> requiredMaterials =
+	const std::vector<own::shared_owner<const Material>> requiredMaterials =
 		SceneManagers->CaptureRequiredRenderMaterials();
 	const EnhancedRequiredAssetPacket requiredAssets =
 		EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
@@ -565,6 +567,8 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
+        // Establish the immutable command owner before Initialize starts PT.
+        (void)ConsoleCommandSystem::Get();
 		m_main->Initialize();
 		BootProgress::Step(L"Initializing input", L"Connecting keyboard and mouse devices");
         InputManagement->Initialize(m_hWnd);
@@ -621,7 +625,7 @@ void Core::App::Run()
 
 		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
 		auto& cli = ConsoleCommandSystem::Get();
-		cli.Pump();
+        cli.Pump([this] { return m_main->LockSceneStructure(); });
 
 		PublishRenderFrame();
 

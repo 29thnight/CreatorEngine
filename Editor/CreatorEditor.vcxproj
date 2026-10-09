@@ -248,6 +248,11 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RuntimeHost\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Engine\GCCE\GCCE.vcxproj">
+      <Project>{F0C6E84D-AD92-45B8-9037-ED3F058C1A46}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

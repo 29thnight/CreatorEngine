@@ -276,6 +276,17 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<byte*, int, int> Audio_LastError;
     public delegate* unmanaged<uint, int, int, int, int> Audio_Configure;
     public delegate* unmanaged<int, int> Audio_SetReverbPreset;
+    // Append-only v34. Owner-bearing native C++ types never cross this table.
+    public delegate* unmanaged<AssetLinkABI*, TextureAssetVariantABI*, int, AssetToken*, int> Asset_Request;
+    public delegate* unmanaged<AssetToken, AssetRequestSnapshotABI*, byte*, int, int> Asset_Snapshot;
+    public delegate* unmanaged<AssetToken, AssetToken*, int> Asset_AcquireResult;
+    public delegate* unmanaged<AssetToken, int> Asset_Cancel;
+    public delegate* unmanaged<AssetToken, int> Asset_Release;
+    public delegate* unmanaged<AssetToken, TextureDescriptor*, int> Asset_ReadTexture;
+    public delegate* unmanaged<ulong, uint, AssetLinkABI*, int, int*, int> Asset_ListRoots;
+    // Append-only v35. Selector IDs prove concrete views, not serialized kinds.
+    public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_RequestTyped;
+    public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_TryAcquireTyped;
 
 }
 
@@ -283,7 +294,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 33;
+    public const int ExpectedVersion = 35;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -388,10 +399,170 @@ internal static unsafe class Native
         if (table == null) return false;
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
+        if (table->Asset_RequestTyped == null || table->Asset_TryAcquireTyped == null)
+        {
+            return false;
+        }
+
+        if (sizeof(AssetLinkABI) != 40 || sizeof(AssetToken) != 12
+            || sizeof(TextureAssetVariantABI) != 12 || sizeof(AssetRequestSnapshotABI) != 16
+            || sizeof(TextureDescriptor) != 20)
+        {
+            return false;
+        }
 
         _api = *table;
         _bound = true;
         return true;
+    }
+
+    internal static void Unbind()
+    {
+        _bound = false;
+        _api = default;
+    }
+
+    private static void CheckAssetResult(AssetBindingResult result)
+    {
+        if (result == AssetBindingResult.Success)
+        {
+            return;
+        }
+        if (result == AssetBindingResult.InvalidToken)
+        {
+            throw new ObjectDisposedException("Asset handle", "The native owner/request token is stale or released.");
+        }
+        if (result == AssetBindingResult.UnsupportedType)
+        {
+            throw new NotSupportedException("This concrete type has no AssetDepot runtime binding.");
+        }
+        throw new InvalidOperationException($"AssetDepot binding failed: {result}.");
+    }
+
+    internal static AssetToken AssetRequestTyped(AssetLinkABI link, uint concreteType, TextureAssetVariant variant, bool residentOnly)
+    {
+        if (!Entered() || _api.Asset_RequestTyped == null || _api.Asset_TryAcquireTyped == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        var options = new TextureAssetVariantABI
+        {
+            ColorSpace = (uint)variant.ColorSpace,
+            Compress = variant.Compress ? 1u : 0u,
+            Role = variant.Role,
+        };
+        AssetToken token = default;
+        var result = (AssetBindingResult)(residentOnly
+            ? _api.Asset_TryAcquireTyped(&link, concreteType, &options, &token)
+            : _api.Asset_RequestTyped(&link, concreteType, &options, &token));
+        if (residentOnly && result == AssetBindingResult.NotResident)
+        {
+            return default;
+        }
+        CheckAssetResult(result);
+        return token;
+    }
+
+    internal static AssetRequestSnapshot AssetSnapshot(AssetToken token)
+    {
+        if (!Entered() || _api.Asset_Snapshot == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        AssetRequestSnapshotABI value = default;
+        CheckAssetResult((AssetBindingResult)_api.Asset_Snapshot(token, &value, null, 0));
+        if (value.MessageBytes == 0)
+        {
+            return new(value.Status, value.Error, string.Empty, value.WorkComplete != 0);
+        }
+        // A request changes Pending -> terminal once; if it completed between
+        // these calls, retry with the terminal message's exact required length.
+        byte[] buffer;
+        do
+        {
+            buffer = new byte[checked(value.MessageBytes + 1)];
+            fixed (byte* text = buffer)
+            {
+                CheckAssetResult((AssetBindingResult)_api.Asset_Snapshot(token, &value, text, buffer.Length));
+            }
+        }
+        while (value.MessageBytes >= buffer.Length);
+        return new(value.Status, value.Error,
+            System.Text.Encoding.UTF8.GetString(buffer, 0, value.MessageBytes), value.WorkComplete != 0);
+    }
+
+    internal static bool AssetAcquireResult(AssetToken request, out AssetToken owner)
+    {
+        owner = default;
+        if (!Entered() || _api.Asset_AcquireResult == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        AssetToken value = default;
+        var result = (AssetBindingResult)_api.Asset_AcquireResult(request, &value);
+        if (result == AssetBindingResult.NotResident)
+        {
+            return false;
+        }
+        CheckAssetResult(result);
+        owner = value;
+        return true;
+    }
+
+    internal static void AssetCancel(AssetToken request)
+    {
+        if (!Entered() || _api.Asset_Cancel == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        CheckAssetResult((AssetBindingResult)_api.Asset_Cancel(request));
+    }
+
+    internal static void AssetRelease(AssetToken token)
+    {
+        if (!Entered() || _api.Asset_Release == null)
+        {
+            return;
+        }
+        // A stale token after shutdown or a repeated release is a safe no-op.
+        // Native validates slot + generation + type before touching an owner.
+        _api.Asset_Release(token);
+    }
+
+    internal static TextureDescriptor AssetReadTexture(AssetToken token)
+    {
+        if (!Entered() || _api.Asset_ReadTexture == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        TextureDescriptor descriptor = default;
+        CheckAssetResult((AssetBindingResult)_api.Asset_ReadTexture(token, &descriptor));
+        return descriptor;
+    }
+
+    internal static AssetLinkABI[] AssetListRoots(ulong mount, AssetKind kind)
+    {
+        if (!Entered() || _api.Asset_ListRoots == null)
+        {
+            throw new InvalidOperationException("AssetDepot requires an active engine on the game thread.");
+        }
+        int count = 0;
+        CheckAssetResult((AssetBindingResult)_api.Asset_ListRoots(mount, (uint)kind, null, 0, &count));
+        AssetLinkABI[] roots;
+        do
+        {
+            roots = new AssetLinkABI[count];
+            fixed (AssetLinkABI* buffer = roots)
+            {
+                CheckAssetResult((AssetBindingResult)_api.Asset_ListRoots(mount, (uint)kind, buffer, roots.Length, &count));
+            }
+        }
+        while (count > roots.Length);
+        if (count != roots.Length)
+        {
+            Array.Resize(ref roots, count);
+        }
+        return roots;
     }
 
     internal static uint RegisterProfilerMarker(string name)

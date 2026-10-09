@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "Ownership.h"
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -12,11 +13,11 @@ class Texture;
 // Editor 객체를 모르고, 프레임을 밀봉할 때 이 값 입력만 받는다.
 struct EnhancedGizmoIconTextures
 {
-    std::shared_ptr<Texture> camera;
-    std::shared_ptr<Texture> mainLight;
-    std::shared_ptr<Texture> directionalLight;
-    std::shared_ptr<Texture> pointLight;
-    std::shared_ptr<Texture> spotLight;
+    own::shared_owner<const Texture> camera;
+    own::shared_owner<const Texture> mainLight;
+    own::shared_owner<const Texture> directionalLight;
+    own::shared_owner<const Texture> pointLight;
+    own::shared_owner<const Texture> spotLight;
 };
 
 // Gizmo 계열 씬 연결 (PHASE 3-6, Gizmo 계열 5차 슬라이스).

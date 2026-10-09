@@ -1,3 +1,4 @@
+#include "../../Tools/regression/gcce_probe_cleanup.h"
 #include "EditorThemeSelfTest.h"
 #include "EditorSelectionHistory.h"
 #include "EditorEntityIcons.h"
@@ -1110,15 +1111,18 @@ namespace editor
             using editor::picking::CollectOccupants;
             using editor::picking::GatherRayHits;
 
-            std::vector<std::unique_ptr<Entity>> slots;
+            gc::domain pickingDomain;
+            std::vector<gc::trace_ref<Entity>> slots;
             slots.emplace_back(nullptr);
-            auto front = std::make_unique<Entity>();
+            auto front = Entity::Create(pickingDomain);
+            gcce_probe::cleanup frontCleanup(*front);
             Entity* const frontRaw = front.get();
-            slots.push_back(std::move(front));
+            slots.emplace_back(front);
             slots.emplace_back(nullptr);
-            auto back = std::make_unique<Entity>();
+            auto back = Entity::Create(pickingDomain);
+            gcce_probe::cleanup backCleanup(*back);
             Entity* const backRaw = back.get();
-            slots.push_back(std::move(back));
+            slots.emplace_back(back);
             slots.emplace_back(nullptr);
 
             const std::vector<Entity*> occupants = CollectOccupants(slots);
@@ -1130,7 +1134,7 @@ namespace editor
                 occupants[0] == frontRaw && occupants[1] == backRaw,
                 "scene pick", "occupants keep slot order");
 
-            std::vector<std::unique_ptr<Entity>> allHoles;
+            std::vector<gc::trace_ref<Entity>> allHoles;
             allHoles.emplace_back(nullptr);
             allHoles.emplace_back(nullptr);
             checks.expect(CollectOccupants(allHoles).empty(), "scene pick", "all-hole slot map");

@@ -135,7 +135,7 @@ constexpr std::array<Texel, 8> kTexels{{{64, 128, 192, 0},
                                         {192, 192, 128, 0}}};
 constexpr std::array<Texel, 2> kMip{{{96, 160, 224, 96}, {224, 96, 160, 160}}};
 
-std::shared_ptr<Texture> Image()
+own::shared_owner<const Texture> Image()
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
@@ -143,7 +143,7 @@ std::shared_ptr<Texture> Image()
     return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
 }
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -232,7 +232,7 @@ void Run(const std::filesystem::path& root)
     GenerationStore store;
     experiment::AssetId graph;
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
-    std::array<std::shared_ptr<const Generation>, 2> generations;
+    std::array<own::shared_owner<const Generation>, 2> generations;
     std::string error;
     for (unsigned i = 0; i < 2; ++i)
     {
@@ -314,8 +314,8 @@ void Run(const std::filesystem::path& root)
     std::shared_ptr<const IblBakeResult> baked;
     std::shared_ptr<const SurfaceBatch> lastGoodBatch;
     std::shared_ptr<const IblBakeResult> lastGoodBake;
-    std::shared_ptr<const Instance> previousInstance;
-    std::shared_ptr<const RenderBindings> staleBindings;
+    own::shared_owner<const Instance> previousInstance;
+    own::shared_owner<const RenderBindings> staleBindings;
     auto points = Points();
     SurfaceView view{{0, 0, 2, 0}, 1, 1, 1};
     auto targetState = RHIResourceState::Common;
@@ -354,7 +354,7 @@ void Run(const std::filesystem::path& root)
                 view.eye[2] = 2;
                 ++view.viewRevision;
             }
-            std::shared_ptr<const Instance> instance;
+            own::shared_owner<const Instance> instance;
             if (frame == 1)
             {
                 instance = previousInstance;
@@ -369,7 +369,7 @@ void Run(const std::filesystem::path& root)
             }
             Check(device.BeginFrame(error), "Begin spatial frame");
             textures.BeginFrame(frame);
-            std::shared_ptr<const RenderBindings> computeBindings, drawBindings;
+            own::shared_owner<const RenderBindings> computeBindings, drawBindings;
             Check(bindings.Prepare(device, textures, instance, evaluators[tier].Layout(), computeBindings, error),
                   "Compute bindings: " + error);
             Check(bindings.Prepare(device, textures, instance, graphicsLayouts[tier], drawBindings, error),
@@ -378,12 +378,12 @@ void Run(const std::filesystem::path& root)
             std::vector<RHITransition> transitions;
             if (frame == 0)
             {
-                const auto entry = textures.GetOrUpload(image.get(), error);
+                const auto entry = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
                 transitions.push_back(
                     {entry.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource});
             }
             const unsigned envIndex = frame >= 5 ? 1 : 0;
-            const IblEnvironment environment{textures.GetOrUpload(environments[envIndex].get(), error), envIndex + 1,
+            const IblEnvironment environment{textures.GetOrUpload((environments[envIndex] ? &*environments[envIndex].borrow() : nullptr), environments[envIndex] ? environments[envIndex]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), envIndex + 1,
                                              environments[envIndex]};
             if (frame == 0 || frame == 5)
             {
@@ -569,7 +569,7 @@ void Run(const std::filesystem::path& root)
         Check(!evaluators[0].Record(device, staleBindings, view, points, batch, error),
               "No evaluation outside a recording");
         Check(!baker.RecordGpu(device, {}, batch, baked, error), "No GPU bake outside a recording");
-        std::shared_ptr<const RenderBindings> abortBindings;
+        own::shared_owner<const RenderBindings> abortBindings;
         Check(device.BeginFrame(error), "Begin aborted evaluation");
         textures.BeginFrame(8);
         Check(bindings.Prepare(device, textures, previousInstance, evaluators[1].Layout(), abortBindings, error),
@@ -579,7 +579,7 @@ void Run(const std::filesystem::path& root)
         device.AbortFrame();
         Check(device.BeginFrame(error), "Begin after evaluation abort");
         textures.BeginFrame(9);
-        const IblEnvironment environment{textures.GetOrUpload(environments[1].get(), error), 2, environments[1]};
+        const IblEnvironment environment{textures.GetOrUpload((environments[1] ? &*environments[1].borrow() : nullptr), environments[1] ? environments[1]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 2, environments[1]};
         auto acceptedBake = baked;
         Check(!baker.RecordGpu(device, environment, aborted, baked, error) && baked == acceptedBake,
               "Cancelled/unvalidated GPU batch cannot cross recordings");

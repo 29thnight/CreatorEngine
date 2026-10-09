@@ -9,21 +9,12 @@
 
 #include <algorithm>
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string DecalHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 Decal.vs.hlsl + Decal.ps.hlsl의 이식.
     //
     // 좌표 복원·상자 판정·아틀라스 계산·채널 마스크를 전부 그대로 옮겼다.
@@ -227,16 +218,20 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     //
     // 캐시가 없으면 올리지 않고 넘어간다. 배칭은 원본 포인터로 판단하므로
     // 그래도 성립하고, 그리지 않고 묶음만 확인하는 검증이 이 경로를 쓴다.
-    const auto upload = [&](Texture* texture, RHITextureHandle& outResource, RHIFormat& outFormat,
+    const auto upload = [&](const Texture* texture, RHITextureHandle& outResource, RHIFormat& outFormat,
                             uint32_t& outMips) -> bool {
-        if (nullptr == texture || nullptr == context.textureCache)
+        if (nullptr == texture)
         {
             return true;
         }
+        if (nullptr == context.textureCache)
+        {
+            return false;
+        }
 
         std::string textureError;
-        const auto entry = context.textureCache->GetOrUpload(texture, textureError);
-        if (!entry.IsValid())
+        const auto entry = context.textureCache->GetOrUpload(texture, context.TextureImage(texture), textureError);
+        if (!entry.IsValid() || !textureError.empty())
         {
             return false;
         }
@@ -263,9 +258,10 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
 
         Batch candidate{};
         candidate.channel = channel;
-        candidate.sources[0] = decal.diffuse;
-        candidate.sources[1] = decal.normal;
-        candidate.sources[2] = decal.occRoughMetal;
+        candidate.texturePinIndices = decal.texturePinIndices;
+        candidate.textureIds[0] = TextureFramePins::Identity(decal.diffuse);
+        candidate.textureIds[1] = TextureFramePins::Identity(decal.normal);
+        candidate.textureIds[2] = TextureFramePins::Identity(decal.occRoughMetal);
         if (!upload(decal.diffuse, candidate.textures[0], candidate.formats[0], candidate.mipLevels[0]) ||
             !upload(decal.normal, candidate.textures[1], candidate.formats[1], candidate.mipLevels[1]) ||
             !upload(decal.occRoughMetal, candidate.textures[2], candidate.formats[2], candidate.mipLevels[2]))
@@ -280,9 +276,9 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         // 배치를 키우려고 큐를 정렬하면 그림이 바뀌는데, 그 차이는 겹치는
         // 데칼에서만 나타나 '가끔 다르다'로만 드러난다. 순서를 지킨다.
         const bool sameAsPrevious = !m_batches.empty() && m_batches.back().channel == candidate.channel &&
-                                    m_batches.back().sources[0] == candidate.sources[0] &&
-                                    m_batches.back().sources[1] == candidate.sources[1] &&
-                                    m_batches.back().sources[2] == candidate.sources[2];
+                                    m_batches.back().textureIds[0] == candidate.textureIds[0] &&
+                                    m_batches.back().textureIds[1] == candidate.textureIds[1] &&
+                                    m_batches.back().textureIds[2] == candidate.textureIds[2];
 
         if (!sameAsPrevious)
         {
@@ -705,6 +701,7 @@ void EnhancedDecalPass::Shutdown()
     m_decals.clear();
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     for (auto& pipeline : m_pipelines)
     {
         pipeline = {};

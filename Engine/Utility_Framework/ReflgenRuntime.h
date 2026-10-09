@@ -22,6 +22,7 @@
 //   Property::hasRange 등      → field_info::attributes() (creator:: 속성)
 #include "TypeTrait.h"
 #include <reflgen/runtime/registry.h>
+#include "../SceneRuntime/SceneGC.h"
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -108,6 +109,7 @@ namespace Meta
 	template<class Base>
 	std::unique_ptr<Base> Create(const reflgen::type_descriptor& type)
 	{
+		static_assert(!gc::managed_type<Base>, "Managed objects require an explicit domain factory");
 		static_assert(std::has_virtual_destructor_v<Base>, "Create<Base>: Base 는 가상 소멸자가 있어야 한다");
 		if (!type.is_constructible())
 		{

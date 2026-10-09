@@ -79,7 +79,8 @@ public:
         failed_.store(false);
         return true;
     }
-    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) override
+    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
+        const GpuPassTimingIdentity& = {}) override
     {
         auto* vk = dynamic_cast<VulkanEncoder*>(&encoder);
         const uint32_t slot = used_.fetch_add(1, std::memory_order_relaxed);

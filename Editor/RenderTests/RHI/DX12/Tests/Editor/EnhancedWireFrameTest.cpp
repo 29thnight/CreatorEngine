@@ -1,3 +1,4 @@
+#include "Ownership.h"
 #include "Render/Passes/Editor/EnhancedWireFramePass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -6,6 +7,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Mesh.h"
+#include "MaterialGraphSceneInput.h"
 
 #include <algorithm>
 #include <cmath>
@@ -491,6 +493,96 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
             }
         }
     }
+
+    // Exercise the live graph-only transport separately from the legacy fixture.
+    for (unsigned skin = 0; passed && skin < 2; ++skin)
+    {
+        const auto mask = assets::kCoreVertexAttributes | (skin ? assets::kSkinVertexAttributes : 0);
+        const auto stride = assets::StrideOf(mask);
+        std::vector<std::byte> packedVertices(4 * stride);
+        for (size_t vertex = 0; vertex < vertices.size(); ++vertex)
+        {
+            auto* bytes = packedVertices.data() + vertex * stride;
+            const float normal[]{0, 0, 1};
+            const float tangent[]{1, 0, 0, 1};
+            const float weights[]{1, 0, 0, 0};
+            std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::Position),
+                &vertices[vertex].position, 12);
+            std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::Normal), normal, sizeof(normal));
+            std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::Tangent), tangent, sizeof(tangent));
+            if (skin)
+            {
+                // Match cooked product vertices: unused influences use 255,
+                // which must never be read from this one-bone palette.
+                const std::uint8_t boneIndices[]{0, 255, 255, 255};
+                std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::BoneIndices),
+                    boneIndices, sizeof(boneIndices));
+                std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::BoneWeights), weights, sizeof(weights));
+            }
+        }
+        auto generation = own::make_shared<material_graph::Generation>();
+        generation->generation = 1;
+        generation->cooked.product.program.surface = true;
+        auto instance = own::make_shared<material_graph::Instance>();
+        instance->generation = generation;
+        instance->description.graphId = generation->assetId;
+        RHIModelMeshView model{};
+        Uuid::TryParse("11111111-1111-8111-8111-111111111111", model.handle.modelId);
+        Uuid::TryParse("22222222-2222-8222-8222-222222222222", model.handle.meshId);
+        model.handle.generation = skin + 1;
+        model.vertexData = packedVertices.data();
+        model.vertexBytes = packedVertices.size();
+        model.vertexStride = stride;
+        model.vertexAttributeMask = mask;
+        model.vertexLayoutHash = assets::VertexLayoutHash(mask);
+        model.indexData = indices.data();
+        model.indexCount = static_cast<uint32_t>(indices.size());
+        const math::matrix4x4 palette[]{math::translation_matrix(math::vector3{0, 1.5f, 0})};
+        std::vector<EnhancedDrawItem> graphDraws(2);
+        for (unsigned draw = 0; draw < graphDraws.size(); ++draw)
+        {
+            auto& item = graphDraws[draw];
+            item.geometryKey = 100 + skin;
+            item.modelMeshView = model;
+            item.materialGraphInstance = instance;
+            item.coverage.flags = EnhancedMaterialCoverage::Enabled;
+            if (draw)
+            {
+                item.coverage.flags |= EnhancedMaterialCoverage::Blended;
+            }
+            item.worldMatrix = draw ? math::translation_matrix(math::vector3{3, 0, 0}) : math::matrix4x4::identity();
+            item.bonePalette = skin ? palette : nullptr;
+            item.boneCount = skin;
+            item.animatorKey = skin;
+        }
+        const material_graph::SceneInputView view{skin + 1, 1, 1, 1, kWireWidth, kWireHeight, front};
+        if (!material_graph::SceneViewInput::Seal(view, graphDraws, {}, frameContext.graphSceneInput, error))
+        {
+            outLog += "Graph WireFrame seal failed: " + error + "\n";
+            passed = false;
+            break;
+        }
+        frameContext.draws = nullptr;
+        frameContext.forwardDraws = nullptr;
+        WireCapture capture;
+        uint32_t edgeX{}, edgeY{}, blendedX{}, blendedY{}, bindX{}, bindY{};
+        if (!renderOnce(front, capture)
+            || !WireProjectToPixel(front.view, front.projection, 0, skin ? 2.5f : 1.f, 0, edgeX, edgeY)
+            || !WireProjectToPixel(front.view, front.projection, 3, skin ? 2.5f : 1.f, 0, blendedX, blendedY)
+            || !WireProjectToPixel(front.view, front.projection, 0, -1.f, 0, bindX, bindY)
+            || capture.MaxInWindow(edgeX, edgeY, 2, 1) < .9f
+            || capture.MaxInWindow(blendedX, blendedY, 2, 1) < .9f
+            || (skin && capture.MaxInWindow(bindX, bindY, 2, 1) > .05f)
+            || wireframe.GetLastDrawItemCount() != 2 || wireframe.GetLastBatchCount() != 1
+            || (skin && (wireframe.GetLastSkinnedCount() != 2 || wireframe.GetLastBonePaletteCount() != 1)))
+        {
+            outLog += "Graph WireFrame typed geometry/pose/instance validation failed: " + error + "\n";
+            passed = false;
+        }
+        frameContext.graphSceneInput.reset();
+    }
+    outLog += passed ? "Graph WireFrame static/skinned transport passed (opaque/blended, unused bone index 255)\n"
+                    : "Graph WireFrame transport failed\n";
 
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);

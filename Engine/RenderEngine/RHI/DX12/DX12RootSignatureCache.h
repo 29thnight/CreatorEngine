@@ -1,5 +1,5 @@
 #pragma once
-#include "RenderFrameServices.h"
+#include "../IRenderPipelineCache.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>

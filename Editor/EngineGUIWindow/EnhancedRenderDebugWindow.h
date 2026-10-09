@@ -5,6 +5,13 @@
 namespace editor
 {
 	void OpenRenderLiveDiagnostics();
+    struct CompiledGraphViewerStats
+    {
+        uint64_t frames{}, matchingFrames{}, staleFrames{};
+        uint32_t target{};
+    };
+    CompiledGraphViewerStats ReadCompiledGraphViewerStats();
+    void RequestCompiledGraphViewerTarget(EnhancedLiveDisplayTarget target);
 }
 
 // RenderPass reads the current view's immutable compiled graph snapshot.

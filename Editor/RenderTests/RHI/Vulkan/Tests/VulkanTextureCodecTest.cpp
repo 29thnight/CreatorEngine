@@ -38,10 +38,10 @@ namespace
 
     struct CodecAssets
     {
-        std::shared_ptr<Texture> plain;       // RGBA8 또는 BGRA8 — 실제 PNG
-        std::shared_ptr<Texture> compressed;  // BC1_UNORM_SRGB — baseColor 압축 경로
-        std::shared_ptr<Texture> blockNoise;  // BC3_UNORM — blueNoise.dds
-        std::shared_ptr<Texture> bgra;        // BGRA8_UNORM — 합성
+        own::shared_owner<const Texture> plain;       // RGBA8 또는 BGRA8 — 실제 PNG
+        own::shared_owner<const Texture> compressed;  // BC1_UNORM_SRGB — baseColor 압축 경로
+        own::shared_owner<const Texture> blockNoise;  // BC3_UNORM — blueNoise.dds
+        own::shared_owner<const Texture> bgra;        // BGRA8_UNORM — 합성
 
         bool IsValid() const
         {
@@ -61,8 +61,8 @@ namespace
             PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
 
         const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
-        out.bgra.reset(Texture::CreateFromPixels(
-            1, 1, "codec_ab_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
+        out.bgra = Texture::CreateFromPixels(
+            1, 1, "codec_ab_bgra", RHIFormat::BGRA8Unorm, bgraPixel);
 
         if (!out.IsValid())
         {
@@ -73,22 +73,22 @@ namespace
         // ★ 포맷을 먼저 단정한다. 로더가 압축을 안 했거나 dds 가 다른 포맷이면
         //   아래 대조는 비압축 자산 둘을 비교해 놓고 초록을 내는 눈먼 검사가
         //   된다 — 블록 배치를 재는 것이 이 검사의 존재 이유다.
-        if (RHIFormat::BC1UnormSrgb != out.compressed->GetImageView().Format())
+        if (RHIFormat::BC1UnormSrgb != out.compressed->GetImageDescription().Format())
         {
             outError = "baseColor 압축 경로가 BC1_SRGB를 만들지 않았다";
             return false;
         }
-        if (RHIFormat::BC3Unorm != out.blockNoise->GetImageView().Format())
+        if (RHIFormat::BC3Unorm != out.blockNoise->GetImageDescription().Format())
         {
             outError = "blueNoise.dds가 BC3로 로드되지 않았다";
             return false;
         }
-        if (RHIFormat::BGRA8Unorm != out.bgra->GetImageView().Format())
+        if (RHIFormat::BGRA8Unorm != out.bgra->GetImageDescription().Format())
         {
             outError = "BGRA8 자산을 만들지 못했다";
             return false;
         }
-        if (out.plain->GetImageView().IsEmpty())
+        if (out.plain->GetImageDescription().IsEmpty())
         {
             outError = "비압축 자산을 로드하지 못했다";
             return false;
@@ -101,14 +101,14 @@ namespace
     template <typename CacheT>
     bool UploadAll(CacheT& cache, const CodecAssets& assets, std::string& outError)
     {
-        Texture* const order[] = {
-            assets.plain.get(), assets.compressed.get(),
-            assets.blockNoise.get(), assets.bgra.get() };
-        for (Texture* texture : order)
+        const Texture* const order[] = {
+            (assets.plain ? &*assets.plain.borrow() : nullptr), (assets.compressed ? &*assets.compressed.borrow() : nullptr),
+            (assets.blockNoise ? &*assets.blockNoise.borrow() : nullptr), (assets.bgra ? &*assets.bgra.borrow() : nullptr) };
+        for (const Texture* texture : order)
         {
             std::string error;
-            const auto entry = cache.GetOrUpload(texture, error);
-            if (!entry.IsValid() || entry.format != texture->GetImageView().Format())
+            const auto entry = cache.GetOrUpload(texture, texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
+            if (!entry.IsValid() || entry.format != texture->GetImageDescription().Format())
             {
                 outError = "업로드가 포맷을 지키지 못했다(" + texture->m_name + "): " + error;
                 return false;
@@ -229,10 +229,10 @@ bool RunVulkanTextureCodecTest(std::string& outLog)
     char assetLine[256]{};
     std::snprintf(assetLine, sizeof(assetLine),
         "[1/3] 자산 넷 준비 — plain %u · BC1_SRGB %u · BC3 %u · BGRA8 %u (서브리소스)\n",
-        assets.plain->GetImageView().SubresourceCount(),
-        assets.compressed->GetImageView().SubresourceCount(),
-        assets.blockNoise->GetImageView().SubresourceCount(),
-        assets.bgra->GetImageView().SubresourceCount());
+        assets.plain->GetImageDescription().SubresourceCount(),
+        assets.compressed->GetImageDescription().SubresourceCount(),
+        assets.blockNoise->GetImageDescription().SubresourceCount(),
+        assets.bgra->GetImageDescription().SubresourceCount());
     outLog += assetLine;
 
     // 스위치는 이 검사 안에서만 켠다 — 4K HDR 128MB 를 매번 해시하면 로드가

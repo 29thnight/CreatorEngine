@@ -3,6 +3,8 @@
 #include "LXMaterialRuntime.h"
 #include "RHI/RHIGraphicsPipelineRequest.h"
 #include "RHI/RHIShaderCompiler.h"
+#include "Experiment/Cooked/CookedCodeMaterial.h"
+#include <algorithm>
 
 namespace LX::Runtime
 {
@@ -18,7 +20,7 @@ struct ComputeCompileIdentity
 struct ComputeShaderDescription
 {
     // Renderer helpers have no material schema; generated material compute does.
-    std::shared_ptr<const ShaderGeneration> shader;
+    own::shared_owner<const ShaderGeneration> shader;
     RHIShaderPermutationKey materialPermutationKey{};
     ComputeCompileIdentity compile;
 };
@@ -46,6 +48,46 @@ inline bool CompileCompute(std::string_view source, std::string_view entry,
     error.clear();
     return true;
 }
+
+    inline bool RestoreCodeCompute(own::shared_owner<const ShaderGeneration> shader,
+        std::uint32_t passIndex, std::span<const std::uint16_t> keywords,
+        CompiledCompute& result, std::string& error)
+    {
+        if (!shader || !shader->codeProgram || shader->meta.codeProgramIdentity.empty())
+        {
+            error = "Code compute requires its exact verified program owner.";
+            return false;
+        }
+        const auto& program = *shader->codeProgram;
+        const auto found = std::ranges::find_if(program.variants, [&](const auto& value)
+        {
+            return value.backend == RHIShaderCompiler::GetOutput() && value.passIndex == passIndex
+                && value.vertexAttributeMask == 0u && !value.referencePath
+                && std::ranges::equal(value.keywordSelections, keywords);
+        });
+        if (found == program.variants.end() || found->stages.size() != 1u
+            || found->stages.front().stage != RHIShaderStage::Compute)
+        {
+            error = "Verified code program has no exact requested compute variant.";
+            return false;
+        }
+        CompiledCompute candidate;
+        const auto& stage = found->stages.front();
+        auto& identity = candidate.description.compile;
+        identity.backend = found->backend;
+        identity.source = program.rootSourcePath;
+        identity.entry = stage.entry;
+        identity.profile = stage.profile;
+        identity.permutation = found->permutation;
+        identity.dependencies = shader->meta.codeProgramIdentity;
+        identity.sealedProgramIdentity = shader->meta.codeProgramIdentity;
+        candidate.stage = { stage.bytecode, stage.reflection, shader->meta.codeProgramIdentity };
+        candidate.description.materialPermutationKey = found->materialPermutationKey;
+        candidate.description.shader = std::move(shader);
+        result = std::move(candidate);
+        error.clear();
+        return true;
+    }
 
 class ComputeGeneration
 {
@@ -162,6 +204,72 @@ struct CompiledGraphics
     RHIShaderCompiler::VerifiedShader vertex, pixel;
 };
 
+    // Source-free restore for the existing explicit/reference code-material helpers.
+    // This selects an already verified CPU variant, never a shader compiler cache.
+    inline bool RestoreCodeGraphics(const ShaderMeta& meta, std::uint32_t passIndex,
+        std::span<const std::uint16_t> keywords, std::uint32_t vertexMask, bool reference,
+        CompiledGraphics& result, std::string& error)
+    {
+        if (!meta.codeProgram || meta.codeProgramIdentity.empty())
+        {
+            error = "Code graphics requires its exact verified program owner.";
+            return false;
+        }
+        const auto& program = *meta.codeProgram;
+        const auto variant = std::ranges::find_if(program.variants, [&](const auto& value)
+        {
+            return value.backend == RHIShaderCompiler::GetOutput() && value.passIndex == passIndex
+                && value.vertexAttributeMask == vertexMask && value.referencePath == reference
+                && std::ranges::equal(value.keywordSelections, keywords);
+        });
+        if (variant == program.variants.end())
+        {
+            error = "Verified code program has no exact requested graphics variant.";
+            return false;
+        }
+        CompiledGraphics candidate;
+        auto& identity = candidate.identity;
+        identity.backend = variant->backend;
+        identity.source = program.rootSourcePath; // Diagnostic value, never opened.
+        identity.vertexAttributeMask = vertexMask;
+        identity.referencePath = reference;
+        identity.permutation = variant->permutation;
+        identity.sealedProgramIdentity = meta.codeProgramIdentity;
+        bool vertex{}, pixel{};
+        for (const auto& stage : variant->stages)
+        {
+            if (stage.stage == RHIShaderStage::Vertex && !vertex)
+            {
+                candidate.vertex = { stage.bytecode, stage.reflection, meta.codeProgramIdentity };
+                identity.vertexEntry = stage.entry;
+                identity.vertexProfile = stage.profile;
+                identity.vertexDependencies = meta.codeProgramIdentity;
+                vertex = true;
+            }
+            else if (stage.stage == RHIShaderStage::Pixel && !pixel)
+            {
+                candidate.pixel = { stage.bytecode, stage.reflection, meta.codeProgramIdentity };
+                identity.pixelEntry = stage.entry;
+                identity.pixelProfile = stage.profile;
+                identity.pixelDependencies = meta.codeProgramIdentity;
+                pixel = true;
+            }
+            else
+            {
+                error = "Code graphics variant contains duplicate or unexpected stages.";
+                return false;
+            }
+        }
+        if (!vertex || !pixel)
+        {
+            error = "Code graphics variant is missing a linked stage.";
+            return false;
+        }
+        result = std::move(candidate);
+        error.clear();
+        return true;
+    }
+
 inline bool CompileGraphics(std::string_view source, std::string_view vertex, std::string_view pixel,
     const RHIShaderPermutation& permutation, RHIShaderCompileOptions options,
     CompiledGraphics& result, std::string& error)
@@ -189,7 +297,7 @@ inline bool CompileGraphics(std::string_view source, std::string_view vertex, st
 
 struct GraphicsShaderDescription
 {
-    std::shared_ptr<const ShaderGeneration> shader;
+    own::shared_owner<const ShaderGeneration> shader;
     RHIShaderPermutationKey materialPermutationKey{};
     GraphicsCompileIdentity compile;
 };

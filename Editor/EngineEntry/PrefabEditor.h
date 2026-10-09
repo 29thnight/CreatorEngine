@@ -19,6 +19,7 @@
 #include "PrefabUtility.h"
 #include "SceneManager.h"
 #include <filesystem>
+#include <cstdint>
 
 class PrefabEditor : public Singleton<PrefabEditor>
 {
@@ -34,10 +35,9 @@ public:
 
 private:
     bool m_isOpened{ false };
-    Scene* m_prevScene{ nullptr };
-    size_t m_prevSceneIndex{ 0 };
-    Scene* m_editScene{ nullptr };
-    Prefab* m_prefab{ nullptr }; // 비소유 — PrefabUtility(캐시/m_createdPrefabs)가 소유한다.
+    std::uint32_t m_previousSceneId{};
+    std::uint32_t m_editSceneId{};
+    FileGuid m_prefabGuid{};
     std::filesystem::path m_path{};
 };
 
