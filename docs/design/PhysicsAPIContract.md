@@ -3,6 +3,10 @@
 작성: 2026-10-01 · 실행 계획: [PhysicsRedesignPlan](../plans/PhysicsRedesignPlan.md)
 상태: 계약 초안과 현재 SDK/빌드/언어 검증. 제품 baseline/corpus 증거 한계는 아래에 명시한다.
 
+## 2026-10-08 접촉 작업 계약 추가
+
+제품 이벤트의 목표 표면은 [PhysicsContactExecutionContract](PhysicsContactExecutionContract.md)다. 저수준 endpoint의 body/shape 신원을 유지하면서 역할 기반 인덱스 라우팅과 Scope-owned ContactStream으로 C#에 연결한다. Read는 준비된 span을 반환하고 PostPhysics는 매칭 결과만 소비한다. 현재 기본 구현은 endpoint의 Entity/component/shape/tick 신원을 관리 Contact에 전달하며 구 OnCollision*/OnTrigger* 콜백을 대체한다. 관리 라우터 18개 검사와 ABI 35개 검사는 통과했다. 후속 Release Editor 양방향 접촉·2 Play/Stop/stream4개 해제 및 cooked Player 접촉·정상종료 제품 게이트가 통과했다. 역할 저작/센서 Persist/삭제·DDOL·reload/profiler/성능 등 나머지 E0 수용은 완료되지 않았다.
+
 ## P1 구현 증거와 현재 경계
 
 공개 PhysicsScene/PhysicsTypes는 PhysX SDK 헤더를 노출하지 않는다. create/begin_step/finish_step은
@@ -828,3 +832,97 @@ Player는 runtime EndOfFrame 뒤 `Time->GetFrameCount()`를 profiler에 발행�
 managed 반복 probe는 외부 gate file이 설정된 경우 HTTP profiler 상태 적용 뒤에만 시작한다.
 query 입력 준비·parity 비교와 HTTP 제어/저장은 timed query wall-time 밖이다.
 profile=false/true 로그는 harness가 실제 record/pause 응답과 대조한다.
+
+E0 저장 역할 후속(2026-10-08): Script ABI35, shape state88/endpoint40/contact112 bytes·tick offset80. 역할 GUID 값은 SDK 형상 신원과 live/retired event snapshot에 보존하며 callback에서 문자열 변환/CLR 호출 없음. 저장 역할 재바인딩은 거부한다. Release Editor 및 fresh cooked Player 수용 근거는 PhysicsContactExecutionContract.md 참조.
+
+E0 센서 후속(2026-10-08): ABI36, event_kind::sensor_persist=5. 고정 활성pair index가 Enter tick을 제외한 매 성공 fixed tick에 Persist를 생산하고 Exit에서 제거한다. capacity는 event_capacity, 초과는 incomplete event snapshot failure. Physics.SensorPersist Scene/tick/task0 계층을 계측한다. 센서 늦은 구독 첫 Persist의 Begin seed는 stream pair generation 신원으로 한 번만 전달한다. 세부 수용/잔여는 PhysicsContactExecutionContract.md 참조.
+
+
+### 2026-10-09 runtime shape role 변경
+
+PhysicsBodyComponent.SetShapeRole(uint shapeId, ShapeRole role)를 추가한다. ABI39의 마지막 Body_ShapeRole 슬롯(189슬롯)으로 전달하며 기존 슬롯 순서와 contact/shape layout은 유지한다. simulation owner-thread window·정확한 owner generation/component instance·shape ID를 검증한다. window 밖 WrongPhase, 사라진 body/shape는 StaleHandle. Guid.Empty는 저장 role을 비우며 별도 Scope-owned BindContactRole은 변경하지 않는다. 기존 role과 같으면 topology 교체 없이 None을 반환한다.
+
+변경값은 복제 shape definition의 contactRole에만 적용하고 기존 ReplaceShapes의 preflight/retirement/rollback 경로로 커밋한다. pose·velocity·형상 플래그·형제 role은 기존 교체 정책을 따른다. 실패 시 기존 shape definition을 커밋하지 않는다. 역할 전환은 body 전체 topology 교체이며 변경하지 않은 형상도 old End/new Begin을 발생시킬 수 있다. 매 tick 역할을 토글하는 핫패스용 API로 수용한 것은 아니다. 이전 SDK endpoint snapshot은 이전 role을 유지하고 새 endpoint는 새 role로 라우팅한다. Play 중 변경은 Play snapshot에서 Stop 시 복원한다.
+### C1 평면 입력과 회전 소유권 (2026-10-09)
+
+`CharacterMovementComponent.SetPlanarInput(input, speed)`는 월드 XZ 입력을 단위 원으로
+제한하고 아날로그 크기를 유지하여 m/s desired velocity로 전달한다. Y는 투영으로
+제거한다. 모든 입력 성분과 speed는 유한해야 하며 speed는 0 이상이다. 실패하면
+네이티브 입력을 변경하지 않는다. `CreatePlanarVelocity`는 같은 변환을 순수 함수로 제공한다.
+0 입력은 원하는 속도를 0으로 갱신하며 실제 정지는 기존 고정 스텝 braking 정책을 따른다.
+입력을 보내지 않으면 기존 desired velocity는 유지된다. OnBeginSimulation에서 컴포넌트를
+바인딩하고 시뮬레이션 입력 단계에서 갱신한다. Stop/비활성/DDOL 수명은 기존 컴포넌트 계약을 따른다.
+
+카메라 기준 축 변환, 데드존, 달리기 배율과 facing은 게임 스크립트가 소유한다.
+자동 회전은 물리 컴포넌트에 추가하지 않는다. 스트레이프/조준 캐릭터는 이동 방향과
+바라보는 방향이 다르며 중력·강제 이동·벽 접촉으로 facing이 바뀌어서는 안 된다.
+회전이 필요한 스크립트는 선택한 평면 방향이 0이 아닐 때
+`Transform.SetWorldRotation(Quaternion.LookRotation(direction))`으로 명시적으로 적용한다.
+회전 보간 속도도 스크립트 정책이며 위치를 Transform으로 중복 적분하지 않는다.
+legacy dynamic Lerp는 이전하지 않는다. 가속/감속은 기존 fixed-step 정책 하나가 담당한다.
+
+ABI40/198 슬롯은 그대로다. managed ABI 게이트는 물리42/접촉44 검사 통과:
+아날로그·대각선·최대 유한 입력·입력 해제·잘못된 값·네이티브 phase 전달을 검증했다.
+제품 Player에서 새 입력 helper를 사용하는 이동/회전 회귀와 실제 콘텐츠 이전은 잔여다.
+
+C1 평면 입력 제품 증거(2026-10-09): 새 SDK 배포본에서 정상 cooked Development
+Player 실행으로 16/0, tick241을 확인했다. 스크립트 facing은 strafe·감속·강제 이동 중
+유지되며 명시적 LookRotation 적용이 실제 Transform 방향에 반영됐다.
+Player snapshot 없음·종료0·패키지231파일 불변. 증거는
+Build/Verification/ContactStream/PlanarPlayer/Evidence/result.json.
+Shipping/Editor 새 입력 회귀와 실제 콘텐츠 이전은 이 결과에 포함하지 않는다.
+
+C1 새 입력 Editor 복원 증거(2026-10-09): 실제 Release Editor 2회 Play/Stop,
+각 입력16/0·tick241, 저작 위치/회전/스케일·enabled/layer 복원, runtime tick/중력/
+입력/force 초기화, 이전 래퍼 StaleHandle 및 Replay 통과. 명시적 저장 후 엔티티
+배열/인덱스 재배치는 존재하지만 ID로 해석한 전체 저작값·계층은 동등하다.
+증거: Build/Verification/ContactStream/PlanarEditor-e0e007f6ebd54d739ace8e81d0774cc5/result.json.
+
+C1 새 입력 Shipping 증거(2026-10-09): 최신 ScriptCore 포함 정상 Shipping 패키지에서
+입력16/0·tick244, 2000GT/display frame2000/promotions1945·종료0·230파일 불변 통과.
+명령 서비스 미컴파일/endpoint 부재·runtime text parser0 및 바이너리 소켓 격리 확인.
+패키지 Player/SDK 해시는 배포본과 일치한다. native ABI40은 변경하지 않았다.
+증거: Build/Verification/ContactStream/PlanarShippingPlayer/Evidence/result.json.
+새 입력 정책의 Development/Editor/Shipping 회귀는 검증됐으며 실제 콘텐츠 단위 이전과
+이동 골든 수용은 잔여다.
+
+### 2026-10-09 Editor Shape 저작과 세션 소유 스레드
+
+SetShapes는 Play 중 저작 변경을 거부하고 전체 정의를 검증한 뒤 직렬화되는 Shape 목록만
+교체한다. Inspector 저작 스레드에서는 ScenePhysicsSimulation::Define을 호출하지 않는다.
+Scene::StartPhysicsSimulation이 Play 시작의 소유 스레드에서 최신 컴포넌트 정의를 다시
+CaptureDefinition/Define한다. Undo/Redo는 같은 저작 경계와 문서/신원 검증을 따른다.
+실행 중 교체는 기존 owner/idle 제한의 ReplaceShapes 경로를 사용한다.
+실제 Shape UI327명령 및 HTTP55명령 증거와 잔여 범위는 PhysicsRedesignPlan의 동 일자 B1 기록을 따른다.
+
+
+### 2026-10-09 Editor shape authoring ownership
+
+`PhysicsBodyComponent::SetShapes` validates authored shape values against the captured transform scale and immutable project layer snapshot without resolving/cooking SDK geometry or accessing the owner-thread geometry cache. Inspector drafts publish one complete list through the common shape transaction. `StartPhysicsSimulation` resolves the resulting cooked definition on the simulation owner thread. Runtime `ReplaceShapes` retains its owner/idle requirements. Actual convex UUID/revision UI, invalid-reference syntax, Undo/Redo, active reload and Play/Stop acceptance are recorded in `Build/Verification/ContactStream/B1Closure/result.json`.
+
+## T1 완료 — 현재 worker 예산/계측 수용 (2026-10-09)
+
+기존 제품의 after-fetch 및 SDK 전용 dispatcher 정책을 유지한다. 기존 계측 게시
+최적화 구현을 대상으로 현재 소스 standalone benchmark를 다시 빌드했다.
+소스 생성기의 PhysicsTestHooks 상대 include와 새 ProfileRecording.cpp 링크 누락을
+수정했다. profiler record는 비동기 시작 요청이므로 wait_until_idle 후 recording을
+확인하고 측정한다. 시작 누락으로238/239tick만 기록된 첫 결과는 미수용이다.
+
+CPU/GPU × 활성16/256/1024 × worker요청0/1/2/4 × 계측on/off,
+정방향/역방향을2회 반복해 자유 낙하192회, 접촉1024바디 계측on32회, 총224회.
+각240tick 측정. 계측on128회는 필수 비용 마커240tick 및 task submit/run/complete
+신원·계층 검사 통과. 현재 auto는12 hardware threads에서 실제8workers다.
+
+4개 run의 median 기준, 계측off CPU16: worker1 평균59.03us/p9977.50us,
+worker2 69.93/95.75us, worker4 127.56/187.80us, auto8 442.35/628.75us.
+계측on CPU접촉1024: worker4 평균1332.13us/p991677.55us,
+worker1 1904.90/2462.85us. workload가 달라 전역1worker 변경은 채택하지 않는다.
+작은 자유 낙하 CPU는 명시1worker, 접촉 많은 CPU는 명시4worker를 이 장비의
+검증된 후보 예산으로 기록한다. GPU256/on/worker4 CV11.75% 그룹은 비용 비교에서
+제외한다. 다른55개 그룹 CV10% 이하. 프로파일 계측on 비용은 제품 지연으로 해석하지 않는다.
+
+현재 Editor/Development cooked Player 정상 실행은 C0Closure 완료 증거를 참조한다.
+T1의 실행정책·최적화·계측·worker/workload 선택 근거는 완료로 판정한다.
+전체 제품 평균/p99/메모리, 다른 장비와 전체 콘텐츠의 수용은 기존 M3 범위다.
+보존 인덱스 T1Closure/result.json, measurements.json 및 원시224개 기록.
+바이너리/캡처 사본은 추가하지 않았다. 기존 Build/Obj capture 위치는 원시기록에 유지한다.

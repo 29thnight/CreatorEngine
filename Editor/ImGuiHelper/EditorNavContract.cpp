@@ -29,6 +29,7 @@ namespace editor::nav
         std::mutex g_mutex;
         contract_view g_published;
         std::deque<ImGuiKey> g_pendingKeys;
+        std::deque<std::string> g_pendingText;
         ImGuiKey g_liveKey = ImGuiKey_None;
 
         // 주입된 포인터. 큐가 아니라 **고정 상태**다 — 이유는 헤더에 있다.
@@ -36,6 +37,7 @@ namespace editor::nav
         float g_pointerX = 0.f;
         float g_pointerY = 0.f;
         bool g_pointerDown = false;
+        float g_pendingWheel = 0.f;
         // 직전 프레임에 우리가 얹은 좌표. 이동량을 여기서 만든다(W2-I5).
         float g_pointerPrevX = 0.f;
         float g_pointerPrevY = 0.f;
@@ -70,6 +72,8 @@ namespace editor::nav
             if ("enter" == name)  return ImGuiKey_Enter;
             if ("space" == name)  return ImGuiKey_Space;
             if ("escape" == name) return ImGuiKey_Escape;
+            if ("backspace" == name) return ImGuiKey_Backspace;
+            if ("end" == name) return ImGuiKey_End;
             return ImGuiKey_None;
         }
     }
@@ -128,6 +132,17 @@ namespace editor::nav
         g_published.cursorVisible = context->NavCursorVisible;
         g_published.navIdIsAlive = context->NavIdIsAlive;
         g_published.navId = static_cast<std::uint32_t>(navId);
+        g_published.navX = g_published.navY = g_published.navW = g_published.navH = 0.f;
+        if (context->NavWindow && navId)
+        {
+            auto bounds = context->NavWindow->NavRectRel[context->NavLayer];
+            bounds.Translate(ImVec2(context->NavWindow->Pos.x - context->NavWindow->Scroll.x,
+                                    context->NavWindow->Pos.y - context->NavWindow->Scroll.y));
+            g_published.navX = bounds.Min.x;
+            g_published.navY = bounds.Min.y;
+            g_published.navW = bounds.GetWidth();
+            g_published.navH = bounds.GetHeight();
+        }
         g_published.activeId = static_cast<std::uint32_t>(context->ActiveId);
         g_published.navWindow = (nullptr != context->NavWindow)
             ? std::string(context->NavWindow->Name) : std::string();
@@ -155,7 +170,9 @@ namespace editor::nav
                 remember(g_published.silentWidgets, navWidget);
             }
 
-            if (!navInteractive)
+            // ImGui may retain a dormant NavId after a mouse edit or lock transition.
+            // Count disabled focus only when the cursor or active edit actually uses it.
+            if (!navInteractive && (context->NavCursorVisible || context->ActiveId == navId))
             {
                 ++g_published.disabledFrames;
                 remember(g_published.disabledWidgets, navWidget);
@@ -170,6 +187,17 @@ namespace editor::nav
     {
         ImGuiIO& io = ImGui::GetIO();
         std::lock_guard lock(g_mutex);
+
+        if (!g_pendingText.empty() && g_pendingKeys.empty() && g_liveKey == ImGuiKey_None)
+        {
+            io.AddInputCharactersUTF8(g_pendingText.front().c_str());
+            g_pendingText.pop_front();
+        }
+        if (g_pendingWheel != 0.f)
+        {
+            io.AddMouseWheelEvent(0.f, g_pendingWheel);
+            g_pendingWheel = 0.f;
+        }
 
         // 누른 프레임과 뗀 프레임을 가른다. 한 프레임에 둘을 같이 넣으면
         // `IsKeyPressed` 가 보는 전이가 프레임 경계 안에서 상쇄되어, nav 가
@@ -191,6 +219,26 @@ namespace editor::nav
             ((ImGuiKey_None != g_liveKey) ? 1u : 0u);
     }
 
+    bool request_text(const std::string& text, std::string& outError)
+    {
+        outError.clear();
+        if (text.empty() || text.size() > 4096 || text.find('\0') != std::string::npos)
+        {
+            outError = "Text must contain 1..4096 bytes without NUL";
+            return false;
+        }
+
+        std::lock_guard lock(g_mutex);
+        if (g_pendingText.size() >= 64)
+        {
+            outError = "Text input queue is full";
+            return false;
+        }
+
+        g_pendingText.push_back(text);
+        return true;
+    }
+
     void request_pointer(pointer_action action, float x, float y)
     {
         std::lock_guard lock(g_mutex);
@@ -200,6 +248,7 @@ namespace editor::nav
         case pointer_action::move:    g_pointerX = x; g_pointerY = y; break;
         case pointer_action::press:   g_pointerDown = true;  break;
         case pointer_action::release: g_pointerDown = false; break;
+        case pointer_action::wheel:   g_pendingWheel = std::clamp(g_pendingWheel + y, -100.f, 100.f); break;
         }
     }
 

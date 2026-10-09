@@ -6547,18 +6547,6 @@ namespace
                 }
             } frameGuard{ dx12, frameCommitted, profilerToken, capture, outError };
 
-            const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
-            profilerToken.engineFrameId = sourceFrameId;
-            profilerToken.sourceEngineFrame = sourceEngineFrame;
-            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
-            if (sourceEngineFrameAvailable && captureSink.on_begin_capture && captureSink.on_finish_capture)
-            {
-                profilerToken.captureGeneration = captureSink.on_begin_capture(sourceEngineFrame);
-            }
-            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
-                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
-            profilerToken.sourceEngineFrame = sourceEngineFrame;
-            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -6627,6 +6615,20 @@ namespace
             {
                 return false;
             }
+            // Deferred resource preparation has no GPU submission to admit.
+            // Telemetry uses the host frame; sourceFrameId remains render identity.
+            const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
+            profilerToken.engineFrameId = sourceFrameId;
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
+            if (sourceEngineFrameAvailable && captureSink.on_begin_capture && captureSink.on_finish_capture)
+            {
+                profilerToken.captureGeneration = captureSink.on_begin_capture(sourceEngineFrame);
+            }
+            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -8001,9 +8003,13 @@ namespace
 									budgetMB = memory.budgetMB;
 								}
 								else if (backend == EnhancedLiveBackend::DX12 && pipeline)
+								{
 									available = dx12.QueryVideoMemory(usedMB, budgetMB);
+								}
 								if (available)
+								{
 									hooks.OnVideoMemory(submission.frame.sourceEngineFrame, usedMB, budgetMB);
+								}
 							}
                         }
                         catch (const std::exception& exception)

@@ -161,7 +161,8 @@ enum class event_kind : std::uint8_t
     contact_persist,
     contact_end,
     sensor_enter,
-    sensor_exit
+    sensor_exit,
+    sensor_persist
 };
 
 struct event_endpoint
@@ -169,6 +170,7 @@ struct event_endpoint
     body_handle body;
     shape_id shape;
     bool sensor = false;
+    contact_role_id role{};
 };
 
 struct contact_point

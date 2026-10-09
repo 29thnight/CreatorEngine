@@ -2600,9 +2600,9 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 			obj->SetParentIndex(Entity::kInvalidIndex);
 		}
 
-        // m_childrenIndices: 합성 루트(0)는 아래에서 부모 포인터 기준으로 통째로
-        // 재구성하므로 여기서는 건드리지 않는다 — 두 출처가 섞이면(파일이 적어 둔
-        // children 목록 vs 자식들의 실제 parentIndex) 어느 쪽이 진실인지 알 수 없다.
+        // 합성 루트(0)는 아래에서 실제 부모 관계로 소속을 재구성하고,
+        // 직렬화된 자식 목록으로 유효한 형제 순서만 복원한다.
+        // 그 외 Entity는 여기서 파일 children을 슬롯 인덱스로 리매핑한다.
         if (obj->m_index != 0)
         {
             std::vector<Entity::Index> remappedChildren;
@@ -2644,9 +2644,9 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     }
 
     // 합성 루트(0)의 children을 배치 기준으로 재구성한다. 진실의 원천은 자식들의
-    // 최종 m_parentIndex다(위 루프에서 이미 슬롯 인덱스로 확정됐다) — 루트 자신이
-    // 파일에서 읽어 온 children 목록은 신뢰하지 않는다. 그래야 "부모는 루트를
-    // 가리키는데 루트의 목록엔 없다" 같은 비대칭 오염도 자연히 치유된다.
+    // 최종 m_parentIndex다(위 루프에서 이미 슬롯 인덱스로 확정됐다). 루트의
+    // 파일 children은 유효한 형제 순서만 제공한다. 누락된 자식은 부모 기준으로
+    // 추가해 "부모는 루트인데 목록엔 없는" 비대칭도 복구한다.
     //
     // LoadEntity는 CreateEntity/AddEntity와 달리 부모의 children에
     // 자동으로 얹지 않으므로(Scene::LoadEntity 참고), 여기서 지우고 다시
@@ -2663,6 +2663,26 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         std::erase_if(retainedRootChildren, [&](Entity::Index idx) { return batchSlots.contains(idx); });
         rootObject->SetChildrenIndices(std::move(retainedRootChildren));
 
+        // Membership comes from the resolved parent, but authored sibling
+        // order comes from the root's serialized children. Slot allocation
+        // and batch traversal can change after Play/Stop and reload.
+        for (const auto& entry : batch)
+        {
+            if (entry.object != rootObject) continue;
+
+            for (const Entity::Index fileChild : entry.fileChildrenIndices)
+            {
+                const auto mapped = fileToSlot.find(fileChild);
+                if (mapped == fileToSlot.end() || mapped->second == Entity::kSceneRootIndex) continue;
+
+                Entity* child = targetScene->GetEntityRaw(mapped->second);
+                if (child && child->GetParentIndex() == Entity::kSceneRootIndex)
+                    rootObject->AttachChildIndex(mapped->second);
+            }
+            break;
+        }
+
+        // Append valid children omitted from the serialized root list.
         for (auto& entry : batch)
         {
             Entity* obj = entry.object;

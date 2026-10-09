@@ -1,4 +1,5 @@
 ﻿#include "ScenePhysicsSimulation.h"
+#include "../Physics/PhysicsTestHooks.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <cmath>
 #include <algorithm>
@@ -87,6 +88,35 @@ result<ScenePhysicsSimulation::binding_id> ScenePhysicsSimulation::Register(body
     }
 }
 
+result<void> ScenePhysicsSimulation::RetireContactBody(body_handle body, binding_id id)
+{
+    if (m_retiredContactHandles.size() == 65536)
+        return std::unexpected(error{error_code::capacity_exceeded, 0, "Pending retired contact body capacity exceeded"});
+
+    const auto key = Key(body);
+    try
+    {
+#if defined(CE_PHYSICS_TESTING)
+        if (test::consume(test::failure_point::retirement_map_allocation)) throw std::bad_alloc{};
+#endif
+        m_retiredContactHandles.emplace(key, id);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return std::unexpected(error{error_code::out_of_memory, 0, "Retired contact binding allocation failed"});
+    }
+
+    auto removed = m_runtime->destroy_body(body);
+    if (!removed)
+    {
+        m_retiredContactHandles.erase(key);
+        return removed;
+    }
+
+    m_handles.erase(key);
+    return {};
+}
+
 result<void> ScenePhysicsSimulation::Unregister(binding_id id)
 {
     if (auto owner = RequireOwner(); !owner)
@@ -96,10 +126,9 @@ result<void> ScenePhysicsSimulation::Unregister(binding_id id)
         return {}; // Lifecycle teardown is idempotent.
     if (position->second.body)
     {
-        auto removed = m_runtime->destroy_body(position->second.body);
+        auto removed = RetireContactBody(position->second.body, id);
         if (!removed)
             return removed;
-        m_handles.erase(Key(position->second.body));
     }
     m_entries.erase(position);
     std::erase_if(m_render, [id](const render_pose& value) { return value.binding == id; });
@@ -155,8 +184,19 @@ result<void> ScenePhysicsSimulation::Replace(binding_id id, body_definition defi
     {
         if (value.body)
         {
+            if (m_retiredContactHandles.size() == 65536)
+                return std::unexpected(error{error_code::capacity_exceeded, 0, "Pending replaced contact body capacity exceeded"});
+
             // Allocate the complete map before retiring the old SDK body.
+#if defined(CE_PHYSICS_TESTING)
+            if (test::consume(test::failure_point::replacement_map_allocation)) throw std::bad_alloc{};
+#endif
             auto prepared = m_handles;
+#if defined(CE_PHYSICS_TESTING)
+            if (test::consume(test::failure_point::replacement_retired_allocation)) throw std::bad_alloc{};
+#endif
+            auto retired = m_retiredContactHandles;
+            retired.emplace(Key(value.body), id);
             prepared.reserve(prepared.size() + 1);
             auto node = prepared.extract(Key(value.body));
             if (node.empty())
@@ -169,6 +209,7 @@ result<void> ScenePhysicsSimulation::Replace(binding_id id, body_definition defi
             node.key() = Key(*replacement);
             prepared.insert(std::move(node)); // Existing node and reserved buckets: no allocation.
             m_handles.swap(prepared);
+            m_retiredContactHandles.swap(retired);
             value.body = *replacement;
         }
         else
@@ -239,11 +280,10 @@ result<void> ScenePhysicsSimulation::SetEnabled(binding_id id, bool enabled)
             auto state = m_runtime->read_body(value.body);
             if (!state)
                 return std::unexpected(state.error());
-            auto removed = m_runtime->destroy_body(value.body);
+            auto removed = RetireContactBody(value.body, id);
             if (!removed)
                 return removed;
             value.state = *state;
-            m_handles.erase(Key(value.body));
             value.body = {};
         }
     }
@@ -439,7 +479,9 @@ result<void> ScenePhysicsSimulation::Stop()
     m_nextRender.clear();
     m_renderPrepared.clear();
     m_runtime.reset(); // In-flight fetch/drain and controller/body owners precede authoring restoration.
+    m_contacts.clear();
     m_handles.clear();
+    m_retiredContactHandles.clear();
     m_changed.clear();
     for (auto& [id, value] : m_entries)
     {
@@ -463,6 +505,7 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
         return std::unexpected(owner.error());
     if (!std::isfinite(seconds) || seconds < 0)
         return std::unexpected(error{error_code::invalid_argument, 0, "Invalid frame duration"});
+    m_contacts.clear();
     m_changed.clear();
     m_changedCharacters.clear();
     if (!m_runtime || seconds == 0)
@@ -520,6 +563,30 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
             m_renderPrepared.clear();
             return std::unexpected(finished.error());
         }
+        const auto& snapshot = *m_runtime->latest_snapshot();
+        if (snapshot.statistics.dropped_events || snapshot.statistics.unresolved_identities)
+            return std::unexpected(error{error_code::capacity_exceeded, 0, "Contact snapshot incomplete"});
+        {
+            ce::profile_context_scope contactContext{{m_runtime->status().identity.value, snapshot.tick.value, 0}};
+            ce::profile_scope contactScope{ce::marker<"Physics.ContactCollect">()};
+            for (const auto& event : snapshot.events)
+            {
+                const auto resolve = [this](body_handle body) -> binding_id {
+                    const auto key = Key(body);
+                    if (const auto live = m_handles.find(key); live != m_handles.end()) return live->second;
+                    if (const auto retired = m_retiredContactHandles.find(key); retired != m_retiredContactHandles.end())
+                        return retired->second;
+                    return 0;
+                };
+                const auto first = resolve(event.first.body);
+                const auto second = resolve(event.second.body);
+                if (!first || !second)
+                    return std::unexpected(error{error_code::stale_handle, 0, "Contact body binding unavailable"});
+                if (m_contacts.size() == 65536)
+                    return std::unexpected(error{error_code::capacity_exceeded, 0, "Frame contact capacity exceeded"});
+                m_contacts.push_back({first, second, snapshot.tick, event});
+            }
+        }
         prepare();
         ++ticks;
         m_accumulator = (std::max)(0.0, m_accumulator - fixed_seconds);
@@ -563,6 +630,7 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
     }
     if (ticks)
     {
+        m_retiredContactHandles.clear();
         for (const auto id : m_characterOrder)
         {
             auto& value = m_characters.at(id);

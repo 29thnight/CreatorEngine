@@ -423,6 +423,7 @@
     <ClInclude Include="PhysicsPrimitivePreview.h" />
     <ClInclude Include="PhysicsShapeDefinition.h" />
     <ClInclude Include="PhysicsTransformPolicy.h" />
+    <ClInclude Include="PhysicsLifecyclePolicy.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CollisionGeometrySource.h" />

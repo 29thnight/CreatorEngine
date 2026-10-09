@@ -98,27 +98,18 @@ public static class Bootstrap
     /// 배열 포인터 하나만 넘기므로 충돌이 몇 건이든 경계 통과는 한 번이다.
     /// 버퍼는 네이티브 소유이고 이 호출이 끝나면 무효가 되므로, 관리 측에서 붙들지 않는다.
     /// </summary>
-    // PhysicsEvent는 내부 표현이라 이 진입점도 internal로 둔다.
+    // NativeContact는 내부 표현이라 이 진입점도 internal로 둔다.
     // UnmanagedCallersOnly는 접근성과 무관하게 함수 포인터로 노출된다.
     [UnmanagedCallersOnly]
-    internal static unsafe int FlushPhysicsEvents(PhysicsEvent* events, int count)
+    internal static unsafe int PublishContacts(NativeContact* events, int count)
     {
         try
         {
-            if (events == null || count <= 0) return 0;
-
-            for (int i = 0; i < count; ++i)
-            {
-                ref readonly PhysicsEvent e = ref events[i];
-
-                Component? target = ScriptFactory.Find(e.InstanceId);
-                if (target is null || !target.IsAlive || !target.Enabled) continue;
-
-                ScriptRegistry.DispatchPhysics(target, (PhysicsEventKind)e.Kind, in e.Collision);
-            }
+            if (count < 0 || (events == null && count != 0)) return -1;
+            for (int i = 0; i < count; ++i) ContactRouter.Route(in events[i]);
             return count;
         }
-        catch (Exception ex) { Report(ex, nameof(FlushPhysicsEvents)); return -1; }
+        catch (Exception ex) { Report(ex, nameof(PublishContacts)); return -1; }
     }
 
     /// <summary>

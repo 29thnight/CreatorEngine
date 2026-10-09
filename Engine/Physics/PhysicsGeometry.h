@@ -8,9 +8,20 @@
 #include <span>
 #include <variant>
 #include <utility>
+#include <array>
 
 namespace ce::physics
 {
+// GUID-compatible value layout; opaque subscription metadata, independent of collision filters.
+struct contact_role_id
+{
+    std::uint32_t a = 0;
+    std::uint16_t b = 0, c = 0;
+    std::array<std::uint8_t, 8> d{};
+    auto operator<=>(const contact_role_id&) const = default;
+};
+static_assert(sizeof(contact_role_id) == 16);
+
 struct pose
 {
     math::vector3 position{};
@@ -90,6 +101,7 @@ struct ShapeInstance
     bool sensor = false;
     bool query_enabled = true;
     ce::layers::layer_id layer_override{}; // Host policy metadata; zero inherits the Entity layer.
+    contact_role_id contact_role{};
 };
 
 enum class body_kind : std::uint8_t

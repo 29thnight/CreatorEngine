@@ -20,6 +20,7 @@
 #include "PathFinder.h"
 #include "Scene.h"
 #include "CharacterMovementComponent.h"
+#include "PhysicsBodyComponent.h"
 #include "ScriptComponent.h"
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
@@ -923,6 +924,22 @@ void Player::PlayerMain::Update()
                     Object::SetDontDestroyOnLoad(entity);
                 }
 
+                char contactDdol[2]{};
+                if (GetEnvironmentVariableA("CE_PHYSICS_CONTACT_DDOL", contactDdol, 2) == 1 && contactDdol[0] == '1')
+                {
+                    auto* actor = Entity::Find("ContactAttack");
+                    auto* body = actor ? actor->GetComponent<PhysicsBodyComponent>() : nullptr;
+                    if (!body || !body->ReadState())
+                    {
+                        std::fprintf(stderr, "[physics.player.contact.scene] FAILED source body\n");
+                        EngineBootstrap::SetExitCode(4);
+                        PostMessage(handle, WM_CLOSE, 0, 0);
+                        return;
+                    }
+
+                    Object::SetDontDestroyOnLoad(actor);
+                }
+
                 SceneManagers->ActivateScene(m_smokeReloadScene);
                 return;
             }
@@ -961,6 +978,34 @@ void Player::PlayerMain::Update()
                     PostMessage(handle, WM_CLOSE, 0, 0);
                     return;
                 }
+            }
+
+            char contactProbe[2]{};
+            if (GetEnvironmentVariableA("CE_PHYSICS_CONTACT_SCENE_PROBE", contactProbe, 2) == 1 && contactProbe[0] == '1')
+            {
+                auto* actor = Entity::Find("ContactAttack");
+                auto* body = actor ? actor->GetComponent<PhysicsBodyComponent>() : nullptr;
+                auto* script = actor ? actor->GetComponent<ScriptComponent>() : nullptr;
+                if (!body || !script || actor->GetScene() != m_smokeReloadScene || !body->ReadState())
+                {
+                    std::fprintf(stderr, "[physics.player.contact.scene] FAILED destination body\n");
+                    EngineBootstrap::SetExitCode(4);
+                    PostMessage(handle, WM_CLOSE, 0, 0);
+                    return;
+                }
+
+                bool ready = false;
+                auto& clr = ClrHost::Get();
+                const auto instance = script->GetInstanceId();
+                for (int field = 0; field < clr.GetFieldCount(instance); ++field)
+                {
+                    const auto name = clr.GetFieldName(instance, field);
+                    if (name == "_ready" || name == "Ready" || name == "ready")
+                        ready = clr.GetFieldBool(instance, field);
+                }
+
+                // The regression script sets this only after destination Begin and Persist.
+                if (!ready) return;
             }
 
             if (gameDisplay.completedFrameId <= m_smokeReloadPublishedFrame ||

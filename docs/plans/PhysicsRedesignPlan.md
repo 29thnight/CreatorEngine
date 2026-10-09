@@ -1,7 +1,13 @@
 # 물리 재설계 — C++23 PhysX API 선행 재작성 (PHASE 19)
 
 수립일: 2026-08-18 · 빅뱅 범위 개정: 2026-10-01
+접촉 저작 개정(2026-10-08): [물리 접촉 작업·C# 계약](../design/PhysicsContactExecutionContract.md). E0 추가, ContactStream 기본 구현 진행 중. 기존 완료 기록은 당시 범위의 증거이며 접촉 제품 배선 완료를 뜻하지 않는다.
+
 관련: [컴포넌트 설계](../design/PhysicsComponentDesign.md) · [잡 시스템 계약](../design/JobSchedulerDesign.md) · [직렬화](SerializationPlan.md) · [고정 Simulation Tick](NetworkFrameworkPlan.md)
+
+## 최신 완료 상태 (2026-10-09)
+
+**B1 형상 저작·공유 자산 및 C0 CharacterMovementComponent 완료.** 고정한 필수 종료 조건7개 제품 게이트를 통과했다. 아래 이전 날짜의 progress 기록은 당시 증거의 이력이다. 상세 증거는 문서 끝 B1 종료 기록 및 `Build/Verification/ContactStream/B1Closure/result.json`에 있다. Phase19 전체는 완료되지 않았다.
 
 ## P0 실행 기록 (2026-10-01)
 
@@ -854,6 +860,7 @@ Z의 결함은 별도 구 래퍼 지혈 구현 없이 새 API의 필수 정확�
 | M0 | C++/C# 소비자 이전 | 새 표면에 맞춘 전량 이전, 구 물리 시그니처·엔트리 제거, 호환 어댑터 없음 |
 | M1 | 씬/프리팹/cooked 스키마 이전 | 구 Rigidbody+Collider 파일을 일회성 도구로 새 바디 정의로 변환, UUID/형상 ID/누락 자산·미지원 데이터 진단 |
 | M2 | 경계/생명주기 게이트 | backend include 격리, 파괴/씬 전환/DDOL 회귀. 기존 include 검사기의 프로젝트 배치 정합성부터 복구 |
+| E0 | ContactStream·C# 접촉 소비 | 역할 신원/Prefab·cook, Scope 구독 인덱스, 네이티브 이벤트→준비된 span, PostPhysics 소비·취소/drain·CLR ABI·구 콜백 제거 및 실제 profiler 게이트 |
 | M3 | 제품 회귀·측정 | 형상별 실제 충돌·sensor/filter·CCT·실패/해제, 실제 profiler 계층 캡처·tick/task 연관, CPU 평균/p99·메모리·변경/활성 비율별 비용 |
 | M4 | 빅뱅 완료 감사 | R0 제거 항목의 소스/링크/프로젝트 재유입 0, 구 배선·선택 스위치·호환 어댑터 0, 필수 제품 게이트 전항 통과 |
 
@@ -883,12 +890,13 @@ R0는 제거·감사 자체만 산정하고 소비자 교체는 B/C/T/M에 배�
 | M0 | 5 | C++/C# 엔트리·모델/terrain·Editor 소비자 전량 교체 |
 | M1 | 4 | 씬/프리팹/cooked 변환·오류 진단·왕복 검증 |
 | M2 | 3 | SDK 경계·씬 전환/DDOL·제품 생명주기 회귀 |
+| E0 | 6 | 역할 저작·라우팅·C# stream/ABI·PostPhysics 소비·생명주기·제품 gate |
 | M3 | 5 | 제품 기능·CPU/GPU 회귀·평균/p99/메모리·실제 캡처 |
 | M4 | 2 | 제거/배선 재유입 감사·필수 게이트 통합 확인 |
-| **합계** | **72** | 기본 범위, 별도 위험 여유 제외 |
+| **합계** | **78** | 기본 범위, 별도 위험 여유 제외 |
 
-통합·스키마 이전·GPU 검증 불확실성에 대한 여유는 기본 공수의 20~30%(약 14~22인일)로
-별도 관리한다. 여유 포함 계획 범위는 약 86~94인일이며 단계 진행 중 새 증거로 갱신한다.
+통합·스키마 이전·GPU 검증 불확실성에 대한 여유는 기본 공수의 20~30%(약 16~23인일)로
+별도 관리한다. 여유 포함 계획 범위는 약 94~101인일이며 단계 진행 중 새 증거로 갱신한다.
 대시보드는 기본 72인일을 사용하고 완료 상태의 공수 가중 집계는 실제 시간 기록과 구분한다.
 P2의 형상/cook 검증과 P3의 계측 스키마가 확정되면 잔여 공수를 다시 산정한다.
 
@@ -3745,3 +3753,1151 @@ CacheNegative/result.json 및 model-reference-full-preflight.json. M1 progress �
 - 300초 watchdog 안에서 준비 완료 확인; 제품 smoke는 GPU/presentation 완료 조건 그대로 유지. renderer 코드 수정 없음. 패키지는 이전 실패 candidate에 유지하며 current pointer publish 없음.
 - 수용 범위는 full corpus package의 PhysicsP0Baseline 시작 씬 smoke다. 모든 씬의 gameplay/geometry/override 검증, 실제 프로젝트 migration apply, 대표 부하 성능 및 M3/M4는 잔여. M1 progress 유지.
 - 근거 Build/Verification/Phase19Preserved/RenderDiagnosis 및 RenderAcceptance/result.json. 다음 M1 복잡 prefab override/자산 참조와 실제 geometry 입력 복구 조건 검증을 진행한다.
+
+
+## 2026-10-08 E0 — 접촉 작업과 C# 접근 계약 제안 (아래 ContactStream 결정으로 대체)
+
+사용자 결정: Collider 객체/ShapeId 분기 콜백과 PostPhysics 스트림 폴링 대신 OnBeginSimulation에서 Scope에 역할 조건과 처리 작업을 한 번 등록한다. 네이티브는 이벤트를 한 번 분류해 실제 매칭 작업에 배치를 공급한다. snapshot Read + typed Commands를 기본으로 하고 접근 범위 증거가 없는 직접 Write 병렬 실행은 허용하지 않는다. 상세 정본은 PhysicsContactExecutionContract.md다.
+
+E0는 구현 미착수이며 PHASE24 PrSM/OnSimulate 개편을 끌어오지 않는다. 현행 OnBeginSimulation() 시그니처/Scope 수명은 유지한다. 현행 Collision 미러는 형상 신원이 없고 새 contact event→QueuePhysicsEvent 배선도 확인되지 않아 제품 이벤트 소비자 이관은 M0 과거 완료 범위와 분리한다. 구 콜백/ABI는 E0에서 제거하며 이중 배선 없음.
+
+의존: P3 snapshot/event, B1 shape/role 저작, M0 ABI/소비자, T0 수명/command, T1 워커, 고정tick 계약. E0 → M3 → M4. 등록 시 인덱스 구축/구독 churn 비용과 E+실제 matching fanout 비용, pair/target 집계, sensor Persist, payload 요구/overflow, 취소·DDOL·Editor 복귀 및 profiler 계층을 필수 게이트로 둔다. 문서 정리 자체는 구현/성능 수용 증거가 아니다. 추가 추정6인일, 기본 합계78인일·위험 여유16~23인일.
+
+
+### 2026-10-08 E0 저작 표면 재확정 및 기본 스트림 구현
+
+후속 사용자 결정이 앞선 Job/PhysicsBehaviour/접근 descriptor 저작 제안을 대체한다. OnBeginSimulation에서 Physics.ObserveContacts를 등록하고 PostPhysics에서 ContactStream.Read의 준비된 배치를 소비한다. 역할/owner/phase hash index로 라우팅하며 전체 구독 또는 전체 접촉을 Read에서 검색하지 않는다. E0 제목과 정본 PhysicsContactExecutionContract.md를 갱신했다.
+
+기본 C# stream·runtime role 바인딩·scope 해제·80-byte contact ABI34, native finish snapshot/catch-up tick collect→Scene endpoint→CLR batch 배선을 구현 중이다. 기본18 관리 회귀 steady allocation0 및 ScriptCore/GameScripts/ABI35 검증 통과. 구 callback sample은 stream 소비로 교체. 역할 파일/Inspector/Prefab/cook, 센서 Persist/대상집계, 교체/파괴/제품수명, profiler/성능은 남으며 E0 progress다. Job 병렬 실행을 구현한 것으로 표기하지 않는다.
+
+### E0 Release Editor·cooked Player 기본 접촉 제품 게이트
+
+2026-10-08 HTTP CLI 저작 primitive/sphere sensor 씬: Editor2 Play/Stop, 양방향 sensor Begin/End·contact Begin/Persist/End 및 endpoint/tick, Transform·scene SHA 원복, Scope stream4/4 해제 통과. 동일 cooked Player 독립 실행2 endpoint probe 성공·2000GT/display promotions1970/exit0·패키지 불변 통과. scale roundoff 불필요 body replacement 억제 및 replacement retired generation→binding 유지/no-step/Stop 경계 수정, native Shipping746 checks+GPU 통과. Release Editor/Player fresh build.
+
+증거 ContactStream/Product-c20dbfff6db74da282cf3a1711140455/result.json 및 Player-44593a84178f4141817904feddb9b680/result.json. 역할 저작/cook, sensor Persist/집계/초기 overlap, 삭제/topology/Disable/reload/DDOL, ContactStream Shipping 제품 및 profiler 손실/성능 수용 잔여. E0 progress 유지.
+
+### 2026-10-08 접촉 계측 후속 검증
+
+B2 probe가 첫 프레임 경계 전에 여러 tick을 기록하던 방식을 수정해 초기 경계와 Advance별 경계를 발행하고 collector 완료를 기다린다. probe의 rolling 보존은64프레임으로 제한한다(엔진 기본값 변경 없음). native Debug/Release 각각813 checks·실제 GPU·capture complete/unacked0, 이벤트/카운터/늦은 CPU·GPU/프레임 손실0을 확인했다. ContactCollect는 Scene identity/물리 tick/task0 문맥을 검증하며 ContactPublish에도 마지막 완료 tick의 문맥을 연결했다. publish 배치 내부 접촉은 각자의 tick을 보존한다.
+
+fresh Release Editor/Player 빌드 통과. Editor 제품 기록에서 ContactCollect18회/ContactPublish16회 모두 Scene/tick/task0 문맥을 확인했다. CPU 이벤트·카운터·프레임 손실0/unacked0이지만 lateGpuSpans72로 complete=false, 제품 capture 게이트는 실패했다. profile.save의 비동기 저장 완료까지 기다린 결과이며 B2 probe 통과로 제품 전체 capture/M3 완료를 대신하지 않는다. 증거 ContactStream/profiler-debug.log, profiler-release.log, Product-49a3394707b241b9a75f23fd1fde7c43/results.jsonl 및 cycle-1.ceprof. E0 progress 유지; GPU 캡처 종료 경계와 대표 부하 성능은 잔여다.
+### 2026-10-08 E0 역할 저작 스키마
+
+PhysicsShapeDefinition에 선택적인 contactRole을 추가했다. 역할 하나를 canonical non-nil UUID 문자열로 저장하며 빈 문자열/기존 필드 누락은 역할 없음이다. 프로젝트 충돌 layerOverride 정책과 분리한다. CLI physics.shapes와 SetShapes/deserialization 공통 preflight에서 UUID 길이/파싱/nil/대소문자 정규형을 검증한다. Inspector는 기존 TypedDraw→Apply Shapes/Undo 경로를 사용한다. UUID는 자산 참조가 아니므로 geometry cook dependency를 추가하지 않는다.
+
+형상 문서 회귀에 기존 데이터·유효/빈 역할·잘못된/nil/비정규 UUID·중복/비scalar 필드 거부 및 CEDO byte encode/decode 역할 보존을 추가했다. 저장 역할의 runtime router 자동 등록, scope 수명/동적 교체 일관성, cooked Player 실제 접촉 소비는 아직 미구현이며 E0 progress를 유지한다. CEDO 단독 왕복은 전체 package/Player 수용 증거가 아니다.
+형상 문서 Debug/Release/ASan 각각54 checks 통과(Build/Obj/Phase19ShapeAuthoring/<configuration>/result.log).
+
+fresh Release Editor build 및 HTTP 제품 역할 저작 게이트 통과: Undo/Redo·Attack 원본/Hurt Prefab override·저장/재로드 보존, play 편집 거부·Stop Transform 원복. 증거 Build/Obj/Phase19ShapeAuthoring/http-b08eb75a8ef8499689fd0e16beb8e000/result.json. fixture는 해당 evidence/Fixture에 보존. Inspector UI 직접 조작과 cooked Player의 자동 role 소비는 아직 수용하지 않았다.
+
+### 2026-10-08 E0 저장 역할 런타임 소비 수용
+
+contactRole UUID를 authoring/body 생성 경계에서 GUID-compatible 16-byte 값으로 변환한다. ShapeInstance→SDK shape_identity→live/retired event_endpoint→Scene/CLR 배치에 역할 값을 보존한다. callback에서 CLR 호출/UUID 파싱 없음; 접촉마다 형상 검색/새 관리 역할 캐시 없음. 저장 역할이 있으면 그 값으로 route 키를 구성하며 역할이 없는 형상만 기존 Scope-owned 명시 바인딩을 조회한다. BindContactRole은 저장 역할이 있는 형상에 대해 같은 역할/다른 역할 모두 거부한다. GetShape에서 ContactRole을 읽을 수 있다. 별도 캐시 자동등록 대신 endpoint 값 전달로 동일 저작 동작을 수용했다.
+
+ABI35: ContactEndpoint40/NativeContact112 bytes, tick offset80; PhysicsShapeState88 bytes. SDK 교체 전후 이벤트가 각 body generation의 역할을 보존하는 Release native817 checks/GPU/capture 게이트 통과. 관리22 checks 및 저장 역할 route/read/clear 10000회 steady 할당0, ABI35 checks·187슬롯 순서 통과. 전체 파이프라인 할당0/대표 성능 수용 의미가 아니다.
+
+fresh Release Editor/Player/GameScripts 및 AssetCooker/AssetPacker ABI35 빌드·배포 신원 일치 통과. script probe는 명시 역할 등록 없이 저장 Attack/Hurt로 구독하며 GetShape 역할 및 재바인딩 거부를 검사한다. HTTP Editor2 Play/Stop·양방향 contact Begin/Persist/End·sensor Begin/End·endpoint/tick·Transform/씬 불변·stream4/4 Dispose 통과. 같은 씬 fresh cooked CEDO/CEMF/PAK 독립 Player 양쪽 probe 성공·2000GT/display promotions1967/exit0·패키지 불변 통과.
+
+증거 ContactStream/Product-31ecc30c68d24df1b41ef9cf1682f1c2/result.json 및 Player-d8a3fd7c8f61424b9789c692c5560cf7/result.json, role-native-release.log, role-managed.log. E0 progress 유지. Inspector UI 직접 수용, sensor Persist/초기 overlap/대상집계, 삭제/topology/stale·Disable/reload/DDOL, Shipping contact 제품, complete 제품 GPU capture와 성능은 잔여다.
+### 2026-10-08 E0 센서 Persist·초기 overlap 관측
+
+sensor_persist(kind5)를 추가하고 프로토콜 ABI36으로 갱신했다(바이트 layout은112/tick80 유지). SDK collector는 event_capacity와 같은 한도의 활성 sensor pair를 고정 bucket index/dense slots에 사전 할당한다. pair key는 Scene/body slot/generation/ShapeId이며 양쪽 endpoint의 역할 값을 유지한다. callbacks는 Enter/Exit만 갱신하고, 성공한 fetch에서 활성 pair만 순회해 tick별 Persist를 생산한다. Enter tick에는 중복 Persist 없음, Exit 뒤 Persist 없음. hash 충돌 삭제는 backward shift로 처리해 tombstone 누적/빈 bucket 전체 순회를 피한다. 초과는 dropped_events로 보고해 기존 incomplete snapshot failure 경로를 사용한다. 활성 pair S의 Persist 생산 O(S)는 출력 비용이며 전체 구독 검색을 추가하지 않는다. 새 Physics.SensorPersist 계층은 Scene/tick/task0 문맥을 보존한다.
+
+관리 stream은 capacity 한도의 sensor pair 신원을 사전 확보하고 End까지 유지한다. Begin-only/End-only 구독도 매칭 role의 pair 전이를 추적한다. 첫 관측이 Persist인 sensor pair는 Begin 요청 시 그 관측 tick의 Begin을 한 번 전달하고 이후 Persist만 전달한다. End 후 재진입과 body generation 변경은 새 pair로 구분한다. no-step frame은 초기 overlap 재생을 수행하지 않는다. 모든 일반 접촉의 초기 manifold replay를 구현한 것은 아니다. pair 추적 초과도 Overflowed/Read 부분 결과 거부 정책을 적용한다.
+
+관리29 checks(10000회 sensor steady 할당0), 고정 index 충돌 집중/중복/overflow/삭제/재사용 포함 형상문서 D/R/ASan 각3654 checks 통과. Release B2 885 checks/GPU, SensorPersist Scene/tick 계층·complete/unacked0/손실0 capture 통과. Release P3 3971/GPU 통과; 검증 스크립트의 누락 ProfileRecording.cpp 링크 목록도 보완했다. ABI35 checks(version36)/187슬롯 순서 및 fresh Release 네 호스트/스크립트 빌드·배포 버전 일치 통과.
+
+HTTP Editor2 Play/Stop에서 양방향 sensor Begin/Persist/End 각1, contact Begin/Persist/End·endpoint/tick·Transform/씬 불변·stream4/4 Dispose 통과. same scene fresh CEDO/CEMF/PAK 독립 Player sensor Begin1/Persist4/End1 양쪽 성공·2000GT/display promotions1970/exit0·패키지 불변 통과. 증거 ContactStream/Product-6136bb4caf144b9e8cb966327c1ce7c7/result.json, Player-86cbfe77ee704dc687c0c17488538056/result.json 및 sensor-*.log.
+
+늦은 구독의 기존 sensor overlap Begin은 관리 회귀와 아래 실행 중 신규 script 구독 Editor/Player 제품 gate에서 수용했다. E0 progress 유지: 대상집계, 삭제/topology/stale 및 Disable/reload/DDOL, Inspector UI/Shipping contact 제품, 전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-08 E0 늦은 sensor 구독 제품 수용
+
+실행 중 이미 Begin/Persist가 발생한 sensor pair에 대해 body 없는 observer Prefab을 생성하고 OnBeginSimulation에서 기존 Attack owner를 구독했다. All-phase와 Begin-only 스트림 모두 첫 관측 tick의 Begin을 한 번만 받고 All-phase만 이후 Persist를 받는다. 과거 Enter tick을 재생하지 않는다. PhysicsLateContactProbe와 HTTP gate의 -LateOverlap 옵션으로 동일 fixture를 Editor와 cooked Player에서 검증한다.
+
+HTTP 44 commands·Editor 두 Play/Stop 통과: 각 cycle spawnTick2→firstTick3→lastTick5, Begin1/Persist2/Begin-only1; 기존 양방향 sensor/contact 검증과 Transform/씬 불변 유지, 누적 stream4/4→8/8 해제. 증거 Build/Verification/ContactStream/Product-aa3e3c56d45b4a47bedbdfacd1ad54db/result.json. 저작 씬·Prefab 및 meta는 해당 Fixture에 보존했다.
+
+검증된 ABI36 Release 배포본을 재사용하고 새 스크립트·씬·Prefab을 fresh CEDO/CEMF/PAK로 패키징했다. 독립 Player spawnTick5→firstTick6→lastTick8, Begin1/Persist2/Begin-only1, 기존 양방향 sensor Begin1/Persist11/End1·contact 성공, 2000GT/display promotions1969/exit0·패키지 불변 통과. 증거 Build/Verification/ContactStream/Player-3a1830cba51a49beabc206b7148a638c/result.json. 이번 변경은 검증 스크립트와 fixture이며 네이티브 API 변경은 없다.
+
+E0 progress 유지. 대상집계, 삭제/topology/stale·Disable/Enable/reload/DDOL, overflow/예외 제품 검증, Inspector UI·Shipping contact 제품, 전체 GPU capture와 대표 부하 성능은 잔여다. 일반 solid contact의 초기 manifold replay 수용을 의미하지 않는다.
+
+### 2026-10-08 E0 sensor 대상 집계 관리 구현
+
+Physics.ObserveContacts에 선택적 grouping: ContactGrouping.SensorTargets를 추가했다. 기본 ShapePairs는 기존 동작을 보존한다. SensorTargets는 sensor만 대상 Entity 세대 핸들 기준으로 집계하며 solid 접촉은 기존 형상 pair 이벤트를 전달한다. 첫 활성 sensor pair의 Begin, 마지막 pair 이탈의 End, 대상당 fixed tick별 한 번의 Persist를 전달한다. 새 pair가 기존 대상에 합류해도 Begin을 반복하지 않는다. 늦은 최초 Persist는 target Begin으로 관측하며 Begin을 요청하지 않은 Persist-only 구독에는 Persist로 전달한다. 같은 tick의 End 후 재진입은 새 Begin을 허용한다. 대표 endpoint/point는 해당 전이를 만든 pair의 값이며 합성 manifold/누적 impulse가 아니다.
+
+stream-owned 사전 할당 pair HashSet과 대상 Dictionary를 사용하며, event 전달 시 평균 O(1) lookup/update로 처리한다. Read는 기존 O(1) borrowed span으로 유지하고 구독 전체/형상 전체를 검색하지 않는다. 활성 pair 한도도 capacity이며 초과 시 partial Read를 거부한다. 프레임 Clear는 overlap 상태를 보존하고 Scope Dispose가 모두 해제한다. endpoint 삭제/Disable/topology 정리 계약은 기존 잔여 gate이며 자동 해결을 주장하지 않는다.
+
+관리 회귀42 checks 통과: 다중 형상 Begin 중복 제거, tick별 Persist/catch-up 보존, 부분/최종 이탈, 알 수 없는 End, 늦은 구독, 대상 generation, pair capacity overflow/Read 거부, invalid grouping, Scope 해제. DOTNET_TieredCompilation=0에서 10000회 집계 steady 할당0을 확인했다. 기본 tiered JIT 실행에서는 기존 기본 routing 할당0 검사가 한 번 실패했으므로 JIT 계측 영향을 제외한 측정 조건을 명시한다. 로그 Build/Verification/ContactStream/target-managed.log. ScriptCore/GameScripts Release 빌드 오류0(기존 trimming 경고8). ABI 변경 없음.
+
+E0 progress 유지. sensor 집계 Editor/독립 cooked Player 제품 검증은 아래 후속 gate에서 수용했다. solid active-pair 대상 집계, 삭제/topology/stale·Disable/reload/DDOL, Inspector UI·Shipping·전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-08 E0 sensor 대상 집계 제품 수용
+
+HTTP gate에 -GroupTargets를 추가했다. Attack sensor19(local x3)·sensor20(local x4)가 같은 Hurt23에 겹친 뒤 Attack을 x0.6으로 이동해 한 쌍만 먼저 이탈시킨다. 이 구간에서 형상별 End1에도 대상 End0을 확인하며 나머지 쌍이 이탈한 뒤 대상 End1을 확인한다. 기본 ShapePairs 구독과 SensorTargets 구독을 양쪽 owner에 함께 등록해 endpoint/phase/tick 및 tick별 중복 Persist를 검증한다. LateOverlap은 별도 fixture로 실행한다.
+
+fresh ScriptCore/GameScripts Release 빌드 및 HTTP42 commands·Editor2 Play/Stop 통과. 각 owner/cycle 형상 sensor Begin2/Persist8/End2, 대상 Begin1/Persist7/End1, solid Begin/Persist/End 유지. Stop Transform 원복·씬 SHA 불변, scope stream4/4→8/8 해제 통과. 증거 Build/Verification/ContactStream/Product-ef86f9e631994b829e5e8a979d76cd98/result.json. 저작 씬/meta는 해당 Fixture에 보존했다.
+
+이번 관리 API를 포함하는 Release 배포본을 정식 publish-engine 경로로 생성했다(TargetDistribution/local-0.0.0.0-win-x64-Release-bed1839d-3b58-499b-9fb8-a2f6fdcf1024). fresh cooked CEDO/CEMF/PAK 독립 Player 양쪽 sensor Begin2/Persist15/End2, 대상 Begin1/Persist11/End1 통과. 2000GT/display promotions1969/exit0·패키지 입력 불변 통과. 증거 Build/Verification/ContactStream/Player-1279e051d441455fad316a3f7e8644f6/result.json 및 target-product-build/target-editor/target-publish/target-player.log. 관리42 checks(tiered JIT off)/steady 할당0도 재확인했다.
+
+E0 progress 유지. sensor 대상 집계 제품 gate는 수용했다. solid 대상 집계, sensor 신규 역할/교체 및 삭제/topology/stale·Disable/Enable/reload/DDOL, overflow/예외 제품, Inspector UI·Shipping·전체 GPU capture/대표 성능은 잔여다. 이번 fixture는 ShapePairs와 SensorTargets의 동시 구독 수용이며 LateOverlap과의 조합 수용은 별도다.
+
+### 2026-10-08 E0 Disable·삭제 retired binding 정리
+
+사전정찰에서 ScenePhysicsSimulation::SetEnabled(false)/Unregister가 SDK body 제거 직후 m_handles를 지우고, 다음 tick의 lost pair End를 해석할 retired binding은 보존하지 않는 결함을 확인했다. 기존 Replace 경로와 달리 Contact body binding unavailable/stale_handle로 실패할 수 있었다. 공통 RetireContactBody는 제거 전에 제한65536의 retired body-generation→binding 값을 확보한다. 할당/한도 실패는 SDK 변경 전에 반환하고 destroy 실패 시 준비한 값을 되돌린다. 성공 후 live map만 제거하며 기존 다음 유효 tick의 contact 수집 이후 정리 경계를 사용한다. no-step에서는 보존하고 Stop은 모두 비운다. pair/SDK endpoint는 기존 retired snapshot 경로로 해석한다. ABI 변경 없음.
+
+Release B2 904 checks/gpu_verified=true 통과. 기존 형상 교체/role generation 보존, Disable 중 overlap의 old-generation End·no stale Persist·no-step 보존·End 재전달 없음, Enable 새 generation/Begin, Unregister overlap End·stable binding·idempotent teardown·재전달 없음 회귀를 추가했다. 실제 SDK callback와 contact collect 경로를 검증했다. 증거 Build/Obj/Phase19B2/Release/result.jsonl 및 Build/Verification/ContactStream/retirement-native-release.log. 이번 변경의 Debug/ASan/Shipping와 Editor/Player 제품 수용은 아직 수행하지 않았다. Editor/Player 실행 바이너리도 이번 네이티브 수정으로 재빌드하지 않았다.
+
+추가 확인된 제품 경계: Scene::UnregisterPhysicsBody는 m_physicsBodies의 component pointer를 즉시 지우고, ContactPublish는 여전히 live component map에서 양쪽을 찾는다. 따라서 삭제 후 End를 CLR까지 전달하려면 포인터 대신 owner generation handle/component ID 값의 retired endpoint snapshot이 필요하다. 이번 네이티브 binding 수정만으로 전체 삭제 수명 수용을 주장하지 않는다. 다음 작업은 이 publication 경계와 실제 제품 삭제/교체 gate다. E0 progress 유지.
+
+### 2026-10-08 E0 삭제 End의 CLR publication 제품 수용
+
+Scene은 body 등록 시 owner의 ScriptObjectHandle(세대 포함)·component instance ID를 값으로 확보한다. ContactPublish는 live component pointer 조회/owner 재등록 대신 binding→값 snapshot으로 endpoint를 구성한다. 삭제 시 live component map은 즉시 제거하고 값 snapshot만 retired 목록(최대65536)에 보존한다. 준비 할당/한도 실패는 Unregister 전에 반환하며 native 제거 실패 시 retired 목록을 되돌린다. 다음 유효 tick의 QueueContact 완료 후 retired 값들을 정리한다. no-step은 보존하고 Stop/scene exit는 정리한다. snapshot에 component/Entity 포인터가 없으므로 해제된 메모리를 읽거나 삭제된 owner를 다시 등록하지 않는다. ABI36/layout112/tick80 유지.
+
+End의 OtherEntity는 삭제 당시 세대 핸들을 가진 신원이다. Entity.IsAlive=false여도 OtherComponentId/ShapeId로 종료 판정을 정리할 수 있다. 삭제된 대상의 Name/Transform 등 live 상태를 읽기 전에 IsAlive를 검사한다. End 전달이 Entity 부활을 의미하지 않는다.
+
+fresh Release Editor/Player/AssetCooker/AssetPacker 및 GameScripts 빌드 통과, 새 정식 배포본 RetirementDistribution/local-0.0.0.0-win-x64-Release-305d7f72-77ab-48b9-8187-6882924ad436 생성. HTTP -Retirement fixture는 두 sensor가 같은 Hurt 대상에 Begin/Persist한 후 C# Entity.Destroy로 실제 대상을 삭제한다. 생존 Attack의 ShapePairs/SensorTargets 구독에서 삭제된 owner handle/component ID 보존, IsAlive=false, shape End2→target End1, 이후0.1초 이상 stale Persist/End 재전달 없음 검증. HTTP41 commands·Editor2 Play/Stop 성공: 각 cycle sensor Begin2/Persist2/End2·target Begin1/Persist1/End1, 삭제 대상 및 Transform 복원·scene SHA 불변, stream2/2→4/4 Scope 해제. 증거 Build/Verification/ContactStream/Product-c412b3e4e7684cfd8a2d3ad19ad1fe31/result.json, 씬/meta는 Fixture에 보존.
+
+same fixture fresh CEDO/CEMF/PAK 독립 Player도 동일 삭제 신원/End counts 통과, 2000GT/display promotions1970/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-58fbd68a3bbd42b88cc86880fe6ff4d9/result.json 및 retirement-*-build/retirement-editor/retirement-publish/retirement-player.log. 관리42 checks/steady 할당0(tiered JIT off), PowerShell/parser·dashboard JS/diff 검사 통과. 이전 native B2 904/GPU 수용과 이번 실제 CLR 제품 수용을 구분한다.
+
+E0 progress 유지. 이번 수용은 전체 Entity 삭제의 sensor 종료다. PhysicsBodyComponent 단독 제거, 복합 형상 교체/topology·solid End·역할 변경, subscriber Disable/Enable·reload/DDOL, overflow/예외 제품, Debug/ASan/Shipping, Inspector UI·전체 GPU capture/대표 성능은 잔여다. 다음은 형상 교체의 제품 topology 수명 gate다.
+
+### 2026-10-08 E0 복합 sensor 형상 교체·body slot 신원 수용
+
+초기 제품 gate(Product-466e430b24434ec2967956be8c18cee6)는 generation만 바뀔 것이라는 검사 가정 때문에 실패했다. 실제 새 SDK body는 다른 slot에서 동일 generation1을 가질 수 있다. 이는 기존 관리 SensorPair 키에서도 다른 slot의 body를 같은 신원으로 취급할 수 있는 결함이다. SDK sensor index는 이미 slot/generation을 사용하지만 CLR endpoint는 slot을 생략하고 있었다. 이를 보완해 endpoint에 bodySlot/reserved를 전달하고 양쪽 관리 SensorPair 키에 slot을 포함했다. Contact에 SelfBodySlot/OtherBodySlot와 SelfBodyGeneration/OtherBodyGeneration을 노출한다. body slot/generation은 Scene-local이며 Entity 세대·component ID와 함께 사용한다. DDOL/scene 간 수명 수용을 대신하지 않는다.
+
+ABI37: endpoint48 bytes, NativeContact128 bytes, tick offset96, shape state88 유지. 새 reserved는0으로 작성한다. 네이티브 sizeof/offsetof와 관리 ABI 크기/offset 검사, API version37·187슬롯 순서 통과(ABI35 checks). 관리44 checks/10000회 steady 할당0(tiered JIT off): 동일 generation·다른 body slot의 sensor pair 격리 회귀를 추가했다. 최신 Release Editor/Player/AssetCooker/AssetPacker 및 GameScripts 재빌드·정식 TopologyDistribution/local-0.0.0.0-win-x64-Release-e11cc1ae-6282-4b3c-8c63-8dbfa72579c7 배포 생성. 이전 ABI36 배포본을 새 스크립트와 섞어 사용하지 않는다.
+
+-Topology gate의 PhysicsTopologyContactProbe는 기존 두 센서가 겹친 상태에서 public SetShapeFlags(19,true,false)를 호출해 복합 body 전체를 교체한다. sensor/role·component ID·대상 신원을 보존하고 query flag만 변경한다. 이전 body End2·새 body Begin2·최종 이탈 새 body End2를 각 신원으로 검사한다. 이전 신원의 Persist/Begin, 제3 신원, 전이 중복을 거부하고 최종 이탈 후0.1초 이상 stale event가 없는지 확인한다. target 집계는 callback 순서에 따라 old End→new Begin 또는 연속 활성 상태가 될 수 있으므로 Begin1~2와 동일 수의 최종 End를 허용한다. frame 전체를 재정렬해 topology 교체를 무조건 연속 overlap으로 합성하는 계약이 아니다.
+
+HTTP37 commands·Editor2 Play/Stop 통과: old(slot0,generation1)→new(slot2,generation1), shape Begin4/Persist4/End4, target Begin2/Persist2/End2, oldEnd2/newBegin2/newEnd2. 매 Play 시작 시 저작 query=true/sensor/role 복원을 검사하며 Stop Transform/scene SHA 불변·stream2/2→4/4 해제 통과. 증거 Build/Verification/ContactStream/Product-ec74932fc7b44b3287c4927ee6489c35/result.json. ABI37 삭제 Editor gate도2cycles 재수용(Product-974e5787679e4559ac086410fbcae7b8). 모든 fixture 씬/meta는 각 Fixture에 보존했다. 초기 실패 fixture도 보존하며 성공으로 판정하지 않는다.
+
+same topology fixture fresh CEDO/CEMF/PAK 독립 Player old/new(slot0→2,generation1 동일), shape Begin4/Persist12/End4·target Begin2/Persist6/End2, oldEnd2/newBegin2/newEnd2 통과. 2000GT/display promotions1969/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-052d2a20d2bc4454aa8b1a18146a7aef/result.json 및 topology-*.log. PowerShell/parser·dashboard JS/diff 검사 통과.
+
+E0 progress 유지. 이번 수용은 sensor를 유지하는 query flag 변경에 따른 한 번의 compound body 교체다. sensor↔solid 변경, 다중 연속 교체/역할 변경, component 단독 제거, subscriber Disable/Enable·reload/DDOL, overflow/예외 제품, Debug/ASan/Shipping·Inspector UI·전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-08 E0 sensor↔solid 단계별 연속 교체 제품 수용
+
+PhysicsSensorTransitionProbe와 HTTP -SensorTransition gate를 추가했다. 복합 body의 sensor19·sensor20이 같은 Hurt23과 겹친 뒤 public SetShapeFlags로19만 sensor→solid→sensor로 전환한다. 각 교체의 접촉을 소비한 다음 교체하며 마지막에는 대상을 이탈한다. 물리적 밀려남을 배제하기 위해 fixture의 dynamic body translation/rotation locks를7로 고정했다. 실제 movement/solver 응답 성능 수용이 아닌 접촉 모드·수명 gate다.
+
+각 단계 body 신원을 slot/generation으로 검사한다: (slot0,gen1)→(slot2,gen1)→(slot0,gen2). 동일 generation의 다른 slot 및 같은 slot의 새 generation을 모두 수용한다. shape19의 sensor/query/role 변경·보존을 GetShape로 확인하고 각 Play 시작에서 원래 sensor=true/query=true/Attack role 복원을 검사한다. raw 센서 Begin/End는 단계별2/1/2, 가운데 solid Begin/End는1/1이다. retired body의 Begin/Persist, snapshot sensor flag 오염, 엔티티/component 신원 변경, target Persist tick 중복, 최종 이탈 뒤0.1초 이상 stale/replay를 거부한다. SensorTargets의 solid 이벤트가 형상 pair로 통과하는 계약도 Begin/End1씩 확인한다. target sensor Begin1~3/같은 수의 End를 허용해 SDK callback 전이 순서를 고정하지 않는다.
+
+Release GameScripts 빌드·HTTP39 commands·Editor2 Play/Stop 통과: sensor Begin/End[2,1,2], Persist[2,1,2], solid Begin/Persist/End1/1/1, target2/4/2·solid pass-through1/1. Stop 원복·씬 SHA 불변·stream2/2→4/4 해제. 증거 Build/Verification/ContactStream/Product-82194b883daa44d48b0d74e0e19925b3/result.json, 씬/meta는 Fixture에 보존. 이번 변경은 제품 회귀 스크립트이며 native/ScriptCore/ABI 변경 없음.
+
+검증된 ABI37 TopologyDistribution 배포본을 재사용해 새 스크립트/씬을 fresh CEDO/CEMF/PAK로 패키징했다. 독립 Player sensor Begin/End[2,1,2]·Persist[8,2,6], solid1/2/1, target2/10/2·solid pass-through1/1, 같은3개 body 신원 통과. 2000GT/display promotions1970/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-fe04373eb5d6473b984d8bde840a5be6/result.json 및 transition-managed-build/transition-editor/transition-player.log. PowerShell/parser·dashboard JS/diff 검사 통과.
+
+E0 progress 유지. 두 차례의 단계별 sensor↔solid 교체는 수용했으나, fetch 전 동일 tick의 다중 연속 교체·역할 변경은 별도 gate다. component 단독 제거, subscriber Disable/Enable·reload/DDOL, overflow/예외 제품, solid 대상 집계, 최신 변경 Debug/ASan/Shipping·Inspector UI·전체 GPU capture/대표 성능은 잔여다. 다음은 fetch 전 다중 교체의 endpoint retirement gate다.
+
+### 2026-10-09 E0 fetch 전 다중 교체 제품 수용
+
+PhysicsTopologyContactProbe의 선택적 _burstReplacements 및 HTTP -BurstTopology gate를 추가했다. 한 PostPhysics 안에서 public SetShapeFlags를19 solid/query-on→19 sensor/query-off→20 solid/query-on→20 sensor/query-on 순서로 네 번 동기 호출하며 사이에 simulate/fetch를 수행하지 않는다. 기존·최종 body만 접촉을 생성해야 한다. 중간 body endpoint/solid 이벤트가 나오면 기존 topology 신원·센서 검사에서 거부한다. final19 sensor/query-off/role 보존 및 다음 Play 저작값 복원을 검사한다.
+
+Release GameScripts 빌드·HTTP39 commands·Editor2 Play/Stop 통과: 네 교체 후 old(slot0,gen1)→final(slot0,gen3), oldEnd2/finalBegin2/finalEnd2, sensor Begin4/Persist4/End4·target Begin2/Persist2/End2. 중간 body 이벤트·stale/replay 없음, Stop Transform/씬 SHA 불변·stream2/2→4/4 해제. 증거 Build/Verification/ContactStream/Product-3fc766ab23184b88927564d26242d493/result.json. fixture 씬/meta는 해당 Fixture에 보존했다.
+
+native/ScriptCore/ABI 변경 없이 기존 ABI37 TopologyDistribution을 재사용해 fresh CEDO/CEMF/PAK를 생성했다. 독립 Player 네 교체·같은 slot generation1→3·oldEnd2/finalBegin2/finalEnd2, sensor4/12/4·target2/6/2 통과. 2000GT/display promotions1969/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-bc1c2fd046d74de6a3fff737b2003cfe/result.json 및 burst-managed-build/burst-editor/burst-player.log. PowerShell/parser·dashboard JS/diff 검사 통과.
+
+E0 progress 유지. fetch 전4회 교체는 수용했지만 역할 변경, 교체 횟수/retirement capacity 초과·오류 rollback·no-step 장기 보존 및 무한 churn 성능은 별도다. 다음은 Entity를 유지한 PhysicsBodyComponent 단독 제거의 End·stale wrapper 제품 gate다. subscriber Disable/Enable·reload/DDOL, overflow/예외 제품, solid 대상 집계, 최신 변경 Debug/ASan/Shipping·Inspector UI·전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-09 E0 물리 컴포넌트 단독 제거 제품 수용
+
+기존 C#에는 native PhysicsBodyComponent만 제거할 수 있는 API가 없었다. PhysicsBodyComponent.Remove()를 추가하고 API table 끝에 Body_Remove를 append했다. ABI38/188슬롯으로 갱신하며 contact endpoint48/Contact128/tick96/shape88 layout은 유지한다. native 호출은 simulation owner-thread window를 먼저 검사하고 owner generation handle·정확한 component ID·destroy mark를 검증한다. 유효한 body에 기존 Object::Destroy mark를 적용하고0을 반환한다. None은 제거 요청 수락이며 SDK 해제는 기존 프레임 경계의 OnRemoving/Unregister 경로가 소유한다. 유효 simulation window에서 이후 같은 래퍼의 호출·반복 Remove는 StaleHandle, window 밖은 기존 WrongPhase 우선 계약이다. owner Entity를 파괴하지 않는다.
+
+HTTP -RemoveComponent와 PhysicsContactStreamProbe의 _removeBodyOnly gate를 추가했다. 두 sensor가 같은 대상에 Begin/Persist한 뒤 정확한 target wrapper.Remove를 호출한다. 즉시 ReadState/SetVelocity/반복 Remove3회, End 후 ReadState/SetShapeFlags/ApplyForce3회가 모두 StaleHandle임을 확인한다. End의 OtherEntity.IsAlive=true·owner handle/component ID 보존, old ID Find=null·HasComponent=false, 이후0.1초 stale/replay 없음 검증. 각 Play 시작에서 Hurt body/shape23/role 복원을 검사한다.
+
+fresh Release Editor/Player/AssetCooker/AssetPacker/GameScripts 빌드 및 정식 ComponentDistribution/local-0.0.0.0-win-x64-Release-5d5e38b7-1793-46c3-b960-137177d06333 배포 생성. 관리 ABI36 checks/version38·188슬롯 순서/Body_Remove 초기화·unbound Remove WrongPhase 통과. 기존 관리 접촉44 checks/steady할당0(tiered JIT off) 재확인. 최신 ABI38 배포본을 사용하며 ABI37과 섞지 않는다.
+
+HTTP43 commands·Editor2 Play/Stop 통과: 각 cycle sensor Begin2/Persist2/End2, target Begin1/Persist1/End1, Entity alive=true·stale checks6, Stop Transform/컴포넌트/role 복원·scene SHA 불변·stream2/2→4/4 해제. 증거 Build/Verification/ContactStream/Product-4c22c5e2256547e881ebbb8b358f214f/result.json, fixture 씬/meta는 해당 Fixture에 보존했다.
+
+same fixture fresh CEDO/CEMF/PAK 독립 Player sensor2/8/2·target1/4/1, Entity alive=true·stale checks6 통과. 2000GT/display promotions1969/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-ca1a671d37ee44b5bca58daef2ff4a67/result.json 및 component-*.log. PowerShell/parser·dashboard JS/diff 검사 통과.
+
+E0 progress 유지. 단독 제거의 sensor 접촉 수명은 수용했다. 같은 owner에 새 body를 추가한 뒤 old wrapper 재지정 방지, role 변경/retirement 한도·rollback, subscriber Disable/Enable·reload/DDOL, overflow/예외 제품, solid 대상 집계, 최신 변경 Debug/ASan/Shipping·Inspector UI·전체 GPU capture/대표 성능은 잔여다. 다음은 subscriber Disable/Enable 구독 수명 gate다.
+
+
+### 2026-10-09 subscriber Disable/Enable 관리 수명 수정
+
+ScriptRegistry.ApplyEnabled(false)는 OnDisable 전에 해당 subscriber의 ContactStream 관측 상태를 초기화한다. subscriber 참조 인덱스로 소유 스트림만 찾으며 매 프레임 전체 구독을 검색하지 않는다. pending buffer·overflow·sensor pair·target 집계를 비우고 touched 목록에서 제거한다. 구독과 Scope는 유지하며 disabled 구간 이벤트는 전달하지 않는다. Enable 후 현재 sensor overlap의 첫 Persist가 새 Begin을 seed하고 이후 Persist로 이어진다. 비활성 구간 이력이나 합성 End를 재생하지 않는다. Dispose는 route/subscriber/touched 인덱스에서 제거한다. 기존 borrowed span은 Disable에서도 만료한다.
+
+관리 회귀54 checks/steadyAllocatedBytes=0(DOTNET_TieredCompilation=0), Release ScriptCore/GameScripts 빌드 오류0. 검사에는 frame 종료 전 buffer 초기화, 같은 route의 다른 subscriber 격리, disabled Begin/End 차단, 재활성화 시 pair/target/Begin-only 초기 overlap, 단일 Begin, 같은 frame Disable/Enable, Scope 유지·최종 해제를 포함한다. standalone probe의 Component는 수명 전이를 모사하므로 실제 native Enabled dispatch와 Editor/Player 제품 수용을 대신하지 않는다. 실제 bodyless observer Disable/Enable Editor2 Play/Stop·fresh cooked Player 검증은 다음 잔여 작업이며 E0 progress를 유지한다.
+
+
+### 2026-10-09 subscriber Disable/Enable 제품 수용
+
+PhysicsSubscriberContactProbe와 HTTP -SubscriberLifetime fixture를 추가했다. bodyless ContactObserver가 attack owner의 shape-pair All·SensorTargets All·Begin-only 세 스트림을 소유하며, 독립 ContactAttack controller는 별도 All 스트림으로 SDK 접촉을 계속 관측한다. observer 스크립트만 Enabled=false로 전이한 뒤 controller가 두 sensor를 이탈·재진입시키고 각 구간을0.15초 이상 유지한다. OnDisable/OnEnable에서 pending buffer·overflow가 비었는지, disabled 동안 PostPhysics callback count가 불변인지, native Enabled 전이 훅이 각각1회인지 검사한다. Scope나 바디는 비활성화하지 않는다.
+
+재활성화 첫 관측 tick은 enableAfterTick보다 커야 한다. pair Begin2·target Begin1·Begin-only2를 새로 받고 Persist가 이어져야 한다. disabled 구간의 End/Begin은 재생하지 않으며 최종 이탈에서 observer shape End2·target End1만 받는다. controller는 전체 두 overlap 수명에서 shape Begin4/End4를 받는다. 마지막 이탈 후0.1초 동안 중복 이벤트가 없는지 확인한다.
+
+Release GameScripts 빌드 오류0, 기존 관리54 checks/steadyAllocatedBytes0(tiered JIT off), ABI38 36 checks 재확인. 새 ScriptCore를 포함한 정식 배포 SubscriberDistribution/local-0.0.0.0-win-x64-Release-98ba056c-27d2-49b8-89ed-47fc3eadfb05 생성. native API/layout 변경 없음.
+
+Editor HTTP39 commands·2 Play/Stop 통과: 두 cycle 모두 controller Begin4/End4, observer Begin4/End2·target Begin2/End1·Begin-only4, Disable/Enable1회, enableAfterTick20→seedTick21, 재활성화 Persist 확인. Stop Transform 복원·scene SHA 불변·stream4/4→8/8 해제. 증거 Build/Verification/ContactStream/Product-e4cb48f15e1e40b9b5b7520da4717054/result.json. 씬/meta는 같은 디렉터리 Fixture로 옮겨 보존했다. 초기 검사 Product-61e8e0b도 Fixture에 보존하되 최종 수용 증거는 e4cb48f다.
+
+fresh CEDO/CEMF/PAK 독립 Player 같은 접촉 계수와 native 활성 전이 통과. enableAfterTick29→seedTick30·재활성화 target Persist6. 2000GT/display promotions1969/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-7f733ad4031b49299eb06e5037cd8c16/result.json 및 subscriber-*.log.
+
+E0 progress 유지. 이 fixture의 subscriber Disable/Enable 수명을 수용했으며 reload/DDOL·role 변경/retirement 한도/rollback·동일owner 새body/old wrapper·overflow/예외 제품·solid 집계·최신 Debug/ASan/Shipping/Inspector UI·전체 GPU capture/대표성능은 잔여다. 다음 작업은 role 변경 접촉 수명 제품 검증이다.
+
+
+### 2026-10-09 role 전환 제품 수용
+
+C# PhysicsBodyComponent.SetShapeRole와 append-only Body_ShapeRole 슬롯을 추가해 ABI39/189슬롯으로 갱신했다. contact endpoint48/Contact128/tick96/ShapeState88 layout은 유지한다. role UUID는 관리 stack buffer로 인코딩하고 native에서 canonical UUID 검증 후 shape definition 복제본을 기존 ReplaceShapes로 커밋한다. owner generation/정확한 component/shape 검증, window 밖 WrongPhase, unknown shape StaleHandle. 동일 role은 no-op, Guid.Empty는 저장 role 제거이며 별도 Scope binding을 변경하지 않는다. empty role/명시 binding 조합의 제품 수용은 이번 gate 범위 밖이다.
+
+PhysicsRoleContactProbe·HTTP -RoleTransition·Player fixture를 추가했다. 두 sensor의 Attack/Hurt overlap에서 shape19만 custom Alternate로 바꾸고 Attack으로 되돌린다. role 변경은 body 전체 교체여서 형제 shape20도 old End/new Begin이 발생한다. 이전 endpoint의 role snapshot은 보존하고 새 endpoint만 새 role로 라우팅한다. shape-pair/target 각 role에 별도4 streams를 등록하여 stale role Persist·misroute·중복·미종료 target을 거부한다. shape flags·형제 role·component instance 보존, unknown shape 거부를 검사한다. 마지막 이탈 후0.1초 settle까지 재생이 없음을 확인하고, Stop 직전 다시 Alternate를 남겨 다음 Play의 Attack snapshot 복원을 검사한다.
+
+Release Editor/Player/AssetCooker/AssetPacker/GameScripts fresh 빌드 통과. ABI39 37 checks/189슬롯 순서 및 Body_ShapeRole 초기화 통과. 기존 관리54 checks/steadyAllocatedBytes0(tiered JIT off) 재확인. 새 정식 RoleDistribution/local-0.0.0.0-win-x64-Release-fc92794c-0535-406f-bdfe-b6696e782abc 배포 생성.
+
+Editor HTTP37 commands·2 Play/Stop 통과: Attack Begin/End[2,1,2], Alternate Begin1/Persist1/End1, Attack target Begin2/End2·Alternate target1/1, 관측 body 신원[1,8589934593,2], Stop 전 runtime role 변경을 남긴 뒤 다음 Play 원복. Transform·scene SHA 불변·stream4/4→8/8 해제. 증거 Build/Verification/ContactStream/Product-3365df487c3a446aa809cf4462b34a8e/result.json, 씬/meta는 Fixture에 보존. 초기 Product-59525511은 추가 finalRoleChanged 검사가 반영되기 전 바이너리의 실패 실행이며 최종 수용 증거로 사용하지 않는다.
+
+fresh cooked CEDO/CEMF/PAK 독립 Player 같은 Attack Begin/End[2,1,2], Alternate1/3/1·target 수명2/2 및1/1 통과. 2000GT/display promotions1954/exit0·패키지 불변. 증거 Build/Verification/ContactStream/Player-8a798b7043884fe2aa5a7989c4ad93a3/result.json 및 role-*.log.
+
+E0 progress 유지. role 전환의 이 sensor 제품 fixture는 수용했다. retirement 한도/rollback·저장 role 제거/명시 binding 조합·동일owner 새body/old wrapper·reload/DDOL·overflow/예외 제품·solid 집계·최신 Debug/ASan/Shipping/Inspector UI·전체 GPU capture/대표성능은 잔여다. 다음은 retirement 한도/rollback 검증이다.
+
+
+### 2026-10-09 retirement 한도/rollback native gate
+
+ScenePhysicsSimulation의 실제65536 retirement map 한도에 대한 B2 회귀를 추가했다. CE_PHYSICS_TESTING friend seam으로 synthetic retirement key65536개를 채워 실제 guard를 실행한다. 실제SDK actor65536개 churn을 수행한 제품/성능 gate는 아니다. full 상태에서 Replace·SetEnabled(false)·Unregister가 CapacityExceeded를 반환하고 body handle/live binding·enabled membership·shape role definition·kind/mass·pose/linear/angular velocity를 유지한다. Advance(0)는 한도를 해제하지 않으며 유효 fixed tick 후 map이 비워지고 기존 sensor Persist만 나온다.
+
+기존 standalone PhysicsTestHooks에 replacement_map_allocation·replacement_retired_allocation·retirement_map_allocation 지점을 추가했다. CE_PHYSICS_TESTING에서만 std::bad_alloc을 주입해 map 준비/retirement catch 경로를 검사한다. 실제 시스템 allocator 고갈을 발생시킨 측정은 아니다. 추가로 SDK body_shape 생성 실패와 negative sphere radius 거부를 검사한다. capacity3·map 준비 OOM2·Disable/Unregister retirement OOM2·SDK 생성1·잘못된 형상1의 총9 실패 후 기존 overlap 유지·ghost Begin/End 없음. 정상 Replace 재시도는 old body/old role End1·new body/new role Begin1, 다음 tick Persist1로 이어진다. Disable/Enable/Unregister 재시도도 통과한다.
+
+Release/Debug/ASan B2 각967 checks·실제 GPU 기본 exercise 통과, native capture dropped/counters/lateEvents/lateSpans/frame loss0·complete1/unacked0. 이 fault rollback 시나리오 자체의 실행 backend는 CPU다. Shipping은 fault hooks/friend seam을 제외한 경로774 checks·GPU 통과. ABI39와 제품 동작 변경은 없으며 native 제품 배포본을 이번 fault test의 증거로 재해석하지 않는다.
+
+증거 Build/Verification/ContactStream/Retirement-474eb861429d432b84ac7defc3e18faa/result.json 및 구성별 build/result/stderr/capture. Build/Obj 삭제에도 보존되도록 로그·JSONL·capture만 복사했으며 DLL/EXE/OBJ/PDB는 복제하지 않았다. source hashes를 포함한다.
+
+상위 수명 실패 전달은 별도 발견 사항이다. PhysicsBodyComponent::ChangeEnabled와 OnRemovingFromScene는 ScenePhysicsSimulation/Scene unregister 오류를 로그로만 처리한다. Component::SetEnabled는 훅보다 먼저 enabled 상태를 바꾸며, Scene의 detach는 OnRemovingFromScene 호출 후 소유권을 해제한다. 따라서 native simulation rollback 통과를 실제 컴포넌트 Disable/삭제 rollback 수용으로 확대하지 않는다. failed unregister 후 남는 Scene registry와 삭제되는 컴포넌트 포인터의 수명 위험은 source상 존재하며 제품 fault 재현·실패 전달/해제 정책 보강이 필요하다. 다음 우선 작업은 이 상위 수명 실패 전파다.
+
+E0 progress 유지. retirement simulation native boundary는 수용했지만 상위 Scene/component/CLR 오류 전달·GPU fault 시나리오·제품 capacity churn은 잔여다. 동일owner 새body/old wrapper·저장 role 제거/명시 binding 조합·reload/DDOL·overflow/예외 제품·solid 집계·최신 전체호스트 Debug/ASan/Shipping/Inspector UI·전체 GPU capture/대표성능도 완료로 올리지 않는다.
+
+
+### 2026-10-09 컴포넌트 수명 실패 전파 보강
+
+PhysicsLifecyclePolicy.h에 RetirePhysicsOwner와 ApplyPhysicsEnabledTransition을 작성하고 PhysicsBodyComponent·CharacterMovementComponent에 연결했다. void 활성 훅에서 SDK 변경이 실패하면 Object::SetEnabled를 직접 호출해 local enabled를 되돌린 뒤 SceneManager::ReportSimulationFailure에 원인을 전달한다. 반대 활성 훅을 재귀 호출하지 않는다. SceneManager는 실패 count/reason을 남기고 GameStart=false로 기존 render-safe 구조 경계의 EndPlayTransaction을 요청한다. Entity 전체 활성 트랜잭션을 계속 진행하는 재시도 계약으로 확대하지 않는다.
+
+제거 훅은 처음 unregister가 성공하면 그대로 종료한다. 실패하면 원인을 보고하고 같은 owner thread에서 StopPhysicsSimulation으로 SDK·pending retirement를 정리한 후 unregister를 재시도한다. 성공 후에만 Scene registry/컴포넌트 binding이 해제된다. stop 또는 재시도가 실패하면 runtime_error로 현재 소유권 drain을 끊으며 실패를 로그만 남기고 반환하지 않는다. 원본 Scene 포인터를 값으로 보존해 성공한 unregister가 component.m_scene을 비워도 복구 lambda가 무효 포인터를 읽지 않는다. 물리 runtime 정리와 Scene 소유권 복원은 각각 이 recovery/기존 host 구조 경계가 담당한다. 실패 세션의 정상 접촉 종료 전달은 수용 범위 밖이다.
+
+프로파일러 계층 Physics.LifecycleRetire/Physics.LifecycleEnabled 및 Physics.CharacterLifecycleRetire/Physics.CharacterLifecycleEnabled를 추가했다. SDK 정리는 기존 Physics.PlayStop으로 이어진다. 새로운 정책 header를 SceneRuntime 프로젝트/필터에 등록했다. ABI39·189슬롯과 contact layout은 유지한다.
+
+B2의 실제 ScenePhysicsSimulation에 용량 failure를 주입하여 local Disable rollback→원래 오류 보고→SDK Stop→unregister 재시도의 순서를 검증했다. 성공 경로의 stop/report0, Stop 실패 시 retry0, 재시도 실패 유지, 정상 Enable의 rollback0도 검사한다. 캐릭터 SDK 생성 fault의 OutOfMemory→local Enabled=false 복원/disabled SDK 유지·Enable 재시도·정상 제거를 추가했다. 최종 Release/Debug/ASan 각984 checks/GPU 통과·native capture complete1/unacked0·손실0. fault 정책 시나리오는 CPU native test이며 실제 SceneManager/GUI 실패 전환을 주입한 제품 수용은 별도 잔여다. Shipping의 fault seam 제외 경로774/GPU도 이번 작업 중 확인했다.
+
+네 Release 호스트 최종 재빌드 통과. 최종 배포 LifecycleDistribution/local-0.0.0.0-win-x64-Release-a45dbc7e-a9a4-4b4d-8586-571788a3b002는 바디/캐릭터 정책 모두 포함한다. 바디만 반영한 중간 ce2450d2 배포는 아래 바디 정상 회귀에 사용했으며 최종 캐릭터 제품은 a45dbc7e를 사용했다.
+
+바디 정상 제거 제품 회귀: Editor HTTP43·2 Play/Stop·sensor End2/target End1·stale6·owner alive·원복/SHA·stream4/4 해제(Product-12354b65). cooked Player2000GT/display1967/exit0·패키지 불변(Player-84e484ae). 캐릭터 최종 Editor HTTP44·관리18 checks·이동 후 Stop[0,3,0] 원복·component remove 통과. 최종 cooked Player 이동12 checks/exit0·231파일 불변·초기/최종 hasAuthoringSnapshot=false·editorSceneLoaded=false 통과. 정상 수명 제품 회귀 결과를 제품 fault 주입 수용으로 확대하지 않는다.
+
+증거 Build/Verification/ContactStream/Lifecycle-e612411f94df4d9fadfc810352e8ec3b/result.json·D/R/ASan/Shipping capture/log·CharacterEditor/CharacterPlayer/result.json. CharacterEditor의 임시 씬/meta를 해당 Fixture로 옮겼다. CharacterLifecyclePlayer-c4c5cc6db52241b6be784c6303f91270 및 lifecycle-*.log에 패키징/빌드 증거 보존. 기존 사용자 수정·staging은 유지했다.
+
+E0 progress 유지. 발견된 로그 전용 실패 소비를 소스와 공통 executable policy gate로 보강했고 정상 Editor/Player 회귀를 수용했다. 전체 제품 fault 주입·GPU fault/actual capacity churn·동일owner 새body/old wrapper·저장 role 제거/명시 binding·reload/DDOL·overflow/예외 제품·solid 집계·Inspector UI·최신 전체 Shipping·전체 GPU capture/대표성능은 잔여다. 다음은 동일 owner에 새 body를 추가했을 때 old wrapper가 재지정되지 않는 제품 검증이다.
+
+### 2026-10-09 동일 owner 재생성: 관리 래퍼 신원 회귀
+
+PhysicsBodyIdentityProbe는 실제 ScriptCore 소스를 컴파일하고 unmanaged ScriptApiTable에 모델 registry를 연결한다. 같은 owner(17,3)의 component101 제거 후 component202를 배치하여 GetComponent/Find가 새 신원을 캡처하고 old wrapper는101을 유지하는지 검증했다. old ReadState는 StaleHandle/출력 초기화, SetVelocity/Remove는 새 body의 상태와 존재를 바꾸지 않는다. 새 wrapper의 읽기/쓰기, owner generation 격리 및 unbound WrongPhase 우선순위도 검사한다. Debug/Release 각각15 checks, ABI39 유지. 증거 Build/Verification/ContactStream/Identity-a6c46c8aaa974f1d928c9fcfeeef48bf/result.json.
+
+이 gate의 native registry는 모델이다. 실제 Scene 컴포넌트 추가/SDK 생성/Editor Play snapshot/Player 재생성 수용으로 확대하지 않는다. C#에는 native AddComponent API가 없으며 HTTP component.add는 EditorOperation/Editor 전용이다. 검증 편의를 위한 공개 생성 API는 추가하지 않았다. 다음 실제 제품 gate에는 owner-thread 구조 경계에서 기존 C++ Entity::AddComponent를 호출하는 테스트 경로가 필요하다. E0 progress 유지; 동일 owner 재생성 제품 검증은 잔여다.
+
+### 2026-10-09 동일 owner 재생성 gate의 적용 범위 정정
+
+실제 제품 경로를 재정찰한 결과 EditorObjectOperations::AddComponent는 Play 중 PhysicsBodyComponent/CharacterMovementComponent 추가를 physics.authoring_frozen으로 거부한다. C# runtime native component 생성 API도 없다. 따라서 동일 owner body 제거 후 신규 component 생성은 현재 지원하는 스크립트 계약에 포함되지 않는다. 모델 wrapper 신원 gate15 checks는 유지하되, 이 시나리오를 현재 E0의 즉시 실행 가능한 제품 수용으로 표시했던 순서를 정정한다. runtime 생성 계약을 확장할 때 실제 Scene/SDK gate를 추가한다. 현재 저작 freeze를 시험 때문에 해제하거나 비공개 자동 재생성 훅을 추가하지 않는다. 기존 지원 범위인 component 제거 후 stale6 제품 gate와 shape 교체의 SDK generation gate는 계속 유효하다.
+
+### 2026-10-09 저장 role 제거 + Scope 바인딩 제품 수용
+
+PhysicsRoleContactProbe의 ExplicitBinding fixture를 추가했다. OnBeginSimulation에서 원본 Attack role 복원 확인→shape19 저장 role 비우기→Scope Attack 바인딩→중복 바인딩 거부를 확인한다. 초기 빈 저장 role은 Scope 바인딩으로 전달되고, runtime Alternate 저장 role 지정은 해당 바인딩보다 우선한다. 이후 저장 role을 다시 비우면 Scope Attack으로 복귀한다. 형제 shape20의 Attack/flags와 shape19의 flags는 유지된다. SDK body identity3개에 대한 retired End/new Begin·stale Persist 배제·target 집계 종료를 기존 role transition gate로 검사한다. 마지막 빈 role을 남겨 Stop/다음 Play의 원본 role 복원과 이전 Scope cleanup을 재검증한다.
+
+Editor HTTP39·2 Play/Stop 통과: Attack Begin/End[2,1,2]·Alternate1/1·Attack target2/2·Alternate target1/1, stream4/4→8/8 해제, transform 원복·씬SHA 불변. 증거 Build/Verification/ContactStream/Product-0487301c6a5e4af09132669b2b576e7c/result.json. fixture scene/meta는 해당 Fixture에 옮기고 결과 scene 경로도 갱신했다.
+
+현재 ABI39 LifecycleDistribution/a45dbc7e를 이용해 변경 스크립트를 새로 cook/package한 Player: 동일 역할/retired identity/target 검사 통과·2000GT/display1960/exit0·패키지 입력 불변. 증거 Build/Verification/ContactStream/Player-f98a880b290447608467741c9d7e9a85/result.json. 엔진 native/ScriptCore 구현·ABI 변경 없음; GameScripts Release 빌드 통과(기존 PhysicsTopologyContactProbe CS8602 경고1). 관리 router54 checks/steady allocation0, HTTP/Player PowerShell parser 및 dashboard JS 검사 통과.
+
+저장 role 제거/명시 binding 조합은 이 fixture 범위에서 수용했다. E0 progress 유지. 다음은 ContactStream overflow와 스크립트 예외 발생 시 제품 실패 전파·Play 정리 검증이다. reload/DDOL·solid 집계·Inspector UI·최신 전체 Shipping·전체 GPU capture/대표성능 및 SceneManager/GPU fault 제품 gate는 잔여다.
+
+### 2026-10-09 ContactStream overflow/PostPhysics 예외 제품 격리 수용
+
+소스 정찰에서 ScriptRegistry.Invoke는 콜백 예외를 기록하고 해당 스크립트만 Enabled=false로 격리하며, PostPhysicsTick finally가 프레임 접촉 버퍼를 비운다는 기존 정책을 확인했다. 일반 스크립트 예외를 SceneManager의 전역 Play 실패로 승격하지 않는다. 앞선 다음 작업 표현의 전역 Play 실패 전파 전제는 정정한다. native contact routing 자체 실패의 전역 failure 경로는 이번 대상과 구분한다.
+
+PhysicsContactFaultProbe와 HTTP/Player FaultCase(Overflow/Exception) gate를 추가했다. Attack/Hurt 두 실제 body·복합 sensor 접촉을 사용한다. Overflow는 capacity1의 실제 SDK 접촉2건 이상을 받으며 Read의 정확한 partial-results 거부 예외를 잡아 검증 표시 후 다시 던진다. 일반 Exception은 정상 Read 이후 의도적인 PostPhysics 예외를 던진다. fault 콜백1회·OnDisable1회·비활성 상태 및 정상 Hurt 구독자의 후속 접촉 소비를 확인한다. Scope는 Disable에서 중단 관측되며 세션 종료까지 소유한다. OnEndSimulation 전에 Read가 ObjectDisposedException을 반환하는 두 스트림의 해제를 검사한다.
+
+최종 Editor 각2 Play/Stop: Overflow HTTP42(Product-ff876a19c96d4a0494a9103e549ac9ab), Exception(Product-9b5700e7af9541c8bae4e27de07c3130). 정상 소비 유지·Play failureCount0·stream2/2→4/4·cleanup4·Transform 원복·씬SHA 불변 통과. fixture scene/meta는 각 Fixture에 옮기고 결과 경로 갱신. 실제 runtime 이동을 주입한 원복 gate로 확대하지 않는다.
+
+ABI39 최신 LifecycleDistribution/a45dbc7e를 이용한 fresh cook/package Player 각2000GT 통과. Overflow Player-d56fcb81d25040e8beee91d7421c532c: required4/readRejectedtrue/정상접촉32/display1958. Exception Player-7be72ce7df2740d08a08ea540f16f8f5: 정상접촉30/display1964. 두 경우 exit0·패키지 입력 불변·cleanup2/2. 기존 CE_PHYSICS_RESOURCE_PROBE 계측 활성화로 실제 생성/해제8종 일치/balancedtrue를 검사했다. 결과 result.json·player.out·fault-ownership.json에 보존한다. 두 Player gate는 독립 패키지로 동시에 실행했으므로 display 수치를 성능 비교에 사용하지 않는다.
+
+native/ScriptCore 정책·ABI 변경 없음. GameScripts Release 빌드 통과(기존 Topology CS8602 경고1), 관리 router54 checks/steady allocation0·PowerShell parser·dashboard JS·diff whitespace 검사 통과. 초기 gate는 Read 거부 표시와 shutdown ledger 추가 전 중간 결과이며 위 최종 결과를 수용 증거로 사용한다. E0 progress 유지. 다음은 ContactStream reload/DDOL 수명 제품 gate다. 실제 SceneManager/GPU fault·solid 집계·Inspector UI·최신 전체 Shipping·전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-09 ContactStream 씬 이탈 관측 초기화/Editor reload·DDOL 수용
+
+ScriptRegistry의 OnRemovingFromScene 전달 전에 ContactRouter.Suspend를 호출한다. DDOL은 Scope·구독·명시 역할 바인딩을 유지하되 이전 Scene의 pending buffer/overflow/sensor pair/target 관측 상태는 버린다. 새 Scene의 현재 overlap은 첫 Persist에서 Begin으로 시작한다. 씬 이탈에서 synthetic End를 만들어 전달하지 않는다. 최종 파괴/Stop은 기존 Scope 취소로 해제한다.
+
+관리 Debug/Release 각각61 checks/steady allocation0: capacity1 스트림의 이전 pending pair/target 버퍼 제거, 구독·Scope·역할 바인딩 유지, 목적지 Begin seed,97번 씬 경계의 bounded capacity 재사용, 최종 pair/target 스트림 해제. 엔진 native·ABI39 변경 없음. ScriptCore/GameScripts Release 빌드 및 정상 publish-engine 배포 SceneDistribution/local-0.0.0.0-win-x64-Release-d6a48fcd-3f4e-4e89-b84f-5b6191740358 완료.
+
+PhysicsSceneContactProbe·verify-physics-contact-scene-http.ps1 추가. 최종 제품 capacity32는 catch-up tick 배치를 수용하고 관리 capacity1 회귀는 씬 경계 누적만 검사한다. Editor DDOL(Product-c99dc9c898d6404398f4b57864a68b37): runs1/added2·동일 stream1 유지/중간disposed0·이전 target 신원 배제·목적지 Begin2/Persist2·Stop disposed1. Editor Scene reload(Product-3be8c936086e4a2297ddaba92f54836e): runs2/added1·stream2/이전disposed1·새 Begin2/Persist2·Stop disposed2. 두 경우 SceneManager failure0·원본씬SHA 불변, fixture/meta 보존 및 결과 scene 경로 갱신. 목적지에는 새 Hurt body만 둔다.
+
+Player 제품 gate는 아직 미수용이다. 첫 HTTP 방식은 Player에 play.state/script.invoke/scene.switch가 없어 command.unknown으로 실패했다(ScenePlayer-c4ef15c9/a79a82d2). 도구를 기존 --smoke-reload 및 구조화 로그로 교체했다. 첫 smoke(ScenePlayer-e45029fae0fb47abbb68b8e258c89041)는 capacity2가 catch-up 배치를 담지 못해 actual Read overflow/스크립트 Disable로 실패했다; 물리 리소스8종 balancedtrue와 reload activation/exit0만으로 접촉 수용을 선언하지 않는다. 이후 fixture capacity32를 보강하고 Editor 양쪽을 재수용했다. capacity32 Player 재패키징·목적지 물리 Begin/Persist 및 해제까지 기다리는 smoke 경계 검증은 다음 작업이다. Player body DDOL은 현 smoke의 캐릭터 전용 경로 확장이 필요하다. 현재 Player 도구는 DDOL 입력을 명시적으로 거부하며 reload 전용이다. 어셈블리 reload 수용도 이번 Scene reload와 별도 잔여다.
+
+PowerShell 두 gate parser·diff whitespace 통과. 대시보드에 Editor 수용/Player 미수용을 분리 반영. E0 progress 유지. native fault·solid 집계·Inspector UI·최신 전체 Shipping·전체 GPU capture/대표 성능은 기존 잔여다.
+
+### 2026-10-09 Player Scene reload/body DDOL 접촉 수용
+
+PlayerMain의 기존 smoke reload 경계에 명시적 회귀 옵션 CE_PHYSICS_CONTACT_SCENE_PROBE를 추가했다. 목적지 ContactAttack이 해당 Scene에 속하고 body ReadState가 성공해야 하며, PhysicsSceneContactProbe의 직렬화된 Ready 필드를 읽어 목적지 Begin2/Persist2가 확인될 때까지 기다린다. 기존 목적지 표시 완료/제출 경계도 그대로 요구한다. Ready는 fixture 전용 필드이며 명령 등록이나 InvokeCallable 권한을 확대하지 않는다. CE_PHYSICS_CONTACT_DDOL은 기존 ActivateScene owner 경계 직전에 live body owner를 DDOL로 표시한다. 옵션이 없으면 기존 smoke 경로를 사용한다. ABI39 유지.
+
+PhysicsSceneContactProbe는 OnBeginSimulation에서 캡처한 PhysicsBodyComponent wrapper를 보존하고 목적지 PostPhysics에서 ReadState와 접촉 SelfComponentId를 검증한다. State에 component ID를 남겨 DDOL 전후 동일 wrapper/component 신원을 검사한다. runtime 생성 API 추가가 아니며, 같은 owner 새 component 생성 수용과 구분한다.
+
+Release Player native 재빌드 통과(contact-scene-player-build.log), ScriptCore/GameScripts 빌드 통과·관리 Release61 checks/할당0. 새 정상 배포 SceneDistribution/local-0.0.0.0-win-x64-Release-28877b16-851f-4b45-924b-8e6482d449ab. native 변경은 PlayerMain 회귀 경계에 한정; Physics/SceneRuntime native ABI 변경 없음.
+
+최종 cooked Player reload: ScenePlayer-1f6925fc29d04497b3d4ae5554597a65/result.json. 2014GT·목적지 display8·exit0·패키지 불변·실제 물리8종 생성해제 일치. runs1→2/streams1→2/이전disposed1→최종2·새 body component2447813378→402624482·목적지 Begin2/Persist2. source와 destination 모두 ready 로그 확인.
+
+DDOL의 첫 실행 ScenePlayer-9ac43fdfd89b47aeabeb244110789665는 목적지 접촉 readiness에 도달했지만 카메라 없는 fixture의 scene_changed/view_inactive 때문에 표시 완료를 충족하지 못했다. 해당 소유 테스트 프로세스를 종료했고 성공으로 수용하지 않는다. destination primary Camera를 fixture에 추가하고 Editor DDOL을 재수용했다(Product-7f3dcac6452743a3acd6d77a8b491137/result.json;fixture/meta 이동·result.scene 갱신).
+
+최종 cooked Player body DDOL: ScenePlayer-9faa08be7c2d4d628f0b1338965ce5f7/result.json. 2014GT·목적지 display8·exit0·패키지 불변·물리8종 생성해제 일치. runs1/added1→2/stream1 유지·중간disposed0/최종1, component2082428627 동일 wrapper 유지·목적지 Begin2/Persist2·이전 target 배제. 실제 접촉 및 표시 완료를 모두 기다렸으며 대기만으로 성공을 선언하지 않았다.
+
+PowerShell 두 gate parser·diff whitespace·dashboard JS 통과. Scene reload/body DDOL의 이 fixture 제품 범위를 수용한다. 어셈블리 reload는 별도 잔여이며 다중 DDOL 계층·실패 경계 전체를 이 검사로 확대하지 않는다. E0 progress 유지. 다음은 스크립트 어셈블리 reload 시 이전 ContactStream/Scope 폐기와 재구독 제품 gate다. native SceneManager/GPU fault·solid 집계·Inspector UI·최신 전체 Shipping·전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-09 Editor 어셈블리 reload ContactStream 수용
+
+Play 중 script.reload 두 번을 실제 실행했다. Product-2d8fb4c083a94ec897a43d39b08e629e/result.json: HTTP46, 각 total1/restored1, 새 인스턴스 Begin2/Persist2, native bodyComponent1040030173 유지, activeScripts1 및 previousContextAlivefalse. 두 이전 Scope와 최종 Stop의 스트림 각각1/1 해제(End marker3개), 씬SHA 불변. fixture scene/meta는 해당 Fixture로 이동하고 result.scene을 갱신했다.
+
+최초 Product-9d55d8b6ae804493a3c4663c1cc09298는 이전 ALC 잔류로 실패했으며 수용하지 않는다. PhysicsSceneContactProbe의 기본 JSON 익명 타입 메타데이터 캐시를 사용하지 않는 primitive invariant JSON 출력으로 변경했다. 직렬화 복원된 Ready가 새 접촉 검사를 건너뛰지 않도록 OnBeginSimulation에서 초기화하고 매 reload의 실제 Begin/Persist를 기다린다. 독립 ContactAssemblyProbe checks2: 기존 default JSON 진단은 ALC retained, 수정 진단은 collected. 이는 현재 SDK와 두 진단 메서드의 비교 증거이며 모든 사용자 캐시의 unload 보장은 아니다. 진단 로그와 소스SHA는 최종 evidence에 보존했다.
+
+GameScripts Release 빌드 오류0(기존 Topology nullable 경고1). native/ScriptCore/ABI39 변경 없음. Player는 runtime script.reload API를 제공하지 않으므로 이 수용은 Editor 범위다. Player Scene 전환 gate가 assemblyReload fixture를 잘못 수용하지 않도록 입력을 거부한다. E0 progress 유지. solid 접촉 소비·집계 계약, 실제 SceneManager/GUI·GPU fault, Inspector UI, 최신 전체 Shipping·전체 GPU capture/대표 성능은 잔여다.
+
+### 2026-10-09 solid 형상 쌍 소비 계약 확정
+
+ContactGrouping.SensorTargets는 센서만 target Entity 단위로 집계한다. solid는 ShapePairs와 동일하게 형상 쌍별 Begin/Persist/End를 전달한다. 같은 target의 두 solid 형상이 같은 tick에 접촉해도 두 사건을 유지하며, 하나만 이탈하면 그 형상의 End와 남은 형상의 Persist를 각각 전달한다. target 전체 End로 해석하지 않는다. solid의 Point와 ContactCount/RequiredContacts는 해당 native 사건의 snapshot이고, 역방향 구독에서도 Point는 동일 좌표로 보존한다. 대표 형상 하나를 고르는 solid target 집계나 접촉점 병합 API를 이번 계약에 추가하지 않는다. 늦은 구독의 solid Persist를 sensor처럼 합성 Begin으로 바꾸지도 않는다.
+
+ContactStreamProbe에 복합 solid 회귀9개 추가: SensorTargets에서도 두 Begin 유지, shape 신원, 역방향 endpoint, point/required metadata, 같은 tick 두 Persist, 부분 이탈, 마지막 이탈, no-step 무재생, Scope 해제. Debug/Release 각각70 checks/기존 steady routing allocation0 통과. 합성 native 사건을 실제 관리 router에 전달하는 회귀이며 실제 PhysX 복합 solid 제품 수용으로 확대하지 않는다. 기존 sensor→solid→sensor Editor/Player gate는 단일 solid 전환만 검증한다. 다음은 두 solid 형상의 실제 Editor/Player 접촉·부분 이탈 제품 gate다. E0 progress 유지; native/ABI 변경 없음.
+
+### 2026-10-09 복합 solid 실제 Editor/Player 접촉 수용
+
+PhysicsSolidContactProbe와 -SolidContacts 제품 gate 추가. gravity off/축 잠금 dynamic body의 두 solid box(shape19/20)가 static shape23과 접촉한다. Z 이동으로 shape20만 이탈한 뒤 shape19의 Persist를 기다리고, 추가 이동으로 마지막 End와 무재생을 검사한다. ShapePairs와 SensorTargets 두 스트림의 사건 수·형상·phase/tick 및 contact count metadata가 동일함을 실제 SDK 사건으로 확인한다. 기존 fixture 모드와 혼용을 거부한다.
+
+Editor Product-eb716fc2e83b4a96a8a537cd03f5fa98/result.json: HTTP39/PlayStop2, 각 Begin[1,1]/Persist[5,2]/End[1,1]/부분 이탈 후 Persist2, stream2/2→4/4 해제, Transform 복원·씬SHA 불변. fixture scene/meta는 Fixture로 보존하고 결과 경로 갱신했다. 최초 도구 실행은 sensor GroupTargets 필드 설정을 solid fixture에도 적용한 verifier 오류로 실패했다. 이를 분리한 최종 실행만 수용한다.
+
+ABI39 기존 정상 SceneDistribution-28877b16을 이용한 fresh cook/package Release Player-abd501f82fe846c2b6b02047eec1b5a8/result.json: Begin[1,1]/Persist[8,4]/End[1,1]/부분Persist3, 2000GT/display1953/exit0/패키지 입력 불변. 접촉 검사 직후 성공을 선언하지 않고 기존 표시 완료와 종료를 기다렸다. GameScripts Release 오류0(기존 Topology nullable 경고1), PowerShell parser 및 dashboard JS·diff whitespace 통과. native/ScriptCore/ABI 변경 없음.
+
+축 잠금·제어된 이동 fixture의 복합 solid 계약 수용이다. 자유 운동 충돌/회전, 양쪽 구독의 실제 point 비교, 전체 Shipping/GPU solver·대표 성능·전체 Editor GPU capture 수용으로 확대하지 않는다. 관리 역방향 payload 검사 D/R70은 별도 근거다. E0 progress 유지. 다음은 최신 ContactStream 변경을 포함한 Shipping 제품 통합 검증이다.
+
+### 2026-10-09 최신 ContactStream Shipping 접촉 통합 수용
+
+현재 소스의 정상 publish-engine -Config Release -Shipping -Build로 Editor/Shipping Player 및 배포 도구를 재빌드했다. ScriptCore Release 빌드 오류0, 정상 배포 ShippingDistribution/local-0.0.0.0-win-x64-Release-Shipping-c20b85d9-6c29-41fc-a9f8-4dd63a1abdc0(ABI39). 기본 프로젝트 최적화 설정 빌드이며 기존 no-WPO 실행과 구분한다. publish 및 SDK 빌드 로그 보존.
+
+verify-physics-contact-stream-player.ps1에 -Shipping 추가: package-game --shipping, package pointer mode 일치, runtime service compiled=no/enabled=no 및 endpoint 부재 검증. 첫 옵션 전달은 PowerShell scalar splat로 Unknown option '-'가 발생해 실패했다(Player-53abf87f). string[] 배열로 고정 후 새 패키징했고 실패 결과를 수용하지 않는다.
+
+fresh Shipping 패키지4개 순차 실행: solid Player-a8d4e4e(두 shape Begin/End[1,1], 부분Persist2), sensorTargets Player-10517a9a(양쪽 sensor2→target1), overflow Player-eb3c0714(capacity1 partial Read 거부), exception Player-0739fec0(PostPhysics 예외). 각2000GT/display 1967,1948,1965,1969, exit0/패키지 입력 불변/Shipping service 격리 통과. 두 fault 사례 콜백1/Disable1/정상 구독 지속/Scope cleanup2 및 실제 물리8종 생성해제 일치. 통합 인덱스 Build/Verification/ContactStream/shipping-contact-matrix.json. display 차이를 성능 비교로 해석하지 않는다.
+
+verify-player-shipping-isolation.ps1 -Config Release -SkipBuild 통과: Development 소켓/서비스 존재를 control로 확인, Shipping runtime의 WS2_32 import 및 서비스 marker 없음. 기본최적화 Shipping 구성에서 위 접촉4범위를 수용한다. Shipping Scene reload/body DDOL·subscriber/role/topology 전체 조합, 전체 GPU capture/대표 성능·M3/M4 완료를 의미하지 않는다. E0 progress 유지. 다음은 Shipping Scene reload/body DDOL 접촉 제품 gate다.
+
+### 2026-10-09 Shipping Scene reload/body DDOL 접촉 수용
+
+verify-physics-contact-scene-player.ps1에 -Shipping 추가: string[] package mode 인자, --shipping fresh package, pointer Shipping 모드 일치, 서비스 compiled=no/enabled=no와 runtime endpoint 부재 검사. 기존 ABI39 기본최적화 정상 ShippingDistribution-c20b85d9 사용; native/관리 SDK 변경 없이 현재 PhysicsSceneContactProbe를 새 패키지에서 컴파일했다.
+
+ScenePlayer-dbe859f9969a4cd3b30c92c8b1784d11/result.json: reload runs1→2, native body2447813378→3646649945, streams1→2/이전disposed1/최종2, 목적지 Begin2/Persist2. ScenePlayer-88e5e16099eb4ae693edb9e46d0b4191/result.json: DDOL runs1/added1→2, body2082428627 동일 captured wrapper/stream1 유지/중간disposed0/최종1, 이전 target 배제와 목적지 Begin2/Persist2.
+
+양쪽2014GT/목적지display8/exit0/패키지 입력 불변/Shipping 서비스 격리/실제 물리8종 생성해제 일치 통과. source 및 destination readiness와 표시 완료까지 기다렸다. 통합 증거 shipping-scene-matrix.json, fixture 원본은 기존 Editor evidence에서 보존한다. PowerShell parser/dashboard JS/diff whitespace 통과. top-level body fixture 범위 수용이며 다중 DDOL 계층·실패 조합 전체를 의미하지 않는다. Player runtime assembly reload는 지원 계약 밖이다. E0 progress 유지. 다음은 Shipping subscriber Disable/Enable·역할 변경·형상 topology 접촉 회귀다. 전체 Editor GPU capture/대표 성능/M3/M4는 잔여다.
+
+### 2026-10-09 Shipping subscriber/role/topology 접촉 전환 수용
+
+기본최적화 정상 ShippingDistribution-c20b85d9/ABI39를 이용해 현재 GameScripts probe로 fresh Shipping 패키지6개를 순차 실행했다. subscriber Player-eae6dc6d: Disable/Enable 각1·Begin-only4·새tick Begin seed 및 정상 Persist. 저장 역할 Player-24202a0a, Scope binding Player-a55bd8a0: Attack Begin/End[2,1,2]·Alternate1/1·역할별 target 종료·retired 역할 snapshot 및 명시 binding 우선순위 전환 수용.
+
+shape flag topology Player-c0aacd00: old End2/new Begin2/new End2·body slot0/gen1→slot2/gen1. fetch 전4회 교체 Player-fb02bb42: replacementCalls4·slot0/gen1→slot0/gen3·중간 body 접촉 없음·최종 Begin2/End2. sensor→solid→sensor Player-80d81305: sensor Begin/End[2,1,2], solid Begin/Persist/End1/2/1·SensorTargets의 solid 사건 유지·서로 다른 body 신원3개 수용.
+
+각2000GT/display 1965,1963,1964,1966,1968,1965/exit0/패키지 입력 불변/Shipping compiled=no enabled=no 및 runtime endpoint 부재 통과. 통합 증거 shipping-contact-transitions.json. display 수치를 성능 비교에 사용하지 않는다. native/SDK/제품 코드 변경 없음; 기존 Editor fixture 원본 그대로 새 패키지에 복사했으며 새 compiler source를 사용했다. 계획/dashboard JS 및 diff whitespace 확인. E0 progress 유지. 다음은 Shipping 늦은 구독 초기 overlap·Entity 삭제·body component 단독 제거 접촉 회귀다. 전체 GPU capture/대표 성능/M3/M4 완료와 구분한다.
+
+### 2026-10-09 원격 master 동기화 및 ABI 통합
+
+origin/master의31커밋을 fast-forward로 반영했다. HEAD=origin/master=329fad205f6560fc4462354b9287d64a68049c8a. 로컬 Phase19 tracked/untracked 작업은 stash로 보존·복원했고 기존 PhysicsContactExecutionContract staged blob도 동일하게 유지했다. 복구 stash는 유지한다. ClrHost.cpp/Native.cs/ScriptApiVersion.h의 AssetDepot/물리 API 충돌3개는 양쪽 슬롯을 보존해 해소했다.
+
+통합 API ABI40/198슬롯. 기존 AssetDepot typed API와 물리 Body_Remove/Body_ShapeRole 모두 유지. Physics ABI checker Release35 및 Contact ABI37/테이블순서198 통과, 관리 router Release70/steady allocation0, GameScripts Release 오류0. AssetDepot managed fixture의 버전 검사는 현재 버전을 기준으로 legacy/future 거부를 검사하도록 수정했으며 해당 fixture 실행은 별도 미검증이다.
+
+동기화 이후 native 호스트 및 전체 제품 실행은 아직 재빌드·재수용하지 않았다. 기존 ABI39 배포·Shipping 결과는 동기화 이전 revision의 유효한 이력이고 ABI40 제품 근거가 아니다. 현재 관리 출력과 기존 native 바이너리는 ABI가 다르므로 다음 제품 실행 전 native/배포 재빌드가 선행되어야 한다. E0 progress 및 M3/M4 잔여 유지.
+
+### 2026-10-09 ABI40 native 재빌드·Shipping lateOverlap/retirement 수용
+
+동기화된 소스에서 BuildTool Release를 재빌드하고 정상 publish-engine Release/Shipping Build 경로를 실행했다. 첫 빌드에서 원격 추가 코드의 reflection/include/소유권 연결/테스트 호출 오류가 드러나 수정했다. FoliageType의 AssetDepot include는 상대 경로로 명시, RenderEngine include 설정은 상속 보존(루트 검색 추가는 MeshOptimizer.h/meshoptimizer.h Windows 이름 충돌을 일으켜 제거). Scene의 AssetBundle/TextureFramePins include를 상대 경로로 명시하고 runtime-only prepared pin은 reflgen::ignore 처리했다.
+
+GBuffer/Forward binding layout alias는 own shader를 직접 std alias owner로 쓸 수 없으므로 이미 shader를 소유하는 std graphics generation을 alias owner로 사용했다. 추가 layout 복사/할당 없이 generation 수명을 유지한다. FBX 외부 경로 u8path deprecation은 u8string 기반 filesystem::path 생성으로 UTF8 의미를 유지했다. MaterialResolver는 TextureAssetRuntime 정의를 직접 include, Editor 렌더 selftest의 BuildRectsFromQueue는 기본 width/height0 뒤 마지막 인자로 texture pin을 전달한다. 원래 staging blob은 유지했다. 최초 실패 로그는 각 abi40-publish-* 이력으로 보존하며 성공 근거로 사용하지 않는다.
+
+최종 abi40-publish-uifix.log 정상 완료. Abi40Distribution/local-0.0.0.0-win-x64-Release-Shipping-e9106c4a-9cf3-4739-8a77-128f58c622c9 manifest의 CreatorEditor/Shipping Player/AssetCooker/AssetPacker 모두 scriptApi40. Development Player 자체는 이번 Shipping publish 빌드 대상 밖이며 별도 재빌드 잔여다. 테이블순서198/Release Physics ABI35 checks/Contact ABI37 checks 재통과.
+
+fresh Shipping Player lateOverlap-7e5c4710: 늦은 구독 Begin1/Begin-only1/Persist 후 이탈. Entity삭제-9db9bb1c: sensor End2/target End1/삭제 Entity 신원 snapshot. body단독제거-95fa9340: Entity alive/End2/target End1/stale wrapper6. 세 경우2000GT/display1936·1942·1944/exit0/패키지 불변/Shipping service 격리 통과. 통합증거 abi40-shipping-retirement.json. display 차이는 성능 비교가 아니다.
+
+ABI40 제품 수용은 위3 fixture 범위다. 이전 ABI39 Editor/Shipping suite는 이력이며 새 revision 전체 수용으로 확대하지 않는다. E0 progress 유지. 다음은 Development Player ABI40 재빌드와 기존 핵심 ContactStream Editor/Player 회귀 재수용이다. 전체 GPU capture/대표 성능/M3/M4는 잔여다.
+
+### 2026-10-09 ABI40 Development 재빌드·핵심 Editor/Player 재수용
+
+정상 publish-engine Release Build 통과(abi40-development-publish.log). Abi40DevelopmentDistribution/local-0.0.0.0-win-x64-Release-2c26c76a-0c56-4d61-a8eb-c9ee0a909d54. Development Player ABI40으로 갱신했고 Editor/cooker/packer도 정상 배포 manifest 검사 통과. native 추가 변경 없이 앞선 빌드 오류 수정 및 통합 ABI40 소스를 사용했다.
+
+새 Editor6범위: solid Product-9138654d(2PlayStop/shape BeginEnd/부분Persist), Scene reload-9050ef70, DDOL-9e53e9f3, assembly reload-aef571b0(2reload/old Scope 해제/새BeginPersist/ALC수거), overflow-30c0e0da, exception-60c4c599(각2PlayStop/정상구독유지·Scope해제). fixture scene/meta를 각 Fixture로 보존하고 result.scene 갱신했다. SceneSHA 불변 및 Stop 원복은 해당 gate 계약대로 검사했다.
+
+fresh Development Player5범위: solid3122979f/overflow bedd5aae/exception a748bbfa 각2000GT, Scene reload fd99f6cd/body DDOL599cb14f 각2014GT. display 1937,1940,1934,8,8·exit0·패키지 불변 통과. 두 fault 사례 실패콜백/Disable1·정상구독지속·cleanup2/물리8종 생성해제 일치, 두 Scene 사례 목적지Begin2/Persist2·표시8·종료해제/물리ledger 일치. DDOL 동일 captured body wrapper/stream 유지, reload 이전stream 해제+새body/stream 확인. Player runtime assemblyreload API는 추가하지 않는다.
+
+관리 router Release70/steady allocation0, 새 dev/ship 바이너리 소켓·서비스 격리 control 감사 통과(abi40-router.log/abi40-isolation.log). 통합 인덱스 abi40-development-core.json. 기본 최적화 구성의 제한 fixture 수용이며 전체 Editor GPU capture·대표 성능·E0/M3/M4 완료가 아니다. 다른 ABI39 contact 전환 suite는 이력이고 ABI40 전체 회귀로 주장하지 않는다. B1 직접 형상 Inspector 저작 경로·C1 입력/회전 정책·전체 콘텐츠/성능 잔여 유지.
+
+### 2026-10-09 C1 입력 프런트엔드와 facing 책임
+
+ScriptCore에 SetPlanarInput/CreatePlanarVelocity를 구현했다. 월드 XZ 입력의 아날로그
+크기를 보존하고 대각선 속도를 제한하며 유한값/비음수 m/s 속도를 검증한다.
+가속/감속은 기존 fixed-step 정책을 사용하고 legacy dynamic Lerp는 이전하지 않는다.
+카메라 변환·데드존·facing·회전 보간은 스크립트가 소유한다. 물리가 중력/넉백에 따라
+캐릭터를 암묵적으로 회전시키지 않는다. PhysicsAPIContract의 새 C1 절을 기준으로 한다.
+ABI40/198 유지, managed 물리42/접촉44 통과. 실제 Player 입력/facing 검증과 콘텐츠
+수치 충돌 해결은 남아 있으므로 C1은 progress를 유지한다.
+
+### 2026-10-09 C1 평면 입력 실제 Development Player 검증
+
+CharacterPlanarInputProbe와 fixture/verifier의 -PlanarInput 옵션을 추가했다.
+최신 ScriptCore를 재빌드하고 기존 ABI40 네이티브 제품으로 새 배포본을 생성하여
+정상 package-game 경로로 스크립트 컴파일·cook·패키지 smoke를 수행했다.
+실제 completed physics tick 241에서 16/0 검사 통과: 아날로그 물리 이동,
+대각선 속도 제한/이동, 입력 해제 후 fixed-step braking, 명시적 script facing,
+잘못된 입력 거부, force 이동 중 released input/facing 보존과 Cancel.
+Player는 authoring snapshot 없이 실행·정상 종료0, 패키지 231개 파일 해시 불변.
+증거: Build/Verification/ContactStream/PlanarPlayer/Evidence/result.json 및 player.out.
+배포본: PlanarDistribution/local-0.0.0.0-win-x64-Release-1df5067f-47df-41ba-8c4c-0765827c0849.
+이번 새 입력 검증은 Development Release/CPU capsule/primitive 씬 범위다.
+Shipping·Editor Play/Stop의 새 입력 회귀와 실제 콘텐츠 수치 이전은 잔여이며 C1 progress 유지.
+
+### 2026-10-09 C1 평면 입력 Editor Play/Stop 복원
+
+verify-physics-planar-input-http.ps1을 추가하고 실제 Release Editor/HTTP 저작 씬에서
+2회 Play→completed tick241 입력 검사16/0→Stop을 통과했다. 저작 yaw35°에서 시작해
+스크립트가 forward/right facing으로 회전하고 물리 이동·감속·force를 수행한 뒤,
+Stop은 위치/회전/스케일·enabled/layer를 복원하고 tick/중력/desired velocity/force를
+초기화한다. 이전 CharacterMovementComponent 래퍼는 ReadState와 SetPlanarInput 모두
+StaleHandle로 거부되며 Replay도 같은16/0을 통과한다.
+증거: Build/Verification/ContactStream/PlanarEditor-e0e007f6ebd54d739ace8e81d0774cc5/result.json.
+
+첫 검증 실패는 로그 파일 공유 접근과 검증 메서드 EngineCallable 누락으로 수정했다.
+저장 비교에서는 Scene 복원 후 엔티티 배열 순서/인덱스 재배치를 확인했다.
+verify_scene_document_equivalence.py는 엔티티 ID로 parent/root/children 인덱스를 해석하여
+전체 저작 필드와 순서 있는 계층 관계의 동등성을 검사한다. 명시적 저장 후 두 번 모두
+동등성 통과; Play/Stop 자체는 저장 파일을 변경하지 않는다. 저장 후 바이트 불변은 주장하지 않는다.
+Shipping 새 입력 회귀와 실제 콘텐츠 단위/저작값 이전은 잔여이므로 C1 progress 유지.
+
+### 2026-10-09 C1 평면 입력 Shipping 수용
+
+최신 ScriptCore를 Release 재빌드하고 기존 ABI40 Shipping 네이티브 제품으로 새
+PlanarShippingDistribution/local-0.0.0.0-win-x64-Release-Shipping-455f6f0f-fb90-49a6-a5bb-659ef14e4b62
+배포본을 생성했다. 정상 package-game --shipping으로 별도 primitive character 프로젝트를
+컴파일·cook·패키징했다. 패키지의 Player.runtime.dll/ScriptCore.dll 해시는 배포본과 일치한다.
+새 SDK helper는 native ABI를 바꾸지 않아 이번 실행에서 native 재빌드는 하지 않았다.
+
+실제 Shipping Player 입력16/0·tick244 통과: 아날로그/대각선 물리 이동, 입력 해제 후
+fixed-step braking, script facing, 잘못된 입력 거부, force 중 released input/facing 유지.
+2000 GT frames/display frame2000/promotions1945, 종료0, 패키지230파일 해시 불변.
+cooked Scene/CEMF, runtime text parser0, 서비스 compiled=no/enabled=no, endpoint 부재 확인.
+별도 바이너리 격리 게이트도 Development의 WS2_32/서비스 문자열 존재와 Shipping 부재를
+확인했다. 증거: Build/Verification/ContactStream/PlanarShippingPlayer/Evidence/result.json,
+planar-shipping-summary.json 및 planar-shipping-isolation.log.
+
+새 평면 입력/facing 정책은 Development·Editor 2회 Play/Stop·Shipping에서 검증됐다.
+C1 전체 완료는 아니다. 실제 legacy 콘텐츠 단위 충돌/저작값 이전과 그 콘텐츠의
+이동 골든 수용은 남아 있으므로 progress를 유지한다. 이번 결과는 CPU capsule/primitive
+고정 씬 범위이며 GPU 완료·전체 콘텐츠·성능 수용을 의미하지 않는다.
+
+### 2026-10-09 C1 실제 이전 대상 조사 및 P0 변환 재수용
+
+현재 Dynamic_CPP/Assets의 Scene/Prefab 91개를 읽기 전용으로 조사했다.
+legacy CCT는 PhysicsP0Baseline.creator의 P0Character 1개뿐이다. CCT+동반 Rigidbody의
+canonical fingerprint는 회귀용 원본과 일치한다(0af2ffd862e1c6cad4692882d70c247b5862fa8bd886e6a4d647e40a45367894).
+실제 게임 콘텐츠로 분류할 legacy 캐릭터는 0개다. 파일명만으로 기준선을 제외하지 않도록
+Tools/regression/audit-character-migration-corpus.py를 추가했으며 검사 파일 SHA를 재확인한다.
+출력은 Assets 외부로 제한하고 원본은 수정하지 않는다. 이것은 현재 프로젝트 범위의 조사이며
+외부 프로젝트나 실제 캐릭터 이동 골든의 존재를 대신 검증하지 않는다.
+
+PHYSICS_SCHEMA_MIGRATION_OK 112개 검사 통과. 소스 해시가 지정된 P0 정책으로 생성한
+character-converted.creator를 최신 ABI40 Release Editor에서 실행했다. 명시적 1.5m/s 이동,
+착지·점프와 2회 Play/Stop pose/component ID 복원·runtime reset·원본/레이어 파일 불변 통과.
+입력은 CLI로 지정한 값이다. 게임플레이 입력 연결이나 과거 운동과의 동등성을 주장하지 않는다.
+증거: Build/Verification/ContactStream/ContentMigration/character-corpus.json 및
+EditorEvidence/result.json. 변환본·정책·mapping도 같은 폴더에 보존했다.
+P0 원본은 삭제/변환하지 않았다. 일반 migration dry-run은 P0의 legacy solver-limit 정책으로
+게시를 차단했으며 부분 변경도 하지 않았다.
+
+C1 잔여의 '실제 콘텐츠 단위 이전/이동 골든'은 현재 구현 결함이 아니라 외부 콘텐츠와
+기준 운동 자료가 없는 수용 항목이다. 임의 속도 선택으로 완료 처리하지 않는다.
+C1 progress 유지. 다음 구현 작업은 현재 코드로 진행 가능한 B1 Inspector 저작 검증이다.
+
+### 2026-10-09 B1 PhysicsBody Inspector 검증 경로 수정
+
+PhysicsBody 일반 필드는 Meta::DrawObject 직접 편집을 사용했고 공통 Property는 CCT만
+CaptureDefinition 검증을 수행했다. Inspector 일반 바디 필드를 focus-loss 초안 방식으로
+바꾸고 EditorObjectOperations::Property를 통해 검증·Undo/Redo·hierarchy lock·Play freeze를
+적용했다. 형상은 기존 Apply Shapes 일괄 transaction을 유지한다.
+Property는 바디 CaptureDefinition과 kind/mass/damping/axis locks/초기 속도의 유한값·범위를
+검증하며 실패하면 이전 문서를 복원하고 Undo를 게시하지 않는다. SDK body 생성 전 검증을
+저작 시점에 적용한 변경이며 기존 runtime ABI40은 변경하지 않았다.
+
+최신 Release Editor 재빌드 후 확장 verify-physics-shape-http.ps1 통과.
+질량0/음수·감쇠음수·축잠금8·motion3 거부 시 Undo/전체 저장 문서 불변,
+정상 mass2 변경의 단일 Undo/Redo, 형상 invalid 거부/Undo/Redo, ShapeRoles 및 Prefab
+override 저장/재로드, Play 중 body/shape 저작 거부, 시뮬레이션 이동/Stop 복원 확인.
+증거: Build/Verification/ContactStream/BodyInspector/result.json 및 results.jsonl.
+이 결과는 실제 HTTP가 Inspector와 공유하는 transaction을 검증한 것이다.
+새 바디 InputText의 실제 pointer/keyboard/focus-loss UI 왕복은 별도 잔여이며 B1 progress 유지.
+첫 중첩 빌드의 Editor.lib 잠금 실패는 증거에서 제외하고 순차 재빌드로 수용했다.
+
+### 2026-10-09 B1 바디 Motion 실제 Inspector 편집 검증
+
+verify-physics-body-inspector-ui.ps1을 추가했다. 최신 Release Editor에서 Inspector의
+실제 InputText를 포인터로 클릭하고 End/Backspace와 UTF-8 text 입력을 전달했다.
+직접 object.property로 값을 쓰지 않는다. 실제 위젯 activeId가 살아 있는지 확인한 뒤
+motion 2→1 편집의 focus-loss 이전 초안/Undo 불변, focus-loss 이후 단일 Undo 게시,
+Undo/Redo, 잘못된 motion3 입력 거부와 문서/Undo 불변, 저장/재로드 의미동등성을 수용했다.
+실행46명령 통과, 증거 BodyInspectorUI-4958d76e000142a692b99061031b81e2/result.json 및 commands.jsonl.
+
+표준 InputText도 공통 property field 장부에 좌표/폭/ID를 기록하도록 연결했다.
+바디9개·캐릭터12개 입력의 계측 경로가 생겼으며 실제 바디9칸을 확인했다.
+editor.nav에 제한된 text 큐(64개·각4096B), End/Backspace와 wheel(-100..100)을 추가했다.
+text/wheel은 기존 ImGui 프레임 입력 경로로 전달하며 별도 입력 프레임워크를 만들지 않는다.
+검증은 스크롤 후 현재 입력칸 좌표를 다시 읽는다. 검증용 배율과 workspace를 분리하고
+EngineSettings.asset 원본 바이트를 finally에서 복원했다. 최초 HTTP wait 사용 및
+스크롤 밖 클릭 실패는 수용 증거에서 제외했다.
+
+이 결과는 Motion의 대표 포인터/키보드/focus-loss 왕복이다. 질량·감쇠·축 잠금·벡터·
+캐릭터 입력칸 각각의 직접 UI 편집, Shape draft Add/Remove/Apply/Reload와 잠금/Play 상태
+UI 검증은 별도 잔여다. HTTP 공유 transaction 결과를 해당 UI 검증으로 확대하지 않는다.
+B1 progress 유지.
+
+### 2026-10-09 B1 질량·속도·캐릭터 반경 실제 Inspector 검증
+
+verify-physics-body-inspector-ui.ps1 -ExtendedFields로 최신 Release Editor에서 197명령을 통과했다.
+Motion 검증을 재수행하고 질량2.5, 초기 선속도(1, 2, 3), CharacterMovement 반경0.75를
+실제 포인터 클릭·Tab 이동·텍스트 입력·focus-loss로 적용했다. 각 입력은 초안 단계에서 Undo를
+만들지 않고 확정 시 단일 Undo를 게시하며 Undo/Redo의 저장 문서 복원을 확인했다.
+질량-1, 속도(NaN, 2, 3), 반경0은 문서와 Undo 기록을 변경하지 않고 거부했다.
+최종 저장/재로드 의미동등성도 통과했다.
+증거: Build/Verification/ContactStream/BodyInspectorUI-df252e5eb54e4dae815a3a8cacdc0edc/result.json 및 commands.jsonl.
+
+Tab 이동에 따른 Inspector 자동 스크롤을 처리하도록 매 편집 전에 스크롤을 복원하고 현재
+입력칸 좌표를 다시 읽는다. 첫 확장 실행의 스크롤 밖 클릭 실패는 수용 증거에서 제외했다.
+검증용 EngineSettings.asset은 finally에서 원본 바이트를 복원한다.
+이 결과는 대표 스칼라·벡터·캐릭터 입력의 검증이며 나머지 입력칸 전체, Shape draft
+Add/Remove/Apply/Reload, 잠금 및 Play 상태의 직접 UI 검증은 잔여다. B1 progress 유지.
+
+### 2026-10-09 B1 Shape 실제 Inspector 클릭·저작 소유권 수정
+
+최신 Release Editor의 verify-physics-body-inspector-ui.ps1 -ShapeUI가 327명령을 통과했다.
+Tab으로 기존 탐색 장부의 버튼 이름을 확인한 뒤 현재 화면 좌표로 직접 클릭했다.
+Add 초안은 문서/Undo 불변, Apply는 Shape 1→2개 및 단일 Undo, Undo/Redo는 저장 문서
+복원을 확인했다. Reload는 추가 초안을 폐기하고 뒤이은 no-op Apply도 Undo 불변이었다.
+펼친 Shape의 Remove 초안과 Apply(2→1개), Undo/Redo도 통과했다.
+잠금 및 Play 중 Add/Apply 버튼 클릭은 Undo를 바꾸지 않았으며 잠금 문서 불변,
+Stop 전후와 최종 저장/재로드 문서 의미동등성을 확인했다.
+증거: Build/Verification/ContactStream/BodyInspectorUI-0394bdccd21f46b8807a40855d8bab98/result.json 및 commands.jsonl.
+같은 바이너리의 기존 HTTP 회귀55명령도 통과했다: http-244bbe5949dd450399c52ee770da277e/result.json.
+프리팹 override 저장/로드, invalid 거부, Play 시뮬레이션 이동 및 Stop 복원을 재확인했다.
+
+실제 Inspector Apply에서 Physics session owner violation이 발견됐다. SetShapes가 UI 저작
+스레드에서 ScenePhysicsSimulation::Define을 직접 호출한 것이 원인이었다. SetShapes는
+전체 정의 검증 후 저작 목록만 교체한다. 기존 Scene::StartPhysicsSimulation이 Play 시작 시
+최신 목록을 CaptureDefinition/Define하므로 세션 소유 스레드 계약과 Play 변경 금지를 유지한다.
+런타임 ReplaceShapes는 변경하지 않았다. UI Undo/Redo도 같은 저작 경계를 따른다.
+
+표준 Shape 버튼/트리를 기존 탐색 장부에 delegated 항목으로 연결하고 현재 Nav 사각형을
+스크롤 오프셋을 반영한 화면 좌표로 게시한다. 잠금 전환 후 숨겨진 이전 NavId는 실제
+커서/active edit가 없으면 disabled-focus 오류로 집계하지 않는다. 실제 비활성 탐색/편집은 계속 집계한다.
+화면 밖 활성화 시도 및 계측 오판 실행은 수용 증거에서 제외했다.
+검증용 EngineSettings.asset 원본 복원(imguiScale1.5)을 확인했다.
+Release 빌드는 성공했으며 RenderEngine.pdb LNK4020 경고는 별도 디버그 심볼 한계로 남긴다.
+B1 progress 유지: 나머지 입력칸 전체 및 바디/캐릭터 입력의 잠금·Play 직접 UI 행렬은 잔여다.
+
+### 2026-10-09 저장소 동기화 후 Release Editor 핵심 재수용
+
+HEAD2965dc487의 GCCE·편집 스레드·렌더 변경과 로컬 Phase19 작업을 통합한 Release Editor를
+재빌드했다. PostSync-2965dc487/editor-build.log 성공 및 공유 런타임33파일 배포를 확인했다.
+관리 ABI40/198슬롯의 물리42·접촉44 checks, router70 checks/steady allocation0을 재수용했다.
+같은 새 Editor에서 기본 ContactStream38명령, subscriber lifetime39명령,
+명시 바인딩/role transition39명령을 각각2회 Play/Stop으로 통과했다.
+Shape HTTP55명령도 통과해 invalid/Undo/Prefab/Play 시뮬레이션/Stop 복원을 확인했다.
+ExtendedFields+ShapeUI 통합470명령은 Motion·질량·선속도·캐릭터 반경의 정상/invalid,
+초안/단일Undo/UndoRedo 및 Shape Add/Remove/Apply/Reload, 잠금/Play 버튼 차단,
+Stop/최종 저장로드 의미동등성을 통과했다.
+통합 증거: Build/Verification/ContactStream/PostSync-2965dc487/result.json 및 각 gate 로그.
+Inspector 증거: BodyInspectorUI-bd9fc8b4ad664be6a000a24c61d69896/result.json.
+
+최초 UI 실행은 새 기본 도크의 표시336px보다 요청420px가 커 clipped 검사로 중단됐다.
+이 실행은 수용에서 제외했다. verifier에 InspectorScale 인자를 추가하고 user scale0.75,
+OS 배율을 포함한 effective1.125에서 요청/표시315px 동일을 확인한 후 통과했다.
+기본 도크의 배율별 배치 수용을 이 입력 검증으로 대체하지 않는다. 입력 폭/화면 가시성 검사는
+유지하며 검증 후 EngineSettings 원본(imguiScale1.5)을 복원했다.
+반사 생성의 비대상 GameInput RG0101 진단1 및 빌드 경고는 기록으로 남긴다.
+
+이번 재수용은 Release Editor 및 관리 핵심 범위다. 동기화 후 Development/Shipping Player
+재빌드와 패키지 회귀, 전체 ABI40 전환 행렬/다중 DDOL/실패 조합, 전체 GPU capture와
+대표 성능은 별도 잔여다. B1/E0 progress 및 M3/M4 대기 상태를 유지한다.
+
+### 2026-10-09 동기화 후 Development·Shipping Player 핵심 재수용
+
+HEAD2965dc487 및 로컬 Phase19 변경으로 최신 BuildTool을 Release 빌드한 뒤 publish-engine
+Release Build와 Release Shipping Build를 순차 수행했다. 두 SDK manifest/host 검사 및 ABI40 배포를 통과했다.
+Development: local-0.0.0.0-win-x64-Release-7a05d095-09b6-45ef-8bfa-5f24c0e688fb.
+Shipping: local-0.0.0.0-win-x64-Release-Shipping-e152c661-8b90-4d34-9868-6875ddb8b5fc.
+두 배포는 Build/Verification/ContactStream/PostSync-2965dc487 아래에 보존한다.
+
+최신 Editor의 기본/SubscriberLifetime/ExplicitBinding fixture를 각 SDK로 새로 패키징했다.
+Development와 Shipping 각각3범위 모두2000GT·완료 표시·exit0·패키지 SHA 불변 통과.
+Development display promotions1909/1938/1942, Shipping1942/1945/1946이며 성능 비교값이 아니다.
+구독 수명과 명시적 역할 재바인딩은 각 probe의 Begin/Persist/End 및 stale 수명 계약을 확인했다.
+각 Shipping 실행의 service compiled=no/enabled=no와 endpoint 부재도 확인했다.
+
+SetPlanarInput/CreatePlanarVelocity 새 캐릭터 입력 패키지도 각 SDK에서 새로 생성했다.
+Development16/0·tick241·exit0·snapshot 없음·232파일 불변,
+Shipping16/0·tick244·2000GT·display1999·promotions1944·parser0·serviceCompiled=false·231파일 불변 통과.
+아날로그/대각선 제한·가감속·회전 정책 수용이며 실제 게임 콘텐츠 운동 골든을 의미하지 않는다.
+
+별도 verify-player-shipping-isolation -Config Release -SkipBuild도 통과했다.
+Development socket import/WSAStartup/endpoint/CommandService 존재와 Shipping 각 부재를 비교해
+빈 서비스 구성의 자명한 성공을 배제했다. Development/Shipping runtime DLL은 별도 경로를 유지한다.
+통합 증거: Build/Verification/ContactStream/PostSync-2965dc487/Player/result.json 및 각 publish/package/verify 로그.
+모든 gate는 새 바이너리/패키지로 통과했고 기존 스테이징 문서118줄 blob은 그대로 보존했다.
+
+이번 수용은 위3 ContactStream fixture와 primitive character 입력 범위다.
+ABI40 전체 전환·topology·다중 DDOL·실패/해제 조합, 실제 콘텐츠 경사/계단·이동 골든,
+전체 Editor GPU capture·대표 성능·M3/M4 최종 감사는 잔여다. B1/C1/E0 progress 유지.
+
+### 2026-10-09 B1 바디·캐릭터 전체 입력과 대표 잠금/Play 검증
+
+verify-physics-body-inspector-ui.ps1 -AllFields -InspectorScale0.75로 최신 Release Editor의
+바디9개와 캐릭터12개 입력21개를 실제 클릭·Tab·타이핑·focus-loss 경로로 검증했다.
+Motion은 기존 공통 검증을 재수행했고 나머지20개는 fieldResults에 개별 결과를 기록한다.
+정상값 단일Undo·Undo/Redo 저장 문서 복원, 잘못된 값 거부 시 Undo/문서 불변,
+최종 저장/재로드 의미동등성 통과. 전체1185명령.
+바디: Motion/질량/중력bool/이동·회전 locks/선·각 damping/초기 선·각 velocity.
+캐릭터: 반경/높이/contact offset/step/slope/gravity/minimum distance/
+acceleration/braking/jump/max fall/initial velocity.
+잘못된 bool 텍스트, 축 잠금8, 음수 감쇠·이동 계수, 0 치수·점프/낙하 속도,
+범위 밖 slope 및 NaN 스칼라·벡터를 각 필드의 현재 유효성 계약에 맞춰 거부했다.
+증거: BodyInspectorUI-f5b35d0bc86346e397df66f3f4c013ec/result.json 및 commands.jsonl.
+
+-LockedInputs 별도 세션144명령 통과. 두 컴포넌트 각각 대표 첫 입력인 Motion/반경을
+잠금 및 Play에서 직접 클릭·텍스트 입력했다. activeId0을 확인해 입력 활성화를 거부하고,
+잠금 문서/Undo 불변 및 Play editUndo/gameUndo 불변·Stop 문서 의미동등 복원을 확인했다.
+증거: BodyInspectorUI-8645c9010d0d4de89dc1453a9768c342/result.json 및 commands.jsonl.
+이는 공통 BeginDisabled 경계의 대표 입력 검증이며21개 입력 각각의 잠금/Play 행렬이라고 주장하지 않는다.
+통합 증거: Build/Verification/ContactStream/InspectorAllFields/result.json.
+
+이번 변경은 verifier 확장이다. native 제품 코드/ABI/배포는 변경하지 않았다.
+user scale0.75/effective1.125에서 전체 가시 입력 조건을 유지했고 EngineSettings 원본을 복원했다.
+B1 직접 입력 정상/invalid 검증의 누락은 해소했다. 기본 도크의 배율별 배치/가시성,
+형상 상세 입력/공유 자산의 전체 UI 수용 및 전체 제품 게이트는 별도 범위로 B1 progress 유지.
+
+
+### 2026-10-09 B1 형상 종류 UI 트랜잭션 검증
+
+- `verify-physics-body-inspector-ui.ps1 -ShapeDetails -InspectorScale 0.75`: 최신 Release Editor 실제 Tab/Space/Down/Enter 입력으로 Box → Sphere 선택. 직접 속성 setter 없이 검증.
+- Apply 전 저장 문서/Undo 불변, Apply 한 번의 Undo, Sphere 직렬화(kind=1), Undo/Redo 정확한 문서 복원 통과. 기존 Add/Remove/Reload·잠금/Play 버튼 차단·Stop 복원·재로드 저장 검증 포함 442명령 통과.
+- 증거: `Build/Verification/ContactStream/BodyInspectorUI-48e48611f938435ca48f8f343a3cf7cd/result.json`, `commands.jsonl`. 사용자 배율0.75/실효1.125의 제한된 검증이며 전체 배치 통과를 의미하지 않는다.
+- B1은 progress 유지. 치수·역할·레이어·공유 geometry UUID/revision 실제 UI 입력 및 기본 도크 배율별 배치 검증은 잔여. 이번 변경은 검증 스크립트와 문서이며 제품 바이너리 변경 없음.
+
+
+### 2026-10-09 B1 역할·geometry 참조 입력 수정과 검증
+
+- 형상 전용 typed Draw 분기에서 문자열을 초안의 실제 버퍼로 편집하도록 수정. 프레임별 복사본과 별도 InputManagement Enter 판정 제거. 다른 컴포넌트 문자열 입력은 변경하지 않음.
+- 기존 편집 분기가 없던 `geometryRevision`을 ImGui U64 입력으로 제공. 전체 형상 Apply가 공통 검증 및 한 번의 Undo를 계속 소유하며, 잠금/Play disabled 상태를 유지. 역할·geometry UUID·revision에 탐색 이름 제공.
+- 새 Release Editor 빌드 통과: `Build/Verification/ContactStream/shape-detail-input-build.log`. 공유 runtime hash `858bcd0c57bb22ccd0646b0ec228a99422a8220251e71d630028461706f627a9`.
+- `verify-physics-body-inspector-ui.ps1 -ShapeReferences -InspectorScale 0.75`: 실제 Tab/text로 역할 UUID·geometry UUID·revision `9007199254740993` 입력. Apply 전 문서/Undo 불변, Apply 한 번의 Undo, 정확한 문자열/64비트 정수 저장, Undo/Redo 문서 복원 통과. 기존 종류·Add/Remove/Reload·잠금/Play·Stop·씬 재로드 검증 포함 585명령 통과.
+- 증거: `Build/Verification/ContactStream/BodyInspectorUI-fa9110a2d6024d6f90cc456313e2ad5d/result.json`, `commands.jsonl`. 최초 실행은 검증 스크립트가 Tab으로 활성화된 입력을 Enter로 종료하여 실패; activeId 사전조건과 중복 Enter 제거 후 재검증 통과. 실패 로그 `shape-reference-ui.log` 유지.
+- 범위: Box 형상에서 참조 필드 저작/직렬화만 검증. 실제 cooked geometry 로딩·공유 자산 연결·참조를 유지한 재로드 및 Player 동작은 이 결과로 완료 처리하지 않음. 치수·레이어 상세 입력·invalid 참조 거부·배율별 배치는 잔여이며 B1 progress 유지.
+
+
+### 2026-10-09 B1 반경·기존 레이어 UI 및 초안 Undo 소유권 수정
+
+- 형상 종류/레이어 Combo와 float 필드에 이름을 제공. 공통 수치 위젯보다 형상 필드 이름을 먼저 등록하여 실제 반경 입력을 식별. 기존 프로젝트 layer catalog의 선택기를 그대로 사용하며 별도 물리 레이어를 추가하지 않음.
+- 실제 UI 검증에서 형상 수치 편집이 `CommitMemberChange`의 일반 CustomChangeCommand를 통해 Apply 이전 Undo를 만들던 결함 발견. 이동/폐기 가능한 초안 주소를 Undo에 보관하는 경로를 형상 전용으로 제거. 수치/벡터/체크박스 초안 편집은 값만 바꾸고 전체 Apply가 유일한 검증/Undo 소유자.
+- 최신 Release Editor 빌드 통과: `shape-dimensions-undo-build.log`, runtime hash `7e1cccb26f79aae137cfe09a676895cbc8bf202711dc6abbe7393a5dd8039d6f`.
+- `verify-physics-body-inspector-ui.ps1 -ShapeDimensions -InspectorScale 0.75`: 실제 UI Sphere 선택·반경0.875·기존 layer1 선택, Apply 전 문서/Undo 불변, 단일 Apply, 음수 반경 거부 시 문서/Undo 불변, Reload 후 Undo/Redo 정확한 문서 복원 통과. Editor 로그의 `Invalid sphere radius`로 실제 검증 거부 확인. 기존 Add/Remove/잠금/Play/Stop/씬 재로드 포함751명령 통과.
+- 증거: `Build/Verification/ContactStream/BodyInspectorUI-fc29d4ae2fb34260967b7304abaab0f5/result.json`, `commands.jsonl`, `editor.out`. 식별 실패 `shape-dimensions-ui.log`와 Undo 개수 실패 `shape-dimensions-ui-retry.log` 유지.
+- 범위: Sphere 반경과 기본 프로젝트 layer1 대표 검증. Box/Capsule 벡터 치수·사용자/retired 레이어 조합·역할 invalid·실제 cooked 공유 geometry 연결/참조 유지 재로드/Player·기본 도크 배율별 배치는 잔여. B1 progress 유지.
+
+
+### 2026-10-09 B1 Box·Capsule 치수 실제 UI 검증
+
+- `verify-physics-body-inspector-ui.ps1 -PrimitiveDimensions -InspectorScale 0.75` 추가. 최신 Release Editor에서 Tab/text 입력으로 Box 반치수 X=0.75/Y=1.25/Z=2.5, Capsule 반경0.625/반높이1.5 저작. 제품 코드/바이너리 변경 없이 검증 범위 확대.
+- 각 형상 Apply 전 문서/Undo 불변, 단일 Apply, 정확한 저장값, invalid Box Y=-1 및 Capsule halfHeight=-1 Apply 거부 시 문서/Undo 불변, Reload 후 Undo/Redo 정확한 문서 복원 통과. 실제 Editor 로그 `Invalid box dimensions`, `Invalid capsule dimensions` 확인.
+- 기존 형상 Add/Remove/Reload·잠금/Play 버튼 차단·Stop 복원·최종 씬 재로드 저장을 포함1186명령 통과. 증거 `Build/Verification/ContactStream/BodyInspectorUI-6e88acd0f14147d099a9453d513d7323/result.json`, `commands.jsonl`, `editor.out`; 정상 치수 문서 `Box-dimensions.creator`, `Capsule-dimensions.creator` 보존.
+- 제한: 치수 변경 문서는 각 Undo/Redo 왕복만 확인하며 최종 재로드는 원래 형상으로 돌아온 문서를 대상으로 함. 치수 유지 재로드/Player와 실제 cooked 공유 geometry 연결·사용자/retired 레이어·역할 invalid·기본 도크 배율별 배치 등은 별도 잔여. B1 progress 유지.
+
+
+### 2026-10-09 B1 치수 유지 실제 씬 활성화/PlayStop/재로드
+
+- 새 `verify-physics-primitive-reload-http.ps1 -FixturesDirectory Build/Verification/ContactStream/BodyInspectorUI-6e88acd0f14147d099a9453d513d7323`로 기존 실제 UI에서 저작한 Box/Capsule 치수 문서를 별도 경로에서 검증.
+- 현재 CLI `scene.load`는 비동기 준비만 수행하고 활성 씬을 바꾸지 않음. `scene.switch`로 activationRequested 확인, 해당 requestId의 `scene.load.status`가 Ready인 것을 기다린 뒤 저장 비교. Sentinel 씬에서 시작하여 실제 전환을 강제. 기존 Inspector verifier의 마지막 재로드도 이 계약으로 수정(전체 입력 gate 재실행은 별도).
+- 로드 시 `m_sceneName`은 파일 stem으로 갱신되는 정상 메타데이터. 예상 문서는 이 항목만 명시적으로 보정하며 물리 치수/Entity/나머지 모든 저작 값을 의미상 비교. 원본 문서는 SHA256 불변 확인.
+- Box XYZ=0.75/1.25/2.5, Capsule radius=0.625/halfHeight=1.5를 유지한 첫 활성화 저장·PlayStop 복원·두 번째 활성화 저장, 두 종류 총6회 문서 비교 및28명령 통과. 증거 `Build/Verification/ContactStream/PrimitiveReload-8ff1eeec4aeb4e4cb576a2e9a0e7d92e/result.json`, `commands.jsonl`; Editor runtime SHA256 `FB0BB88CE7E4327061EA9293A0D601C8963ABB5AD5B20C1E992185DCF1B86F69`.
+- 이전 B1 Inspector UI1185/144/442/585/751/1186 gate의 입력/Undo/PlayStop 결과는 유지하되, 마지막 `scene.load` 직후 저장만으로 실제 활성 씬 재로드를 증명했다는 주장은 철회. 이번 결과가 Box/Capsule 치수 유지 실제 활성화 증거를 제공하며 다른 입력 조합 재로드를 소급 완료하지 않음.
+- 실패 기록: 최초 `primitive-reload-http.log`는 활성화 미요청으로 UIBody 없음; retry는 sceneName 메타데이터 불일치. final 로그만 accepted. 제품 코드/바이너리 변경 없음.
+- B1 progress 유지. 실제 충돌·Player 치수 검증 및 cooked 공유 geometry 연결·역할 invalid·사용자/retired 레이어·배율별 배치 잔여.
+
+
+### 2026-10-09 B1 실제 공유 cooked convex 연결 및 루트 형제 순서 복원
+
+- `verify-physics-shared-geometry-http.ps1` 추가: geometry.create로 tetra convex 자산 UUID/revision1/카탈로그 등록을 저작하고 두 동적 바디에 동일한 키를 physics.shapes로 연결. Sentinel 씬에서 scene.switch 요청 Ready를 기다려 실제 재로드.
+- 첫 재로드/저장·Play에서 두 바디 모두 Y=5→4.9019 이동·Stop 두 위치와 전체 저작 문서 복원·두 번째 재로드/저장3회 문서 비교 및33명령 통과. geometry 원본 SHA256 불변. 증거 `Build/Verification/ContactStream/SharedGeometry-03b6915287c24f8e92a09bef0ad0689a/result.json`, `commands.jsonl`; UUID `988173d2-58bf-4eb0-86f1-9d07e330b48f`.
+- 두 번째 재로드 검증에서 기존 RemapLoadBatchIndices가 루트 자식을 batch/슬롯 순서로 재구성해 형제 순서를 바꾸던 결함 발견. 부모 관계로 유효한 소속을 확인하면서 직렬화된 루트 children 순서를 먼저 복원하고, 누락 자식은 기존 부모 기준 복구 루프로 추가. 배치 밖 DDOL 항목 보존/중복 방지 경로 유지. 비교에서 형제 순서를 무시하지 않음.
+- 최신 Release Editor 빌드 통과: `shared-geometry-order-build-final.log`; runtime SHA256 `335990744824B2EAA16DEA828239B444E195CA1E44A811DA8B738FB881F7FED8`. 빌드에는 RenderEngine.pdb 형식 레코드 LNK4020 경고가 남음(일부 디버거 심볼 제한); 런타임 gate 실패와 구분.
+- 동일 새 바이너리로 Box/Capsule 치수 유지 실제 재로드/PlayStop6회 문서비교28명령 재통과: `PrimitiveReload-db0da467485e4f2c94a79338ea5331aa/result.json`.
+- 최초 생성 실패는 미생성 대상 폴더, retry 실패는 실제 형제 순서 변경. 두 실패 로그 유지하고 final만 accepted. 검증 자산은 작은 source/meta/revision/cooked 파일로 보존하며 배포 바이너리 복제 없음.
+- 범위: HTTP 저작·같은 자산 키 두 바디·실제 Editor cooked 로딩/운동/복원/재로드 검증. Inspector 자산 선택·메모리 공유 할당 수·충돌 형상 정확도/Player·geometry revision 교체 UI·역할 invalid·사용자 레이어/배율별 배치·전체 DDOL/오염 계층 조합은 미검증. B1 progress 유지.
+
+
+### 2026-10-09 B1 종료 조건 고정
+
+이번 묶음의 필수 종료 조건은 (1) primitive/compound/sensor 및 cooked source/cook 공유 API, (2) 실제 geometry UUID/revision의 Inspector 저작·revision 변경·invalid 역할/참조 거부, (3) 공통 레이어 선택, (4) 단일 Apply/UndoRedo·잠금/Play 차단·저장/실제 활성 재로드/Stop 복원·Prefab 보존, (5) 기본 도크의 대표 배율0.75/1.0/1.25에서 입력과 작업 버튼 가시성이다. 기존 native 다중 구성/GPU·cook/패키지 검증과 최신 제품 증거를 함께 대조한다.
+
+성능/할당 수 전체 측정은 T1/M3, 전체 Shipping/콘텐츠 회귀는 M1/M3, GPU 완료 캡처는 M3, 전체 생명주기/DDOL 감사는 M2/E0/M4에서 소유한다. 이들을 B1에 중복 잔여로 붙이지 않는다. 자산 브라우저 picker UX 확장은 문자열 UUID/revision 편집이 실제 자산 연결을 충족하는 한 후속 개선으로 기록한다. 필수 조건 실패는 B1 완료를 차단한다.
+
+
+### 2026-10-09 B1 완료 — 필수 종료 조건 묶음 수용
+
+**B1 완료.** 기존 primitive/compound/sensor/shared cook/source/CEMF/pak/native 다중 구성·GPU 기반 증거와 아래 최신 Editor 제품 게이트를 합쳐 고정된 저작 종료 조건을 충족했다. 종료 후 개선을 B1 잔여로 다시 붙이지 않는다.
+
+- 실제 자산 revision1/2를 geometry.create/update로 생성; UUID 유지 및 source update Undo/Redo를 확인. Inspector에서 실제 convex UUID/revision1 연결 → revision2 교체 → Undo/Redo, invalid contactRole/geometryAsset/revision0 거부, 단일 Apply·문서/Undo 불변·잠금/Play·Stop·최종 scene.switch/Ready/저장 통과.1181명령: `BodyInspectorUI-9b4650fd56ee4c84937da7e405350bc1/result.json`.
+- UI 저작 revision2 문서를 새 Editor에서 실제 활성 재로드·PlayStop·두 번째 재로드3회 비교/15명령 통과: `GeometryUIReload-fcfff197ac5341f6bf137028c965835e/result.json`.
+- 기본 도크 안의 요청280 논리 폭 Inspector 영역을 가용 폭으로 제한하고 Add/Apply/Reload 버튼을 줄바꿈. 배율0.75/1.0/1.25 각각 overflow0·contentWidth≤visibleWidth·입력폭≥80px/12명령 통과: `BodyInspectorUI-994a3ed11bf04100836aef934a4cd453`, `BodyInspectorUI-9535815f38d444cc89b9ef98cf839bf0`, `BodyInspectorUI-8ec75ea27ba34d9aae1f35c720e81ae6`. 전체 실제 자산 UI 자극은 배율1.0에서 실행했으며 모든 배율의 모든 입력 조합이라는 주장은 아님.
+- Prefab 형상/역할 override 저장·실제 scene.switch/Ready 활성 재로드·Play 거부/운동/Stop56명령: `Build/Obj/Phase19ShapeAuthoring/http-37a2ee6c53bc459cb9fad6c52743b37e/result.json`. 이전 verifier의 준비 전용 scene.load는 실제 활성화 대기로 교정.
+- 동일 새 바이너리에서 같은 cooked convex 키 두 바디 재로드·양쪽 운동·Stop 저작복원·두 번째 재로드 재통과: `SharedGeometry-c009086300b245c8a2aea4018556edf0/result.json`.
+- 실제 UI 자산 Apply 실패를 통해 SetShapes→CaptureDefinition이 Presentation 스레드에서 owner-only geometry 캐시를 읽던 결함 발견. SetShapes는 transform/layer/shape 저작값만 ValidatePhysicsShapes로 검증하며 캐시/SDK 접근을 하지 않음. StartPhysicsSimulation이 owner 스레드에서 cooked definition을 해석하는 기존 책임 유지. 새 Release Editor 빌드 `b1-closure-owner-build.log` 통과.
+- 통합7개 제품 게이트 증거: `Build/Verification/ContactStream/B1Closure/result.json`. 최초 UI 실패 `b1-closure-ui.log`는 스레드 소유권 결함 증거로 보존하고 final gate만 accepted.
+
+후속 책임: 대표 성능/할당은 T1/M3, 전체 콘텐츠/최신 Player 회귀는 M1/M3, GPU 완료 캡처는 M3, 전체 DDOL/생명주기는 M2/E0/M4. 자산 브라우저 picker UX는 Phase21 후속 개선이다. B1 필수 조건의 실패를 이관한 것이 아니라 해당 항목의 원래 제품 전체/UX 확장 범위를 중복 제거한 것이다.
+
+## C0 종료 묶음 — 현재 Editor 수용 (2026-10-09)
+
+C0 필수 종료 범위는 독립 CCT, 이동·점프·force·teleport·활성화, 경사/계단,
+C# 소유권·수명, 저장 후 실제 재활성화, Play/Stop 원복, DDOL 정상/실패 복원,
+대표 cooked Player 실행이다. 전체 콘텐츠 골든과 성능은 기존 C1/M3/T1 담당이다.
+
+현재 Release Editor 두 제품 게이트 544명령 통과:
+- http-721288e4ef034c74b008196ff7abb377: 340명령, CLR 18/0,
+  낮은 계단 통과/높은 계단 차단, 점프/force/disable/Stop,
+  실제 저작·저장·활성화한 triangle mesh의 20도 경사 통과(x2.95/footY1.1058),
+  60도 경사 차단(x-0.309808), slope limit 0 통과(x2.98333/footY5.66729).
+  각 경사 150개 이상 completed tick 진행과 Stop 저작 위치 원복 확인.
+- http-4c15a7e0bf414c628187ddf63b598ea6: 204명령, CLR 18/0,
+  회전/scale 부모·비활성 자식 DDOL, 잘못된 목적지 실패 후 Editor 원복·재Play 검증.
+
+기존 gate의 scene.load는 준비 요청뿐이어서 실제 재로드 증거가 아니었다.
+Sentinel 씬으로 전환 후 scene.switch → load.status Ready를 기다리도록 수정했다.
+정상 DDOL 전환도 같은 완료 조건을 사용한다. 계단 벽의 순간 비접지 상태가
+점프 검사에 섞이지 않도록 평지로 teleport 후 접지를 기다려 독립 검사한다.
+
+보존 인덱스: Build/Verification/ContactStream/C0Closure/result.json.
+바이너리 사본 없이 JSONL/로그/작은 입력만 보존했다. 실패한 최초 점프 실행은 수용하지 않는다.
+과거 P19Mesh/P19Geo/P19Fatal/P19Transition Player 결과는 문서에 있으나 현재
+Build/Obj 원본은 없다. 현재 공유 runtime의 fresh cooked Player 수용이 남아 C0는
+아직 progress이며, 다음 작업은 이 마지막 실행 묶음이다. 이번 Editor gate만으로
+현재 Player를 재검증했다고 주장하지 않는다.
+
+## C0 완료 — 현재 cooked Player 수용 (2026-10-09)
+
+C0 종료 조건을 완료했다. 현재 소스에서 publish-engine Release -Build로 Editor,
+Player 및 cooker/packer를 빌드하고 정상 Development SDK로 새 Geometry 프로젝트를
+패키징했다. 바이너리 교체나 과거 패키지 재사용 없이 정상 배포/패키징 경로를 사용했다.
+
+새 cooked Player: run-81eacfec8aa7485c977dd5c4ecc1263e/result.json.
+Triangle mesh·convex·heightfield 이동 검사 총36개 통과/실패0개,
+DDOL C# 계약8개 통과/실패0개, 세 노드 형상 이송·재생성·핸들·목적지 mesh 접지
+검사29개 통과/실패0개. CEPG3개, 저작 cegeometry fallback0개,
+목적지 mesh import1/assets1/cook0, 정상 렌더 진행·종료0 및 패키지 파일 SHA 불변.
+
+첫 run-df5e116acbe24d1380204f1996481205는 verifier 기본 목적지 설정 오류로 미수용:
+형상3개 출발 씬 재로드에 목적지 단일mesh import1을 요구했다.
+PhysicsCharacterMesh.creator를 실제 목적지로 지정해 전체 재검증했다.
+GeometryDdol의 기본 목적지도 같은 mesh 씬으로 수정해 재발을 방지했다.
+
+통합 완료 인덱스: Build/Verification/ContactStream/C0Closure/result.json.
+현재 Editor544명령 및 현재 Development Player73개 검사 실패0으로 C0 완료.
+이번 실행은 Release Development 범위다. Shipping/Debug 현재 소스 전체 행렬과
+실제 콘텐츠 골든·성능은 기존 M3/C1/T 담당이며 이 결과로 검증했다고 주장하지 않는다.
+
+## C1 완료 — 현재 저장소 이전 범위 (2026-10-09)
+
+종료 범위: 현재 프로젝트 Scene/Prefab의 legacy 캐릭터 전수 조사, 명시적 기준
+fixed tick에 대한 단위/변환 정책, P0 변환 문서의 제품 이동·점프·Play/Stop 회귀.
+사용자가 초기 실제 물리 씬이 없다고 명시했고 HTTP 저작을 요청한 범위를 따른다.
+외부 프로젝트의 미제공 운동 골든을 현재 구현 잔여로 계속 추가하지 않는다.
+
+현재 corpus137개 조사: legacy CCT1개는 P0 component fingerprint 일치,
+실제 콘텐츠 검토 대상0개. 원본 SHA 불변. 단위 변환22개 및 스키마 이전112개
+검사 통과. 현재 Release Editor http-42d8859752104dc6bde79ea2e1297ecf:
+변환 P0 실제 씬 활성화 Ready 확인 후 Play/Stop2회, 점프·소유권/신원·저작값 원복,
+completed fixed tick 기준 1.5m/s 수평 이동을 각60개 이상 tick 동안 검사했다.
+예상 거리와 차이3cm 이하, 원본 씬/레이어 SHA 불변. 검사 입력은 명시적 CLI속도다.
+C0 완료 묶음의 경사/계단/force 회귀를 재사용하며 새 입력/facing 계약은 기존
+PlanarInput 제품 검증으로 별도 기록되어 있다.
+
+통합 결과 Build/Verification/ContactStream/C1Closure/result.json.
+C1은 현재 저장소 이전 범위에서 완료다. 외부 게임 프로젝트/게임별 운동 골든은
+검증하지 않았으며 이 결과가 그 콘텐츠의 운동 동일성을 보장하지 않는다.
+전체 콘텐츠 수용과 현재 구성 행렬/성능은 M3의 기존 범위다.
+
+## T1 완료 — 현재 worker 예산/계측 수용 (2026-10-09)
+
+기존 제품의 after-fetch 및 SDK 전용 dispatcher 정책을 유지한다. 기존 계측 게시
+최적화 구현을 대상으로 현재 소스 standalone benchmark를 다시 빌드했다.
+소스 생성기의 PhysicsTestHooks 상대 include와 새 ProfileRecording.cpp 링크 누락을
+수정했다. profiler record는 비동기 시작 요청이므로 wait_until_idle 후 recording을
+확인하고 측정한다. 시작 누락으로238/239tick만 기록된 첫 결과는 미수용이다.
+
+CPU/GPU × 활성16/256/1024 × worker요청0/1/2/4 × 계측on/off,
+정방향/역방향을2회 반복해 자유 낙하192회, 접촉1024바디 계측on32회, 총224회.
+각240tick 측정. 계측on128회는 필수 비용 마커240tick 및 task submit/run/complete
+신원·계층 검사 통과. 현재 auto는12 hardware threads에서 실제8workers다.
+
+4개 run의 median 기준, 계측off CPU16: worker1 평균59.03us/p9977.50us,
+worker2 69.93/95.75us, worker4 127.56/187.80us, auto8 442.35/628.75us.
+계측on CPU접촉1024: worker4 평균1332.13us/p991677.55us,
+worker1 1904.90/2462.85us. workload가 달라 전역1worker 변경은 채택하지 않는다.
+작은 자유 낙하 CPU는 명시1worker, 접촉 많은 CPU는 명시4worker를 이 장비의
+검증된 후보 예산으로 기록한다. GPU256/on/worker4 CV11.75% 그룹은 비용 비교에서
+제외한다. 다른55개 그룹 CV10% 이하. 프로파일 계측on 비용은 제품 지연으로 해석하지 않는다.
+
+현재 Editor/Development cooked Player 정상 실행은 C0Closure 완료 증거를 참조한다.
+T1의 실행정책·최적화·계측·worker/workload 선택 근거는 완료로 판정한다.
+전체 제품 평균/p99/메모리, 다른 장비와 전체 콘텐츠의 수용은 기존 M3 범위다.
+보존 인덱스 T1Closure/result.json, measurements.json 및 원시224개 기록.
+바이너리/캡처 사본은 추가하지 않았다. 기존 Build/Obj capture 위치는 원시기록에 유지한다.
+
+## T2 회전 kinematic 쿼리 구조 검증 (2026-10-09)
+
+길쭉한 box kinematic을 이동+45도 회전시켜 batch overlap을 검사했다.
+완료 tick 이전에는 미래 위치에 hit 없음, 완료 tick 이후 새 회전 위치의 hit1과
+등록 owner 일치, disable 이후 hit0 및 이전 SDK hit의 Binding 거부를 확인한다.
+현재 소스 Release510개/Shipping506개 검사 통과, 두 구성 모두 실제GPU 확인.
+
+probe 빌드의 새 ProfileRecording.cpp 링크 누락을 수정했다. 비동기 record 시작을
+기다리고, 정착200tick 각각 publish_frame하여 단일프레임 누적을 제거했다.
+Release capture complete/unacked0 및 QueryBatch/QueryStructureUpdate Scene 신원 검사 통과.
+처음 capture complete 실패 실행은 미수용이며 수정 후 전체 재실행했다.
+
+T2Closure/result.json 및 session-Release/Shipping.json에 작은 결과/로그를 보존한다.
+T2는 아직 progress: 실제 Player 충돌/회전/kinematic 혼합 쿼리와 동적capture 검증이
+남아 있다. 이번 standalone 결과로 제품 검증이나 전체성능 수용을 대체하지 않는다.
+
+## T2 실제 mixed Player 기능 수용·capture 미수용 (2026-10-09)
+
+새 PhysicsQueryMixed fixture 및 PhysicsB2MixedQueryProbe 추가. 현재 정상 SDK로
+cooked Player 패키징: 동적바디/정적벽 충돌정지 x103.99949, kinematic 90도회전과
+이동 전후 scalar/batch count·Entity/component/shape 신원 검사32개 통과·실패0.
+128 dynamic out-and-back/4096출력 검사136개 통과·실패0, 기존104개 제품 검사,
+실제display·exit0·패키지불변 수용(run-d32422a9632748d59961e85f88f7c33e).
+
+profiler record/pause/save 비동기 writer 및 save 완료를 기다리도록 verifier 수정.
+기록 시작 gate 뒤에 mixed/dynamic 검사를 실행하며 성능벤치마크의 고정 dense
+위치 가정과 동적 이동은 같이 실행하지 않는다. capture 검사 기준은 완전성을 유지한다.
+
+현재 fresh SDK/패키지에서도 capture56frames, unacked0이나 sourceDroppedCounters57,
+completefalse. 마지막 프레임 게시만으로 해결된다는 가설은 전체 재검증에서 실패했고
+PlayerCommands의 speculative pause 변경은 되돌렸다. 해당 빌드 결과는 source와
+pause 구현이 다르므로 후속 게이트 전에 다시 빌드해야 한다. capture는 미수용.
+T2 progress 유지: source counter 귀속/유실 경로 수정 및 무손실 동적 capture가 남는다.
+결과/성공기능/실패로그를 T2Closure에 작은 파일로 보존, 바이너리 사본 추가 없음.
+
+## T2 쿼리 배치 완료 — 실제 동적 Player 무손실 capture (2026-10-09)
+
+이 절이 이전 T2 progress/capture 미수용 기록의 현행 상태를 대체한다. T2 완료.
+정상 전체 재빌드 SDK OwnerSafePointDistribution과 새 cooked 패키지로 재검증했다.
+실제 혼합 충돌·90도 회전·kinematic 이동 검사40개, 동적128바디 검사156개,
+기존 제품 검사104개 통과·실패0. 동적 query 읽기창46회/pose변경45회,
+4096-hit 출력3단계/이탈0hit/복귀128hit/128바디 정지 확인.
+2,000프레임, display승격1859회, exit0 및 패키지불변 통과.
+
+render submission ID와 엔진 profiler frame ID를 혼용하던 counter 귀속을 분리했다.
+호스트가 EnhancedLiveFramePacket.profilingEngineFrame을 게시하고 counter/VRAM/GPU
+계측은 그 신원을 사용한다. render/fence/display 신원은 기존 submission ID를 유지한다.
+GPU capture admission은 deferred resource preparation 성공 뒤로 옮겼다.
+준비보류로 제출하지 않은 프레임을 GPU실패로 세던 순서 오류를 제거했다.
+enkiTS 워커는 new-task/task-completion suspend 진입 전에 자기 스트림을 게시한다.
+다른 스레드의 TLS를 수집기가 변이하지 않는다. worker pool10417개 및 barrier변이 검출 통과.
+
+동적검사 gate 이후 record/pause/save를 비동기 완료까지 기다린 실제 capture는
+complete=true, unackedCPU0, pendingGPU0, failedGPU0,
+writer/source frame/event/counter/lateCPU/lateGPU 손실 모두0.
+파일 직접 읽기와 capture 종료 counter로 확인했다. 열린 스코프2개는 Stop cutoff에
+잘린 경계이며 미응답/손실이 아니다. 이번 구간 admittedGPU0이므로 GPU 타이밍
+수용을 주장하지 않는다. 실제 GPU타이밍/전체성능·p99 수용은 기존 M3에 남는다.
+
+정본 evidence: Build/Verification/ContactStream/T2Closure/result.json.
+원본 capture: Build/Obj/Phase19B2Player/run-1a04af951f254d91a3f99c4a97f0d02c/query.ceprof.
+small receipt/log만 T2Closure로 보존하고 capture/바이너리는 복제하지 않았다.
+SDK bundled DotNet deps 누락 경고와 LNK4020 PDB 경고는 별도 환경 제한이다.
+Phase19 상태: 완료16 / 진행2(M1,E0) / 미착수2(M3,M4).
+
+## E0 다중 DDOL 부모·자식 계층 — Development 제품 수용 (2026-10-09)
+
+PhysicsHierarchyContactProbe와 독립 HTTP/Player 게이트 추가. 부모와 자식 각각
+PhysicsBodyComponent 및 ContactStream을 가진 실제 HTTP 저작 씬으로 검사했다.
+Editor는 부모와 자식 모두 DDOL 등록(중복 계층 이송 경계), 같은 목적지 씬을
+새로 로드해 연속3회 전환했다. 두 스크립트 OnBeginSimulation 각각1회 유지,
+OnAddedToScene 각각1→4, compound sensor Begin2/Persist≥2가 매번 재개됐다.
+이전 씬 target 신원 유입은 예외로 차단하며 native body wrapper 신원도 유지됐다.
+부모·자식 링크와 로컬(0,5,0), Stop 후 4엔티티 pose/enabled/component 신원,
+계층 및 source/destination 파일 SHA 불변, stream2/2 해제를 단정했다. HTTP85명령.
+
+현재 T2 OwnerSafePoint SDK를 그대로 사용해 새 cooked Development Player 패키지
+수용: root DDOL에 자식이 동반 이송, 각각 새 목적지 Begin2/Persist≥2·body wrapper
+동일·OnBeginSimulation1/OnAdded2·stream2 유지, 최종 Scope stream2/2 해제.
+2014GT, 목적지 표시8회 이후 정상 종료0, 패키지 불변, 실제 물리8종 ledger 생성/해제
+일치. Editor 연속3회와 Player1회 범위를 구분하며 Shipping/실패 조합은 확장 주장하지 않는다.
+
+정본 Build/Verification/ContactStream/HierarchyClosure/result.json 및 원본 Editor/Player
+receipt 참조. 바이너리/프로젝트 중복 보존 없음. E0 progress 유지하되 다중 DDOL
+부모·자식의 Editor/Development 완료 범위는 잔여에서 제거한다. 다음은 같은 계층의
+최신 Shipping 수용 및 현행 전환/fault 전체 suite 통합이다. M3 GPU/성능 수용과는 별도다.
+
+## E0 다중 DDOL 계층 Shipping 수용 완료 (2026-10-09)
+
+직전 다중 DDOL의 Shipping 잔여를 닫았다. 최신 소스로 Release-Shipping 전체 정상
+빌드·SDK publish 후 기존 계층 프로젝트의 source/destination/script SHA 일치를
+확인하여 입력만 재사용하고 새 cooked Shipping 패키지를 생성했다. 패키지 host DLL
+SHA가 새 SDK와 일치하며 바이너리 교체나 Development 실행 대체는 없다.
+
+부모·자식 모두 source/destination sensor Begin2/Persist≥2, body wrapper 신원 유지,
+OnBeginSimulation1/OnAdded2, stream2 유지/최종2해제, 실제 물리8종 ledger 생성/해제
+일치. 2014GT·목적지display8·exit0·패키지 입력 불변 수용. Shipping service disabled,
+endpoint 없음 및 binary import 감사 통과(Dev ws2_32 있음/Shipping 없음, WSAStartup·
+endpoint.json·CommandService marker Dev 있음/Shipping 없음).
+
+HierarchyClosure/result.json에 Editor/Development/Shipping 정본 연결 및 SDK/host/verifier
+SHA를 기록했다. 프로젝트·shader·capture 사본 추가 없이 새 패키지/로그만 생성.
+E0 전체 전환/fault 통합 suite는 잔여이며 다중 DDOL 계층 정상제품 범위는 완료다.
+전체 GPU타이밍/대표성능은 M3, 빅뱅 감사는 M4의 기존 완료 조건을 유지한다.
+
+## E0 현행 Editor 전체 전환・失敗 suite 수용 (2026-10-09)
+
+verify-physics-contact-editor-suite.ps1로 고정18항목을 현재 Release Editor에서
+한 번의 suite로 실행: Basic, LateOverlap, SensorTargets, Solid, EntityRetirement,
+ComponentRemoval, Topology, BurstTopology, SensorTransition, SubscriberLifetime,
+RoleTransition, ExplicitBinding, Overflow, Exception, SceneReload, Ddol,
+AssemblyReload, HierarchyDdol. 통과18/실패0/미실행0, HTTP 771명령.
+기본/접촉 변화·fault 항목은 기존 게이트의 2회 Play/Stop/원복/해제 단정을 유지한다.
+씬·어셈블리·계층 항목은 각 원본 게이트의 전환 및 Scope/ALC 수명 단정을 유지한다.
+
+각 프로세스 exit와 새 receipt를 확인하고 항목별 원본결과를 index에 연결했다.
+Editor host SHA가 suite 전후 같고 contact script/gate SHA를 보존한다.
+중도 실패 시 failed/pending 상태를 저장하며 오래된 로그를 성공으로 대체하지 않는다.
+현행 matrix 정본: Build/Verification/ContactStream/E0Suite-db9b3627fced46658700c89513797670/result.json.
+
+지원 Player 행렬은17항목×Development/Shipping=34행. 이미 완료한 계층DDOL2행은
+각 원래 authored fixture/receipt를 연결해 수용; 나머지32행은 최신 배포본에서 검증할
+잔여로 고정한다. Player assembly reload는 현재 제공하지 않는 API여서 두 구성 모두
+unsupported이며 잔여로 세지 않는다. Editor18항목 완료, E0 전체 progress 유지.
+이전 개별 SDK의 성공은 이 최신 Player 행렬의 완료 주장으로 대체하지 않는다.
+
+## E0 완료 — 현행 ContactStream 제품 행렬 (2026-10-09)
+
+고정한 최신 Player 잔여32행을 verify-physics-contact-player-suite.ps1로 모두 실행했다.
+16시나리오×Development/Shipping에서 새 cooked package smoke와 실제2000GT 실행,
+표시/정상종료/패키지 불변·각 시나리오 접촉/Scope 계약 전부 통과·실패0.
+기존 부모·자식DDOL2행을 포함해 지원 Player17×2=34행 수용. Editor18행 통과와
+함께 E0의 현행 지원 ContactStream 계약 완료. Player runtime assembly reload는
+제공하지 않는 계약으로 unsupported 유지하며 실행/수용했다고 주장하지 않는다.
+
+Basic/LateOverlap/SensorTargets/Solid/EntityRetirement/ComponentRemoval/Topology/
+BurstTopology/SensorTransition/SubscriberLifetime/RoleTransition/ExplicitBinding/
+Overflow/Exception/SceneReload/Ddol을 두 구성에서 수용했다. 역할·retired 신원,
+부분접촉·Enable Begin seed·실패 스크립트 격리·reload/DDOL wrapper와 최종 해제
+단정은 각 원본 게이트에 유지했다. Shipping service/endpoint 격리 단정도 통과했다.
+전체34행의 staged Player.runtime.dll SHA를 각 지정 최신 SDK와 직접 대조해 일치.
+
+입력 프로젝트는 같은 시나리오의 Development→Shipping 사이에서 재사용하고
+씬 SHA가 Editor fixture와 같은지 확인한다. 실행 stage/log/receipt는 구성별 새로
+생성해 이전 결과를 덮어쓰지 않는다. 새 suite는 실패/미실행을 index에 남긴다.
+최신 GPU capture 및 전체성능/p99 수용은 기존 M3에서 소유하며 이 결과로 대체하지 않는다.
+E0 정본: Build/Verification/ContactStream/E0Suite-db9b3627fced46658700c89513797670/result.json.
+
+Phase19 현행 상태: 완료17 / 진행1(M1) / 미착수2(M3,M4).
+E0 완료이며 최신 Player32행 잔여를 제거한다. 다음은 M1 corpus 완료판정 정합성
+및 남은 문서/제품 gate를 닫고 M3 제품성능 수용으로 진행한다.
+
+## M1 완료 — 현재 저장소 스키마 이전 범위 (2026-10-09)
+
+현행 corpus158개 전체 재조사 및 임시 사본 이전 수용. 준비/변환2파일,
+body3/character1, diagnostics0·멱등·ZIP byte 정확 복구·원본 SHA 불변 통과.
+legacy CCT1개는 명시된 P0 component fingerprint이며 실제 콘텐츠 검토대상0개.
+기준선 원본을 회귀 입력으로 보존하므로 authoring apply0을 유지한다.
+C1 완료에서 확정한 현재 저장소/명시P0 범위와 같은 기준으로 M1을 닫는다.
+
+schema verifier의 character-policy-example.json 출력이 뒤쪽 geometry 변수 재사용으로
+잘못 저장되는 오류를 수정했다. reviewed character policy를 따로 보존하고 출력 JSON을
+다시 읽어 동일 Scene 변환을 재현하는 회귀를 추가했다. schema113개 통과·실패0.
+실제로 그 출력 policy를 소비한 현재158 corpus 이전/복구도 재통과했다.
+현재 Release Editor로 새 변환P0 이동·접지·점프·fixed tick 1.5m/s 및 Play/Stop2회,
+native runtime 제거·저작값/component 신원/씬·레이어 불변 수용. HTTP 70명령.
+
+이미 B1의 geometry 자산/개정/저작 연결과 C1의 운동단위·입력 계약 수용을 연결했다.
+이전 대상 corpus에 존재하지 않는 외부 게임/legacy geometry 복구·미제공 골든을
+현재 구현 잔여로 추가하지 않는다. unsupported geometry/override/reference는
+스키마 gate에서 전체 publication 차단하는 계약을 유지한다. 전체 콘텐츠의
+현행 구성 Player 실행·GPU타이밍·대표성능 수용은 기존 M3의 제품 회귀 범위다.
+
+M1 정본 Build/Verification/ContactStream/M1Closure/result.json.
+이 절이 과거 M1 progress의 오래된 게임입력/참조/corpus 잔여 서술을 대체한다.
+현재 저장소 M1 완료. Phase19: 완료18 / 진행0 / 미착수2(M3,M4).
+
+### 2026-10-09 M3 — 실제 표시 완료 후 GPU 캡처
+
+- Development Player에 읽기 전용 `render.status` 명령과 Player 역할의 descriptor seed를 추가했다. 완료된 Game 표시의 ready/frame/promotions/slotMask를 조회한다.
+- B2 Player 게이트의 `-WaitForRenderedCapture`는 ready, completedFrame > 0, promotions >= 8을 확인한 뒤 기록을 시작한다. 이번 시작점은 frame 157, promotions 10이었다.
+- 새 Release SDK를 정상 빌드·배포하고 기존 저작 프로젝트를 다시 패키징했다. Player 2,000 프레임, 표시 승격 1,856회, exit 0, 패키지 불변 검증이 통과했다.
+- 실제 `.ceprof` 파일에서 complete=true, admitted GPU 81, pending/failed GPU 0, unacked CPU 0, dropped counters 0, stop drain 5.3804 ms를 확인했다. 이전 GPU admission 0 캡처와 구분한다.
+- 근거: `Build/Verification/ContactStream/M3Acceptance/result.json`, `capture-inspection.log`; 원본 캡처는 해당 receipt의 evidence 경로에 있다.
+- M3는 진행 중이다. Debug/Release 제품 성능 행렬, 평균/p99 및 계측 on/off 비용 수용 판정은 아직 남는다.
+
+### 2026-10-09 M3 — Release Player 쿼리 계측 on/off 측정
+
+- `verify-physics-player-performance.ps1`로 같은 최신 Release 패키지를 off/on/on/off 순서로 4회 실행했다. 매 실행 2,000프레임·렌더 표시·패키지 불변·정상 종료·쿼리 parity 및 소유 스레드 CPU 계측이 통과했다.
+- 16/64 요청, scalar/batch의 각 블록 600표본, 총 38,400표본을 보존했다. 표시 완료 이후 시작하며 tiered compilation을 끄고 GT 물리 코어를 예약한다. 물리 이동은 블록 사이에 발생한다.
+- 8개 블록값의 CV <= 10% 기준으로 평균 비교 4개 통과, p99 비교 4개 미수용. 평균 off/on 중앙값(us): 16 scalar 24.53/29.88(+21.82%), 16 batch 14.12/17.19(+21.72%), 64 scalar 93.04/106.20(+14.14%), 64 batch 49.16/62.20(+26.52%). 이는 쿼리 벽시계 비용이며 프레임/solver 총비용으로 확대하지 않는다.
+- p99 off/on CV(%): 16 scalar 18.4/22.3, 16 batch 53.9/49.2, 64 scalar 15.8/6.3, 64 batch 39.1/11.0. 원자료를 유지하며 p99 개선·수용을 주장하지 않는다.
+- 계측 on 캡처 2개는 실제 파일 인덱스 및 마지막 구간에서 complete=true, admitted GPU 22/25, pending/failed GPU 0, unacked CPU 0, dropped counters 0을 확인했다. 전체 로드의 메모리 한도 초과는 구간 로드로 확인했으며 파일 손상이 아니다.
+- 근거: `Build/Verification/ContactStream/M3Acceptance/Performance-5b2beb6928704f0e8de5fd2e7857f8e0/result.json`. 새 요약 도구는 변동 큰 비교를 수용하지 않는다. M3는 계속 진행 중: p99 안정화/수용 기준, 활성·변경 비율별 solver 총비용, Debug 제품 회귀 및 GPU 시간 분포 확인이 남는다.
+
+### 2026-10-09 M3 — p99 조건 민감도 조사
+
+- 첫 측정의 CPU 실행시간은 GetThreadTimes 15,625us 양자화가 나타나 짧은 블록에서 0 또는 벽시간 초과가 발생했다. 이 값으로 표본별 스케줄링 지연을 원인으로 단정할 수 없다. `M3Acceptance/p99-diagnosis.json`에 원자료 기반 조사 결과를 보존했다.
+- 새 `-PreferLastCore` 옵션으로 같은 Release Player를 마지막 가용 전체 물리 코어에 배치해 off/on/on/off 4회·38,400표본을 재측정했다. 기존 기본 코어 정책은 유지했다. 소유 스레드/코어 배치와 복원, 패키지 불변, 렌더 표시, 정상 종료 및 쿼리 parity가 모두 통과했다.
+- p99 off/on 중앙값(us): 16 scalar 30.05/41.25, 16 batch 19.75/22.45, 64 scalar 138.20/163.45, 64 batch 64.65/107.55. 기존 코어보다 낮지만 p99 비교 4개 모두 CV <= 10%를 충족하지 못했다. 평균 비교도 3개만 안정적이며 16 batch on CV 12.9%로 미수용이다.
+- 이는 CPU 배치 조건에 대한 민감도를 보여주며 OS 지연이나 엔진 쿼리 자체의 원인 판정을 대신하지 않는다. 느린 표본 삭제·임계값 완화·측정 결과 선별 없이 원자료를 보존한다. 동일 측정의 맹목적인 반복으로 수용을 주장하지 않는다.
+- 계측 on 녹화 2개의 complete 및 GPU/CPU 종료 계측은 실제 파일 구간 로드로 재확인했다. 근거: `M3Acceptance/Performance-181142a401c04e738fc8186c146f30dd/result.json`.
+- M3 진행 중. 다음 단계는 solver 총비용과 활성/변경 비율 행렬을 측정하고, 쿼리 p99는 표본별 실행/대기 분리 증거를 보강해 수용 여부를 판단하는 것이다.
+
+### 2026-10-09 M3 — solver 활성·변경 비율 행렬
+
+- 현행 ScenePhysicsSimulation 소스를 사용하는 네이티브 Release 벤치마크를 재빌드했다. 기존 생성 도구의 serial 측은 현행 소스의 include 경로만 바꾼 사본이며 과거 코드와의 성능 비교가 아니다.
+- 총 dynamic 바디 1,024개, 활성 16/256/1,024개 × tick별 속도 갱신 0/50/100% × off/on/on/off를 CPU·PhysX GPU 각각 36회 실행했다. 총 72회 통과, 각 240 tick의 총 17,280 raw 표본을 보존했다. 실제 GPU backend 선택·worker 2개·활성 수·변경 카운터·손실 0·계측 task 계층 및 240 tick 측정 창을 검증했다.
+- SetVelocity 및 Advance를 함께 벽시계로 잰다. 실제 changed_bodies는 갱신 수와 일치한다. active_bodies와 changed_bodies는 별도 카운터이며 활성 pose 수를 변경 입력 수로 오인하지 않는다. 처음 실행에서 이 의미를 잘못 가정한 verifier는 실패했고 소스의 note_change 계약에 맞춰 수정 후 전체 행렬을 다시 실행했다.
+- 평균 off/on 비교 CV <= 10%: CPU 9/9, GPU 8/9. p99 비교: CPU 5/9, GPU 4/9. 각 side 독립 프로세스 2개의 예비 안정성 판정이며 전체 성능 수용이나 통계적 보장을 주장하지 않는다.
+- CPU off 평균(us), 갱신 0/50/100%: active16=71.0/75.7/71.9, active256=156.2/164.4/174.8, active1024=360.1/409.6/452.8. GPU off 평균은 같은 축에서 1,237.8~1,758.2us로 이 작은 자유 운동 부하의 전체 물리 벽시계 비용은 CPU보다 높았다. 프로파일 on이 일부 더 빠른 수치도 있어 결과를 계측 최적화나 GPU 이득으로 해석하지 않는다.
+- 근거: `M3Acceptance/Solver-ca03bcc30cfb4e4592162dd9cc5fe2ae/result.json`(CPU), `M3Acceptance/Solver-e31b3197d4ad4ef5b00118e7ad47127f/result.json`(GPU). 원본 exe·source 해시와 각 capture/JSON 경로를 보존했다.
+- 자유 운동 네이티브 세션 행렬의 측정은 완료했다. Player 전체 프레임·충돌 solver/캐릭터/쿼리 혼합 부하의 수용을 대신하지 않는다. M3의 Debug 제품 회귀, 실제 Player/GPU 시간 분포 및 불안정 p99 판정은 남는다.
+
+### 2026-10-09 M3 — 최신 Debug SDK 실제 Player 회귀
+
+- 현행 소스 전체 Debug 빌드·SDK 생성·새 Player 패키징·시작 장면 smoke를 통과했다. 기존 저작 프로젝트를 재사용해 모델/셰이더 입력의 사본 추가를 피했다. 새 SDK: `M3Acceptance/Debug/Distribution/local-0.0.0.0-win-x64-Debug-ffb2ef08-1f0f-49e0-8472-5026a1ac0f16`.
+- 실제 Debug Player 2,000프레임 실행, 표시 승격 1,856회, exit 0, 패키지 불변을 검증했다. 동적/정적/키네마틱 기본 검사 각 9개 통과, 동적 쿼리 204개·혼합 쿼리 74개 통과, 실패 0개. dense128 이동/정지/복귀, 최대 batch 4,096 hit, 70 read windows와 67 pose 변경을 확인했다.
+- 표시 완료 이후 기록한 실제 파일 인덱스와 끝 구간을 읽어 85프레임 complete=true, GPU admitted 82, pending/failed GPU 0, unacked CPU 0, dropped counters 0, stop drain 18.9312ms를 확인했다.
+- 근거: `Build/Verification/ContactStream/M3Acceptance/Debug/result.json`, `capture-inspection.log`, `publish.log`, `package.log`. 원본 실행과 캡처 해시는 receipt에 보존했다.
+- Debug의 동적 convex 및 dense/mixed 쿼리 제품 경로는 검증 완료다. 전체 Debug CCT·ContactStream/Editor 회귀 완료로 확대하지 않는다. 실제 Player CPU/GPU 시간 분포와 불안정 p99 판정은 M3에 남는다.
+
+### 2026-10-09 M3 — Debug Player ContactStream·CCT 완료
+
+- ContactStream Player 게이트 3종에 `-Configuration Debug|Release`를 추가했다. 선택한 SDK의 해당 구성 도구로 패키징하고 pointer.config 일치를 검증한다. Debug 쿠커가 요구하는 작은 Prim_Cube 모델 입력을 보완하며 테스트 씬에는 배치하지 않는다.
+- 새 Debug suite는 승인된 Editor 입력과 기존 저작 프로젝트를 재사용해 Player 지원 17개 사례 모두 통과, 실패 0개, pending 0개다: Basic/LateOverlap/SensorTargets/Solid/EntityRetirement/ComponentRemoval/Topology/BurstTopology/SensorTransition/SubscriberLifetime/RoleTransition/ExplicitBinding/Overflow/Exception/SceneReload/Ddol/HierarchyDdol.
+- 최초 Basic 실패는 모델 corpus 미충족으로 런타임 이전에 발생했고 입력 보완 후 통과했다. 마지막 HierarchyDdol은 기존 project scene/destination이 승인된 fixture와 달라 identity gate가 거절했다. 승인된 두 fixture를 갱신하고 해당 사례만 재실행해 통과했다. 실패·재실행 이력은 보존했다. AssemblyReload는 Player에서 지원하지 않으므로 Editor에 남는다.
+- Debug CCT 실제 geometry/DDOL Player 검사 73개 통과: triangle mesh motion 12, DDOL 8, geometry carry 29, convex motion 12, heightfield motion 12. 목적지 cooked 씬과 geometry 3개, authoring geometry fallback 0, 정상 종료·패키지 불변을 확인했다.
+- Debug 평면 입력 계약 16개 검사 통과. CCT 합계 89개 통과, 실패 0개. 프로젝트·shader/model 입력을 기존 프로젝트에서 재사용했다.
+- 모든 ContactStream 17개 및 CCT 2개 패키지의 Player.runtime.dll 해시가 최신 Debug SDK와 일치함을 확인했다. Contact pointer도 config=Debug/shipping=false를 전수 확인했다.
+- 근거: `M3Acceptance/Debug/ContactSuite-7eb0d00f56fc4ca28d294d137e93ec64/result.json`, `M3Acceptance/Debug/contract-result.json`. Debug Player CCT·ContactStream 검증 완료. Debug Editor Play/Stop·assembly reload 및 실제 Player CPU/GPU 시간 분포·불안정 p99 수용은 남는다.
+
+### 2026-10-09 M3 — Debug Editor 수명·Play/Stop·재로드 완료
+
+- 최신 Debug Editor에서 ContactStream Editor 전체 suite 18개 사례 통과, 실패 0개, pending 0개, 총 771 HTTP 명령을 검증했다. AssemblyReload·SceneReload·DDOL·HierarchyDdol 및 Play/Stop 복원 계약을 포함한다.
+- CCT 계단/점프/강제 속도/terrain 시나리오 323 HTTP 명령, 계층 DDOL/씬 전환 실패·복구/재생·Stop 원상 복원 시나리오 166 HTTP 명령이 통과했다. CLR API probe 및 최초 저작 위치 [0,3,0] 복원을 확인했다. 평면 입력 Debug Editor 게이트와 저장 문서 동등성 검사도 통과했다.
+- 최초에는 StepProbe와 TransitionFailureProbe를 함께 지정해 실패했다. 계층 fixture의 부모 scale=2로 캡슐 반경이 확대되어 정상 high-step 정지 x=4.51667이 scale=1 step 기준 x>4.7에 미달했다. 엔진 실패로 오인하지 않고 별도 fixture로 분리 실행했다. `verify-physics-character-http.ps1`에 StepProbe/HierarchyProbe 동시 요청을 거부하는 guard를 추가했다.
+- 실제 Debug Editor runtime DLL과 최신 SDK DLL 및 suite 시작 시 해시의 일치를 검증했다. 근거: `M3Acceptance/Debug/editor-result.json`, Editor suite `E0Suite-8d723239c19948678ab49595aff4b342/result.json`, CCT/transition/planar receipt 경로와 각 원본 로그.
+- Debug Editor 및 Player의 CCT·ContactStream 수명/재로드 제품 회귀는 검증 완료다. M3에서 남은 항목은 실제 Player CPU/GPU 시간 분포·성능 수용과 불안정 p99 실행/대기 증거 및 판정이다. M4 최종 감사는 이후 진행한다.
+
+### 2026-10-09 M3 — 실제 Player CPU/GPU 시간 분포 측정
+
+- `physics_player_capture_summary.cpp`를 추가해 녹화 전체를 한 프레임씩 읽는다. complete/finalized, 프레임 dropped events, 실제 GPU 구간 존재를 확인하고 원본 표본·구간 수·평균·nearest-rank p99를 출력한다. 녹화 경계에서 잘린 scope는 별도 개수로 기록하며 완전한 duration 분포에 섞지 않는다.
+- 기존 Release/Debug 단기 캡처를 전수 읽었다. 각각 85프레임과 GPU span 3,240/3,280개. 85표본의 p99가 최대값이므로 장시간 성능 수용 근거로 쓰지 않는다.
+- B2 Player 게이트에 `-CaptureTailFrames`를 추가했다. 실제 렌더 표시 상태를 읽어 동적/혼합 쿼리 검증 후 추가 1,000 completed display frame을 기다린다. 새 Release 실행은 2,000프레임·정상 종료·패키지 불변·동적/혼합 검사 통과, 1,088 녹화 프레임·GPU 43,400span을 기록했다.
+- 실제 GPU submission 1,085개, pending/failed GPU 0, unacked CPU 0, complete=true. 종료 drain 7.6607ms, 경계 잘림 scope 2개. GPU duration은 submission/view/queue별 timestamp interval의 union과 envelope를 별도 집계해 중첩 패스 합산을 피한다.
+- CPU PhysicsTick 1,086표본 평균 0.530ms/p99 1.090ms; FetchWait 평균 0.505ms/p99 1.045ms; RenderThreadFrame 평균 3.297ms/p99 4.903ms. inclusive scope를 서로 더하지 않는다.
+- frame boundary 평균 16.651ms/p99 17.121ms/최대 27.462ms는 pacing을 포함하는 프레임 간격이다. 순수 CPU 작업 총합이나 표시 지연으로 해석하지 않는다.
+- GPU instrumented interval union 평균 1.028ms/p99 5.101ms, envelope 평균 1.031ms/p99 5.108ms. 이는 계측된 제출 구간이며 미계측 GPU 작업·scanout/presentation latency 및 PhysX GPU solver 단독 시간으로 확대하지 않는다.
+- 근거: `M3Acceptance/distribution-result.json`, `long-capture-distribution.json`, 원본 `Phase19B2Player/run-36d55636375e4577afab318ee1ab92f7/query.ceprof`. 단기 Release/Debug 분석도 `release-capture-distribution.json`, `debug-capture-distribution.json`에 보존했다.
+- 실제 Player CPU/GPU 분포 추출은 완료했다. 단일 장시간 실행은 독립 실행 안정성 및 성능 수용을 대신하지 않는다. M3 남음: 독립 실행 안정성·명시적 성능 수용, 불안정 쿼리 p99 실행/대기 증거·판정. M4 최종 감사는 이후 진행한다.
+
+### 2026-10-09 M3 — 실제 Player 독립 실행 안정성 판정
+
+- 같은 Release 패키지·동적/혼합 쿼리 조건 및 추가 표시 완료 1,000프레임으로 독립 프로세스 3회 측정했다. 모두 제품 gate·정상 종료·패키지 불변·complete 캡처를 통과했다. 합계 3,264 녹화 프레임·GPU span 130,200개. 각 실행 GPU 제출 1,085개, pending/failed GPU 및 unacked CPU 0.
+- `summarize-physics-player-capture-stability.py`는 실행별 평균/p99의 CV <= 10%를 각각 판정한다. 평균 CV: PhysicsTick 2.0%, FetchWait 2.2%, RenderThreadFrame 7.8%, GPU instrumented union 8.0%. 모두 평균 재현성 기준 충족.
+- p99 CV: PhysicsTick 25.2%, FetchWait 23.9%, RenderThreadFrame 39.9%, GPU instrumented union 41.5%. 모두 미수용. 중앙값은 각각 1.302/1.223/5.847/5.101ms. pacing 포함 frame boundary p99만 CV4.5%로 안정적이다. 안정적인 프레임 간격으로 내부 물리·렌더 꼬리 지연의 안정성을 대체하지 않는다.
+- 평균 중앙값: PhysicsTick 0.531ms, FetchWait 0.506ms, RenderThreadFrame 3.324ms, GPU 계측 interval union 1.028ms. 구간별 inclusive값을 더하지 않으며 GPU union은 미계측 시간·표시 지연을 포함한 총량이 아니다.
+- 근거: `M3Acceptance/distribution-stability.json` 및 세 실행 원본 capture 해시, `long-capture-repeat.log`, `long-capture-third.log`. 원자료 제외·임계값 완화 없이 보존했다.
+- 독립 실행 측정과 평균 재현성 판정 완료. 전체 성능 수용은 보류한다. M3 잔여는 불안정 p99의 task queue/실행/대기 근거 분석과 성능 수용 판정으로 좁힌다. 동일 조건 재측정을 계속해 우연한 통과를 찾지 않는다. M4 최종 감사는 이후 진행한다.
+
+### 2026-10-10 M3 — p99 물리 tick/task 지연 위치 분석
+
+- `physics_player_task_trace.cpp`로 기존 장시간 녹화 3개를 프레임별로 읽어 session/tick/task/thread/depth 및 submit/start/end/complete timestamps를 내보냈다. `analyze-physics-player-task-tail.py`는 owner FetchWait와 SDK task를 tick 단위로 연결하고 가장 느린 1% tick을 원자료와 함께 보존한다.
+- 분석 tick 1,086/1,086/1,087개, 합계 3,259개. task submit/start/complete 불일치 0개. 2번째 캡처의 완전한 FetchWait가 없는 경계 tick 1개는 따로 기록하며 비교 대상에서 제외한다. 녹화 중간의 느린 tick을 제외하지 않는다.
+- 빠른 절반 vs 느린 1%의 중앙값(us), 실행 1/2/3: FetchWait 406/415/397 → 1,131/1,830/1,996; task별 최대 큐 대기 28.6/30.3/28.1 → 106/140/178; 최대 task 벽시계 실행 30.6/33.1/30.5 → 131/157/230. 큐 지연과 실행 구간의 증가가 함께 관찰됐다.
+- 느린 tick에서 FetchWait 대부분은 Physics.FetchResults에 위치한다. DispatcherDrain은 대다수 약 0.2~5.4us이며 한 사례 55.5us로, 1~4ms 전체 꼬리 지연을 drain만으로 설명하지 못한다.
+- task 수는 부하 전환 중 81~97개, 비교 기준의 안정 구간은 대부분 52개다. 가장 느린 tick에는 52개 task인 tick도 다수 있어 task 개수 증가만으로 꼬리 지연을 설명할 수 없다.
+- task duration은 벽시계이므로 실제 CPU 실행과 OS 선점/대기를 분리한 값이 아니다. worker duration 합은 병렬 중첩을 포함하므로 owner FetchWait와 더하거나 critical path로 해석하지 않는다. 이 자료로 enkiTS 큐 단독 원인이나 PhysX 실행 자체 단독 원인을 확정하지 않는다.
+- 근거: `M3Acceptance/task-tail-analysis.json`, `task-tail-analysis.log`, `task-<captureId>.jsonl`과 기존 capture hashes. 분석 위치는 FetchResults 및 SDK task/queue로 좁혔다. 원인 확정·성능 수용에는 실행/선점 분리 증거가 남으며 전체 p99 수용은 보류한다.
+
+### 2026-10-10 M3 — CPU 실행/선점 분리 ETW 준비·환경 제한
+
+- WPR/xperf/WPA 설치를 확인했다. WPR은 기존 recording 없음. `wpr -start GeneralProfile -filemode`는 `0xc5585011: Failed to enable the policy to profile system performance`로 거부됐다. 후속 상태도 recording 없음으로 확인했다. 현재 토큰은 Medium integrity이며 Administrators 그룹이 deny-only다. ETW 실행/선점 분리 결과는 아직 얻지 못했다.
+- `record-physics-player-etw.ps1`을 준비했다. 관리자 PowerShell에서 기존 WPR 세션이 없을 때만 자체 기록을 시작하고 실제 Player gate 및 추가 완료 표시 1000프레임을 실행한다. 자신이 시작한 recording만 finally에서 ETL로 종료하며 기존 세션은 중단하지 않는다. PID/arguments/start UTC·capture receipt·ETW trace statistics·thread CSwitch 보고서를 보존한다.
+- B2 verifier가 owned Player launch.json을 남기도록 추가했다. task trace exporter는 profiler slot 외 실제 osThreadId를 내보낸다. 현재 라이브러리로 재컴파일하고 기존 원본 캡처에서 OS TID 매핑을 검증했다. 엔진/SDK 바이너리 변경 없이 수집 도구를 준비했다.
+- 근거: `M3Acceptance/etw-start.log`, `etw-environment.json`, `task-os-thread-validation.jsonl`. WPR 정책 실패를 엔진 회귀나 성능 통과로 계산하지 않는다.
+- 실행 명령(관리자 PowerShell): `pwsh -NoProfile -File C:/Users/idene/source/repos/CreatorEngine/Tools/regression/record-physics-player-etw.ps1`.
+- M3는 계속 진행 중이다. ETW 기록 가능한 관리자 환경에서 자료를 얻어 실제 CPU 실행·ready/선점·blocking 구간을 물리 tick/task와 대조한 뒤 p99 수용을 판정해야 한다. 준비된 스크립트만으로 실행/선점 분리를 완료했다고 주장하지 않는다.
+### 2026-10-10 M3 — 실제 Player ETW 수집 및 task 스케줄 상태 대조
+
+- 관리자 실행 ETW-3e43617439c6430db31e3d8c24a235c3 수집 성공. 64.775초 원본 ETL의 Lost Buffers/Events 모두 0이다. Player PID 26240, 2000프레임, display promotions 1849, 종료 코드 0, 패키지 불변 확인. 기본 바디 검증 통과 27개·실패 0개.
+- 원본 ETL의 RAW_TIMESTAMP(QPC)/PerfFreq를 사용해 엔진 QPC 마이크로초와 직접 대조했다. PhysXTask 60094개, FetchResults 1089개를 OS TID로 연결했고 최대 미분류 시간 간극은 0us다. scheduled는 DPC/ISR 간섭을 포함할 수 있어 순수 명령 실행 시간으로 주장하지 않는다.
+- 각 marker별 가장 느린 1%의 독립 중앙값: PhysXTask 벽시계 194.65us / scheduled 143.5us / ready 17.2us / blocked 22.35us. FetchResults 벽시계 5965.3us / scheduled 102.95us / ready 44.85us / blocked 5853.2us. 각 열의 중앙값은 서로 다른 표본에서 나올 수 있어 합산하지 않는다.
+- 느린 FetchResults는 소유 스레드 CPU 점유보다 blocking 대기가 지배적이다. worker에는 실행과 ready 및 blocking이 모두 관찰된다. worker 의존 관계/대기 대상과 반복 p99 수용까지 단일 원인으로 확정하지 않는다. ETW 수집 환경 장애는 해소됐으며 M3는 성능 수용 진행 중이다.
+- 근거: 해당 ETW 폴더의 player.etl, trace-statistics.txt, physics-tasks.jsonl, switches.csv, task-cpu-analysis.json. xperf dumper 일부 이벤트 해석 경고와 별개로 원본 ETL을 직접 읽었다. 4GB 전체 임시 CSV는 제거했고 원본/필요 스케줄 증거는 보존했다.
+### 2026-10-10 M3 — ETW 독립 집계 검증 및 tick 완료 상관관계
+
+- RAW CSwitch 디코더를 실제 캡처의 version 5 / 28-byte 형식으로 제한했다. 미지원 형식은 실패한다. 물리 owner/worker 9개 OS 스레드의 전체 scheduled 합을 독립 xperf thread-cswitch 집계와 대조: 모두 일치, 최대 반올림 차이 0.5us. capture 구간의 미분류 간극 0us 검증도 유지한다.
+- FetchResults 1089개 tick 모두 task submit/run+release/complete 식별자로 연결했다. 가장 느린 tick 1258: task 52개, FetchResults 9423.6us, owner blocked 9238.3us / ready 69.4us / scheduled 115.9us. 최대 submit→start 1174.2us, 마지막 task 완료 후 FetchResults 반환 124us.
+- 느린 tick은 52개 task인 경우에도 발생한다. 큐 지연 하나로 전체를 설명할 수 없으며, SDK 작업 완료 대기와 동시 worker 지연이 관찰된다. TaskComplete는 run()+release() 뒤이고 실제 fetch wakeup은 release() 도중 발생할 수 있으므로 완료와 fetch 반환의 음수 간격도 모순으로 계산하지 않는다. 마지막 완료 시각은 SDK critical path를 증명하지 않는다.
+- 후속 dispatcher drain을 주 지연으로 분류할 근거는 없다. 남은 원인 세분화는 SDK run/release 및 worker 내부 blocking/의존성에 집중한다. ETW 수집·OS 실행 상태 대조·tick 완료 상관관계는 확보됐으나 반복 p99 성능 수용은 보류한다.
+- 근거: 같은 ETW 폴더 task-cpu-analysis.json의 xperfAggregateChecks/tickCorrelation, schema.log 및 원본 ETL. 엔진 런타임 변경 없이 분석 도구를 보강했다.
+### 2026-10-10 M3 — worker 대기 사유 및 SDK Run/Release 계측 분리
+
+- 기존 ETW의 CSwitch wait reason을 추가 추출했다. worker PhysXTask 내부 blocking은 코드 37, owner FetchResults는 코드 6으로 기록됐다. 코드만으로 특정 잠금이나 API를 단정하지 않는다. 최악 tick 1258의 가장 긴 task는 wall 1177.2us / scheduled 214.6us / ready 96.1us / blocked 866.5us로, task wall을 순수 연산 비용으로 분류할 수 없다.
+- Physics.PhysXTask 아래에 Physics.PhysXTaskRun 및 Physics.PhysXTaskRelease 계층을 추가했다. 기존 task identity와 SDK run→release 순서를 유지한다. Shipping의 marker 등록/계측은 기존 compile-out 계약을 따른다. 분석기는 새 marker가 있는 캡처에서 각각 OS 상태를 대조하며, 과거 캡처에 없는 측정치를 만들지 않는다.
+- P1 verifier의 ProfileRecording.cpp 소스 누락을 수정했다. probe의 실제 8회 baseline frame 번호와 이후 프레임 간극, 비동기 Record admission/파일 finalize 대기, 녹화 초기화 후 과거 이벤트를 찾던 검증을 수정했다. baseline 캡처와 destruction 캡처를 각각 확인하며 손실/완료 조건은 완화하지 않았다. 초기 counter loss 3290개 실패를 유지한 채 배선 수정 후 손실 없는 캡처로 통과했다.
+- 새 Run/Release marker의 session/tick/task identity 및 task별 Submit/Parent/Run/Release/Complete cardinality를 확인했다. 전체 스크립트 재빌드·실행: Debug 및 Release 각각 53238 checks / 4160 tasks / 실제 GPU backend 확인; Shipping 4 checks / 51 tasks. 실패 0. 큰 check 수에는 baseline serialization의 이벤트 identity 재개방 검사가 포함된다.
+- 근거: M3Acceptance/task-run-release-result.json, Phase19P1 각 설정 result.jsonl/stderr.log/baseline.ceprof 및 기존 ETW task-cpu-analysis.json. 제품 SDK/Player는 아직 새 계층을 포함하지 않는다. 다음은 제품 Release SDK 재빌드 및 새 Run/Release 계층 포함 캡처로 worker blocking 위치 대조다. M3 성능 수용은 계속 보류한다.
+### 2026-10-10 M3 — Run/Release 계측 제품 SDK 재빌드·Player 검증
+
+- Release 제품 SDK를 --build --no-pointer로 재빌드·배포 검증했다: local-0.0.0.0-win-x64-Release-4f1aed37-cc4d-469a-9e95-e7dd6c22afa4. 기존 MixedProfilePlayer 저작 프로젝트를 재사용했고 probe 3개는 현재 소스와 해시가 일치한다. 새 Player stage는 Game-8854b7d4051c4d88826d8c1905c537dd이며 SDK/Player.runtime.dll 해시 일치를 검증했다.
+- 실제 Player 2000프레임, display promotions 1864, exit 0, 패키지 불변. 기본 바디 통과 27개·실패 0개, dynamic query 통과 210개·실패 0개, mixed query 통과 77개·실패 0개. 렌더 준비 후 완료 표시 1000프레임 추가 캡처를 수행했다.
+- capture complete, 1092프레임, GPU spans 43560, GPU admitted 1089, CPU unacked/GPU pending/GPU failed 각각 0. 종료 경계 clipped scope 3개는 분포에서 제외했다.
+- 제품 task 60182개 모두 Parent 안의 Run→Release 순서·동일 OS thread/session/tick/task·중복 없음 확인. Run mean 4.928us/p99 42.7us, Release mean 3.267us/p99 27.9us. 이는 대기·선점을 포함한 벽시계 분포이며, 순수 실행 또는 반복 p99 수용 증거로 주장하지 않는다.
+- record-physics-player-etw.ps1 기본 stage를 새 검증 패키지로 갱신했다. 관리자 재수집 후 ETW 손실 0 검사·task split 순서 검사·OS 상태 대조/독립 xperf 합 검증까지 자동 실행한다. 현재 비관리자 실행 토큰의 kernel recording 권한 제약 때문에 새 Run/Release 포함 ETW 수집은 관리자 shell 실행이 필요하다. 과거 ETW로 새 계층의 대기 위치를 추정하지 않는다.
+- 근거: M3Acceptance/task-split-product-result.json, product-task-split-summary.json, product-task-split-capture.json, publish-task-split/package-task-split/player-task-split logs 및 run-049d0c666be74f8897b6c45fa09b12ca. 제품 SDK 재빌드·제품 계층 확인 항목을 완료했으며, 남은 M3는 새 ETW에서 Run/Release blocking 위치 확인과 반복 p99 성능 수용이다.
+### 2026-10-10 M3 — 새 Run/Release ETW 대조 완료·계측 경로 대기 발견
+
+- ETW-f98086963e144577a0fe28e4803773b7: Lost Buffers/Events 각각 0, task 59974개 Run→Release 계층·identity 검증 통과. 물리 9개 스레드 scheduled 합은 독립 xperf와 최대 0.5us 차이, OS 시간 간극 0us. 0us timestamp-resolution child scope는 hierarchy 검사에 포함하고 양수 duration OS 분포에서는 제외하므로 Run 59884/Release 58099개와 부모 수가 다르다.
+- Player 2000프레임, display promotions 1865, exit 0, 패키지 불변. 캡처 complete/1089프레임/GPU spans 43440, admitted 1086, CPU unacked/GPU pending/GPU failed 각각 0. open scope 1개는 종료 경계이며 duration 표본에서 제외한다.
+- Run/Release 양쪽 모두 코드 37 blocking 관찰. 각 marker 독립 가장 느린 1% 중앙값: Run wall 177.05us / scheduled 144.6us / blocked 5.2us; Release wall 125.15us / scheduled 75.75us / blocked 23.65us. 중앙값끼리 합산하지 않는다.
+- 부모 task blocking 합 107031.8us 중 Run 34483.6us / Release 30495.7us / 자식 외부 42052.5us. 여러 worker의 중첩 합이므로 tick critical path나 전체 elapsed로 해석하지 않는다.
+- 가장 긴 부모(task 47731, tick 826) wall 2684.6us: Run 2.5us / Release 166.8us, 자식 외부 wall 2515.3us·blocked 2044.6us. 해당 Run과 Release 내부 blocking은 각각 0이다. Run 종료 timestamp부터 Release 시작 timestamp 사이에 긴 대기가 있으며 현재 소스상 profiler scope 종료/시작 처리 경로다. end_scope→honor_seal_request→seal_current 및 chunk_pool::seal/acquire의 공유 mutex가 조사 후보다. 정확한 잠금/스택을 확정하지 않는다.
+- Run/Release 포함 OS 상태 대조 항목은 완료했다. 부모 task wall을 순수 PhysX 연산 지연으로 계산하지 않는다. 다음 조치는 profiler 공유 pool 게시/확보 경로의 대기 단축 검토와 손실 없는 캡처 재검증, 이어서 ETW를 끈 독립 반복 p99 수용이다. ETW 수집 오버헤드가 있는 단일 run을 제품 p99 수용이나 계측 off/on 비교에 섞지 않는다.
+- 근거: 해당 ETW 폴더 assessment.json, task-cpu-analysis.json(splitAttribution 포함), task-split.json, capture-summary.json, trace-statistics.txt 및 원본 ETL. M3 성능 수용은 보류한다.
+### 2026-10-10 M3 — profiler chunk pool 잠금 분리·반환 임계구역 단축
+
+- ProfileThreadStream의 chunk_pool 봉인 FIFO/semaphore 수명 보호를 별도 m_sealedLock으로 분리했다. seal/take_sealed는 이제 free-list 확보·페이지 할당·보충·반환의 m_lock을 기다리지 않는다. 초기화/종료는 scoped_lock으로 두 상태를 함께 보호하고 FIFO 게시 순서·소유권 이전·empty→nonempty 알림 계약은 유지한다.
+- release가 독점 소유한 반환 목록의 count 초기화와 연결은 잠금 밖에서 처리하고, free-list 연결과 카운트 합산만 잠금 안에서 한 번 수행한다. 기존 반환 후 free-list 순서도 유지한다. 잠금 경합을 새 drop/try-lock 정책으로 숨기지 않는다.
+- 코어 Debug/Release 각각 1387 checks, 실패 0. 선택한 sparse-pages-retain-pool 변이는 두 설정 모두 sparse-pages/reuse 검사에서 검출됐다. 전체 72개 변이 suite를 실행했다고 주장하지 않는다.
+- collector stress Debug/Release 각각 20초 설정: 실제 22.685/22.241초, 37/319 cycles, attempted=collected 606208/5226496프레임, droppedFrames/malformedPages/foreignTouches 0, accounted/drained/complete true. active shutdown abandoned 5개는 해당 stress가 의도적으로 만들고 별도 검증한 소유자 생존 종료 조건이다.
+- 수정된 profiler로 Release 물리 P1 전체 재빌드·실행: 53238 checks 통과·실패 0, SDK task 4160개, 실제 GPU backend 확인. 기존 Run/Release task identity/cardinality와 손실 없는 capture/serialization 계약을 통과했다.
+- 근거: M3Acceptance/pool-lock-isolation-result.json, pool-core.log, PoolContentionStress/manifest.json, pool-physics-p1.log. 제품 SDK는 아직 이 변경을 포함하지 않는다. 잠금 간섭 제거는 구현·정확성 확인됐지만 실제 blocking/p99 개선량은 미측정이다. 다음은 제품 SDK 반영 후 캡처·blocking 재측정 및 ETW off 반복 p99 수용이다. M3 성능 수용은 보류한다.
+### 2026-10-10 M3 — pool 잠금 분리 제품 SDK 반영·ETW off 독립 3회 측정
+
+- Release 전체 재빌드·배포 검증: local-0.0.0.0-win-x64-Release-31cd935f-23fb-4045-be7a-d7cbb434123c. 기존 저작 프로젝트 재사용, 새 stage Game-432a3fbd77b1462ab930bd6960704597 시작 검증 통과, SDK/Player DLL hash 일치. 소스 hash와 바이너리 hash는 pool-product-build-result.json에 보존했다.
+- WPR이 기록 중이 아닌 것을 확인하고 같은 새 제품 패키지를 독립 3회 실행했다. 모두 2000프레임, 정상 종료/패키지 불변. 각 query/dynamic/mixed gate와 추가 완료 표시 1000프레임 캡처 및 task Run→Release 순서/identity 검사를 통과했다.
+- complete 캡처 1086/1087/1087프레임, 총 3260프레임·GPU spans 129920. task 59870/59974/59922개(총 179766개) 계층 검증. 모든 실행 CPU unacked/GPU pending/GPU failed 0. 종료 경계 span은 종전 규칙대로 분포에서 제외하고 실행/느린 표본은 제거하지 않았다.
+- 물리 tick 독립 평균 값 865.97/980.73/942.63us, p99 3259.0/3612.8/3565.9us. 중앙값 평균 942.63us / p99 3565.9us. CV 평균 6.29%, p99 5.52%로 반복성 기준 통과. FetchWait 평균/p99 CV 5.79/5.10%, GPU instrumented union 평균/p99 CV 7.56/9.17%도 통과.
+- RenderThread 평균 CV 3.13% 통과, p99 11778.1/13832.6/15485.2us의 CV 13.56%는 보류. 프레임 경계는 pacing 포함 값이며 CPU 작업 또는 실제 presentation latency로 해석하지 않는다.
+- 중요한 한계: 물리 지연 절대값은 이전 기록보다 높다. 이전 단일 Run/Release 제품 캡처의 PhysicsTick mean 549.28us / p99 2048.3us와 이번 값을 단순 비교해 원인이나 변경의 개선/회귀를 확정하지 않는다. 이번 3회로 반복성은 확인했지만 잠금 분리의 실제 지연 개선을 확인했다고 주장하지 않는다. 새로운 제품 ETW에서 profiler 외부/Run/Release blocking 위치 대조와 통제된 성능/계측 비용 수용이 남는다.
+- record-physics-player-etw.ps1 기본 stage를 새 검증 제품으로 갱신했다. 관리자 shell에서 재수집하면 기존과 동일한 자동 task hierarchy·OS QPC/독립 xperf·Run/Release 외부 blocking 분석을 수행한다. 오래된 SDK ETW 결과를 새 코드의 개선 근거로 재사용하지 않는다.
+- 근거: M3Acceptance/pool-product-result.json, pool-product-build-result.json, PoolIsolationPlayer/runs.json·stability.json 및 원본 capture hashes, publish-pool-isolation/package-pool-isolation logs. 제품 SDK 반영·3회 손실 없는 캡처·물리/GPU p99 반복성 확인을 완료했다. M3 전체 성능 수용은 보류한다.
+
+### 2026-10-10 M3 — pool 잠금 분리 후 제품 ETW 대조 완료
+
+- ETW-005887f196d140c2b03fde3aa2c8c361: Lost Buffers/Events 0, task 60055개 Run→Release identity/순서 검증 통과. OS 시간 간극 0us, 9개 스레드 scheduled 합 독립 xperf 대조 최대 차이 0.4us.
+- Run/Release 외부 blocking 합은 이전 ETW의 42052.5us/59974 tasks(0.7012us/task)에서 이번 0us/60055 tasks(0us/task)로 관측됐다. profiler scope 사이 대기 제거 증거이며, 중첩 worker 합을 전체 실행 시간 또는 tick critical path로 해석하지 않는다. 독립 ETW 실행 간 비교이므로 통제된 지연 개선량으로 주장하지 않는다.
+- Run 내부 blocking 합 33542.5us, Release 내부 41773.5us는 남는다. 부모 wall 최대 1288.5us의 Run은 1285.9us 전부 scheduled로 확인됐다. 내부 blocking의 정확한 mutex/SDK stack 원인은 이 기록만으로 확정하지 않는다.
+- Player 2000프레임/display promotions 1866/exit 0/패키지 불변. complete 캡처 1090프레임/GPU spans 43480, admitted 1087, CPU unacked/GPU pending/GPU failed 0. 종료 경계 open scope 3개는 기존 규칙대로 분포에서 제외한다.
+- 새 제품 ETW 대조 항목 완료. 남은 M3는 통제된 계측 비용·성능 수용 및 RenderThread p99 반복성(CV 13.56%) 해소이며 M3 전체 수용/M4는 완료하지 않는다.
+- 근거: 해당 폴더 assessment.json, task-cpu-analysis.json, task-split.json, capture-summary.json, trace-statistics.txt와 원본 ETL.
+
+### 2026-10-10 M3 — 최신 pool 분리 SDK 쿼리 계측 ABBA 비용 측정
+
+- 최신 Release stage Game-432a3fbd77b1462ab930bd6960704597로 ETW off 확인 후 off/on/on/off 독립 4회 실행. 기존 소유 CPU 고정·tiered compilation 비활성·워밍업·블록당 600표본 조건 유지. 각각 2000프레임/정상 종료/패키지 불변/쿼리 parity·CPU accounting 검증 통과, 총 38400 raw 표본 보존.
+- 기존 eight-block CV <= 10% 기준에서 평균 2/4 비교만 안정적: 16 scalar off/on 중앙값 26.797/28.612us(+6.77%), 64 scalar 104.337/112.832us(+8.14%). 안정적인 평균의 계측 비용 측정을 완료했으며, 비용 허용 예산까지 수용한 의미는 아니다.
+- 16 batch 평균 15.934/17.479us(+9.70%), 64 batch 55.987/65.453us(+16.91%)는 불안정하므로 비용 수용값으로 사용하지 않는다. p99 4/4 모두 불안정: off/on CV는 16 scalar 22.30/20.22%, 16 batch 25.96/45.80%, 64 scalar 15.04/12.58%, 64 batch 12.19/32.41%.
+- 비교 8개 중 안정성 2개 통과. 낮아진 일부 on p99 중앙값을 개선으로 주장하거나 느린 표본을 삭제하지 않는다. 이전 SDK/다른 실행의 값을 혼합하지 않는다. Query wall 비용만 측정하므로 solver 총비용·렌더/GPU 수용을 대체하지 않는다.
+- 최신 SDK의 쿼리 ABBA 재측정 항목 완료. 남은 수용 문제는 batch 평균·query p99 변동 원인과 계측 허용 예산, solver 활성/변경 비율별 미수용 셀 및 RenderThread p99 반복성이다. M3는 progress 유지, M4는 시작 전이다.
+- 근거: M3Acceptance/Performance-965fee9afd714227a8bdef8c8609d58e/result.json와 각 원본 run/query-benchmark.json 및 pool-query-abba.log·pool-query-abba-summary.log.

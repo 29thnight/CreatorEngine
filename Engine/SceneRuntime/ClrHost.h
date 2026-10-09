@@ -3,6 +3,7 @@
 #include "SpinLock.h"
 #include "ScriptObjectRegistry.h"
 #include "ScriptLifecyclePhase.h"
+#include "../Physics/PhysicsGeometry.h"
 
 #include <mathematics/vector3.hpp>
 
@@ -64,30 +65,26 @@ public:
 	//
 	// 충돌마다 경계를 넘으면 "틱당 1회" 원칙이 무너진다. 발생 시점에는 큐에만 담고,
 	// 틱 경계에서 배열 하나로 넘긴다(설계 문서 02절 "부분" 방식).
-	enum class PhysicsEventKind : int
-	{
-		TriggerEnter = 0, TriggerStay = 1, TriggerExit = 2,
-		CollisionEnter = 3, CollisionStay = 4, CollisionExit = 5,
-	};
+    struct ScriptContactEndpoint
+    {
+        ScriptObjectHandle owner;
+        std::uint64_t component;
+        std::uint32_t shape, bodyGeneration, bodySlot, reserved;
+        ce::physics::contact_role_id role;
+    };
 
-	// 관리 측 Collision·PhysicsEvent와 배치가 같아야 한다.
-	struct ScriptCollision
-	{
-		ScriptObjectHandle other;
-		int contactCount{ 0 };
-		ScriptFloat3 contact;
-	};
+    struct ScriptContact
+    {
+        ScriptContactEndpoint first, second;
+        std::uint64_t tick;
+        int kind, contactCount, requiredContacts;
+        ScriptFloat3 point;
+    };
 
-	struct ScriptPhysicsEvent
-	{
-		int instanceId{ -1 };
-		int kind{ 0 };
-		ScriptCollision collision;
-	};
-
-	// 물리 이벤트를 큐에 담는다(발생 시점에 호출).
-	void QueuePhysicsEvent(int instanceId, PhysicsEventKind kind,
-		Entity* other, const std::vector<math::vector3>& contactPoints);
+    static_assert(sizeof(ScriptContactEndpoint) == 48);
+    static_assert(sizeof(ScriptContact) == 128);
+    static_assert(offsetof(ScriptContact, tick) == 96);
+    void QueueContact(const ScriptContact& contact);
 
 	// 큐에 모인 것을 한 번에 관리 측으로 넘긴다(틱 경계에서 호출).
 	void FlushPhysicsEvents();
@@ -536,7 +533,7 @@ private:
 	GcLatencyFn  m_fnGcSetLatencyMode{ nullptr };
 	GcStatsFn    m_fnGcGetStats{ nullptr };
 
-	using FlushPhysicsFn = int(__stdcall*)(const ScriptPhysicsEvent*, int);
+	using FlushPhysicsFn = int(__stdcall*)(const ScriptContact*, int);
 	using HasAniFn       = int(__stdcall*)(const char*);
 	using CreateAniFn    = int(__stdcall*)(const char*);
 	using DestroyAniFn   = int(__stdcall*)(int);
@@ -551,7 +548,7 @@ private:
 	TypeNamesFn    m_fnGetAniBehaviorTypeNames{ nullptr };
 
 	// 한 프레임에 모이는 충돌 이벤트. 매 프레임 clear 하되 용량은 유지한다.
-	std::vector<ScriptPhysicsEvent> m_physicsEvents;
+	std::vector<ScriptContact> m_physicsEvents;
 	std::vector<ScriptAniEvent> m_aniEvents;
 
 	// AI 틱 큐. 담는 쪽이 잡 스레드라 플래그로 보호한다(위 주석 참고).

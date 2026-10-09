@@ -1,7 +1,8 @@
-param([string]$EditorExe='', [switch]$ScriptProbe, [switch]$StepProbe, [switch]$MotionProbe, [switch]$DdolProbe, [switch]$HierarchyProbe, [switch]$TransitionFailureProbe)
+param([string]$EditorExe='', [switch]$ScriptProbe, [switch]$StepProbe, [switch]$MotionProbe, [switch]$DdolProbe, [switch]$HierarchyProbe, [switch]$TransitionFailureProbe, [switch]$TerrainProbe)
 $ErrorActionPreference='Stop'
 if($TransitionFailureProbe){$HierarchyProbe=$true;$ScriptProbe=$true}
 if($HierarchyProbe){$DdolProbe=$true}
+if($StepProbe -and $HierarchyProbe){throw 'StepProbe requires the unscaled fixture; run hierarchy transition independently'}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(!$EditorExe){$EditorExe=Join-Path $repo 'Bin/x64-Debug/Editor/CreatorEditor.exe'}
 $exe=Get-Item -LiteralPath $EditorExe
@@ -53,6 +54,20 @@ try {
         return $result
     }
 
+    function SwitchScene([string]$path) {
+        $request=Command 'scene.switch' @($path)
+        if(!$request.data.activationRequested){throw 'Scene activation was not requested'}
+
+        $deadline=(Get-Date).AddSeconds(120)
+        do {
+            Start-Sleep -Milliseconds 100
+            $state=Command 'scene.load.status' @("$($request.data.requestId)")
+            if((Get-Date) -gt $deadline){throw 'Scene activation timeout'}
+        }until($state.data.complete)
+
+        if($state.data.state -ne 'Ready' -or !$state.data.activationRequested){throw 'Scene activation did not reach Ready'}
+        Start-Sleep -Milliseconds 100
+    }
     function SamePosition($left,$right){
         if($left.Count -ne $right.Count){return $false}
         for($axis=0;$axis -lt $left.Count;$axis++){
@@ -142,7 +157,8 @@ try {
     }
     $null=Command 'scene.save' @($scene)
     if([IO.File]::ReadAllText($scene) -notmatch 'm_characterSchema:\s*1'){throw 'Character schema was not serialized'}
-    $null=Command 'scene.load' @($scene)
+    $null=Command 'scene.new' @('CharacterReloadSentinel')
+    SwitchScene $scene
     $initial=(Command 'object.describe' @('CharacterGateActor')).data.position
     if($HierarchyProbe){
         $hierarchyNames=@('PersistentParent','PersistentBranch','PersistentDisabledCharacter','PersistentDisabledBody')
@@ -180,6 +196,18 @@ try {
         if($probe.completed -ne 1 -or $probe.failed -ne 0 -or $probe.passed -ne 18){throw "Character CLR probe incomplete or failed: $($probe|ConvertTo-Json -Compress)"}
     }
     if($MotionProbe){
+        # Step rejection can leave the capsule briefly airborne against the wall.
+        # Start the independent jump scenario on the flat floor with no input.
+        $null=Command 'character.velocity' @('CharacterGateActor','0','0','0')
+        $null=Command 'character.teleport' @('CharacterGateActor','0','3','0')
+        $until=(Get-Date).AddSeconds(10)
+        do {
+            Start-Sleep -Milliseconds 70
+            $grounded=(Command 'character.state' @('CharacterGateActor')).data
+        }while(!$grounded.below -and (Get-Date) -lt $until)
+
+        if(!$grounded.below){throw 'Jump scenario did not settle on the flat floor'}
+
         if($ScriptProbe){
             if((Command 'script.invoke' @('CharacterMovementProbe','JumpGrounded')).data.returnValue -ne 'None'){throw 'C# grounded jump failed'}
         } else {$null=Command 'character.jump' @('CharacterGateActor')}
@@ -211,7 +239,7 @@ try {
             $disabledChildBefore=(Command 'character.state' @('PersistentDisabledCharacter')).data
         }
         $null=Command 'scene.ddol' @('CharacterGateActor')
-        $null=Command 'scene.switch' @($destination)
+        SwitchScene $destination
         $null=Command 'object.describe' @('DestinationMarker')
         $afterOwner=(Command 'object.describe' @('CharacterGateActor')).data
         $afterTransfer=(Command 'character.state' @('CharacterGateActor')).data
@@ -273,7 +301,7 @@ try {
         $null=Command 'character.cancel' @('CharacterGateActor')
         $null=Command 'object.enable' @('CharacterGateActor','off')
         $disabledTransfer=(Command 'character.state' @('CharacterGateActor')).data
-        $null=Command 'scene.switch' @($destination)
+        SwitchScene $destination
         $disabledArrival=(Command 'character.state' @('CharacterGateActor')).data
         if($disabledArrival.simulating -or !(SamePosition $disabledArrival.position $disabledTransfer.position)){throw 'Disabled DDOL character activated or moved'}
         $null=Command 'object.enable' @('CharacterGateActor','on')
@@ -414,7 +442,66 @@ try {
 
     $null=Command 'component.remove' @('CharacterGateActor','CharacterMovementComponent')
     $null=Command 'character.state' @('CharacterGateActor') -Reject
-    @{result='PHYSICS_CHARACTER_HTTP_OK';transitionFailureProbe=[bool]$TransitionFailureProbe;transitionFailureEvidence=$transitionFailureEvidence;scene=$scene;commands=$script:sequence;scriptProbe=[bool]$ScriptProbe;probe=$probe;stepProbe=[bool]$StepProbe;stepEvidence=$stepEvidence;motionProbe=[bool]$MotionProbe;motionEvidence=$motionEvidence;ddolProbe=[bool]$DdolProbe;ddolEvidence=$ddolEvidence;hierarchyProbe=[bool]$HierarchyProbe;hierarchyEvidence=$hierarchyEvidence;initial=$initial;moved=$moved;restored=$restored}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
+    $terrainEvidence=@()
+    if($TerrainProbe){
+        foreach($case in @(@{name='gentle';angle=20;limit=0.70710678},@{name='steep';angle=60;limit=0.70710678},@{name='unrestricted';angle=60;limit=0})){
+            $null=Command 'scene.new' @("CharacterTerrain-$($case.name)-$id")
+            $height=(10*[Math]::Tan($case.angle*[Math]::PI/180)).ToString('R',[Globalization.CultureInfo]::InvariantCulture)
+            $input=Join-Path $out "$($case.name)-mesh.txt"
+            [IO.File]::WriteAllText($input,"4 0 0 -4 0 0 4 10 $height -4 10 $height 4 2 0 1 2 1 3 2")
+            $relative="PhysicsVerification/CharacterTerrain-$($case.name)-$id.cegeometry"
+            New-Item -ItemType Directory -Force (Join-Path $repo 'Dynamic_CPP/Assets/PhysicsVerification')|Out-Null
+            $geometry=(Command 'geometry.create' @($relative,'mesh',$input)).data
+
+            foreach($name in @('TerrainFloor','TerrainRamp')){
+                $null=Command 'object.create' @($name)
+                $null=Command 'component.add' @($name,'PhysicsBodyComponent')
+                $null=Command 'object.property' @($name,'PhysicsBodyComponent','m_motion','0')
+            }
+
+            $null=Command 'object.transform' @('TerrainFloor','0','-0.5','0')
+            [IO.File]::WriteAllText($valid,'[{"shapeId":1,"kind":0,"halfExtent":[30,0.5,30]}]')
+            $null=Command 'physics.shapes' @('TerrainFloor','PhysicsBodyComponent',$valid)
+            $shape=@(@{shapeId=1;kind=4;geometryAsset=$geometry.uuid;geometryRevision=1})
+            [IO.File]::WriteAllText($valid,(ConvertTo-Json -InputObject $shape -Compress))
+            $null=Command 'physics.shapes' @('TerrainRamp','PhysicsBodyComponent',$valid)
+            $null=Command 'object.create' @('TerrainCharacter')
+            $null=Command 'component.add' @('TerrainCharacter','CharacterMovementComponent')
+            $null=Command 'object.transform' @('TerrainCharacter','-2','1.05','0')
+            $limit=([double]$case.limit).ToString('R',[Globalization.CultureInfo]::InvariantCulture)
+            $null=Command 'object.property' @('TerrainCharacter','CharacterMovementComponent','m_slopeLimitCosine',$limit)
+            $terrainScene=Join-Path $out "$($case.name).creator"
+            $null=Command 'scene.save' @($terrainScene)
+            $null=Command 'scene.new' @('TerrainReloadSentinel')
+            SwitchScene $terrainScene
+            $authored=(Command 'object.describe' @('TerrainCharacter')).data.position
+            $null=Command 'play'
+            $deadline=(Get-Date).AddSeconds(15)
+            do {
+                Start-Sleep -Milliseconds 50
+                $state=(Command 'character.state' @('TerrainCharacter')).data
+                if((Get-Date) -gt $deadline){throw 'Terrain grounding timeout'}
+            }until($state.below -and [long]$state.tick -ge 30)
+
+            $null=Command 'character.velocity' @('TerrainCharacter','2','0','0')
+            $start=(Command 'character.state' @('TerrainCharacter')).data
+            do {
+                Start-Sleep -Milliseconds 50
+                $state=(Command 'character.state' @('TerrainCharacter')).data
+                if((Get-Date) -gt $deadline){throw 'Terrain traversal timeout'}
+            }until([long]$state.tick-[long]$start.tick -ge 150)
+
+            if($case.name -eq 'gentle' -and ($state.position[0] -le 2 -or $state.footPosition[1] -le 0.5)){throw 'Walkable mesh slope did not climb'}
+            if($case.name -eq 'steep' -and ($state.position[0] -ge 1 -or $state.footPosition[1] -ge 1)){throw 'Nonwalkable mesh slope did not block ascent'}
+            if($case.name -eq 'unrestricted' -and $state.position[0] -le $terrainEvidence[1].state.position[0]+0.5){throw 'Zero slope limit did not disable slope rejection'}
+
+            $null=Command 'stop'
+            $restoredTerrain=(Command 'object.describe' @('TerrainCharacter')).data.position
+            if(!(SamePosition $authored $restoredTerrain)){throw 'Terrain Stop did not restore authored pose'}
+            $terrainEvidence+=@{name=$case.name;angle=$case.angle;limit=$case.limit;scene=$terrainScene;geometry=$geometry;start=$start;state=$state;restored=$restoredTerrain}
+        }
+    }
+    @{terrainProbe=[bool]$TerrainProbe;terrainEvidence=$terrainEvidence;result='PHYSICS_CHARACTER_HTTP_OK';transitionFailureProbe=[bool]$TransitionFailureProbe;transitionFailureEvidence=$transitionFailureEvidence;scene=$scene;commands=$script:sequence;scriptProbe=[bool]$ScriptProbe;probe=$probe;stepProbe=[bool]$StepProbe;stepEvidence=$stepEvidence;motionProbe=[bool]$MotionProbe;motionEvidence=$motionEvidence;ddolProbe=[bool]$DdolProbe;ddolEvidence=$ddolEvidence;hierarchyProbe=[bool]$HierarchyProbe;hierarchyEvidence=$hierarchyEvidence;initial=$initial;moved=$moved;restored=$restored}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
     Write-Output "PHYSICS_CHARACTER_HTTP_OK evidence=$out"
 } finally {
     if(!$process.HasExited){$process.Kill();$process.WaitForExit()}

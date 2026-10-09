@@ -839,6 +839,33 @@ namespace EditorObjectOperations
             }
         }
 
+        if (auto* body = dynamic_cast<PhysicsBodyComponent*>(component); body)
+        {
+            auto validated = body->CaptureDefinition();
+            if (!validated)
+            {
+                Meta::Deserialize(component, *type, before.Root().Read());
+
+                return InvalidArguments(std::string(validated.error().message), "physics.definition_invalid");
+            }
+
+            const auto& properties = validated->properties;
+            const auto finite = [](math::vector3 value) {
+                return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+            };
+            if (std::to_underlying(properties.kind) > 2 || !std::isfinite(properties.mass) || properties.mass <= 0 ||
+                !std::isfinite(properties.linear_damping) || properties.linear_damping < 0 ||
+                !std::isfinite(properties.angular_damping) || properties.angular_damping < 0 ||
+                std::to_underlying(properties.constraints.translation) > 7 ||
+                std::to_underlying(properties.constraints.rotation) > 7 ||
+                !finite(properties.linear_velocity) || !finite(properties.angular_velocity))
+            {
+                Meta::Deserialize(component, *type, before.Root().Read());
+
+                return InvalidArguments("Invalid physics body properties", "physics.definition_invalid");
+            }
+        }
+
         const bool changed = CommitProperty(*component, field, std::move(before));
         auto data = Snapshot(target, *object); data.Set("changed", CommandData::Bool(changed));
         data.Set("field", CommandData::String(field)); data.Set("value", CommandData::String(raw));

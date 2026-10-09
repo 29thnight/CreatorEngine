@@ -13,6 +13,10 @@
 > 기존 결정인 **폐쇄 효과 카탈로그, 즉시 효과와 중단의 분리, `Var<T>` 이름**은 유지한다.
 > 아래 참조 구현 측정은 과거 검토 자료이며 CreatorEngine 구현 완료나 성능 보장이 아니다.
 
+### 2026-10-08 물리 접촉 작업과의 경계
+
+[PHASE19 E0 접촉 작업 계약](../design/PhysicsContactExecutionContract.md)은 현행 OnBeginSimulation()/Scope에 등록하는 물리 ContactStream 등록·인덱스 라우팅·PostPhysics 소비·수명 계약이다. 별도 Job/PhysicsBehaviour 저작 제안은 철회했다. 본 계획의 PrSM, 효과 실행기, OnSimulate 교체를 구현하거나 완료한 것으로 간주하지 않는다. ContactStream은 owner-thread 소비이며 일반 Task/Scope await의 병렬 허용을 뜻하지 않는다. 미래 생성 언어도 E0의 runtime descriptor와 수명 계약을 소비하도록 정합성을 유지한다.
+
 ## 0. 결정한 목표와 착수 조건
 
 PrSM은 저작 의도와 정적 계약을 표현하고, 생성된 C#은 기존 `ScriptCore` 위에서 실행한다.

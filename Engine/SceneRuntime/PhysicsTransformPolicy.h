@@ -13,6 +13,17 @@ struct PhysicsTransformState
     math::vector3 scale;
 };
 
+inline bool PhysicsScalesNear(math::vector3 a, math::vector3 b)
+{
+    constexpr float tolerance = 8.f * std::numeric_limits<float>::epsilon();
+    const auto nearlyEqual = [](float x, float y) {
+        return std::isfinite(x) && std::isfinite(y) &&
+            std::abs(x-y) <= tolerance * (std::max)({1.f, std::abs(x), std::abs(y)});
+    };
+
+    return nearlyEqual(a.x, b.x) && nearlyEqual(a.y, b.y) && nearlyEqual(a.z, b.z);
+}
+
 inline bool PhysicsTransformsNear(const math::matrix4x4& a, const math::matrix4x4& b,
                                   float tolerance = 8.f * std::numeric_limits<float>::epsilon())
 {

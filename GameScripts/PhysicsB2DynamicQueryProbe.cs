@@ -22,6 +22,8 @@ public sealed partial class PhysicsB2PlayerProbe
     {
         if (!Dynamic || _queryMotionFinished || Environment.GetEnvironmentVariable("CE_PHYSICS_QUERY_DYNAMIC") != "1") return;
 
+        var gate = Environment.GetEnvironmentVariable("CE_PHYSICS_QUERY_GATE");
+        if (!string.IsNullOrEmpty(gate) && !System.IO.File.Exists(gate)) return;
         try
         {
             _queryMotionSeconds += delta;

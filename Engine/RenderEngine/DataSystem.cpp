@@ -2251,7 +2251,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                     break;
                 case ManagedAssetType::Material:
                 {
-                    const auto loaded = LoadMaterialShared(file::path(entry.assetName).stem().string());
+                    const auto loaded = LoadMaterialShared(std::string_view{file::path(entry.assetName).stem().string()});
                     if (!loaded)
                     {
                         throw std::runtime_error("Required material could not be prepared: " + entry.assetName);
@@ -5462,7 +5462,7 @@ own::shared_owner<const Material> DataSystem::LoadMaterialShared(FileGuid guid)
     {
         return {};
     }
-    auto material = LoadMaterialShared(absolute.string());
+    auto material = LoadMaterialShared(std::string_view{absolute.string()});
     return material && material->m_fileGuid == guid ? material : nullptr;
 }
 

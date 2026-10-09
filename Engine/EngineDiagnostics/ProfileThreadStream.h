@@ -114,6 +114,8 @@ namespace ce
 		std::vector<std::unique_ptr<event_chunk>> m_storage;
 
 		mutable std::mutex m_lock;
+		// Sealed FIFO publication must not wait behind allocation or free-list maintenance.
+		mutable std::mutex m_sealedLock;
 		event_chunk*  m_free = nullptr;
 		event_chunk*  m_sealed = nullptr;
 		event_chunk*  m_sealedTail = nullptr;

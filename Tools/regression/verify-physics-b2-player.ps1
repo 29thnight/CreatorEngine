@@ -1,7 +1,8 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Stage, [ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$ExpectedSceneGuid='5703e1d4-b1f5-4a32-b047-dd351c713483', [switch]$Shipping, [switch]$Shear, [switch]$QueryBenchmark, [switch]$QueryStress, [switch]$QueryDynamic, [switch]$BoundedDenseCapture, [switch]$RequireMaximumBatch, [switch]$DisableTieredCompilation, [switch]$IsolateGameThread, [switch]$RequireCpuAccounting, [ValidateSet('none','off','on')][string]$QueryProfile='none', [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000)
+param([Parameter(Mandatory)][string]$Stage, [ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$ExpectedSceneGuid='5703e1d4-b1f5-4a32-b047-dd351c713483', [switch]$Shipping, [switch]$Shear, [switch]$QueryBenchmark, [switch]$QueryStress, [switch]$QueryDynamic, [switch]$QueryMixed, [switch]$TraceCounterLoss, [switch]$WaitForRenderedCapture, [switch]$BoundedDenseCapture, [switch]$RequireMaximumBatch, [switch]$DisableTieredCompilation, [switch]$IsolateGameThread, [switch]$PreferLastCore, [switch]$RequireCpuAccounting, [ValidateSet('none','off','on')][string]$QueryProfile='none', [ValidateRange(0,100000)][int]$CaptureTailFrames=0, [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000)
 $ErrorActionPreference='Stop'
 if($BoundedDenseCapture -and (!$QueryStress -or !$QueryBenchmark -or $QueryProfile -ne 'on')){throw 'Bounded dense capture requires profiled stress benchmark'}
+if($CaptureTailFrames -gt 0 -and ($QueryProfile -ne 'on' -or !$WaitForRenderedCapture -or $CaptureTailFrames + 500 -ge $SmokeFrames)){throw 'Capture tail requires rendered profile on and sufficient smoke frames'}
 if($RequireMaximumBatch -and !$QueryStress){throw 'Maximum batch gate requires QueryStress'}
 
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -30,11 +31,11 @@ if($IsolateGameThread -and ($QueryProfile -eq 'none' -or !$QueryBenchmark)){thro
 if($IsolateGameThread -and -not ('PhysicsQueryCpuPlacement' -as [type])){
     Add-Type -Path "$PSScriptRoot/PhysicsQueryCpuPlacement.cs"
 }
-if($QueryProfile -ne 'none' -and !$QueryBenchmark){throw 'QueryProfile requires QueryBenchmark'}
+if($QueryProfile -ne 'none' -and !$QueryBenchmark -and !$QueryMixed){throw 'QueryProfile requires QueryBenchmark'}
 $launchArgs=@("--smoke", "$SmokeFrames", "--smoke-promotions", "8")
 if($QueryProfile -ne 'none'){$launchArgs+='--command-service'}
 $benchmarkGate=if($QueryProfile -ne 'none'){Join-Path $out 'query.ready'}else{''}
-$launchEnvironment=@{CE_PHYSICS_QUERY_DYNAMIC=$(if($QueryDynamic){'1'}else{'0'});CE_PHYSICS_QUERY_BOUNDED_CAPTURE=$(if($BoundedDenseCapture){'1'}else{'0'});CE_PHYSICS_QUERY_STRESS=$(if($QueryStress){'1'}else{'0'});TEMP=$runtime;TMP=$runtime;CE_PHYSICS_B2_SHEAR=$(if($Shear){'1'}else{'0'});CE_PHYSICS_QUERY_BENCH=$(if($QueryBenchmark){'1'}else{'0'});CE_PHYSICS_QUERY_GATE=$benchmarkGate;CE_PHYSICS_QUERY_PROFILE=$(if($QueryProfile -eq 'on'){'1'}else{'0'})}
+$launchEnvironment=@{CE_PROFILE_COUNTER_LOSS_TRACE=$(if($TraceCounterLoss){'1'}else{$null});CE_PHYSICS_QUERY_MIXED=$(if($QueryMixed){'1'}else{'0'});CE_PHYSICS_QUERY_DYNAMIC=$(if($QueryDynamic){'1'}else{'0'});CE_PHYSICS_QUERY_BOUNDED_CAPTURE=$(if($BoundedDenseCapture){'1'}else{'0'});CE_PHYSICS_QUERY_STRESS=$(if($QueryStress){'1'}else{'0'});TEMP=$runtime;TMP=$runtime;CE_PHYSICS_B2_SHEAR=$(if($Shear){'1'}else{'0'});CE_PHYSICS_QUERY_BENCH=$(if($QueryBenchmark){'1'}else{'0'});CE_PHYSICS_QUERY_GATE=$benchmarkGate;CE_PHYSICS_QUERY_PROFILE=$(if($QueryProfile -eq 'on'){'1'}else{'0'})}
 if($DisableTieredCompilation){$launchEnvironment["DOTNET_TieredCompilation"]="0";$launchEnvironment["COMPlus_TieredCompilation"]="0"}
 $memorySamples=[Collections.Generic.List[object]]::new()
 function SampleMemory([int]$blockCount=-1){
@@ -46,6 +47,7 @@ function SampleMemory([int]$blockCount=-1){
     } catch [InvalidOperationException] {if(!$process.HasExited){throw}}
 }
 $process=Start-Process "$Stage/Player.exe" -ArgumentList $launchArgs -WorkingDirectory $Stage -WindowStyle Hidden -Environment $launchEnvironment -RedirectStandardOutput "$out/player.out" -RedirectStandardError "$out/player.err" -PassThru
+@{pid=$process.Id;stage=$Stage;arguments=$launchArgs;startedUtc=[DateTime]::UtcNow.ToString("o")}|ConvertTo-Json -Depth 10|Set-Content "$out/launch.json" -Encoding utf8
 try {
     $deadline=(Get-Date).AddSeconds($TimeoutSeconds)
     $windowDeadline=(Get-Date).AddSeconds(30)
@@ -81,12 +83,37 @@ try {
             @{command=$name;result=$reply}|ConvertTo-Json -Depth 20 -Compress|Add-Content "$out/profile-commands.jsonl"
             return $reply
         }
+        if($QueryMixed){
+            $baselineDeadline=(Get-Date).AddSeconds(60)
+            do {
+                $baseline=[string](Get-Content "$out/player.out" -Raw)
+                $completed=[regex]::Matches($baseline,'\[physics.player.b2\] .*"complete":true').Count
+                if((Get-Date) -gt $baselineDeadline -or $process.HasExited){throw 'Mixed capture baseline did not complete'}
+                Start-Sleep -Milliseconds 50
+            }until($completed -eq 3)
+        }
+        if($WaitForRenderedCapture){
+            $renderDeadline=(Get-Date).AddSeconds(120)
+            do {
+                $renderState=ProfileCommand 'render.status'
+                if($process.HasExited -or (Get-Date) -gt $renderDeadline){throw 'Completed display capture admission timeout'}
+                Start-Sleep -Milliseconds 50
+            }until($renderState.data.ready -and $renderState.data.completedFrame -gt 0 -and $renderState.data.promotions -ge 8)
+            $renderState.data | ConvertTo-Json | Set-Content "$out/capture-render-admission.json"
+        }
         $state=ProfileCommand $(if($QueryProfile -eq 'on'){'profile.record'}else{'profile.pause'})
-        if([bool]$state.data.recording -ne ($QueryProfile -eq 'on')){throw 'Profiler state mismatch'}
+        $profileDeadline=(Get-Date).AddSeconds(30)
+        if($QueryProfile -eq 'on'){
+            do {
+                Start-Sleep -Milliseconds 50
+                $state=ProfileCommand 'profile.save' @('status')
+                if((Get-Date) -gt $profileDeadline){throw 'Profiler recording admission timeout'}
+            }until($state.data.writer.state -eq 'recording')
+        }
         if($IsolateGameThread){
             $process.Refresh()
             [uint64]$allowed=$process.ProcessorAffinity.ToInt64()
-            [uint64]$reserved=[PhysicsQueryCpuPlacement]::ReserveCore($allowed)
+            [uint64]$reserved=[PhysicsQueryCpuPlacement]::ReserveCore($allowed, [bool]$PreferLastCore)
             [uint64]$ownerMask=$reserved -band (-bnot ($reserved-1))
             [uint64]$others=$allowed -band (-bnot $reserved)
             [uint32]$ownerThread=[PhysicsB2ProbeWindow]::GetWindowThreadProcessId($process.MainWindowHandle,[ref]$windowOwner)
@@ -146,7 +173,23 @@ try {
         $motion[0]|ConvertTo-Json|Set-Content "$out/query-dynamic.json" -Encoding utf8
     }
 
+    if($QueryMixed){
+        do {
+            $mixedText=[string](Get-Content "$out/player.out" -Raw)
+            if($mixedText -match '\[physics.player.mixed-query.failure\]'){throw 'Mixed collision/rotation query failed'}
+            if($mixedText -match '\[physics.player.mixed-query\] (\{[^\r\n]+\})'){
+                $mixed=$Matches[1]|ConvertFrom-Json
+                break
+            }
+            if($process.HasExited -or (Get-Date) -gt $deadline){throw 'Mixed query receipt missing'}
+            Start-Sleep -Milliseconds 100
+        }while($true)
+
+        if(!$mixed.complete -or $mixed.failed -ne 0 -or $mixed.passed -lt 15){throw 'Incomplete mixed query result'}
+        $mixed|ConvertTo-Json|Set-Content "$out/query-mixed.json" -Encoding utf8
+    }
     if($QueryProfile -ne 'none'){
+        if($QueryBenchmark){
         do{
             $queryStdout=[string](Get-Content "$out/player.out" -Raw)
             if($queryStdout -match 'query-benchmark.failure'){throw 'Profiled benchmark failed'}
@@ -156,6 +199,7 @@ try {
             if($process.HasExited -or (Get-Date) -gt $deadline){throw 'Profiled benchmark did not finish'}
             Start-Sleep -Milliseconds 100
         }while($true)
+        }
         if($IsolateGameThread){
             $process.Refresh()
             $liveIds=@($process.Threads|ForEach-Object {$_.Id})
@@ -164,10 +208,34 @@ try {
             }
             @{restoredAfterBenchmark=$true;liveThreads=$liveIds}|ConvertTo-Json|Set-Content "$out/cpu-placement-restore.json"
         }
+        if($CaptureTailFrames -gt 0){
+            $tailStart=(ProfileCommand 'render.status').data.completedFrame
+            $tailTarget=[long]$tailStart+$CaptureTailFrames
+            do {
+                if($process.HasExited -or (Get-Date) -gt $deadline){throw 'Capture tail did not complete'}
+                Start-Sleep -Milliseconds 100
+                $tailState=(ProfileCommand 'render.status').data
+                SampleMemory
+            }until([long]$tailState.completedFrame -ge $tailTarget)
+            @{startFrame=$tailStart;targetFrame=$tailTarget;endFrame=$tailState.completedFrame;additionalCompletedFrames=$CaptureTailFrames}|ConvertTo-Json|Set-Content "$out/capture-tail.json"
+        }
         $null=ProfileCommand 'profile.pause'
         if($QueryProfile -eq 'on'){
+        $profileDeadline=(Get-Date).AddSeconds(30)
+        do {
+            Start-Sleep -Milliseconds 50
+            $state=ProfileCommand 'profile.save' @('status')
+            if((Get-Date) -gt $profileDeadline){throw 'Profiler writer finalization timeout'}
+        }until($state.data.writer.state -eq 'finalized')
+        }
+        if($QueryProfile -eq 'on'){
             $saved=ProfileCommand 'profile.save' @("$out/query.ceprof")
-            if(!$saved.data.complete -or $saved.data.unacked -ne 0 -or !(Test-Path "$out/query.ceprof")){throw 'Incomplete product capture'}
+            do {
+                Start-Sleep -Milliseconds 50
+                $saved=ProfileCommand 'profile.save' @('status')
+                if((Get-Date) -gt $deadline){throw 'Profiler save timeout'}
+            }until(!$saved.data.pending)
+            if($saved.data.saveState -ne 'saved' -or !$saved.data.complete -or $saved.data.unacked -ne 0 -or !(Test-Path "$out/query.ceprof")){throw 'Incomplete product capture'}
         }
     }
     SampleMemory

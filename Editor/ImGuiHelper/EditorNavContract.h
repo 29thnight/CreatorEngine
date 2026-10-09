@@ -84,6 +84,7 @@ namespace editor::nav
 
         std::uint32_t navId{ 0 };
         std::uint32_t activeId{ 0 };
+        float navX{}, navY{}, navW{}, navH{};
         std::string navWindow;   ///< nav 가 선 창의 ImGui 이름
         std::string navWidget;   ///< 그 아이템을 신고한 custom widget(없으면 빈 문자열)
 
@@ -149,6 +150,7 @@ namespace editor::nav
     /// CLI 가 키를 예약한다. 이름은 tab · up · down · left · right · enter ·
     /// space · escape. 하나라도 모르면 아무것도 넣지 않고 거짓을 돌려준다.
     bool request_keys(const std::vector<std::string>& keys, std::string& outError);
+    bool request_text(const std::string& text, std::string& outError);
 
     // ── 포인터 주입 (PHASE 21 W2-3) ───────────────────────────────────────
     //
@@ -165,7 +167,7 @@ namespace editor::nav
     //
     // 누름과 뗌을 나누는 이유는 키와 같다. `ButtonBehavior` 가 보는 것은 전이라,
     // 같은 프레임에 눌렀다 떼면 눌린 적이 없는 것이 된다.
-    enum class pointer_action : unsigned char { move = 0, press = 1, release = 2 };
+    enum class pointer_action : unsigned char { move = 0, press = 1, release = 2, wheel = 3 };
 
     /// 게임 스레드(CLI)에서 부른다. move 는 좌표를, press/release 는 왼쪽
     /// 버튼을 바꾼다. 좌표는 화면(뷰포트) 기준이다. 한 번 부르면 다시 부를

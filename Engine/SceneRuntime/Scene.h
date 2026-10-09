@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "LightProperty.h"
 #include "SceneGC.h"
 #include "GameObjectType.h"
@@ -9,13 +9,14 @@
 #include "JobScheduler.h"
 #include "CameraSystem.h"
 #include "SoundSystem.h"
-#include "AssetBundle.h"
-#include "TextureFramePins.h"
+#include "../RenderEngine/AssetBundle.h"
+#include "../RenderEngine/TextureFramePins.h"
 #include "TransformStore.h"
 #include "HierarchyStore.h"
 #include "DetachedEntityTransfer.h"
 #include "RenderProxyDirty.h"
 #include "ScenePhysicsSimulation.h"
+#include "ScriptObjectRegistry.h"
 #include "CollisionGeometryLibrary.h"
 #include "SceneLayerIndex.h"
 #include <mathematics/rect.hpp>
@@ -1181,6 +1182,19 @@ private:
 
     [[reflgen::ignore]]
     std::unordered_map<ScenePhysicsSimulation::binding_id, PhysicsBodyComponent*> m_physicsBodies;
+
+    struct PhysicsContactOwner
+    {
+        ScriptObjectHandle owner;
+        std::uint64_t component;
+    };
+
+    [[reflgen::ignore]]
+    std::unordered_map<ScenePhysicsSimulation::binding_id, PhysicsContactOwner> m_physicsContactOwners;
+
+    [[reflgen::ignore]]
+    std::vector<ScenePhysicsSimulation::binding_id> m_retiredPhysicsContactOwners;
+
 
     [[reflgen::ignore]]
     std::unordered_map<ScenePhysicsSimulation::binding_id, CharacterMovementComponent*> m_physicsCharacters;

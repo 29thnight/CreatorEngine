@@ -555,7 +555,7 @@ own::shared_owner<const Texture> Texture::CreateOwnedDescriptor(
         // One diagnostic at descriptor publication, never in the rehydration or
         // upload hot path. Authored bytes and intentional mip policy stay exact.
         Debug::PrintLog(spdlog::level::warn,
-            "Cooked texture " + Uuid::ToString(origin->resolved.entry.assetId.value)
+            "Cooked texture " + Uuid::ToString(origin->resolved.entry.asset.key.assetId.value)
             + " preserves its offline mip/compression policy; legacy runtime hints were ignored.");
     }
     auto texture = own::make_shared<Texture>();

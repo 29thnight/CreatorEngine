@@ -73,6 +73,35 @@ public readonly struct PhysicsBatchResult
 
 public static class Physics
 {
+    /// <summary>Register during OnBeginSimulation. Conditions are indexed once; Read returns only matching contacts.</summary>
+    public static ContactStream ObserveContacts(Entity owner, ShapeRole selfRole, ShapeRole otherRole,
+        ContactPhases phases = ContactPhases.Begin, int capacity = 256,
+        ContactGrouping grouping = ContactGrouping.ShapePairs)
+    {
+        var subscriber = ContactRouter.Current ?? throw new InvalidOperationException("ObserveContacts requires OnBeginSimulation.");
+        return ContactRouter.Observe(subscriber, owner.Handle, selfRole, otherRole, phases, capacity, grouping);
+    }
+
+    /// <summary>Explicit script-authored role binding, scoped to the current simulation. No collision layer changes.</summary>
+    public static void BindContactRole(PhysicsBodyComponent body, uint shapeId, ShapeRole role)
+    {
+        var subscriber = ContactRouter.Current ?? throw new InvalidOperationException("Role binding requires OnBeginSimulation.");
+        if (role.Id == Guid.Empty || body.GetShapeCount(out var count) != PhysicsError.None)
+            throw new ArgumentException("Invalid body or role.");
+        bool found = false;
+        for (int i = 0; i < count; ++i)
+            if (body.GetShape(i, out var shape) == PhysicsError.None && shape.ShapeId == shapeId)
+            {
+                if (shape.ContactRole.Id != Guid.Empty)
+                    throw new InvalidOperationException("Authored contact role cannot be rebound by a script.");
+
+                found = true;
+                break;
+            }
+        if (!found) throw new ArgumentException("Shape does not belong to the body.");
+        ContactRouter.BindRole(body.OwnerHandle, body.ComponentId, shapeId, role, subscriber.Scope);
+    }
+
     public const uint AllLayers = uint.MaxValue;
     public const int MaxQueryCapacity = 256;
     public const int MaxBatchRequests = 64;

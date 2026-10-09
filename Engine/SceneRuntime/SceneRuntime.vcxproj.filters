@@ -626,6 +626,7 @@
     <ClInclude Include="AnimationDiagnostics.h" />
     <ClInclude Include="ScenePhysicsSimulation.h"><Filter>Scene</Filter></ClInclude>
     <ClInclude Include="PhysicsTransformPolicy.h"><Filter>Scene</Filter></ClInclude>
+    <ClInclude Include="PhysicsLifecyclePolicy.h"><Filter>Scene</Filter></ClInclude>
     <ClInclude Include="SimulationSessionPolicy.h"><Filter>Scene</Filter></ClInclude>
     <ClInclude Include="ScriptPhysicsABI.h" />
     <ClInclude Include="PhysicsBodyComponent.h"><Filter>Scene</Filter></ClInclude>

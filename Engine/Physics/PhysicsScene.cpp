@@ -1,5 +1,6 @@
 #include "PhysicsScene.h"
 #include "PhysicsTestHooks.h"
+#include "PhysicsSensorPairs.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <physx/PxPhysicsAPI.h>
 #include <physx/gpu/PxGpu.h>
@@ -329,8 +330,16 @@ class task_dispatcher final : public physx::PxCpuDispatcher
         ce::profile_context_scope context{entry.context};
         {
             ce::profile_scope scope{ce::marker<"Physics.PhysXTask">()};
-            entry.task->run();
-            entry.task->release(); // SDK task ownership ends here, including its dependency release.
+            {
+                ce::profile_scope run{ce::marker<"Physics.PhysXTaskRun">()};
+                entry.task->run();
+            }
+
+            {
+                ce::profile_scope release{ce::marker<"Physics.PhysXTaskRelease">()};
+                entry.task->release(); // SDK task ownership ends here, including its dependency release.
+            }
+
             record_resource(resource_kind::task, true);
         }
         ce::profile_instant(ce::marker<"Physics.TaskComplete">());
@@ -545,6 +554,7 @@ struct shape_identity
     body_handle body;
     shape_id shape;
     bool sensor;
+    contact_role_id role{};
 };
 
 struct body_record
@@ -612,7 +622,7 @@ class event_collector final : public physx::PxSimulationEventCallback
 {
   public:
     event_collector(std::uint32_t capacity, const std::vector<std::unique_ptr<body_record>>& retired)
-        : m_retired(retired), m_capacity(capacity)
+        : m_retired(retired), m_capacity(capacity), m_sensors(capacity)
     {
         events.reserve(capacity);
     }
@@ -690,8 +700,32 @@ class event_collector final : public physx::PxSimulationEventCallback
                                                                                : event_kind::sensor_exit;
             event.first = *first;
             event.second = *second;
+            if (event.kind == event_kind::sensor_enter)
+            {
+                if (!m_sensors.Enter(*first, *second))
+                {
+                    ++statistics.required_events;
+                    ++statistics.dropped_events;
+                    continue;
+                }
+            }
+            else
+                m_sensors.Exit(*first, *second);
+
             append(event);
         }
+    }
+
+    void FinishSensorTick()
+    {
+        ce::profile_scope scope{ce::marker<"Physics.SensorPersist">()};
+        m_sensors.FinishTick([&](const auto& first, const auto& second) {
+            collision_event event{};
+            event.kind = event_kind::sensor_persist;
+            event.first = first;
+            event.second = second;
+            append(event);
+        });
     }
 
   private:
@@ -706,7 +740,7 @@ class event_collector final : public physx::PxSimulationEventCallback
                     if (record->shapes[index] == shape)
                     {
                         const auto& value = record->identities[index];
-                        return event_endpoint{value.body, value.shape, value.sensor};
+                        return event_endpoint{value.body, value.shape, value.sensor, value.role};
                     }
             return std::nullopt;
         }
@@ -715,7 +749,7 @@ class event_collector final : public physx::PxSimulationEventCallback
             return std::nullopt;
 
         const auto& value = *static_cast<const shape_identity*>(shape->userData);
-        return event_endpoint{value.body, value.shape, value.sensor};
+        return event_endpoint{value.body, value.shape, value.sensor, value.role};
     }
 
     void append(collision_event event) noexcept
@@ -746,6 +780,7 @@ class event_collector final : public physx::PxSimulationEventCallback
 
     const std::vector<std::unique_ptr<body_record>>& m_retired;
     std::uint32_t m_capacity;
+    sensor_pairs m_sensors;
 };
 
 struct body_slot
@@ -1462,6 +1497,12 @@ result<void> PhysicsScene::finish_step(std::source_location location)
     {
         ce::profile_scope scope{ce::marker<"Physics.EventCollect">()};
         std::lock_guard lock(m_state->event_sink->mutex);
+        if (snapshot.step_succeeded)
+        {
+            ce::profile_context_scope sensorContext{{m_state->identity.value, snapshot.tick.value, 0}};
+            m_state->event_sink->FinishSensorTick();
+        }
+
         snapshot.events.assign(m_state->event_sink->events.begin(), m_state->event_sink->events.end());
         const auto commands_applied = snapshot.statistics.commands_applied;
         const auto commands_failed = snapshot.statistics.commands_failed;
@@ -2296,7 +2337,7 @@ result<body_handle> PhysicsScene::create_body(const body_desc& desc, std::source
             sdk_shape->setLocalPose(local);
             sdk_shape->setSimulationFilterData({shape.filter.belongs_to, shape.filter.collides_with, 0, 0});
             sdk_shape->setQueryFilterData({shape.filter.query_layers, 0, 0, 0});
-            record->identities.push_back({handle, shape.id, shape.sensor});
+            record->identities.push_back({handle, shape.id, shape.sensor, shape.contact_role});
             sdk_shape->userData = &record->identities.back();
             if (const auto* cooked = std::get_if<cooked_geometry>(&shape.form))
                 record->assets.push_back(cooked->asset);

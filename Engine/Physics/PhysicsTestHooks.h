@@ -21,7 +21,10 @@ enum class failure_point
     character_manager,
     character_creation,
     character_generation_limit,
-    step_fetch
+    step_fetch,
+    replacement_map_allocation,
+    replacement_retired_allocation,
+    retirement_map_allocation
 };
 
 inline std::atomic<failure_point> next_failure{failure_point::none};

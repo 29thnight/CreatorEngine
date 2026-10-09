@@ -1,4 +1,5 @@
-﻿#include "PhysicsTransformPolicy.h"
+#include "PhysicsTransformPolicy.h"
+#include "PhysicsLifecyclePolicy.h"
 #include "PhysicsBodyComponent.h"
 #include "Scene.h"
 #include "SceneManager.h"
@@ -138,12 +139,24 @@ result<void> PhysicsBodyComponent::SetShapes(std::vector<PhysicsShapeDefinition>
 
     if (m_scene)
     {
-        auto definition = CaptureDefinition(shapes);
-        if (!definition)
-            return std::unexpected(definition.error());
+        const auto captured = CapturePhysicsTransform(GetOwner()->Transform_().GetWorldMatrix());
+        if (!captured)
+            return std::unexpected(captured.error());
 
-        if (auto defined = m_scene->m_physicsSimulation.Define(m_binding, std::move(*definition)); !defined)
-            return defined;
+        const auto project = SceneManagers->ProjectLayers();
+        const auto settings = project ? project->Snapshot() : nullptr;
+        if (!settings)
+            return std::unexpected(error{error_code::wrong_phase, 0, "Project layer settings are not bound"});
+
+        const auto filter = settings->policy.Filter(settings->catalog, GetOwner()->GetLayer());
+        if (!filter)
+            return std::unexpected(error{error_code::invalid_argument, 0, "Invalid entity collision policy"});
+
+        if (auto valid = ValidatePhysicsShapes(shapes, captured->scale, *filter, m_motion, settings.get()); !valid)
+            return std::unexpected(valid.error());
+
+        // Presentation-thread authoring never resolves or cooks SDK geometry.
+        // StartPhysicsSimulation captures it on the simulation owner thread.
     }
     else if (auto built = ValidatePhysicsShapes(shapes, {1, 1, 1}, {}, m_motion); !built)
         return std::unexpected(built.error());
@@ -203,8 +216,14 @@ void PhysicsBodyComponent::OnRemovingFromScene()
     if (!m_scene)
         return;
 
-    if (auto removed = m_scene->UnregisterPhysicsBody(*this); !removed)
-        Debug::PrintLog(spdlog::level::err, std::string(removed.error().message));
+    ce::profile_scope scope{ce::marker<"Physics.LifecycleRetire">()};
+    auto* scene = m_scene;
+    auto removed = RetirePhysicsOwner(
+        [&] { return scene->UnregisterPhysicsBody(*this); },
+        [&] { return scene->StopPhysicsSimulation(); },
+        [&](const error& failure) { SceneManagers->ReportSimulationFailure(std::string(failure.message)); });
+    if (!removed)
+        throw std::runtime_error(std::string(removed.error().message)); // Abort ownership release on failed recovery.
 }
 
 void PhysicsBodyComponent::OnUninitializing()
@@ -217,8 +236,12 @@ void PhysicsBodyComponent::ChangeEnabled(bool enabled)
     if (!m_scene)
         return;
 
-    if (auto changed = m_scene->m_physicsSimulation.SetEnabled(m_binding, enabled); !changed)
-        Debug::PrintLog(spdlog::level::err, std::string(changed.error().message));
+    ce::profile_scope scope{ce::marker<"Physics.LifecycleEnabled">()};
+    const auto changed = ApplyPhysicsEnabledTransition(enabled,
+        [&](bool value) { return m_scene->m_physicsSimulation.SetEnabled(m_binding, value); },
+        [&](bool value) { Object::SetEnabled(value); },
+        [&](const error& failure) { SceneManagers->ReportSimulationFailure(std::string(failure.message)); });
+    (void)changed; // Original failure was reported; the host owns deferred Play teardown.
 }
 
 void PhysicsBodyComponent::OnEnable()

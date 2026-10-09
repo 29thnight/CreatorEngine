@@ -10,6 +10,7 @@
 #include <new>
 #include <ranges>
 #include <vector>
+#include <charconv>
 
 enum class PhysicsShapeKind : std::uint8_t
 {
@@ -26,6 +27,7 @@ enum class PhysicsShapeKind : std::uint8_t
 struct [[reflgen::reflect]] PhysicsShapeDefinition final
 {
     std::uint32_t shapeId = 1;
+    std::string contactRole; // Canonical role UUID; empty means no contact subscription role.
     [[reflgen::hidden]]
     PhysicsShapeKind kind = PhysicsShapeKind::box;
     math::vector3 halfExtent{.5f, .5f, .5f};
@@ -47,6 +49,27 @@ struct [[reflgen::reflect]] PhysicsShapeDefinition final
 
 namespace ce::physics
 {
+// Called only with a validated canonical UUID at authoring/body construction boundaries.
+inline contact_role_id ContactRoleValue(std::string_view text)
+{
+    contact_role_id value;
+    if (text.empty())
+        return value;
+
+    const auto part = [&](std::size_t offset, std::size_t length, auto& target) {
+        std::from_chars(text.data() + offset, text.data() + offset + length, target, 16);
+    };
+    part(0, 8, value.a);
+    part(9, 4, value.b);
+    part(14, 4, value.c);
+    part(19, 2, value.d[0]);
+    part(21, 2, value.d[1]);
+    for (std::size_t index = 2; index < value.d.size(); ++index)
+        part(24 + (index - 2) * 2, 2, value.d[index]);
+
+    return value;
+}
+
 // Low-frequency authoring conversion; returned storage owns all shape values.
 // Nonuniform scale combined with a rotated primitive can introduce shear. Reject
 // it instead of silently approximating a different collision shape.
@@ -85,6 +108,14 @@ result<std::vector<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const Physic
 
         for (const auto& definition : definitions)
         {
+            if (!definition.contactRole.empty())
+            {
+                Uuid::Uuid16 role;
+                if (definition.contactRole.size() != 36 || !Uuid::TryParse(definition.contactRole, role) ||
+                    role.IsNil() || Uuid::ToString(role) != definition.contactRole)
+                    return std::unexpected(error{error_code::invalid_argument, 0, "Invalid contact role UUID"});
+            }
+
             const auto& rotation = definition.localRotation;
             const float norm =
                 rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z + rotation.w * rotation.w;
@@ -101,6 +132,7 @@ result<std::vector<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const Physic
 
             ShapeInstance shape;
             shape.id = shape_id{definition.shapeId};
+            shape.contact_role = ContactRoleValue(definition.contactRole);
             shape.local_pose.position = {definition.localPosition.x * scale.x, definition.localPosition.y * scale.y,
                                          definition.localPosition.z * scale.z};
             shape.local_pose.rotation = rotation;

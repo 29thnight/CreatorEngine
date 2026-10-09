@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "../Physics/PhysicsScene.h"
 #include "ProjectLayerSettings.h"
 #include "CharacterMotionPolicy.h"
@@ -40,6 +40,15 @@ class ScenePhysicsSimulation final
         binding_id binding;
         character_motion_state state;
     };
+
+    struct contact_event
+    {
+        binding_id first, second;
+        ce::physics::tick_id tick;
+        ce::physics::collision_event value;
+    };
+
+    std::span<const contact_event> Contacts() const noexcept { return m_contacts; }
 
     struct changed_pose
     {
@@ -122,6 +131,10 @@ class ScenePhysicsSimulation final
     static constexpr std::uint32_t max_catchup_ticks = 4;
 
   private:
+#if defined(CE_PHYSICS_TESTING)
+    friend struct ScenePhysicsRetirementProbe;
+#endif
+
     struct character_entry
     {
         character_definition definition;
@@ -145,6 +158,7 @@ class ScenePhysicsSimulation final
     };
 
     ce::physics::result<void> RequireOwner() const;
+    ce::physics::result<void> RetireContactBody(ce::physics::body_handle body, binding_id id);
     ce::physics::result<ce::physics::body_handle> RequireActiveBody(binding_id binding) const;
     void Reset(entry& value);
     static void Reset(character_entry& value);
@@ -158,6 +172,9 @@ class ScenePhysicsSimulation final
     std::vector<binding_id> m_characterOrder;
     std::vector<changed_character> m_changedCharacters;
     std::unordered_map<std::uint64_t, binding_id> m_handles;
+    // Replaced actors may emit a final lost-pair event at the next fetch.
+    std::unordered_map<std::uint64_t, binding_id> m_retiredContactHandles;
+    std::vector<contact_event> m_contacts;
     std::vector<changed_pose> m_changed;
     std::vector<render_pose> m_render, m_nextRender;
     // Owner-only scratch; entry addresses are stable throughout one synchronous step.

@@ -40,3 +40,12 @@ Static GLB source equivalence can be checked with `verify-physics-glb-geometry-s
 Current corpus receipt: reports now include inspectedFiles and per-asset path/SHA256/outcome. Run python Tools/regression/verify-physics-migration-corpus.py --project Dynamic_CPP --output Build/Obj/Phase19M1Corpus/result.json to test a disposable copy with explicit default-limit reset. BLOCKED records confirm all-or-nothing refusal; they do not prove successful migration or restoration. The original project remains untouched. Successful runs verify idempotence, published hashes and exact ZIP restoration. No cook/Player acceptance is implied.
 
 The corpus verifier accepts --character-policy <json>, records its SHA-256 and checks that it remains unchanged during verification. The migration engine validates the CCT/carrier source fingerprint. A reviewed matching policy permits temporary-copy verification; a missing or mismatched policy still blocks all publication. Current Dynamic_CPP evidence: 85 assets inspected, 2 converted files (3 bodies and 1 character), exact backup restoration and idempotence; authoring apply remains zero.
+
+2026-10-09 current-corpus closure: 158 files inspected, 2 files/3 bodies/1 reviewed P0
+character migrated only on a disposable copy. Idempotence, exact ZIP restoration and
+source immutability passed. The exported character policy is retained independently of
+geometry test variables and reloaded to reproduce the reviewed conversion (113 checks).
+Fresh Release Editor migration Play/Stop two-cycle evidence is linked from
+Build/Verification/ContactStream/M1Closure/result.json. Original P0 regression inputs
+remain preserved; authoring apply is zero. M1 is complete for the current repository.
+Whole-product configuration/GPU/performance acceptance remains M3.

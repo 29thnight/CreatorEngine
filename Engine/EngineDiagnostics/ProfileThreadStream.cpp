@@ -24,7 +24,7 @@ namespace ce
 
 	void chunk_pool::initialize(std::uint32_t chunk_count, std::uint32_t maximum_chunks)
 	{
-		std::lock_guard<std::mutex> guard(m_lock);
+		std::scoped_lock guard(m_lock, m_sealedLock);
 
 		m_storage.clear();
 		// 명시적 상한이 있으면 포인터 자리를 미리 잡는다. 기본 모드는
@@ -50,7 +50,7 @@ namespace ce
 
 	void chunk_pool::shutdown()
 	{
-		std::lock_guard<std::mutex> guard(m_lock);
+		std::scoped_lock guard(m_lock, m_sealedLock);
 		m_signal = nullptr;
 		m_free = nullptr;
 		m_sealed = nullptr;
@@ -63,7 +63,7 @@ namespace ce
 
 	void chunk_pool::set_signal(std::counting_semaphore<INT_MAX>* signal)
 	{
-		std::lock_guard<std::mutex> guard(m_lock);
+		std::lock_guard<std::mutex> guard(m_sealedLock);
 		m_signal = signal;
 	}
 
@@ -104,7 +104,7 @@ namespace ce
 			return;
 		}
 
-		std::lock_guard<std::mutex> guard(m_lock);
+		std::lock_guard<std::mutex> guard(m_sealedLock);
 		const bool wasEmpty = (m_sealed == nullptr);
 
 		// 꼬리에 붙인다. 청크 안의 순서는 writer 가, 청크 사이의 순서는
@@ -125,7 +125,7 @@ namespace ce
 
 	event_chunk* chunk_pool::take_sealed()
 	{
-		std::lock_guard<std::mutex> guard(m_lock);
+		std::lock_guard<std::mutex> guard(m_sealedLock);
 		event_chunk* head = m_sealed;
 		m_sealed = nullptr;
 		m_sealedTail = nullptr;
@@ -139,17 +139,26 @@ namespace ce
 			return;
 		}
 
-		std::lock_guard<std::mutex> guard(m_lock);
+		// This list is exclusively owned by the caller until it is spliced into m_free.
+		// Clear and link the batch before taking the shared free-list lock.
+		event_chunk* head = nullptr;
+		event_chunk* tail = chunk_list;
+		std::uint32_t count = 0;
 		while (chunk_list)
 		{
 			event_chunk* next = chunk_list->next;
 			chunk_list->count = 0;
 			chunk_list->render_measurement_count = 0;
-			chunk_list->next = m_free;
-			m_free = chunk_list;
-			++m_freeCount;
+			chunk_list->next = head;
+			head = chunk_list;
+			++count;
 			chunk_list = next;
 		}
+
+		std::lock_guard<std::mutex> guard(m_lock);
+		tail->next = m_free;
+		m_free = head;
+		m_freeCount += count;
 	}
 
 	void chunk_pool::replenish(std::uint32_t target_free, std::uint32_t maximum_chunks)

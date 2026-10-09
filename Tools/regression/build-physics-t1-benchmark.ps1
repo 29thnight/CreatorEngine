@@ -1,4 +1,4 @@
-﻿param([ValidateSet('candidate','serial','merge','wake','profile')][string]$Side='candidate', [switch]$LegacyPublication)
+param([ValidateSet('candidate','serial','merge','wake','profile')][string]$Side='candidate', [switch]$LegacyPublication)
 
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -14,7 +14,7 @@ foreach($config in $configs){
     $flags=if($config -eq 'Debug'){'/MDd /Od /D_DEBUG'}elseif($config -eq 'ASan'){'/MD /Od /Zi /fsanitize=address /DNDEBUG'}else{'/MD /O2 /DNDEBUG'}
     $exe=Join-Path $out 'physics-t1-bench.exe'
     $sources=@('Engine/Physics/PhysicsScene.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Tools/regression/physics_t1_benchmark.cpp')
-    $sources+=@('ProfileMarker','ProfileThreadStream','ProfileCapture','ProfileCaptureFile','ProfileAggregate','ProfileReader','ProfileService') | ForEach-Object {'Engine/EngineDiagnostics/'+$_+'.cpp'}
+    $sources+=@('ProfileMarker','ProfileThreadStream','ProfileCapture','ProfileCaptureFile','ProfileRecording','ProfileAggregate','ProfileReader','ProfileService') | ForEach-Object {'Engine/EngineDiagnostics/'+$_+'.cpp'}
     if($config -eq 'Shipping'){
         $sources=@('Engine/Physics/PhysicsScene.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Tools/regression/physics_t1_benchmark.cpp')
     }

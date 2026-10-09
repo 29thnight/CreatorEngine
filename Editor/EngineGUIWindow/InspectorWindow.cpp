@@ -2,6 +2,7 @@
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
 #include "InspectorControl.h"
+#include "EditorNavContract.h"
 #include "InspectorLayoutFixture.h"
 #include <atomic>
 #include <mutex>
@@ -140,12 +141,22 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
         Authoring::NodesEqual(pending.Root().Read(), draft.before.Root().Read()))
         reload();
     ImGui::SeparatorText("Collision Shapes");
-    ImGui::BeginDisabled(SceneManagers->IsGameStart() || EditorObjectOperations::IsEditLocked(body.GetOwner(), true));
+    const bool shapesDisabled = SceneManagers->IsGameStart() || EditorObjectOperations::IsEditLocked(body.GetOwner(), true);
+    ImGui::BeginDisabled(shapesDisabled);
+
+    const auto shapeButton = [shapesDisabled](const char* label) {
+        const bool clicked = ImGui::Button(label);
+        editor::nav::announce_item(label, ImGui::GetItemID(), !shapesDisabled, true);
+        return clicked;
+    };
     std::size_t remove = draft.shapes.size();
     for (std::size_t index = 0; index < draft.shapes.size(); ++index)
     {
         ImGui::PushID(static_cast<int>(index));
-        if (ImGui::TreeNode("Shape", "Shape %u", draft.shapes[index].shapeId))
+        const bool shapeOpen = ImGui::TreeNode("Shape", "Shape %u", draft.shapes[index].shapeId);
+        editor::nav::announce_item("Physics Shape", ImGui::GetItemID(), !shapesDisabled, true);
+
+        if (shapeOpen)
         {
             auto& shape = draft.shapes[index];
 
@@ -155,13 +166,18 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
             if (ImGui::Combo("Shape Type", &kind, kinds, 6))
                 shape.kind = static_cast<PhysicsShapeKind>(kind);
 
+            editor::nav::announce_item("Shape Type", ImGui::GetItemID(), !shapesDisabled, true);
+
             const auto project = SceneManagers->ProjectLayers();
             const auto settings = project ? project->Snapshot() : nullptr;
             const auto* layer = settings ? settings->catalog.Find(ce::layers::layer_id{shape.layerOverride}) : nullptr;
             const char* preview = shape.layerOverride == 0 ? "Inherit Entity Layer"
                                   : layer                  ? layer->name.c_str()
                                                            : "Missing Layer";
-            if (ImGui::BeginCombo("Layer", preview))
+            const bool layerOpen = ImGui::BeginCombo("Layer", preview);
+            editor::nav::announce_item("Shape Layer", ImGui::GetItemID(), !shapesDisabled, true);
+
+            if (layerOpen)
             {
                 if (ImGui::Selectable("Inherit Entity Layer", shape.layerOverride == 0))
                     shape.layerOverride = 0;
@@ -173,7 +189,7 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
                 ImGui::EndCombo();
             }
             Meta::TypedDraw::DrawOwnMembers(shape);
-            if (ImGui::Button("Remove Shape"))
+            if (shapeButton("Remove Shape"))
                 remove = index;
             ImGui::TreePop();
         }
@@ -181,7 +197,7 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
     }
     if (remove < draft.shapes.size())
         draft.shapes.erase(draft.shapes.begin() + remove);
-    if (ImGui::Button("Add Shape") && draft.shapes.size() < 65535)
+    if (shapeButton("Add Shape") && draft.shapes.size() < 65535)
     {
         std::uint32_t next = 0;
         for (const auto& shape : draft.shapes)
@@ -195,8 +211,16 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
         else
             draft.failure = "Shape ID limit reached";
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Apply Shapes"))
+    const auto nextShapeButton = [](const char* label) {
+        const float right = ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x +
+                            ImGui::CalcTextSize(label).x + 2.f * ImGui::GetStyle().FramePadding.x;
+
+        if (right <= ImGui::GetCurrentWindow()->WorkRect.Max.x)
+            ImGui::SameLine();
+    };
+
+    nextShapeButton("Apply Shapes");
+    if (shapeButton("Apply Shapes"))
     {
         auto document = physics_shape_document(draft.shapes);
         const auto result = EditorObjectOperations::PhysicsShapes(target, "#" + std::to_string(id),
@@ -204,15 +228,18 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
         if (result.IsSuccess())
             reload();
         else
+        {
             draft.failure = result.message;
+            std::printf("[physics.shapes.ui] %s\n", result.message.c_str());
+        }
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Reload Shapes"))
+    nextShapeButton("Reload Shapes");
+    if (shapeButton("Reload Shapes"))
         reload();
     ImGui::EndDisabled();
     if (!draft.failure.empty())
         ImGui::TextWrapped("%s", draft.failure.c_str());
-    ImGui::TextDisabled("Apply saves the complete shape list as one Undo entry.");
+    ImGui::TextWrapped("Apply saves the complete shape list as one Undo entry.");
 }
 
 void draw_character_movement(CharacterMovementComponent& character, editor::widgets::property_layout_state& layoutState)
@@ -264,7 +291,79 @@ void draw_character_movement(CharacterMovementComponent& character, editor::widg
         const auto key = std::to_string(character.GetInstanceID()) + field;
         auto [entry, inserted] = drafts.try_emplace(key, fieldText(root[field]));
         ImGui::PushID(field);
-        ImGui::SetNextItemWidth(sheet.line(label));
+        const float width = sheet.line(label);
+        ImGui::SetNextItemWidth(width);
+        editor::widgets::track_property_input("##Value", width);
+        ImGui::InputText("##Value", &entry->second);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+        {
+            const auto result = EditorObjectOperations::Property(target,
+                "#" + std::to_string(character.GetInstanceID()), field, entry->second);
+            failure = result.IsSuccess() ? std::string{} : result.message;
+            auto current = Meta::SerializeDocument(&character);
+            entry->second = fieldText(current.Root().Read()[field]);
+        }
+        if (!ImGui::IsItemActive())
+            entry->second = fieldText(root[field]);
+        ImGui::PopID();
+    }
+    ImGui::EndDisabled();
+    if (!failure.empty())
+        ImGui::TextWrapped("%s", failure.c_str());
+    ImGui::TextWrapped("Commit on focus loss. Each field uses validated Undo/Redo.");
+}
+
+void draw_physics_body(PhysicsBodyComponent& character, editor::widgets::property_layout_state& layoutState)
+{
+    const auto target = character.GetOwner()->GetScene()->HandleOf(character.GetOwner()->m_index);
+    auto document = Meta::SerializeDocument(&character);
+    const auto root = document.Root().Read();
+    const auto fieldText = [](Authoring::ReadNode node) {
+        std::string error;
+        auto parsed = Authoring::ParsedDocument{};
+        if (node.IsScalar() && node.Scalar().starts_with("{"))
+        {
+            parsed = Authoring::ParsedDocument::ParseText(node.AsString(), error);
+            if (parsed) node = parsed.Root();
+        }
+        if (node.IsMap())
+            return std::string(node["x"].AsString()) + ", " + std::string(node["y"].AsString()) + ", " +
+                   std::string(node["z"].AsString());
+        return std::string(node.AsString());
+    };
+    static EntityHandle previousOwner;
+    static std::unordered_map<std::string, std::string> drafts;
+    static std::string failure;
+    if (previousOwner != target)
+    {
+        drafts.clear();
+        failure.clear();
+        previousOwner = target;
+    }
+
+    ImGui::TextWrapped("Motion: 0 Static, 1 Kinematic, 2 Dynamic. Axis locks: X=1, Y=2, Z=4.");
+    ImGui::BeginDisabled(SceneManagers->IsGameStart() ||
+                         EditorObjectOperations::IsEditLocked(character.GetOwner(), true));
+    const std::pair<const char*, const char*> fields[]{
+        {"m_motion", "Motion (0/1/2)"}, {"m_mass", "Mass (kg)"},
+        {"m_gravityEnabled", "Gravity enabled (true/false)"},
+        {"m_translationLocks", "Translation locks (0..7)"}, {"m_rotationLocks", "Rotation locks (0..7)"},
+        {"m_linearDamping", "Linear damping"}, {"m_angularDamping", "Angular damping"},
+        {"m_initialLinearVelocity", "Initial velocity (x,y,z m/s)"},
+        {"m_initialAngularVelocity", "Initial angular velocity (x,y,z rad/s)"}};
+    const editor::widgets::property_sheet sheet(layoutState,
+        {"Motion (0/1/2)", "Mass (kg)", "Gravity enabled (true/false)",
+         "Translation locks (0..7)", "Rotation locks (0..7)", "Linear damping", "Angular damping",
+         "Initial velocity (x,y,z m/s)", "Initial angular velocity (x,y,z rad/s)"});
+
+    for (const auto& [field, label] : fields)
+    {
+        const auto key = std::to_string(character.GetInstanceID()) + field;
+        auto [entry, inserted] = drafts.try_emplace(key, fieldText(root[field]));
+        ImGui::PushID(field);
+        const float width = sheet.line(label);
+        ImGui::SetNextItemWidth(width);
+        editor::widgets::track_property_input("##Value", width);
         ImGui::InputText("##Value", &entry->second);
         if (ImGui::IsItemDeactivatedAfterEdit())
         {
@@ -467,7 +566,8 @@ void editor::windows::draw_inspector()
 		//   키보드 탐색 계약 자체는 폭 창구 없이 도는 `verify-editor-keyboard-nav`
 		//   가 지킨다.
 		visible = ImGui::BeginChild("##InspectorWidthProbe",
-			ImVec2(editor::ThemePixels(requested) + ImGui::GetStyle().ScrollbarSize, 0.f),
+			ImVec2(ImMin(editor::ThemePixels(requested) + ImGui::GetStyle().ScrollbarSize,
+                ImGui::GetContentRegionAvail().x), 0.f),
 			ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 	}
 	if (visible)
@@ -2513,9 +2613,7 @@ void InspectorWindow::Draw()
                 }
                 else if (auto* body = dynamic_cast<PhysicsBodyComponent*>(component.get()))
                 {
-                    ImGui::BeginDisabled(SceneManagers->IsGameStart());
-                    Meta::DrawObject(component.get(), *type);
-                    ImGui::EndDisabled();
+                    draw_physics_body(*body, m_layout);
                     draw_physics_shapes(*body);
                 }
 				else if (type)

@@ -199,10 +199,10 @@ namespace AssetDepotRegression
         internal static void VerifyVersionAndTypedEntries()
         {
             Require(!Native.IsReady, "ABI fixture requires a fresh isolated managed session");
-            var table = new ScriptApiTable { Version = 35, StructSize = sizeof(ScriptApiTable) };
-            Require(Native.ExpectedVersion == 36, "Fixture expects the intentional ABI 36 migration");
-            Require(!Native.Bind(&table), "A version 35 table bound to managed API 36");
-            table.Version = 36;
+            var table = new ScriptApiTable { Version = 34, StructSize = sizeof(ScriptApiTable) };
+            Require(Native.ExpectedVersion == 41, "Fixture expects the integrated physics and camera-cut ABI 41");
+            Require(!Native.Bind(&table), "A legacy version 34 table bound to the current managed API");
+            table.Version = Native.ExpectedVersion;
             Require(!Native.Bind(&table), "Missing typed entries were accepted");
             table.Asset_RequestTyped = &RequestStub;
             Require(!Native.Bind(&table), "Missing resident entry was accepted");
@@ -211,12 +211,16 @@ namespace AssetDepotRegression
             table.Camera_NotifyCameraCut = &CameraCutStub;
             table.Asset_Request = &LegacyRequestStub;
             table.StructSize = sizeof(ScriptApiTable) - IntPtr.Size;
-            Require(!Native.Bind(&table), "The old v35 table size without the camera-cut slot was accepted");
+            Require(!Native.Bind(&table), "The old v40 table size without the camera-cut slot was accepted");
             table.StructSize = sizeof(ScriptApiTable);
-            table.Version = 37;
-            Require(!Native.Bind(&table), "An unknown future table version was accepted");
             table.Version = 36;
-            Require(Native.Bind(&table), "Complete ABI 36 table failed to bind");
+            Require(!Native.Bind(&table), "The pre-merge camera-only ABI 36 was accepted");
+            table.Version = 40;
+            Require(!Native.Bind(&table), "The pre-merge physics-only ABI 40 was accepted");
+            table.Version = Native.ExpectedVersion + 1;
+            Require(!Native.Bind(&table), "An unknown future table version was accepted");
+            table.Version = Native.ExpectedVersion;
+            Require(Native.Bind(&table), "Complete current ABI table failed to bind");
             try
             {
                 _requestCalls = 0;

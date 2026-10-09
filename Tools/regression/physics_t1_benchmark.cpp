@@ -1,4 +1,4 @@
-﻿#include "../../Engine/SceneRuntime/ScenePhysicsSimulation.h"
+#include "../../Engine/SceneRuntime/ScenePhysicsSimulation.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #include <chrono>
@@ -124,12 +124,14 @@ static std::string profile_costs(const ce::capture_session& capture)
 
 int main(int argc, char** argv)
 {
-    if (argc != 5 && argc != 6 && argc != 7) return 2;
+    if (argc != 5 && argc != 6 && argc != 7 && argc != 8) return 2;
     const bool gpu = std::string_view(argv[1]) == "gpu";
     const auto active = static_cast<unsigned>(std::stoul(argv[2]));
     const bool recording = std::string_view(argv[3]) == "on";
     const auto requestedWorkers = argc >= 6 ? static_cast<unsigned>(std::stoul(argv[5])) : 2u;
-    const std::string_view workload = argc == 7 ? argv[6] : "free";
+    const std::string_view workload = argc >= 7 ? argv[6] : "free";
+    const unsigned writes = argc == 8 ? static_cast<unsigned>(std::stoul(argv[7])) : 0;
+    if (writes > active) return 2;
     const bool stacks = workload == "stack" || workload == "stack-unconstrained";
     const bool contacts = workload == "contact" || stacks;
     const bool small = workload == "small";
@@ -166,6 +168,8 @@ int main(int argc, char** argv)
 
     if (stacks && (active != bodies || active % 4)) return 2;
 
+    std::vector<ScenePhysicsSimulation::binding_id> bindings;
+    bindings.reserve(bodies);
     for (unsigned i = 0; i < bodies; ++i)
     {
         definition.properties.initial_pose.position = {float(i%64)*3, contacts ? .5f : (i < active ? 100.f : 10.f),float(i/64)*3};
@@ -175,7 +179,9 @@ int main(int argc, char** argv)
             definition.properties.initial_pose.position = {float(column % 32) * 3, .5f + float(i % 4), float(column / 32) * 3};
         }
         definition.properties.linear_velocity = {i < active ? 1.f : 0.f,0,0};
-        if (!session.Register(definition,true)) return 3;
+        const auto binding = session.Register(definition, true);
+        if (!binding) return 3;
+        bindings.push_back(*binding);
     }
     ce::physics::scene_config config;
     config.workers = requestedWorkers;
@@ -183,20 +189,32 @@ int main(int argc, char** argv)
     config.execution = gpu ? ce::physics::execution_preference::prefer_gpu : ce::physics::execution_preference::cpu;
     if (!session.Start(config) || (gpu && session.Runtime()->status().backend != ce::physics::execution_backend::gpu)) return 4;
     for (int i=0; i<60; ++i) if(!session.Advance(session.fixed_seconds)) return 5;
-    if(recording) profiler.record(1);
+    if (recording)
+    {
+        profiler.record(1);
+        profiler.wait_until_idle();
+        if (profiler.state() != ce::recorder_state::recording)
+            return 8;
+    }
     std::vector<double> samples;
     samples.reserve(240);
     std::uint64_t contactTicks = 0, minContacts = UINT64_MAX;
     std::uint64_t dynamicContactTicks = 0, minDynamicPairs = UINT64_MAX;
     double minMeanHeight = 5;
+    std::uint64_t minChanged = UINT64_MAX, maxChanged = 0;
     for (int i=0; i<240; ++i)
     {
         const auto start=std::chrono::steady_clock::now();
+        for (unsigned changed = 0; changed < writes; ++changed)
+            if (!session.SetVelocity(bindings[changed], {i % 2 ? 1.f : 1.1f, 0, 0}, {})) return 11;
+
         const auto result=session.Advance(session.fixed_seconds);
         const auto finish=std::chrono::steady_clock::now();
         if(!result || *result != 1) return 6;
         samples.push_back(std::chrono::duration<double,std::micro>(finish-start).count());
         const auto snapshot = session.Runtime()->latest_snapshot();
+        minChanged = std::min(minChanged, snapshot->statistics.changed_bodies);
+        maxChanged = std::max(maxChanged, snapshot->statistics.changed_bodies);
         if (snapshot->statistics.active_bodies != active || snapshot->statistics.dropped_events ||
             snapshot->statistics.dropped_contacts || snapshot->statistics.unresolved_identities) return 9;
         if (contacts)
@@ -248,6 +266,7 @@ int main(int argc, char** argv)
     }
     if (!session.Stop()) return 7;
     const auto mean=std::accumulate(samples.begin(),samples.end(),0.0)/samples.size();
+    const auto rawSamples = samples;
     std::ranges::sort(samples);
     std::string costs = "{}";
     if(recording)
@@ -272,5 +291,9 @@ int main(int argc, char** argv)
               << ",\"minDynamicPairs\":" << (stacks ? minDynamicPairs : 0)
               << ",\"minMeanHeight\":" << (stacks ? minMeanHeight : 0)
               << ",\"bodies\":" << bodies << ",\"profile\":" << (recording?"true":"false")
-              << ",\"samples\":240,\"meanUs\":" << mean << ",\"p99Us\":" << samples[237] << ",\"profileCosts\":" << costs << "}\n";
+              << ",\"writesPerTick\":" << writes << ",\"minChanged\":" << minChanged << ",\"maxChanged\":" << maxChanged
+              << ",\"samples\":240,\"meanUs\":" << mean << ",\"p99Us\":" << samples[237] << ",\"profileCosts\":" << costs << ",\"rawUs\":[";
+    for (std::size_t i = 0; i < rawSamples.size(); ++i)
+        std::cout << (i ? "," : "") << rawSamples[i];
+    std::cout << "]}\n";
 }

@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace CreatorEngine;
@@ -287,7 +287,10 @@ internal unsafe struct ScriptApiTable
     // Append-only v35. Selector IDs prove concrete views, not serialized kinds.
     public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_RequestTyped;
     public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_TryAcquireTyped;
-    // Append-only v36. Camera identity and cut revision remain independent.
+    // Preserve the v40 physics entries before appending new slots.
+    public delegate* unmanaged<ObjectHandle, ulong, int> Body_Remove;
+    public delegate* unmanaged<ObjectHandle, ulong, uint, byte*, int> Body_ShapeRole;
+    // Append-only v41. Camera identity and cut revision remain independent.
     public delegate* unmanaged<ObjectHandle, void> Camera_NotifyCameraCut;
 }
 
@@ -295,7 +298,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 36;
+    public const int ExpectedVersion = 41;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -1537,6 +1540,40 @@ internal static unsafe class Native
 
         fixed (PhysicsShapeState* output = &state)
             return (PhysicsError)_api.Body_ShapeRead(owner, instance, index, output);
+    }
+
+    public static PhysicsError BodyRemove(ObjectHandle owner, ulong instance)
+        => Entered() && _api.Body_Remove != null
+            ? (PhysicsError)_api.Body_Remove(owner, instance)
+            : PhysicsError.WrongPhase;
+
+    public static PhysicsError BodyShapeRole(ObjectHandle owner, ulong instance, uint id, ShapeRole role)
+    {
+        if (!Entered() || _api.Body_ShapeRole == null)
+        {
+            return PhysicsError.WrongPhase;
+        }
+
+        Span<char> text = stackalloc char[36];
+        Span<byte> utf8 = stackalloc byte[37];
+        if (role.Id == Guid.Empty)
+        {
+            utf8[0] = 0;
+        }
+        else
+        {
+            role.Id.TryFormat(text, out _, "D");
+            for (int index = 0; index < 36; ++index)
+            {
+                utf8[index] = (byte)text[index];
+            }
+            utf8[36] = 0;
+        }
+
+        fixed (byte* pointer = utf8)
+        {
+            return (PhysicsError)_api.Body_ShapeRole(owner, instance, id, pointer);
+        }
     }
 
     public static PhysicsError BodyShapeFlags(ObjectHandle owner, ulong instance, uint id, bool sensor, bool queryEnabled)

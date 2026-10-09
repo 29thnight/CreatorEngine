@@ -54,6 +54,37 @@ public sealed class CharacterMovementComponent : NativeComponent
     public PhysicsError SetDesiredVelocity(Float3 velocity)
         => Native.CharacterVelocity(OwnerHandle, NativeInstance, velocity);
 
+    /// <summary>
+    /// World-space XZ input, clamped to unit length while preserving analog magnitude.
+    /// Speed is metres/second. Camera conversion and facing remain script-owned.
+    /// </summary>
+    public PhysicsError SetPlanarInput(Float3 input, float speed)
+    {
+        var error = CreatePlanarVelocity(input, speed, out var velocity);
+
+        return error == PhysicsError.None ? SetDesiredVelocity(velocity) : error;
+    }
+
+    /// <summary>Pure input conversion; no native calls, smoothing, rotation or allocation.</summary>
+    public static PhysicsError CreatePlanarVelocity(Float3 input, float speed, out Float3 velocity)
+    {
+        velocity = default;
+
+        if (!float.IsFinite(input.X) || !float.IsFinite(input.Y) || !float.IsFinite(input.Z) ||
+            !float.IsFinite(speed) || speed < 0)
+            return PhysicsError.InvalidArgument;
+
+        // Double intermediates keep even finite float.MaxValue inputs safe to clamp.
+        double x = input.X;
+        double z = input.Z;
+        double length = Math.Sqrt(x * x + z * z);
+        double scale = speed / Math.Max(1.0, length);
+
+        velocity = new Float3((float)(x * scale), 0, (float)(z * scale));
+
+        return PhysicsError.None;
+    }
+
     public PhysicsError Jump() => Native.CharacterJump(OwnerHandle, NativeInstance);
 
     public PhysicsError ForceVelocity(Float3 velocity, double seconds)

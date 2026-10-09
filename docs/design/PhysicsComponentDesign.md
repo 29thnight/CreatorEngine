@@ -84,12 +84,14 @@ target pose와 simulated pose, 요청 속도와 확정 속도를 구분한다. s
 마지막 값 선택과 누산은 연산별로 정의한다. AddForce도 force/impulse 모드와 순서 의미가 다르면
 무조건 합산하지 않는다. 재현 가능한 워커 간 병합 규칙을 정한다.
 
+2026-10-08 목표 계약은 [물리 접촉 작업과 C# 실행 계약](PhysicsContactExecutionContract.md)을 따른다. 기본 저작 표면은 OnBeginSimulation에서 ContactStream을 한 번 등록하고 PostPhysics에서 이미 매칭된 배치를 소비하는 방식이다. Read의 전체 검색은 없으며 결과 K개 순회만 한다. 별도 Job/PhysicsBehaviour 저작 요구는 철회한다. 현행 구현과 목표 배선은 해당 문서 §1에서 구분한다.
+
 접촉 이벤트는 BodyHandle 쌍에 **ShapeId 쌍**을 포함한다. 바디 단위 전달과 shape 단위 hitbox 판정을 모두 지원한다.
 접촉점 버퍼의 소비 수명과 overflow 정책을 명시한다. WantsEvents는 실제 이벤트 구독 정보로 갱신하며
 옛 생명주기 틱 비트를 접촉 관심도의 대용으로 사용하지 않는다.
 
 PhysX solver 콜백은 엔진의 소유 스레드와 별개다. 콜백에서는 엔진 컴포넌트/CLR을 호출하지 않고,
-동시성 안전한 수집 버퍼에 기록한 후 fetch 완료 뒤 게임 스레드에서 전달한다.
+동시성 안전한 수집 버퍼에 기록한 후 fetch 완료 뒤 소유 경계에서 라우팅한다. 소유자·역할·단계 인덱스로 매칭 스트림에만 전달하고 기존 PostPhysics owner thread에서 소비한다. 새 병렬 Job/명령 writer를 도입하지 않는다.
 쿼리는 scene query 갱신이 완료된 읽기 창에서 수행하며, 빈 결과·버퍼 overflow·실패를 구분한다.
 
 ## 5. C++23 PhysX API 선행

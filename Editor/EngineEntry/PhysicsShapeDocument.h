@@ -88,11 +88,16 @@ inline ce::physics::result<std::vector<PhysicsShapeDefinition>> ParsePhysicsShap
                     valid = decimal(value, shape.geometryRevision);
                 else if (key == "layerOverride")
                     valid = decimal(value, shape.layerOverride);
-                else if (key == "geometryAsset")
+                else if (key == "geometryAsset" || key == "contactRole")
                 {
                     valid = value.IsScalar();
                     if (valid)
-                        shape.geometryAsset = value.AsString();
+                    {
+                        if (key == "contactRole")
+                            shape.contactRole = value.AsString();
+                        else
+                            shape.geometryAsset = value.AsString();
+                    }
                 }
                 else if (key == "radius")
                     valid = scalar(value, shape.radius);

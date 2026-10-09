@@ -1,6 +1,7 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$EngineDistribution, [ValidateSet('Debug','Release')][string]$Configuration='Debug', [string]$Work='', [switch]$Shipping, [switch]$Hierarchy, [switch]$Mesh, [switch]$Geometry, [switch]$Transition)
+param([Parameter(Mandatory)][string]$EngineDistribution, [ValidateSet('Debug','Release')][string]$Configuration='Debug', [string]$Work='', [switch]$Shipping, [switch]$Hierarchy, [switch]$Mesh, [switch]$Geometry, [switch]$Transition, [switch]$PlanarInput)
 $ErrorActionPreference='Stop'
+if($PlanarInput -and ($Hierarchy -or $Mesh -or $Geometry -or $Transition)){throw 'PlanarInput requires the isolated primitive character fixture'}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(!$Work){$Work=Join-Path $repo ('Build/Obj/PhysicsCharacterPlayer-'+[guid]::NewGuid().ToString('N'))}
 $Work=[IO.Path]::GetFullPath($Work)
@@ -18,6 +19,12 @@ foreach($file in @('PhysicsCharacterHierarchy.creator','PhysicsCharacterHierarch
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "fixtures/$file") -Destination (Join-Path $assets 'Scenes')
 }
 Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/CharacterPlayerProbe.cs') -Destination (Join-Path $assets 'Script')
+if($PlanarInput){
+    Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/CharacterPlanarInputProbe.cs') -Destination (Join-Path $assets 'Script')
+    $scenePath=Join-Path $assets 'Scenes/PhysicsCharacterPlayer.creator'
+    $sceneText=[IO.File]::ReadAllText($scenePath).Replace('m_scriptType: CharacterPlayerProbe','m_scriptType: CharacterPlanarInputProbe')
+    [IO.File]::WriteAllText($scenePath,$sceneText,[Text.UTF8Encoding]::new($false))
+}
 if($Mesh){
     foreach($file in @('PhysicsCharacterMesh.creator','PhysicsCharacterMesh.creator.meta')){
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "fixtures/$file") -Destination (Join-Path $assets 'Scenes')
@@ -47,5 +54,5 @@ if($LASTEXITCODE){throw 'Character Player packaging failed'}
 $pointer=Get-Content (Join-Path $Work 'Staging/Project.current.json') -Raw | ConvertFrom-Json
 if($pointer.verification -ne 'passed'){throw 'Package smoke did not pass'}
 $stage=Join-Path $Work ('Staging/'+$pointer.releaseDirectory)
-@{stage=$stage;distribution=$EngineDistribution;configuration=$Configuration;shipping=[bool]$Shipping;hierarchy=[bool]$Hierarchy;mesh=[bool]$Mesh;geometry=[bool]$Geometry;transition=[bool]$Transition} | ConvertTo-Json | Set-Content (Join-Path $Work 'fixture.json') -Encoding utf8
+@{stage=$stage;distribution=$EngineDistribution;configuration=$Configuration;shipping=[bool]$Shipping;hierarchy=[bool]$Hierarchy;mesh=[bool]$Mesh;geometry=[bool]$Geometry;transition=[bool]$Transition;planarInput=[bool]$PlanarInput} | ConvertTo-Json | Set-Content (Join-Path $Work 'fixture.json') -Encoding utf8
 Write-Output "PHYSICS_CHARACTER_PLAYER_STAGE $stage"
