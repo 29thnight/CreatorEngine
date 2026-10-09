@@ -14,6 +14,7 @@
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "Material.h"
+#include "Sha256.h"
 #include "PathFinder.h"
 #include "AuthoringParsedDocument.h"
 #include "ReflectionYml.h"
@@ -31,6 +32,7 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <map>
 #include <regex>
@@ -763,12 +765,221 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			return {};
 		}
 
+        const auto catalogGuid = DataSystems->GetFileGuid(destination);
+        const auto identityPath = DataSystems->GetFilePath(preferredGuid);
+        const auto metaPath = file::path(destination.string() + ".meta");
+        if ((catalogGuid != FileGuid{} && catalogGuid != preferredGuid) ||
+            (!identityPath.empty() && file::absolute(identityPath).lexically_normal() != destination) ||
+            (file::exists(metaPath) && LoadGuidFromMeta(metaPath) != preferredGuid) ||
+            (file::exists(destination) && catalogGuid == FileGuid{} && !file::exists(metaPath)))
+        {
+            Debug::PrintLog(spdlog::level::err, "Editor text save would replace a different asset identity: " +
+                destination.string());
+            return {};
+        }
+
 		const std::span<const std::byte> bytes{
 			reinterpret_cast<const std::byte*>(payload.data()), payload.size() };
 		if (!WriteBinaryFileLocked(destination, bytes, PublishEncoding::Text))
 			return {};
 		return CreateMetaLocked(destination, preferredGuid);
 	}
+
+    bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
+                           const file::path& requestedGraphPath, FileGuid graphGuid, std::string& error)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        error.clear();
+        const auto accepted = DataSystems->FindCachedMaterial(material.m_fileGuid);
+        const auto& instance = material.GetMaterialGraphInstance();
+        const auto acceptedGeneration = DataSystems->ResolveMaterialGraphGeneration(graphGuid);
+        if (!PathFinder::IsAssetAuthoringEnabled() || !accepted || std::addressof(*accepted) != &material || !instance ||
+            !material.m_fileGuid.IsRandomV4() || instance->description.graphId.value != graphGuid.m_guid ||
+            !acceptedGeneration || !instance->generation ||
+            std::addressof(*acceptedGeneration) != std::addressof(*instance->generation))
+        {
+            error = "Apply the current material draft before saving; its accepted asset changed.";
+            return false;
+        }
+        const auto program = LX::GenerateMaterialSlang(graph);
+        if (!program || program->slang != instance->generation->cooked.product.program.slang ||
+            LX::WriteMaterialProgramMetadata(*program) != instance->generation->cooked.metadata)
+        {
+            error = "The graph draft differs from the accepted material. Apply it before saving.";
+            return false;
+        }
+        std::error_code pathError;
+        const auto graphPath = file::absolute(requestedGraphPath, pathError).lexically_normal();
+        auto materialPath = DataSystems->GetFilePath(material.m_fileGuid);
+        if (materialPath.empty())
+        {
+            if (!IsSafeAssetName(file::path(material.m_name).wstring()))
+            {
+                error = "Choose a valid material asset name.";
+                return false;
+            }
+            materialPath = m_root / "Materials" / (material.m_name + ".asset");
+        }
+        materialPath = file::absolute(materialPath, pathError).lexically_normal();
+        const auto root = file::absolute(m_root, pathError).lexically_normal();
+        if (pathError || !IsPathInside(graphPath, root) || !IsPathInside(materialPath, root) ||
+            ToLower(graphPath.extension().string()) != ".shadergraph" ||
+            ToLower(materialPath.extension().string()) != ".asset" || graphPath == materialPath)
+        {
+            error = "Save requires distinct material and shader graph paths inside project Assets.";
+            return false;
+        }
+        struct SavedFile
+        {
+            file::path path;
+            std::string previous;
+            std::string next;
+            bool existed{};
+        };
+        std::vector<SavedFile> files;
+        Authoring::WriteDocument materialDocument;
+        Material serializedMaterial(material);
+        if (!DataSystems->SerializeMaterialPayload(serializedMaterial, materialDocument.Root()))
+        {
+            error = "The accepted material cannot be serialized.";
+            return false;
+        }
+        const auto prepare = [&](const file::path& path, FileGuid guid, std::string payload) {
+            const auto catalogGuid = DataSystems->GetFileGuid(path);
+            const auto identityPath = DataSystems->GetFilePath(guid);
+            const auto metaPath = file::path(path.string() + ".meta");
+            if ((catalogGuid != FileGuid{} && catalogGuid != guid) ||
+                (!identityPath.empty() && file::absolute(identityPath).lexically_normal() != path) ||
+                (file::exists(metaPath) && LoadGuidFromMeta(metaPath) != guid) ||
+                (file::exists(path) && catalogGuid == FileGuid{} && !file::exists(metaPath)) ||
+                (!file::exists(metaPath) && !guid.IsRandomV4()))
+            {
+                error = "Save would overwrite an unrelated asset or change its identity: " + path.string();
+                return false;
+            }
+            Authoring::WriteDocument metadata;
+            if (file::exists(metaPath))
+            {
+                auto existing = Authoring::WriteDocument::ParseFile(metaPath, &error);
+                if (!existing || !existing->Root().Read().IsMap())
+                {
+                    return false;
+                }
+                metadata = std::move(*existing);
+            }
+            metadata.Root().Child("guid").SetScalar(guid.ToString());
+            metadata.Root().Child("importSettings").Child("extension").SetScalar(path.extension().string());
+            files.push_back({metaPath, {}, metadata.Dump(), false});
+            files.push_back({path, {}, std::move(payload), false});
+            return true;
+        };
+        if (!prepare(graphPath, graphGuid, LX::LXMaterialArchive::Write(graph)) ||
+            !prepare(materialPath, material.m_fileGuid, materialDocument.Dump()))
+        {
+            return false;
+        }
+        // Keep exact backups of both sources and both sidecars. This is a
+        // rollback-capable save, not an atomic multi-file filesystem commit.
+        for (auto& saved : files)
+        {
+            saved.existed = file::exists(saved.path);
+            if (saved.existed)
+            {
+                std::ifstream input(saved.path, std::ios::binary);
+                saved.previous.assign(std::istreambuf_iterator<char>(input), {});
+                if (!input)
+                {
+                    error = "Cannot back up existing asset before saving: " + saved.path.string();
+                    return false;
+                }
+            }
+        }
+        // Allocate notification records before changing any file. Their prior
+        // fingerprints already cover a complete rollback even under allocation
+        // failure while updating the advisory watcher records afterward.
+        for (const auto& saved : files)
+        {
+            RememberMaterialAuthoringWrite(saved.path);
+        }
+        const auto write = [&](const file::path& path, std::string_view payload) {
+            try
+            {
+                return WriteBinaryFileLocked(path,
+                    {reinterpret_cast<const std::byte*>(payload.data()), payload.size()}, PublishEncoding::Text);
+            }
+            catch (...)
+            {
+                return false;
+            }
+        };
+        const auto rememberFinal = [&]() noexcept {
+            for (const auto& saved : files)
+            {
+                try
+                {
+                    RememberMaterialAuthoringWrite(saved.path);
+                }
+                catch (...)
+                {
+                    // Failed rollback retains the initial fingerprint. Successful
+                    // saves also have exact-payload checks at the runtime boundary.
+                }
+            }
+        };
+        std::size_t completed = 0;
+        for (; completed < files.size(); ++completed)
+        {
+            if (!write(files[completed].path, files[completed].next))
+            {
+                break;
+            }
+        }
+        if (completed != files.size())
+        {
+            error = "Material/graph save failed; the previous files were restored.";
+            bool restored = true;
+            while (completed != 0)
+            {
+                const auto& saved = files[--completed];
+                if (saved.existed)
+                {
+                    restored = write(saved.path, saved.previous) && restored;
+                }
+                else
+                {
+                    std::error_code removeError;
+                    file::remove(saved.path, removeError);
+                    restored = !removeError && restored;
+                }
+            }
+            rememberFinal();
+            if (!restored)
+            {
+                error = "Material/graph save failed and rollback was incomplete. Inspect both asset files before "
+                    "retrying.";
+            }
+            return false;
+        }
+        rememberFinal();
+        try
+        {
+            const bool registeredGraph = DataSystems->ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert,
+                RuntimeAssetType::MaterialGraph, graphGuid, graphPath});
+            const bool registeredMaterial = DataSystems->ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert,
+                RuntimeAssetType::Material, material.m_fileGuid, materialPath});
+            if (!registeredGraph || !registeredMaterial)
+            {
+                error = "Both files were saved, but an asset catalog identity conflict prevented registration.";
+                return false;
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            error = "Both files were saved, but catalog registration failed: " + std::string(exception.what());
+            return false;
+        }
+        return true;
+    }
 
 	FileGuid RenameAsset(const file::path& source, const file::path& destination)
 	{
@@ -1387,6 +1598,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			const file::path directoryPath(std::u8string(directory.begin(), directory.end()));
 			const file::path filepath = directoryPath / std::u8string(filename.begin(), filename.end());
 			if (ContainsTemporaryPath(filepath)) return;
+            if (MatchesMaterialAuthoringWrite(filepath))
+            {
+                return;
+            }
 
 			switch (action)
 			{
@@ -1739,15 +1954,16 @@ private:
 		}
 
 		const bool prefab = extension == ".prefab";
-		const bool material = extension == ".asset"
-			&& ToLower(targetFile.parent_path().filename().string()) == "materials";
+        const bool material = extension == ".asset";
 		if (!prefab && !material) return {};
 
 		std::string error;
 		const Authoring::ParsedDocument document =
 			Authoring::ParsedDocument::ParseFile(targetFile.string(), error);
 		if (!document) return {};
-		const Authoring::ReadNode identity = document.Root()["m_fileGuid"];
+        const auto root = document.Root();
+        const Authoring::ReadNode identity = material && root["lattice_material"]
+            ? root["assetId"] : root["m_fileGuid"];
 		if (!identity || !identity.IsScalar()) return {};
 		const FileGuid hint(identity.AsString());
 		return hint.IsRandomV4() ? hint : FileGuid{};
@@ -1973,6 +2189,69 @@ private:
 		return guid;
 	}
 
+    bool ReadMaterialAuthoringFingerprint(const file::path& path,
+                                          std::optional<Hash::Sha256Digest>& fingerprint) const
+    {
+        std::error_code error;
+        const bool exists = file::exists(path, error);
+        if (error)
+        {
+            return false;
+        }
+        if (!exists)
+        {
+            fingerprint.reset();
+            return true;
+        }
+        std::ifstream input(path, std::ios::binary);
+        if (!input)
+        {
+            return false;
+        }
+        Hash::Sha256 hash;
+        std::array<char, 65536> buffer;
+        while (input)
+        {
+            input.read(buffer.data(), buffer.size());
+            hash.Update(buffer.data(), static_cast<std::size_t>(input.gcount()));
+        }
+        if (!input.eof())
+        {
+            return false;
+        }
+        fingerprint = hash.Finish();
+        return true;
+    }
+
+    void RememberMaterialAuthoringWrite(const file::path& path)
+    {
+        std::optional<Hash::Sha256Digest> fingerprint;
+        if (ReadMaterialAuthoringFingerprint(path, fingerprint))
+        {
+            m_materialAuthoringWrites[path.lexically_normal()] = fingerprint;
+        }
+    }
+
+    bool MatchesMaterialAuthoringWrite(const file::path& path)
+    {
+        // Wait for the whole save/rollback before examining its final state.
+        // Keep the fingerprint for delayed/duplicate callbacks, including a
+        // rollback that removed a newly created source or sidecar.
+        std::lock_guard lock(m_authoringMutex);
+        const auto found = m_materialAuthoringWrites.find(path.lexically_normal());
+        if (found == m_materialAuthoringWrites.end())
+        {
+            return false;
+        }
+        std::optional<Hash::Sha256Digest> actual;
+        if (ReadMaterialAuthoringFingerprint(path, actual) && actual == found->second)
+        {
+            return true;
+        }
+        m_materialAuthoringWrites.erase(found);
+        return false;
+    }
+
 	void HandleCreated(const file::path& filepath)
 	{
         if (IsCookedArtifactPath(filepath))
@@ -2127,7 +2406,11 @@ private:
 		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
 		// dependency와 다른 asset cache의 reload 정책은 같은 이벤트라는 이유로
 		// 추측해 넓히지 않는다.
-		if (ToLower(filepath.extension().string()) != ".shadermeta") return;
+        const auto extension = ToLower(filepath.extension().string());
+        if (extension != ".shadermeta" && extension != ".shadergraph" && extension != ".asset")
+        {
+            return;
+        }
 
 		FileGuid guid = DataSystems->GetFileGuid(filepath);
 		if (guid == FileGuid{})
@@ -2137,13 +2420,15 @@ private:
 		}
 		if (guid == FileGuid{}) return;
 
-		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
-			RuntimeAssetType::ShaderMeta, guid, filepath });
+        const auto type = extension == ".shadergraph" ? RuntimeAssetType::MaterialGraph :
+            extension == ".asset" ? RuntimeAssetType::Auto : RuntimeAssetType::ShaderMeta;
+        DataSystems->QueueAssetChange({RuntimeAssetChangeKind::ContentReload, type, guid, filepath});
 	}
 
     std::atomic<std::uint64_t> m_audioRevision{ 1u };
 	file::path m_root;
 	std::mutex m_authoringMutex;
+    std::map<file::path, std::optional<Hash::Sha256Digest>> m_materialAuthoringWrites;
 	std::map<file::path, std::array<ModelSourceStamp, 3>> m_failedModelRecovery;
 	std::map<file::path, ModelSourceStamp> m_modelSourceImports;
 	ModelRecoveryStats m_modelRecoveryStats;
@@ -2346,18 +2631,56 @@ bool EditorAssetDatabase::IsSupportExtension(std::string_view extension) const
 
 bool EditorAssetDatabase::SaveMaterial(Material* material)
 {
-	if (!m_impl || !material) return false;
-	const file::path savePath = PathFinder::Relative("Materials\\") /
-		(material->m_name + ".asset");
-	const FileGuid catalogGuid = DataSystems->GetFileGuid(savePath);
-	if (catalogGuid != FileGuid{}) material->m_fileGuid = catalogGuid;
-	else if (material->m_fileGuid == FileGuid{})
-		material->m_fileGuid = FileGuid::CreateRandomV4();
-	Authoring::WriteDocument document;
-	if (!DataSystems->SerializeMaterialPayload(*material, document.Root()))
-		return false;
-	return WriteTextAssetWithMeta(savePath, document.Dump(), material->m_fileGuid)
-		== material->m_fileGuid;
+    if (!m_impl || !material)
+    {
+        return false;
+    }
+    auto savePath = DataSystems->GetFilePath(material->m_fileGuid);
+    if (savePath.empty())
+    {
+        if (!IsSafeAssetName(file::path(material->m_name).wstring()))
+        {
+            return false;
+        }
+        savePath = PathFinder::Relative("Materials") / (material->m_name + ".asset");
+    }
+    const FileGuid catalogGuid = DataSystems->GetFileGuid(savePath);
+    if (catalogGuid != FileGuid{} && catalogGuid != material->m_fileGuid)
+    {
+        return false;
+    }
+    Material candidate(*material);
+    if (candidate.m_fileGuid == FileGuid{})
+    {
+        candidate.m_fileGuid = FileGuid::CreateRandomV4();
+    }
+    Authoring::WriteDocument document;
+    if (!DataSystems->SerializeMaterialPayload(candidate, document.Root()) ||
+        WriteTextAssetWithMeta(savePath, document.Dump(), candidate.m_fileGuid) != candidate.m_fileGuid)
+    {
+        return false;
+    }
+    material->m_fileGuid = candidate.m_fileGuid;
+    return true;
+}
+
+bool EditorAssetDatabase::SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
+                                            const file::path& graphPath, FileGuid graphGuid, std::string& error)
+{
+    if (!m_impl)
+    {
+        error = "The Editor asset database is unavailable.";
+        return false;
+    }
+    try
+    {
+        return m_impl->SaveMaterialGraph(material, graph, graphPath, graphGuid, error);
+    }
+    catch (const std::exception& exception)
+    {
+        error = exception.what();
+        return false;
+    }
 }
 
 namespace

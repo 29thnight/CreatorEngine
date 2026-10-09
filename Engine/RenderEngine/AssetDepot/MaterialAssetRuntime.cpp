@@ -1584,7 +1584,14 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
                         decoded->assetId = work->key.asset.key.assetId;
                         decoded->generation = work->programGeneration;
                         decoded->assetOrigin = std::move(origin);
-                        candidate = std::move(decoded);
+                        if (!material_graph::PrepareGenerationMetadata(*decoded, failure))
+                        {
+                            error = Error::DecodeFailed;
+                        }
+                        else
+                        {
+                            candidate = std::move(decoded);
+                        }
                     }
                 }
             }
@@ -1792,11 +1799,13 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
                             // the legacy authored ShaderMeta slot stays unused.
                             material->m_shaderMetaGuid = {};
                             material->m_doubleSided = document.doubleSided;
-                            if (document.blendMode == "transparent")
+                            const auto& blendMode = program->surfaceBlendMode
+                                ? *program->surfaceBlendMode : document.blendMode;
+                            if (blendMode == "transparent")
                             {
                                 material->m_renderingMode = MaterialRenderingMode::Transparent;
                             }
-                            else if (document.blendMode == "masked")
+                            else if (blendMode == "masked")
                             {
                                 material->m_renderingMode = MaterialRenderingMode::Masked;
                             }

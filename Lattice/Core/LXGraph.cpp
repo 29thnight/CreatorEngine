@@ -1875,55 +1875,74 @@ bool LXGraph::WouldCycle(Id outputNode, Id inputNode) const
     return false;
 }
 
-bool LXGraph::CanConnect(Id first, Id second, std::string* reason) const
-{
-    const Pin* a = FindPin(first);
-    const Pin* b = FindPin(second);
-    if (!a || !b)
+    bool LXGraph::CanConnect(Id first, Id second, std::string* reason) const
     {
-        return Fail(reason, "Missing pin");
+        return CanConnect(first, second, false, reason);
     }
-    if (a->direction == b->direction)
+
+    bool LXGraph::CanConnect(Id first, Id second, bool replaceInput, std::string* reason) const
     {
-        return Fail(reason, "Connect output to input");
+        const Pin* a = FindPin(first);
+        const Pin* b = FindPin(second);
+        if (!a || !b)
+        {
+            return Fail(reason, "Missing pin");
+        }
+        if (a->direction == b->direction)
+        {
+            return Fail(reason, "Connect output to input");
+        }
+        const Pin* output = a->direction == Direction::Output ? a : b;
+        const Pin* input = a->direction == Direction::Input ? a : b;
+        const Node* outputNode = FindNode(output->node);
+        const Node* inputNode = FindNode(input->node);
+        if (!outputNode || !inputNode || !CanEditNode(*outputNode) || !CanEditNode(*inputNode) ||
+            !AllowsPin(output->type) || !AllowsPin(input->type))
+        {
+            return Fail(reason, "Node or pin is not editable in this domain");
+        }
+        if (output->type != input->type)
+        {
+            return Fail(reason, "Pin types differ");
+        }
+        if (output->node == input->node)
+        {
+            return Fail(reason, "Self links are not allowed");
+        }
+        if (!replaceInput && !input->multiple &&
+            std::any_of(links_.begin(), links_.end(), [&](const Link& link) { return link.input == input->id; }))
+        {
+            return Fail(reason, "Input already connected");
+        }
+        if (std::any_of(links_.begin(), links_.end(),
+                        [&](const Link& link) { return link.output == output->id && link.input == input->id; }))
+        {
+            return Fail(reason, "Duplicate link");
+        }
+        if (replaceInput && !input->multiple)
+        {
+            for (const Link& link : links_)
+            {
+                if (link.input == input->id)
+                {
+                    const Pin* previousOutput = FindPin(link.output);
+                    if (!previousOutput || !IsNodeEditable(previousOutput->node))
+                    {
+                        return Fail(reason, "Existing link is not editable in this domain");
+                    }
+                }
+            }
+        }
+        if (!(domain_ == "animation" && output->type == PinType::Flow) && WouldCycle(output->node, input->node))
+        {
+            return Fail(reason, "Cycle is not allowed");
+        }
+        if (reason)
+        {
+            reason->clear();
+        }
+        return true;
     }
-    const Pin* output = a->direction == Direction::Output ? a : b;
-    const Pin* input = a->direction == Direction::Input ? a : b;
-    const Node* outputNode = FindNode(output->node);
-    const Node* inputNode = FindNode(input->node);
-    if (!outputNode || !inputNode || !CanEditNode(*outputNode) || !CanEditNode(*inputNode) ||
-        !AllowsPin(output->type) || !AllowsPin(input->type))
-    {
-        return Fail(reason, "Node or pin is not editable in this domain");
-    }
-    if (output->type != input->type)
-    {
-        return Fail(reason, "Pin types differ");
-    }
-    if (output->node == input->node)
-    {
-        return Fail(reason, "Self links are not allowed");
-    }
-    if (!input->multiple &&
-        std::any_of(links_.begin(), links_.end(), [&](const Link& link) { return link.input == input->id; }))
-    {
-        return Fail(reason, "Input already connected");
-    }
-    if (std::any_of(links_.begin(), links_.end(),
-                    [&](const Link& link) { return link.output == output->id && link.input == input->id; }))
-    {
-        return Fail(reason, "Duplicate link");
-    }
-    if (!(domain_ == "animation" && output->type == PinType::Flow) && WouldCycle(output->node, input->node))
-    {
-        return Fail(reason, "Cycle is not allowed");
-    }
-    if (reason)
-    {
-        reason->clear();
-    }
-    return true;
-}
 
 std::optional<Id> LXGraph::Connect(Id first, Id second, std::string* reason)
 {
@@ -1938,6 +1957,31 @@ std::optional<Id> LXGraph::Connect(Id first, Id second, std::string* reason)
         {id, a->direction == Direction::Output ? first : second, a->direction == Direction::Input ? first : second});
     return id;
 }
+
+    std::optional<Id> LXGraph::ReplaceInputConnection(Id first, Id second, std::string* reason)
+    {
+        if (!CanConnect(first, second, true, reason))
+        {
+            return std::nullopt;
+        }
+        if (nextId_ == std::numeric_limits<Id>::max())
+        {
+            Fail(reason, "No link IDs available");
+            return std::nullopt;
+        }
+        const Pin* a = FindPin(first);
+        const Pin* b = FindPin(second);
+        const Pin* output = a->direction == Direction::Output ? a : b;
+        const Pin* input = a->direction == Direction::Input ? a : b;
+        Commit();
+        if (!input->multiple)
+        {
+            std::erase_if(links_, [&](const Link& link) { return link.input == input->id; });
+        }
+        const Id id = nextId_++;
+        links_.push_back({id, output->id, input->id});
+        return id;
+    }
 
 bool LXGraph::Disconnect(Id id)
 {
