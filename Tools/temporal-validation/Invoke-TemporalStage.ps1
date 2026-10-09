@@ -1,10 +1,17 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$EndpointFile,
-    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','disable','latency','fallback','golden-baseline')]
+    [ValidateSet('discover','support','metadata','motion','reset','upscale','fg','nis','deepdvc','reflex','disable','latency','fallback','golden-baseline')]
     [string]$Stage = 'support',
     [ValidateSet('none','fsr','dlss','xess')][string]$Provider = 'fsr',
     [ValidateSet('native-aa','quality','balanced','performance','ultra-performance')][string]$Quality = 'quality',
+    [ValidateSet('off','scale','sharpen')][string]$NisMode = 'scale',
+    [ValidateRange(0.5,1.0)][float]$NisRenderScale = 0.77,
+    [ValidateRange(0.0,1.0)][float]$NisSharpness = 0.5,
+    [ValidateSet('off','on')][string]$DeepDvcMode = 'on',
+    [ValidateRange(0.0,1.0)][float]$DeepDvcIntensity = 0.5,
+    [ValidateRange(0.0,1.0)][float]$DeepDvcSaturationBoost = 0.25,
+    [ValidateSet('off','on','on-boost')][string]$ReflexMode = 'on',
     [string]$RuntimeDirectory,
     [string]$DlssProjectId,
     [ValidateRange(1,600)][int]$TimeoutSeconds = 60,
@@ -73,6 +80,35 @@ function Require-RealMetadata($Data) {
     }
 }
 
+function Wait-SpatialFrame([string]$Generation, [uint64]$PreviousFrameId) {
+    $data = Wait-TemporalGeneration $Generation
+    $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        if ($data.requestState -eq 'superseded' -or [uint64]$data.requestedGeneration -ne [uint64]$Generation) {
+            throw "Spatial generation $Generation was superseded before a fresh submitted frame"
+        }
+        if ($data.acknowledged -and $data.spatialPost.observed -and !$data.spatialPost.pending -and
+            [uint64]$data.observedGeneration -eq [uint64]$Generation -and
+            [uint64]$data.spatialPost.observedGeneration -eq [uint64]$Generation -and
+            [uint64]$data.spatialPost.realFrameId -gt $PreviousFrameId -and
+            [uint64]$data.spatialPost.realFrameId -eq [uint64]$data.lastRealFrameId -and
+            [uint64]$data.renderSubmittedFrameId -eq [uint64]$data.lastRealFrameId) {
+            Require-RealMetadata $data
+            if ([uint64]$data.viewId -eq 0 -or [uint64]$data.sceneEpoch -eq 0) {
+                throw 'Spatial observation is missing its production view/scene identity'
+            }
+            return $data
+        }
+        if ([DateTime]::UtcNow -ge $limit) { throw 'No fresh submitted spatial observation at the exact requested generation' }
+        Start-Sleep -Milliseconds 100
+        $data = (Invoke-TemporalCommand 'temporal.status' @($Generation)).data
+    } while ($true)
+}
+
+function Format-Setting([float]$Value) {
+    return $Value.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
+}
+
 $report = [ordered]@{ stage=$Stage; passed=$false; scope='live-diagnostic-only'; pixelAcceptance=$false;
     performanceAcceptance=$false; latencyAcceptance=$false; timestampUtc=[DateTime]::UtcNow.ToString('o') }
 try {
@@ -90,7 +126,7 @@ try {
     switch ($Stage) {
         'discover' {
             # The actual registries are written above; invoke every read-only surface to expose missing registration.
-            foreach ($command in @('support','metadata','motion','latency','fallback','status')) {
+            foreach ($command in @('support','metadata','motion','latency','fallback','status','nis','deepdvc','reflex')) {
                 Invoke-TemporalCommand "temporal.$command" | Out-Null
             }
         }
@@ -180,19 +216,121 @@ try {
                 }
             }
         }
+        'nis' {
+            $receipt = Invoke-TemporalCommand 'temporal.nis' @($NisMode,(Format-Setting $NisRenderScale),(Format-Setting $NisSharpness))
+            $generation = [string]$receipt.data.receiptGeneration
+            $report.receiptGeneration = $generation
+            $data = Wait-SpatialFrame $generation ([uint64]$before.lastRealFrameId)
+            $spatial = $data.spatialPost
+            if ($spatial.requestedNisMode -ne $NisMode -or $spatial.effectiveRequestedNisMode -ne $NisMode -or
+                [Math]::Abs([double]$spatial.nisRenderScale - $NisRenderScale) -gt 0.00001 -or
+                [Math]::Abs([double]$spatial.nisSharpness - $NisSharpness) -gt 0.00001 -or
+                [Math]::Abs([double]$spatial.submittedNisRenderScale - $NisRenderScale) -gt 0.00001 -or
+                [Math]::Abs([double]$spatial.submittedNisSharpness - $NisSharpness) -gt 0.00001) {
+                throw 'Submitted NIS tuning does not match the staged request'
+            }
+            $expectedMode = if ($NisMode -eq 'scale' -and ($data.selectedUpscaler -ne 'none' -or $NisRenderScale -eq 1.0)) { 'sharpen' } else { $NisMode }
+            if ($spatial.submittedNisMode -ne $expectedMode -or $spatial.selectedNisMode -ne $expectedMode -or
+                $spatial.activeNisMode -ne $expectedMode) {
+                throw "NIS did not execute the expected mode without duplicate scaling: expected=$expectedMode, selected=$($spatial.selectedNisMode), active=$($spatial.activeNisMode)"
+            }
+            if ($NisMode -ne 'off') {
+                if ($spatial.nisCapability.status -ne 'success' -or $spatial.nisResult.status -ne 'success' -or
+                    $spatial.outputExtent.width -ne $data.displayExtent.width -or
+                    $spatial.outputExtent.height -ne $data.displayExtent.height) {
+                    throw 'NIS support/evaluation/final-resolution output was not observed'
+                }
+                if ($expectedMode -eq 'sharpen' -and ($spatial.inputExtent.width -ne $spatial.outputExtent.width -or
+                    $spatial.inputExtent.height -ne $spatial.outputExtent.height)) {
+                    throw 'NIS sharpen-only must preserve its input extent'
+                }
+                if ($expectedMode -eq 'scale' -and ($spatial.inputExtent.width -gt $spatial.outputExtent.width -or
+                    $spatial.inputExtent.height -gt $spatial.outputExtent.height -or
+                    ($NisRenderScale -lt 1.0 -and $spatial.inputExtent.width -eq $spatial.outputExtent.width -and
+                        $spatial.inputExtent.height -eq $spatial.outputExtent.height))) {
+                    throw 'NIS scaling did not observe the expected lower-resolution input'
+                }
+            }
+            $report.scope = 'submitted-spatial-accepted-dispatch-only-no-pixels-compared'
+        }
+        'deepdvc' {
+            $receipt = Invoke-TemporalCommand 'temporal.deepdvc' @($DeepDvcMode,(Format-Setting $DeepDvcIntensity),(Format-Setting $DeepDvcSaturationBoost))
+            $generation = [string]$receipt.data.receiptGeneration
+            $report.receiptGeneration = $generation
+            $data = Wait-SpatialFrame $generation ([uint64]$before.lastRealFrameId)
+            $spatial = $data.spatialPost
+            $enabled = $DeepDvcMode -eq 'on'
+            if ($spatial.deepDvcRequested -ne $enabled -or $spatial.deepDvcEffectiveRequested -ne $enabled -or
+                $spatial.submittedDeepDvcEnabled -ne $enabled -or $spatial.deepDvcApplied -ne $enabled -or
+                [Math]::Abs([double]$spatial.deepDvcIntensity - $DeepDvcIntensity) -gt 0.00001 -or
+                [Math]::Abs([double]$spatial.deepDvcSaturationBoost - $DeepDvcSaturationBoost) -gt 0.00001 -or
+                [Math]::Abs([double]$spatial.submittedDeepDvcIntensity - $DeepDvcIntensity) -gt 0.00001 -or
+                [Math]::Abs([double]$spatial.submittedDeepDvcSaturationBoost - $DeepDvcSaturationBoost) -gt 0.00001) {
+                throw 'DeepDVC did not observe the exact requested state/tuning'
+            }
+            if ($enabled -and (!$spatial.deepDvcSelected -or !$spatial.sdrEligible -or
+                $spatial.deepDvcCapability.status -ne 'success' -or $spatial.deepDvcResult.status -ne 'success' -or
+                $spatial.outputExtent.width -ne $data.displayExtent.width -or
+                $spatial.outputExtent.height -ne $data.displayExtent.height)) {
+                throw 'DeepDVC requires an accepted SDR-only final-resolution pre-UI SDK dispatch'
+            }
+            $report.scope = 'submitted-sdr-accepted-dispatch-only-no-internal-evaluation-or-pixel-proof'
+        }
+        'reflex' {
+            if ($before.target -ne 'player_swapchain') { throw 'Reflex execution stage requires development DX12 Player' }
+            $receipt = Invoke-TemporalCommand 'temporal.reflex' @($ReflexMode)
+            $generation = [string]$receipt.data.receiptGeneration
+            $report.receiptGeneration = $generation
+            $data = Wait-TemporalGeneration $generation
+            # A final frame from the prior mode can complete after the pre-request snapshot.
+            # Require API evidence newer than the acknowledged mode's own baseline.
+            $reflexBaseline = $data.reflex
+            $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            do {
+                if ($data.requestState -eq 'superseded' -or [uint64]$data.requestedGeneration -ne [uint64]$generation) {
+                    throw "Reflex generation $generation was superseded"
+                }
+                $reflex = $data.reflex
+                $expectedMode = if ($ReflexMode -eq 'off' -and $reflex.requiredByFrameGeneration) { 'on' } else { $ReflexMode }
+                $observedMode = $data.acknowledged -and !$reflex.pending -and
+                    [uint64]$data.playerObservedGeneration -eq [uint64]$generation -and
+                    [uint64]$reflex.observedGeneration -eq [uint64]$generation -and
+                    $data.requestedReflexMode -eq $ReflexMode -and $reflex.requestedMode -eq $ReflexMode -and
+                    $reflex.effectiveMode -eq $expectedMode
+                if ($observedMode -and $expectedMode -eq 'off') { break }
+                if ($observedMode -and $reflex.configured -and $reflex.support.status -eq 'success' -and
+                    $reflex.sleepSupport.status -eq 'success' -and $reflex.markerSupport.status -eq 'success' -and
+                    $reflex.optionsResult.status -eq 'success' -and
+                    [uint64]$reflex.markerRealFrameId -gt [uint64]$reflexBaseline.markerRealFrameId -and
+                    [uint64]$reflex.sleepRealFrameId -gt [uint64]$reflexBaseline.sleepRealFrameId -and
+                    [uint64]$reflex.presentedRealFrameId -gt [uint64]$reflexBaseline.presentedRealFrameId) { break }
+                if ([DateTime]::UtcNow -ge $limit) { throw 'No fresh successful Reflex sleep/marker/presentation observations for the requested mode' }
+                Start-Sleep -Milliseconds 100
+                $data = (Invoke-TemporalCommand 'temporal.status' @($generation)).data
+            } while ($true)
+            $report.scope = 'reflex-api-observations-only-not-input-to-photon'
+            $report.fgRequiredModeOverride = [bool]$data.reflex.requiredByFrameGeneration
+        }
         'disable' {
             Set-Temporal 'temporal.fg' @('none') | Out-Null
+            Set-Temporal 'temporal.nis' @('off') | Out-Null
+            Set-Temporal 'temporal.deepdvc' @('off') | Out-Null
             $data = Set-Temporal 'temporal.upscale' @('none')
-            if ($data.activeUpscaler -ne 'none' -or $data.activeFrameGenerator -ne 'none') { throw 'Temporal feature remains active' }
+            if ($data.activeUpscaler -ne 'none' -or $data.activeFrameGenerator -ne 'none' -or
+                $data.spatialPost.activeNisMode -ne 'off' -or $data.spatialPost.deepDvcApplied) { throw 'Image feature remains active' }
         }
         'golden-baseline' {
             Set-Temporal 'temporal.fg' @('none') | Out-Null
-            $data = Set-Temporal 'temporal.upscale' @('none')
+            Set-Temporal 'temporal.nis' @('off') | Out-Null
+            Set-Temporal 'temporal.deepdvc' @('off') | Out-Null
+            $receipt = Invoke-TemporalCommand 'temporal.upscale' @('none')
+            $data = Wait-SpatialFrame ([string]$receipt.data.receiptGeneration) ([uint64]$before.lastRealFrameId)
             Require-RealMetadata $data
             if ($data.activeUpscaler -ne 'none' -or $data.activeFrameGenerator -ne 'none' -or
+                $data.spatialPost.activeNisMode -ne 'off' -or $data.spatialPost.deepDvcApplied -or
                 $data.renderExtent.width -ne $data.displayExtent.width -or
                 $data.renderExtent.height -ne $data.displayExtent.height) {
-                throw 'Golden baseline must use actual native-resolution real frames with TU/FG disabled'
+                throw 'Golden baseline must use actual native-resolution real frames with TU/FG/NIS/DeepDVC disabled'
             }
             $report.scope = 'golden-preflight-only-no-pixels-compared'
         }
@@ -200,11 +338,13 @@ try {
             $data = (Invoke-TemporalCommand 'temporal.latency').data
             $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
             $latencyNames = @{ fsr='anti-lag-2'; dlss='reflex'; xess='xell' }
-            $expectedLatency = $latencyNames[[string]$before.selectedFrameGenerator]
-            if (!$expectedLatency) { throw 'No selected frame-generation latency provider' }
+            $independentReflex = $before.reflex.configured -and $before.reflex.effectiveMode -ne 'off'
+            $expectedLatency = if ($independentReflex) { 'reflex' } else { $latencyNames[[string]$before.selectedFrameGenerator] }
+            if (!$expectedLatency) { throw 'No configured independent Reflex or selected frame-generation latency provider' }
             while ([uint64]$data.latencyMarkerRealFrameId -le [uint64]$before.latencyMarkerRealFrameId -or
                 $data.latencyResult.status -ne 'success' -or $data.latencyProvider -ne $expectedLatency -or
-                $data.activeFrameGenerator -ne $before.selectedFrameGenerator) {
+                (!$independentReflex -and $data.activeFrameGenerator -ne $before.selectedFrameGenerator) -or
+                ($independentReflex -and (!$data.reflex.configured -or $data.reflex.effectiveMode -ne $before.reflex.effectiveMode))) {
                 if ($data.requestedGeneration -ne $before.requestedGeneration) { throw 'Latency stage settings were superseded' }
                 if ([DateTime]::UtcNow -ge $limit) { throw 'No new successful real-frame latency marker observed' }
                 Start-Sleep -Milliseconds 100

@@ -282,22 +282,37 @@ struct EnhancedPbrCapture
         root["sealLedger"]["recorded"] << false;
     }
 
+    void WriteTemporalProvenance(ryml::NodeRef node) const
+    {
+        const auto& provenance = temporalProvenance;
+        node["temporalProvenanceSchemaVersion"] << 2;
+        node["frameKind"] << TemporalMeasuredFrameKindName(provenance.frameKind);
+        node["realFrameId"] << provenance.realFrameId;
+        node["generatedOrdinal"] << provenance.generatedOrdinal;
+        node["renderWidth"] << provenance.renderExtent.width;
+        node["renderHeight"] << provenance.renderExtent.height;
+        node["displayWidth"] << provenance.displayExtent.width;
+        node["displayHeight"] << provenance.displayExtent.height;
+        node["upscaler"] << TemporalMeasuredProviderName(provenance.upscaler);
+        node["frameGenerator"] << TemporalMeasuredProviderName(provenance.frameGenerator);
+        node["resolutionState"] << TemporalResolutionStateName(provenance.resolutionState);
+        node["spatialMode"] << SpatialScalingModeName(provenance.spatialMode);
+        node["deepDvcApplied"] << provenance.deepDvcApplied;
+        node["temporalNativeGateActive"] << provenance.nativeGateActive;
+    }
+
     void RecordTemporalProvenance(const TemporalMeasurementProvenance& provenance)
     {
         temporalProvenance = provenance;
         auto root = manifest.rootref();
-        root["frameKind"] << TemporalMeasuredFrameKindName(provenance.frameKind);
-        root["realFrameId"] << provenance.realFrameId;
-        root["generatedOrdinal"] << provenance.generatedOrdinal;
-        root["renderWidth"] << provenance.renderExtent.width;
-        root["renderHeight"] << provenance.renderExtent.height;
-        root["displayWidth"] << provenance.displayExtent.width;
-        root["displayHeight"] << provenance.displayExtent.height;
-        root["upscaler"] << TemporalMeasuredProviderName(provenance.upscaler);
-        root["frameGenerator"] << TemporalMeasuredProviderName(provenance.frameGenerator);
-        root["resolutionState"] << TemporalResolutionStateName(provenance.resolutionState);
-        root["temporalNativeGateActive"] << provenance.nativeGateActive;
+        WriteTemporalProvenance(root);
         root["goldenEligible"] << provenance.IsGoldenEligible();
+        // Graph timing is collected before submission. Refresh its frame/effect
+        // labels when Commit supplies the successfully submitted provenance.
+        if (root.has_child("measurement"))
+        {
+            WriteTemporalProvenance(root["measurement"]);
+        }
     }
 
     void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
@@ -640,13 +655,7 @@ struct EnhancedPbrCapture
         root["measurement"] |= ryml::MAP;
         // All timing/memory values below belong to this submitted real frame,
         // never to a generated presentation or a newer status snapshot.
-        root["measurement"]["frameKind"] << TemporalMeasuredFrameKindName(temporalProvenance.frameKind);
-        root["measurement"]["realFrameId"] << temporalProvenance.realFrameId;
-        root["measurement"]["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
-        root["measurement"]["renderWidth"] << temporalProvenance.renderExtent.width;
-        root["measurement"]["renderHeight"] << temporalProvenance.renderExtent.height;
-        root["measurement"]["displayWidth"] << temporalProvenance.displayExtent.width;
-        root["measurement"]["displayHeight"] << temporalProvenance.displayExtent.height;
+        WriteTemporalProvenance(root["measurement"]);
         root["measurement"]["cpuRecordMs"] << recordMs;
         root["measurement"]["cpuGraphCompileMs"] << compileMs;
         root["measurement"]["cpuTransientPrepareMs"] << graph.GetStats().transientPrepareCpuMs;
@@ -822,6 +831,9 @@ struct EnhancedPbrCapture
                 attachment["frameKind"] << TemporalMeasuredFrameKindName(temporalProvenance.frameKind);
                 attachment["realFrameId"] << temporalProvenance.realFrameId;
                 attachment["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
+                attachment["temporalProvenanceSchemaVersion"] << 2;
+                attachment["spatialMode"] << SpatialScalingModeName(temporalProvenance.spatialMode);
+                attachment["deepDvcApplied"] << temporalProvenance.deepDvcApplied;
                 attachment["nonfinite"] << nonfinite;
                 attachment["min"] << minimum;
                 attachment["max"] << maximum;

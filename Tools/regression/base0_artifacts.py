@@ -320,17 +320,20 @@ def logical_backend_graph(graph, backend):
 
 
 def audit_temporal_capture_provenance(m):
+    require(m["temporalProvenanceSchemaVersion"] == 2, "missing/current temporal effect provenance schema")
     require(m["frameKind"] == "real", "generated/unknown frame")
     require(m["realFrameId"] == m["sourceRealFrameId"] > 0 and m["frameId"] > 0 and m["generatedOrdinal"] == 0,
             "real-frame identity/ordinal mismatch")
     require(truth(m["temporalNativeGateActive"]) and truth(m["goldenEligible"]) and
-            m["upscaler"] == m["frameGenerator"] == "none" and m["resolutionState"] == "native",
-            "golden capture did not observe forced native TU/FG-off runtime")
+            m["upscaler"] == m["frameGenerator"] == "none" and m["resolutionState"] == "native" and
+            m["spatialMode"] == "off" and not truth(m["deepDvcApplied"]),
+            "golden capture did not observe forced native TU/FG/NIS/DeepDVC-off runtime")
     require(m["width"] == m["renderWidth"] == m["displayWidth"] > 0 and
             m["height"] == m["renderHeight"] == m["displayHeight"] > 0, "resolution provenance")
     measure = m["measurement"]
-    require(all(measure[key] == m[key] for key in ("frameKind", "realFrameId", "generatedOrdinal",
-            "renderWidth", "renderHeight", "displayWidth", "displayHeight")),
+    require(all(measure[key] == m[key] for key in ("temporalProvenanceSchemaVersion", "frameKind", "realFrameId", "generatedOrdinal",
+            "renderWidth", "renderHeight", "displayWidth", "displayHeight", "upscaler", "frameGenerator",
+            "resolutionState", "spatialMode", "deepDvcApplied", "temporalNativeGateActive")),
             "measurement provenance differs from captured frame")
 
 
@@ -382,7 +385,8 @@ def load_capture(directory):
     expected = {"baseColor", "metalRough", "normal", "emissive", "depth", "preToneHdr", "display"}
     for a in m["attachments"]:
         require(a["name"] in expected and a["name"] not in images, "attachment set")
-        require(all(a[key] == m[key] for key in ("frameKind", "realFrameId", "generatedOrdinal")),
+        require(all(a[key] == m[key] for key in ("temporalProvenanceSchemaVersion", "frameKind", "realFrameId",
+                "generatedOrdinal", "spatialMode", "deepDvcApplied")),
                 "attachment temporal identity")
         require(a["width"] == m["width"] and a["height"] == m["height"] and a["nonfinite"] == 0,
                 "attachment extent/finite")
@@ -520,6 +524,14 @@ def mutations(directory, output):
     c = copy.deepcopy(m); c["temporalNativeGateActive"] = False; reject("missing-native-gate", c)
     c = copy.deepcopy(m); c["upscaler"] = "fsr"; reject("reconstructed-golden", c)
     c = copy.deepcopy(m); c["frameGenerator"] = "dlss"; reject("frame-generation-golden", c)
+    c = copy.deepcopy(m); del c["temporalProvenanceSchemaVersion"]; reject("legacy-effects-unknown", c)
+    c = copy.deepcopy(m); del c["spatialMode"]; reject("missing-spatial-provenance", c)
+    c = copy.deepcopy(m); c["spatialMode"] = "scale"; reject("spatial-scaling-golden", c)
+    c = copy.deepcopy(m); c["spatialMode"] = "sharpen"; reject("same-extent-sharpening-golden", c)
+    c = copy.deepcopy(m); del c["deepDvcApplied"]; reject("missing-dvc-provenance", c)
+    c = copy.deepcopy(m); c["deepDvcApplied"] = True; reject("same-extent-dvc-golden", c)
+    c = copy.deepcopy(m); c["measurement"]["spatialMode"] = "sharpen"; reject("measurement-spatial-mismatch", c)
+    c = copy.deepcopy(m); c["measurement"]["deepDvcApplied"] = True; reject("measurement-dvc-mismatch", c)
     c = copy.deepcopy(m); del c["measurement"]["displayWidth"]; reject("measurement-missing-resolution", c)
     c = copy.deepcopy(m); c["measurement"]["generatedOrdinal"] = 1; reject("generated-measurement-as-real", c)
     c = copy.deepcopy(m); c["compiledGraph"]["executeOrder"].reverse(); reject("reversed-order", c)

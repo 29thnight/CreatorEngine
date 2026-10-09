@@ -103,5 +103,27 @@ int main()
         runtime.Request(settings);
     }
     Expect(runtime.Snapshot().settings == settings, "capture release preserves concurrent new user intent");
+    settings.enabled = false;
+    settings.requestedUpscaler = TemporalProvider::None;
+    settings.requestedFrameGenerator = TemporalProvider::None;
+    settings.reflexMode = TemporalLatencyMode::OnPlusBoost;
+    runtime.Request(settings);
+    const auto latencyOnly = runtime.Snapshot();
+    Expect(latencyOnly.settings.reflexMode == TemporalLatencyMode::OnPlusBoost &&
+        latencyOnly.settings.requestedUpscaler == TemporalProvider::None &&
+        latencyOnly.settings.requestedFrameGenerator == TemporalProvider::None,
+        "independent Reflex intent survives disabled reconstruction and interpolation");
+    Expect(!latencyOnly.reflex.configured && latencyOnly.reflex.sleepRealFrameId == 0 &&
+        latencyOnly.reflex.markerRealFrameId == 0 && latencyOnly.reflex.presentedRealFrameId == 0,
+        "a latency request invents no SDK configuration or timing observation");
+    {
+        TemporalNativeCaptureExclusion capture;
+        Expect(runtime.Snapshot().settings.reflexMode == TemporalLatencyMode::OnPlusBoost,
+            "pixel-only native capture does not overwrite independent latency intent");
+    }
+    settings.reflexMode = TemporalLatencyMode::Off;
+    runtime.Request(settings);
+    Expect(runtime.Snapshot().requestedSettings.reflexMode == TemporalLatencyMode::Off,
+        "Off remains an explicit latency request instead of enabling frame generation");
     return failures ? 1 : 0;
 }

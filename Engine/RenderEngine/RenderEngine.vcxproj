@@ -942,10 +942,13 @@
   <ItemGroup>
     <ClCompile Include="Render\Temporal\TemporalRuntimeControl.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="Render\Temporal\TemporalUpscalerHost.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Render\Temporal\SpatialPostEffectsHost.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="RHI\Temporal\TemporalDeviceDX12.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="Render\Temporal\TemporalRuntimeControl.h" />
     <ClInclude Include="Render\Temporal\TemporalUpscalerHost.h" />
+    <ClInclude Include="Render\Temporal\SpatialPostEffects.h" />
+    <ClInclude Include="Render\Temporal\SpatialPostEffectsHost.h" />
     <ClInclude Include="RHI\Temporal\TemporalDeviceDX12.h" />
     <ClInclude Include="Render\Temporal\TemporalMeasurementProvenance.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.h" />

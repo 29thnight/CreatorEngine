@@ -51,13 +51,20 @@ std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
         result = { TemporalStatus::Success };
         return existing;
     }
-    const auto settings = TemporalRuntimeControl::Get().Snapshot().settings;
-    if (!settings.enabled || (settings.requestedUpscaler == TemporalProvider::None &&
-        settings.requestedFrameGenerator == TemporalProvider::None))
+    const auto control = TemporalRuntimeControl::Get().Snapshot();
+    const auto& settings = control.settings;
+    const bool requestReflex = control.playerLatencyHostRegistered && settings.reflexMode != TemporalLatencyMode::Off &&
+        !(settings.enabled && settings.requestedFrameGenerator == TemporalProvider::XeSS);
+    const bool requestSpatial = settings.spatialPost.nisMode != SpatialScalingMode::Off ||
+        settings.spatialPost.deepDvcEnabled;
+    if (!requestReflex && !requestSpatial && (!settings.enabled ||
+        (settings.requestedUpscaler == TemporalProvider::None &&
+            settings.requestedFrameGenerator == TemporalProvider::None)))
     { result = { TemporalStatus::NotQueried }; return {}; }
     auto owner = std::make_shared<TemporalDeviceDX12>();
-    const bool useDlss = settings.requestedUpscaler == TemporalProvider::Dlss ||
-        settings.requestedFrameGenerator == TemporalProvider::Dlss;
+    const bool useDlss = requestReflex || requestSpatial || (settings.enabled &&
+        (settings.requestedUpscaler == TemporalProvider::Dlss ||
+            (control.playerLatencyHostRegistered && settings.requestedFrameGenerator == TemporalProvider::Dlss)));
     if (!useDlss)
     {
         auto hr = CreateDXGIFactory2(flags, IID_PPV_ARGS(&owner->nativeFactory));
@@ -82,8 +89,12 @@ std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
     init.engineVersion = "CreatorEngine";
     // Do not make SR depend on the optional FG/Reflex DLL set, or vice versa.
     // Adding the other axis later requires a fresh pre-device SDK session.
-    init.loadUpscaling = settings.requestedUpscaler == TemporalProvider::Dlss;
-    init.loadFrameGeneration = settings.requestedFrameGenerator == TemporalProvider::Dlss;
+    init.loadUpscaling = settings.enabled && settings.requestedUpscaler == TemporalProvider::Dlss;
+    init.loadFrameGeneration = control.playerLatencyHostRegistered && settings.enabled &&
+        settings.requestedFrameGenerator == TemporalProvider::Dlss;
+    init.loadReflex = requestReflex;
+    init.loadNis = settings.spatialPost.nisMode != SpatialScalingMode::Off;
+    init.loadDeepDvc = settings.spatialPost.deepDvcEnabled;
     result = owner->session->Initialize(init);
     if (!result.IsSuccess()) return {};
     auto hr = CreateDXGIFactory2(flags, IID_PPV_ARGS(&owner->nativeFactory));

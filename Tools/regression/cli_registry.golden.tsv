@@ -129,11 +129,14 @@ tag.add	-	immediate	editor	editor_operation	live	no	yes	<name>	Add and persist a
 tag.has	-	immediate	editor	engine_service	live	no	yes	<name>	Query a project tag
 tag.list	-	immediate	editor	engine_service	live	no	yes	-	Read project tags and layers
 tag.remove	-	immediate	editor	editor_operation	live	no	yes	<name>	Remove and persist a project tag with Undo
+temporal.deepdvc	-	immediate	both	engine_service	live	no	yes	[off|on] [intensity:0..1] [saturation-boost:0..1]	Request SDR-only pre-UI DeepDVC digital vibrance; default off
 temporal.fallback	-	immediate	both	engine_service	live	no	yes	-	Read requested/effective temporal providers and actual fallback reasons
 temporal.fg	-	immediate	both	engine_service	live	no	yes	[none|fsr|dlss|xess]	Request independent Player frame generation; receipt is not activation
 temporal.latency	-	immediate	both	engine_service	live	no	yes	-	Read real-frame latency markers without claiming input-to-photon latency
 temporal.metadata	-	immediate	both	engine_service	live	no	yes	-	Read observed temporal frame metadata and separate completion identities
 temporal.motion	-	immediate	both	engine_service	live	no	yes	-	Read live motion-input coverage and explicit missing paths
+temporal.nis	-	immediate	both	engine_service	live	no	yes	[off|scale|sharpen] [render-scale:0.5..1] [sharpness:0..1]	Request NIS spatial scaling or sharpen-only without duplicate temporal scaling
+temporal.reflex	-	immediate	both	engine_service	live	no	yes	[off|on|on-boost]	Request NVIDIA Reflex independently of upscaling and frame generation
 temporal.reset	-	immediate	both	engine_service	live	no	yes	-	Queue history reset and return its generation for frame acknowledgement
 temporal.runtime	-	immediate	both	engine_service	live	no	yes	<absolute-trusted-directory> [dlss-project-id]	Configure the trusted external runtime directory without installing a SDK
 temporal.status	-	immediate	both	engine_service	live	no	yes	[generation]	Read live temporal status and optionally require a rendered request acknowledgement

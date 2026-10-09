@@ -740,11 +740,14 @@ namespace PlayerCmd
 		};
 
 		constexpr Registration kPlayerCommands[] = {
+            { "temporal.deepdvc", &Cmd_temporal },
             { "temporal.fallback", &Cmd_temporal },
             { "temporal.fg", &Cmd_temporal },
             { "temporal.latency", &Cmd_temporal },
             { "temporal.metadata", &Cmd_temporal },
             { "temporal.motion", &Cmd_temporal },
+            { "temporal.nis", &Cmd_temporal },
+            { "temporal.reflex", &Cmd_temporal },
             { "temporal.reset", &Cmd_temporal },
             { "temporal.runtime", &Cmd_temporal },
             { "temporal.status", &Cmd_temporal },

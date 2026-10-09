@@ -111,6 +111,9 @@ namespace editor
             value.displayWidth = p.displayExtent.width; value.displayHeight = p.displayExtent.height;
             value.nativeGateActive = p.nativeGateActive;
             value.publicationFrameId = p.publicationFrameId;
+            value.spatialProvenanceAvailable = p.IsValid();
+            value.spatialMode = static_cast<std::uint8_t>(p.spatialMode);
+            value.deepDvcApplied = p.deepDvcApplied;
             return value;
         };
         result.temporalProvenance = provenance(source.temporalProvenance);

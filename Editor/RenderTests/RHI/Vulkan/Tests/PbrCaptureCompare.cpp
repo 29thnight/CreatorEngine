@@ -68,10 +68,11 @@ namespace
         }
         // A pixel gate cannot turn already reconstructed pixels back into native
         // pixels. Require proof that the capture's runtime exclusion produced
-        // this exact real frame with both TU and FG disabled.
-        constexpr const char* required[]{ "frameKind", "realFrameId", "sourceRealFrameId", "frameId", "generatedOrdinal",
+        // this exact real frame with TU, FG, NIS and DeepDVC disabled. Missing
+        // effect fields in old manifests are unknown, never implicit "off".
+        constexpr const char* required[]{ "temporalProvenanceSchemaVersion", "frameKind", "realFrameId", "sourceRealFrameId", "frameId", "generatedOrdinal",
             "renderWidth", "renderHeight", "displayWidth", "displayHeight", "width", "height",
-            "upscaler", "frameGenerator", "resolutionState", "temporalNativeGateActive", "goldenEligible" };
+            "upscaler", "frameGenerator", "resolutionState", "spatialMode", "deepDvcApplied", "temporalNativeGateActive", "goldenEligible" };
         for (const auto* key : required)
         {
             if (!root.has_child(key))
@@ -80,10 +81,11 @@ namespace
                 return false;
             }
         }
-        std::string kind, upscaler, frameGenerator, resolution;
+        std::string kind, upscaler, frameGenerator, resolution, spatialMode;
         uint64_t realFrame{}, frame{}, sourceRealFrame{};
-        uint32_t ordinal{}, renderWidth{}, renderHeight{}, displayWidth{}, displayHeight{}, width{}, height{};
-        bool forcedNative{}, eligible{};
+        uint32_t provenanceSchema{}, ordinal{}, renderWidth{}, renderHeight{}, displayWidth{}, displayHeight{}, width{}, height{};
+        bool forcedNative{}, eligible{}, deepDvcApplied{};
+        root["temporalProvenanceSchemaVersion"] >> provenanceSchema;
         root["frameKind"] >> kind; root["upscaler"] >> upscaler;
         root["frameGenerator"] >> frameGenerator; root["resolutionState"] >> resolution;
         root["realFrameId"] >> realFrame; root["frameId"] >> frame;
@@ -93,7 +95,9 @@ namespace
         root["displayWidth"] >> displayWidth; root["displayHeight"] >> displayHeight;
         root["width"] >> width; root["height"] >> height;
         root["temporalNativeGateActive"] >> forcedNative; root["goldenEligible"] >> eligible;
-        if (kind != "real" || realFrame == 0 || frame == 0 || realFrame != sourceRealFrame || ordinal != 0 ||
+        root["spatialMode"] >> spatialMode; root["deepDvcApplied"] >> deepDvcApplied;
+        if (provenanceSchema != 2 || spatialMode != "off" || deepDvcApplied ||
+            kind != "real" || realFrame == 0 || frame == 0 || realFrame != sourceRealFrame || ordinal != 0 ||
             !forcedNative || !eligible || upscaler != "none" || frameGenerator != "none" ||
             resolution != "native" || width == 0 || height == 0 || width != renderWidth ||
             height != renderHeight || renderWidth != displayWidth || renderHeight != displayHeight)
@@ -101,9 +105,34 @@ namespace
             error = "pixel comparison requires observed native-only real-frame capture provenance";
             return false;
         }
+        const auto nativeEffects = [](ryml::ConstNodeRef node)
+        {
+            if (!node.is_map() || !node.has_child("temporalProvenanceSchemaVersion") ||
+                !node.has_child("spatialMode") || !node.has_child("deepDvcApplied"))
+            {
+                return false;
+            }
+            uint32_t schema{};
+            std::string mode;
+            bool applied{};
+            node["temporalProvenanceSchemaVersion"] >> schema;
+            node["spatialMode"] >> mode;
+            node["deepDvcApplied"] >> applied;
+            return schema == 2 && mode == "off" && !applied;
+        };
+        if (!root.has_child("measurement") || !nativeEffects(root["measurement"]))
+        {
+            error = "measurement is missing native spatial-effect provenance";
+            return false;
+        }
         if (root.has_child("backend")) root["backend"] >> backend;
         for (const ryml::ConstNodeRef node : root["attachments"])
         {
+            if (!nativeEffects(node))
+            {
+                error = "attachment is missing native spatial-effect provenance";
+                return false;
+            }
             AttachmentInfo info;
             node["name"] >> info.name;
             node["file"] >> info.file;

@@ -1122,6 +1122,10 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
             // 놓기 전에 이 참조를 확보해야 하며 CPU 드로우 데이터가 아직
             // 기록·제출되지 않은 동안에도 참조를 유지한다.
             const auto textureId = sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+            if (textureId)
+            {
+                sink.OpenTemporalRealFrame(display.temporalFrame.realFrameId);
+            }
             if (textureId && sink.AcceptsTemporalFrames() && display.temporalSealed)
             {
                 RHITemporalDisplayPacket packet;

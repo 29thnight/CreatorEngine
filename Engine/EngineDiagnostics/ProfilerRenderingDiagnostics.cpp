@@ -175,7 +175,7 @@ namespace ce::profiler_viewer::diagnostics
         }
 
         template <typename Archive, typename Snapshot>
-        void visit(Archive& archive, Snapshot& value)
+        void visit(Archive& archive, Snapshot& value, std::uint32_t version)
         {
             fields(archive, value.backend, value.enabled, value.pipelineReady, value.width, value.height,
                 value.framesRendered, value.framesIdle, value.framesInFlight, value.consumedFrameId,
@@ -211,21 +211,35 @@ namespace ce::profiler_viewer::diagnostics
             fields(archive, value.cpuMs, value.gpuMs, value.gpuCollects, value.gpuCollectMismatches,
                 value.gpuQueryOverflowPasses, value.lastGpuFrameId, value.lastGpuSubmissionId,
                 value.lastGpuViewId);
-            const auto provenance = [&](auto& p) {
+            const auto provenance = [&](auto& p)
+            {
                 fields(archive, p.frameKind, p.resolutionState, p.upscaler, p.frameGenerator,
                     p.realFrameId, p.viewId, p.sceneEpoch, p.generatedOrdinal,
                     p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight, p.nativeGateActive,
                     p.publicationFrameId);
-                archive.valid = archive.valid && p.frameKind <= 2 && p.resolutionState <= 3 &&
+                if (version >= 3)
+                {
+                    fields(archive, p.spatialProvenanceAvailable, p.spatialMode, p.deepDvcApplied);
+                }
+                archive.valid = archive.valid && p.frameKind <= 2 &&
+                    p.resolutionState <= (version >= 3 ? 4 : 3) &&
                     p.upscaler <= 3 && p.frameGenerator <= 3 &&
                     (p.frameKind == 0 || (p.realFrameId != 0 && p.resolutionState != 0 &&
                         p.renderWidth != 0 && p.renderHeight != 0 &&
                         p.displayWidth != 0 && p.displayHeight != 0)) &&
                     (p.frameKind != 1 || p.generatedOrdinal == 0) &&
-                    (p.frameKind != 2 || (p.generatedOrdinal != 0 && p.frameGenerator != 0));
+                    (p.frameKind != 2 || (p.generatedOrdinal != 0 && p.frameGenerator != 0)) &&
+                    p.spatialMode <= 2 &&
+                    (p.spatialProvenanceAvailable || (p.spatialMode == 0 && !p.deepDvcApplied)) &&
+                    (p.resolutionState != 4 || (p.spatialProvenanceAvailable && p.spatialMode == 1 &&
+                        p.upscaler == 0 && p.renderWidth <= p.displayWidth && p.renderHeight <= p.displayHeight)) &&
+                    (p.spatialMode != 1 || p.resolutionState == 4);
             };
-            provenance(value.temporalProvenance);
-            provenance(value.gpuTemporalProvenance);
+            if (version >= 2)
+            {
+                provenance(value.temporalProvenance);
+                provenance(value.gpuTemporalProvenance);
+            }
             archive.text(value.lastGpuCollectError, maximum_rendering_text_bytes);
             archive.field(value.graveyardCount);
             archive.text(value.lastError, maximum_rendering_text_bytes);
@@ -259,7 +273,7 @@ namespace ce::profiler_viewer::diagnostics
         writer.bytes.reserve(4096);
         writer.field(rendering_codec::magic);
         writer.field(rendering_schema_version);
-        rendering_codec::visit(writer, snapshot);
+        rendering_codec::visit(writer, snapshot, rendering_schema_version);
         if (!writer.valid)
         {
             return {};
@@ -278,12 +292,12 @@ namespace ce::profiler_viewer::diagnostics
         std::uint32_t version{};
         reader.field(magic);
         reader.field(version);
-        if (!reader.valid || magic != rendering_codec::magic || version != rendering_schema_version)
+        if (!reader.valid || magic != rendering_codec::magic || version == 0 || version > rendering_schema_version)
         {
             return false;
         }
         rendering_snapshot candidate;
-        rendering_codec::visit(reader, candidate);
+        rendering_codec::visit(reader, candidate, version);
         if (!reader.valid || reader.position != bytes.size())
         {
             return false;

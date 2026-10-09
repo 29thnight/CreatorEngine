@@ -2242,11 +2242,14 @@ namespace ConsoleCmd
 
     void RegisterCoreCommands(Registrar& reg)
     {
+        reg.Result({ "temporal.deepdvc" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.fallback" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.fg" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.latency" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.metadata" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.motion" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.nis" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.reflex" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.reset" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.runtime" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "temporal.status" }, &Cmd_temporal, SceneAccess::OwnedState);

@@ -29,6 +29,19 @@ int main()
     mutation.resolutionState = TemporalResolutionState::Reconstructed;
     mutation.renderExtent = {1280, 720};
     assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    mutation = frame;
+    mutation.spatialMode = SpatialScalingMode::NisScale;
+    mutation.resolutionState = TemporalResolutionState::SpatialScaled;
+    mutation.renderExtent = {1280, 720};
+    assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    mutation = frame;
+    mutation.spatialMode = SpatialScalingMode::NisSharpen;
+    assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    mutation = frame;
+    mutation.deepDvcApplied = true;
+    assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    mutation.spatialMode = SpatialScalingMode::NisSharpen;
+    assert(mutation.IsValid() && !mutation.IsGoldenEligible());
 
     auto& runtime = TemporalRuntimeControl::Get();
     const auto saved = runtime.Snapshot().requestedSettings;
@@ -36,6 +49,8 @@ int main()
     intent.enabled = true;
     intent.requestedUpscaler = TemporalProvider::Fsr;
     intent.requestedFrameGenerator = TemporalProvider::Dlss;
+    intent.spatialPost.nisMode = SpatialScalingMode::NisSharpen;
+    intent.spatialPost.deepDvcEnabled = true;
     runtime.Request(intent);
     const auto before = runtime.Snapshot();
     {
@@ -44,6 +59,8 @@ int main()
         assert(effective.nativeCaptureExclusionActive && !effective.settings.enabled);
         assert(effective.settings.requestedUpscaler == TemporalProvider::None);
         assert(effective.settings.requestedFrameGenerator == TemporalProvider::None);
+        assert(effective.settings.spatialPost.nisMode == SpatialScalingMode::Off);
+        assert(!effective.settings.spatialPost.deepDvcEnabled);
         assert(effective.requestedSettings == intent);
         assert(effective.historyResetGeneration > before.historyResetGeneration);
         {

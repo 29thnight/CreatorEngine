@@ -3,6 +3,7 @@
 #include "../../Render/Temporal/TemporalReconstruction.h"
 #include "../../Render/Temporal/ITemporalUpscaler.h"
 #include "../../Render/Temporal/ITemporalFrameGenerator.h"
+#include "../../Render/Temporal/SpatialPostEffects.h"
 
 #include <functional>
 #include <memory>
@@ -25,6 +26,9 @@ struct DlssInitialization
     std::string projectId; // Project GUID; required with engineVersion if applicationId is zero.
     bool loadUpscaling{ true };
     bool loadFrameGeneration{ false };
+    bool loadReflex{ false };
+    bool loadNis{ false };
+    bool loadDeepDvc{ false };
 };
 
 struct DlssDX12Texture
@@ -41,6 +45,13 @@ struct DlssUpscaleResources
     DlssDX12Texture motionVectors;
     DlssDX12Texture exposure; // Optional 1x1; absent means SDK auto-exposure.
     DlssDX12Texture output;
+};
+
+struct DlssSpatialResources
+{
+    ID3D12GraphicsCommandList* commandList{ nullptr };
+    DlssDX12Texture color; // NIS only, persistent SDR input at the declared extent.
+    DlssDX12Texture output; // Persistent final-resolution SDR UAV; DVC is in-place.
 };
 
 struct DlssFrameGenerationResources
@@ -97,6 +108,11 @@ public:
     bool IsBoundToDX12Device(ID3D12Device* nativeDevice) const;
     bool MatchesRuntimeConfiguration(const std::wstring& directory, const std::string& projectId) const;
     TemporalCapabilities QueryCapabilities();
+    SpatialPostSnapshot QuerySpatialPostCapabilities() const;
+    TemporalLatencyState QueryLatencyState() const;
+    // Serialized with other SDK options; preserves intent while DLSS FG owns
+    // its minimum On requirement. Off restores as soon as FG is disabled.
+    TemporalResult SetLatencyMode(TemporalLatencyMode mode);
 
     // Immediately after native creation, upgrade DEVICE and FACTORY, then use
     // the proxy device for CreateCommandQueue and the proxy factory for all
@@ -123,6 +139,12 @@ public:
     TemporalResult SetFrameConstants(uint32_t viewportId, const TemporalFrame& frame);
     TemporalResult DispatchUpscaling(uint32_t viewportId, uint64_t realFrameId,
         TemporalQuality quality, const DlssUpscaleResources& resources);
+    TemporalResult DispatchNis(uint32_t viewportId, uint64_t realFrameId,
+        SpatialScalingMode mode, float sharpness, TemporalExtent inputExtent,
+        TemporalExtent outputExtent, const DlssSpatialResources& resources);
+    TemporalResult DispatchDeepDvc(uint32_t viewportId, uint64_t realFrameId,
+        const SpatialPostSettings& settings, TemporalExtent outputExtent,
+        bool toneMappedSdr, const DlssSpatialResources& resources);
 
     // PRESENT thread only. Disable before pause/loading/resize/fullscreen and
     // shutdown. Turning FG off does not recreate the proxy swapchain; the shell
@@ -151,6 +173,7 @@ public:
     // free; continuing with a new frame ID alone cannot recover damaged history.
     TemporalResult FreeViewportAfterGpuIdle(uint32_t viewportId);
     TemporalResult FreeUpscalingAfterGpuIdle(uint32_t viewportId);
+    TemporalResult FreeSpatialPostAfterGpuIdle(uint32_t viewportId);
     TemporalResult FreeFrameGenerationAfterGpuIdle(uint32_t viewportId);
     // Bounded serial baseline: release the previous frame owner only after the
     // caller's final-consumption drain, before preparing the next FG input set.

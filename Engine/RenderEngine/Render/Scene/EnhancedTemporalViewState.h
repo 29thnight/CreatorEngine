@@ -2,6 +2,7 @@
 #include "../../MaterialGraphSceneInput.h"
 #include "../Temporal/TemporalUpscalerHost.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
+#include "../Temporal/SpatialPostEffectsHost.h"
 #include <algorithm>
 #include <bit>
 #include <map>
@@ -12,6 +13,7 @@
 struct EnhancedTemporalViewState
 {
     TemporalUpscalerHost upscaler;
+    SpatialPostEffectsHost spatialPost;
     TemporalFrame frame;
     TemporalMeasurementProvenance provenance;
     FrameCameraSnapshot rasterCamera;
@@ -31,6 +33,8 @@ struct EnhancedTemporalViewState
     float previousSeconds{}, pendingSeconds{}, previousJitterX{}, previousJitterY{};
     TemporalExtent previousRender, previousDisplay;
     TemporalQuality quality{ TemporalQuality::Quality };
+    TemporalRuntimeSettings reconstructionSettings;
+    TemporalProvider previousProvider{ TemporalProvider::None };
     // One writer per callback, read only after the graph's recording joins.
     // These observations never choose whether another callback records FXAA.
     bool temporalAaApplied{ false }, fxaaRequested{ true }, fxaaApplied{ false };
@@ -38,7 +42,7 @@ struct EnhancedTemporalViewState
     TemporalResult Begin(IRHIDeviceResources& resources, TemporalBackend backend,
         const TemporalRuntimeSnapshot& control, const FrameCameraSnapshot& camera,
         uint64_t realFrame, uint64_t logicalView, uint64_t scene, uint64_t history,
-        TemporalExtent display, float deltaSeconds, float totalSeconds, bool nativeOnly)
+        TemporalExtent display, float deltaSeconds, float totalSeconds, bool nativeOnly, bool toneMappedSdr)
     {
         auto settings = control.settings;
         if (nativeOnly)
@@ -49,17 +53,29 @@ struct EnhancedTemporalViewState
         temporalAaApplied = fxaaApplied = false;
         const auto configured = upscaler.Configure(resources, backend, settings,
             control.requestedGeneration, display, false, camera.isOrthographic);
-        const auto render = upscaler.RenderExtent();
+        if (!configured.IsSuccess())
+        {
+            return configured;
+        }
+        const auto spatialConfigured = spatialPost.Configure(resources, backend, settings,
+            control.requestedGeneration, display, upscaler.Provider() != TemporalProvider::None, toneMappedSdr, nativeOnly);
+        if (!spatialConfigured.IsSuccess())
+        {
+            return spatialConfigured;
+        }
+        const auto render = spatialPost.RenderExtent(upscaler.RenderExtent());
         if (!render.IsValid()) return {TemporalStatus::InvalidInput};
         const bool reset = !submittedFrame || realFrame <= submittedFrame ||
             viewId != logicalView || sceneEpoch != scene || revision != history ||
             previousRender != render || previousDisplay != display ||
-            settingsGeneration != control.requestedGeneration || resetGeneration != control.historyResetGeneration;
+            !SameTemporalReconstructionSettings(reconstructionSettings, settings) ||
+            previousProvider != upscaler.Provider() || resetGeneration != control.historyResetGeneration;
         // Keep the reset pending through deferred preparation or an aborted
         // recording. Only Commit establishes a valid previous-frame history.
         if (reset) { submittedFrame = 0; previousInput.reset(); previousDecals.clear(); previousSprites.clear(); jitterIndex = 0; }
         viewId = logicalView; sceneEpoch = scene; revision = history;
         settingsGeneration = control.requestedGeneration; resetGeneration = control.historyResetGeneration;
+        reconstructionSettings = settings;
         pendingSeconds = totalSeconds;
         frame = {};
         frame.realFrameId = realFrame; frame.historyRevision = history + control.historyResetGeneration;
@@ -109,7 +125,8 @@ struct EnhancedTemporalViewState
         provenance.upscaler = upscaler.Provider();
         provenance.frameGenerator = TemporalProvider::None; // renderer never generates frames
         provenance.nativeGateActive = control.nativeCaptureExclusionActive;
-        provenance.resolutionState = upscaler.Provider() != TemporalProvider::None ? TemporalResolutionState::Reconstructed :
+        provenance.resolutionState = spatialPost.Scales() ? TemporalResolutionState::SpatialScaled :
+            upscaler.Provider() != TemporalProvider::None ? TemporalResolutionState::Reconstructed :
             settings.requestedUpscaler != TemporalProvider::None ? TemporalResolutionState::NativeFallback : TemporalResolutionState::Native;
         return configured;
     }
@@ -119,6 +136,10 @@ struct EnhancedTemporalViewState
         previousViewProjection = std::bit_cast<math::matrix4x4>(frame.camera.viewMatrix) *
             std::bit_cast<math::matrix4x4>(frame.camera.projectionMatrix);
         previousRender = frame.renderExtent; previousDisplay = frame.displayExtent;
+        previousProvider = upscaler.Provider();
+        const auto spatial = spatialPost.Snapshot();
+        provenance.spatialMode = spatial.activeNisMode;
+        provenance.deepDvcApplied = spatial.deepDvcApplied;
         submittedFrame = frame.realFrameId; previousSeconds = pendingSeconds;
         previousJitterX = frame.jitterX; previousJitterY = frame.jitterY;
         previousDecals = std::move(pendingDecals); previousSprites = std::move(pendingSprites); ++jitterIndex;
@@ -140,6 +161,7 @@ struct EnhancedTemporalViewState
         snapshot.aaObserved = true;
         snapshot.temporalAaApplied = temporalAaApplied;
         snapshot.fxaaRequested = fxaaRequested; snapshot.fxaaApplied = fxaaApplied;
+        snapshot.spatialPost = spatialPost.Snapshot();
         for (const auto& capability : upscaler.Capabilities())
         {
             auto found = std::find_if(snapshot.capabilities.begin(), snapshot.capabilities.end(),

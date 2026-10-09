@@ -38,10 +38,13 @@ struct TemporalDX12::State
     std::condition_variable wake;
     bool stopped{false}, failed{false}, prepared{false}, readState{false};
     bool suspended{false}, renderSubmitEnded{false}, presentationReady{false}, pendingRecovery{false};
+    bool sleepInProgress{false}, reflexSleepSupported{false}, reflexMarkersSupported{false};
+    bool reflexFaulted{false}, reflexConflict{false};
     HWND window{nullptr};
     bool sdkPresented{false}, sdkConsumed{false}, markerFailure{false}, recordingSubmitted{false};
     uint64_t generation{UINT64_MAX}, latencyFrame{0}, lastPresented{0};
     uint64_t reportedDisplayFrames{0};
+    uint64_t openedRealFrame{0};
     TemporalProvider selected{TemporalProvider::None};
     TemporalFrameGenerationConfig configuration;
     TemporalRuntimeSettings settings;
@@ -66,6 +69,39 @@ struct TemporalDX12::State
         std::array<RHITextureHandle, 4> handles{};
     };
     std::shared_ptr<Pins> pins;
+
+    bool UsesDlssToken() const
+    {
+        return dlss && (selected == TemporalProvider::Dlss || reflexSleepSupported || reflexMarkersSupported);
+    }
+
+    void PublishLatency(TemporalResult result)
+    {
+        auto reflex = dlss ? dlss->QueryLatencyState() : TemporalLatencyState{};
+        if (!dlss)
+        {
+#if CREATOR_ENABLE_DLSS_STREAMLINE
+            const auto bootstrap = resources.GetTemporalBootstrapResult();
+            const auto unavailable = !bootstrap.IsSuccess() && bootstrap.status != TemporalStatus::NotQueried
+                ? bootstrap : TemporalResult{TemporalStatus::IntegrationRequired};
+#else
+            const TemporalResult unavailable{TemporalStatus::SdkNotBuilt};
+#endif
+            reflex.support = reflex.sleepSupport = reflex.markerSupport = reflex.optionsResult = unavailable;
+        }
+        reflex.requestedMode = settings.reflexMode;
+        if (reflexConflict || reflexFaulted)
+        {
+            reflex.optionsResult = {TemporalStatus::IntegrationRequired};
+        }
+        TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+        {
+            snapshot.reflex = reflex;
+            snapshot.latencyProvider = UsesDlssToken() ? "reflex" : xess ? "xell" :
+                antiLagActive ? "anti-lag-2" : "";
+            snapshot.latencyResult = result;
+        });
+    }
 
     IDXGISwapChain3* Proxy() const
     {
@@ -172,9 +208,9 @@ struct TemporalDX12::State
 
     bool CancelUnusedToken()
     {
-        if (!latencyFrame || pins || prepared) return false;
+        if (!latencyFrame || pins || prepared || sleepInProgress) { return false; }
         TemporalResult result{TemporalStatus::Success};
-        if (selected == TemporalProvider::Dlss && dlss) result = dlss->DiscardRealFrame(latencyFrame);
+        if (UsesDlssToken()) { result = dlss->DiscardRealFrame(latencyFrame); }
         if (xess) result = xess->DiscardRealFrame(latencyFrame);
         if (!result.IsSuccess()) return false;
         latencyFrame = 0;
@@ -185,16 +221,16 @@ struct TemporalDX12::State
     bool Mark(uint64_t frameId, RHITemporalLatencyMarker marker)
     {
         if (!latencyFrame || frameId != latencyFrame) return false;
+        TemporalResult result{TemporalStatus::Success};
         if (selected == TemporalProvider::Fsr && antiLagActive && marker == RHITemporalLatencyMarker::RenderSubmitEnd)
         {
-            const auto result = antiLag.EndRendering();
+            result = antiLag.EndRendering();
             TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot) { snapshot.latencyResult = result; });
             // Optional latency support cannot turn an otherwise valid FG frame
             // into a fabricated marker success or a fatal presentation failure.
             if (!result.IsSuccess()) antiLagActive = false;
         }
-        TemporalResult result{TemporalStatus::Success};
-        if (selected == TemporalProvider::Dlss && dlss)
+        if (reflexMarkersSupported)
         {
             DlssLatencyMarker native;
             switch (marker)
@@ -222,9 +258,8 @@ struct TemporalDX12::State
             }
             result = xess->Mark(frameId, native);
         }
-        markerFailure |= !result.IsSuccess();
-        if (!result.IsSuccess()) TemporalRuntimeControl::Get().PublishPlayer(
-            [&](auto& snapshot) { snapshot.latencyResult = result; });
+        markerFailure |= !result.IsSuccess() && (selected == TemporalProvider::Dlss || xess);
+        PublishLatency(result);
         if (marker == RHITemporalLatencyMarker::RenderSubmitEnd)
         {
             renderSubmitEnded = true;
@@ -241,6 +276,11 @@ TemporalDX12::~TemporalDX12()
     if (!Shutdown(error)) (void)m_state.release(); // GPU/SDK work must never outlive its code/pins.
 }
 bool TemporalDX12::HasProxy() const { return m_state->Proxy() != nullptr; }
+bool TemporalDX12::RequiresLatencyMarkers() const
+{
+    std::lock_guard lock(m_state->mutex);
+    return m_state->reflexMarkersSupported || m_state->xess;
+}
 void TemporalDX12::CommitConfiguration()
 {
     std::lock_guard lock(m_state->mutex);
@@ -260,11 +300,36 @@ ID3D12Resource* TemporalDX12::GetSdkComposedRealFrameColor() const
         !m_state->pins->packet.nativeGateActive ? m_state->pins->textures[0].Get() : nullptr;
 }
 
-bool TemporalDX12::RequiresReconfigure() const
+bool TemporalDX12::RequiresReconfigure()
 {
-    std::lock_guard lock(m_state->mutex);
-    return !m_state->latencyFrame && (m_state->pendingRecovery ||
-        TemporalRuntimeControl::Get().Snapshot().requestedGeneration != m_state->generation);
+    auto& state = *m_state;
+    std::lock_guard lock(state.mutex);
+    if (state.latencyFrame || state.sleepInProgress) { return false; }
+    const auto snapshot = TemporalRuntimeControl::Get().Snapshot();
+    if (state.pendingRecovery) { return true; }
+    if (snapshot.requestedGeneration == state.generation) { return false; }
+    const auto& settings = snapshot.settings;
+    const auto requested = settings.enabled ? settings.requestedFrameGenerator : TemporalProvider::None;
+    const auto previous = state.settings.enabled ? state.settings.requestedFrameGenerator : TemporalProvider::None;
+    if (requested != previous || settings.interpolatedFrameCount != state.settings.interpolatedFrameCount ||
+        settings.runtimeDirectory != state.settings.runtimeDirectory || settings.dlssProjectId != state.settings.dlssProjectId)
+    {
+        return true;
+    }
+    // Options-only changes are serialized between real-frame tokens. They do
+    // not rebuild the proxy, wait for GPU idle, or invalidate temporal history.
+    state.settings = settings;
+    state.generation = snapshot.requestedGeneration;
+    const auto mode = state.reflexConflict || state.reflexFaulted ? TemporalLatencyMode::Off : settings.reflexMode;
+    const auto result = state.dlss ? state.dlss->SetLatencyMode(mode) :
+        TemporalResult{TemporalStatus::IntegrationRequired};
+    state.PublishLatency(result);
+    TemporalRuntimeControl::Get().PublishPlayer([&](auto& observed)
+    {
+        observed.playerObservedGeneration = state.generation;
+    });
+    state.wake.notify_all();
+    return false;
 }
 
 bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::string& error)
@@ -272,7 +337,7 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     auto& state = *m_state;
     std::lock_guard lock(state.mutex);
     const auto snapshot = TemporalRuntimeControl::Get().Snapshot();
-    if (state.generator || state.Proxy() || state.pins || state.latencyFrame)
+    if (state.generator || state.Proxy() || state.pins || state.latencyFrame || state.sleepInProgress)
     {
         error = "Temporal proxy configuration requires fully drained, released presentation ownership";
         return false;
@@ -280,6 +345,7 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     if (state.generation != snapshot.requestedGeneration)
     {
         state.failedProviders = {};
+        state.reflexFaulted = false;
         state.failureReason.clear();
     }
     state.window = window;
@@ -294,8 +360,30 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     state.stopped = state.failed = state.markerFailure = false;
     state.presentationReady = false;
     state.pendingRecovery = false;
+    state.openedRealFrame = 0;
+    state.reflexSleepSupported = state.reflexMarkersSupported = state.reflexConflict = false;
     state.capabilities.clear();
     state.dlss = state.resources.GetTemporalDlssSession();
+    if (state.dlss && !state.dlss->IsBoundToDX12Device(state.resources.GetDevice()))
+    {
+        // Never send timing or tokens to a renderer on another D3D device.
+        state.dlss.reset();
+    }
+    if (state.dlss)
+    {
+        const bool matches = state.dlss->MatchesRuntimeConfiguration(
+            state.settings.runtimeDirectory, state.settings.dlssProjectId);
+        state.dlss->SetLatencyMode(matches && !state.reflexFaulted
+            ? state.settings.reflexMode : TemporalLatencyMode::Off);
+        const auto latency = state.dlss->QueryLatencyState();
+        state.reflexSleepSupported = latency.sleepSupport.IsSuccess() && !state.reflexFaulted;
+        state.reflexMarkersSupported = latency.markerSupport.IsSuccess() && !state.reflexFaulted;
+        if (!matches)
+        {
+            state.reflexConflict = true;
+            state.failureReason = "Streamline runtime configuration changes require a fresh Player session";
+        }
+    }
 
     auto fsr = QueryFsrBuildAvailability(TemporalBackend::DX12);
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
@@ -340,6 +428,28 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
         TemporalBackend::DX12, state.capabilities);
     state.selected = selection.frameGenerator;
     state.requestedResult = selection.requestedFrameGenerator;
+    if (requested == TemporalProvider::XeSS && state.UsesDlssToken())
+    {
+        // The already-loaded Reflex plugin must keep receiving Sleep calls.
+        // A fresh process can omit it when XeSS FG requests the XeLL pacer;
+        // this live combination has no validated single-owner pacing route.
+        state.selected = TemporalProvider::None;
+        state.requestedResult = {TemporalStatus::IntegrationRequired};
+        state.reflexConflict = true;
+        state.dlss->SetLatencyMode(TemporalLatencyMode::Off);
+        state.failureReason = "XeSS FG and a loaded Reflex timing runtime require a fresh Player session; no alternate FG selected";
+    }
+    else if (requested == TemporalProvider::XeSS && state.settings.reflexMode != TemporalLatencyMode::Off)
+    {
+        state.reflexConflict = true;
+        state.failureReason = "XeSS FG owns XeLL pacing; independent Reflex is unavailable for this combination";
+    }
+    if (state.UsesDlssToken())
+    {
+        state.dlss->SetPlayerFrameTokenOwnership(true);
+    }
+    state.PublishLatency(state.dlss ? state.dlss->QueryLatencyState().optionsResult :
+        TemporalResult{TemporalStatus::NotQueried});
     TemporalRuntimeControl::Get().PublishPlayer([](auto& snapshot)
     {
         snapshot.generatedRealFrameId = 0;
@@ -347,7 +457,7 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     });
     if (state.selected == TemporalProvider::None)
     {
-        state.Publish(selection.requestedFrameGenerator, "Player real-frame fallback; no eligible SDK proxy");
+        state.Publish(state.requestedResult, "Player real-frame fallback; no eligible SDK proxy");
         return true;
     }
     DXGI_SWAP_CHAIN_DESC1 description{};
@@ -391,15 +501,18 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
             {
                 state.fsr = generator.get();
                 state.generator = std::move(generator);
-                auto latency = state.resources.HasTemporalSharedDevice() ?
+                auto latency = state.resources.HasTemporalSharedDevice() && !state.reflexSleepSupported ?
                     state.antiLag.Initialize(state.resources.GetDevice()) : TemporalResult{TemporalStatus::IntegrationRequired};
                 if (latency.IsSuccess()) latency = state.antiLag.BindFsrSwapchain(state.fsr->GetSwapchain());
                 state.antiLagActive = latency.IsSuccess();
-                TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+                if (!state.reflexSleepSupported)
                 {
-                    snapshot.latencyProvider = "anti-lag-2";
-                    snapshot.latencyResult = latency;
-                });
+                    TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+                    {
+                        snapshot.latencyProvider = "anti-lag-2";
+                        snapshot.latencyResult = latency;
+                    });
+                }
             }
             return result;
         }
@@ -505,7 +618,7 @@ bool TemporalDX12::BeginSimulationFrame(uint64_t realFrameId, std::string& error
         error = "Player temporal admission is stopped after a lifecycle failure";
         return false;
     }
-    if (!state.Proxy() || (state.selected == TemporalProvider::Fsr && !state.antiLagActive)) return true;
+    if (!state.UsesDlssToken() && !state.xess && !state.antiLagActive) { return true; }
     // The serial SDK API has one pending latency-token set. A dropped/latest-wins
     // packet may not be relabeled as another frame. Timeout fails closed instead
     // of inventing simulation markers on PT or silently releasing live input.
@@ -516,27 +629,52 @@ bool TemporalDX12::BeginSimulationFrame(uint64_t realFrameId, std::string& error
         return false;
     }
     TemporalResult result{TemporalStatus::Success};
-    if (state.selected == TemporalProvider::Dlss)
+    if (state.UsesDlssToken())
     {
         result = state.dlss->EnsureRealFrame(realFrameId);
-        if (result.IsSuccess()) result = state.dlss->Sleep(realFrameId);
     }
-    else if (state.xess) result = state.xess->Sleep(realFrameId);
-    else if (state.antiLagActive) result = state.antiLag.BeforeInput();
-    TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+    state.latencyFrame = realFrameId;
+    state.sleepInProgress = true;
+    // Pin the SDK owner but release the existing Player mutex while sleeping.
+    // PT/RT must be able to finish prior work; teardown rejects this in-flight
+    // admission and adapter retirement rejects a token whose sleep is running.
+    const auto dlssOwner = state.dlss;
+    auto* xessOwner = state.xess;
+    const bool reflexSleep = state.reflexSleepSupported;
+    const bool antiLagSleep = state.antiLagActive && !reflexSleep && !xessOwner;
+    lock.unlock();
+    if (result.IsSuccess())
     {
-        snapshot.latencyProvider = state.selected == TemporalProvider::Dlss ? "reflex" :
-            state.selected == TemporalProvider::XeSS ? "xell" : "anti-lag-2";
-        snapshot.latencyResult = result;
-    });
-    if (state.selected == TemporalProvider::Fsr && !result.IsSuccess())
+        if (reflexSleep) { result = dlssOwner->Sleep(realFrameId); }
+        else if (xessOwner) { result = xessOwner->Sleep(realFrameId); }
+        else if (antiLagSleep) { result = state.antiLag.BeforeInput(); }
+    }
+    lock.lock();
+    state.sleepInProgress = false;
+    state.wake.notify_all();
+    state.PublishLatency(result);
+    if (state.selected != TemporalProvider::Dlss && !state.xess && !result.IsSuccess())
     {
-        state.antiLagActive = false;
-        return true; // Keep the independently supported FG path, with explicit latency failure.
+        if (state.UsesDlssToken())
+        {
+            // The same simulation may still use SR/NIS/DeepDVC on RT. Keep
+            // its allocated token available to EnsureRealFrame(realFrameId);
+            // render-only ownership retires it at the next frame or shutdown.
+            // Discarding here would make this otherwise valid ID unreusable.
+            state.dlss->SetLatencyMode(TemporalLatencyMode::Off);
+            state.dlss->SetPlayerFrameTokenOwnership(false);
+            state.reflexFaulted = true;
+            state.reflexSleepSupported = state.reflexMarkersSupported = false;
+        }
+        if (antiLagSleep) { state.antiLagActive = false; }
+        state.latencyFrame = 0;
+        state.PublishLatency(result);
+        state.wake.notify_all();
+        return true; // Optional timing failure cannot take away native/FSR rendering.
     }
     const auto recoverLatency = [&](TemporalResult failure, const char* operation)
     {
-        if (state.selected == TemporalProvider::Dlss && state.dlss)
+        if (state.UsesDlssToken())
         {
             const auto discarded = state.dlss->DiscardRealFrame(realFrameId);
             if (!discarded.IsSuccess()) return Report(discarded, "Unretired failed latency token", error);
@@ -557,14 +695,17 @@ bool TemporalDX12::BeginSimulationFrame(uint64_t realFrameId, std::string& error
         return false;
     };
     if (!result.IsSuccess()) return recoverLatency(result, "Temporal frame-start sleep/token");
-    state.latencyFrame = realFrameId;
     state.renderSubmitEnded = false;
     state.markerFailure = false;
-    if (!state.Mark(realFrameId, RHITemporalLatencyMarker::SimulationStart))
+    const bool marked = state.Mark(realFrameId, RHITemporalLatencyMarker::SimulationStart);
+    if (!marked && (state.selected == TemporalProvider::Dlss || state.xess))
     {
         return recoverLatency({TemporalStatus::SdkFailure}, "Temporal simulation-start marker failed");
     }
-    TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot) { snapshot.latencyMarkerRealFrameId = realFrameId; });
+    if (marked)
+    {
+        TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot) { snapshot.latencyMarkerRealFrameId = realFrameId; });
+    }
     return true;
 }
 void TemporalDX12::Mark(uint64_t realFrameId, RHITemporalLatencyMarker marker)
@@ -573,13 +714,72 @@ void TemporalDX12::Mark(uint64_t realFrameId, RHITemporalLatencyMarker marker)
     std::lock_guard lock(state.mutex);
     if (state.latencyFrame == realFrameId) state.Mark(realFrameId, marker);
 }
+
+void TemporalDX12::OpenRealFrame(uint64_t realFrameId)
+{
+    std::lock_guard lock(m_state->mutex);
+    m_state->openedRealFrame = realFrameId;
+}
+
+bool TemporalDX12::PresentRealFrame(std::string& error)
+{
+    auto& state = *m_state;
+    std::unique_lock lock(state.mutex);
+    if (state.Proxy())
+    {
+        error = "Native presentation cannot bypass an active frame-generation proxy";
+        return false;
+    }
+    const uint64_t frameId = state.openedRealFrame;
+    state.openedRealFrame = 0;
+    const bool token = state.UsesDlssToken() && frameId != 0 && frameId == state.latencyFrame &&
+        state.renderSubmitEnded && !state.sleepInProgress;
+    if (!token)
+    {
+        lock.unlock();
+        return state.resources.Present(error);
+    }
+    TemporalResult marker{TemporalStatus::Success};
+    if (token && state.reflexMarkersSupported)
+    {
+        marker = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentStart);
+    }
+    // A stale/native placeholder image may still be presented; never label it
+    // with the current GT token or retire a newer simulation's admission.
+    const bool presented = state.resources.Present(error);
+    if (token)
+    {
+        if (state.reflexMarkersSupported)
+        {
+            const auto ended = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentEnd);
+            if (marker.IsSuccess()) { marker = ended; }
+        }
+        const auto retired = state.dlss->EndRealFrame(frameId);
+        if (!retired.IsSuccess())
+        {
+            state.failed = true;
+            state.PublishLatency(retired);
+            state.wake.notify_all();
+            return Report(retired, "Native Reflex token retirement", error);
+        }
+        state.latencyFrame = 0;
+        state.lastPresented = frameId;
+        state.PublishLatency(marker);
+        TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
+        {
+            snapshot.cpuPresentReturnedFrameId = frameId;
+        });
+        state.wake.notify_all();
+    }
+    return presented;
+}
 void TemporalDX12::Discard(uint64_t frameId)
 {
     auto& state = *m_state;
     std::lock_guard lock(state.mutex);
-    if (!frameId || state.latencyFrame != frameId || state.pins || state.prepared) return;
+    if (!frameId || state.latencyFrame != frameId || state.pins || state.prepared || state.sleepInProgress) { return; }
     TemporalResult discarded{TemporalStatus::Success};
-    if (state.selected == TemporalProvider::Dlss && state.dlss) discarded = state.dlss->DiscardRealFrame(frameId);
+    if (state.UsesDlssToken()) { discarded = state.dlss->DiscardRealFrame(frameId); }
     if (state.xess) discarded = state.xess->DiscardRealFrame(frameId);
     if (!discarded.IsSuccess()) { state.failed = true; state.Publish(discarded, "Temporal token discard refused"); }
     else state.latencyFrame = 0;
@@ -590,7 +790,11 @@ bool TemporalDX12::SuspendProxy(std::string& error)
     auto& state = *m_state;
     std::lock_guard lock(state.mutex);
     state.suspended = true;
-    if (!state.Proxy()) return true;
+    if (!state.Proxy())
+    {
+        if (state.renderSubmitEnded) { state.CancelUnusedToken(); }
+        return true;
+    }
     if (state.pins || state.prepared)
     {
         error = "Cannot suspend an SDK proxy with unfinished temporal inputs";
@@ -620,7 +824,8 @@ bool TemporalDX12::Open(const RHITemporalDisplayPacket& packet, std::string& err
     std::lock_guard lock(state.mutex);
     if (!state.Proxy()) return true;
     if (packet.frame.realFrameId <= state.lastPresented ||
-        (state.selected != TemporalProvider::Fsr && packet.frame.realFrameId != state.latencyFrame)) return true;
+        ((state.selected != TemporalProvider::Fsr || state.UsesDlssToken()) &&
+            packet.frame.realFrameId != state.latencyFrame)) { return true; }
     if (!packet.valid || !packet.consumerLease || !packet.lifetimeToken || state.pins ||
         packet.frame.displayExtent != state.configuration.displayExtent ||
         !ValidateTemporalFrame(packet.frame).IsSuccess())
@@ -727,21 +932,32 @@ bool TemporalDX12::Present(std::string& error)
     if (!state.resources.WaitForLastFrameSubmission(error)) return false;
     const auto frameId = state.pins->packet.frame.realFrameId;
     TemporalResult result{TemporalStatus::NotInitialized};
+    TemporalResult latency{TemporalStatus::Success};
+    if (state.reflexMarkersSupported)
+    {
+        latency = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentStart);
+        if (!latency.IsSuccess() && state.selected == TemporalProvider::Dlss)
+        {
+            state.PublishLatency(latency);
+            return Report(latency, "DLSS Present-start marker", error);
+        }
+    }
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
     if (state.fsr) result = state.pins->packet.nativeGateActive ? state.fsr->PresentRealFrame(1, 0) : state.fsr->Present(1, 0);
 #endif
     if (state.xess) result = state.xess->Present(frameId, 1, 0);
     if (state.selected == TemporalProvider::Dlss)
     {
-        result = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentStart);
-        if (result.IsSuccess())
-        {
-            const HRESULT native = state.dlssSwapchain->Present(0, 0);
-            state.sdkPresented = true; // Even a failing call may have submitted SDK work.
-            result = {SUCCEEDED(native) ? TemporalStatus::Success : TemporalStatus::SdkFailure, native};
-            const auto ended = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentEnd);
-            if (result.IsSuccess()) result = ended;
-        }
+        const HRESULT native = state.dlssSwapchain->Present(0, 0);
+        state.sdkPresented = true; // Even a failing call may have submitted SDK work.
+        result = {SUCCEEDED(native) ? TemporalStatus::Success : TemporalStatus::SdkFailure, native};
+    }
+    if (state.reflexMarkersSupported)
+    {
+        const auto ended = state.dlss->MarkLatency(frameId, DlssLatencyMarker::PresentEnd);
+        if (latency.IsSuccess()) { latency = ended; }
+        if (result.IsSuccess() && state.selected == TemporalProvider::Dlss) { result = latency; }
+        state.PublishLatency(latency);
     }
     state.sdkPresented = true;
     state.Publish(result);
@@ -770,7 +986,10 @@ bool TemporalDX12::Present(std::string& error)
     if (state.selected == TemporalProvider::Dlss)
     {
         if (!state.pins->packet.nativeGateActive && state.reportedDisplayFrames > 1) generated = state.reportedDisplayFrames - 1;
-        if (!Report(state.dlss->EndRealFrame(frameId), "DLSS real-frame retirement", error)) return false;
+    }
+    if (state.UsesDlssToken() && !Report(state.dlss->EndRealFrame(frameId), "Streamline real-frame retirement", error))
+    {
+        return false;
     }
     TemporalRuntimeControl::Get().PublishPlayer([&](auto& snapshot)
     {
@@ -841,9 +1060,14 @@ bool TemporalDX12::Shutdown(std::string& error, bool stopGameLoop)
     if (!m_state) return true;
     auto& state = *m_state;
     std::lock_guard lock(state.mutex);
+    if (state.sleepInProgress)
+    {
+        error = "Temporal shutdown must join the game-loop sleep before releasing SDK ownership";
+        return false;
+    }
     state.presentationReady = false;
     if (stopGameLoop) { state.stopped = true; state.wake.notify_all(); }
-    if (state.selected == TemporalProvider::Dlss && state.dlss && state.latencyFrame && !state.prepared && !state.pins)
+    if (state.UsesDlssToken() && state.latencyFrame && !state.prepared && !state.pins)
     {
         if (!Report(state.dlss->DiscardRealFrame(state.latencyFrame), "DLSS unused token discard", error)) return false;
         state.latencyFrame = 0;
@@ -874,10 +1098,24 @@ bool TemporalDX12::Shutdown(std::string& error, bool stopGameLoop)
         for (const auto handle : state.pins->handles) if (handle.IsValid()) state.resources.ReleaseTexture(handle);
         state.pins.reset();
     }
-    if (state.selected == TemporalProvider::Dlss && state.dlss && state.latencyFrame) state.dlss->EndRealFrame(state.latencyFrame);
+    if (state.UsesDlssToken() && state.latencyFrame)
+    {
+        if (!Report(state.dlss->EndRealFrame(state.latencyFrame), "Retire drained Streamline token", error))
+        {
+            return false;
+        }
+    }
     state.latencyFrame = 0;
     state.dlssSwapchain.Reset();
-    if (state.selected == TemporalProvider::Dlss && state.dlss) state.dlss->SetPlayerFrameTokenOwnership(false);
+    if (state.UsesDlssToken())
+    {
+        state.dlss->SetPlayerFrameTokenOwnership(false);
+        if (stopGameLoop)
+        {
+            state.dlss->SetLatencyMode(TemporalLatencyMode::Off);
+            state.PublishLatency({TemporalStatus::NotInitialized});
+        }
+    }
     state.dlss.reset();
     state.xess = nullptr;
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
@@ -885,6 +1123,8 @@ bool TemporalDX12::Shutdown(std::string& error, bool stopGameLoop)
 #endif
     if (state.finalEvent) { CloseHandle(state.finalEvent); state.finalEvent = nullptr; }
     state.readState = state.prepared = state.sdkPresented = false;
+    state.reflexSleepSupported = state.reflexMarkersSupported = false;
+    state.openedRealFrame = 0;
     state.selected = TemporalProvider::None;
     return true;
 }

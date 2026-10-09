@@ -8,6 +8,7 @@
 #include "PlayerCommands.h"
 
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "Render/Temporal/TemporalRuntimeControl.h"
 #include "PlayerPresentation.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ClrHost.h"
@@ -141,6 +142,9 @@ Player::PlayerMain::~PlayerMain()
 
 void Player::PlayerMain::Initialize()
 {
+    // Register the real GT/input/RT/PT timing owner before either renderer or
+    // presenter can bootstrap Streamline. Editor and fixture hosts stay opt-out.
+    TemporalRuntimeControl::Get().RegisterPlayerLatencyHost();
     if (!SceneManagers->ConfigureSimulationSession(SimulationSessionPolicy::mode::runtime))
         throw std::runtime_error("Player simulation policy must be configured before startup");
 

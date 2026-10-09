@@ -136,6 +136,166 @@ namespace EnhancedRenderDebugUi
 		return postChanged;
 	}
 
+	const char* LiveFeatureStatusLabel(TemporalStatus status)
+	{
+		switch (status)
+		{
+		case TemporalStatus::Success: return "Success";
+		case TemporalStatus::NotQueried: return "Not queried";
+		case TemporalStatus::SdkNotBuilt: return "SDK not built";
+		case TemporalStatus::RuntimeUnavailable: return "Runtime unavailable";
+		case TemporalStatus::SdkVersionMismatch: return "SDK version mismatch";
+		case TemporalStatus::BackendUnsupported: return "Graphics API unsupported";
+		case TemporalStatus::FeatureUnsupported: return "Hardware or feature unsupported";
+		case TemporalStatus::InvalidInput: return "Input missing or invalid";
+		case TemporalStatus::NotInitialized: return "Not initialized";
+		case TemporalStatus::AlreadyInitialized: return "Already initialized";
+		case TemporalStatus::SdkFailure: return "Setup or execution failed";
+		case TemporalStatus::IntegrationRequired: return "Startup integration required";
+		case TemporalStatus::EditorViewportForbidden: return "Editor viewport forbidden";
+		case TemporalStatus::ProjectionUnsupported: return "Projection unsupported";
+		}
+		return "Unknown";
+	}
+
+	const char* SpatialModeLabel(SpatialScalingMode mode)
+	{
+		switch (mode)
+		{
+		case SpatialScalingMode::Off: return "Off";
+		case SpatialScalingMode::NisScale: return "Scale + sharpen";
+		case SpatialScalingMode::NisSharpen: return "Sharpen only";
+		}
+		return "Unknown";
+	}
+
+	const char* ReflexModeLabel(TemporalLatencyMode mode)
+	{
+		switch (mode)
+		{
+		case TemporalLatencyMode::Off: return "Off";
+		case TemporalLatencyMode::On: return "On";
+		case TemporalLatencyMode::OnPlusBoost: return "On + Boost";
+		}
+		return "Unknown";
+	}
+
+	void DrawSpatialAndLatencySettings()
+	{
+		auto& control = TemporalRuntimeControl::Get();
+		const auto snapshot = control.Snapshot();
+		auto settings = snapshot.requestedSettings;
+		bool changed = false;
+		if (ImGui::TreeNodeEx("Spatial scaling / Digital vibrance"))
+		{
+			auto& spatial = settings.spatialPost;
+			int mode = static_cast<int>(spatial.nisMode);
+			constexpr const char* modes[]{ "Off", "NIS scale + sharpen", "NIS sharpen only" };
+			if (ImGui::Combo("NIS mode", &mode, modes, static_cast<int>(std::size(modes))))
+			{
+				spatial.nisMode = static_cast<SpatialScalingMode>(mode);
+				changed = true;
+			}
+			ImGui::BeginDisabled(spatial.nisMode != SpatialScalingMode::NisScale);
+			changed |= ImGui::SliderFloat("NIS render scale", &spatial.nisRenderScale, 0.5f, 1.0f, "%.2f");
+			ImGui::EndDisabled();
+			ImGui::BeginDisabled(spatial.nisMode == SpatialScalingMode::Off);
+			changed |= ImGui::SliderFloat("NIS sharpness", &spatial.nisSharpness, 0.0f, 1.0f, "%.2f");
+			ImGui::EndDisabled();
+			ImGui::TextWrapped("NIS is spatial. A scale request becomes sharpen-only at scale 1.0 or with a selected temporal upscaler, avoiding a second scale.");
+			ImGui::Text("NIS support: %s", LiveFeatureStatusLabel(snapshot.spatialPost.nisCapability.status));
+			ImGui::Text("Last submitted NIS: %s | %s", SpatialModeLabel(snapshot.spatialPost.activeNisMode),
+				LiveFeatureStatusLabel(snapshot.spatialPost.nisResult.status));
+			ImGui::Separator();
+			changed |= ImGui::Checkbox("DeepDVC digital vibrance", &spatial.deepDvcEnabled);
+			ImGui::BeginDisabled(!spatial.deepDvcEnabled);
+			changed |= ImGui::SliderFloat("DeepDVC intensity", &spatial.deepDvcIntensity, 0.0f, 1.0f, "%.2f");
+			changed |= ImGui::SliderFloat("DeepDVC saturation boost", &spatial.deepDvcSaturationBoost, 0.0f, 1.0f, "%.2f");
+			ImGui::EndDisabled();
+			ImGui::TextWrapped("Off by default. DeepDVC processes the final-resolution SDR scene after tone mapping and before UI. HDR is ineligible.");
+			ImGui::Text("DeepDVC support: %s", LiveFeatureStatusLabel(snapshot.spatialPost.deepDvcCapability.status));
+			ImGui::Text("Last submitted DeepDVC: %s | %s", snapshot.spatialPost.deepDvcApplied ? "Dispatch accepted" : "Not applied",
+				LiveFeatureStatusLabel(snapshot.spatialPost.deepDvcResult.status));
+			if (snapshot.spatialPost.observed)
+			{
+				ImGui::TextDisabled("Real frame %llu | input %u x %u / output %u x %u | SDR %s",
+					static_cast<unsigned long long>(snapshot.spatialPost.realFrameId),
+					snapshot.spatialPost.inputExtent.width, snapshot.spatialPost.inputExtent.height,
+					snapshot.spatialPost.outputExtent.width, snapshot.spatialPost.outputExtent.height,
+					snapshot.spatialPost.sdrEligible ? "eligible" : "ineligible");
+				ImGui::TextDisabled("Submitted tuning: NIS scale %.2f / sharpness %.2f | DeepDVC intensity %.2f / saturation %.2f",
+					snapshot.spatialPost.effectiveSettings.nisRenderScale, snapshot.spatialPost.effectiveSettings.nisSharpness,
+					snapshot.spatialPost.effectiveSettings.deepDvcIntensity, snapshot.spatialPost.effectiveSettings.deepDvcSaturationBoost);
+			}
+			else
+			{
+				ImGui::TextDisabled("Waiting for submitted spatial post-process observations.");
+			}
+			if (snapshot.nativeCaptureExclusionActive)
+			{
+				ImGui::TextColored(kWarnColor, "Native capture temporarily disables NIS and DeepDVC; your choices are preserved.");
+			}
+			if (changed || !snapshot.spatialPost.observed || snapshot.spatialPost.generation < snapshot.requestedGeneration)
+			{
+				ImGui::TextColored(kWarnColor, "Spatial settings are pending a submitted renderer frame.");
+			}
+			ImGui::TextWrapped("Missing startup SDK hooks require a restart with the feature enabled before device creation. Capability alone does not prove evaluation.");
+			ImGui::TextWrapped("DeepDVC dispatch acceptance does not prove the SDK's internal image evaluation or visual correctness; a completed capture is still required.");
+			ImGui::TreePop();
+		}
+		if (ImGui::TreeNodeEx("Low latency / NVIDIA Reflex"))
+		{
+			if (ImGui::BeginCombo("Reflex mode", ReflexModeLabel(settings.reflexMode)))
+			{
+				if (ImGui::Selectable("Off", settings.reflexMode == TemporalLatencyMode::Off))
+				{
+					settings.reflexMode = TemporalLatencyMode::Off;
+					changed = true;
+				}
+				ImGui::BeginDisabled();
+				ImGui::Selectable("On", settings.reflexMode == TemporalLatencyMode::On);
+				ImGui::Selectable("On + Boost", settings.reflexMode == TemporalLatencyMode::OnPlusBoost);
+				ImGui::EndDisabled();
+				ImGui::EndCombo();
+			}
+			ImGui::TextWrapped("Independent of AA, upscaling and FG. Player required: enabled modes are unavailable in Editor. Use the DX12 Player command service or CREATOR_TEMPORAL_REFLEX before Player startup.");
+			ImGui::Text("Support: %s | sleep: %s | markers: %s", LiveFeatureStatusLabel(snapshot.reflex.support.status),
+				LiveFeatureStatusLabel(snapshot.reflex.sleepSupport.status), LiveFeatureStatusLabel(snapshot.reflex.markerSupport.status));
+			if (snapshot.reflex.configured)
+			{
+				ImGui::Text("Last observed SDK-accepted mode: %s | %s", ReflexModeLabel(snapshot.reflex.effectiveMode),
+					LiveFeatureStatusLabel(snapshot.reflex.optionsResult.status));
+			}
+			else
+			{
+				ImGui::TextDisabled("No SDK-accepted Reflex mode; Player execution is required.");
+			}
+			if (snapshot.reflex.requiredByFrameGeneration)
+			{
+				ImGui::TextColored(kWarnColor, "Active DLSS FG requires Reflex On; your requested mode is preserved for FG-off.");
+			}
+			if (snapshot.reflex.support.status == TemporalStatus::IntegrationRequired ||
+				snapshot.reflex.support.status == TemporalStatus::NotInitialized)
+			{
+				ImGui::TextColored(kWarnColor, "Enable Reflex before device creation and restart the Player.");
+			}
+			if (settings.reflexMode != TemporalLatencyMode::Off)
+			{
+				ImGui::TextColored(kWarnColor, "Player required; this Editor cannot execute Reflex sleep or native-present timing.");
+			}
+			ImGui::TextDisabled("Marker %llu | sleep %llu | presented %llu (real-frame IDs)",
+				static_cast<unsigned long long>(snapshot.reflex.markerRealFrameId),
+				static_cast<unsigned long long>(snapshot.reflex.sleepRealFrameId),
+				static_cast<unsigned long long>(snapshot.reflex.presentedRealFrameId));
+			ImGui::TextWrapped("Markers and SDK configuration are not input-to-photon measurements. On + Boost can increase GPU power use. XeSS FG owns XeLL; simultaneous Reflex pacing is not supported.");
+			ImGui::TreePop();
+		}
+		if (changed)
+		{
+			control.Request(settings);
+		}
+	}
+
 	// 고른 보기의 색 뜻. 색만 칠하고 읽는 법을 안 적으면 다음 사람이 다시 쫓는다.
 	const char* ShadowDebugViewLegend(int view)
 	{
@@ -594,6 +754,7 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 	}
 
 	changed |= DrawAntiAliasingSettings(m_editing.postChain);
+	DrawSpatialAndLatencySettings();
 
 	if (ImGui::TreeNodeEx("PostChain"))
 	{

@@ -1,7 +1,9 @@
-"""Summarize complete scopes from the engine's version 1/2 continuous .ceprof format.
+"""Summarize complete scopes from the engine's version 1/2 snapshot .ceprof format.
 
 RenderThreadFrame is a render cost; frameMs describes engine frames and must not
 be reported as display FPS. Throughput is measured separately by the HTTP runner.
+Continuous recording v3 uses a record stream, not this chunk table. Neither
+snapshot v1/v2 nor continuous v3 records carry per-frame temporal/spatial effects.
 """
 import sys, struct, zlib, json, statistics, collections
 from pathlib import Path
@@ -12,7 +14,9 @@ class Reader:
  def string(self):
   n=self.get('I');v=self.b[self.p:self.p+n].decode('utf-8');self.p+=n;return v
 def analyze(path):
- b=Path(path).read_bytes();assert b[:8]==b'CEPROF\0\0';version,n=struct.unpack_from('<II',b,8);assert version in (1,2)
+ b=Path(path).read_bytes();assert b[:8]==b'CEPROF\0\0';version,n=struct.unpack_from('<II',b,8)
+ if version == 3:raise ValueError('Continuous CEPROF v3 is a record stream; use ProfilerViewer. Per-frame temporal/spatial provenance is unavailable, so this artifact is not gate-eligible.')
+ if version not in (1,2):raise ValueError('Unsupported CEPROF snapshot version; refusing to guess the wire layout.')
  chunks={};chunk_versions={};cpu_sessions=set();cpu_ticks=set();cpu_tasks=set()
  for i in range(n):
   t,v,o,s,c,r=struct.unpack_from('<IIQQII',b,16+32*i);data=b[o:o+s];assert zlib.crc32(data)==c;chunks[t]=Reader(data);chunk_versions[t]=v
@@ -66,6 +70,8 @@ def analyze(path):
  # Keep engine diagnostics useful, but never promote this artifact to a TR0 gate.
  out['temporalPerformanceGateEligible']=False
  out['temporalProvenanceStatus']='unavailable-in-ceprof-v1-v2'
+ out['spatialProvenanceStatus']='unavailable-in-ceprof-v1-v2'
+ out['nativeQualityGateEligible']=False
  out['frameMsAxis']='engine-frame-boundaries-not-real-render-or-presented-fps'
  Path(str(path)+'.summary.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
  print(json.dumps({**out,'markers':rows[:35]},indent=2))

@@ -4,6 +4,7 @@
 #include "Render/Temporal/TemporalRuntimeControl.h"
 
 #include <charconv>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -95,6 +96,41 @@ namespace CommandCore
             return "unknown";
         }
 
+        inline const char* NisModeName(SpatialScalingMode mode)
+        {
+            switch (mode)
+            {
+            case SpatialScalingMode::Off: return "off";
+            case SpatialScalingMode::NisScale: return "scale";
+            case SpatialScalingMode::NisSharpen: return "sharpen";
+            }
+            return "unknown";
+        }
+
+        inline const char* ReflexModeName(TemporalLatencyMode mode)
+        {
+            switch (mode)
+            {
+            case TemporalLatencyMode::Off: return "off";
+            case TemporalLatencyMode::On: return "on";
+            case TemporalLatencyMode::OnPlusBoost: return "on-boost";
+            }
+            return "unknown";
+        }
+
+        inline bool ParseBoundedFloat(std::string_view text, float minimum, float maximum, float& value)
+        {
+            float parsedValue = 0.0f;
+            const auto parsed = std::from_chars(text.data(), text.data() + text.size(), parsedValue);
+            if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
+                !std::isfinite(parsedValue) || parsedValue < minimum || parsedValue > maximum)
+            {
+                return false;
+            }
+            value = parsedValue;
+            return true;
+        }
+
         inline const char* ExecutionState(TemporalProvider requested, TemporalProvider active,
             const TemporalResult& result, bool observed, bool pending)
         {
@@ -145,6 +181,8 @@ namespace CommandCore
             data.Set("effectiveRequestedUpscaler", CommandData::String(ProviderName(snapshot.settings.requestedUpscaler)));
             data.Set("effectiveRequestedUpscaleQuality", CommandData::String(QualityName(snapshot.settings.quality)));
             data.Set("effectiveRequestedFrameGenerator", CommandData::String(ProviderName(snapshot.settings.requestedFrameGenerator)));
+            data.Set("requestedReflexMode", CommandData::String(ReflexModeName(snapshot.requestedSettings.reflexMode)));
+            data.Set("effectiveRequestedReflexMode", CommandData::String(ReflexModeName(snapshot.settings.reflexMode)));
             data.Set("rendererObserved", CommandData::Bool(snapshot.rendererObserved));
             data.Set("playerObserved", CommandData::Bool(snapshot.playerObserved));
             data.Set("requestedGeneration", Identity(snapshot.requestedGeneration));
@@ -220,6 +258,71 @@ namespace CommandCore
             data.Set("latencyMarkerRealFrameId", Identity(snapshot.latencyMarkerRealFrameId));
             data.Set("latencyProvider", CommandData::String(snapshot.latencyProvider));
             data.Set("latencyResult", ResultData(snapshot.latencyResult));
+            auto reflex = CommandData::Object();
+            const bool reflexPlayerRequired = target == TemporalPresentationTarget::EditorViewport &&
+                snapshot.requestedSettings.reflexMode != TemporalLatencyMode::Off;
+            const bool reflexPending = target == TemporalPresentationTarget::PlayerSwapchain &&
+                (!snapshot.playerObserved || snapshot.playerObservedGeneration < snapshot.requestedGeneration);
+            const auto reflexOptions = reflexPlayerRequired ? TemporalResult{ TemporalStatus::IntegrationRequired }
+                : snapshot.reflex.optionsResult;
+            reflex.Set("requestedGeneration", Identity(snapshot.requestedGeneration));
+            reflex.Set("observedGeneration", Identity(snapshot.playerObservedGeneration));
+            reflex.Set("pending", CommandData::Bool(reflexPending));
+            reflex.Set("executionState", CommandData::String(reflexPlayerRequired ? "player_required" :
+                reflexPending ? "pending" : snapshot.reflex.configured
+                    ? (snapshot.reflex.effectiveMode == TemporalLatencyMode::Off ? "disabled" : "configured")
+                    : snapshot.requestedSettings.reflexMode == TemporalLatencyMode::Off ? "disabled"
+                    : StatusName(reflexOptions.status)));
+            reflex.Set("support", ResultData(snapshot.reflex.support));
+            reflex.Set("sleepSupport", ResultData(snapshot.reflex.sleepSupport));
+            reflex.Set("markerSupport", ResultData(snapshot.reflex.markerSupport));
+            reflex.Set("optionsResult", ResultData(reflexOptions));
+            reflex.Set("requestedMode", CommandData::String(ReflexModeName(snapshot.reflex.requestedMode)));
+            reflex.Set("effectiveMode", CommandData::String(ReflexModeName(snapshot.reflex.effectiveMode)));
+            reflex.Set("configured", CommandData::Bool(snapshot.reflex.configured));
+            reflex.Set("requiredByFrameGeneration", CommandData::Bool(snapshot.reflex.requiredByFrameGeneration));
+            reflex.Set("markerRealFrameId", Identity(snapshot.reflex.markerRealFrameId));
+            reflex.Set("sleepRealFrameId", Identity(snapshot.reflex.sleepRealFrameId));
+            reflex.Set("presentedRealFrameId", Identity(snapshot.reflex.presentedRealFrameId));
+            reflex.Set("evidenceNote", CommandData::String("configured is SDK-accepted mode; marker/sleep/present identities are API observations, not measured latency"));
+            data.Set("reflex", std::move(reflex));
+            const auto& requestedSpatial = snapshot.requestedSettings.spatialPost;
+            const auto& effectiveSpatial = snapshot.settings.spatialPost;
+            const auto& observedSpatial = snapshot.spatialPost;
+            auto spatial = CommandData::Object();
+            spatial.Set("requestedGeneration", Identity(snapshot.requestedGeneration));
+            spatial.Set("observedGeneration", Identity(observedSpatial.generation));
+            spatial.Set("pending", CommandData::Bool(!observedSpatial.observed ||
+                observedSpatial.generation < snapshot.requestedGeneration));
+            spatial.Set("requestedNisMode", CommandData::String(NisModeName(requestedSpatial.nisMode)));
+            spatial.Set("effectiveRequestedNisMode", CommandData::String(NisModeName(effectiveSpatial.nisMode)));
+            spatial.Set("nisRenderScale", CommandData::Double(requestedSpatial.nisRenderScale));
+            spatial.Set("nisSharpness", CommandData::Double(requestedSpatial.nisSharpness));
+            spatial.Set("deepDvcRequested", CommandData::Bool(requestedSpatial.deepDvcEnabled));
+            spatial.Set("deepDvcEffectiveRequested", CommandData::Bool(effectiveSpatial.deepDvcEnabled));
+            spatial.Set("deepDvcIntensity", CommandData::Double(requestedSpatial.deepDvcIntensity));
+            spatial.Set("deepDvcSaturationBoost", CommandData::Double(requestedSpatial.deepDvcSaturationBoost));
+            spatial.Set("submittedNisMode", CommandData::String(NisModeName(observedSpatial.effectiveSettings.nisMode)));
+            spatial.Set("submittedNisRenderScale", CommandData::Double(observedSpatial.effectiveSettings.nisRenderScale));
+            spatial.Set("submittedNisSharpness", CommandData::Double(observedSpatial.effectiveSettings.nisSharpness));
+            spatial.Set("submittedDeepDvcEnabled", CommandData::Bool(observedSpatial.effectiveSettings.deepDvcEnabled));
+            spatial.Set("submittedDeepDvcIntensity", CommandData::Double(observedSpatial.effectiveSettings.deepDvcIntensity));
+            spatial.Set("submittedDeepDvcSaturationBoost", CommandData::Double(observedSpatial.effectiveSettings.deepDvcSaturationBoost));
+            spatial.Set("nisCapability", ResultData(observedSpatial.nisCapability));
+            spatial.Set("deepDvcCapability", ResultData(observedSpatial.deepDvcCapability));
+            spatial.Set("nisResult", ResultData(observedSpatial.nisResult));
+            spatial.Set("deepDvcResult", ResultData(observedSpatial.deepDvcResult));
+            spatial.Set("selectedNisMode", CommandData::String(NisModeName(observedSpatial.selectedNisMode)));
+            spatial.Set("activeNisMode", CommandData::String(NisModeName(observedSpatial.activeNisMode)));
+            spatial.Set("deepDvcSelected", CommandData::Bool(observedSpatial.deepDvcSelected));
+            spatial.Set("deepDvcApplied", CommandData::Bool(observedSpatial.deepDvcApplied));
+            spatial.Set("sdrEligible", CommandData::Bool(observedSpatial.sdrEligible));
+            spatial.Set("observed", CommandData::Bool(observedSpatial.observed));
+            spatial.Set("realFrameId", Identity(observedSpatial.realFrameId));
+            spatial.Set("inputExtent", ExtentData(observedSpatial.inputExtent));
+            spatial.Set("outputExtent", ExtentData(observedSpatial.outputExtent));
+            spatial.Set("evidenceNote", CommandData::String("submitted pre-UI SDK-accepted dispatch; DeepDVC SDK success is not proof of internal NGX evaluation or pixel/visual correctness"));
+            data.Set("spatialPost", std::move(spatial));
             data.Set("inputToPhotonMilliseconds", CommandData{});
             data.Set("completionNote", CommandData::String("zero means unobserved; CPU present return, GPU completion and SDK final consumption are distinct"));
             auto capabilities = CommandData::Array();
@@ -286,6 +389,66 @@ namespace CommandCore
             }
             settings.enabled = settings.requestedUpscaler != TemporalProvider::None ||
                 settings.requestedFrameGenerator != TemporalProvider::None;
+            generation = control.Request(settings);
+        }
+        else if (command == "temporal.reflex")
+        {
+            if (parts.size() == 1)
+            {
+                return Ok("Independent Reflex request and observed SDK state; no measured latency", SnapshotData(snapshot, target));
+            }
+            if (parts.size() != 2)
+            {
+                return InvalidArguments("temporal.reflex [off|on|on-boost]");
+            }
+            if (parts[1] == "off") { settings.reflexMode = TemporalLatencyMode::Off; }
+            else if (parts[1] == "on") { settings.reflexMode = TemporalLatencyMode::On; }
+            else if (parts[1] == "on-boost") { settings.reflexMode = TemporalLatencyMode::OnPlusBoost; }
+            else { return InvalidArguments("Reflex mode must be off, on or on-boost"); }
+            if (target == TemporalPresentationTarget::EditorViewport && settings.reflexMode != TemporalLatencyMode::Off)
+            {
+                return PreconditionFailed("temporal.player_required",
+                    "Reflex execution requires DX12 Player; use its command service or CREATOR_TEMPORAL_REFLEX before Player startup");
+            }
+            generation = control.Request(settings);
+        }
+        else if (command == "temporal.nis")
+        {
+            if (parts.size() == 1)
+            {
+                return Ok("NIS request and observed pre-UI evaluation; selection is not execution", SnapshotData(snapshot, target));
+            }
+            if (parts.size() > 4)
+            {
+                return InvalidArguments("temporal.nis [off|scale|sharpen] [render-scale:0.5..1] [sharpness:0..1]");
+            }
+            if (parts[1] == "off") { settings.spatialPost.nisMode = SpatialScalingMode::Off; }
+            else if (parts[1] == "scale") { settings.spatialPost.nisMode = SpatialScalingMode::NisScale; }
+            else if (parts[1] == "sharpen") { settings.spatialPost.nisMode = SpatialScalingMode::NisSharpen; }
+            else { return InvalidArguments("NIS mode must be off, scale or sharpen"); }
+            if ((parts.size() >= 3 && !ParseBoundedFloat(parts[2], 0.5f, 1.0f, settings.spatialPost.nisRenderScale)) ||
+                (parts.size() >= 4 && !ParseBoundedFloat(parts[3], 0.0f, 1.0f, settings.spatialPost.nisSharpness)))
+            {
+                return InvalidArguments("NIS render scale must be finite in [0.5,1]; sharpness must be finite in [0,1]");
+            }
+            generation = control.Request(settings);
+        }
+        else if (command == "temporal.deepdvc")
+        {
+            if (parts.size() == 1)
+            {
+                return Ok("DeepDVC request and observed SDR-only pre-UI evaluation", SnapshotData(snapshot, target));
+            }
+            if (parts.size() > 4 || (parts[1] != "off" && parts[1] != "on"))
+            {
+                return InvalidArguments("temporal.deepdvc [off|on] [intensity:0..1] [saturation-boost:0..1]");
+            }
+            settings.spatialPost.deepDvcEnabled = parts[1] == "on";
+            if ((parts.size() >= 3 && !ParseBoundedFloat(parts[2], 0.0f, 1.0f, settings.spatialPost.deepDvcIntensity)) ||
+                (parts.size() >= 4 && !ParseBoundedFloat(parts[3], 0.0f, 1.0f, settings.spatialPost.deepDvcSaturationBoost)))
+            {
+                return InvalidArguments("DeepDVC intensity and saturation boost must be finite in [0,1]");
+            }
             generation = control.Request(settings);
         }
         else if (command == "temporal.reset")

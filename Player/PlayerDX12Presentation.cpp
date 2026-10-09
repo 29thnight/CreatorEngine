@@ -75,6 +75,10 @@ namespace Player
                 if (m_temporal && m_frameOpen && m_temporal->HasProxy() &&
                     !m_temporal->Open(packet, m_recordingError)) return;
             }
+            void OpenTemporalRealFrame(uint64_t frameId) override
+            {
+                if (m_temporal && m_frameOpen) { m_temporal->OpenRealFrame(frameId); }
+            }
             bool BeginSimulationFrame(uint64_t frameId, std::string& error) override
             {
                 if (!m_temporal || m_temporal->BeginSimulationFrame(frameId, error)) return true;
@@ -87,6 +91,10 @@ namespace Player
             void MarkTemporalLatency(uint64_t frameId, RHITemporalLatencyMarker marker) override
             {
                 if (m_temporal) m_temporal->Mark(frameId, marker);
+            }
+            bool RequiresTemporalLatencyMarkers() const override
+            {
+                return m_temporal && m_temporal->RequiresLatencyMarkers();
             }
             void DiscardTemporalFrame(uint64_t frameId) override
             {
@@ -177,6 +185,7 @@ namespace Player
                 }
                 m_frameOpen = true;
                 m_recordingError.clear();
+                if (m_temporal) { m_temporal->OpenRealFrame(0); }
                 return true;
             }
 
@@ -361,7 +370,10 @@ namespace Player
                     if (!m_temporal->Present(outError) || !m_temporal->RestoreAndRelease(outError))
                         return RecoverTemporalFailure(outError, false);
                 }
-                else if (!m_resources.Present(outError)) return false;
+                else if (!(m_temporal ? m_temporal->PresentRealFrame(outError) : m_resources.Present(outError)))
+                {
+                    return false;
+                }
                 if (textureId == 1 && m_submittedUse.lease)
                 {
                     RecordSubmittedGameFrame();

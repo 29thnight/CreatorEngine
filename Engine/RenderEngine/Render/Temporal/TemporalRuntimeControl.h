@@ -1,5 +1,6 @@
 #pragma once
 #include "TemporalReconstruction.h"
+#include "SpatialPostEffects.h"
 #include <mutex>
 #include <vector>
 
@@ -10,6 +11,8 @@ struct TemporalRuntimeSettings
     TemporalProvider requestedUpscaler{ TemporalProvider::None };
     TemporalProvider requestedFrameGenerator{ TemporalProvider::None };
     TemporalQuality quality{ TemporalQuality::Quality };
+    TemporalLatencyMode reflexMode{ TemporalLatencyMode::Off };
+    SpatialPostSettings spatialPost;
     bool enabled{ true };
     uint32_t interpolatedFrameCount{ 1 };
     std::wstring runtimeDirectory;
@@ -22,6 +25,7 @@ struct TemporalRuntimeSnapshot
     TemporalRuntimeSettings settings;
     TemporalRuntimeSettings requestedSettings; // Unmodified user intent, including during a capture.
     bool nativeCaptureExclusionActive{ false };
+    bool playerLatencyHostRegistered{ false }; // Explicit host capability, not SDK/hardware support.
     uint64_t viewId{ 0 }, sceneEpoch{ 0 };
     TemporalPresentationTarget presentationTarget{ TemporalPresentationTarget::Unbound };
     uint64_t requestedGeneration{ 0 }, observedGeneration{ 0 }, playerObservedGeneration{ 0 };
@@ -43,6 +47,8 @@ struct TemporalRuntimeSnapshot
     uint32_t generatedOrdinal{ 0 };
     TemporalResult latencyResult;
     std::string latencyProvider;
+    TemporalLatencyState reflex;
+    SpatialPostSnapshot spatialPost;
     uint64_t renderSubmittedFrameId{ 0 }, renderGpuCompletedFrameId{ 0 };
     uint64_t sdkFinalConsumedFrameId{ 0 }, cpuPresentReturnedFrameId{ 0 }, latencyMarkerRealFrameId{ 0 };
     bool motionVectorsValid{ false }, rendererObserved{ false }, playerObserved{ false };
@@ -58,6 +64,9 @@ public:
     TemporalRuntimeSnapshot Snapshot() const;
     uint64_t Request(const TemporalRuntimeSettings& settings);
     uint64_t RequestHistoryReset();
+    // Player calls once before any graphics-device creation. Editor/default
+    // hosts never opt in to plugins requiring a game-loop timing owner.
+    void RegisterPlayerLatencyHost();
     void AcquireNativeCaptureExclusion();
     void ReleaseNativeCaptureExclusion();
     // Updates execute under a short CPU mutex. Do not call SDKs/GPU waits in them.

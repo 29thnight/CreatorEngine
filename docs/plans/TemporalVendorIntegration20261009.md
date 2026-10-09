@@ -130,3 +130,19 @@ Vulkan SR has its native adapter/device requirement path. The current Vulkan Pla
 DirectSR is not selected as an additional provider in this change: the requested pinned DLSS/FSR/XeSS SDKs already implement the neutral operation boundary, while adding a separate platform service would not replace the Vulkan implementation requirement. This is an implementation/scope decision, not a claim about the current availability or maturity of DirectSR releases.
 
 Orthographic views retain native rendering and temporal provenance. The current SDK-facing projection path is explicitly `ProjectionUnsupported` for TU/FG instead of inventing a perspective FOV; native camera/motion/history code accepts a real orthographic camera with zero perspective FOV. Perspective SDK support is still established only by actual device/context queries and successful operations.
+
+## Optional AA, spatial color and independent latency controls
+
+The next source slice keeps the existing SDK pins and adds independently requested controls:
+
+- DLAA / FSR Native AA / XeSS AA are the native-resolution quality of their temporal providers. A successfully submitted temporal reconstruction graph omits FXAA without changing its saved native/fallback preference. SDK recording failure discards the frame; it is not a same-frame FXAA fallback. A standalone engine TAA resolve is not added.
+- NIS supports spatial scaling or sharpening after SDR post-processing and before UI. Already reconstructed temporal output is never scaled twice; a scale request then selects sharpen-only. NVScaler already sharpens, so no second NIS sharpening pass follows it. The Streamline adapter's actual capability query determines availability; the cross-vendor scope of the standalone NIS SDK is not a blanket support claim for this integration.
+- DeepDVC is default-off, final-resolution SDR, after tone mapping and before UI. HDR requests report unavailable. Successful SDK command recording is observable; it is not pixel-level proof that an internally accepted NGX effect changed the image.
+- Reflex Off / On / On+Boost is independent of TU and FG in the DX12 Player. DLSS FG imposes its required minimum mode; disabling FG restores the requested policy. There is one pacing owner, not a second sleep layered onto XeLL. An explicit XeSS FG startup request retains XeLL and disables optional Reflex; switching an already loaded incompatible runtime requires restart rather than silently selecting another FG provider.
+- Editor NIS/DeepDVC use the existing shared proxy-factory/shell Present route. Editor Reflex execution is unavailable because its input/presentation loop does not own the Player latency protocol. A default-off explicit Player-host registration prevents loading Reflex there; Editor FG remains prohibited.
+
+Persistent per-view spatial resources are reused. Reconfiguration, resize, shutdown and failed-operation recovery retire resources; normal frames and scalar sharpness/vibrance changes do not add a GPU-idle wait or rebuild temporal history. Native-only capture suppresses both spatial effects, including same-resolution sharpening, while retaining user intent.
+
+`temporal.nis`, `temporal.deepdvc` and `temporal.reflex` join the existing sorted CommandCore registry. The [staged command guide](../../Tools/temporal-validation/README.md) documents exact request/observed generations, accepted-dispatch evidence, unavailable combinations and external runtime prerequisites. Live rendering diagnostics use PLRD v3 with backward reads that preserve unknown effect evidence; legacy `.ceprof` recordings remain ineligible for native/temporal acceptance gates.
+
+This is source implementation and static review only. Builds, shader compilation, SDK execution, pixel checks, timing/latency measurements and the authored regression fixtures were not run. No existing PHASE 4.5 runtime acceptance row is marked complete by this addition.

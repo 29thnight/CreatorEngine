@@ -42,6 +42,9 @@ namespace ce
     // v1 events: 38 wire bytes. v2 frames append three u64 CPU ownership IDs (62 bytes).
     // v2 thread vocabulary adds physics_worker; existing track values stay unchanged.
     // Native producer pages are version 2 / 64-byte records, independent of file layout.
+    // Neither snapshot v1/v2 nor continuous v3 stores per-frame temporal/spatial
+    // provenance. Live PLRD diagnostics use a separate versioned payload; those
+    // live observations must not be attached to an older .ceprof measurement.
 
     // 왜 못 읽었는가. ★ 하나로 뭉치지 않는다 — "파일이 잘렸다" 와 "누가 고쳤다"
     // 와 "더 새 빌드가 썼다" 는 사용자가 할 일이 다르다.

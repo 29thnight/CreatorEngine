@@ -20,10 +20,13 @@ public:
     ~TemporalDX12();
     bool Configure(HWND window, uint32_t width, uint32_t height, std::string& error);
     bool HasProxy() const;
+    bool RequiresLatencyMarkers() const;
     void CommitConfiguration();
     IDXGISwapChain3* GetSwapchain() const; // Borrowed; never cache an owning COM ref.
     bool BeginSimulationFrame(uint64_t realFrameId, std::string& error);
     void Mark(uint64_t realFrameId, RHITemporalLatencyMarker marker);
+    void OpenRealFrame(uint64_t realFrameId);
+    bool PresentRealFrame(std::string& error);
     void StopSimulationFrames();
     void Discard(uint64_t realFrameId);
     bool SuspendProxy(std::string& error);
@@ -37,7 +40,7 @@ public:
     bool Shutdown(std::string& error, bool stopGameLoop = true);
     void LatchFailure(const std::string& reason, bool recordingAborted);
     bool HasPendingInputs() const;
-    bool RequiresReconfigure() const;
+    bool RequiresReconfigure();
     uint64_t RealFrameId() const;
     ID3D12Resource* GetSdkComposedRealFrameColor() const;
 

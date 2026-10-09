@@ -119,10 +119,23 @@ namespace editor::profiler_view
                 static_cast<unsigned long long>(provenance.realFrameId), provenance.generatedOrdinal);
             LabeledValue("Frame provenance", buffer);
             constexpr const char* providers[]{"none", "fsr", "dlss", "xess"};
-            constexpr const char* resolutions[]{"unknown", "native", "reconstructed", "native-fallback"};
-            std::snprintf(buffer, sizeof(buffer), "%s / TU %s / FG %s", resolutions[provenance.resolutionState],
-                providers[provenance.upscaler], providers[provenance.frameGenerator]);
+            constexpr const char* resolutions[]{"unknown", "native", "reconstructed", "native-fallback", "spatial-scaled"};
+            std::snprintf(buffer, sizeof(buffer), "%s / TU %s / FG %s",
+                provenance.resolutionState < 5 ? resolutions[provenance.resolutionState] : "unknown",
+                provenance.upscaler < 4 ? providers[provenance.upscaler] : "unknown",
+                provenance.frameGenerator < 4 ? providers[provenance.frameGenerator] : "unknown");
             LabeledValue("Temporal state", buffer);
+            constexpr const char* spatialModes[]{"off", "scale", "sharpen"};
+            if (provenance.spatialProvenanceAvailable && provenance.spatialMode < 3)
+            {
+                std::snprintf(buffer, sizeof(buffer), "NIS %s / DeepDVC %s", spatialModes[provenance.spatialMode],
+                    provenance.deepDvcApplied ? "applied" : "off");
+                LabeledValue("Applied spatial effects", buffer);
+            }
+            else
+            {
+                LabeledValue("Applied spatial effects", "unknown (not recorded)", kWarnColor);
+            }
 
             // 드로우 0은 파이프라인이 멀쩡해도 화면이 비는 유일한 조건이라
             // 따로 색을 준다 — 여기서 멈춰야 할 신호다.
@@ -270,6 +283,16 @@ namespace editor::profiler_view
             const auto& p = displayed.gpuTemporalProvenance;
             ImGui::Text("GPU real-frame extent: %u x %u render / %u x %u display",
                 p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight);
+            constexpr const char* spatialModes[]{"off", "scale", "sharpen"};
+            if (p.spatialProvenanceAvailable && p.spatialMode < 3)
+            {
+                ImGui::Text("GPU sample effects: NIS %s / DeepDVC %s", spatialModes[p.spatialMode],
+                    p.deepDvcApplied ? "applied" : "off");
+            }
+            else
+            {
+                ImGui::TextDisabled("GPU sample effects: unknown (not recorded)");
+            }
             ImGui::TextDisabled("Real-frame pass costs only; generated presentations have no render-pass timings.");
             ImGui::Text("GPU samples: %llu, rejected: %llu, query overflow: %llu",
                 static_cast<unsigned long long>(displayed.gpuCollects),

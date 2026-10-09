@@ -59,6 +59,8 @@
            Text="External FSR library does not exist: %(_CreatorFsrLibrary.Identity)" />
     <Error Condition="'$(_CreatorDlss)' == '1' And !Exists('$(CreatorStreamlineRoot)\include\sl_version.h')"
            Text="CreatorStreamlineRoot must name the external pinned Streamline 2.14.1 source root, including header symlink targets." />
+    <Error Condition="'$(_CreatorDlss)' == '1' And (!Exists('$(CreatorStreamlineRoot)\include\sl_nis.h') Or !Exists('$(CreatorStreamlineRoot)\include\sl_deepdvc.h'))"
+           Text="Optional NIS and RTX Dynamic Vibrance adapters require the matching external Streamline 2.14.1 sl_nis.h and sl_deepdvc.h headers. No runtime is downloaded or deployed automatically." />
     <Error Condition="('$(_CreatorXeSS)' == '1' Or '$(_CreatorXeSSVulkan)' == '1') And !Exists('$(CreatorXeSSRoot)\inc\xess\xess.h')"
            Text="CreatorXeSSRoot must name the external pinned XeSS SDK 3.0.2 source root." />
   </Target>

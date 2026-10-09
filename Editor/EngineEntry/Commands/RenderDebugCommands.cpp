@@ -860,6 +860,7 @@ namespace ConsoleCmd
         data.Set("width", CommandData::Int(snapshot->width));
         data.Set("height", CommandData::Int(snapshot->height));
         const auto& temporal = snapshot->temporalProvenance;
+        data.Set("temporalProvenanceSchemaVersion", CommandData::Int(2));
         data.Set("frameKind", CommandData::String(TemporalMeasuredFrameKindName(temporal.frameKind)));
         data.Set("realFrameId", CommandData::Int(temporal.realFrameId));
         data.Set("publicationFrameId", CommandData::Int(temporal.publicationFrameId));
@@ -871,6 +872,8 @@ namespace ConsoleCmd
         data.Set("upscaler", CommandData::String(TemporalMeasuredProviderName(temporal.upscaler)));
         data.Set("frameGenerator", CommandData::String(TemporalMeasuredProviderName(temporal.frameGenerator)));
         data.Set("resolutionState", CommandData::String(TemporalResolutionStateName(temporal.resolutionState)));
+        data.Set("spatialMode", CommandData::String(SpatialScalingModeName(temporal.spatialMode)));
+        data.Set("deepDvcApplied", CommandData::Bool(temporal.deepDvcApplied));
         data.Set("temporalNativeGateActive", CommandData::Bool(temporal.nativeGateActive));
         data.Set("dependencyHash", CommandData::String(std::to_string(snapshot->dependencyHash)));
         data.Set("copyMs", CommandData::Double(snapshot->copyNanoseconds / 1000000.0));

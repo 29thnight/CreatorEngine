@@ -71,6 +71,7 @@ TemporalResult TemporalUpscalerHost::Shutdown()
     }
     state.dlss.reset();
     state.provider = TemporalProvider::None;
+    state.dirty = true; // Explicit lifecycle shutdown requires reconfiguration even with identical settings.
     return { TemporalStatus::Success };
 }
 TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, TemporalBackend backend,
@@ -79,13 +80,19 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
     auto& state = *m_state;
     if (!display.IsValid() || !resources.IsInitialized()) return { TemporalStatus::InvalidInput };
     const bool changed = state.resources != &resources || state.backend != backend ||
-        state.settings != settings || state.display != display || state.depthInverted != depthInverted || state.orthographic != orthographic;
-    if (!changed && !state.dirty && state.generation == generation) return { TemporalStatus::Success };
+        !SameTemporalReconstructionSettings(state.settings, settings) || state.display != display ||
+        state.depthInverted != depthInverted || state.orthographic != orthographic;
+    if (!changed && !state.dirty)
+    {
+        state.generation = generation;
+        state.settings = settings;
+        return { TemporalStatus::Success };
+    }
     const auto shutdown = Shutdown();
     if (!shutdown.IsSuccess()) return shutdown;
-    // A new user request/recreated view may explicitly retry. Ordinary frames
-    // after dispatch failure cannot immediately reselect the damaged provider.
-    if (changed || state.generation != generation)
+    // Only a reconstruction change may retry. Unrelated UI scalar updates must
+    // neither drain this context nor revive a damaged provider automatically.
+    if (changed)
     {
         state.failed = {};
         state.failures = {};
@@ -238,6 +245,7 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
         if (result.IsSuccess() && state.adapter)
         {
             state.provider = provider;
+            state.dirty = false;
             return { TemporalStatus::Success };
         }
         const auto retired = Shutdown();
@@ -247,6 +255,7 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
     }
     // Native fallback reallocates the graph at display size before rendering.
     state.render = display;
+    state.dirty = false;
     return { TemporalStatus::Success };
 }
 TemporalResult TemporalUpscalerHost::Evaluate(const TemporalUpscaleInputs& inputs, RHIEncoder& encoder)

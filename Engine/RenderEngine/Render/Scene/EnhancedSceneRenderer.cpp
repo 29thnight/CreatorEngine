@@ -949,7 +949,7 @@ namespace
             }
             for (auto& view : views)
             {
-                if (!view.temporal.upscaler.Shutdown().IsSuccess())
+                if (!view.temporal.spatialPost.Shutdown().IsSuccess() || !view.temporal.upscaler.Shutdown().IsSuccess())
                 { outError="Vulkan pipeline retained: temporal SDK final consumption is not proven.";return false; }
                 view.temporal.Invalidate();
             }
@@ -1286,13 +1286,6 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
-            if (diagnosticOutput)
-            {
-                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
-                    viewPacket.key.historyRevision, sourceFrameId, frameContext.sceneEpoch, width, height,
-                    views[viewIndex].temporal.provenance);
-            }
-
             // The pipeline retains a query owner if a capture cannot prove idle.
             // A stack destructor must not free queries still referenced by the GPU.
             if (capture)
@@ -1355,6 +1348,16 @@ namespace
             }
             committed = true;
             views[viewIndex].temporal.Commit(graphInput);
+            if (capture)
+            {
+                capture->RecordTemporalProvenance(views[viewIndex].temporal.provenance);
+            }
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
+                    viewPacket.key.historyRevision, sourceFrameId, frameContext.sceneEpoch, width, height,
+                    views[viewIndex].temporal.provenance);
+            }
             slot->temporalProvenance = views[viewIndex].temporal.provenance;
             TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
                 const auto& view = views[viewIndex];
@@ -3078,7 +3081,7 @@ namespace
             }
             for (auto& view : p.views)
             {
-                if (!view.temporal.upscaler.Shutdown().IsSuccess())
+                if (!view.temporal.spatialPost.Shutdown().IsSuccess() || !view.temporal.upscaler.Shutdown().IsSuccess())
                 {lastError="DX12 pipeline retained: temporal SDK final consumption is not proven.";enabled=false;return false;}
                 view.temporal.Invalidate();
             }
@@ -3798,7 +3801,7 @@ namespace
                     auto& host = temporal.upscaler;
                     if (host.Provider() == TemporalProvider::None)
                     {
-                        if (ctx.width != ctx.displayWidth || ctx.height != ctx.displayHeight)
+                        if (!temporal.spatialPost.Scales() && (ctx.width != ctx.displayWidth || ctx.height != ctx.displayHeight))
                         {
                             throw std::runtime_error("Native temporal fallback must render at display resolution.");
                         }
@@ -3857,10 +3860,16 @@ namespace
                 LivePassNode node;
                 node.name = "PostChain";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.postChain; };
-                node.prepare = [&p](const EnhancedFrameContext& ctx,std::string& error,uint32_t) {
+                node.prepare = [&p](const EnhancedFrameContext& ctx,std::string& error,uint32_t viewIndex) {
                     p.displayFrameContext=ctx;p.displayFrameContext.width=ctx.displayWidth?ctx.displayWidth:ctx.width;
                     p.displayFrameContext.height=ctx.displayHeight?ctx.displayHeight:ctx.height;
-                    return p.postChain.PrepareFrame(p.displayFrameContext,error);
+                    auto postContext = p.displayFrameContext;
+                    if (p.views[viewIndex].temporal.spatialPost.Scales())
+                    {
+                        postContext.width = ctx.width;
+                        postContext.height = ctx.height;
+                    }
+                    return p.postChain.PrepareFrame(postContext,error);
                 };
                 node.reads = { LiveSlots::kLitColor };
                 node.writes = { LiveSlots::kDisplayLdr };
@@ -3879,8 +3888,30 @@ namespace
                     temporal.fxaaRequested = p.postChain.GetTuning().fxaaEnabled;
                     inputs.fxaaRecorded = &temporal.fxaaApplied;
                     p.postChain.SetInputs(inputs);
-                    p.postChain.Declare(graph, p.displayFrameContext);
+                    auto postContext = p.displayFrameContext;
+                    if (temporal.spatialPost.Scales())
+                    {
+                        postContext.width = ctx.width;
+                        postContext.height = ctx.height;
+                    }
+                    p.postChain.Declare(graph, postContext);
                     bb.Set(LiveSlots::kDisplayLdr, p.postChain.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // Optional spatial scaling/sharpening, then SDR-only RTX Dynamic
+            // Vibrance. PostChain has finished tone mapping and its eligible AA;
+            // UI and FG hudless extraction consume the final-resolution result.
+            {
+                LivePassNode node;
+                node.name = "SpatialPost";
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                {
+                    auto& spatial = p.views[binding.viewIndex].temporal.spatialPost;
+                    bb.Set(LiveSlots::kDisplayLdr, spatial.Declare(graph, ctx, bb.Get(LiveSlots::kDisplayLdr)));
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -5557,7 +5588,8 @@ namespace
             const auto configure = [&](IRHIDeviceResources& resources, TemporalBackend backend) {
                 return view.temporal.Begin(resources, backend, control, viewPacket.camera, realFrame,
                     viewPacket.key.viewId, packet.sceneEpoch, viewPacket.key.historyRevision,
-                    {packet.width,packet.height}, packet.deltaSeconds, packet.totalSeconds, nativeOnly);
+                    {packet.width,packet.height}, packet.deltaSeconds, packet.totalSeconds, nativeOnly,
+                    p.postChain.GetTuning().toneMapEnabled && EnhancedPostChainPass::kLDRFormat == RHIFormat::RGBA8Unorm);
             };
             TemporalResult result;
             if constexpr (std::is_same_v<PipelineT,LivePipeline>) result=configure(dx12.DeviceResources(),TemporalBackend::DX12);
@@ -6465,16 +6497,6 @@ namespace
                 }
             }
             p.lastNativeRecordMs = ownedQueueExecution ? ownedRecordingMilliseconds : recordWatch.ElapsedMs();
-            // SubmitOwnedGraph specializes order, lifetimes and barriers. Copy
-            // that final plan, never the pre-specialization Compile snapshot.
-            // Failed submissions still return false above; publication clears a
-            // failed frame rather than labeling an unsubmitted plan as displayed.
-            if (diagnosticOutput)
-            {
-                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
-                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height,
-                    view.temporal.provenance);
-            }
             viewShadowStats[targetIndex] = CaptureShadowStats(p);
             if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
             { outError = "capture graph is not compiled"; return false; }
@@ -6522,16 +6544,37 @@ namespace
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
             if (view.displayTarget==EnhancedLiveDisplayTarget::Game)
             {
-                if (temporalSink && temporalSink->AcceptsTemporalFrames() &&
-                    !dx12.WaitForLastFrameSubmission(outError)) return false;
+                if (temporalSink && (temporalSink->AcceptsTemporalFrames() ||
+                        temporalSink->RequiresTemporalLatencyMarkers()) && !dx12.WaitForLastFrameSubmission(outError))
+                {
+                    return false;
+                }
                 temporalSubmittedRealFrame=view.temporal.frame.realFrameId;
                 if(temporalSink)temporalSink->MarkTemporalLatency(view.temporal.frame.realFrameId,RHITemporalLatencyMarker::RenderSubmitEnd);
             }
             view.temporal.Commit(p.graphInput);
+            if (capture)
+            {
+                capture->RecordTemporalProvenance(view.temporal.provenance);
+            }
+            // Copy the specialized graph with the submitted frame's effects,
+            // never a requested/pre-recording or failed-submission label.
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
+                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height,
+                    view.temporal.provenance);
+            }
             slot.temporalProvenance = view.temporal.provenance;
             temporalProvenance = slot.temporalProvenance;
-            if (view.displayTarget == EnhancedLiveDisplayTarget::Game && slot.temporalResources.hudlessColor.IsValid())
-                dx12.SealTemporalDisplayFrame(slot.interopToken,view.temporal.frame,slot.graph,view.temporal.provenance.nativeGateActive);
+            if (view.displayTarget == EnhancedLiveDisplayTarget::Game)
+            {
+                // Native presentation also needs the original simulation ID
+                // for independent low-latency markers, without FG resources.
+                dx12.SealTemporalDisplayFrame(slot.interopToken, view.temporal.frame,
+                    slot.temporalResources.hudlessColor.IsValid() ? slot.graph : nullptr,
+                    view.temporal.provenance.nativeGateActive);
+            }
             TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot) {
                 if(view.displayTarget!=EnhancedLiveDisplayTarget::Game && snapshot.rendererObserved && snapshot.viewId!=view.key.viewId)return;
                 snapshot.presentationTarget=temporalSink && temporalSink->AcceptsTemporalFrames() &&

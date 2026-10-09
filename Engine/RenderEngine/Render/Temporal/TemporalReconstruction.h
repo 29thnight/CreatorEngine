@@ -13,6 +13,9 @@
 enum class TemporalProvider : uint8_t { None, Fsr, Dlss, XeSS };
 enum class TemporalBackend : uint8_t { DX12, Vulkan };
 enum class TemporalQuality : uint8_t { NativeAA, Quality, Balanced, Performance, UltraPerformance };
+// Latency is independent of reconstruction and interpolation. These modes do
+// not imply that every vendor exposes the same controls or supports Boost.
+enum class TemporalLatencyMode : uint8_t { Off, On, OnPlusBoost };
 enum class TemporalStatus : uint8_t
 {
     Success,
@@ -37,6 +40,16 @@ struct TemporalResult
     int64_t nativeCode{ 0 };
 
     bool IsSuccess() const { return status == TemporalStatus::Success; }
+};
+
+struct TemporalLatencyState
+{
+    TemporalResult support, sleepSupport, markerSupport, optionsResult;
+    TemporalLatencyMode requestedMode{ TemporalLatencyMode::Off };
+    TemporalLatencyMode effectiveMode{ TemporalLatencyMode::Off };
+    bool configured{ false }, requiredByFrameGeneration{ false };
+    // Successful CPU SDK calls, not latency measurements or GPU completion.
+    uint64_t markerRealFrameId{ 0 }, sleepRealFrameId{ 0 }, presentedRealFrameId{ 0 };
 };
 
 struct TemporalExtent

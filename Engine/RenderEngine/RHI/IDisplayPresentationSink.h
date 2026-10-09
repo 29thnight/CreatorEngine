@@ -31,9 +31,13 @@ struct IDisplayPresentationSink
     // never cross a device/resource-table boundary.
     virtual bool AcceptsTemporalFrames() const { return false; }
     virtual void OpenTemporalFrame(const RHITemporalDisplayPacket&) {}
+    // Immutable simulation identity of the opened native game image. Unlike
+    // the FG packet, this requires no depth/motion/UI exports or upscaler.
+    virtual void OpenTemporalRealFrame(uint64_t) {}
     // Actual real-frame producer submission boundaries, never reconstructed on
     // the presentation thread from a late completed-frame notification.
     virtual void MarkTemporalLatency(uint64_t, RHITemporalLatencyMarker) {}
+    virtual bool RequiresTemporalLatencyMarkers() const { return false; }
     virtual void DiscardTemporalFrame(uint64_t) {}
 
     /// 리드백 프레임(CPU RGBA — Vulkan 표시 브리지)을 키로 게시한다.

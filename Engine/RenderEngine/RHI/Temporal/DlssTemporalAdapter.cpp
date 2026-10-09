@@ -23,6 +23,8 @@
 #include <sl_dlss.h>
 #include <sl_dlss_g.h>
 #include <sl_reflex.h>
+#include <sl_nis.h>
+#include <sl_deepdvc.h>
 #include <sl_security.h>
 
 #include <atomic>
@@ -175,6 +177,7 @@ struct DlssTemporalAdapter::Implementation
         uint64_t allocationSerial{ 0 };
         std::unordered_map<uint32_t, TemporalFrame> viewports;
         bool presented{ false };
+        bool sleepIssued{ false }, sleepInProgress{ false };
     };
     struct Viewport
     {
@@ -187,6 +190,12 @@ struct DlssTemporalAdapter::Implementation
         bool forceReset{ false };
         uint64_t lastUpscaleFrame{ 0 };
         uint64_t lastFrameGenerationFrame{ 0 };
+    };
+    struct SpatialViewport
+    {
+        bool nisResources{ false }, deepDvcResources{ false };
+        bool nisFaulted{ false }, deepDvcFaulted{ false };
+        uint64_t lastNisFrame{ 0 }, lastDeepDvcFrame{ 0 };
     };
 
     std::mutex mutex;
@@ -208,6 +217,7 @@ struct DlssTemporalAdapter::Implementation
     LUID adapterLuid{};
     DlssInitialization configuration;
     TemporalCapabilities capabilities;
+    TemporalLatencyState latency;
     IDXGISwapChain3* swapchain{ nullptr }; // Borrowed, valid through SDK shutdown.
     TemporalFrameGenerationConfig presentation;
     TemporalExtent dynamicResolutionTarget;
@@ -217,6 +227,8 @@ struct DlssTemporalAdapter::Implementation
     DlssPacingOwner pacingOwner{ DlssPacingOwner::Unspecified };
     std::unordered_map<uint64_t, Frame> frames;
     std::unordered_map<uint32_t, Viewport> viewports;
+    std::unordered_map<uint32_t, SpatialViewport> spatialViewports;
+    SpatialPostSnapshot spatialCapabilities;
 
     PFun_slInit* init{ nullptr };
     PFun_slShutdown* shutdown{ nullptr };
@@ -241,6 +253,8 @@ struct DlssTemporalAdapter::Implementation
     PFun_slReflexSetOptions* setReflexOptions{ nullptr };
     PFun_slReflexSleep* reflexSleep{ nullptr };
     PFun_slPCLSetMarker* setMarker{ nullptr };
+    PFun_slNISSetOptions* setNisOptions{ nullptr };
+    PFun_slDeepDVCSetOptions* setDeepDvcOptions{ nullptr };
 
     template<typename Function>
     bool Import(const char* name, Function*& destination)
@@ -296,26 +310,104 @@ struct DlssTemporalAdapter::Implementation
         return ImportFeature(sl::kFeatureDLSS, "slDLSSSetOptions", setUpscaleOptions);
     }
 
+    TemporalResult ResolveNis()
+    {
+        const auto result = Probe(sl::kFeatureNIS);
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        return ImportFeature(sl::kFeatureNIS, "slNISSetOptions", setNisOptions);
+    }
+
+    TemporalResult ResolveDeepDvc()
+    {
+        const auto result = Probe(sl::kFeatureDeepDVC);
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        return ImportFeature(sl::kFeatureDeepDVC, "slDeepDVCSetOptions", setDeepDvcOptions);
+    }
+
+    void ResolveLatency()
+    {
+        latency.markerSupport = Probe(sl::kFeaturePCL);
+        if (latency.markerSupport.IsSuccess())
+        {
+            latency.markerSupport = ImportFeature(sl::kFeaturePCL, "slPCLSetMarker", setMarker);
+        }
+        auto result = Probe(sl::kFeatureReflex);
+        if (result.IsSuccess())
+        {
+            result = ImportFeature(sl::kFeatureReflex, "slReflexGetState", getReflexState);
+        }
+        if (result.IsSuccess())
+        {
+            result = ImportFeature(sl::kFeatureReflex, "slReflexSetOptions", setReflexOptions);
+        }
+        if (result.IsSuccess())
+        {
+            result = ImportFeature(sl::kFeatureReflex, "slReflexSleep", reflexSleep);
+        }
+        latency.sleepSupport = result;
+        latency.support = result;
+        if (result.IsSuccess())
+        {
+            sl::ReflexState reflexState;
+            result = ToResult(getReflexState(reflexState));
+            latency.support = result.IsSuccess() && !reflexState.lowLatencyAvailable
+                ? TemporalResult{ TemporalStatus::FeatureUnsupported } : result;
+            // The SDK requires one options call, even with unsupported low
+            // latency hardware. Sleep and PCL support are independent of UI.
+            ApplyLatencyMode(false);
+        }
+    }
+
+    TemporalResult ApplyLatencyMode(bool requiredByFrameGeneration)
+    {
+        const auto effective = requiredByFrameGeneration && latency.requestedMode == TemporalLatencyMode::Off
+            ? TemporalLatencyMode::On : latency.requestedMode;
+        if (!latency.sleepSupport.IsSuccess())
+        {
+            latency.optionsResult = latency.sleepSupport;
+            return latency.optionsResult;
+        }
+        if (effective != TemporalLatencyMode::Off && !latency.support.IsSuccess())
+        {
+            latency.optionsResult = latency.support;
+            return latency.optionsResult;
+        }
+        if (latency.configured && effective == latency.effectiveMode)
+        {
+            latency.requiredByFrameGeneration = requiredByFrameGeneration;
+            latency.optionsResult = { TemporalStatus::Success };
+            return latency.optionsResult;
+        }
+        sl::ReflexOptions options;
+        options.mode = effective == TemporalLatencyMode::Off ? sl::ReflexMode::eOff :
+            effective == TemporalLatencyMode::On ? sl::ReflexMode::eLowLatency : sl::ReflexMode::eLowLatencyWithBoost;
+        latency.optionsResult = ToResult(setReflexOptions(options));
+        latency.configured = latency.optionsResult.IsSuccess();
+        if (latency.configured)
+        {
+            latency.effectiveMode = effective;
+            latency.requiredByFrameGeneration = requiredByFrameGeneration;
+        }
+        return latency.optionsResult;
+    }
+
     TemporalResult ResolveFrameGeneration()
     {
-        for (auto feature : { sl::kFeatureDLSS_G, sl::kFeatureReflex, sl::kFeaturePCL })
-        {
-            const auto result = Probe(feature);
-            if (!result.IsSuccess()) return result;
-        }
-#define DLSS_IMPORT_FEATURE(feature, name, member) \
-        { const auto result = ImportFeature(feature, name, member); if (!result.IsSuccess()) return result; }
-        DLSS_IMPORT_FEATURE(sl::kFeatureDLSS_G, "slDLSSGSetOptions", setFrameGenerationOptions);
-        DLSS_IMPORT_FEATURE(sl::kFeatureDLSS_G, "slDLSSGGetState", getFrameGenerationState);
-        DLSS_IMPORT_FEATURE(sl::kFeatureReflex, "slReflexGetState", getReflexState);
-        DLSS_IMPORT_FEATURE(sl::kFeatureReflex, "slReflexSetOptions", setReflexOptions);
-        DLSS_IMPORT_FEATURE(sl::kFeatureReflex, "slReflexSleep", reflexSleep);
-        DLSS_IMPORT_FEATURE(sl::kFeaturePCL, "slPCLSetMarker", setMarker);
-#undef DLSS_IMPORT_FEATURE
-        sl::ReflexState reflexState;
-        auto result = ToResult(getReflexState(reflexState));
-        if (!result.IsSuccess()) return result;
-        if (!reflexState.lowLatencyAvailable) return { TemporalStatus::FeatureUnsupported };
+        if (!latency.support.IsSuccess()) { return latency.support; }
+        if (!latency.sleepSupport.IsSuccess()) { return latency.sleepSupport; }
+        if (!latency.markerSupport.IsSuccess()) { return latency.markerSupport; }
+        auto result = Probe(sl::kFeatureDLSS_G);
+        if (!result.IsSuccess()) { return result; }
+        result = ImportFeature(sl::kFeatureDLSS_G, "slDLSSGSetOptions", setFrameGenerationOptions);
+        if (!result.IsSuccess()) { return result; }
+        result = ImportFeature(sl::kFeatureDLSS_G, "slDLSSGGetState", getFrameGenerationState);
+        if (!result.IsSuccess()) { return result; }
         sl::DLSSGState state;
         result = ToResult(getFrameGenerationState(sl::ViewportHandle{ 0u }, state, nullptr));
         if (!result.IsSuccess()) return result;
@@ -350,9 +442,11 @@ TemporalResult DlssTemporalAdapter::Initialize(const DlssInitialization& initial
     if (state.module || state.permanentlyUnloaded) return { TemporalStatus::AlreadyInitialized };
     state.configuration.backend = initialization.backend;
     if (initialization.backend != TemporalBackend::DX12) return { TemporalStatus::BackendUnsupported };
-    if ((!initialization.loadUpscaling && !initialization.loadFrameGeneration) ||
+    if ((!initialization.loadUpscaling && !initialization.loadFrameGeneration &&
+            !initialization.loadReflex && !initialization.loadNis && !initialization.loadDeepDvc) ||
         initialization.pluginDirectory.empty() ||
-        (initialization.applicationId == 0 &&
+        ((initialization.loadUpscaling || initialization.loadFrameGeneration || initialization.loadDeepDvc) &&
+            initialization.applicationId == 0 &&
             (initialization.engineVersion.empty() || initialization.projectId.empty())))
         return { TemporalStatus::InvalidInput };
     const std::filesystem::path directory{ initialization.pluginDirectory };
@@ -393,15 +487,20 @@ TemporalResult DlssTemporalAdapter::Initialize(const DlssInitialization& initial
         g_runtimeClaimed.store(false);
         return { TemporalStatus::RuntimeUnavailable };
     }
-    sl::Feature features[4];
+    sl::Feature features[6];
     uint32_t count = 0;
     if (initialization.loadUpscaling) features[count++] = sl::kFeatureDLSS;
     if (initialization.loadFrameGeneration)
     {
         features[count++] = sl::kFeatureDLSS_G;
+    }
+    if (initialization.loadReflex || initialization.loadFrameGeneration)
+    {
         features[count++] = sl::kFeatureReflex;
         features[count++] = sl::kFeaturePCL;
     }
+    if (initialization.loadNis) { features[count++] = sl::kFeatureNIS; }
+    if (initialization.loadDeepDvc) { features[count++] = sl::kFeatureDeepDVC; }
     const wchar_t* pluginPath = state.configuration.pluginDirectory.c_str();
     sl::Preferences preferences;
     preferences.pathsToPlugins = &pluginPath;
@@ -459,9 +558,19 @@ TemporalResult DlssTemporalAdapter::BindDX12Device(ID3D12Device* nativeDevice)
     state.adapterLuid = nativeDevice->GetAdapterLuid();
     state.nativeDevice = nativeDevice;
     state.deviceBound = true;
+    state.latency.support = state.latency.sleepSupport = state.latency.markerSupport =
+        state.latency.optionsResult = { TemporalStatus::IntegrationRequired };
+    if (state.configuration.loadReflex || state.configuration.loadFrameGeneration)
+    {
+        state.ResolveLatency();
+    }
     state.capabilities.upscaling = state.configuration.loadUpscaling ? state.ResolveUpscaling() :
         TemporalResult{ TemporalStatus::IntegrationRequired };
     state.capabilities.frameGeneration = state.configuration.loadFrameGeneration ? state.ResolveFrameGeneration() :
+        TemporalResult{ TemporalStatus::IntegrationRequired };
+    state.spatialCapabilities.nisCapability = state.configuration.loadNis ? state.ResolveNis() :
+        TemporalResult{ TemporalStatus::IntegrationRequired };
+    state.spatialCapabilities.deepDvcCapability = state.configuration.loadDeepDvc ? state.ResolveDeepDvc() :
         TemporalResult{ TemporalStatus::IntegrationRequired };
     // Binding succeeded even if only one independently requested axis is usable.
     return { TemporalStatus::Success };
@@ -496,6 +605,51 @@ TemporalCapabilities DlssTemporalAdapter::QueryCapabilities()
         result.upscaling = result.frameGeneration = { state.configuration.backend == TemporalBackend::DX12 ?
             TemporalStatus::NotInitialized : TemporalStatus::BackendUnsupported };
     return result;
+}
+
+SpatialPostSnapshot DlssTemporalAdapter::QuerySpatialPostCapabilities() const
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    auto result = state.spatialCapabilities;
+    if (!state.deviceBound)
+    {
+        result.nisCapability = result.deepDvcCapability = { state.configuration.backend == TemporalBackend::DX12 ?
+            TemporalStatus::NotInitialized : TemporalStatus::BackendUnsupported };
+    }
+    return result;
+}
+
+TemporalLatencyState DlssTemporalAdapter::QueryLatencyState() const
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    auto result = state.latency;
+    if (!state.deviceBound)
+    {
+        result.support = result.sleepSupport = result.markerSupport = result.optionsResult =
+            { state.configuration.backend == TemporalBackend::DX12 ?
+                TemporalStatus::NotInitialized : TemporalStatus::BackendUnsupported };
+        result.configured = false;
+    }
+    return result;
+}
+
+TemporalResult DlssTemporalAdapter::SetLatencyMode(TemporalLatencyMode mode)
+{
+    if (mode != TemporalLatencyMode::Off && mode != TemporalLatencyMode::On &&
+        mode != TemporalLatencyMode::OnPlusBoost)
+    {
+        return { TemporalStatus::InvalidInput };
+    }
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    if (!state.deviceBound) { return { TemporalStatus::NotInitialized }; }
+    state.latency.markerRealFrameId = 0;
+    state.latency.sleepRealFrameId = 0;
+    state.latency.presentedRealFrameId = 0;
+    state.latency.requestedMode = mode;
+    return state.ApplyLatencyMode(state.frameGenerationEnabled);
 }
 
 TemporalResult DlssTemporalAdapter::UpgradeDX12Interface(void** interfacePointer, DlssDX12ProxyKind kind)
@@ -822,6 +976,152 @@ TemporalResult DlssTemporalAdapter::DispatchUpscaling(uint32_t viewportId, uint6
     return result;
 }
 
+TemporalResult DlssTemporalAdapter::DispatchNis(uint32_t viewportId, uint64_t realFrameId,
+    SpatialScalingMode mode, float sharpness, TemporalExtent inputExtent,
+    TemporalExtent outputExtent, const DlssSpatialResources& resources)
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    if (!state.deviceBound)
+    {
+        return { TemporalStatus::NotInitialized };
+    }
+    if (!state.spatialCapabilities.nisCapability.IsSuccess())
+    {
+        return state.spatialCapabilities.nisCapability;
+    }
+    const auto frame = state.frames.find(realFrameId);
+    if (frame == state.frames.end() || viewportId == UINT32_MAX || !resources.commandList ||
+        resources.commandList->GetType() != D3D12_COMMAND_LIST_TYPE_DIRECT ||
+        !std::isfinite(sharpness) || sharpness < 0.f || sharpness > 1.f ||
+        (mode != SpatialScalingMode::NisScale && mode != SpatialScalingMode::NisSharpen) ||
+        !IsTextureValid(resources.color, inputExtent) || !IsTextureValid(resources.output, outputExtent, true) ||
+        resources.color.resource == resources.output.resource ||
+        (mode == SpatialScalingMode::NisSharpen && inputExtent != outputExtent) ||
+        inputExtent.width > outputExtent.width || inputExtent.height > outputExtent.height ||
+        uint64_t(inputExtent.width) * 2 < outputExtent.width || uint64_t(inputExtent.height) * 2 < outputExtent.height)
+    {
+        return { TemporalStatus::InvalidInput };
+    }
+    if (resources.color.resource->GetDesc().Format != DXGI_FORMAT_R8G8B8A8_UNORM ||
+        resources.output.resource->GetDesc().Format != DXGI_FORMAT_R8G8B8A8_UNORM)
+    {
+        return { TemporalStatus::FeatureUnsupported };
+    }
+    auto& viewport = state.spatialViewports[viewportId];
+    if (viewport.nisFaulted)
+    {
+        return { TemporalStatus::IntegrationRequired };
+    }
+    if (viewport.lastNisFrame >= realFrameId)
+    {
+        return { TemporalStatus::InvalidInput };
+    }
+    const sl::ViewportHandle handle{ viewportId };
+    sl::NISOptions options;
+    options.mode = mode == SpatialScalingMode::NisScale ? sl::NISMode::eScaler : sl::NISMode::eSharpen;
+    options.hdrMode = sl::NISHDR::eNone;
+    options.sharpness = sharpness;
+    viewport.nisResources = true;
+    auto result = ToResult(state.setNisOptions(handle, options));
+    if (result.IsSuccess())
+    {
+        auto input = ToResource(resources.color);
+        auto output = ToResource(resources.output);
+        const auto inputBounds = ToExtent(inputExtent);
+        const auto outputBounds = ToExtent(outputExtent);
+        sl::ResourceTag tags[] = {
+            { &input, sl::kBufferTypeScalingInputColor, sl::eValidUntilEvaluate, &inputBounds },
+            { &output, sl::kBufferTypeScalingOutputColor, sl::eValidUntilEvaluate, &outputBounds }
+        };
+        const sl::BaseStructure* inputs[] = { &handle, &tags[0], &tags[1] };
+        result = ToResult(state.evaluate(sl::kFeatureNIS, *frame->second.token,
+            inputs, static_cast<uint32_t>(std::size(inputs)), resources.commandList));
+    }
+    if (result.IsSuccess())
+    {
+        viewport.lastNisFrame = realFrameId;
+    }
+    else
+    {
+        viewport.nisFaulted = true;
+    }
+    return result;
+}
+
+TemporalResult DlssTemporalAdapter::DispatchDeepDvc(uint32_t viewportId, uint64_t realFrameId,
+    const SpatialPostSettings& settings, TemporalExtent outputExtent,
+    bool toneMappedSdr, const DlssSpatialResources& resources)
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    if (!state.deviceBound)
+    {
+        return { TemporalStatus::NotInitialized };
+    }
+    if (!toneMappedSdr)
+    {
+        return { TemporalStatus::FeatureUnsupported };
+    }
+    if (!state.spatialCapabilities.deepDvcCapability.IsSuccess())
+    {
+        return state.spatialCapabilities.deepDvcCapability;
+    }
+    const auto frame = state.frames.find(realFrameId);
+    if (frame == state.frames.end() || viewportId == UINT32_MAX || !settings.deepDvcEnabled ||
+        !ValidateSpatialPostSettings(settings) || !resources.commandList ||
+        resources.commandList->GetType() != D3D12_COMMAND_LIST_TYPE_DIRECT ||
+        !IsTextureValid(resources.output, outputExtent, true))
+    {
+        return { TemporalStatus::InvalidInput };
+    }
+    if (resources.output.resource->GetDesc().Format != DXGI_FORMAT_R8G8B8A8_UNORM)
+    {
+        return { TemporalStatus::FeatureUnsupported };
+    }
+    auto& viewport = state.spatialViewports[viewportId];
+    if (viewport.deepDvcFaulted)
+    {
+        return { TemporalStatus::IntegrationRequired };
+    }
+    if (viewport.lastDeepDvcFrame >= realFrameId)
+    {
+        return { TemporalStatus::InvalidInput };
+    }
+    const sl::ViewportHandle handle{ viewportId };
+    sl::DeepDVCOptions options;
+    options.mode = sl::DeepDVCMode::eOn;
+    options.intensity = settings.deepDvcIntensity;
+    options.saturationBoost = settings.deepDvcSaturationBoost;
+    viewport.deepDvcResources = true;
+    auto result = ToResult(state.setDeepDvcOptions(handle, options));
+    if (result.IsSuccess())
+    {
+        auto output = ToResource(resources.output);
+        const auto extent = ToExtent(outputExtent);
+        sl::ResourceTag tag{ &output, sl::kBufferTypeScalingOutputColor, sl::eValidUntilEvaluate, &extent };
+        // Unlike NIS, pinned deepDVCEntry.cpp does not forward inline evaluate
+        // tags to getTaggedResource. Register this persistent output using the
+        // same frame token and the isolated spatial viewport before evaluating.
+        result = ToResult(state.setTags(*frame->second.token, handle, &tag, 1, resources.commandList));
+        if (result.IsSuccess())
+        {
+            const sl::BaseStructure* inputs[] = { &handle };
+            result = ToResult(state.evaluate(sl::kFeatureDeepDVC, *frame->second.token,
+                inputs, static_cast<uint32_t>(std::size(inputs)), resources.commandList));
+        }
+    }
+    if (result.IsSuccess())
+    {
+        viewport.lastDeepDvcFrame = realFrameId;
+    }
+    else
+    {
+        viewport.deepDvcFaulted = true;
+    }
+    return result;
+}
+
 TemporalResult DlssTemporalAdapter::SetFrameGenerationOptions(uint32_t viewportId,
     const TemporalFrameGenerationConfig& configuration, bool enabled, TemporalExtent dynamicResolutionTarget)
 {
@@ -852,10 +1152,8 @@ TemporalResult DlssTemporalAdapter::SetFrameGenerationOptions(uint32_t viewportI
         return { TemporalStatus::FeatureUnsupported };
     if (enabled)
     {
-        sl::ReflexOptions reflex;
-        reflex.mode = sl::ReflexMode::eLowLatency;
-        result = ToResult(state.setReflexOptions(reflex));
-        if (!result.IsSuccess()) return result;
+        result = state.ApplyLatencyMode(true);
+        if (!result.IsSuccess()) { return result; }
     }
     sl::DLSSGOptions options;
     options.mode = enabled ? sl::DLSSGMode::eOn : sl::DLSSGMode::eOff;
@@ -882,8 +1180,18 @@ TemporalResult DlssTemporalAdapter::SetFrameGenerationOptions(uint32_t viewportI
         state.frameGenerationViewport = viewportId;
         state.dynamicResolutionTarget = dynamicResolutionTarget;
         if (!enabled) state.lastFrameGenerationExtent = {};
+        if (!enabled) { result = state.ApplyLatencyMode(false); }
     }
-    else state.frameGenerationFaulted = true;
+    else
+    {
+        state.frameGenerationFaulted = true;
+        if (enabled && !state.frameGenerationEnabled)
+        {
+            // A failed first FG enable cannot retain its minimum-On override.
+            // ApplyLatencyMode records any restoration failure independently.
+            (void)state.ApplyLatencyMode(false);
+        }
+    }
     return result;
 }
 
@@ -993,15 +1301,24 @@ TemporalResult DlssTemporalAdapter::Sleep(uint64_t realFrameId)
     {
         std::lock_guard lock(state.mutex);
         if (!state.deviceBound) return { TemporalStatus::NotInitialized };
-        if (!state.reflexSleep) return { TemporalStatus::FeatureUnsupported };
+        if (!state.latency.sleepSupport.IsSuccess()) { return state.latency.sleepSupport; }
         const auto frame = state.frames.find(realFrameId);
         if (frame == state.frames.end()) return { TemporalStatus::InvalidInput };
+        if (frame->second.sleepIssued) { return { TemporalStatus::InvalidInput }; }
+        frame->second.sleepIssued = frame->second.sleepInProgress = true;
         token = frame->second.token;
         sleep = state.reflexSleep;
     }
     // Do not hold the adapter mutex while the driver waits for previous-frame
     // work: the rendering/presenting thread must remain able to make progress.
-    return ToResult(sleep(*token));
+    const auto result = ToResult(sleep(*token));
+    {
+        std::lock_guard lock(state.mutex);
+        const auto frame = state.frames.find(realFrameId);
+        if (frame != state.frames.end()) { frame->second.sleepInProgress = false; }
+        if (result.IsSuccess()) { state.latency.sleepRealFrameId = realFrameId; }
+    }
+    return result;
 }
 
 TemporalResult DlssTemporalAdapter::MarkLatency(uint64_t realFrameId, DlssLatencyMarker marker)
@@ -1009,7 +1326,7 @@ TemporalResult DlssTemporalAdapter::MarkLatency(uint64_t realFrameId, DlssLatenc
     auto& state = *m_implementation;
     std::lock_guard lock(state.mutex);
     if (!state.deviceBound) return { TemporalStatus::NotInitialized };
-    if (!state.setMarker) return { TemporalStatus::FeatureUnsupported };
+    if (!state.latency.markerSupport.IsSuccess()) { return state.latency.markerSupport; }
     const auto frame = state.frames.find(realFrameId);
     if (frame == state.frames.end()) return { TemporalStatus::InvalidInput };
     sl::PCLMarker value;
@@ -1027,7 +1344,15 @@ TemporalResult DlssTemporalAdapter::MarkLatency(uint64_t realFrameId, DlssLatenc
     default: return { TemporalStatus::InvalidInput };
     }
     const auto result = ToResult(state.setMarker(value, *frame->second.token));
-    if (result.IsSuccess() && marker == DlssLatencyMarker::PresentEnd) frame->second.presented = true;
+    if (result.IsSuccess())
+    {
+        state.latency.markerRealFrameId = realFrameId;
+        if (marker == DlssLatencyMarker::PresentEnd)
+        {
+            frame->second.presented = true;
+            state.latency.presentedRealFrameId = realFrameId;
+        }
+    }
     return result;
 }
 
@@ -1038,6 +1363,7 @@ TemporalResult DlssTemporalAdapter::DiscardRealFrame(uint64_t realFrameId)
     if (!state.deviceBound) return { TemporalStatus::NotInitialized };
     const auto frame = state.frames.find(realFrameId);
     if (frame == state.frames.end()) return { TemporalStatus::Success };
+    if (frame->second.sleepInProgress) { return { TemporalStatus::IntegrationRequired }; }
     for (auto& [viewportId, viewport] : state.viewports)
     {
         if (viewport.lastFrameGenerationFrame == realFrameId) return { TemporalStatus::IntegrationRequired };
@@ -1055,6 +1381,7 @@ TemporalResult DlssTemporalAdapter::EndRealFrame(uint64_t realFrameId)
     if (!state.deviceBound) return { TemporalStatus::NotInitialized };
     const auto frame = state.frames.find(realFrameId);
     if (frame == state.frames.end()) return { TemporalStatus::InvalidInput };
+    if (frame->second.sleepInProgress) { return { TemporalStatus::IntegrationRequired }; }
     if (state.frameGenerationEnabled && !frame->second.presented) return { TemporalStatus::IntegrationRequired };
     state.frames.erase(frame);
     return { TemporalStatus::Success };
@@ -1074,6 +1401,11 @@ TemporalResult DlssTemporalAdapter::TakePresentationError()
 
 TemporalResult DlssTemporalAdapter::FreeViewportAfterGpuIdle(uint32_t viewportId)
 {
+    const auto spatial = FreeSpatialPostAfterGpuIdle(viewportId);
+    if (!spatial.IsSuccess())
+    {
+        return spatial;
+    }
     const auto upscale = FreeUpscalingAfterGpuIdle(viewportId);
     if (!upscale.IsSuccess()) return upscale;
     if (viewportId != 0) return upscale;
@@ -1105,6 +1437,49 @@ TemporalResult DlssTemporalAdapter::FreeUpscalingAfterGpuIdle(uint32_t viewportI
     if (viewport != state.viewports.end() &&
         (!state.frameGenerationConfigured || viewportId != state.frameGenerationViewport))
         state.viewports.erase(viewport);
+    return { TemporalStatus::Success };
+}
+
+TemporalResult DlssTemporalAdapter::FreeSpatialPostAfterGpuIdle(uint32_t viewportId)
+{
+    auto& state = *m_implementation;
+    std::lock_guard lock(state.mutex);
+    if (!state.deviceBound)
+    {
+        return { TemporalStatus::NotInitialized };
+    }
+    const auto found = state.spatialViewports.find(viewportId);
+    if (found == state.spatialViewports.end())
+    {
+        return { TemporalStatus::Success };
+    }
+    auto& viewport = found->second;
+    const sl::ViewportHandle handle{ viewportId };
+    if (viewport.nisResources)
+    {
+        const auto result = ToResult(state.freeResources(sl::kFeatureNIS, handle));
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        viewport.nisResources = false;
+    }
+    if (viewport.deepDvcResources)
+    {
+        sl::DeepDVCOptions options;
+        options.mode = sl::DeepDVCMode::eOff;
+        auto result = ToResult(state.setDeepDvcOptions(handle, options));
+        if (result.IsSuccess())
+        {
+            result = ToResult(state.freeResources(sl::kFeatureDeepDVC, handle));
+        }
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        viewport.deepDvcResources = false;
+    }
+    state.spatialViewports.erase(found);
     return { TemporalStatus::Success };
 }
 
@@ -1152,10 +1527,12 @@ TemporalResult DlssTemporalAdapter::ShutdownAfterGpuIdle()
     const auto result = ToResult(state.shutdown());
     if (!result.IsSuccess()) return result;
     state.initialized = false;
+    state.latency.configured = false;
     state.deviceBound = false;
     state.nativeDevice = nullptr;
     state.swapchain = nullptr;
     state.viewports.clear();
+    state.spatialViewports.clear();
     state.frameGenerationConfigured = false;
     state.pendingFrameGenerationOwner.reset();
     return result;
@@ -1404,6 +1781,28 @@ TemporalCapabilities DlssTemporalAdapter::QueryCapabilities()
     return result;
 }
 TemporalResult DlssTemporalAdapter::BindDX12Device(ID3D12Device*) { return { TemporalStatus::SdkNotBuilt }; }
+SpatialPostSnapshot DlssTemporalAdapter::QuerySpatialPostCapabilities() const
+{
+    SpatialPostSnapshot result;
+    result.nisCapability = result.deepDvcCapability = { m_implementation->backend == TemporalBackend::DX12 ?
+        TemporalStatus::SdkNotBuilt : TemporalStatus::BackendUnsupported };
+    return result;
+}
+TemporalResult DlssTemporalAdapter::DispatchNis(uint32_t, uint64_t, SpatialScalingMode, float,
+    TemporalExtent, TemporalExtent, const DlssSpatialResources&)
+{ return { TemporalStatus::SdkNotBuilt }; }
+TemporalResult DlssTemporalAdapter::DispatchDeepDvc(uint32_t, uint64_t, const SpatialPostSettings&,
+    TemporalExtent, bool, const DlssSpatialResources&)
+{ return { TemporalStatus::SdkNotBuilt }; }
+TemporalLatencyState DlssTemporalAdapter::QueryLatencyState() const
+{
+    TemporalLatencyState result;
+    result.support = result.sleepSupport = result.markerSupport = result.optionsResult =
+        { m_implementation->backend == TemporalBackend::DX12 ?
+            TemporalStatus::SdkNotBuilt : TemporalStatus::BackendUnsupported };
+    return result;
+}
+TemporalResult DlssTemporalAdapter::SetLatencyMode(TemporalLatencyMode) { return { TemporalStatus::SdkNotBuilt }; }
 bool DlssTemporalAdapter::IsBoundToDX12Device(ID3D12Device*) const { return false; }
 bool DlssTemporalAdapter::MatchesRuntimeConfiguration(const std::wstring&, const std::string&) const { return false; }
 TemporalResult DlssTemporalAdapter::UpgradeDX12Interface(void**, DlssDX12ProxyKind)
@@ -1443,6 +1842,7 @@ TemporalResult DlssTemporalAdapter::EndRealFrame(uint64_t) { return { TemporalSt
 TemporalResult DlssTemporalAdapter::TakePresentationError() { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::FreeViewportAfterGpuIdle(uint32_t) { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::FreeUpscalingAfterGpuIdle(uint32_t) { return { TemporalStatus::SdkNotBuilt }; }
+TemporalResult DlssTemporalAdapter::FreeSpatialPostAfterGpuIdle(uint32_t) { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::FreeFrameGenerationAfterGpuIdle(uint32_t) { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::ReleaseFrameGenerationInputsAfterGpuIdle() { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::ShutdownAfterGpuIdle() { return { TemporalStatus::SdkNotBuilt }; }
