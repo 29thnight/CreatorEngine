@@ -16,6 +16,7 @@
 class Texture;
 class ImageComponent;
 class TextComponent;
+struct TextLayout;
 class SpriteSheetComponent;
 enum class ClipDirection : std::uint8_t;
 enum class TextAlignment : std::uint8_t;
@@ -49,6 +50,7 @@ public:
         /// 폰트 자산 경로. SDF 계통이 이것으로 아틀라스를 찾는다(D4).
         std::string                             fontPath;
         std::string                             message;
+        std::shared_ptr<const TextLayout>        layout;
         math::color                             color{ math::color::black() };
 		math::vector2                           position{};
         math::vector2                          maxSize{};
@@ -59,6 +61,11 @@ public:
         bool                                    stretchX{ false };
         bool                                    stretchY{ false };
         TextAlignment                           alignment{ TextAlignment::Center };
+        CanvasRenderMode                        renderMode{ CanvasRenderMode::ScreenSpaceOverlay };
+        math::matrix4x4                         canvasWorld{ math::matrix4x4::identity() };
+        math::vector4                          canvasRect{};
+        float                                   planeDistance{ 100.f };
+        HashedGuid                              canvasId{};
     };
 
     struct SpriteSheetData

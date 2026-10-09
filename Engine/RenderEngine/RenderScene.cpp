@@ -139,3 +139,19 @@ RenderScene::UIProxySnapshot RenderScene::GetUIProxySnapshot()
 	return snapshot;
 }
 
+RenderScene::UIDrawSnapshot RenderScene::GetUIDrawSnapshot()
+{
+    UIDrawSnapshot snapshot;
+    SpinLock lock(m_uiProxyMapFlag);
+    snapshot.reserve(m_uiProxyMap.size());
+    for (const auto& [guid, proxy] : m_uiProxyMap)
+    {
+        (void)guid;
+        if (proxy)
+        {
+            snapshot.push_back({ proxy->GetInstanceID(), proxy->IsEnabled(), proxy->GetData() });
+        }
+    }
+    return snapshot;
+}
+

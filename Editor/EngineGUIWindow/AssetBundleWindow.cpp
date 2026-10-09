@@ -9,6 +9,7 @@
 #include "Assets/ModelAssetGeneration.h" // MBC9
 #include "Material.h"
 #include "Texture.h"
+#include "FontAsset.h"
 #include "imgui_stdlib.h"
 #include <algorithm>
 
@@ -181,8 +182,49 @@ void AssetBundleWindow::Draw()
 	    }
 	}
 
-	// ★ SpriteFonts 섹션을 걷었다 (D4). 폰트 자산 컨테이너가 DX11
-	//   SpriteFont였고 그것이 사라졌다 - SDF 계통이 서면 다시 붙인다.
+	if (ImGui::CollapsingHeader("Fonts"))
+	{
+	    const auto fonts = DataSystems->SnapshotFonts();
+	    for (const auto& [key, font] : fonts)
+	    {
+	        if (!font)
+	        {
+	            continue;
+	        }
+	        const auto& path = font->GetPath();
+	        const auto utf8Name = path.filename().u8string();
+	        const std::string label(utf8Name.begin(), utf8Name.end());
+	        if (filter.IsActive() && !filter.PassFilter(label.c_str()))
+	        {
+	            continue;
+	        }
+	        const FileGuid guid = DataSystems->GetFileGuid(path);
+	        if (guid == FileGuid{})
+	        {
+	            // Engine resource fonts are always deployed; no source checkout
+	            // path may be serialized into a scene's asset bundle for them.
+	            ImGui::TextDisabled("%s (built-in)", label.c_str());
+	            continue;
+	        }
+	        const std::string reference = guid.ToString();
+	        const AssetEntry containTest{ ManagedAssetType::SpriteFont, reference };
+	        if (bundle.ContainsAsset(containTest))
+	        {
+	            continue;
+	        }
+	        entry.type = static_cast<uint32_t>(ManagedAssetType::SpriteFont);
+	        PackPathUTF8(reference, entry.path, sizeof(entry.path));
+	        ImGui::PushID(key.c_str());
+	        ImGui::Selectable(label.c_str());
+	        if (ImGui::BeginDragDropSource())
+	        {
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(entry));
+	            ImGui::TextUnformatted(label.c_str());
+	            ImGui::EndDragDropSource();
+	        }
+	        ImGui::PopID();
+	    }
+	}
 
 	ImGui::Separator();
 	ImGui::Text("Asset Bundle");

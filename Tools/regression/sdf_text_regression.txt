@@ -1,0 +1,59 @@
+# Source-authored text fixture. Not executed as part of the 2026-10-08 change.
+# Uses packaged Inter + Nanum Gothic, never a workstation font or old spritefont.
+# ui.drawitems reports CPU candidates, not successful GPU submission/pixels.
+wait 60
+scene.new SdfTextRegression
+wait 30
+object.create TextCanvas Canvas
+component.add TextCanvas Canvas
+wait 20
+
+object.create LatinText UI
+component.add LatinText TextComponent
+object.parent LatinText TextCanvas
+ui.anchor LatinText 0.5 0.5 0.5 0.5
+ui.size LatinText 480 100
+ui.pos LatinText 0 -120
+object.property LatinText TextComponent message AVATAR To Wa
+object.property LatinText TextComponent fontSize 40
+object.property LatinText TextComponent horizontalAlignment Left
+object.property LatinText TextComponent color 1,0.8,0.2,1
+
+object.create KoreanText UI
+component.add KoreanText TextComponent
+object.parent KoreanText TextCanvas
+ui.anchor KoreanText 0.5 0.5 0.5 0.5
+ui.size KoreanText 480 100
+ui.pos KoreanText 0 0
+object.property KoreanText TextComponent message 안녕하세요 CreatorEngine 한글
+object.property KoreanText TextComponent fontSize 32
+object.property KoreanText TextComponent horizontalAlignment Center
+object.property KoreanText TextComponent color 0.2,0.8,1,1
+
+object.create WrappedText UI
+component.add WrappedText TextComponent
+object.parent WrappedText TextCanvas
+ui.anchor WrappedText 0.5 0.5 0.5 0.5
+ui.size WrappedText 180 150
+ui.pos WrappedText 0 150
+object.property WrappedText TextComponent message ABCDEFGHIJKLMNOPQRSTUVWXYZ
+object.property WrappedText TextComponent fontSize 32
+object.property WrappedText TextComponent horizontalAlignment Right
+object.property WrappedText TextComponent color 1,1,1,0.5
+wait 60
+ui.rect *
+ui.drawitems
+
+# Dirty publication must update an existing text proxy rather than recreate it.
+object.property LatinText TextComponent message Updated text 123
+object.property KoreanText TextComponent fontSize 48
+object.property WrappedText TextComponent color 1,0.4,0.4,0.75
+wait 30
+ui.drawitems
+play
+wait 60
+ui.drawitems
+stop
+wait 40
+ui.drawitems
+# Leave the authored scene open for Scene/Game view visual inspection.

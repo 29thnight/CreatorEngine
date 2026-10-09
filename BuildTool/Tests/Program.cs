@@ -31,6 +31,23 @@ try
     }
     Metadata.AssertSourceOnlyAudio(["Runtime/Common/normal.dll", "Licenses/ThirdParty/miniaudio/LICENSE"]);
     ++checks;
+    var runtimeRoot = Path.Combine(root, "font-runtime");
+    var runtimeFonts = Paths.Child(runtimeRoot, RuntimeFonts.RelativeRoot);
+    Directory.CreateDirectory(runtimeFonts);
+    foreach (var required in RuntimeFonts.RequiredFiles)
+    {
+        File.WriteAllText(Paths.Child(runtimeFonts, required), "fixture");
+    }
+    Check(RuntimeFonts.Require(runtimeRoot) == runtimeFonts, "Complete runtime fonts rejected");
+    foreach (var required in RuntimeFonts.RequiredFiles)
+    {
+        var resource = Paths.Child(runtimeFonts, required);
+        File.Delete(resource);
+        Reject(() => RuntimeFonts.Require(runtimeRoot), "Missing font/license/provenance accepted: " + required);
+        File.WriteAllText(resource, "");
+        Reject(() => RuntimeFonts.Require(runtimeRoot), "Empty font/license/provenance accepted: " + required);
+        File.WriteAllText(resource, "fixture");
+    }
     // Unrun source fixture for independent AssetSet packaging. Native CEMF
     // semantic/closure validation is covered by asset_set_activation_probe.cpp.
     var assetSet = Path.Combine(root, "standalone-set");
@@ -237,6 +254,19 @@ try
     Check(!Directory.EnumerateFiles(Paths.Child(cookInput, "Assets/Audio")).Any(), "Audio source or meta leaked into package");
     Check(cookedAudio.All(relative => File.Exists(Paths.Child(cookInput, "Assets/Derived/" + relative))), "Audio cleanup removed cooked artifacts");
     Check(!Directory.Exists(Path.Combine(cookInput, "Assets/Script")), "C# source identities leaked into native cook input");
+    foreach (var relative in new[] { "Fonts/Latin.ttf", "Fonts/Korean.otf", "Fonts/LICENSE.txt" })
+    {
+        var source = Paths.Child(project, "Assets/" + relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        File.WriteAllText(source, "font or redistribution notice");
+        Check(!PackageInputs.Excluded(source), "Font/license excluded from Assets payload: " + relative);
+    }
+    var fontInput = Path.Combine(root, "font-input");
+    PackageInputs.CopyProject(project, fontInput, CancellationToken.None);
+    foreach (var relative in new[] { "Fonts/Latin.ttf", "Fonts/Korean.otf", "Fonts/LICENSE.txt" })
+    {
+        Check(File.Exists(Paths.Child(fontInput, "Assets/" + relative)), "Font/license omitted from project copy: " + relative);
+    }
     Check(File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl.meta")) && File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl")), "Runtime source identity was removed from cook input");
     Check(!PackageInputs.Excluded(Path.Combine(cookInput, "Assets/Derived/Models/ab/id/1/sidecar.meta")), "Cooked model sidecar was excluded from the package");
     Check(PackageInputs.Excluded(Path.Combine(cookInput, "Assets/Models/Robot.glb.meta")), "Authoring model sidecar entered the package");

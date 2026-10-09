@@ -139,6 +139,7 @@ internal static class EnginePublisher
             {
                 throw new BuildException("Built ScriptCore.dll script API differs from the native hosts. Rebuild ScriptCore before publishing.");
             }
+            RuntimeFonts.Require(binarySource);
             Tree(Path.Combine(binarySource, "Resources"), Path.Combine(binaryTarget, "Resources"));
             var dotnetRoot = Path.GetDirectoryName(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory().TrimEnd(Path.DirectorySeparatorChar))!;
             dotnetRoot = Directory.GetParent(dotnetRoot)!.Parent!.FullName;

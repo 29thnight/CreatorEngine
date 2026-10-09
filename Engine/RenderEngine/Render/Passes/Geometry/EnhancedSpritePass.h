@@ -3,6 +3,7 @@
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <mathematics/color.hpp>
+#include <memory>
 #include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
@@ -10,7 +11,7 @@
 
 class Texture;
 
-// SpriteRenderer와 3D Canvas 이미지를 함께 그리는 RHI 공용 월드 쿼드 패스.
+// SpriteRenderer와 3D Canvas 이미지·SDF 글리프를 함께 그리는 RHI 공용 월드 쿼드 패스.
 class EnhancedSpritePass : public EnhancedRenderPass
 {
 public:
@@ -26,6 +27,7 @@ public:
         int canvasOrder{ 0 };
         int layerOrder{ 0 };
         bool enableDepth{ false };
+        bool signedDistance{ false };
         std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
     };
 
@@ -75,10 +77,12 @@ private:
         math::matrix4x4 world{};
         math::vector4 uv{};
         math::color   color{};
+        math::vector4 sampling{}; // x = signed-distance flag; WorldSprite.slang과 동일
     };
 
-    static_assert(sizeof(Instance) == 96);
+    static_assert(sizeof(Instance) == 112u);
     static_assert(offsetof(Instance, color) == 80u);
+    static_assert(offsetof(Instance, sampling) == 96u);
     static_assert(std::is_same_v<decltype(Instance::color), math::color>);
     static_assert(std::is_trivially_copyable_v<Instance>);
 

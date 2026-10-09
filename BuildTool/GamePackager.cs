@@ -105,6 +105,15 @@ internal static class GamePackager
                 var relative = "Resources/Environment/" + Paths.Relative(environments, source);
                 Paths.Copy(source, Paths.Child(candidate, relative)); rootFiles.Add(relative);
             }
+            // Text's default and Korean fallback must work without a checkout,
+            // installed OS fonts, or Editor-only resources. Include every notice
+            // beside these unmodified font files in the hashed runtime closure.
+            var fonts = RuntimeFonts.Require(engine.BinaryRoot);
+            foreach (var source in Paths.Files(fonts))
+            {
+                var relative = RuntimeFonts.RelativeRoot + "/" + Paths.Relative(fonts, source);
+                Paths.Copy(source, Paths.Child(candidate, relative)); rootFiles.Add(relative);
+            }
             foreach (var source in runtimeSources)
             {
                 var relative = source.Path.StartsWith("Player/", StringComparison.Ordinal) ? source.Path[7..] : source.Path;

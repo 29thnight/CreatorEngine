@@ -3,7 +3,7 @@ struct RectInstance
     float4 bounds;   // left · top · right · bottom (픽셀)
     float4 uv;       // uvLeft · uvTop · uvRight · uvBottom
     float4 color;
-    float4 rotation; // x = radians
+    float4 rotation; // x = radians, y = signed-distance flag; 64-byte CPU ABI
 };
 
 StructuredBuffer<RectInstance> gRects : register(t0);
@@ -21,6 +21,7 @@ struct VSOut
     float4 position : SV_POSITION;
     float2 uv       : TEXCOORD0;
     float4 color    : COLOR0;
+    nointerpolation float signedDistance : TEXCOORD1;
 };
 
 VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
@@ -45,10 +46,22 @@ VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
         0.0f, 1.0f);
     output.uv = lerp(rect.uv.xy, rect.uv.zw, corner);
     output.color = rect.color;
+    output.signedDistance = rect.rotation.y;
     return output;
 }
 
 float4 PSMain(VSOut input) : SV_TARGET
 {
-    return gTexture.Sample(gSampler, input.uv) * input.color;
+    const float4 sampled = gTexture.Sample(gSampler, input.uv);
+    // FontAsset encodes the contour at byte 128; larger values are inside.
+    // Evaluate derivatives before branching so image/SDF instances can share a batch.
+    const float smoothing = max(fwidth(sampled.r), 1.0f / 255.0f);
+    if (input.signedDistance > 0.5f)
+    {
+        const float coverage = smoothstep(128.0f / 255.0f - smoothing * 0.5f,
+            128.0f / 255.0f + smoothing * 0.5f, sampled.r);
+        // The pipeline uses SrcAlpha/InvSrcAlpha: RGB must stay straight alpha.
+        return float4(input.color.rgb, input.color.a * coverage);
+    }
+    return sampled * input.color;
 }

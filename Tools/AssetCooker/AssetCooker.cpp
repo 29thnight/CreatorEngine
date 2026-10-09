@@ -5,6 +5,7 @@
 #include "ArtifactStoreGuard.h"
 #include <cwctype>
 #include "SoundAssetCookProducer.h"
+#include "FontAssetCookSupport.h"
 #include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedAudioClipFormat.h"
@@ -860,6 +861,16 @@ namespace
                 {
                     failure = "OGG audio source는 지원하지 않는다: " + source.string();
                     return false;
+                }
+                if (extension == ".ttf" || extension == ".otf")
+                {
+                    std::filesystem::path metaPath = source;
+                    metaPath += ".meta";
+                    if (!std::filesystem::is_regular_file(metaPath, error) || error)
+                    {
+                        failure = "font source sidecar is missing: " + source.string();
+                        return false;
+                    }
                 }
                 if (assets::IsAudioClipSource(source) || extension == ".soundgraph" || extension == ".soundpreset")
                 {
@@ -1771,7 +1782,8 @@ namespace
         }
         std::vector<sound_cook::Product> soundProducts;
         if (!sound_cook::Build(assetRoot, manifest, artifactPaths, soundProducts, sourceIdentityFailure)
-            || !sound_cook::RewriteScenes(sceneProducts, manifest, sourceIdentityFailure))
+            || !sound_cook::RewriteScenes(sceneProducts, manifest, sourceIdentityFailure)
+            || !font_cook::RewriteScenes(sceneProducts, manifest, assetRoot, sourceIdentityFailure))
         {
             std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
             return 3;

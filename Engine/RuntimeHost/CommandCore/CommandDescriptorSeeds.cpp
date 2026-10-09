@@ -298,6 +298,7 @@ namespace CommandCore
             { "tag.remove", CommandCost::Immediate, "<name>", "Remove and persist a project tag with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "name", true },
             { "terrain.authoring.probe", CommandCost::Frames, "<이름> <텍스처|->", "Terrain writer 트랜잭션 회귀 검사", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "ui.anchor", CommandCost::Frames, "<오브젝트> <minX> <minY> <maxX> <maxY>", "앵커를 직접 지정한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,minX:number,minY:number,maxX:number,maxY:number", true },
+            { "ui.drawitems", CommandCost::Immediate, "", "Read copied UI proxy and SDF glyph candidates without ticking or drawing", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "ui.hitbox", CommandCost::Frames, "", "버튼의 rect와 클릭 판정 상자를 나란히 출력한다", CommandClass::EngineService, CommandLiveness::Live },
             { "ui.navprobe", CommandCost::Frames, "", "UI 내비게이션 저작 계층을 세워 탐색 결과를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "ui.pos", CommandCost::Frames, "<target> <x> <y>", "UI anchored position을 편집한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,x:number,y:number", true },

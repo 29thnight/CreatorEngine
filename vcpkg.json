@@ -47,7 +47,7 @@
     { "name": "meshoptimizer", "$why": "LOD 생성 — MeshOptimizer" },
     { "name": "physx", "$why": "물리" },
     { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },
-    { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
+    { "name": "stb", "$why": "이미지 로드/기록 — Terrain; CPU 단일채널 거리장 폰트 — FontAsset (stb_truetype, private static implementation)" },
     {
       "name": "reflgen",
       "$why": "reflgen 도입 — [[reflgen::reflect]] 에서 리플렉션 서술을 생성한다(생성기·MSBuild 연동·헤더). overlay port(ports/reflgen)가 reflgen 릴리스 태그(v1.0.0)를 가리킨다. Directory.Build.targets 가 share/reflgen/msbuild/reflgen.targets 를 가져온다"

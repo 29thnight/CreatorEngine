@@ -2437,7 +2437,7 @@ private:
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
 		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".cs",
-		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont",
+		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont", ".ttf", ".otf",
 		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
 		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity

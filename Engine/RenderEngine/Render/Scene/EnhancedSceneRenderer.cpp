@@ -3889,20 +3889,40 @@ namespace
                 center.x, center.y, center.z, 1.f };
         }
 
-        static CanvasPlane ResolveCanvasPlane(const UIRenderProxy::ImageData& image,
+        template<typename TUIData>
+        static CanvasPlane ResolveCanvasPlane(const TUIData& image,
             const FrameCameraSnapshot* gameCamera)
         {
             CanvasPlane plane{};
             const float rootWidth = image.canvasRect.z;
             const float rootHeight = image.canvasRect.w;
-            if (rootWidth <= 0.f || rootHeight <= 0.f) return plane;
+            if (!std::isfinite(rootWidth) || !std::isfinite(rootHeight)
+                || !std::isfinite(image.canvasRect.x) || !std::isfinite(image.canvasRect.y)
+                || rootWidth <= 0.f || rootHeight <= 0.f)
+            {
+                return plane;
+            }
+            for (int row = 0; row < 4; ++row)
+            {
+                for (int column = 0; column < 4; ++column)
+                {
+                    if (!std::isfinite(image.canvasWorld(row, column)))
+                    {
+                        return plane;
+                    }
+                }
+            }
 
             if (CanvasRenderMode::ScreenSpaceCamera == image.renderMode)
             {
                 if (nullptr == gameCamera) return plane;
                 const float projectionX = std::abs(gameCamera->projection(0, 0));
                 const float projectionY = std::abs(gameCamera->projection(1, 1));
-                if (projectionX < 1e-6f || projectionY < 1e-6f) return plane;
+                if (!std::isfinite(projectionX) || !std::isfinite(projectionY)
+                    || !std::isfinite(image.planeDistance) || projectionX < 1e-6f || projectionY < 1e-6f)
+                {
+                    return plane;
+                }
 
                 float distance = (std::max)(image.planeDistance,
                     gameCamera->nearPlane + 0.01f);
@@ -3923,7 +3943,7 @@ namespace
 
             const float centerX = image.canvasRect.x + rootWidth * 0.5f;
             const float centerY = image.canvasRect.y + rootHeight * 0.5f;
-        const math::matrix4x4& canvasWorld = image.canvasWorld;
+            const math::matrix4x4& canvasWorld = image.canvasWorld;
             plane.center = math::transform_point(
                 math::vector3{ centerX, -centerY, 0.f }, canvasWorld);
             plane.right = math::transform_direction(
@@ -4014,7 +4034,59 @@ namespace
             return true;
         }
 
-        static void AppendCanvasOutline(const UIRenderProxy::ImageData& image,
+        static void AppendTextToPlane(const UIRenderProxy::TextData& text,
+            const CanvasPlane& plane, bool enableDepth, std::vector<EnhancedSpritePass::Item>& output,
+            TextureFramePins& texturePins)
+        {
+            if (!plane.valid)
+            {
+                return;
+            }
+            // Overlay and plane paths consume exactly the same glyph rectangles,
+            // including alignment, fallback, line wrapping and whole-block flips.
+            std::vector<EnhancedUIPass::Rect> glyphs;
+            EnhancedUIPass::AppendTextRects(text, glyphs, texturePins);
+            const float rootWidth = text.canvasRect.z;
+            const float rootHeight = text.canvasRect.w;
+            const float rootCenterX = text.canvasRect.x + rootWidth * 0.5f;
+            const float rootCenterY = text.canvasRect.y + rootHeight * 0.5f;
+            for (const auto& glyph : glyphs)
+            {
+                const float centerX = (glyph.left + glyph.right) * 0.5f;
+                const float centerY = (glyph.top + glyph.bottom) * 0.5f;
+                const math::vector3 center = plane.center
+                    + plane.right * ((centerX - rootCenterX) / rootWidth)
+                    + plane.down * ((centerY - rootCenterY) / rootHeight);
+                const math::vector3 right = plane.right * ((glyph.right - glyph.left) / rootWidth);
+                const math::vector3 down = plane.down * ((glyph.bottom - glyph.top) / rootHeight);
+                EnhancedSpritePass::Item item{};
+                item.world = MakeSpriteMatrix(right, down, center);
+                bool finite = true;
+                for (int row = 0; row < 4; ++row)
+                {
+                    for (int column = 0; column < 4; ++column)
+                    {
+                        finite = finite && std::isfinite(item.world(row, column));
+                    }
+                }
+                if (!finite)
+                {
+                    continue;
+                }
+                item.uv = { glyph.uvLeft, glyph.uvTop, glyph.uvRight, glyph.uvBottom };
+                item.color = glyph.color;
+                item.texture = glyph.texture;
+                item.texturePinIndex = glyph.texturePinIndex;
+                item.signedDistance = true;
+                item.canvasOrder = glyph.canvasOrder;
+                item.layerOrder = glyph.layerOrder;
+                item.enableDepth = enableDepth;
+                output.push_back(std::move(item));
+            }
+        }
+
+        template<typename TUIData>
+        static void AppendCanvasOutline(const TUIData& image,
             const CanvasPlane& plane, std::vector<EnhancedSpritePass::Item>& output)
         {
             if (!plane.valid) return;
@@ -5337,7 +5409,27 @@ namespace
             std::unordered_set<size_t> outlinedCanvases;
             for (UIRenderProxy* proxy : uiProxyPointers)
             {
-                if (nullptr == proxy) continue;
+                if (nullptr == proxy || !proxy->IsEnabled())
+                {
+                    continue;
+                }
+                if (const auto* text = std::get_if<UIRenderProxy::TextData>(&proxy->GetData()))
+                {
+                    if (CanvasRenderMode::ScreenSpaceOverlay == text->renderMode
+                        && HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::ScreenSpaceUI))
+                    {
+                        continue;
+                    }
+                    const CanvasPlane plane = ResolveCanvasPlane(*text, gameCamera);
+                    AppendTextToPlane(*text, plane, CanvasRenderMode::WorldSpace == text->renderMode,
+                        worldSprites, *textureFramePins);
+                    if (HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::CanvasPreview)
+                        && outlinedCanvases.insert(text->canvasId.m_ID_Data).second)
+                    {
+                        AppendCanvasOutline(*text, plane, worldSprites);
+                    }
+                    continue;
+                }
                 const auto* image = std::get_if<UIRenderProxy::ImageData>(
                     &proxy->GetData());
                 if (nullptr == image) continue;

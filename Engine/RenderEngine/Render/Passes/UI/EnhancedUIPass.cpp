@@ -4,10 +4,14 @@
 #include "../../../UIRenderProxy.h"
 #include "../../../UIClipping.h"
 #include "../../../Texture.h"
+#include "../../../FontAsset.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
 
@@ -57,12 +61,88 @@ namespace
 }
 
 
-// ── UI 큐를 사각형으로 ──
-//
-// 프록시가 들고 있는 것은 DirectXTK SpriteBatch에 넘길 형태다(앵커 좌표·
-// origin·회전). 그것을 화면 사각형으로 푸는 계산이 DX11 Draw 안에 있었는데,
-// 그 계산을 여기서 다시 쓰지 않고 같은 함수를 부른다 — 두 곳에 따로 두면
-// 하나가 틀려도 알 수 없다.
+// ── 불변 글리프 배치를 화면/Canvas 사각형으로 ──
+bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
+    std::vector<Rect>& outRects, TextureFramePins& texturePins, float offsetX, float offsetY)
+{
+    if (!text.layout || !std::isfinite(offsetX) || !std::isfinite(offsetY) ||
+        !std::isfinite(text.position.x) || !std::isfinite(text.position.y) ||
+        !std::isfinite(text.color.r) || !std::isfinite(text.color.g) ||
+        !std::isfinite(text.color.b) || !std::isfinite(text.color.a))
+    {
+        return false;
+    }
+    const TextLayout& layout = *text.layout;
+    if (!std::isfinite(layout.width) || !std::isfinite(layout.height) ||
+        layout.width < 0.f || layout.height < 0.f)
+    {
+        return false;
+    }
+
+    // 각 줄은 layout의 폭 안에서 이미 정렬돼 있다. 여기서는 블록의
+    // 앵커만 옮긴다. 세로 앵커는 RectTransform과 같이 중앙이다.
+    float anchorX = 0.f;
+    if (TextAlignment::Center == text.alignment)
+    {
+        anchorX = layout.width * 0.5f;
+    }
+    else if (TextAlignment::Right == text.alignment)
+    {
+        anchorX = layout.width;
+    }
+    const float left = text.position.x + offsetX - anchorX;
+    const float top = text.position.y + offsetY - layout.height * 0.5f;
+    if (!std::isfinite(left) || !std::isfinite(top))
+    {
+        return false;
+    }
+    const bool flipX = HasUIEffect(text.filpEffect, UIEffects::UIEffects_FlipHorizontally);
+    const bool flipY = HasUIEffect(text.filpEffect, UIEffects::UIEffects_FlipVertically);
+    bool invalidGlyph = false;
+    for (const TextGlyph& glyph : layout.glyphs)
+    {
+        // Append-only atlas pages may publish a newer CPU texture; this frame
+        // seals one owner while older frames keep their previous texture alive.
+        const auto texture = glyph.GetTexture();
+        if (!texture || !std::isfinite(glyph.left) ||
+            !std::isfinite(glyph.top) || !std::isfinite(glyph.right) ||
+            !std::isfinite(glyph.bottom) || !std::isfinite(glyph.uvLeft) ||
+            !std::isfinite(glyph.uvTop) || !std::isfinite(glyph.uvRight) ||
+            !std::isfinite(glyph.uvBottom) || glyph.right <= glyph.left ||
+            glyph.bottom <= glyph.top)
+        {
+            invalidGlyph = true;
+            continue;
+        }
+        Rect rect{};
+        rect.left = left + (flipX ? layout.width - glyph.right : glyph.left);
+        rect.top = top + (flipY ? layout.height - glyph.bottom : glyph.top);
+        rect.right = left + (flipX ? layout.width - glyph.left : glyph.right);
+        rect.bottom = top + (flipY ? layout.height - glyph.top : glyph.bottom);
+        if (!std::isfinite(rect.left) || !std::isfinite(rect.top) ||
+            !std::isfinite(rect.right) || !std::isfinite(rect.bottom) ||
+            !std::isfinite(rect.left + rect.right) || !std::isfinite(rect.top + rect.bottom) ||
+            !std::isfinite(rect.right - rect.left) || !std::isfinite(rect.bottom - rect.top) ||
+            rect.right <= rect.left || rect.bottom <= rect.top)
+        {
+            invalidGlyph = true;
+            continue;
+        }
+        rect.uvLeft = flipX ? glyph.uvRight : glyph.uvLeft;
+        rect.uvTop = flipY ? glyph.uvBottom : glyph.uvTop;
+        rect.uvRight = flipX ? glyph.uvLeft : glyph.uvRight;
+        rect.uvBottom = flipY ? glyph.uvTop : glyph.uvBottom;
+        rect.color = text.color;
+        rect.canvasOrder = text.canvasOrder;
+        rect.layerOrder = text.layerOrder;
+        rect.texturePinIndex = texturePins.Retain(texture);
+        rect.texture = texturePins.Borrow(rect.texturePinIndex);
+        rect.signedDistance = true;
+        outRects.push_back(std::move(rect));
+    }
+    return !invalidGlyph;
+}
+
 uint32_t EnhancedUIPass::BuildRectsFromQueue(
     UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects,
     float screenWidth, float screenHeight, TextureFramePins* texturePins)
@@ -71,16 +151,40 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
     outRects.reserve(count);
 
     uint32_t skipped = 0;
+    const float offsetX = screenWidth > 0.f ? screenWidth * 0.5f : 0.f;
+    const float offsetY = screenHeight > 0.f ? screenHeight * 0.5f : 0.f;
 
     for (size_t i = 0; i < count; ++i)
     {
         auto* proxy = proxies[i];
-        if (nullptr == proxy) { ++skipped; continue; }
+        if (nullptr == proxy)
+        {
+            ++skipped;
+            continue;
+        }
+        if (!proxy->IsEnabled())
+        {
+            continue;
+        }
+
+        if (const auto* text = std::get_if<UIRenderProxy::TextData>(&proxy->GetData()))
+        {
+            if (CanvasRenderMode::ScreenSpaceOverlay != text->renderMode || !text->layout || !texturePins)
+            {
+                ++skipped;
+                continue;
+            }
+            if (!AppendTextRects(*text, outRects, *texturePins, offsetX, offsetY))
+            {
+                ++skipped;
+            }
+            continue;
+        }
 
         const auto* image = std::get_if<UIRenderProxy::ImageData>(&proxy->GetData());
         if (nullptr == image)
         {
-            // 텍스트·스프라이트시트. 폰트 아틀라스가 붙기 전까지 건너뛴다.
+            // 스프라이트시트는 이 패스에서 아직 펼치지 않는다.
             ++skipped;
             continue;
         }
@@ -103,8 +207,6 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
 
         // RectTransform의 화면 루트는 중앙 원점(-W/2,-H/2)이고 UI 셰이더는
         // 좌상단 원점이다. 라이브 화면 크기를 받았을 때만 그 차이를 옮긴다.
-        const float offsetX = screenWidth > 0.f ? screenWidth * 0.5f : 0.f;
-        const float offsetY = screenHeight > 0.f ? screenHeight * 0.5f : 0.f;
         const float left = image->position.x + offsetX - halfWidth;
         const float top = image->position.y + offsetY - halfHeight;
         const float right = left + texW * image->scale.x;
@@ -135,9 +237,13 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         rect.uvBottom = static_cast<float>(src.bottom) / static_cast<float>(texH);
 
         if (HasUIEffect(image->filpEffect, UIEffects::UIEffects_FlipHorizontally))
+        {
             std::swap(rect.uvLeft, rect.uvRight);
+        }
         if (HasUIEffect(image->filpEffect, UIEffects::UIEffects_FlipVertically))
+        {
             std::swap(rect.uvTop, rect.uvBottom);
+        }
 
         rect.color = image->color;
         rect.rotation = image->rotation;
@@ -147,7 +253,7 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
             : TextureFramePins::InvalidIndex;
         rect.texture = (image->texture ? &*image->texture.borrow() : nullptr);
 
-        outRects.push_back(rect);
+        outRects.push_back(std::move(rect));
     }
 
     return skipped;
@@ -225,8 +331,6 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
 
 bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
-    (void)outError;
-
     m_width = context.width;
     m_height = context.height;
 
@@ -236,6 +340,11 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
     m_lastBatchCount = 0;
 
     if (nullptr == m_rects || m_rects->empty()) return true;
+    if (m_rects->size() > (std::numeric_limits<uint32_t>::max)())
+    {
+        outError = "UI instance count exceeds 32-bit addressing.";
+        return false;
+    }
 
     // ── 순서 정하기 ──
     //
@@ -271,7 +380,7 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
         instance.bounds = math::vector4(rect.left, rect.top, rect.right, rect.bottom);
         instance.uv = math::vector4(rect.uvLeft, rect.uvTop, rect.uvRight, rect.uvBottom);
         instance.color = rect.color;
-        instance.rotation = math::vector4(rect.rotation, 0.f, 0.f, 0.f);
+        instance.rotation = math::vector4(rect.rotation, rect.signedDistance ? 1.f : 0.f, 0.f, 0.f);
         m_instances.push_back(instance);
 
         // 앞 배치와 텍스처가 같으면 이어 붙인다.
