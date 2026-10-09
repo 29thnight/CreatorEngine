@@ -5,6 +5,7 @@
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/RHIShaderCompiler.h"
+#include <algorithm>
 #include <chrono>
 #include <thread>
 #include <stdexcept>
@@ -159,7 +160,12 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             {
                 return name == "transform" ? uint64_t{100} : uint64_t{0};
             });
-            require(measuredHints.size() == 1 && measuredHints.front().pass.index == transform.index,
+            const auto transformHint = std::find_if(measuredHints.begin(), measuredHints.end(),
+                [&](const auto& hint) { return hint.pass.index == transform.index; });
+            require(measuredHints.size() == graph->GetExecuteOrder().size() && transformHint != measuredHints.end() &&
+                transformHint->computeCompatible && transformHint->measuredGpuNanoseconds == 100 &&
+                std::count_if(measuredHints.begin(), measuredHints.end(),
+                    [](const auto& hint) { return hint.computeCompatible; }) == 1,
                 "Author compute declaration did not produce measured hint.");
             compute.profiler = &graphicsProfiler;
             require(!graph->SubmitQueues(graph, recorder, graphics, &compute, measuredHints, 100, storage, execution, error) &&

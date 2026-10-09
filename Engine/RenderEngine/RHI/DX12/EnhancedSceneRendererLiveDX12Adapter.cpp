@@ -63,6 +63,8 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     uint64_t queueBatches{0};
     uint64_t queueBarriers{0};
     uint32_t lastQueueBarriers{0};
+    uint64_t overlapFrames{0};
+    uint64_t predictedGainNanoseconds{0};
     // 프레임마다 재사용하는 수집물. 문자열 버퍼를 지켜 할당을 없앤다.
     DX12GpuProfiler::FrameTimings profilerTimings;
     std::vector<DX12GpuProfiler::PassTiming> profilerMerged;
@@ -102,6 +104,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     impl.graphics = {};
     impl.queueSubmissions = impl.queueBatches = 0;
     impl.queueBarriers = impl.lastQueueBarriers = 0;
+    impl.overlapFrames = impl.predictedGainNanoseconds = 0;
     ID3D12CommandQueue* profilerQueue = impl.resources.GetCommandQueue();
     if (impl.ownedQueueExecution)
     {
@@ -253,6 +256,9 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
             static_cast<unsigned long long>(impl.queueSubmissions), static_cast<unsigned long long>(impl.queueBatches));
         std::printf("[rg8.barriers] total=%llu last=%u\n",
             static_cast<unsigned long long>(impl.queueBarriers), impl.lastQueueBarriers);
+        std::printf("[rg8.schedule] placement=overlap overlapFrames=%llu predictedGainNs=%llu\n",
+            static_cast<unsigned long long>(impl.overlapFrames),
+            static_cast<unsigned long long>(impl.predictedGainNanoseconds));
     }
     impl.graphics = {};
     impl.commandPool.Shutdown();
@@ -390,6 +396,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
     impl.queueBatches += execution.submittedBatches;
     impl.queueBarriers += execution.plannedBarriers;
     impl.lastQueueBarriers = execution.plannedBarriers;
+    if (execution.computeBatches != 0)
+    {
+        ++impl.overlapFrames;
+        impl.predictedGainNanoseconds += execution.predictedSerialNanoseconds - execution.predictedNanoseconds;
+    }
     return impl.resources.JoinQueueFrame(execution.completion, outError);
 }
 

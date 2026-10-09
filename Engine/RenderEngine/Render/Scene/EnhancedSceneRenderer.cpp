@@ -5852,6 +5852,11 @@ namespace
             graph.SetTransientPool(&p.transientPool);
             graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
                 ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
+            // Owned queues use compute only when measured independent graphics work
+            // can hide it. Cost constants are uncalibrated estimates (QueueCostModel).
+            EnhancedRenderGraph::QueueCostModel queueCosts;
+            queueCosts.placement = RGQueuePlacement::Overlap;
+            graph.SetQueueCostModel(queueCosts);
             const std::function<bool(std::string&)> queueBoundary = ownedQueueExecution
                 ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
                 : std::function<bool(std::string&)>{};

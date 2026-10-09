@@ -134,8 +134,17 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     PhaseBarrierPlan prologue, epilogue;
     if (plan.usesCompute)
     {
+        // Overlap placement may submit in another topological order. Barrier
+        // planning and final-state placement follow the order that executes.
+        for (size_t index = 0; index < plan.entries.size(); ++index)
+        {
+            m_executeOrder[index] = plan.entries[index].pass;
+        }
+        UpdateResourceUses();
         PlanBarriers(&batchEnds, &prologue, &epilogue);
     }
+    output.predictedSerialNanoseconds = plan.predictedSerialNanoseconds;
+    output.predictedNanoseconds = plan.predictedNanoseconds;
     output.plannedBarriers = m_stats.barriersEmitted;
     const auto recordBoundary = [&](RHIEncoder& encoder, const PhaseBarrierPlan& plan)
     {

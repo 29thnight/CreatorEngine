@@ -72,6 +72,17 @@ enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVe
 // Access/version declarations and execution ordering are independent contracts.
 enum class RGOrderPolicy { DependencyOrder, PreserveDeclarationOrder };
 
+// How BuildQueueSchedule assigns compute-compatible passes to the compute queue.
+enum class RGQueuePlacement : uint8_t
+{
+    // Every eligible measured pass moves and compiled order is kept. Deterministic
+    // placement for queue execution contract tests; ignores whether work can overlap.
+    Threshold,
+    // Two-queue list schedule over the dependency DAG. Compute is used only when the
+    // predicted span after cross-queue handoff costs improves by minimumGainNanoseconds.
+    Overlap,
+};
+
 // 그래프가 만들 리소스의 설명. transient(그래프 소유)만 이 설명을 쓴다.
 struct RGTextureDesc
 {
@@ -479,13 +490,26 @@ public:
     {
         struct Entry { uint16_t pass; RHIQueueKind queue; };
         struct Wait { uint16_t producer, consumer; uint32_t resource; };
-        std::vector<Entry> entries;
+        std::vector<Entry> entries; // Submission order; a topological order of the DAG.
         std::vector<Wait> waits;
         uint64_t compileGeneration{0};
+        // Cost-model estimates from measured pass times. Unmeasured passes count as 0.
+        uint64_t predictedSerialNanoseconds{0};
+        uint64_t predictedNanoseconds{0};
         bool usesCompute{false};
     };
-    // Planning only: existing barriers/batches remain single-queue. A future executor
-    // must generate COMMON handoffs and retain resources to queue-specific completion.
+    struct QueueCostModel
+    {
+        RGQueuePlacement placement{RGQueuePlacement::Threshold};
+        // Per cross-queue wait: fence wait, extra submission and boundary COMMON
+        // barriers. Uncalibrated estimate; measure before relying on the default.
+        uint64_t handoffNanoseconds{20'000};
+        uint64_t minimumGainNanoseconds{50'000};
+    };
+    void SetQueueCostModel(const QueueCostModel& model) { RequireQueueIdle(); m_queueCostModel = model; }
+    // minimumGpuNanoseconds is the per-pass measured time a compute candidate needs.
+    // Overlap placement may reorder passes (DependencyOrder only) but keeps every
+    // physical resource's use order, so the compiled barrier state sequence holds.
     // Shared physical resources are serialized, including read/read state changes.
     bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
         const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
@@ -508,6 +532,7 @@ public:
         uint32_t submittedBatches{0};
         uint32_t computeBatches{0};
         uint32_t plannedBarriers{0}; // Includes queue boundary plans and repeated phases.
+        uint64_t predictedSerialNanoseconds{0}, predictedNanoseconds{0};
         bool submissionAttempted{false};
         bool recoveryRequired{false}; // Partial execution: never retry on the fallback path.
     };
@@ -785,6 +810,18 @@ private:
     void BuildDependencyWaves();
     std::vector<int32_t> m_dependencyWaves;
     std::vector<uint16_t> m_criticalPath;
+    // Pass dependencies for queue planning: version edges plus each physical
+    // resource's compiled use order. Indexed by pass; culled passes have none.
+    void BuildQueueDependencies(std::vector<std::vector<uint16_t>>& predecessors,
+        std::vector<std::vector<uint16_t>>& successors) const;
+    // Two-queue list simulation. Returns the predicted span and, if requested,
+    // the submission order. reorder=false keeps the compiled order.
+    uint64_t SimulateQueues(const std::vector<RHIQueueKind>& queues, const std::vector<uint64_t>& costs,
+        const std::vector<std::vector<uint16_t>>& predecessors,
+        const std::vector<std::vector<uint16_t>>& successors,
+        bool reorder, std::vector<uint16_t>* order) const;
+    void UpdateResourceUses();
+    QueueCostModel m_queueCostModel;
     RGHandle VersionHandle(uint16_t index, uint16_t version) const;
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;

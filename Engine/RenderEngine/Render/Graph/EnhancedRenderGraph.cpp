@@ -8,6 +8,7 @@
 #include <queue>
 #include <limits>
 #include <chrono>
+#include <tuple>
 #include <mutex>
 
 namespace
@@ -1159,12 +1160,8 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
     return true;
 }
 
-bool EnhancedRenderGraph::CreateTransients(std::string& outError)
+void EnhancedRenderGraph::UpdateResourceUses()
 {
-    ce::profile_scope profile{ce::marker<"RenderGraphTransients">()};
-    TransientPreparationTimer timer{m_stats.transientPrepareCpuMs};
-    // 살아남은 패스가 실제로 쓰는 리소스만 만든다. 컬링된 패스만 쓰던 것을
-    // 만드는 것은 낭비이고, 그 낭비는 프레임마다 반복된다.
     for (auto& resource : m_resources)
     {
         resource.used = false;
@@ -1183,6 +1180,15 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
             resource.lastUse = (std::max)(resource.lastUse, order);
         }
     }
+}
+
+bool EnhancedRenderGraph::CreateTransients(std::string& outError)
+{
+    ce::profile_scope profile{ce::marker<"RenderGraphTransients">()};
+    TransientPreparationTimer timer{m_stats.transientPrepareCpuMs};
+    // 살아남은 패스가 실제로 쓰는 리소스만 만든다. 컬링된 패스만 쓰던 것을
+    // 만드는 것은 낭비이고, 그 낭비는 프레임마다 반복된다.
+    UpdateResourceUses();
 
     if (!CreateAliasedTransients(outError))
     {
@@ -2231,15 +2237,145 @@ std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHi
     const std::function<uint64_t(const std::string&)>& measurement) const
 {
     std::vector<QueueHint> hints;
+    // Graphics passes are measured too: overlap placement needs the work that can
+    // run beside a compute pass, not only the compute candidate itself.
+    hints.reserve(m_executeOrder.size());
     for (const auto index : m_executeOrder)
     {
         const auto& pass = m_passes[index];
-        if (pass.computeCompatible)
-        {
-            hints.push_back({RGPassId{index}, true, measurement(pass.name)});
-        }
+        hints.push_back({RGPassId{index}, pass.computeCompatible, measurement(pass.name)});
     }
     return hints;
+}
+
+void EnhancedRenderGraph::BuildQueueDependencies(std::vector<std::vector<uint16_t>>& predecessors,
+    std::vector<std::vector<uint16_t>>& successors) const
+{
+    predecessors.assign(m_passes.size(), {});
+    successors.assign(m_passes.size(), {});
+    const auto add = [&](uint16_t producer, uint16_t consumer)
+    {
+        if (producer == consumer || m_passes[producer].culled || m_passes[consumer].culled)
+        {
+            return;
+        }
+        predecessors[consumer].push_back(producer);
+        successors[producer].push_back(consumer);
+    };
+    for (const auto& edge : m_versionEdges)
+    {
+        add(static_cast<uint16_t>(edge.producer), static_cast<uint16_t>(edge.consumer));
+    }
+    // Keeping each resource's compiled use order keeps its state sequence, so the
+    // barrier planner produces the same per-resource transitions in any order.
+    std::vector<uint16_t> previous(m_resources.size(), RGPassId::kInvalid);
+    for (const auto pass : m_executeOrder)
+    {
+        for (const auto& usage : m_passes[pass].usages)
+        {
+            if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
+            {
+                continue;
+            }
+            auto& last = previous[usage.handle.index];
+            if (last != RGPassId::kInvalid)
+            {
+                add(last, pass);
+            }
+            last = pass;
+        }
+    }
+    for (auto* lists : {&predecessors, &successors})
+    {
+        for (auto& list : *lists)
+        {
+            std::sort(list.begin(), list.end());
+            list.erase(std::unique(list.begin(), list.end()), list.end());
+        }
+    }
+}
+
+uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& queues,
+    const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
+    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order) const
+{
+    const uint64_t handoff = m_queueCostModel.handoffNanoseconds;
+    std::vector<uint32_t> position(m_passes.size(), UINT32_MAX);
+    for (uint32_t index = 0; index < m_executeOrder.size(); ++index)
+    {
+        position[m_executeOrder[index]] = index;
+    }
+    // Ancestors of compute work go first among equally ready graphics passes so
+    // compute starts early; everything else keeps compiled order on ties.
+    std::vector<bool> feedsCompute(m_passes.size(), false);
+    bool usesCompute = false;
+    for (auto it = m_executeOrder.rbegin(); it != m_executeOrder.rend(); ++it)
+    {
+        usesCompute = usesCompute || queues[*it] == RHIQueueKind::Compute;
+        for (const auto next : successors[*it])
+        {
+            if (queues[next] == RHIQueueKind::Compute || feedsCompute[next])
+            {
+                feedsCompute[*it] = true;
+                break;
+            }
+        }
+    }
+    std::vector<uint32_t> remaining(m_passes.size(), 0);
+    std::vector<uint64_t> earliest(m_passes.size(), 0), finish(m_passes.size(), 0);
+    std::vector<uint16_t> ready;
+    for (const auto pass : m_executeOrder)
+    {
+        remaining[pass] = static_cast<uint32_t>(predecessors[pass].size());
+        if (remaining[pass] == 0)
+        {
+            ready.push_back(pass);
+        }
+    }
+    uint64_t queueFree[2]{0, 0};
+    const auto slot = [&](uint16_t pass) { return queues[pass] == RHIQueueKind::Compute ? 1 : 0; };
+    const auto start = [&](uint16_t pass) { return (std::max)(earliest[pass], queueFree[slot(pass)]); };
+    if (order)
+    {
+        order->clear();
+        order->reserve(m_executeOrder.size());
+    }
+    // Earliest start, then compute ancestors, then compiled position.
+    const auto key = [&](uint16_t pass)
+    {
+        return reorder ? std::tuple<uint64_t, bool, uint32_t>{start(pass), !feedsCompute[pass], position[pass]} :
+            std::tuple<uint64_t, bool, uint32_t>{0, false, position[pass]};
+    };
+    while (!ready.empty())
+    {
+        auto best = ready.begin();
+        for (auto it = ready.begin() + 1; it != ready.end(); ++it)
+        {
+            if (key(*it) < key(*best))
+            {
+                best = it;
+            }
+        }
+        const auto pass = *best;
+        ready.erase(best);
+        finish[pass] = start(pass) + costs[pass];
+        queueFree[slot(pass)] = finish[pass];
+        if (order)
+        {
+            order->push_back(pass);
+        }
+        for (const auto next : successors[pass])
+        {
+            const uint64_t available = finish[pass] + (queues[next] != queues[pass] ? handoff : 0);
+            earliest[next] = (std::max)(earliest[next], available);
+            if (--remaining[next] == 0)
+            {
+                ready.push_back(next);
+            }
+        }
+    }
+    // The graphics epilogue joins the last compute completion.
+    return (std::max)(queueFree[0], usesCompute ? queueFree[1] + handoff : 0);
 }
 
 bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
@@ -2268,16 +2404,105 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     // RG7 lifetimes and alias barriers currently assume a single total order.
     const bool allowCompute = capabilities.compute && capabilities.crossQueueTimeline &&
         minimumGpuNanoseconds > 0 && !m_aliasing && m_scheduling == RGSchedulingMode::ExplicitVersioned;
-    std::vector<RHIQueueKind> queues(m_passes.size(), RHIQueueKind::Graphics);
+    const bool overlap = m_queueCostModel.placement == RGQueuePlacement::Overlap;
+    std::vector<uint64_t> costs(m_passes.size(), 0);
+    std::vector<uint16_t> candidates;
     for (const auto pass : m_executeOrder)
     {
         const auto* hint = byPass[pass];
-        if (allowCompute && hint && hint->computeCompatible &&
+        costs[pass] = hint ? hint->measuredGpuNanoseconds : 0;
+        // Overlap placement also requires the author declaration: hints are data.
+        if (allowCompute && hint && hint->computeCompatible && (!overlap || m_passes[pass].computeCompatible) &&
             hint->measuredGpuNanoseconds >= minimumGpuNanoseconds)
         {
-            queues[pass] = RHIQueueKind::Compute;
-            plan.usesCompute = true;
+            candidates.push_back(pass);
         }
+    }
+    std::vector<std::vector<uint16_t>> predecessors, successors;
+    BuildQueueDependencies(predecessors, successors);
+    const std::vector<RHIQueueKind> serial(m_passes.size(), RHIQueueKind::Graphics);
+    plan.predictedSerialNanoseconds = SimulateQueues(serial, costs, predecessors, successors, false, nullptr);
+    plan.predictedNanoseconds = plan.predictedSerialNanoseconds;
+    std::vector<RHIQueueKind> queues = serial;
+    std::vector<uint16_t> order = m_executeOrder;
+    if (!overlap)
+    {
+        for (const auto pass : candidates)
+        {
+            queues[pass] = RHIQueueKind::Compute;
+        }
+        plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr);
+    }
+    else if (!candidates.empty())
+    {
+        const bool reorder = m_orderPolicy == RGOrderPolicy::DependencyOrder;
+        uint64_t best = plan.predictedSerialNanoseconds;
+        const auto attempt = [&](const std::vector<uint16_t>& passes)
+        {
+            auto trial = queues;
+            for (const auto pass : passes)
+            {
+                trial[pass] = trial[pass] == RHIQueueKind::Compute ? RHIQueueKind::Graphics : RHIQueueKind::Compute;
+            }
+            const auto span = SimulateQueues(trial, costs, predecessors, successors, reorder, nullptr);
+            if (span < best)
+            {
+                best = span;
+                queues = std::move(trial);
+            }
+        };
+        // A dependent chain of candidates (SSAO raw -> filter) only pays off as a
+        // unit: moving one member alone adds two handoffs. Try chains first, then
+        // single toggles to drop members that do not help.
+        std::vector<uint16_t> component(m_passes.size(), RGPassId::kInvalid);
+        std::vector<bool> candidate(m_passes.size(), false);
+        for (const auto pass : candidates)
+        {
+            candidate[pass] = true;
+        }
+        for (const auto root : candidates)
+        {
+            if (component[root] != RGPassId::kInvalid)
+            {
+                continue;
+            }
+            std::vector<uint16_t> members{root}, stack{root};
+            component[root] = root;
+            while (!stack.empty())
+            {
+                const auto pass = stack.back();
+                stack.pop_back();
+                for (const auto* neighbours : {&predecessors[pass], &successors[pass]})
+                {
+                    for (const auto next : *neighbours)
+                    {
+                        if (candidate[next] && component[next] == RGPassId::kInvalid)
+                        {
+                            component[next] = root;
+                            members.push_back(next);
+                            stack.push_back(next);
+                        }
+                    }
+                }
+            }
+            attempt(members);
+        }
+        for (const auto pass : candidates)
+        {
+            attempt({pass});
+        }
+        if (plan.predictedSerialNanoseconds - best >= m_queueCostModel.minimumGainNanoseconds)
+        {
+            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, reorder, &order);
+        }
+        else
+        {
+            queues = serial; // No measurable overlap: keep the single-queue plan.
+        }
+    }
+    for (const auto pass : order)
+    {
+        plan.usesCompute = plan.usesCompute || queues[pass] == RHIQueueKind::Compute;
         plan.entries.push_back({pass, queues[pass]});
     }
     if (!plan.usesCompute)
@@ -2285,39 +2510,28 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         output = std::move(plan);
         return true;
     }
-    const auto addWait = [&](uint16_t producer, uint16_t consumer, uint32_t resource)
-    {
-        if (producer == consumer || m_passes[producer].culled || m_passes[consumer].culled ||
-            queues[producer] == queues[consumer])
-        {
-            return;
-        }
-        const auto duplicate = std::find_if(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
-        {
-            return wait.producer == producer && wait.consumer == consumer && wait.resource == resource;
-        });
-        if (duplicate == plan.waits.end())
-        {
-            plan.waits.push_back({producer, consumer, resource});
-        }
-    };
-    for (const auto& edge : m_versionEdges)
-    {
-        addWait(static_cast<uint16_t>(edge.producer), static_cast<uint16_t>(edge.consumer), edge.resource);
-    }
-    // Logical versions share physical storage. State ownership cannot overlap even
-    // when the DAG allows concurrent readers; serialize every physical use for now.
-    std::vector<uint16_t> previous(m_resources.size(), RGPassId::kInvalid);
     for (const auto pass : m_executeOrder)
     {
-        for (const auto& usage : m_passes[pass].usages)
+        for (const auto producer : predecessors[pass])
         {
-            const auto resource = usage.handle.index;
-            if (previous[resource] != RGPassId::kInvalid)
+            if (queues[producer] == queues[pass])
             {
-                addWait(previous[resource], pass, resource);
+                continue;
             }
-            previous[resource] = pass;
+            // Report the resources behind each cross-queue edge for diagnostics.
+            for (const auto& usage : m_passes[pass].usages)
+            {
+                const auto resource = usage.handle.index;
+                const bool shared = std::any_of(m_passes[producer].usages.begin(), m_passes[producer].usages.end(),
+                    [&](const RGPassUsage& other) { return other.handle.index == resource; });
+                if (shared && std::none_of(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
+                    {
+                        return wait.producer == producer && wait.consumer == pass && wait.resource == resource;
+                    }))
+                {
+                    plan.waits.push_back({producer, pass, resource});
+                }
+            }
         }
     }
     output = std::move(plan);
