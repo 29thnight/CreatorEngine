@@ -167,7 +167,7 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
         description.name = "Geometry.Occlusion." + std::to_string(level);
         const auto target = graph.Write(graph.CreateTexture(description));
         m_levels.push_back(target);
-        graph.AddPass(description.name,
+        const auto buildPass = graph.AddPass(description.name,
             {{source, RHIResourceState::ShaderResource, RGAccessMode::Read},
              {target, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
             [owner, source, target, constants, level](const auto& execution) {
@@ -198,6 +198,9 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
                 encoder.SetBindings(RHIBindPoint::Compute, 2, outputs);
                 encoder.Dispatch((constants.targetWidth + 7u) / 8u, (constants.targetHeight + 7u) / 8u, 1u);
             });
+        // The prepared view is immutable during recording; the callback only
+        // binds declared SRV/UAV resources and dispatches through its encoder.
+        graph.DeclareComputeCompatible(buildPass);
         source = target;
         width = constants.targetWidth;
         height = constants.targetHeight;

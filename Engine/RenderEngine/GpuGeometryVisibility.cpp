@@ -595,7 +595,7 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     {
         m_graphArguments = graph.Write(m_graphArguments);
     }
-    graph.AddPass("Geometry.Visibility.Reset",
+    const auto resetPass = graph.AddPass("Geometry.Visibility.Reset",
                   {{m_graphArguments, RHIResourceState::UnorderedAccess,
                     versioned ? RGAccessMode::Write : RGAccessMode::LegacyState}},
                   [owner](const auto& execution) {
@@ -616,7 +616,8 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     {
         m_pyramid->AddReadUsages(graph, usages);
     }
-    graph.AddPass(m_pyramid ? "Geometry.Visibility.CullOcclusion" : "Geometry.Visibility.Cull", usages,
+    const auto cullPass = graph.AddPass(
+        m_pyramid ? "Geometry.Visibility.CullOcclusion" : "Geometry.Visibility.Cull", usages,
                   [owner](const auto& execution) {
                       owner->CheckCurrent(execution.graph);
                       RHIBindingTable depth;
@@ -626,6 +627,10 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
                       }
                       owner->Dispatch(*execution.encoder, false, depth);
                   });
+    // Candidates, bins and constants are sealed uploads. All mutable GPU
+    // outputs and optional pyramid reads are represented by the usages above.
+    graph.DeclareComputeCompatible(resetPass);
+    graph.DeclareComputeCompatible(cullPass);
 }
 
 void GpuGeometryVisibility::Frame::AddReadUsages(

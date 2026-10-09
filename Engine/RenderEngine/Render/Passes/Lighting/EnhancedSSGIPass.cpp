@@ -514,7 +514,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         }
         usages.push_back({m_hiZMips[mip], RHIResourceState::UnorderedAccess, writeAccess});
 
-        graph.AddPass(
+        const auto buildPass = graph.AddPass(
             "SSGI.HiZ." + std::to_string(mip), usages,
             [this, &context, mip](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 const uint32_t targetWidth = (std::max)(1u, m_giWidth >> mip);
@@ -562,6 +562,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
                 encoder.Dispatch((targetWidth + 7) / 8, (targetHeight + 7) / 8, 1);
             });
+        graph.DeclareComputeCompatible(buildPass);
     }
 
     // ── 2단계: 트레이스 ──
@@ -585,7 +586,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         }
         usages.push_back({m_traceResult, RHIResourceState::UnorderedAccess, writeAccess});
 
-        graph.AddPass(
+        const auto tracePass = graph.AddPass(
             "SSGI.Trace", usages, [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 TraceParams params{};
                 if (nullptr != context.camera)
@@ -663,6 +664,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
                 encoder.Dispatch((m_giWidth + 7) / 8, (m_giHeight + 7) / 8, 1);
             });
+        graph.DeclareComputeCompatible(tracePass);
     }
 
     // ── 3~5단계 공통 ──
@@ -682,7 +684,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<uint8_t> constantCopy(constantBytes);
         memcpy(constantCopy.data(), constants, constantBytes);
 
-        graph.AddPass(
+        const auto stagePass = graph.AddPass(
             name, usages,
             [this, &context, pso, target, srvHandles, externalSrvs, constantCopy, dispatchWidth,
              dispatchHeight](const EnhancedRenderGraph::ExecuteContext& executeContext) {
@@ -746,6 +748,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 encoder.Dispatch((dispatchWidth + 7) / 8, (dispatchHeight + 7) / 8, 1);
             },
             hasSideEffect);
+        // The keep-alive flag on Composite is a culling root, not a CPU side
+        // effect. These callbacks only read declared inputs and dispatch a UAV.
+        graph.DeclareComputeCompatible(stagePass);
     };
 
     // ── 3단계: 리졸브(재투영 + 누적) ──
@@ -917,6 +922,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         const RGHandle historyTarget = m_historyHandle[m_historyIndex];
         const RGHandle historyDepthTarget = m_historyDepthHandle[m_historyIndex];
 
+        // Keep the persistent-history copy on graphics; the compute author
+        // declarations above intentionally cover only the dispatch stages.
         graph.AddPass(
             "SSGI.StoreHistory", usages,
             [this, historyTarget, historyDepthTarget](const EnhancedRenderGraph::ExecuteContext& executeContext) {

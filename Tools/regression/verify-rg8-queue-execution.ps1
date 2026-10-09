@@ -2,14 +2,17 @@
 param(
     [ValidateSet('Debug','Release')][string]$Configuration = 'Debug',
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [switch]$FullRegression
+    [switch]$FullRegression,
+    # Opt-in hardware acceptance. Generic correctness must still run on hardware
+    # or GPU-validation configurations that serialize otherwise eligible queues.
+    [switch]$RequireMeasuredOverlap
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$expectedChecks = 361
-$expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=2 checks=361 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true measuredOverlap=false' + "`n"
-$expectedScheduleChecks = 82
-$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=2 checks=82 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true modelGuards=true timingIdentity=true' + "`n"
+$expectedChecks = 428
+$expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=3 checks=428 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false' + "`n"
+$expectedScheduleChecks = 111
+$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=111 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath($OutputDirectory)
@@ -44,12 +47,13 @@ $start.Environment.Remove('CREATOR_RENDERGRAPH_ALIASING') | Out-Null
 $binary = [ordered]@{configuration=$Configuration; head=(git -C $repo rev-parse HEAD);
     exe=(Get-FileHash $exe).Hash;
     runtime=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;
-    acceptanceSchema=2; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
+    acceptanceSchema=3; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
     expectedScheduleChecks=$expectedScheduleChecks; expectedScheduleLog=$expectedScheduleLog;
     wrapper=(Get-FileHash $PSCommandPath).Hash;
     scheduleWrapper=(Get-FileHash (Join-Path $PSScriptRoot 'verify-rg8-queue-plan.ps1')).Hash;
     scheduleTests=(Get-FileHash (Join-Path $repo 'Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h')).Hash;
     timingContract=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/RHI/IRHIGpuProfiler.h')).Hash;
+    measurementHistory=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/Render/Graph/EnhancedGpuMeasurementHistory.h')).Hash;
     profiler=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp')).Hash;
     recorderContract=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/RHI/RHIQueueRecorder.h')).Hash;
     recorderHeader=(Get-FileHash (Join-Path $repo 'Engine/RenderEngine/RHI/DX12/DX12QueueRecorder.h')).Hash;
@@ -102,9 +106,76 @@ try
         }
     }
     $probe = $results[0]
-    if ($probe.data.log -cne $expectedLog)
+    if (!$probe.data.log.StartsWith($expectedLog, [StringComparison]::Ordinal))
     {
         throw 'Queue execution suite identity or exact check count differs; rebuild the tested header.'
+    }
+    $intervalText = $probe.data.log.Substring($expectedLog.Length)
+    $intervalMatch = [regex]::Match($intervalText, '\ARG8_QUEUE_INTERVALS (\{[^\r\n]*\})\n\z')
+    if (!$intervalMatch.Success)
+    {
+        throw 'Missing or duplicate calibrated native interval evidence.'
+    }
+    $intervals = $intervalMatch.Groups[1].Value | ConvertFrom-Json
+    if ($intervals.schemaVersion -ne 1 -or $intervals.scope -cne 'native-correctness' -or
+        @($intervals.cases).Count -ne 4 -or
+        (@($intervals.cases.case | Sort-Object -Unique) -join ',') -cne '0,1,2,3')
+    {
+        throw 'Native interval evidence must cover the exact positive/reference/fallback matrix.'
+    }
+    $measuredOverlap = $false
+    foreach ($case in $intervals.cases)
+    {
+        if ($case.cpuTicksPerSecond -le 0 -or $case.graphicsCalibrationSamples -lt 2 -or
+            $case.computeCalibrationSamples -lt 2 -or $case.clockErrorCpuTicks -lt 4 -or
+            $case.usesCompute -ne ($case.case -eq 1))
+        {
+            throw 'Queue clocks or selected native case do not match the calibrated evidence.'
+        }
+        $overlap = [decimal]0
+        $previousEnd = [decimal]0
+        foreach ($slice in $case.computeIntervals)
+        {
+            $begin = [decimal]$slice.beginCpuTick
+            $end = [decimal]$slice.endCpuTick
+            if ($begin -le 0 -or $end -lt $begin -or $begin -lt $previousEnd)
+            {
+                throw 'Native compute intervals are invalid or overlap their own queue.'
+            }
+            $previousEnd = $end
+            $intersectionBegin = [Math]::Max([decimal]$case.shadowBeginCpuTick, $begin)
+            $intersectionEnd = [Math]::Min([decimal]$case.shadowEndCpuTick, $end)
+            $overlap += [Math]::Max([decimal]0, $intersectionEnd - $intersectionBegin)
+        }
+        if ($overlap -ne [decimal]$case.overlapCpuTicks -or
+            ($case.usesCompute -and (@($case.computeIntervals).Count -ne 2 -or
+                $case.shadowEndCpuTick -le $case.shadowBeginCpuTick)) -or
+            (!$case.usesCompute -and (@($case.computeIntervals).Count -ne 0 -or $overlap -ne 0)))
+        {
+            throw 'Reported overlap does not equal independently calibrated interval intersections.'
+        }
+        foreach ($name in @('scheduleMilliseconds','recordingMilliseconds','submissionMilliseconds','totalMilliseconds'))
+        {
+            $value = [double]$case.$name
+            if (![double]::IsFinite($value) -or $value -lt 0)
+            {
+                throw 'Missing/invalid full native CPU cost evidence.'
+            }
+        }
+        if ($case.totalMilliseconds + 0.00001 -lt
+            $case.scheduleMilliseconds + $case.recordingMilliseconds + $case.submissionMilliseconds)
+        {
+            throw 'Native CPU total omits a scheduling/recording/submission phase.'
+        }
+        if ($case.usesCompute -and $overlap -gt [decimal]$case.clockErrorCpuTicks)
+        {
+            $measuredOverlap = $true
+        }
+    }
+    $intervals | ConvertTo-Json -Depth 15 | Set-Content "$out/native-intervals.json" -Encoding utf8
+    if ($RequireMeasuredOverlap -and !$measuredOverlap)
+    {
+        throw 'No native GPU overlap above calibrated clock uncertainty; correctness is not overlap proof.'
     }
     if ($FullRegression)
     {
@@ -141,12 +212,17 @@ try
             }
         }
     }
-    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=2; checks=$expectedChecks;
+    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=3; checks=$expectedChecks;
         scope='Native queue execution in existing offscreen Editor'; fullRegression=[bool]$FullRegression;
         scheduleChecks=$(if ($FullRegression) { $expectedScheduleChecks } else { 0 });
         nativeQueueExecutionTested=$true; frameRetirementTested=$true; positiveOverlapExecutionTested=$true;
         negativeFallbackExecutionTested=$true; declarationOrderTested=$true; readReadOwnershipTested=$true;
-        reorderedFailureTested=$true; measuredOverlapEstablished=$false;
+        reorderedFailureTested=$true; parallelRecordingTested=$true; calibratedIntervalsTested=$true;
+        measuredOverlapRequired=[bool]$RequireMeasuredOverlap; measuredOverlapEstablished=$measuredOverlap;
+        intervalEvidence="$out/native-intervals.json"; performanceValidated=$false; adoptionEstablished=$false;
+        sharedGraphicsReadsTested=[bool]$FullRegression; readerEpochJoinTested=[bool]$FullRegression;
+        sideEffectsTested=[bool]$FullRegression; fallbackReasonsTested=[bool]$FullRegression;
+        measurementDomainsTested=[bool]$FullRegression;
         liveSceneQueueCutover=$false; binary=$binary; exitCode=$process.ExitCode} |
         ConvertTo-Json -Depth 10 | Set-Content "$out/execution-result.json" -Encoding utf8
     "RG8_EXECUTION_ACCEPTANCE_OK configuration=$Configuration"

@@ -19,12 +19,18 @@ if (Test-Path -LiteralPath $out)
 $native = Get-Content (Join-Path $NativeEvidence 'execution-result.json') -Raw | ConvertFrom-Json
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 $runtime = Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
-if ($native.schemaVersion -ne 2 -or !$native.passed -or !$native.fullRegression -or
+if ($native.schemaVersion -ne 2 -or $native.acceptanceSchema -ne 3 -or
+    $native.checks -ne 428 -or $native.scheduleChecks -ne 111 -or
+    !$native.passed -or !$native.fullRegression -or !$native.nativeQueueExecutionTested -or
     !$native.positiveOverlapExecutionTested -or !$native.negativeFallbackExecutionTested -or
     !$native.declarationOrderTested -or !$native.readReadOwnershipTested -or !$native.frameRetirementTested -or
+    !$native.reorderedFailureTested -or !$native.calibratedIntervalsTested -or !$native.parallelRecordingTested -or
+    !$native.sharedGraphicsReadsTested -or !$native.readerEpochJoinTested -or !$native.sideEffectsTested -or
+    !$native.fallbackReasonsTested -or !$native.measurementDomainsTested -or $native.exitCode -ne 0 -or
+    $native.binary.head -ne (git -C $repo rev-parse HEAD) -or
     $native.binary.exe -ne (Get-FileHash $exe).Hash -or $native.binary.runtime -ne (Get-FileHash $runtime).Hash)
 {
-    throw 'Native evidence must include the current binary full regression.'
+    throw 'Native evidence must include the exact current schema-3 full regression, calibrated intervals, parallel recording, measurement domains and explicit fallback coverage.'
 }
 if ($AsyncCompute -and !$WorkloadEvidence)
 {
@@ -32,6 +38,7 @@ if ($AsyncCompute -and !$WorkloadEvidence)
 }
 New-Item -ItemType Directory -Path "$out/CompilerEvidence" | Out-Null
 $native.binary | ConvertTo-Json -Depth 10 | Set-Content "$out/binary.json" -Encoding utf8
+$workloadAudit=$null
 if ($AsyncCompute)
 {
     & $Python (Join-Path $PSScriptRoot 'audit-rg8-adoption.py') --verify-workloads `
@@ -40,6 +47,7 @@ if ($AsyncCompute)
     {
         throw 'Real positive-overlap/negative-fallback workload evidence is missing or invalid.'
     }
+    $workloadAudit=Get-Content "$out/workload-audit.json" -Raw | ConvertFrom-Json
 }
 $commands = @(Get-Content (Join-Path $NativeEvidence 'results.jsonl') | ConvertFrom-Json)
 $full = @($commands | Where-Object { $_.data.log -match 'RGV_READER_OK[^\r\n]*stale-scene' })
@@ -125,6 +133,11 @@ try
         {
             throw "Actual schedule, timing, barrier, pool or CPU evidence failed: $mode"
         }
+        $queueEvidence=Get-Content "$out/schedule-$mode.json" -Raw | ConvertFrom-Json
+        if (!$queueEvidence.scheduleEvidencePassed)
+        {
+            throw "Schedule audit did not establish correctness: $mode"
+        }
         $views = @()
         foreach ($target in @('scene','game','preview'))
         {
@@ -141,8 +154,12 @@ try
         {
             throw 'Missing distinct views/scene change/resize.'
         }
-        $rows += @{mode=$mode; evidence=$path; submissions=$count; views=$views; validationErrors=0; exitCode=0;
-            computeSubmissions=$computeCount; computeSlices=$capture.measurement.computeSliceCount; profilerSlices=$capture.measurement.sliceCount; profilerStatus=$capture.measurement.gpuStatus}
+        $rows += @{mode=$mode;evidence=$path;evidencePurpose='capture-correctness-gpu-validation';
+            submissions=$count;views=$views;validationErrors=0;exitCode=0;
+            computeSubmissions=$computeCount;computeSubmissionMeaning='queue-placement-only';
+            computeSlices=$capture.measurement.computeSliceCount;profilerSlices=$capture.measurement.sliceCount;
+            profilerStatus=$capture.measurement.gpuStatus;captureTimingAdmittedForPerformance=$false;
+            queueEvidence=$queueEvidence}
     }
     $off = Get-Content (Join-Path $runPaths['Off'] 'result.json') -Raw | ConvertFrom-Json
     $on = Get-Content (Join-Path $runPaths['On'] 'result.json') -Raw | ConvertFrom-Json
@@ -158,7 +175,13 @@ try
     {
         throw 'Live queue output must match exactly; tolerance-only comparison is insufficient.'
     }
-    @{schemaVersion=2;passed=$true;evidenceValid=$true;phaseComplete=$false;adoptionEstablished=$false;performanceValidated=$false;configuration=$Configuration;runs=$rows;
+    @{schemaVersion=2;acceptanceSchema=3;passed=$true;evidenceValid=$true;phaseComplete=$false;
+        adoptionEstablished=$false;performanceValidated=$false;performanceClaim='none';
+        evidencePurpose='capture-correctness-gpu-validation';outputEquivalent=$true;
+        sameProcessOffOn=@{established=$false;reason='Separate correctness processes do not establish a same-process normal timing comparison'};
+        overlapScope='calibrated-independent-pass-interval-intersection-above-clock-error';
+        queueSubmissionCountsProveOverlap=$false;workloadAudit=$workloadAudit;
+        configuration=$Configuration;runs=$rows;
         scope=$(if ($AsyncCompute) { 'Actual schedule-checked live execution plus separately verified real overlap/fallback workloads; performance adoption pending' } else { 'Live owned graphics queue; performance adoption pending' });
         binary=$native.binary} | ConvertTo-Json -Depth 30 | Set-Content "$out/live-result.json" -Encoding utf8
     "RG8_LIVE_QUEUE_OK configuration=$Configuration"

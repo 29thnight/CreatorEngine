@@ -1017,6 +1017,17 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
     return true;
 }
 
+bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue,
+    std::string& outError)
+{
+    if (!m_queueService)
+    {
+        outError = "Queue service is unavailable.";
+        return false;
+    }
+    return m_queueService->GetPrimaryGraphicsQueue(m_queue.Get(), queue, outError);
+}
+
 bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics,
     std::string& outError)
 {
@@ -1045,6 +1056,12 @@ bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue
     RHITimelinePoint prefix;
     m_queueFrameActive = true;
     m_queueFrameJoined = false;
+    // The prefix ticket proves admission succeeded. On the primary graphics
+    // queue, FIFO already orders the graph after that prefix without a GPU wait.
+    if (DX12QueueService::NativeQueue(graphics) == m_queue.Get())
+    {
+        return true;
+    }
     if (!m_queueService->ImportPrimaryCompletion(m_fence.Get(), m_lastAdmittedFenceValue, prefix, outError) ||
         !graphics->Wait(prefix, outError))
     {

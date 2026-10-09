@@ -112,6 +112,8 @@ void EnhancedRenderGraph::Reset()
     m_statesCommitted = false;
     m_queueExecutionAttempted = false;
     m_queueDiagnostics = {};
+    m_measurementDomain = RGMeasurementDomain::Normal;
+    m_queueExecutionMode = 0;
     m_resources.clear();
     m_passes.clear();
     m_finalStateRequirements.clear();
@@ -712,6 +714,32 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             { outgoing.push_back({consumer, static_cast<uint16_t>(r)}); ++incoming[consumer]; }
         }
     }
+    // CPU callbacks with undeclared external effects are explicit owner-thread
+    // fences, unlike hasSideEffect (which only retains a pass during culling).
+    for (uint16_t fence = 0; fence < count; ++fence)
+    {
+        if (!alive[fence] || !m_passes[fence].recordingSideEffect)
+        {
+            continue;
+        }
+        for (uint16_t pass = 0; pass < count; ++pass)
+        {
+            if (!alive[pass] || pass == fence)
+            {
+                continue;
+            }
+            const uint16_t from = pass < fence ? pass : fence;
+            const uint16_t to = pass < fence ? fence : pass;
+            auto& outgoing = edges[from];
+            if (std::none_of(outgoing.begin(), outgoing.end(), [&](const Edge& edge) { return edge.to == to; }))
+            {
+                outgoing.push_back({to, RGHandle::kInvalid});
+                ++incoming[to];
+            }
+            m_versionEdges.push_back({from, to, RGHandle::kInvalid, 0,
+                DiagnosticSnapshot::VersionEdge::Reason::RecordingSideEffect});
+        }
+    }
     std::priority_queue<uint16_t, std::vector<uint16_t>, std::greater<uint16_t>> ready;
     for (size_t p = 0; p < count; ++p) if (alive[p] && !incoming[p]) ready.push(static_cast<uint16_t>(p));
     std::vector<uint16_t> order;
@@ -745,7 +773,8 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                     {
                         const auto resource = (it + 1 == stack.end()) ? edge.resource : edges[it->pass][it->next - 1].resource;
                         const auto v=(it+1==stack.end()) ? edge.version : edges[it->pass][it->next-1].version;
-                        outError += m_passes[it->pass].name + " --" + m_resources[resource].name
+                        outError += m_passes[it->pass].name + " --" +
+                            (resource == RGHandle::kInvalid ? std::string("recording side effect") : m_resources[resource].name)
                             + (m_scheduling==RGSchedulingMode::ExplicitVersioned ? " v"+std::to_string(v) : "") + "--> ";
                     }
                     outError += m_passes[edge.to].name; return false;
@@ -766,7 +795,8 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 if (alive[from] && alive[edge.to] && from >= edge.to)
                 {
                     outError = "Declaration order violates dependency: " + m_passes[from].name + " -> " +
-                               m_passes[edge.to].name + " resource=" + m_resources[edge.resource].name;
+                               m_passes[edge.to].name + " resource=" +
+                               (edge.resource == RGHandle::kInvalid ? std::string("recording side effect") : m_resources[edge.resource].name);
                     return false;
                 }
             }
@@ -2239,6 +2269,17 @@ void EnhancedRenderGraph::DeclareComputeCompatible(RGPassId pass)
     m_passes[pass.index].computeCompatible = true;
 }
 
+void EnhancedRenderGraph::DeclareRecordingSideEffect(RGPassId pass)
+{
+    RequireQueueIdle();
+    if (!pass.IsValid() || pass.index >= m_passes.size() || m_compiled)
+    {
+        throw std::logic_error("Recording side effects must be declared before compilation on a valid pass");
+    }
+    m_passes[pass.index].recordingSideEffect = true;
+    m_passes[pass.index].hasSideEffect = true;
+}
+
 void EnhancedRenderGraph::BuildTimingSignature()
 {
     // 프레임마다 달라지는 핸들/epoch/포인터는 빼되 선언 슬롯, 이름, 접근과
@@ -2269,6 +2310,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
             number(static_cast<uint64_t>(usage.access));
         }
     };
+    number(static_cast<uint64_t>(m_measurementDomain));
     number(static_cast<uint64_t>(m_scheduling));
     number(static_cast<uint64_t>(m_orderPolicy));
     number(m_aliasing);
@@ -2314,6 +2356,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
         number(pass.culled);
         number(pass.hasSideEffect);
         number(pass.computeCompatible);
+        number(pass.recordingSideEffect);
         number(pass.maxSlices);
         number(pass.recordCost);
         number(static_cast<bool>(pass.splitExecute));
@@ -2358,7 +2401,50 @@ std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHi
     return hints;
 }
 
-void EnhancedRenderGraph::BuildQueueDependencies(std::vector<std::vector<uint16_t>>& predecessors,
+bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
+{
+    const auto& pass = m_passes[passIndex];
+    if (pass.recordingSideEffect)
+    {
+        return false;
+    }
+    const auto compatible = [](const std::vector<RGPassUsage>& usages)
+    {
+        for (const auto& usage : usages)
+        {
+            // This is the RHI compute encoder's supported legacy-state subset.
+            // ShaderResource is narrowed to NON_PIXEL only after a COMMON handoff.
+            switch (usage.state)
+            {
+            case RHIResourceState::Common:
+            case RHIResourceState::ShaderResource:
+            case RHIResourceState::UnorderedAccess:
+            case RHIResourceState::CopySource:
+            case RHIResourceState::CopyDest:
+            case RHIResourceState::IndirectArgument:
+                break;
+            default:
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!compatible(pass.usages))
+    {
+        return false;
+    }
+    for (const auto& phase : pass.phases)
+    {
+        if (!compatible(phase.usages))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
+    std::vector<std::vector<uint16_t>>& predecessors,
     std::vector<std::vector<uint16_t>>& successors) const
 {
     predecessors.assign(m_passes.size(), {});
@@ -2376,9 +2462,15 @@ void EnhancedRenderGraph::BuildQueueDependencies(std::vector<std::vector<uint16_
     {
         add(static_cast<uint16_t>(edge.producer), static_cast<uint16_t>(edge.consumer));
     }
-    // Keeping each resource's compiled use order keeps its state sequence, so the
-    // barrier planner produces the same per-resource transitions in any order.
-    std::vector<uint16_t> previous(m_resources.size(), RGPassId::kInvalid);
+    struct ReadEpoch
+    {
+        std::vector<uint16_t> frontier;
+        std::vector<uint16_t> before;
+        RHIResourceState state{RHIResourceState::Common};
+        RHIQueueKind queue{RHIQueueKind::Graphics};
+        bool immutableRead{false};
+    };
+    std::vector<ReadEpoch> resources(m_resources.size());
     for (const auto pass : m_executeOrder)
     {
         for (const auto& usage : m_passes[pass].usages)
@@ -2387,12 +2479,29 @@ void EnhancedRenderGraph::BuildQueueDependencies(std::vector<std::vector<uint16_
             {
                 continue;
             }
-            auto& last = previous[usage.handle.index];
-            if (last != RGPassId::kInvalid)
+            auto& epoch = resources[usage.handle.index];
+            const bool immutableRead = usage.access == RGAccessMode::Read &&
+                usage.state != RHIResourceState::Common && !IsWriteState(usage.state) &&
+                !m_passes[pass].repeated;
+            // Legacy DX12 maps graphics SRV to PIXEL|NON_PIXEL and compute SRV
+            // to NON_PIXEL. Equal RHI enums do not prove cross-queue compatibility.
+            // Same-queue readers share one immutable state epoch: that queue owns
+            // preparation and batch-boundary COMMON transitions in submission order.
+            const bool compatible = immutableRead && epoch.immutableRead &&
+                usage.state == epoch.state && queues[pass] == epoch.queue;
+            if (!compatible)
             {
-                add(last, pass);
+                epoch.before = std::move(epoch.frontier);
+                epoch.frontier.clear();
             }
-            last = pass;
+            for (const auto predecessor : epoch.before)
+            {
+                add(predecessor, pass);
+            }
+            epoch.frontier.push_back(pass);
+            epoch.state = usage.state;
+            epoch.queue = queues[pass];
+            epoch.immutableRead = immutableRead;
         }
     }
     for (auto* lists : {&predecessors, &successors})
@@ -2517,9 +2626,18 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     }
     QueueSchedule plan;
     plan.compileGeneration = m_compileGeneration;
-    // RG7 lifetimes and alias barriers currently assume a single total order.
+    // RG7 allocation/reuse still requires its validated single-queue lifetime
+    // contract. Never trade that guard for a schedule-only overlap estimate.
     const bool allowCompute = capabilities.compute && capabilities.crossQueueTimeline &&
         minimumGpuNanoseconds > 0 && !m_aliasing && m_scheduling == RGSchedulingMode::ExplicitVersioned;
+    if (minimumGpuNanoseconds == 0)
+    {
+        plan.fallbackReason = RGQueueFallbackReason::Disabled;
+    }
+    else if (!allowCompute)
+    {
+        plan.fallbackReason = RGQueueFallbackReason::Unsupported;
+    }
     const bool overlap = m_queueCostModel.placement == RGQueuePlacement::Overlap;
     std::vector<uint64_t> costs(m_passes.size(), 0);
     std::vector<uint16_t> candidates;
@@ -2527,22 +2645,42 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     for (const auto pass : m_executeOrder)
     {
         const auto* hint = byPass[pass];
-        costs[pass] = hint && hint->hasGpuMeasurement ? hint->measuredGpuNanoseconds : 0;
-        plan.predictionComplete = plan.predictionComplete && hint && hint->hasGpuMeasurement;
+        const bool measured = hint && hint->hasGpuMeasurement;
+        costs[pass] = measured ? hint->measuredGpuNanoseconds : 0;
+        plan.measuredPasses += measured ? 1u : 0u;
+        plan.missingMeasurementPasses += measured ? 0u : 1u;
+        plan.predictionComplete = plan.predictionComplete && measured;
         plan.predictedSerialNanoseconds = costs[pass] > UINT64_MAX - plan.predictedSerialNanoseconds
             ? UINT64_MAX : plan.predictedSerialNanoseconds + costs[pass];
-        // Overlap placement also requires the author declaration: hints are data.
-        if (allowCompute && hint && hint->hasGpuMeasurement && hint->computeCompatible &&
-            (!overlap || m_passes[pass].computeCompatible) &&
+        const bool declared = hint && hint->computeCompatible &&
+            (!overlap || m_passes[pass].computeCompatible);
+        const bool legal = !declared || IsComputeStateCompatible(pass);
+        plan.rejectedStatePasses += declared && !legal ? 1u : 0u;
+        if (allowCompute && declared && legal && measured &&
             hint->measuredGpuNanoseconds >= minimumGpuNanoseconds)
         {
             candidates.push_back(pass);
         }
     }
-    // A single serial queue is exactly the saturated sum of pass costs. Do not
-    // run the ready-list heuristic at all for missing samples or disabled compute.
-    plan.predictedNanoseconds = plan.predictedSerialNanoseconds;
+    plan.eligibleComputePasses = static_cast<uint32_t>(candidates.size());
     plan.predictionComplete = plan.predictionComplete && plan.predictedSerialNanoseconds != UINT64_MAX;
+    // Partial sums are not a prediction. A measured empty scope is valid zero;
+    // missing scopes never receive a synthetic positive cost to force placement.
+    if (!plan.predictionComplete)
+    {
+        plan.predictedSerialNanoseconds = 0;
+    }
+    plan.predictedNanoseconds = plan.predictedSerialNanoseconds;
+    if (allowCompute && overlap && !plan.predictionComplete)
+    {
+        plan.fallbackReason = RGQueueFallbackReason::MissingMeasurement;
+    }
+    else if (allowCompute && candidates.empty())
+    {
+        plan.fallbackReason = plan.rejectedStatePasses != 0 ? RGQueueFallbackReason::UnsupportedState :
+            RGQueueFallbackReason::InsufficientGain;
+    }
+    // Leave the normal serial order and barriers alone on every early fallback.
     if (candidates.empty() || (overlap && !plan.predictionComplete))
     {
         for (const auto pass : m_executeOrder)
@@ -2553,9 +2691,9 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         return true;
     }
     std::vector<std::vector<uint16_t>> predecessors, successors;
-    BuildQueueDependencies(predecessors, successors);
     const std::vector<RHIQueueKind> serial(m_passes.size(), RHIQueueKind::Graphics);
     std::vector<RHIQueueKind> queues = serial;
+    BuildQueueDependencies(queues, predecessors, successors);
     std::vector<uint16_t> order = m_executeOrder;
     if (!overlap)
     {
@@ -2563,7 +2701,11 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         {
             queues[pass] = RHIQueueKind::Compute;
         }
-        plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr);
+        BuildQueueDependencies(queues, predecessors, successors);
+        if (plan.predictionComplete)
+        {
+            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr);
+        }
     }
     // Missing samples and saturated arithmetic are not evidence of a benefit.
     // Retain the original graphics order until the entire executed graph is timed.
@@ -2578,7 +2720,9 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             {
                 trial[pass] = trial[pass] == RHIQueueKind::Compute ? RHIQueueKind::Graphics : RHIQueueKind::Compute;
             }
-            const auto span = SimulateQueues(trial, costs, predecessors, successors, reorder, nullptr);
+            std::vector<std::vector<uint16_t>> trialPredecessors, trialSuccessors;
+            BuildQueueDependencies(trial, trialPredecessors, trialSuccessors);
+            const auto span = SimulateQueues(trial, costs, trialPredecessors, trialSuccessors, reorder, nullptr);
             if (span < best)
             {
                 best = span;
@@ -2627,13 +2771,16 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         }
         if (plan.predictedSerialNanoseconds - best >= m_queueCostModel.minimumGainNanoseconds)
         {
+            BuildQueueDependencies(queues, predecessors, successors);
             plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, reorder, &order);
         }
         else
         {
             queues = serial; // No predicted benefit: keep the single-queue plan.
+            plan.fallbackReason = RGQueueFallbackReason::InsufficientGain;
         }
     }
+    BuildQueueDependencies(queues, predecessors, successors);
     for (const auto pass : order)
     {
         plan.usesCompute = plan.usesCompute || queues[pass] == RHIQueueKind::Compute;
@@ -2652,7 +2799,9 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             {
                 continue;
             }
-            // Report the resources behind each cross-queue edge for diagnostics.
+            // Report resource hazards; non-resource recording fences still require
+            // a GPU wait and use the explicit invalid-resource diagnostic sentinel.
+            const auto waitBegin = plan.waits.size();
             for (const auto& usage : m_passes[pass].usages)
             {
                 const auto resource = usage.handle.index;
@@ -2665,6 +2814,10 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
                 {
                     plan.waits.push_back({producer, pass, resource});
                 }
+            }
+            if (plan.waits.size() == waitBegin)
+            {
+                plan.waits.push_back({producer, pass, RGHandle::kInvalid});
             }
         }
     }
@@ -2923,7 +3076,9 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // 되돌리는 것이 중요하다 — 워커만 1로 두면 한 워커가 조각들을 연달아
     // 맡으면서 조각마다 상태를 다시 거는 비용이 그대로 남는다. 조각 1은
     // 통째로 기록한 것과 같다는 것이 분할 조각의 계약이다.
-    const bool declineParallel =
+    const bool recordingSideEffects = std::any_of(m_executeOrder.begin(), m_executeOrder.end(),
+        [&](uint16_t pass) { return m_passes[pass].recordingSideEffect; });
+    const bool declineParallel = recordingSideEffects ||
         (0 != totalRecordCost && totalRecordCost < m_parallelCostThreshold);
 
     m_stats.totalRecordCost = totalRecordCost;
@@ -3106,45 +3261,60 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // RunParallel은 모든 콜백이 끝난 뒤 반환/throw하므로 아래에서 안전하게 닫는다.
     try
     {
-        // 의존이 줄줄이 이어진 그래프는 차례가 거의 패스 수만큼 생긴다(37 패스에
-        // 33 차례). 차례마다 워커를 깨워 합류시키면 그 비용만 프레임당 2 ms 였다
-        // (기록 0.33 → 2.45 ms, 초당 994 → 315장). 워커 하나만 일하는 차례가
-        // 연달아 오면 그 묶음을 Job 하나가 차례 순서대로 기록한다 — 합류 조건과
-        // 리스트 순서 제약이 그대로이고, 기록은 여전히 공용 워커에서만 일어난다.
-        constexpr uint32_t kMaskedWorkers = 32;
-        std::vector<uint32_t> waveWorkerMask(waveCount, 0);
-        for (size_t i = 0; i < unitCount && workers <= kMaskedWorkers; ++i)
+        if (recordingSideEffects)
         {
-            waveWorkerMask[unitWave[i]] |= 1u << unitWorker[i];
+            // The entire graph is one unsplit target in this uncommon path.
+            // Keep explicitly declared external CPU effects on the owner thread.
+            recordRange(0);
         }
-        const auto isSingleWorkerWave = [&](uint32_t wave)
+        else
         {
-            const uint32_t mask = waveWorkerMask[wave];
-            return workers <= kMaskedWorkers && 0 == (mask & (mask - 1));
-        };
-        for (uint32_t wave = 0; wave < waveCount && !failed.load(std::memory_order_relaxed);)
-        {
-            if (!isSingleWorkerWave(wave))
+            // 의존이 줄줄이 이어진 그래프는 차례가 거의 패스 수만큼 생긴다(37 패스에
+            // 33 차례). 차례마다 워커를 깨워 합류시키면 그 비용만 프레임당 2 ms 였다
+            // (기록 0.33 → 2.45 ms, 초당 994 → 315장). 워커 하나만 일하는 차례가
+            // 연달아 오면 그 묶음을 Job 하나가 차례 순서대로 기록한다 — 합류 조건과
+            // 리스트 순서 제약이 그대로이고, 기록은 여전히 공용 워커에서만 일어난다.
+            constexpr uint32_t kMaskedWorkers = 32;
+            std::vector<uint32_t> waveWorkerMask(waveCount, 0);
+            for (size_t i = 0; i < unitCount && workers <= kMaskedWorkers; ++i)
             {
-                activeWave = wave++;
-                pool.RunParallel(recordRange, workers);
-                continue;
+                waveWorkerMask[unitWave[i]] |= 1u << unitWorker[i];
             }
-            const uint32_t runBegin = wave;
-            while (wave < waveCount && isSingleWorkerWave(wave)) ++wave;
-            const uint32_t runEnd = wave;
-            pool.RunParallel([&](uint32_t)
+            const auto isSingleWorkerWave = [&](uint32_t wave)
             {
-                for (uint32_t run = runBegin; run < runEnd && !failed.load(std::memory_order_relaxed); ++run)
+                const uint32_t mask = waveWorkerMask[wave];
+                return workers <= kMaskedWorkers && 0 == (mask & (mask - 1));
+            };
+            for (uint32_t wave = 0; wave < waveCount && !failed.load(std::memory_order_relaxed);)
+            {
+                if (!isSingleWorkerWave(wave))
                 {
-                    activeWave = run;
-                    const uint32_t mask = waveWorkerMask[run];
-                    for (uint32_t worker = 0; worker < workers; ++worker)
-                    {
-                        if (0 != (mask & (1u << worker))) recordRange(worker);
-                    }
+                    activeWave = wave++;
+                    pool.RunParallel(recordRange, workers);
+                    continue;
                 }
-            }, 1);
+                const uint32_t runBegin = wave;
+                while (wave < waveCount && isSingleWorkerWave(wave))
+                {
+                    ++wave;
+                }
+                const uint32_t runEnd = wave;
+                pool.RunParallel([&](uint32_t)
+                {
+                    for (uint32_t run = runBegin; run < runEnd && !failed.load(std::memory_order_relaxed); ++run)
+                    {
+                        activeWave = run;
+                        const uint32_t mask = waveWorkerMask[run];
+                        for (uint32_t worker = 0; worker < workers; ++worker)
+                        {
+                            if (0 != (mask & (1u << worker)))
+                            {
+                                recordRange(worker);
+                            }
+                        }
+                    }
+                }, 1);
+            }
         }
     }
     catch (const std::exception& e)

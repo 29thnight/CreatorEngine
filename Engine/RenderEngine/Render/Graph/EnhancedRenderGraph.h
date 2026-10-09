@@ -72,6 +72,34 @@ enum class RGAccessMode { LegacyState, Read, Write, ReadWrite };
 enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };
 // Access/version declarations and execution ordering are independent contracts.
 enum class RGOrderPolicy { DependencyOrder, PreserveDeclarationOrder };
+enum class RGMeasurementDomain : uint8_t { Normal, Capture };
+enum class RGQueueFallbackReason : uint8_t
+{
+    None,
+    Disabled,
+    Unsupported,
+    MissingMeasurement,
+    UnsupportedState,
+    InsufficientGain,
+};
+
+inline const char* RGMeasurementDomainName(RGMeasurementDomain domain)
+{
+    return domain == RGMeasurementDomain::Capture ? "capture" : "normal";
+}
+inline const char* RGQueueFallbackReasonName(RGQueueFallbackReason reason)
+{
+    switch (reason)
+    {
+    case RGQueueFallbackReason::None: return "none";
+    case RGQueueFallbackReason::Disabled: return "disabled";
+    case RGQueueFallbackReason::Unsupported: return "unsupported";
+    case RGQueueFallbackReason::MissingMeasurement: return "missing-measurement";
+    case RGQueueFallbackReason::UnsupportedState: return "unsupported-state";
+    case RGQueueFallbackReason::InsufficientGain: return "insufficient-gain";
+    default: return "unknown";
+    }
+}
 
 // How BuildQueueSchedule assigns compute-compatible passes to the compute queue.
 enum class RGQueuePlacement : uint8_t
@@ -501,6 +529,9 @@ public:
         bool usesCompute{false};
         bool predictionComplete{false}; // Every executed pass has a valid timing sample.
         bool predictionCalibrated{false}; // No measured overhead/contention calibration yet.
+        RGQueueFallbackReason fallbackReason{RGQueueFallbackReason::None};
+        uint32_t eligibleComputePasses{0}, rejectedStatePasses{0};
+        uint32_t measuredPasses{0}, missingMeasurementPasses{0};
     };
     struct QueueCostModel
     {
@@ -513,14 +544,34 @@ public:
     };
     void SetQueueCostModel(const QueueCostModel& model) { RequireQueueIdle(); m_queueCostModel = model; }
     // minimumGpuNanoseconds is the per-pass measured time a compute candidate needs.
-    // Overlap placement may reorder passes (DependencyOrder only) but keeps every
-    // physical resource's use order, so the compiled barrier state sequence holds.
-    // Shared physical resources are serialized, including read/read state changes.
+    // Overlap placement may reorder compatible same-queue immutable reads.
+    // Writers and state/ownership changes join every reader, not the last declared
+    // reader. Cross-queue reads remain ordered until a backend shared-state contract
+    // exists; in particular graphics SRV and compute SRV are not the same DX12 state.
     bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
         const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
         QueueSchedule& output, std::string& outError) const;
 
     void DeclareComputeCompatible(RGPassId pass);
+    // A culling root is not a CPU side effect. This opt-in additionally orders
+    // every live pass before/after the callback and prevents parallel recording.
+    void DeclareRecordingSideEffect(RGPassId pass);
+    void SetMeasurementDomain(RGMeasurementDomain domain)
+    {
+        RequireQueueIdle();
+        m_measurementDomain = domain;
+        m_queueDiagnostics.measurementDomain = domain;
+    }
+    RGMeasurementDomain GetMeasurementDomain() const { return m_measurementDomain; }
+    void SetQueueExecutionMode(uint32_t mode)
+    {
+        RequireQueueIdle();
+        m_queueExecutionMode = mode;
+        m_queueDiagnostics.requestedExecutionMode = mode;
+        m_queueDiagnostics.schedule.fallbackReason = mode == 0 ? RGQueueFallbackReason::Disabled :
+            RGQueueFallbackReason::None;
+    }
+    uint32_t GetQueueExecutionMode() const { return m_queueExecutionMode; }
     std::vector<QueueHint> MeasuredQueueHints(
         const std::function<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const;
 
@@ -565,6 +616,8 @@ public:
         std::vector<Batch> batches;
         std::vector<Wait> waits; // Actual reduced queue waits, including prefix and final join.
         bool specialized{false};
+        uint32_t requestedExecutionMode{0}, effectiveExecutionMode{0};
+        RGMeasurementDomain measurementDomain{RGMeasurementDomain::Normal};
     };
     const QueueDiagnostics& GetQueueDiagnostics() const { return m_queueDiagnostics; }
     // One-shot explicit graph execution. Imported DEFAULT resources must already be
@@ -632,7 +685,7 @@ public:
     };
     struct DiagnosticSnapshot
     {
-        struct VersionEdge { uint32_t producer, consumer, resource; uint16_t version; enum class Reason { RAW, WAR, WAW } reason; };
+        struct VersionEdge { uint32_t producer, consumer, resource; uint16_t version; enum class Reason { RAW, WAR, WAW, RecordingSideEffect } reason; };
         struct ReachabilityEdge { uint32_t producer, consumer, resource; };
         std::vector<DiagnosticPass> passes;
         std::vector<DiagnosticResource> resources;
@@ -783,6 +836,7 @@ private:
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
         bool                     computeCompatible{ false };
+        bool                     recordingSideEffect{ false };
         // ★ 이 패스 직전에 한 번에 낸다. 계획 단계는 네 중립 배열만 만들고,
         //   기록 시점에 `RHIBarrierBatch`로 묶어 백엔드 인코더에 넘긴다.
         std::vector<RHITransition>    transitions;
@@ -857,10 +911,12 @@ private:
     void BuildDependencyWaves();
     std::vector<int32_t> m_dependencyWaves;
     std::vector<uint16_t> m_criticalPath;
-    // Pass dependencies for queue planning: version edges plus each physical
-    // resource's compiled use order. Indexed by pass; culled passes have none.
-    void BuildQueueDependencies(std::vector<std::vector<uint16_t>>& predecessors,
+    // Queue assignment is part of state compatibility. Whole-resource access is
+    // conservative for all subresources until declarations expose a narrower range.
+    void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
+        std::vector<std::vector<uint16_t>>& predecessors,
         std::vector<std::vector<uint16_t>>& successors) const;
+    bool IsComputeStateCompatible(uint16_t pass) const;
     // Two-queue list simulation. Returns the predicted span and, if requested,
     // the submission order. reorder=false keeps the compiled order.
     uint64_t SimulateQueues(const std::vector<RHIQueueKind>& queues, const std::vector<uint64_t>& costs,
@@ -869,6 +925,8 @@ private:
         bool reorder, std::vector<uint16_t>* order) const;
     void UpdateResourceUses();
     QueueCostModel m_queueCostModel;
+    RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};
+    uint32_t m_queueExecutionMode{0};
     RGHandle VersionHandle(uint16_t index, uint16_t version) const;
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;

@@ -1907,6 +1907,9 @@ namespace
         Microsoft::WRL::Wrappers::HandleT<Microsoft::WRL::Wrappers::HandleTraits::HANDLENullTraits> pacingTimer{
             CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS) };
         std::atomic<EnhancedLivePacing> livePacing{};
+        std::atomic<bool> hasPendingQueueMode{false};
+        EnhancedLiveQueueExecutionStatus queueExecutionStatus; // debugMutex
+
         uint64_t armedGpuFenceValue{ 0 };          // RT 전용
         bool compositorTickSinceAdmission{ true };  // RT 전용
         uint64_t pacedAdmissionNanoseconds{ 0 };    // RT 전용
@@ -5736,6 +5739,17 @@ namespace
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            static const bool queueEvidence = []
+            {
+                const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
+                return value && std::string_view(value) == "1";
+            }();
+            std::optional<LiveStopwatch> renderOnceWatch;
+            if (queueEvidence)
+            {
+                renderOnceWatch.emplace();
+                renderOnceWatch->Start();
+            }
             preparationDeferred = false;
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
@@ -5744,6 +5758,18 @@ namespace
             if (!p.ibl.FinishCookedCapture(dx12.GetCompletedFenceValue(),environmentCacheError))
                 Debug::PrintLog(spdlog::level::warn,"[EnvironmentCache] " + environmentCacheError);
 
+            EnhancedLiveQueueExecutionStatus queueModeRequest;
+            if (hasPendingQueueMode.load(std::memory_order_acquire))
+            {
+                {
+                    std::lock_guard<std::mutex> lock(debugMutex);
+                    queueModeRequest = queueExecutionStatus;
+                }
+                if (!dx12.SetQueueExecutionMode(queueModeRequest.requestedMode, outError))
+                {
+                    return false;
+                }
+            }
             {
                 RenderThreadPhaseScope begin(RenderPhase::begin_frame);
                 if (!dx12.BeginFrame(outError))
@@ -5807,7 +5833,7 @@ namespace
                 profilerToken.captureGeneration = captureSink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
             }
             profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
-                view.key.viewId, profilerToken.captureGeneration);
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -5845,6 +5871,8 @@ namespace
             slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
                 kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot.graph;
+            graph.SetQueueExecutionMode(dx12.GetQueueExecutionMode());
+            graph.SetMeasurementDomain(capture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal);
             const bool ownedQueueExecution = dx12.UsesOwnedQueueExecution();
             if (ownedQueueExecution && ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false))
             {
@@ -5997,6 +6025,17 @@ namespace
                 }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
+            if (queueModeRequest.requestId != 0)
+            {
+                std::lock_guard<std::mutex> lock(debugMutex);
+                queueExecutionStatus.appliedRequestId = queueModeRequest.requestId;
+                queueExecutionStatus.appliedMode = dx12.GetQueueExecutionMode();
+                queueExecutionStatus.appliedFrame = sourceFrameId;
+                if (queueExecutionStatus.requestId == queueModeRequest.requestId)
+                {
+                    hasPendingQueueMode.store(false, std::memory_order_release);
+                }
+            }
             const double submissionMilliseconds = submitWatch.ElapsedMs() +
                 (ownedQueueExecution ? graph.GetQueueDiagnostics().execution.submissionMilliseconds : 0.0);
             const double recordSubmitMilliseconds = recordWatch.ElapsedMs();
@@ -6004,19 +6043,19 @@ namespace
             {
                 capture->RecordSubmissionCpu(recordSubmitMilliseconds, submissionMilliseconds);
             }
-            static const bool queueEvidence = []
-            {
-                const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
-                return value && std::string_view(value) == "1";
-            }();
             if (queueEvidence)
             {
                 const std::string line = "[rg8.cpu] {\"schemaVersion\":2,\"mode\":" +
-                    std::to_string(dx12.GetQueueExecutionMode()) + ",\"backendGeneration\":" +
+                    std::to_string(dx12.GetQueueExecutionMode()) + ",\"measurementDomain\":\"" +
+                    RGMeasurementDomainName(graph.GetMeasurementDomain()) +
+                    "\",\"scope\":\"record-schedule-submit-frame-retirement-enqueue\",\"backendGeneration\":" +
                     std::to_string(dx12.GetBackendGeneration()) + ",\"frameId\":" +
                     std::to_string(sourceFrameId) + ",\"viewId\":" + std::to_string(view.key.viewId) +
                     ",\"submissionId\":" + std::to_string(profilerToken.submissionId) +
                     ",\"captureGeneration\":" + std::to_string(profilerToken.captureGeneration) +
+                    ",\"renderOnceMilliseconds\":" + std::to_string(renderOnceWatch->ElapsedMs()) +
+                    ",\"compileMilliseconds\":" + std::to_string(compileMs) +
+                    ",\"frameScope\":\"view-prepare-build-compile-record-schedule-submit-retirement-enqueue\"" +
                     ",\"totalMilliseconds\":" + std::to_string(recordSubmitMilliseconds) +
                     ",\"submissionMilliseconds\":" + std::to_string(submissionMilliseconds) + "}";
                 std::printf("%s\n", line.c_str());
@@ -9615,6 +9654,39 @@ void EnhancedSceneRenderer::SetLiveTuning(const EnhancedLiveTuning& tuning)
     std::lock_guard<std::mutex> lock(state.debugMutex);
     state.pendingTuning = tuning;
     state.hasPendingTuning = true;
+}
+
+bool EnhancedSceneRenderer::RequestLiveQueueExecutionMode(uint32_t mode,
+    uint64_t& requestId, std::string& error)
+{
+    requestId = 0;
+    error.clear();
+    if (mode > 2)
+    {
+        error = "Queue execution mode must be 0, 1 or 2";
+        return false;
+    }
+    LiveState& state = GetLiveState();
+    {
+        std::lock_guard<std::mutex> lock(state.debugMutex);
+        if (state.queueExecutionStatus.requestId == UINT64_MAX)
+        {
+            error = "Queue execution request range is exhausted";
+            return false;
+        }
+        requestId = ++state.queueExecutionStatus.requestId;
+        state.queueExecutionStatus.requestedMode = mode;
+        state.hasPendingQueueMode.store(true, std::memory_order_release);
+    }
+    SetEvent(state.renderWakeEvent.Get());
+    return true;
+}
+
+EnhancedLiveQueueExecutionStatus EnhancedSceneRenderer::GetLiveQueueExecutionStatus()
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    return state.queueExecutionStatus;
 }
 
 void EnhancedSceneRenderer::ShutdownLive()
