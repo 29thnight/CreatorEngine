@@ -363,6 +363,80 @@ struct EnhancedPbrCapture
         node["accessContract"] << (snapshot.scheduling == RGSchedulingMode::DeclarationOrder
             ? "inferred-from-state" : "explicit-access");
         node["versionsSupported"] << (snapshot.scheduling == RGSchedulingMode::ExplicitVersioned);
+        // The executed plan is authoritative, including graphics-only fallback.
+        // Never reconstruct boundaries from the requested queue mode.
+        const auto& diagnostics = graph.GetQueueDiagnostics();
+        auto queue = node["queueExecution"];
+        queue |= ryml::MAP;
+        queue["schemaVersion"] << 2;
+        queue["specialized"] << diagnostics.specialized;
+        queue["predictionCalibrated"] << false;
+        auto execution = queue["execution"];
+        execution |= ryml::MAP;
+        execution["scheduleMilliseconds"] << diagnostics.execution.scheduleMilliseconds;
+        execution["recordingMilliseconds"] << diagnostics.execution.recordingMilliseconds;
+        execution["submissionMilliseconds"] << diagnostics.execution.submissionMilliseconds;
+        execution["totalMilliseconds"] << diagnostics.execution.totalMilliseconds;
+        execution["plannedBatches"] << diagnostics.execution.plannedBatches;
+        execution["plannedComputeBatches"] << diagnostics.execution.plannedComputeBatches;
+        execution["plannedWaits"] << diagnostics.execution.plannedWaits;
+        execution["submittedBatches"] << diagnostics.execution.submittedBatches;
+        execution["computeBatches"] << diagnostics.execution.computeBatches;
+        execution["submittedWaits"] << diagnostics.execution.submittedWaits;
+        execution["plannedBarriers"] << diagnostics.execution.plannedBarriers;
+        execution["prologueBarriers"] << diagnostics.execution.prologueBarriers;
+        execution["epilogueBarriers"] << diagnostics.execution.epilogueBarriers;
+        execution["predictedSerialNanoseconds"] << diagnostics.execution.predictedSerialNanoseconds;
+        execution["predictedNanoseconds"] << diagnostics.execution.predictedNanoseconds;
+        execution["submissionAttempted"] << diagnostics.execution.submissionAttempted;
+        execution["recoveryRequired"] << diagnostics.execution.recoveryRequired;
+        execution["completed"] << diagnostics.execution.completed;
+        auto schedule = queue["schedule"];
+        schedule |= ryml::MAP;
+        schedule["compileGeneration"] << diagnostics.schedule.compileGeneration;
+        schedule["usesCompute"] << diagnostics.schedule.usesCompute;
+        schedule["predictionComplete"] << diagnostics.schedule.predictionComplete;
+        schedule["predictionCalibrated"] << diagnostics.schedule.predictionCalibrated;
+        schedule["entries"] |= ryml::SEQ;
+        for (const auto& entry : diagnostics.schedule.entries)
+        {
+            auto item = schedule["entries"].append_child();
+            item |= ryml::MAP;
+            item["pass"] << entry.pass;
+            item["queue"] << static_cast<uint32_t>(entry.queue);
+        }
+        schedule["waits"] |= ryml::SEQ;
+        for (const auto& wait : diagnostics.schedule.waits)
+        {
+            auto item = schedule["waits"].append_child();
+            item |= ryml::MAP;
+            item["producer"] << wait.producer;
+            item["consumer"] << wait.consumer;
+            item["resource"] << wait.resource;
+        }
+        queue["batches"] |= ryml::SEQ;
+        for (const auto& batch : diagnostics.batches)
+        {
+            auto item = queue["batches"].append_child();
+            item |= ryml::MAP;
+            item["queue"] << static_cast<uint32_t>(batch.queue);
+            item["barriers"] << batch.barriers;
+            item["submitted"] << batch.submitted;
+            item["passes"] |= ryml::SEQ;
+            for (const auto pass : batch.passes)
+            {
+                item["passes"].append_child() << pass;
+            }
+        }
+        queue["waits"] |= ryml::SEQ;
+        for (const auto& wait : diagnostics.waits)
+        {
+            auto item = queue["waits"].append_child();
+            item |= ryml::MAP;
+            item["producerBatch"] << wait.producerBatch;
+            item["consumerBatch"] << wait.consumerBatch;
+            item["submitted"] << wait.submitted;
+        }
         node["reachabilityEdges"] |= ryml::SEQ;
         for (const auto& edge : snapshot.reachabilityEdges)
         {
@@ -509,6 +583,14 @@ struct EnhancedPbrCapture
         return true;
     }
 
+    void RecordSubmissionCpu(double recordAndSubmitMs, double submissionMs)
+    {
+        auto node = manifest.rootref()["measurement"];
+        node["cpuRecordSubmitMs"] << recordAndSubmitMs;
+        node["cpuSubmitMs"] << submissionMs;
+        node["cpuRecordSubmitScope"] << "record-schedule-submit-frame-join";
+    }
+
     void RecordIblContract(uint32_t baseSamples, uint32_t reflectionSamples, const RHITextureInfo& info)
     {
         auto node = manifest.rootref()["ibl"];
@@ -546,6 +628,12 @@ struct EnhancedPbrCapture
         node["droppedSlices"] << span.droppedSlices;
         node["sliceCount"] << span.sliceCount;
         node["computeSliceCount"] << span.computeSliceCount;
+        node["clockValid"] << span.cpuAligned;
+        node["overlapClockValid"] << span.overlapClockValid;
+        node["cpuTicksPerSecond"] << span.cpuTicksPerSecond;
+        node["measuredOverlapMilliseconds"] << span.measuredOverlapMilliseconds;
+        node["overlapClockErrorMilliseconds"] << span.overlapClockErrorMilliseconds;
+        node["overlapScope"] << "calibrated-queue-local-pass-interval-intersection";
         node["passes"] |= ryml::SEQ;
         for (const auto& pass : passes)
         {

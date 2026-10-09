@@ -44,6 +44,7 @@ public:
         std::string name;
         uint64_t    beginTicks{ 0 };
         uint64_t    endTicks{ 0 };
+        GpuPassTimingIdentity identity;
     };
 
     /// CPU(QPC)와 GPU 큐 timestamp 를 **한 순간에 함께 읽은** 표본(§5.1).
@@ -133,11 +134,13 @@ public:
 
     /// 패스 시작. 돌려준 슬롯을 EndPass에 그대로 넘긴다.
     /// 슬롯이 모자라면 kInvalidSlot을 돌려주고, 그 패스는 측정에서 빠진다.
-    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) override;
+    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
+        const GpuPassTimingIdentity& identity = {}) override;
     void     EndPass(RHIEncoder& encoder, uint32_t slot) override;
 
     // DX12 전용 benchmark와 Resolve 경로가 native list를 직접 계측할 때 쓴다.
-    uint32_t BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name);
+    uint32_t BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name,
+        const GpuPassTimingIdentity& identity = {});
     void     EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot);
 
     /// 제출을 닫기 전에 부른다. 그 표가 가리키는 슬롯의 질의만 리드백으로 옮긴다.
@@ -194,6 +197,7 @@ private:
     struct PassRecord
     {
         std::string name;
+        GpuPassTimingIdentity identity;
         uint32_t    beginQuery{ 0 };
         uint32_t    endQuery{ 0 };
         bool        used{ false };

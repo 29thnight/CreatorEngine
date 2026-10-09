@@ -18,6 +18,46 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
 {
     output = {};
     outError.clear();
+    // The report survives every return path, including recording and submission
+    // rejection. CPU queue-operation tickets are inside submissionMilliseconds;
+    // these durations must never be presented as CPU waits for GPU completion.
+    struct CpuReport
+    {
+        QueueExecution& output;
+        QueueExecution* diagnostic{nullptr};
+        std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point phaseStart{start};
+        enum class Phase { Schedule, Record, Submit } phase{Phase::Schedule};
+        void FinishPhase()
+        {
+            const auto now = std::chrono::steady_clock::now();
+            const double elapsed = std::chrono::duration<double, std::milli>(now - phaseStart).count();
+            if (phase == Phase::Schedule)
+            {
+                output.scheduleMilliseconds += elapsed;
+            }
+            else if (phase == Phase::Record)
+            {
+                output.recordingMilliseconds += elapsed;
+            }
+            else
+            {
+                output.submissionMilliseconds += elapsed;
+            }
+            phaseStart = now;
+        }
+        ~CpuReport()
+        {
+            FinishPhase();
+            output.totalMilliseconds = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - start).count();
+            if (diagnostic)
+            {
+                *diagnostic = output;
+                diagnostic->completion = {}; // Diagnostic snapshots never retain native fence ownership.
+            }
+        }
+    } cpu{output};
     if (!self || self.get() != this || !owner || !m_queueLease.expired() || m_queueExecutionAttempted ||
         m_statesCommitted || m_recordedRecording != 0 || m_preparedPool || m_aliasing || (m_profiler && compute && (!graphics.profiler || !compute->profiler)) ||
         m_scheduling != RGSchedulingMode::ExplicitVersioned || &recorder.DeviceServices() != m_deviceServices ||
@@ -41,6 +81,9 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         outError = "Queue endpoints must belong to the same device incarnation";
         return false;
     }
+    m_queueDiagnostics = {};
+    auto& diagnostic = m_queueDiagnostics;
+    cpu.diagnostic = &diagnostic.execution;
     QueueSchedule plan;
     if (!BuildQueueSchedule({true, compute != nullptr, false, compute != nullptr}, hints,
         minimumGpuNanoseconds, plan, outError))
@@ -88,38 +131,6 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         outError = "Queue signal range is exhausted";
         return false;
     }
-    // Destruction order matters: graph releases its handles before external storage.
-    struct Lease
-    {
-        std::shared_ptr<const void> owner;
-        std::shared_ptr<EnhancedRenderGraph> graph;
-    };
-    auto lease = std::make_shared<Lease>(Lease{std::move(owner), self});
-    m_queueLease = lease;
-    struct Recording
-    {
-        QueueEndpoint* endpoint;
-        std::shared_ptr<IRHIQueueCommandBatch> batch;
-        std::vector<uint16_t> passes;
-    };
-    std::vector<Recording> recordings;
-    const auto recordingStart = std::chrono::steady_clock::now();
-    recordings.reserve(count);
-    const auto record = [&](QueueEndpoint& endpoint, const std::function<void(RHIEncoder&)>& commands)
-    {
-        Recording recording{&endpoint, {}};
-        if (!recorder.Record(endpoint.queue, commands, lease, recording.batch, outError))
-        {
-            return false;
-        }
-        if (!recording.batch || recording.batch->GetQueueIdentity() != endpoint.queue->GetIdentity())
-        {
-            outError = "Recorder returned a foreign batch";
-            return false;
-        }
-        recordings.push_back(std::move(recording));
-        return true;
-    };
     std::vector<bool> batchEnds(m_passes.size(), false);
     for (size_t index = 0; index < plan.entries.size(); ++index)
     {
@@ -134,23 +145,23 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     PhaseBarrierPlan prologue, epilogue;
     if (plan.usesCompute)
     {
+        for (size_t index = 0; index < plan.entries.size(); ++index)
+        {
+            m_executeOrder[index] = plan.entries[index].pass;
+        }
+        UpdateResourceUses();
         PlanBarriers(&batchEnds, &prologue, &epilogue);
     }
+    diagnostic.specialized = true;
+    diagnostic.schedule = plan;
+    output.predictedSerialNanoseconds = plan.predictedSerialNanoseconds;
+    output.predictedNanoseconds = plan.predictedNanoseconds;
     output.plannedBarriers = m_stats.barriersEmitted;
-    const auto recordBoundary = [&](RHIEncoder& encoder, const PhaseBarrierPlan& plan)
-    {
-        RHIBarrierBatch barriers{};
-        barriers.textureTransitions = plan.transitions;
-        barriers.bufferTransitions = plan.bufferTransitions;
-        if (!barriers.IsEmpty())
-        {
-            encoder.ResourceBarriers(barriers);
-        }
-    };
-    if (!record(graphics, [&](RHIEncoder& encoder) { recordBoundary(encoder, prologue); }))
-    {
-        return false;
-    }
+    output.prologueBarriers = static_cast<uint32_t>(prologue.transitions.size() + prologue.bufferTransitions.size());
+    output.epilogueBarriers = static_cast<uint32_t>(epilogue.transitions.size() + epilogue.bufferTransitions.size());
+    diagnostic.batches.reserve(count);
+    diagnostic.batches.push_back({RHIQueueKind::Graphics, {}, output.prologueBarriers});
+    std::vector<uint32_t> passBatch(m_passes.size(), UINT32_MAX);
     for (size_t begin = 0; begin < plan.entries.size();)
     {
         size_t end = begin + 1;
@@ -158,15 +169,103 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         {
             ++end;
         }
-        auto& endpoint = plan.entries[begin].queue == RHIQueueKind::Compute ? *compute : graphics;
-        if (!record(endpoint, [&](RHIEncoder& encoder)
+        QueueDiagnostics::Batch batch;
+        batch.queue = plan.entries[begin].queue;
+        batch.passes.reserve(end - begin);
+        for (size_t index = begin; index < end; ++index)
         {
-            for (size_t index = begin; index < end; ++index)
+            const auto pass = plan.entries[index].pass;
+            passBatch[pass] = static_cast<uint32_t>(diagnostic.batches.size());
+            batch.passes.push_back(pass);
+            batch.barriers += GetPassBarrierCount(RGPassId{pass});
+        }
+        output.plannedComputeBatches += batch.queue == RHIQueueKind::Compute ? 1u : 0u;
+        diagnostic.batches.push_back(std::move(batch));
+        begin = end;
+    }
+    diagnostic.batches.push_back({RHIQueueKind::Graphics, {}, output.epilogueBarriers});
+    output.plannedBatches = static_cast<uint32_t>(diagnostic.batches.size());
+    // Build the exact wait list before recording/submission. A batch index plus
+    // one is a monotonic frontier on its producer queue; zero means no wait.
+    // Both execution and diagnostics use this list, never reconstruct it later.
+    uint32_t graphicsWaitedCompute = 0, computeWaitedGraphics = 0, lastCompute = 0;
+    for (uint32_t index = 1; index + 1 < diagnostic.batches.size(); ++index)
+    {
+        const bool onCompute = diagnostic.batches[index].queue == RHIQueueKind::Compute;
+        uint32_t producer = onCompute && lastCompute == 0 ? 1u : 0u; // Prologue batch zero.
+        for (const auto& wait : plan.waits)
+        {
+            if (passBatch[wait.consumer] == index)
             {
-                const auto& entry = plan.entries[index];
-                const auto& pass = m_passes[entry.pass];
+                producer = (std::max)(producer, passBatch[wait.producer] + 1);
+            }
+        }
+        auto& waited = onCompute ? computeWaitedGraphics : graphicsWaitedCompute;
+        if (producer > waited)
+        {
+            diagnostic.waits.push_back({producer - 1, index});
+            waited = producer;
+        }
+        if (onCompute)
+        {
+            lastCompute = index + 1;
+        }
+    }
+    if (lastCompute > graphicsWaitedCompute)
+    {
+        diagnostic.waits.push_back({lastCompute - 1, output.plannedBatches - 1});
+    }
+    output.plannedWaits = static_cast<uint32_t>(diagnostic.waits.size());
+
+    // Destruction order matters: graph releases its handles before external storage.
+    struct Lease
+    {
+        std::shared_ptr<const void> owner;
+        std::shared_ptr<EnhancedRenderGraph> graph;
+    };
+    auto lease = std::make_shared<Lease>(Lease{std::move(owner), self});
+    m_queueLease = lease;
+    struct Recording
+    {
+        QueueEndpoint* endpoint;
+        std::shared_ptr<IRHIQueueCommandBatch> batch;
+    };
+    std::vector<Recording> recordings;
+    recordings.reserve(output.plannedBatches);
+    std::vector<RHITimelinePoint> points(output.plannedBatches);
+    const auto recordBoundary = [&](RHIEncoder& encoder, const PhaseBarrierPlan& boundary)
+    {
+        RHIBarrierBatch barriers{};
+        barriers.textureTransitions = boundary.transitions;
+        barriers.bufferTransitions = boundary.bufferTransitions;
+        if (!barriers.IsEmpty())
+        {
+            encoder.ResourceBarriers(barriers);
+        }
+    };
+    cpu.FinishPhase();
+    cpu.phase = CpuReport::Phase::Record;
+    for (uint32_t index = 0; index < output.plannedBatches; ++index)
+    {
+        const auto& batch = diagnostic.batches[index];
+        auto& endpoint = batch.queue == RHIQueueKind::Compute ? *compute : graphics;
+        Recording recording{&endpoint, {}};
+        if (!recorder.Record(endpoint.queue, [&](RHIEncoder& encoder)
+        {
+            if (index == 0)
+            {
+                recordBoundary(encoder, prologue);
+            }
+            else if (index + 1 == output.plannedBatches)
+            {
+                recordBoundary(encoder, epilogue);
+            }
+            for (const auto passIndex : batch.passes)
+            {
+                const auto& pass = m_passes[passIndex];
                 auto* profiler = endpoint.profiler ? endpoint.profiler : m_profiler;
-                const auto timerSlot = profiler ? profiler->BeginPass(encoder, pass.name) : IRHIGpuProfiler::kInvalidSlot;
+                const auto timerSlot = profiler ? profiler->BeginPass(encoder, pass.name,
+                    TimingIdentity(passIndex)) : IRHIGpuProfiler::kInvalidSlot;
                 struct PassTimer
                 {
                     IRHIGpuProfiler* profiler;
@@ -185,109 +284,56 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                 RecordPassBody(context, pass, 0, 1);
                 RecordPassFinalBarriers(encoder, pass);
             }
-        }))
+        }, lease, recording.batch, outError))
         {
             return false;
         }
-        for (size_t index = begin; index < end; ++index)
+        if (!recording.batch || recording.batch->GetQueueIdentity() != endpoint.queue->GetIdentity())
         {
-            recordings.back().passes.push_back(plan.entries[index].pass);
+            outError = "Recorder returned a foreign batch";
+            return false;
         }
-        begin = end;
+        recordings.push_back(std::move(recording));
     }
-    if (!record(graphics, [&](RHIEncoder& encoder) { recordBoundary(encoder, epilogue); }))
-    {
-        return false;
-    }
-    // No callbacks or allocation of recordings after submission begins.
-    std::vector<RHITimelinePoint> points(m_passes.size());
-    RHITimelinePoint prefix, lastCompute;
-    output.recordingMilliseconds = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - recordingStart).count();
+    // No callbacks or allocation of recordings/diagnostics after submission begins.
+    cpu.FinishPhase();
+    cpu.phase = CpuReport::Phase::Submit;
     const auto failSubmission = [&]
     {
         output.recoveryRequired = true;
-        // A partially executed graph must never return resources with planned final
-        // states to a reusable pool. Q0 retains submitted/quarantined batches.
-        m_transientPool = nullptr;
+        m_transientPool = nullptr; // Partial execution cannot re-enter the reusable pool.
         return false;
-    };
-    const auto submit = [&](Recording& recording, RHITimelinePoint& point)
-    {
-        m_queueExecutionAttempted = true;
-        output.submissionAttempted = true;
-        auto& endpoint = *recording.endpoint;
-        if (!endpoint.queue->Submit(recording.batch, endpoint.nextSignal, point, outError))
-        {
-            return false;
-        }
-        ++endpoint.nextSignal;
-        ++output.submittedBatches;
-        if (endpoint.queue->GetIdentity().kind == RHIQueueKind::Compute)
-        {
-            ++output.computeBatches;
-        }
-        return true;
     };
     try
     {
-        if (!submit(recordings.front(), prefix))
-        {
-            return failSubmission();
-        }
-        uint64_t graphicsWaitedCompute = 0;
-        uint64_t computeWaitedGraphics = 0;
-        for (size_t index = 1; index + 1 < recordings.size(); ++index)
+        size_t nextWait = 0;
+        for (uint32_t index = 0; index < output.plannedBatches; ++index)
         {
             auto& recording = recordings[index];
-            const bool onCompute = recording.endpoint == compute;
-            RHITimelinePoint waitPoint;
-            if (onCompute && !lastCompute.IsValid())
+            auto& endpoint = *recording.endpoint;
+            while (nextWait < diagnostic.waits.size() && diagnostic.waits[nextWait].consumerBatch == index)
             {
-                waitPoint = prefix;
-            }
-            // One wait on the newest producer value subsumes older values from
-            // that queue, including duplicate resource edges and earlier batches.
-            for (const auto& wait : plan.waits)
-            {
-                if (std::find(recording.passes.begin(), recording.passes.end(), wait.consumer) != recording.passes.end() &&
-                    points[wait.producer].value > waitPoint.value)
-                {
-                    waitPoint = points[wait.producer];
-                }
-            }
-            auto& waited = onCompute ? computeWaitedGraphics : graphicsWaitedCompute;
-            if (waitPoint.IsValid() && waitPoint.value > waited)
-            {
-                if (!recording.endpoint->queue->Wait(waitPoint, outError))
+                auto& wait = diagnostic.waits[nextWait];
+                if (!points[wait.producerBatch].IsValid() ||
+                    !endpoint.queue->Wait(points[wait.producerBatch], outError))
                 {
                     return failSubmission();
                 }
-                waited = waitPoint.value;
+                wait.submitted = true;
+                ++output.submittedWaits;
+                ++nextWait;
             }
-            RHITimelinePoint completion;
-            if (!submit(recording, completion))
+            output.submissionAttempted = true;
+            if (!endpoint.queue->Submit(recording.batch, endpoint.nextSignal, points[index], outError))
             {
                 return failSubmission();
             }
-            for (const auto pass : recording.passes)
-            {
-                points[pass] = completion;
-            }
-            if (onCompute)
-            {
-                lastCompute = completion;
-            }
+            ++endpoint.nextSignal;
+            diagnostic.batches[index].submitted = true;
+            ++output.submittedBatches;
+            output.computeBatches += diagnostic.batches[index].queue == RHIQueueKind::Compute ? 1u : 0u;
         }
-        if (lastCompute.IsValid() && lastCompute.value > graphicsWaitedCompute &&
-            !graphics.queue->Wait(lastCompute, outError))
-        {
-            return failSubmission();
-        }
-        if (!submit(recordings.back(), output.completion))
-        {
-            return failSubmission();
-        }
+        output.completion = points.back();
         for (const auto& resource : m_resources)
         {
             if (resource.used && resource.writeback)
@@ -307,5 +353,6 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         return failSubmission();
     }
     m_statesCommitted = true;
+    output.completed = true;
     return true;
 }

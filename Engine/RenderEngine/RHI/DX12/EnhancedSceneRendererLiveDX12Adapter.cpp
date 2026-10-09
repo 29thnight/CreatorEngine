@@ -17,11 +17,14 @@
 #include "PathFinder.h"
 
 #include <cstdio>
+#include <array>
 #include <unordered_map>
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <sstream>
+#include <optional>
 #include <utility>
 #include <vector>
 #include <wrl/client.h>
@@ -52,9 +55,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     DX12GpuProfiler computeProfiler;
     EnhancedRenderGraph::QueueEndpoint compute;
     bool asyncCompute{false};
-    uint64_t profilerView{0};
     uint64_t computeSubmissions{0};
-    std::unordered_map<uint64_t, std::unordered_map<std::string, uint64_t>> gpuMeasurements;
     DX12GpuProfiler::FrameTimings computeTimings;
     std::vector<DX12GpuProfiler::PassTiming> computeMerged;
     EnhancedRenderGraph::QueueEndpoint graphics;
@@ -63,9 +64,143 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     uint64_t queueBatches{0};
     uint64_t queueBarriers{0};
     uint32_t lastQueueBarriers{0};
+    uint64_t computeSubmittedFrames{0};
+    uint64_t measuredOverlapSubmissions{0};
+    bool evidenceTelemetry{false};
+    GpuFrameToken currentProfilerToken;
+    std::array<GpuFrameToken, kFrameCount> reportedProfilerTokens{};
+    uint64_t minimumMeasurementSubmitTick{0};
+    uint64_t predictedGainNanoseconds{0};
     // 프레임마다 재사용하는 수집물. 문자열 버퍼를 지켜 할당을 없앤다.
     DX12GpuProfiler::FrameTimings profilerTimings;
     std::vector<DX12GpuProfiler::PassTiming> profilerMerged;
+
+    struct GpuMeasurements
+    {
+        std::shared_ptr<const std::string> graphSignature;
+        std::vector<std::optional<uint64_t>> nanoseconds;
+        GpuFrameToken token;
+    };
+    static constexpr size_t kMaxMeasuredViews = 8;
+    static constexpr size_t kMaxTimingSignatureBytes = 1024 * 1024;
+    static constexpr uint64_t kMaxMeasurementFrameAge = 8;
+    std::unordered_map<uint64_t, GpuMeasurements> gpuMeasurements;
+
+    // 최신 제출의 실패가 예전의 정상 표본을 되살려 쓰게 해서는 안 된다.
+    void DiscardMeasurements(const GpuFrameToken& token)
+    {
+        if (token.cpuSubmitTick < minimumMeasurementSubmitTick)
+        {
+            return;
+        }
+        const auto found = gpuMeasurements.find(token.renderViewId);
+        if (found != gpuMeasurements.end() && found->second.token.submissionId > token.submissionId)
+        {
+            return;
+        }
+        if (found == gpuMeasurements.end() && gpuMeasurements.size() >= kMaxMeasuredViews)
+        {
+            const auto oldest = std::min_element(gpuMeasurements.begin(), gpuMeasurements.end(),
+                [](const auto& left, const auto& right)
+                {
+                    return left.second.token.cpuSubmitTick < right.second.token.cpuSubmitTick;
+                });
+            gpuMeasurements.erase(oldest);
+        }
+        // Retain the failure watermark so a late older collection cannot revive
+        // a measurement rejected by a newer failed submission.
+        auto& sample = gpuMeasurements[token.renderViewId];
+        sample = {};
+        sample.token = token;
+    }
+
+    bool MeasurementsFresh(const GpuMeasurements& sample, const GpuFrameToken& current) const
+    {
+        const uint64_t frequency = profiler.Calibration().cpuTicksPerSecond;
+        return frequency != 0 && sample.token.renderViewId == current.renderViewId &&
+            sample.token.submissionId < current.submissionId &&
+            sample.token.engineFrameId <= current.engineFrameId &&
+            current.engineFrameId - sample.token.engineFrameId <= kMaxMeasurementFrameAge &&
+            sample.token.cpuSubmitTick <= current.cpuSubmitTick &&
+            current.cpuSubmitTick - sample.token.cpuSubmitTick <= frequency / 2;
+    }
+
+    void StoreMeasurements(const GpuFrameToken& token)
+    {
+        if (token.cpuSubmitTick < minimumMeasurementSubmitTick)
+        {
+            return;
+        }
+        const auto previous = gpuMeasurements.find(token.renderViewId);
+        if (previous != gpuMeasurements.end() && previous->second.token.submissionId >= token.submissionId)
+        {
+            return;
+        }
+        GpuMeasurements sample;
+        sample.token = token;
+        const auto append = [&](const DX12GpuProfiler::FrameTimings& timings)
+        {
+            if (timings.token.renderViewId != token.renderViewId ||
+                timings.token.engineFrameId != token.engineFrameId ||
+                timings.token.submissionId != token.submissionId ||
+                timings.ticksPerSecond == 0 || timings.overflowedPasses != 0 || timings.droppedSlices != 0)
+            {
+                return false;
+            }
+            for (const auto& slice : timings.slices)
+            {
+                const auto& identity = slice.identity;
+                if (!identity.IsValid())
+                {
+                    continue; // 그래프 밖의 진단 scope에는 스케줄 비용이 없다.
+                }
+                if (identity.passIndex >= RGPassId::kInvalid ||
+                    identity.graphSignature->size() > kMaxTimingSignatureBytes ||
+                    slice.endTicks < slice.beginTicks)
+                {
+                    return false;
+                }
+                if (!sample.graphSignature)
+                {
+                    sample.graphSignature = identity.graphSignature;
+                }
+                else if (sample.graphSignature != identity.graphSignature &&
+                    *sample.graphSignature != *identity.graphSignature)
+                {
+                    return false;
+                }
+                if (sample.nanoseconds.size() <= identity.passIndex)
+                {
+                    sample.nanoseconds.resize(static_cast<size_t>(identity.passIndex) + 1);
+                }
+                auto& cost = sample.nanoseconds[identity.passIndex];
+                const long double nanoseconds = static_cast<long double>(slice.endTicks - slice.beginTicks) *
+                    1'000'000'000.0L / static_cast<long double>(timings.ticksPerSecond);
+                // MSVC의 long double도 double이므로 상한과 같을 때까지 보수적으로 버린다.
+                if (nanoseconds >= static_cast<long double>(UINT64_MAX - cost.value_or(0)))
+                {
+                    return false;
+                }
+                cost = cost.value_or(0) + static_cast<uint64_t>(nanoseconds);
+            }
+            return true;
+        };
+        if (!append(profilerTimings) || (asyncCompute && !append(computeTimings)) || !sample.graphSignature)
+        {
+            DiscardMeasurements(token);
+            return;
+        }
+        if (previous == gpuMeasurements.end() && gpuMeasurements.size() >= kMaxMeasuredViews)
+        {
+            const auto oldest = std::min_element(gpuMeasurements.begin(), gpuMeasurements.end(),
+                [](const auto& left, const auto& right)
+                {
+                    return left.second.token.cpuSubmitTick < right.second.token.cpuSubmitTick;
+                });
+            gpuMeasurements.erase(oldest);
+        }
+        gpuMeasurements[token.renderViewId] = std::move(sample);
+    }
 
     ComPtr<ID3D12Resource> fogCloudNeutral;
     std::vector<DisplayResource> activeDisplays;
@@ -99,9 +234,17 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     impl.compute = {};
     impl.computeSubmissions = 0;
     impl.gpuMeasurements.clear();
+    impl.currentProfilerToken = {};
+    impl.reportedProfilerTokens = {};
+    impl.minimumMeasurementSubmitTick = 0;
     impl.graphics = {};
     impl.queueSubmissions = impl.queueBatches = 0;
     impl.queueBarriers = impl.lastQueueBarriers = 0;
+    impl.computeSubmittedFrames = impl.measuredOverlapSubmissions = impl.predictedGainNanoseconds = 0;
+    char evidenceFlag[8]{};
+    size_t evidenceFlagBytes = 0;
+    impl.evidenceTelemetry = getenv_s(&evidenceFlagBytes, evidenceFlag, sizeof(evidenceFlag),
+        "CREATOR_RG8_EVIDENCE") == 0 && std::strcmp(evidenceFlag, "1") == 0;
     ID3D12CommandQueue* profilerQueue = impl.resources.GetCommandQueue();
     if (impl.ownedQueueExecution)
     {
@@ -169,7 +312,15 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
 bool EnhancedSceneRendererLiveDX12Adapter::Resize(
     uint32_t width, uint32_t height, std::string& outError)
 {
-    return m_impl->resources.Resize(width, height, outError);
+    if (!m_impl->resources.Resize(width, height, outError))
+    {
+        return false;
+    }
+    m_impl->gpuMeasurements.clear();
+    LARGE_INTEGER resizeTick{};
+    QueryPerformanceCounter(&resizeTick);
+    m_impl->minimumMeasurementSubmitTick = static_cast<uint64_t>(resizeTick.QuadPart);
+    return true;
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
@@ -253,6 +404,10 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
             static_cast<unsigned long long>(impl.queueSubmissions), static_cast<unsigned long long>(impl.queueBatches));
         std::printf("[rg8.barriers] total=%llu last=%u\n",
             static_cast<unsigned long long>(impl.queueBarriers), impl.lastQueueBarriers);
+        std::printf("[rg8.schedule] placement=overlap computeSubmittedFrames=%llu measuredOverlapSubmissions=%llu predictedGainNs=%llu predictionCalibrated=false\n",
+            static_cast<unsigned long long>(impl.computeSubmittedFrames),
+            static_cast<unsigned long long>(impl.measuredOverlapSubmissions),
+            static_cast<unsigned long long>(impl.predictedGainNanoseconds));
     }
     impl.graphics = {};
     impl.commandPool.Shutdown();
@@ -261,6 +416,10 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
     impl.rootSignatures.Shutdown();
     impl.pipelines.Shutdown();
     impl.resources.Shutdown();
+    impl.gpuMeasurements.clear();
+    impl.currentProfilerToken = {};
+    impl.ownedQueueExecution = false;
+    impl.asyncCompute = false;
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::ShutdownInterop()
@@ -357,6 +516,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::UsesOwnedQueueExecution() const
     return m_impl->ownedQueueExecution;
 }
 
+uint32_t EnhancedSceneRendererLiveDX12Adapter::GetQueueExecutionMode() const
+{
+    return m_impl->asyncCompute ? 2u : m_impl->ownedQueueExecution ? 1u : 0u;
+}
+
 bool EnhancedSceneRendererLiveDX12Adapter::BeginOwnedQueueRecording(std::string& outError)
 {
     return m_impl->resources.BeginQueueFrame(m_impl->graphics.queue, outError);
@@ -369,15 +533,29 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
     Impl& impl = *m_impl;
     DX12QueueRecorder recorder(impl.resources);
     EnhancedRenderGraph::QueueExecution execution;
-    const auto hints = graph->MeasuredQueueHints([&](const std::string& name)
+    auto view = impl.gpuMeasurements.find(impl.currentProfilerToken.renderViewId);
+    if (view != impl.gpuMeasurements.end() && !impl.MeasurementsFresh(view->second, impl.currentProfilerToken))
     {
-        const auto view = impl.gpuMeasurements.find(impl.profilerView);
-        if (view == impl.gpuMeasurements.end())
+        impl.gpuMeasurements.erase(view);
+        view = impl.gpuMeasurements.end();
+    }
+    bool checkedSignature = false;
+    bool signatureMatches = false;
+    const auto hints = graph->MeasuredQueueHints([&](const GpuPassTimingIdentity& identity) -> std::optional<uint64_t>
+    {
+        if (view == impl.gpuMeasurements.end() || !view->second.graphSignature || !identity.IsValid())
         {
-            return uint64_t{0};
+            return std::nullopt;
         }
-        const auto measurement = view->second.find(name);
-        return measurement == view->second.end() ? uint64_t{0} : measurement->second;
+        // 한 번의 조회는 한 그래프의 패스만 방문한다. 큰 선언 원문은 한 번만 비교한다.
+        if (!checkedSignature)
+        {
+            signatureMatches = view->second.graphSignature == identity.graphSignature ||
+                *view->second.graphSignature == *identity.graphSignature;
+            checkedSignature = true;
+        }
+        const auto& costs = view->second.nanoseconds;
+        return signatureMatches && identity.passIndex < costs.size() ? costs[identity.passIndex] : std::nullopt;
     });
     if (!graph->SubmitQueues(graph, recorder, impl.graphics, impl.asyncCompute ? &impl.compute : nullptr, hints, 1000,
         std::move(owner), execution, outError))
@@ -390,6 +568,87 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
     impl.queueBatches += execution.submittedBatches;
     impl.queueBarriers += execution.plannedBarriers;
     impl.lastQueueBarriers = execution.plannedBarriers;
+    if (execution.computeBatches != 0)
+    {
+        ++impl.computeSubmittedFrames;
+        impl.predictedGainNanoseconds += execution.predictedSerialNanoseconds - execution.predictedNanoseconds;
+    }
+    if (impl.evidenceTelemetry)
+    {
+        const auto& diagnostics = graph->GetQueueDiagnostics();
+        const auto& token = impl.currentProfilerToken;
+        std::ostringstream line;
+        line.precision(17);
+        line << std::boolalpha << "[rg8.execution] {\"schemaVersion\":2,\"mode\":" << GetQueueExecutionMode()
+             << ",\"backendGeneration\":" << GetBackendGeneration()
+             << ",\"frameId\":" << token.engineFrameId << ",\"viewId\":" << token.renderViewId
+             << ",\"submissionId\":" << token.submissionId << ",\"captureGeneration\":" << token.captureGeneration
+             << ",\"specialized\":" << diagnostics.specialized << ",\"predictionCalibrated\":false,\"execution\":{";
+        line << "\"scheduleMilliseconds\":" << diagnostics.execution.scheduleMilliseconds;
+        line << ",\"recordingMilliseconds\":" << diagnostics.execution.recordingMilliseconds;
+        line << ",\"submissionMilliseconds\":" << diagnostics.execution.submissionMilliseconds;
+        line << ",\"totalMilliseconds\":" << diagnostics.execution.totalMilliseconds;
+        line << ",\"plannedBatches\":" << diagnostics.execution.plannedBatches;
+        line << ",\"plannedComputeBatches\":" << diagnostics.execution.plannedComputeBatches;
+        line << ",\"plannedWaits\":" << diagnostics.execution.plannedWaits;
+        line << ",\"submittedBatches\":" << diagnostics.execution.submittedBatches;
+        line << ",\"computeBatches\":" << diagnostics.execution.computeBatches;
+        line << ",\"submittedWaits\":" << diagnostics.execution.submittedWaits;
+        line << ",\"plannedBarriers\":" << diagnostics.execution.plannedBarriers;
+        line << ",\"prologueBarriers\":" << diagnostics.execution.prologueBarriers;
+        line << ",\"epilogueBarriers\":" << diagnostics.execution.epilogueBarriers;
+        line << ",\"predictedSerialNanoseconds\":" << diagnostics.execution.predictedSerialNanoseconds;
+        line << ",\"predictedNanoseconds\":" << diagnostics.execution.predictedNanoseconds;
+        line << ",\"submissionAttempted\":" << diagnostics.execution.submissionAttempted;
+        line << ",\"recoveryRequired\":" << diagnostics.execution.recoveryRequired;
+        line << ",\"completed\":" << diagnostics.execution.completed;
+        line << "},\"schedule\":{\"compileGeneration\":" << diagnostics.schedule.compileGeneration
+             << ",\"usesCompute\":" << diagnostics.schedule.usesCompute
+             << ",\"predictionComplete\":" << diagnostics.schedule.predictionComplete
+             << ",\"predictionCalibrated\":" << diagnostics.schedule.predictionCalibrated << ",\"entries\":[";
+        const char* separator = "";
+        for (const auto& entry : diagnostics.schedule.entries)
+        {
+            line << separator << "{\"pass\":" << entry.pass << ",\"queue\":"
+                 << static_cast<uint32_t>(entry.queue) << '}';
+            separator = ",";
+        }
+        line << "],\"waits\":[";
+        separator = "";
+        for (const auto& wait : diagnostics.schedule.waits)
+        {
+            line << separator << "{\"producer\":" << wait.producer << ",\"consumer\":" << wait.consumer
+                 << ",\"resource\":" << wait.resource << '}';
+            separator = ",";
+        }
+        line << "]},\"batches\":[";
+        separator = "";
+        for (const auto& batch : diagnostics.batches)
+        {
+            line << separator << "{\"queue\":" << static_cast<uint32_t>(batch.queue)
+                 << ",\"barriers\":" << batch.barriers << ",\"submitted\":" << batch.submitted
+                 << ",\"passes\":[";
+            const char* passSeparator = "";
+            for (const auto pass : batch.passes)
+            {
+                line << passSeparator << pass;
+                passSeparator = ",";
+            }
+            line << "]}";
+            separator = ",";
+        }
+        line << "],\"waits\":[";
+        separator = "";
+        for (const auto& wait : diagnostics.waits)
+        {
+            line << separator << "{\"producerBatch\":" << wait.producerBatch
+                 << ",\"consumerBatch\":" << wait.consumerBatch
+                 << ",\"submitted\":" << wait.submitted << '}';
+            separator = ",";
+        }
+        line << "]}";
+        std::printf("%s\n", line.str().c_str());
+    }
     return impl.resources.JoinQueueFrame(execution.completion, outError);
 }
 
@@ -733,12 +992,13 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
 GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
     uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration)
 {
-    m_impl->profilerView = renderViewId;
     if (m_impl->asyncCompute)
     {
         m_impl->computeProfiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
     }
-    return m_impl->profiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
+    m_impl->currentProfilerToken =
+        m_impl->profiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
+    return m_impl->currentProfilerToken;
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameToken& token)
@@ -809,13 +1069,13 @@ namespace
             // ★ 부호를 살려서 뺀다. uint64 끼리 빼면 음수가 천문학적 양수가 되어
             //   "여유가 아주 많다" 로 읽히고, 어긋남이 통째로 숨는다.
             const int64_t submitToBegin = static_cast<int64_t>(timings.queueBeginCpuTicks) -
-                static_cast<int64_t>(token.cpuSubmitTick);
+                static_cast<int64_t>(timings.token.cpuSubmitTick);
             const int64_t endToCollect = static_cast<int64_t>(collectTick.QuadPart) -
                 static_cast<int64_t>(timings.queueEndCpuTicks);
             outSpan.submitToGpuBeginMs = static_cast<double>(submitToBegin) * cpuToMs;
             outSpan.gpuEndToCollectMs = static_cast<double>(endToCollect) * cpuToMs;
             const int64_t submitToCollect = static_cast<int64_t>(collectTick.QuadPart) -
-                static_cast<int64_t>(token.cpuSubmitTick);
+                static_cast<int64_t>(timings.token.cpuSubmitTick);
             outSpan.submitToCollectMs = static_cast<double>(submitToCollect) * cpuToMs;
 
             // raw 조각을 CPU 축으로 옮겨 내준다. 묶은 것이 아니라 이것이 타임라인의
@@ -824,6 +1084,7 @@ namespace
             for (size_t i = 0; i < timings.slices.size(); ++i)
             {
                 outSlices[i].queueId = 0;
+                outSlices[i].passIndex = timings.slices[i].identity.passIndex;
                 outSlices[i].name.assign(timings.slices[i].name);
                 outSlices[i].beginCpuTick =
                     profiler.GpuTickToCpuTick(timings.slices[i].beginTicks);
@@ -849,6 +1110,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
     if (!CollectQueueProfiler(impl.profiler, impl.profilerTimings, impl.profilerMerged,
         token, outTimings, outSlices, outSpan, outTotalMilliseconds, outError))
     {
+        impl.DiscardMeasurements(token);
         return false;
     }
     if (impl.asyncCompute)
@@ -860,6 +1122,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
         if (!CollectQueueProfiler(impl.computeProfiler, impl.computeTimings, impl.computeMerged,
             token, computePasses, computeSlices, computeSpan, computeTotal, outError))
         {
+            impl.DiscardMeasurements(token);
             return false;
         }
         outSpan.computeSliceCount = computeSpan.sliceCount;
@@ -882,6 +1145,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
                 outSpan.cpuAligned = false;
                 outSpan.queueSpanMs = outSpan.busyMs = 0;
                 outError = "Cross-queue timing requires both calibrated clocks";
+                impl.DiscardMeasurements(token);
                 return false;
             }
             for (auto& slice : computeSlices)
@@ -915,19 +1179,131 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
             outSpan.queueSpanMs = (end - outSpan.queueBeginCpuTicks) * toMs;
             outSpan.busyMs = busy * toMs;
             outSpan.submitToGpuBeginMs = (static_cast<int64_t>(outSpan.queueBeginCpuTicks) -
-                static_cast<int64_t>(token.cpuSubmitTick)) * toMs;
+                static_cast<int64_t>(impl.profilerTimings.token.cpuSubmitTick)) * toMs;
             outSpan.gpuEndToCollectMs = computeSpan.queueEndCpuTicks > impl.profilerTimings.queueEndCpuTicks
                 ? computeSpan.gpuEndToCollectMs : outSpan.gpuEndToCollectMs;
         }
     }
-    // Only completed, valid measurements from the same view can drive the next schedule.
-    if (impl.asyncCompute && outSpan.queryOverflowPasses == 0 && outSpan.droppedSlices == 0)
+    const auto& origin = impl.profilerTimings.token;
+    // Explicit capture collection and later display promotion can collect one
+    // token twice. The query-ring slot bounds this exactly-once evidence cache.
+    bool firstCollection = false;
+    if (origin.ringSlot < impl.reportedProfilerTokens.size())
     {
-        auto& measurements = impl.gpuMeasurements[token.renderViewId];
-        for (const auto& pass : outTimings)
+        auto& reported = impl.reportedProfilerTokens[origin.ringSlot];
+        firstCollection = !reported.IsValid() || reported.submissionId != origin.submissionId ||
+            reported.renderViewId != origin.renderViewId || reported.engineFrameId != origin.engineFrameId;
+        reported = origin;
+    }
+    // Union each queue before intersecting: split slices can overlap within one
+    // queue, and a queue's first-to-last envelope includes idle gaps.
+    const auto& graphicsClock = impl.profiler.Calibration();
+    const auto& computeClock = impl.computeProfiler.Calibration();
+    outSpan.cpuTicksPerSecond = graphicsClock.cpuTicksPerSecond;
+    outSpan.overlapClockValid = outSpan.cpuAligned && graphicsClock.valid &&
+        outSpan.queryOverflowPasses == 0 && outSpan.droppedSlices == 0 &&
+        graphicsClock.cpuTicksPerSecond > 0 &&
+        (outSpan.computeSliceCount == 0 || (computeClock.valid &&
+            graphicsClock.cpuTicksPerSecond == computeClock.cpuTicksPerSecond));
+    if (outSpan.overlapClockValid)
+    {
+        std::vector<std::pair<uint64_t, uint64_t>> lanes[2];
+        for (const auto& slice : outSlices)
         {
-            measurements[pass.name] = static_cast<uint64_t>((std::max)(0.0, pass.milliseconds) * 1000000.0);
+            if (slice.queueId < 2 && slice.endCpuTick > slice.beginCpuTick)
+            {
+                lanes[slice.queueId].emplace_back(slice.beginCpuTick, slice.endCpuTick);
+            }
         }
+        for (auto& lane : lanes)
+        {
+            std::sort(lane.begin(), lane.end());
+            size_t count = 0;
+            for (const auto interval : lane)
+            {
+                if (count == 0 || interval.first > lane[count - 1].second)
+                {
+                    lane[count++] = interval;
+                }
+                else
+                {
+                    lane[count - 1].second = (std::max)(lane[count - 1].second, interval.second);
+                }
+            }
+            lane.resize(count);
+        }
+        uint64_t overlapTicks = 0;
+        size_t graphicsIndex = 0;
+        size_t computeIndex = 0;
+        while (graphicsIndex < lanes[0].size() && computeIndex < lanes[1].size())
+        {
+            const auto& graphics = lanes[0][graphicsIndex];
+            const auto& compute = lanes[1][computeIndex];
+            const auto begin = (std::max)(graphics.first, compute.first);
+            const auto end = (std::min)(graphics.second, compute.second);
+            if (end > begin)
+            {
+                overlapTicks += end - begin;
+            }
+            if (graphics.second <= compute.second)
+            {
+                ++graphicsIndex;
+            }
+            else
+            {
+                ++computeIndex;
+            }
+        }
+        const double toMs = 1000.0 / graphicsClock.cpuTicksPerSecond;
+        outSpan.measuredOverlapMilliseconds = overlapTicks * toMs;
+        // Drift is a measured uncertainty indicator, not a guarantee of clock accuracy.
+        outSpan.overlapClockErrorMilliseconds = outSpan.computeSliceCount == 0 ? 0.0 :
+            (static_cast<double>(graphicsClock.maxAbsoluteDriftTicks) +
+                static_cast<double>(computeClock.maxAbsoluteDriftTicks)) * toMs;
+        if (firstCollection && outSpan.measuredOverlapMilliseconds > outSpan.overlapClockErrorMilliseconds)
+        {
+            ++impl.measuredOverlapSubmissions;
+        }
+    }
+    if (impl.evidenceTelemetry && firstCollection)
+    {
+        std::ostringstream line;
+        line.precision(17);
+        line << std::boolalpha << "[rg8.timing] {\"schemaVersion\":2,\"mode\":" << GetQueueExecutionMode()
+             << ",\"backendGeneration\":" << GetBackendGeneration()
+             << ",\"frameId\":" << origin.engineFrameId << ",\"viewId\":" << origin.renderViewId
+             << ",\"submissionId\":" << origin.submissionId << ",\"captureGeneration\":" << origin.captureGeneration
+             << ",\"cpuSubmitTick\":" << origin.cpuSubmitTick
+             << ",\"cpuTicksPerSecond\":" << outSpan.cpuTicksPerSecond
+             << ",\"clockValid\":" << outSpan.overlapClockValid
+             << ",\"computeSliceCount\":" << outSpan.computeSliceCount
+             << ",\"sliceCount\":" << outSpan.sliceCount
+             << ",\"queryOverflow\":" << outSpan.queryOverflowPasses
+             << ",\"droppedSlices\":" << outSpan.droppedSlices
+             << ",\"queueSpanMilliseconds\":" << outSpan.queueSpanMs
+             << ",\"busyMilliseconds\":" << outSpan.busyMs
+             << ",\"measuredOverlapMilliseconds\":" << outSpan.measuredOverlapMilliseconds
+             << ",\"overlapClockErrorMilliseconds\":" << outSpan.overlapClockErrorMilliseconds
+             << ",\"graphicsCalibrationSamples\":" << graphicsClock.sampleCount
+             << ",\"computeCalibrationSamples\":" << computeClock.sampleCount
+             << ",\"slices\":[";
+        const char* separator = "";
+        for (const auto& slice : outSlices)
+        {
+            line << separator << "{\"queue\":" << static_cast<uint32_t>(slice.queueId)
+                 << ",\"passIndex\":" << slice.passIndex
+                 << ",\"beginCpuTick\":" << slice.beginCpuTick
+                 << ",\"endCpuTick\":" << slice.endCpuTick << '}';
+            separator = ",";
+        }
+        line << "]}";
+        std::printf("%s\n", line.str().c_str());
+    }
+    // Queue-local raw samples retain declaration identity; display-name merges
+    // never feed placement; failed/partial samples invalidate older measurements.
+    if (impl.asyncCompute)
+    {
+        impl.StoreMeasurements(origin);
     }
     return true;
 }

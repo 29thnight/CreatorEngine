@@ -5852,6 +5852,11 @@ namespace
             graph.SetTransientPool(&p.transientPool);
             graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
                 ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
+            // Owned queues use compute only when measured independent graphics work
+            // can hide it. Cost constants are uncalibrated estimates (QueueCostModel).
+            EnhancedRenderGraph::QueueCostModel queueCosts;
+            queueCosts.placement = RGQueuePlacement::Overlap;
+            graph.SetQueueCostModel(queueCosts);
             const std::function<bool(std::string&)> queueBoundary = ownedQueueExecution
                 ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
                 : std::function<bool(std::string&)>{};
@@ -5906,12 +5911,6 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
-            if (diagnosticOutput)
-            {
-                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
-                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
-            }
-
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
@@ -5942,11 +5941,22 @@ namespace
                     return false;
                 }
             }
-            viewShadowStats[targetIndex] = CaptureShadowStats(p);
             p.lastNativeRecordMs = ownedQueueExecution ? ownedRecordingMilliseconds : recordWatch.ElapsedMs();
+            // SubmitOwnedGraph specializes order, lifetimes and barriers. Copy
+            // that final plan, never the pre-specialization Compile snapshot.
+            // Failed submissions still return false above; publication clears a
+            // failed frame rather than labeling an unsubmitted plan as displayed.
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
+                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
+            }
+            viewShadowStats[targetIndex] = CaptureShadowStats(p);
             if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
             { outError = "capture graph is not compiled"; return false; }
             p.lastGraphStats = graph.GetStats();
+            LiveStopwatch submitWatch;
+            submitWatch.Start();
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (ownedQueueExecution)
@@ -5984,6 +5994,30 @@ namespace
                 }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
+            const double submissionMilliseconds = submitWatch.ElapsedMs() +
+                (ownedQueueExecution ? graph.GetQueueDiagnostics().execution.submissionMilliseconds : 0.0);
+            const double recordSubmitMilliseconds = recordWatch.ElapsedMs();
+            if (capture)
+            {
+                capture->RecordSubmissionCpu(recordSubmitMilliseconds, submissionMilliseconds);
+            }
+            static const bool queueEvidence = []
+            {
+                const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
+                return value && std::string_view(value) == "1";
+            }();
+            if (queueEvidence)
+            {
+                const std::string line = "[rg8.cpu] {\"schemaVersion\":2,\"mode\":" +
+                    std::to_string(dx12.GetQueueExecutionMode()) + ",\"backendGeneration\":" +
+                    std::to_string(dx12.GetBackendGeneration()) + ",\"frameId\":" +
+                    std::to_string(sourceFrameId) + ",\"viewId\":" + std::to_string(view.key.viewId) +
+                    ",\"submissionId\":" + std::to_string(profilerToken.submissionId) +
+                    ",\"captureGeneration\":" + std::to_string(profilerToken.captureGeneration) +
+                    ",\"totalMilliseconds\":" + std::to_string(recordSubmitMilliseconds) +
+                    ",\"submissionMilliseconds\":" + std::to_string(submissionMilliseconds) + "}";
+                std::printf("%s\n", line.c_str());
+            }
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -6043,7 +6077,7 @@ namespace
                 EnhancedLiveGpuSpan captureSpan;
                 double captureTotalMs = 0.0;
                 std::string timingError;
-                if (!dx12.CollectProfiler(profilerToken, captureTimings, captureSlices,
+                if (!dx12.CollectProfiler(slot.profilerToken, captureTimings, captureSlices,
                         captureSpan, captureTotalMs, timingError) && timingError.empty())
                     timingError = "capture submission timestamps unavailable";
                 capture->RecordGpuTiming(captureTimings, captureSpan, captureTotalMs, timingError);

@@ -66,6 +66,7 @@ public:
     void AbortFrame();
     bool EndFrame(std::string& outError);
     bool UsesOwnedQueueExecution() const;
+    uint32_t GetQueueExecutionMode() const;
     bool BeginOwnedQueueRecording(std::string& outError);
     bool SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph,
         std::shared_ptr<const void> owner, double& recordingMilliseconds, std::string& outError);
