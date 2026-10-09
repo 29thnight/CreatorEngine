@@ -213,6 +213,37 @@ LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceI
 // Scene preparation pins this immutable stream through submission completion.
 StructuredBuffer<uint> lx_meshlets : register(t155);
 
+groupshared uint lx_meshletOutside;
+
+// Intersect the outside-plane masks of the actual posed vertices. A common
+// plane proves the entire convex hull is outside; crossings/unknowns survive.
+bool LXSceneMeshletVisible(uint remap, uint count, uint lane, float4x4 projection)
+{
+    if (lane == 0u)
+    {
+        lx_meshletOutside = 63u;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (lane < count)
+    {
+        const float4 clip = mul(float4(lx_vertices[lx_meshlets[remap + lane]].position.xyz, 1), projection);
+        const float epsilon = max(1.0, max(abs(clip.w), max(abs(clip.x), max(abs(clip.y), abs(clip.z))))) * 0.00001;
+        uint mask = 0u;
+        if (all(isfinite(clip)))
+        {
+            mask = (clip.x < -clip.w - epsilon ? 1u : 0u) |
+                (clip.x > clip.w + epsilon ? 2u : 0u) |
+                (clip.y < -clip.w - epsilon ? 4u : 0u) |
+                (clip.y > clip.w + epsilon ? 8u : 0u) |
+                (clip.z < -epsilon ? 16u : 0u) |
+                (clip.z > clip.w + epsilon ? 32u : 0u);
+        }
+        InterlockedAnd(lx_meshletOutside, mask);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    return lx_meshletOutside == 0u;
+}
+
 [shader("mesh")]
 [numthreads(64, 1, 1)]
 [outputtopology("triangle")]
@@ -224,7 +255,12 @@ void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     const uint indices = lx_meshlets[3] + lx_meshlets[descriptor + 1u];
     const uint vertexCount = lx_meshlets[descriptor + 2u];
     const uint triangleCount = lx_meshlets[descriptor + 3u];
-    SetMeshOutputCounts(vertexCount, triangleCount);
+    const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_viewProjection);
+    SetMeshOutputCounts(visible ? vertexCount : 0u, visible ? triangleCount : 0u);
+    if (!visible)
+    {
+        return;
+    }
     if (lane < vertexCount)
     {
         LXSceneVertex vertex = LXSceneVertexAt(lx_meshlets[remap + lane], lx_drawOwner, lx_viewProjection);
@@ -295,7 +331,12 @@ void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     const uint indices = lx_meshlets[3] + lx_meshlets[descriptor + 1u];
     const uint vertexCount = lx_meshlets[descriptor + 2u];
     const uint triangleCount = lx_meshlets[descriptor + 3u];
-    SetMeshOutputCounts(vertexCount, triangleCount);
+    const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowViewProjection);
+    SetMeshOutputCounts(visible ? vertexCount : 0u, visible ? triangleCount : 0u);
+    if (!visible)
+    {
+        return;
+    }
     if (lane < vertexCount)
     {
         vertices[lane] = LXSceneVertexAt(lx_meshlets[remap + lane], 0u, lx_shadowViewProjection);
@@ -313,6 +354,15 @@ void LXSceneShadowPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
     const LXMaterialContext context = LXSceneContext(input);
     const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
     ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_shadowCutoff, lx_shadowCoverage, frontFace);
+}
+
+[shader("fragment")]
+void LXSceneDepthPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    input = LXScenePixelCenter(input);
+    const LXMaterialContext context = LXSceneContext(input);
+    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_cutoff, lx_coverage, frontFace);
 }
 
 MaterialInputs LXSceneDecalInputs(MaterialInputs raw, LXSceneVertex input, bool frontFace)

@@ -38,6 +38,7 @@ namespace material_graph
         std::uint32_t chunks = 4096;
         std::uint64_t cpuPayloadBytes = 256ull << 20;
         std::uint64_t gpuPayloadBytes = 512ull << 20;
+        float geometryMaxPixelError = 1.f;
     };
 
     struct SceneInputCost
@@ -60,7 +61,9 @@ namespace material_graph
         float viewDepth{};
         math::vector3 shadowCenter{};
         float shadowRadius{};
+        std::uint32_t geometryLod{};
         std::shared_ptr<const MeshSurfacePlan> geometry;
+        std::shared_ptr<const MeshSurfacePlan> shadowGeometry;
     };
 
     // One selected Scene view. No proxy, Material, Camera, mutable mesh bytes or

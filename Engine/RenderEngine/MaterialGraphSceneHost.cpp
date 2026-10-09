@@ -85,7 +85,7 @@ namespace material_graph
         PassLayout layout;
         PassLayout shadowLayout;
         LX::Runtime::GraphicsPipeline shadow;
-        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, color, blendedColor;
+        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, depth, color, blendedColor;
         std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> lookup, blendedLookup;
         std::array<LX::Runtime::GraphicsPipeline, 2> subsurface;
         std::array<LX::Runtime::GraphicsPipeline, 2> refraction;
@@ -122,6 +122,7 @@ namespace material_graph
         std::uint64_t recording{}, descriptors{};
         own::shared_owner<const SceneViewInput> input;
         std::vector<Draw> draws;
+        std::vector<Draw> shadowDraws;
         std::vector<std::pair<size_t, size_t>> inputRanges;
         std::span<const Draw> DrawsFor(std::optional<size_t> inputIndex) const
         {
@@ -777,6 +778,14 @@ namespace material_graph
                         {
                             return false;
                         }
+                        auto depthDesc = desc;
+                        depthDesc.numRenderTargets = 0;
+                        depthDesc.psBytecode = compiled->depth.bytecode.Data();
+                        depthDesc.psSize = compiled->depth.bytecode.Size();
+                        if (!prepare(candidate->depth[side], depthDesc, "LXSceneVS", "LXSceneDepthPS"))
+                        {
+                            return false;
+                        }
                         desc.psBytecode = color.bytecode.Data();
                         desc.psSize = color.bytecode.Size();
                         desc.depthWriteMask = RHIDepthWrite::Zero;
@@ -881,6 +890,7 @@ namespace material_graph
             }
             auto& program = *preparation->program;
             std::vector<LX::Runtime::GraphicsPipeline*> requests{
+                &program.depth[0], &program.depth[1],
                 &program.gbuffer[0],   &program.gbuffer[1],   &program.color[0],     &program.color[1],
                 &program.lookup[0][0], &program.lookup[0][1], &program.lookup[1][0], &program.lookup[1][1]};
             if (program.hasSurface)
@@ -1520,7 +1530,7 @@ namespace material_graph
                         item.visibilityBin, constants.owner, item.visibleIdOffset,
                         ordered ? GpuGeometryVisibility::kNoOcclusion : 0u});
                 }
-                if (indexedIndirect && shadowEnabled)
+                if (indexedIndirect && shadowEnabled && !draw.geometryLod)
                 {
                     // Independent caster candidates are not camera/HZB filtered.
                     // Each cascade keeps the existing light clip-volume contract.
@@ -1544,7 +1554,57 @@ namespace material_graph
                     }
                     std::memcpy(item.indices.cpuAddress, source.indexData, bytes);
                 }
+                if (shadowEnabled && !draw.geometryLod)
+                {
+                    candidate->shadowDraws.push_back(item);
+                }
                 candidate->draws.push_back(std::move(item));
+            }
+            if (shadowEnabled && draw.geometryLod)
+            {
+                for (const auto& chunk : draw.shadowGeometry->Chunks())
+                {
+                    Frame::Draw item;
+                    item.program = program;
+                    item.bindings = bindings;
+                    item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
+                    item.blended = ordered;
+                    item.shadowEnabled = true;
+                    item.shadowConstants = shadowConstants;
+                    for (unsigned cascade = 0; cascade < 3; ++cascade)
+                    {
+                        item.shadowVisible[cascade] = !indexedIndirect &&
+                            shadow_math::IntersectsClip({draw.shadowCenter, draw.shadowRadius}, shadow.lightViewProjection[cascade]);
+                    }
+                    if (!geometry_.Prepare(*device_, chunk.input, item.geometry, error, true))
+                    {
+                        return false;
+                    }
+                    const auto& source = chunk.input->Geometry();
+                    if (indexedIndirect)
+                    {
+                        item.shadowVisibilityBin = static_cast<uint32_t>(shadowBins.size());
+                        shadowBins.push_back(candidate->UsesMeshlets(item)
+                            ? GpuGeometryVisibility::MeshDispatchBin(item.geometry->MeshletCount())
+                            : GpuGeometryVisibility::Bin{source.indexCount, 0, 0, 0});
+                        shadowCandidates.push_back({
+                            math::vector4{draw.shadowCenter.x, draw.shadowCenter.y, draw.shadowCenter.z, draw.shadowRadius},
+                            item.shadowVisibilityBin, constants.owner,
+                            item.shadowVisibilityBin * GpuGeometryVisibility::kOutputAlignment, 0});
+                    }
+                    item.indices = item.geometry->Indices();
+                    if (!item.indices.IsValid())
+                    {
+                        const auto bytes = size_t(source.indexCount) * sizeof(uint32_t);
+                        item.indices = device_->AllocateUpload({bytes, RHIUploadUsage::IndexData, alignof(uint32_t)});
+                        if (!item.indices.IsWritable())
+                        {
+                            return Fail(error, "LX Scene shadow LOD0 index upload failed.");
+                        }
+                        std::memcpy(item.indices.cpuAddress, source.indexData, bytes);
+                    }
+                    candidate->shadowDraws.push_back(std::move(item));
+                }
             }
         }
         if (!visibility_.Prepare(context, candidate->input->ViewProjection(), visibilityCandidates, visibilityBins,
@@ -1624,8 +1684,10 @@ namespace material_graph
             frame->CheckCurrent(&graph);
             return;
         }
+        std::set<const MeshSurfaceBatch*> declaredGeometry;
         for (const auto& draw : frame->draws)
         {
+            declaredGeometry.insert(draw.geometry.get());
             std::string error;
             if (!draw.geometry->Declare(graph, error))
             {
@@ -1639,6 +1701,18 @@ namespace material_graph
                     handle =
                         graph.ImportTexture(texture.resource, RHIResourceState::PixelShaderResource, "LX.Scene.Image");
                 }
+            }
+        }
+        for (const auto& draw : frame->shadowDraws)
+        {
+            if (!declaredGeometry.insert(draw.geometry.get()).second)
+            {
+                continue;
+            }
+            std::string error;
+            if (!draw.geometry->Declare(graph, error))
+            {
+                throw std::runtime_error(error);
             }
         }
         frame->graph = &graph;
@@ -1689,7 +1763,7 @@ namespace material_graph
         {
             return counts;
         }
-        for (const auto& draw : frame_->draws)
+        for (const auto& draw : frame_->shadowDraws)
         {
             if (!draw.shadowEnabled)
             {
@@ -1735,7 +1809,7 @@ namespace material_graph
                 visibility->AddReadUsages(graph, uses);
             }
         }
-        for (const auto& draw : frame->draws)
+        for (const auto& draw : frame->shadowDraws)
         {
             if (!draw.shadowEnabled)
             {
@@ -1777,7 +1851,7 @@ namespace material_graph
                 // Address identity is local to this pass. The captured frame pins
                 // every compared binding for the entire callback.
                 const RenderBindings* boundBindings = nullptr;
-                for (const auto& draw : frame->draws)
+                for (const auto& draw : frame->shadowDraws)
                 {
                     const auto& visibility = frame->shadowVisibility[cascade];
                     const bool indirect = visibility && draw.shadowVisibilityBin != UINT32_MAX;
@@ -1860,13 +1934,99 @@ namespace material_graph
             throw std::runtime_error("LX Scene GBuffer requires one declaration per prepared frame.");
         }
         DeclareGeometry(graph);
+        auto occluderDepth = incoming.depth;
+        char occlusionFlag[8]{};
+        size_t occlusionFlagBytes{};
+        getenv_s(&occlusionFlagBytes, occlusionFlag, sizeof(occlusionFlag), "CREATOR_LX_HZB");
+        const bool occlusionEnabled = std::strcmp(occlusionFlag, "0") != 0;
+        const bool depthPrepass = occlusionEnabled && !hasOccluderDepth && frame->visibility &&
+            graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+        if (depthPrepass)
+        {
+            // Exact current-frame coverage/pose/LOD, with no camera/HZB-filtered
+            // arguments. The pyramid reads this version before the main write.
+            RGTextureDesc depthDescription;
+            depthDescription.width = frame->input->View().width;
+            depthDescription.height = frame->input->View().height;
+            depthDescription.format = RHIFormat::D32Float;
+            depthDescription.allowDepthStencil = true;
+            depthDescription.name = "LX.Scene.OccluderDepth";
+            // Keep main depth untouched so Less and first-primitive tie ownership
+            // remain identical to the indexed baseline after HZB filtering.
+            occluderDepth = graph.Write(graph.CreateTexture(depthDescription));
+            std::vector<EnhancedRenderGraph::RGPassUsage> depthUses;
+            depthUses.push_back({occluderDepth, RHIResourceState::DepthWrite, RGAccessMode::Write});
+            for (const auto& draw : frame->draws)
+            {
+                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
+                {
+                    continue;
+                }
+                depthUses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
+                if (frame->UsesMeshlets(draw))
+                {
+                    depthUses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
+                }
+                for (const auto& texture : draw.bindings->resources.textures)
+                {
+                    depthUses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
+                }
+            }
+            NormalizeSceneReads(graph, depthUses);
+            graph.AddPass("LX.Scene.OccluderDepth", depthUses, [frame, depthHandle = occluderDepth](const auto& execution) {
+                frame->CheckCurrent(execution.graph);
+                auto& encoder = *execution.encoder;
+                const auto depthTarget = RHIDepthTargetDesc::Depth(execution.ResolveHandle(depthHandle), RHIFormat::D32Float);
+                const auto targets = frame->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depthTarget);
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("LX Scene occluder depth target binding failed.");
+                }
+                encoder.BindRenderTargets(targets);
+                encoder.ClearDepthTarget(targets, 1.f);
+                encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+                for (const auto& draw : frame->draws)
+                {
+                    if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
+                    {
+                        continue;
+                    }
+                    encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->depth[draw.doubleSided].GetHandle()));
+                    std::string error;
+                    if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                    {
+                        throw std::runtime_error(error);
+                    }
+                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                    const unsigned ownerRoot = 15 + (draw.program->hasSpecial ? 2 : 0) +
+                        (draw.program->hasTransmission ? 1 : 0);
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, ownerRoot, draw.visibleOwner);
+                    if (frame->UsesMeshlets(draw))
+                    {
+                        encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->meshletRoot, draw.geometry->Meshlets());
+                        if (!encoder.DispatchMesh(draw.geometry->MeshletCount(), 1, 1))
+                        {
+                            throw std::runtime_error("LX Scene occluder mesh dispatch failed.");
+                        }
+                    }
+                    else
+                    {
+                        encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
+                        encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
+                    }
+                }
+            });
+        }
         if (frame->visibility)
         {
-            if (hasOccluderDepth && graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+            if (occlusionEnabled && (hasOccluderDepth || depthPrepass) &&
+                graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
             {
                 // Cull LX against the native GBuffer's earlier depth version.
                 // Declare before Modify: this must never consume LX's own depth.
-                frame->visibility->DeclareWithOcclusion(graph, incoming.depth);
+                frame->visibility->DeclareWithOcclusion(graph, occluderDepth);
             }
             else
             {
@@ -2899,6 +3059,10 @@ namespace material_graph
         // 큐 접수와 material cache 게시는 별개다. 게시 검사나 tail EndFrame이
         // 실패해도 모든 자원은 이미 접수된 전체 그래프의 완료점을 보유한다.
         for (const auto& draw : frame_->draws)
+        {
+            draw.geometry->MarkSubmitted(completion);
+        }
+        for (const auto& draw : frame_->shadowDraws)
         {
             draw.geometry->MarkSubmitted(completion);
         }

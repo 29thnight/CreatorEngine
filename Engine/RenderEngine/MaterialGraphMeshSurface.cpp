@@ -236,13 +236,16 @@ namespace material_graph
                         return true;
                     }
                 }
-                if (device.GetMeshShaderCapabilities().meshShader)
+                char meshFlag[8]{};
+                size_t meshFlagBytes{};
+                getenv_s(&meshFlagBytes, meshFlag, sizeof(meshFlag), "CREATOR_LX_MESHLETS");
+                const bool buildMeshlets = std::strcmp(meshFlag, "0") != 0 &&
+                    device.GetMeshShaderCapabilities().meshShader;
+                if (buildMeshlets)
                 {
-                    if (!BuildSceneMeshletTopology(geometry, topology, error))
-                    {
-                        return false;
-                    }
-                    sizes[3] = topology.size() * sizeof(uint32_t);
+                    // At most one descriptor (4), three remaps and three local
+                    // indices per triangle. Reserve before any topology work.
+                    sizes[3] = 16ull + std::uint64_t(geometry.indexCount / 3) * 40ull;
                     bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
                 }
                 if (bytes > maxBytes)
@@ -267,6 +270,15 @@ namespace material_graph
                 if (stats.residentBytes + bytes > maxBytes || entries.size() >= maxEntries)
                 {
                     return true;
+                }
+                if (buildMeshlets)
+                {
+                    if (!BuildSceneMeshletTopology(geometry, topology, error))
+                    {
+                        return false;
+                    }
+                    sizes[3] = topology.size() * sizeof(uint32_t);
+                    bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
                 }
             }
             auto entry = std::make_shared<MeshSurfaceStaticBuffers>(device);
@@ -716,13 +728,15 @@ namespace material_graph
             const std::uint32_t* indexData{};
         };
         static std::mutex cacheMutex;
-        static std::map<assets::ModelMeshHandle, Entry> cache;
-        static std::deque<assets::ModelMeshHandle> insertionOrder;
+        using Key = std::pair<assets::ModelMeshHandle, uint32_t>;
+        static std::map<Key, Entry> cache;
+        static std::deque<Key> insertionOrder;
         static std::uint64_t cachedBytes{};
         constexpr std::uint64_t maxCachedBytes = 128ull << 20;
         constexpr std::size_t maxEntries = 64;
 
         const auto& geometry = draw.modelMeshView;
+        const Key key{geometry.handle, geometry.sourceLodIndex};
         const auto sameBudget = [](const MeshSurfacePlanBudget& a, const MeshSurfacePlanBudget& b) {
             return a.maxSourceVertices == b.maxSourceVertices && a.maxTriangles == b.maxTriangles &&
                    a.maxChunkPoints == b.maxChunkPoints && a.maxChunks == b.maxChunks &&
@@ -732,7 +746,7 @@ namespace material_graph
         if (geometry.IsComplete())
         {
             std::lock_guard lock(cacheMutex);
-            if (const auto found = cache.find(geometry.handle);
+            if (const auto found = cache.find(key);
                 found != cache.end() && sameBudget(found->second.budget, budget) &&
                 found->second.vertexData == geometry.vertexData && found->second.indexData == geometry.indexData &&
                 found->second.plan->source_->geometry_.vertexBytes == geometry.vertexBytes &&
@@ -765,14 +779,14 @@ namespace material_graph
             if (result->cost_.cpuPayloadBytes <= maxCachedBytes)
             {
                 std::lock_guard lock(cacheMutex);
-                if (const auto found = cache.find(geometry.handle); found != cache.end())
+                if (const auto found = cache.find(key); found != cache.end())
                 {
                     cachedBytes -= found->second.plan->cost_.cpuPayloadBytes;
                     cache.erase(found);
-                    std::erase(insertionOrder, geometry.handle);
+                    std::erase(insertionOrder, key);
                 }
-                cache.emplace(geometry.handle, Entry{result, budget, geometry.vertexData, geometry.indexData});
-                insertionOrder.push_back(geometry.handle);
+                cache.emplace(key, Entry{result, budget, geometry.vertexData, geometry.indexData});
+                insertionOrder.push_back(key);
                 cachedBytes += result->cost_.cpuPayloadBytes;
                 while (cachedBytes > maxCachedBytes || cache.size() > maxEntries)
                 {

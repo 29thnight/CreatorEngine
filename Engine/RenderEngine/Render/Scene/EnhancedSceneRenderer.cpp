@@ -3205,6 +3205,8 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
+                    // Graph-only GBuffer owns no native occluder raster. LX
+                    // builds its current-frame depth before HZB and main color.
                     const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb), false);
                     bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);

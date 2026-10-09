@@ -79,6 +79,7 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     // ShaderMeta describes generated entry contracts, including the installed
     // common Forward+ alpha consumer.
     graphics("GBuffer", "LXSceneVS", "LXSceneGBufferPS", ShaderPassQueue::Opaque, true);
+    graphics("LXSceneDepth", "LXSceneVS", "LXSceneDepthPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
     graphics("Forward", "LXSceneVS", "LXSceneColorPS", ShaderPassQueue::Transparent);
     passes.back().state.blendMode = ShaderBlendMode::Alpha;
@@ -113,7 +114,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
         if (only && *only != backend) continue;
         targets.push_back({backend, "LXSceneVS", "vs_6_0"});
         targets.push_back({backend, "LXSceneMS", "ms_6_5"});
-        for (const auto entry : {"LXSceneGBufferPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
+        for (const auto entry : {"LXSceneGBufferPS", "LXSceneDepthPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
             targets.push_back({backend, entry, "ps_6_0"});
         }
@@ -270,6 +271,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         }
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
         const std::pair<std::string_view, Member> members[]{{"LXSceneVS", &SceneShaderSet::vertex},
+                                                            {"LXSceneDepthPS", &SceneShaderSet::depth},
                                                             {"LXSceneMS", &SceneShaderSet::mesh},
                                                             {"LXSceneShadowMS", &SceneShaderSet::shadowMesh},
                                                             {"LXSceneGBufferPS", &SceneShaderSet::gbuffer},

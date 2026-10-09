@@ -97,6 +97,8 @@ namespace material_graph
             return selectionDeferred_;
         }
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
+        // With no earlier occluder depth, RG2 builds current-frame LX depth
+        // before HZB. Compatibility graphs retain the frustum-only route.
         EnhancedGBufferPass::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
                                                     const EnhancedGBufferPass::Outputs& inputs,
                                                     bool hasOccluderDepth = true) const;

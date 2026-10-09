@@ -1,5 +1,7 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
+2026-10-09 LX 후속: posed 메시렛별 프러스텀 검사, CPU 기하 LOD 선택·실제 제출과 그림자 LOD0 분리, 별도 현재 깊이→draw HZB, 생성 전 cache 예산 검사를 연결했다. D/R 8조합·192프레임·GPU validation 0, 실제 Release TestShadow 32출력 비트 동일을 확인했다. GPU LOD·메시렛 압축/개별 HZB·성능/VRAM·Vulkan 수용은 별도이며 기존 기성/상태를 변경하지 않는다. [구현·검증 경계](../analysis/LatticeGeometryIntegration20261009.md).
+
 2026-10-09 구조 수정 2: 단일 큐는 기존 compiled barrier 계획을 그대로 사용하고, 다중 큐는 공통 계획기로 배치 내부 상태를 유지한다. D/R 최종 실행 150검사·계획 24검사·전체 RG 회귀 통과. 제품 검증은 [배리어 수정 기록](../analysis/RenderRg8Barriers20261009.md)을 따른다. RG8 progress·기성 0·기본 OFF 및 기존 공수 집계 유지.
 
 2026-10-09 구조 수정 1: 패스별 제출을 의존 경계별 batch로 합치고 queue endpoint 소유 allocator/list 풀을 추가했다. D/R 실행 147검사·계획 24검사·전체 RenderGraph 회귀 통과. COMMON 전이 단일화·overlap 후보 선택·RG7 조합은 잔여이며 RG8 progress·기성 0·기본 OFF를 유지한다. [수정과 제품 검증](../analysis/RenderRg8Batching20261009.md).

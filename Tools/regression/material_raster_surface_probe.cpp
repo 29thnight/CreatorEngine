@@ -4,6 +4,7 @@
 #include "Render/Graph/ShadowCasterBounds.h"
 #include "support/MaterialGraphScenePacket.h"
 #include "MaterialGraphSceneInput.h"
+#include "MaterialGraphSceneLod.h"
 #include "MaterialGraphSceneHost.h"
 #include "MaterialGraphSceneCompiler.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
@@ -1907,7 +1908,8 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
 void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                          ProbeTextures& textures, ProbePool& pool,
                          const std::array<own::shared_owner<const Instance>, 2>& instances, own::shared_owner<const Texture> cube,
-                         const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0)
+                         const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0,
+                         bool currentFrameDepth = false)
 {
     std::string error;
     ProbeMeshes meshes;
@@ -2263,7 +2265,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                   "Actual Scene pass preparation " + error);
             const auto resident = host.PrepareResidency(context, input, error);
             Check(resident, "Scene texture residency " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device,
+                currentFrameDepth ? RGSchedulingMode::ExplicitVersioned : RGSchedulingMode::DeclarationOrder);
             if (workers)
             {
                 pool.BeginFrame(static_cast<std::uint32_t>(context.frameId));
@@ -2296,8 +2299,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 ++sceneCompositionFailures;
             }
             gbuffer.Declare(*graph, context);
-            const auto outputs = gbuffer.GetOutputs();
-            host.DeclareGBuffer(*graph, outputs);
+            const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs(), !currentFrameDepth);
             RGTextureDesc aoDesc;
             aoDesc.width = context.width;
             aoDesc.height = context.height;
@@ -2305,8 +2307,13 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             aoDesc.allowRenderTarget = true;
             const float occlusion = fixture == 1 ? .5f : 1.f;
             aoDesc.clearColor[0] = occlusion;
-            const auto ao = graph->CreateTexture(aoDesc);
-            graph->AddPass("Probe.Scene.AO", {{ao, RHIResourceState::RenderTarget}},
+            auto ao = graph->CreateTexture(aoDesc);
+            if (currentFrameDepth)
+            {
+                ao = graph->Write(ao);
+            }
+            graph->AddPass("Probe.Scene.AO", {{ao, RHIResourceState::RenderTarget,
+                currentFrameDepth ? RGAccessMode::Write : RGAccessMode::LegacyState}},
                            [&device, ao, occlusion](const auto& execution) {
                                const auto handle = execution.ResolveHandle(ao);
                                const auto target = device.CreateRenderTargets({&handle, 1}, nullptr);
@@ -2326,7 +2333,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                       "Scene readback allocation");
             const auto copy = [&](unsigned index, RGHandle handle) {
                 graph->AddPass(
-                    "Probe.Scene.Readback", {{handle, RHIResourceState::CopySource}},
+                    "Probe.Scene.Readback", {{handle, RHIResourceState::CopySource,
+                        currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
                     [readback = readbacks[index], handle](const auto& execution) {
                         execution.encoder->CopyToReadback(readback, execution.ResolveHandle(handle));
                     },
@@ -2355,7 +2363,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     true);
             }
 #endif
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
+            const auto sceneLighting = host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
             std::array<RHIReadback, 11> pointReadbacks;
             RHIReadback sampleReadback;
             if (inspectPoint)
@@ -2407,7 +2415,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                   "Scene lookup stats allocation");
             const auto statistics = host.GraphLookupStatistics(*graph);
             graph->AddPass(
-                "Probe.Scene.LookupStatistics", {{statistics, RHIResourceState::CopySource}},
+                "Probe.Scene.LookupStatistics", {{statistics, RHIResourceState::CopySource,
+                    currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
                 [lookupReadback, buffer = host.LookupStatistics()](const auto& execution) {
                     execution.encoder->CopyBufferToReadback(lookupReadback, buffer);
                 },
@@ -2427,12 +2436,14 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(rejected, "Scene color rejects duplicate/cross-graph declaration");
                 ++sceneCompositionFailures;
             }
-            copy(1, deferred.GetOutput());
+            copy(1, sceneLighting);
             copy(2, outputs.bitmask);
             copy(4, outputs.depth);
             Check(!host.PublishSubmittedCache(context.frameId, {UINT64_MAX}, error),
                   "Unrecorded cache cannot be published");
-            Check(graph->Compile(error), "Scene composition graph compile " + error);
+            error.clear();
+            const bool graphCompiled = graph->Compile(error);
+            Check(graphCompiled, "Scene composition graph compile " + error);
             RHICompletionPoint graphCompletion;
             RHISubmissionTicket graphTicket;
             std::unique_ptr<SceneSubmissionGate> submissionGate;
@@ -3167,6 +3178,40 @@ void RunIssueResourceLifetime(RecordingChangeDevice& device, ProbeRoots& roots, 
 
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
 {
+    {
+        SceneInputView view;
+        view.width = view.height = 100;
+        view.camera.view = view.camera.projection = math::matrix4x4::identity();
+        const auto world = math::matrix4x4::identity();
+        const shadow_math::Sphere sphere{{0, 0, 10}, 1};
+        std::array<experiment::MeshLodLevel, 2> levels;
+        levels[0].indices = {0, 1, 2};
+        levels[0].geometricError = 0.001f;
+        levels[1].indices = {0, 2, 3};
+        levels[1].geometricError = 0.01f;
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 1,
+            "Orthographic projected error chooses actual authored LOD1");
+        view.width = view.height = 10;
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 2,
+            "Smaller screen footprint chooses LOD2");
+        view.width = view.height = 1000;
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 0,
+            "High screen error retains original geometry");
+        Check(SelectSceneGeometryLod(levels, world, {{0, 0, 0}, 1}, view, 1) == 0,
+            "Near-plane crossing retains original geometry");
+        view.camera.projection.m[2][3] = 1;
+        view.width = view.height = 100;
+        const auto close = SelectSceneGeometryLod(levels, world, {{0, 0, 2}, 1}, view, 1);
+        const auto distantLod = SelectSceneGeometryLod(levels, world, {{0, 0, 100}, 1}, view, 1);
+        Check(distantLod == 2 && close < distantLod, "Perspective distance reduces submitted geometry detail");
+        auto scaled = world;
+        scaled.m[0][0] = 100;
+        Check(SelectSceneGeometryLod(levels, scaled, sphere, view, 1) < 2,
+            "Nonuniform world scale preserves the projected-error budget");
+        levels[1].geometricError = std::numeric_limits<float>::quiet_NaN();
+        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 0,
+            "Invalid authored error retains original geometry");
+    }
 #ifdef LX_PROBE_VULKAN
     RHIShaderCompiler::ScopedOutput nativeOutput(RHIShaderBinary::SpirV);
 #endif
@@ -3345,6 +3390,16 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         ShutdownNative(device, roots, pipelines, textures, pool);
         std::cout << "LX_MATERIAL_COOKED_SCENE_OK frames=" << sceneCompositionFrames << " checks=" << checks
                   << " gpuComponents=" << gpuComponents << " sceneCompiles=0 validation=0 pak=encrypted\n";
+        return;
+    }
+    if (mode == "--lx-meshlet-only")
+    {
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 0, true);
+        std::string validation;
+        Check(device.DrainDebugMessages(validation) == 0, "LX meshlet/depth/HZB validation " + validation);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        std::cout << "LX_MESHLET_CULL_LOD_HZB_OK frames=" << sceneCompositionFrames
+            << " checks=" << checks << " gpuComponents=" << gpuComponents << " validation=0\n";
         return;
     }
     if (mode == "--scene-only" || mode == "--scene-full-only")
@@ -3869,6 +3924,7 @@ int main(int argc, char** argv)
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
                    (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                    std::string_view(argv[2]) == "--lx-meshlet-only" ||
                     std::string_view(argv[2]) == "--issue-resource-lifetime" ||
                     std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||

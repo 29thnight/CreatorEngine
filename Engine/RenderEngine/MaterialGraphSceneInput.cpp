@@ -1,4 +1,5 @@
 #include "MaterialGraphSceneInput.h"
+#include "MaterialGraphSceneLod.h"
 #include "Render/Graph/ShadowCasterBounds.h"
 #include "Render/Graph/EnhancedDrawIdentity.h"
 #include "Material.h"
@@ -205,9 +206,26 @@ namespace material_graph
             }
             // Raster computes the texture footprint from perspective UV derivatives.
             // Zero vertex LOD is transport initialization, not a material footprint.
-            if (!MeshSurfacePlan::BuildForScene(draw, candidate->surface_, budget.mesh, input.geometry, error))
+            auto selectedDraw = draw;
+            input.geometryLod = SelectSceneGeometryLod(draw, view, budget.geometryMaxPixelError);
+            if (input.geometryLod)
+            {
+                const auto& indices = geometry.SourceMesh()->coarseLods.levels[input.geometryLod - 1].indices;
+                selectedDraw.modelMeshView.sourceLodIndex = input.geometryLod;
+                selectedDraw.modelMeshView.indexData = indices.data();
+                selectedDraw.modelMeshView.indexCount = static_cast<uint32_t>(indices.size());
+            }
+            if (!MeshSurfacePlan::BuildForScene(selectedDraw, candidate->surface_, budget.mesh, input.geometry, error))
             {
                 error = "Scene graph geometry " + std::to_string(draw.geometryKey) + ": " + error;
+                return false;
+            }
+            // Camera screen error must not lower the detail of a nearby light's
+            // casters. Until a light-space error budget is supplied, shadows keep LOD0.
+            input.shadowGeometry = input.geometry;
+            if (input.geometryLod &&
+                !MeshSurfacePlan::BuildForScene(draw, candidate->surface_, budget.mesh, input.shadowGeometry, error))
+            {
                 return false;
             }
             // Bounds consume source bytes and palette only after their full validation.
@@ -228,6 +246,20 @@ namespace material_graph
             total.chunks += chunks;
             total.cpuPayloadBytes += cost.cpuPayloadBytes;
             total.gpuPayloadBytes += cost.gpuPayloadBytes;
+            if (input.shadowGeometry != input.geometry)
+            {
+                const auto& shadowCost = input.shadowGeometry->Cost();
+                const auto shadowChunks = input.shadowGeometry->Chunks().size();
+                if (shadowChunks > budget.chunks - total.chunks ||
+                    shadowCost.cpuPayloadBytes > budget.cpuPayloadBytes - total.cpuPayloadBytes ||
+                    shadowCost.gpuPayloadBytes > budget.gpuPayloadBytes - total.gpuPayloadBytes)
+                {
+                    return Fail(error, "Scene shadow LOD0 exceeds the aggregate payload budget.");
+                }
+                total.chunks += shadowChunks;
+                total.cpuPayloadBytes += shadowCost.cpuPayloadBytes;
+                total.gpuPayloadBytes += shadowCost.gpuPayloadBytes;
+            }
             candidate->draws_.push_back(std::move(input));
         }
         result = std::move(candidate);

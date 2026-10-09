@@ -734,6 +734,7 @@
     <ClInclude Include="MaterialGraphRasterSurface.h" />
     <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
+    <ClInclude Include="MaterialGraphSceneLod.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
     <ClInclude Include="GpuGeometryVisibility.h" />
     <ClInclude Include="MaterialGraphSceneCompiler.h" />
