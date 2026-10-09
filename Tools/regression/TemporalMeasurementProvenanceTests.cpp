@@ -52,8 +52,11 @@ int main()
     assert(mutation.renderExtent == frame.renderExtent && mutation.displayExtent == frame.displayExtent);
     // Runtime native suppression remains factual even when acceptance proof is unknown.
     assert(mutation.nativeGateActive);
+    assert(mutation.testFaultActive);
+    assert(mutation.frameKind == TemporalMeasuredFrameKind::Unknown);
+    assert(mutation.resolutionState == TemporalResolutionState::Unknown);
     mutation.spatialMode = SpatialScalingMode::NisSharpen;
-    assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    assert(!mutation.IsValid() && !mutation.IsGoldenEligible());
 
     auto& runtime = TemporalRuntimeControl::Get();
     const auto saved = runtime.Snapshot().requestedSettings;
