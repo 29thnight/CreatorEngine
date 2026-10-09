@@ -743,6 +743,11 @@ namespace editor::widgets
         }
     }
 
+    void track_property_input(const char* id, float width) noexcept
+    {
+        announce_property_field(ImGui::GetID(id), width);
+    }
+
     std::uint64_t property_line_count() noexcept
     {
         return g_propertyLineCount;

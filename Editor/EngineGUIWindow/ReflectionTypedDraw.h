@@ -1,4 +1,8 @@
-#pragma once
+﻿#pragma once
+#include "imgui_stdlib.h"
+#include "EditorNavContract.h"
+
+struct PhysicsShapeDefinition;
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
@@ -123,6 +127,11 @@ namespace Meta::TypedDraw
     template<class Owner, class MemberT, auto MP>
     inline void CommitMemberChange(Owner* obj, const MemberT& prevValue, const MemberT& newValue, const char* field)
     {
+        // Shape drafts can move or disappear on Add/Remove/Reload. Never
+        // retain their addresses in Undo; Apply Shapes publishes the list.
+        if constexpr (std::is_same_v<Owner, PhysicsShapeDefinition>)
+            return;
+
         if constexpr (std::is_base_of_v<Component, Owner>)
         {
             const auto* type = Meta::Find(obj->GetTypeID());
@@ -563,7 +572,24 @@ namespace Meta::TypedDraw
         // 엔진이 싣는 기본 드로어도 같은 문으로 들어온다
         // (`InspectorDrawerList.h`). 특수화가 없으면 이 `if` 는 컴파일에서
         // 통째로 사라지므로 런타임 비용도 간접 호출도 없다.
-        if constexpr (editor::inspector::HasInspectorDrawer<MemberT>)
+        if constexpr (std::is_same_v<Owner, PhysicsShapeDefinition> &&
+                      (std::is_same_v<MemberT, std::string> || std::is_same_v<MemberT, std::uint64_t>))
+        {
+            // These are authoring draft values. Apply Shapes owns validation
+            // and the single Undo entry; typing must retain the draft buffer.
+            ImGui::PushID(name);
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+
+            if constexpr (std::is_same_v<MemberT, std::string>)
+                ImGui::InputText(kValueId, &value);
+            else
+                ImGui::InputScalar(kValueId, ImGuiDataType_U64, &value);
+
+            editor::nav::announce_item(name, ImGui::GetItemID(),
+                (ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0, true);
+            ImGui::PopID();
+        }
+        else if constexpr (editor::inspector::HasInspectorDrawer<MemberT>)
         {
             MemberT v = value;
             ImGui::PushID(name);
@@ -619,9 +645,15 @@ namespace Meta::TypedDraw
             float v = value;
             ImGui::PushID(name);
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+
+            if constexpr (std::is_same_v<Owner, PhysicsShapeDefinition>)
+                editor::nav::announce_item(name, ImGui::GetID(kValueId),
+                    (ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0, true);
+
             const bool changed = hasRange
                 ? ImGui::SliderFloat(kValueId, &v, rangeMin, rangeMax)
                 : editor::widgets::drag_property_float(kValueId, &v);
+
             if (changed)
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);

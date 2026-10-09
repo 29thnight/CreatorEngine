@@ -199,6 +199,8 @@ struct EnhancedRequiredAssetPacket
 struct EnhancedLiveFramePacket
 {
     uint64_t frameId{ 0 };
+    // Host engine frame for telemetry; render submission identity is independent.
+    uint32_t profilingEngineFrame{ 0 };
     // 같은 프로세스 steady_clock의 캡처 시각이며 시뮬레이션 시간이나 fence가 아니다.
     // 0은 관측 불가다. 병합해도 교체된 입력의 실제 캡처 시각을 그대로 보존한다.
     uint64_t sourceCaptureNanoseconds{ 0 };

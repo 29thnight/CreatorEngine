@@ -2938,9 +2938,15 @@ ce::physics::result<void> Scene::RegisterPhysicsBody(PhysicsBodyComponent& compo
     auto binding = m_physicsSimulation.Register(std::move(*definition), component.IsEnabled());
     if (!binding) return std::unexpected(binding.error());
 
-    try { m_physicsBodies.emplace(*binding, &component); }
+    try
+    {
+        m_physicsContactOwners.emplace(*binding, PhysicsContactOwner{
+            ScriptObjectRegistry::Get().Register(component.GetOwner()), component.GetInstanceID()});
+        m_physicsBodies.emplace(*binding, &component);
+    }
     catch (const std::bad_alloc&)
     {
+        m_physicsContactOwners.erase(*binding);
         (void)m_physicsSimulation.Unregister(*binding);
         return std::unexpected(ce::physics::error{ce::physics::error_code::out_of_memory, 0, "Physics component membership allocation failed"});
     }
@@ -2956,9 +2962,29 @@ ce::physics::result<void> Scene::UnregisterPhysicsBody(PhysicsBodyComponent& com
 {
     if (component.m_scene != this) return {};
 
-    auto removed = m_physicsSimulation.Unregister(component.m_binding);
-    if (!removed) return removed;
+    const bool retiring = m_physicsSimulation.IsRunning();
+    if (retiring)
+    {
+        if (m_retiredPhysicsContactOwners.size() == 65536)
+            return std::unexpected(ce::physics::error{ce::physics::error_code::capacity_exceeded, 0,
+                "Retired contact owner capacity exceeded"});
 
+        try { m_retiredPhysicsContactOwners.push_back(component.m_binding); }
+        catch (const std::bad_alloc&)
+        {
+            return std::unexpected(ce::physics::error{ce::physics::error_code::out_of_memory, 0,
+                "Retired contact owner allocation failed"});
+        }
+    }
+
+    auto removed = m_physicsSimulation.Unregister(component.m_binding);
+    if (!removed)
+    {
+        if (retiring) m_retiredPhysicsContactOwners.pop_back();
+        return removed;
+    }
+
+    if (!retiring) m_physicsContactOwners.erase(component.m_binding);
     m_physicsBodies.erase(component.m_binding);
     component.m_binding = 0;
     component.m_scene = nullptr;
@@ -3053,7 +3079,12 @@ ce::physics::result<void> Scene::StartPhysicsSimulation()
 
 ce::physics::result<void> Scene::StopPhysicsSimulation()
 {
-    return m_physicsSimulation.Stop();
+    auto stopped = m_physicsSimulation.Stop();
+    if (!stopped) return stopped;
+
+    for (const auto binding : m_retiredPhysicsContactOwners) m_physicsContactOwners.erase(binding);
+    m_retiredPhysicsContactOwners.clear();
+    return {};
 }
 
 ce::physics::result<void> Scene::PreparePhysicsSceneExit()
@@ -3153,6 +3184,34 @@ void Scene::FixedUpdate(float deltaSecond)
         return;
     }
     if (*advanced == 0) return;
+
+    {
+        const auto status = m_physicsSimulation.Runtime()->status();
+        ce::profile_context_scope contactContext{{status.identity.value, status.last_tick.value, 0}};
+        ce::profile_scope scope{ce::marker<"Physics.ContactPublish">()};
+        for (const auto& contact : m_physicsSimulation.Contacts())
+        {
+            const auto first = m_physicsContactOwners.find(contact.first);
+            const auto second = m_physicsContactOwners.find(contact.second);
+            if (first == m_physicsContactOwners.end() || second == m_physicsContactOwners.end())
+            {
+                SceneManagers->ReportSimulationFailure("Contact component binding unavailable");
+                return;
+            }
+            const auto endpoint = [](const PhysicsContactOwner& owner, const ce::physics::event_endpoint& value) {
+                return ClrHost::ScriptContactEndpoint{owner.owner,
+                    owner.component, value.shape.value, value.body.generation, value.body.slot, 0, value.role};
+            };
+            const auto& value = contact.value;
+            const auto point = value.contact_count ? value.contacts[0].position : math::vector3{};
+            ClrHost::Get().QueueContact({endpoint(first->second, value.first), endpoint(second->second, value.second),
+                contact.tick.value, static_cast<int>(value.kind), static_cast<int>(value.contact_count),
+                static_cast<int>(value.required_contacts), {point.x, point.y, point.z}});
+        }
+        for (const auto binding : m_retiredPhysicsContactOwners) m_physicsContactOwners.erase(binding);
+        m_retiredPhysicsContactOwners.clear();
+    }
+
 
     {
         const auto status = m_physicsSimulation.Runtime()->status();
@@ -5598,7 +5657,7 @@ ce::physics::result<void> Scene::CommitPhysicsTransforms()
         if (!captured)
             return std::unexpected(captured.error());
 
-        if (captured->scale != body->m_observedScale)
+        if (!PhysicsScalesNear(captured->scale, body->m_observedScale))
         {
             if (const auto replaced = body->RefreshRuntimeShapes(); !replaced)
                 return replaced;

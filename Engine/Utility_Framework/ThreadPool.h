@@ -27,6 +27,7 @@ class thread_pool
     {
         void (*on_start)(unsigned int worker_index) = nullptr;
         void (*on_stop)(unsigned int worker_index) = nullptr;
+        void (*on_idle)() = nullptr;
     };
     static void set_worker_hooks(const worker_hooks& hooks);
 

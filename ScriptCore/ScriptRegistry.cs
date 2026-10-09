@@ -243,6 +243,9 @@ internal static class ScriptRegistry
                 }
                 return true;
             case LifecyclePhase.OnRemovingFromScene:
+                // DDOL preserves Scope and subscriptions, but observation belongs to the old scene.
+                ContactRouter.Suspend(b);
+
                 // 이송에서도 파괴에서도 온다. 이송은 여러 번 정상 발화하므로 여기서
                 // 막지 않는다 — 파괴 경로의 중복은 TeardownDelivered가 TearDown 쪽에서 가른다.
                 //
@@ -361,6 +364,8 @@ internal static class ScriptRegistry
     internal static void ApplyEnabled(Component b, bool enabled)
     {
         if (!b.SetEnabledState(enabled)) return;
+        if (!enabled) ContactRouter.Suspend(b);
+
         if (!b.InitializeSucceeded) return;
 
         if (enabled) Invoke(b, static x => x.OnEnable(), nameof(Component.OnEnable));
@@ -479,6 +484,8 @@ internal static class ScriptRegistry
     /// </returns>
     private static bool Invoke(Component b, Action<Component> call, string phase)
     {
+        var previous = ContactRouter.Current;
+        ContactRouter.Current = phase == nameof(Component.OnBeginSimulation) ? b : null;
         try
         {
             call(b);
@@ -490,6 +497,7 @@ internal static class ScriptRegistry
             b.Enabled = false;
             return false;
         }
+        finally { ContactRouter.Current = previous; }
     }
 
     /// <summary>
@@ -549,39 +557,18 @@ internal static class ScriptRegistry
     /// <summary>물리 스텝 **뒤**의 틱. 옛 Update·LateUpdate가 함께 여기로 왔다.</summary>
     public static void PostPhysicsTick(float dt)
     {
-        for (int i = 0; i < _active.Count; ++i)
-        {
-            var b = _active[i];
-            if (!b.IsAlive || !b.Enabled) continue;
-            Invoke(b, x => x.PostPhysics(dt), nameof(Component.PostPhysics));
-        }
-
-        Flush();
-    }
-
-    /// <summary>
-    /// 물리 이벤트 하나를 해당 스크립트에 전달한다.
-    /// 예외 격리는 다른 콜백과 같게 처리한다 — 충돌 콜백 하나가 프레임 전체를 죽이지 않는다.
-    /// </summary>
-    public static void DispatchPhysics(Component target, PhysicsEventKind kind, in Collision collision)
-    {
         try
         {
-            switch (kind)
+            for (int i = 0; i < _active.Count; ++i)
             {
-                case PhysicsEventKind.TriggerEnter:   target.OnTriggerEnter(in collision);   break;
-                case PhysicsEventKind.TriggerStay:    target.OnTriggerStay(in collision);    break;
-                case PhysicsEventKind.TriggerExit:    target.OnTriggerExit(in collision);    break;
-                case PhysicsEventKind.CollisionEnter: target.OnCollisionEnter(in collision); break;
-                case PhysicsEventKind.CollisionStay:  target.OnCollisionStay(in collision);  break;
-                case PhysicsEventKind.CollisionExit:  target.OnCollisionExit(in collision);  break;
+                var b = _active[i];
+                if (!b.IsAlive || !b.Enabled) continue;
+                Invoke(b, x => x.PostPhysics(dt), nameof(Component.PostPhysics));
             }
+
+            Flush();
         }
-        catch (Exception ex)
-        {
-            Native.Log(3, $"[{target.GetType().Name}] {kind} 예외 — 이 스크립트를 비활성화합니다.\n{ex}");
-            target.Enabled = false;
-        }
+        finally { ContactRouter.EndFrame(); }
     }
 
     /// <summary>

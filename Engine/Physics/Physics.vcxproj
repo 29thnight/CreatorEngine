@@ -165,6 +165,7 @@
     <ClInclude Include="PhysicsTypes.h" />
     <ClInclude Include="PhysicsGeometry.h" />
     <ClInclude Include="PhysicsStep.h" />
+    <ClInclude Include="PhysicsSensorPairs.h" />
     <ClInclude Include="PhysicsCharacter.h" />
     <ClInclude Include="PhysicsScene.h" />
     <ClInclude Include="PhysicsTestHooks.h" />

@@ -1,6 +1,7 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Stage, [int]$TimeoutSeconds=120, [switch]$Shipping, [switch]$Ddol, [switch]$Hierarchy, [switch]$Offscreen, [switch]$Mesh, [switch]$GeometryDdol, [string]$DestinationScene='', [ValidateRange(1,1000000)][int]$SmokeFrames=2000)
+param([Parameter(Mandatory)][string]$Stage, [int]$TimeoutSeconds=120, [switch]$Shipping, [switch]$Ddol, [switch]$Hierarchy, [switch]$Offscreen, [switch]$Mesh, [switch]$GeometryDdol, [string]$DestinationScene='', [ValidateRange(1,1000000)][int]$SmokeFrames=2000, [switch]$PlanarInput)
 $ErrorActionPreference='Stop'
+if($PlanarInput -and ($Ddol -or $Hierarchy -or $Mesh -or $GeometryDdol -or $DestinationScene)){throw 'PlanarInput requires an isolated character gate'}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $Stage=[IO.Path]::GetFullPath($Stage)
 $out=Join-Path $repo ('Build/Obj/Phase19Player/run-'+[guid]::NewGuid().ToString('N'))
@@ -9,7 +10,12 @@ New-Item -ItemType Directory -Force $runtime | Out-Null
 $before=@{}
 Get-ChildItem -LiteralPath $Stage -File -Recurse | ForEach-Object {$before[$_.FullName]=(Get-FileHash -LiteralPath $_.FullName).Hash}
 if($Hierarchy -or $GeometryDdol){$Ddol=$true}
-if($GeometryDdol){$Mesh=$true}
+if($GeometryDdol){
+    $Mesh=$true
+    # The geometry transfer contract expects a destination with one mesh asset.
+    # Reloading the three-asset startup scene cannot satisfy that contract.
+    if(!$DestinationScene){$DestinationScene='PhysicsCharacterMesh.creator'}
+}
 $launchArguments=if($Shipping -or $Ddol){@('--smoke',"$SmokeFrames",'--smoke-promotions','8')}else{@('--command-service')}
 if($DestinationScene -and !$Ddol){throw 'DestinationScene requires Ddol'}
 if($Ddol){$launchArguments+=@('--smoke-ddol-character','CharacterGateActor')}
@@ -54,11 +60,13 @@ try {
     $probe=$null
     do {
         $stdout=Get-Content "$out/player.out" -Raw
-        if($stdout -match '\[physics.player\] (\{[^\r\n]+\})'){$probe=$Matches[1]|ConvertFrom-Json;break}
+        $probePattern=if($PlanarInput){'\[physics.player.planar\] (\{[^\r\n]+\})'}else{'\[physics.player\] (\{[^\r\n]+\})'}
+        if($stdout -match $probePattern){$probe=$Matches[1]|ConvertFrom-Json;break}
         if($process.HasExited){throw "Player exited before motion evidence: $($process.ExitCode)"}
         Start-Sleep -Milliseconds 100
     } while((Get-Date) -lt $deadline)
-    if(!$probe -or !$probe.complete -or $probe.failed -ne 0 -or $probe.passed -ne 12){throw 'Cooked character motion probe failed or never completed'}
+    $expectedChecks=if($PlanarInput){16}else{12}
+    if(!$probe -or !$probe.complete -or $probe.failed -ne 0 -or $probe.passed -ne $expectedChecks){throw 'Cooked character motion probe failed or never completed'}
     $meshEvidence=$null
     if($Mesh){
         $artifacts=@(Get-ChildItem $runtime -Recurse -File -Filter '*.cepg')
@@ -118,6 +126,7 @@ try {
         if($combined -notmatch '\[runtime.text-parser\] calls=0(?!\d)'){throw 'Destination used runtime text parser'}
     }
 
+    $smokeEvidence=$null
     if($Shipping){
         if($combined -notmatch '\[player.service\] compiled=no enabled=no' -or
            $combined -notmatch '\[runtime.text-parser\] calls=0(?!\d)'){
@@ -127,10 +136,11 @@ try {
            [int]$Matches[1] -lt $SmokeFrames -or [int]$Matches[2] -lt 2 -or [int]$Matches[3] -lt 8){
             throw 'Shipping did not complete requested frames and display promotions'
         }
+        $smokeEvidence=@{gameFrames=[int]$Matches[1];displayFrame=[int]$Matches[2];promotions=[int]$Matches[3];serviceCompiled=$false;textParserCalls=0}
         if(Get-ChildItem -LiteralPath $runtime -Recurse -Filter endpoint.json){throw 'Shipping created a command endpoint'}
     }
 
-    @{result='PHYSICS_CHARACTER_PLAYER_OK';stage=$Stage;shipping=[bool]$Shipping;ddol=[bool]$Ddol;destinationScene=$DestinationScene;ddolProbe=$ddolProbe;hierarchy=[bool]$Hierarchy;offscreen=[bool]$Offscreen;mesh=$meshEvidence;geometryProbe=$geometryProbe;geometryMotion=$geometryMotion;hierarchyProbe=$hierarchyProbe;probe=$probe;initialPolicy=$policy;finalPolicy=$finalPolicy;exitCode=$process.ExitCode;immutableFiles=$before.Count;runtimeSha256=(Get-FileHash (Join-Path $Stage 'Player.runtime.dll')).Hash} | ConvertTo-Json -Depth 20 | Set-Content "$out/result.json" -Encoding utf8
+    @{result='PHYSICS_CHARACTER_PLAYER_OK';planarInput=[bool]$PlanarInput;stage=$Stage;shipping=[bool]$Shipping;smoke=$smokeEvidence;ddol=[bool]$Ddol;destinationScene=$DestinationScene;ddolProbe=$ddolProbe;hierarchy=[bool]$Hierarchy;offscreen=[bool]$Offscreen;mesh=$meshEvidence;geometryProbe=$geometryProbe;geometryMotion=$geometryMotion;hierarchyProbe=$hierarchyProbe;probe=$probe;initialPolicy=$policy;finalPolicy=$finalPolicy;exitCode=$process.ExitCode;immutableFiles=$before.Count;runtimeSha256=(Get-FileHash (Join-Path $Stage 'Player.runtime.dll')).Hash} | ConvertTo-Json -Depth 20 | Set-Content "$out/result.json" -Encoding utf8
     Write-Output "PHYSICS_CHARACTER_PLAYER_OK evidence=$out"
 } finally {
     if(!$process.HasExited){$process.Kill();$process.WaitForExit()}

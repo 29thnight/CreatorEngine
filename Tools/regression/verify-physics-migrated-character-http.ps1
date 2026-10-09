@@ -59,7 +59,17 @@ try {
         return $result
     }
 
-    $null=Command 'scene.switch' @($scene)
+    $null=Command 'scene.new' @('MigratedCharacterReloadSentinel')
+    $request=Command 'scene.switch' @($scene)
+    if(!$request.data.activationRequested){throw 'Migration gate did not request activation'}
+    $until=(Get-Date).AddSeconds(120)
+    do {
+        Start-Sleep -Milliseconds 100
+        $loaded=(Command 'scene.load.status' @("$($request.data.requestId)")).data
+        if((Get-Date) -gt $until){throw 'Migrated scene activation timeout'}
+    }until($loaded.complete)
+
+    if($loaded.state -ne 'Ready'){throw 'Migrated scene activation failed'}
     $initial=(Command 'object.describe' @('P0Character')).data
     if(@($initial.components | Where-Object type -eq 'CharacterMovementComponent').Count -ne 1 -or @($initial.components | Where-Object type -eq 'PhysicsBodyComponent').Count){throw 'Character ownership did not migrate'}
     if(@($initial.components | Where-Object type -eq 'CharacterMovementComponent')[0].id -ne '#2169397090'){throw 'Character identity changed'}
@@ -78,6 +88,20 @@ try {
             if((Get-Date) -gt $until){throw 'Migrated CCT did not move/ground'}
         } until($state.below -and $state.position[0] -gt 4.1)
         if(!$state.simulating -or $state.tick -le 0 -or $state.desiredVelocity[0] -ne 1.5 -or [Math]::Abs($state.footPosition[1]) -gt .12){throw 'Migrated CCT motion mismatch'}
+        # Compare motion against completed fixed ticks, independent of HTTP latency.
+        $goldenStart=$state
+        $until=(Get-Date).AddSeconds(10)
+        do {
+            Start-Sleep -Milliseconds 60
+            $goldenEnd=(Command 'character.state' @('P0Character')).data
+            if((Get-Date) -gt $until){throw 'Migrated movement golden timeout'}
+        }until([long]$goldenEnd.tick-[long]$goldenStart.tick -ge 60)
+
+        $seconds=([long]$goldenEnd.tick-[long]$goldenStart.tick)/60.0
+        $distance=$goldenEnd.position[0]-$goldenStart.position[0]
+        $expected=1.5*$seconds
+        if([Math]::Abs($distance-$expected) -gt 0.03){throw 'Migrated 1.5m/s fixed-tick movement golden mismatch'}
+        $golden=@{start=$goldenStart;end=$goldenEnd;seconds=$seconds;distance=$distance;expectedDistance=$expected;tolerance=0.03}
         $until=(Get-Date).AddSeconds(4)
         $jumpRejections=0
         do {
@@ -101,7 +125,7 @@ try {
         $idle=(Command 'character.state' @('P0Character')).data
         if($idle.simulating -or [long]$idle.tick -ne 0){throw 'Stop retained migrated runtime'}
         if((Get-FileHash $scene).Hash -ne $sourceHash -or (Get-FileHash $layerFile).Hash -ne $layerHash){throw 'Migrated Play/Stop changed authoring files'}
-        $cycles+=@{cycle=$cycle;grounded=$state;airborne=$airborne;jumpRejections=$jumpRejections;restored=$restored;idle=$idle}
+        $cycles+=@{cycle=$cycle;golden=$golden;grounded=$state;airborne=$airborne;jumpRejections=$jumpRejections;restored=$restored;idle=$idle}
     }
     @{result='PHYSICS_MIGRATED_CHARACTER_HTTP_OK';cycles=$cycles;commands=$script:sequence;sourceHash=$sourceHash;runtimeHash=(Get-FileHash $runtimePath).Hash;externalInput='explicit CLI 1.5m/s; gameplay input binding remains outside this gate';authoredFilesImmutable=$true}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
     "PHYSICS_MIGRATED_CHARACTER_HTTP_OK evidence=$out"

@@ -27,6 +27,8 @@ public struct PhysicsShapeState
     public float Radius, HalfHeight;
     public Float3 HalfExtent, LocalPosition;
     public Quaternion LocalRotation;
+    internal Guid Role;
+    public readonly ShapeRole ContactRole => new(Role);
 
     public readonly bool Sensor => SensorValue != 0;
     public readonly bool QueryEnabled => QueryValue != 0;
@@ -54,6 +56,10 @@ public sealed class PhysicsBodyComponent : NativeComponent
     }
 
 
+    /// <summary>Mark this exact native component for removal at the frame boundary.
+    /// Its owner Entity survives; subsequent calls on this wrapper return StaleHandle.</summary>
+    public PhysicsError Remove() => Native.BodyRemove(OwnerHandle, NativeInstance);
+
     public PhysicsError ReadState(out PhysicsBodyState state)
         => Native.BodyRead(OwnerHandle, NativeInstance, out state);
 
@@ -70,6 +76,10 @@ public sealed class PhysicsBodyComponent : NativeComponent
         => Native.BodyShapeRead(OwnerHandle, NativeInstance, index, out state);
 
     // Runtime replacement preserves pose and velocities and can invalidate previously returned SDK handles.
+    // Empty role clears the stored role; Scope bindings remain independent. Runtime changes are restored with the Play snapshot.
+    public PhysicsError SetShapeRole(uint id, ShapeRole role)
+        => Native.BodyShapeRole(OwnerHandle, NativeInstance, id, role);
+
     public PhysicsError SetShapeFlags(uint id, bool sensor, bool queryEnabled)
         => Native.BodyShapeFlags(OwnerHandle, NativeInstance, id, sensor, queryEnabled);
 }

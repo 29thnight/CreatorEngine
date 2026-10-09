@@ -199,9 +199,9 @@ namespace AssetDepotRegression
         {
             Require(!Native.IsReady, "ABI fixture requires a fresh isolated managed session");
             var table = new ScriptApiTable { Version = 34, StructSize = sizeof(ScriptApiTable) };
-            Require(Native.ExpectedVersion == 35, "Fixture expects the intentional ABI 35 migration");
-            Require(!Native.Bind(&table), "A version 34 table bound to managed API 35");
-            table.Version = 35;
+            Require(Native.ExpectedVersion >= 35, "Typed AssetDepot entries require ABI 35 or later");
+            Require(!Native.Bind(&table), "A legacy version 34 table bound to the current managed API");
+            table.Version = Native.ExpectedVersion;
             Require(!Native.Bind(&table), "Missing typed entries were accepted");
             table.Asset_RequestTyped = &RequestStub;
             Require(!Native.Bind(&table), "Missing resident entry was accepted");
@@ -210,10 +210,10 @@ namespace AssetDepotRegression
             table.StructSize = sizeof(ScriptApiTable) - 2 * IntPtr.Size;
             Require(!Native.Bind(&table), "The old truncated table size was accepted");
             table.StructSize = sizeof(ScriptApiTable);
-            table.Version = 36;
+            table.Version = Native.ExpectedVersion + 1;
             Require(!Native.Bind(&table), "An unknown future table version was accepted");
-            table.Version = 35;
-            Require(Native.Bind(&table), "Complete ABI 35 table failed to bind");
+            table.Version = Native.ExpectedVersion;
+            Require(Native.Bind(&table), "Complete current ABI table failed to bind");
             try
             {
                 _requestCalls = 0;

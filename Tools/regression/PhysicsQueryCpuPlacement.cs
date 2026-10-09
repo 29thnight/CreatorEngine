@@ -8,7 +8,7 @@ public static class PhysicsQueryCpuPlacement
     [DllImport("kernel32.dll", SetLastError=true)] static extern UIntPtr SetThreadAffinityMask(IntPtr thread, UIntPtr mask);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
 
-    public static ulong ReserveCore(ulong allowed)
+    public static ulong ReserveCore(ulong allowed, bool preferLast = false)
     {
         if (IntPtr.Size != 8) throw new InvalidOperationException("CPU fixture requires x64");
         uint bytes = 0;
@@ -19,12 +19,16 @@ public static class PhysicsQueryCpuPlacement
         try
         {
             if (!GetLogicalProcessorInformation(buffer, ref bytes)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            ulong selected = 0;
             for (int offset = 0; offset < bytes; offset += 32)
             {
                 if (Marshal.ReadInt32(buffer, offset + 8) != 0) continue;
                 ulong core = unchecked((ulong)Marshal.ReadInt64(buffer, offset));
-                if ((core & allowed) == core && (allowed & ~core) != 0) return core;
+                if ((core & allowed) != core || (allowed & ~core) == 0) continue;
+                if (!preferLast) return core;
+                selected = core;
             }
+            if (selected != 0) return selected;
             throw new InvalidOperationException("No complete reservable physical core in process affinity");
         }
         finally { Marshal.FreeHGlobal(buffer); }

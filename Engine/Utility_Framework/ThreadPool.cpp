@@ -35,6 +35,12 @@ void thread_pool_worker_thread_stop(uint32_t threadnum)
 }
 }
 
+void thread_pool_worker_idle(uint32_t)
+{
+    if (g_thread_pool_worker_hooks.on_idle)
+        g_thread_pool_worker_hooks.on_idle();
+}
+
 struct thread_pool::state
 {
     struct work : enki::ITaskSet
@@ -157,6 +163,8 @@ struct thread_pool::state
         // 없으므로 트램펄린이 정적 훅을 읽는다.
         config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
         config.profilerCallbacks.threadStop  = &thread_pool_worker_thread_stop;
+        config.profilerCallbacks.waitForNewTaskSuspendStart = &thread_pool_worker_idle;
+        config.profilerCallbacks.waitForTaskCompleteSuspendStart = &thread_pool_worker_idle;
         scheduler_.Initialize(config);
         std::promise<bool> registered;
         auto ready = registered.get_future();

@@ -11,7 +11,7 @@ foreach($config in $configs){
     $flags=if($config -eq 'Debug'){'/MDd /Od /D_DEBUG'}else{'/MD /O2 /DNDEBUG'}
     $exe=Join-Path $out 'physics-p1.exe'
     $cmd='call "'+$vcvars+'" >nul && cl /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 '+$flags+' /DCE_SHIPPING=0 /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:I"'+$deps+'/include/physx" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" "'+$repo+'/Engine/Physics/PhysicsScene.cpp" "'+$PSScriptRoot+'/physics_p1_probe.cpp" /link /LIBPATH:"'+$lib+'/lib" /LIBPATH:"'+$repo+'/Build/Lib/x64-'+$config+'" EngineDiagnostics.lib PhysX_64.lib PhysXCommon_64.lib PhysXFoundation_64.lib PhysXCooking_64.lib PhysXCharacterKinematic_static_64.lib PhysXExtensions_static_64.lib PhysXPvdSDK_static_64.lib'
-    $diagnostics=@('ProfileMarker','ProfileThreadStream','ProfileCapture','ProfileCaptureFile','ProfileAggregate','ProfileReader','ProfileService') | ForEach-Object {'"'+$repo+'/Engine/EngineDiagnostics/'+$_+'.cpp"'}
+    $diagnostics=@('ProfileMarker','ProfileThreadStream','ProfileCapture','ProfileCaptureFile','ProfileRecording','ProfileAggregate','ProfileReader','ProfileService') | ForEach-Object {'"'+$repo+'/Engine/EngineDiagnostics/'+$_+'.cpp"'}
     $cmd=$cmd.Replace(' /link ', ' '+($diagnostics -join ' ')+' /link ').Replace(' EngineDiagnostics.lib ',' ').Replace('/DCE_SHIPPING=0','/DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1')
     if($config -eq 'Shipping'){
         $cmd=$cmd.Replace('/DCE_SHIPPING=0','/DCE_SHIPPING=1').Replace('physics_p1_probe.cpp','physics_p1_shipping_probe.cpp')

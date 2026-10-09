@@ -3,12 +3,20 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <mutex>
 #include <utility>
 
 namespace ce
 {
+    static bool counter_loss_trace_enabled()
+    {
+        std::size_t length = 0;
+        return getenv_s(&length, nullptr, 0, "CE_PROFILE_COUNTER_LOSS_TRACE") == 0 && length > 1;
+    }
+
     namespace detail::counter_registry_impl
     {
         struct registry
@@ -718,6 +726,9 @@ namespace ce
             }
             else if (it->frame < engine_frame)
             {
+                if (counter_loss_trace_enabled())
+                    std::fprintf(stderr, "[profile.counter.skipped-frame] counterFrame=%u closedFrame=%u id=%u\n",
+                        it->frame, engine_frame, static_cast<unsigned>(it->sample.id));
                 ++m_droppedCounters;
                 it = m_deferredCounters.erase(it);
             }
@@ -840,6 +851,15 @@ namespace ce
         m_pending.events.resize(0);
         m_lateSpansDropped += m_deferredSpans.size();
         m_deferredSpans.clear();
+        if (counter_loss_trace_enabled())
+        {
+            std::fprintf(stderr, "[profile.counter.pending-loss] count=%zu lastFrame=%u\n",
+                m_deferredCounters.size(), m_frames.empty() ? 0 : m_frames.back().engine_frame);
+            for (std::size_t i = 0; i < std::min<std::size_t>(8, m_deferredCounters.size()); ++i)
+                std::fprintf(stderr, "[profile.counter.pending-loss] frame=%u id=%u\n",
+                    m_deferredCounters[i].frame, static_cast<unsigned>(m_deferredCounters[i].sample.id));
+        }
+
         m_droppedCounters += m_deferredCounters.size();
         m_deferredCounters.clear();
     }

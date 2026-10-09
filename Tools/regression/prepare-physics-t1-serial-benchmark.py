@@ -34,7 +34,7 @@ if side == 'merge':
         if text.count(original) != 1:
             raise RuntimeError('Merge boundary changed; update isolated candidate')
         text = text.replace(original, replacement)
-for original, path in [('ScenePhysicsSimulation.h', 'Engine/SceneRuntime/ScenePhysicsSimulation.h'),
+for original, path in [('../Physics/PhysicsTestHooks.h', 'Engine/Physics/PhysicsTestHooks.h'), ('ScenePhysicsSimulation.h', 'Engine/SceneRuntime/ScenePhysicsSimulation.h'),
                        ('../EngineDiagnostics/ProfileScope.h', 'Engine/EngineDiagnostics/ProfileScope.h')]:
     text = text.replace(f'#include "{original}"', f'#include "{(repo / path).as_posix()}"')
 output = repo / f'Build/Obj/Phase19T1Bench/{side}/ScenePhysicsSimulation.cpp'

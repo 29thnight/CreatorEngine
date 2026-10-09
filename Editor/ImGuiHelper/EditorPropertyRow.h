@@ -332,6 +332,9 @@ namespace editor::widgets
     /// 사라지지 않게 한다.
     void merge_property_field_tally(const property_field_tally& tally) noexcept;
 
+    // Call before a standard input widget, while its value cursor/width are current.
+    void track_property_input(const char* id, float width) noexcept;
+
     /// 이번 프레임의 최소 가독 폭. 검사가 논리 픽셀 리터럴 대신 이것과 견준다 —
     /// 하한이 폰트·배율에서 나오므로 기계마다 값이 다르다.
     float property_value_min_width();

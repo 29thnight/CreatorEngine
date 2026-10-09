@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Physics/PhysicsTypes.h"
+#include "../Physics/PhysicsGeometry.h"
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -49,6 +49,7 @@ struct physics_shape_state
     float radius, half_height;
     vector3 half_extent, local_position;
     vector4 local_rotation;
+    ce::physics::contact_role_id role;
 };
 
 struct physics_hit
@@ -90,7 +91,7 @@ static_assert(sizeof(vector3) == 12 && sizeof(vector4) == 16);
 static_assert(sizeof(physics_body_state) == 60);
 static_assert(sizeof(physics_character_state) == 88 && offsetof(physics_character_state, tick) == 56);
 static_assert(offsetof(physics_character_state, forced_remaining) == 80);
-static_assert(sizeof(physics_shape_state) == 72);
+static_assert(sizeof(physics_shape_state) == 88);
 static_assert(sizeof(physics_hit) == 64 && offsetof(physics_hit, component) == 8);
 static_assert(offsetof(physics_hit, layer) == 24 && offsetof(physics_hit, point) == 32);
 static_assert(sizeof(physics_query_result) == 12);

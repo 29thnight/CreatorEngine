@@ -450,6 +450,7 @@ uint32_t Core::App::PublishRenderFrame()
 		EnhancedSceneRenderer::BuildLiveFramePacket(
 		static_cast<float>(m_main->GetFrameDeltaTime()),
 		views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
+    renderFrame.profilingEngineFrame = Time->GetFrameCount();
     const uint64_t publishedFrameId = renderFrame.frameId;
     // 카메라·gizmo 입력은 값/소유 handle로 확보했다. delta 병합과 queue 역압력은
     // 기존 PublishLiveFrame 경로에 남기되 그 대기는 scene lock 밖에서 한다.

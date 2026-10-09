@@ -5868,7 +5868,7 @@ namespace
         // 공유 텍스처로 복사한다. 그 소비 선언이 있어야 그래프가 체인을
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
-            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds, uint32_t profilingEngineFrame,
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
@@ -5959,14 +5959,7 @@ namespace
                 }
             } frameGuard{ dx12, frameCommitted, profilerToken, capture, outError };
 
-            const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
-            profilerToken.engineFrameId = sourceFrameId;
-            if (captureSink.on_begin_capture && captureSink.on_finish_capture)
-            {
-                profilerToken.captureGeneration = captureSink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
-            }
-            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
-                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
+
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -6029,6 +6022,16 @@ namespace
             {
                 return false;
             }
+            // Deferred resource preparation has no GPU submission to admit.
+            // Telemetry uses the host frame; sourceFrameId remains render identity.
+            const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
+            profilerToken.engineFrameId = profilingEngineFrame;
+            if (captureSink.on_begin_capture && captureSink.on_finish_capture)
+            {
+                profilerToken.captureGeneration = captureSink.on_begin_capture(profilingEngineFrame);
+            }
+            profilerToken = dx12.BeginProfilerFrame(profilingEngineFrame, frameCounter++,
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -7312,7 +7315,7 @@ namespace
 									afterDescriptorOverflows >= beforeDescriptorOverflows ? afterDescriptorOverflows - beforeDescriptorOverflows : 0,
 									profileFrameDrawCount, profileFrameBatchCount,
 									std::chrono::duration<double, std::micro>(counterQueryTime).count() };
-								hooks.OnCounters(static_cast<std::uint32_t>(submission.frame.frameId), sample);
+								hooks.OnCounters(submission.frame.profilingEngineFrame, sample);
 							}
 							// Query on the resource-owning thread at 4 Hz. No Editor/UI
 							// path touches the renderer's state or its lock for this graph.
@@ -7333,7 +7336,7 @@ namespace
 								else if (backend == EnhancedLiveBackend::DX12 && pipeline)
 									available = dx12.QueryVideoMemory(usedMB, budgetMB);
 								if (available)
-									hooks.OnVideoMemory(static_cast<std::uint32_t>(submission.frame.frameId), usedMB, budgetMB);
+									hooks.OnVideoMemory(submission.frame.profilingEngineFrame, usedMB, budgetMB);
 							}
                         }
                         catch (const std::exception& exception)
@@ -8844,7 +8847,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         {
             ImageReleaseGuard imageRelease{ state, state.dx12.TextureCache() };
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
-            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, error,
+            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, frame.profilingEngineFrame, error,
                 state.BeginPbrCapture(frame, viewPacket),
                 captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
         }

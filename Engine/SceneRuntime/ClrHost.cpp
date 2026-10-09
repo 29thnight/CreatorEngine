@@ -1,4 +1,4 @@
-﻿#include "EngineRuntimePaths.h"
+#include "EngineRuntimePaths.h"
 #include "ScriptApiVersion.h"
 #include "ClrHost.h"
 #include "ProfileScope.h"
@@ -392,6 +392,8 @@ namespace
         int (__stdcall* Asset_RequestTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
         int (__stdcall* Asset_TryAcquireTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
 
+        int (__stdcall* Body_Remove)(ScriptObjectHandle owner, std::uint64_t instance);
+        int (__stdcall* Body_ShapeRole)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, const char* role);
 
 	};
 
@@ -2317,8 +2319,48 @@ namespace
         const auto& rotation = shape.localRotation;
         *output = {shape.shapeId, static_cast<int>(shape.kind), shape.sensor, shape.queryEnabled, shape.layerOverride,
                    shape.radius, shape.halfHeight, ScriptVector(shape.halfExtent), ScriptVector(shape.localPosition),
-                   {rotation.x, rotation.y, rotation.z, rotation.w}};
+                   {rotation.x, rotation.y, rotation.z, rotation.w}, ce::physics::ContactRoleValue(shape.contactRole)};
         return 0;
+    }
+
+    int __stdcall Api_Body_Remove(ScriptObjectHandle owner, std::uint64_t instance)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+
+        body->Destroy(); // Mark now; lifecycle teardown owns SDK retirement at the frame boundary.
+        return 0;
+    }
+
+    int __stdcall Api_Body_ShapeRole(ScriptObjectHandle owner, std::uint64_t instance, unsigned int id, const char* role)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (!role) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+
+        try
+        {
+            std::string value(role);
+            if (!value.empty())
+            {
+                Uuid::Uuid16 parsed;
+                if (value.size() != 36 || !Uuid::TryParse(value, parsed) || parsed.IsNil() || Uuid::ToString(parsed) != value)
+                    return PhysicsFailure(ce::physics::error_code::invalid_argument);
+            }
+
+            std::vector<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
+            const auto shape = std::ranges::find(shapes, id, &PhysicsShapeDefinition::shapeId);
+            if (shape == shapes.end()) return PhysicsFailure(ce::physics::error_code::stale_handle);
+            if (shape->contactRole == value) return 0;
+
+            shape->contactRole = std::move(value);
+            auto changed = body->ReplaceShapes(std::move(shapes));
+            return changed ? 0 : PhysicsFailure(changed.error().code);
+        }
+        catch (const std::bad_alloc&) { return PhysicsFailure(ce::physics::error_code::out_of_memory); }
+        catch (...) { return PhysicsFailure(ce::physics::error_code::invalid_argument); }
     }
 
     int __stdcall Api_Body_ShapeFlags(ScriptObjectHandle owner, std::uint64_t instance, unsigned int id,
@@ -2971,6 +3013,8 @@ namespace
         g_apiTable.Body_ShapeCount = &Api_Body_ShapeCount;
         g_apiTable.Body_ShapeRead = &Api_Body_ShapeRead;
         g_apiTable.Body_ShapeFlags = &Api_Body_ShapeFlags;
+        g_apiTable.Body_Remove = &Api_Body_Remove;
+        g_apiTable.Body_ShapeRole = &Api_Body_ShapeRole;
         g_apiTable.Physics_Query = &Api_Physics_Query;
         g_apiTable.Physics_QueryBatch = &Api_Physics_QueryBatch;
 
@@ -3124,7 +3168,7 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"PrePhysicsTick", &fn))   return false;  m_fnPrePhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<NoArgumentFn>(fn);
-	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
+	if (!bind(L"PublishContacts", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
 	if (!bind(L"CreateComponent", &fn))  return false;  m_fnCreateComponent = reinterpret_cast<CreateFn>(fn);
 
 	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
@@ -3458,31 +3502,9 @@ void ClrHost::FlushAniEvents()
 	m_fnFlushAniEvents(batch.data(), static_cast<int>(batch.size()));
 }
 
-void ClrHost::QueuePhysicsEvent(int instanceId, PhysicsEventKind kind,
-	Entity* other, const std::vector<math::vector3>& contactPoints)
+void ClrHost::QueueContact(const ScriptContact& contact)
 {
-	if (!m_ready || instanceId < 0) return;
-
-	ScriptPhysicsEvent event{};
-	event.instanceId = instanceId;
-	event.kind = static_cast<int>(kind);
-
-	// 상대는 핸들로만 넘긴다. 여기서 등록해 두면 관리 측이 세대 검사로
-	// 이미 파괴된 상대를 걸러낼 수 있다.
-	event.collision.other = (nullptr != other)
-		? ScriptObjectRegistry::Get().Register(other)
-		: ScriptObjectHandle{};
-
-	event.collision.contactCount = static_cast<int>(contactPoints.size());
-	if (!contactPoints.empty())
-	{
-		// 접점 배열 전체를 복사하지 않는다 — 대부분 대표 접점 하나면 충분하고,
-		// 전부 필요해지면 별도 조회 API를 두는 편이 경계를 얇게 유지한다.
-		const auto& first = contactPoints.front();
-		event.collision.contact = { first.x, first.y, first.z };
-	}
-
-	m_physicsEvents.push_back(event);
+    if (m_ready) m_physicsEvents.push_back(contact);
 }
 
 void ClrHost::FlushPhysicsEvents()
@@ -3491,7 +3513,8 @@ void ClrHost::FlushPhysicsEvents()
 	if (m_physicsEvents.empty()) return;
 
 	// 배열 포인터 하나만 넘긴다. 충돌이 몇 건이든 경계 통과는 한 번이다.
-	m_fnFlushPhysicsEvents(m_physicsEvents.data(), static_cast<int>(m_physicsEvents.size()));
+	const auto delivered = m_fnFlushPhysicsEvents(m_physicsEvents.data(), static_cast<int>(m_physicsEvents.size()));
+    if (delivered < 0) SceneManagers->ReportSimulationFailure("Managed contact routing failed");
 
 	// 용량은 유지해 매 프레임 재할당이 일어나지 않게 한다.
 	m_physicsEvents.clear();
@@ -3518,6 +3541,7 @@ void ClrHost::TickPostPhysics(float deltaTime)
 
 void ClrHost::NotifySceneUnload()
 {
+    m_physicsEvents.clear();
 	if (m_ready && nullptr != m_fnSceneUnload) m_fnSceneUnload();
 
 	ScriptObjectRegistry::Get().Clear();

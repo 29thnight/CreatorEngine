@@ -96,7 +96,8 @@ namespace EngineBootstrap
                 // 스레드가 죽기 전에 스트림을 끊는다. 이것이 없으면 수집기가
                 // 죽은 저장소를 가리킨 채 남는다(옛 코어의 UAF 자리).
                 ce::profiler().unregister_thread();
-            } });
+            },
+            []() { ce::profiler().publish_thread(); } });
 
         // 전용 RenderThread 도 같은 역전으로 붙인다 — RenderEngine 은 관측 도구를
         // 모르고 함수를 받아 두기만 한다. 첫 라이브 발행에서 스레드가 만들어지므로

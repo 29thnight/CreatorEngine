@@ -20,20 +20,30 @@ static_assert(!std::is_move_constructible_v<PhysicsScene>);
 int main(int argc, char** argv)
 {
     int checks = 0;
-    const auto check = [&](bool value) {
+    const auto check = [&](bool value, std::source_location location = std::source_location::current()) {
         ++checks;
         if (!value)
         {
-            std::cerr << "check failed " << checks << '\n';
+            std::cerr << "check failed " << checks << " line " << location.line() << '\n';
             std::exit(1);
         }
     };
 
     auto& profiler = ce::profiler();
+    const auto wait_recording_finalized = [&] {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (profiler.recording_status().state != ce::recording_state::finalized &&
+               profiler.recording_status().state != ce::recording_state::failed &&
+               std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        check(profiler.recording_status().state == ce::recording_state::finalized);
+    };
     profiler.initialize();
     profiler.register_thread("PhysicsProbe", ce::track_kind::game_thread);
     profiler.record(1);
-    profiler.publish_frame(1);
+    profiler.wait_until_idle(); // Recording admission is asynchronous.
+    profiler.publish_frame(0);
     check(!body_handle{});
     check(bool(body_handle{scene_id{1}, 0, 1}));
     for (auto config : {scene_config{{0, 0, 0}, 257}, scene_config{{0, 0, 0}, 1, 0},
@@ -88,7 +98,7 @@ int main(int argc, char** argv)
         scene.reset(); // Must fetch and drain outstanding SDK work before releasing resources.
         check(bool((*second)->begin_step(1.f / 60)) && bool((*second)->finish_step()));
         second->reset();
-        profiler.publish_frame(repetition + 2);
+        profiler.publish_frame(repetition + 1);
     }
     check(tasks > 0);
     std::atomic<int> concurrency_failures{0};
@@ -156,10 +166,15 @@ int main(int argc, char** argv)
     auto live_scene = PhysicsScene::create(scene_config{{0, -9.81f, 0}, 2});
     check(bool(live_scene));
 
+    ce::capture_session_ptr baseline_capture;
     for (std::uint32_t iteration = 0; iteration < 20; ++iteration)
     {
+        const auto capture_frame = iteration == 0 ? 9u : 20 + iteration;
         if (iteration != 0)
+        {
             profiler.record(20 + iteration);
+            profiler.wait_until_idle();
+        }
 
         const auto previous_tasks = (*live_scene)->status().completed_tasks;
         check(bool((*live_scene)->begin_step(1.f / 60)));
@@ -169,28 +184,40 @@ int main(int argc, char** argv)
         check(status.last_tick.value == iteration + 1);
 
         // No sleep, synthetic worker event, or worker teardown before freeze.
-        profiler.publish_frame(20 + iteration);
+        profiler.publish_frame(capture_frame);
         profiler.pause();
         profiler.wait_until_idle();
+        wait_recording_finalized();
         const auto live_capture = profiler.capture();
+        const auto diagnostics = profiler.summary();
+        if (!live_capture || !live_capture->complete() || live_capture->unacked_streams() != 0)
+            std::cerr << "iteration=" << iteration << " state=" << static_cast<int>(profiler.state())
+                      << " capture=" << bool(live_capture) << " unacked="
+                      << (live_capture ? live_capture->unacked_streams() : 0)
+                      << " dropped=" << diagnostics.dropped_events << " counters=" << diagnostics.dropped_counters
+                      << " late=" << diagnostics.late_spans_dropped
+                      << " gpu=" << diagnostics.pause_pending_gpu_submissions << '/' << diagnostics.pause_failed_gpu_submissions << '\n';
         check(live_capture && live_capture->complete() && live_capture->unacked_streams() == 0);
+        if (iteration == 0)
+            baseline_capture = live_capture;
 
-        const auto* frame = live_capture->find_frame(20 + iteration);
+        const auto* frame = live_capture->find_frame(capture_frame);
         check(frame && std::ranges::any_of(frame->events, [&](const auto& event) {
             return live_capture->marker(event.marker).name == "Physics.PhysXTask";
         }));
         for (const auto* name : {"PhysicsTick", "Physics.SimulateSubmit", "Physics.FetchWait",
-                                 "Physics.TaskSubmit", "Physics.PhysXTask", "Physics.TaskComplete"})
+                                 "Physics.TaskSubmit", "Physics.PhysXTask", "Physics.PhysXTaskRun",
+                                 "Physics.PhysXTaskRelease", "Physics.TaskComplete"})
         {
             check(frame && std::ranges::any_of(frame->events, [&](const auto& event) {
                 const bool task = std::string_view(name).starts_with("Physics.Task") ||
-                                  std::string_view(name) == "Physics.PhysXTask";
+                                  std::string_view(name).starts_with("Physics.PhysXTask");
                 return live_capture->marker(event.marker).name == name &&
                        event.cpu.session == status.identity.value && event.cpu.tick == status.last_tick.value &&
                        (task ? event.cpu.task != 0 : event.cpu.task == 0) && event.submission == 0 && event.queue == 0;
             }));
         }
-        std::map<std::uint64_t, std::array<unsigned, 3>> task_flow;
+        std::map<std::uint64_t, std::array<unsigned, 5>> task_flow;
         for (const auto& event : frame->events)
         {
             if (event.cpu.session != status.identity.value || event.cpu.tick != status.last_tick.value ||
@@ -204,23 +231,34 @@ int main(int argc, char** argv)
                 ++task_flow[event.cpu.task][1];
             else if (name == "Physics.TaskComplete")
                 ++task_flow[event.cpu.task][2];
+            else if (name == "Physics.PhysXTaskRun")
+                ++task_flow[event.cpu.task][3];
+            else if (name == "Physics.PhysXTaskRelease")
+                ++task_flow[event.cpu.task][4];
         }
 
         check(task_flow.size() == status.completed_tasks - previous_tasks);
         check(std::ranges::all_of(task_flow, [](const auto& item) {
-            return item.second == std::array<unsigned, 3>{1, 1, 1};
+            return item.second == std::array<unsigned, 5>{1, 1, 1, 1, 1};
         }));
         check(std::ranges::all_of(live_capture->frames(), [](const auto& value) {
             return value.dropped_events == 0;
         }));
     }
 
-    live_scene->reset();
     profiler.record(40);
+    profiler.wait_until_idle();
+    live_scene->reset();
     profiler.publish_frame(40);
     profiler.pause();
     profiler.wait_until_idle();
-    const auto capture = profiler.capture();
+    wait_recording_finalized();
+    const auto destruction_capture = profiler.capture();
+    check(destruction_capture && destruction_capture->complete() && destruction_capture->unacked_streams() == 0);
+    check(std::ranges::any_of(destruction_capture->frames() | std::views::transform([](const auto& frame) -> const auto& { return frame.events; }) | std::views::join,
+        [&](const auto& event) { return destruction_capture->marker(event.marker).name == "Physics.SceneDestroy"; }));
+
+    const auto capture = baseline_capture;
     check(bool(capture));
     check(capture->complete() && capture->unacked_streams() == 0);
     for (const auto* name : {"Physics.SceneCreate", "Physics.SceneDestroy", "Physics.SimulateSubmit",

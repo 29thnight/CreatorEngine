@@ -17,6 +17,13 @@ void check(bool value, const char* message) {
     if (!value) { std::cerr << "B2 failure: " << message << '\n'; std::exit(1); }
 }
 bool close(float a, float b) { return std::abs(a-b) < .001f; }
+void publish_profile_frame() {
+#if !CE_SHIPPING
+    static std::uint32_t frame = 0;
+    ce::profiler().publish_frame(++frame);
+#endif
+}
+
 bool exercise(execution_preference preference) {
     ScenePhysicsSimulation session;
     body_definition moving;
@@ -35,6 +42,7 @@ bool exercise(execution_preference preference) {
     auto kinematic = fixed;
     kinematic.properties.kind = body_kind::kinematic;
     kinematic.properties.initial_pose.position = {0, 20, 0};
+    kinematic.shapes.front().form = box_geometry{{2, .25f, .25f}};
     auto target = session.Register(kinematic, true);
     check(bool(target), "kinematic registration");
     check(!session.SetPose(*dynamic, {}), "Editor rejects runtime pose");
@@ -69,17 +77,39 @@ bool exercise(execution_preference preference) {
     pose ground{{3, -10, 0}, {0,0,0,1}};
     check(bool(session.SetPose(*stationary, ground)), "static explicit move");
     check(close(session.Read(*stationary)->transform.position.x, 3), "static query state updates immediately");
-    pose goal{{2, 20, 0}, {0,0,0,1}};
+    pose goal{{2, 20, 0}, math::quaternion_from_axis_angle(math::vector3::unit_y(), .785398163f)};
+    std::array<query_hit, 8> rotatedHits{};
+    std::array rotatedRequests{query_request{
+        overlap_query{sphere_geometry{.1f}, {{3.1f, 20, -1.1f}, {0, 0, 0, 1}}}, rotatedHits}};
+    std::array<result<query_result>, 1> rotatedAnswers;
+    check(bool(session.QueryBatch(rotatedRequests, rotatedAnswers)) && rotatedAnswers[0] &&
+              rotatedAnswers[0]->written == 0,
+          "future rotated target does not alter pre-step query structure");
     check(bool(session.SetKinematicTarget(*target, goal)), "kinematic target request");
     check(close(session.Read(*target)->transform.position.x, 0), "target is not completed state");
     auto multiple = session.Advance(session.fixed_seconds*2);
     check(multiple && *multiple == 2, "multi tick frame");
     check(close(session.Read(*target)->transform.position.x, 2), "kinematic target completed");
+    check(bool(session.QueryBatch(rotatedRequests, rotatedAnswers)) && rotatedAnswers[0] &&
+              rotatedAnswers[0]->written == 1,
+          "rotated kinematic target updates overlap structure after completed tick");
+    check(session.Binding(rotatedHits[0].body) && *session.Binding(rotatedHits[0].body) == *target,
+          "rotated query preserves registered kinematic owner");
+    const auto kinematicHit = rotatedHits[0].body;
+    check(bool(session.SetEnabled(*target, false)), "disable queried kinematic");
+    check(bool(session.QueryBatch(rotatedRequests, rotatedAnswers)) && rotatedAnswers[0] &&
+              rotatedAnswers[0]->written == 0,
+          "disabled kinematic disappears from committed query structure");
+    check(!session.Binding(kinematicHit), "disabled SDK hit does not resolve a live binding");
+    check(bool(session.SetEnabled(*target, true)), "re-enable queried kinematic");
     check(close(session.RenderPose(*dynamic)->position.x, 4.15f), "multi tick keeps last two completed poses");
     check(!session.SetKinematicTarget(*dynamic, goal), "dynamic rejects kinematic target");
     check(bool(session.SetVelocity(*dynamic, {}, {})), "stop moving body");
     for (int i=0; i<200; ++i)
+    {
         check(bool(session.Advance(session.fixed_seconds)), "sleep settling tick");
+        publish_profile_frame();
+    }
     check(session.RenderPoses().empty(), "sleeping bodies leave render work list");
     check(bool(session.SetEnabled(*dynamic, false)), "disable");
     check(close(session.RenderPose(*dynamic)->position.x, session.Read(*dynamic)->transform.position.x), "disabled history resets");
@@ -104,6 +134,7 @@ int main(int argc, char** argv) {
     profiler.initialize();
     profiler.register_thread("PhysicsB2Probe", ce::track_kind::game_thread);
     profiler.record(1);
+    profiler.wait_until_idle();
 #endif
     const auto rotation = math::quaternion_from_axis_angle(math::vector3::unit_y(), .5f);
     const auto parent = math::compose(math::vector3{2,2,2}, rotation, math::vector3{3,4,5});
@@ -116,7 +147,7 @@ int main(int argc, char** argv) {
     exercise(execution_preference::cpu);
     const auto gpu = exercise(execution_preference::prefer_gpu);
 #if !CE_SHIPPING
-    profiler.publish_frame(1);
+    publish_profile_frame();
     profiler.pause();
     profiler.wait_until_idle();
     const auto capture = profiler.capture();

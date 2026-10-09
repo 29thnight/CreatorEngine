@@ -1,5 +1,7 @@
 #include "../../Editor/EngineEntry/PhysicsShapeDocument.h"
 #include "AuthoringWriteNode.h"
+#include "AuthoringCookedDocument.h"
+#include "../../Engine/Physics/PhysicsSensorPairs.h"
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -14,6 +16,29 @@ int main(int argc, char** argv)
     };
     try
     {
+        ce::physics::sensor_pairs pairs(16);
+        const ce::physics::event_endpoint sensor{{ce::physics::scene_id{1}, 0, 1}, ce::physics::shape_id{1}, true};
+        for (std::uint32_t cycle = 0; cycle < 100; ++cycle)
+        {
+            for (std::uint32_t index = 1; index <= 16; ++index)
+            {
+                const ce::physics::event_endpoint other{{ce::physics::scene_id{1}, index * 32 + cycle * 512, 1}, ce::physics::shape_id{2}};
+                check(pairs.Enter(sensor, other));
+                check(pairs.Enter(other, sensor));
+            }
+            check(!pairs.Enter(sensor, {{ce::physics::scene_id{1}, 999999, 1}, ce::physics::shape_id{2}}));
+            std::size_t persisted = 0;
+            pairs.FinishTick([&](auto&, auto&) { ++persisted; });
+            check(persisted == 0);
+            pairs.FinishTick([&](auto&, auto&) { ++persisted; });
+            check(persisted == 16);
+
+            for (std::uint32_t index = 1; index <= 16; ++index)
+                pairs.Exit({{ce::physics::scene_id{1}, index * 32 + cycle * 512, 1}, ce::physics::shape_id{2}}, sensor);
+            pairs.FinishTick([&](auto&, auto&) { ++persisted; });
+            check(persisted == 16);
+        }
+
         if (argc >= 2)
         {
             std::ifstream input(argv[1], std::ios::binary);
@@ -83,6 +108,37 @@ int main(int argc, char** argv)
             R"([{"shapeId":1,"kind":3,"geometryAsset":"91EA9B44-13A6-4AEC-99EC-0963EEF7EAA1","geometryRevision":1}])"));
         auto owned = std::move(*parsed);
         check(owned[0].shapeId == 11);
+        check(owned[0].contactRole.empty());
+
+        const auto roleShapes = Editor::ParsePhysicsShapeDocument(
+            R"([{"shapeId":1,"kind":0,"contactRole":"67adfded-47c8-4ef9-9c38-d1c3497a7421"},{"shapeId":2,"kind":0,"contactRole":""}])");
+        check(roleShapes && (*roleShapes)[0].contactRole == "67adfded-47c8-4ef9-9c38-d1c3497a7421" &&
+              (*roleShapes)[1].contactRole.empty());
+
+        for (const auto role : {"bad", "00000000-0000-0000-0000-000000000000",
+                                "67ADFDED-47C8-4EF9-9C38-D1C3497A7421"})
+        {
+            const auto input = std::string("[{shapeId: 1, kind: 0, contactRole: \"") + role + "\"}]";
+            check(!Editor::ParsePhysicsShapeDocument(input));
+        }
+
+        check(!Editor::ParsePhysicsShapeDocument("[{shapeId: 1, kind: 0, contactRole: []}]"));
+        check(!Editor::ParsePhysicsShapeDocument(
+            "[{shapeId: 1, kind: 0, contactRole: '', contactRole: ''}]"));
+
+        std::string roleError;
+        auto roleDocument = Authoring::WriteDocument::ParseText(
+            "[{shapeId: 1, kind: 0, contactRole: 67adfded-47c8-4ef9-9c38-d1c3497a7421}]", &roleError);
+        check(roleDocument.has_value());
+
+        std::vector<std::byte> roleCooked;
+        check(Authoring::EncodeCookedDocument(roleDocument->Root().Read(), roleCooked, roleError));
+        auto roleDecoded = Authoring::DecodeCookedDocument(roleCooked, roleError);
+        check(roleDecoded.has_value());
+        const auto roleRoundTrip = Editor::ParsePhysicsShapeDocument(roleDecoded->Dump());
+        check(roleRoundTrip && roleRoundTrip->front().contactRole == roleShapes->front().contactRole);
+
+
         check(bool(Editor::ParsePhysicsShapeDocument("- shapeId: 1\n  kind: 2\n  radius: 1\n  halfHeight: 2\n")));
         check(bool(Editor::ParsePhysicsShapeDocument(
             R"([{"shapeId":1,"kind":3,"geometryAsset":"91ea9b44-13a6-4aec-99ec-0963eef7eaa1","geometryRevision":"18446744073709551615","geometryScale":[2,3,4]}])")));

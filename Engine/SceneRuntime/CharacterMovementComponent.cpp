@@ -1,4 +1,6 @@
 #include "CharacterMovementComponent.h"
+#include "PhysicsLifecyclePolicy.h"
+#include "../EngineDiagnostics/ProfileScope.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Transform.h"
@@ -103,8 +105,15 @@ void CharacterMovementComponent::OnRemovingFromScene()
 {
     if (!m_scene)
         return;
-    if (auto removed = m_scene->UnregisterCharacterMovement(*this); !removed)
-        Debug::PrintLog(spdlog::level::err, std::string(removed.error().message));
+
+    ce::profile_scope scope{ce::marker<"Physics.CharacterLifecycleRetire">()};
+    auto* scene = m_scene;
+    auto removed = RetirePhysicsOwner(
+        [&] { return scene->UnregisterCharacterMovement(*this); },
+        [&] { return scene->StopPhysicsSimulation(); },
+        [&](const error& failure) { SceneManagers->ReportSimulationFailure(std::string(failure.message)); });
+    if (!removed)
+        throw std::runtime_error(std::string(removed.error().message));
 }
 
 void CharacterMovementComponent::OnUninitializing()
@@ -116,8 +125,13 @@ void CharacterMovementComponent::ChangeEnabled(bool enabled)
 {
     if (!m_scene)
         return;
-    if (auto changed = m_scene->m_physicsSimulation.SetCharacterEnabled(m_binding, enabled); !changed)
-        Debug::PrintLog(spdlog::level::err, std::string(changed.error().message));
+
+    ce::profile_scope scope{ce::marker<"Physics.CharacterLifecycleEnabled">()};
+    const auto changed = ApplyPhysicsEnabledTransition(enabled,
+        [&](bool value) { return m_scene->m_physicsSimulation.SetCharacterEnabled(m_binding, value); },
+        [&](bool value) { Object::SetEnabled(value); },
+        [&](const error& failure) { SceneManagers->ReportSimulationFailure(std::string(failure.message)); });
+    (void)changed;
 }
 
 void CharacterMovementComponent::OnEnable()

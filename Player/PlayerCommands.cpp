@@ -1,4 +1,4 @@
-﻿#include "PlayerCommands.h"
+#include "PlayerCommands.h"
 
 #include <string_view>
 
@@ -30,6 +30,7 @@ namespace
 #include "Scene.h"
 #include "SceneManager.h"
 #include "TimeSystem.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Transform.h"
 
 #if !CE_SHIPPING
@@ -568,6 +569,21 @@ namespace PlayerCmd
             return data;
         }
 
+        static CommandCore::CommandResult Cmd_render_status(const std::vector<std::string>& parts)
+        {
+            using namespace CommandCore;
+            if (parts.size() != 1)
+                return InvalidArguments("render.status takes no arguments");
+
+            const auto snapshot = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+            const auto& game = snapshot.Get(EnhancedLiveDisplayTarget::Game);
+            auto data = CommandData::Object();
+            data.Set("ready", CommandData::Bool(game.ready));
+            data.Set("completedFrame", CommandData::Int(game.completedFrameId));
+            data.Set("promotions", CommandData::Int(game.promotionCount));
+            data.Set("slotMask", CommandData::Int(game.promotedSlotMask));
+            return Ok("", std::move(data));
+        }
         static CommandCore::CommandResult Cmd_profile_record(const std::vector<std::string>& parts)
         {
             using namespace CommandCore;
@@ -591,7 +607,9 @@ namespace PlayerCmd
             {
                 return PreconditionFailed("profile.finalizing", "The previous recording is still finalizing");
             }
-            service.record(service.summary().engine_frame);
+            // Profiler summaries stop advancing while recording is disabled.
+            // Seed the first counter frame from the active owner frame instead.
+            service.record(Time->GetFrameCount());
             return Ok("New recording requested", ProfileStatePayload());
         }
 
@@ -735,6 +753,7 @@ namespace PlayerCmd
 
 		constexpr Registration kPlayerCommands[] = {
 			#if !CE_SHIPPING
+            { "render.status", &Cmd_render_status },
             { "profile.record", &Cmd_profile_record },
             { "profile.pause", &Cmd_profile_pause },
             { "profile.save", &Cmd_profile_save },

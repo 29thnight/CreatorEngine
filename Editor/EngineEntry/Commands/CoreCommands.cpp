@@ -1389,6 +1389,21 @@ namespace ConsoleCmd
         {
             ::editor::nav::request_pointer(::editor::nav::pointer_action::release, 0.f, 0.f);
         }
+        else if (args.size() == 3 && "wheel" == args[1])
+        {
+            char* end = nullptr;
+            const float steps = std::strtof(args[2].c_str(), &end);
+            if (end == args[2].c_str() || *end != '\0' || !std::isfinite(steps) || std::abs(steps) > 100.f)
+                return InvalidArguments("editor.nav wheel <-100..100>");
+
+            ::editor::nav::request_pointer(::editor::nav::pointer_action::wheel, 0.f, steps);
+        }
+        else if (args.size() == 3 && "text" == args[1])
+        {
+            std::string error;
+            if (!::editor::nav::request_text(args[2], error))
+                return Fail("editor.nav.text", error);
+        }
         else if (args.size() >= 2 && "key" == args[1])
         {
             if (args.size() < 3) return InvalidArguments(usage);
@@ -1413,6 +1428,10 @@ namespace ConsoleCmd
         data.Set("cursorVisible", CommandData::Bool(view.cursorVisible));
         data.Set("navIdIsAlive", CommandData::Bool(view.navIdIsAlive));
         data.Set("navId", CommandData::Int(static_cast<long long>(view.navId)));
+        data.Set("navX", CommandData::Double(view.navX));
+        data.Set("navY", CommandData::Double(view.navY));
+        data.Set("navW", CommandData::Double(view.navW));
+        data.Set("navH", CommandData::Double(view.navH));
         data.Set("activeId", CommandData::Int(static_cast<long long>(view.activeId)));
         data.Set("navWindow", CommandData::String(view.navWindow));
         data.Set("navWidget", CommandData::String(view.navWidget));
