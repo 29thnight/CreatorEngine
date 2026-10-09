@@ -6,8 +6,157 @@
 #include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <DirectXTex.h>
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstring>
+#include <limits>
+
+namespace
+{
+	bool load_terrain_image(const std::filesystem::path& path, DirectX::ScratchImage& image)
+	{
+		// Treat PNG channels as stored bytes: neither sRGB metadata nor alpha
+		// opacity is permission to transform Terrain height or mask data.
+		const auto flags = static_cast<DirectX::WIC_FLAGS>(
+			DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_RGB);
+		std::string extension = path.extension().string();
+		for (char& character : extension)
+		{
+			character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+		}
+		HRESULT loaded{};
+		if (extension == ".hdr")
+		{
+			loaded = DirectX::LoadFromHDRFile(path.c_str(), nullptr, image);
+		}
+		else if (extension == ".tga")
+		{
+			loaded = DirectX::LoadFromTGAFile(path.c_str(),
+				static_cast<DirectX::TGA_FLAGS>(DirectX::TGA_FLAGS_IGNORE_SRGB |
+					DirectX::TGA_FLAGS_ALLOW_ALL_ZERO_ALPHA), nullptr, image);
+		}
+		else
+		{
+			loaded = DirectX::LoadFromWICFile(path.c_str(), flags, nullptr, image);
+		}
+		if (FAILED(loaded))
+		{
+			return false;
+		}
+		const auto& metadata = image.GetMetadata();
+		return metadata.dimension == DirectX::TEX_DIMENSION_TEXTURE2D &&
+			metadata.arraySize == 1 && metadata.mipLevels == 1 &&
+			metadata.width > 0 && metadata.height > 0 &&
+			metadata.width <= static_cast<size_t>((std::numeric_limits<int>::max)()) &&
+			metadata.height <= static_cast<size_t>((std::numeric_limits<int>::max)());
+	}
+
+	const DirectX::Image* terrain_rgba8(const DirectX::ScratchImage& source,
+		DirectX::ScratchImage& converted)
+	{
+		const auto* image = source.GetImage(0, 0, 0);
+		if (!image || !image->pixels)
+		{
+			return nullptr;
+		}
+		if (image->format == DXGI_FORMAT_R8G8B8A8_UNORM)
+		{
+			return image;
+		}
+		if (FAILED(DirectX::Convert(*image, DXGI_FORMAT_R8G8B8A8_UNORM,
+			DirectX::TEX_FILTER_FORCE_NON_WIC, DirectX::TEX_THRESHOLD_DEFAULT, converted)))
+		{
+			return nullptr;
+		}
+		return converted.GetImage(0, 0, 0);
+	}
+
+	bool terrain_gray8(const DirectX::ScratchImage& source, std::vector<uint8_t>& gray)
+	{
+		const auto* image = source.GetImage(0, 0, 0);
+		if (!image || !image->pixels)
+		{
+			return false;
+		}
+		gray.resize(image->width * image->height);
+		// Authored splats are gray8. Preserve their byte values and respect pitch.
+		if (image->format == DXGI_FORMAT_R8_UNORM)
+		{
+			for (size_t row = 0; row < image->height; ++row)
+			{
+				std::memcpy(gray.data() + row * image->width,
+					image->pixels + row * image->rowPitch, image->width);
+			}
+			return true;
+		}
+		// The former mask decoder reduced 16-bit samples only after integer
+		// luminance conversion, then discarded the low byte (no rounding).
+		if (image->format == DXGI_FORMAT_R16_UNORM ||
+			image->format == DXGI_FORMAT_R16G16B16A16_UNORM)
+		{
+			for (size_t row = 0; row < image->height; ++row)
+			{
+				const auto* pixels = reinterpret_cast<const uint16_t*>(
+					image->pixels + row * image->rowPitch);
+				for (size_t column = 0; column < image->width; ++column)
+				{
+					const uint32_t value = image->format == DXGI_FORMAT_R16_UNORM
+						? pixels[column]
+						: (77u * pixels[column * 4] + 150u * pixels[column * 4 + 1] +
+							29u * pixels[column * 4 + 2]) >> 8;
+					gray[row * image->width + column] = static_cast<uint8_t>(value >> 8);
+				}
+			}
+			return true;
+		}
+		if (image->format == DXGI_FORMAT_R32G32B32A32_FLOAT)
+		{
+			// Keep the HDR mask policy (average RGB, then gamma 1/2.2).
+			// DirectXTex RGBE samples differ from the historical decoder;
+			// cross-decoder HDR/JPEG parity remains unverified.
+			for (size_t row = 0; row < image->height; ++row)
+			{
+				const auto* pixels = reinterpret_cast<const float*>(
+					image->pixels + row * image->rowPitch);
+				for (size_t column = 0; column < image->width; ++column)
+				{
+					const auto* pixel = pixels + column * 4;
+					const float average = (pixel[0] + pixel[1] + pixel[2]) / 3.0f;
+					if (!std::isfinite(average))
+					{
+						return false;
+					}
+					const float value = std::pow((std::max)(average, 0.0f), 1.0f / 2.2f) *
+						255.0f + 0.5f;
+					gray[row * image->width + column] = static_cast<uint8_t>(
+						std::clamp(value, 0.0f, 255.0f));
+				}
+			}
+			return true;
+		}
+		DirectX::ScratchImage converted;
+		image = terrain_rgba8(source, converted);
+		if (!image || !image->pixels)
+		{
+			return false;
+		}
+		for (size_t row = 0; row < image->height; ++row)
+		{
+			const auto* pixels = image->pixels + row * image->rowPitch;
+			for (size_t column = 0; column < image->width; ++column)
+			{
+				const auto* pixel = pixels + column * 4;
+				// Keep the previous integer grayscale rule; WIC/DirectXTex's
+				// color-to-luminance conversion has a different weighting.
+				gray[row * image->width + column] = static_cast<uint8_t>(
+					(77u * pixel[0] + 150u * pixel[1] + 29u * pixel[2]) >> 8);
+			}
+		}
+		return true;
+	}
+}
 
 #pragma pack(push, 1) // 1 byte alignment for DirectX structures
 struct TerrainBinHeader {
@@ -642,89 +791,61 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 
 bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out)
 {
-
-	int width, height, channels;
-	auto pathUtf8 = pngPath.string();
-
-	// comp=4 for RGBA8
-	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 4);
-	if (!data || width != static_cast<int>(dataWidth)
-		|| height != static_cast<int>(dataHeight))
+	DirectX::ScratchImage source;
+	if (!load_terrain_image(pngPath, source))
 	{
-		if (data) stbi_image_free(data);
+		return false;
+	}
+	DirectX::ScratchImage converted;
+	const auto* image = terrain_rgba8(source, converted);
+	if (!image || !image->pixels || static_cast<float>(image->width) != dataWidth ||
+		static_cast<float>(image->height) != dataHeight)
+	{
 		return false;
 	}
 
-	size_t N = static_cast<size_t>(width) * height;
-	out.resize(N);
-
-	for (size_t i = 0; i < N; ++i)
+	out.resize(image->width * image->height);
+	for (size_t row = 0; row < image->height; ++row)
 	{
-		uint32_t b0 = data[i * 4 + 0];
-		uint32_t b1 = data[i * 4 + 1];
-		uint32_t b2 = data[i * 4 + 2];
-		uint32_t b3 = data[i * 4 + 3];
-		uint32_t bits = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
-
-		float f;
-		std::memcpy(&f, &bits, sizeof(f));
-		out[i] = f;
+		const auto* pixels = image->pixels + row * image->rowPitch;
+		for (size_t column = 0; column < image->width; ++column)
+		{
+			const auto* pixel = pixels + column * 4;
+			const uint32_t bits = (static_cast<uint32_t>(pixel[0]) << 24) |
+				(static_cast<uint32_t>(pixel[1]) << 16) |
+				(static_cast<uint32_t>(pixel[2]) << 8) | pixel[3];
+			// Height PNG alpha is the low byte of the float, never opacity.
+			static_assert(sizeof(float) == sizeof(bits));
+			std::memcpy(&out[row * image->width + column], &bits, sizeof(bits));
+		}
 	}
-
-	//float normalized = (static_cast<float>(data[i * channels + c]) / 100.0f) + minH; // 0 ~ 1 범위로 정규화
-	//out[i] = normalized;
-
-	stbi_image_free(data);
 	return true;
-
 }
 
-//bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out)
-//{
-//	int width, height, channels;
-//	auto path = pngPath.string();
-//	unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-//	if (!data || width != dataWidth || height != dataHeight) {
-//		Debug::PrintLog(spdlog::level::err, "Failed to load splat map from PNG: " + path);
-//		if (data) {
-//			stbi_image_free(data);
-//		}
-//		return false;
-//	}
-//	out.resize(4);
-//	for (size_t i = 0; i < 4; ++i) {
-//		out[i].resize(width * height, 0.0f);
-//
-//		for (int y = 0; y < height; ++y) {
-//			for (int x = 0; x < width; ++x) {
-//				int idx = y * width + x;
-//				unsigned char* pixel = &data[(y * width + x) * channels];
-//				if (i < channels) {
-//					out[i][idx] = pixel[i] / 255.0f; // R, G, B, A 채널에 가중치 저장
-//				}
-//			}
-//		}
-//
-//	}
-//
-//	stbi_image_free(data);
-//	return true;
-//
-//
-//}
-
-// 신규: 단일 흑백 PNG를 읽어 특정 레이어의 가중치 맵으로 로드
 bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out)
 {
-	int width, height, channels;
-	unsigned char* data = stbi_load(pngPath.string().c_str(), &width, &height, &channels, 1); // 1 = Grayscale
-	if (!data || width != dataWidth || height != dataHeight) { /* ... 에러 처리 ... */ return false; }
-
-	out[layerIndex].resize(width * height);
-	for (int i = 0; i < width * height; ++i) {
-		out[layerIndex][i] = data[i] / 255.0f;
+	if (dataWidth <= 0 || dataHeight <= 0 || layerIndex < 0 ||
+		static_cast<size_t>(layerIndex) >= out.size())
+	{
+		return false;
 	}
-	stbi_image_free(data);
+	DirectX::ScratchImage source;
+	if (!load_terrain_image(pngPath, source) ||
+		source.GetMetadata().width != static_cast<size_t>(dataWidth) ||
+		source.GetMetadata().height != static_cast<size_t>(dataHeight))
+	{
+		return false;
+	}
+	std::vector<uint8_t> bytes;
+	if (!terrain_gray8(source, bytes))
+	{
+		return false;
+	}
+	out[layerIndex].resize(bytes.size());
+	for (size_t index = 0; index < bytes.size(); ++index)
+	{
+		out[layerIndex][index] = bytes[index] / 255.0f;
+	}
 	return true;
 }
 
@@ -927,20 +1048,18 @@ void TerrainComponent::RefreshTexture()
 /// 브러쉬 마스크 텍스쳐 로드
 bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight)
 {
-	auto pathUtf8 = Utf8Encode(path);
-
-	int width, height, channels;
-	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 1);
-	if (!data)
+	// PNG/TGA and WIC-supported mask formats retain the byte-to-gray policy.
+	// PSD/PIC/PNM need an installed WIC codec; no private decoder is added.
+	DirectX::ScratchImage source;
+	std::vector<uint8_t> bytes;
+	if (!load_terrain_image(std::filesystem::path(path), source) ||
+		!terrain_gray8(source, bytes))
+	{
 		return false;
-
-	size_t N = static_cast<size_t>(width) * height;
-	outMask.assign(data, data + N);
-
-	stbi_image_free(data);
-	dataWidth = width;
-	dataHeight = height;
-
+	}
+	outMask = std::move(bytes);
+	dataWidth = static_cast<int>(source.GetMetadata().width);
+	dataHeight = static_cast<int>(source.GetMetadata().height);
 	return true;
 }
 

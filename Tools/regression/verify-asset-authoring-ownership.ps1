@@ -39,7 +39,7 @@ Assert-DoesNotMatch "Engine\RenderEngine\DataSystem.cpp" 'SaveToWICFile'
 # Terrain produces only a value snapshot. PNG/texture/descriptor publication and
 # transaction lifetime belong to the Editor adapter.
 Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
-    'std::ofstream|stbi_write_png|create_directories\s*\(|copy_file\s*\(|WorkerPools'
+    'std::ofstream|SaveToWICFile|create_directories\s*\(|copy_file\s*\(|WorkerPools'
 Assert-Matches "Engine\SceneRuntime\Terrain.cpp" `
     'AssetAuthoringPort::WriteTerrain'
 Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
@@ -186,7 +186,13 @@ Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'file::copy_file'
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
-    'stbi_write_png'
+    'GUID_WICPixelFormat32bppBGRA'
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+    'GUID_WICPixelFormat8bppGray'
+Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+    'stb_image_write|stbi_write_'
+Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
+    'stb_image|stbi_'
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'file::rename\(stagingDirectory, finalGeneration'
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `

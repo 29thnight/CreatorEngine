@@ -1,7 +1,7 @@
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "../EditorModelPlacement.h"
 #include <DirectXTex.h>
-#include <stb_image.h>
+#include <wincodec.h>
 #include "Texture.h"
 #include "../EditorDiagnostics.h"
 #include "../EditorProjectOperations.h"
@@ -1202,288 +1202,261 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_assets_decodeab(const ConsoleCommandContext& ctx)
+    static bool texture_roundtrip_matches(const DirectX::ScratchImage& source,
+        bool hdr, std::string& failure)
+    {
+        const auto* expected = source.GetImage(0, 0, 0);
+        if (!expected || !expected->pixels || source.GetImageCount() != 1)
+        {
+            failure = "Missing canonical source image";
+            return false;
+        }
+        DirectX::Blob encoded;
+        const GUID* pngFormat = expected->format == DXGI_FORMAT_R8_UNORM
+            ? &GUID_WICPixelFormat8bppGray : &GUID_WICPixelFormat32bppBGRA;
+        const HRESULT saved = hdr
+            ? DirectX::SaveToDDSMemory(source.GetImages(), source.GetImageCount(),
+                source.GetMetadata(), DirectX::DDS_FLAGS_FORCE_DX10_EXT, encoded)
+            : DirectX::SaveToWICMemory(*expected, DirectX::WIC_FLAGS_NONE,
+                DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), encoded, pngFormat);
+        if (FAILED(saved))
+        {
+            failure = "Canonical image encode failed";
+            return false;
+        }
+        DirectX::ScratchImage decoded;
+        const auto* bytes = static_cast<const uint8_t*>(encoded.GetBufferPointer());
+        const auto wicFlags = static_cast<DirectX::WIC_FLAGS>(
+            DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_RGB);
+        const HRESULT loaded = hdr
+            ? DirectX::LoadFromDDSMemory(bytes, encoded.GetBufferSize(),
+                DirectX::DDS_FLAGS_NONE, nullptr, decoded)
+            : DirectX::LoadFromWICMemory(bytes, encoded.GetBufferSize(),
+                wicFlags, nullptr, decoded);
+        if (FAILED(loaded))
+        {
+            failure = "Canonical image decode failed";
+            return false;
+        }
+        const auto* actual = decoded.GetImage(0, 0, 0);
+        if (!actual || !actual->pixels || decoded.GetImageCount() != 1 ||
+            actual->format != expected->format || actual->width != expected->width ||
+            actual->height != expected->height)
+        {
+            failure = "Canonical image format or dimensions changed";
+            return false;
+        }
+        const size_t pixelBytes = hdr ? sizeof(float) * 4 :
+            (expected->format == DXGI_FORMAT_R8_UNORM ? 1 : 4);
+        const size_t rowBytes = expected->width * pixelBytes;
+        if (expected->rowPitch < rowBytes || actual->rowPitch < rowBytes)
+        {
+            failure = "Canonical image row pitch is too small";
+            return false;
+        }
+        for (size_t row = 0; row < expected->height; ++row)
+        {
+            if (std::memcmp(expected->pixels + row * expected->rowPitch,
+                actual->pixels + row * actual->rowPitch, rowBytes) != 0)
+            {
+                failure = "Canonical image pixel bytes changed";
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static bool texture_png_byte_fixtures(std::string& failure)
+    {
+        // Exhaust every alpha and gray byte, including transparent RGB data.
+        // Compare rows using each image's pitch, never a flat buffer comparison.
+        for (const DXGI_FORMAT format : { DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8_UNORM })
+        {
+            DirectX::ScratchImage fixture;
+            if (FAILED(fixture.Initialize2D(format, 256, 3, 1, 1)))
+            {
+                failure = "PNG byte fixture allocation failed";
+                return false;
+            }
+            const auto* image = fixture.GetImage(0, 0, 0);
+            for (size_t row = 0; row < image->height; ++row)
+            {
+                auto* pixels = image->pixels + row * image->rowPitch;
+                for (size_t column = 0; column < image->width; ++column)
+                {
+                    if (format == DXGI_FORMAT_R8_UNORM)
+                    {
+                        pixels[column] = static_cast<uint8_t>(column + row);
+                    }
+                    else
+                    {
+                        pixels[column * 4] = static_cast<uint8_t>(column + row);
+                        pixels[column * 4 + 1] = static_cast<uint8_t>(255 - column);
+                        pixels[column * 4 + 2] = static_cast<uint8_t>(column * 37 + row);
+                        pixels[column * 4 + 3] = static_cast<uint8_t>(column);
+                    }
+                }
+            }
+            if (!texture_roundtrip_matches(fixture, false, failure))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static CommandCore::CommandResult texture_canonical_roundtrip(
+        const ConsoleCommandContext& ctx, bool hdr)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() > 3) return InvalidArguments("assets.decodeab [root] [limit]");
-        int parsedLimit = 0;
-        if (ctx.parts.size() > 2 && (!ParseNumber(ctx.parts[2], parsedLimit) || parsedLimit < 0)) return InvalidArguments("limit must be a nonnegative integer");
-        // 인자: [루트] [상한]. 루트를 '-' 로 주면 저작 자산 트리.
-        //
-        // ★ 기본값을 저장소 루트로 둔다. 디코더를 태우는 PNG 는 저작 자산
-        //   (Dynamic_CPP/Assets)만이 아니다 — generation 이 뽑아 둔 모델
-        //   임베디드 텍스처와 에디터 아이콘도 같은 로더를 지난다.
+        const char* name = hdr ? "assets.decodeabhdr" : "assets.decodeab";
+        if (ctx.parts.size() > (hdr ? 2u : 3u))
+        {
+            return InvalidArguments(hdr ? "assets.decodeabhdr [root]" :
+                "assets.decodeab [root] [limit]");
+        }
+        int limit = 0;
+        if (!hdr && ctx.parts.size() > 2 &&
+            (!ParseNumber(ctx.parts[2], limit) || limit < 0))
+        {
+            return InvalidArguments("limit must be a nonnegative integer");
+        }
         const file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
             ? file::path(ctx.parts[1]) : PathFinder::Relative();
-        const int limit = ctx.parts.size() > 2
-            ? parsedLimit : 0;   // 0 = 전수
-
         std::vector<file::path> sources;
         std::error_code walkError;
         for (auto it = file::recursive_directory_iterator(root, walkError);
             it != file::recursive_directory_iterator(); it.increment(walkError))
         {
-            if (walkError) break;
-            if (!it->is_regular_file(walkError)) continue;
-            std::string ext = it->path().extension().string();
-            for (char& c : ext) c = static_cast<char>(std::tolower(c));
-            if (ext == ".png") sources.push_back(it->path());
-            if (0 != limit && static_cast<int>(sources.size()) >= limit) break;
-        }
-
-        uint32_t compared = 0, identical = 0, sizeMismatch = 0, wicWasBgra = 0;
-        uint32_t wicFailed = 0, stbFailed = 0, differing = 0;
-        uint64_t totalDiffBytes = 0;
-        uint32_t maxDelta = 0;
-        uint32_t channelDiff[4] = { 0, 0, 0, 0 };
-        std::vector<std::string> samples;
-
-        for (const file::path& path : sources)
-        {
-            std::ifstream stream(path, std::ios::binary | std::ios::ate);
-            if (!stream) continue;
-            const std::streamsize size = stream.tellg();
-            stream.seekg(0);
-            std::vector<char> raw(static_cast<size_t>(size));
-            stream.read(raw.data(), size);
-            stream.close();
-            const auto* bytes = reinterpret_cast<const uint8_t*>(raw.data());
-
-            // ── A: DirectXTex(WIC) → RGBA8 정규화 ──
-            DirectX::ScratchImage wic;
-            DirectX::TexMetadata meta{};
-            if (FAILED(DirectX::LoadFromWICMemory(bytes, raw.size(),
-                DirectX::WIC_FLAGS_IGNORE_SRGB, &meta, wic))) { ++wicFailed; continue; }
-
-            DirectX::ScratchImage converted;
-            const DirectX::ScratchImage* wicFinal = &wic;
-            if (DXGI_FORMAT_R8G8B8A8_UNORM != meta.format)
+            if (walkError)
             {
-                // ★ 이 계수가 0 이면 아래 Convert 가 한 번도 안 돌았다는 뜻이고,
-                //   그러면 대조는 "WIC 원본 vs stb" 그대로다. 0 이 아니면
-                //   "WIC→Convert vs stb" 이므로 Convert 가 채널 순서만 바꾼다는
-                //   전제가 결과에 섞인다.
-                ++wicWasBgra;
-                // BGRA8_UNORM -> RGBA8_UNORM 은 채널 순서만 바꾼다(둘 다 IsSRGB
-                // 가 false 라 DirectXTex 가 전달 함수에 손대지 않는다).
-                if (FAILED(DirectX::Convert(wic.GetImages(), wic.GetImageCount(),
-                    meta, DXGI_FORMAT_R8G8B8A8_UNORM, DirectX::TEX_FILTER_DEFAULT,
-                    DirectX::TEX_THRESHOLD_DEFAULT, converted))) { ++wicFailed; continue; }
-                wicFinal = &converted;
+                break;
             }
-            const DirectX::Image* a = wicFinal->GetImage(0, 0, 0);
-            if (nullptr == a || nullptr == a->pixels) { ++wicFailed; continue; }
-
-            // ── B: stb_image → RGBA8 ──
-            int w = 0, h = 0, channelsInFile = 0;
-            stbi_uc* b = stbi_load_from_memory(bytes, static_cast<int>(raw.size()),
-                &w, &h, &channelsInFile, 4);
-            if (nullptr == b) { ++stbFailed; continue; }
-
-            ++compared;
-            if (static_cast<size_t>(w) != a->width || static_cast<size_t>(h) != a->height)
+            if (!it->is_regular_file(walkError))
             {
-                ++sizeMismatch;
-                if (samples.size() < 5)
-                    samples.push_back(path.filename().string() + " 치수 "
-                        + std::to_string(a->width) + "x" + std::to_string(a->height)
-                        + " vs " + std::to_string(w) + "x" + std::to_string(h));
-                stbi_image_free(b);
+                if (walkError)
+                {
+                    break;
+                }
                 continue;
             }
-
-            // 행 간격이 다를 수 있다(WIC 쪽은 정렬). 행 단위로 센다.
-            uint64_t diffBytes = 0;
-            uint32_t localMax = 0;
-            const size_t rowBytes = static_cast<size_t>(w) * 4u;
-            for (int y = 0; y < h; ++y)
+            std::string extension = it->path().extension().string();
+            for (char& character : extension)
             {
-                const uint8_t* ra = a->pixels + static_cast<size_t>(y) * a->rowPitch;
-                const uint8_t* rb = b + static_cast<size_t>(y) * rowBytes;
-                for (size_t x = 0; x < rowBytes; ++x)
+                character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+            }
+            if (extension == (hdr ? ".hdr" : ".png"))
+            {
+                sources.push_back(it->path());
+            }
+        }
+        std::sort(sources.begin(), sources.end());
+        const size_t found = sources.size();
+        if (limit > 0 && sources.size() > static_cast<size_t>(limit))
+        {
+            sources.resize(static_cast<size_t>(limit));
+        }
+
+        size_t compared = 0;
+        size_t identical = 0;
+        size_t failed = 0;
+        std::vector<std::string> failures;
+        for (const auto& path : sources)
+        {
+            DirectX::ScratchImage source;
+            const auto flags = static_cast<DirectX::WIC_FLAGS>(
+                DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_RGB);
+            const HRESULT loaded = hdr
+                ? DirectX::LoadFromHDRFile(path.c_str(), nullptr, source)
+                : DirectX::LoadFromWICFile(path.c_str(), flags, nullptr, source);
+            std::string failure;
+            if (FAILED(loaded))
+            {
+                failure = "Source decode failed";
+            }
+            else
+            {
+                const DXGI_FORMAT canonical = hdr ? DXGI_FORMAT_R32G32B32A32_FLOAT :
+                    DXGI_FORMAT_R8G8B8A8_UNORM;
+                DirectX::ScratchImage normalized;
+                const DirectX::ScratchImage* input = &source;
+                if (source.GetMetadata().format != canonical)
                 {
-                    if (ra[x] == rb[x]) continue;
-                    ++diffBytes;
-                    const uint32_t delta = static_cast<uint32_t>(
-                        std::abs(static_cast<int>(ra[x]) - static_cast<int>(rb[x])));
-                    if (delta > localMax) localMax = delta;
-                    ++channelDiff[x % 4];
+                    if (FAILED(DirectX::Convert(source.GetImages(), source.GetImageCount(),
+                        source.GetMetadata(), canonical, DirectX::TEX_FILTER_FORCE_NON_WIC,
+                        DirectX::TEX_THRESHOLD_DEFAULT, normalized)))
+                    {
+                        failure = "Source normalization failed";
+                    }
+                    else
+                    {
+                        input = &normalized;
+                    }
+                }
+                if (failure.empty())
+                {
+                    ++compared;
+                    if (texture_roundtrip_matches(*input, hdr, failure))
+                    {
+                        ++identical;
+                    }
                 }
             }
-            stbi_image_free(b);
-
-            if (0 == diffBytes) { ++identical; continue; }
-            ++differing;
-            totalDiffBytes += diffBytes;
-            if (localMax > maxDelta) maxDelta = localMax;
-            if (samples.size() < 5)
+            if (!failure.empty())
             {
-                char line[256]{};
-                std::snprintf(line, sizeof(line), "%s — 다른 바이트 %llu / %llu (최대 편차 %u)",
-                    path.filename().string().c_str(),
-                    static_cast<unsigned long long>(diffBytes),
-                    static_cast<unsigned long long>(rowBytes * h), localMax);
-                samples.push_back(line);
+                ++failed;
+                if (failures.size() < 5)
+                {
+                    failures.push_back(path.filename().string() + ": " + failure);
+                }
             }
         }
-
-        std::printf("[CLI] assets.decodeab PNG %zu장 중 %u장 대조\n",
-            sources.size(), compared);
-        std::printf("  완전 일치      %u\n", identical);
-        std::printf("  픽셀 불일치    %u  (다른 바이트 누적 %llu · 최대 편차 %u)\n",
-            differing, static_cast<unsigned long long>(totalDiffBytes), maxDelta);
-        std::printf("  치수 불일치    %u\n", sizeMismatch);
-        std::printf("  WIC 실패 %u · stb 실패 %u\n", wicFailed, stbFailed);
-        std::printf("  WIC 이 BGRA 로 낸 장수 %u  (0 이면 정규화 없이 원본끼리 대조한 것)\n",
-            wicWasBgra);
-        if (0 != differing)
+        std::string fixtureFailure;
+        const bool fixturesPassed = hdr || texture_png_byte_fixtures(fixtureFailure);
+        const bool passed = !walkError && !sources.empty() && compared == sources.size() &&
+            identical == compared && failed == 0 && fixturesPassed;
+        std::printf("[CLI] %s DirectXTex %s canonical roundtrip: found=%zu selected=%zu "
+            "compared=%zu identical=%zu failed=%zu result=%s\n", name,
+            hdr ? "HDR to float DDS" : "RGBA8 to PNG", found, sources.size(),
+            compared, identical, failed, passed ? "passed" : "failed");
+        for (const auto& failure : failures)
         {
-            std::printf("  채널별 불일치 R %u · G %u · B %u · A %u\n",
-                channelDiff[0], channelDiff[1], channelDiff[2], channelDiff[3]);
+            std::printf("  %s\n", failure.c_str());
         }
-        for (const std::string& sample : samples)
-            std::printf("    %s\n", sample.c_str());
-        std::printf("[CLI] assets.decodeab %s\n",
-            (0 == differing && 0 == sizeMismatch && 0 == wicFailed && 0 == stbFailed)
-                ? "통과" : "차이 있음");
+        if (!fixturesPassed)
+        {
+            std::printf("  byte fixtures: %s\n", fixtureFailure.c_str());
+        }
         auto data = CommandData::Object();
-        data.Set("found", CommandData::Int(sources.size()));
+        data.Set("validation", CommandData::String(hdr ?
+            "directxtex.hdr_float_dds_roundtrip" : "directxtex.rgba8_png_roundtrip"));
+        data.Set("found", CommandData::Int(found));
+        data.Set("selected", CommandData::Int(sources.size()));
         data.Set("compared", CommandData::Int(compared));
         data.Set("identical", CommandData::Int(identical));
-        data.Set("differing", CommandData::Int(differing));
-        data.Set("sizeMismatch", CommandData::Int(sizeMismatch));
-        data.Set("wicFailed", CommandData::Int(wicFailed));
-        data.Set("stbFailed", CommandData::Int(stbFailed));
-        data.Set("totalDiffBytes", CommandData::Int(totalDiffBytes));
-        data.Set("maxDelta", CommandData::Int(maxDelta));
-        if (!(!walkError && !sources.empty() && compared == sources.size() && identical == compared && !wicFailed && !stbFailed)) return Fail("texture.validation_failed", "Texture measurement incomplete or mismatched", std::move(data));
-        return Ok("Texture measurement completed", std::move(data));
+        data.Set("failed", CommandData::Int(failed));
+        data.Set("walkFailed", CommandData::Bool(static_cast<bool>(walkError)));
+        data.Set("pngByteFixtures", CommandData::String(hdr ? "not_applicable" :
+            (fixturesPassed ? "passed" : "failed")));
+        if (!passed)
+        {
+            return Fail("texture.validation_failed", "Canonical roundtrip incomplete or mismatched",
+                std::move(data));
+        }
+        return Ok("DirectXTex canonical roundtrip completed; not an independent decoder comparison",
+            std::move(data));
+    }
 
+    // Retain command names for callers; their result explicitly identifies the
+    // new canonical roundtrip contract rather than implying two decoders ran.
+    static CommandCore::CommandResult Cmd_assets_decodeab(const ConsoleCommandContext& ctx)
+    {
+        return texture_canonical_roundtrip(ctx, false);
     }
 
     static CommandCore::CommandResult Cmd_assets_decodeabhdr(const ConsoleCommandContext& ctx)
     {
-        using namespace CommandCore;
-        if (ctx.parts.size() > 2) return InvalidArguments("assets.decodeabhdr [root]");
-        const file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
-            ? file::path(ctx.parts[1]) : PathFinder::Relative();
-
-        std::vector<file::path> sources;
-        std::error_code walkError;
-        for (auto it = file::recursive_directory_iterator(root, walkError);
-            it != file::recursive_directory_iterator(); it.increment(walkError))
-        {
-            if (walkError) break;
-            if (!it->is_regular_file(walkError)) continue;
-            std::string ext = it->path().extension().string();
-            for (char& c : ext) c = static_cast<char>(std::tolower(c));
-            if (ext == ".hdr") sources.push_back(it->path());
-        }
-
-        uint32_t compared = 0, identical = 0, differing = 0, failed = 0;
-        uint32_t stbChannels = 0;
-        double maxDelta = 0.0;
-        uint64_t diffSamples = 0;
-        std::vector<std::string> samples;
-
-        for (const file::path& path : sources)
-        {
-            std::ifstream stream(path, std::ios::binary | std::ios::ate);
-            if (!stream) continue;
-            const std::streamsize size = stream.tellg();
-            stream.seekg(0);
-            std::vector<char> raw(static_cast<size_t>(size));
-            stream.read(raw.data(), size);
-            stream.close();
-            const auto* bytes = reinterpret_cast<const uint8_t*>(raw.data());
-
-            DirectX::ScratchImage hdr;
-            DirectX::TexMetadata meta{};
-            if (FAILED(DirectX::LoadFromHDRMemory(bytes, raw.size(), &meta, hdr)))
-            { ++failed; continue; }
-            const DirectX::Image* a = hdr.GetImage(0, 0, 0);
-            if (nullptr == a || DXGI_FORMAT_R32G32B32A32_FLOAT != meta.format)
-            { ++failed; continue; }
-
-            int w = 0, h = 0, channelsInFile = 0;
-            float* b = stbi_loadf_from_memory(bytes, static_cast<int>(raw.size()),
-                &w, &h, &channelsInFile, 4);
-            if (nullptr == b) { ++failed; continue; }
-            stbChannels = static_cast<uint32_t>(channelsInFile);
-
-            if (static_cast<size_t>(w) != a->width || static_cast<size_t>(h) != a->height)
-            { ++failed; stbi_image_free(b); continue; }
-            ++compared;
-            double localMax = 0.0;
-            uint64_t localDiff = 0;
-            if (static_cast<size_t>(w) == a->width && static_cast<size_t>(h) == a->height)
-            {
-                for (int y = 0; y < h; ++y)
-                {
-                    const auto* ra = reinterpret_cast<const float*>(
-                        a->pixels + static_cast<size_t>(y) * a->rowPitch);
-                    const float* rb = b + static_cast<size_t>(y) * w * 4;
-                    for (int x = 0; x < w * 4; ++x)
-                    {
-                        const double delta = std::abs(
-                            static_cast<double>(ra[x]) - static_cast<double>(rb[x]));
-                        if (!std::isfinite(delta) || delta > 0.0) { ++localDiff; if (delta > localMax) localMax = delta; }
-                    }
-                }
-            }
-            // ★ 첫 불일치 자산에서 실제 값을 찍는다. "다르다"와 "몇 배
-            //   다르다"는 대응이 갈린다 — 비율이 일정하면 스케일 규약 차이이고
-            //   보정 가능하지만, 들쭉날쭉하면 디코드 자체가 다른 것이다.
-            if (0 != localDiff && 0 == differing)
-            {
-                const auto* ra = reinterpret_cast<const float*>(a->pixels);
-                for (int s = 0; s < (std::min)(4, w * h); ++s)
-                {
-                    const int o = s * 4;
-                    std::printf("    표본%d WIC(%.6f %.6f %.6f %.3f) stb(%.6f %.6f %.6f %.3f) 비율 %.5f\n",
-                        s, ra[o], ra[o + 1], ra[o + 2], ra[o + 3],
-                        b[o], b[o + 1], b[o + 2], b[o + 3],
-                        (0.0f != b[o]) ? (ra[o] / b[o]) : 0.0f);
-                }
-            }
-            stbi_image_free(b);
-
-            if (0 == localDiff) { ++identical; continue; }
-            ++differing;
-            diffSamples += localDiff;
-            if (localMax > maxDelta) maxDelta = localMax;
-            if (samples.size() < 5)
-            {
-                char line[256]{};
-                std::snprintf(line, sizeof(line), "%s — 다른 표본 %llu (최대 편차 %.6f)",
-                    path.filename().string().c_str(),
-                    static_cast<unsigned long long>(localDiff), localMax);
-                samples.push_back(line);
-            }
-        }
-
-        std::printf("[CLI] assets.decodeabhdr HDR %zu장 중 %u장 대조\n",
-            sources.size(), compared);
-        std::printf("  완전 일치      %u\n", identical);
-        std::printf("  값 불일치      %u  (다른 표본 %llu · 최대 편차 %.6f)\n",
-            differing, static_cast<unsigned long long>(diffSamples), maxDelta);
-        std::printf("  실패           %u\n", failed);
-        std::printf("  파일의 채널 수 %u  (stbi_loadf 는 4로 강제 요청했다)\n", stbChannels);
-        for (const std::string& sample : samples)
-            std::printf("    %s\n", sample.c_str());
-        std::printf("[CLI] assets.decodeabhdr %s\n",
-            (0 == differing && 0 == failed) ? "통과" : "차이 있음");
-        auto data = CommandData::Object();
-        data.Set("found", CommandData::Int(sources.size()));
-        data.Set("compared", CommandData::Int(compared));
-        data.Set("identical", CommandData::Int(identical));
-        data.Set("differing", CommandData::Int(differing));
-        data.Set("failed", CommandData::Int(failed));
-        data.Set("diffSamples", CommandData::Int(diffSamples));
-        data.Set("maxDelta", CommandData::Double(maxDelta));
-        if (!(!walkError && !sources.empty() && compared == sources.size() && identical == compared && !failed)) return Fail("texture.validation_failed", "Texture measurement incomplete or mismatched", std::move(data));
-        return Ok("Texture measurement completed", std::move(data));
-
+        return texture_canonical_roundtrip(ctx, true);
     }
 
     static CommandCore::CommandResult Cmd_assets_texturebench(const ConsoleCommandContext& ctx)

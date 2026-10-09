@@ -13,8 +13,10 @@
     "boost는 앞서 4-7에서 자체 UUID 구현으로 대체하며 80개를 걷었다.",
     "",
     "★ 따옴표 include에 주의. vcpkg의 include 디렉토리가 경로에 있어",
-    "  #include \"ImGuizmo.h\" 처럼 따옴표로도 열린다. 꺾쇠만 세면 imguizmo와",
-    "  stb를 '안 쓰임'으로 잘못 판정한다(실제로 한 번 그랬다).",
+    "  #include \"ImGuizmo.h\" 처럼 따옴표로도 열린다. 꺾쇠만 세면 직접 소비를 놓친다.",
+    "  당시 stb를 '안 쓰임'으로 잘못 판정했다. PHASE 12(2026-10-09)는 Terrain·",
+    "  이미지 프로브를 DirectXTex로 이관한 뒤 직접 include/심볼/빌드 소비가 없어",
+    "  직접 stb 의존을 제거한다. ImGui 등 외부 라이브러리 내장 구현은 유지한다.",
     "",
     "2026-08-24 재실측으로 2개를 더 걷었다: bshoshany-thread-pool(include 0·",
     "심볼 0 — Core.ThreadPool 소비 소멸), magic-enum(include 0 — PHASE 18",
@@ -47,7 +49,6 @@
     { "name": "meshoptimizer", "$why": "LOD 생성 — MeshOptimizer" },
     { "name": "physx", "$why": "물리" },
     { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },
-    { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
     {
       "name": "reflgen",
       "$why": "reflgen 도입 — [[reflgen::reflect]] 에서 리플렉션 서술을 생성한다(생성기·MSBuild 연동·헤더). overlay port(ports/reflgen)가 reflgen 릴리스 태그(v1.0.0)를 가리킨다. Directory.Build.targets 가 share/reflgen/msbuild/reflgen.targets 를 가져온다"

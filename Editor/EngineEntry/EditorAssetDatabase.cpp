@@ -23,8 +23,7 @@
 
 #include <efsw/efsw.hpp>
 #include <DirectXTex.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
+#include <wincodec.h>
 
 #include <algorithm>
 #include <array>
@@ -1047,9 +1046,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 				bytes[index * 4 + 2] = static_cast<uint8_t>(bits >> 8);
 				bytes[index * 4 + 3] = static_cast<uint8_t>(bits);
 			}
-			const std::string path = WstringToString(destination.wstring());
-			return 0 != stbi_write_png(path.c_str(), request.width,
-				request.height, 4, bytes.data(), request.width * 4);
+			// Every RGBA channel stores float bits, including alpha. The native
+			// PNG encoder accepts straight BGRA8; WIC only swaps R/B on write.
+			// Requiring that format prevents opaque/premultiplied substitution.
+			const DirectX::Image image{ width, height, DXGI_FORMAT_R8G8B8A8_UNORM,
+				width * 4, bytes.size(), bytes.data() };
+			return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str(),
+				&GUID_WICPixelFormat32bppBGRA));
 		};
 
 		auto WriteSplatPng = [&](const file::path& destination,
@@ -1061,9 +1065,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 				bytes[index] = static_cast<uint8_t>(
 					std::clamp(weights[index], 0.0f, 1.0f) * 255.0f);
 			}
-			const std::string path = WstringToString(destination.wstring());
-			return 0 != stbi_write_png(path.c_str(), request.width,
-				request.height, 1, bytes.data(), request.width);
+			const DirectX::Image image{ width, height, DXGI_FORMAT_R8_UNORM,
+				width, bytes.size(), bytes.data() };
+			return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str(),
+				&GUID_WICPixelFormat8bppGray));
 		};
 
 		const file::path stagedHeight = stagingDirectory / "HeightMap.png";
