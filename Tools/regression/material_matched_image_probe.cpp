@@ -90,7 +90,7 @@ MatchedGeometry ReadMatchedGeometry(const std::filesystem::path& file)
     return result;
 }
 
-std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& root,
+own::shared_owner<const Instance> MatchedInstance(const std::filesystem::path& root,
                                                const std::filesystem::path& shaderRoot,
                                                const std::filesystem::path& inputs,
                                                const std::filesystem::path& output,
@@ -153,7 +153,7 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
         cooked = {product, WriteMaterialProgramMetadata(product.program), BuildBoundSource(product.program)};
         return true;
     }, true, error);
-    std::shared_ptr<const Instance> result;
+    own::shared_owner<const Instance> result;
     CheckWith(generation && BuildInstance(generation, {id, {}, {}}, {}, result, error), "Matched instance ", error);
     return result;
 }
@@ -311,7 +311,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             lights.push_back(light);
         }
         SceneInputView view{context.frameId, context.sceneEpoch, 1, 1, 64, 64, camera};
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         CheckWith(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, input, error), "Matched Scene seal ", error);
         CheckWith(device.BeginFrame(error), "Matched begin ", error);
         textures.BeginFrame(context.frameId);
@@ -320,7 +320,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         RHITextureHandle irradianceHandle, prefilteredHandle;
         if (furnace)
         {
-            const auto uploaded = textures.GetOrUpload(cube.get(), error);
+            const auto uploaded = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             CheckWith(uploaded.IsValid(), "Matched furnace cube ", error);
             environmentHandle = uploaded.handle;
         }

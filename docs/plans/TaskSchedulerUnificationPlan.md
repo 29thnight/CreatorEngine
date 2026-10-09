@@ -476,9 +476,10 @@ RHI 명령 기록은 §12에서 공용 실행 기반으로 후속 이관했다. 
   워커에서 생성하던 동작은 제거했다. callback DDOL의 기존 활성 씬 경유를 유지한다.
 - 첫 실제 저장/재로딩 검사에서 일반 엔티티/DDOL 두 절의 동일 ID가 중복 구성되는
   것을 잡았다. 이관한 두 경로는 DDOL 절의 ID를 일반 절에서 제외하고 한 번만 구성한다.
-- 반환 future는 유지하되 결과 전달만 맡는다. 정상 프레임 경계 또는 명시적
-  `WaitForSceneLoad()`가 구성까지 완료한다. 소유 스레드의 pump 없는 future.get은
-  지원하지 않는다. 이관 전 두 API의 제품 호출자는 없었으며 동기 제품 로드는 유지한다.
+- 반환 future는 유지하되 결과 전달만 맡는다. 정상 프레임 경계 또는 명시적 비차단
+  `PollSceneLoads()`가 준비된 결과를 구성한다. AssetDepot 전환에서는 미완료 granular
+  요청을 기다리지 않도록 기존 `WaitForSceneLoad()`를 제거했다. Poll의 false는 다음
+  경계에서 다시 확인해야 한다는 뜻이며, 소유 스레드의 pump 없는 future.get은 지원하지 않는다. 이관 전 두 API의 제품 호출자는 없었으며 동기 제품 로드는 유지한다.
 - 버린 future의 성공 씬도 SceneManager가 소유한다. 실패/취소는 nullptr, 겹친 callback은
   최신 요청만 활성화, 동기 Create/Load는 이전 준비 취소·회수, 준비 중 loading 상태를 제공한다.
 - Editor/Player CLR 종료 전에 새 요청을 닫고 준비/자산 작업을 회수한다. 종료 시 취소한

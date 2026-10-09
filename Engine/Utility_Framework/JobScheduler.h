@@ -1,5 +1,6 @@
 #pragma once
 #include "ThreadPool.h"
+#include <exception>
 #include <functional>
 #include <memory>
 #include <span>
@@ -43,12 +44,21 @@ class job_group
     {
         tasks_.emplace_back(std::forward<F>(task));
     }
+    // One terminal observer for accepted work, including dependency/dispatch
+    // failure before a task body runs. Invoked after task captures are released,
+    // before the completion token becomes ready; observer captures are also
+    // released before readiness. May run inline during submit_after.
+    void on_complete(std::function<void(std::exception_ptr)> observer)
+    {
+        terminal_observer_ = std::move(observer);
+    }
     std::size_t size() const noexcept { return tasks_.size(); }
     bool empty() const noexcept { return tasks_.empty(); }
 
   private:
     friend class job_scheduler;
     std::vector<std::function<void()>> tasks_;
+    std::function<void(std::exception_ptr)> terminal_observer_;
 };
 
 class job_scheduler

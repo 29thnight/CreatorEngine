@@ -38,20 +38,20 @@ namespace RenderTest
             return id;
         }
 
-        [[nodiscard]] std::shared_ptr<const experiment::Material> MakeBase(
+        [[nodiscard]] own::shared_owner<const experiment::Material> MakeBase(
             const experiment::AssetId& materialId,
             const experiment::AssetId& shaderId)
         {
-            auto base = std::make_shared<experiment::Material>();
-            base->assetId = materialId;
-            base->shaderAssetId = shaderId;
-            base->name = "InstanceBase";
-            base->properties = {
+            experiment::Material base;
+            base.assetId = materialId;
+            base.shaderAssetId = shaderId;
+            base.name = "InstanceBase";
+            base.properties = {
                 { "tint", math::vector4{ 1.0f, 0.5f, 0.25f, 1.0f } },
                 { "sheen", 0.5f },
             };
-            base->keywords = { "on" };   // FOG=on
-            return base;
+            base.keywords = { "on" };   // FOG=on
+            return own::make_shared<const experiment::Material>(std::move(base));
         }
 
         [[nodiscard]] const experiment::MaterialProperty* FindProperty(
@@ -162,26 +162,22 @@ namespace RenderTest
 
             FileGuid shaderGuid{};
             shaderGuid.m_guid = shaderId.value;
-            auto meta = std::make_shared<ShaderMeta>();
-            meta->guid = shaderGuid;
-            meta->keywords = { { "FOG", { "off", "on" } } };
+            ShaderMeta metaValue;
+            metaValue.guid = shaderGuid;
+            metaValue.keywords = { { "FOG", { "off", "on" } } };
+            const auto meta = own::make_shared<const ShaderMeta>(std::move(metaValue));
 
             experiment::MaterialResolveServices services;
-            services.loadShaderMetaHandle =
-                [](const FileGuid&, std::string&)
+            services.loadShaderMetaOwner =
+                [meta](const FileGuid&, ShaderMetaHandle& outHandle, std::string&)
                 {
-                    return ShaderMetaHandle{ 1, 1 };
-                };
-            services.resolveShaderMeta =
-                [meta](const ShaderMetaHandle&)
-                    -> std::shared_ptr<const ShaderMeta>
-                {
+                    outHandle = { 1, 1 };
                     return meta;
                 };
             services.loadTexture =
                 [](const std::filesystem::path&, bool, experiment::TextureColorSpace)
                 {
-                    return std::make_shared<Texture>();
+                    return own::make_shared<const Texture>();
                 };
             services.resolveSourcePath = [](const FileGuid&)
                 {

@@ -72,7 +72,7 @@ void DecalComponent::SetDecalTexture(const std::string_view& fileName)
 	file::path filename = fileName;
 	file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
 	m_decalTextureOwner = Texture::LoadSharedFromPath(filepath.string());
-	m_decalTexture = m_decalTextureOwner.get();
+	m_decalTexture = (m_decalTextureOwner ? &*m_decalTextureOwner.borrow() : nullptr);
     m_diffusefileName = fileName;
 	PublishRenderProxyDirty(ProxyDirty::Material);
 }
@@ -86,7 +86,7 @@ void DecalComponent::SetNormalTexture(const std::string_view& fileName)
     file::path filename = fileName;
     file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
 	m_normalTextureOwner = Texture::LoadSharedFromPath(filepath.string());
-	m_normalTexture = m_normalTextureOwner.get();
+	m_normalTexture = (m_normalTextureOwner ? &*m_normalTextureOwner.borrow() : nullptr);
     m_normalFileName = fileName;
 	PublishRenderProxyDirty(ProxyDirty::Material);
 }
@@ -100,7 +100,7 @@ void DecalComponent::SetORMTexture(const std::string_view& fileName)
     file::path filename = fileName;
     file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
 	m_ormTextureOwner = Texture::LoadSharedFromPath(filepath.string());
-	m_occluroughmetalTexture = m_ormTextureOwner.get();
+	m_occluroughmetalTexture = (m_ormTextureOwner ? &*m_ormTextureOwner.borrow() : nullptr);
     m_ormFileName = fileName;
 	PublishRenderProxyDirty(ProxyDirty::Material);
 }

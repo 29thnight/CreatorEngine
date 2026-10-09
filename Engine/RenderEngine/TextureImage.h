@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 // 텍스처의 CPU 픽셀 — 백엔드 중립 (축 A).
@@ -79,6 +80,27 @@ inline void CopyImageRows(std::byte* destination, size_t destinationPitch,
             source + static_cast<size_t>(row) * sourcePitch, copyBytes);
     }
 }
+
+// Small image description. It contains no subresource pointers and remains valid
+// when the independently cached CPU payload has been evicted.
+struct TextureImageDescription final
+{
+    RHIFormat format{ RHIFormat::Unknown };
+    uint32_t width{};
+    uint32_t height{};
+    uint32_t mipLevels{};
+    uint32_t arraySize{};
+    bool isCube{};
+
+    [[nodiscard]] bool IsEmpty() const { return format == RHIFormat::Unknown || width == 0u || height == 0u; }
+    [[nodiscard]] RHIFormat Format() const { return format; }
+    [[nodiscard]] uint32_t Width() const { return width; }
+    [[nodiscard]] uint32_t Height() const { return height; }
+    [[nodiscard]] uint32_t MipLevels() const { return mipLevels; }
+    [[nodiscard]] uint32_t ArraySize() const { return arraySize; }
+    [[nodiscard]] bool IsCube() const { return isCube; }
+    [[nodiscard]] uint32_t SubresourceCount() const { return mipLevels * arraySize; }
+};
 
 /// CPU 이미지의 읽기 전용 뷰. **소유하지 않는다** — 수명은 소유자가 정한다.
 ///
@@ -237,6 +259,13 @@ public:
     [[nodiscard]] uint32_t  ArraySize() const { return m_arraySize; }
     [[nodiscard]] bool      IsCube() const { return m_isCube; }
     [[nodiscard]] size_t    TotalBytes() const { return m_pixels.size(); }
+    [[nodiscard]] std::size_t RetainedBytes() const noexcept
+    {
+        const auto maximum = (std::numeric_limits<std::size_t>::max)();
+        const auto table = m_subresources.capacity() > maximum / sizeof(TextureSubimage)
+            ? maximum : m_subresources.capacity() * sizeof(TextureSubimage);
+        return table > maximum - m_pixels.capacity() ? maximum : table + m_pixels.capacity();
+    }
 
     [[nodiscard]] const TextureSubimage* Find(uint32_t mip, uint32_t item) const
     {

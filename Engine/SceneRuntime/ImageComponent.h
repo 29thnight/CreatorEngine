@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/color.hpp>
@@ -18,8 +19,8 @@ public:
 	ImageComponent();
 	~ImageComponent() = default;
 
-	void Load(const std::shared_ptr<Texture>& ptr);
-	void DeserializeTexture(const std::shared_ptr<Texture>& ptr);
+	void Load(const own::shared_owner<const Texture>& ptr);
+	void DeserializeTexture(const own::shared_owner<const Texture>& ptr);
 	void OnDeserialized(); // CT6-d: 텍스처 경로 일괄 로드(구 팩토리 분기)
 
 	virtual void OnInitialized() override;
@@ -65,7 +66,7 @@ public:
 	// SetSizeDelta 호출이 주석 처리돼 두 경로의 동작이 달랐다).
 	void RefreshTransformFromRect();
 
-	const std::vector<std::shared_ptr<Texture>>& GetTextures() const { return textures; }
+	const std::vector<own::shared_owner<const Texture>>& GetTextures() const { return textures; }
 	const std::vector<std::string>& GetTexturePaths() const { return texturePaths; }
 private:
 	friend class ProxyCommand;
@@ -73,14 +74,14 @@ private:
 	std::vector<std::string> 				texturePaths;
 
 	[[reflgen::ignore]]
-	std::vector<std::shared_ptr<Texture>>	textures;
+	std::vector<own::shared_owner<const Texture>>	textures;
 
 public:
 	[[reflgen::ignore]]
 	ImageInfo								uiinfo{};
 
 	[[reflgen::ignore]]
-	std::shared_ptr<Texture>				m_curtexture{};
+	own::shared_owner<const Texture>				m_curtexture{};
 
 	math::color								color{ 1,1,1,1 };
 	int										curindex{ 0 };

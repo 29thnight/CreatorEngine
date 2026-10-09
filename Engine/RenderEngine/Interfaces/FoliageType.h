@@ -1,60 +1,85 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "Ownership.h"
+#include "Reflection.hpp"
+#include "TypeTrait.h"
+#include "AssetDepot/AssetLink.h"
 #include <cstdint>
 #include <memory>
 #include <string>
 
-// 데이터 경계 헤더는 렌더 본체를 include하지 않는다. shared_ptr는 불완전 타입을
-// 보관할 수 있으므로 Mesh·Material 정의 없이도 소유권 계약을 표현할 수 있다.
 class Material;
 namespace material_graph
 {
-struct SceneMaterialSource;
+    struct SceneMaterialSource;
 }
-namespace experiment { struct Material; } // I5-D5c4
-namespace assets { class ModelAssetGeneration; } // PHASE 3.75 MBC8: typed 정본
+namespace experiment
+{
+    struct Material;
+}
+namespace assets
+{
+    class ModelAssetGeneration;
+    struct ModelAnimationDescriptor;
+    struct ModelMeshDescriptor;
+}
 
 struct [[reflgen::reflect]] FoliageType
 {
-   public:
-    [[reflgen::ignore]]
-    std::shared_ptr<Material> m_material{};
-
-    [[reflgen::ignore]]
-    std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
-
-    // I5-D5c4(S2c-2c) — 재질의 저작 정본(비직렬화 런타임 필드). Foliage 자산은
-    // 재질을 따로 저작하지 않고 모델 것을 그대로 쓰므로 정본도 같은 generation
-    // 재질에서 온다(메시가 가리키는 MaterialId) — MeshRenderer처럼 씬 diff를 얹을
-    // 표면이 없어 인스턴스가 아니라 base 값 그대로다.
-    [[reflgen::ignore]]
-    std::shared_ptr<const experiment::Material> m_authoredMaterial{};
-
-    // PHASE 3.75 MBC8 — typed 정본(MeshRenderer m_modelGeneration 패턴). 비직렬화
-    // 런타임 필드. FoliageComponent::BindExperimentMesh가 m_modelName → ModelId →
-    // generation으로 잇고, 프록시 DrawSource와 drawPool이 RHIModelMeshView로 나른다
-    // (experiment 핸들·legacy Mesh보다 먼저 소비된다). 재질의 embedded texture는
-    // 같은 generation closure에서 푼다.
-    [[reflgen::ignore]]
-    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
-
-    [[reflgen::ignore]]
-    std::uint32_t m_modelMeshIndex{ 0 };
-
+public:
+    // Serialized values, interpreted only through their expected typed links.
+    // Names are labels / old authoring migration input, never mounted identity.
+    FileGuid m_modelGuid{};
+    FileGuid m_meshAssetId{};
+    FileGuid m_materialAssetId{};
+    bool m_allowLegacySource{ false };
     bool m_castShadow{ true };
     bool m_isShadowRecive{ true };
-	std::string m_modelName{};
+    std::string m_modelName{};
 
-	FoliageType() = default;
-	~FoliageType() = default;
+    [[nodiscard]] AssetDepot::AssetLink<assets::ModelAnimationDescriptor> ModelLink() const
+    {
+        return { { experiment::AssetId{ m_modelGuid.m_guid }, {} } };
+    }
+    [[nodiscard]] AssetDepot::AssetLink<assets::ModelMeshDescriptor> MeshLink() const
+    {
+        return { { experiment::AssetId{ m_meshAssetId.m_guid }, {} } };
+    }
+    [[nodiscard]] AssetDepot::AssetLink<Material> MaterialLink() const
+    {
+        return { { experiment::AssetId{ m_materialAssetId.m_guid }, {} } };
+    }
 
-    // MBC9 — 모델 이름이 유일한 영속 신원이다. 런타임 필드는
-    // FoliageComponent::BindModelGeneration이 이름 → ModelId → generation으로 잇는다.
+    // Immutable published owners only. Requests belong to the component and
+    // cannot be copied into render proxies or cancel another subscriber there.
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelAnimationDescriptor> m_modelDescriptor{};
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelMeshDescriptor> m_meshDescriptor{};
+    [[reflgen::ignore]]
+    own::shared_owner<const Material> m_material{};
+    [[reflgen::ignore]]
+    own::shared_owner<const material_graph::SceneMaterialSource> m_graphMaterialSource{};
+    [[reflgen::ignore]]
+    own::shared_owner<const experiment::Material> m_authoredMaterial{};
+
+    // Explicit, unmounted authoring fallback only. Mounted bindings never own
+    // whole-model geometry, images or unrelated clips through this field.
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};
+    [[reflgen::ignore]]
+    std::uint32_t m_modelMeshIndex{};
+
+    FoliageType() = default;
     explicit FoliageType(const std::string& modelName, bool castShadow = true)
-        : m_castShadow(castShadow), m_modelName(modelName) {}
+        : m_allowLegacySource(true), m_castShadow(castShadow), m_modelName(modelName)
+    {
+    }
     bool operator==(const FoliageType& other) const
     {
-        return m_modelName == other.m_modelName && m_castShadow == other.m_castShadow;
-	}
-
+        return m_modelGuid == other.m_modelGuid && m_meshAssetId == other.m_meshAssetId
+            && m_materialAssetId == other.m_materialAssetId
+            && m_allowLegacySource == other.m_allowLegacySource
+            && m_modelName == other.m_modelName && m_castShadow == other.m_castShadow
+            && m_isShadowRecive == other.m_isShadowRecive;
+    }
 };

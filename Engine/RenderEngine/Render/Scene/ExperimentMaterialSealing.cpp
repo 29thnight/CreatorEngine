@@ -190,11 +190,11 @@ namespace ExperimentMaterialSealing
         // c3-2가 "catalog가 서면 이 자리가 그대로 cooked 우선이 된다"고 적어
         // 둔 그 자리다. 미게시(저작 트리)에서는 nullptr이라 예전처럼 source.
         //
-        // shared_ptr을 이 스코프에서 붙잡는다 — services는 raw 포인터를 나르고,
+        // catalog owner를 이 스코프에서 붙잡는다 — services는 raw 포인터를 나르고,
         // 마운트가 렌더 중에 표를 갈아 끼울 수 있다.
         const auto catalog = DataSystems->GetCookedCatalog();
         const experiment::MaterialResolveServices services =
-            experiment::MakeDataSystemMaterialResolveServices(catalog.get(),
+            experiment::MakeDataSystemMaterialResolveServices(catalog ? &*catalog.borrow() : nullptr,
                 generation);
         experiment::ResolvedMaterial resolved;
         if (!experiment::ResolveMaterial(source.material, services, resolved,
@@ -282,16 +282,16 @@ namespace ExperimentMaterialSealing
         std::vector<std::uint8_t>& outPropertyBytes,
         std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
         std::string& outError,
-        std::shared_ptr<const LX::Runtime::Instance>* outRuntime,
+        own::shared_owner<const LX::Runtime::Instance>* outRuntime,
         ShaderMetaHandle handle)
     {
         std::vector<MaterialTextureOwner> owners;
         for (const auto& texture : source.textures) owners.push_back({texture.propertyName, texture.owner});
-        std::shared_ptr<const LX::Runtime::Instance> runtime;
+        own::shared_owner<const LX::Runtime::Instance> runtime;
         bool prepared;
         if (source.hasCodeValues)
         {
-            std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
+            own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
             std::vector<std::uint16_t> keywords;
             prepared = LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError) &&
                 experiment::NormalizeMaterialKeywordSelections(source.material, meta.keywords, keywords, outError) &&

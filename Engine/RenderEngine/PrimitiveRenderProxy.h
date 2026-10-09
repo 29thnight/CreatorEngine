@@ -14,6 +14,7 @@
 // 것의 공통)가 들고, 타입별 필드는 파생이 든다. ③은 As<T>()가 받는다 —
 // 태그가 맞을 때만 그 타입 포인터를 돌려주므로 태그와 필드가 한 자리에서
 // 함께 검사된다.
+#include "Ownership.h"
 #include "RenderProxy.h"
 #include "AnimationPaletteArena.h"
 #include "LightMapping.h"
@@ -43,7 +44,7 @@ struct SceneMaterialSource;
 class Mesh;
 class MeshRenderer;
 namespace experiment { struct Material; } // I5-D5c2-2 저작 정본 스냅샷
-namespace assets { class ModelAssetGeneration; } // PHASE 3.75 MBC7 typed 정본
+namespace assets { class ModelAssetGeneration; struct ModelMeshDescriptor; } // PHASE 3.75 MBC7 typed 정본
 class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
@@ -121,20 +122,21 @@ public:
 	// 렌더 스레드가 사용하는 동안 에셋 수명을 보장한다(12.3-⑦).
 	// 컴포넌트에서 스냅샷할 때 shared_ptr을 그대로 복사하므로,
 	// 원본이 파괴되거나 언로드되어도 이 프록시가 그리는 중에는 안전하다.
-	std::shared_ptr<Material>		m_Material{};
-    std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
+	own::shared_owner<const Material>		m_Material{};
+    own::shared_owner<const material_graph::SceneMaterialSource> m_graphMaterialSource;
 	// PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 컴포넌트가
 	// 붙든 immutable generation과 메시 인덱스의 사본. drawPool이 이것으로
-	// RHIModelMeshView를 만들어 패스에 싣고, shared_ptr이 뷰가 가리키는 정점·인덱스
+	// RHIModelMeshView를 만들어 패스에 싣고, shared_owner가 뷰가 가리키는 정점·인덱스
 	// 저장소의 수명을 이 프레임 동안 잡아 준다. null이면 그릴 것이 없다.
-	std::shared_ptr<const assets::ModelAssetGeneration>	m_modelGeneration{};
+	own::shared_owner<const assets::ModelAssetGeneration>	m_modelGeneration{};
+    own::shared_owner<const assets::ModelMeshDescriptor> m_meshDescriptor{};
 	uint32							m_modelMeshIndex{ 0 };
 	// I5-D5c2-2 — 재질 저작 정본의 **값 스냅샷**(base+override 합성 결과).
 	// MeshRenderer의 MaterialInstance에서 프록시 생성 시 한 번 만든다 —
 	// 프록시 갱신 커맨드가 재질을 바꾸면 그 경로가 다시 만든다. null이면
 	// 저작 원본이 없다는 뜻이고(legacy 표기 문서·Assimp 모델) sealing은
 	// legacy 브리지를 그대로 탄다.
-	std::shared_ptr<const experiment::Material>	m_authoredMaterial{};
+	own::shared_owner<const experiment::Material>	m_authoredMaterial{};
 	// I5-D5c3 — 그 스냅샷이 어느 세대의 것인가. 갱신 커맨드가 이 값을 보고
 	// 재스냅샷을 결정한다(재질 GUID가 그대로인 property 편집을 잡는 축).
 	std::uint64_t								m_authoredRevision{ 0 };
@@ -198,15 +200,8 @@ public:
 
 	struct DrawSource
 	{
-		std::shared_ptr<Material> material{};
-        std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
-		// I5-D5c4 — 재질 저작 정본(FoliageType 병행 필드의 사본). drawPool이
-		// pooled.authoredMaterialSource로 옮겨 sealing 직행에 합류시킨다.
-		std::shared_ptr<const experiment::Material> authoredMaterial{};
-		// PHASE 3.75 MBC8/MBC9 — typed 정본(FoliageType 필드의 사본). drawPool이
-		// 이것으로 RHIModelMeshView를 만들어 싣는다 — 유일한 지오메트리 출처다.
-		std::shared_ptr<const assets::ModelAssetGeneration> modelGeneration{};
-		uint32 modelMeshIndex{ 0 };
+        // The proxy owns each selected type once. Draw records contain only
+        // values/indices; the renderer adds one exact generation to frame pins.
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};
 		uint32 foliageTypeID{};
@@ -236,9 +231,9 @@ public:
 	explicit DecalRenderProxy(DecalComponent* component);
 
 public:
-	std::shared_ptr<Texture>		m_diffuseTexture{};
-	std::shared_ptr<Texture>		m_normalTexture{};
-	std::shared_ptr<Texture>		m_occluroughmetalTexture{};
+	own::shared_owner<const Texture>		m_diffuseTexture{};
+	own::shared_owner<const Texture>		m_normalTexture{};
+	own::shared_owner<const Texture>		m_occluroughmetalTexture{};
 	uint32							m_sliceX{ 1 };
 	uint32							m_sliceY{ 1 };
 	int								m_sliceNum{ 0 };
@@ -255,7 +250,7 @@ public:
 
 public:
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
-	std::shared_ptr<Texture>		m_spriteTexture{ nullptr };
+	own::shared_owner<const Texture>		m_spriteTexture{ nullptr };
 	BillboardType                   m_billboardType{ BillboardType::None };
 	math::vector3                   m_billboardAxis{ 0.f, 1.f, 0.f };
 	bool                            m_enableDepth{ false };

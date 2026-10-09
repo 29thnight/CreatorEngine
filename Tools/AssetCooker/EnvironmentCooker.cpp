@@ -74,7 +74,7 @@ int wmain(int argc,wchar_t** argv)
         { std::cout<<"ENVIRONMENT_COOK_CACHE_MISS\n"; CoUninitialize(); return 3; }
         error.clear();
         const auto start=std::chrono::steady_clock::now();
-        std::shared_ptr<Texture> texture;
+        own::shared_owner<const Texture> texture;
         if (argc==5)
         {
             std::ifstream input(argv[4],std::ios::binary);
@@ -97,7 +97,7 @@ int wmain(int argc,wchar_t** argv)
         EnhancedIBLGenerator generator;
         EnvironmentRequire(generator.Initialize(context,error),error);
         EnvironmentRequire(device.BeginFrame(error),error);
-        const auto uploaded=textures.GetOrUpload(texture.get(),error);
+        const auto uploaded=textures.GetOrUpload((texture ? &*texture.borrow() : nullptr),error);
         EnvironmentRequire(error.empty() && uploaded.IsValid() && !uploaded.isCube,"Environment source upload: "+error);
         EnvironmentRequire(generator.Generate(context,uploaded.handle,uploaded.format,cube,brdf,error),error);
         EnvironmentRequire(generator.QueueCookedCapture(output,identity,error),error);

@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "support/MaterialPipelineSlot.h"
 #include "MaterialGraphRenderBindings.h"
 #include "PathFinder.h"
@@ -153,7 +154,7 @@ void Run(const std::filesystem::path& root)
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), pixels.data(), pixels.size());
     const auto texture = Texture::CreateSharedFromImage("LX.RenderBindings.SRGB", std::move(image));
     Check(!!texture, "Actual CPU texture");
-    std::shared_ptr<const Instance> instance;
+    own::shared_owner<const Instance> instance;
     Check(BuildInstance(
               generation, {graph, {{900, .31}}, {}},
               [&](const experiment::AssetId&, LXColorSpace, std::string&) { return texture; }, instance, error),
@@ -204,7 +205,7 @@ void Run(const std::filesystem::path& root)
     RHIReadback readback;
     Check(device.CreateReadback(4, 1, targetDescription.format, 1, readback, error), "Actual readback");
     RenderBindingCache bindings;
-    std::shared_ptr<const RenderBindings> packet;
+    own::shared_owner<const RenderBindings> packet;
     Check(!bindings.Prepare(device, textures, instance, layout, packet, error) && !packet,
           "No upload outside recording");
     PipelineSlot pipeline;
@@ -222,6 +223,11 @@ void Run(const std::filesystem::path& root)
             Check(!RenderBindingCache::ValidatePass(device, *packet, layout, error),
                   "Pass binding rejects stale recordings");
         }
+        // A prepared lookup is weak: after the previous recording's callers
+        // release their packet, it cannot keep the CPU wrapper resident.
+        own::weak_owner<const RenderBindings> previousPacket(packet);
+        packet.reset();
+        Check(previousPacket.expired(), "Prepared weak lookup does not own an unused binding packet");
         const double roughness = frame % 2 ? .81 : .31;
         Check(BuildInstance(
                   generation, {graph, {{900, roughness}}, {}},
@@ -232,30 +238,46 @@ void Run(const std::filesystem::path& root)
         Check(bindings.SamplerTableCount() == 1 && packet->resources.samplers.size() == 4,
               "Sampler table is shared across repeated frames and value edits");
         const auto accepted = packet;
-        std::shared_ptr<const RenderBindings> repeated;
-        Check(bindings.Prepare(device, textures, instance, layout, repeated, error) && repeated == packet,
+        own::shared_owner<const RenderBindings> repeated;
+        Check(bindings.Prepare(device, textures, instance, layout, repeated, error) && material_graph_test::SamePinnedObject(repeated, packet),
               "Same immutable instance and complete layout reuse one packet in this recording");
+        Check(packet->instancePins && packet->instancePinIndex != InstanceFramePins::InvalidIndex &&
+                  material_graph_test::SamePinnedObject(packet->instance, instance) &&
+                  material_graph_test::SamePinnedObject(packet->instancePins->Borrow(packet->instancePinIndex), instance) &&
+                  packet->resources.owners.empty(),
+              "Binding packet borrows the exact instance and texture closure through its frame pin index");
+        auto otherViewPins = own::make_shared<InstanceFramePins>();
+        otherViewPins->Retain(instance);
+        Check(bindings.Prepare(device, textures, instance, layout, repeated, error, otherViewPins) &&
+                  material_graph_test::SamePinnedObject(repeated, packet) &&
+                  !material_graph_test::SamePinnedObject(repeated->instancePins, otherViewPins),
+              "Same-recording reuse retains its original independent frame pin table");
         Check(RenderBindingCache::ValidatePass(device, *packet, layout, error),
               "Second pass validates the shared material resources without copying");
         auto wrongLayout = layout;
         wrongLayout.samplerSlot.reset();
         Check(!RenderBindingCache::ValidatePass(device, *packet, wrongLayout, error),
               "Pass binding rejects a missing reflected slot");
-        Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && packet == accepted,
+        Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted),
               "Missing sampler root retains accepted render packet");
         wrongLayout = layout;
         wrongLayout.samplerSlot = layout.uniformSlot;
-        Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && packet == accepted,
+        Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted),
               "Aliased root slots retain accepted render packet");
-        auto wrongInstance = std::make_shared<Instance>(*instance);
-        wrongInstance->uniforms.clear();
-        Check(!bindings.Prepare(device, textures, wrongInstance, layout, packet, error) && packet == accepted,
+        Instance wrongInstanceValue(*instance);
+        wrongInstanceValue.uniforms.clear();
+        const auto wrongInstance = own::make_shared<const Instance>(std::move(wrongInstanceValue));
+        Check(!bindings.Prepare(device, textures, wrongInstance, layout, packet, error, accepted->instancePins) &&
+                  material_graph_test::SamePinnedObject(packet, accepted),
+              "Copied representation identity cannot substitute a different object in the frame pin table");
+        Check(!bindings.Prepare(device, textures, wrongInstance, layout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted),
               "Invalid packed values retain accepted render packet");
         if (frame == 0)
         {
-            auto missingPixels = std::make_shared<Instance>(*instance);
-            missingPixels->textures.front().owner = std::make_shared<Texture>();
-            Check(!bindings.Prepare(device, textures, missingPixels, layout, packet, error) && packet == accepted &&
+            Instance missingPixelsValue(*instance);
+            missingPixelsValue.textures.front().owner = own::make_shared<const Texture>();
+            const auto missingPixels = own::make_shared<const Instance>(std::move(missingPixelsValue));
+            Check(!bindings.Prepare(device, textures, missingPixels, layout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted) &&
                       textures.GetUploadFailureCount() == 1,
                   "Actual cache neutral substitution is rejected and retains the accepted packet");
         }
@@ -264,7 +286,7 @@ void Run(const std::filesystem::path& root)
         description.rtvFormats[0] = targetDescription.format;
         std::vector<TextureBinding> uploaded;
         for (const auto& owner : instance->textures)
-            uploaded.push_back({owner.slot, textures.GetOrUpload(owner.owner.get(), error), owner.owner});
+            uploaded.push_back({owner.slot, textures.GetOrUpload((owner.owner ? &*owner.owner.borrow() : nullptr), owner.owner ? owner.owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), owner.owner});
         std::vector<LXMaterialDiagnostic> diagnostics;
         Check(pipeline.Publish(pipelines, product, RHIShaderBinary::Dxil, {.coreForward = true}, {},
                                instance->description.parameters, uploaded, description, {}, diagnostics),

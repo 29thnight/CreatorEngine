@@ -1974,6 +1974,15 @@ void Scene::CommitRenderProxies()
     if (nullptr == renderScene) return;
 
     auto& registry = *m_renderRegistry;
+    // Descriptor preparation can finish while a static renderer has no dirty
+    // transforms. Poll on its owner thread before draining proxy publications.
+    for (MeshRenderer* renderer : registry.meshes)
+    {
+        if (renderer && !renderer->IsDestroyMark())
+        {
+            renderer->EnsureMeshBinding();
+        }
+    }
 
     // Even a frame with no fixed step advances render alpha. Queue only bodies
     // retained by the last completed tick, plus their render descendants.

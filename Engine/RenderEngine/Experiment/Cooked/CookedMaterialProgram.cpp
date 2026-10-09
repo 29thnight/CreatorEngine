@@ -89,13 +89,17 @@ bool OpenCookedMaterialProgram(const CookedAssetManifestEntry& entry, const Arti
         entry.byteSize < 20 || entry.byteSize > budget.compiledBytes + 128ull * 1024ull * 1024ull ||
         entry.artifactPath != MakeDerivedMaterialProgramArtifactPath(entry.assetId))
         return invalid();
+    own::shared_owner<const ArtifactByteSource> exactBytes;
+    if (!bytes.CaptureArtifact(entry.artifactPath, exactBytes, error))
+        return false;
+    const auto& source = exactBytes ? *exactBytes : bytes;
     std::uint64_t size{};
-    if (!bytes.Size(entry.artifactPath, size, error))
+    if (!source.Size(entry.artifactPath, size, error))
         return false;
     if (size != entry.byteSize)
         return invalid();
     std::vector<std::byte> payload(static_cast<std::size_t>(size));
-    if (!bytes.ReadAt(entry.artifactPath, 0, payload, error))
+    if (!source.ReadAt(entry.artifactPath, 0, payload, error))
         return false;
     Sha256Digest digest;
     if (!ComputeSha256(payload, digest, error))

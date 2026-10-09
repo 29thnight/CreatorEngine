@@ -9,6 +9,7 @@
 
 class RenderScene;
 class Animator;
+struct AnimatorAnimationBinding;
 class AnimationController;
 class SceneManager;
 struct AnimationHudSnapshot;
@@ -55,15 +56,15 @@ private:
     // I6-B4b — legacy 재귀 틱 3종과 calculAni는 제거됐다(본문 373줄).
     // MBC8 — BlendAni는 틱 뷰 템플릿의 자유 함수(BlendPose)가 됐다.
 
-	// 두 그룹 사이의 join 뒤에 실행한다. 데이터 출처는 typed generation 하나다.
-	void PrepareGeneration(Animator& animator,
-		const assets::ModelAssetGeneration& generation, float deltaT);
-	void ExecuteGeneration(Animator& animator,
-		const assets::ModelAssetGeneration& generation);
-	void InterpolateGeneration(Animator& animator,
-		const assets::ModelAssetGeneration& generation);
-	void FinalizeGenerationQuality(Animator& animator,
-		const assets::ModelAssetGeneration& generation);
+    // Both job groups use the exact owner-thread capture, never latest lookups.
+    bool PrepareBinding(Animator& animator,
+        const AnimatorAnimationBinding& binding, float deltaT);
+    void ExecuteBinding(Animator& animator,
+        const AnimatorAnimationBinding& binding);
+    void InterpolateBinding(Animator& animator,
+        const AnimatorAnimationBinding& binding);
+    void FinalizeBindingQuality(Animator& animator,
+        const AnimatorAnimationBinding& binding);
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;

@@ -13,9 +13,13 @@
 #include "../RenderEngine/BoneRegion.h"
 #include "SceneManager.h"
 #include "Socket.h"
-#include "../RenderEngine/Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8
+#include "../RenderEngine/Assets/ModelAssetGeneration.h" // Transitional CEMCv11
+#include "../RenderEngine/Assets/ModelAnimationDescriptor.h"
+#include "../RenderEngine/Assets/ModelAnimationPayload.h"
+#include "../RenderEngine/Assets/ModelMeshDescriptor.h"
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 
 Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}
 
@@ -151,41 +155,303 @@ namespace
 	}
 }
 
+const assets::ModelSkeletonAsset* AnimatorAnimationBinding::Skeleton() const noexcept
+{
+    if (descriptor)
+    {
+        return skeleton ? &skeleton->skeleton : nullptr;
+    }
+    return legacyGeneration ? legacyGeneration->Skeleton() : nullptr;
+}
+
+const assets::ModelAnimationDescriptor* Animator::TypedDescriptor() const noexcept
+{
+    return m_animationDescriptor ? &*m_animationDescriptor : nullptr;
+}
+
 const assets::ModelSkeletonAsset* Animator::TypedSkeleton() const noexcept
 {
-	return m_modelGeneration ? m_modelGeneration->Skeleton() : nullptr;
+    if (m_granularAnimationBinding)
+    {
+        return m_skeletonPayload ? &m_skeletonPayload->skeleton : nullptr;
+    }
+    return m_modelGeneration ? m_modelGeneration->Skeleton() : nullptr;
 }
 
 std::size_t Animator::TypedClipCount() const noexcept
 {
-	return m_modelGeneration ? m_modelGeneration->Animations().size() : 0u;
+    if (m_granularAnimationBinding)
+    {
+        return m_animationDescriptor ? m_animationDescriptor->summary.clips.size() : 0u;
+    }
+    return m_modelGeneration ? m_modelGeneration->Animations().size() : 0u;
 }
 
 const assets::ModelAnimationAsset* Animator::TypedClip(int clipIndex) const noexcept
 {
-	if (!m_modelGeneration || clipIndex < 0) return nullptr;
-	const auto clips = m_modelGeneration->Animations();
-	const std::size_t index = static_cast<std::size_t>(clipIndex);
-	return index < clips.size() ? &clips[index] : nullptr;
+    if (clipIndex < 0)
+    {
+        return nullptr;
+    }
+    if (m_granularAnimationBinding)
+    {
+        for (const auto& selected : m_requestedClips)
+        {
+            if (selected.clipIndex == clipIndex && selected.payload)
+            {
+                return &selected.payload->clip;
+            }
+        }
+        return nullptr;
+    }
+    if (!m_modelGeneration)
+    {
+        return nullptr;
+    }
+    const auto clips = m_modelGeneration->Animations();
+    const auto index = static_cast<std::size_t>(clipIndex);
+    return index < clips.size() ? &clips[index] : nullptr;
 }
 
 AnimatorDataPath Animator::GetSkeletonPath() const noexcept
 {
-	return nullptr != TypedSkeleton() ? AnimatorDataPath::Generation : AnimatorDataPath::None;
+    if (!TypedSkeleton())
+    {
+        return AnimatorDataPath::None;
+    }
+    return m_granularAnimationBinding ? AnimatorDataPath::Granular
+        : AnimatorDataPath::Generation;
 }
 
 void Animator::EnsureAnimationBinding()
 {
-	// PHASE 3.75 MBC9 — 재생 데이터의 유일한 출처는 typed generation이다. m_Motion은
-	// ModelId(UUIDv8)고, 여기서 직접 generation을 게시·해석한다. skeleton 불변식
-	// (본이 있다·루트가 범위 안)을 typed 쪽에서 검사한다.
-	BindModelGeneration(FileGuid{} == m_Motion ? nullptr
-		: DataSystems->LoadModelAssetGeneration(m_Motion));
+    if (!m_animationBindingInitialized || m_animationBindingMotion != m_Motion)
+    {
+        const bool motionChanged = m_animationBindingMotion != m_Motion;
+        m_animationBindingMotion = m_Motion;
+        m_animationBindingInitialized = true;
+        GetInstance().layerTrackTables.clear();
+        m_descriptorRequest.Cancel();
+        m_skeletonRequest.Cancel();
+        m_descriptorRequest = {};
+        m_skeletonRequest = {};
+        m_animationDescriptor.reset();
+        m_skeletonPayload.reset();
+        m_requestedClips.clear();
+        m_skeletonRequested = false;
+        m_granularAnimationBinding = false;
+        if (FileGuid{} == m_Motion)
+        {
+            m_modelGeneration.reset();
+            ResetAnimationPose();
+            return;
+        }
+        const AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link{
+            { experiment::AssetId{ m_Motion.m_guid }, {} } };
+        m_granularAnimationBinding = DataSystems->HasModelAnimationDescriptor(link);
+        if (!m_granularAnimationBinding)
+        {
+            // Explicit CEMCv11 fallback only. A pending/failed v3 request must
+            // never enter the synchronous legacy aggregate loader.
+            if (!m_modelGeneration || motionChanged)
+            {
+                BindModelGeneration(DataSystems->LoadModelAssetGeneration(m_Motion));
+                m_animationBindingInitialized = true;
+            }
+            return;
+        }
+        m_modelGeneration.reset();
+        m_animationDescriptor = DataSystems->TryAcquire(link);
+        if (!m_animationDescriptor)
+        {
+            m_descriptorRequest = DataSystems->RequestAsync(link);
+        }
+    }
+    if (!m_granularAnimationBinding)
+    {
+        return;
+    }
+    if (!m_animationDescriptor)
+    {
+        const auto result = m_descriptorRequest.Snapshot();
+        if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+        {
+            // Terminal failure/staleness is observable until the caller makes
+            // an explicit rebind. Never silently replace its requested revision.
+            return;
+        }
+        m_animationDescriptor = result.asset;
+        m_descriptorRequest = {};
+    }
+    if (!m_skeletonPayload)
+    {
+        if (!m_animationDescriptor->summary.skeletonAssetId.IsValid())
+        {
+            return;
+        }
+        if (!m_skeletonRequested)
+        {
+            m_skeletonPayload = DataSystems->TryAcquireSkeleton(m_animationDescriptor);
+            if (!m_skeletonPayload)
+            {
+                m_skeletonRequest = DataSystems->RequestSkeletonAsync(m_animationDescriptor);
+            }
+            m_skeletonRequested = true;
+        }
+        if (!m_skeletonPayload)
+        {
+            const auto result = m_skeletonRequest.Snapshot();
+            if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+            {
+                return;
+            }
+            m_skeletonPayload = result.asset;
+        }
+        m_skeletonRequest = {};
+        RestoreDeferredAvatarMasks();
+    }
 }
 
-void Animator::BindModelGeneration(
-    std::shared_ptr<const assets::ModelAssetGeneration> generation)
+AnimatorAnimationBinding Animator::CaptureAnimationBinding()
 {
+    EnsureAnimationBinding();
+    AnimatorAnimationBinding binding{};
+    binding.descriptor = m_animationDescriptor;
+    binding.skeleton = m_skeletonPayload;
+    binding.skeletonSerial = GetSkeletonSerial();
+    if (!m_granularAnimationBinding)
+    {
+        binding.legacyGeneration = m_modelGeneration;
+        binding.ready = binding.Skeleton() != nullptr;
+        return binding;
+    }
+    if (!m_animationDescriptor)
+    {
+        return binding;
+    }
+    std::vector<int> indices;
+    const auto select = [&](int index)
+    {
+        if (index >= 0 && static_cast<std::size_t>(index) < TypedClipCount()
+            && std::find(indices.begin(), indices.end(), index) == indices.end())
+        {
+            indices.push_back(index);
+        }
+    };
+    const auto& instance = GetInstance();
+    // AnimatorSystem has already selected transitions on the owner thread.
+    // Enabled layers also need their current clip for time/event advancement.
+    if (m_animationControllers.empty() || IsDirectEditorPreview())
+    {
+        select(static_cast<int>(instance.selectedClipIndex));
+        if (!IsDirectEditorPreview() && instance.control.isBlending)
+        {
+            select(instance.control.nextClipIndex);
+        }
+    }
+    else
+    {
+        for (const auto& controller : m_animationControllers)
+        {
+            if (!controller || !controller->useController)
+            {
+                continue;
+            }
+            select(controller->GetAnimationIndex());
+            if (controller->IsBlending())
+            {
+                select(controller->GetNextAnimationIndex());
+            }
+        }
+    }
+    // Old per-layer spans must not outlive the selected owners they borrowed.
+    GetInstance().layerTrackTables.clear();
+    // Drop deselected owners and subscriber handles. Submitted decode jobs own
+    // their own captures and can drain without keeping the old clip resident here.
+    std::erase_if(m_requestedClips, [&](const RequestedAnimationClip& clip)
+    {
+        return std::find(indices.begin(), indices.end(), clip.clipIndex) == indices.end();
+    });
+    binding.ready = m_skeletonPayload != nullptr;
+    for (const int index : indices)
+    {
+        auto found = std::find_if(m_requestedClips.begin(), m_requestedClips.end(),
+            [index](const RequestedAnimationClip& clip) { return clip.clipIndex == index; });
+        if (found == m_requestedClips.end())
+        {
+            m_requestedClips.push_back({ index });
+            found = std::prev(m_requestedClips.end());
+        }
+        if (!found->payload && !found->requested)
+        {
+            found->payload = DataSystems->TryAcquireAnimation(m_animationDescriptor,
+                static_cast<std::size_t>(index));
+            if (!found->payload)
+            {
+                found->request = DataSystems->RequestAnimationAsync(m_animationDescriptor,
+                    static_cast<std::size_t>(index));
+            }
+            found->requested = true;
+        }
+        if (!found->payload)
+        {
+            const auto result = found->request.Snapshot();
+            if (result.status == AssetDepot::AssetRequestStatus::Ready && result.asset)
+            {
+                found->payload = result.asset;
+                found->request = {};
+            }
+        }
+        if (found->payload)
+        {
+            const auto& summary = m_animationDescriptor->summary.clips[
+                static_cast<std::size_t>(index)];
+            const auto& payload = *found->payload;
+            const auto& clip = payload.clip;
+            const auto& expected = m_animationDescriptor->clips[static_cast<std::size_t>(index)];
+            const auto& skeleton = m_animationDescriptor->skeleton;
+            if (payload.origin.entry.asset.key.assetId != summary.clipAssetId || clip.name != summary.name
+                || clip.durationTicks != summary.durationTicks
+                || clip.ticksPerSecond != summary.ticksPerSecond || clip.looping != summary.looping
+                || payload.origin.entry.asset != expected.entry.asset
+                || payload.origin.blob != expected.blob
+                || payload.origin.resolverRevision != expected.resolverRevision
+                || !payload.skeleton
+                || payload.skeleton->origin.entry.asset.key.assetId != m_animationDescriptor->summary.skeletonAssetId
+                || payload.skeleton->origin.entry.asset != skeleton.entry.asset
+                || payload.skeleton->origin.blob != skeleton.blob
+                || payload.skeleton->origin.resolverRevision != skeleton.resolverRevision
+                || payload.tracks.size() != payload.skeleton->skeleton.bones.size())
+            {
+                // Fail closed once for this selection. Do not sample a clip
+                // whose metadata disagrees with the UI/controller descriptor.
+                found->payload.reset();
+                found->request = {};
+                Debug::PrintLog(spdlog::level::err,
+                    "[Animator] Animation payload does not match its exact descriptor: "
+                    + m_Motion.ToString());
+            }
+        }
+        if (!found->payload)
+        {
+            binding.ready = false;
+        }
+        binding.clips.push_back({ index, found->payload });
+    }
+    if (binding.ready && m_poseSkeletonSerial != binding.skeletonSerial)
+    {
+        // Keep the last published pose while any selected payload is pending.
+        // Change the skeleton's pose storage only at the ready capture boundary.
+        ResetAnimationPose();
+        GetInstance().boneRegions = DeriveTypedBoneRegions(m_skeletonPayload->skeleton);
+        m_poseSkeletonSerial = binding.skeletonSerial;
+    }
+    return binding;
+}
+
+void Animator::ResetAnimationPose()
+{
+    m_poseSkeletonSerial = 0;
 	auto& instance = GetInstance();
 	instance.layerTrackTables.clear();
 	instance.layerMaskCaches.clear();
@@ -219,8 +485,65 @@ void Animator::BindModelGeneration(
 	instance.blendRecoveryActive = false;
 	instance.localTransforms.clear();
 	instance.finalTransforms.clear();
-	for (auto& slot : instance.samplingCursors)
-		for (auto& cursor : slot) cursor.Clear();
+    for (auto& slot : instance.samplingCursors)
+    {
+        for (auto& cursor : slot)
+        {
+            cursor.Clear();
+        }
+    }
+    instance.boneRegions.clear();
+}
+
+bool Animator::BindModelDescriptor(
+    own::shared_owner<const assets::ModelAnimationDescriptor> descriptor,
+    own::shared_owner<const assets::ModelSkeletonPayload> skeleton)
+{
+    if (!descriptor || !skeleton || descriptor->summary.modelAssetId.value != m_Motion.m_guid ||
+        descriptor->summary.skeletonAssetId != skeleton->origin.entry.asset.key.assetId ||
+        descriptor->origin.resolverRevision != skeleton->origin.resolverRevision ||
+        descriptor->skeleton.blob != skeleton->origin.blob || skeleton->skeleton.bones.empty() ||
+        skeleton->skeleton.rootBone >= skeleton->skeleton.bones.size())
+    {
+        return false;
+    }
+    ResetAnimationPose();
+    m_descriptorRequest.Cancel();
+    m_skeletonRequest.Cancel();
+    m_descriptorRequest = {};
+    m_skeletonRequest = {};
+    m_requestedClips.clear();
+    m_modelGeneration.reset();
+    m_animationDescriptor = std::move(descriptor);
+    m_skeletonPayload = std::move(skeleton);
+    m_animationBindingMotion = m_Motion;
+    m_animationBindingInitialized = true;
+    m_granularAnimationBinding = true;
+    m_skeletonRequested = true;
+    auto& instance = GetInstance();
+    instance.layerTrackTables.clear();
+    instance.boneRegions = DeriveTypedBoneRegions(m_skeletonPayload->skeleton);
+    m_poseSkeletonSerial = GetSkeletonSerial();
+    RestoreDeferredAvatarMasks();
+    return true;
+}
+
+void Animator::BindModelGeneration(
+    assets::ModelAssetGeneration::Shared generation)
+{
+    ResetAnimationPose();
+    m_animationBindingInitialized = false;
+    m_animationBindingMotion = m_Motion;
+    m_granularAnimationBinding = false;
+    m_animationDescriptor.reset();
+    m_skeletonPayload.reset();
+    m_descriptorRequest.Cancel();
+    m_skeletonRequest.Cancel();
+    m_descriptorRequest = {};
+    m_skeletonRequest = {};
+    m_skeletonRequested = false;
+    m_requestedClips.clear();
+    auto& instance = GetInstance();
 	m_modelGeneration.reset();
 	instance.boneRegions.clear();
 	if (!generation) return;
@@ -232,7 +555,8 @@ void Animator::BindModelGeneration(
 		return;
 	}
 	instance.boneRegions = DeriveTypedBoneRegions(*skeleton);
-	m_modelGeneration = std::move(generation);
+    m_modelGeneration = std::move(generation);
+    m_poseSkeletonSerial = GetSkeletonSerial();
 }
 
 uint64 Animator::GetSkeletonSerial(bool* outViaExperiment,
@@ -242,19 +566,118 @@ uint64 Animator::GetSkeletonSerial(bool* outViaExperiment,
 	// {ModelId, SkeletonId, generation} 해시(MBC8) 하나다.
 	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
-		return TypedSkeletonSerial(*m_modelGeneration, *typedSkeleton);
+        ReportPath(outViaExperiment, outPath, GetSkeletonPath());
+        if (m_skeletonPayload && m_animationDescriptor)
+        {
+            std::uint64_t hash = 1469598103934665603ull;
+            const auto mix = [&hash](const void* data, std::size_t size)
+            {
+                const auto* bytes = static_cast<const unsigned char*>(data);
+                for (std::size_t index = 0; index < size; ++index)
+                {
+                    hash ^= bytes[index];
+                    hash *= 1099511628211ull;
+                }
+            };
+            const auto& origin = m_animationDescriptor->origin;
+            mix(&origin.mountId.value, sizeof(origin.mountId.value));
+            mix(&origin.resolverRevision, sizeof(origin.resolverRevision));
+            mix(origin.blob.contentSha256.data(), origin.blob.contentSha256.size());
+            const auto& digest = m_skeletonPayload->origin.blob.contentSha256;
+            mix(digest.data(), digest.size());
+            return hash == 0 ? 1 : hash;
+        }
+        return TypedSkeletonSerial(*m_modelGeneration, *typedSkeleton);
 	}
 	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
 	return 0;
 }
 
+bool Animator::IsSkinBindingCompatible(const assets::ModelAssetGeneration& geometry) const noexcept
+{
+    if (!m_granularAnimationBinding)
+    {
+        // Preserve the established CEMCv11 adapter. This gate specifically
+        // prevents new independent animation payloads crossing an unchecked rig.
+        return true;
+    }
+    if (!m_skeletonPayload || m_poseSkeletonSerial == 0u
+        || m_poseSkeletonSerial != GetSkeletonSerial())
+    {
+        return false;
+    }
+    const auto* legacy = geometry.Skeleton();
+    const auto& selected = m_skeletonPayload->skeleton;
+    if (!legacy || selected.bones.size() != legacy->bones.size()
+        || selected.rootBone != legacy->rootBone
+        || selected.rootTransform != legacy->rootTransform
+        || selected.globalInverseTransform != legacy->globalInverseTransform)
+    {
+        return false;
+    }
+    for (std::size_t index = 0; index < selected.bones.size(); ++index)
+    {
+        const auto& source = selected.bones[index];
+        const auto& target = legacy->bones[index];
+        if (source.name != target.name || source.parent != target.parent
+            || source.inverseBindMatrix != target.inverseBindMatrix)
+        {
+            return false;
+        }
+    }
+    // Geometry joint indices address this exact ordered table. Matching only
+    // bone count or the clip's v3 layout digest would not prove skin compatibility.
+    // Both descriptions remain borrowed under their callers' existing owners.
+    return true;
+}
+
+bool Animator::IsSkinBindingCompatible(const assets::ModelMeshDescriptor& geometry) const noexcept
+{
+    const auto* selected = TypedSkeleton();
+    if (!geometry.skinned || !geometry.skeleton || !selected
+        || m_poseSkeletonSerial == 0u || m_poseSkeletonSerial != GetSkeletonSerial()
+        || geometry.requiredBoneCount != geometry.skeleton->skeleton.bones.size()
+        || geometry.requiredSkinBindingSha256 != geometry.skeleton->skinBindingSha256
+        || (m_skeletonPayload
+            && m_skeletonPayload->skinBindingSha256 != geometry.requiredSkinBindingSha256))
+    {
+        return false;
+    }
+    const auto& bound = geometry.skeleton->skeleton;
+    if (selected->bones.size() != bound.bones.size() || selected->rootBone != bound.rootBone
+        || selected->rootTransform != bound.rootTransform
+        || selected->globalInverseTransform != bound.globalInverseTransform)
+    {
+        return false;
+    }
+    for (std::size_t index = 0; index < bound.bones.size(); ++index)
+    {
+        const auto& poseBone = selected->bones[index];
+        const auto& geometryBone = bound.bones[index];
+        if (poseBone.name != geometryBone.name || poseBone.parent != geometryBone.parent
+            || poseBone.inverseBindMatrix != geometryBone.inverseBindMatrix)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 double Animator::GetClipDuration(int clipIndex, bool* outViaExperiment,
 	AnimatorDataPath* outPath) const
 {
-	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
-	if (clipIndex < 0 || nullptr == TypedSkeleton()) return 0.0;
-	ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+    ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
+    if (m_animationDescriptor && clipIndex >= 0
+        && static_cast<std::size_t>(clipIndex) < m_animationDescriptor->summary.clips.size())
+    {
+        ReportPath(outViaExperiment, outPath, AnimatorDataPath::Granular);
+        return m_animationDescriptor->summary.clips[static_cast<std::size_t>(clipIndex)].durationTicks;
+    }
+    if (clipIndex < 0 || nullptr == TypedSkeleton())
+    {
+        return 0.0;
+    }
+	ReportPath(outViaExperiment, outPath, GetSkeletonPath());
 	const assets::ModelAnimationAsset* clip = TypedClip(clipIndex);
 	return clip ? clip->durationTicks : 0.0;
 }
@@ -264,7 +687,7 @@ std::size_t Animator::GetBoneCount(bool* outViaExperiment,
 {
 	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		ReportPath(outViaExperiment, outPath, GetSkeletonPath());
 		return typedSkeleton->bones.size();
 	}
 	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
@@ -279,7 +702,7 @@ std::string Animator::GetBoneName(int boneIndex, bool* outViaExperiment,
 	const std::size_t index = static_cast<std::size_t>(boneIndex);
 	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		ReportPath(outViaExperiment, outPath, GetSkeletonPath());
 		if (index >= typedSkeleton->bones.size()) return std::string{};
 		return typedSkeleton->bones[index].name;
 	}
@@ -292,7 +715,7 @@ int Animator::ResolveBoneIndex(const std::string& boneName,
 	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
 	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		ReportPath(outViaExperiment, outPath, GetSkeletonPath());
 		for (std::size_t index = 0; index < typedSkeleton->bones.size(); ++index)
 		{
 			if (typedSkeleton->bones[index].name == boneName)
@@ -356,7 +779,7 @@ BoneMask* Animator::BuildAvatarBoneMasks(AvatarMask& mask,
 	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
 	const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton();
 	if (nullptr == typedSkeleton) return nullptr;
-	ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+	ReportPath(outViaExperiment, outPath, GetSkeletonPath());
 	return BuildBoneMasksFrom(mask, typedSkeleton->bones.size(),
 		typedSkeleton->rootBone,
 		[typedSkeleton](std::size_t index) -> const std::string&
@@ -371,6 +794,51 @@ BoneMask* Animator::BuildAvatarBoneMasks(AvatarMask& mask,
 
 // Scene 편입/이탈은 첫 생성과 DDOL 재부착에 모두 호출된다. AnimationScheduler의
 // raw Animator* 등록도 이 수명 경계를 따라야 씬 언로드 후 다시 채워진다.
+void Animator::RestoreDeferredAvatarMasks()
+{
+    for (const auto& deferred : m_deferredAvatarMasks)
+    {
+        const auto controller = deferred.controller.lock();
+        if (!controller || !controller->m_avatarMask)
+        {
+            continue;
+        }
+        AvatarMask restored;
+        restored.ReCreateMask(controller->m_avatarMask);
+        restored.RootMask = BuildAvatarBoneMasks(restored);
+        for (std::size_t index = 0; index < deferred.bones.size(); ++index)
+        {
+            const auto& authored = deferred.bones[index];
+            BoneMask* target = nullptr;
+            if (authored.name.empty())
+            {
+                if (index < restored.m_BoneMasks.size())
+                {
+                    target = restored.m_BoneMasks[index];
+                }
+            }
+            else
+            {
+                for (BoneMask* candidate : restored.m_BoneMasks)
+                {
+                    if (candidate && candidate->boneName == authored.name)
+                    {
+                        target = candidate;
+                        break;
+                    }
+                }
+            }
+            if (target)
+            {
+                target->isEnabled = authored.enabled;
+                target->weight = authored.weight;
+            }
+        }
+        controller->ReCreateMask(&restored);
+    }
+    m_deferredAvatarMasks.clear();
+}
+
 void Animator::OnAddedToScene()
 {
 	AnimatorSystems->Register(this);
@@ -416,7 +884,14 @@ void Animator::UpdateAnimation()
 	// I6-B0 — 클립 계수는 창구가 정본이다(experiment 우선·legacy 폴백).
 	// 이전엔 m_Skeleton을 **가드 없이** 역참조했다 — 모델이 안 붙은 Animator에
 	// SetAnimation이 닿으면 그 자리에서 죽는다. 클립이 0이면 선택도 0이다.
-	const std::size_t clipCount = GetClipCount();
+    const std::size_t clipCount = GetClipCount();
+    if (m_granularAnimationBinding && !m_animationDescriptor)
+    {
+        // Do not erase an explicit selection just because metadata is pending.
+        SetSelectedClipIndex(static_cast<uint32_t>(m_AnimIndex));
+        GetInstance().timeElapsed = 0;
+        return;
+    }
 	if (0 == clipCount)
 	{
 		m_AnimIndex = 0;
@@ -801,7 +1276,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	// typed 재생 바인딩. m_Motion 복원 직후, 아래 컨트롤러 복원 **이전**이어야
 	// 한다 — AvatarMask 재생성(BuildAvatarBoneMasks)이 generation을 읽는다.
 	EnsureAnimationBinding();
-	if (FileGuid{} != m_Motion && nullptr == TypedSkeleton())
+	if (FileGuid{} != m_Motion && nullptr == TypedSkeleton() && !m_granularAnimationBinding)
 	{
 		Debug::PrintLog(spdlog::level::err, "[Animator] 모델 generation의 스켈레톤을 붙들지 못했다: "
 			+ m_Motion.ToString());
@@ -833,8 +1308,11 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 				if (layer["m_avatarMask"])
 				{
 					const auto MaskNode = layer["m_avatarMask"];
-					AvatarMask avatarMask;
-					Meta::Deserialize(&avatarMask, MaskNode);
+                    AvatarMask avatarMask;
+                    DeferredAvatarMask deferred;
+                    deferred.controller = animationController;
+                    const bool deferMask = m_granularAnimationBinding && !TypedSkeleton();
+                    Meta::Deserialize(&avatarMask, MaskNode);
 					// I5-D4e-3 — 마스크 트리 생성 창구(experiment 정본·legacy 폴백,
 					// m_BoneMasks 순서는 legacy DFS 선순 재현 — 저장분 인덱스 대응).
 					avatarMask.RootMask = BuildAvatarBoneMasks(avatarMask);
@@ -846,8 +1324,13 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 						for (const auto boneMask : boneMaskNode)
 						{
 							BoneMask authored;
-							Meta::Deserialize(&authored, boneMask);
-							BoneMask* target = nullptr;
+                            Meta::Deserialize(&authored, boneMask);
+                            if (deferMask)
+                            {
+                                deferred.bones.push_back({ authored.boneName,
+                                    authored.isEnabled, authored.weight });
+                            }
+                            BoneMask* target = nullptr;
 							if (!authored.boneName.empty())
 							{
 								for (BoneMask* candidate : avatarMask.m_BoneMasks)
@@ -864,7 +1347,11 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 							i++;
 						}
 					}
-					animationController->ReCreateMask(&avatarMask);
+                    animationController->ReCreateMask(&avatarMask);
+                    if (deferMask)
+                    {
+                        m_deferredAvatarMasks.push_back(std::move(deferred));
+                    }
 				}
 			}
 			if (layer["StateVec"])

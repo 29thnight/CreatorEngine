@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "Core.Minimal.h"
 #include "Component.h"
 
@@ -29,32 +30,32 @@ public:
     void SetORMTexture(const std::string_view& fileName);
     void SetORMTexture(const FileGuid& fileGuid);
 
-    Texture* GetDecalTexture() { return m_decalTexture; }
-    Texture* GetNormalTexture() { return m_normalTexture; }
+    const Texture* GetDecalTexture() { return m_decalTexture; }
+    const Texture* GetNormalTexture() { return m_normalTexture; }
     // Occlusion, Roughness, Metallic
-    Texture* GetORMTexture() { return m_occluroughmetalTexture; }
-	const std::shared_ptr<Texture>& GetDecalTextureShared() const { return m_decalTextureOwner; }
-	const std::shared_ptr<Texture>& GetNormalTextureShared() const { return m_normalTextureOwner; }
-	const std::shared_ptr<Texture>& GetORMTextureShared() const { return m_ormTextureOwner; }
+    const Texture* GetORMTexture() { return m_occluroughmetalTexture; }
+	const own::shared_owner<const Texture>& GetDecalTextureShared() const { return m_decalTextureOwner; }
+	const own::shared_owner<const Texture>& GetNormalTextureShared() const { return m_normalTextureOwner; }
+	const own::shared_owner<const Texture>& GetORMTextureShared() const { return m_ormTextureOwner; }
 
 private:
     std::string m_diffusefileName{};
     std::string m_normalFileName{};
     std::string m_ormFileName{};
 
-    Texture* m_decalTexture{};
-    Texture* m_normalTexture{};
-    Texture* m_occluroughmetalTexture{};
+    const Texture* m_decalTexture{};
+    const Texture* m_normalTexture{};
+    const Texture* m_occluroughmetalTexture{};
 
 	// 직렬화/인스펙터 호환 raw 별칭은 위에 남기되 실제 수명은 이 셋이 가진다.
 	[[reflgen::ignore]]
-	std::shared_ptr<Texture> m_decalTextureOwner{};
+	own::shared_owner<const Texture> m_decalTextureOwner{};
 
 	[[reflgen::ignore]]
-	std::shared_ptr<Texture> m_normalTextureOwner{};
+	own::shared_owner<const Texture> m_normalTextureOwner{};
 
 	[[reflgen::ignore]]
-	std::shared_ptr<Texture> m_ormTextureOwner{};
+	own::shared_owner<const Texture> m_ormTextureOwner{};
 
 public:
     uint32 sliceX = 1;

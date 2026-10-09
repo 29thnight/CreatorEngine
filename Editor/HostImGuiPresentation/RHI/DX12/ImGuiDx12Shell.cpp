@@ -74,6 +74,7 @@ struct ImGuiDx12Shell::Impl
         uint64_t textureId{ 0 };
         uint64_t lastUsedFrame{ 0 };
         bool uploaded{ false };
+        bool initialized{ false };
     };
     std::unordered_map<uint64_t, TextureSlot> textureSlots;
 
@@ -604,11 +605,18 @@ void ImGuiDx12Shell::Resize(uint32_t width, uint32_t height)
     }
 }
 
-uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
+uint64_t ImGuiDx12Shell::RegisterTexture(const Texture* texture,
+    const own::shared_owner<const Texture::CodecImage>& image)
 {
     Impl& impl = *m_impl;
-    if (!impl.active) return 0;
-    if (nullptr == texture) return impl.fallbackTextureId;
+    if (!impl.active)
+    {
+        return 0;
+    }
+    if (nullptr == texture)
+    {
+        return impl.fallbackTextureId;
+    }
 
     const uint64_t assetId = static_cast<uint64_t>(texture->m_assetId.m_ID_Data);
     auto found = impl.textureSlots.find(assetId);
@@ -616,7 +624,10 @@ uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
     {
         D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
         D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-        if (!impl.AllocateSlot(cpu, gpu)) return impl.fallbackTextureId;
+        if (!impl.AllocateSlot(cpu, gpu))
+        {
+            return impl.fallbackTextureId;
+        }
         impl.WriteNullSrv(cpu);
 
         Impl::TextureSlot slot{};
@@ -628,45 +639,87 @@ uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
 
     Impl::TextureSlot& slot = found->second;
     slot.lastUsedFrame = impl.frameIndex;
+    const bool previousReady = slot.uploaded && impl.textureCache.IsResident(texture);
+    slot.uploaded = previousReady;
 
-    // 프레임 밖에서 온 등록은 안정 슬롯만 예약한다. 다음 표시 프레임의 같은
-    // 호출이 실제 업로드를 수행하므로 Texture*를 대기열에 보관하지 않는다.
+    // Outside a frame, reserve only the slot. The caller retains any prepared
+    // payload; no raw descriptor or borrowed rows enter a deferred upload queue.
     if (impl.frameOpen)
     {
         std::string uploadError;
-        const auto entry = impl.textureCache.GetOrUpload(texture, uploadError);
-        if (entry.IsValid() && !slot.uploaded)
+        const auto entry = impl.textureCache.GetOrUpload(texture, image, uploadError);
+        if (!uploadError.empty())
         {
+            // Error fallbacks may be valid white entries. Never install one over
+            // the last good SRV or classify it as a completed thumbnail upload.
+            std::printf("[ImGui] DX12 사용자 텍스처 업로드 실패: %s\n",
+                uploadError.c_str());
+            return previousReady ? slot.textureId : impl.fallbackTextureId;
+        }
+        if (entry.preparationNeeded || !entry.IsValid())
+        {
+            return previousReady ? slot.textureId : impl.fallbackTextureId;
+        }
+        if (!previousReady)
+        {
+            ID3D12Resource* resource = impl.resources.Resolve(entry.handle);
+            if (resource == nullptr)
+            {
+                return impl.fallbackTextureId;
+            }
+            if (slot.initialized)
+            {
+                // Older submissions may still read the prior descriptor even
+                // after logical cache eviction. Never overwrite that slot.
+                D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+                D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
+                if (!impl.AllocateSlot(cpu, gpu))
+                {
+                    return impl.fallbackTextureId;
+                }
+                try
+                {
+                    impl.pendingFrameRetirements.push_back(
+                        Impl::RetiredDescriptor{ slot.textureId, {} });
+                }
+                catch (...)
+                {
+                    impl.FreeSlot(gpu);
+                    throw;
+                }
+                slot.cpu = cpu;
+                slot.textureId = gpu.ptr;
+            }
             D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
             desc.Format = ToDXGI(entry.format);
             desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
             desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             desc.Texture2D.MipLevels = entry.mipLevels;
             impl.resources.GetDevice()->CreateShaderResourceView(
-                impl.resources.Resolve(entry.handle), &desc, slot.cpu);
+                resource, &desc, slot.cpu);
+            slot.initialized = true;
             slot.uploaded = true;
         }
-        else if (!uploadError.empty())
-        {
-            std::printf("[ImGui] DX12 사용자 텍스처 업로드 실패: %s\n",
-                uploadError.c_str());
-        }
+        return slot.textureId;
     }
 
-    return slot.textureId;
+    return previousReady ? slot.textureId : impl.fallbackTextureId;
 }
 
-bool ImGuiDx12Shell::IsTextureReady(Texture* texture) const
+bool ImGuiDx12Shell::IsTextureReady(const Texture* texture) const
 {
     const Impl& impl = *m_impl;
-    if (!impl.active || nullptr == texture) return false;
+    if (!impl.active || nullptr == texture)
+    {
+        return false;
+    }
 
-    // ★ 슬롯이 있다는 것과 올라갔다는 것은 다르다. RegisterTexture가 프레임
-    //   밖에서 불리면 슬롯을 잡고 null SRV를 써 두므로, 슬롯의 존재만 보면
-    //   빈 그림을 "준비됐다"로 읽는다. uploaded가 그 둘을 가른다.
+    // A slot can outlive cache eviction or an aborted upload. Never hand its
+    // stale SRV to ImGui after the cache has relinquished the native allocation.
     const auto found = impl.textureSlots.find(
         static_cast<uint64_t>(texture->m_assetId.m_ID_Data));
-    return found != impl.textureSlots.end() && found->second.uploaded;
+    return found != impl.textureSlots.end() && found->second.uploaded
+        && impl.textureCache.IsResident(texture);
 }
 
 uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue,

@@ -67,7 +67,7 @@ struct Session
     bool confirmReload = false;
     bool previewPinned = false;
     std::chrono::steady_clock::time_point previewVisible{};
-    std::shared_ptr<const material_graph::SceneMaterialSource> previewSource;
+    own::shared_owner<const material_graph::SceneMaterialSource> previewSource;
     std::uint64_t previewRevision = 0;
 
     Session(EntityHandle object, const MeshRenderer& renderer, FileGuid identity, std::filesystem::path source,
@@ -271,7 +271,7 @@ struct Session
         }
         const auto before = renderer->m_Material;
         const auto previousBase = renderer->m_materialBaseGuid;
-        auto candidate = before ? std::make_shared<Material>(*before) : std::make_shared<Material>();
+        auto candidate = before ? own::make_shared<Material>(*before) : own::make_shared<Material>();
         material_graph::InstanceDescription description;
         if (before && before->HasMaterialGraph() &&
             before->GetMaterialGraphInstance()->description.graphId.value == guid.m_guid)
@@ -285,7 +285,7 @@ struct Session
             message = "Apply failed. Scene and preview keep the last accepted material. " + message;
             return false;
         }
-        const auto apply = [handle = target, identity = component](const std::shared_ptr<Material>& material,
+        const auto apply = [handle = target, identity = component](const own::shared_owner<Material>& material,
                                                                    FileGuid base) {
             auto* scene = SceneManagers->GetActiveScene();
             auto* object = scene ? scene->Resolve(handle) : nullptr;
@@ -388,7 +388,7 @@ std::mutex sessionMutex;
 std::vector<std::unique_ptr<Session>> sessions;
 Session* active = nullptr;
 std::uint64_t previewSerial = 0;
-std::shared_ptr<const material_graph::SceneMaterialSource> inspectorPreview;
+own::shared_owner<const material_graph::SceneMaterialSource> inspectorPreview;
 std::uint64_t inspectorPreviewRevision{};
 std::chrono::steady_clock::time_point inspectorPreviewVisible{};
 std::uint32_t observedSceneId{};
@@ -433,7 +433,7 @@ void ReconcileSceneLocked()
     });
 }
 
-std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> previewFloor;
+std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> previewFloor;
 std::string previewFloorError;
 
 bool PreparePreviewFloor()
@@ -473,7 +473,8 @@ void RefreshPreview(Session& session)
     auto source = renderer && renderer->m_Material
                       ? material_graph::SceneMaterialSource::Capture(*renderer->m_Material) : nullptr;
     if (!source || !source->instance) { session.previewSource.reset(); return; }
-    if (!session.previewSource || session.previewSource->instance != source->instance ||
+    if (!session.previewSource || !session.previewSource->instance ||
+        std::addressof(*session.previewSource->instance) != std::addressof(*source->instance) ||
         session.previewSource->coverage.flags != source->coverage.flags)
     {
         session.previewSource = std::move(source);
@@ -946,7 +947,8 @@ void DrawInspectorPreview(MeshRenderer& renderer)
         ImGui::TextDisabled("Apply a Surface graph to preview this material.");
         return;
     }
-    if (!inspectorPreview || inspectorPreview->instance != source->instance ||
+    if (!inspectorPreview || !inspectorPreview->instance ||
+        std::addressof(*inspectorPreview->instance) != std::addressof(*source->instance) ||
         inspectorPreview->coverage.flags != source->coverage.flags)
     {
         inspectorPreview = std::move(source);

@@ -29,8 +29,8 @@ namespace
 
     struct UiRhiFixture
     {
-        Texture* redTexture{ nullptr };
-        Texture* blueTexture{ nullptr };
+        own::shared_owner<const Texture> redTexture;
+        own::shared_owner<const Texture> blueTexture;
         std::vector<EnhancedUIPass::Rect> baseRects;
         std::vector<EnhancedUIPass::Rect> texturedRects;
 
@@ -90,15 +90,10 @@ namespace
                 rect.right = rect.left + 40.f;
                 rect.bottom = 200.f;
                 rect.color = { 1.f, 1.f, 1.f, 1.f };
-                rect.texture = (0 == (i & 1u)) ? redTexture : blueTexture;
+                const auto& texture = (0 == (i & 1u)) ? redTexture : blueTexture;
+                rect.texture = texture ? &*texture.borrow() : nullptr;
                 texturedRects.push_back(rect);
             }
-        }
-
-        ~UiRhiFixture()
-        {
-            delete redTexture;
-            delete blueTexture;
         }
 
         bool IsValid() const

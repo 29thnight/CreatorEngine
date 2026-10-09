@@ -33,7 +33,9 @@
 //   않기 때문이다 — DX12 는 표시 프레임 밖 호출에서 슬롯만 잡고 null SRV 를 써
 //   두므로 업로드 전에도 0 이 아닌 ID 가 나온다. 그 ID 로 그리면 한 프레임
 //   **빈 그림**이 나온다. 그래서 상태가 하나 더 있다(`awaiting_upload`):
-//   Texture 는 섰지만 아직 안 올라간 구간이다.
+//   Texture 는 섰지만 아직 안 올라간 구간이다. CodecImage owner를 업로드의
+//   동기 row copy까지 명시적으로 붙든다. 생성 썸네일은 재생성 입력을 보존하지
+//   않으므로 descriptor에도 non-rehydratable image pin이 남는다.
 //
 //   그 구간에서 `EditorImGuiTexture::Prime` 으로 **그리지 않고 등록만** 한다.
 //   이것이 없으면 교착이다 — 준비될 때까지 아이콘만 그리는 타일은 썸네일
@@ -167,7 +169,7 @@ namespace editor
     /// `visible` 은 지금 화면에 보이는 타일인가다 — 계약의 "가시 타일 우선
     /// 요청". clipping 이 건너뛴 행은 묻지 않으므로 사실상 전부 참이지만,
     /// 목록이 그것을 보장하지 않으므로 인자로 받는다.
-    Texture* thumbnail_acquire(const thumbnail_key& key,
+    const Texture* thumbnail_acquire(const thumbnail_key& key,
                                const thumbnail_fs::path& source,
                                bool visible);
 

@@ -119,8 +119,8 @@ Vector SceneTransmissionIntegral(const MaterialProbe::Reference::Material& glass
 
 void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                        std::shared_ptr<Texture> image, std::shared_ptr<Texture> cube,
-                        const std::shared_ptr<const Instance>& background)
+                        own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
+                        const own::shared_owner<const Instance>& background)
 {
     const std::array products{RefractionProduct(root, false), RefractionProduct(root, true),
                               RefractionProduct(root, false, true)};
@@ -128,7 +128,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     experiment::AssetId graphId;
     Check(Uuid::TryParse("88888888-8888-4888-8888-888888888888", graphId.value), "Refraction graph identity");
     std::string error;
-    std::array<std::shared_ptr<const Generation>, 3> generations;
+    std::array<own::shared_owner<const Generation>, 3> generations;
     for (unsigned i = 0; i < generations.size(); ++i)
     {
         generations[i] = store.Load(
@@ -184,7 +184,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const double ior = fixture == 0 ? 1 : 1.5;
             const double roughness = fixture == 2 ? .5 : fixture == 6 ? .2 : 0;
             const double transmission = fixture == 6 ? .5 : 1;
-            std::shared_ptr<const Instance> instance;
+            own::shared_owner<const Instance> instance;
             Check(BuildInstance(
                       generations[fixture == 6   ? 1
                                   : fixture == 7 ? 2
@@ -249,14 +249,14 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             }
             context.draws = &oldDraws;
             const std::array draws{glass.draw, backdrop.draw};
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 92, 1, 24, 24, camera}, draws, {}, input,
                                        error),
                   "Refraction Scene seal " + error);
             Check(device.BeginFrame(error), "Refraction frame begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload(cube.get(), error).handle;
+            const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) && forward.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);

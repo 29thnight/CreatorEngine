@@ -1,3 +1,4 @@
+#include "../../../../../Tools/regression/material_owner_checks.h"
 #include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/ShaderReflectionSelfTest.h"
@@ -12,6 +13,7 @@
 #include "Render/Scene/EnhancedDrawReplayInput.h"
 #include "Render/Scene/EnhancedLatticeReplayInput.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
+#include "Render/Core/PassResourceRetirement.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Passes/Geometry/EnhancedDeferredPass.h"
 #include "MaterialGraphSceneLookup.h"
@@ -54,6 +56,7 @@
 #include "CameraComponent.h"
 #include "Render/Core/EnhancedLightPacking.h"
 #include "Texture.h"
+#include "TextureFramePins.h"
 #include "PrimitiveRenderProxy.h"
 #include "BoneRegion.h" // kMaxBones
 #include "DataSystem.h"
@@ -485,7 +488,7 @@ passes:
         bool ReserveUploadBatch(std::span<const RHIUploadRequest>,
             std::span<RHIBufferSlice>, std::string&) override { return false; }
         RHIBufferSlice AllocateUpload(const RHIUploadRequest&) override { return {}; }
-        uint64_t GetCurrentUploadRecordingId() const override { return 1; }
+        uint64_t GetCurrentUploadRecordingId() const override { return currentRecording; }
         void RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
         {
             listeners.push_back(listener);
@@ -494,11 +497,12 @@ passes:
         {
             std::erase(listeners, listener);
         }
-        void AcceptRecording()
+        void AcceptRecording(RHICompletionPoint completion = {1})
         {
+            const auto recording = GetCurrentUploadRecordingId();
             for (auto* listener : listeners)
             {
-                listener->OnUploadAccepted(GetCurrentUploadRecordingId(), {1});
+                listener->OnUploadAccepted(recording, completion);
             }
         }
         std::vector<IRHIUploadTransactionListener*> listeners;
@@ -514,8 +518,16 @@ passes:
         RHIRenderTargetBinding CreateRenderTargets(
             std::span<const RHIColorTargetDesc>, const RHIDepthTargetDesc*) override { return {}; }
         RHITextureInfo DescribeTexture(RHITextureHandle) const override { return {}; }
-        void ReleaseTexture(RHITextureHandle) override {}
-        void ReleaseBuffer(RHIBufferHandle) override {}
+        void ReleaseTexture(RHITextureHandle handle) override
+        {
+            if (textureReleaseFailures)
+            {
+                --textureReleaseFailures;
+                throw 1;
+            }
+            releasedTextures.push_back(handle);
+        }
+        void ReleaseBuffer(RHIBufferHandle handle) override { releasedBuffers.push_back(handle); }
         void TransitionResources(std::span<const RHITransition>) override {}
         void TransitionBuffers(std::span<const RHIBufferTransition>) override {}
 
@@ -587,10 +599,155 @@ passes:
         }
 
         R6bFakeReadbackEncoder encoder;
+        uint64_t currentRecording{ 1 };
+        std::vector<RHITextureHandle> releasedTextures;
+        std::vector<RHIBufferHandle> releasedBuffers;
+        uint32_t textureReleaseFailures{};
         uint32_t nextHandle{ 100 };
         uint32_t liveReadbacks{ 0 };
         uint32_t releasedReadbacks{ 0 };
     };
+
+    bool ValidatePassResourceRetirement(std::string& error)
+    {
+        const auto fail = [&](const char* reason) { error = reason; return false; };
+        const auto texture = [](uint32_t slot) { return RHITextureHandle{RHIHandleBits::Encode(slot, 1)}; };
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            retirement.ReserveRetirements(4);
+            auto* listener = services.listeners.front();
+            retirement.Retire(texture(1));
+            services.AcceptRecording({7});
+            // The retirement listener has already run, as it does before IBL's
+            // acceptance callback. The device can still report the old recording.
+            retirement.RetireAccepted(texture(2), {7});
+            retirement.Retire(texture(3));
+            services.currentRecording = 2;
+            retirement.RetireAccepted(texture(4), {7});
+            listener->OnUploadCompleted(6);
+            if (retirement.PendingCount() != 4 || !services.releasedTextures.empty())
+                return fail("accepted targets released before their exact completion");
+            listener->OnUploadCompleted(7);
+            listener->OnUploadAborted(1);
+            listener->OnUploadCompleted(8);
+            if (retirement.PendingCount() || services.releasedTextures.size() != 4)
+                return fail("post-accept retirement missed its decision or released twice");
+            for (uint32_t i = 0; i < 4; ++i)
+                if (services.releasedTextures[i] != texture(i + 1))
+                    return fail("retirement did not preserve the exact native handles");
+            retirement.ClearAfterIdle();
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            auto* listener = services.listeners.front();
+            retirement.Retire(texture(1));
+            retirement.Retire(texture(2));
+            services.AcceptRecording({7});
+            services.textureReleaseFailures = 1;
+            listener->OnUploadCompleted(7);
+            if (retirement.PendingCount() != 1 || services.releasedTextures.size() != 1
+                || services.releasedTextures.front() != texture(2))
+                return fail("one release exception interrupted collection of other owners");
+            listener->OnUploadCompleted(7);
+            if (retirement.PendingCount() || services.releasedTextures.size() != 2
+                || services.releasedTextures.back() != texture(1))
+                return fail("failed release lost its retained handle before retry");
+            retirement.ClearAfterIdle();
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            retirement.ReserveRetirements(4);
+            auto* listener = services.listeners.front();
+            retirement.Retire(texture(1));
+            services.AcceptRecording({});
+            retirement.RetireAccepted(texture(2), {});
+            retirement.Retire(RHIBufferHandle{RHIHandleBits::Encode(3, 1)});
+            listener->OnUploadAborted(1);
+            listener->OnUploadSubmissionRejected(1, {});
+            listener->OnUploadCompleted(UINT64_MAX);
+            services.currentRecording = 2;
+            retirement.Retire(texture(4));
+            listener->OnUploadSubmissionRejected(2, {9});
+            listener->OnUploadCompleted(UINT64_MAX);
+            if (retirement.PendingCount() != 4 || !services.releasedTextures.empty()
+                || !services.releasedBuffers.empty())
+                return fail("accepted completion zero escaped idle quarantine");
+            retirement.ClearAfterIdle();
+            if (retirement.PendingCount() || services.releasedTextures.size() != 3
+                || services.releasedBuffers.size() != 1)
+                return fail("idle teardown did not release quarantined native owners");
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            auto* listener = services.listeners.front();
+            uint32_t accepted = 0, rejected = 0;
+            struct AcceptanceProbe final : IRHIUploadTransactionListener
+            {
+                uint32_t count{};
+                void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
+                void OnUploadCompleted(uint64_t) override {}
+                void OnUploadAborted(uint64_t) override {}
+                void OnUploadAccepted(uint64_t, RHICompletionPoint) override { ++count; }
+            } probe;
+            services.RegisterUploadTransactionListener(&probe);
+            retirement.WatchRecording([&] { ++rejected; }, [&]
+            {
+                ++accepted;
+                services.currentRecording = 2;
+                retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+                throw 1;
+            });
+            retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+            services.AcceptRecording({5});
+            listener->OnUploadAborted(1);
+            listener->OnUploadSubmissionRejected(1, {5});
+            if (accepted != 2 || rejected || probe.count != 1)
+                return fail("throwing accepted watch interrupted or rolled back acceptance");
+            services.AcceptRecording({6});
+            if (accepted != 3 || rejected || probe.count != 2)
+                return fail("reentrant watch registration lost its next recording decision");
+            services.UnregisterUploadTransactionListener(&probe);
+            retirement.ClearAfterIdle();
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            auto* listener = services.listeners.front();
+            uint32_t rejected = 0, accepted = 0;
+            services.AcceptRecording({3});
+            services.currentRecording = 2;
+            retirement.Retire(texture(1));
+            retirement.WatchRecording([&] { ++rejected; throw 1; }, [&] { ++accepted; });
+            retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+            listener->OnUploadSubmitted(2, {9});
+            listener->OnUploadSubmissionRejected(2, {9});
+            listener->OnUploadAborted(2);
+            listener->OnUploadCompleted(2);
+            if (rejected != 2 || accepted || retirement.PendingCount() != 1
+                || !services.releasedTextures.empty())
+                return fail("genuine rejection did not consume rollback watches exactly once");
+            listener->OnUploadCompleted(3);
+            if (retirement.PendingCount() || services.releasedTextures.size() != 1)
+                return fail("rejected reservation replaced the preceding accepted completion");
+            services.currentRecording = 3;
+            retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+            services.AcceptRecording({10});
+            if (accepted != 1 || rejected != 2)
+                return fail("rejection prevented a clean retry recording");
+            retirement.ClearAfterIdle();
+        }
+        error.clear();
+        return true;
+    }
 
     bool ValidateRg1GraphFixtures(std::string& error)
     {
@@ -1107,12 +1264,14 @@ passes:
         frame.frameId = 1;
         // A closed tetrahedron and retained synthetic material identify two media.
         // These fixtures compile declarations; they do not dispatch material coefficients.
-        auto generation = std::make_shared<Generation>();
-        generation->generation = 1;
-        generation->cooked.product.program.volume = true;
-        auto instance = std::make_shared<Instance>();
-        instance->generation = generation;
-        instance->description.graphId = generation->assetId;
+        Generation generationValue;
+        generationValue.generation = 1;
+        generationValue.cooked.product.program.volume = true;
+        const auto generation = own::make_shared<const Generation>(std::move(generationValue));
+        Instance instanceValue;
+        instanceValue.generation = generation;
+        instanceValue.description.graphId = generation->assetId;
+        const auto instance = own::make_shared<const Instance>(std::move(instanceValue));
         EnhancedDrawItem draw{};
         draw.geometryKey = 1;
         draw.materialGraphInstance = instance;
@@ -1154,7 +1313,7 @@ passes:
         SceneInputView view{1, 1, 1, 1, 4, 4};
         view.camera.view = math::matrix4x4::identity();
         view.camera.projection = math::matrix4x4::identity();
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         if (!SceneViewInput::Seal(view, draws, {}, input, error))
         {
             return false;
@@ -1179,8 +1338,11 @@ passes:
         {
             return false;
         }
-        auto bindings = std::make_shared<RenderBindings>();
-        bindings->instance = instance;
+        auto bindings = own::make_shared<RenderBindings>();
+        auto instancePins = own::make_shared<InstanceFramePins>();
+        bindings->instancePinIndex = instancePins->Retain(instance);
+        bindings->instance = instancePins->Borrow(bindings->instancePinIndex);
+        bindings->instancePins = std::move(instancePins);
         const auto constants = resources.UploadConstants(normal.data(), sizeof(normal));
         const SceneVolumeBinding binding{bindings, coefficientFixture.GetGeneration(), constants};
         const std::array<SceneVolumeBinding, 2> coefficientBindings{binding, binding};
@@ -3200,6 +3362,13 @@ bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& ou
 
 bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& outLog)
 {
+    std::string retirementError;
+    if (!ValidatePassResourceRetirement(retirementError))
+    {
+        outLog += "[common] pass resource retirement failed: " + retirementError + "\n";
+        return false;
+    }
+    outLog += "[common] pass retirement acceptance, quarantine, and retry contracts passed\n";
     if (!ValidateCompletionRetireQueue())
     {
         outLog += "[공통] completion retire queue 경계 검증 실패\n";
@@ -3641,7 +3810,7 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         {
             const file::path scenePath = file::path(modelPath);
             // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
-            const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
+            const assets::ModelAssetGeneration::Shared sceneModel =
                 DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
             std::vector<RHIModelMeshView> sceneMeshes;
             uint64_t sceneUploadBytes = 0;
@@ -4079,7 +4248,7 @@ static bool ValidateBase0CameraReplay(std::string& error)
 
 static bool ValidateBase0DrawReplay(std::string& error)
 {
-    std::array<float, 16> vertex{};
+    std::array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{};
     std::array<uint32_t, 3> indices{0,0,0};
     auto bone=math::matrix4x4::identity();
     EnhancedDrawItem item;
@@ -4150,7 +4319,7 @@ static bool ValidateBase0DrawReplay(std::string& error)
 
 static bool ValidateBase0LatticeReplay(std::string& error)
 {
-    std::array<float,16> vertex{}; std::array<uint32_t,3> indices{0,0,0};
+    std::array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{}; std::array<uint32_t,3> indices{0,0,0};
     EnhancedDrawItem item;
     assets::TryParseCanonicalUuidV8("11111111-1111-8111-8111-111111111111",item.modelMeshView.handle.modelId);
     assets::TryParseCanonicalUuidV8("22222222-2222-8222-8222-222222222222",item.modelMeshView.handle.meshId);
@@ -4159,27 +4328,42 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     item.modelMeshView.vertexAttributeMask=assets::kCoreVertexAttributes;
     item.modelMeshView.vertexLayoutHash=assets::VertexLayoutHash(assets::kCoreVertexAttributes);
     item.modelMeshView.indexData=indices.data(); item.modelMeshView.indexCount=3; item.materialGraphSlot=7;
-    auto generation=std::make_shared<material_graph::Generation>();
-    experiment::TryParseCanonicalAssetId("11111111-1111-4111-8111-111111111111",generation->assetId);
-    generation->generation=1; auto& product=generation->cooked.product;
-    product.program.semanticKey="base0-native-lattice-fixture";
-    const auto parameter=[&](LX::Id id,LX::PinType type,LX::LXSocketValue value,uint32_t offset,uint32_t bytes) {
-        LX::LXMaterialParameter p; p.id=id; p.type=type; p.value=std::move(value); p.identifier="param"+std::to_string(id); p.exposed=true;
-        product.program.parameters.push_back(p); product.layout.parameters.push_back({p,offset,bytes});
-    };
-    parameter(900,LX::PinType::Float,0.5,0,4); parameter(902,LX::PinType::Bool,true,4,4);
-    parameter(903,LX::PinType::Int,int64_t(7),8,4);
-    parameter(904,LX::PinType::Vector,std::array<double,3>{1,2,3},12,12);
-    parameter(905,LX::PinType::Color,std::array<double,4>{1,.5,.25,1},24,16);
-    product.layout.uniformBytes=40;
-    experiment::AssetId textureId;
-    experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222",textureId);
-    LX::LXMaterialResource resource; resource.slot=0; resource.reference=Uuid::ToString(textureId.value); resource.colorSpace=LX::LXColorSpace::Data;
-    product.layout.textures.push_back(resource);
+    material_graph::Generation generationValue;
+    experiment::TryParseCanonicalAssetId("11111111-1111-4111-8111-111111111111", generationValue.assetId);
+    generationValue.generation = 1;
+    {
+        auto& product = generationValue.cooked.product;
+        product.program.semanticKey = "base0-native-lattice-fixture";
+        const auto parameter = [&](LX::Id id, LX::PinType type, LX::LXSocketValue value,
+                                   uint32_t offset, uint32_t bytes) {
+            LX::LXMaterialParameter p;
+            p.id = id;
+            p.type = type;
+            p.value = std::move(value);
+            p.identifier = "param" + std::to_string(id);
+            p.exposed = true;
+            product.program.parameters.push_back(p);
+            product.layout.parameters.push_back({p, offset, bytes});
+        };
+        parameter(900, LX::PinType::Float, 0.5, 0, 4);
+        parameter(902, LX::PinType::Bool, true, 4, 4);
+        parameter(903, LX::PinType::Int, int64_t(7), 8, 4);
+        parameter(904, LX::PinType::Vector, std::array<double, 3>{1, 2, 3}, 12, 12);
+        parameter(905, LX::PinType::Color, std::array<double, 4>{1, .5, .25, 1}, 24, 16);
+        product.layout.uniformBytes = 40;
+        experiment::AssetId textureId;
+        experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222", textureId);
+        LX::LXMaterialResource resource;
+        resource.slot = 0;
+        resource.reference = Uuid::ToString(textureId.value);
+        resource.colorSpace = LX::LXColorSpace::Data;
+        product.layout.textures.push_back(resource);
+    }
+    const auto generation = own::make_shared<const material_graph::Generation>(std::move(generationValue));
     const uint32_t pixel=0xff4080c0;
-    auto texture=std::shared_ptr<Texture>(Texture::CreateFromPixels(1,1,"base0-lattice-owner",RHIFormat::RGBA8Unorm,&pixel));
+    auto texture=Texture::CreateFromPixels(1,1,"base0-lattice-owner",RHIFormat::RGBA8Unorm,&pixel);
     material_graph::InstanceDescription description; description.graphId=generation->assetId;
-    std::shared_ptr<const material_graph::Instance> source;
+    own::shared_owner<const material_graph::Instance> source;
     if(!texture || !material_graph::BuildInstance(generation,description,[&](const auto&,auto,std::string&){return texture;},source,error)) return false;
     item.materialGraphInstance=source;
     std::array<EnhancedDrawItem,2> graph{item,item};
@@ -4210,7 +4394,7 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     bad=bytes; std::fill_n(bad.begin()+48,16,0); if(!reject(bad,true)) return false;
     const auto rejectApply=[&](EnhancedLatticeReplayInput badInput) {
         std::string why;
-        return !badInput.Apply(graph,why) && !why.empty() && graph[0].materialGraphInstance==source && graph[1].materialGraphInstance==source;
+        return !badInput.Apply(graph,why) && !why.empty() && material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, source) && material_graph_test::SamePinnedObject(graph[1].materialGraphInstance, source);
     };
     auto mutation=sealed; mutation.draws[0].program^=1; if(!rejectApply(mutation)) return false;
     mutation=sealed; mutation.draws[0].textures[0].content^=1; if(!rejectApply(mutation)) return false;
@@ -4220,10 +4404,14 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     mutation=sealed; mutation.draws[0].description.parameters[0].value=.25;
     mutation.draws[1].description.graphId.value.data[0]^=1; if(!rejectApply(mutation)) return false; // late rejection is atomic
     for(auto& d:accepted.draws) d.description.parameters[0].value=.25;
-    if(!accepted.Apply(graph,error) || graph[0].materialGraphInstance==source
-        || graph[0].materialGraphInstance!=graph[1].materialGraphInstance
-        || graph[0].materialGraphInstance->generation!=generation
-        || graph[0].materialGraphInstance->textures[0].owner!=texture) return false;
+    if(!accepted.Apply(graph,error) || material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, source)
+        || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, graph[1].materialGraphInstance)
+        || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance->generation, generation)
+        || !graph[0].materialGraphInstance->textures[0].owner
+        || graph[0].materialGraphInstance->textures[0].owner->m_assetId != texture->m_assetId)
+    {
+        return false;
+    }
     float replayed{}; std::memcpy(&replayed,graph[0].materialGraphInstance->uniforms.data(),sizeof(replayed));
     if(replayed!=.25f || source->uniforms==graph[0].materialGraphInstance->uniforms) return false;
     error.clear(); return true;
@@ -5193,6 +5381,9 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
     // 큐 하나를 드로우 목록으로 옮긴다. deferred와 forward가 같은 복사
     // 규칙을 쓰므로 함수로 뽑았다 — 두 곳에 같은 코드를 두면 한쪽만 고치고
     // 다른 쪽을 잊는 부류의 버그가 생긴다.
+    // This isolated legacy draw fixture has no sealed material packet. Its
+    // owner table pins every texture alias until all render probes finish.
+    auto sceneTexturePins = own::make_shared<TextureFramePins>();
     const auto copyQueue = [&](const auto& queue,
         std::vector<EnhancedDrawItem>& deferred,
         std::vector<EnhancedDrawItem>& forward)
@@ -5282,12 +5473,16 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
 
             // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
             bool isTransparent = false;
-            if (auto* material = proxy->m_Material.get())
+            if (const auto* material = proxy->m_Material ? &*proxy->m_Material.borrow() : nullptr)
             {
-		item.baseColor = material->GetBaseColorMapShared().get();
-		item.normalMap = material->GetNormalMapShared().get();
-		item.occRoughMetal = material->GetOccRoughMetalMapShared().get();
-		item.emissive = material->GetEmissiveMapShared().get();
+                const auto pinTexture = [&](const own::shared_owner<const Texture>& owner)
+                {
+                    return sceneTexturePins->Borrow(sceneTexturePins->Retain(owner));
+                };
+                item.baseColor = pinTexture(material->GetBaseColorMapShared());
+                item.normalMap = pinTexture(material->GetNormalMapShared());
+                item.occRoughMetal = pinTexture(material->GetOccRoughMetalMapShared());
+                item.emissive = pinTexture(material->GetEmissiveMapShared());
 
                 item.baseColorFactor = material->m_materialInfo.m_baseColor;
                 item.metallic = material->m_materialInfo.m_metallic;
@@ -5362,7 +5557,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             + " · 큐 " + std::to_string(flat.size()) + "\n";
 
         uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
-            flat.data(), flat.size(), uiRects);
+            flat.data(), flat.size(), uiRects, &*sceneTexturePins.borrow());
     }
 
     if (report) { report->drawCandidates = draws.size(); report->lights = lights.size(); }
@@ -5474,7 +5669,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         outLog += "[2/4] UI 초기화 실패: " + error + "\n";
         return false;
     }
-    uiPass.SetRects(&uiRects);
+    uiPass.SetRects(&uiRects, sceneTexturePins);
 
     EnhancedPostChainPass postChain;
     if (!postChain.Initialize(frameContext, error))
@@ -6266,9 +6461,9 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         //   가려 09-17 까지 아무도 이 줄에 닿지 못했다.
         const uint8_t keyPixelA[4] = { 255, 0, 0, 255 };
         const uint8_t keyPixelB[4] = { 0, 0, 255, 255 };
-        auto* keyTextureA = Texture::CreateFromPixels(1, 1, "sceneKeyA",
+        auto keyTextureA = Texture::CreateFromPixels(1, 1, "sceneKeyA",
             RHIFormat::RGBA8Unorm, keyPixelA);
-        auto* keyTextureB = Texture::CreateFromPixels(1, 1, "sceneKeyB",
+        auto keyTextureB = Texture::CreateFromPixels(1, 1, "sceneKeyB",
             RHIFormat::RGBA8Unorm, keyPixelB);
 
         if (nullptr != keyTextureA && nullptr != keyTextureB)
@@ -6276,11 +6471,11 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             std::vector<EnhancedDrawItem> sameMeshDraws;
 
             EnhancedDrawItem first = draws.front();
-            first.baseColor = keyTextureA;
+            first.baseColor = (keyTextureA ? &*keyTextureA.borrow() : nullptr);
             sameMeshDraws.push_back(first);
 
             EnhancedDrawItem variant = draws.front();   // 메시는 같다
-            variant.baseColor = keyTextureB;            // 재질만 다르다
+            variant.baseColor = (keyTextureB ? &*keyTextureB.borrow() : nullptr);            // 재질만 다르다
             sameMeshDraws.push_back(variant);
 
             frameContext.draws = &sameMeshDraws;
@@ -6309,8 +6504,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             frameContext.draws = &draws;
         }
 
-        Memory::SafeDelete(keyTextureA);
-        Memory::SafeDelete(keyTextureB);
+        keyTextureA.reset();
+        keyTextureB.reset();
     }
 
     step("[4/4] 정반사");
@@ -6482,15 +6677,18 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         // 4x4 텍스처를 여러 개 만들어 복제마다 돌려 쓴다. 픽셀 내용은 상관없다
         // — 재질 키가 포인터라 객체가 다르기만 하면 배치가 갈린다.
         constexpr uint32_t kMaterialVariants = 64;
-        std::vector<Texture*> variantTextures;
+        std::vector<own::shared_owner<const Texture>> variantTextures;
         variantTextures.reserve(kMaterialVariants);
         for (uint32_t index = 0; index < kMaterialVariants; ++index)
         {
             // 신원만 필요하지만 CPU 픽셀은 있어야 한다(위 재질 키잉 주석 참조).
             const uint8_t pixel[4] = { static_cast<uint8_t>(index * 4u), 128, 128, 255 };
-            auto* texture = Texture::CreateFromPixels(1, 1,
+            auto texture = Texture::CreateFromPixels(1, 1,
                 "sceneVariant" + std::to_string(index), RHIFormat::RGBA8Unorm, pixel);
-            if (nullptr != texture) variantTextures.push_back(texture);
+            if (texture)
+            {
+                variantTextures.push_back(std::move(texture));
+            }
         }
 
         // 재질을 가르지 않은 경우와 가른 경우를 나란히 잰다. 하나만 재면
@@ -6525,7 +6723,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
 
                     if (mode.varyMaterial)
                     {
-                        clone.baseColor = variantTextures[copy % variantTextures.size()];
+                        clone.baseColor = (variantTextures[copy % variantTextures.size()] ? &*variantTextures[copy % variantTextures.size()].borrow() : nullptr);
                     }
 
                     scaled.push_back(clone);
@@ -6622,7 +6820,6 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         }
         }
 
-        for (auto* texture : variantTextures) Memory::SafeDelete(texture);
         variantTextures.clear();
 
         frameContext.draws = &draws;

@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include <mathematics/vector3.hpp>
 #include "Core.Minimal.h"
 #include "Component.h"
@@ -19,11 +20,11 @@ public:
    void OnRemovingFromScene() override;
    virtual void OnUninitializing() override;
 
-   void SetSprite(const std::shared_ptr<Texture>& ptr);
+   void SetSprite(const own::shared_owner<const Texture>& ptr);
    void OnDeserialized(); // CT6-d: 스프라이트 텍스처 로드(구 팩토리 분기)
 
 
-   const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
+   const own::shared_owner<const Texture>& GetSprite() const { return m_Sprite; }
    void SetBillboardType(BillboardType type) { m_billboardType = type; PublishRenderProxyDirty(ProxyDirty::Payload); }
    BillboardType GetBillboardType() const noexcept { return m_billboardType; }
    void SetBillboardAxis(const math::vector3& axis) { m_billboardAxis = axis; PublishRenderProxyDirty(ProxyDirty::Payload); }
@@ -40,7 +41,7 @@ private:
     math::vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
 
     [[reflgen::ignore]]
-    std::shared_ptr<Texture> m_Sprite = nullptr;
+    own::shared_owner<const Texture> m_Sprite = nullptr;
 
     BillboardType m_billboardType{ BillboardType::None };
 	bool m_enableDepth{ false };

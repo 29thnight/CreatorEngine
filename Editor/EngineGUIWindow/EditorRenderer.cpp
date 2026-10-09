@@ -13,6 +13,7 @@
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
 #include "EditorAssetPresentation.h"
+#include "EditorImGuiTexture.h"
 #include "EditorSettingsStore.h"
 #include "PathFinder.h"
 #include "EditorWindowNames.h"
@@ -85,6 +86,7 @@ EditorRenderer::~EditorRenderer()
 {
     if (m_workspace) m_workspace->SaveOnShutdown();
     m_workspace.reset();
+    EditorImGuiTexture::Shutdown();
     m_host->Shutdown();
 }
 
@@ -293,6 +295,7 @@ void EditorRenderer::BeginRender(std::unique_lock<std::mutex>& sceneLock)
         m_host->BeginFrame();
         sceneLock.lock();
     }
+    EditorImGuiTexture::BeginFrame();
 
     // 복원된 Game 모드나 접힌 도크에서도 예열이 끝나야 한다. 텍스처를 여는
     // 작업은 PT의 열린 Host 프레임에서만 하고, GT에는 원자 이정표만 전달한다.
@@ -511,6 +514,7 @@ void EditorRenderer::EndRender(std::function<void()> onRecorded)
             ::editor::windows::shell_cost_section::present };
         m_host->EndFrame(std::move(onRecorded));
     }
+    EditorImGuiTexture::EndFrame();
 
     // draw data 는 `EndFrame` 안의 `ImGui::Render()` 뒤라야 유효하다
     // (`ImDrawData::Valid`). 그래서 배치·스타일과 자리가 다르고, 뜬 프레임에만

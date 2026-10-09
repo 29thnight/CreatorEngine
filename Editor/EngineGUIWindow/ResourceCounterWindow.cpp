@@ -71,22 +71,15 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture() const
 	snapshot.valid = true;
 
 	// --- 에셋 캐시 ---
-	// 전용 뮤텍스가 있는 컨테이너는 규약을 지켜 읽는다.
-	// UI texture and sprite caches share the texture lock. The retained bundle
-	// set has its own snapshot because the bundle window can update it on PT.
+    // Owner-returning snapshots synchronize current resident generations. Weak
+    // expired index entries are not counted as live resources.
 	if (auto* dataSystem = DataSystem::GetInstance())
 	{
 		snapshot.models = dataSystem->SnapshotModelAssetGenerations().currentAssets;
-		{
-			std::lock_guard<std::mutex> lock(dataSystem->m_materialMutex);
-			snapshot.materials = dataSystem->Materials.size();
-		}
-		{
-			std::lock_guard<std::mutex> lock(dataSystem->m_textureMutex);
-			snapshot.textures = dataSystem->Textures.size();
-			snapshot.uiTextures = dataSystem->UITextures.size();
-			snapshot.spriteSheets = dataSystem->SpriteSheets.size();
-		}
+        snapshot.materials = dataSystem->SnapshotMaterials().size();
+        snapshot.textures = dataSystem->SnapshotTextures().size();
+        snapshot.uiTextures = dataSystem->SnapshotTextures(DataSystem::TextureFileType::UITexture).size();
+        snapshot.spriteSheets = dataSystem->SnapshotTextures(DataSystem::TextureFileType::SpriteSheet).size();
 		snapshot.spriteFonts = 0; // 폰트 컨테이너는 D4에서 은퇴, SDF 계통에서 복원
 		snapshot.retainedAssets = dataSystem->SnapshotRetainedAssetCount();
 	}

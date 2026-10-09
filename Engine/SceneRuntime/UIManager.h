@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include "ClassProperty.h"
@@ -22,10 +23,10 @@ public:
 	void AddCanvas(Entity* canvas);
 	void DeleteCanvas(Entity* canvas);
 
-	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,math::vector2 Pos = { 0, 0 });
-	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
-	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, math::vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
-	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
+	Entity* MakeImage(std::string_view name, const own::shared_owner<const Texture>& texture,Entity* canvas = nullptr,math::vector2 Pos = { 0, 0 });
+	Entity* MakeImage(std::string_view name, const own::shared_owner<const Texture>& texture, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
+	Entity* MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, math::vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
+	Entity* MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
 	Entity* MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, math::vector2 Pos = { 0, 0 });
 	Entity* MakeText(std::string_view name, file::path FontName, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
 

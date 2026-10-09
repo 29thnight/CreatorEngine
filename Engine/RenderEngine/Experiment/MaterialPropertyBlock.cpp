@@ -2,6 +2,7 @@
 
 #include "../MaterialPropertyPacker.h"
 #include "MaterialResolver.h"
+#include "../AssetDepot/MaterialAssetRuntime.h"
 
 #include <algorithm>
 
@@ -104,8 +105,13 @@ namespace experiment
             return false;
         }
 
-        std::shared_ptr<const LX::Runtime::Instance> instance;
-        if (!BuildMaterialRuntimeInstance(material, meta, layout, {}, {}, instance, outError)) return false;
+        own::shared_owner<const LX::Runtime::Instance> instance;
+        const auto handle = material.assetOrigin && material.assetOrigin->codeProgram
+            ? material.assetOrigin->codeProgram->codeHandle : ShaderMetaHandle{};
+        if (!BuildMaterialRuntimeInstance(material, meta, layout, handle, {}, instance, outError))
+        {
+            return false;
+        }
         outBytes = instance->uniforms;
         outError.clear();
         return true;
@@ -114,10 +120,23 @@ namespace experiment
     bool BuildMaterialRuntimeInstance(const Material& material, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout, ShaderMetaHandle handle,
         std::span<const MaterialTextureOwner> textures,
-        std::shared_ptr<const LX::Runtime::Instance>& outInstance, std::string& outError)
+        own::shared_owner<const LX::Runtime::Instance>& outInstance, std::string& outError)
     {
-        std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
-        if (!LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError)) return false;
+        own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
+        if (material.assetOrigin)
+        {
+            shader = material.assetOrigin->codeProgram;
+            if (!shader || !shader->codeProgram || shader->codeHandle != handle
+                || shader->meta != meta || shader->layout != layout)
+            {
+                outError = "Cooked material instance requires its exact captured program and layout.";
+                return false;
+            }
+        }
+        else if (!LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError))
+        {
+            return false;
+        }
         std::vector<::MaterialPropertyValue> values;
         for (const ShaderPropertyDesc& desc : meta.properties)
         {

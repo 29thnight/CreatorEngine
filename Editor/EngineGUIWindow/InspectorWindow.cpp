@@ -286,7 +286,7 @@ void draw_character_movement(CharacterMovementComponent& character, editor::widg
 
 struct ComponentMenuVisual
 {
-    Texture* image{};
+    const Texture* image{};
     const char* fallback{};
 };
 
@@ -848,6 +848,26 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 			}
 			break;
 		}
+        case ClrHost::ScriptFieldType::AssetLink:
+        {
+            std::string value = clr.GetFieldString(instanceId, i);
+            if (ImGui::InputText("##Value", &value, ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+                if (clr.SetFieldAssetLink(instanceId, i, value))
+                {
+                    script->CaptureFields();
+                }
+                else
+                {
+                    Debug::PrintLog(spdlog::level::warn, "[ScriptCore] Invalid AssetLink version, kind or UUID; expected 1:<this field's kind>:<canonical asset UUID>:<subasset UUID or nil>.");
+                }
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Typed link: 1:<expected kind>:<canonical asset UUID>:<subasset UUID or nil>. Preserve this field's kind. Press Enter to apply. Nil/nil clears the link.");
+            }
+            break;
+        }
 		case ClrHost::ScriptFieldType::String:
 		{
 			std::string value = clr.GetFieldString(instanceId, i);
@@ -1388,7 +1408,7 @@ static bool NameButton(const std::string& name, const char* id, float width)
 
 // 자산 칸: 이름을 보여 주는 버튼 하나. 버튼이 끌어 놓기 대상이다. 텍스처가 있으면
 // 앞에 줄 높이의 미리보기를 붙인다. 놓인 자산 경로를 돌려준다(없으면 빈 경로).
-static file::path DrawAssetSlot(const char* id, Texture* texture, const char* emptyText,
+static file::path DrawAssetSlot(const char* id, const own::shared_owner<const Texture>& texture, const char* emptyText,
 	const char* payloadType, float width)
 {
 	ImGui::PushID(id);
@@ -1648,18 +1668,24 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	}
 
 	// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
-	const auto slot = [&](const char* label, Texture* texture, const char* context)
+	const auto slot = [&](const char* label, const own::shared_owner<const Texture>& texture, const char* context)
 	{
 		const file::path dropped = DrawAssetSlot(label, texture, "None", "Texture", sheet.line(label));
 		return !dropped.empty() && editor::asset_drag::lives_in(dropped, "Textures", context)
 			? dropped.filename().string() : std::string();
 	};
-	if (auto name = slot("Diffuse", decalComponent->GetDecalTexture(), "Decal Decal texture drop"); !name.empty())
+	if (auto name = slot("Diffuse", decalComponent->GetDecalTextureShared(), "Decal Decal texture drop"); !name.empty())
+	{
 		decalComponent->SetDecalTexture(name.c_str());
-	if (auto name = slot("Normal", decalComponent->GetNormalTexture(), "Decal Normal texture drop"); !name.empty())
+	}
+	if (auto name = slot("Normal", decalComponent->GetNormalTextureShared(), "Decal Normal texture drop"); !name.empty())
+	{
 		decalComponent->SetNormalTexture(name.c_str());
-	if (auto name = slot("ORM", decalComponent->GetORMTexture(), "Decal ORM texture drop"); !name.empty())
+	}
+	if (auto name = slot("ORM", decalComponent->GetORMTextureShared(), "Decal ORM texture drop"); !name.empty())
+	{
 		decalComponent->SetORMTexture(name.c_str());
+	}
 }
 
 void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageComponent)
@@ -1692,7 +1718,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 
-	const file::path dropped = DrawAssetSlot("AddTexture", nullptr,
+	const file::path dropped = DrawAssetSlot("AddTexture", {},
 		count > 0 ? "Drag UI texture to add" : "No textures - drag UI texture", "UI_TEXTURE",
 		sheet.line("Add Texture"));
 	if (!dropped.empty())
@@ -1764,7 +1790,8 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 {
 	{
 		const editor::widgets::property_sheet sheet(m_layout, { "Sprite" });
-		const file::path dropped = DrawAssetSlot("Sprite", spriteRenderer->GetSprite().get(), "None (drag texture)",
+		const auto& sprite = spriteRenderer->GetSprite();
+		const file::path dropped = DrawAssetSlot("Sprite", sprite, "None (drag texture)",
 			"Texture", sheet.line("Sprite"));
 		if (!dropped.empty())
 		{

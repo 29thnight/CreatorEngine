@@ -9,6 +9,7 @@
 #include "CameraSystem.h"
 #include "SoundSystem.h"
 #include "AssetBundle.h"
+#include "TextureFramePins.h"
 #include "TransformStore.h"
 #include "HierarchyStore.h"
 #include "DetachedEntityTransfer.h"
@@ -29,6 +30,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <span>
 #include <unordered_map>
 #include <mutex> // MBC10: 마지막 animator publish 메트릭 스냅샷
@@ -278,7 +280,23 @@ struct TransformWriteMetrics
 
 class [[reflgen::reflect]] Scene
 {
-   public:
+private:
+    own::shared_owner<TextureFramePins> m_preparedTextureImagePins;
+public:
+    // Scene-owner handoff only. The first queued packet owns these preload pins.
+    void SetPreparedTextureImagePins(own::shared_owner<TextureFramePins> pins)
+    {
+        m_preparedTextureImagePins = std::move(pins);
+    }
+    own::shared_owner<TextureFramePins> PreparedTextureImagePins() const
+    {
+        return m_preparedTextureImagePins;
+    }
+    own::shared_owner<TextureFramePins> TakePreparedTextureImagePins()
+    {
+        return std::exchange(m_preparedTextureImagePins, {});
+    }
+
 public:
 	class HierarchyBulkBuildScope
 	{

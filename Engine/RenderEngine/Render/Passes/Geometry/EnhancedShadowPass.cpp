@@ -638,7 +638,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     for (std::size_t i = 0; i < frameDraws->size(); ++i)
     {
         const auto& draw = (*frameDraws)[i];
-        if (draw.materialGraphInstance)
+        if (draw.GraphInstance())
         {
             continue;
         }
@@ -657,7 +657,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             outError = "Masked shadow needs texture cache";
             return false;
         }
-        Texture* texture = draw.baseColor;
+        const Texture* texture = draw.baseColor;
         if (draw.materialSnapshot)
         {
             const auto& bindings = draw.materialSnapshot->textureBindings;
@@ -675,25 +675,29 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             {
                 return false;
             }
-            texture = found->textureOwner.get();
+            texture = (found->textureOwner ? &*found->textureOwner.borrow() : nullptr);
         }
-        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, outError);
+        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, context.TextureImage(texture), outError);
         if (!m_alphaTextures[i].IsValid())
         {
             return false;
         }
     }
 
+    if (!enhanced_draw::ValidateGeometryIdentities(*frameDraws, outError))
+    {
+        return false;
+    }
     // Reuse the same LOD0 cache entry as the other geometry passes.
     for (const auto& draw : *frameDraws)
     {
-        if (draw.materialGraphInstance || 0 == enhanced_draw::GeometryKey(draw)
+        if (draw.GraphInstance() || 0 == enhanced_draw::GeometryKey(draw)
             || m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) != m_drawGeometry.end())
         {
             continue;
         }
         std::string uploadError;
-        const auto entry = draw.modelMeshView.IsComplete()
+        const auto entry = draw.modelMeshView.handle.IsValid()
             ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
             : context.meshCache->GetOrUpload(draw.mesh, uploadError);
         if (!entry.IsValid())
@@ -715,7 +719,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // local fixture route must reject conflicting ranges just like the shared owner.
     for (const auto& draw : *frameDraws)
     {
-        if (draw.materialGraphInstance || 0 == enhanced_draw::GeometryKey(draw) || draw.boneCount == 0)
+        if (draw.GraphInstance() || 0 == enhanced_draw::GeometryKey(draw) || draw.boneCount == 0)
         {
             continue;
         }
@@ -771,7 +775,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     for (size_t index = 0; index < frameDraws->size(); ++index)
     {
         const auto& draw = (*frameDraws)[index];
-        if (draw.materialGraphInstance)
+        if (draw.GraphInstance())
         {
             continue;
         }
@@ -830,7 +834,7 @@ bool EnhancedShadowPass::PrepareGraphFrame(const EnhancedFrameContext& context, 
     }
     for (const auto& draw : *casters)
     {
-        if (!draw.materialGraphInstance)
+        if (!draw.GraphInstance())
         {
             outError = "Graph shadow caster has no material graph instance.";
             return false;

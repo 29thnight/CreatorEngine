@@ -273,13 +273,26 @@ namespace Meta::Typed
     // K2 스테이지 A: Entity::m_components가 vector<std::unique_ptr<Component>>로
     // 바뀌며 shared_ptr 짝이 필요해졌다 — 삭제자 인자(D)는 무시(항상 default_delete).
     template<class U, class D> struct Pointee<std::unique_ptr<U, D>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<own::shared_owner<U>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<own::unique_owner<U>> { using type = std::remove_cv_t<U>; };
     template<class T> using PointeeT = typename Pointee<std::remove_cv_t<T>>::type;
 
     template<class P>
     inline auto* RawPtrOf(P& p)
     {
-        if constexpr (std::is_pointer_v<std::remove_cv_t<P>>) { return p; }
-        else { return p.get(); }
+        if constexpr (std::is_pointer_v<std::remove_cv_t<P>>)
+        {
+            return p;
+        }
+        else if constexpr (requires { p.borrow(); })
+        {
+            // Borrow only the live lvalue owner; no raw adoption or const removal.
+            return p.borrow().unsafe_get();
+        }
+        else
+        {
+            return p.get();
+        }
     }
 
     // ── 타입 계열 판정 ─────────────────────────────────────────────────────

@@ -3,6 +3,7 @@
 #include "../AssetIdentity.h"
 
 #include <array>
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -42,6 +43,10 @@ namespace experiment::cooked
         CollisionGeometry = 9,
         SoundGraph = 10,
         SoundPreset = 11,
+        // CEMF v3 only. The legacy v2 validator deliberately rejects these.
+        Mesh = 12,
+        Skeleton = 13,
+        AnimationClip = 14,
     };
 
     using Sha256Digest = std::array<std::uint8_t, 32>;
@@ -79,6 +84,92 @@ namespace experiment::cooked
             const AssetId& assetId) const noexcept;
         [[nodiscard]] const AssetSourceManifestEntry* FindSource(
             const AssetId& assetId) const noexcept;
+    };
+
+    // CEMF v3 is a separately validated AssetSet contract. There is no automatic
+    // conversion from the untyped dependency list in a legacy CEMF v2 package.
+    inline constexpr std::uint16_t kAssetSetManifestVersion = 3u;
+    inline constexpr std::size_t kAssetSetManifestMaxBytes = 512u * 1024u * 1024u;
+    inline constexpr std::uint32_t kAssetSetManifestMaxEntries = 1024u * 1024u;
+    inline constexpr std::uint32_t kAssetSetManifestMaxDependencies = 4u * 1024u * 1024u;
+    inline constexpr std::uint32_t kAssetSetManifestMaxStringBytes = 64u * 1024u * 1024u;
+
+    struct AssetIdentity final
+    {
+        AssetId assetId{};
+        // Nil selects the whole asset. Otherwise this is a stable UUIDv4/v8,
+        // never a transient model array index or a runtime generation handle.
+        AssetId subassetId{};
+
+        friend auto operator<=>(const AssetIdentity&, const AssetIdentity&) noexcept = default;
+    };
+
+    struct TypedAssetReference final
+    {
+        AssetIdentity key{};
+        CookedAssetKind kind{ CookedAssetKind::Model };
+
+        friend auto operator<=>(const TypedAssetReference&, const TypedAssetReference&) noexcept = default;
+    };
+
+    enum class AssetDependencyKind : std::uint8_t
+    {
+        Hard = 1,
+        Loadable = 2,
+    };
+
+    enum class AssetDependencyScope : std::uint8_t
+    {
+        Internal = 1,
+        External = 2,
+    };
+
+    struct AssetDependency final
+    {
+        TypedAssetReference target{};
+        AssetDependencyKind kind{ AssetDependencyKind::Hard };
+        AssetDependencyScope scope{ AssetDependencyScope::Internal };
+
+        friend auto operator<=>(const AssetDependency&, const AssetDependency&) noexcept = default;
+    };
+
+    // Content address includes type, representation, schema and target ABI.
+    // Matching SHA-256 alone does not permit typed payload/decode sharing.
+    // artifactPath locates these exact bytes in the associated mount backing.
+    struct AssetBlobRecord final
+    {
+        Sha256Digest contentSha256{};
+        std::uint64_t byteSize{};
+        CookedAssetKind kind{ CookedAssetKind::Model };
+        std::uint32_t representation{};
+        std::uint32_t schemaVersion{};
+        std::string targetPlatform{};
+        std::string targetAbi{};
+        std::string artifactPath{};
+
+        friend auto operator<=>(const AssetBlobRecord&, const AssetBlobRecord&) = default;
+    };
+
+    struct AssetSetEntry final
+    {
+        TypedAssetReference asset{};
+        std::uint32_t blobIndex{};
+        std::vector<AssetDependency> dependencies{};
+    };
+
+    struct AssetSetManifest final
+    {
+        AssetId assetSetId{};
+        std::uint64_t revision{};
+        std::string targetPlatform{};
+        std::string targetAbi{};
+        std::vector<AssetSetEntry> entries{};
+        std::vector<TypedAssetReference> roots{};
+        std::vector<AssetBlobRecord> blobs{};
+
+        // Valid for authored and normalized manifests; performs no payload I/O.
+        [[nodiscard]] const AssetSetEntry* Find(
+            const AssetIdentity& identity) const noexcept;
     };
 
     struct AssetManifestIssue final
@@ -148,6 +239,27 @@ namespace experiment::cooked
     // 실패 시 outManifest는 바꾸지 않는다.
     [[nodiscard]] bool ReadAssetManifest(std::span<const std::byte> bytes,
         CookedAssetManifest& outManifest,
+        std::vector<AssetManifestIssue>& outIssues);
+
+    // Validates local type/reference integrity and rejects hard ownership cycles.
+    // Explicit external hard edges must additionally resolve, with the expected
+    // type, in the complete captured mount set before a catalog is published.
+    // Only external loadable edges may remain unresolved until RequestAsync.
+    [[nodiscard]] bool ValidateAssetSetManifest(
+        const AssetSetManifest& manifest,
+        std::vector<AssetManifestIssue>& outIssues);
+
+    // Sorts entries, roots, edges and blob records, remapping blob indices.
+    // Both functions are transactional: failed input never replaces the output.
+    [[nodiscard]] bool NormalizeAssetSetManifest(
+        const AssetSetManifest& manifest, AssetSetManifest& outManifest,
+        std::vector<AssetManifestIssue>& outIssues);
+
+    [[nodiscard]] AssetManifestWriteResult WriteAssetSetManifest(
+        const AssetSetManifest& manifest);
+
+    [[nodiscard]] bool ReadAssetSetManifest(std::span<const std::byte> bytes,
+        AssetSetManifest& outManifest,
         std::vector<AssetManifestIssue>& outIssues);
 
     [[nodiscard]] bool VerifyArtifact(

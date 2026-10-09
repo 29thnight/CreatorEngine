@@ -368,7 +368,24 @@ void VulkanTextureCache::Shutdown()
     m_impl->resources = nullptr;
 }
 
-RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& outError)
+bool VulkanTextureCache::IsResident(const Texture* texture) const
+{
+    if (!texture)
+    {
+        return true;
+    }
+    const auto resident = m_impl->entries.find(texture->m_assetId);
+    if (resident == m_impl->entries.end())
+    {
+        return false;
+    }
+    const auto transaction = m_impl->transactions.find(resident->second.entry.handle.id);
+    return transaction == m_impl->transactions.end()
+        || transaction->second.state != RHIUploadTransactionState::Quarantined;
+}
+
+RHITextureEntry VulkanTextureCache::GetOrUpload(const Texture* texture,
+    const own::shared_owner<const Texture::CodecImage>& image, std::string& outError)
 {
     if (nullptr == texture)
     {
@@ -381,12 +398,23 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
     const auto found = m_impl->entries.find(texture->m_assetId);
     if (m_impl->entries.end() != found)
     {
+        if (!IsResident(texture))
+        {
+            outError = "Vulkan texture upload has no verified completion; native allocation is quarantined.";
+            return {};
+        }
         ++m_impl->stats.hits;
         found->second.lastUsedFrame = m_impl->frameIndex;
         return found->second.entry;
     }
 
-    const TextureImageView pixels = texture->GetImageView();
+    if (!image)
+    {
+        RHITextureEntry pending;
+        pending.preparationNeeded = true;
+        return pending;
+    }
+    const TextureImageView pixels = texture->GetImageView(image);
     if (pixels.IsEmpty())
     {
         ++m_impl->stats.failures;
@@ -827,19 +855,39 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         static_cast<uint32_t>(indices.size()), outError);
 }
 
+RHIMeshBinding VulkanMeshCache::FindModel(const assets::ModelMeshHandle& handle) const
+{
+    if (!m_impl || !m_impl->resources || !handle.IsValid())
+    {
+        return {};
+    }
+    const auto found = m_impl->modelEntries.find(handle);
+    return found != m_impl->modelEntries.end() &&
+        found->second.state == RHIUploadTransactionState::Resident
+        ? found->second.binding : RHIMeshBinding{};
+}
+
 RHIMeshBinding VulkanMeshCache::GetOrUploadModel(
     const RHIModelMeshView& view, std::string& outError)
 {
-    RHIMeshBinding empty{};
-    if (view.sourceLodIndex != 0)
+    if (!m_impl || !m_impl->resources || !view.IsMetadataComplete() || view.sourceLodIndex != 0)
     {
-        outError = "Vulkan model mesh cache requires the base LOD view.";
-        return empty;
+        outError = "Vulkan mesh cache requires valid base-LOD model metadata.";
+        return {};
     }
-    if (!m_impl || nullptr == m_impl->resources || !view.IsComplete())
+    // The immutable descriptor is enough to reuse GPU bytes after CPU eviction.
+    const auto found = m_impl->modelEntries.find(view.handle);
+    if (found != m_impl->modelEntries.end())
     {
-        outError = "Vulkan 메시 캐시: ModelAssetGeneration 뷰가 완비되지 않았다";
-        return empty;
+        ++m_impl->stats.hits;
+        found->second.lastUsedFrame = m_impl->frameIndex;
+        outError.clear();
+        return found->second.binding;
+    }
+    if (!view.IsComplete())
+    {
+        outError = "Vulkan mesh geometry preparation is required before upload: no compatible CPU payload is pinned.";
+        return {};
     }
     return UploadResolved(0, &view.handle, view.vertexData, view.vertexBytes,
         view.vertexStride, view.vertexAttributeMask, view.indexData,

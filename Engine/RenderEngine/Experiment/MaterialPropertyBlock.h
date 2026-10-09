@@ -33,5 +33,5 @@ namespace experiment
     [[nodiscard]] bool BuildMaterialRuntimeInstance(const Material& material,
         const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
         ShaderMetaHandle handle, std::span<const MaterialTextureOwner> textures,
-        std::shared_ptr<const LX::Runtime::Instance>& outInstance, std::string& outError);
+        own::shared_owner<const LX::Runtime::Instance>& outInstance, std::string& outError);
 }

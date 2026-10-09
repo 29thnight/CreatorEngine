@@ -347,7 +347,7 @@ namespace Meta
     {
     public:
         LoadModelToSceneObjCommand(Scene* scene,
-            std::shared_ptr<const assets::ModelAssetGeneration> generation,
+            assets::ModelAssetGeneration::Shared generation,
             Entity** outObj = nullptr)
             : m_sceneId(scene->GetSceneId()), m_generation(std::move(generation)), m_outObj(outObj) {
         }
@@ -374,7 +374,7 @@ namespace Meta
     private:
         uint32_t m_sceneId{};
         std::unique_ptr<DeleteGameObjectCommand> m_delete;
-        std::shared_ptr<const assets::ModelAssetGeneration> m_generation{};
+        assets::ModelAssetGeneration::Shared m_generation{};
         Entity** m_outObj{};
     };
 }

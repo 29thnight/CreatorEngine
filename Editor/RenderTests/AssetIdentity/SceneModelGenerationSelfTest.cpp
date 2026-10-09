@@ -80,7 +80,7 @@ namespace RenderTest
             SceneModelTally& tally)
         {
             ++tally.renderers;
-            const std::shared_ptr<const assets::ModelAssetGeneration> generation =
+            const assets::ModelAssetGeneration::Shared generation =
                 renderer.m_modelGeneration;
             if (!generation)
             {
@@ -141,9 +141,9 @@ namespace RenderTest
                 ++tally.embeddedProps;
                 if (isRobot) ++tally.robotEmbedded;
 
-                const std::shared_ptr<Texture> owner =
+                const own::shared_owner<const Texture> owner =
                     renderer.m_Material->GetTextureMapShared(value.m_name);
-                const std::shared_ptr<Texture> expected =
+                const own::shared_owner<const Texture> expected =
                     DataSystems->ResolveModelGenerationTexture(*generation,
                         value.m_textureGuid.m_guid);
                 if (!owner)
@@ -151,7 +151,7 @@ namespace RenderTest
                     ++tally.missingTextures;
                     tally.Note("missing " + entityName + "." + value.m_name);
                 }
-                else if (owner == expected)
+                else if (expected && owner->m_assetId == expected->m_assetId)
                 {
                     ++tally.generationTextures;
                 }
@@ -248,7 +248,7 @@ namespace RenderTest
     {
         if (report) { *report = {}; report->reload = true; }
         const FileGuid guid = DataSystems->GetStemToGuid(modelName);
-        const std::shared_ptr<const assets::ModelAssetGeneration> before =
+        const assets::ModelAssetGeneration::Shared before =
             FileGuid{} == guid ? nullptr : DataSystems->LoadModelAssetGeneration(guid);
         if (!before)
         {
@@ -258,7 +258,7 @@ namespace RenderTest
             return false;
         }
 
-        std::map<Uuid::Uuid16, std::shared_ptr<Texture>> ownersBefore;
+        std::map<Uuid::Uuid16, own::shared_owner<const Texture>> ownersBefore;
         for (const assets::ModelTextureAsset& texture : before->Textures())
         {
             ownersBefore[texture.textureId] =
@@ -275,7 +275,7 @@ namespace RenderTest
         change.path = DataSystems->GetFilePath(guid);
         const bool accepted = DataSystems->ApplyAssetChange(change);
 
-        const std::shared_ptr<const assets::ModelAssetGeneration> after =
+        const assets::ModelAssetGeneration::Shared after =
             DataSystems->LoadModelAssetGeneration(guid);
         std::size_t reused = 0;
         std::size_t created = 0;
@@ -284,12 +284,15 @@ namespace RenderTest
         {
             for (const assets::ModelTextureAsset& texture : after->Textures())
             {
-                const std::shared_ptr<Texture> owner =
+                const own::shared_owner<const Texture> owner =
                     DataSystems->ResolveModelGenerationTexture(*after, texture.textureId);
                 const auto previous = ownersBefore.find(texture.textureId);
                 if (!owner) ++missingAfter;
                 else if (previous != ownersBefore.end() && previous->second
-                    && previous->second == owner) ++reused;
+                    && previous->second->m_assetId == owner->m_assetId)
+                {
+                    ++reused;
+                }
                 else ++created;
             }
         }
@@ -298,9 +301,15 @@ namespace RenderTest
         const std::uint64_t retired = statsAfter.retired - statsBefore.retired;
 
         const bool duplicate = after && after->Handle() == before->Handle();
+        // This diagnostic measures actual reuse, not owner-handle equality.
+        // Both local strong owners remain alive for the complete observation.
+        const auto beforeView = before.borrow();
+        const auto afterView = after.borrow();
+        const bool sameAggregate = beforeView && afterView
+            && beforeView.unsafe_get() == afterView.unsafe_get();
         const bool passed = accepted && after && 0 == missingAfter
             && (duplicate
-                ? after == before && reused == before->Textures().size() && created == 0 && retired == 0
+                ? sameAggregate && reused == before->Textures().size() && created == 0 && retired == 0
                 : after->Handle().generation > before->Handle().generation && reused == 0
                     && created == after->Textures().size() && retired == before->Textures().size());
         char line[384]{};
@@ -309,7 +318,7 @@ namespace RenderTest
             " missing=%zu retired=%llu sameAggregate=%d\n",
             passed ? "pass" : "fail", modelName.c_str(), before->Textures().size(),
             reused, created, missingAfter, static_cast<unsigned long long>(retired),
-            after == before ? 1 : 0);
+            sameAggregate ? 1 : 0);
         outLog += line;
         std::printf("%s", line);
         if (report)
@@ -319,7 +328,7 @@ namespace RenderTest
             report->created = created;
             report->missing = missingAfter;
             report->retired = retired;
-            report->sameAggregate = before == after;
+            report->sameAggregate = sameAggregate;
         }
         return passed;
     }

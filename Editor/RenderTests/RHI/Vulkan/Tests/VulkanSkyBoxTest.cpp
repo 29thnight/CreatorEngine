@@ -372,13 +372,14 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     std::string error;
 
     const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
-    std::unique_ptr<Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
-    if (!cameraIcon || cameraIcon->GetImageView().IsEmpty())
+    own::shared_owner<const Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
+    if (!cameraIcon || cameraIcon->GetImageDescription().IsEmpty())
     {
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
         return false;
     }
-    const TextureImageView iconPixels = cameraIcon->GetImageView();
+    const auto imagePayload_cameraIcon = cameraIcon->NonRehydratableImage();
+    const TextureImageView iconPixels = cameraIcon->GetImageView(imagePayload_cameraIcon);
     if (128 != iconPixels.Width() || 128 != iconPixels.Height() ||
         !cameraIcon->IsTextureAlpha())
     {
@@ -458,22 +459,22 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     //
     // ★ 포맷을 먼저 단정하는 이유: 로더가 압축을 안 했거나 dds가 다른 포맷이면
     //   아래 업로드 단정은 비압축 자산을 올려 놓고 초록을 내는 눈먼 검사가 된다.
-    std::shared_ptr<Texture> compressedIcon =
+    own::shared_owner<const Texture> compressedIcon =
         Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
-    std::shared_ptr<Texture> blockNoise = Texture::LoadSharedFromPath(
+    own::shared_owner<const Texture> blockNoise = Texture::LoadSharedFromPath(
         PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
     const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
-    std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
+    own::shared_owner<const Texture> bgraTexture(Texture::CreateFromPixels(
         1, 1, "vk_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
 
     if (!compressedIcon ||
-        RHIFormat::BC1UnormSrgb != compressedIcon->GetImageView().Format())
+        RHIFormat::BC1UnormSrgb != compressedIcon->GetImageDescription().Format())
         return fail("[1/4] baseColor 압축 경로가 BC1_SRGB를 만들지 않았다\n");
     if (!blockNoise ||
-        RHIFormat::BC3Unorm != blockNoise->GetImageView().Format())
+        RHIFormat::BC3Unorm != blockNoise->GetImageDescription().Format())
         return fail("[1/4] blueNoise.dds가 BC3로 로드되지 않았다\n");
     if (!bgraTexture ||
-        RHIFormat::BGRA8Unorm != bgraTexture->GetImageView().Format())
+        RHIFormat::BGRA8Unorm != bgraTexture->GetImageDescription().Format())
         return fail("[1/4] BGRA8 자산을 만들지 못했다\n");
 
     outLog += "[1/4] 실제 CameraGizmo.png 로드 · SPIR-V·파이프라인 생성 · "
@@ -486,7 +487,7 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     std::vector<EnhancedGizmoIconPass::Icon> icons(1);
     icons[0].position = { 0.f, 0.f, 0.f };
     icons[0].size = 2.f;
-    icons[0].texture = cameraIcon.get();
+    icons[0].texture = (cameraIcon ? &*cameraIcon.borrow() : nullptr);
     gizmo.SetIcons(&icons);
 
     if (!resources.BeginFrame(error))
@@ -501,11 +502,11 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     //   RGBA8Unorm 이라 BC1_SRGB · BC3 · BGRA8 어느 것과도 다르다.
     std::string codecError;
     const RHITextureEntry compressedEntry =
-        textureCache.GetOrUpload(compressedIcon.get(), codecError);
+        textureCache.GetOrUpload((compressedIcon ? &*compressedIcon.borrow() : nullptr), compressedIcon ? compressedIcon->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
     const RHITextureEntry noiseEntry =
-        textureCache.GetOrUpload(blockNoise.get(), codecError);
+        textureCache.GetOrUpload((blockNoise ? &*blockNoise.borrow() : nullptr), blockNoise ? blockNoise->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
     const RHITextureEntry bgraEntry =
-        textureCache.GetOrUpload(bgraTexture.get(), codecError);
+        textureCache.GetOrUpload((bgraTexture ? &*bgraTexture.borrow() : nullptr), bgraTexture ? bgraTexture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
     if (!compressedEntry.IsValid() || !noiseEntry.IsValid() || !bgraEntry.IsValid() ||
         RHIFormat::BC1UnormSrgb != compressedEntry.format ||
         RHIFormat::BC3Unorm != noiseEntry.format ||

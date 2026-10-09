@@ -213,7 +213,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
             if (error.empty()) error = "Generated Scene material source cannot be read.";
             return false;
         }
-        candidate.materialShader = std::make_shared<GeneratedMaterialShader>(std::move(generated));
+        candidate.materialShader = own::make_shared<const GeneratedMaterialShader>(std::move(generated));
     }
     result = std::move(candidate);
     error.clear();

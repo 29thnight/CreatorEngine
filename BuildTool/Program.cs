@@ -14,13 +14,19 @@ internal static class Program
             switch (options.Command)
             {
                 case "help":
-                    context.Log("CreatorBuildTool: publish-engine | compile-game | package-game | verify-engine | select-engine | open-project\n" +
+                    context.Log("CreatorBuildTool: publish-engine | compile-game | package-game | build-asset-set | build-runtime-bootstrap | verify-engine | select-engine | open-project\n" +
                         "  publish-engine --repository PATH --config Debug|Release [--output-root PATH] [--build] [--shipping] [--no-pointer]\n" +
                         "  compile-game --engine-distribution PATH --project PATH --output PATH [--config Release] [--prebuilt-assembly FILE]\n" +
                         "  package-game --engine-distribution PATH --project PATH [--config Debug] [--stage-root PATH]\n" +
                         "    [--input-mode Project|Workspace|Tracked] [--startup-scene NAME.creator] [--render-backend dx12|vulkan]\n" +
                         "    [--asset-list FILE: exact paths relative to Assets, one per line; Project mode only]\n" +
+                        "    [--asset-set-list FILE] [--asset-set-abi TOKEN: optional installed-host assertion]\n" +
+                        "    [--content-mode Legacy|PrebuiltAssetSets --bootstrap-root PATH --game-scripts-assembly FILE]\n" +
+                        "  build-runtime-bootstrap --engine-distribution PATH --project PATH --output NEW_PATH --asset-set-list FILE\n" +
+                        "    [--startup-scene NAME.creator] [--render-backend dx12|vulkan] [--asset-list FILE]\n" +
                         "    [--shipping] [--build-native] [--skip-verify] [--smoke-offscreen] [--smoke-frames 120] [--smoke-promotions 2] [--smoke-timeout-sec 180]\n" +
+                        "  build-asset-set --engine-distribution PATH --project PATH --asset-set FILE --output NEW_PATH\n" +
+                        "    [--artifact-cache PATH] (source-authored typed AssetSet; independent of Player)\n" +
                         "  verify-engine | select-engine --engine-distribution PATH [--project PATH]\n" +
                         "  open-project --engine-distribution PATH --development-project PATH [--select-engine]\n" +
                         "  Common: --log-path FILE --json (JSON Lines), Ctrl+C cancels the process tree.\n" +
@@ -35,6 +41,8 @@ internal static class Program
                     break;
                 }
                 case "package-game": await GamePackager.Build(context); break;
+                case "build-asset-set": await AssetSetBuilding.BuildAssetSet(context); break;
+                case "build-runtime-bootstrap": await RuntimeBootstrap.Build(context); break;
                 case "verify-engine":
                 {
                     var engine = EngineDistribution.Load(options.Required("engine-distribution"), context);
@@ -75,7 +83,7 @@ internal sealed class Options
     private static readonly HashSet<string> Switches = new(["build", "shipping", "buildnative", "skipverify", "smokeoffscreen", "selectengine", "json", "nopointer"], StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> Names = new(["repository", "config", "outputroot", "output", "project", "developmentproject",
         "enginedistribution", "prebuiltassembly", "gamescriptsassembly", "stageroot", "inputmode", "startupscene", "renderbackend",
-        "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target", "assetlist"], StringComparer.OrdinalIgnoreCase);
+        "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target", "assetlist", "assetset", "artifactcache", "assetsetlist", "assetsetabi", "contentmode", "bootstraproot"], StringComparer.OrdinalIgnoreCase);
     public string Command { get; }
     private static string Key(string name) => name.TrimStart('-').Replace("-", "");
     public Options(string[] args)

@@ -10,6 +10,7 @@
 #include "HostAbi.h"
 #include "CrashReporter.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"
+#include "../../Engine/Utility_Framework/ContentAbi.h"
 
 namespace
 {
@@ -82,14 +83,23 @@ namespace
             strcmp(info->featureRelease, CreatorEngineVersion::FeatureRelease) != 0 ||
             info->localDevelopment != static_cast<unsigned>(CreatorEngineVersion::LocalDevelopment))
             return Fail(L"Launcher and host engine versions differ", ERROR_REVISION_MISMATCH);
+        auto getContentInfo = reinterpret_cast<CreatorHostGetContentInfo>(GetProcAddress(host, "CreatorHostGetContentInfoV1"));
+        if (!getContentInfo) return Fail(L"Host content ABI entry point is missing", ERROR_PROC_NOT_FOUND);
+        const auto* contentInfo = getContentInfo();
+        if (!contentInfo || contentInfo->size != sizeof(CreatorHostContentInfoV1) ||
+            contentInfo->contentAbiVersion != CreatorContentAbi::Version || !contentInfo->contentAbi ||
+            strcmp(contentInfo->contentAbi, CreatorContentAbi::Token) != 0)
+            return Fail(L"Launcher and host content ABIs differ", ERROR_REVISION_MISMATCH);
         if (argc == 2 && wcscmp(argv[1], L"--engine-info") == 0)
         {
             std::printf("{\"hostAbi\":%u,\"compiler\":%u,\"iteratorDebugLevel\":%u,"
                 "\"debug\":%u,\"shipping\":%u,\"scriptApi\":%u,\"pointerBits\":%u,"
-                "\"localDevelopment\":%s,\"productName\":\"%s\",\"featureRelease\":\"%s\",\"version\":\"%s\"}\n",
+                "\"localDevelopment\":%s,\"productName\":\"%s\",\"featureRelease\":\"%s\",\"version\":\"%s\","
+                "\"contentAbiVersion\":%u,\"contentAbi\":\"%s\"}\n",
                 info->hostAbi, info->compiler, info->iteratorDebugLevel, info->debug,
                 info->shipping, info->scriptApi, info->pointerBits,
-                info->localDevelopment ? "true" : "false", info->productName, info->featureRelease, info->engineVersion);
+                info->localDevelopment ? "true" : "false", info->productName, info->featureRelease, info->engineVersion,
+                contentInfo->contentAbiVersion, contentInfo->contentAbi);
             return 0;
         }
         return run(argc, argv, show);

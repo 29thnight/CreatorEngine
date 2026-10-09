@@ -235,9 +235,9 @@ bool DX12Test::RunDecalTest(std::string& outLog)
     DX12TestTextureRegistration ormRegistration;
     DX12TestTextureRegistration depthRegistration;
 
-    Texture* decalDiffuse = nullptr;
-    Texture* decalNormal = nullptr;
-    Texture* decalOrm = nullptr;
+    own::shared_owner<const Texture> decalDiffuse;
+    own::shared_owner<const Texture> decalNormal;
+    own::shared_owner<const Texture> decalOrm;
 
     {
         // 데칼 텍스처는 CPU 픽셀로 만든다 — 캐시가 그것을 그대로 DX12로 올린다.
@@ -428,9 +428,9 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         EnhancedDecalPass::Item item{};
         item.worldMatrix = math::scaling_matrix(math::vector3{ 0.5f, 0.5f, 8.f }) *
             math::translation_matrix(math::vector3{ 0.f, 0.f, 5.f });
-        item.diffuse = decalDiffuse;
-        item.normal = decalNormal;
-        item.occRoughMetal = decalOrm;
+        item.diffuse = (decalDiffuse ? &*decalDiffuse.borrow() : nullptr);
+        item.normal = (decalNormal ? &*decalNormal.borrow() : nullptr);
+        item.occRoughMetal = (decalOrm ? &*decalOrm.borrow() : nullptr);
 
         decal.SetDecals({ item });
 
@@ -639,13 +639,15 @@ bool DX12Test::RunDecalTest(std::string& outLog)
     // ── [5/5] 배칭 — 연속한 것만 묶고 갈리면 늘어난다 ──
     if (passed)
     {
-        // 텍스처 자원 없이 포인터의 같고 다름만 본다(기즈모 아이콘 검증과
-        // 같은 방식). 캐시를 떼면 업로드를 건너뛰므로 가짜 포인터가 안전하다.
+        // Keep CPU texture owners alive while comparing their resource IDs.
+        // Disable the cache because this probe does not need GPU pixels.
         EnhancedFrameContext batchContext = frameContext;
         batchContext.textureCache = nullptr;
 
-        Texture* const fakeA = reinterpret_cast<Texture*>(0x1);
-        Texture* const fakeB = reinterpret_cast<Texture*>(0x2);
+        const auto batchTextureA = own::make_shared<const Texture>();
+        const auto batchTextureB = own::make_shared<const Texture>();
+        const Texture* const textureA = (batchTextureA ? &*batchTextureA.borrow() : nullptr);
+        const Texture* const textureB = (batchTextureB ? &*batchTextureB.borrow() : nullptr);
 
         std::vector<EnhancedDecalPass::Item> items(4);
         for (auto& item : items) item.worldMatrix = math::matrix4x4::identity();
@@ -653,22 +655,28 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         std::string dummy;
 
         // 같은 텍스처 넷이 연속 → 배치 1
-        for (auto& item : items) item.diffuse = fakeA;
+        for (auto& item : items)
+        {
+            item.diffuse = textureA;
+        }
         decal.SetDecals(items);
         decal.PrepareFrame(batchContext, dummy);
         const uint32_t runBatches = decal.GetLastBatchCount();
         const uint32_t runDecals = decal.GetLastDecalCount();
 
         // 번갈아 → 배치 4. 이 대조군이 없으면 '항상 1을 내는' 구현도 통과한다.
-        items[1].diffuse = fakeB;
-        items[3].diffuse = fakeB;
+        items[1].diffuse = textureB;
+        items[3].diffuse = textureB;
         decal.SetDecals(items);
         decal.PrepareFrame(batchContext, dummy);
         const uint32_t mixedBatches = decal.GetLastBatchCount();
 
         // 채널이 갈려도 묶이면 안 된다 — 조합마다 PSO가 다르다.
-        for (auto& item : items) item.diffuse = fakeA;
-        items[2].normal = fakeA;
+        for (auto& item : items)
+        {
+            item.diffuse = textureA;
+        }
+        items[2].normal = textureA;
         decal.SetDecals(items);
         decal.PrepareFrame(batchContext, dummy);
         const uint32_t channelBatches = decal.GetLastBatchCount();
@@ -720,9 +728,9 @@ bool DX12Test::RunDecalTest(std::string& outLog)
     diffuseRegistration.Reset();
     resources.Shutdown();
 
-    delete decalDiffuse;
-    delete decalNormal;
-    delete decalOrm;
+    decalDiffuse.reset();
+    decalNormal.reset();
+    decalOrm.reset();
 
     outLog += passed ? "데칼 패스 검증 통과\n" : "데칼 패스 검증 실패\n";
     return passed;

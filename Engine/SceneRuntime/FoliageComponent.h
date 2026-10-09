@@ -4,6 +4,7 @@
 #include "FoliageInstance.h"
 #include "TerrainBuffers.h"
 #include "Component.h"
+#include "AssetDepot/AssetRequest.h"
 #include <mathematics/frustum.hpp>
 #include <optional>
 
@@ -12,7 +13,8 @@ class [[reflgen::reflect]] FoliageComponent : public meta::identity<FoliageCompo
 {
     public:
 public:
-    FoliageComponent() = default;
+    FoliageComponent();
+    ~FoliageComponent() override;
 
     void OnDeserialized(); // CT6-d: 폴리지 애셋·모델 로드(구 팩토리 분기)
 
@@ -35,10 +37,10 @@ public:
     void AddFoliageType(const FoliageType& type);
     void RemoveFoliageType(uint32 typeID);
 
-    // PHASE 3.75 MBC9 — typed 바인딩. m_modelName → ModelId → 현재 generation으로
-    // 잇고, 재질(0번 메시의 재질)을 generation에서 시공해 embedded texture를 같은
-    // closure에서 푼다. AddFoliageType(저작·자산 로드)과 OnDeserialized가 부른다.
-    static void BindModelGeneration(FoliageType& type);
+    // Explicit rebind is the only retry after Failed, Stale or Cancelled.
+    void RebindFoliageType(uint32 typeID);
+    void PollAssetBindings();
+    [[nodiscard]] AssetDepot::AssetRequestStatus GetAssetBindingStatus(uint32 typeID) const;
 
     void AddFoliageInstance(const FoliageInstance& instance);
     void RemoveFoliageInstance(size_t index);
@@ -55,6 +57,11 @@ public:
 
     FileGuid m_foliageAssetGuid{};
 private:
+    struct AssetBinding;
+    void CancelAssetBindings();
+    [[reflgen::ignore]]
+    std::vector<own::unique_owner<AssetBinding>> m_assetBindings{};
+
     [[reflgen::ignore]]
     std::vector<FoliageType> m_foliageTypes{};
 

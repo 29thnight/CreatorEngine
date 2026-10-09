@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 
 #include "../../Experiment/MaterialResolver.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -9,7 +10,10 @@
 
 class Material;
 struct ShaderMeta;
-namespace assets { class ModelAssetGeneration; } // MBC7 — closure texture 축
+namespace assets
+{
+    class ModelAssetGeneration; // MBC7 — closure texture 축
+}
 
 // I5-M4 — M6 draw snapshot sealing의 experiment 치환.
 //
@@ -24,7 +28,7 @@ namespace ExperimentMaterialSealing
     struct SealTextureOwner final
     {
         std::string propertyName{};
-        std::shared_ptr<Texture> owner{};
+        own::shared_owner<const Texture> owner{};
     };
 
     struct SealSource final
@@ -118,6 +122,6 @@ namespace ExperimentMaterialSealing
         std::vector<std::uint8_t>& outPropertyBytes,
         std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
         std::string& outError,
-        std::shared_ptr<const LX::Runtime::Instance>* outRuntime = nullptr,
+        own::shared_owner<const LX::Runtime::Instance>* outRuntime = nullptr,
         ShaderMetaHandle handle = {});
 }

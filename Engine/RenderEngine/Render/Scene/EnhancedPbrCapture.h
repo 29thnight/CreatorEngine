@@ -65,6 +65,33 @@ struct EnhancedPbrCapture
         return true;
     }
 
+    static void WriteMeshIdentity(ryml::NodeRef item, const assets::ModelMeshHandle& handle)
+    {
+        item["meshId"] << FileGuid(handle.meshId).ToString();
+        item["meshDomain"] << (handle.domain == assets::ModelMeshDomain::Granular ? "granular" : "aggregate");
+        if (handle.domain == assets::ModelMeshDomain::Granular)
+        {
+            item["assetId"] << FileGuid(handle.asset.key.assetId.value).ToString();
+            item["subassetId"] << FileGuid(handle.asset.key.subassetId.value).ToString();
+            item["resolverRevision"] << handle.resolverRevision;
+            item["representation"] << handle.blob.representation;
+            item["artifactSchema"] << handle.blob.schemaVersion;
+            item["artifactBytes"] << handle.blob.byteSize;
+            item["targetPlatform"] << handle.blob.targetPlatform;
+            item["targetAbi"] << handle.blob.targetAbi;
+            item["contentSha256"] |= ryml::SEQ;
+            for (const auto byte : handle.blob.contentSha256)
+            {
+                item["contentSha256"].append_child() << static_cast<uint32_t>(byte);
+            }
+        }
+        else
+        {
+            item["modelId"] << FileGuid(handle.modelId).ToString();
+            item["modelGeneration"] << handle.generation;
+        }
+    }
+
     void Begin(const EnhancedLiveFramePacket& frame, const EnhancedLiveViewPacket& view,
         EnhancedLiveBackend backend, std::span<const EnhancedDrawItem> opaque,
         std::span<const EnhancedDrawItem> transparent,
@@ -161,9 +188,7 @@ struct EnhancedPbrCapture
             item |= ryml::MAP;
             item["route"] << route;
             matrix(item["world"], draw.worldMatrix);
-            item["modelId"] << FileGuid(draw.modelMeshView.handle.modelId).ToString();
-            item["meshId"] << FileGuid(draw.modelMeshView.handle.meshId).ToString();
-            item["modelGeneration"] << draw.modelMeshView.handle.generation;
+            WriteMeshIdentity(item, draw.modelMeshView.handle);
             if (material)
             {
                 // W8: 이 packet이 어느 저작 값·어느 프레임의 밀봉인지.
@@ -211,7 +236,7 @@ struct EnhancedPbrCapture
         root["sealLedger"]["recorded"] << false;
     }
 
-    void RecordLatticeInput(const std::shared_ptr<const material_graph::SceneViewInput>& input)
+    void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
     {
         if (!input)
         {
@@ -224,9 +249,7 @@ struct EnhancedPbrCapture
             item |= ryml::MAP;
             item["route"] << "lattice";
             const auto& geometry = draw.geometry->Source()->Geometry();
-            item["modelId"] << FileGuid(geometry.handle.modelId).ToString();
-            item["meshId"] << FileGuid(geometry.handle.meshId).ToString();
-            item["modelGeneration"] << geometry.handle.generation;
+            WriteMeshIdentity(item, geometry.handle);
             item["world"] |= ryml::SEQ;
             std::array<float, 16> world;
             std::memcpy(world.data(), &draw.geometry->Source()->World(), sizeof(world));

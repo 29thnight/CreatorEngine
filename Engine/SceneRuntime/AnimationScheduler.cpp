@@ -16,7 +16,9 @@
 #include "TwoBoneIK.h"
 #include "Animator.h"
 #include "Socket.h"
-#include "Assets/ModelAssetGeneration.h"   // PHASE 3.75 MBC8
+#include "Assets/ModelAssetGeneration.h"   // Transitional CEMCv11
+#include "Assets/ModelAnimationDescriptor.h"
+#include "Assets/ModelAnimationPayload.h"
 #include "Assets/ModelAnimationSampler.h"  // PHASE 3.75 MBC8
 #include <limits>
 #include <stdexcept>
@@ -64,7 +66,9 @@ namespace
     struct AnimationWork final
     {
         Animator* animator{};
-        std::shared_ptr<const assets::ModelAssetGeneration> generation{};
+        // Pins only the exact skeleton and selected current/transition/layer
+        // clips through both worker batch joins. Metadata owns no bulk siblings.
+        AnimatorAnimationBinding binding{};
         animation::quality_observation observation{};
         animation::quality_stage maximumStage{ animation::quality_stage::l0 };
         animation::quality_stage previousStage{ animation::quality_stage::l0 };
@@ -535,6 +539,7 @@ void AnimationScheduler::Update(float deltaTime)
             animator->m_animationControllers.end(),
             [](const std::shared_ptr<AnimationController>& controller) { return !controller; });
         if (hasExpiredController) continue;
+        auto binding = animator->CaptureAnimationBinding();
         auto& instance = animator->GetInstance();
         instance.captureTaskExecution = captureHud && !detailedAssigned
             && (requestedAnimatorId == 0
@@ -602,7 +607,7 @@ void AnimationScheduler::Update(float deltaTime)
         SnapshotBoneTransforms(*animator);
         AnimationWork item{};
         item.animator = animator;
-        item.generation = animator->m_modelGeneration;
+        item.binding = std::move(binding);
         item.observation = observation;
         item.maximumStage = selected;
         item.previousStage = previousStage;
@@ -651,31 +656,15 @@ void AnimationScheduler::Update(float deltaTime)
             {
                 if (timing) timing->m_updateBegin = Clock::now();
                 const assets::ModelSkeletonAsset* typedSkeleton =
-                    item->generation ? item->generation->Skeleton() : nullptr;
-                if (!item->animator->GetInstance().tickPathLogged)
+                    item->binding.Skeleton();
+                if (!item->animator->GetInstance().tickPathLogged && item->binding.ready)
                 {
                     item->animator->GetInstance().tickPathLogged = true;
                     ModelConsumptionDiagnostics::NoteTickPath(nullptr != typedSkeleton);
                 }
-                if (nullptr != typedSkeleton)
+                if (nullptr != typedSkeleton && item->binding.ready)
                 {
-                    auto& control = item->animator->GetPlaybackControl();
-                    const auto& instance = item->animator->GetInstance();
-                    float deltaT = SceneManagers->IsGameStart()
-                        || instance.editorPreviewPlaying ? deltaTime : 0.f;
-                    if (control.stopTimer > 0.f)
-                    {
-                        control.stoppedDuration += deltaT;
-                        control.stopTimer -= deltaT;
-                        deltaT = 0.f;
-                        if (control.stopTimer <= 0.f)
-                        {
-                            deltaT = control.stoppedDuration;
-                            control.stoppedDuration = 0.f;
-                        }
-                    }
-                    PrepareGeneration(*item->animator, *item->generation, deltaT);
-                    item->prepared = true;
+                    item->prepared = PrepareBinding(*item->animator, item->binding, deltaTime);
                 }
                 if (timing) timing->m_updateEnd = Clock::now();
             }
@@ -701,7 +690,7 @@ void AnimationScheduler::Update(float deltaTime)
     const auto estimate = [&](AnimationWork& item, animation::quality_stage stage)
     {
         const auto& instance = item.animator->GetInstance();
-        const auto* skeleton = item.generation ? item.generation->Skeleton() : nullptr;
+        const auto* skeleton = item.binding.Skeleton();
         if (!skeleton) return 0.;
         const auto fullBones = static_cast<std::uint32_t>(skeleton->bones.size());
         const auto lowBones = item.animator->m_LowDetailBoneCount > 0
@@ -716,11 +705,23 @@ void AnimationScheduler::Update(float deltaTime)
     {
         auto& instance = item.animator->GetInstance();
         instance.qualityStage = item.previousStage;
+        if (!item.prepared)
+        {
+            // Pending or failed selected payloads preserve the previous pose,
+            // playback recipe and interpolation state without partial layers.
+            if (sample)
+            {
+                ++sample->m_qualityStageCounts[static_cast<std::size_t>(instance.qualityStage)];
+            }
+            return;
+        }
         CommitQuality(*item.animator, stage, item.observation, deltaTime,
             item.forcedQuality);
         item.predictedUs = item.prepared ? estimate(item, instance.qualityStage) : 0.;
         if (item.prepared)
-            FinalizeGenerationQuality(*item.animator, *item.generation);
+        {
+            FinalizeBindingQuality(*item.animator, item.binding);
+        }
         if (work.size() > 1 && item.budgetEligible
             && item.previousStage != animation::quality_stage::l6
             && instance.qualityStage == animation::quality_stage::l6)
@@ -807,12 +808,15 @@ void AnimationScheduler::Update(float deltaTime)
                     && !item->animator->GetInstance().l6Evaluate)
                 {
                     const auto interpolationBegin = Clock::now();
-                    InterpolateGeneration(*item->animator, *item->generation);
+                    InterpolateBinding(*item->animator, item->binding);
                     item->interpolatedUs = AnimationMeasurementScope::Microseconds(
                         interpolationBegin, Clock::now());
                     item->interpolated = true;
                 }
-                else ExecuteGeneration(*item->animator, *item->generation);
+                else
+                {
+                    ExecuteBinding(*item->animator, item->binding);
+                }
                 if (timing)
                 {
                     timing->m_executeEnd = Clock::now();
@@ -834,7 +838,7 @@ void AnimationScheduler::Update(float deltaTime)
     const auto joined = sample ? Clock::now() : Clock::time_point{};
     for (auto& item : work)
     {
-        const auto* skeleton = item.generation ? item.generation->Skeleton() : nullptr;
+        const auto* skeleton = item.binding.Skeleton();
         if (!item.prepared || !skeleton) continue;
         const auto bones = item.animator->GetInstance().activeBoneCount;
         for (std::size_t kind = 0; kind < animation::task_kind_count; ++kind)
@@ -951,14 +955,19 @@ void AnimationScheduler::Update(float deltaTime)
         std::lock_guard<std::mutex> lock(m_hudMutex);
         m_hudPublished = std::move(hud);
     }
-    work.clear(); // Release generation references after both groups finish.
-
 	// X7 — worker는 Animator 소유 pose/socket staging만 쓴다. Scene packed
 	// storage와 부착 오브젝트 Transform은 모든 job이 끝난 이 barrier 뒤에서
 	// 메인 스레드가 직렬 commit한다. 따라서 worker-local queue를 따로 만들지
 	// 않아도 resolver/파괴/다른 Animator와 Scene write가 겹치지 않는다.
-	for (Animator* animator : currentAnimators)
-	{
+    for (const auto& item : work)
+    {
+        // A pending new skeleton must not publish old pose arrays under new bone
+        // names. Leave scene transforms and sockets at their last completed pose.
+        if (!item.prepared)
+        {
+            continue;
+        }
+        Animator* animator = item.animator;
 		if (!animator || animator->IsDestroyMark() || !animator->IsEnabled()) continue;
 		Entity* owner = animator->GetOwner();
 		if (!owner || owner->IsDestroyMark()) continue;
@@ -985,6 +994,7 @@ void AnimationScheduler::Update(float deltaTime)
 		}
         if (sample) sample->m_socketUs += AnimationMeasurementScope::Microseconds(socketBegin, Clock::now());
 	}
+    work.clear(); // Both groups and scene publication have released borrowed views.
     if (sample) sample->m_updateUs = AnimationMeasurementScope::Microseconds(begin, Clock::now());
 }
 
@@ -1023,7 +1033,9 @@ namespace
         using Track = assets::ModelAnimationTrack;
         const assets::ModelSkeletonAsset& skeleton;
         std::span<const assets::ModelAnimationAsset> clips;
-        const assets::ModelAssetGeneration& generation;
+        const assets::ModelAssetGeneration* generation{};
+        const AnimatorAnimationBinding* binding{};
+        std::uint64_t skeletonSerial{};
 
         std::size_t BoneCount() const noexcept { return skeleton.bones.size(); }
         std::uint32_t Parent(std::size_t index) const noexcept
@@ -1039,16 +1051,48 @@ namespace
         { return skeleton.bones[index].name; }
         const math::matrix4x4& RootTransform() const noexcept { return skeleton.rootTransform; }
         const math::matrix4x4& GlobalInverse() const noexcept { return skeleton.globalInverseTransform; }
-        std::size_t ClipCount() const noexcept { return clips.size(); }
+        std::size_t ClipCount() const noexcept
+        {
+            return binding && binding->descriptor
+                ? binding->descriptor->summary.clips.size() : clips.size();
+        }
+        const assets::ModelAnimationPayload* PayloadAt(int index) const noexcept
+        {
+            if (binding && binding->descriptor)
+            {
+                for (const auto& selected : binding->clips)
+                {
+                    if (selected.clipIndex == index)
+                    {
+                        return selected.payload ? &*selected.payload : nullptr;
+                    }
+                }
+            }
+            return nullptr;
+        }
         const Clip* ClipAt(int index) const noexcept
         {
+            if (binding && binding->descriptor)
+            {
+                const auto* payload = PayloadAt(index);
+                return payload ? &payload->clip : nullptr;
+            }
             return index >= 0 && static_cast<std::size_t>(index) < clips.size()
                 ? &clips[static_cast<std::size_t>(index)] : nullptr;
         }
         static double Duration(const Clip& clip) noexcept { return clip.durationTicks; }
         static double TicksPerSecond(const Clip& clip) noexcept { return clip.ticksPerSecond; }
         std::span<const Track* const> TracksAt(int clipIndex) const noexcept
-        { return generation.AnimationTracks(clipIndex); }
+        {
+            if (binding && binding->descriptor)
+            {
+                const auto* payload = PayloadAt(clipIndex);
+                return payload ? std::span<const Track* const>{ payload->tracks }
+                    : std::span<const Track* const>{};
+            }
+            return generation ? generation->AnimationTracks(clipIndex)
+                : std::span<const Track* const>{};
+        }
         static Animation::LocalTransform SampleLocalTransform(const Track& track, double time,
             Animation::TrackKeyCursor& cursor)
         {
@@ -1064,12 +1108,66 @@ namespace
         }
     };
 
+    GenerationPoseSource CapturedPoseSource(const AnimatorAnimationBinding& binding)
+    {
+        return { *binding.Skeleton(), binding.legacyGeneration
+            ? binding.legacyGeneration->Animations()
+            : std::span<const assets::ModelAnimationAsset>{},
+            binding.legacyGeneration ? &*binding.legacyGeneration : nullptr,
+            &binding, binding.skeletonSerial };
+    }
+
+    template <class Source>
+    bool HasSelectedPayloads(const Animator& animator, const Source& source)
+    {
+        const auto available = [&](int index)
+        {
+            // Invalid authored selections retain the existing no-clip behavior.
+            if (index < 0 || static_cast<std::size_t>(index) >= source.ClipCount())
+            {
+                return true;
+            }
+            return source.ClipAt(index) != nullptr
+                && source.TracksAt(index).size() == source.BoneCount();
+        };
+        const auto& instance = animator.GetInstance();
+        if (animator.m_animationControllers.empty() || animator.IsDirectEditorPreview())
+        {
+            return available(static_cast<int>(instance.selectedClipIndex))
+                && (animator.IsDirectEditorPreview() || !instance.control.isBlending
+                    || available(instance.control.nextClipIndex));
+        }
+        for (const auto& controller : animator.m_animationControllers)
+        {
+            if (controller && controller->useController
+                && (!available(controller->GetAnimationIndex())
+                    || (controller->IsBlending()
+                        && !available(controller->GetNextAnimationIndex()))))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    template <class Source>
+    bool CapturedClipLooping(const Animator& animator, const Source& source, int index)
+    {
+        if (const auto* clipOverride = animator.FindClipOverride(index);
+            clipOverride && clipOverride->loopOverride.has_value())
+        {
+            return *clipOverride->loopOverride;
+        }
+        const auto* clip = source.ClipAt(index);
+        return clip ? clip->looping : true;
+    }
+
     template <class Source>
     bool PrepareBindLocals(Animator& animator, const Source& source)
     {
         auto& instance = animator.GetInstance();
         const std::size_t boneCount = source.BoneCount();
-        const std::uint64_t serial = animator.GetSkeletonSerial();
+        const std::uint64_t serial = source.skeletonSerial;
         if (instance.bindSkeletonSerial == serial
             && instance.bindLocals.size() == boneCount) return true;
 
@@ -1823,7 +1921,7 @@ namespace
             if (!clip) return;
             const auto current = animation::AdvanceClip(instance.timeElapsed,
                 deltaT * Source::TicksPerSecond(*clip), Source::Duration(*clip),
-                animator.IsClipLooping(clipIndex));
+                CapturedClipLooping(animator, source, clipIndex));
             instance.timeElapsed = current.time;
             int nextIndex = -1;
             if (!animator.IsDirectEditorPreview() && control.isBlending)
@@ -1833,7 +1931,7 @@ namespace
                     nextIndex = control.nextClipIndex;
                     instance.nextTimeElapsed = animation::AdvanceClip(
                         instance.nextTimeElapsed, deltaT * Source::TicksPerSecond(*next),
-                        Source::Duration(*next), animator.IsClipLooping(nextIndex)).time;
+                        Source::Duration(*next), CapturedClipLooping(animator, source, nextIndex)).time;
                 }
             }
             auto finalIndex = AppendClipTasks(tasks, animation::invalid_task,
@@ -1885,7 +1983,7 @@ namespace
             const AnimationState* state = controller->GetCurrentState();
             const float speed = state ? state->animationSpeed
                 * (state->useMultipler ? state->multiplerAnimationSpeed : 1.f) : 1.f;
-            const bool looping = animator.IsClipLooping(clipIndex);
+            const bool looping = CapturedClipLooping(animator, source, clipIndex);
             auto& playback = controller->GetPlayback();
             const auto current = animation::AdvanceClip(playback.timeElapsed,
                 deltaT * Source::TicksPerSecond(*clip) * speed,
@@ -1904,7 +2002,7 @@ namespace
                     nextIndex = controller->GetNextAnimationIndex();
                     nextStep = animation::AdvanceClip(playback.nextTimeElapsed,
                         deltaT * Source::TicksPerSecond(*next), Source::Duration(*next),
-                        animator.IsClipLooping(nextIndex));
+                        CapturedClipLooping(animator, source, nextIndex));
                     playback.nextTimeElapsed = nextStep.time;
                     playback.previousNextProgress = playback.nextProgress;
                     playback.nextProgress = nextStep.progress;
@@ -2117,23 +2215,47 @@ namespace
     }
 }
 
-void AnimationScheduler::PrepareGeneration(Animator& animator,
-    const assets::ModelAssetGeneration& generation, float deltaT)
+bool AnimationScheduler::PrepareBinding(Animator& animator,
+    const AnimatorAnimationBinding& binding, float deltaT)
 {
-    const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
-    if (nullptr == skeleton) return;
-    const GenerationPoseSource source{ *skeleton, generation.Animations(), generation };
+    if (!binding.ready || !binding.Skeleton())
+    {
+        return false;
+    }
+    const auto source = CapturedPoseSource(binding);
+    // A state change after capture cannot borrow an uncaptured/latest clip.
+    // Defer the entire recipe before any playback or pose state is advanced.
+    if (!HasSelectedPayloads(animator, source))
+    {
+        return false;
+    }
     auto& instance = animator.GetInstance();
+    auto& control = instance.control;
+    deltaT = SceneManagers->IsGameStart() || instance.editorPreviewPlaying ? deltaT : 0.f;
+    if (control.stopTimer > 0.f)
+    {
+        control.stoppedDuration += deltaT;
+        control.stopTimer -= deltaT;
+        deltaT = 0.f;
+        if (control.stopTimer <= 0.f)
+        {
+            deltaT = control.stoppedDuration;
+            control.stoppedDuration = 0.f;
+        }
+    }
     instance.activeBoneCount = static_cast<std::uint32_t>(source.BoneCount());
     PreparePose(animator, source, deltaT);
+    return true;
 }
 
-void AnimationScheduler::FinalizeGenerationQuality(Animator& animator,
-    const assets::ModelAssetGeneration& generation)
+void AnimationScheduler::FinalizeBindingQuality(Animator& animator,
+    const AnimatorAnimationBinding& binding)
 {
-    const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
-    if (nullptr == skeleton) return;
-    const GenerationPoseSource source{ *skeleton, generation.Animations(), generation };
+    if (!binding.Skeleton())
+    {
+        return;
+    }
+    const auto source = CapturedPoseSource(binding);
     auto& instance = animator.GetInstance();
     if (instance.qualityStage >= animation::quality_stage::l1
         && instance.optionalIKWeight <= 0.f)
@@ -2199,12 +2321,14 @@ void AnimationScheduler::FinalizeGenerationQuality(Animator& animator,
     }
 }
 
-void AnimationScheduler::ExecuteGeneration(Animator& animator,
-    const assets::ModelAssetGeneration& generation)
+void AnimationScheduler::ExecuteBinding(Animator& animator,
+    const AnimatorAnimationBinding& binding)
 {
-    const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
-    if (nullptr == skeleton) return;
-    const GenerationPoseSource source{ *skeleton, generation.Animations(), generation };
+    if (!binding.Skeleton())
+    {
+        return;
+    }
+    const auto source = CapturedPoseSource(binding);
     ExecutePose(animator, source);
     auto& instance = animator.GetInstance();
     if (instance.qualityStage != animation::quality_stage::l6) return;
@@ -2233,14 +2357,16 @@ void AnimationScheduler::ExecuteGeneration(Animator& animator,
     PublishL6Pose(animator, source, 1.f / instance.l6Interval);
 }
 
-void AnimationScheduler::InterpolateGeneration(Animator& animator,
-    const assets::ModelAssetGeneration& generation)
+void AnimationScheduler::InterpolateBinding(Animator& animator,
+    const AnimatorAnimationBinding& binding)
 {
-    const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
-    if (nullptr == skeleton) return;
+    if (!binding.Skeleton())
+    {
+        return;
+    }
     auto& instance = animator.GetInstance();
     PublishL6Pose(animator,
-        GenerationPoseSource{ *skeleton, generation.Animations(), generation },
+        CapturedPoseSource(binding),
         static_cast<float>(instance.l6Phase + 1) / instance.l6Interval);
 }
 
@@ -2255,6 +2381,7 @@ bool AnimationScheduler::EvaluateGenerationPose(Animator& animator,
     const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
     if (nullptr == skeleton) return false;
     return EvaluatePoseSample(animator,
-        GenerationPoseSource{ *skeleton, generation.Animations(), generation },
+        GenerationPoseSource{ *skeleton, generation.Animations(), &generation,
+            nullptr, animator.GetSkeletonSerial() },
         clipIndex, time, outPose);
 }

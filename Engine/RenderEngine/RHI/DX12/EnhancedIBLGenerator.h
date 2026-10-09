@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../../Render/Core/PassResourceRetirement.h"
 #include <optional>
 #include "../RHIFormat.h"
@@ -94,6 +95,19 @@ public:
         RHITextureHandle equirect, RHIFormat equirectFormat,
         uint32_t cubeSize, uint32_t brdfSize, std::string& outError);
 
+    struct PreparedCookedEnvironment
+    {
+        std::array<own::shared_owner<const Texture>, 8> textures;
+        assets::EnvironmentIdentity identity;
+        uint32_t cubeSize{};
+        uint32_t brdfSize{};
+    };
+    // CPU preparation moves image storage into immutable generated descriptions.
+    // The resulting exact source can survive any number of rejected recordings.
+    static own::shared_owner<const PreparedCookedEnvironment> PrepareCooked(
+        assets::CookedEnvironment value, std::string& error);
+    bool InstallCooked(const EnhancedFrameContext& context,
+        const PreparedCookedEnvironment& source, std::string& error);
     bool InstallCooked(const EnhancedFrameContext& context, assets::CookedEnvironment value, std::string& error);
     bool TouchCooked(const EnhancedFrameContext& context, std::string& error);
     // Record copies in the current upload frame; publish only after its fence.
@@ -119,7 +133,7 @@ public:
 
 private:
     struct CookedCaptureSlice { RHIReadback readback; uint32_t image{}, mip{}; };
-    std::array<std::shared_ptr<class Texture>, 8> m_cookedTextures;
+    std::array<own::shared_owner<const Texture>, 8> m_cookedTextures;
     struct CookedCapture
     {
         std::vector<CookedCaptureSlice> slices;
@@ -127,6 +141,7 @@ private:
         assets::EnvironmentIdentity identity;
         uint64_t fence{};
         uint64_t recording{};
+        bool accepted{};
         uint32_t cube{}, brdf{}, sourceWidth{}, sourceHeight{}, sampleCount{};
     };
     // Selections may change while the preceding GPU copy/disk write is pending.
@@ -136,22 +151,24 @@ private:
     struct TargetSnapshot
     {
         std::array<RHITextureHandle, 12> handles;
-        std::array<std::shared_ptr<class Texture>, 8> cooked;
+        std::array<own::shared_owner<const Texture>, 8> cooked;
         uint64_t generation{}, recording{}, completion{};
+        bool waitForIdle{};
         uint32_t cube{}, brdf{}, importanceSize{}, importanceMip{};
     };
     std::array<RHITextureHandle*, 12> Targets();
     bool BeginReplacement(std::string& error);
     void RollbackReplacement();
-    void RetireSnapshot(const TargetSnapshot& snapshot);
+    void RetireSnapshot(const TargetSnapshot& snapshot) noexcept;
     void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
     void OnUploadCompleted(uint64_t completion) override;
     void OnUploadAborted(uint64_t recording) override;
     void OnUploadSubmissionRejected(uint64_t recording, RHICompletionPoint) override { OnUploadAborted(recording); }
-    void OnUploadAccepted(uint64_t recording, RHICompletionPoint completion) override;
+    void OnUploadAccepted(uint64_t recording, RHICompletionPoint completion) noexcept override;
     PassResourceRetirement m_retirement;
     std::optional<TargetSnapshot> m_previousTargets;
     std::vector<TargetSnapshot> m_retiredOwners;
+    bool m_targetsWaitForIdle{};
     std::function<void()> m_preparationRejected;
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool CreateTargets(uint32_t cubeSize, uint32_t brdfSize,

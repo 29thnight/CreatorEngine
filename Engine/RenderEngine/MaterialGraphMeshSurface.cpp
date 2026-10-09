@@ -417,6 +417,12 @@ namespace material_graph
         candidate->indices_.assign(geometry.indexData, geometry.indexData + geometry.indexCount);
         candidate->geometry_.vertexData = candidate->vertices_.data();
         candidate->geometry_.indexData = candidate->indices_.data();
+        // The sealed surface owns its copied bytes. It must not retain borrowed
+        // provenance into an independently evictable upload/CPU-use payload.
+        candidate->geometry_.sourceGeneration = nullptr;
+        candidate->geometry_.sourceDescriptor = nullptr;
+        candidate->geometry_.sourcePayload = nullptr;
+        candidate->geometry_.sourceMeshIndex = UINT32_MAX;
         if (!std::ranges::all_of(candidate->indices_, [&](auto index) { return index < candidate->Count(); }))
         {
             return Fail(error, "Mesh surface triangle index exceeds the sealed vertex count.");

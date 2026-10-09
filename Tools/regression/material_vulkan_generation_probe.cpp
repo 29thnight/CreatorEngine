@@ -131,7 +131,7 @@ Id FindPin(const LXGraph& graph, Id node, const char* identifier, Direction dire
     throw std::runtime_error("Missing fixture socket");
 }
 
-std::shared_ptr<const Generation> SceneGeneration(const std::filesystem::path& root, bool layered)
+own::shared_owner<const Generation> SceneGeneration(const std::filesystem::path& root, bool layered)
 {
     LXMaterialAsset asset;
     const auto surface = asset.CreateNode("ShaderNodeBsdfPrincipled", 0, 0);
@@ -166,10 +166,10 @@ std::shared_ptr<const Generation> SceneGeneration(const std::filesystem::path& r
     for (const auto& diagnostic : diagnostics)
         message += diagnostic.message + "\n";
     Check(verified, "Scene fixture verify " + message);
-    auto generation = std::make_shared<Generation>();
-    generation->generation = layered ? 2 : 1;
-    generation->cooked = {product, WriteMaterialProgramMetadata(product.program), BuildBoundSource(product.program)};
-    return generation;
+    Generation generationValue;
+    generationValue.generation = layered ? 2 : 1;
+    generationValue.cooked = {product, WriteMaterialProgramMetadata(product.program), BuildBoundSource(product.program)};
+    return own::make_shared<const Generation>(std::move(generationValue));
 }
 
 class TrackingPipelines final : public IRenderPipelineCache

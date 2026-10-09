@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include <algorithm>
@@ -11,6 +12,7 @@
 
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/TypeTrait.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
@@ -18,6 +20,7 @@
 class RenderScene;
 class Scene;
 class Material;
+class TextureFramePins;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
@@ -96,8 +99,8 @@ struct EnhancedLiveViewPacket
     std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -108,8 +111,8 @@ struct EnhancedLiveViewRequest
     FrameCameraSnapshot camera{};
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
@@ -119,7 +122,7 @@ struct EnhancedShaderMetaFrameSnapshot
 {
     FileGuid guid{};
     ShaderMetaHandle handle{};
-    std::shared_ptr<const ShaderMeta> value;
+    own::shared_owner<const ShaderMeta> value;
     std::string error;
 
     bool IsValid() const
@@ -210,6 +213,9 @@ struct EnhancedLiveFramePacket
     // M6-P2d-d: Host가 실제 Scene material에서 수집해 넘긴 추가 의존성.
     // 아래 ShaderMeta owner 배열은 이 선언과 primary/cache 입력을 resolve한 결과다.
     EnhancedRequiredAssetPacket requiredAssets;
+    // One-shot scene preparation result. The queue and RT preserve this owner
+    // until the first relevant staging copy, including coalesced/pending frames.
+    own::shared_owner<TextureFramePins> preparedTextureImages;
     // 첫 항목은 제품 GBuffer primary meta다. 뒤에는 GT가 DataSystem의 material
     // generation 집합에서 함께 밀봉한 material별 meta가 GUID 순서로 붙는다.
     std::vector<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;
@@ -900,7 +906,7 @@ namespace EnhancedSceneRenderer
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
     inline constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
     EnhancedRequiredAssetPacket BuildRequiredAssetPacket(
-        std::span<const std::shared_ptr<Material>> materials);
+        std::span<const own::shared_owner<const Material>> materials);
 
     EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
         const EnhancedLiveViewRequest* views, uint32_t viewCount,

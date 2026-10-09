@@ -6,6 +6,7 @@
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
 #include "Texture.h"
+#include "TextureFramePins.h"
 
 #include <array>
 #include <cstdio>
@@ -145,7 +146,7 @@ namespace RenderTest
                 albedo.m_textureUvScale = {-2.f, .75f}; albedo.m_textureUvRotation = .4f;
                 legacy.m_propertyValues = { baseColor, metallic, albedo };
             }
-            auto owner = std::make_shared<Texture>();
+            auto owner = own::make_shared<const Texture>();
             legacy.UseTextureMap("albedoMap", owner);
 
             std::vector<EnhancedMaterialTextureBinding> bindings;
@@ -156,7 +157,8 @@ namespace RenderTest
                 check.Check(bindings[0].propertyName == "albedoMap"
                     && bindings[0].registerIndex == 3u,
                     "binding property/register 보존");
-                check.Check(bindings[0].textureOwner == owner,
+                check.Check(bindings[0].textureOwner
+                    && bindings[0].textureOwner->m_assetId == owner->m_assetId,
                     "generation owner 보존");
                 check.Check(bindings[0].coordinates == assets::TextureCoordinates{1, {.25f, -.5f}, {-2.f, .75f}, .4f}, "UV metadata sealing");
                 check.Check(bindings[0].textureGuid == authoredAlbedo,
@@ -275,6 +277,56 @@ namespace RenderTest
                 for (const auto& property : materials[0].properties)
                     if (property.name == "emissiveStrength") strength = std::get<float>(property.value) == 8.f;
                 check.Check(strength, "W6 importer preserves HDR emissive strength");
+            }
+        }
+
+        // One recording pins each texture representation once and owns it until
+        // the recording's final table owner is released, independently of producers.
+        {
+            const std::uint32_t pixel = 0xFFFFFFFFu;
+            auto producer = Texture::CreateFromPixels(1, 1, "FramePins.Linear",
+                RHIFormat::RGBA8Unorm, &pixel);
+            check.Check(static_cast<bool>(producer), "frame texture fixture created");
+            if (producer)
+            {
+                auto recording = own::make_shared<TextureFramePins>();
+                const auto originalId = producer->m_assetId;
+                const auto first = recording->Retain(producer);
+                const auto repeated = recording->Retain(producer);
+                check.Check(first != TextureFramePins::InvalidIndex
+                    && repeated == first && recording->Size() == 1u,
+                    "frame pins deduplicate the same texture representation");
+
+                auto srgb = Texture::WithColorSpace(producer, true);
+                check.Check(srgb && srgb->m_assetId != originalId,
+                    "color-space view has a distinct texture representation identity");
+                if (srgb)
+                {
+                    const auto srgbId = srgb->m_assetId;
+                    const auto second = recording->Retain(srgb);
+                    check.Check(second != TextureFramePins::InvalidIndex
+                        && second != first && recording->Size() == 2u,
+                        "frame pins retain distinct color-space representations separately");
+                    check.Check(recording->Retain(srgb) == second && recording->Size() == 2u,
+                        "repeated color-space representation does not duplicate a frame pin");
+
+                    const own::weak_owner<const Texture> originalLifetime = producer;
+                    const own::weak_owner<const Texture> srgbLifetime = srgb;
+                    own::shared_owner<TextureFramePins> retainedFrame = recording;
+                    recording.reset();
+                    producer.reset();
+                    srgb.reset();
+                    check.Check(!originalLifetime.expired() && !srgbLifetime.expired(),
+                        "retained frame table outlives both texture producers");
+                    check.Check(retainedFrame->Borrow(first)
+                        && retainedFrame->Borrow(first)->m_assetId == originalId
+                        && retainedFrame->Borrow(second)
+                        && retainedFrame->Borrow(second)->m_assetId == srgbId,
+                        "frame indices resolve their retained representation after producer release");
+                    retainedFrame.reset();
+                    check.Check(originalLifetime.expired() && srgbLifetime.expired(),
+                        "texture representations expire with the final frame table owner");
+                }
             }
         }
 

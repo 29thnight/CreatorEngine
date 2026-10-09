@@ -167,7 +167,7 @@ namespace
         }
 
         std::filesystem::path shaderPath = meta.source;
-        if (!meta.originPath.empty())
+        if (!meta.codeProgram && !meta.originPath.empty())
         {
             std::error_code pathError;
             shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
@@ -202,6 +202,10 @@ namespace
     // 직렬 경로가 같은 오류를 보고한다.
     void FwdPrecompileMetaVariants(const ShaderMeta& meta, std::span<const std::uint16_t> keywordSelections)
     {
+        if (meta.assetOrigin || meta.codeProgram)
+        {
+            return; // Mounted variants are already carried by their CPU program.
+        }
         const ShaderPassDesc* pass = nullptr;
         ShaderMetaPermutation materialPermutation;
         std::string shaderFile;
@@ -428,7 +432,7 @@ namespace
 bool EnhancedForwardPass::MaterialKey::operator==(const MaterialKey& other) const
 {
     if (coordinates != other.coordinates || sampler != other.sampler
-        || textures != other.textures
+        || textureIds != other.textureIds
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -465,8 +469,7 @@ bool EnhancedForwardPass::MaterialKey::operator<(const MaterialKey& other) const
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
     if (sampler != other.sampler) return sampler < other.sampler;
-    return std::lexicographical_compare(textures.begin(), textures.end(),
-        other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+    return textureIds < other.textureIds;
 }
 
 RHISamplerTable EnhancedForwardPass::SamplerTableFor(
@@ -535,6 +538,11 @@ EnhancedForwardPass::MaterialKey EnhancedForwardPass::MakeMaterialKey(
     else
     {
         key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
+    }
+    key.textureIds.reserve(key.textures.size());
+    for (const Texture* texture : key.textures)
+    {
+        key.textureIds.push_back(TextureFramePins::Identity(texture));
     }
     return key;
 }
@@ -781,7 +789,8 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     const ShaderRenderState* renderState,
     const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
-    RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled)
+    RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled,
+    const LX::Runtime::CompiledGraphics* prepared)
 {
     // I5-D34c: experiment 짝은 퍼뮤테이션 위에 레이아웃 매크로를 얹는다 —
     // 호출자마다 얹게 하면 하나가 빠뜨렸을 때 화면이 조용히 틀린다.
@@ -797,8 +806,23 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     }
 
     LX::Runtime::CompiledGraphics verified;
-    if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
-            *effectivePermutation, {}, verified, outError)) return false;
+    if (prepared)
+    {
+        if (prepared->identity.backend != RHIShaderCompiler::GetOutput()
+            || prepared->identity.vertexEntry != vertexEntry || prepared->identity.pixelEntry != pixelEntry
+            || prepared->identity.permutation.Entries() != effectivePermutation->Entries()
+            || prepared->identity.sealedProgramIdentity.empty())
+        {
+            outError = "Prepared code graphics does not match the exact pipeline request.";
+            return false;
+        }
+        verified = *prepared;
+    }
+    else if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
+        *effectivePermutation, {}, verified, outError))
+    {
+        return false;
+    }
     verified.identity.vertexAttributeMask = modelVertexMask;
     outVs = std::move(verified.vertex.bytecode);
     outPs = std::move(verified.pixel.bytecode);
@@ -891,11 +915,23 @@ bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
     }
     const ShaderPassDesc& pass = *passPointer;
 
+    if (meta.assetOrigin && !meta.codeProgram)
+    {
+        outError = "Mounted ShaderMeta descriptor has no prepared code program.";
+        return false;
+    }
+    const auto passIndex = static_cast<std::uint32_t>(passPointer - meta.passes.data());
+    LX::Runtime::CompiledGraphics prepared;
+    if (meta.codeProgram && !LX::Runtime::RestoreCodeGraphics(meta, passIndex, keywordSelections,
+        modelVertexMask, referencePath, prepared, outError))
+    {
+        return false;
+    }
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildShadePipelineDesc(context, shaderFile.c_str(),
             pass.vertex->entry.c_str(), pass.pixel->entry.c_str(), &pass.state,
             compilePermutation, modelVertexMask, outDesc, outVs, outPs,
-            outError, &compiled))
+            outError, &compiled, meta.codeProgram ? &prepared : nullptr))
     {
         return false;
     }
@@ -1415,6 +1451,10 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_drawGeometry.clear();
     if (nullptr != context.meshCache && nullptr != context.forwardDraws)
     {
+        if (!enhanced_draw::ValidateGeometryIdentities(*context.forwardDraws, outError))
+        {
+            return false;
+        }
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
             if (0 == enhanced_draw::GeometryKey(draw)
@@ -1422,7 +1462,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
             std::string uploadError;
             // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
-            const RHIMeshBinding entry = draw.modelMeshView.IsComplete()
+            const RHIMeshBinding entry = draw.modelMeshView.handle.IsValid()
                 ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
@@ -1459,7 +1499,11 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                     key.snapshot->bindingLayout, schema, outError)) return false;
             MaterialTextures textures;
             if (!MaterialTextureTable::Upload(*context.textureCache, schema,
-                    key.textures, textures.views, outError, !key.snapshot)) return false;
+                    key.textures, textures.views, outError, !key.snapshot,
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
+            {
+                return false;
+            }
             m_materialTextures.emplace(key, std::move(textures));
         }
     }

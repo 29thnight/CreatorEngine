@@ -276,57 +276,92 @@ void Player::PlayerMain::Initialize()
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
 
-	// 시작 씬 — 로드에 성공하면 그 자리에서 재생을 켠다.
-	//
-	// 예전에는 SceneManager::LoadSceneImmediate가 EngineMode::IsPlayer()를 물어보고
-	// 스스로 켰다(E3-6에서 옮겨 왔다). "씬이 로드되는 순간이 곧 재생 시작"은
-	// 플레이어의 정책이지 씬 로더가 알아야 할 일이 아니다 — 로더가 실행 모드를
-	// 캐묻는 대신 정책을 가진 쪽이 런타임 primitive(SetGameStart)를 직접 부른다.
-	// 그래서 Core에서 마지막 Player mode 분기가 사라졌다.
-	{
-		// 스모크에서만 직렬화 단계 계측을 켠다 — 종료 시 `[runtime.serialization]`으로
-		// 찍힌다(EmitTextParseTelemetry). 평소 실행은 원자 플래그 읽기 하나만 남는다.
-		if (g_smoke.IsActive())
-			SerializationProfile::SetEnabled(true);
+    // Startup uses the same staged scene preparation as later transitions.
+    // Metadata/payload jobs progress without blocking the owner or render thread;
+    // simulation and command admission begin only after successful activation.
+    if (g_smoke.IsActive())
+    {
+        SerializationProfile::SetEnabled(true);
+    }
+    const auto sceneName = RuntimeSettings::Get().GetStartupSceneName();
+    m_startupScenePath = PathFinder::Relative("Scenes").append(sceneName).string();
+    m_startupScene = SceneManagers->LoadSceneAsync(m_startupScenePath);
 
-		const std::wstring sceneName = RuntimeSettings::Get().GetStartupSceneName();
-		const file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
-		Scene* loadedScene = SceneManagers->LoadSceneImmediate(scenePath.string());
-		if (nullptr == loadedScene)
-		{
-			// LoadSceneImmediate는 실패를 삼키고 nullptr를 돌려준다 —
-			// 여기서 종료 코드로 승격하지 않으면 스모크가 빈 화면을
-			// 성공으로 오판한다(§2.4의 1호 발견이 정확히 이 모양이었다).
-			Debug::PrintLog(spdlog::level::err, "[SMOKE] startup scene load FAILED: " + scenePath.string());
-			if (g_smoke.IsActive())
-			{
-				// §5.4 의 3 = precondition 불충족. LC8 이 표를 이관하며 다시 봤고
-				// **그대로 둔다** — 시작 씬이 없는 것은 부를 수 없는 상태이지
-				// infrastructure 고장이 아니다.
-				EngineBootstrap::SetExitCode(3);
-			}
-		}
-		else
-		{
-			SceneManagers->SetGameStart(true);
-
-			// 스모크(--smoke)의 판정 마커다 — Tools/build.ps1이
-			// 'Scene loaded:[^\r\n]*<시작 씬>'으로 찾는다. 문구와 인자를 바꾸면
-			// 게임 빌드 검증이 조용히 깨진다. 옛 코드가 찍던 것과 같은 문자열이다
-			// (Core는 이 함수에 넘어온 경로 문자열을 그대로 찍었다).
-			Debug::PrintLog(spdlog::level::info, "Scene loaded: {}", scenePath.string());
-		}
-	}
-
-	// ── 명령 서비스 (PHASE 14.5 LC8 · §11.2) ────────────────────────────
+	// ★ 컴파일 여부를 **항상** 찍는다.
 	//
-	// ★ **씬이 선 뒤에 연다.** 서비스가 먼저 열리면 첫 요청이 씬 없는 상태를
-	//   만나 `scene.none` 을 받는다 — 붙는 쪽은 "붙었다" 와 "붙었는데 아직
-	//   아무것도 없다" 를 구분할 수 없고, 그 구간은 프레임 몇 개가 아니라
-	//   씬 로드만큼(LC0 실측 2.4 초) 길다.
-	//
-	// ★★ 실패해도 게임은 계속 돈다. 서비스가 안 열린 것과 게임이 못 뜨는 것은
-	//    다른 사건이다.
+	//   플래그를 주지 않은 실행에서도 찍는다. 이 한 줄이 없으면 스모크 로그에서
+	//   "서비스를 안 켰다" 와 "이 빌드에는 서비스가 없다" 가 똑같이 침묵으로
+	//   보이고, Shipping 격리 게이트가 무엇을 확인했는지도 로그에 남지 않는다.
+    std::printf("[player.service] compiled=%s enabled=%s\n", PlayerCommandService::IsCompiledIn() ? "yes" : "no",
+		g_service.enabled ? "yes" : "no");
+
+    StartPresentationThread();
+}
+
+bool Player::PlayerMain::PollStartupScene()
+{
+    if (m_startupComplete)
+    {
+        return !m_startupFailed;
+    }
+    const auto fail = [this](std::string_view reason)
+    {
+        m_startupComplete = true;
+        m_startupFailed = true;
+        EngineBootstrap::SetExitCode(3);
+        Debug::PrintLog(spdlog::level::err, "[SMOKE] startup scene load FAILED: "
+            + m_startupScenePath + ": " + std::string(reason));
+#if CE_DEVELOPMENT
+        PlayerCmd::CommandHost::Get().StartBatch(false);
+#endif
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return false;
+    };
+    try
+    {
+        SceneManagers->PollSceneLoads();
+        if (!m_startupSceneToActivate)
+        {
+            if (!m_startupScene.valid())
+            {
+                return fail("startup preparation has no result ticket");
+            }
+            if (m_startupScene.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            {
+                return false;
+            }
+            m_startupSceneToActivate = m_startupScene.get();
+            if (!m_startupSceneToActivate)
+            {
+                return fail("preparation did not produce a scene");
+            }
+            // The SceneManager already owns the constructed scene. Startup has
+            // no separate raw asset lifetime and never retries a Stale ticket.
+            SceneManagers->ActivateScene(m_startupSceneToActivate, true);
+        }
+        SceneManagers->ApplyPendingSceneStructureChange();
+        if (SceneManagers->GetActiveScene() != m_startupSceneToActivate)
+        {
+            return fail("scene activation was rejected");
+        }
+        m_startupSceneToActivate = nullptr;
+        SceneManagers->SetGameStart(true);
+        SceneManagers->ApplyPendingSceneStructureChange();
+        if (!SceneManagers->IsPlayCommitted() || SceneManagers->PlayFailureCount() != 0)
+        {
+            return fail("play transaction was rejected: " + SceneManagers->LastPlayFailure());
+        }
+        Time->ResetElapsedTime();
+        m_startupComplete = true;
+        Debug::PrintLog(spdlog::level::info, "Scene loaded: {}", m_startupScenePath);
+    }
+    catch (const std::exception& exception)
+    {
+        return fail(exception.what());
+    }
+
+    // Keep the existing command-service contract: no requests are admitted
+    // while startup is still an empty scene or an incomplete payload ticket.
 	if (g_service.enabled)
 	{
 		std::string error;
@@ -342,18 +377,11 @@ void Player::PlayerMain::Initialize()
 		}
 	}
 
-	// ★ 컴파일 여부를 **항상** 찍는다.
-	//
-	//   플래그를 주지 않은 실행에서도 찍는다. 이 한 줄이 없으면 스모크 로그에서
-	//   "서비스를 안 켰다" 와 "이 빌드에는 서비스가 없다" 가 똑같이 침묵으로
-	//   보이고, Shipping 격리 게이트가 무엇을 확인했는지도 로그에 남지 않는다.
-    std::printf("[player.service] compiled=%s enabled=%s\n", PlayerCommandService::IsCompiledIn() ? "yes" : "no",
-		g_service.enabled ? "yes" : "no");
 
 #if CE_DEVELOPMENT
     PlayerCmd::CommandHost::Get().StartBatch(EngineBootstrap::g_exitCode == 0);
 #endif
-    StartPresentationThread();
+    return true;
 }
 
 void Player::PlayerMain::StartPresentationThread()
@@ -620,6 +648,15 @@ void Player::PlayerMain::Update()
     {
         EngineBootstrap::SetExitCode(5);
         PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return;
+    }
+    if (!PollStartupScene())
+    {
+        // Keep native presentation responsive while preparation is Pending.
+        // No simulation/smoke frame is counted before startup is activated.
+        m_frameDeltaTime = 0.0;
+        m_audioHost->Update(0.f);
+        m_audioPlayback->Update();
         return;
     }
 #if CE_DEVELOPMENT

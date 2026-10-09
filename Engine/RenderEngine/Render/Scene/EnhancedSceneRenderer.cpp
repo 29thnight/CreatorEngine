@@ -40,6 +40,7 @@
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
 #include "../../DataSystem.h"
+#include "../../Assets/ModelGeometryPayload.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h"
 
@@ -49,6 +50,7 @@
 #include "../../MaterialGraphSceneHost.h"
 #include "../../MaterialGraphSceneCompiler.h"
 #include "../../RenderScene.h"
+#include "../../../SceneRuntime/Scene.h"
 #include "../Core/EnhancedLightPacking.h"
 #include "../../Texture.h"
 #include "../../PrimitiveRenderProxy.h"
@@ -71,6 +73,8 @@
 #include <unordered_set>
 #include <mutex>
 #include <array>
+#include <limits>
+#include <map>
 #include <cassert>
 #include <thread>
 #include <deque>
@@ -489,7 +493,7 @@ namespace
         //   카메라가 둘이어도 한 인스턴스로 충분하다.
         EnhancedGBufferPass   gbuffer;
         material_graph::SceneHost graphMaterials;
-        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedShadowPass    shadow;
         EnhancedDecalPass     decal;
         EnhancedDeferredPass  deferred;
@@ -706,7 +710,7 @@ namespace
         EnhancedShadowPass shadow;
         EnhancedGBufferPass gbuffer;
         material_graph::SceneHost graphMaterials;
-        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedDecalPass decal;
         EnhancedSSAOPass ssao;
         EnhancedDeferredPass deferred;
@@ -1071,6 +1075,20 @@ namespace
 #endif
         }
 
+        void MaintainAssetCaches()
+        {
+            textureCache.BeginFrame(frameCounter);
+            meshCache.BeginFrame(frameCounter);
+            const RHIDeviceMemoryPressureInfo pressureInfo = resources
+                .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+            RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+                pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+            textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                &evictionPass);
+            meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                &evictionPass);
+        }
+
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
             uint64_t resizeGeneration, uint64_t backendGeneration,
@@ -1179,20 +1197,10 @@ namespace
                 ~CaptureHistoryGuard() { if (active) Reset(); }
             } historyGuard{ views[viewIndex], capture && capture->controlled };
             if (historyGuard.active) historyGuard.Reset();
-            const uint32_t frameIndex = static_cast<uint32_t>(frameCounter++);
+            ++frameCounter;
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
                 commandPool.BeginFrame(commandPoolFrame);
-                textureCache.BeginFrame(frameIndex);
-                meshCache.BeginFrame(frameIndex);
-                const RHIDeviceMemoryPressureInfo pressureInfo = resources
-                    .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
-                RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
-                    pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
-                textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
-                    &evictionPass);
-                meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
-                    &evictionPass);
                 if (!prepareFrame(outError))
                 {
                     preparationDeferred = graphMaterials.SelectionDeferred();
@@ -1324,7 +1332,7 @@ namespace
             // 최신 요청이 아니라 실제 패스가 소비한 카메라를 완료 슬롯에 붙인다.
             slot->camera = *frameContext.camera;
             slot->previewComplete = graphInput && !graphInput->Draws().empty() &&
-                (!viewPacket.materialPreview || graphInput->Draws()[0].material == viewPacket.materialPreview->instance);
+                (!viewPacket.materialPreview || graphInput->Draws()[0].material->representationId == viewPacket.materialPreview->instance->representationId);
             slot->pending = true;
             if (capture)
             {
@@ -1382,13 +1390,15 @@ namespace
         file::path shaders;
         file::path cache;
         file::path project;
+        bool updateSelection{ true };
     };
 
     struct PreparedEnvironment
     {
         EnvironmentPreparationRequest request;
-        std::optional<assets::CookedEnvironment> cooked;
-        std::shared_ptr<Texture> equirect;
+        own::shared_owner<const EnhancedIBLGenerator::PreparedCookedEnvironment> cooked;
+        own::shared_owner<const Texture> equirect;
+        own::shared_owner<const Texture::CodecImage> equirectImage;
         std::optional<assets::EnvironmentIdentity> identity;
         file::path cachePath;
     };
@@ -1403,8 +1413,10 @@ namespace
         uint64_t generation{ 1 };
         uint64_t nextRequest{ 0 };
         std::optional<EnvironmentPreparationRequest> pending;
-        std::unique_ptr<PreparedEnvironment> ready;
+        own::unique_owner<PreparedEnvironment> ready;
         EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
+        std::string selection;
+        std::string cpuError;
     };
 
     bool SetEnvironmentPreparationPhase(EnvironmentPreparationState& state,
@@ -1456,8 +1468,8 @@ namespace
                 error = "Cooked environment recipe changed; recook the selected environment";
                 return false;
             }
-            result.cooked = std::move(cooked);
-            return true;
+            result.cooked = EnhancedIBLGenerator::PrepareCooked(std::move(cooked), error);
+            return bool(result.cooked);
         }
 
         assets::EnvironmentIdentity identity;
@@ -1475,8 +1487,8 @@ namespace
         std::string cacheError;
         if (assets::ReadCookedEnvironment(result.cachePath, cooked, cacheError, &identity))
         {
-            result.cooked = std::move(cooked);
-            return true;
+            result.cooked = EnhancedIBLGenerator::PrepareCooked(std::move(cooked), error);
+            return bool(result.cooked);
         }
         if (!SetEnvironmentPreparationPhase(state, request, "Decoding HDR environment"))
         {
@@ -1517,7 +1529,8 @@ namespace
             error = "HDR decode failed";
             return false;
         }
-        const auto image = result.equirect->GetImageView();
+        result.equirectImage = result.equirect->NonRehydratableImage();
+        const auto image = result.equirect->GetImageDescription();
         if (image.IsEmpty() || image.IsCube() || image.ArraySize() != 1
             || image.MipLevels() != 1 || image.Format() != RHIFormat::RGBA32Float)
         {
@@ -1527,7 +1540,7 @@ namespace
         return true;
     }
 
-    void RunEnvironmentPreparation(const std::shared_ptr<EnvironmentPreparationState>& state)
+    void RunEnvironmentPreparation(const own::shared_owner<EnvironmentPreparationState>& state)
     {
         for (;;)
         {
@@ -1544,12 +1557,12 @@ namespace
             }
             const uint64_t requestId = request.id;
             const uint64_t generation = request.generation;
-            std::unique_ptr<PreparedEnvironment> result;
+            own::unique_owner<PreparedEnvironment> result;
             std::string error;
             bool prepared = false;
             try
             {
-                result = std::make_unique<PreparedEnvironment>();
+                result = own::make_unique<PreparedEnvironment>();
                 result->request = std::move(request);
                 prepared = PrepareEnvironmentCpu(*state, *result, error);
             }
@@ -1561,7 +1574,7 @@ namespace
             {
                 error = "Environment preparation failed";
             }
-            std::unique_ptr<PreparedEnvironment> retired;
+            own::unique_owner<PreparedEnvironment> retired;
             bool failed = false;
             {
                 std::lock_guard<std::mutex> lock(state->mutex);
@@ -1579,6 +1592,7 @@ namespace
                         state->progress.activeRequests = 0;
                         state->progress.phase = "Failed";
                         state->progress.error = error;
+                        state->cpuError = error;
                         failed = true;
                     }
                 }
@@ -1591,9 +1605,102 @@ namespace
         }
     }
 
+    bool QueueEnvironmentPreparation(const own::shared_owner<EnvironmentPreparationState>& preparation,
+        const std::string& selection, std::string& error, bool updateSelection = true)
+    {
+        EnvironmentPreparationRequest request;
+        request.updateSelection = updateSelection;
+        request.selection = selection;
+        request.source = file::absolute(file::path(selection));
+        request.shaders = PathFinder::ShaderPath() / "DefaultPassShader";
+        request.cache = PathFinder::CachePath() / "Environment";
+        request.project = PathFinder::BaseProjectPath();
+        EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
+        progress.activeRequests = 1;
+        progress.phase = "Queued";
+        progress.name = request.source.filename().string();
+        bool launch = false;
+        own::unique_owner<PreparedEnvironment> retired;
+        {
+            std::lock_guard lock(preparation->mutex);
+            if (!preparation->accepting)
+            {
+                error = "EnhancedRenderer environment preparation is not running";
+                return false;
+            }
+            request.id = ++preparation->nextRequest;
+            request.generation = preparation->generation;
+            progress.requestId = request.id;
+            progress.appliedRequestId = preparation->progress.appliedRequestId;
+            preparation->pending = std::move(request);
+            retired = std::move(preparation->ready);
+            preparation->progress = std::move(progress);
+            preparation->selection = selection;
+            preparation->cpuError.clear();
+            launch = !preparation->running;
+            preparation->running = true;
+        }
+        if (launch)
+        {
+            const auto fail = [preparation](std::exception_ptr failure)
+            {
+                if (!failure)
+                {
+                    return;
+                }
+                std::string reason = "Environment preparation dispatch failed";
+                try
+                {
+                    std::rethrow_exception(failure);
+                }
+                catch (const std::exception& exception)
+                {
+                    reason = exception.what();
+                }
+                catch (...)
+                {
+                }
+                own::unique_owner<PreparedEnvironment> retired;
+                std::lock_guard lock(preparation->mutex);
+                preparation->running = false;
+                preparation->pending.reset();
+                retired = std::move(preparation->ready);
+                preparation->progress.activeRequests = 0;
+                preparation->progress.phase = "Failed";
+                preparation->cpuError = reason;
+                preparation->progress.error = std::move(reason);
+            };
+            try
+            {
+                job_group work;
+                work.add([preparation] { RunEnvironmentPreparation(preparation); });
+                work.on_complete(fail);
+                ce::get_job_scheduler().submit(std::move(work));
+            }
+            catch (...)
+            {
+                fail(std::current_exception());
+                std::lock_guard lock(preparation->mutex);
+                error = preparation->progress.error;
+                return false;
+            }
+        }
+        error.clear();
+        return true;
+    }
+
+    struct FogImagePreparation
+    {
+        std::mutex mutex;
+        own::shared_owner<const Texture> texture;
+        std::string error;
+        bool started{};
+        bool complete{};
+    };
+
     void InvalidateEnvironmentPreparation(EnvironmentPreparationState& state, bool stop)
     {
-        std::unique_ptr<PreparedEnvironment> retired;
+        own::unique_owner<PreparedEnvironment> retired;
         {
             std::lock_guard<std::mutex> lock(state.mutex);
             ++state.generation;
@@ -1608,13 +1715,14 @@ namespace
             state.progress.applied = false;
             state.progress.phase = "Cancelled";
             state.progress.error.clear();
+            state.cpuError.clear();
         }
     }
 
-    std::unique_ptr<PreparedEnvironment> FailEnvironmentPreparation(
+    own::unique_owner<PreparedEnvironment> FailEnvironmentPreparation(
         EnvironmentPreparationState& state, const std::string& error)
     {
-        std::unique_ptr<PreparedEnvironment> retired;
+        own::unique_owner<PreparedEnvironment> retired;
         {
             std::lock_guard<std::mutex> lock(state.mutex);
             if (state.progress.activeRequests == 0)
@@ -1827,18 +1935,19 @@ namespace
         // Cooked data is loaded before decode/generation. A raw HDR cache miss
         // generates the four maps once and publishes their pixels asynchronously.
         std::string                 skyBoxPath;
-        std::shared_ptr<Texture> skyEquirect;
-        std::optional<assets::CookedEnvironment> skyCooked;
+        own::shared_owner<const Texture> skyEquirect;
+        own::shared_owner<const Texture::CodecImage> skyEquirectImage;
+        own::shared_owner<const EnhancedIBLGenerator::PreparedCookedEnvironment> skyCooked;
         std::optional<assets::EnvironmentIdentity> skyCookIdentity;
         std::filesystem::path skyCookCachePath;
         bool                        skyBoxDirty{ true };
         bool                        skyBoxEnabled{ true };
-        std::shared_ptr<EnvironmentPreparationState> environmentPreparation{
-            std::make_shared<EnvironmentPreparationState>() };
+        own::shared_owner<EnvironmentPreparationState> environmentPreparation{
+            own::make_shared<EnvironmentPreparationState>() };
         uint64_t skyPreparationRequest{ 0 };
         uint64_t skyPreparationGeneration{ 0 };
 
-        void ApplyPreparedEnvironment(std::unique_ptr<PreparedEnvironment>& retired)
+        void ApplyPreparedEnvironment(own::unique_owner<PreparedEnvironment>& retired)
         {
             auto& preparation = *environmentPreparation;
             std::lock_guard<std::mutex> lock(preparation.mutex);
@@ -1858,6 +1967,7 @@ namespace
             }
             skyBoxPath = request.selection;
             skyEquirect.swap(retired->equirect);
+            skyEquirectImage.swap(retired->equirectImage);
             skyCooked.swap(retired->cooked);
             skyCookIdentity.swap(retired->identity);
             skyCookCachePath.swap(retired->cachePath);
@@ -1865,9 +1975,12 @@ namespace
             skyPreparationGeneration = request.generation;
             skyBoxDirty = true;
             preparation.progress.phase = "Applying environment on render thread";
-            if (auto* settings = RuntimeSettings::TryGet())
+            if (request.updateSelection)
             {
-                settings->SetEnvironmentSelection(skyBoxPath, true);
+                if (auto* settings = RuntimeSettings::TryGet())
+                {
+                    settings->SetEnvironmentSelection(skyBoxPath, true);
+                }
             }
             lastError.clear();
         }
@@ -1886,13 +1999,16 @@ namespace
                 }
                 if (preparation.progress.requestId == skyPreparationRequest)
                 {
-                    preparation.progress.activeRequests = 0;
+                    preparation.progress.activeRequests = error.empty() ? 0 : 1;
                     preparation.progress.applied = error.empty();
-                    preparation.progress.phase = error.empty() ? "Upload recorded" : "Failed";
+                    preparation.progress.phase = error.empty() ? "Upload recorded" : "Upload retry pending";
                     preparation.progress.error = error;
                 }
             }
-            skyPreparationRequest = 0;
+            if (error.empty())
+            {
+                skyPreparationRequest = 0;
+            }
         }
 
         // ── 볼류메트릭 포그 입력 ──
@@ -1909,7 +2025,8 @@ namespace
         //   PIXEL 전용 값이 없어 ShaderResource가 곧 ALL인데, textureCache는
         //   업로드를 PIXEL로 끝내므로 그대로 임포트하면 배리어의 before가
         //   실제와 어긋난다(검증 레이어가 잡는다).
-        std::unique_ptr<Texture> fogBlueNoise;
+        own::shared_owner<const Texture> fogBlueNoise;
+        own::shared_owner<FogImagePreparation> fogImagePreparation{ own::make_shared<FogImagePreparation>() };
 
         // ★ 핸들을 옆에 든다(V3). 예전에는 프레임마다 ImportTexture 의 포인터
         //   오버로드를 타서 표에 등록하고 그래프가 죽을 때 놓기를 반복했다 —
@@ -2111,23 +2228,67 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             std::shared_ptr<Mesh> meshSource{};
-            // item.modelMeshView의 정점·인덱스 저장소를 소유하는 immutable generation.
-            std::shared_ptr<const assets::ModelAssetGeneration> generationSource{};
-            std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
+            // Borrowed mesh bytes are covered by the frame's single model pin
+            // table. Copies of this draw carry only the stable table index.
+            std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
+            // Source identity/coverage is copied once. The immutable instance
+            // itself is retained by the frame pin table, never per draw.
+            bool hasGraphMaterialSource{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
         };
         std::vector<PooledDraw>       drawPool;
+        own::shared_owner<const assets::ModelAssetGenerationPins> modelFramePins{};
+        assets::ModelGeometryPreparationPins geometryFramePins{};
+        struct GeometryDemand final
+        {
+            own::shared_owner<const assets::ModelMeshDescriptor> descriptor{};
+            AssetDepot::AssetRequest<assets::ModelGeometryPayload> request{};
+            own::shared_owner<const assets::ModelGeometryPayload> ready{};
+            bool requested{};
+            std::uint64_t seenFrame{};
+            // A preparation cohort survives deferred cameras. Marking a view
+            // consumed performs no allocation after native queue acceptance.
+            std::map<std::pair<uint64_t, uint64_t>, bool> views;
+        };
+        std::map<assets::ModelMeshHandle, GeometryDemand> geometryDemands{};
+        std::set<std::pair<uint64_t, uint64_t>> geometryDemandViews{};
 
         struct PooledSprite
         {
             math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
-            std::shared_ptr<Texture> texture;
+            std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
             BillboardType billboardType{ BillboardType::None };
             math::vector3 billboardAxis{ 0.f, 1.f, 0.f };
             int orderInLayer{ 0 };
             bool enableDepth{ false };
         };
+        own::shared_owner<TextureFramePins> textureFramePins;
+        enum class ImageAdmission { Ready, Pending, Failed };
+        struct ImageDemand
+        {
+            own::shared_owner<const Texture> texture;
+            AssetDepot::AssetRequest<Texture::CodecImage> request;
+            own::shared_owner<const Texture::CodecImage> ready;
+            bool requested{};
+            bool replayNeeded{};
+            bool bootstrap{};
+            uint64_t bootstrapSceneEpoch{};
+            std::set<std::pair<uint64_t, uint64_t>> views;
+        };
+        // Retain both pending requests and ready results until staging consumes
+        // them. Another view/resource can remain Pending at a zero CPU budget.
+        std::unordered_map<std::uint64_t, ImageDemand> imageDemands;
+        std::pair<uint64_t, uint64_t> imageAdmissionView{};
+        struct ImageBootstrapViews
+        {
+            uint64_t sceneEpoch{};
+            std::set<uint64_t> pending;
+            std::set<uint64_t> admitted;
+        };
+        std::optional<ImageBootstrapViews> imageBootstrapViews;
+
+        own::shared_owner<material_graph::InstanceFramePins> graphFramePins;
         std::vector<PooledSprite> spritePool;
         RenderScene::UIProxySnapshot uiProxySnapshot;
         std::vector<UIRenderProxy*> uiProxyPointers;
@@ -2149,7 +2310,7 @@ namespace
         // remains aligned when optional graph candidates are removed.
         std::vector<bool> graphShadowEligible;
         std::vector<bool> graphViewRequired;
-        std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
         // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —
@@ -2864,26 +3025,13 @@ namespace
             // ── 블루 노이즈 — 프록셀 지터의 씨앗 ──
             if (!fogBlueNoise)
             {
-                const file::path path =
-                    PathFinder::Relative("VolumetricFog\\blueNoise.dds");
-                try
-                {
-                    fogBlueNoise = Texture::LoadManagedFromPath(path);
-                }
-                catch (const std::exception& exception)
-                {
-                    outError = "블루 노이즈 로드 실패: " + std::string(exception.what());
-                    return false;
-                }
-            }
-            if (!fogBlueNoise)
-            {
                 outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
                 return false;
             }
 
             const RHITextureEntry noiseEntry =
-                dx12.TextureCache().GetOrUpload(fogBlueNoise.get(), outError);
+                dx12.TextureCache().GetOrUpload((fogBlueNoise ? &*fogBlueNoise.borrow() : nullptr),
+                    p.frameContext.TextureImage(fogBlueNoise ? &*fogBlueNoise : nullptr), outError);
             if (!noiseEntry.IsValid())
             {
                 outError = "블루 노이즈 운반 실패" +
@@ -2916,28 +3064,14 @@ namespace
 
             if (!fogBlueNoise)
             {
-                const file::path path =
-                    PathFinder::Relative("VolumetricFog\\blueNoise.dds");
-                try
-                {
-                    fogBlueNoise = Texture::LoadManagedFromPath(path);
-                }
-                catch (const std::exception& exception)
-                {
-                    outError = "블루 노이즈 로드 실패: " +
-                        std::string(exception.what());
-                    return false;
-                }
-            }
-            if (!fogBlueNoise)
-            {
                 outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
                 return false;
             }
 
             std::string noiseError;
             const RHITextureEntry noise =
-                p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
+                p.textureCache.GetOrUpload((fogBlueNoise ? &*fogBlueNoise.borrow() : nullptr),
+                    p.frameContext.TextureImage(fogBlueNoise ? &*fogBlueNoise : nullptr), noiseError);
             if (!noise.IsValid())
             {
                 outError = "Vulkan 블루 노이즈 운반 실패" +
@@ -2947,7 +3081,7 @@ namespace
 
             std::string neutralError;
             const RHITextureEntry neutral =
-                p.textureCache.GetOrUpload(nullptr, neutralError);
+                p.textureCache.GetOrUpload(nullptr, {}, neutralError);
             if (!neutral.IsValid())
             {
                 outError = "Vulkan 포그 중립 구름 텍스처 생성 실패" +
@@ -3090,7 +3224,7 @@ namespace
                 node.prepare = [this, &p](const EnhancedFrameContext& ctx,
                     std::string& err, uint32_t) -> bool
                 {
-                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals);
+                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
                     return p.decal.PrepareFrame(ctx, err);
                 };
                 node.reads = { LiveSlots::kGBufferDepth };
@@ -3825,7 +3959,7 @@ namespace
 
         static bool AppendImageToPlane(const UIRenderProxy::ImageData& image,
             const CanvasPlane& plane, bool enableDepth,
-            std::vector<EnhancedSpritePass::Item>& output)
+            std::vector<EnhancedSpritePass::Item>& output, TextureFramePins& texturePins)
         {
             if (!plane.valid) return false;
 
@@ -3859,7 +3993,8 @@ namespace
             item.world = MakeSpriteMatrix(right, down, center);
             item.uv = uv;
             item.color = image.color;
-            item.texture = image.texture.get();
+            item.texturePinIndex = texturePins.Retain(image.texture);
+            item.texture = texturePins.Borrow(item.texturePinIndex);
             item.canvasOrder = image.canvasOrder;
             item.layerOrder = image.layerOrder;
             item.enableDepth = enableDepth;
@@ -3897,19 +4032,352 @@ namespace
             add(plane.center + plane.right * 0.5f, rightUnit * thickness, plane.down);
         }
 
+        void RetainGraphImages(const own::shared_owner<const material_graph::Instance>& instance)
+        {
+            if (instance)
+            {
+                for (const auto& texture : instance->textures)
+                {
+                    textureFramePins->Retain(texture.owner);
+                }
+            }
+        }
+
+        void PinGraphInstance(EnhancedDrawItem& draw,
+            const own::shared_owner<const material_graph::Instance>& instance)
+        {
+            RetainGraphImages(instance);
+            draw.materialGraphPinIndex = graphFramePins->Retain(instance);
+            draw.materialGraphView = graphFramePins->Borrow(draw.materialGraphPinIndex);
+            draw.materialGraphInstance.reset();
+        }
+
+        // Runs before either backend begins an upload recording. Exact requests
+        // survive Pending across packets; cache-zero ready results are handed to
+        // the CPU-use table before the request owner is released.
+        bool PrepareGeometry(std::uint64_t frameId, bool& pending, std::string& error)
+        {
+            pending = false;
+            error.clear();
+            geometryFramePins.entries.clear();
+            const auto admit = [&](const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor,
+                bool cpuConsumer)
+            {
+                const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                if (!handle.IsValid())
+                {
+                    error = "Invalid granular mesh descriptor identity.";
+                    return false;
+                }
+                const bool resident = backend == EnhancedLiveBackend::DX12
+                    ? pipeline && dx12.MeshCache().FindModel(handle).IsValid()
+                    : vulkanPipeline && vulkanPipeline->meshCache.FindModel(handle).IsValid();
+                // Graph sealing is a distinct CPU user, even with a resident GPU buffer.
+                if (resident && !cpuConsumer)
+                {
+                    return true;
+                }
+                auto& demand = geometryDemands[handle];
+                demand.seenFrame = frameId;
+                for (const auto& view : geometryDemandViews)
+                {
+                    demand.views.try_emplace(view, false);
+                }
+                if (!demand.descriptor)
+                {
+                    demand.descriptor = descriptor;
+                }
+                if (!demand.ready)
+                {
+                    demand.ready = DataSystems->TryAcquire(demand.descriptor);
+                }
+                if (!demand.ready)
+                {
+                    if (!demand.requested)
+                    {
+                        demand.request = DataSystems->RequestAsync(demand.descriptor);
+                        demand.requested = true;
+                    }
+                    const auto result = demand.request.Snapshot();
+                    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+                    {
+                        pending = true;
+                        return true;
+                    }
+                    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+                    {
+                        error = "Exact mesh geometry preparation failed: " + result.message;
+                        return false;
+                    }
+                    demand.ready = result.asset;
+                }
+                if (!demand.ready->Matches(*demand.descriptor))
+                {
+                    error = "Prepared mesh geometry does not match its exact descriptor.";
+                    return false;
+                }
+                return true;
+            };
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                if (!primitive || !primitive->m_isEnabled)
+                {
+                    continue;
+                }
+                if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
+                {
+                    if (!admit(mesh->m_meshDescriptor, mesh->m_graphMaterialSource || mesh->m_isAnimationEnabled))
+                    {
+                        return false;
+                    }
+                }
+                else if (const auto* foliage = primitive->As<FoliageRenderProxy>(); foliage && !foliage->m_isCulled)
+                {
+                    // One demand per actual selected type, never a model root
+                    // closure or an unrelated mesh/material in the descriptor.
+                    for (std::size_t index = 0u; index < foliage->m_foliageTypes.size(); ++index)
+                    {
+                        const auto& type = foliage->m_foliageTypes[index];
+                        const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
+                        if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty()
+                            && !admit(type.m_meshDescriptor, static_cast<bool>(type.m_graphMaterialSource)))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
+            {
+                if (position->second.seenFrame != frameId)
+                {
+                    position->second.request.Cancel();
+                    position = geometryDemands.erase(position);
+                }
+                else
+                {
+                    ++position;
+                }
+            }
+            if (pending)
+            {
+                return false;
+            }
+            geometryFramePins.entries.reserve(geometryDemands.size());
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                geometryFramePins.entries.push_back({ handle, demand.ready });
+                demand.request = {};
+                demand.requested = false;
+            }
+            return true;
+        }
+
+        void CancelGeometryDemands()
+        {
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                demand.request.Cancel();
+            }
+            geometryDemands.clear();
+        }
+
+        void CompleteGeometryView(uint64_t epoch, uint64_t viewId)
+        {
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                const auto view = demand.views.find({ epoch, viewId });
+                if (view != demand.views.end())
+                {
+                    view->second = true;
+                }
+                if (!demand.views.empty() && std::ranges::all_of(demand.views,
+                    [](const auto& entry) { return entry.second; }))
+                {
+                    // Frame-local raw views still have geometryFramePins until
+                    // their final CPU use. Future cold demand may rehydrate.
+                    demand.ready.reset();
+                    demand.request = {};
+                    demand.requested = false;
+                    demand.views.clear();
+                }
+            }
+        }
+
+        void ReconcileGeometryDemands(bool hasSceneGeometryView)
+        {
+            if (geometryDemands.empty())
+            {
+                return;
+            }
+            if (!hasSceneGeometryView || !runtimeInitialized || !renderScene)
+            {
+                CancelGeometryDemands();
+                return;
+            }
+            // Reconcile after proxy deltas even when pixel work will be skipped.
+            // A ready request owns its CPU result independently of cache budgets.
+            // Keep relevant requests across active Pending frames, but never let
+            // a removed/disabled/rebound proxy leave that result pinned forever.
+            std::set<assets::ModelMeshHandle> activeMeshes;
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                if (!primitive || !primitive->m_isEnabled)
+                {
+                    continue;
+                }
+                if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
+                {
+                    activeMeshes.insert(assets::MakeModelMeshHandle(*mesh->m_meshDescriptor));
+                }
+                else if (const auto* foliage = primitive->As<FoliageRenderProxy>(); foliage && !foliage->m_isCulled)
+                {
+                    for (std::size_t index = 0u; index < foliage->m_foliageTypes.size(); ++index)
+                    {
+                        const auto& type = foliage->m_foliageTypes[index];
+                        const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
+                        if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty())
+                        {
+                            activeMeshes.insert(assets::MakeModelMeshHandle(*type.m_meshDescriptor));
+                        }
+                    }
+                }
+            }
+            for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
+            {
+                if (!activeMeshes.contains(position->first))
+                {
+                    position->second.request.Cancel();
+                    position = geometryDemands.erase(position);
+                }
+                else
+                {
+                    std::erase_if(position->second.views,
+                        [this](const auto& view) { return !geometryDemandViews.contains(view.first); });
+                    ++position;
+                }
+            }
+        }
+
+        void ReleaseGeometrySources()
+        {
+            const auto release = [](EnhancedDrawItem& draw)
+            {
+                if (draw.modelMeshView.sourceDescriptor)
+                {
+                    draw.modelMeshView.sourcePayload = nullptr;
+                    draw.modelMeshView.vertexData = nullptr;
+                    draw.modelMeshView.indexData = nullptr;
+                }
+            };
+            for (auto& draw : drawPool)
+            {
+                release(draw.item);
+            }
+            for (auto& draw : shadowDraws)
+            {
+                release(draw);
+            }
+            for (auto& draw : graphDraws)
+            {
+                release(draw);
+            }
+            geometryFramePins.entries.clear();
+        }
+
         void BuildDrawPool()
         {
             drawPool.clear();
+            shadowDraws.clear();
             graphDraws.clear();
             graphShadowEligible.clear();
             graphViewRequired.clear();
             graphViewInput.reset();
             decals.clear();
             spritePool.clear();
+            worldSprites.clear();
+            uiRects.clear();
+            textureFramePins = own::make_shared<TextureFramePins>();
+            graphFramePins = own::make_shared<material_graph::InstanceFramePins>();
             uiProxySnapshot.clear();
             uiProxyPointers.clear();
+            modelFramePins.reset();
 
-            if (nullptr == renderScene) return;
+            if (nullptr == renderScene)
+            {
+                return;
+            }
+
+            assets::ModelAssetGenerationPins modelPins;
+            std::map<assets::ModelAssetGenerationHandle, std::size_t> modelPinIndices;
+            std::map<assets::ModelMeshHandle, std::size_t> meshPinIndices;
+            struct BuildGuard final
+            {
+                LiveState& state;
+                bool published{};
+                ~BuildGuard()
+                {
+                    if (!published)
+                    {
+                        // Clear every current-input borrow before local owners
+                        // unwind, including failures partway through collection.
+                        // Accepted frames have independent table owners.
+                        state.drawPool.clear();
+                        state.shadowDraws.clear();
+                        state.graphDraws.clear();
+                        state.graphShadowEligible.clear();
+                        state.graphViewRequired.clear();
+                        state.graphViewInput.reset();
+                        state.decals.clear();
+                        state.spritePool.clear();
+                        state.worldSprites.clear();
+                        state.uiRects.clear();
+                        state.uiProxyPointers.clear();
+                        state.uiProxySnapshot.clear();
+                        state.modelFramePins.reset();
+                        state.graphFramePins.reset();
+                        state.textureFramePins.reset();
+                    }
+                }
+            };
+            BuildGuard buildGuard{ *this };
+            const auto pinModel = [&modelPins, &modelPinIndices](
+                const assets::ModelAssetGeneration::Shared& generation)
+            {
+                const auto handle = generation->Handle();
+                const auto [position, inserted] = modelPinIndices.emplace(
+                    handle, modelPins.generations.size());
+                if (inserted)
+                {
+                    modelPins.generations.push_back(generation);
+                }
+                else
+                {
+                    const auto& identity = generation->Identity();
+                    const auto& pinned = modelPins.generations[position->second]->Identity();
+                    if (identity.sourceFingerprint != pinned.sourceFingerprint
+                        || identity.identityProfile != pinned.identityProfile
+                        || identity.identityEpoch != pinned.identityEpoch)
+                    {
+                        return (std::numeric_limits<std::size_t>::max)();
+                    }
+                }
+                return position->second;
+            };
+
+            const auto pinMesh = [&modelPins, &meshPinIndices](
+                const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor)
+            {
+                const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                const auto [position, inserted] = meshPinIndices.emplace(handle, modelPins.meshes.size());
+                if (inserted)
+                {
+                    modelPins.meshes.push_back(descriptor);
+                }
+                return position->second;
+            };
 
             const auto poolDecal = [this](const DecalRenderProxy* proxy)
             {
@@ -3924,45 +4392,72 @@ namespace
 
                 EnhancedDecalPass::Item item{};
                 item.worldMatrix = proxy->m_worldMatrix;
-                item.diffuse = proxy->m_diffuseTexture.get();
-                item.normal = proxy->m_normalTexture.get();
-                item.occRoughMetal = proxy->m_occluroughmetalTexture.get();
+                item.texturePinIndices = {textureFramePins->Retain(proxy->m_diffuseTexture),
+                    textureFramePins->Retain(proxy->m_normalTexture),
+                    textureFramePins->Retain(proxy->m_occluroughmetalTexture)};
+                item.diffuse = textureFramePins->Borrow(item.texturePinIndices[0]);
+                item.normal = textureFramePins->Borrow(item.texturePinIndices[1]);
+                item.occRoughMetal = textureFramePins->Borrow(item.texturePinIndices[2]);
                 item.sliceX = proxy->m_sliceX;
                 item.sliceY = proxy->m_sliceY;
                 item.sliceNum = proxy->m_sliceNum;
                 decals.push_back(item);
             };
 
-            const auto poolMesh = [this](const MeshRenderProxy* proxy)
+            const auto poolMesh = [this, &pinModel, &pinMesh, &modelPins](const MeshRenderProxy* proxy)
             {
                 // Visibility is published by Scene even when the Animator is disabled.
                 // Exclude the mesh before building draws for any render pass.
                 if (!proxy->m_isEnabled) return;
-
-                // PHASE 3.75 MBC7 — typed generation 뷰가 정본이다. generation
-                // descriptor와 immutable 저장소를 대조해 뷰를 짓고(BuildRHIModelMeshView),
-                // 실패·부재면 experiment 핸들 → legacy Mesh 순으로 내려간다(MBC9 은퇴).
-                RHIModelMeshView modelView{};
-                if (!proxy->m_modelGeneration
-                    || !BuildRHIModelMeshView(*proxy->m_modelGeneration,
-                        proxy->m_modelMeshIndex, modelView))
+                if (proxy->m_graphMaterialSource)
                 {
-                    return;
+                    RetainGraphImages(proxy->m_graphMaterialSource->instance);
                 }
 
                 PooledDraw pooled{};
-                pooled.item.worldMatrix = proxy->m_worldMatrix;
-                pooled.item.modelMeshView = modelView;
-                pooled.generationSource = proxy->m_modelGeneration;
-                // I6-C — 신원 키와 반경을 값으로 싣는다.
-                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                RHIModelMeshView modelView{};
+                math::aabb bounds{};
+                if (proxy->m_meshDescriptor)
                 {
-                    const math::aabb& bounds = proxy->m_modelGeneration
-                        ->Meshes()[proxy->m_modelMeshIndex].bounds;
-                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
-                    pooled.item.boundRadius = bounds.is_empty()
-                        ? 0.f : math::length(bounds.extents);
+                    const auto pinIndex = pinMesh(proxy->m_meshDescriptor);
+                    const auto& descriptor = modelPins.meshes[pinIndex];
+                    const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                    const auto payload = std::ranges::find_if(geometryFramePins.entries,
+                        [&](const auto& entry) { return entry.handle == handle; });
+                    const bool valid = payload != geometryFramePins.entries.end()
+                        ? payload->payload && BuildRHIModelMeshView(*descriptor, *payload->payload, modelView)
+                        : BuildRHIModelMeshView(*descriptor, modelView);
+                    if (!valid)
+                    {
+                        return;
+                    }
+                    pooled.modelPinIndex = pinIndex;
+                    bounds = descriptor->bounds;
                 }
+                else
+                {
+                    if (!proxy->m_modelGeneration)
+                    {
+                        return;
+                    }
+                    const auto pinIndex = pinModel(proxy->m_modelGeneration);
+                    if (pinIndex == (std::numeric_limits<std::size_t>::max)())
+                    {
+                        return;
+                    }
+                    const auto& generation = modelPins.generations[pinIndex];
+                    if (!BuildRHIModelMeshView(*generation, proxy->m_modelMeshIndex, modelView))
+                    {
+                        return;
+                    }
+                    pooled.modelPinIndex = pinIndex;
+                    bounds = generation->Meshes()[proxy->m_modelMeshIndex].bounds;
+                }
+                pooled.item.worldMatrix = proxy->m_worldMatrix;
+                pooled.item.modelMeshView = std::move(modelView);
+                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                pooled.item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
 
                 const math::matrix4x4* palette = proxy->m_paletteArena
                     ? proxy->m_paletteArena->resolve(proxy->m_paletteOffset,
@@ -3978,10 +4473,11 @@ namespace
 
                 if (proxy->m_graphMaterialSource)
                 {
-                    pooled.graphMaterialSource = proxy->m_graphMaterialSource;
-                    pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
-                    pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
-                    pooled.item.coverage = pooled.graphMaterialSource->coverage;
+                    const auto& source = *proxy->m_graphMaterialSource;
+                    pooled.hasGraphMaterialSource = true;
+                    PinGraphInstance(pooled.item, source.instance);
+                    pooled.item.materialGraphSlot = source.materialSlot;
+                    pooled.item.coverage = source.coverage;
                 }
 
                 pooled.worldBounds = proxy->m_worldBounds;
@@ -3990,48 +4486,69 @@ namespace
                 drawPool.push_back(pooled);
             };
 
-            const auto poolFoliage = [this](const FoliageRenderProxy* proxy)
+            const auto poolFoliage = [this, &pinModel, &pinMesh, &modelPins](const FoliageRenderProxy* proxy)
             {
                 if (!proxy->m_isEnabled || proxy->m_isCulled) return;
 
-                for (FoliageRenderProxy::DrawSource source :
-                    proxy->CaptureDrawSources())
+                // CaptureDrawSources returns only instance values and type
+                // indices. Owners stay on the live proxy, then in frame tables.
+                for (const auto& source : proxy->CaptureDrawSources())
                 {
-                    // PHASE 3.75 MBC8 — poolMesh와 같은 typed 축이 첫째다.
-                    RHIModelMeshView modelView{};
-                    if (!source.modelGeneration
-                        || !BuildRHIModelMeshView(*source.modelGeneration,
-                            source.modelMeshIndex, modelView))
-                    {
-                        continue;
-                    }
-
+                    const auto& type = proxy->m_foliageTypes[source.foliageTypeID];
                     PooledDraw pooled{};
+                    RHIModelMeshView modelView{};
+                    math::aabb bounds{};
+                    if (type.m_meshDescriptor)
+                    {
+                        const auto pinIndex = pinMesh(type.m_meshDescriptor);
+                        const auto& descriptor = modelPins.meshes[pinIndex];
+                        const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                        const auto payload = std::ranges::find_if(geometryFramePins.entries,
+                            [&](const auto& entry) { return entry.handle == handle; });
+                        const bool valid = payload != geometryFramePins.entries.end()
+                            ? payload->payload && BuildRHIModelMeshView(*descriptor, *payload->payload, modelView)
+                            : BuildRHIModelMeshView(*descriptor, modelView);
+                        if (!valid)
+                        {
+                            continue;
+                        }
+                        pooled.modelPinIndex = pinIndex;
+                        bounds = descriptor->bounds;
+                    }
+                    else
+                    {
+                        if (!type.m_modelGeneration)
+                        {
+                            continue;
+                        }
+                        const auto pinIndex = pinModel(type.m_modelGeneration);
+                        if (pinIndex == (std::numeric_limits<std::size_t>::max)())
+                        {
+                            continue;
+                        }
+                        const auto& generation = modelPins.generations[pinIndex];
+                        if (!BuildRHIModelMeshView(*generation, type.m_modelMeshIndex, modelView))
+                        {
+                            continue;
+                        }
+                        pooled.modelPinIndex = pinIndex;
+                        bounds = generation->Meshes()[type.m_modelMeshIndex].bounds;
+                    }
                     pooled.item.worldMatrix = source.worldMatrix;
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
-                    pooled.item.modelMeshView = modelView;
-                    pooled.generationSource = source.modelGeneration;
-
-                    if (source.graphMaterialSource)
+                    pooled.item.modelMeshView = std::move(modelView);
+                    if (type.m_graphMaterialSource)
                     {
-                        pooled.graphMaterialSource = std::move(source.graphMaterialSource);
-                        pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
-                        pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
-                        pooled.item.coverage = pooled.graphMaterialSource->coverage;
+                        const auto& material = *type.m_graphMaterialSource;
+                        pooled.hasGraphMaterialSource = true;
+                        PinGraphInstance(pooled.item, material.instance);
+                        pooled.item.materialGraphSlot = material.materialSlot;
+                        pooled.item.coverage = material.coverage;
                     }
-
-                    // I6-C — poolMesh와 같은 규약: 신원 키와 반경을 값으로
-                    //   싣는다(패스가 Mesh를 역참조하지 않게).
                     pooled.item.geometryKey = MakeGeometryKey(pooled.item);
-                    {
-                        const math::aabb& bounds = source.modelGeneration
-                            ->Meshes()[source.modelMeshIndex].bounds;
-                        pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
-                    pooled.item.boundRadius = bounds.is_empty()
-                            ? 0.f : math::length(bounds.extents);
-                    }
-
+                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                    pooled.item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
                     drawPool.push_back(std::move(pooled));
                 }
             };
@@ -4041,7 +4558,7 @@ namespace
                 if (!proxy->m_isEnabled || nullptr == proxy->m_spriteTexture) return;
                 PooledSprite pooled{};
                 pooled.worldMatrix = proxy->m_worldMatrix;
-                pooled.texture = proxy->m_spriteTexture;
+                pooled.texturePinIndex = textureFramePins->Retain(proxy->m_spriteTexture);
                 pooled.billboardType = proxy->m_billboardType;
                 pooled.billboardAxis = proxy->m_billboardAxis;
                 pooled.orderInLayer = proxy->m_orderInLayer;
@@ -4086,12 +4603,566 @@ namespace
                 }
             }
 
+            // Publish only after every raw draw view has an owning table slot.
+            // No mutable table alias survives this conversion.
+            modelFramePins = own::make_shared<const assets::ModelAssetGenerationPins>(
+                std::move(modelPins));
             uiProxySnapshot = renderScene->GetUIProxySnapshot();
             uiProxyPointers.reserve(uiProxySnapshot.size());
             for (const auto& proxy : uiProxySnapshot)
             {
                 if (proxy) uiProxyPointers.push_back(proxy.get());
             }
+            buildGuard.published = true;
+        }
+
+        void ImportPreparedImages(const EnhancedLiveFramePacket& frame)
+        {
+            if (!frame.preparedTextureImages)
+            {
+                return;
+            }
+            imageBootstrapViews.emplace();
+            imageBootstrapViews->sceneEpoch = frame.sceneEpoch;
+            for (uint32_t index = 0; index < frame.viewCount; ++index)
+            {
+                const auto& view = frame.views[index];
+                if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+                {
+                    imageBootstrapViews->pending.insert(view.key.viewId);
+                }
+            }
+            for (const auto& texture : frame.preparedTextureImages->Owners())
+            {
+                const auto image = frame.preparedTextureImages->Image(&*texture);
+                if (!image)
+                {
+                    continue;
+                }
+                auto& demand = imageDemands[TextureFramePins::Identity(&*texture)];
+                demand.texture = texture;
+                demand.ready = image;
+                demand.request.Cancel();
+                demand.request = {};
+                demand.bootstrap = true;
+                demand.bootstrapSceneEpoch = frame.sceneEpoch;
+            }
+            // The result has moved into exact-generation demands. Other packets
+            // may still share this table, but must not retain duplicate bulk pins.
+            frame.preparedTextureImages->ReleaseImages();
+        }
+
+        void CompleteImageBootstrap(uint64_t epoch, uint64_t admittedView)
+        {
+            if (!imageBootstrapViews || imageBootstrapViews->sceneEpoch != epoch)
+            {
+                return;
+            }
+            if (admittedView != 0)
+            {
+                imageBootstrapViews->admitted.insert(admittedView);
+                imageBootstrapViews->pending.erase(admittedView);
+            }
+            if (!imageBootstrapViews->pending.empty())
+            {
+                return;
+            }
+            // Every current scene camera registered its exact demand. Unused
+            // preload may now be dropped without racing an unvisited camera.
+            imageBootstrapViews.reset();
+            for (auto& [identity, demand] : imageDemands)
+            {
+                if (demand.bootstrapSceneEpoch == epoch)
+                {
+                    demand.bootstrap = false;
+                }
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                const auto& demand = item.second;
+                if (demand.bootstrapSceneEpoch == epoch && demand.views.empty())
+                {
+                    demand.request.Cancel();
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        void ReconcileImageDemands(const EnhancedLiveFramePacket& frame, bool renderable)
+        {
+            std::set<std::pair<uint64_t, uint64_t>> currentViews;
+            std::set<uint64_t> currentSceneViews;
+            if (renderable)
+            {
+                for (uint32_t index = 0; index < (std::min)(frame.viewCount,
+                    static_cast<uint32_t>(EnhancedSceneRenderer::kMaxLiveCameraViews)); ++index)
+                {
+                    const auto& view = frame.views[index];
+                    if (!view.key.IsValid())
+                    {
+                        continue;
+                    }
+                    currentViews.emplace(frame.sceneEpoch, view.key.viewId);
+                    if (view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+                    {
+                        currentSceneViews.insert(view.key.viewId);
+                    }
+                }
+            }
+            if (!currentSceneViews.empty())
+            {
+                ImportPreparedImages(frame);
+            }
+            else if (frame.preparedTextureImages)
+            {
+                frame.preparedTextureImages->ReleaseImages();
+            }
+            if (imageBootstrapViews && imageBootstrapViews->sceneEpoch == frame.sceneEpoch)
+            {
+                std::erase_if(imageBootstrapViews->pending,
+                    [&](uint64_t view) { return !currentSceneViews.contains(view); });
+                for (const auto view : currentSceneViews)
+                {
+                    if (!imageBootstrapViews->admitted.contains(view))
+                    {
+                        imageBootstrapViews->pending.insert(view);
+                    }
+                }
+                CompleteImageBootstrap(frame.sceneEpoch, 0);
+            }
+            else
+            {
+                imageBootstrapViews.reset();
+            }
+            for (auto& [identity, demand] : imageDemands)
+            {
+                std::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                const auto& demand = item.second;
+                if (!demand.views.empty() || (demand.bootstrap
+                    && demand.bootstrapSceneEpoch == frame.sceneEpoch && !currentSceneViews.empty()))
+                {
+                    return false;
+                }
+                demand.request.Cancel();
+                return true;
+            });
+            if (currentViews.empty() && textureFramePins)
+            {
+                textureFramePins->ReleaseImages();
+            }
+        }
+
+        void PruneImageDemands(const EnhancedLiveFramePacket& frame)
+        {
+            if (!textureFramePins)
+            {
+                textureFramePins = own::make_shared<TextureFramePins>();
+            }
+            const auto retainMaterial = [this](const auto& source)
+            {
+                if (source && source->instance)
+                {
+                    for (const auto& texture : source->instance->textures)
+                    {
+                        textureFramePins->Retain(texture.owner);
+                    }
+                }
+            };
+            for (const auto& proxy : uiProxySnapshot)
+            {
+                if (proxy)
+                {
+                    if (const auto* image = std::get_if<UIRenderProxy::ImageData>(&proxy->GetData()))
+                    {
+                        textureFramePins->Retain(image->texture);
+                    }
+                }
+            }
+            std::set<std::pair<uint64_t, uint64_t>> currentViews;
+            std::set<uint64_t> currentSceneViews;
+            for (uint32_t index = 0; index < frame.viewCount; ++index)
+            {
+                const auto& view = frame.views[index];
+                currentViews.emplace(frame.sceneEpoch, view.key.viewId);
+                if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+                {
+                    currentSceneViews.insert(view.key.viewId);
+                }
+                retainMaterial(view.materialPreview);
+                for (const auto& ground : view.materialPreviewFloor)
+                {
+                    retainMaterial(ground);
+                }
+                if (view.gizmos && view.gizmos->iconTextures)
+                {
+                    const auto& icons = *view.gizmos->iconTextures;
+                    textureFramePins->Retain(icons.camera);
+                    textureFramePins->Retain(icons.mainLight);
+                    textureFramePins->Retain(icons.directionalLight);
+                    textureFramePins->Retain(icons.pointLight);
+                    textureFramePins->Retain(icons.spotLight);
+                }
+            }
+            if (imageBootstrapViews && imageBootstrapViews->sceneEpoch == frame.sceneEpoch)
+            {
+                std::erase_if(imageBootstrapViews->pending,
+                    [&](uint64_t view) { return !currentSceneViews.contains(view); });
+                for (const auto view : currentSceneViews)
+                {
+                    if (!imageBootstrapViews->admitted.contains(view))
+                    {
+                        imageBootstrapViews->pending.insert(view);
+                    }
+                }
+                CompleteImageBootstrap(frame.sceneEpoch, 0);
+            }
+            else
+            {
+                imageBootstrapViews.reset();
+            }
+            textureFramePins->Retain(skyEquirect);
+            if (fogEnabled)
+            {
+                textureFramePins->Retain(fogBlueNoise);
+            }
+            std::unordered_set<std::uint64_t> current;
+            for (const auto& texture : textureFramePins->Owners())
+            {
+                current.insert(TextureFramePins::Identity(&*texture));
+            }
+            for (auto& [identity, demand] : imageDemands)
+            {
+                std::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                const auto& demand = item.second;
+                if ((current.contains(item.first) && !demand.views.empty())
+                    || (demand.bootstrap && demand.bootstrapSceneEpoch == frame.sceneEpoch))
+                {
+                    return false;
+                }
+                // Cancels only this demand, never the tracked shared decode job.
+                demand.request.Cancel();
+                return true;
+            });
+        }
+
+        ImageAdmission AdmitEnvironment(bool required, std::string& error)
+        {
+            error.clear();
+            if (!required || skyCooked || skyEquirect)
+            {
+                return ImageAdmission::Ready;
+            }
+            {
+                std::lock_guard lock(environmentPreparation->mutex);
+                if (environmentPreparation->progress.activeRequests != 0)
+                {
+                    return ImageAdmission::Pending;
+                }
+                if (environmentPreparation->selection == skyBoxPath
+                    && !environmentPreparation->cpuError.empty())
+                {
+                    error = environmentPreparation->cpuError;
+                    return ImageAdmission::Failed;
+                }
+            }
+            return QueueEnvironmentPreparation(environmentPreparation, skyBoxPath, error, false)
+                ? ImageAdmission::Pending : ImageAdmission::Failed;
+        }
+
+        ImageAdmission AdmitFogImage(std::string& error)
+        {
+            error.clear();
+            if (!fogEnabled || fogBlueNoise)
+            {
+                return ImageAdmission::Ready;
+            }
+            const auto preparation = fogImagePreparation;
+            {
+                std::lock_guard lock(preparation->mutex);
+                if (preparation->complete)
+                {
+                    if (!preparation->texture)
+                    {
+                        error = preparation->error;
+                        return ImageAdmission::Failed;
+                    }
+                    fogBlueNoise = preparation->texture;
+                    return ImageAdmission::Ready;
+                }
+                if (preparation->started)
+                {
+                    return ImageAdmission::Pending;
+                }
+                preparation->started = true;
+            }
+            // Capture the source path on RT; all opening/decoding is worker-only.
+            const auto path = PathFinder::Relative("VolumetricFog\\blueNoise.dds");
+            const auto finish = [preparation](std::exception_ptr failure)
+            {
+                std::lock_guard lock(preparation->mutex);
+                if (failure)
+                {
+                    try
+                    {
+                        std::rethrow_exception(failure);
+                    }
+                    catch (const std::exception& exception)
+                    {
+                        preparation->error = exception.what();
+                    }
+                    catch (...)
+                    {
+                        preparation->error = "Blue noise preparation failed";
+                    }
+                }
+                if (!preparation->texture && preparation->error.empty())
+                {
+                    preparation->error = "Blue noise image is unavailable";
+                }
+                preparation->complete = true;
+            };
+            try
+            {
+                job_group work;
+                work.add([preparation, path]
+                {
+                    auto texture = Texture::LoadSharedFromPath(path);
+                    std::lock_guard lock(preparation->mutex);
+                    preparation->texture = std::move(texture);
+                });
+                work.on_complete(finish);
+                ce::get_job_scheduler().submit(std::move(work));
+            }
+            catch (...)
+            {
+                finish(std::current_exception());
+            }
+            return ImageAdmission::Pending;
+        }
+
+        ImageAdmission AdmitViewImages(IRenderTextureCache& cache, bool environmentRequired,
+            std::string& error)
+        {
+            const auto environment = AdmitEnvironment(environmentRequired, error);
+            if (environment == ImageAdmission::Failed)
+            {
+                return environment;
+            }
+            std::string fogError;
+            const auto fog = AdmitFogImage(fogError);
+            if (fog == ImageAdmission::Failed)
+            {
+                // Preserve the existing optional-fog failure policy.
+                lastError = "Volumetric fog disabled: " + fogError;
+                fogEnabled = false;
+                fogTeardownPending = true;
+            }
+            const auto images = AdmitImagePayloads(cache, false, error);
+            if (images == ImageAdmission::Failed)
+            {
+                return images;
+            }
+            return environment == ImageAdmission::Pending || fog == ImageAdmission::Pending
+                || images == ImageAdmission::Pending ? ImageAdmission::Pending : ImageAdmission::Ready;
+        }
+
+        ImageAdmission AdmitImagePayloads(IRenderTextureCache& cache, bool replayPixels,
+            std::string& error)
+        {
+            error.clear();
+            std::unordered_set<std::uint64_t> needed;
+            const auto requireTexture = [&](const Texture* texture)
+            {
+                if (texture)
+                {
+                    needed.insert(TextureFramePins::Identity(texture));
+                }
+            };
+            const auto requireMaterial = [&](const auto& material)
+            {
+                if (material)
+                {
+                    for (const auto& texture : material->textures)
+                    {
+                        textureFramePins->Retain(texture.owner);
+                        requireTexture(texture.owner ? &*texture.owner : nullptr);
+                    }
+                }
+            };
+            if (graphViewInput)
+            {
+                for (const auto& draw : graphViewInput->Draws())
+                {
+                    requireMaterial(draw.material);
+                }
+            }
+            else
+            {
+                // The controlled replay hashes rows before it seals the view.
+                for (const auto& draw : graphDraws)
+                {
+                    requireMaterial(draw.GraphInstance());
+                }
+            }
+            for (const auto& draw : shadowDraws)
+            {
+                requireMaterial(draw.GraphInstance());
+                if (draw.materialSnapshot)
+                {
+                    for (const auto& texture : draw.materialSnapshot->textureBindings)
+                    {
+                        textureFramePins->Retain(texture.textureOwner);
+                        requireTexture(texture.textureOwner ? &*texture.textureOwner : nullptr);
+                    }
+                }
+                if (draw.forwardMaterialSnapshot)
+                {
+                    for (const auto& texture : draw.forwardMaterialSnapshot->textureBindings)
+                    {
+                        textureFramePins->Retain(texture.textureOwner);
+                        requireTexture(texture.textureOwner ? &*texture.textureOwner : nullptr);
+                    }
+                }
+                requireTexture(draw.baseColor);
+                requireTexture(draw.normalMap);
+                requireTexture(draw.occRoughMetal);
+                requireTexture(draw.emissive);
+            }
+            for (const auto& sprite : worldSprites)
+            {
+                requireTexture(sprite.texture);
+            }
+            for (const auto& rect : uiRects)
+            {
+                requireTexture(rect.texture);
+            }
+            if (!materialPreviewView)
+            {
+                for (const auto& decal : decals)
+                {
+                    requireTexture(decal.diffuse);
+                    requireTexture(decal.normal);
+                    requireTexture(decal.occRoughMetal);
+                }
+            }
+            for (const auto& icon : gizmoData.icons)
+            {
+                requireTexture(icon.texture);
+            }
+            if (skyEquirect)
+            {
+                textureFramePins->Retain(skyEquirect);
+                requireTexture(&*skyEquirect);
+                textureFramePins->RetainImage(skyEquirect, skyEquirectImage);
+            }
+            if (fogEnabled && fogBlueNoise)
+            {
+                textureFramePins->Retain(fogBlueNoise);
+                requireTexture(&*fogBlueNoise);
+            }
+            for (auto& [identity, demand] : imageDemands)
+            {
+                if (!needed.contains(identity))
+                {
+                    demand.views.erase(imageAdmissionView);
+                }
+            }
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                if (!item.second.bootstrap && item.second.views.empty() && !needed.contains(item.first))
+                {
+                    item.second.request.Cancel();
+                    return true;
+                }
+                return false;
+            });
+            bool pending = false;
+            auto unresolved = needed;
+            for (const auto& texture : textureFramePins->Owners())
+            {
+                const auto* descriptor = &*texture;
+                const auto id = TextureFramePins::Identity(descriptor);
+                if (!needed.contains(id))
+                {
+                    continue;
+                }
+                unresolved.erase(id);
+                if (!replayPixels && cache.IsResident(descriptor))
+                {
+                    const auto found = imageDemands.find(id);
+                    if (found != imageDemands.end() && !found->second.replayNeeded)
+                    {
+                        imageDemands.erase(found);
+                    }
+                    continue;
+                }
+                auto& demand = imageDemands[id];
+                demand.texture = texture;
+                demand.views.insert(imageAdmissionView);
+                demand.replayNeeded |= replayPixels;
+                if (!demand.ready)
+                {
+                    demand.ready = textureFramePins->Image(descriptor);
+                }
+                if (!demand.ready)
+                {
+                    demand.ready = DataSystems->TryAcquire<Texture::CodecImage>(texture);
+                }
+                if (!demand.ready && !demand.requested)
+                {
+                    demand.request = DataSystems->RequestAsync<Texture::CodecImage>(texture);
+                    demand.requested = true;
+                }
+                if (!demand.ready)
+                {
+                    const auto result = demand.request.Snapshot();
+                    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+                    {
+                        pending = true;
+                        continue;
+                    }
+                    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+                    {
+                        error = result.message.empty() ? "Exact texture image preparation failed" : result.message;
+                        return ImageAdmission::Failed;
+                    }
+                    demand.ready = result.asset;
+                    demand.request = {};
+                }
+                textureFramePins->RetainImage(texture, demand.ready);
+            }
+            if (!unresolved.empty())
+            {
+                error = "Texture upload demand has no pinned exact descriptor";
+                return ImageAdmission::Failed;
+            }
+            return pending ? ImageAdmission::Pending : ImageAdmission::Ready;
+        }
+
+        void ReleaseStagedImages(IRenderTextureCache& cache)
+        {
+            if (textureFramePins)
+            {
+                textureFramePins->ReleaseImages();
+            }
+            // Upload calls synchronously copied every source row. GPU staging
+            // and native allocation retirement retain their own completion pins.
+            std::erase_if(imageDemands, [&](const auto& item)
+            {
+                if (item.second.replayNeeded && pbrCapture
+                    && pbrCapture->result.state == EnhancedPbrCaptureState::Pending)
+                {
+                    return false;
+                }
+                return cache.IsResident(&*item.second.texture);
+            });
         }
 
         // ── 렌더 입력 소비: 이 뷰의 몫 ──
@@ -4102,6 +5173,17 @@ namespace
             if (!viewPacket.key.IsValid() || nullptr == renderScene ||
                 0 == frame.width || 0 == frame.height) return false;
 
+            // A preview can resume after a scene-loading packet discarded its
+            // previous current-input roots. Build fresh empty append-only tables.
+            if (!textureFramePins)
+            {
+                textureFramePins = own::make_shared<TextureFramePins>();
+            }
+            if (!graphFramePins)
+            {
+                graphFramePins = own::make_shared<material_graph::InstanceFramePins>();
+            }
+            imageAdmissionView = { frame.sceneEpoch, viewPacket.key.viewId };
             cameraSnapshot = viewPacket.camera;
             materialPreviewView = viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             totalSeconds = frame.totalSeconds;
@@ -4128,7 +5210,7 @@ namespace
                 draw.worldMatrix = math::matrix4x4::identity();
                 draw.boundRadius = 1.f;
                 draw.coverage = source->coverage;
-                draw.materialGraphInstance = source->instance;
+                PinGraphInstance(draw, source->instance);
                 draw.materialGraphSlot = source->materialSlot ? source->materialSlot : 1;
                 material_graph::SceneInputView inputView;
                 inputView.frameId = frame.frameId;
@@ -4151,11 +5233,11 @@ namespace
                     tile.worldMatrix = math::matrix4x4::identity();
                     tile.boundRadius = 8.f;
                     tile.coverage = ground->coverage;
-                    tile.materialGraphInstance = ground->instance;
+                    PinGraphInstance(tile, ground->instance);
                     tile.materialGraphSlot = ground->materialSlot;
                     previewDraws.push_back(std::move(tile));
                 }
-                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error))
+                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error, {}, graphFramePins))
                 {
                     lastError = "Material preview: " + error;
                     return false;
@@ -4210,7 +5292,8 @@ namespace
 
                 EnhancedSpritePass::Item item{};
                 item.world = MakeSpriteMatrix(right, down, center);
-                item.texture = sprite.texture.get();
+                item.texturePinIndex = sprite.texturePinIndex;
+                item.texture = textureFramePins->Borrow(item.texturePinIndex);
                 item.layerOrder = sprite.orderInLayer;
                 item.enableDepth = sprite.enableDepth;
                 worldSprites.push_back(item);
@@ -4233,7 +5316,8 @@ namespace
             {
                 EnhancedUIPass::BuildRectsFromQueue(uiProxyPointers.data(),
                     uiProxyPointers.size(), uiRects,
-                    static_cast<float>(frame.width), static_cast<float>(frame.height));
+                    static_cast<float>(frame.width), static_cast<float>(frame.height),
+                    &*textureFramePins.borrow());
             }
 
             // Scene View에서는 Overlay도 Canvas Transform 평면으로 미리 본다.
@@ -4252,7 +5336,7 @@ namespace
 
                 const CanvasPlane plane = ResolveCanvasPlane(*image, gameCamera);
                 const bool depth = CanvasRenderMode::WorldSpace == image->renderMode;
-                AppendImageToPlane(*image, plane, depth, worldSprites);
+                AppendImageToPlane(*image, plane, depth, worldSprites, *textureFramePins);
 
                 if (HasViewFlag(viewPacket.viewFlags,
                     EnhancedLiveViewFlags::CanvasPreview))
@@ -4309,7 +5393,7 @@ namespace
                 // Resolve the exact already-sealed generation before CPU rejection,
                 // including on devices without indirect support and before the
                 // optional offscreen candidate budget can discard a custom draw.
-                bool knownPositionContract = bool(pooled.graphMaterialSource);
+                bool knownPositionContract = bool(pooled.hasGraphMaterialSource);
                 const bool conservative = !knownPositionContract || !shadow_math::FinitePose(pooled.item);
                 const bool sourceVisible = conservative || !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
                     || math::intersects(frustum, pooled.worldBounds);
@@ -4317,7 +5401,7 @@ namespace
                 // every skinned CAMERA candidate before CPU rejection/budgeting;
                 // a bind-pose/proxy box is not a proof for arbitrary current skin.
                 const bool visible = pooled.item.boneCount != 0 || sourceVisible;
-                if (!pooled.graphMaterialSource || !pooled.item.materialGraphInstance)
+                if (!pooled.hasGraphMaterialSource || !pooled.item.GraphInstance())
                 {
                     lastError = "Live scene draw requires a prepared material graph source.";
                     ++frameFailures;
@@ -4354,7 +5438,7 @@ namespace
                         continue;
                     }
                     ++optionalGpuCandidates;
-                    hasOptionalGraphCandidates |= bool(pooled.graphMaterialSource);
+                    hasOptionalGraphCandidates |= bool(pooled.hasGraphMaterialSource);
                 }
                 size_t shadowIndex = static_cast<size_t>(-1);
                 if (relevantToShadow)
@@ -4379,6 +5463,21 @@ namespace
                 && pbrCapture->target == viewPacket.displayTarget && frame.frameId > pbrCapture->afterFrameId)
             {
                 std::string replayError;
+                if (pbrCapture->latticeReplayExtension)
+                {
+                    auto& textures = backend == EnhancedLiveBackend::DX12
+                        ? dx12.TextureCache() : static_cast<IRenderTextureCache&>(vulkanPipeline->textureCache);
+                    const auto admission = AdmitImagePayloads(textures, true, replayError);
+                    if (admission == ImageAdmission::Pending)
+                    {
+                        return false;
+                    }
+                    if (admission == ImageAdmission::Failed)
+                    {
+                        pbrCapture->Fail(replayError);
+                        return false;
+                    }
+                }
                 EnhancedDrawReplayInput selected;
                 EnhancedLatticeReplayInput selectedMaterials;
                 // Stage both slices: a material rejection must not leave an
@@ -4388,8 +5487,8 @@ namespace
                     ? pbrCapture->drawReplay->Apply({}, {}, stagedGraph, replayError)
                     : EnhancedDrawReplayInput::Seal({}, {}, graphDraws, selected, replayError);
                 if (passed && pbrCapture->latticeReplayExtension) passed = pbrCapture->latticeReplay
-                    ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError)
-                    : EnhancedLatticeReplayInput::Seal(graphDraws, selectedMaterials, replayError);
+                    ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError, &*textureFramePins)
+                    : EnhancedLatticeReplayInput::Seal(graphDraws, selectedMaterials, replayError, &*textureFramePins);
                 if (!passed)
                 {
                     // Apply validates all identities first: the normal live view
@@ -4424,8 +5523,24 @@ namespace
                 inputView.height = frame.height;
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
+                // Replay may return new producer owners. Publish each exact
+                // representation once, then leave only frame-table borrows.
+                for (auto& draw : graphDraws)
+                {
+                    if (draw.materialGraphInstance)
+                    {
+                        PinGraphInstance(draw, draw.materialGraphInstance);
+                    }
+                }
+                for (auto& draw : shadowDraws)
+                {
+                    if (draw.materialGraphInstance)
+                    {
+                        PinGraphInstance(draw, draw.materialGraphInstance);
+                    }
+                }
                 bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                    sceneInputBudget, graphViewInput, inputError);
+                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
                 if (!sealed && hasOptionalGraphCandidates)
                 {
                     // Aggregate geometry budgets can be tighter than the draw
@@ -4451,7 +5566,7 @@ namespace
                     graphShadowEligible.resize(retained);
                     graphViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                        sceneInputBudget, graphViewInput, inputError);
+                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
                 }
                 if (!sealed)
                 {
@@ -4486,6 +5601,7 @@ namespace
         {
             RHIShaderCompiler::ScopedOutput environmentOutput(output);
             p.frameContext.shadowDraws = &shadowDraws;
+            p.frameContext.textureFramePins = textureFramePins;
             p.graphInput = graphViewInput;
             p.frameContext.viewFlags = HasViewFlag(p.views[viewIndex].viewFlags,
                 EnhancedLiveViewFlags::SceneOverlay) ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
@@ -4506,85 +5622,29 @@ namespace
             {
                 const auto prepareIbl = [&]() -> bool
                 {
-                    // Startup and pipeline rebuilds retain their existing
-                    // synchronous path. Explicit selections arrive prepared.
+                    // Startup, selection and rebuild source work all arrives
+                    // through the CPU mailbox before this recording opens.
                     if (!skyCooked && !skyEquirect)
                     {
-                        assets::CookedEnvironment cached;
-                        if (file::path(skyBoxPath).extension() == ".ceibl")
-                        {
-                            if (!assets::ReadCookedEnvironment(skyBoxPath, cached, outError))
-                            {
-                                return false;
-                            }
-                            Hash::Sha256Digest recipe;
-                            if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath() / "DefaultPassShader",
-                                    cached.cubeSize, cached.brdfSize, recipe, outError))
-                            {
-                                return false;
-                            }
-                            if (cached.identity.recipe != recipe)
-                            {
-                                outError = "Cooked environment recipe changed; recook the selected environment";
-                                return false;
-                            }
-                            skyCooked = std::move(cached);
-                        }
-                        else
-                        {
-                            if (!skyCookIdentity)
-                            {
-                                assets::EnvironmentIdentity identity;
-                                if (!assets::EnvironmentSourceIdentity(skyBoxPath, identity.source, outError)
-                                    || !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath() / "DefaultPassShader",
-                                        512, 512, identity.recipe, outError))
-                                {
-                                    return false;
-                                }
-                                skyCookIdentity = identity;
-                                skyCookCachePath = PathFinder::CachePath() / "Environment" / assets::EnvironmentCacheName(identity);
-                            }
-                            std::string cacheError;
-                            if (assets::ReadCookedEnvironment(skyCookCachePath, cached, cacheError, &*skyCookIdentity))
-                            {
-                                skyCooked = std::move(cached);
-                                Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] hit " + skyCookCachePath.string());
-                            }
-                        }
+                        outError = "Environment image preparation is pending";
+                        return false;
                     }
                     if (skyCooked)
                     {
-                        if (!p.ibl.InstallCooked(p.frameContext, std::move(*skyCooked), outError))
+                        // Keep the exact worker-prepared source across both
+                        // immediate upload failure and later recording rejection.
+                        if (!p.ibl.InstallCooked(p.frameContext, *skyCooked, outError))
                         {
                             return false;
                         }
-                        skyCooked.reset();
                         Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] uploaded cooked maps " + skyBoxPath);
                     }
                     else
                     {
-                        if (!skyEquirect)
-                        {
-                            try
-                            {
-                                skyEquirect = Texture::LoadManagedFromPath(file::path(skyBoxPath));
-                            }
-                            catch (const std::exception& exception)
-                            {
-                                outError = "HDR 로드 실패: " + std::string(exception.what());
-                                return false;
-                            }
-                        }
-
-                        if (!skyEquirect)
-                        {
-                            outError = "HDR 로드 실패: " + skyBoxPath;
-                            return false;
-                        }
-
                         std::string skyUploadError;
                         const RHITextureEntry skyEntry = p.frameContext.textureCache->GetOrUpload(
-                            skyEquirect.get(), skyUploadError);
+                            (skyEquirect ? &*skyEquirect.borrow() : nullptr),
+                            p.frameContext.TextureImage(&*skyEquirect), skyUploadError);
                         if (!skyEntry.IsValid() || skyEntry.isCube || !skyUploadError.empty())
                         {
                             outError = "equirect HDR 운반 실패";
@@ -4609,10 +5669,16 @@ namespace
 
                     const bool previouslyGenerated = p.iblGenerated;
                     const bool previouslyDirty = skyBoxDirty;
-                    p.ibl.WatchPreparationRejected([this, &p, previouslyGenerated, previouslyDirty]
+                    const auto preparedRequest = skyPreparationRequest;
+                    const auto preparedGeneration = skyPreparationGeneration;
+                    p.ibl.WatchPreparationRejected([this, &p, previouslyGenerated, previouslyDirty,
+                        preparedRequest, preparedGeneration]
                     {
                         p.iblGenerated = previouslyGenerated;
                         skyBoxDirty = previouslyDirty;
+                        skyPreparationRequest = preparedRequest;
+                        skyPreparationGeneration = preparedGeneration;
+                        FinishEnvironmentPreparation("Environment recording rejected; retrying the prepared source");
                     });
                     p.iblGenerated = true;
                     skyBoxDirty = false;
@@ -4638,8 +5704,8 @@ namespace
 
             // 기즈모 데이터(gizmoData)의 프레임별 feed는 기여 노드의 prepare가
             // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
-            p.sprite.SetItems(&worldSprites);
-            p.ui.SetRects(&uiRects);
+            p.sprite.SetItems(&worldSprites, textureFramePins);
+            p.ui.SetRects(&uiRects, textureFramePins);
 
             if (!p.animationPalettes.Prepare(*p.frameContext.resources,
                     p.frameContext.shadowDraws, p.frameContext.forwardDraws, p.frameContext.draws))
@@ -4893,7 +5959,7 @@ namespace
             slot.camera = *p.frameContext.camera;
             slot.previewComplete = p.graphInput && !p.graphInput->Draws().empty() &&
                 (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
-                    p.graphInput->Draws()[0].material == graphViewInput->Draws()[0].material));
+                    p.graphInput->Draws()[0].material->representationId == graphViewInput->Draws()[0].material->representationId));
             slot.key = view.key;
             finish_gpu_capture(slot.profilerToken, false,
                 "DX12 display slot reused before GPU query collection");
@@ -5800,7 +6866,7 @@ namespace
                     // GT 발행이 멈춰도 마지막 생산자 GPU 결과를 수집한다.
                     // 전용 RT만 기다리며 작업 스케줄러의 worker는 점유하지 않는다.
                     uint32_t pendingGpu = 0;
-                    std::unique_ptr<PreparedEnvironment> failedEnvironment;
+                    own::unique_owner<PreparedEnvironment> failedEnvironment;
                     {
                         std::lock_guard<std::mutex> stateLock(renderStateMutex);
                         try
@@ -6183,6 +7249,22 @@ namespace
                 renderCoalescedDeltas += mergedSuperseded;
                 ProxyCommandQueue->MarkSuperseded(mergedSuperseded);
                 submission.deltas = std::move(merged);
+                if (newest.frame.sceneEpoch == submission.frame.sceneEpoch
+                    && newest.frame.preparedTextureImages)
+                {
+                    if (!submission.frame.preparedTextureImages)
+                    {
+                        submission.frame.preparedTextureImages = std::move(newest.frame.preparedTextureImages);
+                    }
+                    else
+                    {
+                        for (const auto& texture : newest.frame.preparedTextureImages->Owners())
+                        {
+                            submission.frame.preparedTextureImages->RetainImage(texture,
+                                newest.frame.preparedTextureImages->Image(&*texture));
+                        }
+                    }
+                }
                 newest = std::move(submission);
                 ++renderCoalescedFrames;
             }
@@ -6216,6 +7298,23 @@ namespace
             renderThread.join();
             std::lock_guard<std::mutex> lock(renderQueueMutex);
             ++renderShutdownDrains;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(renderStateMutex);
+            ReleaseGeometrySources();
+            CancelGeometryDemands();
+            geometryDemandViews.clear();
+            for (auto& [identity, demand] : imageDemands)
+            {
+                demand.request.Cancel();
+            }
+            imageDemands.clear();
+            imageBootstrapViews.reset();
+            if (textureFramePins)
+            {
+                textureFramePins->ReleaseImages();
+            }
         }
 
         const uint64_t discarded = ProxyCommandQueue->DiscardPendingForShutdown();
@@ -6340,18 +7439,8 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
 
         state.skyBoxPath =
             PathFinder::EngineResourcePath("Environment/forest.ceibl").string();
-        assets::CookedEnvironment defaultEnvironment;
-        if (!assets::ReadCookedEnvironment(state.skyBoxPath,defaultEnvironment,outError)) return false;
-        Hash::Sha256Digest recipe;
-        if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                defaultEnvironment.cubeSize,defaultEnvironment.brdfSize,recipe,outError)) return false;
-        if (recipe != defaultEnvironment.identity.recipe)
-        {
-            outError="Default forest environment cook recipe is stale; recook engine resources";
-            return false;
-        }
-        state.skyCooked=std::move(defaultEnvironment);
         state.skyEquirect.reset();
+        state.skyEquirectImage.reset();
         state.skyBoxDirty = true;
         // Bootstrap actually installs the bundled forest, not the legacy saved path.
         // Keep the reported selection consistent and hide only its background.
@@ -6378,6 +7467,13 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         {
             std::lock_guard<std::mutex> lock(state.environmentPreparation->mutex);
             state.environmentPreparation->accepting = true;
+        }
+        if (!QueueEnvironmentPreparation(state.environmentPreparation, state.skyBoxPath, outError, false))
+        {
+            state.StopRenderThread();
+            state.runtimeInitialized = false;
+            state.enabled = false;
+            return false;
         }
 
         return true;
@@ -6454,82 +7550,7 @@ bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& 
         outError = "Select an HDR or cooked .ceibl environment";
         return false;
     }
-    // Capture every path on the caller. Worker admission and progress never
-    // acquire renderStateMutex, even while the first frame compiles shaders.
-    EnvironmentPreparationRequest request;
-    request.selection = path;
-    request.source = file::absolute(source);
-    request.shaders = PathFinder::ShaderPath() / "DefaultPassShader";
-    request.cache = PathFinder::CachePath() / "Environment";
-    request.project = PathFinder::BaseProjectPath();
-    EnvironmentPreparationProgress progress;
-    progress.activeRequests = 1;
-    progress.phase = "Queued";
-    progress.name = source.filename().string();
-    const auto preparation = state.environmentPreparation;
-    bool launch = false;
-    std::unique_ptr<PreparedEnvironment> retired;
-    {
-        std::lock_guard<std::mutex> lock(preparation->mutex);
-        if (!preparation->accepting)
-        {
-            outError = "EnhancedRenderer environment preparation is not running";
-            return false;
-        }
-        request.id = ++preparation->nextRequest;
-        request.generation = preparation->generation;
-        progress.requestId = request.id;
-        progress.appliedRequestId = preparation->progress.appliedRequestId;
-        preparation->pending = std::move(request);
-        retired = std::move(preparation->ready);
-        preparation->progress = std::move(progress);
-        launch = !preparation->running;
-        preparation->running = true;
-    }
-    if (launch)
-    {
-        try
-        {
-            const auto job = ce::get_job_scheduler().submit([preparation]
-            {
-                try
-                {
-                    RunEnvironmentPreparation(preparation);
-                }
-                catch (...)
-                {
-                    // Includes allocation failure outside the decoder. Clear
-                    // admission state without allocating another error string.
-                    std::unique_ptr<PreparedEnvironment> retired;
-                    std::lock_guard<std::mutex> lock(preparation->mutex);
-                    preparation->running = false;
-                    preparation->pending.reset();
-                    retired = std::move(preparation->ready);
-                    preparation->progress.activeRequests = 0;
-                    preparation->progress.phase = "Failed";
-                }
-            });
-            // Dependency-free dispatch failures are completed before submit
-            // returns. Observe them without ever waiting for running work.
-            if (job.is_complete())
-            {
-                job.wait();
-            }
-        }
-        catch (const std::exception& exception)
-        {
-            std::lock_guard<std::mutex> lock(preparation->mutex);
-            preparation->running = false;
-            preparation->pending.reset();
-            preparation->progress.activeRequests = 0;
-            preparation->progress.phase = "Failed";
-            preparation->progress.error = exception.what();
-            outError = preparation->progress.error;
-            return false;
-        }
-    }
-    outError.clear();
-    return true;
+    return QueueEnvironmentPreparation(state.environmentPreparation, path, outError);
 }
 
 EnhancedSceneRenderer::EnvironmentPreparationProgress EnhancedSceneRenderer::GetEnvironmentPreparationProgress()
@@ -6591,10 +7612,10 @@ void EnhancedSceneRenderer::WaitForLiveGpu()
 }
 
 EnhancedRequiredAssetPacket EnhancedSceneRenderer::BuildRequiredAssetPacket(
-    std::span<const std::shared_ptr<Material>> materials)
+    std::span<const own::shared_owner<const Material>> materials)
 {
     EnhancedRequiredAssetPacket packet{};
-    for (const std::shared_ptr<Material>& material : materials)
+    for (const own::shared_owner<const Material>& material : materials)
     {
         if (!material) continue;
         const EnhancedShaderMetaDomain domain =
@@ -6677,16 +7698,38 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         view.gizmos = std::move(gizmos);
     }
 
+    bool hasSceneView = false;
+    for (uint32_t index = 0; index < frame.viewCount; ++index)
+    {
+        hasSceneView |= frame.views[index].displayTarget != EnhancedLiveDisplayTarget::MaterialPreview;
+    }
+    if (!sceneLoading && hasSceneView && state.renderScene)
+    {
+        if (auto* scene = state.renderScene->GetScene())
+        {
+            frame.preparedTextureImages = scene->TakePreparedTextureImagePins();
+        }
+    }
     return frame;
 }
 
 bool EnhancedSceneRenderer::PublishLiveFrame(EnhancedLiveFramePacket frame)
 {
     LiveState& state = GetLiveState();
+    const auto preparedImages = frame.preparedTextureImages;
+    const auto sceneEpoch = frame.sceneEpoch;
     LiveState::FrameSubmission submission{};
     submission.frame = std::move(frame);
     submission.deltas = ProxyCommandQueue->CapturePending();
-    return state.PublishFrame(std::move(submission));
+    const bool accepted = state.PublishFrame(std::move(submission));
+    if (!accepted && preparedImages && state.sceneEpoch == sceneEpoch && state.renderScene)
+    {
+        if (auto* scene = state.renderScene->GetScene())
+        {
+            scene->SetPreparedTextureImagePins(preparedImages);
+        }
+    }
+    return accepted;
 }
 
 void EnhancedSceneRenderer::SetLivePacing(EnhancedLivePacing pacing)
@@ -6817,7 +7860,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 {
     LiveState& state = GetLiveState();
     // Declared before the lock so old CPU pixels are freed after it is released.
-    std::unique_ptr<PreparedEnvironment> retiredEnvironment;
+    own::unique_owner<PreparedEnvironment> retiredEnvironment;
     std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::defer_lock);
     {
         RenderThreadPhaseScope lockWait(RenderPhase::state_lock_wait);
@@ -6908,6 +7951,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 
     if (!state.enabled)
     {
+        state.ReleaseGeometrySources();
+        state.CancelGeometryDemands();
+        state.geometryDemandViews.clear();
+        state.ReconcileImageDemands(frame, false);
         ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
         return;
     }
@@ -6947,26 +7994,89 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
             //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
             state.drawPool.clear();
+            state.shadowDraws.clear();
             state.graphDraws.clear();
             state.graphShadowEligible.clear();
             state.graphViewRequired.clear();
             state.graphViewInput.reset();
             state.decals.clear();
+            state.spritePool.clear();
+            state.worldSprites.clear();
+            state.uiRects.clear();
+            state.uiProxyPointers.clear();
+            state.uiProxySnapshot.clear();
+            // Accepted frames own independent copies of their pin tables.
+            // Drop only obsolete current-input roots after every borrow above.
+            state.modelFramePins.reset();
+            state.geometryFramePins.entries.clear();
+            state.CancelGeometryDemands();
+            state.graphFramePins.reset();
+            state.textureFramePins.reset();
         }
     }
 
     traceProgress("proxy.end");
+    bool hasSceneGeometryView = false;
+    state.geometryDemandViews.clear();
+    if (!sceneLoading && !state.activeFrameDrainOnly && frame.width != 0u && frame.height != 0u)
+    {
+        for (uint32_t index = 0u; index < cameraCount; ++index)
+        {
+            const auto& view = frame.views[index];
+            if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview
+                && (!state.controlledCaptureFrame || view.displayTarget == state.pbrCapture->target))
+            {
+                hasSceneGeometryView = true;
+                state.geometryDemandViews.emplace(frame.sceneEpoch, view.key.viewId);
+            }
+        }
+    }
+    // This precedes every idle/drain/age/size exit below. Preview-only views use
+    // their own geometry and do not justify retaining scene payload requests.
+    state.ReconcileGeometryDemands(hasSceneGeometryView);
+    state.ReconcileImageDemands(frame, !sceneLoading && !state.activeFrameDrainOnly
+        && state.runtimeInitialized && state.renderScene && frame.width != 0u && frame.height != 0u);
     traceProgress("collect.begin");
     state.CollectCompletedDisplays();
     if (state.activeFrameDrainOnly || state.ShouldSkipScenePixels(frame))
     {
         return;
     }
-    if (state.runtimeInitialized && state.renderScene && !sceneLoading)
+    struct GeometrySourceGuard final
     {
+        LiveState& state;
+        ~GeometrySourceGuard() { state.ReleaseGeometrySources(); }
+    } geometrySourceGuard{ state };
+    const auto prepareSceneGeometry = [&]()
+    {
+        if (!state.runtimeInitialized || !state.renderScene || !hasSceneGeometryView)
+        {
+            state.PruneImageDemands(frame);
+            return true;
+        }
         RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
+        bool preparationDeferred = false;
+        std::string geometryError;
+        if (!state.PrepareGeometry(frame.frameId, preparationDeferred, geometryError))
+        {
+            // No BeginFrame/recording has started. Keep the completed display
+            // and exact request owners until a future packet admits all bytes.
+            ++state.framesIdle;
+            if (!preparationDeferred)
+            {
+                state.CancelGeometryDemands();
+            }
+            if (!preparationDeferred && state.lastError != geometryError)
+            {
+                state.lastError = std::move(geometryError);
+                Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+            }
+            return false;
+        }
         state.BuildDrawPool();
-    }
+        state.PruneImageDemands(frame);
+        return true;
+    };
 
     // ── Vulkan editor TickLive 공통 scene graph 경로 ──
     //
@@ -7010,6 +8120,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
         }
 
+        // Retire before either CPU or image residency admission. No second
+        // eviction pass may invalidate a successful descriptor-only probe.
+        state.vulkanPipeline->MaintainAssetCaches();
+        if (!prepareSceneGeometry())
+        {
+            return;
+        }
         VulkanLivePipeline& p = *state.vulkanPipeline;
         p.frameContext.frameId = frame.frameId;
         p.frameContext.sceneEpoch = frame.sceneEpoch;
@@ -7065,6 +8182,37 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 return;
             }
             std::string error;
+            const auto admission = state.AdmitViewImages(p.textureCache,
+                !p.iblGenerated || state.skyBoxDirty, error);
+            if (admission != LiveState::ImageAdmission::Ready)
+            {
+                ++state.framesIdle;
+                if (admission == LiveState::ImageAdmission::Failed)
+                {
+                    state.lastError = "Vulkan image preparation failed: " + error;
+                    if (state.reportedValidation.insert(state.lastError).second)
+                    {
+                        ++state.frameFailures;
+                        Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+                    }
+                }
+                else
+                {
+                    state.consecutiveFrameFailures = 0;
+                }
+                state.ReleaseStagedImages(p.textureCache);
+                continue;
+            }
+            if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+            {
+                state.CompleteImageBootstrap(frame.sceneEpoch, viewPacket.key.viewId);
+            }
+            struct ImageReleaseGuard
+            {
+                LiveState& state;
+                IRenderTextureCache& cache;
+                ~ImageReleaseGuard() { state.ReleaseStagedImages(cache); }
+            };
             const auto prepareFrame = [&state, &p, viewIndex](std::string& prepareError)
             {
                 return state.PreparePipelineFrame(
@@ -7075,11 +8223,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             LiveGraphSnapshot diagnosticSnapshot;
             const bool captureDiagnostics = state.ConsumeGraphSnapshotRequest(viewPacket.displayTarget);
             {
+                ImageReleaseGuard imageRelease{ state, p.textureCache };
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
                     frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
-                    prepareFrame, error, state.BeginPbrCapture(frame, viewPacket),
+                    prepareFrame,
+                    error, state.BeginPbrCapture(frame, viewPacket),
                     captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
             }
             if (captureDiagnostics || !rendered)
@@ -7125,6 +8275,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 continue;
             }
 
+            if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+            {
+                state.CompleteGeometryView(frame.sceneEpoch, viewPacket.key.viewId);
+            }
             state.consecutiveFrameFailures = 0;
             state.RecordSceneAdmission(frame);
             // W8: 인코더가 버린 명령을 프레임마다 비우며 모은다. 성공한 프레임에
@@ -7231,6 +8385,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     traceProgress("pipeline.end");
+    if (!prepareSceneGeometry())
+    {
+        return;
+    }
     LivePipeline& p = *state.pipeline;
     {
         traceProgress("seal.begin");
@@ -7406,11 +8564,43 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             return;
         }
         std::string error;
+        const auto admission = state.AdmitViewImages(state.dx12.TextureCache(),
+            !state.pipeline->iblGenerated || state.skyBoxDirty, error);
+        if (admission != LiveState::ImageAdmission::Ready)
+        {
+            ++state.framesIdle;
+            if (admission == LiveState::ImageAdmission::Failed)
+            {
+                state.lastError = "Image preparation failed: " + error;
+                if (state.reportedValidation.insert(state.lastError).second)
+                {
+                    ++state.frameFailures;
+                    Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+                }
+            }
+            else
+            {
+                state.consecutiveFrameFailures = 0;
+            }
+            state.ReleaseStagedImages(state.dx12.TextureCache());
+            continue;
+        }
+        if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+        {
+            state.CompleteImageBootstrap(frame.sceneEpoch, viewPacket.key.viewId);
+        }
+        struct ImageReleaseGuard
+        {
+            LiveState& state;
+            IRenderTextureCache& cache;
+            ~ImageReleaseGuard() { state.ReleaseStagedImages(cache); }
+        };
         bool rendered = false;
         bool preparationDeferred = false;
         LiveGraphSnapshot diagnosticSnapshot;
         const bool captureDiagnostics = state.ConsumeGraphSnapshotRequest(viewPacket.displayTarget);
         {
+            ImageReleaseGuard imageRelease{ state, state.dx12.TextureCache() };
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
             rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, error,
                 state.BeginPbrCapture(frame, viewPacket),
@@ -7465,6 +8655,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 return;
             }
             continue;
+        }
+        if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview)
+        {
+            state.CompleteGeometryView(frame.sceneEpoch, viewPacket.key.viewId);
         }
         state.consecutiveFrameFailures = 0;
         state.RecordSceneAdmission(frame);
@@ -8368,9 +9562,18 @@ void EnhancedSceneRenderer::ShutdownLive()
     if (state.runtimeInitialized)
     {
         state.skyEquirect.reset();
+        state.skyEquirectImage.reset();
         state.skyCooked.reset();
         state.skyCookIdentity.reset();
         state.skyCookCachePath.clear();
+        state.imageDemands.clear();
+        state.imageBootstrapViews.reset();
+        if (state.textureFramePins)
+        {
+            state.textureFramePins->ReleaseImages();
+        }
+        state.fogBlueNoise.reset();
+        state.fogImagePreparation = own::make_shared<FogImagePreparation>();
         if (state.renderScene)
         {
             // SceneManager::Decommissioning이 활성 RenderScene을 먼저 Finalize한다.

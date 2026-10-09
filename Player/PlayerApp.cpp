@@ -370,7 +370,7 @@ void Player::App::Run()
 				EnhancedLiveDisplayTarget::Game,
 				EnhancedLiveViewFlags::ScreenSpaceUI };
 		}
-		const std::vector<std::shared_ptr<Material>> requiredMaterials =
+		const auto requiredMaterials =
 			SceneManagers->CaptureRequiredRenderMaterials();
 		const EnhancedRequiredAssetPacket requiredAssets =
 			EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);

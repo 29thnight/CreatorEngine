@@ -49,15 +49,15 @@ namespace experiment::importer
         }
 
         void BuildNodes(const ImportedScene& scene, const NodeLayout& layout,
-            const ConversionOptions& options, ModelDraft& draft)
+            const ConversionOptions& options, std::vector<ModelNode>& nodes)
         {
-            draft.nodes.reserve(scene.nodes.size() + (layout.synthesizedRoot ? 1 : 0));
+            nodes.reserve(scene.nodes.size() + (layout.synthesizedRoot ? 1 : 0));
 
             if (layout.synthesizedRoot)
             {
                 ModelNode root;
                 root.name = options.synthesizedRootName;
-                draft.nodes.push_back(std::move(root));
+                nodes.push_back(std::move(root));
             }
 
             for (std::size_t i = 0; i < scene.nodes.size(); ++i)
@@ -80,7 +80,7 @@ namespace experiment::importer
                 {
                     node.meshes.push_back(MeshIndex(mesh.Value()));
                 }
-                draft.nodes.push_back(std::move(node));
+                nodes.push_back(std::move(node));
             }
         }
 
@@ -418,89 +418,111 @@ namespace experiment::importer
             }
         }
 
+        MeshMetadata DescribeMesh(const ImportedScene& scene, const SkeletonPlan& plan,
+            const std::vector<SkinIndex>& meshSkins, std::size_t meshIndex)
+        {
+            const auto& source = scene.meshes[meshIndex];
+            const auto& streams = source.streams;
+            MeshMetadata value;
+            value.name = source.name;
+            value.material = MaterialIndex(source.material.Value());
+            value.attributes = kCoreVertexAttributes;
+            value.skinned = plan.present && streams.HasSkin() && meshSkins[meshIndex] == plan.sourceSkin;
+            if (!streams.uv1.empty())
+            {
+                value.attributes |= Bit(VertexAttribute::Uv1);
+            }
+            if (!streams.colors.empty())
+            {
+                value.attributes |= Bit(VertexAttribute::Color);
+            }
+            if (value.skinned)
+            {
+                value.attributes |= kSkinVertexAttributes;
+            }
+            value.stride = StrideOf(value.attributes);
+            value.vertexCount = static_cast<std::uint32_t>(streams.VertexCount());
+            value.indexCount = static_cast<std::uint32_t>(source.indices.size());
+            math::vector3 minimum{}, maximum{};
+            for (std::size_t index = 0; index < streams.VertexCount(); ++index)
+            {
+                const auto& position = streams.positions[index];
+                if (index == 0)
+                {
+                    minimum = position;
+                    maximum = position;
+                }
+                else
+                {
+                    minimum.x = (std::min)(minimum.x, position.x);
+                    minimum.y = (std::min)(minimum.y, position.y);
+                    minimum.z = (std::min)(minimum.z, position.z);
+                    maximum.x = (std::max)(maximum.x, position.x);
+                    maximum.y = (std::max)(maximum.y, position.y);
+                    maximum.z = (std::max)(maximum.z, position.z);
+                }
+            }
+            // math::aabb는 center/extents이므로 min/max를 필드에 직접 넣지 않는다.
+            value.bounds = math::aabb::from_min_max(minimum, maximum);
+            return value;
+        }
+
+        Mesh BuildMesh(const ImportedScene& scene, const SkeletonPlan& plan,
+            const std::vector<SkinIndex>& meshSkins, std::size_t meshIndex, ImportNoteSink& notes)
+        {
+            const auto& source = scene.meshes[meshIndex];
+            const auto& streams = source.streams;
+            const auto metadata = DescribeMesh(scene, plan, meshSkins, meshIndex);
+            const std::string context = "meshes[" + std::to_string(meshIndex) + "]";
+            Mesh mesh;
+            mesh.name = metadata.name;
+            mesh.material = metadata.material;
+            mesh.bounds = metadata.bounds;
+            mesh.indices = source.indices;
+            if (streams.HasSkin() && !metadata.skinned)
+            {
+                notes.Warn(ImportNoteCode::InvalidSkin, context,
+                    "이 메시의 skin 이 채택된 skeleton 과 달라 weight 를 버렸다.");
+            }
+            if (!mesh.vertices.SetLayout(metadata.attributes))
+            {
+                notes.Error(ImportNoteCode::InvalidVertexStreams, context,
+                    "지원하지 않는 runtime vertex attribute 조합이다.");
+                return mesh;
+            }
+            mesh.vertices.reserve(streams.VertexCount());
+            for (std::size_t index = 0; index < streams.VertexCount(); ++index)
+            {
+                Vertex vertex{};
+                vertex.position = streams.positions[index];
+                vertex.normal = ValueAt(streams.normals, index);
+                vertex.uv0 = ValueAt(streams.uv0, index);
+                // IR의 tangent.xyz + handedness.w를 보존한다. shader가 bitangent를 복원한다.
+                vertex.tangent = ValueAt(streams.tangents, index);
+                if (metadata.skinned)
+                {
+                    FillSkin(streams, index, plan, vertex, context, notes);
+                }
+                const math::vector2* uv1 = streams.uv1.empty() ? nullptr : &streams.uv1[index];
+                const math::vector4* color = streams.colors.empty() ? nullptr : &streams.colors[index];
+                if (!mesh.vertices.Append(vertex, uv1, color))
+                {
+                    notes.Error(ImportNoteCode::InvalidVertexStreams, context,
+                        "vertex attribute mask와 실제 stream이 어긋났다.");
+                    break;
+                }
+            }
+            return mesh;
+        }
+
         void BuildMeshes(const ImportedScene& scene, const SkeletonPlan& plan,
             ImportNoteSink& notes, ModelDraft& draft)
         {
-            const std::vector<SkinIndex> meshSkins = MapMeshToSkin(scene);
+            const auto meshSkins = MapMeshToSkin(scene);
             draft.meshes.reserve(scene.meshes.size());
-
-            for (std::size_t meshIndex = 0; meshIndex < scene.meshes.size(); ++meshIndex)
+            for (std::size_t index = 0; index < scene.meshes.size(); ++index)
             {
-                const ImportedMesh& source = scene.meshes[meshIndex];
-                const VertexStreams& streams = source.streams;
-                const std::string context = "meshes[" + std::to_string(meshIndex) + "]";
-
-                Mesh mesh;
-                mesh.name = source.name;
-                if (source.material.IsValid())
-                {
-                    mesh.material = MaterialIndex(source.material.Value());
-                }
-                mesh.indices = source.indices;
-
-                const bool skinnable = plan.present && streams.HasSkin()
-                    && meshSkins[meshIndex] == plan.sourceSkin;
-                if (streams.HasSkin() && !skinnable)
-                {
-                    notes.Warn(ImportNoteCode::InvalidSkin, context,
-                        "이 메시의 skin 이 채택된 skeleton 과 달라 weight 를 버렸다.");
-                }
-
-                const std::size_t vertexCount = streams.VertexCount();
-                VertexAttributeMask attributes = kCoreVertexAttributes;
-                if (!streams.uv1.empty()) attributes |= Bit(VertexAttribute::Uv1);
-                if (!streams.colors.empty()) attributes |= Bit(VertexAttribute::Color);
-                if (skinnable) attributes |= kSkinVertexAttributes;
-                if (!mesh.vertices.SetLayout(attributes))
-                {
-                    notes.Error(ImportNoteCode::InvalidVertexStreams, context,
-                        "지원하지 않는 runtime vertex attribute 조합이다.");
-                    continue;
-                }
-                mesh.vertices.reserve(vertexCount);
-                math::vector3 minimum{}, maximum{};
-                for (std::size_t v = 0; v < vertexCount; ++v)
-                {
-                    Vertex vertex{};
-                    vertex.position = streams.positions[v];
-                    vertex.normal = ValueAt(streams.normals, v);
-                    vertex.uv0 = ValueAt(streams.uv0, v);
-                    // IR이 이미 tangent.xyz + handedness.w를 정본으로 가진다.
-                    // bitangent는 shader에서 cross(normal, tangent.xyz) * w로 재현한다.
-                    vertex.tangent = ValueAt(streams.tangents, v);
-
-                    if (skinnable) FillSkin(streams, v, plan, vertex, context, notes);
-
-                    const math::vector2* uv1 = streams.uv1.empty()
-                        ? nullptr : &streams.uv1[v];
-                    const math::vector4* color = streams.colors.empty()
-                        ? nullptr : &streams.colors[v];
-                    if (!mesh.vertices.Append(vertex, uv1, color))
-                    {
-                        notes.Error(ImportNoteCode::InvalidVertexStreams, context,
-                            "vertex attribute mask와 실제 stream이 어긋났다.");
-                        break;
-                    }
-
-                    if (v == 0)
-                    {
-                        minimum = vertex.position;
-                        maximum = vertex.position;
-                    }
-                    else
-                    {
-                        minimum.x = (std::min)(minimum.x, vertex.position.x);
-                        minimum.y = (std::min)(minimum.y, vertex.position.y);
-                        minimum.z = (std::min)(minimum.z, vertex.position.z);
-                        maximum.x = (std::max)(maximum.x, vertex.position.x);
-                        maximum.y = (std::max)(maximum.y, vertex.position.y);
-                        maximum.z = (std::max)(maximum.z, vertex.position.z);
-                    }
-                }
-                // math::aabb 는 center/extents 다. min/max 로 만들 때는 반드시
-                // from_min_max 를 쓴다 — 필드에 그냥 넣으면 조용히 오독한다.
-                mesh.bounds = math::aabb::from_min_max(minimum, maximum);
-                draft.meshes.push_back(std::move(mesh));
+                draft.meshes.push_back(BuildMesh(scene, plan, meshSkins, index, notes));
             }
         }
 
@@ -693,13 +715,18 @@ namespace experiment::importer
         }
 
         void BuildAnimations(const ImportedScene& scene, const SkeletonPlan& plan,
-            const ConversionOptions& options, ImportNoteSink& notes, Skeleton& out)
+            const ConversionOptions& options, ImportNoteSink& notes, Skeleton& out,
+            std::span<const std::size_t> selected = {}, bool selectAll = true)
         {
             const double tps = options.ticksPerSecond;
-            out.clips.reserve(scene.clips.size());
+            out.clips.reserve(selectAll ? scene.clips.size() : selected.size());
 
             for (std::size_t clipIndex = 0; clipIndex < scene.clips.size(); ++clipIndex)
             {
+                if (!selectAll && !std::ranges::binary_search(selected, clipIndex))
+                {
+                    continue;
+                }
                 const ImportedClip& source = scene.clips[clipIndex];
                 const std::string context = "clips[" + std::to_string(clipIndex) + "]";
 
@@ -788,6 +815,99 @@ namespace experiment::importer
             t.x,       t.y,       t.z,       1.0f };
     }
 
+    MeshConversionResult ConvertToMesh(const ImportedScene& scene, std::size_t meshIndex)
+    {
+        MeshConversionResult result;
+        ImportNoteSink notes;
+        if (meshIndex >= scene.meshes.size())
+        {
+            notes.Error(ImportNoteCode::InvalidVertexStreams, "selection", "Selected mesh index is out of range");
+            result.notes = notes.Release();
+            return result;
+        }
+        const auto plan = PlanSkeleton(scene, notes);
+        if (scene.skins.empty() || plan.present)
+        {
+            auto mesh = BuildMesh(scene, plan, MapMeshToSkin(scene), meshIndex, notes);
+            if (!notes.HasErrors())
+            {
+                result.mesh = std::move(mesh);
+            }
+        }
+        result.notes = notes.Release();
+        return result;
+    }
+
+    ModelMetadataConversionResult ConvertToModelMetadata(
+        const ImportedScene& scene, const ConversionOptions& options)
+    {
+        ModelMetadataConversionResult result;
+        ImportNoteSink notes;
+        const auto layout = PlanNodes(scene);
+        if (scene.nodes.empty() || (layout.synthesizedRoot && !options.synthesizeRootNode))
+        {
+            notes.Error(ImportNoteCode::InvalidSceneStructure, "nodes", "Cannot create a single model root");
+            result.notes = notes.Release();
+            return result;
+        }
+        const auto plan = PlanSkeleton(scene, notes);
+        if (!scene.skins.empty() && !plan.present)
+        {
+            result.notes = notes.Release();
+            return result;
+        }
+        BuildNodes(scene, layout, options, result.nodes);
+        const auto meshSkins = MapMeshToSkin(scene);
+        result.meshes.reserve(scene.meshes.size());
+        for (std::size_t index = 0; index < scene.meshes.size(); ++index)
+        {
+            result.meshes.push_back(DescribeMesh(scene, plan, meshSkins, index));
+        }
+        result.succeeded = !notes.HasErrors();
+        result.notes = notes.Release();
+        return result;
+    }
+
+    SkeletonConversionResult ConvertToSkeleton(const ImportedScene& scene,
+        const ConversionOptions& options, std::span<const std::size_t> clipIndices)
+    {
+        SkeletonConversionResult result;
+        ImportNoteSink notes;
+        if (scene.nodes.empty() || !std::ranges::is_sorted(clipIndices) ||
+            std::adjacent_find(clipIndices.begin(), clipIndices.end()) != clipIndices.end() ||
+            (!clipIndices.empty() && clipIndices.back() >= scene.clips.size()))
+        {
+            notes.Error(ImportNoteCode::InvalidAnimation, "selection", "Invalid selected clip indices or empty node graph");
+            result.notes = notes.Release();
+            return result;
+        }
+        const auto plan = PlanSkeleton(scene, notes);
+        if (!plan.present)
+        {
+            notes.Error(ImportNoteCode::InvalidSkin, "skeleton", "Source has no representable skeleton");
+            result.notes = notes.Release();
+            return result;
+        }
+        // An unnamed sole hierarchy root has an unambiguous root role; unnamed
+        // descendants cannot establish stable bone-index semantics.
+        for (const auto index : plan.boneToNode)
+        {
+            if (scene.nodes[index].name.empty() && scene.nodes[index].parent.IsValid())
+            {
+                notes.Error(ImportNoteCode::InvalidSkin, "skeleton", "Name all source bones before granular animation cooking");
+            }
+        }
+        Skeleton skeleton;
+        BuildSkeleton(scene, plan, notes, skeleton);
+        BuildAnimations(scene, plan, options, notes, skeleton, clipIndices, false);
+        if (!notes.HasErrors())
+        {
+            result.skeleton = std::move(skeleton);
+        }
+        result.notes = notes.Release();
+        return result;
+    }
+
     ConversionResult ConvertToModelDraft(
         const ImportedScene& scene, const ConversionOptions& options)
     {
@@ -825,7 +945,7 @@ namespace experiment::importer
         draft.metadata.sourcePath = scene.metadata.sourcePath;
         draft.metadata.payloadKind = ModelPayloadKind::SourceImport;
 
-        BuildNodes(scene, layout, options, draft);
+        BuildNodes(scene, layout, options, draft.nodes);
 
         const SkeletonPlan plan = PlanSkeleton(scene, notes);
         if (!scene.skins.empty() && !plan.present)

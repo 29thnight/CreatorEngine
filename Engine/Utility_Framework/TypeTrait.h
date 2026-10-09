@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include <typeinfo>
 #include <typeindex>
 #include <string_view>
@@ -43,6 +44,9 @@ constexpr bool is_shared_ptr_v = false;
 template<typename T>
 constexpr bool is_shared_ptr_v<std::shared_ptr<T>> = true;
 
+template<typename T>
+constexpr bool is_shared_ptr_v<own::shared_owner<T>> = true;
+
 // K2 스테이지 A: m_components가 vector<std::unique_ptr<Component>>로
 // 바뀌며 is_shared_ptr_v 짝이 필요해졌다 — 리플렉션 포인터 분기(직렬화·
 // 인스펙터)가 shared_ptr과 나란히 unique_ptr도 인식해야 한다. 삭제자
@@ -52,6 +56,9 @@ constexpr bool is_unique_ptr_v = false;
 
 template<typename T, typename D>
 constexpr bool is_unique_ptr_v<std::unique_ptr<T, D>> = true;
+
+template<typename T>
+constexpr bool is_unique_ptr_v<own::unique_owner<T>> = true;
 
 // 콘솔 세터(MakePropertyImpl)의 std::any_cast<T> 인스턴스화 가드 (K2 스테이지 A
 // 함정, 실측). std::is_copy_constructible_v<std::vector<std::unique_ptr<X>>>는

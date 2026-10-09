@@ -220,12 +220,13 @@ namespace
             if (m_renderer) m_renderer->RebuildFontAtlas();
         }
 
-        uint64_t RegisterTexture(Texture* texture) override
+        uint64_t RegisterTexture(const Texture* texture,
+            const own::shared_owner<const Texture::CodecImage>& image) override
         {
-            return m_renderer ? m_renderer->RegisterTexture(texture) : 0;
+            return m_renderer ? m_renderer->RegisterTexture(texture, image) : 0;
         }
 
-        bool IsTextureReady(Texture* texture) const override
+        bool IsTextureReady(const Texture* texture) const override
         {
             return m_renderer && m_renderer->IsTextureReady(texture);
         }

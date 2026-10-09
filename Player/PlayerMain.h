@@ -93,6 +93,13 @@ namespace Player
         std::unique_ptr<wave::PlaybackService> m_audioPlayback;
         std::unique_ptr<wave::AudioCatalog> m_audioCatalog;
 
+        bool PollStartupScene();
+        std::future<Scene*> m_startupScene;
+        std::string m_startupScenePath;
+        Scene* m_startupSceneToActivate{}; // SceneManager owns the constructed result.
+        bool m_startupComplete{};
+        bool m_startupFailed{};
+
 		void StartPresentationThread();
 		void StopPresentationThread();
 		void PresentationThreadMain();

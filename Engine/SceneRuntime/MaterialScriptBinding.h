@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 
 #include "TypeTrait.h"
 
@@ -76,6 +77,6 @@ namespace MaterialScriptBinding
     // S2c-1: m_fileGuid도 비승계다 — 모델 해석은 MeshRenderer::m_modelGuid가
     // 자립했고(legacy 씬은 읽기 시점 이주), 클론에 자산 GUID가 남으면
     // 씬 embed의 assetId가 원본 자산을 사칭한다.
-    [[nodiscard]] std::shared_ptr<Material> InstantiateOwned(
+    [[nodiscard]] own::shared_owner<Material> InstantiateOwned(
         const Material& origin, std::string_view newName);
 }

@@ -528,7 +528,9 @@ public:
     bool Initialize(VulkanDeviceResources* resources, std::string& outError);
     void Shutdown();
 
-    RHITextureEntry GetOrUpload(Texture* texture, std::string& outError) override;
+    bool IsResident(const Texture* texture) const override;
+    RHITextureEntry GetOrUpload(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) override;
     RHITextureEntry GetBlackTexture(std::string& outError) override;
     RHITextureEntry GetOrmNeutralTexture(std::string& outError) override;
     uint32_t GetUploadFailureCount() const override;
@@ -596,6 +598,7 @@ public:
     void Shutdown();
 
     RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) override;
+    RHIMeshBinding FindModel(const assets::ModelMeshHandle& handle) const override;
     RHIMeshBinding GetOrUploadModel(
         const RHIModelMeshView& view, std::string& outError) override;
     uint32_t GetModelGenerationUploadCount() const override;

@@ -16,6 +16,7 @@
 //   지금 CPU 픽셀은 백엔드 중립 타입이 든다. 디코더와 BC 압축기는 여전히
 //   DirectXTex 이지만 Texture.cpp 안에만 있다.
 #include "TextureImage.h"
+#include "../Utility_Framework/Ownership.h"
 #include <mathematics/vector2.hpp>
 #include <cstddef>
 #include <memory>
@@ -39,10 +40,18 @@
 //     인라인 Create* 구현에서 났고, 헤더 밖에서 부르는 곳은 0이었다. 즉
 //     '아무도 안 쓰는 것들이 서로를 부르는' 덩어리가 남아 있었다.
 //
-//   지금 이 타입이 하는 일은 하나다 — 파일에서 읽은 픽셀을 CPU에 들고,
-//   텍스처 캐시(DX12·Vulkan)가 그것을 신원(m_assetId)으로 캐싱해 GPU에
-//   올린다.
+//   AssetDepot generations are small immutable descriptions with exact image
+//   provenance. Decoded CodecImage storage lives in its own bounded cache and is
+//   pinned explicitly for CPU staging. Legacy/procedural constructors retain an
+//   explicitly non-rehydratable image until an exact source adapter is provided.
 //-----------------------------------------------------------------------------
+
+namespace AssetDepot
+{
+    struct TextureAssetVariant;
+    struct TextureAssetOrigin;
+    struct TextureImageKey;
+}
 
 enum class TextureType
 {
@@ -60,10 +69,10 @@ public:
 	Texture() = default;
 	Texture(const Texture&) = delete;
 	Texture(Texture&& texture) noexcept;
-	~Texture();
+	~Texture() = default;
 
 	/// CPU 픽셀에서 바로 만든다. 자가 검증이 작은 더미 텍스처를 세울 때 쓴다.
-	static Texture* CreateFromPixels(
+	static own::shared_owner<const Texture> CreateFromPixels(
 		_In_ uint32 width,
 		_In_ uint32 height,
 		_In_ std::string_view name,
@@ -72,35 +81,38 @@ public:
 		_In_opt_ size_t rowPitch = 0
 	);
 
-	static Texture* LoadFormPath(_In_ const file::path& path, bool isCompress = false);
+	static own::shared_owner<const Texture> LoadFormPath(_In_ const file::path& path, bool isCompress = false);
 
     // Shares encoded CPU pixels, but owns a distinct GPU cache identity when
     // the sampling format changes. Never mutates a texture used by another role.
-    static std::shared_ptr<Texture> WithColorSpace(
-        const std::shared_ptr<Texture>& source, bool srgb);
+    static own::shared_owner<const Texture> WithColorSpace(
+        const own::shared_owner<const Texture>& source, bool srgb);
 
     // Call after choosing the material color space. Retains authored chains and
     // 1x1 owners; otherwise generates a full chain with linear-light RGB filtering
     // for sRGB formats and independent linear alpha. Preserves mip 0 exactly.
-    static std::shared_ptr<Texture> WithMipChain(
-        const std::shared_ptr<Texture>& source, std::string& outFailure);
+    static own::shared_owner<const Texture> WithMipChain(
+        const own::shared_owner<const Texture>& source, std::string& outFailure);
 
-	static std::shared_ptr<Texture> LoadSharedFromPath(
-		const file::path& path, bool isCompress = false);
+	static own::shared_owner<const Texture> LoadSharedFromPath(
+		const file::path& path, bool isCompress = false, std::string_view assetPath = {});
 
 	// I2-E 후속 — 컨테이너 안에 묻힌 이미지(glb 임베디드 등)를 디스크에 뽑지
 	// 않고 바이트에서 바로 만든다. 포맷은 매직으로 가른다(DDS·HDR, 나머지는
 	// WIC → 실패 시 TGA). 실패는 nullptr — 예외를 밖으로 내지 않는다.
 	// LoadSharedFromPath 와 같은 결과물(압축 정책 포함)을 만든다.
-	static std::shared_ptr<Texture> LoadSharedFromMemory(
+	static own::shared_owner<const Texture> LoadSharedFromMemory(
 		std::span<const std::byte> bytes, bool isCompress = false);
+
+    [[nodiscard]] own::shared_owner<const AssetDepot::TextureAssetOrigin> GetAssetOrigin() const;
+    [[nodiscard]] std::size_t DecodedByteSize() const noexcept;
 
 	// PHASE 3.75 MBC7 — 이미 디코드된 이미지(mip·array 포함)를 그대로 CPU 픽셀로
 	// 삼는다. ModelAssetGeneration의 embedded texture는 generation load가 검증·
 	// 디코드해 둔 RGBA8 픽셀이라 파일 로더를 다시 태울 이유가 없다 — 여기서
 	// 두 번째 디코드가 생기면 generation의 SHA-256 검증이 뜻을 잃는다. 이미지가
 	// 비었으면 nullptr.
-	static std::shared_ptr<Texture> CreateSharedFromImage(
+	static own::shared_owner<const Texture> CreateSharedFromImage(
 		std::string_view name, TextureImage image);
 
 	// ── 디코드 전용 창구 (축 A) ──
@@ -115,52 +127,30 @@ public:
 	static bool DecodeToRgba8(std::span<const std::byte> bytes,
 		TextureImage& outImage, std::string& outFailure);
 
-	static std::unique_ptr<Texture> LoadManagedFromPath(
+	static own::shared_owner<const Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
 
-	// ── 업로드용 CPU 픽셀 (PHASE 3-1 재정의, T1 · 축 A) ──
-	//
-	// 파일에서 읽어 압축까지 끝낸 최종 이미지다. 예전에는 이것으로 DX11 SRV를
-	// 만든 뒤 그냥 버렸고, DX12가 쓸 때는 그 DX11 텍스처에서 되읽었다
-	// (DX11 스테이징 복사 → Map → 업로드 링). 파일을 읽는 시점에 이미 손에
-	// 있던 픽셀을 GPU까지 갔다가 도로 가져오던 셈이다.
-	//
-	// ★ 정정(2026-08-08, 자산 상주 관리 ③): 예전에는 DX12가 가져가면서
-	//   놓았다(TakeCpuPixels). 그 전제는 "한 번 올리면 캐시가 영원히 들고
-	//   있다"였는데, ③(미사용 기반 은퇴)이 그 전제를 깼다.
-	//
-	//   실측으로 드러났다 — 은퇴한 텍스처를 다시 요청하니 CPU 픽셀이 이미
-	//   비어 있어 재업로드가 실패했다(씬 왕복 후 실패 3102건, 화면에 흰색).
-	//   T4에서 DX11 폴백까지 걷어낸 뒤라 되읽을 곳도 없었다.
-	//
-	//   그래서 놓지 않는다. 비용은 실측이 정당화한다: 재질 텍스처 전체가
-	//   3.8MB이고, 그 정도면 재업로드 실패보다 훨씬 싸다.
-	//
-	// ★ 큰 것 하나는 예외다. 4K HDR equirect(128MB)는 IBL 생성 뒤로는
-	//   진짜 안 쓰이므로 CPU 사본을 계속 드는 것이 아깝다. 지금은 그대로
-	//   두고 관측만 한다 — 은퇴 시점에 함께 놓는 것은 별도 판단이다.
-	//
-	// shared_ptr인 이유: Texture가 이동되는 경로가 있어 소유권을 하나로
-	// 묶어야 하고, unique_ptr이면 그 경로들이 깨진다.
-	//
-	// ★ 불투명 타입인 이유(축 A). 코덱이 낸 픽셀을 **그 자리에 그대로 둔다**.
-	//   컨테이너로 옮기면 로드마다 전량 복사가 한 번 붙는데, 4K HDR equirect
-	//   한 장이 128MB 라 그 한 번이 무시할 수 없다(저장소에 19장). 그래서
-	//   소유는 코덱 산출물 그대로 들고, 경계로는 뷰만 낸다.
-	//
-	//   정의가 Texture.cpp 에만 있으므로 이 헤더는 DirectXTex 는 물론
-	//   DirectX:: 이름조차 알지 않는다. 디코더를 갈아 끼우는 날 바뀌는 것은
-	//   그 struct 의 정의 하나뿐이고 이 선언은 그대로다.
-	struct CodecImage;
-	std::shared_ptr<CodecImage> m_codecImage;
-
-	/// GPU 업로드용 뷰. 소유권을 넘기지 않는다 — 은퇴 후 재업로드가 같은
-	/// 픽셀을 다시 읽어야 한다.
-	///
-	/// ★ 뷰는 이 Texture 보다 오래 살 수 없다. 소비자 둘(DX12·Vulkan 텍스처
-	///   캐시)은 GetOrUpload 안에서 받아 그 안에서 다 쓰고 버린다. 멤버로
-	///   들거나 프레임을 넘기면 그 순간 규약이 깨진다.
-	TextureImageView GetImageView() const;
+    // Codec-owned SDK arrays remain opaque and are never copied into a generic
+    // byte wrapper. Reproducible descriptors do not strongly own this payload.
+    struct CodecImage;
+    [[nodiscard]] TextureImageDescription GetImageDescription() const noexcept;
+    [[nodiscard]] TextureImageView GetImageView(
+        const own::shared_owner<const CodecImage>& image) const;
+    // Explicit transitional/generated storage with no durable regeneration input.
+    // Callers must keep the returned owner through all borrowed row accesses.
+    [[nodiscard]] own::shared_owner<const CodecImage> NonRehydratableImage() const;
+    [[nodiscard]] std::size_t DescriptorByteSize() const noexcept;
+    [[nodiscard]] static std::size_t ImageByteSize(
+        const own::shared_owner<const CodecImage>& image) noexcept;
+    [[nodiscard]] static std::size_t ImageRetainedCharge(
+        const own::shared_owner<const CodecImage>& image) noexcept;
+    struct ImageMemorySnapshot final
+    {
+        std::size_t liveBytes{};
+        std::size_t nonRehydratableBytes{};
+        std::size_t livePayloads{};
+    };
+    [[nodiscard]] static ImageMemorySnapshot SnapshotImageMemory() noexcept;
 
 	// ── 자산 신원 (PHASE 3-1 재정의, 자산 상주 관리 ①) ──
 	//
@@ -203,6 +193,19 @@ public:
 
 private:
 	friend class DataSystem;
+    // AssetDepot worker-only construction from already verified exact bytes.
+    // No raw adoption, unique promotion or mutable aliases survive publication.
+    [[nodiscard]] static own::shared_owner<const CodecImage> DecodeOwnedImage(
+        std::span<const std::byte> bytes, const AssetDepot::TextureImageKey& key,
+        std::string& failure);
+    [[nodiscard]] static own::shared_owner<const Texture> CreateOwnedDescriptor(
+        const own::shared_owner<const CodecImage>& image,
+        own::shared_owner<const AssetDepot::TextureAssetOrigin> origin, std::string& failure);
+    void SetNonRehydratableImage(own::shared_owner<const CodecImage> image);
+    own::shared_owner<const CodecImage> m_nonRehydratableImage{};
+    own::shared_owner<const AssetDepot::TextureAssetOrigin> m_assetOrigin{};
+    TextureImageDescription m_imageDescription{};
+    std::size_t m_decodedBytes{};
 
 	RHIFormat m_samplingFormat{ RHIFormat::Unknown };
 	math::vector2 m_size{};

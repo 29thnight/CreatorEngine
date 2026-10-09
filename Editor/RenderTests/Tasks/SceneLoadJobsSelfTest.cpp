@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace
@@ -109,6 +110,7 @@ namespace RenderTest
             Check(!hasModel(), "Fixture model is already cached; run in a fresh isolated process");
 
             std::future<Scene*> loaded;
+            std::uint64_t trackedMissing{}, replacedCallback{}, latestCallback{};
             std::future<Scene*> missing;
             {
                 WorkerGate gate;
@@ -118,20 +120,37 @@ namespace RenderTest
                 loaded = SceneManagers->LoadSceneAsync(temporary);
                 temporary.assign(temporary.size(), 'x');
                 { auto abandoned = SceneManagers->LoadSceneAsync(first); }
-                SceneManagers->LoadSceneAsyncAndWaitCallback(first);
-                SceneManagers->LoadSceneAsyncAndWaitCallback(second);
+                replacedCallback = SceneManagers->QueueSceneLoad(first, true);
+                latestCallback = SceneManagers->QueueSceneLoad(second, true);
+                trackedMissing = SceneManagers->QueueSceneLoad(first + ".missing-status", false);
+                Check(SceneManagers->QuerySceneLoad(trackedMissing).state == SceneManager::SceneLoadRequestState::Pending,
+                    "Queued scene request did not expose Pending without waiting");
                 missing = SceneManagers->LoadSceneAsync(first + ".missing");
                 Check(SceneManagers->IsSceneLoading(), "Pending preparation not reported");
                 Check(loaded.wait_for(std::chrono::seconds(0)) == std::future_status::timeout,
                     "Result completed before owner-thread construction");
                 Check(SceneManagers->GetScenes().size() == before, "Worker changed scene ownership");
             }
-            SceneManagers->WaitForSceneLoad();
+            // Explicit test-harness pumping, not a runtime blocking asset API.
+            // The production frame boundary keeps polling without waiting.
+            const auto sceneDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(2);
+            while (!SceneManagers->PollSceneLoads())
+            {
+                Check(std::chrono::steady_clock::now() < sceneDeadline,
+                    "Asynchronous scene completion exceeded the fixture deadline");
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
             Scene* prepared = loaded.get();
             Check(prepared && Find(prepared, "SceneJobsChild"), "Prepared entity missing");
             Check(Find(prepared, "SceneJobsChild")->GetComponent<Transform>() != nullptr, "Component load missing");
             Check(missing.get() == nullptr, "Missing document did not resolve to nullptr");
-            Check(SceneManagers->GetActiveScene() == original, "Wait activated outside frame boundary");
+            Check(SceneManagers->QuerySceneLoad(trackedMissing).state == SceneManager::SceneLoadRequestState::Failed,
+                "Missing document was reported as a successful queued scene result");
+            Check(SceneManagers->QuerySceneLoad(replacedCallback).state == SceneManager::SceneLoadRequestState::Superseded,
+                "Replaced activation ticket lost its terminal status");
+            Check(SceneManagers->QuerySceneLoad(latestCallback).state == SceneManager::SceneLoadRequestState::Ready,
+                "Completed activation preparation did not report Ready");
+            Check(SceneManagers->GetActiveScene() == original, "Poll activated outside frame boundary");
             Check(SceneManagers->GetScenes().size() == before + 3,
                 "Abandoned result ownership or replaced callback count mismatch");
             Check(prepared->m_requiredLoadAssetsBundle.assets.size() == 1, "Asset bundle not preserved");

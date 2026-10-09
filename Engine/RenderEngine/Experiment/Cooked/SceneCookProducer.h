@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+namespace Authoring
+{
+    class ReadNode;
+}
+
 namespace experiment::cooked
 {
 // `.creator`(scene) 와 `.prefab` 하나를 publication 직전의 완전 소유
@@ -50,6 +55,7 @@ struct SceneCookProductRequest final
 {
     std::filesystem::path sourcePath{};
     std::filesystem::path assetRoot{};
+    bool bootstrapReferences{};
 };
 
 struct SceneCookProduct final
@@ -59,12 +65,15 @@ struct SceneCookProduct final
     std::string artifactPath{};
     std::vector<std::byte> artifactBytes{};
     CookedAssetManifestEntry manifestEntry{};
+    // Explicit expected kinds for the optional source-free document bridge.
+    std::vector<TypedAssetReference> bootstrapReferences{};
 
     std::size_t geometryEdges{};
     std::size_t modelEdges{};
     std::size_t prefabEdges{};
     std::size_t textureEdges{};
     std::size_t materialGraphEdges{};
+    std::size_t bootstrapMaterialEdges{};
 
     // ★ 그리지 못한 것들. 아무도 안 읽는 필드로 두지 않는다 —
     //   AssetCooker 가 요약에 찍고, 계획서가 D5-c 판정에 쓴다.
@@ -90,4 +99,9 @@ struct SceneCookProductResult final
 // 확장자 불일치, `.meta` 누락·비정규 GUID, YAML 파싱 실패, 비정규 참조
 // GUID, source-root 탈출, 빈 파일은 모두 게시 전에 실패한다.
 [[nodiscard]] SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& request);
+
+// Source-only validation of the existing FoliageAsset.Types document shape.
+// Reuses the same bounded bootstrap walker; no new cooked kind or payload load.
+[[nodiscard]] bool CollectFoliageBootstrapReferences(const Authoring::ReadNode& root,
+    std::vector<TypedAssetReference>& outReferences, std::string& failure);
 } // namespace experiment::cooked

@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 
 #include "LXMaterialPipeline.h"
 
@@ -11,6 +12,8 @@
 #include <array>
 #include <atomic>
 #include <memory>
+
+class Texture;
 
 namespace material_graph
 {
@@ -55,7 +58,7 @@ struct IblEnvironment
 {
     RHITextureEntry cube;
     std::uint64_t generation{};
-    std::shared_ptr<const void> owner;
+    own::shared_owner<const Texture> owner;
 };
 
 class IblBakeResult

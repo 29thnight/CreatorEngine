@@ -224,14 +224,82 @@ namespace
         }
         for(auto& t:threads) { t.join(); }
         Check(valid,"concurrent loose bounded reads exact");
+#if defined(_WIN32)
+        {
+            std::fstream writer(regularRoot/fs::path(f.entry.artifactPath),
+                std::ios::binary | std::ios::in | std::ios::out);
+            Check(!writer.is_open(), "validated loose clip denies in-place writers");
+        }
+        clip = {};
+#endif
         auto corrupt=f.artifact;corrupt.back()^=std::byte{1};Write(regularRoot/fs::path(f.entry.artifactPath),corrupt);
         ck::CookedAudioClipSource rejected;
         Check(!ck::OpenCookedAudioClipEntry(f.entry,loose,rejected,why),"mutated loose artifact rejected on open");
-        // Deliberately verify the documented contract: path-based readers do not pin identity
-        // or rehash each read. AudioBackend's load-time hash is a separate test boundary.
+#if !defined(_WIN32)
+        // The opened inode is pinned, but POSIX in-place mutation is still a
+        // caller immutability violation. AudioBackend rehashes on payload load.
         Check(clip.ReadPayload(f.payload.size()-1,one,why)&&one[0]!=f.payload.back(),
             "post-open loose mutation remains observable; caller must enforce immutability");
+#endif
         std::cout << "CEAC_LOOSE_PATH_CONCURRENCY_OK postOpenImmutability=caller-contract\n";
+    }
+    void TestLooseOwnership(const Fixture& f, const fs::path& root) {
+        const auto pinRoot = root / "independent-pins";
+        auto second = f.entry;
+        second.assetId = Id("11234567-89ab-4cde-8fab-0123456789ab");
+        second.artifactPath = ck::MakeDerivedAudioClipArtifactPath(second.assetId);
+        const auto firstPath = pinRoot / fs::path(f.entry.artifactPath);
+        const auto secondPath = pinRoot / fs::path(second.artifactPath);
+        Write(firstPath, f.artifact);
+        Write(secondPath, f.artifact);
+        auto source = std::make_shared<ck::LooseArtifactByteSource>(pinRoot);
+        std::weak_ptr<ck::LooseArtifactByteSource> weakMount = source;
+        ck::CookedAudioClipSource first, sibling;
+        std::string why;
+        Check(ck::OpenCookedAudioClipEntry(f.entry, source, first, why), "first exact clip opened");
+        Check(ck::OpenCookedAudioClipEntry(second, source, sibling, why), "sibling exact clip opened");
+        auto firstCopy = first;
+        Bytes actual(f.payload.size());
+#if !defined(_WIN32)
+        const auto retired = firstPath.string() + ".retired";
+        fs::rename(firstPath, retired);
+        fs::remove(retired);
+        auto replaced = f.artifact;
+        replaced.back() ^= std::byte{1};
+        Write(firstPath, replaced);
+        Check(first.ReadPayload(0, actual, why) && actual == f.payload,
+            "legacy audio keeps old exact bytes after path replacement/unlink");
+        ck::CookedAudioClipSource rejected;
+        Check(!ck::OpenCookedAudioClipEntry(f.entry,
+            std::make_shared<ck::LooseArtifactByteSource>(pinRoot), rejected, why),
+            "a fresh source still rejects replacement content with the old manifest digest");
+#endif
+        first = {};
+        Check(firstCopy.ReadPayload(0, actual, why) && actual == f.payload,
+            "copy of exact audio source remains valid after original release");
+        firstCopy = {};
+#if defined(_WIN32)
+        {
+            std::fstream firstWriter(firstPath, std::ios::binary | std::ios::in | std::ios::out);
+            std::fstream siblingWriter(secondPath, std::ios::binary | std::ios::in | std::ios::out);
+            Check(firstWriter.is_open() && !siblingWriter.is_open(),
+                "final audio reader releases only its own file while root and sibling remain");
+        }
+#else
+        std::array<std::byte, 1> last{};
+        Check(source->ReadAt(f.entry.artifactPath, f.artifact.size() - 1u, last, why)
+            && last[0] != f.artifact.back(), "root weak lookup releases the old file after its last clip owner");
+#endif
+        source.reset();
+        Check(weakMount.expired(), "a retained clip must not keep the entire loose mount source alive");
+        Check(sibling.ReadPayload(0, actual, why) && actual == f.payload,
+            "sibling audio still reads exact bytes after mount and other clip release");
+        sibling = {};
+#if defined(_WIN32)
+        std::fstream writer(secondPath, std::ios::binary | std::ios::in | std::ios::out);
+        Check(writer.is_open(), "final sibling audio reader releases its native handle");
+#endif
+        std::cout << "CEAC_INDEPENDENT_EXACT_PINS_OK\n";
     }
     void TestManifest(const Fixture& f) {
         ck::CookedAssetManifest m;m.entries={f.entry};m.sourceAssets={{f.id,"Audio/test.wav"}};
@@ -302,7 +370,7 @@ int main(int argc,char** argv){try{
     const std::array<std::uint8_t,32> abc={0xba,0x78,0x16,0xbf,0x8f,0x01,0xcf,0xea,0x41,0x41,0x40,0xde,0x5d,0xae,0x22,0x23,
         0xb0,0x03,0x61,0xa3,0x96,0x17,0x7a,0x9c,0xb4,0x10,0xff,0x61,0xf2,0x00,0x15,0xad};
     Check(Hash::Sha256::Compute("abc",3)==abc,"production SHA256 known-answer vector");
-    Fixture f;TestHeaders(f);TestMemory(f);TestLoose(f,fs::path(argv[1]));TestManifest(f);
+    Fixture f;TestHeaders(f);TestMemory(f);TestLoose(f,fs::path(argv[1]));TestLooseOwnership(f,fs::path(argv[1]));TestManifest(f);
     std::cout<<"COOKED_CONTRACT_OK checks="<<checks<<" pak=not-tested device=not-used\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<"COOKED_CONTRACT_FAILED after="<<checks<<" reason="<<e.what()<<'\n';return 1;}}

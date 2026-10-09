@@ -2,6 +2,7 @@
 #include "EditorModelCollisionGeometry.h"
 
 #include "DataSystem.h"
+#include "TypeTrait.h"
 #include "ModelSceneInstantiation.h"
 #include "JobScheduler.h"
 #include "ReflectionUndo.h"
@@ -24,6 +25,7 @@ namespace Editor
 {
     struct ModelPlacement::Request
     {
+        HashedGuid requestId{ TypeTrait::MakeRuntimeResourceId() };
         std::uint32_t sceneId{};
         std::string path;
         std::optional<math::vector3> position;
@@ -38,7 +40,7 @@ namespace Editor
         std::atomic<std::size_t> completedSteps{ 0 };
         std::atomic<std::size_t> totalSteps{ 0 };
         // Worker writes these before ready.store(release); only GT reads afterwards.
-        std::unique_ptr<ModelSceneInstantiation::PendingInstance> prepared;
+        own::unique_owner<ModelSceneInstantiation::PendingInstance> prepared;
         std::string error;
         // GT only, including undo cleanup. UI only posts cancellation.
         EntityHandle root;
@@ -56,11 +58,11 @@ namespace Editor
         bool stopping{ true };
         job_handle preparationTail;
         // Cancelled requests remain here until their scheduler jobs release all captures.
-        std::vector<std::shared_ptr<Request>> preparations;
-        std::vector<std::shared_ptr<Request>> incoming;
-        std::vector<std::shared_ptr<Request>> cancellations;
-        std::vector<std::shared_ptr<Request>> visible;
-        std::vector<std::shared_ptr<Request>> pending; // GT only
+        std::vector<own::shared_owner<Request>> preparations;
+        std::vector<own::shared_owner<Request>> incoming;
+        std::vector<own::shared_owner<Request>> cancellations;
+        std::vector<own::shared_owner<Request>> visible;
+        std::vector<own::shared_owner<Request>> pending; // GT only
         std::uint64_t completed{};
         std::uint64_t failed{};
         std::uint64_t cancelled{};
@@ -85,7 +87,7 @@ namespace Editor
         std::string m_path;
         std::optional<math::vector3> m_position;
         bool m_gameMode;
-        std::shared_ptr<Request> m_request;
+        own::shared_owner<Request> m_request;
     };
 
     ModelPlacement::ModelPlacement() : m_impl(std::make_unique<Impl>()) {}
@@ -109,10 +111,66 @@ namespace Editor
         state.preparationTail = {};
     }
 
-    void ModelPlacement::Prepare(const std::shared_ptr<Request>& request)
+    void ModelPlacement::Prepare(const own::shared_owner<Request>& request)
     {
         if (request->cancelled.load(std::memory_order_acquire))
         {
+            request->ready.store(true, std::memory_order_release);
+            return;
+        }
+        if (DataSystems->HasPreparedModelScene(request->modelPreparation))
+        {
+            const auto prepareStart = std::chrono::steady_clock::now();
+            try
+            {
+                assets::ModelSceneAssetInputs inputs;
+                if (DataSystems->ReadPreparedModelScene(request->modelPreparation, inputs, request->error) &&
+                    !request->cancelled.load(std::memory_order_acquire))
+                {
+                    ModelSceneInstantiation::Options options;
+                    options.createMeshCollider = inputs.createMeshCollider;
+                    if (options.createMeshCollider)
+                    {
+                        const auto assetRoot = request->assetRoot;
+                        const auto expectedProject = request->project;
+                        const auto model = inputs.descriptor->summary.modelAssetId.value;
+                        std::vector<Uuid::Uuid16> meshes;
+                        for (const auto& mesh : inputs.descriptor->summary.meshes)
+                        {
+                            meshes.push_back(mesh.meshAssetId.value);
+                        }
+                        options.collisionGeometry = [assetRoot, expectedProject, model, meshes = std::move(meshes)](
+                            Scene& scene, std::uint32_t meshIndex, const ce::physics::triangle_mesh_source& source)
+                            -> ce::physics::result<ce::physics::geometry_asset_key>
+                        {
+                            const auto current = expectedProject.lock();
+                            if (!current || current != SceneManagers->ProjectLayers() ||
+                                assetRoot != PathFinder::Relative() || SceneManagers->IsPlayCommitted() ||
+                                meshIndex >= meshes.size())
+                            {
+                                return std::unexpected(ce::physics::error{ ce::physics::error_code::wrong_phase, 0,
+                                    "Model collision project changed or Play is active" });
+                            }
+                            return PublishModelCollisionGeometry(scene, assetRoot, model, meshes[meshIndex], source);
+                        };
+                    }
+                    request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(std::move(inputs), options);
+                    if (!request->prepared)
+                    {
+                        request->error = "Typed model hierarchy/material preparation failed: " + request->path;
+                    }
+                }
+            }
+            catch (const std::exception& error)
+            {
+                request->error = error.what();
+            }
+            catch (...)
+            {
+                request->error = "Typed model scene preparation failed.";
+            }
+            request->prepareMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - prepareStart).count();
             request->ready.store(true, std::memory_order_release);
             return;
         }
@@ -198,11 +256,11 @@ namespace Editor
             std::make_unique<Command>(sceneId, std::move(path), position));
     }
 
-    std::shared_ptr<ModelPlacement::Request> ModelPlacement::Enqueue(
+    own::shared_owner<ModelPlacement::Request> ModelPlacement::Enqueue(
         std::uint32_t sceneId, const std::string& path,
         const std::optional<math::vector3>& position, bool gameMode)
     {
-        auto request = std::make_shared<Request>();
+        auto request = own::make_shared<Request>();
         request->sceneId = sceneId;
         request->path = path;
         request->position = position;
@@ -257,7 +315,7 @@ namespace Editor
         return request;
     }
 
-    void ModelPlacement::Cancel(const std::shared_ptr<Request>& request)
+    void ModelPlacement::Cancel(const own::shared_owner<Request>& request)
     {
         if (!request || request->cancelled.exchange(true, std::memory_order_acq_rel)) return;
         std::lock_guard lock(m_impl->mutex);
@@ -277,7 +335,7 @@ namespace Editor
     void ModelPlacement::Tick()
     {
         auto& state = *m_impl;
-        std::vector<std::shared_ptr<Request>> cancellations;
+        std::vector<own::shared_owner<Request>> cancellations;
         {
             std::lock_guard lock(state.mutex);
             state.pending.insert(state.pending.end(), state.incoming.begin(), state.incoming.end());
@@ -332,7 +390,15 @@ namespace Editor
                 if (!request->ready.load(std::memory_order_acquire))
                 {
                     std::string assetError;
-                    (void)DataSystems->ReadPreparedModel(request->modelPreparation, assetError);
+                    if (DataSystems->HasPreparedModelScene(request->modelPreparation))
+                    {
+                        assets::ModelSceneAssetInputs ignored;
+                        (void)DataSystems->ReadPreparedModelScene(request->modelPreparation, ignored, assetError);
+                    }
+                    else
+                    {
+                        (void)DataSystems->ReadPreparedModel(request->modelPreparation, assetError);
+                    }
                     request->error = assetError.empty()
                         ? "Model preparation job completed without a result" : std::move(assetError);
                     request->ready.store(true, std::memory_order_release);
@@ -458,11 +524,12 @@ namespace Editor
     // HasVisible이 대신 답한다.
     void ModelPlacement::DrawStatus()
     {
-        std::vector<std::shared_ptr<Request>> visible;
+        std::vector<own::shared_owner<Request>> visible;
         { std::lock_guard lock(m_impl->mutex); visible = m_impl->visible; }
         for (const auto& request : visible)
         {
-            ImGui::PushID(request.get());
+            const std::string requestId = std::to_string(request->requestId.m_ID_Data);
+            ImGui::PushID(requestId.c_str());
             ImGui::TextUnformatted(file::path(request->path).filename().string().c_str());
             const auto total = request->totalSteps.load(std::memory_order_relaxed);
             if (total) ImGui::ProgressBar(static_cast<float>(request->completedSteps.load(std::memory_order_relaxed)) / total);
@@ -484,7 +551,7 @@ namespace Editor
         m_statusBody.reset();
 
         auto& state = *m_impl;
-        std::vector<std::shared_ptr<Request>> preparations;
+        std::vector<own::shared_owner<Request>> preparations;
         {
             std::lock_guard lock(state.mutex);
             if (state.stopping)

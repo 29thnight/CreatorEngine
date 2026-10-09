@@ -352,9 +352,7 @@ namespace
             return false;
         }
 
-        outHandle = DataSystems->LoadShaderMetaHandle(guid, outError);
-        const std::shared_ptr<const ShaderMeta> snapshot =
-            DataSystems->ResolveShaderMeta(outHandle);
+        const auto snapshot = DataSystems->LoadShaderMetaOwner(guid, outHandle, outError);
         if (!outHandle.IsValid() || !snapshot)
         {
             if (outError.empty()) outError = "제품 GBuffer generation resolve 실패";
@@ -507,7 +505,7 @@ namespace
         open = true;
         if (beginCaches) beginCaches();
         const std::array<RHITextureEntry, 3> entries{
-            cache.GetOrUpload(nullptr, outError),
+            cache.GetOrUpload(nullptr, {}, outError),
             cache.GetOrmNeutralTexture(outError), cache.GetBlackTexture(outError) };
         EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
         for (uint32_t i = 0; i < entries.size(); ++i)
@@ -992,9 +990,7 @@ namespace
             return false;
         }
 
-        outHandle = DataSystems->LoadShaderMetaHandle(guid, outError);
-        const std::shared_ptr<const ShaderMeta> snapshot =
-            DataSystems->ResolveShaderMeta(outHandle);
+        const auto snapshot = DataSystems->LoadShaderMetaOwner(guid, outHandle, outError);
         if (!outHandle.IsValid() || !snapshot)
         {
             if (outError.empty()) outError = "제품 Forward generation resolve 실패";
@@ -2029,10 +2025,10 @@ bool RunVulkanGBufferTest(std::string& outLog)
     secondaryMeta.passes[0].state.depthTest = RHICompareOp::LessEqual;
     constexpr ShaderMetaHandle secondaryMetaHandle{ 0xFFFFFFFDu, 1u };
     EnhancedLiveFramePacket shaderMetaFrame{};
-    auto primaryFrameOwner = std::make_shared<const ShaderMeta>(materialProbeMeta);
-    auto secondaryFrameOwner = std::make_shared<const ShaderMeta>(secondaryMeta);
-    std::weak_ptr<const ShaderMeta> primaryFrameLifetime = primaryFrameOwner;
-    std::weak_ptr<const ShaderMeta> secondaryFrameLifetime = secondaryFrameOwner;
+    auto primaryFrameOwner = own::make_shared<const ShaderMeta>(materialProbeMeta);
+    auto secondaryFrameOwner = own::make_shared<const ShaderMeta>(secondaryMeta);
+    own::weak_owner<const ShaderMeta> primaryFrameLifetime = primaryFrameOwner;
+    own::weak_owner<const ShaderMeta> secondaryFrameLifetime = secondaryFrameOwner;
     EnhancedShaderMetaFrameSnapshot primaryFrameSnapshot{};
     primaryFrameSnapshot.guid = materialProbeMeta.guid;
     primaryFrameSnapshot.handle = materialProbeHandle;
@@ -2055,13 +2051,13 @@ bool RunVulkanGBufferTest(std::string& outLog)
         64u, 128u, 255u, 255u };
     const std::array<std::uint8_t, 4> sharedNormalPixel{
         255u, 128u, 128u, 255u };
-    std::shared_ptr<Texture> firstBaseColorOwner{ Texture::CreateFromPixels(
+    own::shared_owner<const Texture> firstBaseColorOwner{ Texture::CreateFromPixels(
         1, 1, "m6_p1b2a_first_base_color", RHIFormat::RGBA8Unorm,
         firstBaseColorPixel.data(), firstBaseColorPixel.size()) };
-    std::shared_ptr<Texture> secondBaseColorOwner{ Texture::CreateFromPixels(
+    own::shared_owner<const Texture> secondBaseColorOwner{ Texture::CreateFromPixels(
         1, 1, "m6_p1b2a_second_base_color", RHIFormat::RGBA8Unorm,
         secondBaseColorPixel.data(), secondBaseColorPixel.size()) };
-    std::shared_ptr<Texture> sharedNormalOwner{ Texture::CreateFromPixels(
+    own::shared_owner<const Texture> sharedNormalOwner{ Texture::CreateFromPixels(
         1, 1, "m6_p1b2b1_shared_normal", RHIFormat::RGBA8Unorm,
         sharedNormalPixel.data(), sharedNormalPixel.size()) };
     if (!firstBaseColorOwner || !secondBaseColorOwner || !sharedNormalOwner)
@@ -2075,9 +2071,9 @@ bool RunVulkanGBufferTest(std::string& outLog)
         "20000000-0000-4000-8000-000000000002" };
     const FileGuid sharedNormalGuid{
         "40000000-0000-4000-8000-000000000004" };
-    std::weak_ptr<Texture> firstBaseColorLifetime = firstBaseColorOwner;
-    std::weak_ptr<Texture> secondBaseColorLifetime = secondBaseColorOwner;
-    std::weak_ptr<Texture> sharedNormalLifetime = sharedNormalOwner;
+    own::weak_owner<const Texture> firstBaseColorLifetime = firstBaseColorOwner;
+    own::weak_owner<const Texture> secondBaseColorLifetime = secondBaseColorOwner;
+    own::weak_owner<const Texture> sharedNormalLifetime = sharedNormalOwner;
     materialProbe.UseBaseColorMap(firstBaseColorOwner);
     if (!materialProbe.TrySetTextureGuid(
             standard_material::property::BaseColorMap, firstBaseColorGuid))
@@ -2212,11 +2208,11 @@ bool RunVulkanGBufferTest(std::string& outLog)
             + error + "\n";
         return false;
     }
-    materialProbe.UseBaseColorMap(std::shared_ptr<Texture>{});
-    secondMaterial.UseBaseColorMap(std::shared_ptr<Texture>{});
-    secondMaterial.UseNormalMap(std::shared_ptr<Texture>{});
-    reducedMaterial.UseBaseColorMap(std::shared_ptr<Texture>{});
-    reducedMaterial.UseNormalMap(std::shared_ptr<Texture>{});
+    materialProbe.UseBaseColorMap(own::shared_owner<const Texture>{});
+    secondMaterial.UseBaseColorMap(own::shared_owner<const Texture>{});
+    secondMaterial.UseNormalMap(own::shared_owner<const Texture>{});
+    reducedMaterial.UseBaseColorMap(own::shared_owner<const Texture>{});
+    reducedMaterial.UseNormalMap(own::shared_owner<const Texture>{});
     firstBaseColorOwner.reset();
     secondBaseColorOwner.reset();
     sharedNormalOwner.reset();
@@ -2240,11 +2236,11 @@ bool RunVulkanGBufferTest(std::string& outLog)
         && thirdTexture.textureOwner && fourthTexture.textureOwner
         && secondNormal.textureOwner && thirdNormal.textureOwner
         && fourthNormal.textureOwner
-        && firstTexture.textureOwner.get() != secondTexture.textureOwner.get()
-        && secondTexture.textureOwner.get() == thirdTexture.textureOwner.get()
-        && thirdTexture.textureOwner.get() == fourthTexture.textureOwner.get()
-        && secondNormal.textureOwner.get() == thirdNormal.textureOwner.get()
-        && thirdNormal.textureOwner.get() == fourthNormal.textureOwner.get()
+        && firstTexture.textureOwner->m_assetId != secondTexture.textureOwner->m_assetId
+        && secondTexture.textureOwner->m_assetId == thirdTexture.textureOwner->m_assetId
+        && thirdTexture.textureOwner->m_assetId == fourthTexture.textureOwner->m_assetId
+        && secondNormal.textureOwner->m_assetId == thirdNormal.textureOwner->m_assetId
+        && thirdNormal.textureOwner->m_assetId == fourthNormal.textureOwner->m_assetId
         && firstTexture.textureGuid == firstBaseColorGuid
         && secondTexture.textureGuid == secondBaseColorGuid
         && thirdTexture.textureGuid == secondBaseColorGuid
@@ -2631,15 +2627,15 @@ bool RunVulkanForwardTest(std::string& outLog)
         RHIShaderSource::Resolve("ForwardWater.shadermeta"));
     const FileGuid windCatalogGuid = DataSystems->GetFileGuid(
         RHIShaderSource::Resolve("ForwardWind.shadermeta"));
-    auto waterRequiredMaterial = std::make_shared<Material>();
+    auto waterRequiredMaterial = own::make_shared<Material>();
     waterRequiredMaterial->m_shaderMetaGuid = waterCatalogGuid;
     waterRequiredMaterial->m_renderingMode = MaterialRenderingMode::Transparent;
-    auto windRequiredMaterial = std::make_shared<Material>();
+    auto windRequiredMaterial = own::make_shared<Material>();
     windRequiredMaterial->m_shaderMetaGuid = windCatalogGuid;
     windRequiredMaterial->m_renderingMode = MaterialRenderingMode::Transparent;
-    const std::weak_ptr<Material> waterRequiredLifetime = waterRequiredMaterial;
-    const std::weak_ptr<Material> windRequiredLifetime = windRequiredMaterial;
-    std::vector<std::shared_ptr<Material>> requiredMaterials{
+    const own::weak_owner<Material> waterRequiredLifetime = waterRequiredMaterial;
+    const own::weak_owner<Material> windRequiredLifetime = windRequiredMaterial;
+    std::vector<own::shared_owner<const Material>> requiredMaterials{
         windRequiredMaterial, waterRequiredMaterial, windRequiredMaterial, nullptr };
     EnhancedRequiredAssetPacket requiredAssets =
         EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
@@ -2702,9 +2698,9 @@ bool RunVulkanForwardTest(std::string& outLog)
         return false;
     }
 
-    const std::shared_ptr<Material> waterAsset =
+    const own::shared_owner<const Material> waterAsset =
         DataSystems->LoadMaterialShared("ForwardWater");
-    const std::shared_ptr<Material> windAsset =
+    const own::shared_owner<const Material> windAsset =
         DataSystems->LoadMaterialShared("ForwardWind");
     if (!waterAsset || !windAsset
         || waterAsset->m_shaderMetaGuid != waterCatalogGuid
@@ -2727,7 +2723,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     Material waterMaterial(*waterAsset);
     Material windMaterial(*windAsset);
 
-    // P2d-a: 실제 FoliageRenderProxy가 타입별 인스턴스를 owning draw source로
+    // P2d-a: 실제 FoliageRenderProxy가 타입별 인스턴스를 type-index draw source로
     // 펼친다. m_isCulled는 한 카메라의 파생값이므로 여기서 버리지 않고,
     // worldBounds를 제품 CaptureFromView의 카메라별 절두체 판정으로 넘긴다.
     bool foliageDrawSourceValid = false;
@@ -2735,22 +2731,20 @@ bool RunVulkanForwardTest(std::string& outLog)
     {
         // MBC9 — Foliage 지오메트리는 typed generation이 유일한 출처다. 코퍼스의
         // Prim_Cube generation을 붙든다(없으면 fixture 실패).
-        const std::shared_ptr<const assets::ModelAssetGeneration> foliageGeneration =
+        const assets::ModelAssetGeneration::Shared foliageGeneration =
             DataSystems->FindModelAssetGenerationByStem("Prim_Cube");
         if (!foliageGeneration)
         {
             outLog += "[1/4] Foliage fixture용 Prim_Cube generation을 찾지 못했다\n";
             return false;
         }
-        auto foliageMaterialOwner = std::make_shared<Material>(windMaterial);
-        const std::weak_ptr<Material> foliageMaterialLifetime =
+        auto foliageMaterialOwner = own::make_shared<Material>(windMaterial);
+        const own::weak_owner<Material> foliageMaterialLifetime =
             foliageMaterialOwner;
 
         FoliageRenderProxy foliage;
         {
-            // 지역 사본이 재질을 붙들면 아래 "마지막 owner 해제" 단정이 거짓으로 붉는다.
-            // FoliageType은 사용자 선언 소멸자 때문에 move가 복사로 떨어지므로 블록으로
-            // 수명을 끊는다(MBC9 실측: ownerNotReleased).
+            // Keep the authoring temporary outside the lifetime assertion below.
             FoliageType windType("P2dWind", true);
             windType.m_material = foliageMaterialOwner;
             windType.m_modelGeneration = foliageGeneration;
@@ -2781,9 +2775,23 @@ bool RunVulkanForwardTest(std::string& outLog)
         for (std::size_t index = 0; index < sources.size(); ++index)
         {
             const FoliageRenderProxy::DrawSource& source = sources[index];
-            if (source.modelGeneration != foliageGeneration) foliageWhy += " generation";
-            if (0u != source.modelMeshIndex) foliageWhy += " meshIndex";
-            if (source.material != foliageMaterialOwner) foliageWhy += " material";
+            if (source.foliageTypeID >= foliage.m_foliageTypes.size())
+            {
+                foliageWhy += " typeIndex";
+                continue;
+            }
+            const auto& type = foliage.m_foliageTypes[source.foliageTypeID];
+            if (!type.m_modelGeneration || !foliageGeneration
+                || type.m_modelGeneration->Handle() != foliageGeneration->Handle())
+            {
+                foliageWhy += " generation";
+            }
+            if (0u != type.m_modelMeshIndex) foliageWhy += " meshIndex";
+            if (!type.m_material || !foliageMaterialOwner
+                || type.m_material->m_materialGuid != foliageMaterialOwner->m_materialGuid)
+            {
+                foliageWhy += " material";
+            }
             if (0u != source.foliageTypeID) foliageWhy += " typeID";
             if (source.worldBounds.is_empty()) foliageWhy += " emptyBounds";
         }
@@ -2795,19 +2803,22 @@ bool RunVulkanForwardTest(std::string& outLog)
         }
         foliageDrawSourceValid = foliageWhy.empty();
 
-        // 프록시 원본을 놓아도 frame draw source가 owner를 유지하고, source를
-        // 놓은 뒤에는 반환되는지까지 같이 고정한다.
+        // A retained proxy snapshot pins each type once. Instance records carry
+        // no hidden Material/model owners; releasing the snapshot releases them
+        // even while those value-only draw records remain alive.
+        auto retainedTypes = foliage.m_foliageTypes;
         foliage.m_foliageTypes.clear();
         foliageMaterialOwner.reset();
         if (foliageMaterialLifetime.expired()) foliageWhy += " ownerLostEarly";
-        sources.clear();
+        retainedTypes.clear();
         if (!foliageMaterialLifetime.expired()) foliageWhy += " ownerNotReleased";
+        sources.clear();
         foliageDrawSourceValid = foliageWhy.empty();
         foliageFailureWhy = foliageWhy;
     }
     if (!foliageDrawSourceValid)
     {
-        outLog += "[1/4] FoliageRenderProxy owning draw source/culling 경계 실패:"
+        outLog += "[1/4] FoliageRenderProxy indexed draw source/culling 경계 실패:"
             + foliageFailureWhy + "\n";
         return false;
     }
@@ -2845,12 +2856,12 @@ bool RunVulkanForwardTest(std::string& outLog)
         primaryHandle, waterHandle, windHandle };
 
     EnhancedLiveFramePacket shaderMetaFrame{};
-    std::array<std::shared_ptr<const ShaderMeta>, 3> frameOwners{
-        std::make_shared<const ShaderMeta>(primaryMeta),
-        std::make_shared<const ShaderMeta>(waterMeta),
-        std::make_shared<const ShaderMeta>(windMeta),
+    std::array<own::shared_owner<const ShaderMeta>, 3> frameOwners{
+        own::make_shared<const ShaderMeta>(primaryMeta),
+        own::make_shared<const ShaderMeta>(waterMeta),
+        own::make_shared<const ShaderMeta>(windMeta),
     };
-    std::array<std::weak_ptr<const ShaderMeta>, 3> frameLifetimes{
+    std::array<own::weak_owner<const ShaderMeta>, 3> frameLifetimes{
         frameOwners[0], frameOwners[1], frameOwners[2] };
     for (std::size_t index = 0; index < frameOwners.size(); ++index)
     {
@@ -2863,7 +2874,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     frameOwners = {};
     const bool shaderMetaOwnedByFrame = 3 == shaderMetaFrame.forwardShaderMetas.size()
         && std::all_of(frameLifetimes.begin(), frameLifetimes.end(),
-            [](const std::weak_ptr<const ShaderMeta>& owner)
+            [](const own::weak_owner<const ShaderMeta>& owner)
             {
                 return !owner.expired();
             })
@@ -2891,13 +2902,13 @@ bool RunVulkanForwardTest(std::string& outLog)
         FileGuid{ "82000000-0000-4000-8000-000000000002" },
         FileGuid{ "83000000-0000-4000-8000-000000000003" },
     };
-    std::array<std::shared_ptr<Texture>, 3> emissionOwners{};
-    std::array<std::weak_ptr<Texture>, 3> emissionLifetimes{};
+    std::array<own::shared_owner<const Texture>, 3> emissionOwners{};
+    std::array<own::weak_owner<const Texture>, 3> emissionLifetimes{};
     for (std::size_t index = 0; index < emissionOwners.size(); ++index)
     {
-        emissionOwners[index].reset(Texture::CreateFromPixels(1, 1,
+        emissionOwners[index] = Texture::CreateFromPixels(1, 1,
             textureNames[index], RHIFormat::RGBA8Unorm,
-            emissionPixels[index].data(), emissionPixels[index].size()));
+            emissionPixels[index].data(), emissionPixels[index].size());
         if (!emissionOwners[index])
         {
             outLog += "[1/4] Forward P2b emission texture 생성 실패\n";
@@ -2907,7 +2918,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     }
     constexpr std::array<std::uint8_t, 4> genericWindPixel{
         255u, 255u, 255u, 255u };
-    std::shared_ptr<Texture> genericWindOwner(Texture::CreateFromPixels(1, 1,
+    own::shared_owner<const Texture> genericWindOwner(Texture::CreateFromPixels(1, 1,
         "m6_p2d_c_wind_map", RHIFormat::RGBA8Unorm,
         genericWindPixel.data(), genericWindPixel.size()));
     if (!genericWindOwner)
@@ -2915,13 +2926,13 @@ bool RunVulkanForwardTest(std::string& outLog)
         outLog += "[1/4] P2d-c generic windMap texture 생성 실패\n";
         return false;
     }
-    std::weak_ptr<Texture> genericWindLifetime = genericWindOwner;
+    own::weak_owner<const Texture> genericWindLifetime = genericWindOwner;
     const FileGuid genericWindGuid{
         "84000000-0000-4000-8000-000000000004" };
 
     Material primaryNearMaterial(primaryMaterial);
     const auto configureMaterial = [&](Material& material,
-        const std::shared_ptr<Texture>& emission, const FileGuid& emissionGuid)
+        const own::shared_owner<const Texture>& emission, const FileGuid& emissionGuid)
     {
         material.m_renderingMode = MaterialRenderingMode::Transparent;
         const bool configured = material.TrySetVector("MaterialProperties", "baseColor",
@@ -3144,14 +3155,17 @@ bool RunVulkanForwardTest(std::string& outLog)
     for (Material* material : { &primaryMaterial, &waterMaterial,
             &primaryNearMaterial, &windMaterial, &mutatedWindMaterial })
     {
-        material->UseEmissiveMap(std::shared_ptr<Texture>{});
+        material->UseEmissiveMap(own::shared_owner<const Texture>{});
     }
     windMaterial.UseTextureMap("windMap", {});
     mutatedWindMaterial.UseTextureMap("windMap", {});
     genericWindOwner.reset();
-    for (std::shared_ptr<Texture>& owner : emissionOwners) owner.reset();
+    for (own::shared_owner<const Texture>& owner : emissionOwners)
+    {
+        owner.reset();
+    }
     const bool packetOwnsTextures = std::all_of(emissionLifetimes.begin(),
-        emissionLifetimes.end(), [](const std::weak_ptr<Texture>& owner)
+        emissionLifetimes.end(), [](const own::weak_owner<const Texture>& owner)
         {
             return !owner.expired();
         }) && !genericWindLifetime.expired()
@@ -3432,13 +3446,13 @@ bool RunVulkanForwardTest(std::string& outLog)
     invalidFlowPacket.reset();
     shaderMetaFrame.forwardShaderMetas.clear();
     const bool packetReleasedTextures = std::all_of(emissionLifetimes.begin(),
-        emissionLifetimes.end(), [](const std::weak_ptr<Texture>& owner)
+        emissionLifetimes.end(), [](const own::weak_owner<const Texture>& owner)
         {
             return owner.expired();
         }) && genericWindLifetime.expired();
     const bool frameReleasedShaderMetas = std::all_of(
         frameLifetimes.begin(), frameLifetimes.end(),
-        [](const std::weak_ptr<const ShaderMeta>& owner)
+        [](const own::weak_owner<const ShaderMeta>& owner)
         {
             return owner.expired();
         });
@@ -3626,9 +3640,9 @@ namespace
     {
         GBufferFixture geometry;
         FrameCameraSnapshot camera{};
-        Texture* diffuse{ nullptr };
-        Texture* normal{ nullptr };
-        Texture* orm{ nullptr };
+        own::shared_owner<const Texture> diffuse;
+        own::shared_owner<const Texture> normal;
+        own::shared_owner<const Texture> orm;
         std::vector<EnhancedDecalPass::Item> decals;
 
         DecalRhiFixture()
@@ -3659,17 +3673,10 @@ namespace
             // GBuffer 표면은 데칼 밖 대조군으로 남는다.
             item.worldMatrix = math::scaling_matrix(math::vector3{ 0.75f, 0.75f, 0.8f }) *
                 math::translation_matrix(math::vector3{ 0.f, 0.f, 0.5f });
-            item.diffuse = diffuse;
-            item.normal = normal;
-            item.occRoughMetal = orm;
+            item.diffuse = (diffuse ? &*diffuse.borrow() : nullptr);
+            item.normal = (normal ? &*normal.borrow() : nullptr);
+            item.occRoughMetal = (orm ? &*orm.borrow() : nullptr);
             decals.push_back(item);
-        }
-
-        ~DecalRhiFixture()
-        {
-            delete diffuse;
-            delete normal;
-            delete orm;
         }
 
         bool IsValid() const { return diffuse && normal && orm; }

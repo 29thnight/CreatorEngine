@@ -1,23 +1,80 @@
 #include "FoliageComponent.h"
-#include "JobScheduler.h"
 #include "FoliageSystem.h"
-#include "ExperimentMaterialMigration.h" // MBC9: generation 재질 시공
 #include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelAnimationDescriptor.h"
+#include "Assets/ModelMeshDescriptor.h"
+#include "MaterialGraphSceneInput.h"
 #include "Material.h"
 #include "DataSystem.h"
-#include "Experiment/Model.h" // I5-D5c4: 재질 저작 정본 해석
 #include "Interfaces/AssetAuthoringPort.h"
 #include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Terrain.h"
 #include "Scene.h"
-#include "Camera.h"
-#include "SceneManager.h"
 #include "Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
 #include <random>
-#include <sstream>
+#include <algorithm>
+
+struct FoliageComponent::AssetBinding
+{
+    AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> model{};
+    AssetDepot::AssetRequest<assets::ModelMeshDescriptor> mesh{};
+    AssetDepot::AssetRequest<Material> material{};
+    DataSystem::ModelPreparation legacyPreparation{};
+    own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};
+    own::shared_owner<const assets::ModelMeshDescriptor> selectedMesh{};
+    own::shared_owner<const assets::ModelAssetGeneration> legacyGeneration{};
+    AssetDepot::AssetRequestStatus status{ AssetDepot::AssetRequestStatus::Pending };
+    AssetDepot::AssetRequestError error{ AssetDepot::AssetRequestError::None };
+    std::string message{};
+    std::size_t meshIndex{};
+    bool childrenRequested{};
+
+    void Cancel()
+    {
+        model.Cancel();
+        mesh.Cancel();
+        material.Cancel();
+        if (status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            status = AssetDepot::AssetRequestStatus::Cancelled;
+        }
+        // Accepted jobs retain their own captures in DataSystem's shutdown
+        // barrier. Dropping this subscriber is not proof the work has drained.
+        model = {};
+        mesh = {};
+        material = {};
+        descriptor.reset();
+        selectedMesh.reset();
+        legacyGeneration.reset();
+        legacyPreparation.reset();
+    }
+};
+
+FoliageComponent::FoliageComponent() = default;
+FoliageComponent::~FoliageComponent()
+{
+    CancelAssetBindings();
+}
+
+void FoliageComponent::CancelAssetBindings()
+{
+    for (auto& binding : m_assetBindings)
+    {
+        if (binding)
+        {
+            binding->Cancel();
+        }
+    }
+}
+
+AssetDepot::AssetRequestStatus FoliageComponent::GetAssetBindingStatus(uint32 typeID) const
+{
+    return typeID < m_assetBindings.size() && m_assetBindings[typeID]
+        ? m_assetBindings[typeID]->status : AssetDepot::AssetRequestStatus::Failed;
+}
 
 void FoliageComponent::OnInitialized()
 {
@@ -69,6 +126,7 @@ void FoliageComponent::OnRemovingFromScene()
 
 void FoliageComponent::OnUninitializing()
 {
+    CancelAssetBindings();
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if(scene)
@@ -140,6 +198,8 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
         return;
     }
 
+    CancelAssetBindings();
+    m_assetBindings.clear();
     m_foliageTypes.clear();
     m_foliageInstances.clear();
     for (const Authoring::ReadNode typeNode :
@@ -157,76 +217,266 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
         Meta::Deserialize(&instance, instanceNode);
         AddFoliageInstance(instance);
     }
+    PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 	Debug::PrintLog(spdlog::level::info, "Foliage asset loaded successfully: {}", assetPath.string());
 }
 
-void FoliageComponent::BindModelGeneration(FoliageType& type)
+void FoliageComponent::RebindFoliageType(uint32 typeID)
 {
- // PHASE 3.75 MBC9 — typed 정본만 있다. Foliage 자산은 모델을 **이름**으로만
- // 적으므로(m_modelName) 이름 → ModelId → 현재 generation으로 잇는다. 메시는
- // legacy 규약과 같은 0번(FoliageType이 메시를 고르지 않는다). 재질은 그 메시가
- // 가리키는 generation 재질에서 시공하고 embedded texture는 같은 closure에서 푼다.
-    type.m_modelGeneration.reset();
-    type.m_modelMeshIndex = 0;
-    type.m_material.reset();
-    type.m_authoredMaterial.reset();
-    if (type.m_modelName.empty()) return;
-
-    const FileGuid modelGuid = DataSystems->GetStemToGuid(type.m_modelName);
-    std::shared_ptr<const assets::ModelAssetGeneration> generation =
-        DataSystems->LoadModelAssetGeneration(modelGuid);
-    if (!generation || generation->Meshes().empty())
+    if (typeID >= m_foliageTypes.size())
     {
-        Debug::PrintLog(spdlog::level::err, "FoliageType 모델 generation 해석 실패: " + type.m_modelName);
         return;
     }
-    const assets::ModelMeshAsset& mesh = generation->Meshes().front();
-    const auto materials = generation->Materials();
-    for (std::size_t index = 0; index < materials.size(); ++index)
+    if (m_assetBindings[typeID])
     {
-        if (materials[index].materialId != mesh.materialId) continue;
-        experiment::Material converted;
-        ExperimentMaterialMigration::ConvertModelMaterialAsset(
-            materials[index], *generation, converted);
-        auto material = std::make_shared<Material>();
-        std::string error;
-        if (ExperimentMaterialMigration::ConvertToLegacyMaterial(
-            converted, nullptr, *material, error))
+        m_assetBindings[typeID]->Cancel();
+    }
+    auto binding = own::make_unique<AssetBinding>();
+    auto& type = m_foliageTypes[typeID];
+    // One-time migration of name-only authoring data. A persisted typed link
+    // never consults stem lookup, even if its current mount is absent.
+    if (type.m_modelGuid == FileGuid{} && !type.m_modelName.empty())
+    {
+        type.m_modelGuid = DataSystems->GetStemToGuid(type.m_modelName);
+        type.m_allowLegacySource = true;
+    }
+    const auto link = type.ModelLink();
+    const auto catalog = DataSystems->GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry resolved;
+    const bool mounted = catalog && catalog->Find(link.ToReference(), resolved)
+        != experiment::cooked::AssetLookupStatus::NotMounted;
+    if (mounted || !type.m_allowLegacySource || !PathFinder::IsAssetAuthoringEnabled())
+    {
+        // A wrong-kind/unsupported/missing record stays an explicit typed error.
+        binding->model = DataSystems->RequestAsync(link);
+    }
+    else
+    {
+        const auto source = DataSystems->GetFilePath(type.m_modelGuid);
+        if (link.IsValid() && !source.empty())
         {
-            DataSystems->FinalizeMaterialRuntime(*material);
-            DataSystems->BindModelGenerationTextures(*material, *generation);
-            type.m_material = std::move(material);
-            if (!materials[index].shaderAssetId.IsNil())
+            try
             {
-                auto authored = std::make_shared<experiment::Material>(std::move(converted));
-                type.m_authoredMaterial = std::move(authored);
+                binding->legacyPreparation = DataSystems->PrepareModelAssetByPath(source.string(), false);
+            }
+            catch (const std::exception& error)
+            {
+                binding->message = error.what();
             }
         }
-        else
+        if (!binding->legacyPreparation)
         {
-            Debug::PrintLog(spdlog::level::warn, "FoliageType 재질 변환 실패 — 빈 재질: " + error);
+            binding->status = AssetDepot::AssetRequestStatus::Failed;
+            binding->error = AssetDepot::AssetRequestError::NotMounted;
+            binding->message = "Foliage legacy source is unavailable; bind a mounted model link. " + binding->message;
+            Debug::PrintLog(spdlog::level::err, binding->message);
         }
-        break;
     }
-    type.m_modelGeneration = std::move(generation);
+    m_assetBindings[typeID] = std::move(binding);
+    PollAssetBindings();
+}
+
+void FoliageComponent::PollAssetBindings()
+{
+    using Status = AssetDepot::AssetRequestStatus;
+    using Error = AssetDepot::AssetRequestError;
+    for (std::size_t index = 0u; index < m_assetBindings.size(); ++index)
+    {
+        auto& binding = *m_assetBindings[index];
+        if (binding.status != Status::Pending)
+        {
+            continue;
+        }
+        auto& type = m_foliageTypes[index];
+        const auto fail = [&](Status status, Error error, std::string message)
+        {
+            binding.Cancel();
+            binding.status = status;
+            binding.error = error;
+            binding.message = std::move(message);
+            Debug::PrintLog(spdlog::level::err, "Foliage binding failed: "
+                + type.m_modelGuid.ToString() + " " + binding.message);
+        };
+        if (!binding.childrenRequested)
+        {
+            if (binding.legacyPreparation)
+            {
+                if (!DataSystems->ModelPreparationCompletion(binding.legacyPreparation).is_complete())
+                {
+                    continue;
+                }
+                std::string error;
+                binding.legacyGeneration = DataSystems->ReadPreparedModel(binding.legacyPreparation, error);
+                if (!binding.legacyGeneration || DataSystems->HasPreparedModelScene(binding.legacyPreparation))
+                {
+                    fail(Status::Stale, Error::RevisionChanged,
+                        "Legacy foliage preparation changed or failed; rebind explicitly. " + error);
+                    continue;
+                }
+                const auto meshes = binding.legacyGeneration->Meshes();
+                const auto selected = type.m_meshAssetId == FileGuid{} ? meshes.begin()
+                    : std::ranges::find(meshes, type.m_meshAssetId.m_guid, &assets::ModelMeshAsset::meshId);
+                if (selected == meshes.end())
+                {
+                    fail(Status::Failed, Error::InvalidLink, "Selected legacy foliage mesh is absent.");
+                    continue;
+                }
+                binding.meshIndex = static_cast<std::size_t>(selected - meshes.begin());
+                type.m_meshAssetId = FileGuid(selected->meshId);
+                if (type.m_materialAssetId == FileGuid{})
+                {
+                    type.m_materialAssetId = FileGuid(selected->materialId);
+                }
+                binding.material = DataSystems->RequestLegacyModelMaterialAsync(
+                    binding.legacyGeneration, type.m_materialAssetId);
+                binding.legacyPreparation.reset();
+            }
+            else
+            {
+                const auto result = binding.model.Snapshot();
+                if (result.status == Status::Pending)
+                {
+                    continue;
+                }
+                if (result.status != Status::Ready || !result.asset)
+                {
+                    fail(result.status == Status::Ready ? Status::Failed : result.status,
+                        result.status == Status::Ready ? Error::DecodeFailed : result.error, result.message);
+                    continue;
+                }
+                binding.descriptor = result.asset;
+                if (type.m_modelName.empty())
+                {
+                    type.m_modelName = binding.descriptor->summary.name;
+                }
+                const auto& meshes = binding.descriptor->summary.meshes;
+                const auto selected = type.m_meshAssetId == FileGuid{} ? meshes.begin()
+                    : std::ranges::find_if(meshes, [&](const auto& mesh)
+                    {
+                        return mesh.meshAssetId.value == type.m_meshAssetId.m_guid;
+                    });
+                if (selected == meshes.end() || selected->skinned)
+                {
+                    fail(Status::Failed, Error::UnsupportedRepresentation,
+                        "Foliage needs a selected static mesh in its model descriptor.");
+                    continue;
+                }
+                binding.meshIndex = static_cast<std::size_t>(selected - meshes.begin());
+                type.m_meshAssetId = FileGuid(selected->meshAssetId.value);
+                if (type.m_materialAssetId == FileGuid{})
+                {
+                    type.m_materialAssetId = FileGuid(selected->materialAssetId.value);
+                }
+                binding.selectedMesh = DataSystems->TryAcquire(binding.descriptor, binding.meshIndex);
+                if (!binding.selectedMesh)
+                {
+                    binding.mesh = DataSystems->RequestAsync(binding.descriptor, binding.meshIndex);
+                }
+                binding.material = DataSystems->RequestAsync(binding.descriptor, type.MaterialLink());
+                binding.model = {};
+            }
+            binding.childrenRequested = true;
+        }
+        if (binding.descriptor && !binding.selectedMesh)
+        {
+            const auto result = binding.mesh.Snapshot();
+            if (result.status == Status::Pending)
+            {
+                continue;
+            }
+            if (result.status != Status::Ready || !result.asset)
+            {
+                fail(result.status == Status::Ready ? Status::Failed : result.status,
+                    result.status == Status::Ready ? Error::DecodeFailed : result.error, result.message);
+                continue;
+            }
+            binding.selectedMesh = result.asset;
+            binding.mesh = {};
+        }
+        const auto material = binding.material.Snapshot();
+        if (material.status == Status::Pending)
+        {
+            continue;
+        }
+        if (material.status != Status::Ready || !material.asset)
+        {
+            fail(material.status == Status::Ready ? Status::Failed : material.status,
+                material.status == Status::Ready ? Error::DecodeFailed : material.error, material.message);
+            continue;
+        }
+        if (!material.asset->HasMaterialGraph())
+        {
+            fail(Status::Failed, Error::UnsupportedRepresentation,
+                "Live foliage requires a cooked Lattice graph material; Code-only materials are unsupported.");
+            continue;
+        }
+        if (binding.descriptor && (!material.asset->GetAssetOrigin()
+            || material.asset->GetAssetOrigin()->resolved.resolverRevision != binding.descriptor->origin.resolverRevision))
+        {
+            fail(Status::Stale, Error::RevisionChanged, "Foliage model/material resolver revisions differ.");
+            continue;
+        }
+        // Allocate the source snapshot before moving any replacement owner;
+        // a failed allocation must not leave a partially published type.
+        auto graphSource = material_graph::SceneMaterialSource::Capture(*material.asset);
+        // Publish one coherent selected replacement. Until here old proxy/scene
+        // owners remain valid. No geometry/image payload is retained by the type.
+        type.m_modelDescriptor = std::move(binding.descriptor);
+        type.m_meshDescriptor = std::move(binding.selectedMesh);
+        type.m_modelGeneration = std::move(binding.legacyGeneration);
+        type.m_modelMeshIndex = static_cast<std::uint32_t>(binding.meshIndex);
+        type.m_material = material.asset;
+        type.m_graphMaterialSource = std::move(graphSource);
+        type.m_authoredMaterial.reset();
+        binding.material = {};
+        binding.status = Status::Ready;
+        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    }
 }
 
 void FoliageComponent::AddFoliageType(const FoliageType& type)
 {
-    m_foliageTypes.push_back(type);
- // 저작 경로(에디터 드롭·CLI)든 자산 로드 경로(LoadFoliageAsset)든 이름으로
- // 같은 typed 바인딩을 한다.
-    BindModelGeneration(m_foliageTypes.back());
-	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    FoliageType candidate = type;
+    candidate.m_modelDescriptor.reset();
+    candidate.m_meshDescriptor.reset();
+    candidate.m_modelGeneration.reset();
+    candidate.m_material.reset();
+    candidate.m_graphMaterialSource.reset();
+    candidate.m_authoredMaterial.reset();
+    m_assetBindings.push_back(own::make_unique<AssetBinding>());
+    try
+    {
+        m_foliageTypes.push_back(std::move(candidate));
+    }
+    catch (...)
+    {
+        m_assetBindings.pop_back();
+        throw;
+    }
+    RebindFoliageType(static_cast<uint32>(m_foliageTypes.size() - 1u));
+    PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 void FoliageComponent::RemoveFoliageType(uint32 typeID)
 {
     if (typeID < m_foliageTypes.size())
-	{
+    {
+        m_assetBindings[typeID]->Cancel();
+        m_assetBindings.erase(m_assetBindings.begin() + typeID);
         m_foliageTypes.erase(m_foliageTypes.begin() + typeID);
-		PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
-	}
+        std::erase_if(m_foliageInstances, [typeID](const auto& instance)
+        {
+            return instance.m_foliageTypeID == typeID;
+        });
+        for (auto& instance : m_foliageInstances)
+        {
+            if (instance.m_foliageTypeID > typeID)
+            {
+                --instance.m_foliageTypeID;
+            }
+        }
+        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    }
 }
 
 void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
@@ -312,34 +562,6 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
 	if (m_foliageInstances.size() != previousSize)
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 }
-//helper
-std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
-{
-    std::vector<std::pair<size_t, size_t>> ranges;
-    if (count == 0)
-        return ranges;
-
-    unsigned int hwThreads = std::thread::hardware_concurrency();
-    if (hwThreads == 0) hwThreads = 4; // 안전 기본값 (미검출 시)
-
-    const size_t numSplits = hwThreads * 2 + 1;
-    ranges.reserve(numSplits);
-
-    const size_t chunk = (count + numSplits - 1) / numSplits; // ceil(count / numSplits)
-    size_t begin = 0;
-
-    for (size_t i = 0; i < numSplits; ++i)
-    {
-        size_t end = std::min(begin + chunk, count);
-        if (begin >= end)
-            break;
-        ranges.emplace_back(begin, end);
-        begin = end;
-    }
-
-    return ranges;
-}
-
 void FoliageComponent::UpdateFoliageCullingData(
     const std::optional<math::bounding_frustum>& cameraFrustum)
 {
@@ -363,18 +585,19 @@ void FoliageComponent::UpdateFoliageCullingData(
             foliage.RebuildWorldMatrix();
 
             const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
- // MBC9 — 바운드는 typed generation 메시가 소유한다.
-            if (!foliageType.m_modelGeneration
-                || foliageType.m_modelMeshIndex >= foliageType.m_modelGeneration->Meshes().size())
+            const auto* bounds = foliageType.m_meshDescriptor ? &foliageType.m_meshDescriptor->bounds
+                : foliageType.m_modelGeneration && foliageType.m_modelMeshIndex < foliageType.m_modelGeneration->Meshes().size()
+                    ? &foliageType.m_modelGeneration->Meshes()[foliageType.m_modelMeshIndex].bounds : nullptr;
+            if (!bounds)
             {
-                foliage.m_isCulled = true; // 안전 기본값
+                foliage.m_isCulled = true;
                 continue;
             }
 
             if(SceneManagers->IsGameStart())
             {
 				const math::aabb worldBounds = math::transform(
-					foliageType.m_modelGeneration->Meshes()[foliageType.m_modelMeshIndex].bounds,
+					*bounds,
 					foliage.m_worldMatrix);
 				foliage.m_isCulled = cameraFrustum.has_value() &&
 					!worldBounds.is_empty() &&
@@ -387,17 +610,9 @@ void FoliageComponent::UpdateFoliageCullingData(
         }
     };
 
-    auto ranges = DivideRangeAuto(m_foliageInstances.size());
-
-    job_group tasks;
-
-    for (auto& [begin, end] : ranges)
-    {
-        tasks.add([process_range, begin, end] { process_range(begin, end); });
-    }
-
- // 완료 대기
-    ce::get_job_scheduler().submit(std::move(tasks)).wait();
+    // Bounds-only owner-thread work avoids queued raw component captures and
+    // a blocking job barrier on the scene/UI thread.
+    process_range(0u, count);
 }
 
 
@@ -411,16 +626,6 @@ void FoliageComponent::OnDeserialized()
 	}
 
 	LoadFoliageAsset(m_foliageAssetGuid);
-
-	// MBC9 — 타입은 LoadFoliageAsset → AddFoliageType이 이미 typed 바인딩했다.
-	// 여기서는 바인딩 실패(모델 부재)를 한 번 더 관측한다.
-	for (const FoliageType& type : GetFoliageTypes())
-	{
-		if (!type.m_modelName.empty() && !type.m_modelGeneration)
-		{
-			Debug::PrintLog(spdlog::level::err, "Failed to load model for FoliageType: " + type.m_modelName);
-		}
-	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존
 }

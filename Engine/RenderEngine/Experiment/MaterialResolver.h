@@ -2,12 +2,14 @@
 
 #include "ModelData.h"
 #include "../ShaderMetaHandle.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "TypeTrait.h"
 
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -33,14 +35,12 @@ namespace experiment
     //   fallbackPath는 진단용이다).
     struct MaterialResolveServices final
     {
-        // GUID → ShaderMeta generation. 정본: DataSystem::LoadShaderMetaHandle.
-        std::function<ShaderMetaHandle(const FileGuid&, std::string&)>
-            loadShaderMetaHandle{};
-        // handle → 불변 스냅샷. 정본: DataSystem::ResolveShaderMeta.
-        std::function<std::shared_ptr<const ShaderMeta>(const ShaderMetaHandle&)>
-            resolveShaderMeta{};
+        // Transitional engine-internal load hands the owner and identity to the
+        // consumer together. A numeric handle alone cannot pin a cache generation.
+        std::function<own::shared_owner<const ShaderMeta>(
+            const FileGuid&, ShaderMetaHandle&, std::string&)> loadShaderMetaOwner{};
         // 경로 → texture generation owner. 정본: DataSystem::LoadSharedMaterialTexture.
-        std::function<std::shared_ptr<Texture>(const std::filesystem::path&, bool, TextureColorSpace)>
+        std::function<own::shared_owner<const Texture>(const std::filesystem::path&, bool, TextureColorSpace)>
             loadTexture{};
         // GUID → cooked artifact 경로. 정본: CookedAssetCatalog::ResolveArtifactPath.
         // 비어 있으면(catalog 부재) source만 쓴다.
@@ -53,14 +53,14 @@ namespace experiment
         // owner를 받는다 — 경로 해석이 없다(파일이 없는 subasset이다). nullptr이면
         // 그 generation에 없는 것이고 cooked/source 경로로 내려간다. 비어 있으면
         // (generation 없는 재질) 건너뛴다. 정본: DataSystem::ResolveModelGenerationTexture.
-        std::function<std::shared_ptr<Texture>(const AssetId&)> resolveEmbeddedTexture{};
+        std::function<own::shared_owner<const Texture>(const AssetId&)> resolveEmbeddedTexture{};
     };
 
     struct ResolvedMaterialTexture final
     {
         std::string propertyName{};
         AssetId assetId{};
-        std::shared_ptr<Texture> owner{};
+        own::shared_owner<const Texture> owner{};
         bool fromCookedArtifact{};
         bool fromGenerationClosure{}; // MBC7
     };
@@ -78,13 +78,19 @@ namespace experiment
     {
         AssetId assetId{};
         ShaderMetaHandle shaderMetaHandle{};
-        std::shared_ptr<const ShaderMeta> shaderMeta{};
+        own::shared_owner<const ShaderMeta> shaderMeta{};
         // ShaderMeta 축 순서 기준 정규화 결과. 이름 기반 keywords가 정본이고
         // 인덱스 keywordSelections는 보조다(ModelData.h의 저작 계약 그대로).
         std::vector<std::uint16_t> keywordSelections{};
         std::vector<ResolvedMaterialTexture> textures{};
         ResolvedMaterialNotes notes{};
     };
+
+    // Extends only a runtime instance copy with explicitly supplied prepared
+    // texture owners. IDs/revision must match its captured program snapshot;
+    // this never queries a catalog, starts work or changes an asset-cache root.
+    [[nodiscard]] bool BindPreparedMaterialTextures(Material& material,
+        std::span<const own::shared_owner<const Texture>> textures, std::string& outError);
 
     [[nodiscard]] bool ResolveMaterial(const Material& material,
         const MaterialResolveServices& services,

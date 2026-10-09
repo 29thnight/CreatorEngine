@@ -18,6 +18,27 @@ namespace material_graph
 {
     namespace
     {
+        template<class Left, class Right>
+        bool SamePinnedObject(const Left& left, const Right& right)
+        {
+            if (!left || !right)
+            {
+                return !left && !right;
+            }
+            if constexpr (requires { left->representationId; right->representationId; })
+            {
+                // Both handles are anchored during this check. A copied or
+                // forged representation key is not the same immutable instance.
+                return InstanceFramePins::Identity(*left) == InstanceFramePins::Identity(*right)
+                    && std::addressof(*left) == std::addressof(*right);
+            }
+            else
+            {
+                return left->assetId == right->assetId && left->generation == right->generation
+                    && left->cooked.product.program.semanticKey == right->cooked.product.program.semanticKey;
+            }
+        }
+
         constexpr char PreparationAdmissionError[] =
             "LX Scene program preparation exceeds its 64-request admission budget.";
         bool Fail(std::string& error, std::string message)
@@ -59,7 +80,7 @@ namespace material_graph
 
     struct SceneHost::Program
     {
-        std::shared_ptr<const Generation> generation;
+        own::shared_owner<const Generation> generation;
         RHIShaderBinary backend{};
         PassLayout layout;
         PassLayout shadowLayout;
@@ -79,8 +100,8 @@ namespace material_graph
     {
         struct Draw
         {
-            std::shared_ptr<const Program> program;
-            std::shared_ptr<const RenderBindings> bindings;
+            own::shared_owner<const Program> program;
+            own::shared_owner<const RenderBindings> bindings;
             bool shadowEnabled{};
             std::shared_ptr<const MeshSurfaceBatch> geometry;
             RHIBufferSlice indices, constants, referenceConstants;
@@ -95,7 +116,7 @@ namespace material_graph
         };
         IRenderDeviceServices* device{};
         std::uint64_t recording{}, descriptors{};
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         std::vector<Draw> draws;
         std::vector<std::pair<size_t, size_t>> inputRanges;
         std::span<const Draw> DrawsFor(std::optional<size_t> inputIndex) const
@@ -338,25 +359,25 @@ namespace material_graph
     {
         struct Work : SceneShaderSet
         {
-            std::shared_ptr<const Generation> generation;
-            std::shared_ptr<const VerifiedProduct> verified;
+            own::shared_owner<const Generation> generation;
+            own::unique_owner<const VerifiedProduct> verified;
             RHIShaderBinary backend{};
             std::filesystem::path file, shaderDirectory;
             std::string error;
             bool worker{}, cooked{};
         };
-        std::shared_ptr<const Generation> generation;
+        own::shared_owner<const Generation> generation;
         RHIShaderBinary backend{};
-        std::shared_ptr<Work> work;
+        own::shared_owner<Work> work;
         job_handle job;
-        std::shared_ptr<Program> program;
+        own::shared_owner<Program> program;
         std::string error;
         bool checked{};
     };
 
     struct SceneHost::Slot
     {
-        std::shared_ptr<const Instance> requested, active;
+        own::shared_owner<const Instance> requested, active;
         EnhancedMaterialCoverage requestedCoverage, activeCoverage;
         std::uint64_t revision{};
     };
@@ -373,10 +394,10 @@ namespace material_graph
         }
     }
 
-    bool SceneHost::IsProgramReady(const std::shared_ptr<const Generation>& generation, RHIShaderBinary backend) const
+    bool SceneHost::IsProgramReady(const own::shared_owner<const Generation>& generation, RHIShaderBinary backend) const
     {
         return std::ranges::any_of(programs_, [&](const auto& program) {
-            return program->generation == generation && program->backend == backend;
+            return SamePinnedObject(program->generation, generation) && program->backend == backend;
         });
     }
 
@@ -391,7 +412,7 @@ namespace material_graph
         return result;
     }
 
-    void SceneHost::PruneFailedPreparations(const std::shared_ptr<const Generation>& requested)
+    void SceneHost::PruneFailedPreparations(const own::shared_owner<const Generation>& requested)
     {
         std::size_t retainedFailures = std::ranges::count_if(preparations_, [](const auto& item)
         {
@@ -400,7 +421,7 @@ namespace material_graph
         std::erase_if(preparations_, [&](const auto& preparation)
         {
             if (retainedFailures <= 16 || preparation->error.empty()
-                || preparation->generation == requested
+                || SamePinnedObject(preparation->generation, requested)
                 || (preparation->job.valid() && !preparation->job.is_complete()))
             {
                 return false;
@@ -408,9 +429,9 @@ namespace material_graph
             const bool referenced = std::ranges::any_of(slots_, [&](const auto& item)
             {
                 return (item.second->requested
-                        && item.second->requested->generation == preparation->generation)
+                        && SamePinnedObject(item.second->requested->generation, preparation->generation))
                     || (item.second->active
-                        && item.second->active->generation == preparation->generation);
+                        && SamePinnedObject(item.second->active->generation, preparation->generation));
             });
             if (referenced)
             {
@@ -421,7 +442,7 @@ namespace material_graph
         });
     }
 
-    bool SceneHost::RequestProgram(const EnhancedFrameContext& context, std::shared_ptr<const Generation> generation,
+    bool SceneHost::RequestProgram(const EnhancedFrameContext& context, own::shared_owner<const Generation> generation,
                                    std::string& error)
     {
         const auto backend = RHIShaderCompiler::GetOutput();
@@ -438,7 +459,7 @@ namespace material_graph
         }
         for (const auto& item : preparations_)
         {
-            if (item->generation == generation && item->backend == backend)
+            if (SamePinnedObject(item->generation, generation) && item->backend == backend)
             {
                 error = item->error;
                 return error.empty();
@@ -454,14 +475,14 @@ namespace material_graph
                 return Fail(error, PreparationAdmissionError);
             }
         }
-        auto preparation = std::make_shared<Preparation>();
+        auto preparation = own::make_unique<Preparation>();
         preparation->generation = std::move(generation);
         preparation->backend = backend;
         const auto reject = [&](std::string message) {
             preparation->error = message;
             stats_.lastError = message;
             ++stats_.failedPreparations;
-            preparations_.push_back(preparation);
+            preparations_.push_back(std::move(preparation));
             return Fail(error, std::move(message));
         };
         const auto& product = preparation->generation->cooked.product;
@@ -484,7 +505,7 @@ namespace material_graph
                 "LX Scene Volume requires homogeneous coefficients; spatially varying Volume is unsupported.");
         }
         static std::atomic<std::uint64_t> serial{};
-        auto work = std::make_shared<Preparation::Work>();
+        auto work = own::make_shared<Preparation::Work>();
         work->generation = preparation->generation;
         work->backend = backend;
         if (product.program.semanticKey.ends_with(SceneHostIdentity))
@@ -576,7 +597,7 @@ namespace material_graph
                 const auto backend = preparation->backend;
                 std::string error;
                 const auto describe = [&]() -> bool {
-                    auto candidate = std::make_shared<Program>();
+                    auto candidate = own::make_shared<Program>();
                     candidate->generation = preparation->generation;
                     candidate->backend = backend;
                     const auto& product =
@@ -858,7 +879,13 @@ namespace material_graph
             if (preparation->program &&
                 std::ranges::all_of(requests, [](const auto* request) { return request->IsValid(); }))
             {
-                programs_.push_back(preparation->program);
+                // Allocate before the converting move. If growth fails, the
+                // checked preparation still owns its ready Program for a retry.
+                if (programs_.size() == programs_.capacity())
+                {
+                    programs_.reserve((std::max)(programs_.size() + 1, programs_.capacity() * 2));
+                }
+                programs_.push_back(std::move(preparation->program));
                 if (!PathFinder::IsAssetAuthoringEnabled())
                 {
                     std::printf("[lx.scene.program] source=cooked graph=%s ready=%zu sceneCompiles=%llu\n",
@@ -902,7 +929,7 @@ namespace material_graph
                         {
                             return false;
                         }
-                        work->verified = std::make_shared<VerifiedProduct>(std::move(verified));
+                        work->verified = own::make_unique<const VerifiedProduct>(std::move(verified));
                         return true;
                     });
                     ++stats_.compileSubmissions;
@@ -919,12 +946,12 @@ namespace material_graph
     }
 
     bool SceneHost::PrepareProgram(const EnhancedFrameContext&, const Instance& instance,
-                                   std::shared_ptr<const Program>& result, std::string& error)
+                                   own::shared_owner<const Program>& result, std::string& error)
     {
         const auto backend = RHIShaderCompiler::GetOutput();
         for (const auto& program : programs_)
         {
-            if (program->generation == instance.generation && program->backend == backend)
+            if (SamePinnedObject(program->generation, instance.generation) && program->backend == backend)
             {
                 result = program;
                 error.clear();
@@ -935,8 +962,8 @@ namespace material_graph
     }
 
     bool SceneHost::SelectReadyInput(const EnhancedFrameContext& context,
-                                     std::shared_ptr<const SceneViewInput> requested,
-                                     std::shared_ptr<const SceneViewInput>& result, std::string& error)
+                                     own::shared_owner<const SceneViewInput> requested,
+                                     own::shared_owner<const SceneViewInput>& result, std::string& error)
     {
         selectionDeferred_ = false;
         if (!requested)
@@ -973,7 +1000,7 @@ namespace material_graph
         for (const auto& draw : requested->Draws())
         {
             const auto [entry, inserted] = sources.emplace(draw.materialSlot, &draw);
-            if (!draw.materialSlot || (!inserted && (entry->second->material != draw.material ||
+            if (!draw.materialSlot || (!inserted && (!SamePinnedObject(entry->second->material, draw.material) ||
                                                      !sameCoverage(entry->second->coverage, draw.coverage))))
             {
                 return Fail(error, "LX Scene Material slots must identify one exact instance and coverage per view.");
@@ -988,11 +1015,11 @@ namespace material_graph
             auto& slot = slots_[{view.sceneEpoch, view.viewId, id}];
             if (!slot)
             {
-                slot = std::make_shared<Slot>();
+                slot = own::make_unique<Slot>();
             }
-            if (slot->requested != draw->material || !sameCoverage(slot->requestedCoverage, draw->coverage))
+            if (!SamePinnedObject(slot->requested, draw->material) || !sameCoverage(slot->requestedCoverage, draw->coverage))
             {
-                slot->requested = draw->material;
+                slot->requested = requested->MaterialOwner(*draw);
                 slot->requestedCoverage = draw->coverage;
                 slot->revision = ++selectionSerial_;
             }
@@ -1020,7 +1047,7 @@ namespace material_graph
             {
                 const auto failed = std::ranges::find_if(preparations_, [&](const auto& item)
                 {
-                    return item->generation == draw.material->generation && item->backend == backend
+                    return SamePinnedObject(item->generation, draw.material->generation) && item->backend == backend
                         && !item->error.empty();
                 });
                 if (failed != preparations_.end())
@@ -1033,7 +1060,7 @@ namespace material_graph
         }
         // Copy only after every requested program is ready. Geometry owners stay
         // shared, and each draw record is copied exactly once.
-        auto selected = std::shared_ptr<SceneViewInput>(new SceneViewInput(*requested));
+        auto selected = own::make_shared<SceneViewInput>(SceneViewInput::ConstructionKey{}, *requested);
         for (auto& draw : selected->draws_)
         {
             const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
@@ -1041,11 +1068,13 @@ namespace material_graph
         }
         // Only the cache's CPU record is pruned. Shared native handles stay in the
         // backend cache; global cache eviction remains a separate lifetime policy.
+        // This drops only the cache pin. Frames/recordings keep their exact Program;
+        // reference counts are not an in-use or GPU-completion decision.
         std::erase_if(programs_, [&](const auto& program) {
-            return programs_.size() > 32 && program.use_count() == 1 &&
+            return programs_.size() > 32 &&
                    std::ranges::none_of(slots_, [&](const auto& item) {
-                       return (item.second->active && item.second->active->generation == program->generation) ||
-                              (item.second->requested && item.second->requested->generation == program->generation);
+                       return (item.second->active && SamePinnedObject(item.second->active->generation, program->generation)) ||
+                              (item.second->requested && SamePinnedObject(item.second->requested->generation, program->generation));
                    });
         });
         PruneFailedPreparations();
@@ -1055,7 +1084,7 @@ namespace material_graph
     }
 
     bool SceneHost::PrepareResidency(const EnhancedFrameContext& context,
-                                     const std::shared_ptr<const SceneViewInput>& input, std::string& error) const
+                                     const own::shared_owner<const SceneViewInput>& input, std::string& error) const
     {
         error.clear();
         if (!input || input->Draws().empty())
@@ -1072,7 +1101,8 @@ namespace material_graph
             for (const auto& texture : draw.material->textures)
             {
                 const auto failures = context.textureCache->GetUploadFailureCount();
-                const auto entry = context.textureCache->GetOrUpload(texture.owner.get(), error);
+                const auto entry = context.textureCache->GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr),
+                    context.TextureImage(texture.owner ? &*texture.owner : nullptr), error);
                 if (!entry.IsValid() || !error.empty() || context.textureCache->GetUploadFailureCount() != failures)
                 {
                     return Fail(error, error.empty() ? "LX Scene texture residency upload failed." : error);
@@ -1083,7 +1113,7 @@ namespace material_graph
         return true;
     }
 
-    bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<const SceneViewInput> input,
+    bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<const SceneViewInput> input,
                             RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                             const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
                             std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance,
@@ -1123,7 +1153,7 @@ namespace material_graph
             device_ = context.resources;
             device_->RegisterUploadTransactionListener(this);
         }
-        auto candidate = std::make_shared<Frame>();
+        auto candidate = own::make_shared<Frame>();
         candidate->device = device_;
         candidate->recording = device_->GetCurrentUploadRecordingId();
         candidate->descriptors = device_->GetDescriptorVersionToken();
@@ -1227,10 +1257,12 @@ namespace material_graph
         const bool indexedIndirect = device_->GetIndirectDrawCapabilities().indexedDraw;
         for (const auto& draw : candidate->input->Draws())
         {
-            std::shared_ptr<const Program> program;
-            std::shared_ptr<const RenderBindings> bindings;
+            own::shared_owner<const Program> program;
+            own::shared_owner<const RenderBindings> bindings;
             if (!PrepareProgram(context, *draw.material, program, error) ||
-                !bindings_.Prepare(*device_, *context.textureCache, draw.material, program->layout, bindings, error))
+                !bindings_.Prepare(*device_, *context.textureCache, candidate->input->MaterialOwner(draw),
+                    program->layout, bindings, error, candidate->input->MaterialPins(),
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
             {
                 return false;
             }
@@ -1238,8 +1270,9 @@ namespace material_graph
             {
                 SceneVolumeBinding volume;
                 volume.pipeline = program->volume.GetGeneration();
-                if (!bindings_.Prepare(*device_, *context.textureCache, draw.material, program->volumeLayout,
-                                       volume.material, error))
+                if (!bindings_.Prepare(*device_, *context.textureCache, candidate->input->MaterialOwner(draw),
+                    program->volumeLayout, volume.material, error, candidate->input->MaterialPins(),
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
                 {
                     return false;
                 }
@@ -1440,19 +1473,34 @@ namespace material_graph
         {
             return Fail(error, exception.what());
         }
+        // Freeze before any durable publication. Recording and graph callbacks
+        // share this exact frame; no mutable candidate alias survives the handoff.
+        own::shared_owner<const Frame> published(std::move(candidate));
+        decltype(recordings_) retired;
         {
             ce::profile_scope retire{ce::marker<"MaterialFrameRetirement">()};
             std::lock_guard lock(recordingMutex_);
-            recordings_[candidate->recording].owners.push_back(candidate);
-            std::erase_if(recordings_, [&](const auto& item) {
-                return item.first != candidate->recording && !item.second.publication && item.second.submitted &&
-                       item.second.completion <= completed_;
-            });
+            recordings_[published->recording].owners.push_back(published);
+            for (auto it = recordings_.begin(); it != recordings_.end();)
+            {
+                const auto& recording = it->second;
+                if (it->first != published->recording && !recording.publication && recording.accepted &&
+                    recording.completion != 0 && recording.completion <= completed_)
+                {
+                    retired.insert(recordings_.extract(it++));
+                }
+                else
+                {
+                    ++it;
+                }
+            }
         }
         {
             ce::profile_scope replace{ce::marker<"MaterialFrameReplace">()};
-            frame_ = std::move(candidate);
+            frame_ = std::move(published);
         }
+        // Resource/ticket destruction may call backend code; never under the
+        // recording mutex, including completed entries replaced by another view.
         error.clear();
         return true;
     }
@@ -1607,6 +1655,8 @@ namespace material_graph
                 }
                 encoder.BindRenderTargets(targets);
                 RHIPipelineHandle boundPipeline{};
+                // Address identity is local to this pass. The captured frame pins
+                // every compared binding for the entire callback.
                 const RenderBindings* boundBindings = nullptr;
                 for (const auto& draw : frame->draws)
                 {
@@ -1624,14 +1674,14 @@ namespace material_graph
                         boundBindings = nullptr;
                     }
                     std::string error;
-                    if (boundBindings != draw.bindings.get() &&
+                    if (boundBindings != std::addressof(*draw.bindings) &&
                         !RenderBindingCache::BindPass(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
                                                   draw.program->shadowLayout,
                                                   error))
                     {
                         throw std::runtime_error(error);
                     }
-                    boundBindings = draw.bindings.get();
+                    boundBindings = std::addressof(*draw.bindings);
                     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.shadowConstants[cascade]);
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                     encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
@@ -2658,8 +2708,9 @@ namespace material_graph
         {
             std::lock_guard lock(recordingMutex_);
             const auto found = recordings_.find(frame_->recording);
-            if (found == recordings_.end() || !found->second.submitted || found->second.decided ||
-                found->second.publication || found->second.completion != completion.value ||
+            if (!completion.value || found == recordings_.end() || !found->second.submitted ||
+                !found->second.accepted || found->second.decided || found->second.publication ||
+                found->second.completion != completion.value ||
                 frame_->input->View().frameId != frameId)
             {
                 return Fail(error, "LX Scene material publication needs its exact successful native submission.");
@@ -2669,17 +2720,18 @@ namespace material_graph
         if (ticket.IsValid())
         {
             const auto* batch = ticket.GetRecordedBatch();
-            if (!batch || batch->GetFrameId() != frameId || batch->GetCompletionPoint().value != completion.value)
+            if (!batch || batch->GetFrameId() != frameId || batch->GetRecordingId() != frame_->recording ||
+                batch->GetCompletionPoint().value != completion.value)
             {
                 return Fail(error, "LX Scene publication ticket must identify its exact recorded graph batch.");
             }
             pending = !ticket.IsComplete();
         }
+        RHISubmissionTicket previousTicket;
         {
             std::lock_guard lock(recordingMutex_);
             auto& recording = recordings_.at(frame_->recording);
-            recording.accepted = true;
-            recording.completion = completion.value;
+            previousTicket = std::move(recording.ticket);
             recording.ticket = ticket;
             if (pending)
             {
@@ -2731,7 +2783,7 @@ namespace material_graph
         return CommitSubmittedFrame(frame_, completion, error);
     }
 
-    bool SceneHost::CommitSubmittedFrame(const std::shared_ptr<const Frame>& frame, RHICompletionPoint completion,
+    bool SceneHost::CommitSubmittedFrame(const own::shared_owner<const Frame>& frame, RHICompletionPoint completion,
                                          std::string& error)
     {
         if (frame->runtimeEffects)
@@ -2768,19 +2820,22 @@ namespace material_graph
                 ++stats_.stalePublications;
                 continue;
             }
-            found->second->active = draw.material;
+            found->second->active = frame->input->MaterialOwner(draw);
             found->second->activeCoverage = draw.coverage;
             ++stats_.publications;
         }
+        own::shared_owner<const Frame> publication;
+        RHISubmissionTicket ticket;
+        decltype(recordings_)::node_type retired;
         {
             std::lock_guard lock(recordingMutex_);
             auto& recording = recordings_.at(frame->recording);
             recording.decided = true;
-            recording.publication.reset();
-            recording.ticket = {};
-            if (recording.completion <= completed_)
+            publication = std::move(recording.publication);
+            ticket = std::move(recording.ticket);
+            if (recording.completion != 0 && recording.completion <= completed_)
             {
-                recordings_.erase(frame->recording);
+                retired = recordings_.extract(frame->recording);
             }
         }
         error.clear();
@@ -2791,7 +2846,7 @@ namespace material_graph
     {
         struct Pending
         {
-            std::shared_ptr<const Frame> frame;
+            own::shared_owner<const Frame> frame;
             RHISubmissionTicket ticket;
             RHICompletionPoint completion;
         };
@@ -2816,16 +2871,21 @@ namespace material_graph
             }
             stats_.lastError = std::move(error);
             ++stats_.failedSubmissions;
-            std::lock_guard lock(recordingMutex_);
-            const auto found = recordings_.find(item.frame->recording);
-            if (found != recordings_.end())
+            own::shared_owner<const Frame> publication;
+            RHISubmissionTicket ticket;
+            decltype(recordings_)::node_type retired;
             {
-                found->second.decided = true;
-                found->second.publication.reset();
-                found->second.ticket = {};
-                if (found->second.completion <= completed_)
+                std::lock_guard lock(recordingMutex_);
+                const auto found = recordings_.find(item.frame->recording);
+                if (found != recordings_.end())
                 {
-                    recordings_.erase(found);
+                    found->second.decided = true;
+                    publication = std::move(found->second.publication);
+                    ticket = std::move(found->second.ticket);
+                    if (found->second.completion != 0 && found->second.completion <= completed_)
+                    {
+                        retired = recordings_.extract(found);
+                    }
                 }
             }
         }
@@ -2895,9 +2955,10 @@ namespace material_graph
         programDevice_ = nullptr;
         preparations_.clear();
         slots_.clear();
+        decltype(recordings_) retired;
         {
             std::lock_guard lock(recordingMutex_);
-            recordings_.clear();
+            retired.swap(recordings_);
             completed_ = 0;
         }
         stats_ = {};
@@ -2912,44 +2973,80 @@ namespace material_graph
         if (found != recordings_.end())
         {
             found->second.submitted = true;
-            found->second.completion = completion.value;
+            if (!found->second.accepted)
+            {
+                found->second.completion = completion.value;
+            }
         }
+    }
+
+    void SceneHost::OnUploadAccepted(std::uint64_t recording, RHICompletionPoint completion)
+    {
+        std::lock_guard lock(recordingMutex_);
+        const auto found = recordings_.find(recording);
+        if (found == recordings_.end())
+        {
+            return;
+        }
+        auto& owner = found->second;
+        // Queue admission owns the frame even when later publication or tail
+        // work fails. An accepted unknown completion stays quarantined to idle.
+        owner.completion = owner.accepted
+            ? (owner.completion == 0 || completion.value == 0 ? 0 : (std::max)(owner.completion, completion.value))
+            : completion.value;
+        owner.submitted = true;
+        owner.accepted = true;
     }
 
     void SceneHost::OnUploadCompleted(std::uint64_t completed)
     {
         geometry_.NotifyCompleted(completed);
-        std::lock_guard lock(recordingMutex_);
-        completed_ = (std::max)(completed_, completed);
-        for (auto& [recording, owner] : recordings_)
+        std::vector<std::vector<own::shared_owner<const Frame>>> released;
+        decltype(recordings_) retired;
         {
-            if (owner.submitted && owner.completion <= completed_)
+            std::lock_guard lock(recordingMutex_);
+            completed_ = (std::max)(completed_, completed);
+            released.reserve(recordings_.size());
+            for (auto it = recordings_.begin(); it != recordings_.end();)
             {
-                owner.owners.clear();
+                auto& owner = it->second;
+                if (owner.accepted && owner.completion != 0 && owner.completion <= completed_)
+                {
+                    released.push_back(std::move(owner.owners));
+                    if (owner.decided)
+                    {
+                        retired.insert(recordings_.extract(it++));
+                        continue;
+                    }
+                }
+                ++it;
             }
         }
-        std::erase_if(recordings_, [&](const auto& item) {
-            return item.second.submitted && item.second.decided && item.second.completion <= completed_;
-        });
     }
 
     void SceneHost::OnUploadAborted(std::uint64_t recording)
     {
-        std::lock_guard lock(recordingMutex_);
-        const auto found = recordings_.find(recording);
-        if (found != recordings_.end() && !found->second.accepted)
+        decltype(recordings_)::node_type retired;
         {
-            recordings_.erase(found);
+            std::lock_guard lock(recordingMutex_);
+            const auto found = recordings_.find(recording);
+            if (found != recordings_.end() && !found->second.accepted)
+            {
+                retired = recordings_.extract(found);
+            }
         }
     }
     void SceneHost::OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion)
     {
-        std::lock_guard lock(recordingMutex_);
-        const auto found = recordings_.find(recording);
-        if (found != recordings_.end() && !found->second.accepted &&
-            (!found->second.submitted || found->second.completion == completion.value))
+        decltype(recordings_)::node_type retired;
         {
-            recordings_.erase(found);
+            std::lock_guard lock(recordingMutex_);
+            const auto found = recordings_.find(recording);
+            if (found != recordings_.end() && !found->second.accepted &&
+                (!found->second.submitted || found->second.completion == completion.value))
+            {
+                retired = recordings_.extract(found);
+            }
         }
     }
 } // namespace material_graph

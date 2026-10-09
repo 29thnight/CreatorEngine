@@ -2,6 +2,7 @@
 #include <functional>
 #include <span>
 #include <string>
+#include <utility>
 
 #include "RHIResourceTypes.h"
 #include "RHIFormat.h"
@@ -10,6 +11,7 @@
 #include "RHITransientHeap.h"
 #include "RHIPipelineLayout.h"
 #include "../Assets/ModelAssetGeneration.h"
+#include "../Assets/ModelGeometryPayload.h"
 
 class Mesh;
 
@@ -367,9 +369,9 @@ public:
     /// 원본은 COPY_SOURCE 상태여야 한다(그래프가 선언으로 만들어 준다).
 };
 
-/// MBC6 제품 upload view. 주소는 immutable ModelAssetGeneration이 소유하고 캐시는
-/// memcpy 동안만 읽는다. 신원은 축약 hash가 아니라 {ModelId, MeshId, generation}
-/// 전체이며 layoutHash까지 검산해 다른 mask/stride를 같은 PSO에 넣지 않는다.
+/// Borrowed mesh metadata and optional upload bytes. The frame/preparation owner
+/// retains the descriptor and, only while CPU bytes are needed, the payload.
+/// A descriptor-only view remains usable for GPU residency and draw metadata.
 struct RHIModelMeshView
 {
     assets::ModelMeshHandle handle{};
@@ -381,38 +383,96 @@ struct RHIModelMeshView
     const uint32_t* indexData{ nullptr };
     uint32_t indexCount{ 0 };
 
-    // Optional provenance for the generation's SHA-validated derived payload.
-    // Like vertexData, this is borrowed only until upload copies it. A manually
-    // constructed/indexed-only view has no provenance and cannot enable MS.
+    // Transitional aggregate provenance. Neither branch owns its CPU source.
     const assets::ModelAssetGeneration* sourceGeneration{ nullptr };
     uint32_t sourceMeshIndex{ UINT32_MAX };
-    uint32_t sourceLodIndex{ 0 }; // Internal upload view: zero is original geometry.
+    uint32_t sourceLodIndex{ 0 }; // Zero is original geometry; nonzero is upload-only.
+    const assets::ModelMeshDescriptor* sourceDescriptor{ nullptr };
+    const assets::ModelGeometryPayload* sourcePayload{ nullptr };
+
+    [[nodiscard]] bool IsMetadataComplete() const noexcept
+    {
+        if (!handle.IsValid() || vertexBytes == 0 || vertexStride == 0 ||
+            vertexBytes % vertexStride != 0 || indexCount == 0 ||
+            !assets::IsSupportedModelVertexLayout(vertexAttributeMask) ||
+            vertexStride != assets::StrideOf(vertexAttributeMask) ||
+            vertexLayoutHash != assets::VertexLayoutHash(vertexAttributeMask))
+        {
+            return false;
+        }
+        if (handle.domain == assets::ModelMeshDomain::LegacyAggregate)
+        {
+            return !sourceDescriptor && !sourcePayload;
+        }
+        if (!sourceDescriptor || sourceGeneration || sourceMeshIndex != UINT32_MAX)
+        {
+            return false;
+        }
+        const auto& descriptor = *sourceDescriptor;
+        const auto& origin = descriptor.origin;
+        const auto& geometryKey = descriptor.geometryKey;
+        if (geometryKey.contentSha256 != origin.blob.contentSha256 ||
+            geometryKey.byteSize != origin.blob.byteSize || geometryKey.kind != origin.blob.kind ||
+            geometryKey.representation != origin.blob.representation ||
+            geometryKey.schemaVersion != origin.blob.schemaVersion ||
+            geometryKey.targetPlatform != origin.blob.targetPlatform ||
+            geometryKey.targetAbi != origin.blob.targetAbi || geometryKey.decoderRecipe == 0)
+        {
+            return false;
+        }
+        if (!origin.byteSource || !handle.modelId.IsNil() || handle.generation != 0 ||
+            handle.meshId != descriptor.meshId || handle.asset != origin.entry.asset ||
+            handle.blob != origin.blob || handle.resolverRevision != origin.resolverRevision ||
+            handle.mountId != origin.mountId.value || handle.assetSetId != origin.assetSetId ||
+            handle.manifestRevision != origin.manifestRevision ||
+            descriptor.vertexAttributeMask != vertexAttributeMask ||
+            descriptor.vertexStride != vertexStride || descriptor.vertexLayoutHash != vertexLayoutHash ||
+            uint64_t(descriptor.vertexCount) * descriptor.vertexStride != vertexBytes ||
+            descriptor.coarseLodCount > descriptor.coarseLods.size() ||
+            sourceLodIndex > descriptor.coarseLodCount)
+        {
+            return false;
+        }
+        const uint32_t expectedCount = sourceLodIndex == 0 ? descriptor.indexCount
+            : descriptor.coarseLods[sourceLodIndex - 1].indexCount;
+        return indexCount == expectedCount;
+    }
 
     [[nodiscard]] const assets::ModelMeshAsset* SourceMesh() const noexcept
     {
-        if (!sourceGeneration || !handle.IsValid())
+        const assets::ModelMeshAsset* source = nullptr;
+        if (handle.domain == assets::ModelMeshDomain::Granular)
+        {
+            if (!IsMetadataComplete() || !sourcePayload || !sourcePayload->Matches(*sourceDescriptor))
+            {
+                return nullptr;
+            }
+            source = &sourcePayload->mesh;
+        }
+        else
+        {
+            if (!sourceGeneration || !handle.IsValid() || sourceDescriptor || sourcePayload)
+            {
+                return nullptr;
+            }
+            const auto& identity = sourceGeneration->Identity();
+            const auto meshes = sourceGeneration->Meshes();
+            if (identity.modelId != handle.modelId || identity.generation != handle.generation ||
+                sourceMeshIndex >= meshes.size() || meshes[sourceMeshIndex].meshId != handle.meshId)
+            {
+                return nullptr;
+            }
+            source = &meshes[sourceMeshIndex];
+        }
+        const auto& mesh = *source;
+        if (mesh.vertexBytes.data() != vertexData || mesh.vertexBytes.size() != vertexBytes ||
+            mesh.vertexStride != vertexStride || mesh.vertexAttributeMask != vertexAttributeMask ||
+            mesh.vertexLayoutHash != vertexLayoutHash || sourceLodIndex > mesh.coarseLods.levels.size())
         {
             return nullptr;
         }
-        const auto& identity = sourceGeneration->Identity();
-        const auto meshes = sourceGeneration->Meshes();
-        if (identity.modelId != handle.modelId || identity.generation != handle.generation ||
-            sourceMeshIndex >= meshes.size())
-        {
-            return nullptr;
-        }
-        const auto& mesh = meshes[sourceMeshIndex];
-        if (mesh.meshId != handle.meshId || mesh.vertexBytes.data() != vertexData ||
-            mesh.vertexBytes.size() != vertexBytes || mesh.vertexStride != vertexStride ||
-            mesh.vertexAttributeMask != vertexAttributeMask || mesh.vertexLayoutHash != vertexLayoutHash)
-        {
-            return nullptr;
-        }
-        if (sourceLodIndex > mesh.coarseLods.levels.size())
-        {
-            return nullptr;
-        }
-        const auto& indices = sourceLodIndex == 0 ? mesh.indices : mesh.coarseLods.levels[sourceLodIndex - 1].indices;
+        const auto& indices = sourceLodIndex == 0 ? mesh.indices
+            : mesh.coarseLods.levels[sourceLodIndex - 1].indices;
         return indices.data() == indexData && indices.size() == indexCount ? &mesh : nullptr;
     }
 
@@ -423,29 +483,44 @@ struct RHIModelMeshView
         {
             return nullptr;
         }
-        const auto& payload = sourceLodIndex == 0 ? mesh->meshlets : mesh->coarseLods.levels[sourceLodIndex - 1].meshlets;
+        const auto& payload = sourceLodIndex == 0 ? mesh->meshlets
+            : mesh->coarseLods.levels[sourceLodIndex - 1].meshlets;
         return payload.HasMeshlets() ? &payload : nullptr;
+    }
+
+    [[nodiscard]] bool HasMeshlets() const noexcept
+    {
+        if (sourceDescriptor && IsMetadataComplete())
+        {
+            const auto& summary = sourceLodIndex == 0 ? sourceDescriptor->meshlets
+                : sourceDescriptor->coarseLods[sourceLodIndex - 1].meshlets;
+            return summary.HasMeshlets();
+        }
+        return Meshlets() != nullptr;
+    }
+
+    [[nodiscard]] bool HasSourceMetadata() const noexcept
+    {
+        return sourceDescriptor ? IsMetadataComplete() : SourceMesh() != nullptr;
     }
 
     [[nodiscard]] bool IsComplete() const noexcept
     {
-        return handle.IsValid() && nullptr != vertexData && 0 != vertexBytes
-            && 0 != vertexStride && 0 == vertexBytes % vertexStride
-            && assets::IsSupportedModelVertexLayout(vertexAttributeMask)
-            && vertexLayoutHash == assets::VertexLayoutHash(vertexAttributeMask)
-            && nullptr != indexData && 0 != indexCount;
+        return IsMetadataComplete() && vertexData && indexData &&
+            (handle.domain == assets::ModelMeshDomain::LegacyAggregate || SourceMesh());
     }
 };
 
-/// MBC7 — typed 뷰의 지오메트리 키. 패스의 지오메트리 맵·배치 키·정렬은 값 키를
-/// 쓰고(EnhancedDrawIdentity), 그 값은 자산 신원 {ModelId, MeshId, generation}
-/// 전체에서 유도한다(FNV-1a 64). legacy m_hashingMesh·experiment stableKey와
-/// 같은 64비트 키 공간을 공유하며 충돌 무시 가정도 같다. 0은 '키 없음' 표지라
-/// 회피한다. 신원이 무효면 0이다 — 호출부가 다른 축으로 내려간다.
+/// Compact draw/batch hash of every full-identity equality field. Backend maps
+/// retain the full handle, including its explicit legacy/granular domain.
+/// Zero is reserved for an invalid identity.
 [[nodiscard]] inline size_t HashModelMeshHandle(
     const assets::ModelMeshHandle& handle) noexcept
 {
-    if (!handle.IsValid()) return 0;
+    if (!handle.IsValid())
+    {
+        return 0;
+    }
     uint64_t hash = 1469598103934665603ull;
     const auto mix = [&hash](const void* data, size_t size)
     {
@@ -456,11 +531,80 @@ struct RHIModelMeshView
             hash *= 1099511628211ull;
         }
     };
+    const auto mixString = [&mix](const std::string& value)
+    {
+        const uint64_t size = value.size();
+        mix(&size, sizeof(size));
+        mix(value.data(), value.size());
+    };
     mix(handle.modelId.data.data(), handle.modelId.data.size());
     mix(handle.meshId.data.data(), handle.meshId.data.size());
     mix(&handle.generation, sizeof(handle.generation));
-    if (0 == hash) hash = 1;
+    mix(&handle.domain, sizeof(handle.domain));
+    mix(handle.asset.key.assetId.value.data.data(), handle.asset.key.assetId.value.data.size());
+    mix(handle.asset.key.subassetId.value.data.data(), handle.asset.key.subassetId.value.data.size());
+    mix(&handle.asset.kind, sizeof(handle.asset.kind));
+    mix(handle.blob.contentSha256.data(), handle.blob.contentSha256.size());
+    mix(&handle.blob.byteSize, sizeof(handle.blob.byteSize));
+    mix(&handle.blob.kind, sizeof(handle.blob.kind));
+    mix(&handle.blob.representation, sizeof(handle.blob.representation));
+    mix(&handle.blob.schemaVersion, sizeof(handle.blob.schemaVersion));
+    mixString(handle.blob.targetPlatform);
+    mixString(handle.blob.targetAbi);
+    mixString(handle.blob.artifactPath);
+    mix(&handle.resolverRevision, sizeof(handle.resolverRevision));
+    mix(&handle.mountId, sizeof(handle.mountId));
+    mix(handle.assetSetId.value.data.data(), handle.assetSetId.value.data.size());
+    mix(&handle.manifestRevision, sizeof(handle.manifestRevision));
+    if (hash == 0)
+    {
+        hash = 1;
+    }
     return static_cast<size_t>(hash);
+}
+
+/// Build an identity/metadata-only view. No CPU bulk is acquired or required.
+[[nodiscard]] inline bool BuildRHIModelMeshView(
+    const assets::ModelMeshDescriptor& descriptor, RHIModelMeshView& outView)
+{
+    outView = {};
+    RHIModelMeshView candidate;
+    candidate.handle = assets::MakeModelMeshHandle(descriptor);
+    candidate.vertexBytes = uint64_t(descriptor.vertexCount) * descriptor.vertexStride;
+    candidate.vertexStride = descriptor.vertexStride;
+    candidate.vertexAttributeMask = descriptor.vertexAttributeMask;
+    candidate.vertexLayoutHash = descriptor.vertexLayoutHash;
+    candidate.indexCount = descriptor.indexCount;
+    candidate.sourceDescriptor = &descriptor;
+    if (!candidate.IsMetadataComplete())
+    {
+        return false;
+    }
+    outView = std::move(candidate);
+    return true;
+}
+
+/// The caller holds both owners until every synchronous CPU reader/staging copy
+/// has finished. Compatible raw storage can serve multiple logical descriptors.
+[[nodiscard]] inline bool BuildRHIModelMeshView(
+    const assets::ModelMeshDescriptor& descriptor, const assets::ModelGeometryPayload& payload,
+    RHIModelMeshView& outView)
+{
+    outView = {};
+    RHIModelMeshView candidate;
+    if (!payload.Matches(descriptor) || !BuildRHIModelMeshView(descriptor, candidate))
+    {
+        return false;
+    }
+    candidate.sourcePayload = &payload;
+    candidate.vertexData = payload.mesh.vertexBytes.data();
+    candidate.indexData = payload.mesh.indices.data();
+    if (!candidate.IsComplete())
+    {
+        return false;
+    }
+    outView = std::move(candidate);
+    return true;
 }
 
 /// generation descriptor와 실제 immutable 저장소를 한 번 더 대조한 뒤 RHI 뷰를
@@ -509,7 +653,7 @@ struct RHIModelMeshView
     return outView.IsComplete();
 }
 
-/// Derive a per-LOD upload view from the same immutable, validated generation.
+/// Derive a per-LOD upload view from the same validated aggregate or payload.
 /// coarseIndex is zero-based (LOD1). This is not a separate mesh cache identity.
 [[nodiscard]] inline bool BuildRHIModelMeshLodView(const RHIModelMeshView& base,
     uint32_t coarseIndex, RHIModelMeshView& result)
@@ -545,7 +689,13 @@ public:
 
     virtual RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) = 0;
 
-    /// MBC6 제품 진입점. 신원은 {ModelId, MeshId, generation} 전체다.
+    /// Side-effect-free residency probe for preadmission before BeginFrame.
+    /// It never creates resources, records work, reads bytes or updates last use.
+    /// Backends expose only completed Resident entries; mocks may return empty.
+    virtual RHIMeshBinding FindModel(const assets::ModelMeshHandle&) const { return {}; }
+
+    /// Full identity first; a resident hit does not require CPU payload bytes.
+    /// A miss requires an already-pinned complete view and never schedules work.
     virtual RHIMeshBinding GetOrUploadModel(
         const RHIModelMeshView& view, std::string& outError) = 0;
 

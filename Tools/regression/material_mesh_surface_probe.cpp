@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphMeshSurface.h"
 #include "support/MaterialGraphScenePacket.h"
 #include "PathFinder.h"
@@ -136,7 +137,7 @@ constexpr std::array<Texel, 8> kTexels{{{64, 128, 192, 0},
                                         {192, 192, 128, 0}}};
 constexpr std::array<Texel, 2> kMip{{{96, 160, 224, 96}, {224, 96, 160, 160}}};
 
-std::shared_ptr<Texture> Image()
+own::shared_owner<const Texture> Image()
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
@@ -144,7 +145,7 @@ std::shared_ptr<Texture> Image()
     return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
 }
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -876,7 +877,7 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
 
 void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, RenderBindingCache& bindings,
                       MeshSurfaceEvaluator& meshEvaluator, SurfaceEvaluator& evaluator, IblBaker& baker,
-                      const std::shared_ptr<const Instance>& instance, const std::shared_ptr<Texture>& cube,
+                      const own::shared_owner<const Instance>& instance, const own::shared_owner<const Texture>& cube,
                       const Environment& environmentColors, const SheenTable& table, const SurfaceView& view,
                       unsigned tier, unsigned& frames)
 {
@@ -906,9 +907,9 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     Check(device.CreateBufferReadback(kSamples * sizeof(IblBakeSample), readbacks[3], error), "Sample bake readback");
     Check(device.BeginFrame(error), "Sample begin");
     textures.BeginFrame(++frames);
-    std::shared_ptr<const RenderBindings> materialBindings;
+    own::shared_owner<const RenderBindings> materialBindings;
     Check(bindings.Prepare(device, textures, instance, evaluator.Layout(), materialBindings, error), "Sample bindings");
-    const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     std::shared_ptr<const MeshSurfaceBatch> vertices, sampled;
     std::shared_ptr<const SurfaceBatch> surface;
     std::shared_ptr<const IblBakeResult> bake;
@@ -965,7 +966,7 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     Check(surface->ValidateReadback({actualMaterial, kSamples}, error), "Sample material accepted " + error);
     SceneSurfaceEvaluation evaluation;
     Check(BuildSceneSurfaceEvaluation(surface, evaluation, error) && evaluation.gpu->Count() == kSamples &&
-              evaluation.instance == instance && evaluation.sceneEpoch == view.sceneEpoch &&
+              material_graph_test::SamePinnedObject(evaluation.instance, instance) && evaluation.sceneEpoch == view.sceneEpoch &&
               evaluation.viewRevision == view.viewRevision && evaluation.geometryRevision == view.geometryRevision,
           "Sampled batch retains its exact count and view/material identity at the Scene boundary");
     double endpointInterpolationError = 0;
@@ -1091,7 +1092,7 @@ void Run(const std::filesystem::path& root)
     experiment::AssetId graph;
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
     std::string error;
-    std::array<std::shared_ptr<const Instance>, 2> instances;
+    std::array<own::shared_owner<const Instance>, 2> instances;
     for (unsigned i = 0; i < 2; ++i)
     {
         const auto generation = store.Load(
@@ -1285,15 +1286,15 @@ void Run(const std::filesystem::path& root)
                 }
                 Check(device.BeginFrame(error), "Begin");
                 textures.BeginFrame(frames);
-                std::shared_ptr<const RenderBindings> materialBindings;
+                own::shared_owner<const RenderBindings> materialBindings;
                 Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings,
                                        error),
                       "Material bind prepare");
-                const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+                const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
                 auto& encoder = device.GetImmediateEncoder();
                 if (frames == 0)
                 {
-                    const auto texture = textures.GetOrUpload(image.get(), error);
+                    const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
                     const RHITransition transitions[]{
                         {texture.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource},
                         {environment.cube.handle, RHIResourceState::PixelShaderResource,
@@ -1491,7 +1492,7 @@ void Run(const std::filesystem::path& root)
         device.AbortFrame();
         Check(device.BeginFrame(error), "Mesh abort reuse begin");
         textures.BeginFrame(++frames);
-        std::shared_ptr<const RenderBindings> materialBindings;
+        own::shared_owner<const RenderBindings> materialBindings;
         Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
               "Abort material bindings");
         std::shared_ptr<const SurfaceBatch> rejected;
@@ -1518,7 +1519,7 @@ void Run(const std::filesystem::path& root)
               "Record invalid frame graph candidate");
         SceneSurfaceEvaluation invalidEvaluation;
         Check(BuildSceneSurfaceEvaluation(rejected, invalidEvaluation, error), "Invalid GPU candidate ownership");
-        const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         EnhancedMaterialCoverage coverage;
         coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::DoubleSided;
         RHIGraphicsPipelineDesc invalidPipeline;

@@ -96,6 +96,54 @@ namespace experiment::importer
     [[nodiscard]] ConversionResult ConvertToModelDraft(
         const ImportedScene& scene, const ConversionOptions& options);
 
+    struct MeshMetadata final
+    {
+        std::string name{};
+        MaterialIndex material{};
+        math::aabb bounds{};
+        VertexAttributeMask attributes{};
+        std::uint32_t stride{};
+        std::uint32_t vertexCount{};
+        std::uint32_t indexCount{};
+        bool skinned{};
+    };
+
+    struct MeshConversionResult final
+    {
+        std::optional<Mesh> mesh{};
+        std::vector<ImportNote> notes{};
+    };
+
+    struct ModelMetadataConversionResult final
+    {
+        std::vector<ModelNode> nodes{};
+        std::vector<MeshMetadata> meshes{};
+        std::vector<ImportNote> notes{};
+        bool succeeded{};
+    };
+
+    // 형제 geometry/material/track을 만들었다 버리지 않도록 선택 mesh만 packing한다.
+    // draft와 같은 skin 매핑·레이아웃 경계를 재사용한다.
+    [[nodiscard]] MeshConversionResult ConvertToMesh(
+        const ImportedScene& scene, std::size_t meshIndex);
+
+    // root 열거에 bulk가 따라오지 않게 작은 설명 값만 변환한다. bounds용 위치
+    // 스캔은 하되 packed vertex/index/meshlet/LOD/track 저장소는 만들지 않는다.
+    [[nodiscard]] ModelMetadataConversionResult ConvertToModelMetadata(
+        const ImportedScene& scene, const ConversionOptions& options);
+
+    struct SkeletonConversionResult final
+    {
+        std::optional<Skeleton> skeleton{};
+        std::vector<ImportNote> notes{};
+    };
+
+    // Converts only the selected clips (in ascending source-index order).
+    // Empty selection emits bind data only; no meshes/materials are converted.
+    [[nodiscard]] SkeletonConversionResult ConvertToSkeleton(
+        const ImportedScene& scene, const ConversionOptions& options,
+        std::span<const std::size_t> clipIndices);
+
     // TRS → 행 우선 4x4. 합성 순서는 S * R * T(행 벡터 규약)로, legacy
     // calculAni 및 global = local * parent 누적과 같은 의미다.
     [[nodiscard]] math::matrix4x4 ComposeTrs(const TrsTransform& transform) noexcept;

@@ -112,8 +112,8 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // 라이브 경로와 같은 파일 로더를 거친다. CreateFromPixels 더미로 검사하면
     // CameraIcon 연결이 다시 nullptr로 퇴행하거나 WIC 알파가 사라져도 통과한다.
     const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
-    std::unique_ptr<Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
-    if (!cameraIcon || cameraIcon->GetImageView().IsEmpty())
+    own::shared_owner<const Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
+    if (!cameraIcon || cameraIcon->GetImageDescription().IsEmpty())
     {
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
         return false;
@@ -122,7 +122,8 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // 알파 판정은 Texture 가 로드 때 재어 둔 값을 본다. 예전에는 여기서
     // ScratchImage::IsAlphaAllOpaque 를 직접 불렀는데, 그 물음의 답은
     // m_isTextureAlpha 에 이미 들어 있다(로더가 같은 함수로 잰다).
-    const TextureImageView cameraPixels = cameraIcon->GetImageView();
+    const auto imagePayload_cameraIcon = cameraIcon->NonRehydratableImage();
+    const TextureImageView cameraPixels = cameraIcon->GetImageView(imagePayload_cameraIcon);
     if (128 != cameraPixels.Width() || 128 != cameraPixels.Height() ||
         !cameraIcon->IsTextureAlpha())
     {
@@ -250,7 +251,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
         EnhancedGizmoIconPass::Icon icon{};
         icon.position = { 0.f, 0.f, 0.f };
         icon.size = 2.f;
-        icon.texture = cameraIcon.get();
+        icon.texture = (cameraIcon ? &*cameraIcon.borrow() : nullptr);
         icons.push_back(icon);
     }
     gizmo.SetIcons(&icons);
@@ -403,13 +404,14 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
 
     // ── ③ 배칭 — 같은 텍스처는 묶이고 갈리면 늘어난다 ──
     //
-    // 실제 텍스처 자원 없이 포인터의 같고 다름만 확인한다(UI 검증과 같은
-    // 방식) — 배칭이 보는 것이 포인터뿐이라 이것으로 충분하다. 렌더는
-    // 하지 않고 PrepareFrame까지만 돌린다.
+    // CPU-only texture owners provide real resource identities for batching.
+    // Keep both owners alive through PrepareFrame; no GPU upload is needed.
     if (passed)
     {
-        Texture* const fakeA = reinterpret_cast<Texture*>(0x1);
-        Texture* const fakeB = reinterpret_cast<Texture*>(0x2);
+        const auto batchTextureA = own::make_shared<const Texture>();
+        const auto batchTextureB = own::make_shared<const Texture>();
+        const Texture* const textureA = (batchTextureA ? &*batchTextureA.borrow() : nullptr);
+        const Texture* const textureB = (batchTextureB ? &*batchTextureB.borrow() : nullptr);
 
         std::vector<EnhancedGizmoIconPass::Icon> mixed;
         for (int i = 0; i < 4; ++i)
@@ -422,19 +424,18 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
 
         std::string dummy;
         IRenderTextureCache* const savedTextureCache = frameContext.textureCache;
-        // 이 구간은 포인터 동일성만 보는 배칭 검사다. PrepareFrame이 이제
-        // 실제 업로드도 맡으므로 가짜 포인터를 캐시에 넘기지 않는다.
+        // Isolate representation-identity batching from GPU upload.
         frameContext.textureCache = nullptr;
 
         // 같은 텍스처 넷 → 배치 1
-        mixed[0].texture = fakeA; mixed[1].texture = fakeA;
-        mixed[2].texture = fakeA; mixed[3].texture = fakeA;
+        mixed[0].texture = textureA; mixed[1].texture = textureA;
+        mixed[2].texture = textureA; mixed[3].texture = textureA;
         gizmo.SetIcons(&mixed);
         gizmo.PrepareFrame(frameContext, dummy);
         const uint32_t sameBatches = gizmo.GetLastBatchCount();
 
         // 번갈아 → 배치 4
-        mixed[1].texture = fakeB; mixed[3].texture = fakeB;
+        mixed[1].texture = textureB; mixed[3].texture = textureB;
         gizmo.PrepareFrame(frameContext, dummy);
         const uint32_t mixedBatches = gizmo.GetLastBatchCount();
         frameContext.textureCache = savedTextureCache;
@@ -496,20 +497,20 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     //   그때 이 파일 쪽만으로는 아무것도 드러나지 않았다는 것이 요점이다 —
     //   비대칭은 한쪽만 재면 보이지 않는다.
     {
-        std::shared_ptr<Texture> compressedIcon =
+        own::shared_owner<const Texture> compressedIcon =
             Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
-        std::shared_ptr<Texture> blockNoise = Texture::LoadSharedFromPath(
+        own::shared_owner<const Texture> blockNoise = Texture::LoadSharedFromPath(
             PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
         const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
-        std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
+        own::shared_owner<const Texture> bgraTexture(Texture::CreateFromPixels(
             1, 1, "dx12_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
 
         if (!compressedIcon ||
-            RHIFormat::BC1UnormSrgb != compressedIcon->GetImageView().Format() ||
+            RHIFormat::BC1UnormSrgb != compressedIcon->GetImageDescription().Format() ||
             !blockNoise ||
-            RHIFormat::BC3Unorm != blockNoise->GetImageView().Format() ||
+            RHIFormat::BC3Unorm != blockNoise->GetImageDescription().Format() ||
             !bgraTexture ||
-            RHIFormat::BGRA8Unorm != bgraTexture->GetImageView().Format())
+            RHIFormat::BGRA8Unorm != bgraTexture->GetImageDescription().Format())
         {
             passed = false;
             outLog += "[4/4] 코덱 자산 셋(BC1_SRGB·BC3·BGRA8)을 준비하지 못했다\n";
@@ -525,11 +526,11 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
             // 그것도 유효한 handle 이다. 판별하는 것은 format 이다.
             std::string codecError;
             const DX12TextureCache::Entry compressedEntry =
-                textureCache.GetOrUpload(compressedIcon.get(), codecError);
+                textureCache.GetOrUpload((compressedIcon ? &*compressedIcon.borrow() : nullptr), compressedIcon ? compressedIcon->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
             const DX12TextureCache::Entry noiseEntry =
-                textureCache.GetOrUpload(blockNoise.get(), codecError);
+                textureCache.GetOrUpload((blockNoise ? &*blockNoise.borrow() : nullptr), blockNoise ? blockNoise->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
             const DX12TextureCache::Entry bgraEntry =
-                textureCache.GetOrUpload(bgraTexture.get(), codecError);
+                textureCache.GetOrUpload((bgraTexture ? &*bgraTexture.borrow() : nullptr), bgraTexture ? bgraTexture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
             const bool codecOk = compressedEntry.IsValid() && noiseEntry.IsValid() &&
                 bgraEntry.IsValid() &&
                 RHIFormat::BC1UnormSrgb == compressedEntry.format &&

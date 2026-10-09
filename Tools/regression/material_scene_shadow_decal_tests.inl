@@ -239,7 +239,7 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
 
 void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                    const std::shared_ptr<Texture>& image)
+                    const own::shared_owner<const Texture>& image)
 {
     CheckCsmContracts(device);
     RunCsmLegacyBatches(device, roots, pipelines, textures);
@@ -353,7 +353,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             {
                 sealBudget.mesh.maxChunkPoints = 3;
             }
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             const std::array<std::array<float, 2>, 1> volumeDepth{{{.2f, .6f}}};
             auto volume = VolumeBoxes(volumeDepth, 12600, false);
             if (fixture == 12)

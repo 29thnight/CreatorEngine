@@ -12,12 +12,14 @@
 // 게시 계약(parent < index) 덕에 노드·본 모두 단일 순회다. 계약을 어기는
 // generation이면 아무것도 만들지 않고 nullptr — 반쪽 시공은 없다.
 
+#include "Ownership.h"
 #include <memory>
 #include <string>
 #include <chrono>
 #include <functional>
 #include "CollisionGeometrySource.h"
 #include "EntityHandle.h"
+#include "Assets/ModelSceneAssetInputs.h"
 
 class Entity;
 class Scene;
@@ -28,9 +30,13 @@ namespace ModelSceneInstantiation
     struct Options final
     {
         // Worker prepares triangle values; the owner-thread host publishes/resolves a shared asset.
+        // Applies to legacy generation preparation. Typed inputs carry their
+        // effective collider policy from DataSystem::PrepareModelAsset.
         bool createMeshCollider{ false };
         std::function<ce::physics::result<ce::physics::geometry_asset_key>(
             Scene&, std::uint32_t, const ce::physics::triangle_mesh_source&)> collisionGeometry;
+        // Source compatibility only; typed inputs already resolve this choice.
+        bool useCookedColliderDefault{ true };
 
     };
 
@@ -39,11 +45,23 @@ namespace ModelSceneInstantiation
     // 경계에서만 호출한다. 한 작업은 한 인스턴스의 재질과 생성 상태를 소유한다.
     class PendingInstance final
     {
+        struct Impl;
+
     public:
+        class ConstructionKey final
+        {
+            friend class PendingInstance;
+            ConstructionKey() = default;
+        };
+        explicit PendingInstance(ConstructionKey, own::unique_owner<Impl> impl);
         enum class Status { Building, Complete, Failed };
-        static std::unique_ptr<PendingInstance> Prepare(
-            std::shared_ptr<const assets::ModelAssetGeneration> generation,
+        static own::unique_owner<PendingInstance> Prepare(
+            own::shared_owner<const assets::ModelAssetGeneration> generation,
             const Options& options);
+        // Already prepared typed children from one resolver snapshot. No source
+        // loading, shader compilation, image decode or scene mutation occurs here.
+        static own::unique_owner<PendingInstance> Prepare(
+            assets::ModelSceneAssetInputs inputs, const Options& options);
         ~PendingInstance();
         Status Advance(Scene& scene, std::size_t maxSteps = 16,
             std::chrono::microseconds budget = std::chrono::milliseconds(2),
@@ -54,14 +72,12 @@ namespace ModelSceneInstantiation
         std::size_t TotalSteps() const;
 
     private:
-        struct Impl;
-        explicit PendingInstance(std::unique_ptr<Impl> impl);
-        std::unique_ptr<Impl> m_impl;
+        own::unique_owner<Impl> m_impl;
     };
 
     // 성공하면 루트 엔티티. 관측은 ModelConsumptionDiagnostics 계수(읽기 전용)로만
     // 남긴다 — stdout 토큰은 MBC10에서 은퇴했다.
     Entity* Instantiate(Scene& scene,
-        const std::shared_ptr<const assets::ModelAssetGeneration>& generation,
+        const own::shared_owner<const assets::ModelAssetGeneration>& generation,
         const Options& options);
 }

@@ -1,3 +1,4 @@
+#include "Ownership.h"
 #include "Render/Passes/Editor/EnhancedWireFramePass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -514,10 +515,10 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
                 std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::BoneWeights), weights, sizeof(weights));
             }
         }
-        auto generation = std::make_shared<material_graph::Generation>();
+        auto generation = own::make_shared<material_graph::Generation>();
         generation->generation = 1;
         generation->cooked.product.program.surface = true;
-        auto instance = std::make_shared<material_graph::Instance>();
+        auto instance = own::make_shared<material_graph::Instance>();
         instance->generation = generation;
         instance->description.graphId = generation->assetId;
         RHIModelMeshView model{};

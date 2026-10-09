@@ -1,5 +1,6 @@
 #pragma once
 #include "RHI/RHIFormat.h"
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <wrl/client.h>
@@ -93,7 +94,7 @@ private:
     {
         uint32_t first{ 0 };
         uint32_t count{ 0 };
-        Texture* texture{ nullptr };
+        std::size_t textureId{};
         RHITextureEntry uploaded;
     };
 
