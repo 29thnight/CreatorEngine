@@ -12,9 +12,15 @@
 ![miniaudio](https://img.shields.io/badge/Audio-miniaudio-000000?style=flat-square)
 ![AI Assisted](https://img.shields.io/badge/Development-AI%20Assisted-412991?style=flat-square)
 
-Windows용 C++23 게임 엔진과 통합 에디터
+<p align="center">Windows용 C++23 게임 엔진과 통합 에디터</p>
 
-[시작하기](#시작하기) · [기술설명서](docs/TechnicalGuide.md) · [문서](docs/README.md) · [개발 계획](docs/RefactoringPlanDashboard.html) · [기여하기](CONTRIBUTING.md)
+<p align="center">
+  <a href="#시작하기">시작하기</a> ·
+  <a href="docs/TechnicalGuide.md">기술설명서</a> ·
+  <a href="docs/README.md">문서</a> ·
+  <a href="docs/RefactoringPlanDashboard.html">개발 계획</a> ·
+  <a href="CONTRIBUTING.md">기여하기</a>
+</p>
 
 ## CreatorEngine 소개
 
