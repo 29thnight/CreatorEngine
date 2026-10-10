@@ -234,6 +234,7 @@ internal static class PackageInputs
             path.Replace('\\', '/').Contains("/Assets/Derived/Models/", StringComparison.OrdinalIgnoreCase))
             return false;
         return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json"
+            or ".inputgraph" or ".inputmap"
             or ".wav" or ".mp3" or ".flac" or ".ogg" or ".soundgraph" or ".soundpreset";
     }
 }

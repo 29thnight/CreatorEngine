@@ -257,6 +257,7 @@ namespace
         }
         static const std::wstring_view kExcluded[] = {
             L".cpp", L".h", L".hpp", L".cs", L".meta", L".json",
+            L".inputgraph", L".inputmap",
             L".wav", L".mp3", L".flac", L".ogg", L".soundgraph", L".soundpreset"
         };
 

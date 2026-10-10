@@ -53,7 +53,7 @@
 
 ## 자산·해시·재게시 계약
 
-- AssetDepot은 불변 `InputGraphProgram` lease를 제공한다. Player는 CEMF v3의 InputGraph kind와 CEIG만 읽고 LX/YAML/문자열 콜백을 런타임에서 해석하지 않는다. CEIG 읽기는 명시적 endian, UUID, schema/compiler/API 버전, capability, collection/byte 경계와 semantic hash를 검사하고 파생 CPU 표를 한 번 준비한다.
+- AssetDepot은 불변 `InputGraphProgram` lease를 제공한다. BuildTool과 native AssetPacker는 `.inputgraph` 및 구 `.inputmap`을 패키징에서 제외하고 `.ceig`를 유지한다. Player는 CEMF v3의 InputGraph kind와 CEIG만 읽고 LX/YAML/문자열 콜백을 런타임에서 해석하지 않는다. CEIG 읽기는 명시적 endian, UUID, schema/compiler/API 버전, capability, collection/byte 경계와 semantic hash를 검사하고 파생 CPU 표를 한 번 준비한다.
 - Interface hash는 graph/layer/signal 안정 ID, signal 타입, schema/ABI 계약을 식별한다. binding·processor 재설정은 기존 타입 접근자를 무효화하지 않는다. Semantic hash는 실제 실행 설정과 순서 있는 processor를 식별한다. 두 해시는 역할이 다르다.
 - LX 배치·뷰·표시 제목 변경은 semantic identity에서 제외한다. 정상 저작 세대와 의미가 같은 배치 저장은 재컴파일·런타임 재게시를 생략하고 cook receipt도 정규화된 의미를 사용한다. 안정 signal ID의 타입 변경은 거절한다.
 - Save와 watcher reload는 입력 전용 mutex로 직렬화하고 최신 게시 revision을 확인한다. 잘못된 새 정의는 기존 session lease를 교체하지 않는다. 첫 source 저장 뒤 meta 실패는 기존/후보의 동일 UUID를 검증한 재시도로 복구하며, InputGraph sidecar는 staging 후 교체한다.
@@ -80,7 +80,7 @@ Native subscriber는 `InputSubscriptionScope`를 소유하고 disable/world remo
 - Native 계약 probe: `InputGraphContractTests.cpp`의 22개 scenario group. schema/ID/해시, 같은 tick의 다중 전이, delta·processor 순서, 시간 경계·지연 기록, Hold/Tap/Chord, layer claim, 사용자/도메인 분리, 취소·재동기화·overflow, reload·보유 frame, native 구독 재진입·변경·수명을 다룬다.
 - LX probe: `InputGraphAuthoringTests.cpp`. LXG9 의미 보존, Vector2·Undo/Redo, archive round-trip, 배치/의미 identity, 지원하지 않는 문법과 결합 후 processor 순서를 다룬다.
 - Managed probe: `InputGraphScriptProbe/`. POD layout, 소유한 snapshot, 타입 lookup, 이벤트 다중성, stale accessor, 구독·session/reload 수명을 다룬다. deterministic native test double을 사용하며 실제 ClrHost 검증이 아니다. trimmed NativeAOT 설정도 실행 결과가 아니다.
-- Codec probe: `InputGraphAssetCodecSelfTest.cpp`. CEIG/CEIO round-trip, 잘린/지원하지 않는 payload, 마지막 정상 결과 보존과 override 거절을 다룬다. 오프라인 변환 계약 소스는 `Tools/input-migration/test_migrate_inputmap.py`다.
+- Codec probe: `InputGraphAssetCodecSelfTest.cpp`. CEIG/CEIO round-trip, 잘린/지원하지 않는 payload, 마지막 정상 결과 보존과 override 거절을 다룬다. 오프라인 변환 계약 소스는 `Tools/input-migration/test_migrate_inputmap.py`다. `BuildTool/Tests/Program.cs` 및 `verify-pak-source-exclusion.ps1`에는 입력 원본 제외·CEIG 보존의 대소문자 fixture를 추가했으며 이 역시 미실행이다.
 - CLI: `input.graph.inspect <path.inputgraph>`, `input.graph.roundtrip <path.inputgraph>`, `input.graph.selftest`, `input.graph.authoring.probe <save|verify> <CE_InputProbe_name>`. 마지막 명령과 회귀 harness는 실제 EditorAssetDatabase 저장·재시작 후 source/meta UUID 확인 경로를 작성한 것이며 실행하지 않았다.
 
 모든 Debug/Release/Shipping·non-unity 빌드, native/managed 테스트, 회귀 script, converter, NativeAOT publish/run, 실제 Editor UI·물리 장치·고정 step·UI/game 라우팅·hot reload·사용자 profile·packaged Player 실행, sanitizer와 benchmark는 **NOT RUN**이다. 메모리 할당량, latency, 처리량 또는 프레임 예산 충족에 대한 성능 주장은 없다. managed 안전 복사 경로는 publication마다 할당하며 allocation-free로 표시하지 않는다.

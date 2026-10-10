@@ -125,7 +125,9 @@ internal static class AssetCooking
         var log = await context.Run(cooker, arguments);
         var summary = Regex.Match(log.Output, @"(?m)^asset-cooker runtime-documents=(\d+) bytes=(\d+) format=CEDO1\+TRBN2\r?$");
         if (!summary.Success) throw new BuildException("Runtime document cook summary missing.");
-        var extensions = new[] { ".inputmap", ".bt", ".blackboard", ".renderprofile", ".terrain", ".foliage" };
+        // InputGraph is a separate CEIG artifact, not a CEDO runtime document.
+        // Its LX source and retired .inputmap sources are excluded at packaging.
+        var extensions = new[] { ".bt", ".blackboard", ".renderprofile", ".terrain", ".foliage" };
         var documents = Paths.Files(Path.Combine(root, "ProjectSetting")).Where(p => Path.GetExtension(p).Equals(".asset", StringComparison.OrdinalIgnoreCase))
             .Concat(Paths.Files(Path.Combine(root, "Assets")).Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()))).ToArray();
         var count = int.Parse(summary.Groups[1].Value); var bytes = long.Parse(summary.Groups[2].Value);

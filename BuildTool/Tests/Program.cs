@@ -266,6 +266,23 @@ try
     PackageInputs.RemoveAudioSources(cookInput);
     Check(!Directory.EnumerateFiles(Paths.Child(cookInput, "Assets/Audio")).Any(), "Audio source or meta leaked into package");
     Check(cookedAudio.All(relative => File.Exists(Paths.Child(cookInput, "Assets/Derived/" + relative))), "Audio cleanup removed cooked artifacts");
+    // Source-only InputGraph fixture: current LX and retired maps are excluded,
+    // while CEIG payloads survive. Uppercase exercises the shared case policy.
+    foreach (var extension in new[] { "inputgraph", "INPUTGRAPH", "inputmap", "INPUTMAP" })
+    {
+        var source = Paths.Child(cookInput, "Assets/InputGraph/source." + extension);
+        Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        File.WriteAllText(source, "input authoring fixture");
+        Check(PackageInputs.Excluded(source), "Input authoring source not excluded: " + extension);
+        Check(PackageInputs.Excluded(source + ".meta"), "Input authoring sidecar exclusion changed");
+    }
+    foreach (var extension in new[] { "ceig", "CEIG" })
+    {
+        var artifact = Paths.Child(cookInput, "Assets/Derived/InputGraph/ce/probe." + extension);
+        Directory.CreateDirectory(Path.GetDirectoryName(artifact)!);
+        File.WriteAllText(artifact, "synthetic cooked InputGraph payload");
+        Check(!PackageInputs.Excluded(artifact), "Cooked InputGraph artifact was excluded: " + extension);
+    }
     Check(!Directory.Exists(Path.Combine(cookInput, "Assets/Script")), "C# source identities leaked into native cook input");
     foreach (var relative in new[] { "Fonts/Latin.ttf", "Fonts/Korean.otf", "Fonts/LICENSE.txt" })
     {

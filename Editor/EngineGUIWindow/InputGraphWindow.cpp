@@ -2,6 +2,7 @@
 #include "EditorAssetDatabase.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
+#include "EditorPropertyRow.h"
 #include "DataSystem.h"
 #include "PathFinder.h"
 #include "InputSessionComponent.h"
@@ -476,18 +477,32 @@ namespace editor::input_editing
     void DrawInspector(InputSessionComponent& component)
     {
         ImGui::PushID(&component);
+        static editor::widgets::property_layout_state configurationLayout;
+        const editor::widgets::property_sheet configurationSheet(configurationLayout,
+            {"User", "Gamepad index", "Share keyboard / mouse", "Evaluate UI domain", "InputGraph"});
         auto configuration = component.GetConfiguration();
-        bool changed = ImGui::InputScalar("User", ImGuiDataType_U64, &configuration.user);
-        changed |= ImGui::InputInt("Gamepad index", &configuration.controllerIndex);
-        changed |= ImGui::Checkbox("Share keyboard / mouse", &configuration.shareKeyboard);
-        changed |= ImGui::Checkbox("Evaluate UI domain", &configuration.evaluateUI);
+        const float userWidth = configurationSheet.line("User");
+        ImGui::SetNextItemWidth(userWidth);
+        editor::widgets::track_property_input("##User", userWidth);
+        bool changed = ImGui::InputScalar("##User", ImGuiDataType_U64, &configuration.user);
+        const float gamepadWidth = configurationSheet.line("Gamepad index");
+        ImGui::SetNextItemWidth(gamepadWidth);
+        editor::widgets::track_property_input("##GamepadIndex", gamepadWidth);
+        changed |= ImGui::InputInt("##GamepadIndex", &configuration.controllerIndex);
+        configurationSheet.line("Share keyboard / mouse");
+        changed |= ImGui::Checkbox("##ShareKeyboardMouse", &configuration.shareKeyboard);
+        configurationSheet.line("Evaluate UI domain");
+        changed |= ImGui::Checkbox("##EvaluateUIDomain", &configuration.evaluateUI);
         if (changed)
         {
             component.RequestConfiguration(configuration);
         }
         const auto graphPath = DataSystems->GetFilePath(configuration.graph);
         const std::string caption = graphPath.empty() ? "Select InputGraph" : graphPath.filename().string();
-        if (ImGui::BeginCombo("InputGraph", caption.c_str()))
+        const float graphWidth = configurationSheet.line("InputGraph");
+        ImGui::SetNextItemWidth(graphWidth);
+        editor::widgets::track_property_input("##InputGraph", graphWidth);
+        if (ImGui::BeginCombo("##InputGraph", caption.c_str()))
         {
             static std::vector<std::filesystem::path> paths;
             if (ImGui::IsWindowAppearing())
@@ -513,7 +528,9 @@ namespace editor::input_editing
         const auto program = component.GetDiagnosticProgram();
         if (!program)
         {
+            ImGui::PushTextWrapPos(0.0f);
             ImGui::TextDisabled("No live input session. Enter Play with a valid InputGraph.");
+            ImGui::PopTextWrapPos();
             ImGui::PopID();
             return;
         }
