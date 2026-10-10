@@ -151,6 +151,27 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 device->ReleaseBuffer(prefixBuffer);
             }
         };
+        // Explicit transitions cannot prevent decay on simultaneous-access
+        // textures. Verify the backend refuses the retention guarantee.
+        {
+            D3D12_HEAP_PROPERTIES heap{};
+            heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+            D3D12_RESOURCE_DESC simultaneousDesc{};
+            simultaneousDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            simultaneousDesc.Width = simultaneousDesc.Height = 4;
+            simultaneousDesc.DepthOrArraySize = simultaneousDesc.MipLevels = 1;
+            simultaneousDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            simultaneousDesc.SampleDesc.Count = 1;
+            simultaneousDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
+            Microsoft::WRL::ComPtr<ID3D12Resource> native;
+            require(SUCCEEDED(device.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
+                &simultaneousDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&native))),
+                "Simultaneous-access texture fixture creation failed.");
+            const auto handle = device.RegisterTexture(native);
+            const bool retained = device.DescribeTexture(handle).retainsExplicitStateOnGraphicsQueue;
+            device.ReleaseTexture(handle);
+            require(!retained, "Automatically decaying texture advertised explicit-state retention.");
+        }
         std::vector<uint8_t> baseline;
         RHITimelinePoint foreignCompletion;
         for (uint32_t mode = 0; mode < 2; ++mode)
@@ -171,6 +192,19 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             auto first = graph->Write(graph->CreateBuffer({256, true, false, "queue-input"}));
             auto second = graph->Write(graph->CreateBuffer({256, true, false, "queue-output"}));
+            auto imported = graph->Write(graph->ImportTexture(storage->texture, storage->state, "imported-final-state", &storage->state));
+            const auto clearTexture = [&device, imported](const auto& context)
+            {
+                const auto target = context.ResolveHandle(imported);
+                const auto color = RHIColorTargetDesc::Texture(target);
+                auto binding = device.CreateRenderTargets(std::span<const RHIColorTargetDesc>{&color, 1});
+                if (!binding.IsValid())
+                {
+                    throw std::runtime_error("Render target creation failed.");
+                }
+                const float value[]{0, 0, 0, 0};
+                context.encoder->ClearRenderTargets(binding, value);
+            };
             const auto produce = graph->AddRepeatedPass("produce",
                 {{first, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
                 {{"write", {{first, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}}}, 3,
@@ -184,7 +218,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 });
             // These independent passes must remain outside cross-queue waits:
             // batching across either handoff would remove available overlap.
-            graph->AddPass("independent-before-compute", {}, nullptr, true);
+            const auto firstClear = graph->AddPass("independent-before-compute",
+                {{imported, RHIResourceState::RenderTarget, RGAccessMode::Write}}, clearTexture, true);
             auto transform = graph->AddPass("transform", {
                 {first, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {second, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
@@ -204,20 +239,9 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 {
                     context.encoder->CopyBufferToReadback(storage->readback, context.graph->ResolveBufferHandle(second));
                 }, true);
-            auto imported = graph->Write(graph->ImportTexture(storage->texture, storage->state, "imported-final-state", &storage->state));
-            graph->AddPass("independent-clear", {{imported, RHIResourceState::RenderTarget, RGAccessMode::Write}},
-                [&device, imported](const auto& context)
-                {
-                    const auto target = context.ResolveHandle(imported);
-                    const auto color = RHIColorTargetDesc::Texture(target);
-                    auto binding = device.CreateRenderTargets(std::span<const RHIColorTargetDesc>{&color, 1});
-                    if (!binding.IsValid())
-                    {
-                        throw std::runtime_error("Render target creation failed.");
-                    }
-                    const float value[]{0, 0, 0, 0};
-                    context.encoder->ClearRenderTargets(binding, value);
-                }, true);
+            imported = graph->Modify(imported);
+            const auto finalClear = graph->AddPass("independent-clear",
+                {{imported, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}}, clearTexture, true);
             graph->RequireImportedFinalState(imported, RHIResourceState::ShaderResource);
             require(graph->Compile(error), error);
             Microsoft::WRL::ComPtr<ID3D12Fence> gate;
@@ -246,9 +270,23 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             compute.profiler = &computeProfiler;
             require(graph->SubmitQueues(graph, recorder, graphics, mode ? &compute : nullptr,
                 measuredHints, 100, storage, execution, error), error);
-            require(execution.plannedBarriers == (mode ? 15u : 8u) &&
+            require(execution.plannedBarriers == (mode ? 14u : 8u) &&
                 graph->GetPassBarrierCount(produce) == (mode ? 4u : 3u),
                 "Repeated UAV ordering or batch-local state retention was lost.");
+            require(device.DescribeTexture(storage->texture).retainsExplicitStateOnGraphicsQueue,
+                "Non-simultaneous texture did not advertise explicit-state retention.");
+            EnhancedRenderGraph::DiagnosticSnapshot barrierSnapshot;
+            const bool captured = graph->CaptureDiagnosticSnapshot(barrierSnapshot);
+            const auto textureBarrierCount = [&](RGPassId pass)
+            {
+                return captured ? std::count_if(barrierSnapshot.passes[pass.index].barriers.begin(),
+                    barrierSnapshot.passes[pass.index].barriers.end(), [&](const auto& barrier)
+                    {
+                        return barrier.resource == imported.index;
+                    }) : -1;
+            };
+            require(!mode || (textureBarrierCount(firstClear) == 1 && textureBarrierCount(finalClear) == 0),
+                "Graphics-only texture was reset between graphics batches.");
             const uint32_t expectedBatches = mode ? 7u : 3u;
             require(execution.submittedBatches == expectedBatches && !execution.recoveryRequired &&
                 !execution.completion.IsComplete(), "Incorrect submission/join state.");
@@ -410,6 +448,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             finalTextureDesc.width = finalTextureDesc.height = 8;
             finalTextureDesc.allowRenderTarget = true;
             finalTextureDesc.format = RHIFormat::RGBA8Unorm;
+            finalTextureDesc.clearColor[0] = 0.25f;
+            finalTextureDesc.clearColor[1] = 0.5f;
+            finalTextureDesc.clearColor[2] = 0.75f;
+            finalTextureDesc.clearColor[3] = 1.0f;
             require(device.CreateBuffer(importedDesc, storage->prefixBuffer, error) &&
                 device.CreateTexture(finalTextureDesc, storage->texture, error), error);
             auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
@@ -986,7 +1028,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             ~FrameCleanup()
             {
                 gate->Signal(2);
-                device.AbortFrame();
+                if (device.GetCurrentUploadRecordingId() != 0)
+                {
+                    device.AbortFrame();
+                }
                 device.WaitForGpu();
             }
         } frameCleanup{device, frameGate.Get()};
@@ -1120,7 +1165,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         device.AbortFrame();
         std::string validation;
         require(device.DrainDebugMessages(validation) == 0, validation);
-        constexpr uint32_t kExpectedChecks = 428;
+        constexpr uint32_t kExpectedChecks = 434;
         if (checks != kExpectedChecks)
         {
             throw std::runtime_error("Queue execution acceptance check count changed.");

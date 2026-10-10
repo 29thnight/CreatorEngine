@@ -1,9 +1,39 @@
 # RG8 PR167 follow-up: execution evidence and acceptance contracts
 
-Status: implementation and acceptance tooling revised; native correctness and performance **unvalidated**.
+Status: VS 2026 Debug/Release builds and schema-2 native correctness/full regression passed on 2026-10-09 after the fixture clear-value correction below. Product overlap and performance remain **unvalidated**. The original static-only record below describes the PR authoring stage.
 Async compute remains **default OFF**. RG7 transient aliasing remains explicitly unsupported by the owned queue executor. This document does not close RG8, award earned days, or supersede the historical measurements in `RenderRg8Barriers20261009.md`.
 
 ## Changes
+
+### TestShadow performance run after native validation (2026-10-09)
+
+Measured the same Release binary from the Windows validation below, with GPU validation OFF and no concurrent build or GPU test. This compares current mode 0 (baseline), 1 (owned graphics executor), and 2 (overlap scheduler), not a rebuilt pre-PR binary. TestShadow at 1496x692 was run in separate processes in forward 0/1/2 and reverse 2/1/0 order, with 32 unique normal submissions per case (192 total). NVIDIA RTX 4070 Ti/595.97 clocks and power were sampled. Clocks were not locked, and this is not a same-process randomized comparison; the numbers below are observations, not a causal speedup percentage.
+
+| Order/mode | GPU span median / p95 ms | Full record-submit CPU median / p95 ms |
+|---|---:|---:|
+| Forward 0 | 3.0080 / 3.6188 | 0.7989 / 1.1046 |
+| Forward 1 | 2.9793 / 3.3679 | 1.1593 / 1.5392 |
+| Forward 2 | 2.7182 / 3.2481 | 1.1120 / 1.7007 |
+| Reverse 2 | 2.8227 / 3.4509 | 1.2185 / 1.6168 |
+| Reverse 1 | 3.0761 / 3.2983 | 1.0766 / 1.4813 |
+| Reverse 0 | 3.1565 / 3.9086 | 0.8812 / 1.1532 |
+
+The mode-2 normal samples had **zero compute submissions and zero measured overlap in all 64 frames**. Only one of those 64 schedules had complete cost prediction input; the remaining 63 fell back with incomplete input. Thus this is not proof that a fully informed scheduler finds TestShadow unprofitable. Across the full two mode-2 logs, two earlier submissions selected compute; both also reported zero measured overlap. No async-compute performance gain was demonstrated. Full CPU median increased by 0.3131/0.3373 ms versus mode 0 in the two orders; this includes opt-in evidence serialization. Mode-2 scheduling median was 0.0081/0.00835 ms, recording 0.5615/0.5825 ms, and submission 0.2333/0.24425 ms.
+
+Separate controlled captures (4 per case, 24 total) matched graph inputs and all 7 float attachments exactly: **168 comparisons, maxAbs=0, no nonfinite output**. These diagnostic captures are excluded from the normal timing distributions. All six timing and six capture processes exited zero.
+
+The strict per-run adoption audit failed for owned modes with `Timing has no matching actual schedule`. There were 1-2 unmatched early timing records per run, around backend-generation changes. Selected normal samples had matching execution/timing/CPU identities; they were summarized separately without calling the strict audit a pass. The generation mismatch cause and missing normal cost inputs require follow-up. A raw timing difference with no compute work must not be presented as RG8 overlap benefit.
+
+Evidence: `Build/Verification/Phase43/RG8Pr167Perf20261009/` contains normal/capture runs, exact binary identities, `performance-summary.json`, `pixel-summary.json`, GPU state samples, and the retained summarization scripts. The results do not close RG8 or establish product adoption. Existing process-separated tooling cannot satisfy the requested controlled same-process performance gate.
+
+### Windows validation after synchronization (2026-10-09)
+
+- Fast-forwarded master from `2965dc48` to `4bb4978897e2c99ae7f64233d3e691b0a113ad9b` (PR #167). Existing local GCCE/command test edits were preserved and included in the build; this is not a clean-checkout-only result.
+- VS 2026 v18 MSBuild built `Editor/CreatorEditor.vcxproj`, x64 Debug and Release. Release reported LNK4020 warnings for existing `Utility_Framework.pdb` type records; build exit code was zero. ScriptCore trimming warnings were also retained in the logs.
+- The first Debug native run failed the zero-validation-message gate: all seven new overlap cases cleared the final render target to `(0.25, 0.5, 0.75, 1)` while its optimized creation clear value remained zero. Set the fixture's creation clear value to the actual clear value. No warning filters, payload expectations, or acceptance thresholds were relaxed.
+- After correction, both configurations passed `verify-rg8-queue-execution.ps1 -FullRegression`: native 361 checks, queue-plan 82 checks, full RenderGraph regression, payload error zero, validation problems zero, process exit zero.
+- Evidence root: `Build/Verification/Phase43/RG8Pr167Sync20261009/`. The initial failed run remains in `native-debug`; successful runs are `native-debug-fixed` and `native-release`, each with raw command results, logs and binary/source hashes in `execution-result.json`. Build logs and the pre-test local diff are retained beside them.
+- This run did not measure product-scene overlap or GPU speedup. Both receipts retain `measuredOverlapEstablished=false`, `liveSceneQueueCutover=false`, and `phaseComplete=false`. RG8 remains incomplete/default OFF.
 
 ### Stable measurement identity
 

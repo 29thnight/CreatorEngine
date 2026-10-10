@@ -373,7 +373,8 @@ namespace
                         }
                     }
                     std::string messages;
-                    require(resources.DrainDebugMessages(messages) == 0, "Final GPU validation: " + messages);
+                    const auto validationCount = resources.DrainDebugMessages(messages);
+                    require(validationCount == 0, "Final GPU validation: " + messages);
                 }
             }
             for (const auto count : contributions)

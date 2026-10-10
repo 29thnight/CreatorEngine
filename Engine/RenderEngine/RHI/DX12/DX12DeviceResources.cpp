@@ -2749,6 +2749,8 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
     info.depthOrArraySize = desc.DepthOrArraySize;
     info.mipLevels = desc.MipLevels;
     info.format = FromDXGI(desc.Format);
+    info.retainsExplicitStateOnGraphicsQueue = desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER &&
+        (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) == 0;
     return info;
 }
 

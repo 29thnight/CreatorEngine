@@ -875,7 +875,8 @@ private:
     // Queue execution specializes the same planner at submission boundaries.
     // Pass states persist inside each batch; boundary plans use COMMON.
     void PlanBarriers(const std::vector<bool>* batchEnds = nullptr,
-        PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr);
+        PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr,
+        const std::vector<bool>* retainedGraphicsTextures = nullptr);
     bool ValidateFinalStates(std::string& outError) const;
     bool ValidateRepeatedPasses(std::string& outError) const;
     void PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite);
@@ -913,9 +914,18 @@ private:
     std::vector<uint16_t> m_criticalPath;
     // Queue assignment is part of state compatibility. Whole-resource access is
     // conservative for all subresources until declarations expose a narrower range.
+    struct QueueReadEpoch
+    {
+        std::vector<uint16_t> frontier;
+        std::vector<uint16_t> before;
+        RHIResourceState state{RHIResourceState::Common};
+        RHIQueueKind queue{RHIQueueKind::Graphics};
+        bool immutableRead{false};
+    };
     void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
         std::vector<std::vector<uint16_t>>& predecessors,
-        std::vector<std::vector<uint16_t>>& successors) const;
+        std::vector<std::vector<uint16_t>>& successors,
+        std::vector<QueueReadEpoch>& resources) const;
     bool IsComputeStateCompatible(uint16_t pass) const;
     // Two-queue list simulation. Returns the predicted span and, if requested,
     // the submission order. reorder=false keeps the compiled order.
@@ -923,6 +933,10 @@ private:
         const std::vector<std::vector<uint16_t>>& predecessors,
         const std::vector<std::vector<uint16_t>>& successors,
         bool reorder, std::vector<uint16_t>* order) const;
+    uint64_t SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
+        const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
+        const std::vector<std::vector<uint16_t>>& successors, bool reorder, bool prioritizeComputeInputs,
+        std::vector<uint16_t>* order) const;
     void UpdateResourceUses();
     QueueCostModel m_queueCostModel;
     RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};

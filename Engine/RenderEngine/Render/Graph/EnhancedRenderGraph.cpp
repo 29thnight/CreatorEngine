@@ -1648,13 +1648,18 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& pr
 }
 
 void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
-    PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue)
+    PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue,
+    const std::vector<bool>* retainedGraphicsTextures)
 {
     const bool queuePlan = batchEnds != nullptr;
     m_stats.barriersEmitted = 0;
     m_stats.barrierBatches = 0;
     std::vector<bool> previousWrite(m_resources.size(),true);
     std::vector<RHIResourceState> finalStates;
+    const auto retainsState = [&](size_t index)
+    {
+        return retainedGraphicsTextures && (*retainedGraphicsTextures)[index];
+    };
     const auto appendTransition = [](PhaseBarrierPlan& plan, const Resource& resource,
         RHIResourceState before, RHIResourceState after)
     {
@@ -1678,8 +1683,15 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             finalStates.push_back(resource.state);
             if (resource.used)
             {
-                appendTransition(*prologue, resource, resource.initialState, RHIResourceState::Common);
-                resource.state = RHIResourceState::Common;
+                if (!retainsState(finalStates.size() - 1))
+                {
+                    appendTransition(*prologue, resource, resource.initialState, RHIResourceState::Common);
+                    resource.state = RHIResourceState::Common;
+                }
+                else
+                {
+                    resource.state = resource.initialState;
+                }
             }
         }
         else
@@ -1824,15 +1836,18 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
 
         if (queuePlan && (*batchEnds)[passIndex])
         {
-            // Only resources touched by this batch have left COMMON. Ending their
-            // states here preserves cross-queue handoff and buffer decay contracts.
+            // Graphics-only nondecaying textures retain explicit state on the
+            // same FIFO queue. Buffers, unknown textures and cross-queue resources
+            // keep the original COMMON handoff/decay contract.
             PhaseBarrierPlan boundary;
-            for (auto& resource : m_resources)
+            for (size_t index = 0; index < m_resources.size(); ++index)
             {
-                if (resource.used)
+                auto& resource = m_resources[index];
+                if (resource.used && !retainsState(index))
                 {
                     appendTransition(boundary, resource, resource.state, RHIResourceState::Common);
                     resource.state = RHIResourceState::Common;
+                    previousWrite[index] = true;
                 }
             }
             pass.finalTransitions = std::move(boundary.transitions);
@@ -1843,7 +1858,6 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             {
                 ++m_stats.barrierBatches;
             }
-            std::fill(previousWrite.begin(), previousWrite.end(), true);
         }
     }
 
@@ -1854,7 +1868,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             auto& resource = m_resources[index];
             if (resource.used)
             {
-                appendTransition(*epilogue, resource, RHIResourceState::Common, finalStates[index]);
+                appendTransition(*epilogue, resource, resource.state, finalStates[index]);
             }
             resource.state = finalStates[index];
         }
@@ -2445,10 +2459,18 @@ bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
 
 void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
     std::vector<std::vector<uint16_t>>& predecessors,
-    std::vector<std::vector<uint16_t>>& successors) const
+    std::vector<std::vector<uint16_t>>& successors,
+    std::vector<QueueReadEpoch>& resources) const
 {
-    predecessors.assign(m_passes.size(), {});
-    successors.assign(m_passes.size(), {});
+    // Candidate trials share capacity, never edges or state from the last trial.
+    for (auto* lists : {&predecessors, &successors})
+    {
+        lists->resize(m_passes.size());
+        for (auto& list : *lists)
+        {
+            list.clear();
+        }
+    }
     const auto add = [&](uint16_t producer, uint16_t consumer)
     {
         if (producer == consumer || m_passes[producer].culled || m_passes[consumer].culled)
@@ -2462,15 +2484,15 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
     {
         add(static_cast<uint16_t>(edge.producer), static_cast<uint16_t>(edge.consumer));
     }
-    struct ReadEpoch
+    resources.resize(m_resources.size());
+    for (auto& epoch : resources)
     {
-        std::vector<uint16_t> frontier;
-        std::vector<uint16_t> before;
-        RHIResourceState state{RHIResourceState::Common};
-        RHIQueueKind queue{RHIQueueKind::Graphics};
-        bool immutableRead{false};
-    };
-    std::vector<ReadEpoch> resources(m_resources.size());
+        epoch.frontier.clear();
+        epoch.before.clear();
+        epoch.state = RHIResourceState::Common;
+        epoch.queue = RHIQueueKind::Graphics;
+        epoch.immutableRead = false;
+    }
     for (const auto pass : m_executeOrder)
     {
         for (const auto& usage : m_passes[pass].usages)
@@ -2491,7 +2513,7 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
                 usage.state == epoch.state && queues[pass] == epoch.queue;
             if (!compatible)
             {
-                epoch.before = std::move(epoch.frontier);
+                epoch.before.swap(epoch.frontier);
                 epoch.frontier.clear();
             }
             for (const auto predecessor : epoch.before)
@@ -2517,6 +2539,30 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
 uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& queues,
     const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
     const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order) const
+{
+    const auto baseline = SimulateQueueOrder(queues, costs, predecessors, successors, reorder, false, order);
+    if (!reorder)
+    {
+        return baseline;
+    }
+    std::vector<uint16_t> candidateOrder;
+    const auto candidate = SimulateQueueOrder(queues, costs, predecessors, successors, true, true,
+        order ? &candidateOrder : nullptr);
+    if (candidate < baseline)
+    {
+        if (order)
+        {
+            *order = std::move(candidateOrder);
+        }
+        return candidate;
+    }
+    return baseline;
+}
+
+uint64_t EnhancedRenderGraph::SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
+    const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
+    const std::vector<std::vector<uint16_t>>& successors, bool reorder, bool prioritizeComputeInputs,
+    std::vector<uint16_t>* order) const
 {
     const uint64_t handoff = m_queueCostModel.handoffNanoseconds;
     const auto addTime = [](uint64_t left, uint64_t right)
@@ -2568,8 +2614,13 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
     // Earliest start, then compute ancestors, then compiled position.
     const auto key = [&](uint16_t pass)
     {
-        return reorder ? std::tuple<uint64_t, bool, uint32_t>{start(pass), !feedsCompute[pass], position[pass]} :
-            std::tuple<uint64_t, bool, uint32_t>{0, false, position[pass]};
+        // Compare a compute-input-first order with the earliest-start baseline.
+        // This may leave a queue idle; the caller keeps it only if the whole
+        // modeled frame finishes earlier. Pass names never enter the decision.
+        const bool deferred = prioritizeComputeInputs && !feedsCompute[pass] &&
+            queues[pass] != RHIQueueKind::Compute;
+        return reorder ? std::tuple<bool, uint64_t, bool, uint32_t>{deferred, start(pass), !feedsCompute[pass], position[pass]} :
+            std::tuple<bool, uint64_t, bool, uint32_t>{false, 0, false, position[pass]};
     };
     while (!ready.empty())
     {
@@ -2691,9 +2742,10 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         return true;
     }
     std::vector<std::vector<uint16_t>> predecessors, successors;
+    std::vector<QueueReadEpoch> dependencyResources;
     const std::vector<RHIQueueKind> serial(m_passes.size(), RHIQueueKind::Graphics);
     std::vector<RHIQueueKind> queues = serial;
-    BuildQueueDependencies(queues, predecessors, successors);
+    BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
     std::vector<uint16_t> order = m_executeOrder;
     if (!overlap)
     {
@@ -2701,7 +2753,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         {
             queues[pass] = RHIQueueKind::Compute;
         }
-        BuildQueueDependencies(queues, predecessors, successors);
+        BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
         if (plan.predictionComplete)
         {
             plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr);
@@ -2713,6 +2765,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     {
         const bool reorder = m_orderPolicy == RGOrderPolicy::DependencyOrder;
         uint64_t best = plan.predictedSerialNanoseconds;
+        std::vector<std::vector<uint16_t>> trialPredecessors, trialSuccessors;
         const auto attempt = [&](const std::vector<uint16_t>& passes)
         {
             auto trial = queues;
@@ -2720,8 +2773,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             {
                 trial[pass] = trial[pass] == RHIQueueKind::Compute ? RHIQueueKind::Graphics : RHIQueueKind::Compute;
             }
-            std::vector<std::vector<uint16_t>> trialPredecessors, trialSuccessors;
-            BuildQueueDependencies(trial, trialPredecessors, trialSuccessors);
+            BuildQueueDependencies(trial, trialPredecessors, trialSuccessors, dependencyResources);
             const auto span = SimulateQueues(trial, costs, trialPredecessors, trialSuccessors, reorder, nullptr);
             if (span < best)
             {
@@ -2771,7 +2823,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         }
         if (plan.predictedSerialNanoseconds - best >= m_queueCostModel.minimumGainNanoseconds)
         {
-            BuildQueueDependencies(queues, predecessors, successors);
+            BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
             plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, reorder, &order);
         }
         else
@@ -2780,7 +2832,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             plan.fallbackReason = RGQueueFallbackReason::InsufficientGain;
         }
     }
-    BuildQueueDependencies(queues, predecessors, successors);
+    BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
     for (const auto pass : order)
     {
         plan.usesCompute = plan.usesCompute || queues[pass] == RHIQueueKind::Compute;

@@ -178,10 +178,12 @@ function Export-NormalSamples($telemetry,$candidates,[int]$mode,[string]$directo
     ConvertTo-Json -InputObject @($joined) -Depth 70 | Set-Content "$directory/normal-samples.json"
     if($selected.Count -ne 32)
     {
-        throw "Insufficient warm ordinary frames with full cost and calibrated interval evidence: $($selected.Count)/32; see normal-selection.json"
+        $script:hasIncompleteNormalSamples=$true
+        Write-Warning "Insufficient warm ordinary frames with full cost and calibrated interval evidence: $($selected.Count)/32; see normal-selection.json. Continue collecting diagnostics; final acceptance will fail."
     }
 }
 $runs=@()
+$script:hasIncompleteNormalSamples=$false
 $orders=if($ValidateGpu){@('Forward')}else{@('Forward','Reverse')}
 foreach($order in $orders)
 {
@@ -432,7 +434,7 @@ foreach($order in $orders)
             {
                 $candidates=@(Get-Content "$case/normal-candidates.json" -Raw | ConvertFrom-Json)
                 Export-NormalSamples $telemetry $candidates $mode $case
-                Write-Output "RG8_NORMAL order=$order mode=$mode frames=32 domain=normal"
+                Write-Output "RG8_NORMAL_COLLECTED order=$order mode=$mode domain=normal; see normal-selection.json for accepted count"
             }
             $runs+=$run
             ConvertTo-Json -InputObject @($runs) -Depth 10 | Set-Content "$out/runs.json"
@@ -441,8 +443,9 @@ foreach($order in $orders)
 }
 if($sameProcessRequested)
 {
-    $sameProcess.established=$true
-    $sameProcess.reason='Both mode orders collected within their original Editor process; full acceptance and calibrated model validation remain required'
+    $sameProcess.established=!$script:hasIncompleteNormalSamples
+    $sameProcess.reason=if($script:hasIncompleteNormalSamples){'Both mode orders collected, but required valid normal samples are incomplete; diagnostics only'}else{'Both mode orders collected within their original Editor process; full acceptance and calibrated model validation remain required'}
     $context | ConvertTo-Json -Depth 10 | Set-Content "$out/measurement-context.json"
 }
+if($script:hasIncompleteNormalSamples){throw 'RG8 normal collection retained all mode diagnostics, but required valid samples are incomplete; see normal-selection.json'}
 'RG8_MEASUREMENT_COMPLETE'

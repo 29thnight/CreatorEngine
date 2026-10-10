@@ -100,7 +100,9 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         } sharedInput{device};
         RHIBufferDesc sharedDesc{};
         sharedDesc.bytes = 256;
-        sharedDesc.initialState = RHIResourceState::ShaderResource;
+        // This fixture only compiles plans; the imported read state below is
+        // hypothetical. D3D12 default-heap buffers are created in COMMON.
+        sharedDesc.initialState = RHIResourceState::Common;
         require(device.CreateBuffer(sharedDesc, sharedInput.buffer, error), error);
         // Overlap placement on an SSAO-shaped graph. Costs (ns) are chosen so the
         // expected spans can be derived by hand with a 20 us handoff:
@@ -583,8 +585,62 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             require(!history.Find(RGMeasurementDomain::Normal, 7) &&
                 !history.Find(RGMeasurementDomain::Capture, 28), "History reset retained a measurement domain.");
         }
+        // No render-pass names: a delayed graphics producer competes with
+        // independent graphics work. Trying both orders avoids the 2500 us
+        // earliest-start-only local optimum (serial is 2900 us).
+        for (const bool reverse : {false, true})
+        {
+            EnhancedRenderGraph subject(device, RGSchedulingMode::ExplicitVersioned);
+            subject.SetQueueCostModel(overlapModel);
+            std::array<RGHandle, 7> outputs;
+            std::array<RGPassId, 7> passes;
+            const std::array<uint64_t, 7> costs{200'000, 700'000, 200'000, 300'000, 500'000, 700'000, 300'000};
+            const std::array<std::vector<uint32_t>, 7> inputs{{{}, {0}, {}, {1}, {3}, {}, {2, 4, 5}}};
+            for (uint32_t index = 0; index < outputs.size(); ++index)
+            {
+                outputs[index] = subject.Write(subject.CreateBuffer({256, true, false, "order-fixture"}));
+            }
+            for (uint32_t ordinal = 0; ordinal < passes.size(); ++ordinal)
+            {
+                const uint32_t index = reverse ? 6 - ordinal : ordinal;
+                std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+                for (const auto input : inputs[index])
+                {
+                    usages.push_back({outputs[input], RHIResourceState::ShaderResource, RGAccessMode::Read});
+                }
+                usages.push_back({outputs[index], RHIResourceState::UnorderedAccess, RGAccessMode::Write});
+                passes[index] = subject.AddPass((reverse ? "renamed-" : "node-") + std::to_string(index), usages, body, index == 6);
+                if (index == 0 || index == 2 || index == 3)
+                {
+                    subject.DeclareComputeCompatible(passes[index]);
+                }
+            }
+            std::vector<EnhancedRenderGraph::QueueHint> measured;
+            for (uint32_t index = 0; index < passes.size(); ++index)
+            {
+                measured.push_back({passes[index], index == 0 || index == 2 || index == 3, costs[index]});
+            }
+            require(subject.Compile(error), error);
+            require(subject.BuildQueueSchedule(caps, measured, 1000, plan, error), error);
+            require(plan.usesCompute && plan.predictedNanoseconds <= 2'400'000,
+                "Alternative order search retained the earliest-start local optimum.");
+            bool topological = true;
+            for (uint32_t index = 0; index < passes.size(); ++index)
+            {
+                for (const auto input : inputs[index])
+                {
+                    topological = topological && positionOf(plan, passes[input]) < positionOf(plan, passes[index]);
+                }
+            }
+            require(topological, "Alternative order violated a producer dependency.");
+        }
         require(callbacks == callbacksBeforeOverlap, "Overlap planning executed a callback.");
-        constexpr uint32_t kExpectedChecks = 111;
+        std::string validationMessages;
+        if (device.DrainDebugMessages(validationMessages) != 0)
+        {
+            throw std::runtime_error("Queue planning GPU validation: " + validationMessages);
+        }
+        constexpr uint32_t kExpectedChecks = 119;
         if (checks != kExpectedChecks)
         {
             throw std::runtime_error("Queue schedule acceptance check count changed.");

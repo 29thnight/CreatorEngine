@@ -423,12 +423,15 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     //
     // 둘 다 넣는다 — 이번 프레임의 읽는 쪽과 쓰는 쪽이 핑퐁으로 갈리므로
     // 한쪽만 들이면 나머지가 그래프 밖에 남아 같은 문제가 반복된다.
-    for (uint32_t i = 0; i < kHistoryCount; ++i)
+    // Declare logical roles in stable order. Physical ping-pong slots rotate,
+    // but changing declaration indices would invalidate every pass timing sample.
+    for (uint32_t role = 0; role < kHistoryCount; ++role)
     {
-        m_historyHandle[i] = graph.ImportTexture(m_history[i], m_historyState[i], "SSGI.History" + std::to_string(i),
+        const uint32_t i = (m_historyIndex + role) % kHistoryCount;
+        m_historyHandle[i] = graph.ImportTexture(m_history[i], m_historyState[i], "SSGI.History.Role" + std::to_string(role),
                                                  &m_historyState[i]);
         m_historyDepthHandle[i] = graph.ImportTexture(m_historyDepth[i], m_historyDepthState[i],
-                                                      "SSGI.HistoryDepth" + std::to_string(i), &m_historyDepthState[i]);
+                                                      "SSGI.HistoryDepth.Role" + std::to_string(role), &m_historyDepthState[i]);
     }
 
     // ── Hi-Z 밉 체인 선언 ──

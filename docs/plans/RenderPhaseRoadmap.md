@@ -1,5 +1,11 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
+2026-10-09 RG8 graphics 전용 텍스처 상태 유지: 백엔드가 상태 유지를 보장하고 compute 사용이 없는 텍스처의 불필요한 COMMON 왕복을 제거했다. Release 실행 434·계획 119·전체 RG 회귀 통과, 제품 384개 출력 비교 오차 0, 제품 GPU 검증 모드 1·2 오류 0. 배리어 중앙값은 767→422개지만 실제 overlap은 5/64프레임이며 GPU 개선은 일관되지 않았다. RG8 progress·기성 0·기본 OFF 유지. [구현·측정 경계](../analysis/RenderRg8GraphicsRetention20261009.md).
+
+2026-10-09 RG8 순서 탐색: 패스 이름 없이 earliest-start와 compute 입력 우선 순서를 비교하도록 구현했다. Release 실행 428·계획 119·전체 RG 회귀 통과. TestShadow async 64프레임 중 30프레임에서 실제 overlap을 확인했지만 GPU 중앙값은 기본 경로보다 느렸다. RG8 progress·기성 0·기본 OFF 유지. [구현·측정 경계](../analysis/RenderRg8OrderSearch20261009.md).
+
+2026-10-09 RG8 후보 탐색 비용 수정: 의존성 계산의 임시 벡터 용량을 재사용해 Release 스케줄 CPU 중앙값이 4.20/3.88ms에서 0.80/1.06ms로 감소했다(별도 빌드·실행 비교). 전체 RG 회귀와 384개 제품 출력 비교 오차 0을 확인했지만, 실제 GPU overlap은 0이며 GPU 성능 개선은 미입증이다. RG8 progress·기성 0·기본 OFF 유지. [측정과 잔여 배치 문제](../analysis/RenderRg8SchedulerCost20261009.md).
+
 2026-10-09 LX 후속: posed 메시렛별 프러스텀 검사, CPU 기하 LOD 선택·실제 제출과 그림자 LOD0 분리, 별도 현재 깊이→draw HZB, 생성 전 cache 예산 검사를 연결했다. D/R 8조합·192프레임·GPU validation 0, 실제 Release TestShadow 32출력 비트 동일을 확인했다. GPU LOD·메시렛 압축/개별 HZB·성능/VRAM·Vulkan 수용은 별도이며 기존 기성/상태를 변경하지 않는다. [구현·검증 경계](../analysis/LatticeGeometryIntegration20261009.md).
 
 2026-10-09 구조 수정 2: 단일 큐는 기존 compiled barrier 계획을 그대로 사용하고, 다중 큐는 공통 계획기로 배치 내부 상태를 유지한다. D/R 최종 실행 150검사·계획 24검사·전체 RG 회귀 통과. 제품 검증은 [배리어 수정 기록](../analysis/RenderRg8Barriers20261009.md)을 따른다. RG8 progress·기성 0·기본 OFF 및 기존 공수 집계 유지.
