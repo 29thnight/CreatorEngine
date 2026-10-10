@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <type_traits>
 
 namespace LX
 {
@@ -23,21 +24,29 @@ enum class Direction : std::uint8_t
 };
 enum class PinType : std::uint8_t
 {
-    Flow,
-    Bool,
-    Int,
-    Float,
-    Vector,
-    Color,
-    Normal,
-    Texture,
-    Surface,
-    Sampler,
-    Closure
+    Flow = 0,
+    Bool = 1,
+    Int = 2,
+    Float = 3,
+    Vector = 4,
+    Color = 5,
+    Normal = 6,
+    Texture = 7,
+    Surface = 8,
+    Sampler = 9,
+    Closure = 10,
+    // Serialized IDs 0..10 and variant alternatives 0..6 are immutable.
+    Vector2 = 11
 };
 
 using LXSocketValue =
-    std::variant<std::monostate, bool, std::int64_t, double, std::array<double, 3>, std::array<double, 4>, std::string>;
+    std::variant<std::monostate, bool, std::int64_t, double, std::array<double, 3>, std::array<double, 4>, std::string,
+                 std::array<double, 2>>;
+
+static_assert(std::is_same_v<std::variant_alternative_t<4, LXSocketValue>, std::array<double, 3>>);
+static_assert(std::is_same_v<std::variant_alternative_t<5, LXSocketValue>, std::array<double, 4>>);
+static_assert(std::is_same_v<std::variant_alternative_t<6, LXSocketValue>, std::string>);
+static_assert(std::is_same_v<std::variant_alternative_t<7, LXSocketValue>, std::array<double, 2>>);
 
 bool IsSocketValueValid(PinType type, const LXSocketValue& value);
 
@@ -260,6 +269,7 @@ class LXGraph
 
   private:
     friend class LXMaterialArchive;
+    friend class LXInputArchive;
 
     struct Snapshot
     {

@@ -563,7 +563,7 @@ std::optional<LXStyleSheet> LXStyleSheet::LoadExact(const std::string& path, std
     {
         int type = -1;
         LXPinStyle style;
-        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Closure) || !ReadStyle(in, style, version) ||
+        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Vector2) || !ReadStyle(in, style, version) ||
             !styles.pinTypeStyles_.emplace(static_cast<PinType>(type), style).second)
         {
             return invalid("Invalid pin type style");
@@ -590,7 +590,7 @@ std::optional<LXStyleSheet> LXStyleSheet::LoadExact(const std::string& path, std
     {
         int type = -1;
         LXWireStyle style;
-        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Closure) || !ReadStyle(in, style, version) ||
+        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Vector2) || !ReadStyle(in, style, version) ||
             !styles.wireTypeStyles_.emplace(static_cast<PinType>(type), style).second)
         {
             return invalid("Invalid wire type style");

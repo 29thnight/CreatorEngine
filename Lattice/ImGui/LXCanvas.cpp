@@ -212,6 +212,12 @@ std::string ItemValue(const Node& node, const std::string& key, const LXNodeItem
         stream << (*value)[0] << ", " << (*value)[1] << ", " << (*value)[2];
         return stream.str();
     }
+    if (const auto* value = std::get_if<std::array<double, 2>>(&pin->value))
+    {
+        std::ostringstream stream;
+        stream << (*value)[0] << ", " << (*value)[1];
+        return stream.str();
+    }
     if (const auto* value = std::get_if<std::string>(&pin->value))
     {
         return *value;
@@ -1676,6 +1682,30 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                         if (ImGui::Checkbox("##bool", &checked))
                         {
                             state.dirty |= setSocketValue(valuePin->id, checked);
+                        }
+                    }
+                    else if (kind == LXNodeItemKind::Vector2 && valuePin)
+                    {
+                        auto components = state.vectorValue;
+                        if (state.editingPin != valuePin->id)
+                        {
+                            components = {};
+                            if (const auto* vector = std::get_if<std::array<double, 2>>(&valuePin->value))
+                            {
+                                std::transform(vector->begin(), vector->end(), components.begin(),
+                                               [](double number) { return static_cast<float>(number); });
+                            }
+                        }
+                        if (ImGui::DragFloat2("##vector2", components.data(), 0.01f))
+                        {
+                            state.editingPin = valuePin->id;
+                            state.vectorValue = components;
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit())
+                        {
+                            state.dirty |= setSocketValue(
+                                valuePin->id, std::array<double, 2>{components[0], components[1]});
+                            state.editingPin = 0;
                         }
                     }
                     else if (kind == LXNodeItemKind::Vector && valuePin)

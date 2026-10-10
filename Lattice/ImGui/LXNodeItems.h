@@ -27,7 +27,8 @@ enum class LXNodeItemKind
     Boolean,
     Integer,
     Choice,
-    String
+    String,
+    Vector2
 };
 
 // A domain supplies presentation and editing range. Socket values stay in LXGraph;
