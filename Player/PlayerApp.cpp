@@ -332,6 +332,7 @@ void Player::App::Finalize()
 
 void Player::App::RegisterHandler(CoreWindow& coreWindow)
 {
+    coreWindow.RegisterHandler(WM_ACTIVATEAPP, this, &App::HandleFocusEvent);
 	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
 }
@@ -401,5 +402,11 @@ LRESULT Player::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
     {
         m_main->InvokeResizeFlag();
     }
+    return 0;
+}
+
+LRESULT Player::App::HandleFocusEvent(HWND, WPARAM focused, LPARAM)
+{
+    InputManagement->SetWindowFocused(focused != 0);
     return 0;
 }

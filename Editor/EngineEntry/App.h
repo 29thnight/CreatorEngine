@@ -20,11 +20,8 @@ namespace Core
 		void Load();
 		void Run();
 		//Window Event Func
+		LRESULT HandleFocusEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleMaximizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);

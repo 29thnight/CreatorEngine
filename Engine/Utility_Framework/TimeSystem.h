@@ -190,6 +190,7 @@ namespace Core
 			return static_cast<double>(counter.QuadPart) / static_cast<double>(frequency.QuadPart);
 		}
 
+        double GetTimeScale() const noexcept { return timeScale; }
 		void UpdateTimeScale(float _timeDelta);
 		void SetTimeScale(float _timeScale,float _changeTimeScaleTime);
 		void SetTimeScale(float _timeScale);

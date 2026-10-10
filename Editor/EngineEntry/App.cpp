@@ -32,7 +32,6 @@
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
-#include "InputActionManager.h"
 #include "EngineBootstrap.h"
 #include "EngineLaunchConfig.h"
 #include "BootProgress.h"
@@ -331,10 +330,9 @@ void Core::App::Finalize()
 
 void Core::App::RegisterHandler(CoreWindow& coreWindow)
 {
-    coreWindow.RegisterHandler(WM_INPUT,		this, &App::ProcessRawInput);
+    coreWindow.RegisterHandler(WM_ACTIVATEAPP, this, &App::HandleFocusEvent);
 	coreWindow.RegisterHandler(WM_SIZE,			this, &App::HandleResizeEvent);
 	coreWindow.RegisterHandler(WM_SYSKEYDOWN,	this, &App::HandleMaximizeEvent);
-    coreWindow.RegisterHandler(WM_KEYDOWN,		this, &App::HandleCharEvent);
     coreWindow.RegisterHandler(WM_CLOSE,		this, &App::Shutdown);
     coreWindow.RegisterHandler(WM_DROPFILES,	this, &App::HandleDropFileEvent);
 }
@@ -577,7 +575,6 @@ void Core::App::Run()
 		m_main->Initialize();
 		BootProgress::Step(L"Initializing input", L"Connecting keyboard and mouse devices");
         InputManagement->Initialize(m_hWnd);
-		//InputActionManagers->LoadManager();
 		// ★ 첫 라이브 프레임은 로딩 화면 **뒤**에서 돌린다 (2026-09-14).
 		//
 		//   렌더 파이프라인은 GT가 첫 frame packet을 발행해야 서고, 그
@@ -656,54 +653,10 @@ LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-LRESULT Core::App::ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam)
+LRESULT Core::App::HandleFocusEvent(HWND, WPARAM focused, LPARAM)
 {
-	//InputManagement->ProcessRawInput(lParam); *****
-
-	return 0;
-}
-
-LRESULT Core::App::ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-	ImGuiKey key = ImGuiKey(wParam);
-
-	if (key >= 0 && key < ImGuiKey_COUNT)
-	{
-		io.AddKeyEvent(key, true);
-	}
-
-	return 0;
-}
-
-LRESULT Core::App::ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-	ImGuiKey key = ImGuiKey(wParam);
-
-	if (key >= 0 && key < ImGuiKey_COUNT)
-	{
-		io.AddKeyEvent(key, false);
-	}
-
-
-	return 0;
-}
-
-LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-
-	wchar_t wch = 0;
-	static BYTE KeyState[256];
-	GetKeyboardState(KeyState);
-	// Virtual Key를 Unicode 문자로 변환
-	if (ToUnicode((UINT)wParam, (UINT)lParam, KeyState, &wch, 1, 0) > 0)
-	{
-		io.AddInputCharacter(wch);
-	}
-
-	return 0;
+    InputManagement->SetWindowFocused(focused != 0);
+    return 0;
 }
 
 LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)

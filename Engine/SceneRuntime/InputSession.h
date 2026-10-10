@@ -98,6 +98,8 @@ namespace Input
 
         // Invalid/duplicate boundaries, wrong-thread use and malformed batches fail
         // closed with an empty owner; they never mutate a previously sealed frame.
+        // Nonfinite device telemetry instead seals an explicit gap/cancellation.
+        // The caller retains future records until their domain boundary is due.
         [[nodiscard]] own::shared_owner<const InputFrame> Evaluate(Domain domain, InputBoundary boundary,
             std::span<const RoutedInputRecord> records);
         bool QueueLayerChange(LayerID layer, bool enabled);
@@ -145,6 +147,7 @@ namespace Input
             bool held{};
             bool active{};
             bool performed{};
+            bool timerExhausted{};
             bool requiresNeutral{};
             Timestamp started{};
             Timestamp deadline{};

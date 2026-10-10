@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <windows.h>
 #include <functional>
 #include <string_view>
@@ -90,6 +90,8 @@ public:
                 }
                 else
                 {
+                    // WM_CHAR/IME remains on the host's WinProcProxy -> PT path.
+                    TranslateMessage(&msg);
                     DispatchMessage(&msg);
                 }
             }

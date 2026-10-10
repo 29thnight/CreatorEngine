@@ -142,6 +142,8 @@ namespace Input
         std::uint64_t deviceEpoch{};
         std::uint64_t assignmentEpoch{};
         UserID user{};
+        std::uint64_t targetSessionId{}; // Zero pair broadcasts within the routed user/domain scope.
+        std::uint64_t targetSessionGeneration{};
         DeviceID device{};
         ControlID control{};
         InputValue value{};

@@ -20,9 +20,10 @@ namespace Input
             return control.kind == SourceKind::MouseDelta || control.kind == SourceKind::MouseWheel;
         }
 
-        float Magnitude(InputValue value)
+        double Magnitude(InputValue value)
         {
-            return value.type == ValueType::Vector2 ? std::hypot(value.x, value.y) : std::abs(value.x);
+            return value.type == ValueType::Vector2 ? std::hypot(static_cast<double>(value.x),
+                static_cast<double>(value.y)) : std::abs(static_cast<double>(value.x));
         }
 
         bool IsFinite(InputValue value)
@@ -84,17 +85,17 @@ namespace Input
                     break;
                 case ProcessorKind::Normalize:
                 {
-                    const float magnitude = Magnitude(value);
+                    const double magnitude = Magnitude(value);
                     if (magnitude > 0.0f)
                     {
-                        value.x /= magnitude;
-                        value.y /= magnitude;
+                        value.x = static_cast<float>(value.x / magnitude);
+                        value.y = static_cast<float>(value.y / magnitude);
                     }
                     break;
                 }
                 case ProcessorKind::Deadzone:
                 {
-                    const float magnitude = Magnitude(value);
+                    const double magnitude = Magnitude(value);
                     if (magnitude <= processor.x)
                     {
                         value.x = 0.0f;
@@ -102,9 +103,9 @@ namespace Input
                     }
                     else
                     {
-                        const float rescaled = (std::min)(1.0f, (magnitude - processor.x) / (processor.y - processor.x));
-                        value.x *= rescaled / magnitude;
-                        value.y *= rescaled / magnitude;
+                        const double rescaled = (std::min)(1.0, (magnitude - processor.x) / (processor.y - processor.x));
+                        value.x = static_cast<float>(value.x * (rescaled / magnitude));
+                        value.y = static_cast<float>(value.y * (rescaled / magnitude));
                     }
                     break;
                 }
@@ -141,9 +142,11 @@ namespace Input
         {
             for (const auto& source : binding.sources)
             {
-                for (const auto& control : state.controls)
+                auto control = std::lower_bound(state.controls.begin(), state.controls.end(), source.control,
+                    [](const auto& value, ControlID key) { return value.control < key; });
+                for (; control != state.controls.end() && control->control == source.control; ++control)
                 {
-                    if (control.control == source.control && Magnitude(control.value) > threshold)
+                    if (Magnitude(control->value) > threshold)
                     {
                         return false;
                     }
@@ -160,9 +163,12 @@ namespace Input
             sequence = 0;
             for (const auto& source : binding.sources)
             {
-                for (const auto& control : state.controls)
+                auto found = std::lower_bound(state.controls.begin(), state.controls.end(), source.control,
+                    [](const auto& value, ControlID key) { return value.control < key; });
+                for (; found != state.controls.end() && found->control == source.control; ++found)
                 {
-                    if (control.control != source.control || !control.allowed)
+                    const auto& control = *found;
+                    if (!control.allowed)
                     {
                         continue;
                     }
@@ -171,7 +177,7 @@ namespace Input
                     {
                         if (type == ValueType::Button)
                         {
-                            value.x += Magnitude(control.value) * source.scaleX;
+                            value.x += static_cast<float>(Magnitude(control.value) * source.scaleX);
                         }
                         else
                         {
@@ -670,11 +676,12 @@ namespace Input
             }
             state.devices.push_back({ record.device, record.deviceEpoch, record.assignmentEpoch, true });
         }
-        auto control = std::find_if(state.controls.begin(), state.controls.end(), [&](const ControlState& item)
+        auto control = std::lower_bound(state.controls.begin(), state.controls.end(), record, [](const ControlState& item,
+            const RoutedInputRecord& key)
         {
-            return item.device == record.device && item.control == record.control;
+            return item.control != key.control ? item.control < key.control : item.device < key.device;
         });
-        if (control == state.controls.end())
+        if (control == state.controls.end() || control->device != record.device || control->control != record.control)
         {
             if (state.controls.size() >= 16'384)
             {
@@ -682,9 +689,8 @@ namespace Input
                 CancelAll(domain, state, frame, CancelReason::HistoryGap, record);
                 return;
             }
-            state.controls.push_back({ record.device, record.deviceEpoch, record.assignmentEpoch, record.control,
+            control = state.controls.insert(control, { record.device, record.deviceEpoch, record.assignmentEpoch, record.control,
                 InputValue::Zero(record.value.type), 0, frame.HasHistoryGap(), record.IsRecipient(domain) });
-            control = state.controls.end() - 1;
         }
         control->deviceEpoch = record.deviceEpoch;
         control->assignmentEpoch = record.assignmentEpoch;
@@ -827,6 +833,8 @@ namespace Input
                     {
                         frame.m_boundary.historyGap = true;
                         bindingState.value = InputValue::Zero(definition.type);
+                        CancelAll(domain, state, frame, CancelReason::HistoryGap, record);
+                        return;
                     }
                 }
                 if (blocked || bindingState.requiresNeutral)
@@ -902,8 +910,22 @@ namespace Input
                 if (allNeutral)
                 {
                     signal.requiresNeutral = false;
+                    // Establish analog neutral as a silent baseline. Otherwise a
+                    // small residual value would emit Performed on the next empty
+                    // frame even though no new device record arrived.
+                    signal.value = definition.type == ValueType::Button ? InputValue::Zero(definition.type) :
+                        ProcessValue(combined, definition.processors);
+                    if (!IsFinite(signal.value))
+                    {
+                        frame.m_boundary.historyGap = true;
+                        CancelAll(domain, state, frame, CancelReason::HistoryGap, record);
+                        return;
+                    }
                 }
-                signal.value = InputValue::Zero(definition.type);
+                else
+                {
+                    signal.value = InputValue::Zero(definition.type);
+                }
                 continue;
             }
             if (!IsFinite(combined))
@@ -1003,6 +1025,7 @@ namespace Input
             {
                 signal.active = true;
                 signal.performed = false;
+                signal.timerExhausted = false;
                 signal.started = time;
                 signal.deadline = AddTime(time, interaction.duration);
                 signal.lastPressTime = time;
@@ -1085,25 +1108,29 @@ namespace Input
         {
             Timestamp time{};
             std::uint32_t slot{};
+            std::uint32_t order{};
         };
         const auto later = [](const Timer& left, const Timer& right)
         {
-            return left.time != right.time ? left.time > right.time : left.slot > right.slot;
+            return left.time != right.time ? left.time > right.time : left.order > right.order;
         };
         std::priority_queue<Timer, std::vector<Timer>, decltype(later)> timers(later);
         const auto& graph = state.program->GetDefinition();
-        for (std::uint32_t slot = 0; slot < state.signals.size(); ++slot)
+        const auto evaluationOrder = state.program->GetEvaluationOrder();
+        for (std::uint32_t order = 0; order < evaluationOrder.size(); ++order)
         {
+            const auto slot = evaluationOrder[order];
             const auto& signal = state.signals[slot];
             const auto& interaction = graph.signals[slot].interaction;
             if (graph.signals[slot].domain != domain || signal.requiresNeutral ||
                 (!signal.active && signal.chordProgress == 0) || interaction.kind == InteractionKind::Press ||
+                signal.timerExhausted ||
                 (interaction.kind == InteractionKind::Hold && signal.performed && interaction.repeatInterval == 0) ||
                 (interaction.kind == InteractionKind::Chord && signal.performed))
             {
                 continue;
             }
-            timers.push({ signal.deadline, slot });
+            timers.push({ signal.deadline, slot, order });
         }
         while (!timers.empty())
         {
@@ -1134,7 +1161,11 @@ namespace Input
                     if (next > timer.time)
                     {
                         signal.deadline = next;
-                        timers.push({ next, timer.slot });
+                        timers.push({ next, timer.slot, timer.order });
+                    }
+                    else
+                    {
+                        signal.timerExhausted = true;
                     }
                 }
             }
@@ -1199,6 +1230,15 @@ namespace Input
             if (record.user != m_user && (record.user != 0 || control))
             {
                 continue;
+            }
+            if (record.targetSessionId != 0 && (record.targetSessionId != m_handle.id ||
+                record.targetSessionGeneration != m_handle.generation))
+            {
+                continue;
+            }
+            if ((record.targetSessionId == 0) != (record.targetSessionGeneration == 0))
+            {
+                return {};
             }
             if (std::binary_search(state.consumedSequences.begin(), state.consumedSequences.end(), record.sequence) ||
                 record.GetTime(domain) > boundary.end)

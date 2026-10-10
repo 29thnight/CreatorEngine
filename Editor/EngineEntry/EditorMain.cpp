@@ -1,3 +1,4 @@
+#include "InputSessionSystem.h"
 #include "EditorProjectLayerSettings.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
@@ -818,6 +819,7 @@ void Editor::EditorMain::Update()
 			// W5: 입력 갱신 뒤, 씬 틱 앞. 상태를 유도하고 이번 프레임의 입력
 			// 소유자를 정한다 — 그래야 아래 스크립트가 같은 프레임의 소유권을 본다.
 			m_playModeController.Tick();
+            InputSessionSystem::Get().ApplyAuthoringChanges();
 
 			// ★ 요청(IsGameStart)이 아니라 **확정**(IsPlayCommitted)으로 가른다(W5).
 			//   요청으로 가르면 Play 를 누른 프레임에 스냅샷이 뜨기 **전**에 Physics 와

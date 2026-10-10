@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "CoreWindow.h"
 #include "PlayerMain.h"
 
@@ -23,6 +23,7 @@ namespace Player
 		void Load();
 		void Run();
 
+		LRESULT HandleFocusEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
