@@ -20,6 +20,7 @@
 #include "SceneManager.h"
 #include <filesystem>
 #include <cstdint>
+#include <chrono>
 
 class PrefabEditor : public Singleton<PrefabEditor>
 {
@@ -31,6 +32,7 @@ private:
 public:
     void Open(const std::string& path);
     void Close(bool apply = true);
+    void TickAutomaticSave(bool flush = false);
     bool IsOpened() const { return m_isOpened; }
 
 private:
@@ -39,6 +41,12 @@ private:
     std::uint32_t m_editSceneId{};
     FileGuid m_prefabGuid{};
     std::filesystem::path m_path{};
+    std::string m_observedPayload;
+    std::string m_savedPayload;
+    std::string m_diskPayload;
+    std::string m_attemptedPayload;
+    std::chrono::steady_clock::time_point m_changedAt{};
+    std::chrono::steady_clock::time_point m_nextPoll{};
 };
 
 static auto PrefabEditors = PrefabEditor::GetInstance();

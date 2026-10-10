@@ -45,6 +45,7 @@ namespace CommandCore
             { "assets.modeldiag", CommandCost::Immediate, "", "모델 소비 계수를 읽는다(상태를 바꾸지 않는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "assets.scenemodel", CommandCost::Frames, "[reload <모델 이름>]", "활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.texture", CommandCost::Immediate, "[load <texture|ui|spritesheet> <경로>]", "텍스처 캐시 키와 앉은 이미지를 읽고 경로 하나를 적재한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
+            { "assets.texture.reimportprobe", CommandCost::Long, "<isolated-source> <isolated-scene>", "텍스처 재임포트와 씬 재로드 종단 회귀(격리 프로세스)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.texturebench", CommandCost::Long, "[limit]", "Measure texture decode mip and compression stages", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.unload", CommandCost::Frames, "", "사용하지 않는 에셋 캐시 정리", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "audio.authoringprobe", CommandCost::Frames, "[directory name clip-guid]", "Queue Sound Graph create/save/reload/preview acceptance on its presentation owner", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

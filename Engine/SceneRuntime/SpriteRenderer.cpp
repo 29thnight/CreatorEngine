@@ -4,6 +4,7 @@
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "BillboardType.h"
+#include "../RenderEngine/AssetDepot/TextureAssetRuntime.h"
 
 void SpriteRenderer::OnInitialized()
 {
@@ -51,18 +52,26 @@ void SpriteRenderer::OnUninitializing()
 
 void SpriteRenderer::SetSprite(const own::shared_owner<const Texture>& ptr)
 {
-	m_Sprite = ptr;
-	if (m_Sprite)
-	{
-		// G2 — 이름이 아니라 캐시 신원을 적는다. 이름을 적으면 다시 열 때 Textures 폴더의
-		// 같은 이름(없으면 아무것도)이 붙었다.
-		m_SpritePath = !m_Sprite->m_assetPath.empty()
-			? m_Sprite->m_assetPath : m_Sprite->m_name + m_Sprite->m_extension;
-	}
-	else
-	{
-		m_SpritePath.clear();
-	}
+    std::string reference;
+    if (ptr)
+    {
+        reference = !ptr->m_assetPath.empty() ? ptr->m_assetPath : ptr->m_name + ptr->m_extension;
+        if (reference.empty())
+        {
+            if (const auto origin = ptr->GetAssetOrigin())
+            {
+                reference = DataSystems->GetFilePath(FileGuid(origin->resolved.entry.asset.key.assetId.value)).string();
+                if (reference.empty())
+                {
+                    Debug::PrintLog(spdlog::level::err, "Cannot attach cooked SpriteRenderer texture without a serializable asset reference");
+                    return;
+                }
+            }
+        }
+    }
+    // Resolve before replacing the owner so a rejected cooked reference preserves it.
+    m_Sprite = ptr;
+    m_SpritePath = std::move(reference);
 	PublishRenderProxyDirty(ProxyDirty::Material);
 }
 

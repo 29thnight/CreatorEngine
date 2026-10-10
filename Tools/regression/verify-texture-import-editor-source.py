@@ -25,13 +25,13 @@ class TextureImportEditorContracts(unittest.TestCase):
         for forbidden in ('Child("guid")', 'Child("wrap")', 'Child("filter")'):
             self.assertNotIn(forbidden, writer)
         inspector = source("Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp")
-        self.assertIn('"Save and Reimport"', inspector)
+        self.assertIn("QueueAutomaticTextureSettings(source, settings)", inspector)
         self.assertIn("ValidateTextureImportSettings(settings, validationError)", inspector)
         self.assertIn("SetTextureImportSettingsAndReimport(source, settings", inspector)
-        self.assertIn("TextureImportReady(source)", inspector)
-        self.assertIn("current scene keeps its prior textures until Reload Saved Scene", database)
-        self.assertIn("Unsaved changes in the active scene will be discarded", inspector)
-        self.assertIn('EnqueueStructured({ "scene.open_async", scene.string() })', inspector)
+        self.assertIn("Scene references update without reloading the scene", inspector)
+        self.assertIn("Existing scene references update automatically", database)
+        self.assertNotIn("Unsaved changes in the active scene will be discarded", inspector)
+        self.assertNotIn('EnqueueStructured({ "scene.open_async", file::path(scene).string() })', inspector)
         self.assertNotIn("QueueSceneLoad(", inspector)
 
     def test_cook_is_scheduled_and_never_waited_on_game_thread(self):

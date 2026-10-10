@@ -101,6 +101,9 @@ public:
 	Material& UseAOMap(own::shared_owner<const Texture> texture);
 	Material& UseEmissiveMap(own::shared_owner<const Texture> texture);
 	Material& UseTextureMap(std::string_view property, own::shared_owner<const Texture> texture);
+    bool ReplaceTextureOwner(const Texture* previous, const own::shared_owner<const Texture>& replacement,
+        std::string& error);
+    bool ReloadCodeShader(own::shared_owner<const LX::Runtime::ShaderGeneration> shader, std::string& error);
 
 	const own::shared_owner<const Texture>& GetTextureMapShared(
 		std::string_view property) const noexcept;

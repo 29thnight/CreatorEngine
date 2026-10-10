@@ -1,6 +1,8 @@
 #include "DataSystem.h"
 
 #include "ShaderMeta.h"
+#include "Material.h"
+#include "AssetDepot/LegacyResourceCharges.h"
 #include "ShaderPermutationDomain.h"
 #include "../Utility_Framework/LogSystem.h"
 #include "../Utility_Framework/PathFinder.h"
@@ -384,6 +386,75 @@ bool DataSystem::LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta, std::str
         return false;
     }
     outMeta = *owner;
+    return true;
+}
+
+bool DataSystem::PublishCodeShaderReload(const own::shared_owner<const LX::Runtime::ShaderGeneration>& expected,
+    own::shared_owner<const LX::Runtime::ShaderGeneration>& shader, std::string& error)
+{
+    if (!expected || !shader || expected->meta.guid != shader->meta.guid)
+    {
+        error = "Shader reload identity changed";
+        return false;
+    }
+    std::lock_guard admission(m_assetPreparationMutex);
+    std::lock_guard materials(m_materialMutex);
+    std::lock_guard metadata(m_shaderMetaMutex);
+    const auto found = m_shaderMetaSlotByGuid.find(shader->meta.guid);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || m_assetRootHandoffs != 0u
+        || found == m_shaderMetaSlotByGuid.end()
+        || m_shaderMetaGenerationSerial >= (std::numeric_limits<std::uint32_t>::max)())
+    {
+        error = "Shader reload cannot publish while the owner is unavailable";
+        return false;
+    }
+    auto& slot = m_shaderMetaSlots[found->second];
+    if (expected->codeHandle.generation != slot.generation)
+    {
+        error = "Shader reload was superseded by a newer accepted generation";
+        return false;
+    }
+    std::vector<own::shared_owner<const ShaderMeta>> released;
+    released.reserve(m_shaderMetaSlots.size() + 1u);
+    auto replacement = own::make_shared<LX::Runtime::ShaderGeneration>(*shader);
+    replacement->codeHandle = { found->second + 1u, static_cast<std::uint32_t>(m_shaderMetaGenerationSerial + 1u) };
+    auto updated = Materials;
+    for (auto& [key, entry] : updated)
+    {
+        const auto current = asset_cache_detail::Acquire(entry, m_assetDepotRevision);
+        const auto instance = current ? current->GetLXMaterialInstance() : nullptr;
+        if (!instance || current->HasMaterialGraph() || &*instance->shader != &*expected)
+        {
+            continue;
+        }
+        auto candidate = own::make_shared<Material>(*current);
+        if (!candidate->ReloadCodeShader(replacement, error))
+        {
+            return false;
+        }
+        entry.current = own::weak_owner<const Material>(candidate);
+        entry.retained = std::move(candidate);
+        entry.retainedBytes = asset_cache_detail::LegacyMaterialRetainedBytes(*entry.retained);
+        entry.publication = asset_cache_detail::NextUse();
+        entry.lastUse = entry.publication;
+    }
+    auto meta = own::make_shared<const ShaderMeta>(replacement->meta);
+    const auto charge = RetainedShaderMetaBytes(*meta);
+    m_shaderMetaRetainedBytes -= slot.retainedBytes;
+    released.push_back(std::move(slot.retained));
+    slot.retainedBytes = 0u;
+    slot.current = own::weak_owner<const ShaderMeta>(meta);
+    RetainShaderMetaLocked(slot, meta, charge, released);
+    asset_cache_detail::Trim(updated, kLegacyMaterialBudgetBytes, kLegacyCacheBudgetEntries);
+    slot.generation = replacement->codeHandle.generation;
+    slot.codeProgram = !!replacement->codeProgram;
+    slot.resolverRevision = m_assetDepotRevision;
+    slot.hasDocumentDigest = false;
+    ++m_shaderMetaGenerationSerial;
+    Materials.swap(updated);
+    m_materialAssetRevision.fetch_add(1, std::memory_order_relaxed);
+    shader = std::move(replacement);
+    error.clear();
     return true;
 }
 

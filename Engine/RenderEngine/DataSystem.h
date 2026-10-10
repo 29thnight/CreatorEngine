@@ -605,6 +605,10 @@ public:
     static own::shared_owner<const material_graph::Generation> CompileMaterialGraphAuthoring(
         const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
         const file::path& cacheDirectory, std::string& error);
+    bool PublishMaterialGraphReload(own::shared_owner<const material_graph::Generation> generation,
+        const own::shared_owner<const material_graph::Generation>& expected, std::string& error);
+    bool PublishCodeShaderReload(const own::shared_owner<const LX::Runtime::ShaderGeneration>& expected,
+        own::shared_owner<const LX::Runtime::ShaderGeneration>& shader, std::string& error);
     own::shared_owner<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
 	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 		std::string& outError);

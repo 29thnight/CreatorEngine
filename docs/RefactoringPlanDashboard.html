@@ -1147,7 +1147,7 @@
   <br><br><b>현황 정정:</b> 런타임 밉 생성은 이미 있다. 이번 작업은 import 정책·cook artifact·실제 소비 연결이다. T0~T2는 구현 중이고 T3는 실제 모바일/Web 타깃 확정 후에만 착수한다. WIC의 플랫폼 제약을 해소했다고 주장하지 않는다.
   <br><br><b>역사적 기준선(2026-09-04):</b> PNG 99장 Release 런타임 5.34 ms/장, cook 34.1 ms/장, RGBA8 무밉 VRAM 420 MB 및 BC1+밉 70 MB 계산값은 당시 기록이다. PNG 685장/HDR 19장 stb A/B는 종료된 조사이며 현재 검사 통과나 현재 코퍼스가 아니다.
   <br><br><b>보존 계약:</b> Terrain 높이 RGBA8의 네 바이트 모두 float 비트 데이터다. 알파 제거·감마·premultiply를 금지하고 splat gray8 절삭 및 brush 정수 회색 변환을 유지한다. cooked 소비 일부를 연결했다고 전체 런타임 코덱 링크가 0이 됐다고 선언하지 않는다.</div>
-  <div class="phase-goal"><b>구현 정책:</b> 독립 텍스처의 누락 설정은 Source / None / PreserveAuthored. 모델 단일 역할 추론 뒤 명시 설정 우선. 기존 역할별 자동 압축·밉과 같은 결과라고 주장하지 않는다. 비동기 재cook 후 열린 씬은 준비 완료된 새 세대로 명시적 Reload Saved Scene을 실행하며 미저장 편집을 확인한다. 자동 컴포넌트 재바인딩과 다중 역할별 필터 산출물 선택은 잔여 범위다. CECT2와 CEMF3를 구분하고 Player 코덱 분리는 소스·프로젝트 기준으로 검토하며 실제 링크/실행은 미검증이다.</div>
+  <div class="phase-goal"><b>구현 정책:</b> 독립 텍스처의 누락 설정은 Source / None / PreserveAuthored. 모델 단일 역할 추론 뒤 명시 설정 우선. 기존 역할별 자동 압축·밉과 같은 결과라고 주장하지 않는다. 비동기 재cook 후 열린 씬의 기존 컴포넌트 참조를 준비 완료된 새 세대로 자동 갱신하며 미저장 편집을 보존한다. 재질 그래프 Apply·Save, 프리팹 Apply 및 C# 자동 빌드·재연결의 한정 Debug 실행 검증은 <a href="analysis/AutomaticResourceEditingValidation20261010.md">자동 처리 검증 기록</a>에 유지한다. 다중 역할별 필터 산출물 선택은 잔여 범위다. CECT2와 CEMF3를 구분하고 Player 코덱 분리는 소스·프로젝트 기준으로 검토하며 실제 링크/실행은 미검증이다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="12"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 · 현재 실행 검증 전</div>

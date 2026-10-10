@@ -10,6 +10,9 @@
 #include <cstdint>
 #include <fstream>
 #include <utility>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 namespace experiment::cooked
 {
@@ -59,6 +62,41 @@ namespace experiment::cooked
         [[nodiscard]] bool ReadInput(const std::filesystem::path& path,
             std::uint64_t limit, std::vector<std::byte>& bytes, std::string& failure)
         {
+#ifdef _WIN32
+            // Editor rename/save must remain possible during both initial
+            // capture and the independent disk recheck after cooking.
+            const auto handle = CreateFileW(path.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+            {
+                failure = "Cannot open texture input: " + path.string();
+                return false;
+            }
+            struct CloseInput final
+            {
+                HANDLE handle;
+                ~CloseInput() { CloseHandle(handle); }
+            } close{ handle };
+            LARGE_INTEGER size{};
+            if (!GetFileSizeEx(handle, &size) || size.QuadPart < 0
+                || static_cast<std::uint64_t>(size.QuadPart) > limit
+                || static_cast<std::uint64_t>(size.QuadPart) > MAXDWORD)
+            {
+                failure = "Texture input exceeds its byte budget: " + path.string();
+                return false;
+            }
+            bytes.resize(static_cast<std::size_t>(size.QuadPart));
+            DWORD read{};
+            LARGE_INTEGER after{};
+            if (!ReadFile(handle, bytes.data(), static_cast<DWORD>(bytes.size()), &read, nullptr)
+                || read != bytes.size() || !GetFileSizeEx(handle, &after) || after.QuadPart != size.QuadPart)
+            {
+                failure = "Texture input changed size or could not be read: " + path.string();
+                return false;
+            }
+            return true;
+#else
             std::ifstream stream(path, std::ios::binary | std::ios::ate);
             if (!stream)
             {
@@ -83,6 +121,7 @@ namespace experiment::cooked
                 return false;
             }
             return true;
+#endif
         }
     }
 

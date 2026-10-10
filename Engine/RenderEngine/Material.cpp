@@ -37,6 +37,77 @@ Material::Material()
 {
 }
 
+bool Material::ReloadCodeShader(own::shared_owner<const LX::Runtime::ShaderGeneration> shader, std::string& error)
+{
+    if (!m_runtimeInstance || !shader || m_materialGraphInstance
+        || shader->meta.guid != m_runtimeInstance->shader->meta.guid
+        || shader->meta.keywords != m_runtimeInstance->shader->meta.keywords)
+    {
+        error = "Code shader reload cannot discard the material's existing keyword contract";
+        return false;
+    }
+    own::shared_owner<const LX::Runtime::Instance> candidate;
+    if (!LX::Runtime::BuildInstance(shader, m_runtimeInstance->properties,
+        m_runtimeInstance->keywordSelections, m_runtimeInstance->textureOwners, candidate, error))
+    {
+        return false;
+    }
+    m_runtimeInstance = std::move(candidate);
+    m_shaderMetaHandle = shader->codeHandle;
+    m_assetOrigin.reset();
+    SynchronizeCodeRuntime();
+    return true;
+}
+
+bool Material::ReplaceTextureOwner(const Texture* previous,
+    const own::shared_owner<const Texture>& replacement, std::string& error)
+{
+    std::vector<std::string> properties;
+    for (const auto& owner : GetTextureOwners())
+    {
+        if (owner.textureOwner && &*owner.textureOwner == previous)
+        {
+            properties.push_back(owner.propertyName);
+        }
+    }
+    if (properties.empty())
+    {
+        return false;
+    }
+    if (m_materialGraphInstance)
+    {
+        // Change only physical owners. Logical GUIDs, samplers, values and overrides stay intact.
+        auto candidate = own::make_shared<material_graph::Instance>(*m_materialGraphInstance);
+        for (auto& texture : candidate->textures)
+        {
+            if (texture.owner && &*texture.owner == previous)
+            {
+                texture.owner = replacement;
+            }
+        }
+        for (const auto& property : properties)
+        {
+            for (auto& owner : candidate->textureOwners)
+            {
+                if (owner.propertyName == property)
+                {
+                    owner.textureOwner = replacement;
+                }
+            }
+        }
+        m_materialGraphInstance = std::move(candidate);
+    }
+    else
+    {
+        for (const auto& property : properties)
+        {
+            UseTextureMap(property, replacement);
+        }
+    }
+    error.clear();
+    return true;
+}
+
 Material::Material(const Material& material)
     : m_name(material.m_name), m_baseColorTexName(material.m_baseColorTexName),
       m_normalTexName(material.m_normalTexName), m_ORM_TexName(material.m_ORM_TexName),

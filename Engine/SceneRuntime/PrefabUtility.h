@@ -65,7 +65,7 @@ public:
     // "0건 적용"이 성공처럼 보이는 것을 막는다 — prefab.update는 오래 등록부
     // 전체(RegisteredInstanceCount)를 찍어, identity가 어긋나 아무것도 못 찾은
     // 실행에서도 "2개에 적용"이라고 말했다(2026-08-30).
-    size_t UpdateInstances(const Prefab* prefab);
+    size_t UpdateInstances(const Prefab* prefab, const Scene* excludedScene = nullptr);
     bool SavePrefab(const Prefab* prefab, const std::string& path);
 
     // 아래 세 Load*는 모두 비소유 관찰 포인터를 반환한다 — 소유는 m_prefabCache가

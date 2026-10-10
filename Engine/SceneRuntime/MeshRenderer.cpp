@@ -1,4 +1,6 @@
+#include <set>
 #include "MeshRenderer.h"
+#include "AuthoringParsedDocument.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "ReflectionYml.h"
 #include "DataSystem.h"
@@ -1191,6 +1193,57 @@ void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 	{
 		Debug::PrintLog(spdlog::level::warn, "m_Material writer ryml 전환 실패");
 	}
+}
+
+bool MeshRenderer::RefreshModelGeneration(assets::ModelAssetGeneration::Shared generation)
+{
+    if (!generation || !m_modelGeneration || generation->Identity().modelId != m_modelGuid.m_guid
+        || &*generation == &*m_modelGeneration)
+    {
+        return false;
+    }
+    const auto* mesh = generation->FindMesh(m_meshAssetId.m_guid);
+    if (!mesh)
+    {
+        return false;
+    }
+    auto material = m_Material ? own::make_shared<Material>(*m_Material) : own::shared_owner<Material>{};
+    if (material)
+    {
+        const auto graph = material->GetMaterialGraphInstance();
+        if (graph)
+        {
+            // Physical embedded owners follow the model while scene overrides stay intact.
+            std::set<const Texture*> replaced;
+            for (const auto& texture : graph->textures)
+            {
+                if (texture.owner && !replaced.contains(&*texture.owner)
+                    && generation->FindTexture(texture.assetId.value))
+                {
+                    const auto replacement = DataSystems->ResolveModelGenerationTexture(*generation, texture.assetId.value);
+                    std::string error;
+                    if (!replacement || !material->ReplaceTextureOwner(&*texture.owner, replacement, error))
+                    {
+                        return false;
+                    }
+                    replaced.insert(&*texture.owner);
+                }
+            }
+        }
+        else
+        {
+            DataSystems->BindModelGenerationTextures(*material, *generation);
+        }
+    }
+    m_modelMeshIndex = static_cast<std::uint32_t>(mesh - generation->Meshes().data());
+    m_modelGeneration = std::move(generation);
+    if (material)
+    {
+        SetMaterial(std::move(material));
+    }
+    m_isNeedUpdateCulling = true;
+    PublishRenderProxyDirty(ProxyDirty::Payload | ProxyDirty::LOD | ProxyDirty::Material);
+    return true;
 }
 
 bool MeshRenderer::BindModelGeneration(

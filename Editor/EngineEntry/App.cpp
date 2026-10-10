@@ -17,6 +17,8 @@
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorAssetDatabase.h"
+#include "PrefabEditor.h"
+#include "MaterialGraphWindow.h"
 #include "EditorAssetPresentation.h"
 #include "EditorPlatform.h"
 #include "EditorWindowChrome.h"
@@ -286,6 +288,8 @@ void Core::App::Finalize()
 	//   dx12.compare 크래시와 씬 로드 행에서 각각 같은 자리를 겪었다.
 	std::printf("[SHUTDOWN] Finalize 진입\n");
 
+    EditorAssetDatabase::Get().FlushAutomaticSaves();
+    PrefabEditors->TickAutomaticSave(true);
 	ConsoleCommandSystem::Get().Shutdown();
 	std::printf("[SHUTDOWN] CLI Shutdown 반환\n");
 
@@ -622,9 +626,12 @@ void Core::App::Run()
 		DataSystems->DrainQueuedAssetChanges();
 
 		// 메인 루프
+		EditorAssetDatabase::Get().TickAutomaticChanges();
+		PrefabEditors->TickAutomaticSave();
 		m_main->Update();
 
 		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
+		editor::material_editing::TickAutomaticChanges();
 		auto& cli = ConsoleCommandSystem::Get();
         cli.Pump([this] { return m_main->LockSceneStructure(); });
 

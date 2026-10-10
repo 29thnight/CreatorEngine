@@ -120,6 +120,8 @@ namespace editor::material_editing
             std::uint64_t workRevision = 0;
             std::uint64_t workDocument = 0;
             double changedAt = 0.0;
+            std::uint64_t automaticAttempt = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t automaticDocument = 0;
             MaterialRenderingMode renderingMode = MaterialRenderingMode::Opaque;
             bool doubleSided = false;
             bool persistedMaterial = false;
@@ -479,7 +481,25 @@ namespace editor::material_editing
                 return true;
             }
 
-            void TickPreview()
+            void TickAutomaticSave(bool flush = false)
+            {
+                const auto revision = Revision();
+                if (!Editable() || !Dirty() || document.HasActivePreview() || (!flush && ImGui::IsAnyItemActive())
+                    || preparedDocument != document.DocumentId() || preparedRevision != revision
+                    || (!flush && ImGui::GetTime() - changedAt < 0.6)
+                    || (automaticAttempt == revision && automaticDocument == document.DocumentId()))
+                {
+                    return;
+                }
+                automaticAttempt = revision;
+                automaticDocument = document.DocumentId();
+                if (Apply())
+                {
+                    Save();
+                }
+            }
+
+            void TickPreview(bool flush = false)
             {
                 const auto revision = Revision();
                 if (observedRevision != revision)
@@ -542,7 +562,7 @@ namespace editor::material_editing
                     previewJob = {};
                     previewWork.reset();
                 }
-                if (document.HasActivePreview() || attemptedRevision == revision || ImGui::GetTime() - changedAt < 0.25)
+                if (document.HasActivePreview() || attemptedRevision == revision || (!flush && ImGui::GetTime() - changedAt < 0.25))
                 {
                     return;
                 }
@@ -809,6 +829,7 @@ namespace editor::material_editing
         void RefreshPreview(Session& session)
         {
             session.TickPreview();
+            session.TickAutomaticSave();
         }
 
         LXMaterialAsset NewGraph()
@@ -1713,6 +1734,7 @@ namespace editor::material_editing
             ImGui::EndChild();
             ImGui::EndChild();
             session.TickPreview();
+            session.TickAutomaticSave();
             ++session.uiFrames;
             ImGui::PopID();
         }
@@ -1736,6 +1758,20 @@ namespace editor::material_editing
     {
         std::lock_guard lock(sessionMutex);
         ReconcileSceneLocked();
+    }
+
+    void TickAutomaticChanges()
+    {
+        std::lock_guard lock(sessionMutex);
+        if (shuttingDown || !ImGui::GetCurrentContext())
+        {
+            return;
+        }
+        ReconcileSceneLocked();
+        for (const auto& session : sessions)
+        {
+            RefreshPreview(*session);
+        }
     }
 
     void Draw()
@@ -1776,6 +1812,7 @@ namespace editor::material_editing
             }
             for (const auto& session : sessions)
             {
+                session->TickPreview(true);
                 if (session->previewJob.valid())
                 {
                     pending.push_back(session->previewJob);
@@ -1796,6 +1833,24 @@ namespace editor::material_editing
             }
         }
         std::lock_guard lock(sessionMutex);
+        for (const auto& session : sessions)
+        {
+            session->TickPreview(true);
+            // An older in-flight revision can finish after the last edit. Drain
+            // the final revision at shutdown while the compiler and scene still exist.
+            if (session->previewJob.valid())
+            {
+                try
+                {
+                    session->previewJob.wait();
+                }
+                catch (const std::exception&)
+                {
+                }
+                session->TickPreview(true);
+            }
+            session->TickAutomaticSave(true);
+        }
         active = nullptr;
         sessions.clear();
         inspectorPreview.reset();
@@ -2042,6 +2097,19 @@ namespace editor::material_editing
         else if (parts[1] == "add" && parts.size() == 5)
         {
             applied = active->Execute(LXCreateNode{parts[4], 100.0f, 100.0f}, revision);
+        }
+        else if (parts[1] == "assign" && parts.size() == 5)
+        {
+            EntityHandle target;
+            auto resolved = EditorObjectOperations::ResolveTarget(parts[4], target);
+            if (!resolved.IsSuccess())
+            {
+                return resolved;
+            }
+            auto* scene = SceneManagers->GetActiveScene();
+            auto* object = scene ? scene->Resolve(target) : nullptr;
+            auto* renderer = object ? object->GetComponent<MeshRenderer>() : nullptr;
+            applied = renderer && active->Assign(*renderer);
         }
         else if (parts.size() == 6 && ParseNumber(parts[4], first) && ParseNumber(parts[5], second) &&
                  parts[1] == "connect")

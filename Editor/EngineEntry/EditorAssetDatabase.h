@@ -5,6 +5,8 @@
 
 #include <memory>
 #include <cstdint>
+#include <chrono>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -43,6 +45,18 @@ public:
 	bool Initialize();
 	void Shutdown() noexcept;
 	bool IsInitialized() const noexcept;
+    // Owner-thread polling; only prepared replacements touch live scene references.
+    void TickAutomaticChanges();
+    void FlushAutomaticSaves();
+    // Thread-safe diagnostic snapshot; absent means this sidecar has no queued save.
+    [[nodiscard]] std::optional<std::chrono::milliseconds> PendingAutomaticSaveAge(const file::path& sidecar) const;
+    [[nodiscard]] std::string AutomaticSaveError(const file::path& sidecar) const;
+    void ClearAutomaticSaveError(const file::path& sidecar);
+    bool SaveImportMetadata(const file::path& source, std::string_view payload, std::string& error);
+    void QueueAutomaticImportMetadata(const file::path& source, std::string payload);
+    void QueueAutomaticTextureSettings(const file::path& source,
+        const experiment::cooked::TextureImportSettings& settings);
+    void QueueAutomaticRenderProfile(FileGuid guid, const SceneRenderProfile& profile);
     // Event revision only: the host refreshes its AudioCatalog on the game thread.
     [[nodiscard]] std::uint64_t AudioRevision() const noexcept;
 

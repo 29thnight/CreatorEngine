@@ -3,6 +3,9 @@
 #include <DirectXTex.h>
 #include <wincodec.h>
 #include "Texture.h"
+#include "TextureCodecImage.h"
+#include "SpriteRenderer.h"
+#include "Experiment/Cooked/TextureImportSettings.h"
 #include "../EditorDiagnostics.h"
 #include "../EditorProjectOperations.h"
 #include "../EditorObjectOperations.h"
@@ -46,6 +49,7 @@
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
+#include "EditorWindowRegistry.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 #include <mathematics/color.hpp>
@@ -56,6 +60,7 @@
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"
+#include "PrefabEditor.h"
 #include "ComponentFactory.h"
 #include "ModelSceneInstantiation.h" // MBC9: generation 씬 인스턴스화
 #include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 소비 스냅샷
@@ -167,6 +172,7 @@
 
 namespace ConsoleCmd
 {
+#include "../../../Tools/regression/texture_reimport_scene_probe.inl"
     class GeometryRevisionCommand final : public Meta::IUndoableCommand
     {
       public:
@@ -1994,6 +2000,7 @@ namespace ConsoleCmd
 
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "assets.texture.reimportprobe" }, &Cmd_texture_reimport_scene_probe);
         reg.Result({ "assets.model.meshlets" }, &Cmd_assets_model_meshlets);
         reg.Result({ "assets.model.lods" }, &Cmd_assets_model_lods);
         reg.Result({ "scene.loadjobs" }, &Cmd_scene_loadjobs);

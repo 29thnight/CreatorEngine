@@ -28,6 +28,7 @@ bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::p
         std::filesystem::path source;
         std::string baseline;
         cooked::TextureImportSettings settings;
+        cooked::TextureImportSettings observed;
         std::string parseError;
         std::string saveError;
         editor::widgets::property_layout_state layout;
@@ -40,6 +41,7 @@ bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::p
         draft.source = source;
         draft.baseline = document;
         (void)cooked::ParseTextureImportSettings(document, draft.settings, draft.parseError);
+        draft.observed = draft.settings;
     }
     if (!draft.parseError.empty())
     {
@@ -47,6 +49,33 @@ bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::p
         return true;
     }
     auto& settings = draft.settings;
+    const auto sidecar = std::filesystem::path(source.string() + ".meta");
+    auto& database = EditorAssetDatabase::Get();
+    const auto automaticSaveError = database.AutomaticSaveError(sidecar);
+    if (!automaticSaveError.empty())
+    {
+        ImGui::TextWrapped("Automatic save failed: %s", automaticSaveError.c_str());
+        if (ImGui::Button("Reload Disk Settings"))
+        {
+            std::string failure;
+            const auto disk = Authoring::WriteDocument::ParseFile(sidecar, &failure);
+            cooked::TextureImportSettings diskSettings;
+            if (disk && cooked::ParseTextureImportSettings(disk->Dump(), diskSettings, failure))
+            {
+                // Discard only this local settings draft. Do not enqueue a write.
+                settings = diskSettings;
+                draft.observed = diskSettings;
+                draft.saveError.clear();
+                EditorAssetDatabase::WriteTextureImportSettings(node, diskSettings);
+                draft.baseline = node.Dump();
+                database.ClearAutomaticSaveError(sidecar);
+            }
+            else
+            {
+                draft.saveError = failure;
+            }
+        }
+    }
     const editor::widgets::property_sheet sheet(draft.layout, { "Color Space", "Compression", "Mip Policy",
         "Maximum Dimension", "Normal Map", "Alpha Coverage", "Alpha Cutoff", "Compression Quality" });
     const auto combo = [&sheet](const char* label, auto& value, const char* entries)
@@ -87,52 +116,27 @@ bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::p
     {
         ImGui::TextWrapped("%s", validationError.c_str());
     }
-    ImGui::BeginDisabled(!valid);
-    if (ImGui::Button("Save and Reimport"))
+    if (valid && draft.observed != settings)
     {
+        draft.observed = settings;
         draft.saveError.clear();
-        if (EditorAssetDatabase::Get().SetTextureImportSettingsAndReimport(source, settings, draft.saveError))
+        EditorAssetDatabase::WriteTextureImportSettings(node, settings);
+        draft.baseline = node.Dump();
+        EditorAssetDatabase::Get().QueueAutomaticTextureSettings(source, settings);
+    }
+    if (ImGui::Button("Retry Import") && valid)
+    {
+        if (database.SetTextureImportSettingsAndReimport(source, settings, draft.saveError))
         {
-            EditorAssetDatabase::WriteTextureImportSettings(node, settings);
-            draft.baseline = node.Dump();
+            database.ClearAutomaticSaveError(sidecar);
         }
     }
-    ImGui::EndDisabled();
     if (!draft.saveError.empty())
     {
         ImGui::TextWrapped("%s", draft.saveError.c_str());
     }
     ImGui::TextWrapped("%s", EditorAssetDatabase::Get().TextureImportStatus(source).c_str());
-    ImGui::BeginDisabled(!EditorAssetDatabase::Get().TextureImportReady(source));
-    if (ImGui::Button("Reload Saved Scene..."))
-    {
-        ImGui::OpenPopup("##TextureReloadScene");
-    }
-    ImGui::EndDisabled();
-    if (ImGui::BeginPopupModal("##TextureReloadScene", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::TextWrapped("Reload a saved scene to replace existing texture references with the cooked generation.");
-        ImGui::TextWrapped("Unsaved changes in the active scene will be discarded. Save the scene first if you need to keep them.");
-        if (ImGui::Button("Choose Scene and Reload"))
-        {
-            const auto scene = ShowOpenFileDialog(L"Scene Files (*.creator)\0*.creator\0",
-                L"Reload Scene with Cooked Textures", PathFinder::Relative("Scenes\\").wstring());
-            if (!scene.empty())
-            {
-                // Match the existing scene menu: owner-thread admission and
-                // asynchronous dependency preparation retain the current scene
-                // until the complete replacement is ready for activation.
-                ConsoleCommandSystem::Get().EnqueueStructured({ "scene.open_async", scene.string() });
-            }
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-        {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
+    ImGui::TextWrapped("Edits are saved and imported automatically. Scene references update without reloading the scene.");
     return true;
 }
 

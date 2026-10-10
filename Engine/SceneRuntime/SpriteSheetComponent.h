@@ -40,6 +40,7 @@ public:
 	// 메커니즘은 C3 완결로 사라졌다 — Component의 가상 틱 3종과 Bit_Update가
 	// 함께 철거됐다.
 	void TickLayout(float tick);
+    void ReplaceTextureOwner(const Texture* previous, const own::shared_owner<const Texture>& replacement);
 
 	[[reflgen::ignore]]
 	ImageInfo				 uiinfo{};

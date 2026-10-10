@@ -4,6 +4,7 @@
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ProjectLayerSettingsCodec.h"
 #include "EditorAssetDatabase.h"
+#include "EditorScriptAuthoring.h"
 #include "TextureSourceProcessing.h"
 #include "Assets/ModelMaterialGraph.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
@@ -27,6 +28,23 @@
 #include "RuntimeSettings.h"
 #include "StringHelper.h"
 #include "SceneRenderProfile.h"
+#include "SceneManager.h"
+#include "Scene.h"
+#include "MeshRenderer.h"
+#include "ImageComponent.h"
+#include "SpriteRenderer.h"
+#include "SpriteSheetComponent.h"
+#include "DecalComponent.h"
+#include "Animator.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "ShaderMeta.h"
+#include "ShaderMetaReflection.h"
+#include "ShaderPermutationDomain.h"
+#include "Experiment/Cooked/CookedCodeMaterial.h"
+#include "Experiment/Cooked/CookedShaderMeta.h"
+#include "AuthoringCookedDocument.h"
+#include <chrono>
+#include <cstdio>
 
 #include <efsw/efsw.hpp>
 #include <DirectXTex.h>
@@ -45,6 +63,156 @@
 
 namespace
 {
+    std::string ReadModelRecoveryText(const file::path& path);
+    own::shared_owner<const LX::Runtime::ShaderGeneration> CompileCodeReload(
+        const LX::Runtime::Instance& instance, const file::path& root, std::string& error)
+    {
+        const auto& previous = *instance.shader;
+        const auto metadataPath = previous.codeProgram ? root / previous.codeProgram->metadataPath
+            : previous.meta.originPath;
+        const auto document = Authoring::ParsedDocument::ParseFile(metadataPath.string(), error);
+        ShaderMeta meta;
+        if (!document || !ShaderMetaLoader::Parse(ReadModelRecoveryText(metadataPath), metadataPath,
+            previous.meta.guid, meta, error))
+        {
+            return {};
+        }
+        if (meta.keywords != previous.meta.keywords || meta.passes != previous.meta.passes)
+        {
+            error = "Code shader pass/keyword changes require compatible material contracts; prior generation retained";
+            return {};
+        }
+        std::vector<RHIShaderReflection> reflections;
+        Hash::Sha256 identity;
+        const auto source = meta.ResolveSource(metadataPath);
+        std::map<file::path, std::string> inputs;
+        inputs.emplace(metadataPath, ReadModelRecoveryText(metadataPath));
+        inputs.emplace(source, ReadModelRecoveryText(source));
+        if (previous.codeProgram)
+        {
+            for (const auto& input : previous.codeProgram->inputs)
+            {
+                inputs.try_emplace(root / input.path, ReadModelRecoveryText(root / input.path));
+            }
+        }
+        RHIShaderCompiler::ModuleReuseScope reuse;
+        auto program = previous.codeProgram ? own::make_shared<experiment::cooked::CodeProgram>(*previous.codeProgram)
+            : own::shared_owner<experiment::cooked::CodeProgram>{};
+        if (program)
+        {
+            if (!Authoring::EncodeCookedDocument(document.Root(), program->metadataBytes, error)
+                || !experiment::cooked::ReadShaderMetaArtifact(program->metadataBytes,
+                    program->shaderMetaAssetId, program->meta, error))
+            {
+                return {};
+            }
+            for (auto& variant : program->variants)
+            {
+                for (auto& stage : variant.stages)
+                {
+                    RHIShaderCompiler::VerifiedShader verified;
+                    if (!RHIShaderCompiler::VerifyFile(source.string(), stage.entry, stage.profile, variant.backend,
+                        variant.permutation, verified, error))
+                    {
+                        return {};
+                    }
+                    stage.bytecode = verified.bytecode;
+                    stage.reflection = verified.reflection;
+                    reflections.push_back(verified.reflection);
+                    identity.Update(verified.dependencyIdentity.data(), verified.dependencyIdentity.size());
+                    for (const auto& dependency : verified.dependencies)
+                    {
+                        inputs.try_emplace(dependency, ReadModelRecoveryText(dependency));
+                    }
+                }
+            }
+            if (!ShaderMetaReflection::Resolve(meta, reflections, program->layout, error))
+            {
+                return {};
+            }
+            program->inputs.clear();
+            for (const auto& [path, bytes] : inputs)
+            {
+                std::error_code pathError;
+                const auto relative = file::relative(path, root, pathError);
+                if (pathError || relative.empty() || *relative.begin() == "..")
+                {
+                    error = "Code shader dependency escapes the project Assets directory";
+                    return {};
+                }
+                Hash::Sha256 hash;
+                hash.Update(bytes.data(), bytes.size());
+                program->inputs.push_back({ relative.generic_string(), bytes.size(), hash.Finish() });
+            }
+            std::ranges::sort(program->inputs, {}, &experiment::cooked::CodeProgramInput::path);
+            meta = program->meta;
+            std::vector<std::byte> encoded;
+            std::vector<experiment::cooked::AssetDependency> edges;
+            if (!experiment::cooked::EncodeCodeProgramArtifact(*program, encoded, edges, error))
+            {
+                return {};
+            }
+            identity.Update(encoded.data(), encoded.size());
+            meta.codeProgram = std::move(program);
+        }
+        else
+        {
+            for (std::uint32_t index = 0; index < meta.passes.size(); ++index)
+            {
+                const auto& pass = meta.passes[index];
+                ShaderMetaPermutation permutation;
+                if (!ShaderPermutationDomain::Resolve(meta, index, instance.keywordSelections, permutation, error))
+                {
+                    return {};
+                }
+                const auto compile = [&](const std::optional<ShaderStageEntry>& entry, std::string_view profile)
+                {
+                    if (!entry)
+                    {
+                        return true;
+                    }
+                    RHIShaderCompiler::VerifiedShader verified;
+                    if (!RHIShaderCompiler::VerifyFile(source.string(), entry->entry, profile,
+                        RHIShaderCompiler::GetOutput(), permutation.defines, verified, error))
+                    {
+                        return false;
+                    }
+                    reflections.push_back(verified.reflection);
+                    identity.Update(verified.dependencyIdentity.data(), verified.dependencyIdentity.size());
+                    for (const auto& dependency : verified.dependencies)
+                    {
+                        inputs.try_emplace(dependency, ReadModelRecoveryText(dependency));
+                    }
+                    return true;
+                };
+                if (!compile(pass.vertex, "vs_6_0") || !compile(pass.pixel, "ps_6_0") || !compile(pass.compute, "cs_6_0"))
+                {
+                    return {};
+                }
+            }
+        }
+        for (const auto& [path, bytes] : inputs)
+        {
+            if (bytes != ReadModelRecoveryText(path))
+            {
+                error = "Shader sources changed during compilation; prior generation retained";
+                return {};
+            }
+        }
+        ShaderMetaBindingLayout layout;
+        if (!ShaderMetaReflection::Resolve(meta, reflections, layout, error))
+        {
+            return {};
+        }
+        meta.codeProgramIdentity = Hash::ToHex(identity.Finish());
+        own::shared_owner<const LX::Runtime::ShaderGeneration> result;
+        if (!LX::Runtime::CreateCodeShader(meta, layout, previous.codeHandle, result, error))
+        {
+            return {};
+        }
+        return result;
+    }
+
 	bool RecoverModelThroughEditor(const file::path& source, FileGuid expectedId)
 	{
 		return EditorAssetDatabase::Get().RecoverModel(source, expectedId);
@@ -623,17 +791,764 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		// FileWatcher owns the callback thread. Destroy it while this listener is
 		// still alive, then let the rest of Impl be released.
 		m_watcher.reset();
-        std::lock_guard lock(m_authoringMutex);
-        m_stopping = true;
-        for (auto& [path, work] : m_textureImports)
         {
-            work.latestRevision->fetch_add(1u, std::memory_order_release);
+            std::lock_guard lock(m_authoringMutex);
+            m_stopping = true;
+            for (auto& [path, work] : m_textureImports)
+            {
+                work.latestRevision->fetch_add(1u, std::memory_order_release);
+            }
         }
+        for (const auto& work : m_shaderReloads)
+        {
+            try
+            {
+                work->job.wait();
+            }
+            catch (const std::exception&)
+            {
+                // Shutdown drains compiler ownership without publishing late results.
+            }
+        }
+        m_shaderReloads.clear();
+        for (const auto& job : m_modelReloads)
+        {
+            try
+            {
+                job.wait();
+            }
+            catch (const std::exception&)
+            {
+            }
+        }
+        m_modelReloads.clear();
 	}
 
     std::uint64_t AudioRevision() const noexcept
     {
         return m_audioRevision.load(std::memory_order_acquire);
+    }
+
+    struct AutomaticModelLoad final
+    {
+        assets::ModelAssetGeneration::Shared generation;
+        job_handle job;
+    };
+
+    struct TextureRefresh final
+    {
+        own::shared_owner<const Texture> previous;
+        AssetDepot::AssetRequest<Texture> descriptor;
+        AssetDepot::AssetRequest<Texture::CodecImage> image;
+        bool imageRequested{};
+        std::uint64_t resolverRevision{};
+    };
+
+    struct ShaderReload final
+    {
+        own::shared_owner<const material_graph::Generation> expectedGraph;
+        own::shared_owner<const material_graph::Generation> graph;
+        own::shared_owner<const LX::Runtime::Instance> expectedCode;
+        own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
+        file::path source, root, shaders, cache;
+        FileGuid guid;
+        std::string error;
+        job_handle job;
+        std::uint64_t revision{};
+    };
+
+    void TickShaderReloads()
+    {
+        for (auto it = m_shaderReloads.begin(); it != m_shaderReloads.end();)
+        {
+            const auto work = *it;
+            if (!work->job.is_complete())
+            {
+                ++it;
+                continue;
+            }
+            try
+            {
+                work->job.wait();
+            }
+            catch (const std::exception& exception)
+            {
+                work->error = exception.what();
+            }
+            if (work->revision == m_shaderRevision && work->error.empty())
+            {
+                if (work->graph)
+                {
+                    DataSystems->PublishMaterialGraphReload(work->graph, work->expectedGraph, work->error);
+                }
+                else if (work->shader)
+                {
+                    // Prepare every dependent material before changing any accepted instance.
+                    std::vector<std::pair<MeshRenderer*, own::shared_owner<Material>>> replacements;
+                    for (auto* scene : SceneManagers->GetScenes())
+                    {
+                        if (!scene)
+                        {
+                            continue;
+                        }
+                        for (const auto& entity : scene->m_Entities)
+                        {
+                            if (!entity || entity->IsDestroyMark())
+                            {
+                                continue;
+                            }
+                            for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                            {
+                                const auto instance = mesh->m_Material ? mesh->m_Material->GetLXMaterialInstance() : nullptr;
+                                if (!instance || mesh->m_Material->HasMaterialGraph()
+                                    || &*instance->shader != &*work->expectedCode->shader)
+                                {
+                                    continue;
+                                }
+                                auto candidate = own::make_shared<Material>(*mesh->m_Material);
+                                if (!candidate->ReloadCodeShader(work->shader, work->error))
+                                {
+                                    break;
+                                }
+                                replacements.emplace_back(mesh, std::move(candidate));
+                            }
+                        }
+                    }
+                    if (work->error.empty())
+                    {
+                        if (!DataSystems->PublishCodeShaderReload(work->expectedCode->shader, work->shader, work->error))
+                        {
+                            Debug::PrintLog(spdlog::level::err, "Automatic shader publication retained prior materials: " + work->error);
+                            it = m_shaderReloads.erase(it);
+                            continue;
+                        }
+                        for (auto& [mesh, material] : replacements)
+                        {
+                            // Publication allocates the real cache generation handle after validation.
+                            material->ReloadCodeShader(work->shader, work->error);
+                            mesh->SetMaterial(std::move(material));
+                        }
+                    }
+                }
+            }
+            if (work->revision == m_shaderRevision && !work->error.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "Automatic shader reload retained prior materials: " + work->error);
+            }
+            it = m_shaderReloads.erase(it);
+        }
+        if (!m_shaderDirty || !m_shaderReloads.empty())
+        {
+            return;
+        }
+        m_shaderDirty = false;
+        std::map<Uuid::Uuid16, own::shared_owner<const material_graph::Generation>> graphs;
+        std::map<const LX::Runtime::ShaderGeneration*, own::shared_owner<const LX::Runtime::Instance>> codes;
+        const auto collect = [&](const Material& material)
+        {
+            if (const auto graph = material.GetMaterialGraphInstance())
+            {
+                graphs.try_emplace(graph->generation->assetId.value, graph->generation);
+            }
+            else if (const auto instance = material.GetLXMaterialInstance(); instance && instance->shader)
+            {
+                codes.try_emplace(&*instance->shader, instance);
+            }
+        };
+        for (const auto& [name, material] : DataSystems->SnapshotMaterials())
+        {
+            collect(*material);
+        }
+        for (auto* scene : SceneManagers->GetScenes())
+        {
+            if (!scene)
+            {
+                continue;
+            }
+            for (const auto& entity : scene->m_Entities)
+            {
+                if (!entity || entity->IsDestroyMark())
+                {
+                    continue;
+                }
+                for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                {
+                    if (mesh->m_Material)
+                    {
+                        collect(*mesh->m_Material);
+                    }
+                }
+            }
+        }
+        const auto submit = [&](own::shared_owner<ShaderReload> work)
+        {
+            work->root = m_root;
+            work->shaders = PathFinder::RelativeToShader("DefaultPassShader");
+            work->cache = PathFinder::CachePath("Lattice/AutomaticReload");
+            work->revision = m_shaderRevision;
+            work->job = ce::get_job_scheduler().submit([work]
+            {
+                if (work->expectedGraph)
+                {
+                    const auto source = LX::LXMaterialAsset::Load(work->source, LX::CreateMaterialDefinitions(), &work->error);
+                    if (source)
+                    {
+                        work->graph = DataSystem::CompileMaterialGraphAuthoring(*source, work->guid,
+                            work->shaders, work->cache, work->error);
+                    }
+                }
+                else
+                {
+                    work->shader = CompileCodeReload(*work->expectedCode, work->root, work->error);
+                }
+            });
+            m_shaderReloads.push_back(std::move(work));
+        };
+        for (const auto& [id, graph] : graphs)
+        {
+            auto work = own::make_shared<ShaderReload>();
+            work->expectedGraph = graph;
+            work->guid = FileGuid(id);
+            work->source = DataSystems->GetMaterialGraphSourcePath(work->guid);
+            if (!work->source.empty())
+            {
+                submit(std::move(work));
+            }
+        }
+        for (const auto& [shader, instance] : codes)
+        {
+            auto work = own::make_shared<ShaderReload>();
+            work->expectedCode = instance;
+            submit(std::move(work));
+        }
+    }
+
+    void ScheduleModelReload(const file::path& source, bool metadata)
+    {
+        const auto self = shared_from_this();
+        m_modelReloads.push_back(ce::get_job_scheduler().submit([self, source, metadata]
+        {
+            try
+            {
+                if (metadata)
+                {
+                    const auto guid = self->CreateMeta(source);
+                    if (guid != FileGuid{})
+                    {
+                        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                            RuntimeAssetType::Model, guid, source });
+                    }
+                }
+                else
+                {
+                    self->ReloadChangedModel(source);
+                }
+            }
+            catch (const std::exception& failure)
+            {
+                Debug::PrintLog(spdlog::level::err, "Automatic model reload retained prior references: " + std::string(failure.what()));
+            }
+            self->m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+        }));
+    }
+
+    bool SaveImportMetadata(const file::path& requestedSource, std::string_view payload, std::string& failure)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        std::error_code error;
+        const auto source = file::weakly_canonical(requestedSource, error);
+        const auto document = Authoring::ParsedDocument::ParseText(std::string(payload), failure);
+        const auto sidecar = file::path(source.string() + ".meta");
+        const auto expected = LoadGuidFromMeta(sidecar);
+        auto identityNode = document ? document.Root()["assetId"] : Authoring::ReadNode{};
+        if (!identityNode && document)
+        {
+            identityNode = document.Root()["guid"];
+        }
+        Uuid::Uuid16 identity;
+        if (error || m_stopping || !IsPathInside(source, file::weakly_canonical(m_root))
+            || !document || !document.Root().IsMap() || expected == FileGuid{}
+            || !identityNode || !identityNode.IsScalar()
+            || !Uuid::TryParse(identityNode.AsString(), identity) || identity != expected.m_guid)
+        {
+            failure = "Import settings must retain the existing asset GUID and project path";
+            return false;
+        }
+        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(payload.data(), payload.size())), PublishEncoding::Text))
+        {
+            failure = "Could not save import metadata";
+            return false;
+        }
+        HandleModified(sidecar);
+        failure.clear();
+        return true;
+    }
+
+    bool SaveAutomaticRenderProfilePayload(const file::path& path, std::string_view payload, std::string& error)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        if (m_stopping || !IsPathInside(path, m_root)
+            || !WriteBinaryFileLocked(path, std::as_bytes(std::span(payload.data(), payload.size())), PublishEncoding::Text))
+        {
+            error = "Render profile save failed; current settings are retained.";
+            return false;
+        }
+        HandleModified(path);
+        return true;
+    }
+
+    struct AutomaticSave
+    {
+        std::string expectedDisk;
+        std::function<bool(std::string&)> write;
+        std::chrono::steady_clock::time_point changedAt;
+    };
+
+    void QueueAutomaticSave(const file::path& path, std::function<bool(std::string&)> write)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        const auto key = path.lexically_normal();
+        m_automaticSaveErrors.erase(key);
+        auto [it, inserted] = m_automaticSaves.try_emplace(key);
+        if (inserted)
+        {
+            it->second.expectedDisk = ReadModelRecoveryText(key);
+        }
+        it->second.write = std::move(write);
+        it->second.changedAt = std::chrono::steady_clock::now();
+    }
+
+    void TickAutomaticSaves(bool flush = false)
+    {
+        std::map<file::path, AutomaticSave> ready;
+        {
+            std::lock_guard lock(m_automaticSaveMutex);
+            const auto now = std::chrono::steady_clock::now();
+            for (auto it = m_automaticSaves.begin(); it != m_automaticSaves.end();)
+            {
+                if (flush || now - it->second.changedAt >= std::chrono::milliseconds(400))
+                {
+                    if (flush)
+                    {
+                        const auto age = std::chrono::duration_cast<std::chrono::milliseconds>(now - it->second.changedAt);
+                        std::printf("[AUTOSAVE_FLUSH] ageMs=%lld path=%s\n",
+                            static_cast<long long>(age.count()), it->first.string().c_str());
+                    }
+                    ready.emplace(it->first, std::move(it->second));
+                    it = m_automaticSaves.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+        for (auto& [path, save] : ready)
+        {
+            std::string error;
+            if (ReadModelRecoveryText(path) != save.expectedDisk)
+            {
+                error = "The source changed on disk; pending edits were not written.";
+                std::printf("[AUTOSAVE_CONFLICT] pending edit rejected path=%s\n", path.string().c_str());
+            }
+            else
+            {
+                try
+                {
+                    if (save.write(error))
+                    {
+                        continue;
+                    }
+                }
+                catch (const std::exception& failure)
+                {
+                    error = failure.what();
+                }
+            }
+            {
+                std::lock_guard lock(m_automaticSaveMutex);
+                m_automaticSaveErrors[path] = error;
+            }
+            Debug::PrintLog(spdlog::level::err, "Automatic asset save failed: " + path.string() + ": " + error);
+        }
+    }
+
+    std::string AutomaticSaveError(const file::path& sidecar)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        const auto found = m_automaticSaveErrors.find(sidecar.lexically_normal());
+        return found == m_automaticSaveErrors.end() ? std::string{} : found->second;
+    }
+
+    void ClearAutomaticSaveError(const file::path& sidecar)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        m_automaticSaveErrors.erase(sidecar.lexically_normal());
+    }
+
+    std::optional<std::chrono::milliseconds> PendingAutomaticSaveAge(const file::path& sidecar)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        const auto found = m_automaticSaves.find(sidecar.lexically_normal());
+        if (found == m_automaticSaves.end())
+        {
+            return std::nullopt;
+        }
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - found->second.changedAt);
+    }
+
+    void TickAutomaticChanges()
+    {
+        TickAutomaticSaves();
+        std::erase_if(m_modelReloads, [](const auto& job) { return job.is_complete(); });
+        std::vector<file::path> changed;
+        {
+            std::lock_guard lock(m_modifiedMutex);
+            const auto now = std::chrono::steady_clock::now();
+            for (auto it = m_modifiedPaths.begin(); it != m_modifiedPaths.end();)
+            {
+                if (now - it->second >= std::chrono::milliseconds(350))
+                {
+                    changed.push_back(it->first);
+                    it = m_modifiedPaths.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+        for (const auto& path : changed)
+        {
+            ProcessModified(path);
+        }
+        bool pendingShaderEdit = false;
+        {
+            std::lock_guard lock(m_modifiedMutex);
+            for (const auto& [path, stamp] : m_modifiedPaths)
+            {
+                const auto extension = path.extension();
+                if (extension == ".hlsl" || extension == ".hlsli" || extension == ".slang"
+                    || extension == ".shadermeta" || extension == ".shadergraph")
+                {
+                    pendingShaderEdit = true;
+                    break;
+                }
+            }
+        }
+        if (!pendingShaderEdit)
+        {
+            TickShaderReloads();
+        }
+        // Resident-only lookup; unused models remain lazy and no source I/O belongs here.
+        auto models = DataSystems->SnapshotCurrentModelAssetGenerations();
+        const auto modelRefreshEpoch = m_modelRefreshEpoch.load(std::memory_order_acquire);
+        if (modelRefreshEpoch != m_observedModelRefreshEpoch)
+        {
+            m_observedModelRefreshEpoch = modelRefreshEpoch;
+            m_automaticModelLoads.clear();
+        }
+        for (const auto& [id, work] : m_automaticModelLoads)
+        {
+            if (work->job.is_complete() && work->generation
+                && std::ranges::none_of(models, [&](const auto& model) { return model->Identity().modelId == id; }))
+            {
+                models.push_back(work->generation);
+            }
+        }
+        std::map<Uuid::Uuid16, std::uint64_t> modelGenerations;
+        for (const auto& model : models)
+        {
+            modelGenerations.emplace(model->Identity().modelId, model->Identity().generation);
+        }
+        const auto liveNow = std::chrono::steady_clock::now();
+        const bool refreshScenes = liveNow >= m_nextLiveRefresh;
+        if (refreshScenes)
+        {
+            m_nextLiveRefresh = liveNow + std::chrono::milliseconds(500);
+        }
+        const auto requestModel = [&](Uuid::Uuid16 id)
+        {
+            if (modelGenerations.contains(id) || m_automaticModelLoads.contains(id))
+            {
+                return;
+            }
+            auto work = std::make_shared<AutomaticModelLoad>();
+            work->job = ce::get_job_scheduler().submit([id, work]
+            {
+                try
+                {
+                    // Invalidation retires the cache entry, not the live scene owner.
+                    // Admit its replacement from the immutable model products off-thread.
+                    work->generation = DataSystems->LoadModelAssetGeneration(FileGuid(id));
+                }
+                catch (const std::exception& failure)
+                {
+                    Debug::PrintLog(spdlog::level::err, "Automatic model preparation retained prior references: " + std::string(failure.what()));
+                }
+            });
+            m_modelReloads.push_back(work->job);
+            m_automaticModelLoads.emplace(id, std::move(work));
+        };
+        if (refreshScenes || modelGenerations != m_liveModelGenerations)
+        {
+            for (auto* scene : SceneManagers->GetScenes())
+            {
+                if (!scene)
+                {
+                    continue;
+                }
+                for (const auto& entity : scene->m_Entities)
+                {
+                    if (!entity || entity->IsDestroyMark())
+                    {
+                        continue;
+                    }
+                    for (auto* animator : entity->GetComponents<Animator>())
+                    {
+                        if (animator->m_modelGeneration)
+                        {
+                            requestModel(animator->m_modelGeneration->Identity().modelId);
+                        }
+                        for (const auto& model : models)
+                        {
+                            if (animator->m_modelGeneration && model->Skeleton()
+                                && animator->m_Motion.m_guid == model->Identity().modelId
+                                && &*animator->m_modelGeneration != &*model)
+                            {
+                                const auto elapsed = animator->GetInstance().timeElapsed;
+                            animator->BindModelGeneration(model);
+                            animator->GetInstance().timeElapsed = elapsed;
+                            }
+                        }
+                    }
+                    for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                    {
+                        const auto handle = mesh->GetModelMeshHandle();
+                        if (handle.IsValid() && handle.domain == assets::ModelMeshDomain::LegacyAggregate)
+                        {
+                            requestModel(handle.modelId);
+                        }
+                        for (const auto& model : models)
+                        {
+                            mesh->RefreshModelGeneration(model);
+                        }
+                    }
+                }
+            }
+            m_liveModelGenerations = std::move(modelGenerations);
+        }
+        // All scene mutation is owner-thread only, after asset publication and before frame sealing.
+        const auto catalog = DataSystems->GetCookedCatalog();
+        const auto revision = catalog ? catalog->ResolverRevision() : 0u;
+        if (revision != m_liveTextureRevision)
+        {
+            m_liveTextureRevision = revision;
+            m_liveTexturePending = true;
+            m_liveTextureRefresh.clear();
+        }
+        if (!m_liveTexturePending && !refreshScenes)
+        {
+            return;
+        }
+        std::map<std::uint64_t, own::shared_owner<const Texture>> owners;
+        std::map<Scene*, std::unordered_set<std::uint64_t>> sceneOwners;
+        Scene* collectingScene{};
+        const auto collect = [&](const own::shared_owner<const Texture>& texture)
+        {
+            if (texture)
+            {
+                owners.try_emplace(texture->m_assetId, texture);
+                sceneOwners[collectingScene].insert(texture->m_assetId);
+            }
+        };
+        for (auto* scene : SceneManagers->GetScenes())
+        {
+            collectingScene = scene;
+            if (!scene)
+            {
+                continue;
+            }
+            for (const auto& entity : scene->m_Entities)
+            {
+                if (!entity || entity->IsDestroyMark())
+                {
+                    continue;
+                }
+                for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                {
+                    if (mesh->m_Material)
+                    {
+                        for (const auto& texture : mesh->m_Material->GetTextureOwners())
+                        {
+                            collect(texture.textureOwner);
+                        }
+                    }
+                }
+                for (auto* image : entity->GetComponents<ImageComponent>())
+                {
+                    for (const auto& texture : image->GetTextures())
+                    {
+                        collect(texture);
+                    }
+                }
+                for (auto* sprite : entity->GetComponents<SpriteRenderer>())
+                {
+                    collect(sprite->GetSprite());
+                }
+                for (auto* sheet : entity->GetComponents<SpriteSheetComponent>())
+                {
+                    collect(sheet->m_spriteSheetTexture);
+                }
+                for (auto* decal : entity->GetComponents<DecalComponent>())
+                {
+                    collect(decal->GetDecalTextureShared());
+                    collect(decal->GetNormalTextureShared());
+                    collect(decal->GetORMTextureShared());
+                }
+            }
+        }
+        bool pending = false;
+        for (const auto& [id, previous] : owners)
+        {
+            const auto origin = previous->GetAssetOrigin();
+            FileGuid guid = origin ? FileGuid(origin->resolved.entry.asset.key.assetId.value)
+                : DataSystems->GetFileGuid(previous->m_assetPath);
+            const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+            experiment::cooked::ResolvedAssetEntry resolved;
+            if (!catalog || !link.IsValid() || catalog->Find(link.ToReference(), resolved)
+                != experiment::cooked::AssetLookupStatus::Found)
+            {
+                continue;
+            }
+            if (origin && origin->resolved.blob.contentSha256 == resolved.blob.contentSha256)
+            {
+                continue;
+            }
+            auto& work = m_liveTextureRefresh[id];
+            if (!work.previous)
+            {
+                work.previous = previous;
+                work.resolverRevision = revision;
+                work.descriptor = DataSystems->RequestAsync<Texture>(link,
+                    origin ? origin->variant : AssetDepot::TextureAssetVariant{});
+            }
+            const auto descriptor = work.descriptor.Snapshot();
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Pending)
+            {
+                pending = true;
+                continue;
+            }
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Stale
+                || descriptor.status == AssetDepot::AssetRequestStatus::Cancelled)
+            {
+                work.descriptor = DataSystems->RequestAsync<Texture>(link,
+                    origin ? origin->variant : AssetDepot::TextureAssetVariant{});
+                pending = true;
+                continue;
+            }
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Failed)
+            {
+                Debug::PrintLog(spdlog::level::err, "Automatic texture reload retained prior references: " + descriptor.message);
+                continue;
+            }
+            const auto replacement = DataSystems->TryAcquire<Texture>(link,
+                origin ? origin->variant : AssetDepot::TextureAssetVariant{});
+            if (!replacement)
+            {
+                continue;
+            }
+            if (!work.imageRequested)
+            {
+                work.image = DataSystems->RequestAsync<Texture::CodecImage>(replacement);
+                work.imageRequested = true;
+            }
+            const auto image = DataSystems->TryAcquire<Texture::CodecImage>(replacement);
+            if (!image)
+            {
+                const auto status = work.image.Snapshot().status;
+                if (status == AssetDepot::AssetRequestStatus::Stale || status == AssetDepot::AssetRequestStatus::Cancelled)
+                {
+                    work.image = DataSystems->RequestAsync<Texture::CodecImage>(replacement);
+                    pending = true;
+                }
+                else
+                {
+                    pending = status == AssetDepot::AssetRequestStatus::Pending || pending;
+                }
+                continue;
+            }
+            for (auto* scene : SceneManagers->GetScenes())
+            {
+                if (!scene)
+                {
+                    continue;
+                }
+                if (!sceneOwners[scene].contains(id))
+                {
+                    continue;
+                }
+                // Copy the scene's pin table; already sealed packets retain the prior table.
+                auto pins = own::make_shared<TextureFramePins>();
+                if (const auto oldPins = scene->PreparedTextureImagePins())
+                {
+                    for (const auto& owner : oldPins->Owners())
+                    {
+                        if (&*owner != &*previous)
+                        {
+                            pins->Retain(owner);
+                            pins->RetainImage(owner, oldPins->Image(&*owner));
+                        }
+                    }
+                }
+                pins->RetainImage(replacement, image);
+                scene->SetPreparedTextureImagePins(std::move(pins));
+                for (const auto& entity : scene->m_Entities)
+                {
+                    if (!entity || entity->IsDestroyMark())
+                    {
+                        continue;
+                    }
+                    for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                    {
+                        if (mesh->m_Material)
+                        {
+                            auto material = own::make_shared<Material>(*mesh->m_Material);
+                            std::string error;
+                            if (material->ReplaceTextureOwner(&*previous, replacement, error))
+                            {
+                                mesh->SetMaterial(std::move(material));
+                            }
+                        }
+                    }
+                    for (auto* component : entity->GetComponents<ImageComponent>())
+                    {
+                        component->ReplaceTextureOwner(&*previous, replacement);
+                    }
+                    for (auto* component : entity->GetComponents<SpriteRenderer>())
+                    {
+                        if (component->GetSprite() && &*component->GetSprite() == &*previous)
+                        {
+                            component->SetSprite(replacement);
+                        }
+                    }
+                    for (auto* component : entity->GetComponents<SpriteSheetComponent>())
+                    {
+                        component->ReplaceTextureOwner(&*previous, replacement);
+                    }
+                    for (auto* component : entity->GetComponents<DecalComponent>())
+                    {
+                        component->ReplaceTextureOwner(&*previous, replacement);
+                    }
+                }
+            }
+        }
+        m_liveTexturePending = pending;
+        if (!pending)
+        {
+            m_liveTextureRefresh.clear();
+        }
     }
 
 	bool IsSupportExtension(std::string_view extension) const
@@ -753,7 +1668,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             const AssetDepot::AssetLink<Texture> link{ work.publication->manifest.entries.front().asset.key };
             if (DataSystems->TryAcquire<Texture>(link))
             {
-                return "Cooked generation ready. The current scene keeps its prior textures until Reload Saved Scene.";
+                return "Cooked generation ready. Existing scene references update automatically when image preparation completes.";
             }
             // Other asset publications can advance the shared resolver while
             // this preload runs. Reacquire through the existing nonblocking API.
@@ -871,7 +1786,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         {
             const auto& product = *result.product;
             generation = m_root.parent_path() / "Library" / "TextureAssetGenerations"
-                / FileGuid(product.textureAssetId.value).ToString() / FileGuid::CreateRandomV4().ToString();
+                / FileGuid::CreateRandomV4().ToString();
+            // artifactPath already contains the texture GUID. A unique generation
+            // root preserves immutable ownership without repeating that GUID in
+            // the host path (which can otherwise exceed Windows path limits).
             generationCleanup.target = generation;
             // This directory is unique and never overwritten after publication.
             // Failed/stale generations are removed before any locator escapes.
@@ -994,7 +1912,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		{
 			return false;
 		}
-		return CreateMetaLocked(source, {}, existing, enabled) == existing;
+		if (CreateMetaLocked(source, {}, existing, enabled) != existing)
+        {
+            return false;
+        }
+        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+            RuntimeAssetType::Model, existing, source });
+        m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+        return true;
 	}
 
 	bool SetModelLodsAndReimport(const file::path& requestedSource, std::uint32_t levels)
@@ -1014,7 +1939,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		{
 			return false;
 		}
-		return CreateMetaLocked(source, {}, existing, {}, levels) == existing;
+		if (CreateMetaLocked(source, {}, existing, {}, levels) != existing)
+        {
+            return false;
+        }
+        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+            RuntimeAssetType::Model, existing, source });
+        m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+        return true;
 	}
 
 	bool RecoverModel(const file::path& requestedSource, FileGuid expectedId)
@@ -1977,6 +2909,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 			default:
 				break;
 			}
+            const auto extension = ToLower(filepath.extension().string());
+            if (extension == ".hlsl" || extension == ".hlsli" || extension == ".slang" || extension == ".shadermeta")
+            {
+                HandleModified(filepath);
+            }
             if (IsAudioAssetPath(filepath) || IsAudioAssetPath(directoryPath / oldFilename))
             {
                 m_audioRevision.fetch_add(1u, std::memory_order_release);
@@ -2409,6 +3346,8 @@ private:
             }
 			const FileGuid guid(result.modelAssetId);
 			m_modelSourceImports[targetFile.lexically_normal()] = ReadModelSourceStamp(targetFile);
+            RememberMaterialAuthoringWrite(targetFile.string() + ".meta");
+            m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
 				RuntimeAssetType::Model, guid, targetFile });
 			return guid;
@@ -2636,6 +3575,10 @@ private:
 
 	void HandleCreated(const file::path& filepath)
 	{
+        if (ToLower(filepath.extension().string()) == ".cs")
+        {
+            HandleModified(filepath);
+        }
         if (IsCookedArtifactPath(filepath))
         {
             return;
@@ -2665,6 +3608,14 @@ private:
 	{
 		const file::path oldPath = directory / std::u8string(oldName.begin(), oldName.end());
 		const file::path newPath = directory / std::u8string(newName.begin(), newName.end());
+        if (ToLower(oldPath.extension().string()) == ".cs")
+        {
+            HandleModified(oldPath);
+        }
+        if (ToLower(newPath.extension().string()) == ".cs")
+        {
+            HandleModified(newPath);
+        }
         if (IsCookedArtifactPath(oldPath) || IsCookedArtifactPath(newPath))
         {
             return;
@@ -2751,6 +3702,10 @@ private:
 
 	void HandleDeleted(const file::path& deletedPath)
 	{
+        if (ToLower(deletedPath.extension().string()) == ".cs")
+        {
+            HandleModified(deletedPath);
+        }
         if (IsCookedArtifactPath(deletedPath))
         {
             return;
@@ -2816,8 +3771,19 @@ private:
 		}
 	}
 
-	void HandleModified(const file::path& filepath)
+    void HandleModified(const file::path& filepath)
+    {
+        std::lock_guard lock(m_modifiedMutex);
+        m_modifiedPaths[filepath.lexically_normal()] = std::chrono::steady_clock::now();
+    }
+
+	void ProcessModified(const file::path& filepath)
 	{
+        if (ToLower(filepath.extension().string()) == ".cs")
+        {
+            EditorScriptAuthoring::NotifySourceChanged(filepath);
+            return;
+        }
         if (IsCookedArtifactPath(filepath))
         {
             return;
@@ -2825,12 +3791,44 @@ private:
         const auto textureSource = filepath.extension() == ".meta" ? RemoveMetaExtension(filepath) : filepath;
         if (EditorAssetDatabase::IsTextureSource(textureSource))
         {
-            ReloadChangedTexture(textureSource, true);
+            ReloadChangedTexture(textureSource);
+            return;
+        }
+        const auto shaderExtension = ToLower(filepath.extension().string());
+        if (shaderExtension == ".hlsl" || shaderExtension == ".hlsli" || shaderExtension == ".slang"
+            || shaderExtension == ".shadermeta")
+        {
+            ++m_shaderRevision;
+            m_shaderDirty = true;
+            return;
+        }
+        if (filepath.extension() == ".meta")
+        {
+            const auto source = RemoveMetaExtension(filepath);
+            if (MatchesMaterialAuthoringWrite(filepath))
+            {
+                return;
+            }
+            if (assets::IsModelAuthoringSource(source))
+            {
+                ScheduleModelReload(source, true);
+            }
+            else if (assets::IsAudioClipSource(source))
+            {
+                (void)CreateMeta(source);
+            }
+            else
+            {
+                RegisterMetaFile(filepath);
+                const auto guid = DataSystems->GetFileGuid(source);
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                    RuntimeAssetType::Auto, guid, source });
+            }
             return;
         }
 		if (assets::IsModelAuthoringSource(filepath))
 		{
-			ReloadChangedModel(filepath);
+			ScheduleModelReload(filepath, false);
 			return;
 		}
         if (assets::IsAudioClipSource(filepath))
@@ -2840,9 +3838,8 @@ private:
             (void)CreateMeta(filepath);
             return;
         }
-		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
-		// dependency와 다른 asset cache의 reload 정책은 같은 이벤트라는 이유로
-		// 추측해 넓히지 않는다.
+        // Resource documents use their established typed reload contracts.
+        // Material shader sources/includes are compiled asynchronously above.
         const auto extension = ToLower(filepath.extension().string());
         if (extension != ".shadermeta" && extension != ".shadergraph" && extension != ".asset")
         {
@@ -2863,6 +3860,23 @@ private:
 	}
 
     std::atomic<std::uint64_t> m_audioRevision{ 1u };
+    std::chrono::steady_clock::time_point m_nextLiveRefresh{};
+    std::atomic<std::uint64_t> m_modelRefreshEpoch{ 1u };
+    std::uint64_t m_observedModelRefreshEpoch{};
+    std::map<Uuid::Uuid16, std::shared_ptr<AutomaticModelLoad>> m_automaticModelLoads;
+    std::vector<job_handle> m_modelReloads;
+    std::mutex m_automaticSaveMutex;
+    std::map<file::path, AutomaticSave> m_automaticSaves;
+    std::map<file::path, std::string> m_automaticSaveErrors;
+    std::mutex m_modifiedMutex;
+    std::uint64_t m_shaderRevision{};
+    bool m_shaderDirty{};
+    std::vector<own::shared_owner<ShaderReload>> m_shaderReloads;
+    std::map<file::path, std::chrono::steady_clock::time_point> m_modifiedPaths;
+    std::map<Uuid::Uuid16, std::uint64_t> m_liveModelGenerations;
+    std::uint64_t m_liveTextureRevision{};
+    bool m_liveTexturePending{};
+    std::map<std::uint64_t, TextureRefresh> m_liveTextureRefresh;
 	file::path m_root;
 	std::mutex m_authoringMutex;
     bool m_stopping{};
@@ -2897,6 +3911,55 @@ EditorAssetDatabase& EditorAssetDatabase::Get() noexcept
 {
 	static EditorAssetDatabase instance;
 	return instance;
+}
+
+void EditorAssetDatabase::FlushAutomaticSaves()
+{
+    if (m_impl)
+    {
+        m_impl->TickAutomaticSaves(true);
+    }
+}
+
+std::optional<std::chrono::milliseconds> EditorAssetDatabase::PendingAutomaticSaveAge(const file::path& sidecar) const
+{
+    if (!m_impl)
+    {
+        return std::nullopt;
+    }
+    return m_impl->PendingAutomaticSaveAge(sidecar);
+}
+
+std::string EditorAssetDatabase::AutomaticSaveError(const file::path& sidecar) const
+{
+    return m_impl ? m_impl->AutomaticSaveError(sidecar) : std::string{};
+}
+
+void EditorAssetDatabase::ClearAutomaticSaveError(const file::path& sidecar)
+{
+    if (m_impl)
+    {
+        m_impl->ClearAutomaticSaveError(sidecar);
+    }
+}
+
+void EditorAssetDatabase::TickAutomaticChanges()
+{
+    if (m_impl)
+    {
+        m_impl->TickAutomaticChanges();
+    }
+}
+
+bool EditorAssetDatabase::SaveImportMetadata(const file::path& source, std::string_view payload,
+    std::string& error)
+{
+    if (!m_impl)
+    {
+        error = "Editor asset database is unavailable";
+        return false;
+    }
+    return m_impl->SaveImportMetadata(source, payload, error);
 }
 
 bool EditorAssetDatabase::IsTextureSource(const file::path& source)
@@ -3312,6 +4375,41 @@ bool EditorAssetDatabase::CreateSceneRenderProfile(const file::path& directory, 
 	}
 	createdPath = candidate;
 	return true;
+}
+
+void EditorAssetDatabase::QueueAutomaticImportMetadata(const file::path& source, std::string payload)
+{
+    if (m_impl)
+    {
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, payload = std::move(payload)](std::string& error)
+        {
+            return impl->SaveImportMetadata(source, payload, error);
+        });
+    }
+}
+
+void EditorAssetDatabase::QueueAutomaticTextureSettings(const file::path& source,
+    const experiment::cooked::TextureImportSettings& settings)
+{
+    if (m_impl)
+    {
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, settings](std::string& error)
+        {
+            return impl->SetTextureImportSettingsAndReimport(source, settings, error);
+        });
+    }
+}
+
+void EditorAssetDatabase::QueueAutomaticRenderProfile(FileGuid guid, const SceneRenderProfile& profile)
+{
+    const auto path = DataSystems->GetFilePath(guid);
+    if (m_impl && !path.empty())
+    {
+        m_impl->QueueAutomaticSave(path, [impl = m_impl.get(), path, payload = Meta::SerializeDocument(const_cast<SceneRenderProfile*>(&profile)).Dump()](std::string& error)
+        {
+            return impl->SaveAutomaticRenderProfilePayload(path, payload, error);
+        });
+    }
 }
 
 bool EditorAssetDatabase::SaveExistingSceneRenderProfile(

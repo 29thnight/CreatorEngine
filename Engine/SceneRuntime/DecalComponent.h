@@ -41,6 +41,7 @@ public:
     // Owner-thread polling also runs for paused/editor scenes before proxy publication.
     [[reflgen::ignore]]
     void PollTextureRequests();
+    void ReplaceTextureOwner(const Texture* previous, const own::shared_owner<const Texture>& replacement);
 
     const Texture* GetDecalTexture() { return m_decalTexture; }
     const Texture* GetNormalTexture() { return m_normalTexture; }

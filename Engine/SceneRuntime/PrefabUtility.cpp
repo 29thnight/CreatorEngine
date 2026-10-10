@@ -614,8 +614,22 @@ void PrefabUtility::UnregisterInstance(Entity* instance)
     }
 }
 
-size_t PrefabUtility::UpdateInstances(const Prefab* prefab)
+size_t PrefabUtility::UpdateInstances(const Prefab* prefab, const Scene* excludedScene)
 {
+    if (!prefab)
+    {
+        return 0;
+    }
+    auto definition = prefab->GetPrefabData();
+    // Cached disk definitions wrap the root in PrefabNode; fresh candidates are maps.
+    if (definition.IsSequence() && definition.Size() == 1u)
+    {
+        definition = definition.At(0);
+    }
+    if (!definition.IsMap())
+    {
+        throw std::runtime_error("Prefab Apply requires one entity root");
+    }
     auto it = m_instanceMap.find(prefab->GetFileGuid());
     if (it == m_instanceMap.end())
         return 0;
@@ -629,10 +643,12 @@ size_t PrefabUtility::UpdateInstances(const Prefab* prefab)
     for (const InstanceRef& ref : it->second)
     {
         Entity* obj = Resolve(ref);
-        if (!obj)
+        if (!obj || obj->GetScene() == excludedScene)
+        {
             continue;
+        }
 
-        auto newData = prefab->GetPrefabData();
+        auto newData = definition;
 
         // 명시 오버라이드가 비어 있으면(과도기) 적용 직전에 한 번만 시딩한다.
         if (obj->m_prefabOverrides.empty())

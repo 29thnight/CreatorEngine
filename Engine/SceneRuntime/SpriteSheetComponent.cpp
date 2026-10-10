@@ -8,6 +8,17 @@
 #include "UIManager.h"
 #include "UITickSystem.h"
 
+void SpriteSheetComponent::ReplaceTextureOwner(const Texture* previous,
+    const own::shared_owner<const Texture>& replacement)
+{
+    if (m_spriteSheetTexture && &*m_spriteSheetTexture == previous)
+    {
+        m_spriteSheetTexture = replacement;
+        uiinfo.size = replacement->GetImageSize();
+        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    }
+}
+
 void SpriteSheetComponent::LoadSpriteSheet(const file::path& path)
 {
 	m_spriteSheetPath = path.filename().string();
