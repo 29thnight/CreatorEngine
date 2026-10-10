@@ -1,4 +1,13 @@
 guid: a80817f3-54c3-47e2-9033-8ef9a204ea93
 importSettings:
   extension: .png
-  timestamp: 134300939747401300
+  timestamp: 134308765289078554
+  importerVersion: 2
+  colorSpace: Source
+  compression: None
+  mipPolicy: PreserveAuthored
+  maxDimension: 0
+  normalMap: false
+  preserveAlphaCoverage: false
+  alphaCutoff: 0.5
+  compressionQuality: Normal
