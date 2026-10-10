@@ -340,4 +340,13 @@
     <ClInclude Include="LayerTypes.h" />
     <ClInclude Include="LayerCatalog.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="InputAccessorGenerator.cpp" />
+    <ClCompile Include="InputBindingOverrideArchive.cpp" />
+    <ClCompile Include="InputGraph.cpp" />
+    <ClInclude Include="InputAccessorGenerator.h" />
+    <ClInclude Include="InputBindingOverrideArchive.h" />
+    <ClInclude Include="InputGraph.h" />
+    <ClInclude Include="InputGraphTypes.h" />
+  </ItemGroup>
 </Project>

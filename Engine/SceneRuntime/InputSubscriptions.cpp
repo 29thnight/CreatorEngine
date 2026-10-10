@@ -151,7 +151,8 @@ namespace Input
         {
             return {};
         }
-        if (state.session.id != 0 && (state.session.id != session.id || session.generation <= state.retiredGeneration))
+        if (state.session.id != 0 && (state.session.id != session.id ||
+            session.generation < state.session.generation || session.generation <= state.retiredGeneration))
         {
             return {};
         }
@@ -205,6 +206,7 @@ namespace Input
                     entry->active.store(false, std::memory_order_release);
                 }
             }
+            state->retiredGeneration = (std::max)(state->retiredGeneration, state->session.generation);
             state->session = frame.GetSession();
             state->lastSequence = {};
         }

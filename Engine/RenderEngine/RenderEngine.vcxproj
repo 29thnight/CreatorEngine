@@ -896,6 +896,28 @@
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AssetDepot\InputGraphAssetRuntime.h" />
+    <ClInclude Include="Experiment\Cooked\CookedInputGraph.h" />
+    <ClInclude Include="..\..\Lattice\Input\LXInputGraph.h" />
+    <ClInclude Include="..\..\Lattice\Input\LXInputCompiler.h" />
+    <ClCompile Include="AssetDepot\InputGraphAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedInputGraph.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Input\LXInputGraph.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Input\LXInputCompiler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

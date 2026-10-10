@@ -1265,4 +1265,14 @@
       <Filter>Resources</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Lattice\Input\LXInputCompiler.cpp" />
+    <ClCompile Include="..\..\Lattice\Input\LXInputGraph.cpp" />
+    <ClCompile Include="AssetDepot\InputGraphAssetRuntime.cpp" />
+    <ClCompile Include="Experiment\Cooked\CookedInputGraph.cpp" />
+    <ClInclude Include="..\..\Lattice\Input\LXInputCompiler.h" />
+    <ClInclude Include="..\..\Lattice\Input\LXInputGraph.h" />
+    <ClInclude Include="AssetDepot\InputGraphAssetRuntime.h" />
+    <ClInclude Include="Experiment\Cooked\CookedInputGraph.h" />
+  </ItemGroup>
 </Project>

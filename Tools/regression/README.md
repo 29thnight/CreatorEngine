@@ -216,10 +216,10 @@ pwsh Tools/regression/verify-player-runtime-text-parser.ps1
 ```
 
 `Tools/build.ps1`은 EngineSettings를 YAML 상태에서 먼저 preflight한 뒤 ProjectSetting
-3개·InputMap 6개·BT/BlackBoard 2개·Volume 7개, 총 18개를 CEDO1으로 바꿔 pak에 넣는다.
+3개·BT/BlackBoard 2개·Volume 7개를 CEDO1으로 바꿔 pak에 넣는다. InputGraph는 별도 typed AssetSet/CEIG 경로다.
 scene 8·prefab 9·material 2·ShaderMeta 6의 GUID-addressed artifact 25개도 같은 포맷이다.
 Player 스모크는 실제 text parser 진입 카운터가 정확히 0인지 강제하고, 위 독립 관문은
-runtime 모듈 direct ryml include/symbol 0, CEDO magic 43/43, legacy JSON 0을 다시 확인한다.
+runtime 모듈 direct ryml include/symbol 0, 선택된 문서의 CEDO magic, legacy JSON 0을 다시 확인한다. InputGraph 전환 전의 고정 43개 수치는 현재 수용 근거가 아니다.
 구 Animator/NodeEditor JSON 31개는 reader를 되살리지 않고 pak 필터에서 제외한다.
 
 ## yaml-cpp 은퇴 + Base64 계약 (SerializationPlan D3-b-4)
@@ -239,10 +239,15 @@ runtime 모듈 direct ryml include/symbol 0, CEDO magic 43/43, legacy JSON 0을 
 구버전 JSON 호환은 제품 계약이 아니다. 현재 자산을 canonical YAML로 직접 이주했고
 제품 loader에는 migration reader나 dual-read를 두지 않는다. 정본 관문은 두 개다.
 
-- `verify-inputmap-yaml-corpus.ps1` — `.inputmap` 6개를 strict schemaVersion 1 YAML로
-  전수 로드해 26 actions/104 keys와 키보드·게임패드 분류를 확인한다.
+- `verify-inputgraph-corpus.ps1` — 실제 `.inputgraph`와 필수 `.meta`의 GUID를 대조하고
+  `input.graph.inspect`/`roundtrip` 및 native codec self-test를 실행한다. Gameplay는
+  3 signals/3 bindings/1 layer이며 읽기 검증 전후 source/meta 해시가 같아야 한다.
+  역사적인 6개 `.inputmap`은 `Tools/input-migration/fixtures/legacy`에 보존한 offline
+  자료이며 제품 코퍼스가 아니다. 미확정 타입/콜백과 변환 조건은
+  [offline migration 안내](../input-migration/README.md)를 따른다.
+  새 harness와 codec/converter 테스트는 소스로 작성했으며 이 구현 작업에서 실행하지 않았다.
 - `verify-nlohmann-retirement.ps1` — Engine/Editor/Player source, vcpkg manifest와
-  설치 상태, `ISerializable`, Animator legacy JSON entry point, InputMap `.json`,
+  설치 상태, `ISerializable`, Animator legacy JSON entry point, legacy InputMap/JSON production 경로,
   Terrain JSON/compat 경로가 모두 0인지 확인한다. Terrain 동적 왕복은
   `verify-asset-authoring-ownership.ps1`이 함께 담당한다.
 

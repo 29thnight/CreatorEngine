@@ -331,7 +331,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp" />
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperInputSession.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp" />
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp" />
@@ -484,6 +484,13 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RuntimeHost\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineGUIWindow\InputGraphWindow.h" />
+    <ClCompile Include="EngineGUIWindow\InputGraphWindow.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
@@ -517,5 +524,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineEntry\LegacyProjectLayerImport.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RenderTests\InputGraph\InputGraphAssetCodecSelfTest.h" />
+    <ClCompile Include="RenderTests\InputGraph\InputGraphAssetCodecSelfTest.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
   </ItemGroup>
 </Project>
