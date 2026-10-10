@@ -12,6 +12,9 @@
 #include "Experiment/Cooked/ModelAssetSetProducer.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/CookedShaderMeta.h"
+#include "Experiment/Cooked/CookedInputGraph.h"
+#include "../../Lattice/Input/LXInputGraph.h"
+#include "../../Lattice/Input/LXInputCompiler.h"
 #include "Experiment/Cooked/MaterialAssetSetProducer.h"
 #include "Assets/AssetIdentityProfile.h"
 
@@ -51,6 +54,7 @@ namespace AssetCooking
         constexpr std::string_view kMaterialProgramImporterVersion = "lattice-source-verified-program-v1";
         constexpr std::string_view kAuthoredMaterialImporterVersion = "authored-material-source-document-v1";
         constexpr std::string_view kCodeProgramImporterVersion = "code-source-verified-program-v1";
+        constexpr std::string_view kInputGraphImporterVersion = "lattice-inputgraph-ceig-v1";
         constexpr std::string_view kBuildVersion = "asset-set-build-v5";
 
         struct AssetSource final
@@ -158,6 +162,10 @@ namespace AssetCooking
                     name == "Material" ? ck::CookedAssetKind::Material : ck::CookedAssetKind::MaterialProgram;
                 return { { id, {} }, kind };
             }
+            if (name == "InputGraph")
+            {
+                return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::InputGraph };
+            }
             if (name == "ShaderMeta")
             {
                 return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::ShaderMeta };
@@ -181,7 +189,7 @@ namespace AssetCooking
             else
             {
                 Fail("Unsupported AssetSet source kind: " + name +
-                    "; supported: Texture, ShaderMeta, Material, MaterialProgram, Model, Mesh, Skeleton, AnimationClip");
+                    "; supported: InputGraph, Texture, ShaderMeta, Material, MaterialProgram, Model, Mesh, Skeleton, AnimationClip");
             }
             const auto text = Text(node, "assetId");
             Uuid::Uuid16 parsed{};
@@ -713,6 +721,14 @@ namespace AssetCooking
             case ck::CookedAssetKind::Texture:
                 ValidateTexture(bytes, extension, representation, schema);
                 return;
+            case ck::CookedAssetKind::InputGraph:
+            {
+                own::shared_owner<const Input::InputGraphProgram> value;
+                valid = dependencies.empty() && extension == ".ceig" &&
+                    representation == ck::kInputGraphRepresentation && schema == ck::kInputGraphArtifactVersion &&
+                    ck::ReadInputGraphArtifact(bytes, asset.key.assetId, value, failure);
+                break;
+            }
             case ck::CookedAssetKind::ShaderMeta:
             {
                 ShaderMeta value;
@@ -975,6 +991,12 @@ namespace AssetCooking
                     }
                 }
                 break;
+            case ck::CookedAssetKind::InputGraph:
+                value.importer = kInputGraphImporterVersion;
+                value.representation = ck::kInputGraphRepresentation;
+                value.schema = ck::kInputGraphArtifactVersion;
+                value.extension = ".ceig";
+                break;
             case ck::CookedAssetKind::ShaderMeta:
                 value.importer = kShaderMetaImporterVersion;
                 value.representation = ck::kShaderMetaDocumentRepresentation; value.schema = ck::kShaderMetaDocumentVersion;
@@ -1027,12 +1049,31 @@ namespace AssetCooking
             return text;
         }
 
+        std::pair<std::uint64_t, std::string> InputReceiptIdentity(
+            const std::filesystem::path& path, const CapturedFile& input)
+        {
+            if (path.extension() == ".inputgraph")
+            {
+                std::string failure;
+                const auto graph = LX::LXInputArchive::Read(
+                    { reinterpret_cast<const char*>(input.bytes.data()), input.bytes.size() }, &failure);
+                if (!graph)
+                {
+                    Fail("InputGraph receipt source is invalid: " + failure);
+                }
+                const auto semantic = graph->SemanticIdentity();
+                return { semantic.size(), Hash(semantic) };
+            }
+            return { input.bytes.size(), input.digest };
+        }
+
         void AppendInput(std::vector<std::byte>& bytes, const InputCapture& capture,
             const std::filesystem::path& path, const CapturedFile& input)
         {
+            const auto [size, digest] = InputReceiptIdentity(path, input);
             ReceiptText(bytes, InputPath(capture, path));
-            ReceiptNumber(bytes, input.bytes.size());
-            ReceiptText(bytes, input.digest);
+            ReceiptNumber(bytes, size);
+            ReceiptText(bytes, digest);
         }
 
         std::string ImportRecipeKey(const AssetSet& definition,
@@ -1175,7 +1216,8 @@ namespace AssetCooking
                             continue;
                         }
                         const auto& input = candidateCapture.Capture(inputPath);
-                        matches = matches && size == input.bytes.size() && digest == input.digest;
+                        const auto [currentSize, currentDigest] = InputReceiptIdentity(inputPath, input);
+                        matches = matches && size == currentSize && digest == currentDigest;
                     }
                     if (!std::ranges::includes(inventoried, required)) Fail("Import receipt omits mandatory source inputs");
                     if (reader.Number() != selections.size()) Fail("Import receipt selected product count mismatch");
@@ -1299,6 +1341,52 @@ namespace AssetCooking
             {
                 return edge.target == target && edge.scope == ck::AssetDependencyScope::External;
             });
+        }
+
+        PreparedArtifact PrepareInputGraph(const AssetSource& authored,
+            const std::filesystem::path& assetRoot, InputCapture& capture)
+        {
+            if (!authored.dependencies.empty() || !authored.verifiedProgram.empty())
+            {
+                Fail("InputGraph v1 requires dependencies: [] and no external verifiedProgram.");
+            }
+            const auto source = Canonical(assetRoot / std::filesystem::u8path(authored.source));
+            if (!ck::IsContainedPath(assetRoot, source) || source.extension() != ".inputgraph")
+            {
+                Fail("InputGraph source must be a .inputgraph inside the asset root.");
+            }
+            auto meta = source;
+            meta += ".meta";
+            const auto& sourceBytes = capture.Capture(source, ck::kInputGraphMaxBytes).bytes;
+            const auto& metaBytes = capture.Capture(meta, kMaxDefinitionBytes).bytes;
+            std::string failure;
+            const auto graph = LX::LXInputArchive::Read(
+                { reinterpret_cast<const char*>(sourceBytes.data()), sourceBytes.size() }, &failure);
+            experiment::AssetId identity;
+            std::vector<ck::ModelIdentityIssue> issues;
+            if (!graph || !ck::ReadAssetIdFromMeta(
+                { reinterpret_cast<const char*>(metaBytes.data()), metaBytes.size() }, identity, issues) ||
+                identity != authored.asset.key.assetId || graph->graphId != Uuid::ToString(identity.value))
+            {
+                Fail("InputGraph source, sidecar and AssetSet identity must match: " + authored.source + ": " + failure);
+            }
+            const auto compiled = LX::CompileInputGraph(*graph);
+            if (!compiled.program)
+            {
+                Fail("InputGraph source validation failed: " + authored.source);
+            }
+            PreparedArtifact value = ExpectedFormat(authored);
+            if (!ck::WriteInputGraphArtifact(*compiled.program, value.bytes, failure))
+            {
+                Fail("InputGraph artifact encoding failed: " + failure);
+            }
+            own::shared_owner<const Input::InputGraphProgram> readback;
+            if (!ck::ReadInputGraphArtifact(value.bytes, identity, readback, failure))
+            {
+                Fail("InputGraph source-free readback failed: " + failure);
+            }
+            value.inputDigest = Hash("semantic=" + graph->SemanticIdentity() + "\nmeta=" + Hash(metaBytes));
+            return value;
         }
 
         PreparedArtifact PrepareShaderMeta(const AssetSource& authored,
@@ -1526,6 +1614,12 @@ namespace AssetCooking
                     continue;
                 }
                 ++metrics.recookedImports;
+                if (authored.asset.kind == ck::CookedAssetKind::InputGraph)
+                {
+                    result.emplace(identity, PrepareInputGraph(authored, assetRoot, capture));
+                    receipts.push_back(MakeReceipt(definition, selections, capture, cache, recipeKey, result));
+                    continue;
+                }
                 if (authored.asset.kind == ck::CookedAssetKind::ShaderMeta)
                 {
                     result.emplace(identity, PrepareShaderMeta(authored, assetRoot, capture));

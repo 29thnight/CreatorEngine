@@ -1,0 +1,17 @@
+schemaVersion: 1
+assetSetId: "a289c3ae-5309-4091-a215-8b580798ce16"
+revision: 1
+inclusion: "HardAndLoadable"
+target:
+  platform: "win-x64"
+  abi: "creator-content-v1"
+settings:
+  textureEncoding: "GPUReady"
+roots:
+  - assetId: "9ad58e30-9ff7-4f2a-a8c2-435a3c126801"
+    kind: "InputGraph"
+assets:
+  - assetId: "9ad58e30-9ff7-4f2a-a8c2-435a3c126801"
+    kind: "InputGraph"
+    source: "InputGraph/Gameplay.inputgraph"
+    dependencies: []

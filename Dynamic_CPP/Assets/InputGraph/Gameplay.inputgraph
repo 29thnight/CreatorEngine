@@ -1,0 +1,83 @@
+LXINPUT 1 "9ad58e30-9ff7-4f2a-a8c2-435a3c126801"
+LXG 10 "input" 210
+N 11
+1 "Input.Layer" "Gameplay" 0 4 0 0 3 0 0 0
+"claim" "PassThrough"
+"enabled" "true"
+"name" "Gameplay"
+"priority" "0"
+2 "Input.Key" "A" 1 1 0 0 3 0 0 0
+100 "Value" "Value" 1 1 0 0 0 0
+"control" "30"
+3 "Input.Key" "D" 1 1 0 0 3 0 0 0
+101 "Value" "Value" 1 1 0 0 0 0
+"control" "32"
+4 "Input.Key" "S" 1 1 0 0 3 0 0 0
+102 "Value" "Value" 1 1 0 0 0 0
+"control" "31"
+5 "Input.Key" "W" 1 1 0 0 3 0 0 0
+103 "Value" "Value" 1 1 0 0 0 0
+"control" "17"
+6 "Input.Axis2D" "Move composite" 5 0 0 0 3 0 0 0
+104 "Left" "Left" 0 1 0 0 0 0
+105 "Right" "Right" 0 1 0 0 0 0
+106 "Down" "Down" 0 1 0 0 0 0
+107 "Up" "Up" 0 1 0 0 0 0
+108 "Value" "Value" 1 11 0 0 0 0
+10 "Input.Signal.Vector2" "Move" 2 6 0 0 3 0 0 0
+109 "Value" "Value" 0 11 1 0 0 0
+110 "Signal" "Signal" 1 11 0 0 0 0
+"combine" "MaximumMagnitude"
+"domain" "Game"
+"layer" "1"
+"lifetime" "Persistent"
+"name" "Move"
+"resumePersistentValue" "false"
+11 "Input.Key" "Space" 1 1 0 0 3 0 0 0
+111 "Value" "Value" 1 1 0 0 0 0
+"control" "57"
+20 "Input.Signal.Button" "Jump" 2 6 0 0 3 0 0 0
+112 "Value" "Value" 0 1 1 0 0 0
+113 "Signal" "Signal" 1 1 0 0 0 0
+"combine" "MaximumMagnitude"
+"domain" "Game"
+"layer" "1"
+"lifetime" "Persistent"
+"name" "Jump"
+"resumePersistentValue" "false"
+21 "Input.MouseDelta" "Mouse motion" 1 2 0 0 3 0 0 0
+114 "Value" "Value" 1 11 0 0 0 0
+"control" "0"
+"space" "RelativeCounts"
+30 "Input.Signal.Vector2" "Look" 2 6 0 0 3 0 0 0
+115 "Value" "Value" 0 11 1 0 0 0
+116 "Signal" "Signal" 1 11 0 0 0 0
+"combine" "MaximumMagnitude"
+"domain" "Game"
+"layer" "1"
+"lifetime" "Delta"
+"name" "Look"
+"resumePersistentValue" "false"
+P 11
+1 0 0 0 0
+2 0 100 0 0
+3 0 220 0 0
+4 0 340 0 0
+5 0 460 0 0
+6 260 160 0 0
+10 560 180 0 0
+11 260 600 0 0
+20 560 600 0 0
+21 260 820 0 0
+30 560 820 0 0
+F 0
+V 0 0 0 1
+L 7
+200 100 104
+201 101 105
+202 102 106
+203 103 107
+204 108 109
+205 111 112
+206 114 115
+G 0
