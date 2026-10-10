@@ -9,6 +9,10 @@ if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
         -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)[0]
 }
 $vcvars = Join-Path $VisualStudioInstallation 'VC\Auxiliary\Build\vcvars64.bat'
+$dependencies = Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
+if (!(Test-Path -LiteralPath (Join-Path $dependencies 'include/ryml/ryml.hpp'))) {
+    $dependencies = Join-Path $repo 'vcpkg_installed/x64-windows'
+}
 $output = Join-Path $repo 'Build\Obj\MaterialCodegenProbe'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $exe = Join-Path $output 'material_codegen_probe.exe'
@@ -20,15 +24,23 @@ $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join
 $compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++latest ' +
     '/permissive- /utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /MD ' +
     '/I"' + (Join-Path $repo 'ThirdParty/Slang/include') + '" /I"' + (Join-Path $repo 'Engine/RenderEngine/RHI') +
-    '" /I"' + (Join-Path $repo 'vcpkg_installed/x64-windows/include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe + '" ' +
-    $quoted + ' /link /LIBPATH:"' + (Join-Path $repo 'vcpkg_installed/x64-windows/lib') + '" ryml.lib c4core.lib d3d12.lib dxgi.lib'
+    '" /I"' + (Join-Path $dependencies 'include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe + '" ' +
+    $quoted + ' /link /LIBPATH:"' + (Join-Path $dependencies 'lib') + '" ryml.lib c4core.lib d3d12.lib dxgi.lib'
 & $env:ComSpec /d /s /c $compile
 if ($LASTEXITCODE -ne 0) { throw "Material codegen probe build failed: exit $LASTEXITCODE" }
 $arguments = @($repo)
 if ($WriteGolden) { $arguments += '--write-golden' }
-$result = @(& $exe @arguments 2>&1)
+$previousPath = $env:PATH
+try {
+    $env:PATH = (Join-Path $dependencies 'bin') + ';' + $previousPath
+    $result = @(& $exe @arguments 2>&1)
+    $probeExit = $LASTEXITCODE
+}
+finally {
+    $env:PATH = $previousPath
+}
 $result | Set-Content -LiteralPath (Join-Path $output 'codegen.log') -Encoding utf8
-if ($LASTEXITCODE -ne 0 -or @($result | Where-Object { $_ -match '^LX_MATERIAL_CODEGEN_OK ' }).Count -ne 1) {
+if ($probeExit -ne 0 -or @($result | Where-Object { $_ -match '^LX_MATERIAL_CODEGEN_OK ' }).Count -ne 1) {
     throw "Material codegen gate failed: $($result -join "`n")"
 }
 $result

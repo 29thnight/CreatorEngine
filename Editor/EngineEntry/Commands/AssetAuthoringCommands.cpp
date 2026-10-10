@@ -173,6 +173,7 @@
 namespace ConsoleCmd
 {
 #include "../../../Tools/regression/texture_reimport_scene_probe.inl"
+#include "../../../Tools/regression/texture_auto_ui_pending_probe.inl"
     class GeometryRevisionCommand final : public Meta::IUndoableCommand
     {
       public:
@@ -2001,6 +2002,7 @@ namespace ConsoleCmd
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
         reg.Result({ "assets.texture.reimportprobe" }, &Cmd_texture_reimport_scene_probe);
+        reg.Result({ "assets.texture.pendingprobe" }, &Cmd_texture_auto_ui_pending_probe);
         reg.Result({ "assets.model.meshlets" }, &Cmd_assets_model_meshlets);
         reg.Result({ "assets.model.lods" }, &Cmd_assets_model_lods);
         reg.Result({ "scene.loadjobs" }, &Cmd_scene_loadjobs);

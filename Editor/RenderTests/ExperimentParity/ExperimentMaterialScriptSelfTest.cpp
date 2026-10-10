@@ -263,7 +263,7 @@ namespace RenderTest
         material.m_name = "ScriptRealOrigin";
         const auto clone = MaterialScriptBinding::InstantiateOwned(material, {});
         check.Check(clone
-            && nullptr == DataSystems->FindCachedMaterial(clone->m_name),
+            && nullptr == DataSystems->FindCachedMaterial(std::string_view(clone->m_name)),
             "클론이 DataSystem 캐시에 등록되지 않는다");
 
         char summary[160]{};

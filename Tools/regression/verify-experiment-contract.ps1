@@ -242,7 +242,9 @@ foreach ($current in $configurations) {
     # 그 코드는 "무엇이 없는지" 를 말해 주지 않는다.
     Write-Host ("[EXPERIMENT CONTRACT] {0} 실행" -f $current)
     $previousPath = $env:PATH
-    $env:PATH = $gcce.RuntimeDirectory + ';' + $dllDir + ';' + $previousPath
+    $vendorBinDir = if ($current -eq 'Debug') { Join-Path $vcpkgRoot 'debug\bin' }
+                    else { Join-Path $vcpkgRoot 'bin' }
+    $env:PATH = $vendorBinDir + ';' + $gcce.RuntimeDirectory + ';' + $dllDir + ';' + $previousPath
     try {
         if ([string]::IsNullOrWhiteSpace($Only)) { & $executable }
         else { & $executable $Only }

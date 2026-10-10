@@ -249,7 +249,7 @@ namespace
                 {
                     error = "Enter a valid material name.";
                 }
-                else if (std::filesystem::exists(path) || DataSystems->FindCachedMaterial(name))
+                else if (std::filesystem::exists(path) || DataSystems->FindCachedMaterial(std::string_view(name)))
                 {
                     error = "That name already exists. Choose another name.";
                 }

@@ -334,9 +334,12 @@ std::vector<Case> Cases(const LXMaterialDefinitions& definitions)
         auto& graph = normalImage.asset.graph;
         Check(graph.SetProperty(normalImage.image, "image", "asset://fixture/image"), "Normal image reference");
         Check(graph.SetProperty(normalImage.image, "colorSpace", "data"), "Normal image data encoding");
+        Check(graph.SetProperty(normalImage.image, "interpolation", "Closest"), "Normal image alternate filter");
         Check(graph.SetProperty(normalImage.image, "interpolation", "Linear"), "Normal image filter");
+        Check(graph.SetProperty(normalImage.image, "extension", "EXTEND"), "Normal image alternate address");
         Check(graph.SetProperty(normalImage.image, "extension", "REPEAT"), "Normal image address");
         const auto normalNode = normalImage.asset.CreateNode("ShaderNodeNormalMap", 100, 0);
+        Set(graph, normalNode, "Strength", 0.5);
         Set(graph, normalNode, "Strength", 1.0);
         Connect(graph, normalImage.image, "Color", normalNode, "Color");
         Connect(graph, normalNode, "Normal", normalImage.surface, "Normal");
