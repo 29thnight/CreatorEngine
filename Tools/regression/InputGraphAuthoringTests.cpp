@@ -80,6 +80,12 @@ namespace
         Require(changed.program->GetInterfaceHash() == first.program->GetInterfaceHash(),
                 "Binding change incorrectly invalidated generated accessors");
 
+        const auto retired = asset.graph.CreateNode("Input.Signal.Float", 100.0f, 300.0f);
+        Require(asset.graph.Undo(), "New signal could not be undone");
+        const auto replacement = asset.graph.CreateNode("Input.Signal.Vector2", 100.0f, 300.0f);
+        Require(replacement != retired, "New signal reused a retired output ID after Undo");
+        asset.graph.RemoveNode(replacement);
+
         auto unknown = LX::LXInputArchive::Write(asset);
         const auto at = unknown.find("\"Input.Key\"");
         Require(at != std::string::npos, "Missing fixture definition");

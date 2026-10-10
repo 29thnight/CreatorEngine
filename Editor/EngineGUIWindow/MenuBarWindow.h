@@ -21,7 +21,7 @@ public:
 	void DrawBlackBoardWindow();
 	void ShowBehaviorTreeWindow();
 	void ShowBlackBoardWindow();
-	void SHowInputActionMap();
+	void ShowInputGraph();
 	void ShowBuildSceneSettingWindow();
 	void ShowRenderDebugWindow();
 

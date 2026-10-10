@@ -18,6 +18,7 @@
 #include "EditorIcons.h"
 #include "EditorAssetDragPayload.h"
 #include "SoundGraphEditor.h"
+#include "InputGraphWindow.h"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -1166,7 +1167,14 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 	{
 		// 열기에 **성공한** 것만 최근 항목이다(계약 5).
-        if (editor::sound_graph_editing::CanOpen(directory))
+        if (directory.extension() == ".inputgraph")
+        {
+            if (editor::input_editing::Open(directory, m_error))
+            {
+                RecordRecent(directory);
+            }
+        }
+        else if (editor::sound_graph_editing::CanOpen(directory))
         {
             if (editor::sound_graph_editing::OpenAsset(directory, m_error))
             {
@@ -1187,6 +1195,13 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	// 집을 수 있었다. 호스트별로 갈랐다(PHASE 21 M1).
 	if (ImGui::BeginPopup("ContentAssetTileMenu"))
 	{
+        if (directory.extension() == ".inputgraph" && ImGui::MenuItem("Edit InputGraph"))
+        {
+            if (editor::input_editing::Open(directory, m_error))
+            {
+                RecordRecent(directory);
+            }
+        }
         if (editor::sound_graph_editing::CanOpen(directory) && ImGui::MenuItem("Edit Sound Asset"))
         {
             if (editor::sound_graph_editing::OpenAsset(directory, m_error))

@@ -19,7 +19,7 @@ namespace editor::windows
     void draw_sound_graph();
     void draw_behavior_tree();       bool has_behavior_tree();
     void draw_black_board();         bool has_black_board();
-    void draw_input_action_maps();   bool has_input_action_maps();
+    void draw_input_graphs();   bool has_input_graphs();
 
     void draw_frame_profiler();      bool has_frame_profiler();
     void draw_output_log();          bool has_output_log();
@@ -70,11 +70,11 @@ struct editor_authoring_windows
                 .open_by_default(false)
                 .available(&windows::has_black_board),
 
-            panel<&windows::draw_input_action_maps>(
-                EditorWindowName::kInputActionMaps, EditorWindowName::kInputActionMapsLabel)
+            panel<&windows::draw_input_graphs>(
+                EditorWindowName::kInputGraphs, EditorWindowName::kInputGraphsLabel)
                 .initial_size(800.f, 600.f)
                 .open_by_default(false)
-                .available(&windows::has_input_action_maps));
+                .available(&windows::has_input_graphs));
     }
 };
 

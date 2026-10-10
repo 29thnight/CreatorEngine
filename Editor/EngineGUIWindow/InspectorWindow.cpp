@@ -49,8 +49,7 @@
 #include "Terrain.h"
 #include "FileDialog.h"
 #include "TagManager.h"
-#include "PlayerInput.h"
-#include "InputActionManager.h"
+#include "InputSessionComponent.h"
 #include "SoundSystem.h"
 #include <mathematics/scalar.hpp>
 //----------------------------
@@ -2542,12 +2541,12 @@ void InspectorWindow::Draw()
 						ImGuiDrawHelperBT(bt);
 					}
 				}
-				else if (componentTypeID == type_guid(PlayerInputComponent))
+				else if (componentTypeID == type_guid(InputSessionComponent))
 				{
-					PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
+					InputSessionComponent* input = dynamic_cast<InputSessionComponent*>(component.get());
 					if (nullptr != input)
 					{
-						ImGuiDrawHelperPlayerInput(input);
+						ImGuiDrawHelperInputSession(input);
 					}
 				}
 				else if (componentTypeID == type_guid(SceneRenderProfileComponent))

@@ -643,7 +643,9 @@ void LXGraph::Restore(const Snapshot& snapshot)
     layout_ = snapshot.layout;
     layout_.view = currentView;
     groups_ = snapshot.groups;
-    nextId_ = snapshot.nextId;
+    // Input output/binding IDs are external contracts. Undo may restore an old
+    // object, but a new edit after Undo must never recycle its published ID.
+    nextId_ = domain_ == "input" ? std::max(nextId_, snapshot.nextId) : snapshot.nextId;
 }
 
 Id LXGraph::AddNode(const NodeSpec& spec, float x, float y)

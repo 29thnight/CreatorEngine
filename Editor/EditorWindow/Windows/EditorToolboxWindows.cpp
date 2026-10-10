@@ -8,7 +8,7 @@ namespace editor::windows
 {
     EDITOR_DEFINE_WINDOW_ENTRY(behavior_tree,       EditorWindowName::kBehaviorTree)
     EDITOR_DEFINE_WINDOW_ENTRY(black_board,         EditorWindowName::kBlackBoard)
-    EDITOR_DEFINE_WINDOW_ENTRY(input_action_maps,   EditorWindowName::kInputActionMaps)
+    EDITOR_DEFINE_WINDOW_ENTRY(input_graphs,   EditorWindowName::kInputGraphs)
 
     EDITOR_DEFINE_WINDOW_ENTRY(frame_profiler,      EditorWindowName::kFrameProfiler)
     EDITOR_DEFINE_WINDOW_ENTRY(output_log,          EditorWindowName::kOutputLog)

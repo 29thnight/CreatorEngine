@@ -11,7 +11,7 @@
 #include <string_view>
 
 class Material;
-namespace LX { class LXMaterialAsset; }
+namespace LX { class LXMaterialAsset; class LXInputAsset; }
 class SceneRenderProfile;
 struct TerrainAuthoringRequest;
 struct TerrainAuthoringResult;
@@ -85,7 +85,7 @@ public:
 	bool ReplaceCollisionGeometry(const file::path& destination,
 		const ce::physics::CollisionGeometrySource& expected,
 		const ce::physics::CollisionGeometrySource& replacement);
-	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
+    bool SaveInputGraph(const LX::LXInputAsset& graph, const file::path& path, std::string& error);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool RecoverModel(const file::path& source, FileGuid expectedId);
 	bool SetModelMeshletsAndReimport(const file::path& source, bool enabled);

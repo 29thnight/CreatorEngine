@@ -4,10 +4,13 @@
 #include <atomic>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <limits>
+#include <locale>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <Windows.h>
 
 namespace LX
@@ -153,6 +156,7 @@ namespace LX
     std::string LXInputAsset::SemanticIdentity() const
     {
         std::ostringstream out;
+        out.imbue(std::locale::classic());
         out << std::quoted(graphId) << ' ' << LXInputArchive::SchemaVersion << '\n';
         std::vector<const Node*> nodes;
         for (const auto& node : graph.Nodes())
@@ -203,6 +207,7 @@ namespace LX
     std::string LXInputArchive::Write(const LXInputAsset& asset)
     {
         std::ostringstream out;
+        out.imbue(std::locale::classic());
         out << "LXINPUT " << SchemaVersion << ' ' << std::quoted(asset.graphId) << '\n';
         asset.graph.Write(out);
         return out.str();
@@ -216,6 +221,7 @@ namespace LX
             return std::nullopt;
         }
         std::istringstream in{std::string(text)};
+        in.imbue(std::locale::classic());
         std::string magic, identity;
         std::uint32_t version{};
         if (!(in >> magic >> version >> std::quoted(identity)) || magic != "LXINPUT" || version != SchemaVersion)
