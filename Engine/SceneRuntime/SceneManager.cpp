@@ -1,4 +1,4 @@
-﻿#include "ProjectLayerSettings.h"
+#include "ProjectLayerSettings.h"
 #include "SceneManager.h"
 #include <limits>
 #include "RenderScene.h"
@@ -26,7 +26,7 @@
 #include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
 #include "ProfileScope.h"
 #include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
-#include "InputActionManager.h"
+#include "InputSessionSystem.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
 #include <algorithm>
@@ -546,9 +546,7 @@ void SceneManager::ManagerInitialize()
     m_gcDomain.set_max_cycle_interval(std::chrono::seconds(1));
     RegisterReflectManual(); // CT4: 명시 메타 파일럿 4타입 — def에서 빠진 몫
     ComponentFactorys->Initialize();
-    m_inputActionManager = new InputActionManager();
-    InputActionManagers = m_inputActionManager;
-    InputActionManagers->LoadManager();
+
 }
 
 bool SceneManager::HasPendingSceneStructureChange() const
@@ -642,7 +640,6 @@ void SceneManager::Editor()
             if (!activeScenePtr) return;
             // Sweep DDOL bucket for destroyed objects
     		std::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
-    		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
             m_isInitialized = false; // Reset initialization state for editor scene
             activeScenePtr->DrainPendingLifecycle();
     	}
@@ -850,7 +847,7 @@ void SceneManager::Decommissioning()
     // Callback destruction can release external roots. Sweep those releases
     // while the input/animation/audio/CLR services are still available too.
     m_gcDomain.collect_full();
-    Memory::SafeDelete(m_inputActionManager);
+    InputSessionSystem::Get().Stop();
     SetActiveScene(nullptr);
     m_activeSceneIndex = 0;
 
@@ -2135,6 +2132,7 @@ void SceneManager::NotePlayFailure(std::string reason)
 
 void SceneManager::EndPlayTransaction()
 {
+    InputSessionSystem::Get().Stop();
     if (m_audioPlayback)
     {
         m_audioPlayback->EndScope(m_audioSession);

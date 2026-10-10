@@ -35,7 +35,7 @@ namespace editor
         // 가 대부분을 갖게 한다. 입력 맵을 떠 있는 창에서 오른쪽 아래로 끌어와
         // 함께 연다 — UI 작업에서 늘 같이 보는 짝이다.
         constexpr std::array kUiEditing{
-            layout_override{ EditorWindowName::kInputActionMaps, dock_slot::right_lower,
+            layout_override{ EditorWindowName::kInputGraphs, dock_slot::right_lower,
                              preset_visibility::opened },
             layout_override{ EditorWindowName::kAssetBundle, dock_slot::bottom,
                              preset_visibility::closed },

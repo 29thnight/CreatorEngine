@@ -286,7 +286,7 @@ std::string Quote(const std::string& value)
 
 void WriteValue(std::ostream& out, const LXSocketValue& value)
 {
-    static constexpr const char* kinds[] = {"none", "bool", "int", "float", "vector", "color", "string"};
+    static constexpr const char* kinds[] = {"none", "bool", "int", "float", "vector", "color", "string", "vector2"};
     out << "{\"kind\":" << Quote(kinds[value.index()]);
     std::visit(
         [&](const auto& field) {
@@ -298,7 +298,8 @@ void WriteValue(std::ostream& out, const LXSocketValue& value)
                 {
                     out << Quote(field);
                 }
-                else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                else if constexpr (std::is_same_v<T, std::array<double, 2>> ||
+                                   std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
                 {
                     out << '[';
                     for (std::size_t index = 0; index < field.size(); ++index)

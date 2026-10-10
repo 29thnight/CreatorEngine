@@ -873,7 +873,7 @@ namespace
         if (virtualPath.starts_with("ProjectSetting/") && extension == ".asset")
             return true;
         if (!virtualPath.starts_with("Assets/")) return false;
-        return extension == ".inputmap" || extension == ".bt"
+        return extension == ".bt"
             || extension == ".blackboard" || extension == ".renderprofile"
             || extension == ".terrain" || extension == ".foliage";
     }
@@ -1500,7 +1500,7 @@ namespace
                 const auto relative = path.lexically_relative(assetRoot).generic_string();
                 const bool shader = relative.starts_with("Shaders/")
                     && (extension == ".slang" || extension == ".hlsl" || extension == ".hlsli");
-                const bool document = extension == ".creator" || extension == ".prefab" || extension == ".inputmap"
+                const bool document = extension == ".creator" || extension == ".prefab"
                     || extension == ".bt" || extension == ".blackboard" || extension == ".renderprofile"
                     || extension == ".terrain" || extension == ".foliage" || extension == ".cegeometry"
                     || extension == ".wav" || extension == ".mp3" || extension == ".flac"

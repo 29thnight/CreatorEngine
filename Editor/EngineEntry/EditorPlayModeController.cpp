@@ -281,8 +281,12 @@ namespace Editor
 
         const bool foreground = ForegroundNow();
         const bool gameOwns = PlayState::PlayingPossessed == m_state
-            && !paused && foreground && !demand.uiWantTextInput;
+            && foreground;
+        InputManagement->SetWindowFocused(foreground);
         InputManagement->SetGameInputOwned(gameOwns);
+        InputManagement->CommitRoutingPolicy(demand.publishedFrames,
+            demand.uiWantTextInput || (demand.uiWantCaptureKeyboard && !demand.hostFocused),
+            demand.uiWantCaptureMouse && !demand.hostHovered);
 
         const EnhancedLiveDisplaySnapshot display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
         const bool gameTargetReady = display.Get(EnhancedLiveDisplayTarget::Game).active;

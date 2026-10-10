@@ -5,6 +5,8 @@
 
 #include <type_traits>
 
+namespace Input { class InputGraphProgram; }
+
 class Texture;
 class Material;
 struct ShaderMeta;
@@ -37,6 +39,12 @@ namespace AssetDepot
     // neither RTTI names nor native pointer values enter serialized references.
     template<class T>
     struct AssetTypeTraits;
+
+    template<>
+    struct AssetTypeTraits<Input::InputGraphProgram>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::InputGraph;
+    };
 
     template<>
     struct AssetTypeTraits<Texture>

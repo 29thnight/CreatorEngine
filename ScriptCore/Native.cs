@@ -176,22 +176,20 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, Color4> Mesh_GetBaseColor;
     public delegate* unmanaged<ObjectHandle, Color4, void> Mesh_SetBaseColor;
 
-    // 입력 (실측 43회 · 지금까지 스크립트가 아무것도 받을 수 없던 표면)
-    public delegate* unmanaged<int, int> Input_GetKeyState;
-    public delegate* unmanaged<int, int> Input_GetMouseButtonState;
-    public delegate* unmanaged<int, int, int> Input_GetControllerButtonState;
-    public delegate* unmanaged<int> Input_IsAnyKeyPressed;
-
-    public delegate* unmanaged<Float2> Input_GetMousePosition;
-    public delegate* unmanaged<Float2> Input_GetMouseDelta;
-    public delegate* unmanaged<int> Input_GetWheelDelta;
-    public delegate* unmanaged<int, void> Input_SetCursorVisible;
-
-    public delegate* unmanaged<int, int> Input_IsControllerConnected;
-    public delegate* unmanaged<int, int> Input_IsControllerTriggerL;
-    public delegate* unmanaged<int, int> Input_IsControllerTriggerR;
-    public delegate* unmanaged<int, Float2> Input_GetControllerThumbL;
-    public delegate* unmanaged<int, Float2> Input_GetControllerThumbR;
+    // Retired raw input slots stay reserved. Subsequent function offsets are unchanged.
+    public delegate* unmanaged<void> ReservedInput00;
+    public delegate* unmanaged<void> ReservedInput01;
+    public delegate* unmanaged<void> ReservedInput02;
+    public delegate* unmanaged<void> ReservedInput03;
+    public delegate* unmanaged<void> ReservedInput04;
+    public delegate* unmanaged<void> ReservedInput05;
+    public delegate* unmanaged<void> ReservedInput06;
+    public delegate* unmanaged<int, void> Cursor_SetVisible;
+    public delegate* unmanaged<void> ReservedInput08;
+    public delegate* unmanaged<void> ReservedInput09;
+    public delegate* unmanaged<void> ReservedInput10;
+    public delegate* unmanaged<void> ReservedInput11;
+    public delegate* unmanaged<void> ReservedInput12;
 
     public delegate* unmanaged<ObjectHandle, ulong> Body_Find;
     public delegate* unmanaged<ObjectHandle, ulong> Character_Find;
@@ -289,6 +287,14 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<AssetLinkABI*, uint, TextureAssetVariantABI*, AssetToken*, int> Asset_TryAcquireTyped;
     public delegate* unmanaged<ObjectHandle, ulong, int> Body_Remove;
     public delegate* unmanaged<ObjectHandle, ulong, uint, byte*, int> Body_ShapeRole;
+    // v41 InputGraph POD boundary. Mirrors the native table in this exact order.
+    public delegate* unmanaged<ObjectHandle, InputSessionHandle> Input_FindSession;
+    public delegate* unmanaged<InputSessionHandle, uint, ulong, NativeInputFrameHeader*, NativeInputState*, uint, NativeInputEvent*, uint, int> Input_CopyFrame;
+    public delegate* unmanaged<InputSessionHandle, NativeInputRequest*, int> Input_Request;
+    public delegate* unmanaged<InputSessionHandle, float, float, float, int> Input_Haptic;
+    public delegate* unmanaged<InputSessionHandle, InputID, InputID, ulong, uint, uint, int> Input_ValidateSignal;
+    public delegate* unmanaged<NativeInputDevice*, uint, uint*, int> Input_ListDevices;
+
 
 }
 
@@ -296,7 +302,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 40;
+    public const int ExpectedVersion = 41;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -409,6 +415,15 @@ internal static unsafe class Native
         if (sizeof(AssetLinkABI) != 40 || sizeof(AssetToken) != 12
             || sizeof(TextureAssetVariantABI) != 12 || sizeof(AssetRequestSnapshotABI) != 16
             || sizeof(TextureDescriptor) != 20)
+        {
+            return false;
+        }
+
+        if (!BitConverter.IsLittleEndian || sizeof(InputID) != 16 || sizeof(InputSessionHandle) != 16 ||
+            sizeof(NativeInputValue) != 16 || sizeof(NativeInputState) != 40 || sizeof(NativeInputEvent) != 96 ||
+            sizeof(NativeInputFrameHeader) != 120 || sizeof(NativeInputRequest) != 72 || sizeof(NativeInputDevice) != 48 ||
+            table->Input_FindSession == null || table->Input_CopyFrame == null || table->Input_Request == null ||
+            table->Input_ValidateSignal == null || table->Input_Haptic == null || table->Input_ListDevices == null)
         {
             return false;
         }
@@ -1412,54 +1427,119 @@ internal static unsafe class Native
         if (Entered() && _api.Mesh_SetBaseColor != null) _api.Mesh_SetBaseColor(h, c);
     }
 
-    // ── 입력 ──
-    // 상태값을 그대로 받는다. 술어 조합은 Input이 한다.
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static KeyState GetKeyState(int key)
-        => Entered() && _api.Input_GetKeyState != null ? (KeyState)_api.Input_GetKeyState(key) : KeyState.Idle;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static KeyState GetMouseButtonState(int button)
-        => Entered() && _api.Input_GetMouseButtonState != null
-            ? (KeyState)_api.Input_GetMouseButtonState(button) : KeyState.Idle;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static KeyState GetControllerButtonState(int index, int button)
-        => Entered() && _api.Input_GetControllerButtonState != null
-            ? (KeyState)_api.Input_GetControllerButtonState(index, button) : KeyState.Idle;
-
-    public static bool InputIsAnyKeyPressed()
-        => Entered() && _api.Input_IsAnyKeyPressed != null && _api.Input_IsAnyKeyPressed() != 0;
-
-    public static Float2 InputGetMousePosition()
-        => Entered() && _api.Input_GetMousePosition != null ? _api.Input_GetMousePosition() : default;
-
-    public static Float2 InputGetMouseDelta()
-        => Entered() && _api.Input_GetMouseDelta != null ? _api.Input_GetMouseDelta() : default;
-
-    public static int InputGetWheelDelta()
-        => Entered() && _api.Input_GetWheelDelta != null ? _api.Input_GetWheelDelta() : 0;
-
-    public static void InputSetCursorVisible(bool visible)
+    internal static InputSessionHandle InputFindSession(ObjectHandle owner)
     {
-        if (Entered() && _api.Input_SetCursorVisible != null) _api.Input_SetCursorVisible(visible ? 1 : 0);
+        if (!Entered() || _api.Input_FindSession == null)
+        {
+            throw new InvalidOperationException("InputGraph requires an active engine on the game thread.");
+        }
+        return _api.Input_FindSession(owner);
     }
 
-    public static bool InputIsControllerConnected(int index)
-        => Entered() && _api.Input_IsControllerConnected != null && _api.Input_IsControllerConnected(index) != 0;
+    private static void CheckInputResult(int result)
+    {
+        if (result == 0)
+        {
+            return;
+        }
+        if (result == 1)
+        {
+            throw new ObjectDisposedException(nameof(InputSession), "Native session generation is no longer valid.");
+        }
+        throw new InvalidOperationException($"InputGraph request failed with status {result}.");
+    }
 
-    public static bool InputIsControllerTriggerL(int index)
-        => Entered() && _api.Input_IsControllerTriggerL != null && _api.Input_IsControllerTriggerL(index) != 0;
+    internal static InputFrame InputCopyFrame(InputSessionHandle session, InputDomain domain)
+    {
+        if (!Entered() || _api.Input_CopyFrame == null)
+        {
+            throw new InvalidOperationException("InputGraph requires an active engine on the game thread.");
+        }
+        NativeInputFrameHeader header = default;
+        int result = _api.Input_CopyFrame(session, (uint)domain, 0, &header, null, 0, null, 0);
+        // Capacity is expected for the sizing call. No frame and stale sessions
+        // are explicit failures, not neutral input fabricated by the wrapper.
+        if (result != 5)
+        {
+            CheckInputResult(result);
+        }
+        InputFrame.ValidateHeader(header);
+        var states = new NativeInputState[checked((int)header.StateCount)];
+        var events = new NativeInputEvent[checked((int)header.EventCount)];
+        ulong sequence = header.Sequence;
+        fixed (NativeInputState* stateData = states)
+        fixed (NativeInputEvent* eventData = events)
+        {
+            CheckInputResult(_api.Input_CopyFrame(session, (uint)domain, sequence, &header,
+                stateData, (uint)states.Length, eventData, (uint)events.Length));
+        }
+        return new(header, states, events);
+    }
 
-    public static bool InputIsControllerTriggerR(int index)
-        => Entered() && _api.Input_IsControllerTriggerR != null && _api.Input_IsControllerTriggerR(index) != 0;
+    internal static void InputRequest(InputSessionHandle session, NativeInputRequest request)
+    {
+        if (!Entered() || _api.Input_Request == null)
+        {
+            throw new InvalidOperationException("InputGraph requires an active engine on the game thread.");
+        }
+        CheckInputResult(_api.Input_Request(session, &request));
+    }
 
-    public static Float2 InputGetControllerThumbL(int index)
-        => Entered() && _api.Input_GetControllerThumbL != null ? _api.Input_GetControllerThumbL(index) : default;
+    internal static void InputValidateSignal(InputSessionHandle session, InputID graph, InputID signal,
+        ulong interfaceHash, InputValueType type, InputDomain domain)
+    {
+        if (!Entered() || _api.Input_ValidateSignal == null)
+        {
+            throw new InvalidOperationException("InputGraph requires an active engine on the game thread.");
+        }
+        CheckInputResult(_api.Input_ValidateSignal(session, graph, signal, interfaceHash, (uint)type, (uint)domain));
+    }
 
-    public static Float2 InputGetControllerThumbR(int index)
-        => Entered() && _api.Input_GetControllerThumbR != null ? _api.Input_GetControllerThumbR(index) : default;
+    internal static void InputHaptic(InputSessionHandle session, float seconds, float left, float right)
+    {
+        if (!Entered() || _api.Input_Haptic == null)
+        {
+            throw new InvalidOperationException("InputGraph requires an active engine on the game thread.");
+        }
+        CheckInputResult(_api.Input_Haptic(session, seconds, left, right));
+    }
+
+    internal static InputDevice[] InputListDevices()
+    {
+        if (!Entered() || _api.Input_ListDevices == null)
+        {
+            throw new InvalidOperationException("InputGraph requires an active engine on the game thread.");
+        }
+        // Adapter capacity is 32. A fixed bounded buffer avoids a size/read race
+        // with asynchronous device arrival. No native address survives this call.
+        NativeInputDevice* devices = stackalloc NativeInputDevice[32];
+        uint count = 0;
+        CheckInputResult(_api.Input_ListDevices(devices, 32, &count));
+        if (count > 32)
+        {
+            throw new InvalidOperationException("Input device snapshot exceeds the adapter capacity.");
+        }
+        var result = new InputDevice[checked((int)count)];
+        for (int index = 0; index < result.Length; ++index)
+        {
+            var device = devices[index];
+            if (device.ID == 0 || device.Epoch == 0 || device.AssignmentEpoch == 0 ||
+                device.Kind > 2 || device.Connected != 1)
+            {
+                throw new InvalidOperationException("Malformed connected input device snapshot.");
+            }
+            result[index] = new(device);
+        }
+        return result;
+    }
+
+    internal static void CursorSetVisible(bool visible)
+    {
+        if (Entered() && _api.Cursor_SetVisible != null)
+        {
+            _api.Cursor_SetVisible(visible ? 1 : 0);
+        }
+    }
 
     public static ulong BodyFind(ObjectHandle owner)
         => Entered() && _api.Body_Find != null ? _api.Body_Find(owner) : 0;

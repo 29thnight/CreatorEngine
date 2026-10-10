@@ -54,7 +54,7 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 # 이관을 끝낸 드로어. 옮길 때마다 여기에 더한다.
 $Migrated = @('GameObjectBaseInfo', 'Transform',
     'SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'SceneRenderProfileComponent',
-    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent',
+    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'InputSessionComponent', 'TerrainComponent',
     'RectTransformComponent')
 # 이관한 드로어의 그리는 함수 — 소스 축이 본문을 잘라 읽는다. 첫 칸이 파일(저장소 기준), 나머지가
 # 함수 이름이다. 드로어가 부르는 같은 파일의 조각 함수도 적는다(고정 폭이 그리로 숨을 수 있다).
@@ -65,7 +65,8 @@ $DrawerSources = @{
     SpriteRenderer        = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperSpriteRenderer')
     Animator              = @('Editor/EngineGUIWindow/ImGuiDrawHelperAnimator.cpp', 'ImGuiDrawHelperAnimator')
     MeshRenderer          = @('Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp', 'ImGuiDrawHelperMeshRenderer', 'DrawMaterialTextureSlot', 'ReadOnlyLine')
-    PlayerInputComponent  = @('Editor/EngineGUIWindow/ImGuiDrawHelperPlayerInput.cpp', 'ImGuiDrawHelperPlayerInput')
+    InputSessionComponent = @('Editor/EngineGUIWindow/ImGuiDrawHelperInputSession.cpp', 'ImGuiDrawHelperInputSession')
+    InputSessionInspector = @('Editor/EngineGUIWindow/InputGraphWindow.cpp', 'DrawInspector')
     TerrainComponent      = @('Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp', 'ImGuiDrawHelperTerrainComponent', 'DrawBrushMasks', 'ButtonRow')
     ImportSettings        = @('Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp', 'DrawYamlNodeEditor', 'DrawEntry', 'DrawScalar', 'BeginContainer')
     Canvas                = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperCanvas')
@@ -76,7 +77,7 @@ $DrawerSources = @{
 }
 # 전용 드로어를 가진 컴포넌트 열둘 — 계획서 §W2-I 재기준선 표.
 $Drawers = @('SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'SceneRenderProfileComponent',
-    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent')
+    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'InputSessionComponent', 'TerrainComponent')
 # 유형이 붙이는 공간 컴포넌트. 값은 `object.create` 의 유형이다.
 $SpatialDrawers = [ordered]@{ RectTransformComponent = 'UI' }
 $Targets = @($Drawers) + @($SpatialDrawers.Keys)
@@ -106,7 +107,9 @@ function Get-FunctionBody([string]$File, [string]$Name) {
 }
 $fixedWidth = '(SetNextItemWidth|PushItemWidth)\(\s*\d[\d.]*f?\s*\)|ImVec2\(\s*[1-9][\d.]*f?\s*,|ImVec2\([^()]*,\s*[1-9][\d.]*f?\s*\)'
 $ImportAsset = 'Animation/Cha_Mon_5.fbx'
-foreach ($name in @($Migrated) + 'ImportSettings') {
+# InputSession's wrapper delegates its actual drawing to InputGraphWindow.
+# Keep the former body-level check on that implementation as well as the wrapper.
+foreach ($name in @($Migrated) + @('ImportSettings', 'InputSessionInspector')) {
     if (-not $DrawerSources.ContainsKey($name)) { continue }
     $file = $DrawerSources[$name][0]
     foreach ($function in @($DrawerSources[$name] | Select-Object -Skip 1)) {

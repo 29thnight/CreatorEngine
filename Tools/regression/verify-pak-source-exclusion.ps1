@@ -80,6 +80,8 @@ try {
         'Shaders/Probe.hlsli'           = '#define PROBE 1'
         'Textures/Probe.png'            = 'not-a-real-png'
         'Derived/asset-manifest.cemf'   = 'synthetic-cemf'
+        'Derived/InputGraph/ce/Probe.ceig' = 'synthetic-ceig'
+        'Derived/InputGraph/ce/Upper.CEIG' = 'synthetic-ceig-uppercase'
     }
     $keepSettings = @{
         'EngineSettings.asset' = 'settings: probe'
@@ -94,6 +96,10 @@ try {
         'Scenes/UPPER.META'   = 'guid: 00000000-0000-4000-8000-000000000002'
         'Animator/Legacy.json' = '{"retired":true}'
         'NodeEditor/UPPER.JSON' = '{"retired":true}'
+        'InputGraph/Probe.inputgraph' = 'LXINPUT source fixture'
+        'InputGraph/UPPER.INPUTGRAPH' = 'LXINPUT uppercase source fixture'
+        'InputMap/Legacy.inputmap' = 'retired input map fixture'
+        'InputMap/UPPER.INPUTMAP' = 'retired uppercase input map fixture'
     }
 
     function Write-TreeFiles {

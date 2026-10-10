@@ -63,8 +63,8 @@ namespace EditorWindowName
     inline constexpr const char* kOutputLog = "###Editor.OutputLog";
     inline constexpr const char* kAboutLabel = "About Creator Engine";
     inline constexpr const char* kAbout = "###Editor.About";
-    inline constexpr const char* kInputActionMapsLabel = "InputActionMaps";
-    inline constexpr const char* kInputActionMaps = "###Editor.InputActionMaps";
+    inline constexpr const char* kInputGraphsLabel = "Input Graphs";
+    inline constexpr const char* kInputGraphs = "###Editor.InputGraphs";
     inline constexpr const char* kBuildSceneSettingLabel = "Build Scene Setting";
     inline constexpr const char* kBuildSceneSetting = "###Editor.BuildSceneSetting";
     inline constexpr const char* kRenderPassDebugLabel = "Render Frame Debugger";
@@ -108,7 +108,9 @@ namespace EditorWindowName
         { "\xef\x82\x80" " FrameProfiler", kFrameProfiler },
         { "\xef\x84\xa0" " Log", kOutputLog },
         { "About Creator Engine", kAbout },
-        { "InputActionMaps", kInputActionMaps },
+        { "InputActionMaps", kInputGraphs },
+        { "###Editor.InputActionMaps", kInputGraphs },
+        { "Editor.InputActionMaps", kInputGraphs },
         { "Build Scene Setting", kBuildSceneSetting },
         { "RenderPass Debug", kRenderPassDebug },
         { "Grid Settings", kGridSettings },

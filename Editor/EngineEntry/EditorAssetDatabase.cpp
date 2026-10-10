@@ -42,6 +42,9 @@
 #include "ShaderPermutationDomain.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
 #include "Experiment/Cooked/CookedShaderMeta.h"
+#include "Experiment/Cooked/CookedInputGraph.h"
+#include "../../Lattice/Input/LXInputGraph.h"
+#include "../../Lattice/Input/LXInputCompiler.h"
 #include "AuthoringCookedDocument.h"
 #include <chrono>
 #include <cstdio>
@@ -393,25 +396,7 @@ namespace
 		return false;
 	}
 
-	bool WriteInputActionMapThroughEditor(
-		const UncatalogedAuthoringRequest& request) noexcept
-	{
-		try
-		{
-			return EditorAssetDatabase::Get().WriteInputActionMap(request);
-		}
-		catch (const std::exception& exception)
-		{
-			Debug::PrintLog(spdlog::level::err, "Editor input-action-map authoring failed: " +
-				std::string(exception.what()));
-		}
-		catch (...)
-		{
-			Debug::PrintLog(spdlog::level::err, "Editor input-action-map authoring failed with an "
-				"unknown error");
-		}
-		return false;
-	}
+
 
 	bool WriteTagManagerThroughEditor(
 		const UncatalogedAuthoringRequest& request) noexcept
@@ -472,6 +457,37 @@ namespace
 		}
 		return false;
 	}
+
+    class InputGraphMemorySource final : public experiment::cooked::ArtifactByteSource
+    {
+    public:
+        InputGraphMemorySource(std::string path, std::vector<std::byte> bytes)
+            : m_path(std::move(path)), m_bytes(std::move(bytes)) {}
+        bool Size(std::string_view path, std::uint64_t& result, std::string& failure) const override
+        {
+            if (path != m_path)
+            {
+                failure = "InputGraph artifact path is not in this immutable source.";
+                return false;
+            }
+            result = m_bytes.size();
+            return true;
+        }
+        bool ReadAt(std::string_view path, std::uint64_t offset,
+            std::span<std::byte> output, std::string& failure) const override
+        {
+            if (path != m_path || offset > m_bytes.size() || output.size() > m_bytes.size() - offset)
+            {
+                failure = "InputGraph artifact read exceeds its immutable bounds.";
+                return false;
+            }
+            std::copy_n(m_bytes.data() + static_cast<std::size_t>(offset), output.size(), output.data());
+            return true;
+        }
+    private:
+        std::string m_path;
+        std::vector<std::byte> m_bytes;
+    };
 
 	const char* ImportDirectory(EditorAssetDatabase::ImportKind kind) noexcept
 	{
@@ -1203,8 +1219,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         TickAutomaticSaves();
         std::erase_if(m_modelReloads, [](const auto& job) { return job.is_complete(); });
         std::vector<file::path> changed;
+        std::vector<file::path> invalidatedInputGraphs;
         {
             std::lock_guard lock(m_modifiedMutex);
+            invalidatedInputGraphs.swap(m_inputGraphInvalidations);
             const auto now = std::chrono::steady_clock::now();
             for (auto it = m_modifiedPaths.begin(); it != m_modifiedPaths.end();)
             {
@@ -1217,6 +1235,13 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 {
                     ++it;
                 }
+            }
+        }
+        {
+            std::lock_guard inputLock(m_inputGraphMutex);
+            for (const auto& path : invalidatedInputGraphs)
+            {
+                m_inputGraphSemantics.erase(path);
             }
         }
         for (const auto& path : changed)
@@ -2041,10 +2066,28 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         const auto catalogGuid = DataSystems->GetFileGuid(destination);
         const auto identityPath = DataSystems->GetFilePath(preferredGuid);
         const auto metaPath = file::path(destination.string() + ".meta");
+        const bool uncatalogedSource = file::exists(destination) && catalogGuid == FileGuid{} &&
+            !file::exists(metaPath);
+        bool inputGraphRetry = false;
+        if (uncatalogedSource && destination.extension() == ".inputgraph")
+        {
+            // A first save may publish the source before its sidecar fails.
+            // Recover only a valid source and draft declaring this same UUID;
+            // never adopt an unrelated file or remove a pre-existing source.
+            const auto existing = LX::LXInputAsset::Load(destination);
+            const auto candidate = LX::LXInputArchive::Read(payload);
+            experiment::AssetId existingIdentity;
+            experiment::AssetId candidateIdentity;
+            inputGraphRetry = existing && candidate &&
+                experiment::TryParseCanonicalAssetId(existing->graphId, existingIdentity) &&
+                experiment::TryParseCanonicalAssetId(candidate->graphId, candidateIdentity) &&
+                FileGuid{ existingIdentity.value } == preferredGuid &&
+                FileGuid{ candidateIdentity.value } == preferredGuid;
+        }
         if ((catalogGuid != FileGuid{} && catalogGuid != preferredGuid) ||
             (!identityPath.empty() && file::absolute(identityPath).lexically_normal() != destination) ||
             (file::exists(metaPath) && LoadGuidFromMeta(metaPath) != preferredGuid) ||
-            (file::exists(destination) && catalogGuid == FileGuid{} && !file::exists(metaPath)))
+            (uncatalogedSource && !inputGraphRetry))
         {
             Debug::PrintLog(spdlog::level::err, "Editor text save would replace a different asset identity: " +
                 destination.string());
@@ -2057,6 +2100,188 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 			return {};
 		return CreateMetaLocked(destination, preferredGuid);
 	}
+
+    bool PrepareInputGraph(const LX::LXInputAsset& graph, const file::path& path,
+        own::shared_owner<RuntimeInputGraphPublication>& publication,
+        std::map<Input::SignalID, Input::ValueType>& nextContract, std::string& error)
+    {
+        namespace cooked = experiment::cooked;
+        experiment::AssetId identity;
+        if (path.extension() != ".inputgraph" || !experiment::TryParseCanonicalAssetId(graph.graphId, identity))
+        {
+            error = "InputGraph requires .inputgraph and a canonical UUIDv4 identity.";
+            return false;
+        }
+        const auto compiled = LX::CompileInputGraph(graph);
+        if (!compiled.program)
+        {
+            error = "InputGraph compilation failed; the last good runtime definition is retained.";
+            return false;
+        }
+        const auto& signals = compiled.program->GetDefinition().signals;
+        if (const auto prior = m_inputGraphSignalTypes.find(graph.graphId); prior != m_inputGraphSignalTypes.end())
+        {
+            for (const auto& signal : signals)
+            {
+                const auto found = prior->second.find(signal.id);
+                if (found != prior->second.end() && found->second != signal.type)
+                {
+                    error = "A stable InputSignal ID cannot change type; create a new output node/ID.";
+                    return false;
+                }
+            }
+        }
+        std::vector<std::byte> bytes;
+        if (!cooked::WriteInputGraphArtifact(*compiled.program, bytes, error))
+        {
+            return false;
+        }
+        own::shared_owner<const Input::InputGraphProgram> readback;
+        if (!cooked::ReadInputGraphArtifact(bytes, identity, readback, error))
+        {
+            return false;
+        }
+        auto candidate = own::make_shared<RuntimeInputGraphPublication>();
+        auto& manifest = candidate->manifest;
+        manifest.assetSetId = identity;
+        manifest.revision = 1u;
+        manifest.targetPlatform = "win-x64";
+        manifest.targetAbi = CreatorContentAbi::Token;
+        const cooked::TypedAssetReference reference{ { identity, {} }, cooked::CookedAssetKind::InputGraph };
+        manifest.roots.push_back(reference);
+        manifest.entries.push_back({ reference, 0u, {} });
+        cooked::AssetBlobRecord blob;
+        if (!cooked::ComputeSha256(bytes, blob.contentSha256, error))
+        {
+            return false;
+        }
+        blob.byteSize = bytes.size();
+        blob.kind = cooked::CookedAssetKind::InputGraph;
+        blob.representation = cooked::kInputGraphRepresentation;
+        blob.schemaVersion = cooked::kInputGraphArtifactVersion;
+        blob.targetPlatform = manifest.targetPlatform;
+        blob.targetAbi = manifest.targetAbi;
+        blob.artifactPath = "Derived/InputGraphs/" + graph.graphId + ".ceig";
+        candidate->byteSource = own::make_shared<const InputGraphMemorySource>(blob.artifactPath, std::move(bytes));
+        manifest.blobs.push_back(std::move(blob));
+        auto written = cooked::WriteAssetSetManifest(manifest);
+        if (!written.Succeeded())
+        {
+            error = "InputGraph manifest validation failed.";
+            return false;
+        }
+        candidate->manifestBytes = std::move(written.bytes);
+        publication = std::move(candidate);
+        nextContract.clear();
+        for (const auto& signal : signals)
+        {
+            nextContract.emplace(signal.id, signal.type);
+        }
+        error.clear();
+        return true;
+    }
+
+    bool StampInputGraphPublication(const std::string& identity,
+        RuntimeInputGraphPublication& publication, std::string& error)
+    {
+        auto& latest = m_inputGraphRevisions[identity];
+        if (!latest)
+        {
+            latest = std::make_shared<std::atomic<std::uint64_t>>(0u);
+        }
+        const auto revision = latest->load(std::memory_order_relaxed);
+        if (revision == (std::numeric_limits<std::uint64_t>::max)())
+        {
+            error = "InputGraph authoring revision space exhausted.";
+            return false;
+        }
+        publication.latestRevision = latest;
+        publication.revision = revision + 1u;
+        latest->store(publication.revision, std::memory_order_release);
+        return true;
+    }
+
+    bool SaveInputGraph(const LX::LXInputAsset& graph, const file::path& requestedPath, std::string& error)
+    {
+        const auto path = file::absolute(requestedPath).lexically_normal();
+        // PT Save and GT watcher reload share one source-generation contract.
+        // Do not use m_authoringMutex here; the text writer acquires it below.
+        std::lock_guard inputLock(m_inputGraphMutex);
+        const auto accepted = m_inputGraphSemantics.find(path.lexically_normal());
+        if (const auto previous = LX::LXInputAsset::Load(path);
+            previous && accepted != m_inputGraphSemantics.end() &&
+            accepted->second == graph.SemanticIdentity() && previous->SemanticIdentity() == graph.SemanticIdentity())
+        {
+            experiment::AssetId identity;
+            if (!experiment::TryParseCanonicalAssetId(graph.graphId, identity) ||
+                WriteTextAssetWithMeta(path, LX::LXInputArchive::Write(graph), FileGuid{ identity.value }) !=
+                FileGuid{ identity.value })
+            {
+                error = "InputGraph layout save failed.";
+                return false;
+            }
+            m_inputGraphSemantics[path.lexically_normal()] = graph.SemanticIdentity();
+            error.clear();
+            return true;
+        }
+        own::shared_owner<RuntimeInputGraphPublication> publication;
+        std::map<Input::SignalID, Input::ValueType> nextContract;
+        if (!PrepareInputGraph(graph, path, publication, nextContract, error))
+        {
+            return false;
+        }
+        const FileGuid identity{ publication->manifest.assetSetId.value };
+        const auto payload = LX::LXInputArchive::Write(graph);
+        if (WriteTextAssetWithMeta(path, payload, identity) != identity)
+        {
+            error = "InputGraph source/meta publication failed; the last good runtime definition is retained.";
+            return false;
+        }
+        if (!StampInputGraphPublication(graph.graphId, *publication, error))
+        {
+            return false;
+        }
+        m_inputGraphSignalTypes[graph.graphId].merge(nextContract);
+        m_inputGraphSemantics[path.lexically_normal()] = graph.SemanticIdentity();
+        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload, RuntimeAssetType::InputGraph,
+            identity, path, {}, std::move(publication) });
+        return true;
+    }
+
+    void ReloadInputGraph(const file::path& path)
+    {
+        std::lock_guard inputLock(m_inputGraphMutex);
+        std::string error;
+        const auto graph = LX::LXInputAsset::Load(path, &error);
+        experiment::AssetId identity;
+        own::shared_owner<RuntimeInputGraphPublication> publication;
+        std::map<Input::SignalID, Input::ValueType> nextContract;
+        const bool validIdentity = graph && experiment::TryParseCanonicalAssetId(graph->graphId, identity) &&
+            LoadGuidFromMeta(path.string() + ".meta") == FileGuid{ identity.value };
+        if (validIdentity)
+        {
+            const auto previous = m_inputGraphSemantics.find(path.lexically_normal());
+            if (previous != m_inputGraphSemantics.end() && previous->second == graph->SemanticIdentity())
+            {
+                return;
+            }
+        }
+        if (!validIdentity || !PrepareInputGraph(*graph, path, publication, nextContract, error))
+        {
+            Debug::PrintLog(spdlog::level::err, "InputGraph reload rejected; last good definition retained: " +
+                path.string() + ": " + error);
+            return;
+        }
+        if (!StampInputGraphPublication(graph->graphId, *publication, error))
+        {
+            Debug::PrintLog(spdlog::level::err, error);
+            return;
+        }
+        m_inputGraphSignalTypes[graph->graphId].merge(nextContract);
+        m_inputGraphSemantics[path.lexically_normal()] = graph->SemanticIdentity();
+        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload, RuntimeAssetType::InputGraph,
+            FileGuid{ identity.value }, path, {}, std::move(publication) });
+    }
 
     bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
                            const file::path& requestedGraphPath, FileGuid graphGuid, std::string& error)
@@ -2777,12 +3002,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 			PathFinder::ProjectSettingPath(""), request);
 	}
 
-	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request)
-	{
-		std::lock_guard lock(m_authoringMutex);
-		return PublishUncatalogedLocked("InputActionMap",
-			PathFinder::InputMapPath(), request);
-	}
+
 
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
@@ -3154,6 +3374,12 @@ private:
 			{
 				continue;
 			}
+            if (entry.path().extension() == ".inputgraph")
+            {
+                RegisterMetaFile(entry.path().string() + ".meta");
+                ReloadInputGraph(entry.path());
+                continue;
+            }
 			const file::path metaPath = entry.path().string() + ".meta";
 			if (file::exists(metaPath))
 			{
@@ -3484,14 +3710,37 @@ private:
 				eventSettings.Append().SetScalar(function);
 			}
 		}
-		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
-		std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
-		if (!output.is_open()) return {};
-		output << document.Dump();
-		output.flush();
-		if (!output.good()) return {};
-		output.close();
-		if (output.fail()) return {};
+        if (extension == ".inputgraph")
+        {
+            // Keep an existing sidecar intact, or leave no sidecar on a failed
+            // first publication so the verified same-identity retry can recover.
+            const auto payload = document.Dump();
+            if (!WriteBinaryFileLocked(metaPath,
+                { reinterpret_cast<const std::byte*>(payload.data()), payload.size() }, PublishEncoding::Text))
+            {
+                return {};
+            }
+        }
+        else
+        {
+            // D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+            std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
+            if (!output.is_open())
+            {
+                return {};
+            }
+            output << document.Dump();
+            output.flush();
+            if (!output.good())
+            {
+                return {};
+            }
+            output.close();
+            if (output.fail())
+            {
+                return {};
+            }
+        }
 
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
 			RuntimeAssetType::Auto, guid, targetFile });
@@ -3575,6 +3824,12 @@ private:
 
 	void HandleCreated(const file::path& filepath)
 	{
+        const auto inputSource = filepath.extension() == ".meta" ? RemoveMetaExtension(filepath) : filepath;
+        if (inputSource.extension() == ".inputgraph")
+        {
+            HandleModified(filepath);
+            return;
+        }
         if (ToLower(filepath.extension().string()) == ".cs")
         {
             HandleModified(filepath);
@@ -3702,6 +3957,17 @@ private:
 
 	void HandleDeleted(const file::path& deletedPath)
 	{
+        const auto inputSource = deletedPath.extension() == ".meta" ? RemoveMetaExtension(deletedPath) : deletedPath;
+        if (inputSource.extension() == ".inputgraph")
+        {
+            // A delete/recreate pair can restore identical bytes before the next tick.
+            // Invalidate the memoized publication even when the source exists again.
+            {
+                std::lock_guard modifiedLock(m_modifiedMutex);
+                m_inputGraphInvalidations.push_back(inputSource.lexically_normal());
+            }
+            HandleModified(inputSource);
+        }
         if (ToLower(deletedPath.extension().string()) == ".cs")
         {
             HandleModified(deletedPath);
@@ -3779,6 +4045,19 @@ private:
 
 	void ProcessModified(const file::path& filepath)
 	{
+        const auto inputSource = filepath.extension() == ".meta" ? RemoveMetaExtension(filepath) : filepath;
+        if (inputSource.extension() == ".inputgraph")
+        {
+            if (!file::exists(inputSource))
+            {
+                std::lock_guard inputLock(m_inputGraphMutex);
+                m_inputGraphSemantics.erase(inputSource.lexically_normal());
+                return;
+            }
+            RegisterMetaFile(inputSource.string() + ".meta");
+            ReloadInputGraph(inputSource);
+            return;
+        }
         if (ToLower(filepath.extension().string()) == ".cs")
         {
             EditorScriptAuthoring::NotifySourceChanged(filepath);
@@ -3859,6 +4138,11 @@ private:
         DataSystems->QueueAssetChange({RuntimeAssetChangeKind::ContentReload, type, guid, filepath});
 	}
 
+    std::mutex m_inputGraphMutex;
+    std::vector<file::path> m_inputGraphInvalidations; // Guarded by m_modifiedMutex.
+    std::map<file::path, std::string> m_inputGraphSemantics;
+    std::map<std::string, std::map<Input::SignalID, Input::ValueType>> m_inputGraphSignalTypes;
+    std::map<std::string, std::shared_ptr<std::atomic<std::uint64_t>>> m_inputGraphRevisions;
     std::atomic<std::uint64_t> m_audioRevision{ 1u };
     std::chrono::steady_clock::time_point m_nextLiveRefresh{};
     std::atomic<std::uint64_t> m_modelRefreshEpoch{ 1u };
@@ -3890,7 +4174,7 @@ private:
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
-		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".cs",
+		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".inputgraph", ".cpp", ".cs",
 		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont", ".ttf", ".otf",
 		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
@@ -4064,16 +4348,12 @@ bool EditorAssetDatabase::Initialize()
 		&WriteCollisionMatrixThroughEditor);
 	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	AssetAuthoringPort::InstallLayerSettingsWriter(&WriteLayerSettingsThroughEditor);
-	AssetAuthoringPort::InstallInputActionMapWriter(
-		&WriteInputActionMapThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
 	AssetAuthoringPort::UninstallModelRecovery(&RecoverModelThroughEditor);
-	AssetAuthoringPort::UninstallInputActionMapWriter(
-		&WriteInputActionMapThroughEditor);
 	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	AssetAuthoringPort::UninstallLayerSettingsWriter(&WriteLayerSettingsThroughEditor);
 	AssetAuthoringPort::UninstallCollisionMatrixWriter(
@@ -4179,11 +4459,7 @@ bool EditorAssetDatabase::WriteLayerSettings(
 	return m_impl && m_impl->WriteLayerSettings(request);
 }
 
-bool EditorAssetDatabase::WriteInputActionMap(
-	const UncatalogedAuthoringRequest& request)
-{
-	return m_impl && m_impl->WriteInputActionMap(request);
-}
+
 
 file::path EditorAssetDatabase::ImportSourceAsset(
 	const file::path& source, ImportKind kind)
@@ -4459,4 +4735,23 @@ bool EditorAssetDatabase::SetModelMeshletsAndReimport(const file::path& source, 
 bool EditorAssetDatabase::SetModelLodsAndReimport(const file::path& source, std::uint32_t levels)
 {
 	return m_impl && m_impl->SetModelLodsAndReimport(source, levels);
+}
+
+
+bool EditorAssetDatabase::SaveInputGraph(const LX::LXInputAsset& graph, const file::path& path, std::string& error)
+{
+    if (!m_impl)
+    {
+        error = "The Editor asset database is unavailable.";
+        return false;
+    }
+    try
+    {
+        return m_impl->SaveInputGraph(graph, path, error);
+    }
+    catch (const std::exception& exception)
+    {
+        error = exception.what();
+        return false;
+    }
 }

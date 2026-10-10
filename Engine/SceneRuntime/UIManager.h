@@ -85,6 +85,7 @@ public:
 	float elapsed{};
 
 private:
+    std::uint64_t m_lastInputFrame{};
 	// 소유가 아니라 선택 상태다. 수명은 Scene이 쥔다.
 	EntityHandle CurCanvas{};
 	EntityHandle SelectUI{};

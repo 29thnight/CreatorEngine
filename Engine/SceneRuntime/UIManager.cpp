@@ -5,6 +5,7 @@
 #include "ImageComponent.h"
 #include "UIButton.h"
 #include "InputManager.h"
+#include "InputSessionSystem.h"
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
@@ -390,99 +391,106 @@ void UIManager::DeleteCanvas(Entity* canvas)
 
 void UIManager::CheckInput()
 {
-	if (SceneManagers->IsSceneLoading()) return;
-
-	// 활성 씬의 것이 아니면 여기서 이미 nullptr다 — 예전에는 lock한 뒤 그
-	// GetScene()을 활성 씬과 손으로 비교해 리셋했다(트랙 E5-R3).
-	Entity* curCanvasObj = GetCurCanvas();
-	float tick = Time->GetElapsedSeconds();
-
-	elapsed += tick;
-
-	if (!curCanvasObj) return;
-
-	if (!isEnableUINavigation)
-	{
-		return;
-	}
-
-	Canvas* curCanvas = curCanvasObj->GetComponent<Canvas>();
-	// 게임 UI 는 게임 입력이다 — 소유가 아니면 클릭도 패드 탐색도 받지 않는다(W5 관문).
-	if (!InputManagement->IsGameInputOwned()) return;
-	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
-	{
-		Scene* scene = curCanvasObj->GetScene();
-		for (const EntityHandle& uiHandle : curCanvas->UIObjs)
-		{
-			Entity* uiObj = scene ? scene->Resolve(uiHandle) : nullptr;
-			if (!uiObj) continue;
-			UIComponent* UI = uiObj->GetComponent<UIComponent>();
-			if (UI && false == UI->IsEnabled()) continue;
-			UIButton* btn = uiObj->GetComponent<UIButton>();
-			if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
-			btn->Click();
-			break;
-		}
-	}
-
-	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
-	//TODO : 추가로 특정 상황일때 비활성화 할 수 있도록 처리도 해야할 거 같은데?
-	math::vector2 stickLP1 = InputManagement->GetControllerThumbL(0);
-	math::vector2 stickLP2 = InputManagement->GetControllerThumbL(1);
-	Entity* selectUI = GetSelectUI();
-	if (selectUI)
-	{
-		auto imageComponent = selectUI->GetComponent<ImageComponent>();
-		if(!imageComponent || imageComponent->IsNavLock()) return;
-
-		if(0.2 < elapsed)
-		{
-			if (stickLP1.x > 0.5 || stickLP2.x > 0.5)
-			{
-				auto navi = imageComponent->GetNextNavi(Direction::Right);
-				if (navi)
-				{
-					SetSelectUI(navi);
-					elapsed = 0;
-				}
-			}
-			if (stickLP1.x < -0.5 || stickLP2.x < -0.5)
-			{
-				auto navi = imageComponent->GetNextNavi(Direction::Left);
-				if (navi)
-				{
-					SetSelectUI(navi);
-					elapsed = 0;
-				}
-			}
-			if (stickLP1.y > 0.5 || stickLP2.y > 0.5)
-			{
-				auto navi = imageComponent->GetNextNavi(Direction::Up);
-				if (navi)
-				{
-					SetSelectUI(navi);
-					elapsed = 0;
-				}
-			}
-			if (stickLP1.y < -0.5 || stickLP2.y < -0.5)
-			{
-				auto navi = imageComponent->GetNextNavi(Direction::Down);
-				if (navi)
-				{
-					SetSelectUI(navi);
-					elapsed = 0;
-				}
-			}
-		}
-
-		if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A) ||
-			InputManagement->IsControllerButtonReleased(1, ControllerButton::A))
-		{
-			auto button = selectUI->GetComponent<UIButton>();
-			if(button)
-				button->Click();
-		}
-	}
+    if (SceneManagers->IsSceneLoading())
+    {
+        return;
+    }
+    const auto frame = InputSessionSystem::Get().GetUIFrame();
+    if (!frame || frame->GetBoundary().sequence == m_lastInputFrame)
+    {
+        return;
+    }
+    m_lastInputFrame = frame->GetBoundary().sequence;
+    elapsed += static_cast<float>(frame->GetBoundary().end - frame->GetBoundary().begin) / 1'000'000'000.0f;
+    if (!isEnableUINavigation)
+    {
+        return;
+    }
+    for (const auto& event : frame->GetEvents())
+    {
+        // Cancellation is never a release-click. Every genuine completion in the
+        // immutable frame is delivered, including several press/release pairs.
+        if (event.phase != Input::EventPhase::Completed)
+        {
+            continue;
+        }
+        if (event.signal == InputSessionSystem::kClickSignal)
+        {
+            // A previous click may have switched scenes or destroyed this canvas.
+            // Resolve fresh handles for each event and keep no iterator across Click.
+            Entity* canvasObject = GetCurCanvas();
+            auto* canvas = canvasObject ? canvasObject->GetComponent<Canvas>() : nullptr;
+            if (!canvas)
+            {
+                continue;
+            }
+            Scene* scene = canvasObject->GetScene();
+            const auto handles = canvas->UIObjs;
+            const auto position = InputSessionSystem::Get().GetUIPointerAt(event.sequence);
+            for (const EntityHandle& handle : handles)
+            {
+                Entity* object = scene ? scene->Resolve(handle) : nullptr;
+                if (!object)
+                {
+                    continue;
+                }
+                auto* ui = object->GetComponent<UIComponent>();
+                auto* button = object->GetComponent<UIButton>();
+                if (ui && !ui->IsEnabled())
+                {
+                    continue;
+                }
+                if (button && button->CheckClick({position.x, position.y}))
+                {
+                    button->Click();
+                    break;
+                }
+            }
+        }
+        else if (event.signal == InputSessionSystem::kSubmitSignal)
+        {
+            if (auto* selected = GetSelectUI())
+            {
+                if (auto* button = selected->GetComponent<UIButton>())
+                {
+                    button->Click();
+                }
+            }
+        }
+    }
+    auto* selected = GetSelectUI();
+    const auto* navigation = frame->FindState(InputSessionSystem::kNavigateSignal, Input::ValueType::Vector2);
+    if (!selected || !navigation || elapsed <= 0.2f)
+    {
+        return;
+    }
+    auto* image = selected->GetComponent<ImageComponent>();
+    if (!image || image->IsNavLock())
+    {
+        return;
+    }
+    Entity* next = nullptr;
+    if (navigation->value.x > 0.5f)
+    {
+        next = image->GetNextNavi(Direction::Right);
+    }
+    else if (navigation->value.x < -0.5f)
+    {
+        next = image->GetNextNavi(Direction::Left);
+    }
+    else if (navigation->value.y > 0.5f)
+    {
+        next = image->GetNextNavi(Direction::Up);
+    }
+    else if (navigation->value.y < -0.5f)
+    {
+        next = image->GetNextNavi(Direction::Down);
+    }
+    if (next)
+    {
+        SetSelectUI(next);
+        elapsed = 0;
+    }
 }
 
 Entity* UIManager::FindCanvasName(std::string_view name)

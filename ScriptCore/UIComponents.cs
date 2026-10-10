@@ -70,7 +70,7 @@ public abstract class UIComponent : NativeComponent
     /// <summary>
     /// 패드/키 내비게이션이 지금 이 UI를 가리키고 있는지.
     /// 게임 메뉴 버튼의 표준 형태가 이 값 + 입력 조합이다(실측 5회):
-    /// <code>if (image.IsSelected &amp;&amp; Input.GetButtonDown(0, GamepadButton.A)) { ... }</code>
+    /// Read the UI InputSession frame or subscribe to its generated confirm signal.
     /// </summary>
     public bool IsSelected => Native.UiIsSelected(OwnerHandle);
 

@@ -129,7 +129,7 @@ namespace CreatorBuildTool
                     || relative.StartsWith("ProjectSetting/", StringComparison.Ordinal) && extension is ".asset" or ".celayers"
                     || relative.StartsWith("Assets/Shaders/", StringComparison.Ordinal) && extension is ".slang" or ".hlsl" or ".hlsli"
                     || relative.StartsWith("Assets/", StringComparison.Ordinal) && !relative.StartsWith("Assets/Derived/", StringComparison.Ordinal)
-                        && extension is ".creator" or ".prefab" or ".inputmap" or ".bt" or ".blackboard" or ".renderprofile" or ".terrain" or ".foliage"
+                        && extension is ".creator" or ".prefab" or ".bt" or ".blackboard" or ".renderprofile" or ".terrain" or ".foliage"
                     || relative.StartsWith("Assets/Derived/", StringComparison.Ordinal)
                         && System.Text.RegularExpressions.Regex.IsMatch(relative,
                             @"^Assets/Derived/(Scenes|Prefabs|Audio|SoundGraphs|SoundPresets|CollisionGeometry)/[0-9a-f]{2}/[0-9a-f-]{36}\.(creator|prefab|ceac|cesg|cesp|cepg)$");

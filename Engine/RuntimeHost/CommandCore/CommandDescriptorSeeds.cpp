@@ -133,8 +133,10 @@ namespace CommandCore
             // LC8 — 두 호스트가 같은 뜻으로 갖는 둘 중 하나다. 요약은 이미 호스트 중립이다.
             { "gpu.census", CommandCost::Frames, "[라벨]", "VRAM과 엔진 에셋 수를 로그에 기록", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "label=" },
             { "help", CommandCost::Immediate, "[명령]", "명령 목록 또는 명령 하나의 상세를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
-            { "inputmap.authoring.probe", CommandCost::Frames, "<save|verify> <이름>", "입력 액션맵 저장·재기동 왕복으로 payload 복원을 본다", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
-            { "inputmap.corpus.probe", CommandCost::Long, "", "입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "input.graph.authoring.probe", CommandCost::Long, "<save|verify> <CE_InputProbe_name>", "Save or verify isolated InputGraph fixture through editor authoring", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "mode,name", false, true },
+            { "input.graph.inspect", CommandCost::Long, "<path.inputgraph>", "Validate and inspect an LX input graph and prepared CPU definition", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "path", false, true },
+            { "input.graph.roundtrip", CommandCost::Long, "<path.inputgraph>", "Verify input graph archive and prepared semantic identity round-trip", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "path", false, true },
+            { "input.graph.selftest", CommandCost::Long, "", "Verify cooked InputGraph and override codec contracts", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "()", false, true },
             { "layer.add", CommandCost::Immediate, "<name>", "Add and persist a common layer with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "name", true },
             { "layer.collision", CommandCost::Immediate, "<left> <right> <enabled>", "Persist a symmetric common collision rule", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "left,right,enabled:boolean", true },
             { "layer.list", CommandCost::Immediate, "", "Read stable project layers", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },

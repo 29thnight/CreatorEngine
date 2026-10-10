@@ -8,6 +8,7 @@
 #include <span>
 #include <vector>
 #include <algorithm>
+#include <functional>
 
 // Scene-owned runtime. Registration is authoring membership; no SDK scene exists in editor mode.
 class ScenePhysicsSimulation final
@@ -101,7 +102,8 @@ class ScenePhysicsSimulation final
     ce::physics::result<void> Start(const ce::physics::scene_config& config = {});
     ce::physics::result<void> Stop();
 
-    ce::physics::result<std::uint32_t> Advance(double frame_seconds);
+    using BeforeStep = std::function<ce::physics::result<void>(double fixedSeconds, double droppedSeconds)>;
+    ce::physics::result<std::uint32_t> Advance(double frame_seconds, const BeforeStep& beforeStep = {});
 
     ce::physics::result<ce::physics::body_state> Read(binding_id binding) const;
     ce::physics::body_handle Handle(binding_id binding) const;

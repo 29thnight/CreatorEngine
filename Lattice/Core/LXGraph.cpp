@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <type_traits>
 #include <Windows.h>
 
 namespace LX
@@ -177,8 +178,44 @@ bool Fail(std::string* error, const std::string& value)
 
 void WriteSocketValue(std::ostream& out, const LXSocketValue& value)
 {
-    out << ' ' << value.index() << std::setprecision(std::numeric_limits<double>::max_digits10);
-    switch (value.index())
+    // Wire tags are an archive contract, independent of future variant storage.
+    const unsigned tag = std::visit([](const auto& field) -> unsigned {
+        using T = std::decay_t<decltype(field)>;
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            return 1;
+        }
+        else if constexpr (std::is_same_v<T, std::int64_t>)
+        {
+            return 2;
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            return 3;
+        }
+        else if constexpr (std::is_same_v<T, std::array<double, 3>>)
+        {
+            return 4;
+        }
+        else if constexpr (std::is_same_v<T, std::array<double, 4>>)
+        {
+            return 5;
+        }
+        else if constexpr (std::is_same_v<T, std::string>)
+        {
+            return 6;
+        }
+        else if constexpr (std::is_same_v<T, std::array<double, 2>>)
+        {
+            return 7;
+        }
+        else
+        {
+            return 0;
+        }
+    }, value);
+    out << ' ' << tag << std::setprecision(std::numeric_limits<double>::max_digits10);
+    switch (tag)
     {
     case 1:
         out << ' ' << std::get<bool>(value);
@@ -203,6 +240,12 @@ void WriteSocketValue(std::ostream& out, const LXSocketValue& value)
         break;
     case 6:
         out << ' ' << std::quoted(std::get<std::string>(value));
+        break;
+    case 7:
+        for (double component : std::get<std::array<double, 2>>(value))
+        {
+            out << ' ' << component;
+        }
         break;
     default:
         break;
@@ -275,6 +318,15 @@ bool ReadSocketValue(std::istream& in, LXSocketValue& value)
         value = std::move(field);
         return true;
     }
+    case 7: {
+        std::array<double, 2> field{};
+        if (!(in >> field[0] >> field[1]))
+        {
+            return false;
+        }
+        value = field;
+        return true;
+    }
     default:
         return false;
     }
@@ -295,6 +347,13 @@ bool IsSocketValueValid(PinType type, const LXSocketValue& value)
         return std::holds_alternative<std::int64_t>(value);
     case PinType::Float:
         return std::holds_alternative<double>(value) && std::isfinite(std::get<double>(value));
+    case PinType::Vector2:
+        if (const auto* components = std::get_if<std::array<double, 2>>(&value))
+        {
+            return std::all_of(components->begin(), components->end(),
+                               [](double component) { return std::isfinite(component); });
+        }
+        return false;
     case PinType::Vector:
     case PinType::Normal:
         if (const auto* components = std::get_if<std::array<double, 3>>(&value))
@@ -584,7 +643,9 @@ void LXGraph::Restore(const Snapshot& snapshot)
     layout_ = snapshot.layout;
     layout_.view = currentView;
     groups_ = snapshot.groups;
-    nextId_ = snapshot.nextId;
+    // Input output/binding IDs are external contracts. Undo may restore an old
+    // object, but a new edit after Undo must never recycle its published ID.
+    nextId_ = domain_ == "input" ? std::max(nextId_, snapshot.nextId) : snapshot.nextId;
 }
 
 Id LXGraph::AddNode(const NodeSpec& spec, float x, float y)
@@ -2239,14 +2300,14 @@ bool LXGraph::Redo()
 const char* PinTypeName(PinType type)
 {
     static constexpr const char* names[] = {"Flow",  "Bool",   "Int",     "Float",  "Vector",
-                                            "Color", "Normal", "Texture", "Surface", "Sampler", "Closure"};
+                                            "Color", "Normal", "Texture", "Surface", "Sampler", "Closure", "Vector2"};
     const auto index = static_cast<unsigned>(type);
     return index < std::size(names) ? names[index] : "Unknown";
 }
 
 void LXGraph::Write(std::ostream& out) const
 {
-    out << "LXG 9 " << std::quoted(domain_) << ' ' << nextId_ << '\n';
+    out << "LXG 10 " << std::quoted(domain_) << ' ' << nextId_ << '\n';
     out << "N " << nodes_.size() << '\n';
     for (const Node& node : nodes_)
     {
@@ -2418,7 +2479,7 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
     std::string magic, domain, tag;
     int version = 0;
     Id nextId = 0;
-    if (!(in >> magic >> version >> std::quoted(domain) >> nextId) || magic != "LXG" || (version < 1 || version > 9) ||
+    if (!(in >> magic >> version >> std::quoted(domain) >> nextId) || magic != "LXG" || (version < 1 || version > 10) ||
         !nextId)
     {
         Fail(error, "Invalid LXG header");
@@ -2446,7 +2507,7 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
             (version >= 3 && !(in >> hasRule >> ruleDirection >> ruleType >> ruleMultiple >> ruleLimit)) ||
             (version >= 8 && !(in >> node.groupId)) || (collapsed != 0 && collapsed != 1) ||
             (hasRule != 0 && hasRule != 1) || ruleDirection < 0 || ruleDirection > 1 || ruleType < 0 ||
-            ruleType > static_cast<int>(version >= 9 ? PinType::Closure : PinType::Surface) ||
+            ruleType > static_cast<int>(version >= 10 ? PinType::Vector2 : version >= 9 ? PinType::Closure : PinType::Surface) ||
             (ruleMultiple != 0 && ruleMultiple != 1) ||
             pinCount > kDocumentLimit || propertyCount > kDocumentLimit || ruleLimit > kDocumentLimit)
         {
@@ -2467,7 +2528,7 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
                 !(in >> direction >> type >> multiple) || (version >= 3 && !(in >> dynamic)) ||
                 (version >= 8 && !(in >> pin.interfaceId)) || (version >= 5 && !ReadSocketValue(in, pin.value)) ||
                 direction < 0 || direction > 1 || type < 0 ||
-                type > static_cast<int>(version >= 9 ? PinType::Closure : PinType::Surface) ||
+                type > static_cast<int>(version >= 10 ? PinType::Vector2 : version >= 9 ? PinType::Closure : PinType::Surface) ||
                 (multiple != 0 && multiple != 1) || (dynamic != 0 && dynamic != 1) ||
                 (version >= 4 && pin.identifier.empty()))
             {
@@ -2608,7 +2669,7 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
                 if (!(in >> socket.id >> std::quoted(socket.identifier) >> std::quoted(socket.name) >> direction >>
                       type >> socket.internalPin) ||
                     !ReadSocketValue(in, socket.value) || direction < 0 || direction > 1 || type < 0 ||
-                    type > static_cast<int>(version >= 9 ? PinType::Closure : PinType::Surface))
+                    type > static_cast<int>(version >= 10 ? PinType::Vector2 : version >= 9 ? PinType::Closure : PinType::Surface))
                 {
                     Fail(error, "Invalid group socket record");
                     return std::nullopt;

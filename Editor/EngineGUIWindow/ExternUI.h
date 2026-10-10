@@ -10,7 +10,7 @@ extern bool DrawTextureImportEditor(Authoring::WriteNode node,
     const std::filesystem::path& source);
 extern void ImGuiDrawHelperMeshRenderer(class MeshRenderer* meshRenderer);
 extern void ImGuiDrawHelperAnimator(class Animator* animator);
-extern void ImGuiDrawHelperPlayerInput(class PlayerInputComponent* playerInput);
+extern void ImGuiDrawHelperInputSession(class InputSessionComponent* input);
 extern void ImGuiDrawHelperRectTransformComponent(class RectTransformComponent* rectTransform);
 extern void ImGuiDrawHelperTerrainComponent(class TerrainComponent* terrain);
 

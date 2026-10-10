@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $failures = [Collections.Generic.List[string]]::new()
-$sourceRoots = @('Engine', 'Editor', 'Player') | ForEach-Object {
+$sourceRoots = @('Engine', 'Editor', 'Player', 'Lattice') | ForEach-Object {
     Join-Path $repoRoot $_
 }
 $sourceFiles = @($sourceRoots | ForEach-Object {
@@ -76,17 +76,50 @@ if ($animatorText -match 'SerializeControllers|DeserializeControllers|ImportLega
     $failures.Add('Animator legacy JSON entry point remains')
 }
 
-$inputText = (Get-Content -LiteralPath `
-    (Join-Path $repoRoot 'Engine\SceneRuntime\InputActionManager.cpp') -Raw) +
-    (Get-Content -LiteralPath `
-    (Join-Path $repoRoot 'Engine\SceneRuntime\InputActionManager.h') -Raw)
-if ($inputText -match 'SerializeMap|DeSerializeMap|\.json') {
-    $failures.Add('InputMap legacy JSON contract remains')
+# InputGraph replaces the deleted manager: retain both the old retirement
+# assertion and positive checks on the current authoring/cooked source boundary.
+foreach ($retired in @('Engine\SceneRuntime\InputActionManager.cpp', 'Engine\SceneRuntime\InputActionManager.h')) {
+    if (Test-Path -LiteralPath (Join-Path $repoRoot $retired)) {
+        $failures.Add("retired InputActionManager source remains: $retired")
+    }
 }
-$inputRoot = Join-Path $repoRoot 'Dynamic_CPP\Assets\InputMap'
-$legacyInput = @(Get-ChildItem -LiteralPath $inputRoot -Filter '*.json' -File)
+$inputRuntimeText = (@(
+    'Engine\RenderEngine\Experiment\Cooked\CookedInputGraph.cpp',
+    'Engine\RenderEngine\Experiment\Cooked\CookedInputGraph.h',
+    'Engine\RenderEngine\AssetDepot\InputGraphAssetRuntime.cpp',
+    'Engine\RenderEngine\AssetDepot\InputGraphAssetRuntime.h'
+) | ForEach-Object { Get-Content -LiteralPath (Join-Path $repoRoot $_) -Raw }) -join "`n"
+$inputAuthoringText = (@(
+    'Lattice\Input\LXInputGraph.cpp', 'Lattice\Input\LXInputGraph.h',
+    'Lattice\Input\LXInputCompiler.cpp', 'Lattice\Input\LXInputCompiler.h'
+) | ForEach-Object { Get-Content -LiteralPath (Join-Path $repoRoot $_) -Raw }) -join "`n"
+if (($inputRuntimeText + $inputAuthoringText) -match 'SerializeMap|DeSerializeMap|\.json|json::') {
+    $failures.Add('InputGraph reintroduced a legacy JSON contract')
+}
+if ($inputRuntimeText -match 'LXInputArchive|ParsedDocument|ryml::') {
+    $failures.Add('InputGraph runtime reintroduced an authoring text parser')
+}
+if ($inputRuntimeText -notmatch 'ReadInputGraphArtifact' -or
+    $inputRuntimeText -notmatch 'WriteInputGraphArtifact' -or
+    $inputRuntimeText -notmatch '0x47494543u') {
+    $failures.Add('InputGraph canonical CEIG reader/writer contract is missing')
+}
+if ($inputAuthoringText -notmatch 'LXInputArchive::Read' -or $inputAuthoringText -notmatch '"LXINPUT') {
+    $failures.Add('InputGraph canonical LX authoring archive contract is missing')
+}
+$legacyInput = @(@('Dynamic_CPP\Assets\InputMap', 'Dynamic_CPP\Assets\InputGraph') | ForEach-Object {
+    $inputRoot = Join-Path $repoRoot $_
+    if (Test-Path -LiteralPath $inputRoot -PathType Container) {
+        Get-ChildItem -LiteralPath $inputRoot -Filter '*.json' -File -Recurse
+    }
+})
 if ($legacyInput.Count -ne 0) {
-    $failures.Add("InputMap JSON files remain: $($legacyInput.Count)")
+    $failures.Add("Input authoring JSON files remain: $($legacyInput.Count)")
+}
+$legacyInputMaps = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Dynamic_CPP\Assets') `
+    -Filter '*.inputmap' -File -Recurse)
+if ($legacyInputMaps.Count -ne 0) {
+    $failures.Add("Legacy InputMap sources remain in packaged Assets: $($legacyInputMaps.Count)")
 }
 
 $terrainText = (Get-Content -LiteralPath `
@@ -100,7 +133,7 @@ if ($terrainText -notmatch 'schemaVersion') {
     $failures.Add('Terrain canonical YAML schema marker is missing')
 }
 
-"nlohmann retirement: sources=$($sourceFiles.Count) sourceHits=$($sourceHits.Count) projectHits=$($projectHits.Count) inputJson=$($legacyInput.Count)"
+"nlohmann retirement: sources=$($sourceFiles.Count) sourceHits=$($sourceHits.Count) projectHits=$($projectHits.Count) inputJson=$($legacyInput.Count) inputMap=$($legacyInputMaps.Count)"
 if ($failures.Count -gt 0) {
     'FAIL:'
     $failures | ForEach-Object { "  - $_" }

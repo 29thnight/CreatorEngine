@@ -18,6 +18,7 @@
 #include "AssetDepot/LegacyResourceCache.h"
 #include "AssetDepot/ModelAssetRuntime.h"
 #include "AssetDepot/MaterialAssetRuntime.h"
+#include "AssetDepot/InputGraphAssetRuntime.h"
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -89,6 +90,7 @@ enum class RuntimeAssetType
 	ShaderMeta,
     MaterialGraph,
     Font,
+    InputGraph,
 };
 
 enum class RuntimeAssetChangeKind
@@ -113,6 +115,16 @@ struct RuntimeTexturePublication final
     AssetDepot::AssetRequest<Texture> request{};
 };
 
+// Already validated source-free InputGraph artifact. Authoring owns source parsing.
+struct RuntimeInputGraphPublication final
+{
+    std::shared_ptr<std::atomic<std::uint64_t>> latestRevision;
+    std::uint64_t revision{};
+    experiment::cooked::AssetSetManifest manifest;
+    std::vector<std::byte> manifestBytes;
+    own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource;
+};
+
 // Editor 같은 authoring Host가 완전히 게시한 파일의 결과만 이 계약으로 넘긴다.
 // Runtime은 source/meta 작성 방법을 알지 않고 catalog와 cache generation만 갱신한다.
 struct RuntimeAssetChange
@@ -122,6 +134,7 @@ struct RuntimeAssetChange
 	FileGuid guid{};
 	file::path path{};
     own::shared_owner<RuntimeTexturePublication> texturePublication{};
+    own::shared_owner<const RuntimeInputGraphPublication> inputGraphPublication{};
 };
 
 class DataSystem : public Singleton<DataSystem>
@@ -174,6 +187,10 @@ public:
         {
             return TryAcquireShaderMeta(link);
         }
+        else if constexpr (std::is_same_v<T, Input::InputGraphProgram>)
+        {
+            return TryAcquireInputGraph(link);
+        }
         else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>
             || std::is_same_v<T, experiment::Material> || std::is_same_v<T, LX::Runtime::ShaderGeneration>)
         {
@@ -201,6 +218,10 @@ public:
         else if constexpr (std::is_same_v<T, ShaderMeta>)
         {
             return RequestShaderMetaAsync(link);
+        }
+        else if constexpr (std::is_same_v<T, Input::InputGraphProgram>)
+        {
+            return RequestInputGraphAsync(link);
         }
         else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>
             || std::is_same_v<T, experiment::Material> || std::is_same_v<T, LX::Runtime::ShaderGeneration>)
@@ -685,6 +706,8 @@ private:
     // Frame-boundary authoring overlays, guarded by m_assetPreparationMutex.
     std::map<FileGuid, AssetDepot::AssetMountId> m_authoredTextureMounts;
     bool PublishAuthoredTexture(const RuntimeAssetChange& change);
+    bool PublishAuthoredInputGraph(const RuntimeAssetChange& change);
+    std::map<FileGuid, AssetDepot::AssetMountId> m_authoredInputGraphMounts;
     [[nodiscard]] std::vector<experiment::cooked::TypedAssetReference> ListAssetSetRoots(
         AssetDepot::AssetMountId mountId, experiment::cooked::CookedAssetKind kind) const;
 	// I7-C2 — 마운트 때 한 번 판정한 stale 집합. 해석마다 stat을 두 번 하면
@@ -695,6 +718,16 @@ private:
 	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
+    own::shared_owner<const Input::InputGraphProgram> TryAcquireInputGraph(
+        AssetDepot::AssetLink<Input::InputGraphProgram> link);
+    AssetDepot::AssetRequest<Input::InputGraphProgram> RequestInputGraphAsync(
+        AssetDepot::AssetLink<Input::InputGraphProgram> link);
+    void RunInputGraphAssetWork(own::shared_owner<AssetDepot::InputGraphAssetWork> work);
+    void CompleteInputGraphAssetWorkLocked(const own::shared_owner<AssetDepot::InputGraphAssetWork>& work,
+        AssetDepot::AssetRequestError error, const std::string& failure,
+        const own::shared_owner<const Input::InputGraphProgram>& candidate = {});
+    std::map<AssetDepot::InputGraphAssetKey, AssetDepot::InputGraphAssetEntry> m_inputGraphAssets;
+
     static constexpr std::size_t kMaxCachedFonts = 32u;
     std::unordered_map<std::string, std::shared_ptr<FontAsset>> m_fonts;
     std::atomic<std::uint64_t> m_fontCacheRevision{ 1 };

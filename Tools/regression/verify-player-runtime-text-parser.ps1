@@ -115,9 +115,18 @@ try {
     $runtimeDocuments = [Collections.Generic.List[IO.FileInfo]]::new()
     foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $runtimeRoot 'ProjectSetting') `
         -File -Recurse -Filter '*.asset')) { $runtimeDocuments.Add($file) }
-    $extensions = @('.inputmap', '.bt', '.blackboard', '.renderprofile', '.terrain', '.foliage')
-    foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $runtimeRoot 'Assets') `
-        -File -Recurse | Where-Object { $extensions -contains $_.Extension.ToLowerInvariant() })) {
+    $runtimeAssetFiles = @(Get-ChildItem -LiteralPath (Join-Path $runtimeRoot 'Assets') -File -Recurse)
+    $inputSources = @($runtimeAssetFiles | Where-Object {
+        $_.Extension.ToLowerInvariant() -in @('.inputgraph', '.inputmap')
+    })
+    if ($inputSources.Count -ne 0) {
+        throw "D6 package leaked InputGraph/legacy input authoring sources: $($inputSources.FullName -join ', ')"
+    }
+    # CEIG is validated by the InputGraph reader. It is not a CEDO document,
+    # and neither current LX source nor legacy inputmap belongs in this list.
+    $extensions = @('.bt', '.blackboard', '.renderprofile', '.terrain', '.foliage')
+    foreach ($file in @($runtimeAssetFiles |
+        Where-Object { $extensions -contains $_.Extension.ToLowerInvariant() })) {
         $runtimeDocuments.Add($file)
     }
     $expectedRuntimeDocuments = [int]$manifest.cook.runtimeDocumentCount

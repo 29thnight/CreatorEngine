@@ -61,7 +61,7 @@ internal static class PackageInputs
         bool Document(string relative)
         {
             var extension = Path.GetExtension(relative).ToLowerInvariant();
-            return extension is ".creator" or ".prefab" or ".inputmap" or ".bt" or ".blackboard" or ".renderprofile"
+            return extension is ".creator" or ".prefab" or ".bt" or ".blackboard" or ".renderprofile"
                 or ".terrain" or ".foliage" or ".cegeometry" or ".wav" or ".mp3" or ".flac" or ".soundgraph" or ".soundpreset"
                 || relative.StartsWith("Shaders/", StringComparison.Ordinal) && extension is ".slang" or ".hlsl" or ".hlsli";
         }
@@ -234,6 +234,7 @@ internal static class PackageInputs
             path.Replace('\\', '/').Contains("/Assets/Derived/Models/", StringComparison.OrdinalIgnoreCase))
             return false;
         return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json"
+            or ".inputgraph" or ".inputmap"
             or ".wav" or ".mp3" or ".flac" or ".ogg" or ".soundgraph" or ".soundpreset";
     }
 }

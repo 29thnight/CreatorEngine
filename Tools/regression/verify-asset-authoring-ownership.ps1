@@ -100,12 +100,12 @@ Assert-DoesNotMatch "Engine\SceneRuntime\Animator.cpp" `
 Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
 	'AnimatorControllerWriter|WriteAnimatorControllerThroughEditor'
 
-Assert-DoesNotMatch "Engine\SceneRuntime\InputActionManager.cpp" `
-    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\SceneRuntime\InputActionManager.cpp" `
-    'AssetAuthoringPort::WriteInputActionMap'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
-    'InstallInputActionMapWriter\(\s*&WriteInputActionMapThroughEditor\)'
+# InputGraph is a formal cataloged asset; Player never writes/parses its authoring source.
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" 'bool SaveInputGraph'
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" 'WriteTextAssetWithMeta\(path, payload, identity\)'
+Assert-Matches "Engine\RenderEngine\AssetDepot\InputGraphAssetRuntime.cpp" 'ReadInputGraphArtifact'
+Assert-DoesNotMatch "Engine\RenderEngine\AssetDepot\InputGraphAssetRuntime.cpp" 'LXInputArchive|ParsedDocument|\.inputmap'
+Assert-DoesNotMatch "Engine\RenderEngine\Interfaces\AssetAuthoringPort.h" 'WriteInputActionMap'
 
 Assert-DoesNotMatch "Engine\SceneRuntime\TagManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
@@ -203,7 +203,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|LayerSettingsWriter|TagManagerWriter|InputActionMapWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|LayerSettingsWriter|TagManagerWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -709,38 +709,38 @@ try {
         throw "TagManager publication created a .meta sidecar"
     }
 
-    # 입력 액션맵은 맵마다 파일 하나이고, 읽기는 디렉터리 스캔이다. 이름에 '.'이 든
-    # 맵이 잘리지 않는지(예전 replace_extension 결함), 그리고 저장한 것이 재기동 후
-    # 스캔으로 다시 읽히는지를 함께 본다.
-    $inputMapRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\InputMap"))
-    $inputMapName = "CE_InputProbe_" + $probeName.Substring($probeName.Length - 12) + ".v2"
-    $inputMapAsset = Join-Path $inputMapRoot ($inputMapName + ".inputmap")
+    # Cataloged InputGraph source and sidecar must survive an actual Editor restart.
+    $inputGraphRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\InputGraph"))
+    $inputGraphName = "CE_InputProbe_" + $probeName.Substring($probeName.Length - 12) + ".v2"
+    $inputGraphAsset = Join-Path $inputGraphRoot ($inputGraphName + ".inputgraph")
+    [IO.File]::WriteAllLines($commandFile, @("input.graph.authoring.probe save $inputGraphName", "quit"))
+    $inputSaveOutput = Invoke-Import "inputgraph-save"
+    if ($inputSaveOutput -notmatch '\[input\.graph\.authoring\.probe\] save=ok') {
+        throw "InputGraph did not save through the Editor source/meta transaction"
+    }
+    if (-not (Test-Path -LiteralPath $inputGraphAsset) -or -not (Test-Path -LiteralPath ($inputGraphAsset + '.meta'))) {
+        throw "InputGraph source/meta missing or name with a dot was truncated: $inputGraphAsset"
+    }
+    $sourceGuid = [regex]::Match((Get-Content -LiteralPath $inputGraphAsset -Raw), '^LXINPUT 1 "([0-9a-f-]{36})"')
+    $metaText = Get-Content -LiteralPath ($inputGraphAsset + '.meta') -Raw
+    if (-not $sourceGuid.Success -or $metaText -notmatch ('(?m)^guid:\s*"?' +
+        [regex]::Escape($sourceGuid.Groups[1].Value) + '"?\s*$')) {
+        throw "InputGraph source/meta GUID contract is inconsistent"
+    }
+    $sourceHash = (Get-FileHash -LiteralPath $inputGraphAsset -Algorithm SHA256).Hash
+    $metaHash = (Get-FileHash -LiteralPath ($inputGraphAsset + '.meta') -Algorithm SHA256).Hash
+    [IO.File]::WriteAllLines($commandFile, @("input.graph.authoring.probe verify $inputGraphName", "quit"))
+    $inputVerifyOutput = Invoke-Import "inputgraph-verify"
+    if ($inputVerifyOutput -notmatch '\[input\.graph\.authoring\.probe\] verify signals=3 bindings=3 layers=1 stable=1 meta=1') {
+        throw "Restarted Editor did not restore the complete cataloged InputGraph"
+    }
+    if ((Get-FileHash -LiteralPath $inputGraphAsset -Algorithm SHA256).Hash -ne $sourceHash -or
+        (Get-FileHash -LiteralPath ($inputGraphAsset + '.meta') -Algorithm SHA256).Hash -ne $metaHash) {
+        throw "InputGraph verification unexpectedly rewrote source/meta"
+    }
 
-    [IO.File]::WriteAllLines($commandFile, @(
-        "inputmap.authoring.probe save $inputMapName"
-        "quit"
-    ))
-    $inputSaveOutput = Invoke-Import "inputmap-save"
-    if ($inputSaveOutput -notmatch '\[inputmap\.authoring\.probe\] save=ok') {
-        throw "input action map did not save through the Editor authoring transaction"
-    }
-    if (-not (Test-Path -LiteralPath $inputMapAsset)) {
-        throw "input action map name with a dot was truncated — expected $inputMapAsset"
-    }
-    if (Test-Path -LiteralPath ($inputMapAsset + ".meta")) {
-        throw "input action map publication created a .meta sidecar"
-    }
 
-    [IO.File]::WriteAllLines($commandFile, @(
-        "inputmap.authoring.probe verify $inputMapName"
-        "quit"
-    ))
-    $inputVerifyOutput = Invoke-Import "inputmap-verify"
-    if ($inputVerifyOutput -notmatch '\[inputmap\.authoring\.probe\] verify found=1 actions=1 stable=1') {
-        throw "restarted Editor did not load the persisted input action map"
-    }
-
-	"asset authoring ownership: PASS (legacy .asset 캐시 미생성=PASS, 임베디드 추출 미생성=PASS, source intake=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator single-truth=PASS)"
+	"asset authoring ownership: PASS (legacy .asset 캐시 미생성=PASS, 임베디드 추출 미생성=PASS, source intake=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input graph/meta=PASS, animator single-truth=PASS)"
 }
 finally {
     if ($null -ne $matrixOriginal) { [IO.File]::WriteAllBytes($matrixAsset, $matrixOriginal) }
@@ -822,14 +822,14 @@ finally {
         }
         Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
     }
-	if ($null -ne $inputMapAsset) {
-        $absoluteInputMap = [IO.Path]::GetFullPath($inputMapAsset)
-        if (-not $absoluteInputMap.StartsWith($inputMapRoot, [StringComparison]::OrdinalIgnoreCase) -or
-            -not (Split-Path $absoluteInputMap -Leaf).StartsWith(
-                "CE_InputProbe_", [StringComparison]::OrdinalIgnoreCase)) {
-            throw "refusing to remove an unverified input map probe: $absoluteInputMap"
+    if ($null -ne $inputGraphAsset) {
+        $absoluteInputGraph = [IO.Path]::GetFullPath($inputGraphAsset)
+        if ([IO.Path]::GetFullPath((Split-Path $absoluteInputGraph -Parent)) -ne $inputGraphRoot -or
+            -not (Split-Path $absoluteInputGraph -Leaf).StartsWith("CE_InputProbe_", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to remove an unverified InputGraph probe: $absoluteInputGraph"
         }
-        Remove-Item -LiteralPath $absoluteInputMap -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $absoluteInputGraph -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath ($absoluteInputGraph + '.meta') -Force -ErrorAction SilentlyContinue
     }
     if (Test-Path -LiteralPath $tempRoot) {
         $verifiedTemp = [IO.Path]::GetFullPath($tempRoot)

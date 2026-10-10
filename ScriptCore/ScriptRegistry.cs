@@ -364,7 +364,11 @@ internal static class ScriptRegistry
     internal static void ApplyEnabled(Component b, bool enabled)
     {
         if (!b.SetEnabledState(enabled)) return;
-        if (!enabled) ContactRouter.Suspend(b);
+        if (!enabled)
+        {
+            ContactRouter.Suspend(b);
+            InputRouter.RemoveOwner(b);
+        }
 
         if (!b.InitializeSucceeded) return;
 
@@ -643,6 +647,7 @@ internal static class ScriptRegistry
     /// </summary>
     public static void Clear()
     {
+        InputRouter.Reset();
         // ★ 보류 큐를 먼저 반영한다(2026-09-05).
         //
         // 관리 틱이 한 번도 돌지 않은 인스턴스는 _pendingAdd에 머문다 — 편집
@@ -682,6 +687,8 @@ internal static class ScriptRegistry
         // 수명 내내 유지하면 리로드 뒤의 같은 결함이 조용히 지나간다 — 저작 중에는
         // 고치고 다시 돌리는 것이 기본 동작이므로 그 자리가 바로 다음 회차다.
         Native.ResetOffThreadReports();
+        // Teardown hooks cannot retain a newly-created subscription into an unload.
+        InputRouter.Reset();
     }
 }
 

@@ -132,9 +132,6 @@
     <Filter Include="Managers">
       <UniqueIdentifier>{da5e0785-8ccd-4eb4-9aff-9a74beb9502b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\InputActionManager">
-      <UniqueIdentifier>{c83882e2-80b3-4d8d-95cd-8da2418fea94}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\InputManager">
       <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
     </Filter>
@@ -170,9 +167,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ActionMap.cpp">
-      <Filter>Managers\InputActionManager</Filter>
-    </ClCompile>
     <ClCompile Include="AIManager.cpp">
       <Filter>Classes\GameAI\Core\Manager</Filter>
     </ClCompile>
@@ -248,12 +242,6 @@
     <ClCompile Include="ImageComponent.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
-    <ClCompile Include="InputAction.cpp">
-      <Filter>Managers\InputActionManager</Filter>
-    </ClCompile>
-    <ClCompile Include="InputActionManager.cpp">
-      <Filter>Managers\InputActionManager</Filter>
-    </ClCompile>
     <ClCompile Include="InputManager.cpp">
       <Filter>Managers\InputManager</Filter>
     </ClCompile>
@@ -289,9 +277,6 @@
     </ClCompile>
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
-    </ClCompile>
-    <ClCompile Include="PlayerInput.cpp">
-      <Filter>Classes\Components\InputComponent</Filter>
     </ClCompile>
     <ClCompile Include="Prefab.cpp">
       <Filter>Classes\GameObject\Prefab</Filter>
@@ -382,9 +367,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ActionMap.h">
-      <Filter>Managers\InputActionManager</Filter>
-    </ClInclude>
     <ClInclude Include="AIManager.h">
       <Filter>Classes\GameAI\Core\Manager</Filter>
     </ClInclude>
@@ -535,12 +517,6 @@
     <ClInclude Include="ImageComponent.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
-    <ClInclude Include="InputAction.h">
-      <Filter>Managers\InputActionManager</Filter>
-    </ClInclude>
-    <ClInclude Include="InputActionManager.h">
-      <Filter>Managers\InputActionManager</Filter>
-    </ClInclude>
     <ClInclude Include="InputManager.h">
       <Filter>Managers\InputManager</Filter>
     </ClInclude>
@@ -601,9 +577,6 @@
     </ClInclude>
     <ClInclude Include="Object.h">
       <Filter>Classes\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="PlayerInput.h">
-      <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
@@ -771,5 +744,18 @@
     <ClInclude Include="Audio\AudioSourceInspection.h" />
     <ClInclude Include="Audio\AudioSourceValidation.h" />
     <ClInclude Include="Audio\EditorAudioClipCache.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="InputSession.cpp" />
+    <ClCompile Include="InputSessionComponent.cpp" />
+    <ClCompile Include="InputSessionSystem.cpp" />
+    <ClInclude Include="InputSession.h" />
+    <ClInclude Include="InputSessionComponent.h" />
+    <ClInclude Include="InputSessionSystem.h" />
+    <ClInclude Include="ScriptInputABI.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="InputSubscriptions.h" />
+    <ClCompile Include="InputSubscriptions.cpp" />
   </ItemGroup>
 </Project>

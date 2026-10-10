@@ -1,3 +1,4 @@
+#include "InputSessionSystem.h"
 #include "EditorProjectLayerSettings.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
@@ -872,6 +873,9 @@ void Editor::EditorMain::Update()
 		}
 		Editor::ModelPlacement::Get().Tick();
 		EditorScriptAuthoring::Tick();
+		// Commit queued inspector configuration under the PT/GT scene barrier
+		// immediately before a pending Play transaction captures its baseline.
+		InputSessionSystem::Get().ApplyAuthoringChanges();
 		SceneManagers->ApplyPendingSceneStructureChange();
 		// UI 가 잠금 아래에서 고친 선택을 다음 프레임 시뮬레이션이 읽을 사본으로 뜬다.
 		// 씬 전환 뒤에 떠야 새 씬의 사본이 선다.

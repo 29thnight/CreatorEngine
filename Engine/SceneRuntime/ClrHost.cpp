@@ -9,6 +9,10 @@
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "ScriptPhysicsABI.h"
+#include "ScriptInputABI.h"
+#include "InputSessionComponent.h"
+#include "InputSessionSystem.h"
+#include <cmath>
 #include <array>
 #include <thread>
 #include "Transform.h"
@@ -272,26 +276,20 @@ namespace
 		Float4 (__stdcall* Mesh_GetBaseColor)(ScriptObjectHandle handle);
 		void  (__stdcall* Mesh_SetBaseColor)(ScriptObjectHandle handle, Float4 color);
 
-		// 입력. 실측 43회인데 스크립트에서 아무것도 받을 수 없던 표면이다.
-		//
-		// 개별 술어(Down/Pressed/Released)를 따로 열지 않고 상태값을 통째로 넘긴다.
-		// 경계 왕복이 한 번으로 줄고, 무엇보다 엔진의 Pressed가 첫 프레임을 제외한다는
-		// 함정을 C# 쪽에서 정확히 조합해 감출 수 있다.
-		int   (__stdcall* Input_GetKeyState)(int key);
-		int   (__stdcall* Input_GetMouseButtonState)(int button);
-		int   (__stdcall* Input_GetControllerButtonState)(int index, int button);
-		int   (__stdcall* Input_IsAnyKeyPressed)();
-
-		Float2 (__stdcall* Input_GetMousePosition)();
-		Float2 (__stdcall* Input_GetMouseDelta)();
-		int   (__stdcall* Input_GetWheelDelta)();
-		void  (__stdcall* Input_SetCursorVisible)(int visible);
-
-		int   (__stdcall* Input_IsControllerConnected)(int index);
-		int   (__stdcall* Input_IsControllerTriggerL)(int index);
-		int   (__stdcall* Input_IsControllerTriggerR)(int index);
-		Float2 (__stdcall* Input_GetControllerThumbL)(int index);
-		Float2 (__stdcall* Input_GetControllerThumbR)(int index);
+        // Retired raw input slots remain reserved. Later ABI slots never move.
+        void (__stdcall* ReservedInput00)();
+        void (__stdcall* ReservedInput01)();
+        void (__stdcall* ReservedInput02)();
+        void (__stdcall* ReservedInput03)();
+        void (__stdcall* ReservedInput04)();
+        void (__stdcall* ReservedInput05)();
+        void (__stdcall* ReservedInput06)();
+        void (__stdcall* Cursor_SetVisible)(int visible);
+        void (__stdcall* ReservedInput08)();
+        void (__stdcall* ReservedInput09)();
+        void (__stdcall* ReservedInput10)();
+        void (__stdcall* ReservedInput11)();
+        void (__stdcall* ReservedInput12)();
 
         std::uint64_t (__stdcall* Body_Find)(ScriptObjectHandle owner);
         std::uint64_t (__stdcall* Character_Find)(ScriptObjectHandle owner);
@@ -395,7 +393,25 @@ namespace
         int (__stdcall* Body_Remove)(ScriptObjectHandle owner, std::uint64_t instance);
         int (__stdcall* Body_ShapeRole)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, const char* role);
 
+        // v41 InputGraph: stable IDs, owned snapshots, next-boundary commands.
+        Input::InputSessionHandle (__stdcall* Input_FindSession)(ScriptObjectHandle owner);
+        int (__stdcall* Input_CopyFrame)(Input::InputSessionHandle session, std::uint32_t domain,
+            std::uint64_t expectedSequence, Input::Script::FrameHeader* header,
+            Input::Script::State* states, std::uint32_t stateCapacity,
+            Input::Script::Event* events, std::uint32_t eventCapacity);
+        int (__stdcall* Input_Request)(Input::InputSessionHandle session, const Input::Script::Request* request);
+        int (__stdcall* Input_Haptic)(Input::InputSessionHandle session, float seconds, float left, float right);
+        int (__stdcall* Input_ValidateSignal)(Input::InputSessionHandle session, Input::GraphID graph,
+            Input::SignalID signal, std::uint64_t interfaceHash, std::uint32_t type, std::uint32_t domain);
+        int (__stdcall* Input_ListDevices)(Input::Script::Device* devices, std::uint32_t capacity, std::uint32_t* count);
+
 	};
+
+    static_assert(offsetof(ScriptApiTable, Body_Find)
+        == offsetof(ScriptApiTable, ReservedInput00) + 13 * sizeof(void*));
+    static_assert(offsetof(ScriptApiTable, Input_FindSession)
+        == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(void*));
+    static_assert(sizeof(ScriptApiTable) == 8 + 204 * sizeof(void*));
 
     static_assert(offsetof(ScriptApiTable, Asset_RequestTyped)
         == offsetof(ScriptApiTable, Asset_ListRoots) + sizeof(decltype(ScriptApiTable::Asset_ListRoots)));
@@ -2021,119 +2037,254 @@ namespace
 		}
 	}
 
-	// ── 입력 ──
-	//
-	// 엔진의 KeyState 전이는 Idle → Down(첫 프레임) → Pressed(유지) → Released(뗀 프레임)다.
-	// Pressed가 첫 프레임을 포함하지 않는 것이 함정이라, 상태를 그대로 넘겨
-	// "눌려 있는가"를 C#에서 Down|Pressed로 정확히 조합하게 한다.
+    // InputGraph consumes sealed frames; cursor visibility is an output-only control.
+    void __stdcall Api_Cursor_SetVisible(int visible)
+    {
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return;
+        }
+        if (0 != visible)
+        {
+            InputManagement->ShowCursor();
+        }
+        else
+        {
+            InputManagement->HideCursor();
+        }
+    }
 
-	// 스크립트는 게임 소비처다 — 소유가 아닌 프레임에는 장치가 조용한 것처럼
-	// 보인다(W5 관문, InputManager.h). 위치는 그대로 준다: 위치는 상태가 아니라
-	// 사실이고, 그것으로 무엇을 할지는 버튼 상태가 정한다.
-	static bool GameInputOwned()
-	{
-		return InputManagement->IsGameInputOwned();
-	}
+    Input::InputSessionHandle __stdcall Api_Input_FindSession(ScriptObjectHandle owner)
+    {
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return {};
+        }
+        try
+        {
+            auto* entity = ScriptObjectRegistry::Get().Resolve(owner);
+            if (entity == nullptr || entity->IsDestroyMark())
+            {
+                return {};
+            }
+            auto* component = entity->GetComponent<InputSessionComponent>();
+            return component != nullptr && !component->IsDestroyMark() && component->GetSession() != nullptr
+                ? component->GetSessionHandle() : Input::InputSessionHandle{};
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
 
-	int __stdcall Api_Input_GetKeyState(int key)
-	{
-		if (key < 0 || key >= kKeyboardCount) return static_cast<int>(KeyState::Idle);
-		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
-		return static_cast<int>(InputManagement->m_keyboardState.GetKeyState(static_cast<size_t>(key)));
-	}
+    int __stdcall Api_Input_CopyFrame(Input::InputSessionHandle handle, std::uint32_t domain,
+        std::uint64_t expectedSequence, Input::Script::FrameHeader* header,
+        Input::Script::State* states, std::uint32_t stateCapacity,
+        Input::Script::Event* events, std::uint32_t eventCapacity)
+    {
+        using Input::Script::Result;
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return static_cast<int>(Result::WrongThread);
+        }
+        if (header == nullptr || domain > static_cast<std::uint32_t>(Input::Domain::UI))
+        {
+            return static_cast<int>(Result::InvalidArgument);
+        }
+        *header = {};
+        try
+        {
+            const auto* session = InputSessionSystem::Get().ResolveSession(handle);
+            if (session == nullptr)
+            {
+                return static_cast<int>(Result::InvalidSession);
+            }
+            const auto& frame = session->GetLastFrame(static_cast<Input::Domain>(domain));
+            if (!frame)
+            {
+                return static_cast<int>(Result::NoFrame);
+            }
+            if (frame->GetStates().size() > Input::Script::kMaximumStates ||
+                frame->GetEvents().size() > Input::Script::kMaximumEvents)
+            {
+                return static_cast<int>(Result::Capacity);
+            }
+            *header = Input::Script::CopyHeader(*frame);
+            if (expectedSequence != 0 && expectedSequence != header->sequence)
+            {
+                return static_cast<int>(Result::Rejected);
+            }
+            if (header->stateCount > stateCapacity || header->eventCount > eventCapacity ||
+                (header->stateCount != 0 && states == nullptr) || (header->eventCount != 0 && events == nullptr))
+            {
+                return static_cast<int>(Result::Capacity);
+            }
+            for (std::size_t i = 0; i < frame->GetStates().size(); ++i)
+            {
+                states[i] = Input::Script::CopyState(frame->GetStates()[i]);
+            }
+            for (std::size_t i = 0; i < frame->GetEvents().size(); ++i)
+            {
+                events[i] = Input::Script::CopyEvent(frame->GetEvents()[i]);
+            }
+            return static_cast<int>(Result::Success);
+        }
+        catch (...)
+        {
+            return static_cast<int>(Result::Failure);
+        }
+    }
 
-	int __stdcall Api_Input_GetMouseButtonState(int button)
-	{
-		if (button < 0 || button >= static_cast<int>(MouseKey::MAX)) return static_cast<int>(KeyState::Idle);
-		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
+    int __stdcall Api_Input_ValidateSignal(Input::InputSessionHandle handle, Input::GraphID graph,
+        Input::SignalID signal, std::uint64_t interfaceHash, std::uint32_t type, std::uint32_t domain)
+    {
+        using Input::Script::Result;
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return static_cast<int>(Result::WrongThread);
+        }
+        const auto* session = InputSessionSystem::Get().ResolveSession(handle);
+        if (session == nullptr)
+        {
+            return static_cast<int>(Result::InvalidSession);
+        }
+        const auto& program = session->GetProgram();
+        if (!program || program->GetDefinition().id != graph || program->GetInterfaceHash() != interfaceHash ||
+            type > static_cast<std::uint32_t>(Input::ValueType::Vector2) ||
+            domain > static_cast<std::uint32_t>(Input::Domain::UI))
+        {
+            return static_cast<int>(Result::Rejected);
+        }
+        const auto slot = program->FindSignal(signal, static_cast<Input::ValueType>(type));
+        if (slot == Input::kInvalidSlot ||
+            program->GetDefinition().signals[slot].domain != static_cast<Input::Domain>(domain))
+        {
+            return static_cast<int>(Result::Rejected);
+        }
+        return static_cast<int>(Result::Success);
+    }
 
-		// 마우스 상태는 private이라 술어 셋으로 되짚는다.
-		const MouseKey key = static_cast<MouseKey>(button);
-		if (InputManagement->IsMouseButtonDown(key))     return static_cast<int>(KeyState::Down);
-		if (InputManagement->IsMouseButtonPressed(key))  return static_cast<int>(KeyState::Pressed);
-		if (InputManagement->IsMouseButtonReleased(key)) return static_cast<int>(KeyState::Released);
-		return static_cast<int>(KeyState::Idle);
-	}
+    int __stdcall Api_Input_Haptic(Input::InputSessionHandle handle, float seconds, float left, float right)
+    {
+        using Input::Script::Result;
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return static_cast<int>(Result::WrongThread);
+        }
+        if (!std::isfinite(seconds) || !std::isfinite(left) || !std::isfinite(right) ||
+            seconds < 0 || left < 0 || left > 1 || right < 0 || right > 1)
+        {
+            return static_cast<int>(Result::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(InputSessionSystem::Get().RequestHaptic(handle, seconds, left, right)
+                ? Result::Success : Result::Rejected);
+        }
+        catch (...)
+        {
+            return static_cast<int>(Result::Failure);
+        }
+    }
 
-	int __stdcall Api_Input_GetControllerButtonState(int index, int button)
-	{
-		if (index < 0 || button < 0 || button >= static_cast<int>(ControllerButton::MAX))
-		{
-			return static_cast<int>(KeyState::Idle);
-		}
+    int __stdcall Api_Input_ListDevices(Input::Script::Device* devices, std::uint32_t capacity, std::uint32_t* count)
+    {
+        using Input::Script::Result;
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return static_cast<int>(Result::WrongThread);
+        }
+        if (count == nullptr || (capacity != 0 && devices == nullptr))
+        {
+            return static_cast<int>(Result::InvalidArgument);
+        }
+        *count = 0;
+        try
+        {
+            // The adapter takes one locked value snapshot. Device changes after this
+            // point are detected by epoch validation when a control request arrives.
+            const auto snapshot = InputManagement->GetDevices();
+            *count = static_cast<std::uint32_t>(snapshot.size());
+            if (snapshot.size() > capacity)
+            {
+                return static_cast<int>(Result::Capacity);
+            }
+            for (std::size_t index = 0; index < snapshot.size(); ++index)
+            {
+                const auto& value = snapshot[index];
+                devices[index] = { value.id, value.epoch, value.assignmentEpoch, value.user,
+                    static_cast<std::uint32_t>(value.kind), value.controllerIndex, value.connected ? 1u : 0u, 0 };
+            }
+            return static_cast<int>(Result::Success);
+        }
+        catch (...)
+        {
+            return static_cast<int>(Result::Failure);
+        }
+    }
 
-		const DWORD pad = static_cast<DWORD>(index);
-		const ControllerButton btn = static_cast<ControllerButton>(button);
-
-		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
-		if (InputManagement->IsControllerButtonDown(pad, btn))     return static_cast<int>(KeyState::Down);
-		if (InputManagement->IsControllerButtonPressed(pad, btn))  return static_cast<int>(KeyState::Pressed);
-		if (InputManagement->IsControllerButtonReleased(pad, btn)) return static_cast<int>(KeyState::Released);
-		return static_cast<int>(KeyState::Idle);
-	}
-
-	int __stdcall Api_Input_IsAnyKeyPressed()
-	{
-		if (!GameInputOwned()) return 0;
-		return InputManagement->IsAnyKeyPressed() ? 1 : 0;
-	}
-
-	Float2 __stdcall Api_Input_GetMousePosition()
-	{
-		const auto p = InputManagement->GetMousePos();
-		return { p.x, p.y };
-	}
-
-	Float2 __stdcall Api_Input_GetMouseDelta()
-	{
-		if (!GameInputOwned()) return {};
-		const auto d = InputManagement->GetMouseDelta();
-		return { d.x, d.y };
-	}
-
-	int __stdcall Api_Input_GetWheelDelta()
-	{
-		if (!GameInputOwned()) return 0;
-		return static_cast<int>(InputManagement->GetWheelDelta());
-	}
-
-	void __stdcall Api_Input_SetCursorVisible(int visible)
-	{
-		if (0 != visible) InputManagement->ShowCursor();
-		else              InputManagement->HideCursor();
-	}
-
-	int __stdcall Api_Input_IsControllerConnected(int index)
-	{
-		if (index < 0) return 0;
-		return InputManagement->IsControllerConnected(static_cast<DWORD>(index)) ? 1 : 0;
-	}
-
-	int __stdcall Api_Input_IsControllerTriggerL(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return 0;
-		return InputManagement->IsControllerTriggerL(static_cast<DWORD>(index)) ? 1 : 0;
-	}
-
-	int __stdcall Api_Input_IsControllerTriggerR(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return 0;
-		return InputManagement->IsControllerTriggerR(static_cast<DWORD>(index)) ? 1 : 0;
-	}
-
-	Float2 __stdcall Api_Input_GetControllerThumbL(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return {};
-		const auto v = InputManagement->GetControllerThumbL(static_cast<DWORD>(index));
-		return { v.x, v.y };
-	}
-
-	Float2 __stdcall Api_Input_GetControllerThumbR(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return {};
-		const auto v = InputManagement->GetControllerThumbR(static_cast<DWORD>(index));
-		return { v.x, v.y };
-	}
+    int __stdcall Api_Input_Request(Input::InputSessionHandle handle, const Input::Script::Request* request)
+    {
+        using Input::Script::Result;
+        if (g_physicsApiOwner != std::this_thread::get_id())
+        {
+            return static_cast<int>(Result::WrongThread);
+        }
+        if (request == nullptr || request->enabled > 1)
+        {
+            return static_cast<int>(Result::InvalidArgument);
+        }
+        try
+        {
+            auto* session = InputSessionSystem::Get().ResolveSession(handle);
+            if (session == nullptr)
+            {
+                return static_cast<int>(Result::InvalidSession);
+            }
+            bool accepted = false;
+            switch (static_cast<Input::Script::RequestKind>(request->kind))
+            {
+            case Input::Script::RequestKind::Layer:
+                accepted = InputSessionSystem::Get().RequestLayerChange(handle, request->target, request->enabled != 0);
+                break;
+            case Input::Script::RequestKind::Device:
+                accepted = InputSessionSystem::Get().RequestDeviceAssignment(handle, request->device,
+                    request->deviceEpoch, request->assignmentEpoch, request->enabled != 0);
+                break;
+            case Input::Script::RequestKind::Rebind:
+            {
+                if (request->sourceKind > static_cast<std::uint32_t>(Input::SourceKind::GamepadAxis) ||
+                    request->coordinateSpace > static_cast<std::uint32_t>(Input::CoordinateSpace::Normalized) ||
+                    !std::isfinite(request->scaleX) || !std::isfinite(request->scaleY))
+                {
+                    return static_cast<int>(Result::InvalidArgument);
+                }
+                Input::InputBindingOverride override;
+                override.graph = session->GetProgram()->GetDefinition().id;
+                override.binding = { request->target.high, request->target.low };
+                override.sources.push_back({ { static_cast<Input::SourceKind>(request->sourceKind), request->controlCode },
+                    request->scaleX, request->scaleY, static_cast<Input::CoordinateSpace>(request->coordinateSpace) });
+                std::vector<Input::InputDiagnostic> diagnostics;
+                accepted = InputSessionSystem::Get().RequestRebind(handle, std::span(&override, 1), diagnostics);
+                break;
+            }
+            case Input::Script::RequestKind::Cancel:
+                if (request->reason > static_cast<std::uint32_t>(Input::CancelReason::ScriptReload))
+                {
+                    return static_cast<int>(Result::InvalidArgument);
+                }
+                accepted = session->QueueCancel(static_cast<Input::CancelReason>(request->reason));
+                break;
+            default:
+                return static_cast<int>(Result::InvalidArgument);
+            }
+            return static_cast<int>(accepted ? Result::Success : Result::Rejected);
+        }
+        catch (...)
+        {
+            return static_cast<int>(Result::Failure);
+        }
+    }
 
     // Physics ABI: owner generation + component identity, explicit failures, no legacy adapters.
     bool PhysicsApiEntered() { return g_physicsApiOwner == std::this_thread::get_id(); }
@@ -2985,19 +3136,7 @@ namespace
 		g_apiTable.Mesh_GetBaseColor           = &Api_Mesh_GetBaseColor;
 		g_apiTable.Mesh_SetBaseColor           = &Api_Mesh_SetBaseColor;
 
-		g_apiTable.Input_GetKeyState              = &Api_Input_GetKeyState;
-		g_apiTable.Input_GetMouseButtonState      = &Api_Input_GetMouseButtonState;
-		g_apiTable.Input_GetControllerButtonState = &Api_Input_GetControllerButtonState;
-		g_apiTable.Input_IsAnyKeyPressed          = &Api_Input_IsAnyKeyPressed;
-		g_apiTable.Input_GetMousePosition         = &Api_Input_GetMousePosition;
-		g_apiTable.Input_GetMouseDelta            = &Api_Input_GetMouseDelta;
-		g_apiTable.Input_GetWheelDelta            = &Api_Input_GetWheelDelta;
-		g_apiTable.Input_SetCursorVisible         = &Api_Input_SetCursorVisible;
-		g_apiTable.Input_IsControllerConnected    = &Api_Input_IsControllerConnected;
-		g_apiTable.Input_IsControllerTriggerL     = &Api_Input_IsControllerTriggerL;
-		g_apiTable.Input_IsControllerTriggerR     = &Api_Input_IsControllerTriggerR;
-		g_apiTable.Input_GetControllerThumbL      = &Api_Input_GetControllerThumbL;
-		g_apiTable.Input_GetControllerThumbR      = &Api_Input_GetControllerThumbR;
+        g_apiTable.Cursor_SetVisible = &Api_Cursor_SetVisible;
 
         g_apiTable.Body_Find = &Api_Body_Find;
         g_apiTable.Character_Find = &Api_Character_Find;
@@ -3015,6 +3154,12 @@ namespace
         g_apiTable.Body_ShapeFlags = &Api_Body_ShapeFlags;
         g_apiTable.Body_Remove = &Api_Body_Remove;
         g_apiTable.Body_ShapeRole = &Api_Body_ShapeRole;
+        g_apiTable.Input_FindSession = &Api_Input_FindSession;
+        g_apiTable.Input_CopyFrame = &Api_Input_CopyFrame;
+        g_apiTable.Input_Request = &Api_Input_Request;
+        g_apiTable.Input_Haptic = &Api_Input_Haptic;
+        g_apiTable.Input_ValidateSignal = &Api_Input_ValidateSignal;
+        g_apiTable.Input_ListDevices = &Api_Input_ListDevices;
         g_apiTable.Physics_Query = &Api_Physics_Query;
         g_apiTable.Physics_QueryBatch = &Api_Physics_QueryBatch;
 
@@ -3169,6 +3314,17 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<NoArgumentFn>(fn);
 	if (!bind(L"PublishContacts", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
+    if (!bind(L"PublishInputFrame", &fn))
+    {
+        return false;
+    }
+    m_fnPublishInputFrame = reinterpret_cast<PublishInputFrameFn>(fn);
+    if (!bind(L"InvalidateInputSession", &fn))
+    {
+        return false;
+    }
+    m_fnInvalidateInputSession = reinterpret_cast<InvalidateInputSessionFn>(fn);
+
 	if (!bind(L"CreateComponent", &fn))  return false;  m_fnCreateComponent = reinterpret_cast<CreateFn>(fn);
 
 	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
@@ -3914,3 +4070,45 @@ void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 
 
 
+
+void ClrHost::PublishInputFrame(Input::InputSessionHandle session, const Input::InputFrame& frame)
+{
+    if (!m_ready || m_fnPublishInputFrame == nullptr || session != frame.GetSession() ||
+        g_physicsApiOwner != std::this_thread::get_id())
+    {
+        return;
+    }
+    if (frame.GetStates().size() > Input::Script::kMaximumStates ||
+        frame.GetEvents().size() > Input::Script::kMaximumEvents)
+    {
+        SceneManagers->ReportSimulationFailure("InputGraph script batch capacity exceeded; no partial batch delivered");
+        return;
+    }
+    // A synchronous copy boundary. The managed callback copies both arrays before
+    // invoking subscribers; none of these addresses are retained by ScriptCore.
+    const auto header = Input::Script::CopyHeader(frame);
+    std::vector<Input::Script::State> states;
+    std::vector<Input::Script::Event> events;
+    states.reserve(frame.GetStates().size());
+    events.reserve(frame.GetEvents().size());
+    for (const auto& state : frame.GetStates())
+    {
+        states.push_back(Input::Script::CopyState(state));
+    }
+    for (const auto& event : frame.GetEvents())
+    {
+        events.push_back(Input::Script::CopyEvent(event));
+    }
+    if (m_fnPublishInputFrame(&header, states.data(), events.data()) < 0)
+    {
+        SceneManagers->ReportSimulationFailure("Managed InputGraph frame publication failed");
+    }
+}
+
+void ClrHost::InvalidateInputSession(Input::InputSessionHandle session)
+{
+    if (m_ready && m_fnInvalidateInputSession != nullptr && g_physicsApiOwner == std::this_thread::get_id())
+    {
+        m_fnInvalidateInputSession(session);
+    }
+}

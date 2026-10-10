@@ -56,8 +56,8 @@ struct TextAssetAuthoringResult
 };
 
 // 카탈로그에 등록되지 않는 자산은 위 저작 자산과 다르다. GUID로 참조되지 않고
-// `.meta`도 없으므로 meta를 만들지 않는다. 프로젝트 설정(`ProjectSetting/*.asset`)과
-// 이름으로만 참조되는 프리셋(`Assets/InputMap`의 `.inputmap` YAML)이 여기 속한다.
+// `.meta`도 없으므로 meta를 만들지 않는다. 프로젝트 설정(`ProjectSetting/*.asset`)이
+// 여기 속한다. InputGraph는 GUID와 meta를 가진 정식 자산이다.
 // 목적 경로는 Core가 읽기와 같은 규약으로 만들고 Editor가 지정된 루트 바로 아래인지만
 // 검증한다 — 이름 왕복을 없애 write/read가 갈라질 여지를 남기지 않는다.
 struct UncatalogedAuthoringRequest
@@ -143,8 +143,6 @@ public:
 		const UncatalogedAuthoringRequest& request);
 	using WriteLayerSettingsHandler = bool (*)(
 		const UncatalogedAuthoringRequest& request);
-	using WriteInputActionMapHandler = bool (*)(
-		const UncatalogedAuthoringRequest& request);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -210,13 +208,6 @@ public:
 	static void UninstallLayerSettingsWriter(
 		WriteLayerSettingsHandler handler) noexcept;
 	static bool WriteLayerSettings(
-		const UncatalogedAuthoringRequest& request) noexcept;
-
-	static void InstallInputActionMapWriter(
-		WriteInputActionMapHandler handler) noexcept;
-	static void UninstallInputActionMapWriter(
-		WriteInputActionMapHandler handler) noexcept;
-	static bool WriteInputActionMap(
 		const UncatalogedAuthoringRequest& request) noexcept;
 
 	static bool IsInstalled() noexcept;

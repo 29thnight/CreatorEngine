@@ -11,10 +11,13 @@
 #include "../EditorObjectOperations.h"
 #include "../EditorProjectLayerSettings.h"
 #include "../CollisionGeometryAuthoring.h"
+#include "../../../Lattice/Input/LXInputCompiler.h"
+#include "../../RenderTests/InputGraph/InputGraphAssetCodecSelfTest.h"
+#include <fstream>
 // LC6 (PHASE 14.5) — AssetAuthoring 도메인 명령.
 //
 // `assets.*` · `asset.*` · `material.*` · `model.*` · `terrain.*` · `foliage.*` ·
-// `blackboard.*` · `bt.*` · `tag.*` · `inputmap.*` · `collisionmatrix.*` ·
+// `blackboard.*` · `bt.*` · `tag.*` · `input.graph.*` · `collisionmatrix.*` ·
 // `experiment.*`. 자산을 만들고 굽고 신원을 검증한다.
 //
 // ★ `experiment.*` 30 개가 여기 들어온다. §12 의 도메인 목록에는 그 이름이
@@ -522,172 +525,143 @@ namespace ConsoleCmd
 	// D4: Animator controller graph의 유일한 영속 경로인 scene reflection YAML을
 	// 실물 그래프로 왕복한다. JSON 파일이나 별도 controller writer는 관여하지 않는다.
 
-	static CommandCore::CommandResult Cmd_inputmap_authoring_probe(const ConsoleCommandContext& ctx)
-	{
-		if (ctx.parts.size() < 2)
-		{
-			std::printf("[inputmap.authoring.probe] usage: <save|verify> <name>\n");
-			return CommandCore::InvalidArguments(
-				"inputmap.authoring.probe: <save|verify> <name> 가 필요하다",
-				"inputmap.usage");
-		}
-
-		const std::string& action = ctx.parts[1];
-		const std::string name = ctx.parts.size() >= 3 ? ctx.parts[2] : std::string{};
-
-		if (action == "save")
-		{
-			ActionMap* map = InputActionManagers->AddActionMap(name);
-			if (nullptr == map)
-			{
-				std::printf("[inputmap.authoring.probe] rejected no-map\n");
-				return CommandCore::PreconditionFailed(
-					"inputmap.map_unavailable",
-					"inputmap.authoring.probe: action map 을 만들 수 없다: " + name);
-			}
-			InputAction* probeAction = map->AddAction();
-			probeAction->actionName = "ProbeMove";
-			probeAction->inputType = InputType::KeyBoard;
-			probeAction->actionType = ActionType::Value;
-			probeAction->keystate = KeyState::Released;
-			probeAction->key = {
-				static_cast<std::size_t>(KeyBoard::LeftArrow),
-				static_cast<std::size_t>(KeyBoard::RightArrow),
-				static_cast<std::size_t>(KeyBoard::DownArrow),
-				static_cast<std::size_t>(KeyBoard::UpArrow) };
-			probeAction->m_scriptName = "ProbeScript";
-			probeAction->funName = "ProbeFunction";
-			const bool saved = InputActionManagers->SaveMap(map);
-			std::printf("[inputmap.authoring.probe] save=%s\n",
-				saved ? "ok" : "failed");
-
-			CommandCore::CommandData data = CommandCore::CommandData::Object();
-			data.Set("action", CommandCore::CommandData::String("save"));
-			data.Set("name",   CommandCore::CommandData::String(name));
-			data.Set("saved",  CommandCore::CommandData::Bool(saved));
-			if (!saved)
-			{
-				return CommandCore::Fail("inputmap.save_failed",
-					"inputmap.authoring.probe: 저장 실패: " + name, std::move(data));
-			}
-			return CommandCore::Ok("inputmap 저장", std::move(data));
-		}
-
-		if (action == "verify")
-		{
-			InputActionManagers->LoadManager();
-			size_t found = 0;
-			size_t actionCount = 0;
-			bool stable = false;
-			for (ActionMap* map : InputActionManagers->m_actionMaps)
-			{
-				if (!map || map->m_name != name) continue;
-				++found;
-				actionCount = map->m_actions.size();
-				if (actionCount == 1 && map->m_actions.front())
-				{
-					const InputAction* restored = map->m_actions.front();
-					stable = restored->actionName == "ProbeMove"
-						&& restored->inputType == InputType::KeyBoard
-						&& restored->actionType == ActionType::Value
-						&& restored->keystate == KeyState::Released
-						&& restored->key == std::vector<std::size_t>{
-							static_cast<std::size_t>(KeyBoard::LeftArrow),
-							static_cast<std::size_t>(KeyBoard::RightArrow),
-							static_cast<std::size_t>(KeyBoard::DownArrow),
-							static_cast<std::size_t>(KeyBoard::UpArrow) }
-						&& restored->m_scriptName == "ProbeScript"
-						&& restored->funName == "ProbeFunction";
-				}
-			}
-			std::printf(
-				"[inputmap.authoring.probe] verify found=%zu actions=%zu stable=%d\n",
-				found, actionCount, stable ? 1 : 0);
-
-			CommandCore::CommandData data = CommandCore::CommandData::Object();
-			data.Set("action",  CommandCore::CommandData::String("verify"));
-			data.Set("name",    CommandCore::CommandData::String(name));
-			data.Set("found",   CommandCore::CommandData::Int(static_cast<int64_t>(found)));
-			data.Set("actions", CommandCore::CommandData::Int(static_cast<int64_t>(actionCount)));
-			data.Set("stable",  CommandCore::CommandData::Bool(stable));
-
-			// ★ 예전에는 `SetExitCode(5)` 였다.
-			//
-			//   5 는 §5.4 에서 infrastructure 오류다. 검사가 정직하게 "저장한
-			//   것과 읽은 것이 다르다"를 판정한 것과 디스크가 죽은 것을 같은
-			//   숫자로 알리면, 자동화가 재시도해서는 안 될 것을 재시도한다.
-			//   판정 실패는 `Failed`(exit 4)다.
-			if (found != 1 || !stable)
-			{
-				return CommandCore::Fail("inputmap.roundtrip_mismatch",
-					"inputmap.authoring.probe: 왕복 결과가 저장한 것과 다르다",
-					std::move(data));
-			}
-			return CommandCore::Ok("inputmap 왕복 일치", std::move(data));
-		}
-
-		std::printf("[inputmap.authoring.probe] unknown action %s\n", action.c_str());
-		return CommandCore::InvalidArguments(
-			"inputmap.authoring.probe: 알 수 없는 동작: " + action, "inputmap.unknown_action");
-	}
-
-    static CommandCore::CommandResult Cmd_inputmap_corpus_probe(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult InspectInputGraph(const ConsoleCommandContext& ctx, bool roundTrip)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("inputmap.corpus.probe");
-        InputActionManagers->LoadManager();
-        std::size_t maps = 0;
-        std::size_t actions = 0;
-        std::size_t keys = 0;
-        std::size_t keyboard = 0;
-        std::size_t gamepad = 0;
-        std::size_t buttons = 0;
-        std::size_t values = 0;
-        std::size_t invalid = 0;
-        std::unordered_set<std::string> names;
-        for (const ActionMap* map : InputActionManagers->m_actionMaps)
+        if (ctx.parts.size() != 2)
         {
-            if (!map || map->m_name.empty() || !names.insert(map->m_name).second)
-            {
-                ++invalid;
-                continue;
-            }
-            ++maps;
-            for (const InputAction* action : map->m_actions)
-            {
-                if (!action || action->actionName.empty() || action->key.empty()
-                    || action->key.size() > 4)
-                {
-                    ++invalid;
-                    continue;
-                }
-                ++actions;
-                keys += action->key.size();
-                if (action->inputType == InputType::KeyBoard) ++keyboard;
-                else if (action->inputType == InputType::GamePad) ++gamepad;
-                else ++invalid;
-                if (action->actionType == ActionType::Button) ++buttons;
-                else if (action->actionType == ActionType::Value) ++values;
-                else ++invalid;
-            }
+            return InvalidArguments("input.graph: <path.inputgraph> is required", "input.graph.usage");
         }
-
-        const bool passed = maps > 0 && actions > 0 && keys > 0 && invalid == 0;
-        std::printf(
-            "[inputmap.corpus.probe] maps=%zu actions=%zu keys=%zu keyboard=%zu "
-            "gamepad=%zu buttons=%zu values=%zu invalid=%zu selfcheck=%s\n",
-            maps, actions, keys, keyboard, gamepad, buttons, values, invalid,
-            passed ? "pass" : "fail");
+        std::string failure;
+        auto asset = LX::LXInputAsset::Load(std::filesystem::path(ctx.parts[1]), &failure);
+        if (!asset)
+        {
+            return Fail("input.graph.read", failure);
+        }
+        auto compiled = LX::CompileInputGraph(*asset);
+        auto diagnostics = CommandData::Array();
+        for (const auto& issue : compiled.diagnostics)
+        {
+            auto item = CommandData::Object();
+            item.Set("code", CommandData::String(issue.code));
+            item.Set("message", CommandData::String(issue.message));
+            item.Set("node", CommandData::String(std::to_string(issue.node)));
+            item.Set("pin", CommandData::String(std::to_string(issue.pin)));
+            diagnostics.Append(std::move(item));
+        }
         auto data = CommandData::Object();
-        data.Set("maps", CommandData::Int(maps));
-        data.Set("actions", CommandData::Int(actions));
-        data.Set("keys", CommandData::Int(keys));
-        data.Set("keyboard", CommandData::Int(keyboard));
-        data.Set("gamepad", CommandData::Int(gamepad));
-        data.Set("buttons", CommandData::Int(buttons));
-        data.Set("values", CommandData::Int(values));
-        data.Set("invalid", CommandData::Int(invalid));
-        return passed ? Ok({}, std::move(data)) : Fail("inputmap.corpus.failed", "Commandlet verification failed", std::move(data));
+        data.Set("path", CommandData::String(ctx.parts[1]));
+        data.Set("graph", CommandData::String(asset->graphId));
+        data.Set("diagnostics", std::move(diagnostics));
+        if (!compiled.program)
+        {
+            return Fail("input.graph.compile", "InputGraph validation/preparation failed", std::move(data));
+        }
+        const auto& definition = compiled.program->GetDefinition();
+        data.Set("signals", CommandData::Int(static_cast<std::int64_t>(definition.signals.size())));
+        data.Set("bindings", CommandData::Int(static_cast<std::int64_t>(definition.bindings.size())));
+        data.Set("layers", CommandData::Int(static_cast<std::int64_t>(definition.layers.size())));
+        data.Set("semanticHash", CommandData::String(std::to_string(compiled.program->GetSemanticHash())));
+        if (roundTrip)
+        {
+            const auto encoded = LX::LXInputArchive::Write(*asset);
+            auto restored = LX::LXInputArchive::Read(encoded, &failure);
+            if (!restored || restored->SemanticIdentity() != asset->SemanticIdentity())
+            {
+                return Fail("input.graph.roundtrip", "InputGraph archive changed semantic identity: " + failure,
+                    std::move(data));
+            }
+            const auto checked = LX::CompileInputGraph(*restored);
+            if (!checked.program || checked.program->GetSemanticHash() != compiled.program->GetSemanticHash())
+            {
+                return Fail("input.graph.roundtrip", "Restored InputGraph prepared a different program",
+                    std::move(data));
+            }
+            data.Set("roundTrip", CommandData::Bool(true));
+        }
+        return Ok("InputGraph source and prepared definition inspected", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_input_graph_authoring_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 3 || (ctx.parts[1] != "save" && ctx.parts[1] != "verify"))
+        {
+            return InvalidArguments("input.graph.authoring.probe <save|verify> <CE_InputProbe_name>", "input.graph.usage");
+        }
+        const std::string name(ctx.parts[2]);
+        if (!name.starts_with("CE_InputProbe_") || name.size() > 128 ||
+            name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-") != std::string::npos)
+        {
+            return InvalidArguments("Use a bounded CE_InputProbe_ fixture name without path separators", "input.graph.name");
+        }
+        const auto root = std::filesystem::path("Dynamic_CPP/Assets/InputGraph");
+        const auto path = root / (name + ".inputgraph");
+        auto metaPath = path;
+        metaPath += ".meta";
+        std::string failure;
+        if (ctx.parts[1] == "save")
+        {
+            if (std::filesystem::exists(path) || std::filesystem::exists(metaPath))
+            {
+                return Fail("input.graph.exists", "Probe never overwrites an existing source or metadata file");
+            }
+            auto source = LX::LXInputAsset::Load(root / "Gameplay.inputgraph", &failure);
+            if (!source)
+            {
+                return Fail("input.graph.template", failure);
+            }
+            source->graphId = FileGuid::CreateRandomV4().ToString();
+            if (!EditorAssetDatabase::Get().SaveInputGraph(*source, path, failure))
+            {
+                return Fail("input.graph.save", failure);
+            }
+            std::printf("[input.graph.authoring.probe] save=ok\n");
+            return Ok("InputGraph fixture saved through Editor authoring transaction");
+        }
+        const auto source = LX::LXInputAsset::Load(path, &failure);
+        if (!source)
+        {
+            return Fail("input.graph.read", failure);
+        }
+        const auto compiled = LX::CompileInputGraph(*source);
+        const auto restored = LX::LXInputArchive::Read(LX::LXInputArchive::Write(*source), &failure);
+        const auto metadata = Authoring::ParsedDocument::ParseFile(metaPath.string(), failure);
+        const auto identity = metadata ? metadata.Root()["guid"] : Authoring::ReadNode{};
+        const bool metaMatches = identity && identity.IsScalar() && identity.AsString() == source->graphId;
+        if (!compiled.program || !restored || restored->SemanticIdentity() != source->SemanticIdentity() || !metaMatches)
+        {
+            return Fail("input.graph.verify", "InputGraph source, metadata or semantic round-trip differs");
+        }
+        const auto& graph = compiled.program->GetDefinition();
+        std::printf("[input.graph.authoring.probe] verify signals=%zu bindings=%zu layers=%zu stable=1 meta=1\n",
+            graph.signals.size(), graph.bindings.size(), graph.layers.size());
+        return Ok("InputGraph fixture and matching metadata verified");
+    }
+
+    static CommandCore::CommandResult Cmd_input_graph_selftest(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1)
+        {
+            return InvalidArguments("input.graph.selftest takes no arguments", "input.graph.usage");
+        }
+        std::string failure;
+        if (!InputTests::RunAssetCodecSelfTest(failure))
+        {
+            return Fail("input.graph.selftest", failure);
+        }
+        return Ok("InputGraph asset codec and override contract checks passed");
+    }
+
+    static CommandCore::CommandResult Cmd_input_graph_inspect(const ConsoleCommandContext& ctx)
+    {
+        return InspectInputGraph(ctx, false);
+    }
+
+    static CommandCore::CommandResult Cmd_input_graph_roundtrip(const ConsoleCommandContext& ctx)
+    {
+        return InspectInputGraph(ctx, true);
     }
 
 	// 태그 저작은 편집이 아니라 **종료 시 Finalize**가 디스크에 반영한다. 그 저장이
@@ -2028,8 +2002,10 @@ namespace ConsoleCmd
         reg.Result({ "entity.layer" }, &Cmd_entity_layer);
         reg.Result({ "tag.add" }, &Cmd_tag_add);
         reg.Result({ "tag.remove" }, &Cmd_tag_remove);
-        reg.Result({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
-        reg.Result({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
+        reg.Result({ "input.graph.authoring.probe" }, &Cmd_input_graph_authoring_probe);
+        reg.Result({ "input.graph.selftest" }, &Cmd_input_graph_selftest);
+        reg.Result({ "input.graph.inspect" }, &Cmd_input_graph_inspect);
+        reg.Result({ "input.graph.roundtrip" }, &Cmd_input_graph_roundtrip);
         reg.Result({ "model.loadcached" }, &Cmd_model_loadcached);
         reg.Result({ "model.place" }, &Cmd_model_place);
         reg.Result({ "model.async" }, &Cmd_model_async);

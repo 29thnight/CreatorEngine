@@ -81,7 +81,7 @@ if (-not $SkipCommandlets) {
 if (-not $SkipCommandlets) {
     $scenario = Join-Path $Work 'commandlet-scenario.txt'
     $output = Join-Path $Work 'commandlet-scenario.jsonl'
-    @('scene.new CommandletScenario', 'object.create ScenarioObject', 'scene.hierarchycheck', 'inputmap.corpus.probe') | Set-Content -LiteralPath $scenario -Encoding utf8
+    @('scene.new CommandletScenario', 'object.create ScenarioObject', 'scene.hierarchycheck', 'input.graph.roundtrip Dynamic_CPP/Assets/InputGraph/Gameplay.inputgraph') | Set-Content -LiteralPath $scenario -Encoding utf8
     if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output }
     $proc = Start-GateEditor @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$output+'"')) 'scenario'
     try {
