@@ -262,6 +262,7 @@ namespace CommandCore
             { "scene.ddol", CommandCost::Frames, "<이름>", "오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.dump", CommandCost::Immediate, "[라벨]", "활성 씬의 오브젝트 계층을 로그에 남긴다", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.flag", CommandCost::Immediate, "[<dirtytraversal|bonecache> [0|1]]", "씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)", CommandClass::EngineService, CommandLiveness::Live },
+            { "scene.gc.selftest", CommandCost::Long, "", "Validate scene GC cycles, cleanup, handles, DDOL and worker pins", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "()", false, true },
             { "scene.hierarchycheck", CommandCost::Frames, "", "씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "scene.load", CommandCost::Immediate, "<경로>", "Queue scene CPU preparation without activation; query scene.load.status for completion", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.load.status", CommandCost::Immediate, "<request-id>", "Query a pending scene request or one of the last 64 terminal results", CommandClass::EngineService, CommandLiveness::Live },

@@ -1,7 +1,8 @@
 # GCCE scene graph integration
 
-Status: implementation draft, 2026-10-09. Source and static review only; this is not
-runtime validation or approval to merge.
+Status: scoped Windows Debug/Release validation, 2026-10-09. Scene GC repeated
+20 times per configuration and Play round-trip regressions passed. See the
+[validation record](../analysis/GCCEValidation20261009.md) for evidence and remaining gates.
 
 ## Ownership and construction
 
@@ -140,19 +141,27 @@ not an engine build entrypoint.
 
 ## Validation and remaining gates
 
-Performed: source review, exact upstream blob hashes, changed project XML parsing,
-Python source parsing, new include/reference inspection, and whitespace diff checks.
-These checks do not establish compilation or runtime correctness.
+Initial integration review covered source, exact upstream blob hashes, changed
+project XML, Python source parsing, include/reference inspection and whitespace.
+Subsequent authorized validation built the Editor dependency closure and managed
+assemblies in Windows x64 Debug/Release. Editor GC owner-source contracts (8),
+Entity ownership contracts, reflection container classification (D/R), and
+reflection value/shape round-trip (Debug, 37 axes) passed.
 
 Regression source includes `SceneGCSelfTest` (real graph cycles, hooks, stale handles,
 selection, DDOL and an actual component pin through job join), editor owner-thread
 source contracts, and migrated existing standalone component probes. The Scene GC
-fixture is compiled into RenderTests for a quiescent initialized host; it has not
-been invoked. Its pin example intentionally distinguishes storage retention from
+fixture is invoked by the process-scoped `scene.gc.selftest` commandlet under the
+host scene borrow fence. Debug/Release each passed 20 repetitions with exit 0,
+including final incremental collection and unchanged live/quarantine/aborted-cycle
+counts. Its pin example intentionally distinguishes storage retention from
 logical cleanup and does not claim pins prevent Destroy.
 
-Not run, by request: any engine/upstream build or test, compiler/linker validation,
-NativeAOT publish, shader compilation, engine launch, packaged smoke test, ASan, or
-benchmark. Before merging, verify Windows Debug/Release and DLL loading; reflection
-regeneration; repeated scene/Play/prefab/undo transitions; callback reentrancy and
-failure paths; script/native ABI; shutdown with pending work; and packaged Player.
+Play-to-Stop content restoration and the W5 state-machine/failure-injection/Undo
+preservation gates also passed in both configurations. These scoped initialized
+host runs exercise DLL loading, reflection regeneration, script handle identity
+and normal shutdown. They do not complete general script/native ABI coverage.
+Remaining runtime gates include repeated prefab UI transitions, cleanup callback
+reentrancy/failure paths, pending-work shutdown, packaged Player/Shipping,
+NativeAOT publish, ASan, and scale/latency benchmarks. Upstream tests were not run.
+The validation record also preserves Release PDB and profiler shutdown warnings.

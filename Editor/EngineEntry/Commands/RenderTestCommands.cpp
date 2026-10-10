@@ -26,6 +26,7 @@
 #include "CommandRegistrar.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "CommandSupport.h"
+#include "Tasks/SceneGCSelfTest.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
@@ -165,6 +166,25 @@
 
 namespace ConsoleCmd
 {
+    static CommandCore::CommandResult Cmd_scene_gc_selftest(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1)
+        {
+            return CommandCore::InvalidArguments("scene.gc.selftest");
+        }
+        std::string log;
+        const bool passed = RenderTest::RunSceneGCSelfTest(log);
+        std::printf("%s\n", log.c_str());
+        auto data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", log, std::move(data));
+        }
+        return CommandCore::Ok(log, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_dx12_selftest(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -1336,6 +1356,7 @@ namespace ConsoleCmd
 
     void RegisterRenderTestCommands(Registrar& reg)
     {
+        reg.Result({ "scene.gc.selftest" }, &Cmd_scene_gc_selftest);
         reg.Result({ "dx12.selftest" }, &Cmd_dx12_selftest);
         reg.Result({ "vk.grid" }, &Cmd_vk_grid);
         reg.Result({ "vk.texturecodec" }, &Cmd_vk_texturecodec);
