@@ -198,6 +198,10 @@ namespace
         {
             return RuntimeAssetType::Font;
         }
+        if (extension == ".inputgraph")
+        {
+            return RuntimeAssetType::InputGraph;
+        }
 		if (extension == ".shadermeta") return RuntimeAssetType::ShaderMeta;
         if (extension == ".shadergraph")
             return RuntimeAssetType::MaterialGraph;
@@ -2729,6 +2733,8 @@ void DataSystem::Finalize()
         DetachLegacyCachesLocked(retiredLegacy);
         m_cookedStaleAssets.clear();
         m_authoredTextureMounts.clear();
+        m_authoredInputGraphMounts.clear();
+        m_inputGraphAssets.clear();
         if (m_assetDepotRevision != (std::numeric_limits<std::uint64_t>::max)())
         {
             ++m_assetDepotRevision;
@@ -5993,6 +5999,13 @@ void DataSystem::QueueAssetChange(RuntimeAssetChange change)
 		});
 	if (duplicate != m_pendingAssetChanges.rend())
 	{
+        // A stale mount retry must not replace a later accepted authoring edit.
+        if (change.inputGraphPublication && duplicate->inputGraphPublication &&
+            change.inputGraphPublication->latestRevision == duplicate->inputGraphPublication->latestRevision &&
+            change.inputGraphPublication->revision < duplicate->inputGraphPublication->revision)
+        {
+            return;
+        }
 		*duplicate = std::move(change);
 		return;
 	}
@@ -6018,6 +6031,10 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
     {
         return PublishAuthoredTexture(change);
     }
+    if (change.inputGraphPublication)
+    {
+        return PublishAuthoredInputGraph(change);
+    }
 
     if (change.path.empty())
     {
@@ -6028,12 +6045,14 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
     {
         const auto guid = change.guid != FileGuid{} ? change.guid : GetFileGuid(change.path);
         AssetDepot::AssetMountId retired;
+        const bool inputGraph = ResolveRuntimeAssetType(change.path) == RuntimeAssetType::InputGraph;
         {
             std::lock_guard lock(m_assetPreparationMutex);
-            if (const auto found = m_authoredTextureMounts.find(guid); found != m_authoredTextureMounts.end())
+            auto& mounts = inputGraph ? m_authoredInputGraphMounts : m_authoredTextureMounts;
+            if (const auto found = mounts.find(guid); found != mounts.end())
             {
                 retired = found->second;
-                m_authoredTextureMounts.erase(found);
+                mounts.erase(found);
             }
         }
         if (retired.IsValid())
@@ -6043,7 +6062,8 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
             {
                 QueueAssetChange(change);
                 std::lock_guard lock(m_assetPreparationMutex);
-                m_authoredTextureMounts[guid] = retired;
+                auto& mounts = inputGraph ? m_authoredInputGraphMounts : m_authoredTextureMounts;
+                mounts[guid] = retired;
                 return false;
             }
         }
@@ -7117,6 +7137,8 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
         InvalidateMaterialAssetsLocked(retiredMaterials);
         m_cookedCatalog = std::move(catalog);
         m_authoredTextureMounts.clear();
+        m_authoredInputGraphMounts.clear();
+        m_inputGraphAssets.clear();
         m_cookedStaleAssets = std::move(stale);
         ++m_assetDepotRevision;
         DetachLegacyCachesLocked(retiredLegacy);

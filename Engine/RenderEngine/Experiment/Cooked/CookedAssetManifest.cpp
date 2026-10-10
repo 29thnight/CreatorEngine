@@ -1006,7 +1006,8 @@ namespace experiment::cooked
         {
             return IsKnownKind(kind) || kind == CookedAssetKind::Mesh
                 || kind == CookedAssetKind::Skeleton
-                || kind == CookedAssetKind::AnimationClip;
+                || kind == CookedAssetKind::AnimationClip
+                || kind == CookedAssetKind::InputGraph;
         }
 
         [[nodiscard]] bool IsAssetSetIdentity(const AssetIdentity& identity) noexcept

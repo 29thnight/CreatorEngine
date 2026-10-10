@@ -46,6 +46,7 @@ namespace experiment::cooked
         Mesh = 12,
         Skeleton = 13,
         AnimationClip = 14,
+        InputGraph = 15,
     };
 
     using Sha256Digest = std::array<std::uint8_t, 32>;

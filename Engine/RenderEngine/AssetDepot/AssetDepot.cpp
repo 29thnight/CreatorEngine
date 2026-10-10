@@ -6,6 +6,7 @@
 #include "../Experiment/Cooked/CookedShaderMeta.h"
 #include "../Experiment/Cooked/MaterialAssetSetCodec.h"
 #include "../Experiment/Cooked/CookedCodeMaterial.h"
+#include "../Experiment/Cooked/CookedInputGraph.h"
 
 
 #include <limits>
@@ -121,6 +122,10 @@ namespace AssetDepot
             std::uint32_t schema{};
             switch (blob.kind)
             {
+            case cooked::CookedAssetKind::InputGraph:
+                representation = cooked::kInputGraphRepresentation;
+                schema = cooked::kInputGraphArtifactVersion;
+                break;
             case cooked::CookedAssetKind::Texture:
                 representation = cooked::kCookedTextureRepresentationVersion;
                 schema = cooked::kTextureArtifactVersion;
@@ -344,4 +349,77 @@ std::vector<experiment::cooked::TypedAssetReference> DataSystem::ListAssetSetRoo
     }
     return snapshot ? snapshot->ListRoots(mountId, kind)
         : std::vector<experiment::cooked::TypedAssetReference>{};
+}
+
+
+bool DataSystem::PublishAuthoredInputGraph(const RuntimeAssetChange& change)
+{
+    namespace cooked = experiment::cooked;
+    const auto& publication = change.inputGraphPublication;
+    if (!publication || !publication->latestRevision ||
+        publication->latestRevision->load(std::memory_order_acquire) != publication->revision ||
+        publication->manifest.entries.size() != 1u ||
+        publication->manifest.blobs.size() != 1u ||
+        publication->manifest.entries.front().asset.key.assetId != experiment::AssetId{ change.guid.m_guid } ||
+        publication->manifest.entries.front().asset.kind != cooked::CookedAssetKind::InputGraph)
+    {
+        return false;
+    }
+    const auto registry = SnapshotAssetMetaRegistry();
+    if (!registry || registry->GetGuid(change.path) != change.guid)
+    {
+        // Removal/rename invalidates an older queued authoring publication.
+        return false;
+    }
+    AssetDepot::AssetMountId previous;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping)
+        {
+            return false;
+        }
+        if (m_assetRootHandoffs != 0u || m_assetInvalidationDepth != 0u)
+        {
+            QueueAssetChange(change);
+            return false;
+        }
+        if (const auto found = m_authoredInputGraphMounts.find(change.guid); found != m_authoredInputGraphMounts.end())
+        {
+            previous = found->second;
+        }
+    }
+    cooked::AssetSetMountOptions options;
+    options.expectedTargetPlatform = "win-x64";
+    options.expectedTargetAbi = CreatorContentAbi::Token;
+    const auto reference = publication->manifest.entries.front().asset;
+    const auto catalog = GetCookedCatalog();
+    cooked::ResolvedAssetEntry old;
+    if (catalog && catalog->Find(reference, old) == cooked::AssetLookupStatus::Found)
+    {
+        if (old.blob == publication->manifest.blobs.front())
+        {
+            return true;
+        }
+        options.overrideIdentities.push_back(reference.key);
+    }
+    std::vector<cooked::AssetManifestIssue> issues;
+    const auto mounted = MountAssetSet(publication->manifestBytes, publication->byteSource, options, issues, previous);
+    if (!mounted.IsValid())
+    {
+        for (const auto& issue : issues)
+        {
+            if (issue.context == "mount" && issue.message.find("stale") != std::string::npos)
+            {
+                QueueAssetChange(change);
+                return false;
+            }
+            Debug::PrintLog(spdlog::level::err, "InputGraph publication rejected [" + issue.context + "]: " + issue.message);
+        }
+        return false;
+    }
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        m_authoredInputGraphMounts[change.guid] = mounted;
+    }
+    return true;
 }
