@@ -46,7 +46,7 @@ namespace editor::components
             Group{"Physics", "|PhysicsBodyComponent|CharacterMovementComponent|"},
             Group{"Audio", "|SoundComponent|AudioListenerComponent|"},
             Group{"AI", "|StateMachineComponent|BehaviorTreeComponent|"},
-            Group{"Input", "|PlayerInputComponent|"},
+            Group{"Input", "|InputSessionComponent|"},
             Group{"UI", "|Canvas|UIComponent|ImageComponent|TextComponent|UIButton|"}
         };
         const std::string key = "|" + std::string(type) + "|";

@@ -49,14 +49,13 @@
 #include "VolumetricFogPassSetting.h"
 #include "VignettePassSetting.h"
 #include "Prefab.h"
-#include "PlayerInput.h"
+#include "InputSessionComponent.h"
 #include "KeyFrameEvent.h"
 #include "Component.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
 #include "Mesh.h"
 #include "InvalidScriptComponent.h"
-#include "ActionMap.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "Animator.h"
@@ -74,7 +73,6 @@
 #include "LightComponent.h"
 #include "CurvePoint.h"
 #include "Entity.h"
-#include "InputAction.h"
 #include "Object.h"
 #include "RectTransformComponent.h"
 #include "ScriptComponent.h"
@@ -90,7 +88,6 @@
     X(LightMapping) \
     X(ShadowMapPassSetting) \
     X(AAPassSetting) \
-    X(ActionMap) \
     X(AniTransition) \
     X(AnimationController) \
     X(AnimationState) \
@@ -122,7 +119,6 @@
     X(FoliageType) \
     X(Entity) \
     X(ImageComponent) \
-    X(InputAction) \
     X(InvalidScriptComponent) \
     X(KeyFrameEvent) \
     X(LightComponent) \
@@ -132,7 +128,7 @@
     X(Mesh) \
     X(Navigation) \
     X(Object) \
-    X(PlayerInputComponent) \
+    X(InputSessionComponent) \
     X(Prefab) \
     X(PrefabOverride) \
     X(RectTransformComponent) \

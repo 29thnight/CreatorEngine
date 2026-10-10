@@ -2,25 +2,10 @@
 #include "SceneManager.h"
 #include "TimeSystem.h"
 #include "ClrHost.h"
+#include "InputSessionSystem.h"
 
 namespace
 {
-    // 물리 스텝 **앞**의 관리 틱 (설계 문서 §4 트랙 L5).
-    //
-    // 예전에는 관리 측 틱이 전부 물리 뒤에 있었다 — 프레임 루프가
-    // Physics → GameLogic → 관리 틱 순이고 그 안에서 Update/LateUpdate를
-    // 연속으로 넘겼다. 그래서 "이번 프레임의 물리에 영향을 주는" 자리가 아예 없었다.
-    //
-    // 크로싱이 프레임당 하나 는다. 규약은 "스크립트가 몇 개든 프레임당 통과 횟수는
-    // 고정"이지 1회가 아니므로 이 분할은 규약 안이다.
-    void TickManagedPrePhysics(float deltaSeconds)
-    {
-        auto& clr = ClrHost::Get();
-        if (!clr.IsReady()) return;
-
-        clr.TickPrePhysics(deltaSeconds);
-    }
-
     // 물리 뒤의 관리 틱. 경계는 여기가 전부다 — 스크립트가 몇 개든 프레임당 통과
     // 횟수는 고정이고 순회는 관리 영역에서 끝난다(설계 문서 02절).
     // 게임 스레드에서만 부른다 — CoreCLR GC가 스레드를 정지시키기 때문이다.
@@ -67,18 +52,19 @@ namespace Runtime
     void TickSimulationFrame(float deltaSeconds)
     {
         SceneManagers->Initialization();
+        InputSessionSystem::Get().PumpUI(SceneManagers->IsGamePaused(), Time->GetTimeScale());
         SceneManagers->InputEvents(deltaSeconds);
+        // UI callbacks are GT-owned and flush even when physics has zero ticks or is paused.
+        if (ClrHost::Get().IsReady())
+        {
+            ClrHost::Get().FlushRegistrations();
+            ClrHost::Get().FlushScriptMessages();
+        }
 
         if (SceneManagers->IsGamePaused())
         {
             SceneManagers->Pausing();
             return;
-        }
-
-        // 앞뒤 관리 틱은 같은 가드를 쓴다 — 헤더 주석 참고.
-        if (!SceneManagers->HasPendingSceneStructureChange())
-        {
-            TickManagedPrePhysics(deltaSeconds);
         }
 
         SceneManagers->Physics(deltaSeconds);

@@ -22,7 +22,7 @@
 #include "SpriteSheetComponent.h"
 #include "SoundComponent.h"
 #include "AudioListenerComponent.h"
-#include "PlayerInput.h"
+#include "InputSessionComponent.h"
 #include "Canvas.h"
 #include "UIManager.h"
 #include "RegisterReflectManual.h"

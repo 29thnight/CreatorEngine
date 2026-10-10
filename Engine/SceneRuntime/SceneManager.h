@@ -28,7 +28,6 @@ class MeshRenderer;
 class Material;
 class RenderScene;
 class AnimationScheduler;
-class InputActionManager;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
@@ -190,8 +189,6 @@ public:
 	void ToggleGamePaused();
 
 	bool IsEditorSceneLoaded() const { return m_sessionPolicy.RestoresAuthoring() && m_isSimulationSessionActive; }
-    InputActionManager* GetInputActionManager() { return m_inputActionManager; }
-    void SetInputActionManager(InputActionManager* inputActionManager) { m_inputActionManager = inputActionManager;}
 
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
     // GT frame sealing용. 활성 Scene의 mesh/foliage가 실제 소유한 Material을
@@ -254,7 +251,6 @@ public:
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
 
-    InputActionManager*                 m_inputActionManager{ nullptr };
 private:
     wave::PlaybackService* m_audioPlayback{};
     SoundSystem::AssetResolver m_audioResolver;

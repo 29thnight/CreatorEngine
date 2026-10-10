@@ -21,7 +21,7 @@
 #include "StateMachineComponent.h"
 #include "UIComponent.h"
 #include "MeshRenderer.h"
-#include "PlayerInput.h"
+#include "InputSessionComponent.h"
 #include "ScriptComponent.h"
 #include "SoundComponent.h"
 #include "AudioListenerComponent.h"
@@ -103,7 +103,7 @@ namespace Lifecycle
         Register<StateMachineComponent>();
         Register<UIComponent>();
         Register<MeshRenderer>();
-        Register<PlayerInputComponent>();
+        Register<InputSessionComponent>();
         Register<ScriptComponent>();
         Register<SoundComponent>();
         Register<AudioListenerComponent>();

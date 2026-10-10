@@ -24,7 +24,7 @@
 #include "FoliageSystem.h"
 #include "UITickSystem.h"
 #include "SoundSystem.h"
-#include "PlayerInputSystem.h"
+#include "InputSessionSystem.h"
 #include "LightSystem.h"
 #include "CameraSystem.h"
 #include "CameraComponent.h"
@@ -37,7 +37,7 @@
 #include "TextComponent.h"
 #include "TagManager.h"
 #include "UIManager.h"
-#include "PlayerInput.h"
+#include "InputSessionComponent.h"
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
 #include "Canvas.h"
@@ -2447,13 +2447,7 @@ void Scene::InternalPauseUpdateForUI()
                     spriteSheetComponent->TickLayout(deltaTime);
                 }
 
-                auto inputComponents = obj->GetComponents<PlayerInputComponent>();
-                for (const auto& inputComponent : inputComponents)
-                {
-                    // C3 — PlayerInputComponent가 TickInput으로 옮겨갔다. 이 자리를
-                    // 안 고치면 기반의 빈 가상 Component::Update에 조용히 붙는다.
-                    inputComponent->TickInput(deltaTime);
-                }
+
 
             }
         }
@@ -3177,7 +3171,23 @@ void Scene::FixedUpdate(float deltaSecond)
         return;
     }
 
-    const auto advanced = m_physicsSimulation.Advance(deltaSecond);
+    const auto advanced = m_physicsSimulation.Advance(deltaSecond,
+        [this](double fixedSeconds, double droppedSeconds) -> ce::physics::result<void> {
+            InputSessionSystem::Get().BeforeFixedStep(fixedSeconds, droppedSeconds);
+            auto& clr = ClrHost::Get();
+            if (clr.IsReady() && !SceneManagers->HasPendingSceneStructureChange())
+            {
+                clr.FlushRegistrations();
+                clr.TickPrePhysics(static_cast<float>(fixedSeconds));
+            }
+            // PrePhysics may move a transform or change a layer; commit before begin_step.
+            AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
+            if (const auto layers = CommitPhysicsLayers(); !layers)
+            {
+                return std::unexpected(layers.error());
+            }
+            return CommitPhysicsTransforms();
+        });
     if (!advanced)
     {
         SceneManagers->ReportSimulationFailure(std::string(advanced.error().message));
@@ -3327,10 +3337,7 @@ void Scene::Update(float deltaSecond)
         LightSystems->Update(deltaSecond);
     }
 
-    {
-        ce::profile_scope _profile{ ce::marker<"PlayerInputSystem">() };
-        PlayerInputSystems->Update(deltaSecond);
-    }
+
 
     // Tween apply는 stable EntityHandle을 binding 함수가 그 자리에서 resolve한다.
     // 이 위치는 로직 시스템 뒤·두 번째 world-matrix 갱신 앞이라 Transform/UI 값을

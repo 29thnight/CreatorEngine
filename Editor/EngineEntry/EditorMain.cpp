@@ -819,7 +819,6 @@ void Editor::EditorMain::Update()
 			// W5: 입력 갱신 뒤, 씬 틱 앞. 상태를 유도하고 이번 프레임의 입력
 			// 소유자를 정한다 — 그래야 아래 스크립트가 같은 프레임의 소유권을 본다.
 			m_playModeController.Tick();
-            InputSessionSystem::Get().ApplyAuthoringChanges();
 
 			// ★ 요청(IsGameStart)이 아니라 **확정**(IsPlayCommitted)으로 가른다(W5).
 			//   요청으로 가르면 Play 를 누른 프레임에 스냅샷이 뜨기 **전**에 Physics 와
@@ -874,6 +873,9 @@ void Editor::EditorMain::Update()
 		}
 		Editor::ModelPlacement::Get().Tick();
 		EditorScriptAuthoring::Tick();
+		// Commit queued inspector configuration under the PT/GT scene barrier
+		// immediately before a pending Play transaction captures its baseline.
+		InputSessionSystem::Get().ApplyAuthoringChanges();
 		SceneManagers->ApplyPendingSceneStructureChange();
 		// UI 가 잠금 아래에서 고친 선택을 다음 프레임 시뮬레이션이 읽을 사본으로 뜬다.
 		// 씬 전환 뒤에 떠야 새 씬의 사본이 선다.

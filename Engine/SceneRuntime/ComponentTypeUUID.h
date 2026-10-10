@@ -47,7 +47,7 @@ namespace ComponentTypeUUID
         { "StateMachineComponent",       "a8688982-9812-48ef-bdd4-ed92690a889f" },
         { "UIComponent",                 "f8526eda-5faa-48bc-9167-40764dc3d685" },
         { "MeshRenderer",                "a84ed25a-31de-4289-92a0-546b27cee0ff" },
-        { "PlayerInputComponent",        "fb08e9f8-ba18-4444-85db-a042d822bd4c" },
+        { "InputSessionComponent",        "fb08e9f8-ba18-4444-85db-a042d822bd4c" },
         { "ScriptComponent",             "16beda95-3967-4d95-838b-b9e6694b6609" },
         { "SoundComponent",              "f2441c9e-234b-42cd-8067-2276a3c985fe" },
         { "AudioListenerComponent",      "c942d1d3-04da-4bea-826b-32bd7d5d2124" },

@@ -499,7 +499,7 @@ result<void> ScenePhysicsSimulation::Stop()
     return {};
 }
 
-result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
+result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds, const BeforeStep& beforeStep)
 {
     if (auto owner = RequireOwner(); !owner)
         return std::unexpected(owner.error());
@@ -525,6 +525,14 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
     std::uint32_t ticks = 0;
     while (m_accumulator + 1e-12 >= fixed_seconds && ticks < max_catchup_ticks)
     {
+        // Input and scripts run while the SDK is idle, once for each real fixed step.
+        if (beforeStep)
+        {
+            if (auto prepared = beforeStep(fixed_seconds, ticks == 0 ? discarded : 0.0); !prepared)
+            {
+                return std::unexpected(prepared.error());
+            }
+        }
         if (auto moved = MoveCharacters(); !moved)
             return std::unexpected(moved.error());
         auto begun = m_runtime->begin_step(static_cast<float>(fixed_seconds));
