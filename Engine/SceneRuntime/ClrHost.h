@@ -3,6 +3,7 @@
 #include "SpinLock.h"
 #include "ScriptObjectRegistry.h"
 #include "ScriptLifecyclePhase.h"
+#include "ScriptInputABI.h"
 #include "../Physics/PhysicsGeometry.h"
 
 #include <mathematics/vector3.hpp>
@@ -88,6 +89,9 @@ public:
 
 	// 큐에 모인 것을 한 번에 관리 측으로 넘긴다(틱 경계에서 호출).
 	void FlushPhysicsEvents();
+
+    void PublishInputFrame(Input::InputSessionHandle session, const Input::InputFrame& frame);
+    void InvalidateInputSession(Input::InputSessionHandle session);
 
 	// ── 애니메이션 상태 스크립트 ──
 	//
@@ -539,6 +543,11 @@ private:
 	using DestroyAniFn   = int(__stdcall*)(int);
 	using FlushAniFn     = int(__stdcall*)(const ScriptAniEvent*, int);
 	using FlushMessageFn = int(__stdcall*)(const ScriptMessage*, int);
+    using PublishInputFrameFn = int(__stdcall*)(const Input::Script::FrameHeader*, const Input::Script::State*,
+        const Input::Script::Event*);
+    using InvalidateInputSessionFn = int(__stdcall*)(Input::InputSessionHandle);
+    PublishInputFrameFn m_fnPublishInputFrame{ nullptr };
+    InvalidateInputSessionFn m_fnInvalidateInputSession{ nullptr };
 	FlushPhysicsFn m_fnFlushPhysicsEvents{ nullptr };
 	HasAniFn       m_fnHasAniBehavior{ nullptr };
 	CreateAniFn    m_fnCreateAniBehavior{ nullptr };

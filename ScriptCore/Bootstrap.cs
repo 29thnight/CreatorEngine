@@ -54,6 +54,7 @@ public static class Bootstrap
         {
             try { AssetReleaseQueue.Drain(); }
             catch { /* Native shutdown still invalidates all owner slots. */ }
+            InputRouter.Reset();
             Native.Unbind();
         }
     }
@@ -98,6 +99,50 @@ public static class Bootstrap
     /// 배열 포인터 하나만 넘기므로 충돌이 몇 건이든 경계 통과는 한 번이다.
     /// 버퍼는 네이티브 소유이고 이 호출이 끝나면 무효가 되므로, 관리 측에서 붙들지 않는다.
     /// </summary>
+    [UnmanagedCallersOnly]
+    internal static unsafe int PublishInputFrame(NativeInputFrameHeader* header,
+        NativeInputState* states, NativeInputEvent* events)
+    {
+        try
+        {
+            if (header == null)
+            {
+                return -1;
+            }
+            InputFrame.ValidateHeader(*header);
+            if ((header->StateCount != 0 && states == null) || (header->EventCount != 0 && events == null))
+            {
+                return -1;
+            }
+            // Copy before invoking any user code. Native storage expires on return.
+            var frame = new InputFrame(*header,
+                new ReadOnlySpan<NativeInputState>(states, checked((int)header->StateCount)).ToArray(),
+                new ReadOnlySpan<NativeInputEvent>(events, checked((int)header->EventCount)).ToArray());
+            InputRouter.Publish(frame);
+            return checked((int)header->EventCount);
+        }
+        catch (Exception error)
+        {
+            Report(error, nameof(PublishInputFrame));
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    internal static int InvalidateInputSession(InputSessionHandle session)
+    {
+        try
+        {
+            InputRouter.Invalidate(session);
+            return 0;
+        }
+        catch (Exception error)
+        {
+            Report(error, nameof(InvalidateInputSession));
+            return -1;
+        }
+    }
+
     // NativeContact는 내부 표현이라 이 진입점도 internal로 둔다.
     // UnmanagedCallersOnly는 접근성과 무관하게 함수 포인터로 노출된다.
     [UnmanagedCallersOnly]
@@ -113,7 +158,7 @@ public static class Bootstrap
     }
 
     /// <summary>
-    /// 이름으로 부르는 콜백 배치를 전달한다(애니메이션 키프레임 이벤트·입력 액션).
+    /// 이름으로 부르는 콜백 배치를 전달한다(애니메이션 키프레임 이벤트).
     /// 물리 이벤트와 같은 규약 — 발생 시점이 아니라 틱 경계에서 한 번에 넘어온다.
     /// </summary>
     [UnmanagedCallersOnly]

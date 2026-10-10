@@ -1,0 +1,17 @@
+# Typed InputGraph consumption
+
+LX is the authoring source. Export C++ and C# accessors from the compiled `InputGraphProgram`; export never recalculates IDs from display names. C# scripts use `InputSession.TryFor(component, out session)` while AssetDepot prepares the graph, then consume an immutable `InputFrame` on the simulation owner thread. `InputSession.For` is the throwing form for a session that must already be ready.
+
+`frame.Read(GameplayInputs.Move)` returns the typed value plus held/pressed/released flags. `frame.ReadEvent(index, GameplayInputs.Jump)` reads one typed ordered transition. A press/release/press/release in one boundary retains both cycles and every phase event; it is never compressed to one boolean pulse. State reads do not consume events. Choose one command producer for a gameplay command: ordered frame iteration or a subscription, not both.
+
+For subscriptions, call `session.Subscribe(component, GameplayInputs.Jump, handler)`. The result is an `IDisposable` token owned by the component's `SimulationScope`. Disable, destruction, scope end, session invalidation and script reload invalidate the token. Re-enable requires a new subscription. Removal during dispatch takes effect before the next callback; additions start at the next frame. Handler exceptions are logged independently. The graph/interface identity and type are validated on subscribe and before delivery. The compiled interface fingerprint covers stable graph/layer/signal IDs, types and schema/ABI versions; binding changes do not invalidate generated accessors.
+
+Native frames cross one synchronous publication boundary per session/domain. C# copies the POD header, state array and ordered event array before any callback. The router retains the latest owned copy, so callbacks and queries use the same immutable result. Old returned frames remain valid after later boundaries and session destruction; they contain values, never native pointers. This safe-copy path allocates per publication and is not claimed to be allocation-free. Native and managed POD widths and offsets have source assertions/fixtures. Little-endian layout is required.
+
+`InputDevices.GetConnected()` returns copied device identities with connection and assignment epochs. Pass one to `session.AssignDevice(device)`; a stale snapshot is rejected and must be refreshed.
+
+`SetLayerEnabled(GameplayInputs.Layers.Gameplay, enabled)`, `AssignDevice` and `Rebind` submit validated next-boundary requests through the central session system. Rebind source codes are physical control codes (keyboard scan codes), not Windows virtual key values or text. `Vibrate` is an explicit output request tied to the session's current assignment; reading or replaying input does not repeat device output. `Cursor.SetVisible` is a separate output-only API.
+
+API table version 41 reserves the retired raw input slots in their original positions and appends the InputGraph functions. Version 40 assemblies are rejected. No compatibility polling path, action map, method-name input callback or unmanaged function-pointer facade is exposed to game scripts.
+
+The checked-in Gameplay accessors follow `Assets/InputGraph/Gameplay.inputgraph`; their fingerprint was derived from the static canonical schema. Actual LX export, native host execution and trimmed NativeAOT validation have not been run for this source-only change. `Tools/regression/InputGraphScriptProbe` contains the managed source fixture; real host/device/cook/reload acceptance remains required.
