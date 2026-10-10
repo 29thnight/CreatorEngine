@@ -105,6 +105,13 @@ namespace Input
                 hash.Add(static_cast<std::uint8_t>(signal.combine));
                 hash.AddID(signal.gate);
                 hash.Add(signal.resumePersistentValue);
+                hash.Add(signal.processors.size());
+                for (const auto& processor : signal.processors)
+                {
+                    hash.Add(static_cast<std::uint8_t>(processor.kind));
+                    hash.AddFloat(processor.x);
+                    hash.AddFloat(processor.y);
+                }
                 const auto& interaction = signal.interaction;
                 hash.Add(static_cast<std::uint8_t>(interaction.kind));
                 hash.Add(static_cast<std::uint64_t>(interaction.duration));
@@ -192,12 +199,12 @@ namespace Input
         std::size_t elementCount = 0;
         for (const auto& signal : source.signals)
         {
-            if (signal.interaction.chord.size() > 64 || signal.name.size() > 4'096)
+            if (signal.interaction.chord.size() > 64 || signal.processors.size() > 64 || signal.name.size() > 4'096)
             {
                 reject("Signal dependency or name size exceeds the preparation limit.", signal.id);
                 return {};
             }
-            elementCount += signal.interaction.chord.size() + (signal.gate.IsValid() ? 1 : 0);
+            elementCount += signal.interaction.chord.size() + signal.processors.size() + (signal.gate.IsValid() ? 1 : 0);
         }
         for (const auto& binding : source.bindings)
         {
@@ -222,7 +229,7 @@ namespace Input
             return {};
         }
 
-        auto program = own::make_shared<InputGraphProgram>();
+        auto program = own::make_shared<InputGraphProgram>(InputGraphProgram::ConstructionKey{});
         auto& graph = program->m_definition;
         graph = source;
         const auto byID = [](const auto& left, const auto& right) { return left.id < right.id; };
@@ -300,8 +307,20 @@ namespace Input
                 }
                 prepared.chordIndices.push_back(slot);
             }
+            for (const auto& processor : signal.processors)
+            {
+                if (!IsEnum(processor.kind, ProcessorKind::Clamp) || !std::isfinite(processor.x) ||
+                    !std::isfinite(processor.y) ||
+                    (processor.kind == ProcessorKind::Deadzone && (processor.x < 0.0f || processor.y <= processor.x)) ||
+                    (processor.kind == ProcessorKind::Clamp && processor.x > processor.y) ||
+                    interaction.kind == InteractionKind::Chord)
+                {
+                    reject("Invalid post-combine processor, or a processor attached after a Chord interaction.", signal.id);
+                }
+            }
         }
         std::vector<std::pair<ControlID, std::uint32_t>> controlBindings;
+        program->m_bindingSignals.resize(graph.bindings.size(), kInvalidSlot);
         for (std::uint32_t index = 0; index < graph.bindings.size(); ++index)
         {
             const auto& binding = graph.bindings[index];
@@ -313,6 +332,7 @@ namespace Input
                 continue;
             }
             const auto& signal = graph.signals[signalIndex];
+            program->m_bindingSignals[index] = signalIndex;
             program->m_signals[signalIndex].bindingIndices.push_back(index);
             for (const auto& input : binding.sources)
             {
@@ -461,19 +481,19 @@ namespace Input
             return {};
         }
         auto graph = program.GetDefinition();
-        std::vector<BindingID> replaced;
+        std::vector<bool> replaced(graph.bindings.size());
         for (const auto& override : overrides)
         {
             const auto binding = program.FindBinding(override.binding);
             if (override.graph != graph.id || override.schemaVersion != graph.schemaVersion ||
                 binding == kInvalidSlot || override.sources.empty() ||
-                std::find(replaced.begin(), replaced.end(), override.binding) != replaced.end())
+                (binding != kInvalidSlot && replaced[binding]))
             {
                 diagnostics.push_back({ {}, override.binding,
                     "Rebind override has an incompatible graph/schema, orphan binding, empty source, or duplicate target." });
                 return {};
             }
-            replaced.push_back(override.binding);
+            replaced[binding] = true;
             graph.bindings[binding].sources = override.sources;
         }
         if (graph.generation == (std::numeric_limits<std::uint64_t>::max)())

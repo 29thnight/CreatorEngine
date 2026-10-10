@@ -56,6 +56,7 @@ namespace Input
         InputInteraction interaction{};
         SignalID gate{}; // Optional same-layer Button dependency. Invalid means always enabled.
         bool resumePersistentValue{}; // Explicit opt-in for positions/axes; never allowed for Button/charge.
+        std::vector<InputProcessor> processors; // Applied after alternative binding combination, in stored order.
     };
 
     struct InputBinding final
@@ -105,11 +106,15 @@ namespace Input
     // Only the compiler can construct it; publication exposes const ownership.
     class InputGraphProgram final
     {
+        struct ConstructionKey final {};
+
     public:
+        explicit InputGraphProgram(ConstructionKey) {}
         const InputGraph& GetDefinition() const noexcept { return m_definition; }
         std::span<const PreparedInputSignal> GetSignals() const noexcept { return m_signals; }
         std::span<const std::uint32_t> GetEvaluationOrder() const noexcept { return m_evaluationOrder; }
         std::span<const PreparedControlLookup> GetControls() const noexcept { return m_controls; }
+        std::span<const std::uint32_t> GetBindingSignals() const noexcept { return m_bindingSignals; }
         std::uint64_t GetSemanticHash() const noexcept { return m_semanticHash; }
         std::uint64_t GetInterfaceHash() const noexcept { return m_interfaceHash; }
         std::uint32_t FindSignal(SignalID signal, ValueType type) const noexcept;
@@ -123,6 +128,7 @@ namespace Input
         std::vector<PreparedInputSignal> m_signals;
         std::vector<std::uint32_t> m_evaluationOrder;
         std::vector<PreparedControlLookup> m_controls;
+        std::vector<std::uint32_t> m_bindingSignals;
         std::uint64_t m_semanticHash{};
         std::uint64_t m_interfaceHash{};
     };

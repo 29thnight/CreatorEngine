@@ -67,7 +67,7 @@ namespace Input
     enum class CancelReason : std::uint8_t
     {
         None, LayerBlocked, UIOwnership, FocusLost, Paused, DeviceDisconnected, DeviceReassigned,
-        DefinitionChanged, Rebound, HistoryGap, ClockDiscontinuity, SessionShutdown, ScriptReload
+        DefinitionChanged, Rebound, HistoryGap, ClockDiscontinuity, SessionShutdown, ScriptReload, InteractionTimeout
     };
     enum class RecordKind : std::uint8_t
     {
@@ -145,9 +145,9 @@ namespace Input
         DeviceID device{};
         ControlID control{};
         InputValue value{};
-        Recipient recipients{ Recipient::Both };
+        Recipient recipients{ Recipient::Both }; // Control routing decision; policy record target domains.
         LayerID layer{};
-        bool enabled{};
+        bool enabled{}; // OwnershipChanged/LayerChanged resulting state for the targeted domains.
         bool late{};
         CancelReason reason{ CancelReason::None };
 
