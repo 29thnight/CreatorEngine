@@ -1,8 +1,10 @@
-# CreatorEngine
+<p align="center">
+  <img src="Resources/Editor/Branding/CreatorEngineLogo.png" alt="CreatorEngine" width="640">
+</p>
 
-![Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D4?style=flat-square&logo=windows11&logoColor=white)
+![Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D4?style=flat-square)
 ![C++23](https://img.shields.io/badge/C%2B%2B-23-00599C?style=flat-square&logo=cplusplus&logoColor=white)
-![MSVC v145](https://img.shields.io/badge/MSVC-v145-5C2D91?style=flat-square&logo=visualstudio&logoColor=white)
+![MSVC v145](https://img.shields.io/badge/MSVC-v145-5C2D91?style=flat-square)
 ![DirectX 12](https://img.shields.io/badge/Graphics-DirectX%2012-107C10?style=flat-square)
 ![Vulkan](https://img.shields.io/badge/Graphics-Vulkan-AC162C?style=flat-square&logo=vulkan&logoColor=white)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white)
@@ -10,331 +12,105 @@
 ![miniaudio](https://img.shields.io/badge/Audio-miniaudio-000000?style=flat-square)
 ![AI Assisted](https://img.shields.io/badge/Development-AI%20Assisted-412991?style=flat-square)
 
-Windows x64용 C++23 게임 엔진과 Dear ImGui 에디터, 독립 Player, 콘텐츠 빌드 도구를 함께 개발하는 프로젝트입니다.
+Windows용 C++23 게임 엔진과 통합 에디터
 
-Editor와 Player는 같은 런타임 계층을 사용합니다. 렌더링은 DirectX 12·Vulkan RHI와 `EnhancedRenderGraph`로 구성하고, 게임 로직은 .NET 10 C# 스크립트로 확장합니다. enkiTS 기반 공용 작업 스케줄러가 애니메이션·자산 로딩·렌더 명령 기록을 실행하고, 독립 실행 파일인 **CreatorBuildTool**이 엔진 배포·C# 컴파일·콘텐츠 cook·게임 패키징을 담당합니다.
+[시작하기](#시작하기) · [기술설명서](docs/TechnicalGuide.md) · [문서](docs/README.md) · [개발 계획](docs/RefactoringPlanDashboard.html) · [기여하기](CONTRIBUTING.md)
 
-> **개발 상태:** 현재는 구조 개선이 진행 중인 개발 버전입니다. [`EngineVersion.json`](EngineVersion.json)의 `CreatorEngine 2 / 0.0.0.0 / preview / localDevelopment=true`는 미발행 로컬 개발 상태이며 정식 릴리스 번호가 아닙니다. 아래 설명은 **2026-09-30의 소스와 빌드 설정**을 기준으로 합니다. 계획서의 목표와 현재 구현·검증 범위는 구분합니다.
+## CreatorEngine 소개
 
-## 현재 구성
+CreatorEngine은 씬 편집부터 게임 실행과 패키징까지 하나의 작업 흐름으로 연결하는 게임 엔진입니다. Dear ImGui 기반 에디터에서 씬·프리팹·재질을 편집하고, C#으로 게임 로직을 작성하며, 독립 Player로 게임을 실행합니다. Editor와 Player는 같은 네이티브 런타임과 콘텐츠 파이프라인을 사용합니다.
 
-| 영역 | 구현과 역할 |
-|---|---|
-| Editor | 중앙 ViewportHost, 도킹 도구 창, 씬·프리팹 문서, Inspector·Content Browser, 기즈모, Play/Stop 전환, 테마와 메뉴·창 선언 계층 |
-| Rendering | DX12/Vulkan RHI, 백엔드 공용 렌더 패스, `EnhancedRenderGraph`의 패스 검증·컬링·배리어·자원 수명 관리, Slang 셰이더 컴파일 |
-| Runtime | Scene·Component 수명주기, 렌더 프록시 발행, 입력, UI, PhysX 물리와 miniaudio 오디오 |
-| Jobs & Animation | enkiTS 기반 `thread_pool`·`job_scheduler`, 태스크 기반 포즈 평가·LOD·CPU 버짓·청크 실행과 애니메이션 HUD |
-| Scripting | CoreCLR 호스트, .NET 10 `ScriptCore`, 교체 가능한 게임 C# 어셈블리, Roslyn 소스 제너레이터 |
-| Content | fastgltf·ufbx 모델 임포트, MikkTSpace 탄젠트 생성, ryml 기반 저작 YAML, 자산 메타데이터, AssetCooker와 AssetPacker |
-| Build & Distribution | C# `CreatorBuildTool`, 엔진 배포본과 프로젝트 pin, 포함된 Roslyn 컴파일러·사설 .NET 런타임, cook → PAK → Player 검증 → 게시 |
-| Diagnostics | CPU/GPU 타임라인·계층 분석·모듈별 카운터, `.ceprof` 저장·열기, Memory 스냅샷·A/B 비교, Editor/Player 명령 서비스와 회귀 검사 |
-| Graph Authoring | Lattice 그래프·문서·ImGui 캔버스, MeshRenderer에서 여는 Material Node Editor, Inspector 재질 편집·미리보기, 그래프의 Slang 생성·제품 렌더·쿠킹 경로 |
-| Reflection | reflgen의 생성된 타입 서술자·모듈 등록, 엔진의 저작 YAML·Inspector 어댑터. 저장 제외 필드는 `[[reflgen::ignore]]`로 명시 |
+현재 재설계와 개발은 개인이 주도하며, Legacy 버전에서 이어진 코드와 외부 라이브러리를 함께 사용합니다. 코드 분석·개발·문서 작성에는 생성형 AI를 보조 도구로 활용합니다.
 
-### 런타임 흐름
+> **개발 버전:** 현재 엔진은 `preview` 상태입니다. API와 자산 형식은 개발 중 변경될 수 있습니다. 이 문서의 기능 설명은 2026-10-10의 커밋된 master를 기준으로 하며, 지원·검증 범위의 세부사항은 [기술설명서](docs/TechnicalGuide.md)에 정리합니다.
 
-아래는 Editor와 Player가 공유하는 실행 흐름입니다. 화살표는 서비스 호출과 데이터 전달을 나타냅니다.
+## 시작하기
 
-```mermaid
-flowchart TB
-    Editor["Editor<br/>편집 · Play"] --> Runtime["SceneRuntime<br/>Scene · Component"]
-    Player["Player<br/>게임 실행"] --> Runtime
-    Runtime --> Scripts["CoreCLR<br/>ScriptCore · 게임 C#"]
-    Runtime --> Physics["Physics<br/>PhysX"]
-    Runtime --> Audio["AudioHost<br/>miniaudio"]
-    Runtime -->|렌더 프록시| Renderer["RenderEngine<br/>렌더 씬"]
-    Renderer --> Graph["EnhancedRenderGraph<br/>패스 · 자원 관리"]
-    Graph --> RHI["공용 RHI"]
-    RHI --> DX12["DirectX 12"]
-    RHI --> Vulkan["Vulkan"]
-```
+### 소스에서 빌드
 
-공용 [`job_scheduler`](Engine/Utility_Framework/JobScheduler.h)는 [`thread_pool`](Engine/Utility_Framework/ThreadPool.cpp)의 enkiTS 워커를 사용합니다. Editor/Player 공통 부트스트랩이 그 수명을 관리하며, 자산 로딩·썸네일·애니메이션·Foliage·AI·DX12 PSO 컴파일·DX12/Vulkan 명령 기록이 이 기반을 사용합니다. Render·Presentation·GPU 제출처럼 지속적으로 도는 전용 루프는 별도로 유지합니다. 이관 범위와 검증 기록은 [태스크 스케줄러 단일화 문서](docs/plans/TaskSchedulerUnificationPlan.md)에 있습니다.
+다음 개발 환경을 준비합니다.
 
-### 구현 범위와 후속 작업
-
-**DX12와 Vulkan 코드가 존재하는 것과 에디터 전체가 양쪽에서 동일하게 검증된 것은 다릅니다.** 현재 [에디터 워크스페이스 개편](docs/plans/EditorWorkspaceRedesignPlan.md)의 검증 대상은 DX12입니다. Vulkan RHI와 공용 패스 경로는 별도로 다루며, 빠른 시작과 아래 게임 패키징 예제는 DX12를 사용합니다. DX11은 현재 Scene Renderer 백엔드가 아닙니다.
-
-[`EnhancedRenderGraph::BuildOrder`](Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp)는 현재 **패스 선언 순서**로 실행 순서를 구성합니다. 리소스 의존성에 따른 자동 정렬, 리소스 버전 모델, aliasing·async compute는 [후속 스케줄링 계획](docs/plans/RenderGraphDependencySchedulingPlan.md)의 범위이며 현재 기능으로 표시하지 않습니다.
-
-최근 구현과 남은 범위는 다음과 같습니다.
-
-| 영역 | 현재 구현 | 남은 범위 |
-|---|---|---|
-| [작업 스케줄러·애니메이션](docs/plans/AnimationSchedulerPlan.md) | 공용 스케줄러 이관, 포즈·태스크 평가, LOD·CPU 버짓·HUD | AnimationGraph 확장 AG0~AG5. 공용 스케줄러 이관 자체를 성능 향상으로 해석하지 않음 |
-| [프레임 프로파일러](docs/plans/ProfilingCapturePlan.md) | Record/Pause, CPU/GPU 구간·카운터 분석, 캡처 소유 이름·시계, `.ceprof` 저장·열기 | 장시간 녹화·오버헤드 등 잔여 게이트. 별도 단일 제출 캡처인 [Render Frame Debugger](docs/plans/RenderFrameDebuggerPlan.md)의 `.ceframe`은 계획 단계 |
-| [메모리 프로파일러](docs/plans/MemoryProfilerPlan.md) | GameThread 경계의 수동 스냅샷, 프로세스·힙·자산 객체·주소 지도와 A/B 비교 | 네이티브 할당 소유자, 관리 객체·참조, GPU 자원별 계측과 보존 확장 |
-| [오디오 전환](docs/plans/AudioBackendModernizationPlan.md) | `wave::AudioRuntime`·PlaybackService, direct clip/preset와 SoundGraph, scene-owned emitter/listener, cooked bytes, FMOD-free 제품 배선 | Windows 전체 빌드·패키지·실장치·장시간 성능 gate는 미검증 |
-| [Lattice](docs/plans/LatticeAdoptionPlan.md)·[Material Graph](docs/plans/BlenderMaterialGraphPlan.md) | MAT-0~8 완료: 그래프를 재질 정본으로 사용, Slang·바인딩·PSO·쿠킹, Scene Surface/Volume·SSS·투과, 노드 창·Inspector 편집과 미리보기 | MAT-9 렌더 대조·성능 수용 진행. 박막의 Blender 이미지 차이, Special·텍스처 및 경로별 대조와 성능 게이트. BT·Animator 자산은 재작성 때 LX 사용 |
-| [리플렉션](docs/design/ReflectionDesign.md) | reflgen 1.0.0 생성기·런타임, Visual Studio 18용 확장, 생성된 모듈 등록과 기존 저작 포맷 어댑터 | 새 반영 필드는 기본 저장 대상이므로 런타임 캐시의 제외 속성과 기동 등록 검사를 함께 유지 |
-| [배포·Launcher](docs/plans/EngineDistributionAndLauncherPlan.md) | CreatorBuildTool, 엔진 배포본·프로젝트 pin과 패키징 | 정식 `.creatorproject` parser, Launcher·MSI 제품화 |
-
-[네트워크 fixed tick·replication](docs/plans/NetworkFrameworkPlan.md)도 후속 구현 범위입니다. 전체 작업 상태와 검증 기록은 [문서 색인](docs/README.md)과 [대시보드](docs/RefactoringPlanDashboard.html)에서 확인할 수 있습니다.
-
-PHASE 4.25의 현재 완료 공수는 **32/34일**입니다. [동일 입력 Blender 이미지 대조](docs/analysis/MAT9BlenderImageComparison.md), [모델 배치 성능 조사](docs/analysis/MAT9MaterialScenePerformance.md), [다른 세션의 노드 편집기 성능 개선](docs/analysis/MAT9NodeEditorPerformance.md)은 각각 측정 조건과 남은 검증을 기록합니다. reflgen 병합 전의 성능 수치를 병합 후 측정으로 해석하지 않습니다.
-
-## 기술 기준
-
-| 항목 | 기준 |
-|---|---|
-| 플랫폼·네이티브 | Windows x64, Win32, C++23 (`stdcpp23` / `/std:c++23preview`), MSVC v145, MSBuild |
-| 렌더링·에디터 | DirectX 12, Vulkan, Slang, Dear ImGui, ImGuizmo·ImViewGuizmo |
-| 관리 코드·빌드 도구 | .NET 10, C#, CoreCLR hosting API, Roslyn |
-| 모델·텍스처 | fastgltf + simdjson, ufbx, MikkTSpace, meshoptimizer, DirectXTex |
-| 작업 실행 | enkiTS, 엔진 공용 `thread_pool`·`job_scheduler` |
-| 물리·오디오 | NVIDIA PhysX, 소스 벤더링한 miniaudio 0.11.25 (MIT-0) |
-| 직렬화·패키징 | ryml 기반 저작 YAML, 도구·명령용 JSON, `.creator`·`.prefab`·`.meta`, 쿠킹된 런타임 문서, PAK |
-| 리플렉션 | reflgen 1.0.0, `[[reflgen::reflect]]` 타입의 생성된 서술자와 엔진 등록소, `creator::` Inspector 속성 |
-| 의존성 관리 | [`vcpkg.json`](vcpkg.json)의 manifest·baseline + [`ThirdParty/`](ThirdParty/README.md)의 고정 의존성 |
-
-수학 라이브러리 교체에는 `ThirdParty/Mathematics`를 사용합니다. 구조 이주와 픽셀·물리 런타임 검증의 잔여 범위는 [Mathematics 이주 계획](docs/plans/MathematicsMigrationPlan.md)에서 구분합니다.
-
-## 소스에서 시작하기
-
-이 절은 **엔진을 수정·빌드하는 개발자**를 위한 안내입니다. 이미 만들어진 엔진 배포본으로 게임을 제작하는 경우에는 [엔진 배포본으로 게임 만들기](#엔진-배포본으로-게임-만들기)를 참고하십시오.
-
-### 1. 요구 환경
-
-- Windows 10/11 x64와 Git
-- Visual Studio **18 계열**의 **Desktop development with C++** 워크로드, **MSVC v145**, Windows SDK, x64 MSBuild
-- **.NET 10 SDK와 x64 Runtime** — ScriptCore, GameScripts, CreatorBuildTool 빌드용
-- **vcpkg**, **PowerShell 7 (`pwsh`)** — 네이티브 의존성과 빌드·배포 스크립트용
-
-정적 경계 검사는 Python 3를 사용합니다. .NET 네이티브 호스트의 nethost 헤더·lib·DLL은 [`ThirdParty/DotNetHost`](ThirdParty/DotNetHost/README.md)에 고정되어 있으므로 설치된 SDK의 패치 폴더에 맞춰 경로를 수정하지 않습니다.
-
-Vulkan 헤더와 Slang 런타임은 저장소에 고정되어 있어 일반 네이티브 빌드에 Vulkan SDK를 요구하지 않습니다. Vulkan 실행에는 드라이버의 Vulkan 로더가 필요하고, validation layer 등을 이용한 별도 검증에는 해당 개발 환경이 필요합니다.
-
-### 2. 저장소와 의존성 준비
+- Windows 10/11 x64
+- Visual Studio 18 계열, Desktop development with C++ 워크로드, MSVC v145와 Windows SDK
+- .NET 10 SDK, vcpkg, PowerShell 7
+- DirectX 12를 지원하는 GPU와 드라이버
 
 ```powershell
 git clone https://github.com/29thnight/CreatorEngine.git
 Set-Location CreatorEngine
 
-# VCPKG_ROOT는 vcpkg가 설치된 실제 경로로 설정합니다.
+# VCPKG_ROOT를 설치된 vcpkg의 실제 경로로 설정합니다.
 & "$env:VCPKG_ROOT\vcpkg.exe" integrate install
-```
 
-MSBuild의 manifest mode가 `vcpkg_installed/`에 필요한 패키지를 복원합니다. 바이너리 캐시가 없는 환경에서는 PhysX 등 네이티브 의존성을 소스에서 빌드하므로 첫 복원 비용이 큽니다. 현재 모델 임포트 경로는 저장소에 고정된 fastgltf·ufbx이며, Assimp 설치 목록을 따로 구성하지 않습니다.
-
-reflgen은 [`ports/reflgen`](ports/reflgen/portfile.cmake)의 고정 버전을 복원합니다. 처음 설치되거나 생성기 설정이 바뀐 빌드는 MSBuild 설정을 다시 읽도록 재빌드를 안내할 수 있습니다. Visual Studio의 코드 탐색 지원은 [공식 VSIX 릴리스](https://github.com/29thnight/reflgen_cpp/releases/tag/v1.0.1)의 확장 1.0.1을 VS 18에 설치합니다. 확장은 편집 지원용이며 실제 생성은 MSBuild가 수행합니다.
-
-오디오 SDK를 별도로 배치하지 않습니다. `ThirdParty/miniaudio`의 고정 소스를 SceneRuntime의 private 구현 TU 하나에 컴파일합니다. [출처·해시·라이선스](ThirdParty/miniaudio/PROVENANCE.md)를 확인할 수 있습니다.
-
-의존성의 출처·판본·갱신 규칙은 [`ThirdParty/README.md`](ThirdParty/README.md)와 각 하위 문서를 기준으로 합니다.
-
-### 3. Editor와 빌드 도구 빌드
-
-Visual Studio에서 `CreatorEngine.sln`을 열고 `CreatorEditor`를 시작 프로젝트로 지정합니다. 명령행에서는 **v145 도구가 준비된 x64 Developer PowerShell**에서 다음 명령을 실행합니다. `$msbuild`는 VS 18 Community의 설치 예시이며, 설치 에디션·위치가 다르면 해당 경로로 바꿉니다.
-
-```powershell
-dotnet build .\BuildTool\CreatorBuildTool.csproj -c Debug
-
+# VS 18 Community 설치 예시입니다. 설치 위치가 다르면 경로를 바꿉니다.
 $msbuild = 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe'
-& $msbuild .\CreatorEngine.sln `
-  /m `
-  /t:CreatorEditor `
-  /p:Configuration=Debug `
-  /p:Platform=x64 `
-  /v:minimal
+& $msbuild .\Editor\CreatorEditor.vcxproj /t:Build /m /p:Configuration=Debug /p:Platform=x64
+
+& .\Bin\x64-Debug\Editor\CreatorEditor.exe --development-project .\Dynamic_CPP
 ```
 
-`CreatorEditor`의 네이티브 빌드는 `ScriptCore`와 `GameScripts`도 함께 빌드합니다. Player·AssetCooker·AssetPacker는 별도 타깃이며, 게임 제작용 엔진 배포본 생성 절차에서 함께 준비합니다.
+Visual Studio에서는 `CreatorEngine.sln`을 열고 `CreatorEditor`를 시작 프로젝트로 지정할 수 있습니다. 의존성은 vcpkg manifest로 복원되며, 최초 빌드는 복원과 컴파일에 시간이 걸립니다. 실행 파일과 함께 생성된 런타임·리소스 폴더를 유지하십시오.
 
-주요 산출물의 배치는 다음과 같습니다. 아래의 Player·도구 항목은 해당 타깃을 빌드했을 때 생성됩니다.
+### 엔진 배포본으로 게임 제작
 
-```text
-Bin/x64-Debug/
-  Editor/CreatorEditor.exe + CreatorEditor.runtime.dll
-  Player/Player.exe + Player.runtime.dll
-  Tools/AssetCooker/AssetCooker.exe + AssetCooker.runtime.dll
-  Tools/AssetPacker/AssetPacker.exe + AssetPacker.runtime.dll
-  Tools/CreatorBuildTool/        C# 빌드 도구
-  Runtime/Common/               공용 네이티브 DLL
-  Runtime/Editor/               Editor 전용 DLL
-  Runtime/Manifests/             호스트별 의존성·해시 기록
-  Managed/                      ScriptCore와 GameScripts
-  Resources/                    엔진 리소스
-Build/Lib/x64-Debug/             네이티브 정적 라이브러리
-Build/Obj/                       프로젝트별 중간 산출물
-```
+엔진 배포본을 사용하는 게임 제작자는 포함된 Editor와 CreatorBuildTool로 프로젝트를 열고 패키징할 수 있습니다. 이 경로에는 엔진 소스, Visual Studio, vcpkg와 시스템 .NET SDK가 필요하지 않습니다.
 
-각 호스트의 작은 EXE가 DLL 검색 경로를 설정한 뒤 `*.runtime.dll`을 로드합니다. 엔진 정적 라이브러리는 해당 호스트 DLL에 링크됩니다. **EXE 하나만 복사해서 실행하는 구조가 아니므로** `Runtime/`을 포함한 산출물 배치를 유지해야 합니다. 자세한 경계는 [공용 런타임·배포 구조](Tools/distribution/README.md)에 정리되어 있습니다.
+배포본 준비·프로젝트 연결·패키징 명령은 [배포 가이드](Tools/distribution/README.md)와 [BuildTool 사용법](BuildTool/README.md)을 참고하십시오. 현재 프로젝트 연결은 개발용 adapter이며, Launcher와 정식 프로젝트 파일 지원은 후속 작업입니다.
 
-### 4. 실행
+## 주요 기능
 
-```powershell
-.\Bin\x64-Debug\Editor\CreatorEditor.exe
-```
+- **씬과 프리팹 편집** — 도킹 에디터, Scene/Game 뷰, Hierarchy, Inspector, Content Browser, 기즈모와 Play/Stop 전환을 제공합니다.
+- **그래프 기반 재질 제작** — Lattice Material Node Editor에서 재질 자산을 작성하고 미리 볼 수 있습니다. 그래프 편집은 준비·검증 후 자동 반영·저장되며, 메시별 재질 override를 지원합니다.
+- **렌더링 파이프라인** — Slang 재질과 공용 렌더 패스, 의존성·리소스 버전 기반 RenderGraph를 사용합니다. Editor는 DX12로 실행하고, Player와 공용 RHI에는 DX12·Vulkan 경로가 있습니다.
+- **모델과 텍스처 처리** — glTF·FBX 임포트, 기하 LOD와 메시렛 경로, 임포트 설정에 따른 텍스처 mip·압축·쿠킹을 지원합니다. 게임 패키지는 준비된 콘텐츠를 사용합니다.
+- **리소스 편집 자동 반영** — 자산과 메타데이터 변경을 감지해 재임포트·쿠킹·소비자 갱신을 수행합니다. C# 게임 스크립트는 저장 후 자동 빌드·재연결되며, 실패 시 이전 정상 결과를 유지합니다.
+- **게임 런타임** — Scene·Entity·Component 수명 관리, 공용 작업 스케줄러, 애니메이션 LOD·CPU 버짓, PhysX 물리, miniaudio 오디오와 SDF 텍스트 경로를 갖추고 있습니다.
+- **진단과 패키징** — CPU/GPU 프로파일링, 메모리 스냅샷 비교, `.ceprof` 캡처와 별도 뷰어를 제공합니다. CreatorBuildTool은 C# 컴파일부터 cook·PAK·Player 검증·게시까지 처리합니다.
 
-소스 checkout의 기본 저작 프로젝트는 `Dynamic_CPP/`입니다. 외부 게임 프로젝트는 아래의 `select-engine`·`open-project` 경로로 특정 엔진 배포본에 연결합니다.
+구현된 경로의 전체 품질·성능 수용을 뜻하지는 않습니다. 특히 Vulkan 교차 검증, GPU 기능 확대와 RenderGraph 큐 최적화의 채택 조건은 [기술설명서의 구현 경계](docs/TechnicalGuide.md#구현과-검증의-경계)를 참고하십시오.
 
-## 엔진 배포본으로 게임 만들기
+## 엔진 구조
 
-### 엔진 개발자: 배포본 생성
-
-[`CreatorBuildTool`](BuildTool/README.md)이 엔진 배포본 생성, 게임 C# 컴파일, 콘텐츠 cook·PAK·Player 검증·게시를 담당합니다. Editor와 CLI는 같은 실행 파일을 사용하며, [`Tools/build.ps1`](Tools/build.ps1)은 기존 호출을 전달하는 **호환 진입점**입니다.
-
-```powershell
-dotnet build .\BuildTool\CreatorBuildTool.csproj -c Release
-
-$tool = '.\Bin\x64-Release\Tools\CreatorBuildTool\CreatorBuildTool.exe'
-& $tool publish-engine --repository . --config Release --build
-```
-
-`--build`는 엔진 개발 환경에서 네이티브 호스트·도구 빌드까지 수행하는 명시적 옵션입니다. 결과는 기본적으로 `Build/Distributions/` 아래에 생성됩니다. 배포본에는 네이티브 호스트와 의존 DLL, 엔진 리소스, ScriptCore, Roslyn·참조 어셈블리·소스 제너레이터, 사설 .NET 런타임, CreatorBuildTool과 라이선스 자료가 포함됩니다.
-
-### 게임 제작자: 프로젝트 연결과 패키징
-
-다음 예제의 `$engine`은 **위 단계에서 생성했거나 전달받은 실제 Release 배포본의 절대 경로**, `$project`는 **`Assets/`와 `ProjectSetting/`이 있는 기존 게임 프로젝트의 절대 경로**로 바꿉니다. 아래 명령은 프로젝트를 새로 생성하지 않습니다.
-
-```powershell
-$engine = 'C:\Engines\MyEngineDistribution'
-$project = 'C:\Projects\MyGame'
-$tool = Join-Path $engine 'Bin/x64-Release/Tools/CreatorBuildTool/CreatorBuildTool.exe'
-
-& $tool verify-engine --engine-distribution $engine
-& $tool select-engine --engine-distribution $engine --project $project
-& $tool open-project --engine-distribution $engine --development-project $project
-
-# 에디터를 종료한 뒤, 같은 Release 배포본으로 패키징합니다.
-& $tool package-game `
-  --engine-distribution $engine `
-  --project $project `
-  --config Release `
-  --input-mode Project `
-  --stage-root "$project\Build\Staging" `
-  --render-backend dx12
-```
-
-게임 C# 소스는 `Assets/Script/**/*.cs`에서 읽습니다. 배포본에 포함된 Roslyn으로 컴파일하므로 이 경로의 게임 제작자에게 Visual Studio·vcpkg·시스템 .NET SDK·PowerShell 설치를 요구하지 않습니다. 별도 NuGet 복원이나 사용자 네이티브 플러그인 ABI는 이 경로의 지원 범위가 아닙니다.
-
-`select-engine`은 프로젝트에 구성별 엔진 pin을 저장합니다. **현재는 개발용 프로젝트 adapter이며 정식 `.creatorproject` parser나 Launcher를 의미하지 않습니다.** 엔진 배포본과 패키징 구성(Debug/Release 및 Shipping variant)을 일치시켜야 합니다.
-
-패키징은 아래 순서로 진행됩니다. 위 예제는 `--stage-root`로 게임 프로젝트의 `Build/Staging/`을 명시합니다.
+Editor와 Player는 씬 런타임을 공유하고, 콘텐츠 도구는 저작 자산을 실행용 데이터로 준비합니다.
 
 ```mermaid
-flowchart TB
-    Inputs["게임 프로젝트<br/>구성별 엔진 pin"] --> Compile["Roslyn<br/>게임 C# 컴파일"]
-    Compile --> Cook["AssetCooker<br/>런타임 콘텐츠 cook"]
-    Cook --> Stage["candidate 스테이징<br/>런타임 배치"]
-    Stage --> Pak["AssetPacker<br/>PAK 생성"]
-    Pak --> Verify{"격리된 Player smoke 검증"}
-    Verify -->|성공| Publish["불변 Game-ID 게시<br/>current 포인터 갱신"]
-    Verify -->|실패| Fail["게시 중단<br/>기존 current 유지"]
-    Pak -.->|skip-verify| Candidate["미검증 candidate<br/>current 유지"]
+flowchart LR
+    Editor["Editor<br/>씬 · 재질 · 자산 편집"] --> Runtime["공용 런타임<br/>C# · 애니메이션 · 물리 · 오디오"]
+    Player["Player<br/>게임 실행"] --> Runtime
+    Runtime --> Render["RenderEngine<br/>RenderGraph · RHI"]
+    Assets["저작 자산"] --> Build["CreatorBuildTool<br/>컴파일 · cook · PAK"]
+    Build --> Player
 ```
 
-검증에 성공한 candidate만 불변 `Game-<ID>` 디렉터리로 게시하고 `*.current.json` 포인터를 갱신합니다.
+모듈 간 책임, 자원 소유권, 렌더 제출과 콘텐츠 게시 과정은 [기술설명서](docs/TechnicalGuide.md)에서 설명합니다.
 
-Release 게임 패키지는 현재 **.NET 10 x64와 필요한 네이티브 런타임을 함께 배치**합니다. Debug 결과는 개발 검증용입니다. `--skip-verify`는 미검증 candidate만 남기며 게시 포인터를 바꾸지 않습니다. `Workspace`·`Tracked` 입력은 엔진 소스 checkout의 `Dynamic_CPP` 전용입니다.
+## 저장소 안내
 
-명령별 옵션과 실패·취소 동작은 [BuildTool 사용법](BuildTool/README.md), 엔진 pin과 배포 경계는 [배포 가이드](Tools/distribution/README.md)를 참고하십시오.
-
-## 저장소 구조
-
-| 경로 | 책임 |
+| 경로 | 내용 |
 |---|---|
-| [`Engine/Utility_Framework/`](Engine/Utility_Framework/) | 공용 타입·컨테이너, 로깅, 리플렉션, 직렬화와 런타임 설정 |
-| [`Engine/RenderEngine/`](Engine/RenderEngine/) | RHI, RenderGraph, 렌더 패스, GPU 자원과 렌더 씬 |
-| [`Engine/SceneRuntime/`](Engine/SceneRuntime/) | Scene·Component, 애니메이션 스케줄러·오디오, CoreCLR 호스트와 렌더 프록시 연결 |
-| [`Engine/Physics/`](Engine/Physics/) | PhysX 초기화, 시뮬레이션·쿼리와 컴포넌트 연결 |
-| [`Engine/EngineDiagnostics/`](Engine/EngineDiagnostics/) | 프로파일링과 진단 인프라 |
-| [`Engine/CommandService/`](Engine/CommandService/) | 개발용 Editor/Player 명령 서비스 |
-| [`Editor/`](Editor/) | Editor 호스트, 워크스페이스·도구 창·메뉴, ImGui 표시 계층과 렌더 회귀 |
-| [`Player/`](Player/) | 패키지된 게임을 실행하는 독립 호스트 |
-| [`BuildTool/`](BuildTool/README.md) | C# CreatorBuildTool: 엔진 배포, 게임 컴파일·패키징·게시 |
-| [`Tools/`](Tools/) | AssetCooker, AssetPacker, 배포 adapter와 검증·회귀 도구 |
-| [`ScriptCore/`](ScriptCore/) · [`ScriptCore.Generators/`](ScriptCore.Generators/) | C# 엔진 API·네이티브 바인딩과 Roslyn 소스 제너레이터 |
-| [`GameScripts/`](GameScripts/) | 소스 checkout의 게임 스크립트·회귀 샘플. 외부 프로젝트의 `Assets/Script` 배치와 구분 |
-| [`Lattice/`](Lattice/) · [`Tools/LatticeExample/`](Tools/LatticeExample/README.md) | 독립 그래프 모델·문서·ImGui 캔버스와 Win32/DX11 예제. 메인 Scene Renderer의 DX12/Vulkan 경로와 구분 |
-| [`Dynamic_CPP/`](Dynamic_CPP/) | 소스 checkout의 기본 저작 프로젝트와 테스트 자산 |
-| [`ThirdParty/`](ThirdParty/README.md) | vcpkg 밖에서 버전을 고정하는 외부 코드·런타임과 출처 |
-| [`docs/`](docs/README.md) | 활성·보관 계획, 설계 결정, 시점별 분석과 진행 대시보드 |
+| [Engine](Engine/) | 씬 런타임, 렌더링, 물리, 진단과 공용 기반 |
+| [Editor](Editor/) · [Player](Player/) | 편집용 호스트와 게임 실행 호스트 |
+| [ScriptCore](ScriptCore/) · [ScriptCore.Generators](ScriptCore.Generators/) | C# 엔진 API와 소스 제너레이터 |
+| [Lattice](Lattice/) | 그래프 모델, 문서와 편집 캔버스 |
+| [BuildTool](BuildTool/README.md) · [Tools](Tools/) | 배포·컴파일·쿠킹·패키징과 검증 도구 |
+| [Dynamic_CPP](Dynamic_CPP/) · [GameScripts](GameScripts/) | 소스 개발용 프로젝트, 자산과 스크립트 샘플 |
+| [ThirdParty](ThirdParty/README.md) | 저장소에 고정한 외부 의존성과 출처 |
+| [docs](docs/README.md) | 기술설명서, 설계, 개발 계획과 검증 기록 |
 
-## 빌드와 검증
+## 문서
 
-### 로컬 빌드 범위
+- [기술설명서](docs/TechnicalGuide.md) — 현재 구현의 구조와 데이터 흐름, 빌드·실행·검증 경계
+- [문서 색인](docs/README.md) — 설계 결정과 분야별 문서
+- [개발 대시보드](docs/RefactoringPlanDashboard.html) — 진행 중인 작업과 후속 계획
+- [BuildTool](BuildTool/README.md) · [배포 가이드](Tools/distribution/README.md) — 배포본과 게임 패키징
+- [회귀 검사 안내](Tools/regression/README.md) — 변경 영역별 검증 절차
 
-엔진 빌드는 MSVC v145가 설치된 Windows 개발 환경에서 검증합니다. 공개 GitHub Actions에는 [브랜드·문서 페이지 배포](.github/workflows/website.yml)만 남아 있으며, 엔진 빌드 결과를 확인하는 CI는 없습니다. Editor/Player 링크·실행과 실제 게임 패키징은 Windows 환경에서 별도로 검증해야 합니다. 오디오 독립 회귀는 `python3 Tools/regression/audio/run_portable.py --config all`로 Linux에서도 실행할 수 있습니다.
+## 기여와 커뮤니티
 
-x64 Debug/Release는 기본 unity 구성을 사용합니다. 각 번역 단위의 include 자급성은 다음 Debug non-unity 빌드로 확인합니다.
+버그 보고, 문서 개선과 코드 변경은 [GitHub Issues](https://github.com/29thnight/CreatorEngine/issues)와 Pull Request로 제안할 수 있습니다. 개발 환경과 변경·검증 기준은 [CONTRIBUTING.md](CONTRIBUTING.md), 참여자 간 행동 기준은 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)에 있습니다.
 
-```powershell
-$targets = @(
-  'Engine\Utility_Framework'
-  'Engine\Physics'
-  'Engine\SceneRuntime'
-  'Engine\RenderEngine'
-) -join ';'
+## 라이선스
 
-& $msbuild .\CreatorEngine.sln `
-  "/t:$targets" `
-  /p:Configuration=Debug `
-  /p:Platform=x64 `
-  /p:EnableUnitySupport=false `
-  /m /v:minimal /nologo
-```
+현재 저장소 루트에는 프로젝트 전체에 적용되는 별도 `LICENSE` 파일이 없습니다. 소스가 공개되어 있다는 사실만으로 사용·수정·재배포 권한이 부여되지는 않으므로, 외부 이용은 저장소 소유자에게 확인하십시오.
 
-### 정적 검사와 BuildTool 테스트
-
-```powershell
-python .\scripts\check_include_boundary.py
-
-dotnet run --project .\BuildTool\Tests\CreatorBuildTool.Tests.csproj -c Debug
-```
-
-첫 명령은 Editor/Core include 방향·프로젝트 참조·소스 편입을 검사합니다. BuildTool 테스트는 경로·pin·변조 거부·PAK 목록·게시와 프로세스 종료 계약 등을 확인합니다. 실제 엔진 배포본을 사용하는 컴파일 검증은 테스트에 `-- --engine <배포본의 실제 경로>`를 추가하고, 게임 실행 완료는 별도의 `package-game` Player 검증으로 판단합니다.
-
-### 진단 빌드와 추가 회귀
-
-```powershell
-# 별도 솔루션 구성 없이 AddressSanitizer를 켭니다.
-& $msbuild .\CreatorEngine.sln `
-  /t:CreatorEditor `
-  /p:Configuration=Debug `
-  /p:Platform=x64 `
-  /p:EngineAsan=true
-
-# Player의 개발용 명령·진단 경로를 분리하는 Shipping 빌드입니다.
-& $msbuild .\CreatorEngine.sln `
-  /t:Player `
-  /p:Configuration=Release `
-  /p:Platform=x64 `
-  /p:EngineShipping=true
-```
-
-Shipping 산출물은 `Bin/x64-Release-Shipping/`으로 분리되며 Editor의 별도 구성은 아닙니다. 게임 패키징에도 일치하는 Shipping 엔진 배포본과 `--shipping` 옵션이 필요합니다.
-
-| 안내 | 범위 |
-|---|---|
-| [구조·에디터 회귀](Tools/regression/README.md) | 생명주기·리플렉션·계층·워크스페이스·패키징 등 개별 회귀 절차 |
-| [DX12 검증](Tools/dx12-validation/README.md) | DX12 검증 환경과 실행 절차 |
-| [프로파일링 검증](Tools/profiling-validation/README.md) | 수집 코어 계약과 실제 Editor의 CPU/GPU·카운터·Memory 배선 검사 |
-| [애니메이션 회귀](Tools/regression/verify-animation-s7.ps1) | 스케줄러·버짓·LOD·HUD의 제품 회귀. 시각·Player 검증은 별도 스크립트로 실행 |
-| [Lattice 독립 예제](Tools/LatticeExample/README.md) | 그래프·문서·캔버스의 자체 검사와 캡처. Editor 통합 완료 판정과 구분 |
-| [렌더 테스트 소스](Editor/RenderTests/) | DX12/Vulkan 공용 패스와 백엔드별 테스트 |
-| [BuildTool 검증 기록](docs/analysis/CreatorBuildToolValidation.md) | 시점별 실행 결과와 모델 씬 등 검증 한계 |
-
-검사 스크립트가 존재하거나 계획서에 완료 표시가 있는 것만으로 현재 빌드·런타임이 통과했다고 판단하지 않습니다. 성능 수치도 해당 기록의 구성·장면·측정 조건과 함께 읽어야 합니다.
-
-## 문서 읽는 순서
-
-[문서 색인](docs/README.md)에서 시작해 [진행 대시보드](docs/RefactoringPlanDashboard.html)로 전체 상태를 확인합니다. 사용 절차는 [BuildTool](BuildTool/README.md)과 [배포 가이드](Tools/distribution/README.md), 설계 근거는 `docs/design/`, 측정 기록은 `docs/analysis/`에 있습니다.
-
-`docs/plans/`는 활성·미래 작업, [`docs/plans/archive/`](docs/plans/archive/README.md)는 완료·중단·대체된 계획입니다. 보관 문서의 과거 목표나 측정 결과를 현재 기능 목록으로 읽지 않습니다.
-
-## 개발 방식과 AI 활용
-
-CreatorEngine은 Legacy 버전과 달리 현재의 재설계, 기능 개발, 리팩터링 및 문서화를 사실상 1인이 주도하는 개인 프로젝트입니다. 저장소에는 Legacy 버전에서 이어진 코드와 외부 오픈소스 의존성이 포함되어 있으므로, 이는 전체 코드가 단독으로 작성되었다는 의미는 아닙니다.
-
-제한된 개발 인력으로 프로젝트의 규모와 복잡도를 관리하기 위해 생성형 AI 도구를 보조 수단으로 활용합니다. 활용 범위에는 코드베이스 탐색과 영향 범위 분석, 설계 대안 검토, 반복적인 코드·문서 초안 작성, 테스트 절차 정리 및 문제 진단이 포함될 수 있습니다.
-
-AI가 제안하거나 생성한 결과는 그 자체로 구현 완료나 품질을 보증하지 않습니다. 변경 사항은 관련 소스와 호출 경로를 검토하고, 가능한 범위에서 컴파일, 정적 검사, 회귀 테스트 및 런타임 검증을 거친 뒤 반영합니다.
-
-최종 설계 결정, 변경 승인, 품질 및 라이선스 준수에 대한 책임은 저장소 관리자에게 있습니다. 계획 문서나 AI가 작성한 설명보다 현재 소스 코드와 검증 결과를 우선합니다.
-
-## 의존성과 라이선스
-
-- vcpkg가 관리하는 직접 의존성은 [`vcpkg.json`](vcpkg.json)을 기준으로 합니다.
-- 저장소가 직접 포함하는 의존성의 출처와 라이선스는 [`ThirdParty/README.md`](ThirdParty/README.md) 및 각 하위 디렉터리 문서를 기준으로 합니다.
-- 저장소 루트에는 현재 프로젝트 전체에 적용되는 별도 `LICENSE` 파일이 없습니다. 외부 사용·재배포가 필요하면 프로젝트 소유자에게 먼저 확인하십시오.
+외부 의존성의 라이선스와 출처는 [vcpkg.json](vcpkg.json), [ThirdParty 안내](ThirdParty/README.md)와 각 라이브러리의 라이선스 문서에서 확인할 수 있습니다.

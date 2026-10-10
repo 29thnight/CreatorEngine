@@ -2,6 +2,10 @@
 
 엔지니어링 문서 트리. 루트에 흩어져 있던 30개 문서를 2026-08-17에 여기로 옮겼다.
 
+- **[TechnicalGuide.md](TechnicalGuide.md)** — 커밋된 master 기준의 기술설명서.
+  엔진 구조·소유권·렌더링·콘텐츠·스크립팅·빌드 흐름과 구현·검증 경계를 설명한다.
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)** — 기여 절차와 참여 기준.
+
 - **[RefactoringPlanDashboard.html](RefactoringPlanDashboard.html)** — 전체 리팩터링 페이즈 색인.
   진행 상태·의존 관계·슬라이스 단위를 한 눈에 본다. **여기서 시작하는 것이 빠르다.**
 
@@ -37,7 +41,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
 | [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
 | [ModelGeometryTextureImprovementPlan.md](plans/ModelGeometryTextureImprovementPlan.md) | 비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분 |
-| [TexturePipelinePlan.md](plans/TexturePipelinePlan.md) | PHASE 12 · 미착수 — 텍스처 import 설정·mip·cook 트랜스코딩·런타임 소비. |
+| [TexturePipelinePlan.md](plans/TexturePipelinePlan.md) | PHASE 12 · 구현·부분 수용 — 텍스처 import 설정·mip·cook·Player 소비와 편집 자동 처리. 전체 품질·성능 및 잔여 게이트는 계획과 검증 기록 참조. |
 | [BuildPipelinePlan.md](plans/BuildPipelinePlan.md) | PHASE 12.5 · 진행 — 게임 빌드·cook·stage·managed·CI 파이프라인. B/L 잔여 유지. |
 | [EngineLayerSeparationPlan.md](plans/EngineLayerSeparationPlan.md) | E0~E7 · 잔여 있음 — Runtime Core·Editor·Host 경계. E2 writer와 E7 잔여 유지. |
 | [AnimationSchedulerPlan.md](plans/AnimationSchedulerPlan.md) | PHASE 13 — 애니메이션 스케줄러·LOD·CPU 버짓 재설계. |
