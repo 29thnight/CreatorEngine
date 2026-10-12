@@ -114,11 +114,15 @@ $appCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\App.cpp")
 if ($mainCode -notmatch 'SetCameraRig') {
     throw "EditorMain이 카메라 rig를 세션에 설치하지 않는다 — E4-5 배선이 사라졌다"
 }
-if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)') {
+# The host now reads the editor camera through its rig (CameraRig()); either accessor
+# keeps the property that the Editor host seals its own camera into the view request.
+if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)|CameraRig\(\)') {
     throw "Editor Host(App.cpp)가 뷰 요청으로 밀봉하지 않는다 — E4-5 배선이 사라졌다"
 }
 $facadeCode = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.h")
-if ($liveCode -match 'editorCamera' -or $facadeCode -match 'GetEditorCamera') {
+# Word boundary: FrameCameraSnapshot::editorCameraRevision is camera data the
+# renderer reads, not an owned editor camera.
+if ($liveCode -match '\beditorCamera\b' -or $facadeCode -match 'GetEditorCamera') {
     throw "Core(RenderCore)가 에디터 카메라를 소유/노출한다 — E4-5 소유권 회귀"
 }
 foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
@@ -215,7 +219,11 @@ try {
     # ── 판정 A: 알려진 런타임 패스가 전부 있다 ──
     # 이것이 양성 대조다. 이게 없으면 "Editor 패스가 없다"가 파이프라인이 통째로
     # 비어서 참이 되는 경우와 구분되지 않는다.
-    $requiredRuntime = @('Shadow','GBuffer','Deferred','Forward+','PostChain','UI','live_present')
+    # METEOR scene wiring (2026-10-12): Shadow/GBuffer/Deferred/Forward+ became the
+    # METEOR.Scene geometry, cull, shadow, surface, color, light tile and blended nodes.
+    $requiredRuntime = @('METEOR.Scene.Geometry','METEOR.Scene.Cull','METEOR.Scene.Shadow',
+        'METEOR.Scene.Surface','METEOR.Scene.Color','METEOR.Scene.LightTiles','METEOR.Scene.Blended',
+        'PostChain','UI','live_present')
     foreach ($name in $requiredRuntime) {
         if (-not ($nodes | Where-Object { $_.Name -eq $name })) {
             throw "런타임 패스 '$name'이 파이프라인에 없다 — 구성이 무너졌다"

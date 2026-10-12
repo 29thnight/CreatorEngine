@@ -356,6 +356,42 @@ namespace
 
 namespace
 {
+    // W9 soak: model generations drawn by one sealed METEOR frame. A model is
+    // mixed when two of its generations draw together (an old instance kept
+    // beside a reimported one). Granular meshes name the model by asset set and
+    // its generation by manifest revision.
+    struct ModelGenerationMix
+    {
+        uint32_t pairs{}, mixedModels{};
+        uint64_t mixedNewest{};
+    };
+
+    ModelGenerationMix CountModelGenerations(const material_graph::SceneViewInput* input)
+    {
+        ModelGenerationMix result;
+        if (!input) return result;
+        std::vector<std::pair<Uuid::Uuid16, std::uint64_t>> drawn;
+        drawn.reserve(input->Draws().size());
+        for (const auto& draw : input->Draws())
+        {
+            if (draw.mesh.domain == assets::ModelMeshDomain::Granular)
+                drawn.emplace_back(draw.mesh.assetSetId.value, draw.mesh.manifestRevision);
+            else
+                drawn.emplace_back(draw.model.modelId, draw.model.generation);
+        }
+        std::sort(drawn.begin(), drawn.end());
+        drawn.erase(std::unique(drawn.begin(), drawn.end()), drawn.end());
+        for (std::size_t i = 1; i < drawn.size(); ++i)
+        {
+            if (drawn[i].first != drawn[i - 1].first) continue;
+            // Sorted: count a model once, at its second generation.
+            if (i < 2 || drawn[i - 2].first != drawn[i].first) ++result.mixedModels;
+            result.mixedNewest = (std::max)(result.mixedNewest, drawn[i].second);
+        }
+        result.pairs = static_cast<uint32_t>(drawn.size());
+        return result;
+    }
+
     uint64_t capture_steady_nanoseconds()
     {
         return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -2766,7 +2802,7 @@ namespace
         uint32_t lastSpriteBatchCount{ 0 };
         uint32_t lastUIRectCount{ 0 };
         uint32_t lastUIBatchCount{ 0 };
-        // W9 soak — 직전 GBuffer 밀봉이 본 모델 generation. 재임포트 뒤 옛 인스턴스와
+        // W9 soak — 직전 METEOR Scene 밀봉이 본 모델 generation. 재임포트 뒤 옛 인스턴스와
         // 새 인스턴스가 한 프레임에 함께 그려질 때만 mixed 가 1 이상이 된다. 이 수가
         // 0 인 채로 soak 이 통과하면 재임포트 축은 자극되지 않은 것이다.
         uint32_t lastModelGenerationPairs{ 0 };   // 서로 다른 (modelId, generation)
@@ -6609,6 +6645,10 @@ namespace
 
             lastDrawCount = static_cast<uint32_t>(p.graphInput ? p.graphInput->Draws().size() : 0);
             lastBatchCount = p.graphMaterials.PreparedMeshletDrawCount();
+            const auto generations = CountModelGenerations(p.graphInput ? &*p.graphInput : nullptr);
+            lastModelGenerationPairs = generations.pairs;
+            lastMixedGenerationModels = generations.mixedModels;
+            lastMixedNewestGeneration = generations.mixedNewest;
 			profileFrameDrawCount += lastDrawCount;
 			profileFrameBatchCount += lastBatchCount;
             lastDecalCount = p.decal.GetLastDecalCount();
@@ -9486,6 +9526,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
             state.lastDrawCount = static_cast<uint32_t>(p.graphInput ? p.graphInput->Draws().size() : 0);
             state.lastBatchCount = p.graphMaterials.PreparedMeshletDrawCount();
+            const auto generations = CountModelGenerations(p.graphInput ? &*p.graphInput : nullptr);
+            state.lastModelGenerationPairs = generations.pairs;
+            state.lastMixedGenerationModels = generations.mixedModels;
+            state.lastMixedNewestGeneration = generations.mixedNewest;
 			state.profileFrameDrawCount += state.lastDrawCount;
 			state.profileFrameBatchCount += state.lastBatchCount;
             state.lastDecalCount = p.decal.GetLastDecalCount();

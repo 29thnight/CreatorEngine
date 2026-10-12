@@ -62,7 +62,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 <header class="hero">
   <div class="kicker">docs/analysis · 2026-10-12 · 배선 정리 반영</div>
   <h1>METEOR 라이브 배선 현황과 RE 엔진까지 남은 작업</h1>
-  <p class="meta"><b>METEOR</b>는 LX 머티리얼을 그리는 장면 렌더러다(정식 명칭은 <code>MaterialGraphSceneHost.h</code> 머리 주석 한 곳에 둔다). <b>LX</b>(Lattice eXperiment)는 노드 언어 자체(<code>LX::Runtime</code>, LX 머티리얼)를 가리키며 이후 비주얼 스크립트·BT에도 쓰인다. 대상은 DX12 라이브 경로이며 커밋 <code>dc8233a90</code>(PR #172) 기준이다. 배선 서술은 소스 구조이고, 04장의 실행 결과는 이번 정리에서 직접 돌린 검증이다.</p>
+  <p class="meta"><b>METEOR</b>는 LX 머티리얼을 그리는 장면 렌더러다(정식 명칭은 <code>MaterialGraphSceneHost.h</code> 머리 주석 한 곳에 둔다). <b>LX</b>(Lattice eXperiment)는 노드 언어 자체(<code>LX::Runtime</code>, LX 머티리얼)를 가리키며 이후 비주얼 스크립트·BT에도 쓰인다. 대상은 DX12 라이브 경로이며 <code>master</code>(PR #169·#172 병합 이후) 기준이다. 배선 서술은 소스 구조이고, 04장의 실행 결과는 이번 정리에서 직접 돌린 검증이다.</p>
 </header>
 
 <div class="verdict">
@@ -208,10 +208,26 @@ flowchart TB
 <ul class="caution">
   <li class="good"><b>해결 1 — PostChain 병렬 기록과 GPU 기반 validation.</b> GPU 기반 validation(<code>CREATOR_DX12_VALIDATION=gpu</code>)에서 <code>PostChain.ToneMapped</code>가 COMMON 레이아웃 그대로 UAV로 디스패치된다는 오류가 간헐적으로 났다(약 7회에 1회). 포인터 단위 로그로 보니 그래프 계획과 기록된 배리어는 정상이었다. 오류는 transient pool 없이 매 프레임 RT+UAV 텍스처를 새로 만드는 RG5 final 테스트에서만 났다. 테스트에 <code>RGTransientPool</code>을 붙이자 25/25 통과했다. <code>DeclareRecordingIndependent</code>를 빼서 고쳐진 것처럼 보였던 한 번의 결과는 간헐성 때문이었고, 그 변경은 되돌렸다. 수정: <code>EnhancedFinalRg5Tests.h</code>.</li>
   <li class="good"><b>해결 2 — <code>DirectionalLightGizmo</code> 첫 드로우의 COPY_DEST 레이아웃.</b> 테스트 뒤 라이브 장면까지 도는 전체 Debug 검증에서 약 2회에 1회, 갓 업로드한 기즈모 텍스처의 첫 드로우가 <code>LEGACY_COPY_DEST</code> 레이아웃으로 보고됐다. 업로드는 같은 큐에서 먼저 제출됐고(fence 16 → 17), 오류는 첫 사용 때 한 번만 났다. 이후 약 1000프레임은 깨끗했다. <code>DX12TextureCache</code>가 업로드 텍스처를 COPY_DEST 대신 COMMON으로 만들게 바꿨다. 복사가 일어나면 COPY_DEST로 자동 전환되고, 그 뒤 배리어는 그대로다. 수정 후 전체 Debug 검증 4회와 Release 1회에서 오류 0건이었다. 원인은 GBV가 새 리소스를 생성 시 상태로 추적하는 방식으로 추정하며, 증명하지는 못했다. 엔진은 Agility SDK 없이 OS 기본 런타임을 쓴다.</li>
-  <li class="bad"><b>기존 문제 — 머티리얼 프로브.</b> Raster·Matched 프로브(<code>MaterialRasterSurfaceProbe</code>)는 새 API로 옮겨 빌드되지만, 공통 준비 단계에서 멈춘다. 합성 메시에 쿠킹된 메시렛 토폴로지가 없기 때문이다(메시렛 계약 전환 이후 필수). <code>MaterialCommonConsumerProbe</code>는 GBuffer 전환 이후 이미 컴파일되지 않는다. 프로브 안의 인자 평가 순서 버그(오류 메시지가 비어 보이던 원인)는 고쳤다.</li>
+  <li class="good"><b>해결 3 — 머티리얼 프로브(<code>b13695122</code>).</b> 프로브는 컷오버 이전 구조를 전제했다. 합성 메시에는 쿠킹된 메시렛이 없었고, Scene 테스트는 호스트가 더 이상 런타임에 컴파일하지 않는 surface product를 넣었다.
+    <ul>
+      <li><code>Tools/regression/support/CookedMeshFixture.h</code>가 합성 메시를 메시렛이 있는 granular payload로 쿠킹하고 Scene seal의 pin 테이블을 만든다. <code>GraphSceneFixture</code>도 이 헬퍼를 쓴다.</li>
+      <li>Scene 테스트의 머티리얼은 AssetCooker와 같은 <code>CompileSceneProduct</code>로 쿠킹한다. 리로드는 재쿠킹이고, 잘못된 셰이더는 쿠커 단계에서 거부된다.</li>
+      <li>transform 셰이더(<code>MaterialGraphMeshSurface.slang</code>)의 불필요한 <code>NonUniformResourceIndex</code>를 지웠다(SPIR-V <code>spirv_1_3</code> 초과). 샘플 출력도 <code>u4096</code>으로 옮겨 transform 출력 테이블(u0..u4095)과 겹치지 않게 했다.</li>
+      <li>모드별 게이트 <code>verify-material-scene-probes.ps1</code>를 추가했다. 기본 모드와 12개 모드가 Debug·Release에서 통과하고, scene-cook, matched 이미지, shadermeta 게이트도 통과한다.</li>
+    </ul></li>
+  <li class="good"><b>해결 4 — 저작 머티리얼 캐시(<code>fd2875b77</code>).</b> 저작 컴파일은 격리된 임시 디렉터리에서 돈다. 그런데 검증된 product 캐시가 그 안에 쓰였고, 의존 목록에는 지워질 생성 소스가 들어갔다. 그래서 머티리얼을 다시 열 때마다 Scene 24단계를 전부 다시 컴파일했다. 이제 캐시는 고정된 <code>Lattice</code> 디렉터리에 남고 생성 소스는 의존 목록에서 빠진다. 다시 열 때 재컴파일은 0회다.</li>
   <li><b>남은 LX 표기.</b> 셰이더 진입점·Scene 패스 이름(<code>LXSceneVS</code> 등)과 <code>LxMeshletGpuContract.slang</code>은 쿠킹된 Scene 제품에 기록된다. 그래서 바꾸려면 Scene ABI를 올리고 재쿠킹해야 하며, 별도 작업으로 남긴다. 과거 분석 기록(<code>docs/analysis/Lx*.md</code>)은 당시 명칭 그대로 보존한다.</li>
   <li><b>Forward ShaderMeta 자산.</b> <code>Forward*.shadermeta</code>·<code>ForwardShade.slang</code>·<code>ExperimentMaterialSealing</code>의 Forward 축은 렌더러가 더 이상 소비하지 않는다. 에디터 코드 머티리얼 저작 체계와 엮여 있어 이번에는 남겼다.</li>
-  <li><b>오래된 스크립트.</b> <code>verify-pipeline-composition.ps1</code>(GBuffer·Deferred·Forward+ 노드 요구)와 <code>verify-pbr-soak.ps1</code>(GBuffer·Forward seal 필드)는 이전 전환부터 맞지 않는 상태다.</li>
+  <li class="good"><b>해결 5 — 낡은 게이트 스크립트(2026-10-13).</b> 지우지 않고 METEOR 구조에 맞췄다. 둘 다 Debug에서 통과한다.
+    <ul>
+      <li><code>verify-pipeline-composition.ps1</code>: 필수 런타임 노드를 <code>METEOR.Scene.*</code>, PostChain, UI, live_present로 바꿨다. 정적 판정 두 곳의 오탐도 고쳤다. 카메라 rig 재설계 이후의 <code>CameraRig()</code> 접근을 인정하고, 카메라 리비전 필드 <code>editorCameraRevision</code>을 에디터 카메라 소유로 보지 않는다. 결과: 노드 27개, 에디터 패스 상태는 전과 같다.</li>
+      <li><code>verify-pbr-soak.ps1</code>: 사라진 GBuffer/Forward 밀봉 카운터 검사를 걷어냈다. 세대 밀봉은 이제 Scene 입력의 pin 테이블이 맡는다.
+        <ul>
+          <li>렌더러의 모델 세대 집계(<code>mixedGenerationModels</code>)는 10월 8일 옛 GBuffer 밀봉 함수와 함께 사라져 늘 0이었다. 이를 METEOR Scene 입력에서 다시 센다.</li>
+          <li>그려지는 geometry 신원은 이제 내용 기반이다. 같은 바이트를 다시 임포트하면 세대 혼합이 생기지 않으므로, 혼합 수는 보고만 한다. 재임포트 축은 Fresh 배치 뒤에도 기존·새 인스턴스가 모두 그려지는지로 판정한다.</li>
+          <li>회귀 모델 CreatorRobot은 로컬 준비본이라 <code>-Model</code> 인자를 추가했다. 이 체크아웃에서는 <code>Prim_Suzanne</code>로 표본 54개, 재임포트 4회를 통과했다.</li>
+        </ul></li>
+    </ul></li>
   <li><b>성능.</b> GPU 시간 비교는 전원 상태를 통제하지 않으면 판정할 수 없다(저활용 시 P5 강등). 성능은 각 작업과 함께 측정하며 원인을 찾는다.</li>
 </ul>
 
@@ -237,7 +253,7 @@ flowchart TB
 <tr><td>C5</td><td>그래프 commutative writer</td><td><span class="tag gap">없음</span></td><td>C2와 함께</td></tr>
 <tr><td colspan="4"><b>D. 검증·인프라</b></td></tr>
 <tr><td>D1</td><td>전원 상태를 기록하는 측정</td><td><span class="tag ext">진행 중</span></td><td>작업마다 측정하며 원인 확인</td></tr>
-<tr><td>D2</td><td>프로브 메시렛 쿠킹 복구</td><td><span class="tag gap">고장</span></td><td>05장 머티리얼 프로브</td></tr>
+<tr><td>D2</td><td>프로브 메시렛 쿠킹 복구</td><td><span class="tag ok">완료</span></td><td>05장 해결 3·4</td></tr>
 <tr><td>D3</td><td>Vulkan 동등성</td><td><span class="tag ext">보류</span> PHASE 4.9</td><td>RenderDoc 최종 비교</td></tr>
 <tr><td>D4</td><td>Temporal 하드코딩</td><td><span class="tag ok">완료</span></td><td>이번 정리</td></tr>
 </tbody></table></div>
@@ -265,7 +281,7 @@ flowchart TB
 <tr><td>검증</td><td><code>Tools/regression/verify-meteor-scene-cutover.ps1</code> · <code>Editor/RenderTests/.../Geometry/EnhancedBlendedStreamTest.cpp</code>(<code>dx12.blended</code>)</td></tr>
 </tbody></table></div>
 
-<footer>CreatorEngine docs/analysis · 2026-10-12 · 브랜치 <code>codex/pr169-build-fixes</code> · PR #172 · 관련: LxSceneBigBangCutover20261012.md, LxHdrCutover20261012.md, LxMeshletGeometryContract20261012.md, LxTransformDispatch20261012.md (당시 명칭 보존)</footer>
+<footer>CreatorEngine docs/analysis · 2026-10-12 · <code>master</code> (PR #169·#172 병합) · 관련: LxSceneBigBangCutover20261012.md, LxHdrCutover20261012.md, LxMeshletGeometryContract20261012.md, LxTransformDispatch20261012.md (당시 명칭 보존)</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>

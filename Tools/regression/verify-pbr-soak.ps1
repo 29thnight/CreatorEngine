@@ -2,12 +2,13 @@
 #
 # 연속 표본에서는 W8의 상태 수치를, 마지막 제품 frame에서는 픽셀을 검사한다.
 # 모든 frame의 검정/변색 부재를 증명하지 않으며, 수치가 다루지 않는 원인은 남는다.
-#     · seal 위반(세대 혼합·지난 프레임 밀봉·기록 단계 누락)
 #     · 인코더가 조용히 버린 명령(놓인 PSO 핸들·만료 descriptor)
 #     · 업로드 실패를 흰색으로 덮은 횟수
-#   이 셋 중 하나라도 0이 아니면 해당 회차를 실패시킨다.
+#   이 둘 중 하나라도 0이 아니면 해당 회차를 실패시킨다. 세대 혼합·지난 프레임
+#   밀봉은 METEOR 이후 Scene 입력의 pin 테이블이 막는다. 위반하면 그 프레임의
+#   seal 이 실패하므로 아래 drawCount 와 마지막 캡처가 잡는다.
 #
-# ★ drawCount 도 함께 본다. 위 셋이 0이어도 그릴 것이 0이면 화면은 검다 —
+# ★ drawCount 도 함께 본다. 위 둘이 0이어도 그릴 것이 0이면 화면은 검다 —
 #   "위반 없음"과 "그렸음"은 다른 질문이다.
 #
 # ★★ 재임포트 축 (2026-09-16 정정). 처음 판은 `model.loadcached` 로 "같은 모델을 다시
@@ -36,6 +37,10 @@ param(
     [double]$MinimumWallSeconds = 0,
     # 몇 표본마다 probe 를 재임포트하나. 재임포트 하나가 generation 디렉터리 하나다.
     [int]$ReimportEvery = 20,
+    # 회전·이동시킬 Assets/Models 의 모델 이름. CreatorRobot 은 로컬에서 준비하는
+    # 회귀 모델이다(Tools/regression/fixtures/creator-robot/README.md). 없는 체크아웃은
+    # 저장소의 Prim_* 모델로 나머지 축(재임포트·세대 혼합·최종 캡처)을 돌릴 수 있다.
+    [string]$Model = 'CreatorRobot',
     [int]$TimeoutSeconds = 1800
 )
 
@@ -95,8 +100,8 @@ function New-SoakCommands([int]$Samples) {
     # 첫 대기가 렌더 예열을 겸한다(캡처 게이트와 같은 이유).
     $commands.Add('wait 2000')
     $commands.Add('editor.viewport game')
-    $commands.Add("model.loadcached `"$root/Dynamic_CPP/Assets/Models/CreatorRobot.glb`"")
-    $commands.Add('model.place CreatorRobot')
+    $commands.Add("model.loadcached `"$root/Dynamic_CPP/Assets/Models/$Model.glb`"")
+    $commands.Add("model.place $Model")
     # probe 의 첫 generation 인스턴스(Anchor). 끝까지 지우지 않는다 — 옛 generation 을 그리는 쪽이다.
     #
     # ★ 이름을 바꾸지 않는다. `object.rename` 은 옛 이름을 이름 집합에서 놓지 않아(2026-09-16
@@ -115,7 +120,7 @@ function New-SoakCommands([int]$Samples) {
         $angle = ($i * 23) % 360
         $z = 2.0 + [math]::Sin($i * 0.4)
         $commands.Add(
-            ('object.transform CreatorRobot 0 0 {0:0.###} 0 {1} 0 1 1 1' -f $z, $angle))
+            ("object.transform $Model 0 0 {0:0.###} 0 {1} 0 1 1 1" -f $z, $angle))
         $commands.Add("wait $framesPerSample")
         $commands.Add('render.pbr.sealstatus')
 
@@ -222,12 +227,9 @@ try {
             $rendering = $true
         }
         if (-not $data.enabled) { throw "Live renderer went dark during the soak; artifacts: $run" }
-        if ($data.gbufferViolations -ne 0 -or $data.forwardViolations -ne 0) {
-            throw "Seal violations during soak (gbuffer $($data.gbufferViolations), forward $($data.forwardViolations)); artifacts: $run"
-        }
-        if ($data.gbufferUnstamped -ne 0 -or $data.forwardUnstamped -ne 0) {
-            throw "Unstamped product draws during soak; artifacts: $run"
-        }
+        # METEOR seals generation ownership through the Scene input pin tables; a
+        # mixed or unpinned draw fails the seal and the frame, which drawCount and
+        # the final capture below catch. The GBuffer/Forward seal counters are gone.
         if ($data.encoderDrops -ne 0) {
             throw "Encoder dropped commands during soak ($($data.encoderDrops)); artifacts: $run"
         }
@@ -254,7 +256,7 @@ try {
 
     # ── 재임포트 축: 자극했음을 수로 단정한다 ──
     $placedNames = @($results | Where-Object command -eq 'model.place' | ForEach-Object { $_.data.name })
-    $unexpectedNames = @($placedNames | Where-Object { $_ -notin @('CreatorRobot', $probeName, "$probeName (1)") })
+    $unexpectedNames = @($placedNames | Where-Object { $_ -notin @($Model, $probeName, "$probeName (1)") })
     if ($unexpectedNames.Count -gt 0) {
         throw "배치 이름이 예측과 다르다($($unexpectedNames[0])) — Fresh 를 지우지 못해 쌓이고 있다; artifacts: $run"
     }
@@ -267,16 +269,25 @@ try {
     if ($reloaded -ne $expectedReimports) {
         throw "재임포트 $reloaded/$expectedReimports 회만 새 generation 을 냈다(cache=reloaded); artifacts: $run"
     }
+    # ★ METEOR 이후(2026-10-13) 그려지는 geometry 의 신원은 내용 기반이다(granular
+    #   handle: blob 해시 + 매니페스트 리비전). 같은 바이트를 다시 임포트하면 신원이 같아
+    #   "같은 모델의 두 세대가 한 프레임에" 가 생기지 않고, 그런 혼합은 Scene 입력의 pin
+    #   테이블이 막는다. 그래서 혼합 수는 보고만 하고, 재임포트 축은 재로드 뒤에도 Anchor 와
+    #   Fresh 가 모두 계속 그려지는지로 판정한다 — Fresh 배치 뒤 드로우가 하나 늘어야 한다.
     $mixedSamples = @($status | Where-Object { $_.data.mixedGenerationModels -ge 1 }).Count
     $newest = @($status | ForEach-Object { [uint64]$_.data.mixedNewestGeneration } |
         Where-Object { $_ -gt 0 } | Sort-Object -Unique)
-    if ($mixedSamples -eq 0) {
-        throw "한 프레임에 같은 모델의 두 generation 이 그려진 표본이 0 이다 — 세대 혼합을 자극하지 못했다; artifacts: $run"
+    $firstReimport = [array]::IndexOf($results, $reimports[0])
+    $before = @($results[0..($firstReimport - 1)] | Where-Object command -eq 'render.pbr.sealstatus')
+    $after = @($results[($firstReimport + 1)..($results.Count - 1)] | Where-Object command -eq 'render.pbr.sealstatus')
+    if ($before.Count -eq 0 -or $after.Count -eq 0) {
+        throw "재임포트 앞뒤 표본이 없다; artifacts: $run"
     }
-    # 재임포트마다 새 번호가 그려져야 한다. watcher 가 한 번 더 임포트하면 번호는 더 뛸
-    # 수 있지만(그래서 '이상'), 모자라면 새 generation 이 화면에 닿지 않은 것이다.
-    if ($newest.Count -lt $expectedReimports) {
-        throw "그려진 새 generation 이 $($newest.Count) 종뿐이다(재임포트 $expectedReimports 회); artifacts: $run"
+    $anchorDraws = [int]$before[-1].data.drawCount
+    $lowAfter = @($after | Where-Object { [int]$_.data.drawCount -lt $anchorDraws + 1 })
+    if ($lowAfter.Count -gt 0) {
+        throw ("재임포트 뒤 드로우가 {0} 로 줄었다(기대 {1} 이상: 기존 + Fresh) — 재로드가 " +
+            "기존 인스턴스나 새 인스턴스를 놓쳤다; artifacts: $run") -f $lowAfter[0].data.drawCount, ($anchorDraws + 1)
     }
     if ($movedFrames -lt [int]($measured * 0.9)) {
         throw "Soak samples did not advance frames ($movedFrames/$measured); artifacts: $run"
@@ -295,19 +306,20 @@ try {
         throw "Active sample interval was $activeSampleSeconds s, required $MinimumWallSeconds s (startup/final capture excluded)"
     }
 
-    [ordered]@{ passed=$true; backend=$Backend; configuration=$Configuration;
+    $lastGeneration = if ($newest.Count) { $newest[-1] } else { 0 }
+    [ordered]@{ passed=$true; backend=$Backend; configuration=$Configuration; model=$Model;
         processWallSeconds=$wallSeconds; activeSampleSeconds=$activeSampleSeconds;
         measuredSamples=$measured; warmupSamples=$warmupSamples;
-        advancingFrames=$movedFrames; reimports=$reloaded; mixedGenerationSamples=$mixedSamples;
-        distinctNewestGenerations=$newest.Count; lastGeneration=$newest[-1];
-        sealViolations=0; unstamped=0; encoderDrops=0; textureUploadFailures=0;
+        advancingFrames=$movedFrames; reimports=$reloaded; drawsBeforeReimport=$anchorDraws;
+        mixedGenerationSamples=$mixedSamples; distinctNewestGenerations=$newest.Count; lastGeneration=$lastGeneration;
+        encoderDrops=0; textureUploadFailures=0;
         finalFrameId=$final.frameId; finalFinite=$final.finite; finalValidationCount=$final.validationCount;
         pixelCoverage='final frame only; continuous samples use seal and draw counters' } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'summary.json') -Encoding utf8
     Write-Output ("PBR soak PASS: {0} samples ({1} warmup excluded), {2} advancing frames, backend {3}, requested {4} min, wall {5:0} s" -f `
         $measured, $warmupSamples, $movedFrames, $Backend, $Minutes, $clock.Elapsed.TotalSeconds)
-    Write-Output ("  reimport: {0} reloaded, {1} mixed-generation samples, {2} distinct newest generations (last {3})" -f `
-        $reloaded, $mixedSamples, $newest.Count, $newest[-1])
+    Write-Output ("  reimport: {0} reloaded, draws {1} -> {2}+ after Fresh, {3} mixed-generation samples (reported only)" -f `
+        $reloaded, $anchorDraws, ($anchorDraws + 1), $mixedSamples)
     exit 0
 }
 catch {
