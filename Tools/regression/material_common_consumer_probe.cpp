@@ -6,6 +6,7 @@
 #include "AuthoringParseTelemetry.h"
 #include "AuthoringWriteNode.h"
 #include "PathFinder.h"
+#include "RHI/RHIShaderCompiler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -131,17 +132,31 @@ int main(int argc, char** argv)
         const bool coldPrepared = data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error);
         check(coldPrepared, "Cold authoring common generation: " + error);
         const auto cold = authored.GetMaterialGraphInstance();
-        const auto sourcePath = paths->CacheRoot / "Lattice" / (guid.ToString() + ".slang");
-        const auto cachePath = std::filesystem::path(sourcePath.string() + ".scene-cache");
-        check(std::filesystem::exists(cachePath) && std::filesystem::exists(sourcePath), "Cold authoring writes source and LXMC v4 cache");
-        const auto cacheTime = std::filesystem::last_write_time(cachePath);
-        std::filesystem::rename(sourcePath, sourcePath.string() + ".offline");
-        const auto generatedRoot = sourcePath.parent_path() / (sourcePath.stem().string() + ".generated");
-        std::filesystem::rename(generatedRoot, generatedRoot.string() + ".offline");
-        check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
-            SameGraphOwner(authored.GetMaterialGraphInstance()->generation, cold->generation) && !std::filesystem::exists(sourcePath) &&
-            !std::filesystem::exists(generatedRoot) && std::filesystem::last_write_time(cachePath) == cacheTime,
-            "Warm authoring cache restores common generation without recompiling or source pair access");
+        // Each authoring compile writes its generated source to its own scratch
+        // directory and removes it (DataSystem::CompileMaterialGraphAuthoring); the
+        // product owns its bytecode. The verified-product cache stays beside the
+        // scratch roots, so "warm" means the same generation without a stage compile.
+        const auto scratchRoot = paths->CacheRoot / "Lattice";
+        check(std::filesystem::exists(scratchRoot / (guid.ToString() + ".slang.scene-cache")),
+            "Cold authoring keeps its verified-product cache outside the scratch directory");
+        const auto scratchLeft = [&] {
+            std::error_code ignored;
+            if (!std::filesystem::exists(scratchRoot, ignored)) return false;
+            return std::ranges::any_of(std::filesystem::directory_iterator(scratchRoot),
+                [](const auto& entry) { return entry.path().filename().string().starts_with("authoring-"); });
+        };
+        check(!scratchLeft(), "Cold authoring removes its scratch source pair");
+        const auto compiles = [] { return RHIShaderCompiler::GetStats().compiles; };
+        const auto sameProduct = [&](const auto& instance) {
+            return instance->generation->cooked.product.program.semanticKey ==
+                cold->generation->cooked.product.program.semanticKey;
+        };
+        auto compilesBefore = compiles();
+        const bool warmPrepared = data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error);
+        check(warmPrepared && sameProduct(authored.GetMaterialGraphInstance()) && compiles() == compilesBefore &&
+            !scratchLeft(),
+            "Warm authoring restores the same common generation without compiling a stage: prepared=" +
+            std::to_string(warmPrepared) + " compiles=" + std::to_string(compiles() - compilesBefore) + " " + error);
         check(authored.GetGeneratedShaderMeta() && authored.TryGetFloat("LXMaterialProperties.lx_bound_p900", roughness) && roughness == .31f,
             "Warm generation preserves stable override through common Material API");
 
@@ -159,16 +174,17 @@ int main(int argc, char** argv)
             stream << "\n// material dependency cache probe\n";
             check(static_cast<bool>(stream), "Edit shader copy: " + file.string());
         };
+        compilesBefore = compiles();
         check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
-            std::filesystem::last_write_time(cachePath) == cacheTime,
+            compiles() == compilesBefore,
             "Relocated shader tree keeps the warm cache: " + error);
         appendComment(shaderCopy / "DefaultPassShader/IblBrdf.slang");
         check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
-            std::filesystem::last_write_time(cachePath) == cacheTime,
+            compiles() == compilesBefore,
             "Editing a shader the material never reads keeps the warm cache: " + error);
         appendComment(shaderCopy / "DefaultPassShader/Includes/CascadedShadow.slang");
         check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
-            std::filesystem::last_write_time(cachePath) != cacheTime,
+            compiles() > compilesBefore,
             "Editing a recorded dependency recompiles the material: " + error);
         paths->ShaderSourcePath = std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders";
         RunMaterialCodeRuntimeTests(paths->CacheRoot / "CodeRuntime");

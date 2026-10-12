@@ -4120,18 +4120,24 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view header,
 }
 
 void WriteMaterialGraphCache(const file::path& path, std::string_view header,
-                             const file::path& shaderDirectory, const material_graph::VerifiedProduct& product)
+                             const file::path& shaderDirectory, const material_graph::VerifiedProduct& product,
+                             const file::path& generatedSource)
 {
-    // 의존 목록이 비면 무엇이 바뀌어도 맞히는 캐시가 된다. 그런 캐시는 쓰지 않는다.
-    if (product.dependencies.empty() || product.dependencies.size() > kMaterialGraphCacheMaxDependencies) return;
     std::vector<std::pair<std::string, Hash::Sha256Digest>> dependencies;
     dependencies.reserve(product.dependencies.size());
+    std::error_code ignored;
+    const auto generated = std::filesystem::weakly_canonical(generatedSource, ignored);
     for (const auto& dependency : product.dependencies)
     {
+        // The generated source is the header's own content in a scratch file that
+        // may already be gone; recording it would make every later read miss.
+        if (std::filesystem::weakly_canonical(dependency, ignored) == generated) continue;
         Hash::Sha256Digest digest{};
         if (!HashMaterialGraphDependency(dependency, digest)) return;
         dependencies.emplace_back(MaterialGraphDependencyKey(dependency, shaderDirectory), digest);
     }
+    // 의존 목록이 비면 무엇이 바뀌어도 맞히는 캐시가 된다. 그런 캐시는 쓰지 않는다.
+    if (dependencies.empty() || dependencies.size() > kMaterialGraphCacheMaxDependencies) return;
     std::vector<std::uint8_t> bytes;
     std::string error;
     if (!material_graph::WriteCookedProgram(product, {}, bytes, error)) return;
@@ -4170,9 +4176,14 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view header,
     }
 }
 
+// The verified-product cache lives in cacheDirectory and survives compiles. The
+// generated source is written to scratchDirectory (cacheDirectory when empty);
+// an isolated authoring compile deletes its scratch afterwards, and the cache
+// never depends on that file because the header already holds its contents.
 bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
                               std::string& error, const file::path& shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader"),
-                              const file::path& cacheDirectory = PathFinder::CachePath("Lattice"))
+                              const file::path& cacheDirectory = PathFinder::CachePath("Lattice"),
+                              const file::path& scratchDirectory = {})
 {
     ce::profile_scope profile{ ce::marker<"Material.CompileAuthoring">() };
     error.clear();
@@ -4192,9 +4203,11 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     const std::string sourceIdentity = cacheHeader.empty()
         ? material_graph::BuildBoundSource(*program) + LX::WriteMaterialProgramMetadata(*program) : cacheHeader;
     const auto sourceRevision = Hash::ToHex(Hash::Sha256::Compute(sourceIdentity.data(), sourceIdentity.size()));
-    const auto source = cacheDirectory / (guid.ToString() + "-" + sourceRevision + ".slang");
+    const auto source = (scratchDirectory.empty() ? cacheDirectory : scratchDirectory) /
+                        (guid.ToString() + "-" + sourceRevision + ".slang");
     std::error_code filesystemError;
-    std::filesystem::create_directories(source.parent_path(), filesystemError);
+    std::filesystem::create_directories(cacheDirectory, filesystemError);
+    if (!filesystemError) std::filesystem::create_directories(source.parent_path(), filesystemError);
     if (filesystemError)
     {
         error = filesystemError.message();
@@ -4229,7 +4242,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     result.boundSource = material_graph::BuildBoundSource(result.product.program);
     step.reset();
     step.emplace(ce::marker<"Material.CacheWrite">());
-    if (!cacheHeader.empty()) WriteMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result.product);
+    if (!cacheHeader.empty()) WriteMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result.product, source);
     return true;
 }
 }
@@ -4253,7 +4266,8 @@ own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialG
     return material_graph::PrepareGeneration(
         experiment::AssetId{graphGuid.m_guid},
         [&](material_graph::CookedProgram& result, std::string& failure) {
-            return CompileAuthoringMaterial(asset, graphGuid, result, failure, shaderDirectory, isolatedDirectory);
+            return CompileAuthoringMaterial(asset, graphGuid, result, failure, shaderDirectory, cacheDirectory,
+                                            isolatedDirectory);
         }, error);
 }
 
