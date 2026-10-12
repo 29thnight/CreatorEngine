@@ -153,7 +153,39 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             m_executeOrder[index] = plan.entries[index].pass;
         }
         UpdateResourceUses();
-        PlanBarriers(&batchEnds, &prologue, &epilogue);
+        std::vector<bool> retainedGraphicsTextures(m_resources.size(), false);
+        for (size_t index = 0; index < m_resources.size(); ++index)
+        {
+            const auto& resource = m_resources[index];
+            if (resource.used && !resource.IsBuffer())
+            {
+                retainedGraphicsTextures[index] = m_deviceServices->DescribeTexture(resource.handle).
+                    retainsExplicitStateOnGraphicsQueue;
+            }
+        }
+        const auto rejectComputeUses = [&](const std::vector<RGPassUsage>& usages)
+        {
+            for (const auto& usage : usages)
+            {
+                if (usage.handle.IsValid() && usage.handle.index < retainedGraphicsTextures.size())
+                {
+                    retainedGraphicsTextures[usage.handle.index] = false;
+                }
+            }
+        };
+        for (const auto& entry : plan.entries)
+        {
+            if (entry.queue == RHIQueueKind::Compute)
+            {
+                const auto& pass = m_passes[entry.pass];
+                rejectComputeUses(pass.usages);
+                for (const auto& phase : pass.phases)
+                {
+                    rejectComputeUses(phase.usages);
+                }
+            }
+        }
+        PlanBarriers(&batchEnds, &prologue, &epilogue, &retainedGraphicsTextures);
     }
     diagnostic.specialized = true;
     diagnostic.schedule = plan;

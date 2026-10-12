@@ -49,6 +49,9 @@
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
 #include "FontCookContract.h"
 
+#include <d3d11.h>
+#include <DirectXTex.h>
+#include <objbase.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -85,6 +88,28 @@ namespace
 
 int main(int argc, char** argv)
 {
+    // DirectXTex retains a process-wide WIC factory. Keep the host apartment
+    // alive across every cook, as Editor/AssetCooker do; per-call COM guards
+    // cannot own that cached factory's lifetime.
+    const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE)
+    {
+        std::fprintf(stderr, "EXPERIMENT_COM_FAILED hr=%08lx\n", comResult);
+        return 1;
+    }
+    struct ComScope final
+    {
+        HRESULT result;
+        ~ComScope()
+        {
+            DirectX::SetWICFactory(nullptr);
+            if (SUCCEEDED(result))
+            {
+                CoUninitialize();
+            }
+        }
+    } comScope{ comResult };
+
     // 인자를 주면 그 이름만 돌린다. 주지 않으면 전부 돈다.
     const char* filter = (argc > 1) ? argv[1] : nullptr;
 

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <future>
 #include <memory>
 #include <stdexcept>
@@ -238,7 +239,23 @@ namespace RenderTest
                 && results.handlesValidInCleanup, "Cleanup callbacks were missing or duplicated");
             destination->RetireManagedGraph();
             destination.reset();
-            domain.collect_full();
+            domain.request_collection();
+            bool incrementalFinished = false;
+            std::size_t incrementalSteps = 0;
+            for (; incrementalSteps < 4096; ++incrementalSteps)
+            {
+                const auto step = domain.collect_step(
+                    gc::step_budget{ std::chrono::microseconds(250), 16 });
+                Require(!step.refused, "Incremental collection refused the owner-thread boundary");
+                if (step.cycle_finished)
+                {
+                    incrementalFinished = true;
+                    ++incrementalSteps;
+                    break;
+                }
+            }
+            Require(incrementalFinished && domain.current_phase() == gc::phase::idle,
+                "Incremental collection did not finish within the step limit");
             Require(results.reclaimed == 2 && !weakFirst.lock() && !weakSecond.lock()
                 && !weakFirstProbe.lock() && !weakSecondProbe.lock()
                 && !weakSource.lock() && !weakDestination.lock(),
@@ -246,7 +263,10 @@ namespace RenderTest
             const auto final = domain.stats();
             Require(final.live_objects == baseline.live_objects && final.quarantined == baseline.quarantined,
                 "Regression leaked graph objects or unfinished cleanup obligations");
-            log = "SCENE_GC_OK cycle=2 lifecycle=2 staleHandles=2 selection=2 ddol=1 workerPin=1";
+            Require(final.cycles_aborted == baseline.cycles_aborted,
+                "Collection aborted during the graph regression");
+            log = "SCENE_GC_OK cycle=2 lifecycle=2 staleHandles=2 selection=2 ddol=1 workerPin=1 incrementalSteps="
+                + std::to_string(incrementalSteps);
             return true;
         }
         catch (const std::exception& error)

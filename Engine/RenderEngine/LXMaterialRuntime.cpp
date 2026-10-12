@@ -130,7 +130,8 @@ namespace LX::Runtime
                 for (const auto& entry : found->second)
                 {
                     if (const auto accepted = entry.lock(); accepted && accepted->codeHandle == handle &&
-                        accepted->meta == meta && accepted->layout == layout)
+                        accepted->meta == meta && accepted->meta.codeProgramIdentity == meta.codeProgramIdentity
+                        && accepted->layout == layout)
                     {
                         result = accepted;
                         error.clear();

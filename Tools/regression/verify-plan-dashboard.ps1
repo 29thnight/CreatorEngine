@@ -79,6 +79,7 @@ $entryStart = -1
 $arrayEnd = -1
 $quote = [char]0
 $inString = $false
+$propertyKeyCandidate = $false
 $stringOpenLine = 0
 
 for ($i = $open; $i -lt $total; $i++) {
@@ -89,11 +90,12 @@ for ($i = $open; $i -lt $total; $i++) {
         if ($c -eq '\') { $i++; if ($i -lt $total -and $chars[$i] -eq "`n") { $line++ }; continue }
         if ($c -ne $quote) { continue }
 
-        # 닫혔다. 다음 글자가 값의 경계여야 한다.
+        # 닫혔다. 값은 값의 경계, 객체 필드 시작의 따옴표 키는 ':'가 뒤따라야 한다.
         $inString = $false
         $j = $i + 1
         while ($j -lt $total -and [char]::IsWhiteSpace($chars[$j])) { $j++ }
-        if ($j -ge $total -or $closeAfter -notcontains $chars[$j]) {
+        $isPropertyKey = $propertyKeyCandidate -and $j -lt $total -and $chars[$j] -eq ':'
+        if (-not $isPropertyKey -and ($j -ge $total -or $closeAfter -notcontains $chars[$j])) {
             $seen = if ($j -lt $total) { $chars[$j] } else { '<끝>' }
             $violations.Add("$line 줄: 문자열이 닫힌 뒤에 ',' · '}' · ']' 가 아니라 '$seen' 이 왔다 — 값 안의 따옴표가 문자열을 일찍 닫았다")
         }
@@ -131,6 +133,8 @@ for ($i = $open; $i -lt $total; $i++) {
             $stringOpenLine = $line
             $j = $i - 1
             while ($j -ge $open -and [char]::IsWhiteSpace($chars[$j])) { $j-- }
+            # 따옴표 키는 객체 필드 시작에서만 허용한다. 값 내부의 raw 따옴표는 계속 거부한다.
+            $propertyKeyCandidate = $brace -gt 0 -and $j -ge $open -and $chars[$j] -in @('{', ',')
             if ($j -lt $open -or $openBefore -notcontains $chars[$j]) {
                 $seen = if ($j -ge $open) { $chars[$j] } else { '<앞>' }
                 $violations.Add("$stringOpenLine 줄: 문자열이 ':' · ',' · '[' · '{' 뒤가 아니라 '$seen' 뒤에서 열렸다 — 앞 값이 일찍 닫힌 흔적이다")
@@ -176,11 +180,11 @@ $knownStatus = @('todo', 'progress', 'done', 'blocked', 'stopped')
 
 foreach ($span in $entrySpans) {
     $body = $span.Text
-    $idM = [regex]::Match($body, 'id:\s*"([^"]*)"')
-    $stM = [regex]::Match($body, 'status:\s*"([^"]*)"')
-    $dayM = [regex]::Match($body, 'days:\s*(null|-?[\d.]+)')
-    $phM = [regex]::Match($body, 'phase:\s*(?:"([^"]*)"|(-?[\d.]+))')
-    $earnM = [regex]::Match($body, 'earnedDays:\s*(-?[\d.]+)')
+    $idM = [regex]::Match($body, '(?:^|[,{])\s*(?:id|"id"|''id'')\s*:\s*"([^"]*)"')
+    $stM = [regex]::Match($body, '(?:^|[,{])\s*(?:status|"status"|''status'')\s*:\s*"([^"]*)"')
+    $dayM = [regex]::Match($body, '(?:^|[,{])\s*(?:days|"days"|''days'')\s*:\s*(null|-?[\d.]+)')
+    $phM = [regex]::Match($body, '(?:^|[,{])\s*(?:phase|"phase"|''phase'')\s*:\s*(?:"([^"]*)"|(-?[\d.]+))')
+    $earnM = [regex]::Match($body, '(?:^|[,{])\s*(?:earnedDays|"earnedDays"|''earnedDays'')\s*:\s*(-?[\d.]+)')
 
     $id = if ($idM.Success) { $idM.Groups[1].Value } else { '<id 없음>' }
     if (-not $idM.Success) { $shapeErrors.Add("id 가 없는 항목이 있다: $($body.Substring(0, [Math]::Min(80, $body.Length)))") ; continue }

@@ -177,6 +177,25 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
     m_texturePending[slot] = true;
 }
 
+void DecalComponent::ReplaceTextureOwner(const Texture* previous,
+    const own::shared_owner<const Texture>& replacement)
+{
+    std::array<own::shared_owner<const Texture>*, 3> owners{
+        &m_decalTextureOwner, &m_normalTextureOwner, &m_ormTextureOwner };
+    std::array<const Texture**, 3> aliases{ &m_decalTexture, &m_normalTexture, &m_occluroughmetalTexture };
+    for (std::size_t slot = 0; slot < owners.size(); ++slot)
+    {
+        if (*owners[slot] && &**owners[slot] == previous)
+        {
+            *owners[slot] = replacement;
+            *aliases[slot] = &*replacement;
+            m_texturePending[slot] = false;
+            m_textureRequests[slot] = {};
+            PublishRenderProxyDirty(ProxyDirty::Material);
+        }
+    }
+}
+
 void DecalComponent::PollTextureRequests()
 {
     const auto active = [](bool value) { return value; };

@@ -2,6 +2,7 @@
 #include "CommandCore/CommandResult.h"
 #include "EntityHandle.h"
 #include <string>
+#include <filesystem>
 
 namespace EditorScriptAuthoring
 {
@@ -19,6 +20,7 @@ namespace EditorScriptAuthoring
     CommandCore::CommandResult CreateAndAttach(EntityHandle target, const std::string& name);
     CommandCore::CommandResult Retry();
     CommandCore::CommandResult Reload();
+    void NotifySourceChanged(const std::filesystem::path& source);
     Status GetStatus();
     void Cancel();
     void Tick();

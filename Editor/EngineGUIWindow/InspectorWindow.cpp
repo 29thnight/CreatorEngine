@@ -1,4 +1,4 @@
-﻿#include "../EngineEntry/EditorProjectOperations.h"
+#include "../EngineEntry/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
 #include "InspectorControl.h"
@@ -1643,6 +1643,8 @@ void InspectorWindow::ImGuiDrawHelperRenderProfile(SceneRenderProfileComponent* 
 	if (!renderProfileComponent->IsProfileLoaded()) return;
 
 	SceneRenderProfile& profile = renderProfileComponent->GetRenderProfile();
+    const auto profileBeforeEdit = Meta::SerializeDocument(&profile).Dump();
+
 	const auto drawMembers = [](const char* header, auto& setting)
 	{
 		if (!ImGui::CollapsingHeader(header)) return;
@@ -1734,11 +1736,13 @@ void InspectorWindow::ImGuiDrawHelperRenderProfile(SceneRenderProfileComponent* 
 	renderProfileComponent->UpdateProfileEditMode();
 
 	ImGui::Separator();
-	if (ImGui::Button("Save Scene Render Profile Asset", ImVec2(ImGui::GetContentRegionAvail().x, 0.f)))
-	{
-		EditorAssetDatabase::Get().SaveExistingSceneRenderProfile(
-			renderProfileComponent->m_renderProfileGuid, &profile);
-	}
+    const auto payload = Meta::SerializeDocument(&profile).Dump();
+    if (payload != profileBeforeEdit)
+    {
+        EditorAssetDatabase::Get().QueueAutomaticRenderProfile(renderProfileComponent->m_renderProfileGuid, profile);
+    }
+    ImGui::TextWrapped("Render profile edits are applied and saved automatically.");
+
 }
 
 void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
@@ -2731,6 +2735,7 @@ void InspectorWindow::Draw()
 
 		stem += " Import Settings";
 
+        const auto importBeforeEdit = selectedNode->Dump();
 		const bool importOpen = ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 		file::path importSource = selectedMetaFilePath;
 		importSource.replace_extension();
@@ -2745,36 +2750,32 @@ void InspectorWindow::Draw()
 				}
 				else
 				{
-					DrawYamlNodeEditor(selectedNode->Root());
+                    const auto root = selectedNode->Root();
+                    if (root.Read()["assetId"] && root.Read()["importSettings"])
+                    {
+                        DrawYamlNodeEditor(root.Child("importSettings"));
+                        if (root.Read()["ModelImporter"])
+                        {
+                            DrawYamlNodeEditor(root.Child("ModelImporter"));
+                        }
+                    }
+                    else
+                    {
+                        DrawYamlNodeEditor(root);
+                    }
 				}
 			}
 			probe.finish("ImportSettings", 0, importOpen);
 		}
-		if (importOpen && !textureImport)
-		{
-
-			ImGui::Spacing();
-			if (ImGui::Button("Save"))
-			{
-				try
-				{
-					std::ofstream fout(selectedMetaFilePath, std::ios::binary | std::ios::trunc);
-					if (fout.is_open())
-					{
-						fout << selectedNode->Dump();
-						fout.close();
-					}
-					else
-					{
-						Debug::PrintLog(spdlog::level::err, "Failed to open file for writing: " + selectedMetaFilePath.string());
-					}
-				}
-				catch (const std::exception& e)
-				{
-					Debug::PrintLog(spdlog::level::err, "Failed to save YAML: " + std::string(e.what()));
-				}
-			}
-		}
+        if (importOpen && !textureImport)
+        {
+            const auto payload = selectedNode->Dump();
+            if (payload != importBeforeEdit)
+            {
+                EditorAssetDatabase::Get().QueueAutomaticImportMetadata(importSource, payload);
+            }
+            ImGui::TextWrapped("Import setting edits are saved and processed automatically.");
+        }
 		ImGui::PopStyleVar(2);
 	}
 

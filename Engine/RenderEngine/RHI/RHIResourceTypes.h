@@ -427,6 +427,10 @@ struct RHITextureInfo
     uint32_t  mipLevels{ 0 };
     RHIFormat format{ RHIFormat::Unknown };
 
+    // Backend guarantee for explicit states across graphics-queue submissions.
+    // Unknown backends and automatically decaying resources remain conservative.
+    bool retainsExplicitStateOnGraphicsQueue{false};
+
     bool IsValid() const { return 0 != width && 0 != height; }
 };
 

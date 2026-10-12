@@ -1651,13 +1651,18 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& pr
 }
 
 void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
-    PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue)
+    PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue,
+    const std::vector<bool>* retainedGraphicsTextures)
 {
     const bool queuePlan = batchEnds != nullptr;
     m_stats.barriersEmitted = 0;
     m_stats.barrierBatches = 0;
     std::vector<bool> previousWrite(m_resources.size(),true);
     std::vector<RHIResourceState> finalStates;
+    const auto retainsState = [&](size_t index)
+    {
+        return retainedGraphicsTextures && (*retainedGraphicsTextures)[index];
+    };
     const auto appendTransition = [](PhaseBarrierPlan& plan, const Resource& resource,
         RHIResourceState before, RHIResourceState after)
     {
@@ -1681,8 +1686,15 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             finalStates.push_back(resource.state);
             if (resource.used)
             {
-                appendTransition(*prologue, resource, resource.initialState, RHIResourceState::Common);
-                resource.state = RHIResourceState::Common;
+                if (!retainsState(finalStates.size() - 1))
+                {
+                    appendTransition(*prologue, resource, resource.initialState, RHIResourceState::Common);
+                    resource.state = RHIResourceState::Common;
+                }
+                else
+                {
+                    resource.state = resource.initialState;
+                }
             }
         }
         else
@@ -1827,15 +1839,18 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
 
         if (queuePlan && (*batchEnds)[passIndex])
         {
-            // Only resources touched by this batch have left COMMON. Ending their
-            // states here preserves cross-queue handoff and buffer decay contracts.
+            // Graphics-only nondecaying textures retain explicit state on the
+            // same FIFO queue. Buffers, unknown textures and cross-queue resources
+            // keep the original COMMON handoff/decay contract.
             PhaseBarrierPlan boundary;
-            for (auto& resource : m_resources)
+            for (size_t index = 0; index < m_resources.size(); ++index)
             {
-                if (resource.used)
+                auto& resource = m_resources[index];
+                if (resource.used && !retainsState(index))
                 {
                     appendTransition(boundary, resource, resource.state, RHIResourceState::Common);
                     resource.state = RHIResourceState::Common;
+                    previousWrite[index] = true;
                 }
             }
             pass.finalTransitions = std::move(boundary.transitions);
@@ -1846,7 +1861,6 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             {
                 ++m_stats.barrierBatches;
             }
-            std::fill(previousWrite.begin(), previousWrite.end(), true);
         }
     }
 
@@ -1857,7 +1871,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             auto& resource = m_resources[index];
             if (resource.used)
             {
-                appendTransition(*epilogue, resource, RHIResourceState::Common, finalStates[index]);
+                appendTransition(*epilogue, resource, resource.state, finalStates[index]);
             }
             resource.state = finalStates[index];
         }
@@ -2631,6 +2645,24 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
     QueuePlanningScratch& scratch) const
 {
     QueuePlanningScratch::Timer timer{scratch.simulationMilliseconds};
+    const auto baseline = SimulateQueueOrder(queues, costs, predecessors, successors, reorder, order, scratch, false);
+    if (!reorder) return baseline;
+    std::vector<uint16_t> candidateOrder;
+    const auto candidate = SimulateQueueOrder(queues, costs, predecessors, successors, true,
+        order ? &candidateOrder : nullptr, scratch, true);
+    if (candidate < baseline)
+    {
+        if (order) *order = std::move(candidateOrder);
+        return candidate;
+    }
+    return baseline;
+}
+
+uint64_t EnhancedRenderGraph::SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
+    const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
+    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order,
+    QueuePlanningScratch& scratch, bool prioritizeComputeInputs) const
+{
     const uint64_t handoff = m_queueCostModel.handoffNanoseconds;
     const auto addTime = [](uint64_t left, uint64_t right)
     {
@@ -2680,8 +2712,18 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
         return position[pass] + (reorder && !feedsCompute[pass] ? static_cast<uint32_t>(m_executeOrder.size()) : 0u);
     };
     const auto readyLater = [&](uint16_t left, uint16_t right) { return rank(left) > rank(right); };
+    const auto deferred = [&](uint16_t pass)
+    {
+        return prioritizeComputeInputs && !feedsCompute[pass] && queues[pass] != RHIQueueKind::Compute;
+    };
+    const auto better = [&](uint16_t left, uint16_t right)
+    {
+        return std::tuple{deferred(left), reorder ? start(left) : 0, rank(left)} <
+            std::tuple{deferred(right), reorder ? start(right) : 0, rank(right)};
+    };
     const auto futureLater = [&](uint16_t left, uint16_t right)
     {
+        if (deferred(left) != deferred(right)) return deferred(left) > deferred(right);
         return earliest[left] > earliest[right] || (earliest[left] == earliest[right] && readyLater(left, right));
     };
     for (uint32_t queue = 0; queue < 2; ++queue)
@@ -2734,17 +2776,17 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
             }
             if (!ready[queue].empty()) heads[queue] = ready[queue].front();
             else if (!future[queue].empty()) heads[queue] = future[queue].front();
+            if (!ready[queue].empty() && !future[queue].empty() &&
+                better(future[queue].front(), heads[queue])) heads[queue] = future[queue].front();
         }
         auto pass = heads[0];
         if (pass == RGPassId::kInvalid) pass = heads[1];
         else if (heads[1] != RGPassId::kInvalid)
         {
-            const auto leftStart = reorder ? start(pass) : 0;
-            const auto rightStart = reorder ? start(heads[1]) : 0;
-            if (rightStart < leftStart || (rightStart == leftStart && rank(heads[1]) < rank(pass))) pass = heads[1];
+            if (better(heads[1], pass)) pass = heads[1];
         }
         const auto queue = slot(pass);
-        if (!ready[queue].empty())
+        if (!ready[queue].empty() && ready[queue].front() == pass)
         {
             std::pop_heap(ready[queue].data(), ready[queue].data() + ready[queue].size(), readyLater);
             ready[queue].pop_back();

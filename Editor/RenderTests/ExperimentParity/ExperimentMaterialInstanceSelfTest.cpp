@@ -213,6 +213,9 @@ namespace RenderTest
         {
             ShaderMeta meta;
             meta.name = "InstanceProbe";
+            // MakeBase selects FOG=on. Packing validates keywords against the
+            // declared axes, so both comparison paths need that same axis.
+            meta.keywords = { { "FOG", { "off", "on" } } };
             meta.properties = {
                 { "tint", "Tint", ShaderPropertyType::Float4,
                   std::array<float, 4>{ 1.0f, 0.5f, 0.25f, 1.0f } },

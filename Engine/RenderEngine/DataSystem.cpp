@@ -2259,7 +2259,8 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                     break;
                 case ManagedAssetType::Material:
                 {
-                    const auto loaded = LoadMaterialShared(std::string_view{file::path(entry.assetName).stem().string()});
+                    const auto materialName = file::path(entry.assetName).stem().string();
+                    const auto loaded = LoadMaterialShared(std::string_view(materialName));
                     if (!loaded)
                     {
                         throw std::runtime_error("Required material could not be prepared: " + entry.assetName);
@@ -3545,6 +3546,12 @@ bool DataSystem::PublishMaterialAsset(own::shared_owner<Material> candidate,
         generation = expectedGeneration;
     }
     return PublishMaterialGraphGeneration(generation, expectedGeneration, std::move(candidate), expectedCurrent, error);
+}
+
+bool DataSystem::PublishMaterialGraphReload(own::shared_owner<const material_graph::Generation> generation,
+    const own::shared_owner<const material_graph::Generation>& expected, std::string& error)
+{
+    return PublishMaterialGraphGeneration(std::move(generation), expected, {}, {}, error);
 }
 
 bool DataSystem::PublishMaterialGraphGeneration(
@@ -5498,7 +5505,8 @@ own::shared_owner<const Material> DataSystem::LoadMaterialShared(FileGuid guid)
     {
         return {};
     }
-    auto material = LoadMaterialShared(std::string_view{absolute.string()});
+    const auto materialPath = absolute.string();
+    auto material = LoadMaterialShared(std::string_view(materialPath));
     return material && material->m_fileGuid == guid ? material : nullptr;
 }
 

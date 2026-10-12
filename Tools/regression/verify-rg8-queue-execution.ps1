@@ -9,10 +9,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$expectedChecks = 428
-$expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=3 checks=428 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false' + "`n"
-$expectedScheduleChecks = 121
-$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=121 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
+$expectedChecks = 434
+$expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=3 checks=434 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false' + "`n"
+$expectedScheduleChecks = 129
+$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=129 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath($OutputDirectory)
@@ -193,7 +193,7 @@ try
             'RG3_PLAN_OK shuffles=120 dead-version WAR-bridge sorted-lifetime transitions UAV-read-write import-final Modify stale',
             'RG4_WAVES_OK shuffles=24 critical-path culled',
             'RG5_PRODUCERS_OK passes=GBuffer/Shadow modes=3 orders=2 outputs=7 RAW=7',
-            'RG5_CONSUMERS_OK Deferred/SkyBox policies=2 paths=2 Modify/WAR/depth',
+            'RG5_CONSUMERS_OK LX-HDR/SkyBox policies=2 paths=2 Modify/WAR/depth',
             'RG5_INDIRECT_OK SSAO/SSGI policies=2 optional=2 frames=2 history-v1',
             'RG5_LIGHTTILES_OK policies=2 writer=1 tile-v1',
             'RG5_LOOKUP_OK policies=2 capture=11 iterations=2 outputs-v2 WAR range-rejection',

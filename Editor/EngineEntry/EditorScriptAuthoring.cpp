@@ -15,6 +15,8 @@
 #include <mutex>
 #include <utility>
 #include <vector>
+#include <chrono>
+#include <map>
 
 namespace EditorScriptAuthoring
 {
@@ -28,9 +30,35 @@ namespace EditorScriptAuthoring
             std::filesystem::path source, log;
             HANDLE process{}, job{};
             bool compiled{};
+            bool automatic{}, pending{}, sourcesChecked{};
+            std::filesystem::path project, changedSource;
+            std::chrono::steady_clock::time_point changedAt;
+            std::map<std::filesystem::path, std::string> attemptedSources;
             ~Work() { if (job) CloseHandle(job); if (process) CloseHandle(process); }
         };
         Work& State() { static Work state; return state; }
+        std::map<std::filesystem::path, std::string> CaptureSources()
+        {
+            std::map<std::filesystem::path, std::string> sources;
+            const auto root = PathFinder::BaseProjectPath() / "Assets/Script";
+            if (!std::filesystem::exists(root))
+            {
+                return sources;
+            }
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(root))
+            {
+                if (entry.is_regular_file() && _wcsicmp(entry.path().extension().c_str(), L".cs") == 0)
+                {
+                    std::ifstream input(entry.path(), std::ios::binary);
+                    if (!input)
+                    {
+                        throw std::runtime_error("Cannot read script source: " + entry.path().string());
+                    }
+                    sources.emplace(entry.path(), std::string(std::istreambuf_iterator<char>(input), {}));
+                }
+            }
+            return sources;
+        }
         std::string Utf8(const std::filesystem::path& path)
         {
             const auto value = path.u8string();
@@ -86,6 +114,10 @@ namespace EditorScriptAuthoring
         CommandCore::CommandResult StartBuild(Work& work)
         {
             const auto projectRoot = PathFinder::BaseProjectPath();
+            work.project = projectRoot;
+            work.attemptedSources = CaptureSources();
+            work.pending = false;
+            work.sourcesChecked = false;
             std::filesystem::path program, workingDirectory;
             std::vector<std::wstring> arguments;
             std::filesystem::create_directories(work.log.parent_path());
@@ -227,6 +259,7 @@ namespace EditorScriptAuthoring
             CloseHandle(fileHandle);
             if (!saved) return CommandCore::Fail("script.write_failed", "Could not write the complete script file.");
             work.target = target;
+            work.automatic = false;
             work.source = source;
             work.log = PathFinder::RuntimeDataPath("Logs/ScriptCompilation.log");
             work.status = {false, false, {}, Utf8(source), Utf8(work.log), typeName};
@@ -241,6 +274,17 @@ namespace EditorScriptAuthoring
         auto& work = State();
         std::lock_guard lock(work.mutex);
         if (work.status.busy) return CommandCore::PreconditionFailed("script.busy", "A script is already compiling.");
+        if (work.automatic)
+        {
+            try
+            {
+                return StartBuild(work);
+            }
+            catch (const std::exception& error)
+            {
+                return FailWork(work, error.what());
+            }
+        }
         auto check = ValidateTarget(work.target);
         if (!check.IsSuccess()) { work.status.message = check.message; return check; }
         try
@@ -260,13 +304,52 @@ namespace EditorScriptAuthoring
     {
         auto& work = State();
         std::lock_guard lock(work.mutex);
+        work.pending = false;
         if (work.status.busy) FailWork(work, "Compilation cancelled. The script file is kept.");
     }
     void Tick()
     {
         auto& work = State();
         std::lock_guard lock(work.mutex);
-        if (!work.status.busy) return;
+        if (!work.project.empty() && work.project != PathFinder::BaseProjectPath())
+        {
+            CloseBuild(work);
+            work.status = {};
+            work.pending = false;
+            work.attemptedSources.clear();
+            work.project.clear();
+            return;
+        }
+        if (!work.status.busy)
+        {
+            if (!work.pending || std::chrono::steady_clock::now() - work.changedAt < std::chrono::milliseconds(650))
+            {
+                return;
+            }
+            work.pending = false;
+            try
+            {
+                if (CaptureSources() == work.attemptedSources)
+                {
+                    return;
+                }
+                work.automatic = true;
+                work.source = work.changedSource;
+                work.log = PathFinder::RuntimeDataPath("Logs/ScriptCompilation.log");
+                work.status = {false, false, {}, Utf8(work.source), Utf8(work.log), {}};
+                const auto result = StartBuild(work);
+                if (!result.IsSuccess())
+                {
+                    Debug::PrintLog(spdlog::level::err, result.message);
+                }
+            }
+            catch (const std::exception& error)
+            {
+                FailWork(work, error.what());
+                Debug::PrintLog(spdlog::level::err, error.what());
+            }
+            return;
+        }
         if (!work.compiled)
         {
             if (!work.process || WaitForSingleObject(work.process, 0) == WAIT_TIMEOUT) return;
@@ -274,22 +357,75 @@ namespace EditorScriptAuthoring
             if (!GetExitCodeProcess(work.process, &exitCode) || exitCode != 0)
             {
                 FailWork(work, "Script compilation failed. Open the build log, correct the script, then retry.");
+                Debug::PrintLog(spdlog::level::err, work.status.message);
                 return;
             }
             CloseBuild(work);
             work.compiled = true;
         }
-        if (SceneManagers->IsGameStart())
+        try
+        {
+            if ((!work.sourcesChecked || work.pending) && CaptureSources() != work.attemptedSources)
+            {
+                if (std::chrono::steady_clock::now() - work.changedAt >= std::chrono::milliseconds(650))
+                {
+                    StartBuild(work);
+                }
+                return;
+            }
+            work.sourcesChecked = true;
+        }
+        catch (const std::exception& error)
+        {
+            FailWork(work, error.what());
+            return;
+        }
+        work.pending = false;
+        if (!work.automatic && SceneManagers->IsGameStart())
         {
             work.status.message = "Compilation completed. Stop Play to add the script.";
             return;
         }
-        auto result = ValidateTarget(work.target);
-        if (result.IsSuccess()) result = ReloadNow();
-        if (result.IsSuccess()) result = EditorObjectOperations::AddManagedScript(work.target, work.status.type);
+        auto result = work.automatic ? CommandCore::Ok() : ValidateTarget(work.target);
+        if (result.IsSuccess())
+        {
+            result = ReloadNow();
+        }
+        if (result.IsSuccess() && !work.automatic)
+        {
+            result = EditorObjectOperations::AddManagedScript(work.target, work.status.type);
+        }
         work.status.busy = false;
         work.status.succeeded = result.IsSuccess();
-        work.status.message = result.IsSuccess() ? work.source.filename().string() + " compiled and added to the original entity." : result.message;
+        work.status.message = result.IsSuccess()
+            ? (work.automatic ? "Changed C# scripts compiled and reconnected." : work.source.filename().string() + " compiled and added to the original entity.")
+            : result.message;
+        Debug::PrintLog(result.IsSuccess() ? spdlog::level::info : spdlog::level::err, work.status.message);
+    }
+    void NotifySourceChanged(const std::filesystem::path& source)
+    {
+        if (_wcsicmp(source.extension().c_str(), L".cs") != 0)
+        {
+            return;
+        }
+        const auto project = PathFinder::BaseProjectPath();
+        const auto relative = source.lexically_normal().lexically_relative((project / "Assets/Script").lexically_normal());
+        if (relative.empty() || *relative.begin() == ".." || relative.is_absolute())
+        {
+            return;
+        }
+        auto& work = State();
+        std::lock_guard lock(work.mutex);
+        if (!work.project.empty() && work.project != project)
+        {
+            CloseBuild(work);
+            work.status = {};
+            work.attemptedSources.clear();
+        }
+        work.project = project;
+        work.changedSource = source;
+        work.changedAt = std::chrono::steady_clock::now();
+        work.pending = true;
     }
     void Shutdown()
     {
@@ -297,5 +433,8 @@ namespace EditorScriptAuthoring
         std::lock_guard lock(work.mutex);
         CloseBuild(work);
         work.status = {};
+        work.pending = false;
+        work.project.clear();
+        work.attemptedSources.clear();
     }
 }

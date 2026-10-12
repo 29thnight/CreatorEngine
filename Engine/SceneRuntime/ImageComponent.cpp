@@ -5,6 +5,7 @@
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 #include "../RenderEngine/Texture.h"
+#include "../RenderEngine/AssetDepot/TextureAssetRuntime.h"
 #include "../RenderEngine/mesh.h"
 #include "Entity.h"
 #include "SceneManager.h"
@@ -18,6 +19,31 @@
 ImageComponent::ImageComponent()
 {
 	type = UItype::Image;
+}
+
+bool ImageComponent::ReplaceTextureOwner(const Texture* previous,
+    const own::shared_owner<const Texture>& replacement)
+{
+    bool changed = false;
+    for (auto& texture : textures)
+    {
+        if (texture && &*texture == previous)
+        {
+            texture = replacement;
+            changed = true;
+        }
+    }
+    if (changed)
+    {
+        // Preserve authored paths, selection, rect size and pivot during reload.
+        if (m_curtexture && &*m_curtexture == previous)
+        {
+            m_curtexture = replacement;
+            uiinfo.size = replacement->GetImageSize();
+        }
+        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    }
+    return changed;
 }
 
 void ImageComponent::SetTexture(int index)
@@ -66,9 +92,24 @@ void ImageComponent::Load(const own::shared_owner<const Texture>& ptr)
 	if (nullptr == ptr)
 		return;
 
+    // Cooked descriptors own immutable image identity, not a loose filename.
+    // Resolve the registered authoring reference before writing the scene path.
+    std::string reference = !ptr->m_assetPath.empty() ? ptr->m_assetPath : ptr->m_name + ptr->m_extension;
+    if (reference.empty())
+    {
+        if (const auto origin = ptr->GetAssetOrigin())
+        {
+            reference = DataSystems->GetFilePath(FileGuid(origin->resolved.entry.asset.key.assetId.value)).string();
+            if (reference.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "Cannot attach cooked ImageComponent texture without a serializable asset reference");
+                return;
+            }
+        }
+    }
 	textures.push_back(ptr);
 	// G2 — 이름이 아니라 캐시 신원을 적는다(SpriteRenderer::SetSprite 와 같은 규약).
-	texturePaths.push_back(!ptr->m_assetPath.empty() ? ptr->m_assetPath : ptr->m_name + ptr->m_extension);
+	texturePaths.push_back(std::move(reference));
 	if (1 == textures.size())
 	{
 		SetTexture(0);

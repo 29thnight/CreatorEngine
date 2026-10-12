@@ -34,6 +34,10 @@ CommandData DescribeGraph(const MeshRenderer& renderer)
     data.Set("generation", CommandData::Int(instance->generation->generation));
     data.Set("features", CommandData::Int(instance->generation->cooked.product.program.features));
     data.Set("renderableMesh", CommandData::Bool(renderer.HasRenderableMesh()));
+    const auto meshHandle = renderer.GetModelMeshHandle();
+    data.Set("modelId", CommandData::String(FileGuid(meshHandle.modelId).ToString()));
+    data.Set("meshId", CommandData::String(FileGuid(meshHandle.meshId).ToString()));
+    data.Set("modelGeneration", CommandData::Int(meshHandle.generation));
     auto uniforms = CommandData::Array();
     for (auto byte : instance->uniforms)
     {

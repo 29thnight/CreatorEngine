@@ -2,3 +2,12 @@ guid: caa2db6e-79ee-4a51-bc19-e159515d9f5e
 importSettings:
   extension: .hdr
   timestamp: 133915070087323899
+  importerVersion: 2
+  colorSpace: Source
+  compression: None
+  mipPolicy: PreserveAuthored
+  maxDimension: 0
+  normalMap: false
+  preserveAlphaCoverage: false
+  alphaCutoff: 0.5
+  compressionQuality: Normal

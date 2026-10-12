@@ -103,6 +103,7 @@ public:
     bool BindModelGeneration(
         own::shared_owner<const assets::ModelAssetGeneration> generation,
         std::uint32_t meshIndex);
+    bool RefreshModelGeneration(own::shared_owner<const assets::ModelAssetGeneration> generation);
     [[nodiscard]] assets::ModelMeshHandle GetModelMeshHandle() const;
     bool BindMeshDescriptor(own::shared_owner<const assets::ModelMeshDescriptor> descriptor);
     // Owner-thread resident lookup/request polling only. Never waits or decodes.

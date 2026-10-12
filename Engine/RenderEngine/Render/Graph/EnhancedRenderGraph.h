@@ -901,7 +901,8 @@ private:
     // Queue execution specializes the same planner at submission boundaries.
     // Pass states persist inside each batch; boundary plans use COMMON.
     void PlanBarriers(const std::vector<bool>* batchEnds = nullptr,
-        PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr);
+        PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr,
+        const std::vector<bool>* retainedGraphicsTextures = nullptr);
     bool ValidateFinalStates(std::string& outError) const;
     bool ValidateRepeatedPasses(std::string& outError) const;
     void PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite);
@@ -950,6 +951,10 @@ private:
         const std::vector<std::vector<uint16_t>>& predecessors,
         const std::vector<std::vector<uint16_t>>& successors,
         bool reorder, std::vector<uint16_t>* order, QueuePlanningScratch& scratch) const;
+    uint64_t SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
+        const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
+        const std::vector<std::vector<uint16_t>>& successors, bool reorder,
+        std::vector<uint16_t>* order, QueuePlanningScratch& scratch, bool prioritizeComputeInputs) const;
     void UpdateResourceUses();
     QueueCostModel m_queueCostModel;
     RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};

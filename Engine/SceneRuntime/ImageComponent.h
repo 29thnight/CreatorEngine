@@ -27,6 +27,7 @@ public:
 
 	void Load(const own::shared_owner<const Texture>& ptr);
 	void DeserializeTexture(const own::shared_owner<const Texture>& ptr);
+	bool ReplaceTextureOwner(const Texture* previous, const own::shared_owner<const Texture>& replacement);
 	void OnDeserialized(); // CT6-d: 텍스처 경로 일괄 로드(구 팩토리 분기)
 
 	virtual void OnInitialized() override;
