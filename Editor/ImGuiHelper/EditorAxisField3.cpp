@@ -175,8 +175,10 @@ namespace editor::widgets
                 request.speed, request.min, request.max, request.format, 0, true);
             ImGui::PopStyleVar();
             const ImGuiContext& context = *ImGui::GetCurrentContext();
-            const bool focused = ImGui::IsItemActive() ||
-                (ImGui::IsItemFocused() && context.NavCursorVisible);
+            // The numeric widget owns the visible keyboard cursor. Keep this
+            // outer border neutral then, so focus is not outlined twice.
+            const bool keyboard_focus = ImGui::IsItemFocused() && context.NavCursorVisible;
+            const bool focused = ImGui::IsItemActive() && !keyboard_focus;
             const ThemeColor border = focused ? ThemeColor::Primary
                 : ImGui::IsItemHovered() ? ThemeColor::BorderStrong : ThemeColor::Border;
             ImGui::GetWindowDrawList()->AddRect(group_min,
