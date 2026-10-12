@@ -182,23 +182,23 @@ namespace editor
             }
         }
 
-        // Plan §3.1 values are fixed independently of the product token table.
+        // The refined palette is fixed independently of the product token table.
         struct ExpectedColor { ThemeColor token; const char* name; std::uint32_t rgb; };
         constexpr ExpectedColor palette[] = {
             { ThemeColor::Canvas, "Canvas", 0x181818 },
-            { ThemeColor::Chrome, "Chrome", 0x2A2A2A },
-            { ThemeColor::Panel, "Panel", 0x343434 },
-            { ThemeColor::PanelRaised, "PanelRaised", 0x484848 },
-            { ThemeColor::Selection, "Selection", 0x525252 },
-            { ThemeColor::Border, "Border", 0x3E3E3E },
-            { ThemeColor::BorderStrong, "BorderStrong", 0x484848 },
-            { ThemeColor::Primary, "Primary", 0x2E70EA },
-            { ThemeColor::Text, "Text", 0xFFFFFF },
-            { ThemeColor::TextMuted, "TextMuted", 0x9E9E9E },
-            { ThemeColor::TextDisabled, "TextDisabled", 0x999999 },
-            { ThemeColor::Positive, "Positive", 0x5AEB5C },
-            { ThemeColor::Warning, "Warning", 0xE6DB74 },
-            { ThemeColor::Error, "Error", 0xFB5A5A },
+            { ThemeColor::Chrome, "Chrome", 0x262626 },
+            { ThemeColor::Panel, "Panel", 0x2E2E2E },
+            { ThemeColor::PanelRaised, "PanelRaised", 0x383838 },
+            { ThemeColor::Selection, "Selection", 0x454545 },
+            { ThemeColor::Border, "Border", 0x3D3D3D },
+            { ThemeColor::BorderStrong, "BorderStrong", 0x505050 },
+            { ThemeColor::Primary, "Primary", 0x4B91E2 },
+            { ThemeColor::Text, "Text", 0xE6E6E6 },
+            { ThemeColor::TextMuted, "TextMuted", 0xA9A9A9 },
+            { ThemeColor::TextDisabled, "TextDisabled", 0x777777 },
+            { ThemeColor::Positive, "Positive", 0x7ABF83 },
+            { ThemeColor::Warning, "Warning", 0xD6AD5C },
+            { ThemeColor::Error, "Error", 0xE47777 },
         };
         checks.expect(static_cast<int>(ThemeColor::Count) == 14, "palette", "14 semantic colors");
         for (const ExpectedColor& expected : palette)
@@ -214,10 +214,27 @@ namespace editor
                          "explicit alpha", expected.name);
         }
 
+        // Structural surfaces must remain neutral; semantic colors carry meaning.
+        for (const ThemeColor surface : { ThemeColor::Canvas, ThemeColor::Chrome,
+                 ThemeColor::Panel, ThemeColor::PanelRaised, ThemeColor::Selection,
+                 ThemeColor::Border, ThemeColor::BorderStrong })
+        {
+            const std::uint32_t rgb = ThemeColorHex(surface);
+            checks.expect(((rgb >> 16) & 255) == ((rgb >> 8) & 255) &&
+                          ((rgb >> 8) & 255) == (rgb & 255),
+                "neutral surfaces", ThemeColorName(surface));
+        }
+        checks.expect(InspectorThemeTokens::AxisBackground == InspectorThemeTokens::Field,
+            "axis group", "badge and numeric field share one neutral surface");
+        checks.expect(HierarchyThemeTokens::SelectedRow != HierarchyThemeTokens::Row &&
+                      HierarchyThemeTokens::SelectedRow != ThemeColorHex(ThemeColor::Primary),
+            "hierarchy selection", "subtle row background remains distinct from the blue accent");
+
         ImGuiStyle style;
         style.FontSizeBase = 16.f;
         ApplyEditorTheme(style, 1.f, 1.f);
         const ImGuiStyle baseline = style;
+        checks.number(style.FrameBorderSize, 1.f, "logical metrics", "thin control border");
         checks.number(style.FontSizeBase + style.ItemSpacing.y, 20.f,
                       "logical metrics", "row height");
         checks.number(style.FontSizeBase + 2.f * style.FramePadding.y, 20.f,
@@ -248,29 +265,31 @@ namespace editor
         struct ExpectedSlot { ImGuiCol slot; const char* name; std::uint32_t rgb; float alpha; };
         constexpr ExpectedSlot slots[] = {
             { ImGuiCol_WindowBg, "canvas", 0x181818, 1.f },
-            { ImGuiCol_TitleBgActive, "active title chrome", 0x2A2A2A, 1.f },
-            { ImGuiCol_PopupBg, "popup panel", 0x343434, 1.f },
-            { ImGuiCol_Button, "idle button", 0x343434, 1.f },
-            { ImGuiCol_ButtonHovered, "hover button", 0x484848, 1.f },
-            { ImGuiCol_ButtonActive, "pressed button", 0x2E70EA, 1.f },
-            { ImGuiCol_FrameBg, "idle input field", 0x2A2A2A, 1.f },
-            { ImGuiCol_FrameBgHovered, "hover input field", 0x484848, 1.f },
-            { ImGuiCol_FrameBgActive, "active field selection", 0x525252, 1.f },
-            { ImGuiCol_Border, "panel border", 0x3E3E3E, 1.f },
-            { ImGuiCol_TableBorderStrong, "strong border", 0x484848, 1.f },
-            { ImGuiCol_Text, "body text", 0xFFFFFF, 1.f },
-            { ImGuiCol_TextDisabled, "disabled text", 0x999999, 1.f },
-            { ImGuiCol_PlotLines, "muted graph", 0x9E9E9E, 1.f },
-            { ImGuiCol_PlotHistogramHovered, "positive graph", 0x5AEB5C, 1.f },
-            { ImGuiCol_TabSelectedOverline, "active tab marker", 0x2E70EA, 1.f },
-            { ImGuiCol_NavCursor, "keyboard focus", 0x2E70EA, 1.f },
-            { ImGuiCol_TextSelectedBg, "text selection alpha", 0x2E70EA, 0.35f },
-            { ImGuiCol_DockingPreview, "dock preview alpha", 0x2E70EA, 0.45f },
+            { ImGuiCol_TitleBgActive, "active title chrome", 0x262626, 1.f },
+            { ImGuiCol_PopupBg, "popup panel", 0x2E2E2E, 1.f },
+            { ImGuiCol_Button, "idle button", 0x2E2E2E, 1.f },
+            { ImGuiCol_ButtonHovered, "hover button", 0x383838, 1.f },
+            { ImGuiCol_ButtonActive, "pressed button", 0x454545, 1.f },
+            { ImGuiCol_FrameBg, "idle input field", 0x262626, 1.f },
+            { ImGuiCol_FrameBgHovered, "hover input field", 0x383838, 1.f },
+            { ImGuiCol_FrameBgActive, "active field selection", 0x454545, 1.f },
+            { ImGuiCol_Border, "panel border", 0x3D3D3D, 1.f },
+            { ImGuiCol_TableBorderStrong, "strong border", 0x505050, 1.f },
+            { ImGuiCol_Text, "body text", 0xE6E6E6, 1.f },
+            { ImGuiCol_TextDisabled, "disabled text", 0x777777, 1.f },
+            { ImGuiCol_PlotLines, "muted graph", 0xA9A9A9, 1.f },
+            { ImGuiCol_PlotHistogramHovered, "positive graph", 0x7ABF83, 1.f },
+            { ImGuiCol_TabSelectedOverline, "active tab marker", 0x4B91E2, 1.f },
+            { ImGuiCol_NavCursor, "keyboard focus", 0x4B91E2, 1.f },
+            { ImGuiCol_TextSelectedBg, "text selection alpha", 0x4B91E2, 0.35f },
+            { ImGuiCol_DockingPreview, "dock preview alpha", 0x4B91E2, 0.45f },
             { ImGuiCol_BorderShadow, "transparent shadow", 0x181818, 0.f },
         };
         for (const ExpectedSlot& expected : slots)
+        {
             checks.color(style.Colors[expected.slot], expected.rgb, expected.alpha,
                          "ImGui slot", expected.name);
+        }
 
         // ── 입력칸이 바탕에서 떨어져 보이는가 ────────────────────────
         //
@@ -314,14 +333,14 @@ namespace editor
         // Expected pixel values include ImGui's geometry truncation (7*1.5=10,
         // 6*2.25=13). The same object traverses both axes and repeated scales.
         constexpr ThemeGeometryExpectation transitions[] = {
-            { "initial 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
-            { "user 150/100", 1.5f, 1.f, 12.f, 30.f, 4.f, 3.f, 10.f, 3.f, 6.f, 3.f },
-            { "user return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
-            { "dpi 100/150", 1.f, 1.5f, 12.f, 30.f, 4.f, 3.f, 10.f, 3.f, 6.f, 3.f },
-            { "dpi return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
-            { "combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 6.f, 4.f, 15.f, 4.f, 9.f, 4.f },
-            { "repeat combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 6.f, 4.f, 15.f, 4.f, 9.f, 4.f },
-            { "combined return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
+            { "initial 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 3.f, 2.f },
+            { "user 150/100", 1.5f, 1.f, 12.f, 30.f, 4.f, 3.f, 10.f, 3.f, 4.f, 3.f },
+            { "user return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 3.f, 2.f },
+            { "dpi 100/150", 1.f, 1.5f, 12.f, 30.f, 4.f, 3.f, 10.f, 3.f, 4.f, 3.f },
+            { "dpi return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 3.f, 2.f },
+            { "combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 6.f, 4.f, 15.f, 4.f, 6.f, 4.f },
+            { "repeat combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 6.f, 4.f, 15.f, 4.f, 6.f, 4.f },
+            { "combined return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 3.f, 2.f },
         };
         for (const ThemeGeometryExpectation& expected : transitions)
         {
@@ -369,7 +388,7 @@ namespace editor
         checks.number(style.FontScaleMain, 1.f, "recovery", "user font axis");
         checks.number(style.FontScaleDpi, 1.f, "recovery", "DPI font axis");
         checks.number(style.FontSizeBase, 19.f, "recovery", "font owner keeps base size");
-        checks.color(style.Colors[ImGuiCol_ButtonActive], 0x2E70EA, 1.f,
+        checks.color(style.Colors[ImGuiCol_ButtonActive], 0x454545, 1.f,
                      "recovery", "active button palette");
 
         // 섹션 머리줄의 상태 색 넷 (PHASE 21 W2).
@@ -387,7 +406,7 @@ namespace editor
             constexpr std::array<const char*, 4> names{
                 "closed", "open", "hovered", "held" };
             constexpr std::array<std::uint32_t, 4> expected{
-                0x343434, 0x484848, 0x525252, 0x2E70EA };
+                0x2E2E2E, 0x383838, 0x454545, 0x4B91E2 };
 
             for (std::size_t index = 0; index < surfaces.size(); ++index)
             {
@@ -492,7 +511,7 @@ namespace editor
                 surface::Idle, surface::Hovered, surface::Held };
             constexpr std::array<const char*, 3> names{ "idle", "hovered", "held" };
             constexpr std::array<std::uint32_t, 3> expected{
-                0x2A2A2A, 0x484848, 0x525252 };
+                0x262626, 0x383838, 0x454545 };
 
             for (std::size_t index = 0; index < surfaces.size(); ++index)
             {

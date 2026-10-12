@@ -13,13 +13,13 @@ namespace editor
         Primary, Text, TextMuted, TextDisabled, Positive, Warning, Error, Count
     };
 
-    // PHASE 21 §3.1: S&Box theme.json을 참고한 2026-09-11 이식값.
-    // 외부 파일을 읽지 않는다. 아래 geometry는 배율 적용 전 logical px이다.
+    // Compact editor geometry with Spectrum-inspired neutral surfaces.
+    // Values are logical pixels before user and monitor scale are applied.
     struct EditorThemeTokens
     {
         static constexpr float RowHeight = 20.f;
         static constexpr float ControlHeight = 20.f;
-        static constexpr float ControlRadius = 4.f;
+        static constexpr float ControlRadius = 3.f;
         static constexpr float TabHeight = 24.f;
         static constexpr float TabActiveMarker = 2.f;
         static constexpr float TreeIndent = 20.f;
@@ -48,17 +48,17 @@ namespace editor
         static constexpr float PropertyGapX = 1.f;
     };
 
-    // Inspector reference palette, sampled from the supplied screenshot.
+    // Inspector surfaces share the workspace's flat neutral palette.
     // Separate from the workspace canvas so viewport contrast is unchanged.
     struct InspectorThemeTokens
     {
         static constexpr float PanelPaddingX = 10.f;
-        static constexpr float BackgroundR = 50.f / 255.f;
-        static constexpr float BackgroundG = 53.f / 255.f;
-        static constexpr float BackgroundB = 52.f / 255.f;
-        static constexpr std::uint32_t Field = 0x171818;
-        static constexpr std::uint32_t Label = 0xBEC5C2;
-        static constexpr std::uint32_t AxisBackground = 0x262A28;
+        static constexpr float BackgroundR = 43.f / 255.f;
+        static constexpr float BackgroundG = 43.f / 255.f;
+        static constexpr float BackgroundB = 43.f / 255.f;
+        static constexpr std::uint32_t Field = 0x1E1E1E;
+        static constexpr std::uint32_t Label = 0xB8B8B8;
+        static constexpr std::uint32_t AxisBackground = 0x1E1E1E;
         static constexpr float RowGap = 3.f;
         static constexpr float AxisGap = 3.f;
     };
@@ -90,15 +90,15 @@ namespace editor
     // Hierarchy reference palette. The tree stays darker than its surrounding panel.
     struct HierarchyThemeTokens
     {
-        static constexpr float BackgroundR = 50.f / 255.f;
-        static constexpr float BackgroundG = 53.f / 255.f;
-        static constexpr float BackgroundB = 52.f / 255.f;
-        static constexpr std::uint32_t Row = 0x171818;
-        static constexpr std::uint32_t AlternateRow = 0x1E201F;
-        static constexpr std::uint32_t SelectedRow = 0x494D4C;
-        static constexpr std::uint32_t SelectedHoveredRow = 0x535856;
-        static constexpr std::uint32_t EntityText = 0x7095D0;
-        static constexpr std::uint32_t SelectedText = 0xA8C9FA;
+        static constexpr float BackgroundR = 43.f / 255.f;
+        static constexpr float BackgroundG = 43.f / 255.f;
+        static constexpr float BackgroundB = 43.f / 255.f;
+        static constexpr std::uint32_t Row = 0x1E1E1E;
+        static constexpr std::uint32_t AlternateRow = 0x232323;
+        static constexpr std::uint32_t SelectedRow = 0x373737;
+        static constexpr std::uint32_t SelectedHoveredRow = 0x404040;
+        static constexpr std::uint32_t EntityText = 0xD6D6D6;
+        static constexpr std::uint32_t SelectedText = 0xF0F0F0;
         static constexpr float ToolbarGap = 3.f;
     };
 

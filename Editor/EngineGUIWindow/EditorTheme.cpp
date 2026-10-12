@@ -12,13 +12,13 @@ namespace editor
     {
         struct ColorToken { const char* name; std::uint32_t rgb; };
         constexpr std::array<ColorToken, static_cast<std::size_t>(ThemeColor::Count)> kColors{{
-            { "Canvas", 0x181818 }, { "Chrome", 0x2A2A2A },
-            { "Panel", 0x343434 }, { "PanelRaised", 0x484848 },
-            { "Selection", 0x525252 }, { "Border", 0x3E3E3E },
-            { "BorderStrong", 0x484848 }, { "Primary", 0x2E70EA },
-            { "Text", 0xFFFFFF }, { "TextMuted", 0x9E9E9E },
-            { "TextDisabled", 0x999999 }, { "Positive", 0x5AEB5C },
-            { "Warning", 0xE6DB74 }, { "Error", 0xFB5A5A },
+            { "Canvas", 0x181818 }, { "Chrome", 0x262626 },
+            { "Panel", 0x2E2E2E }, { "PanelRaised", 0x383838 },
+            { "Selection", 0x454545 }, { "Border", 0x3D3D3D },
+            { "BorderStrong", 0x505050 }, { "Primary", 0x4B91E2 },
+            { "Text", 0xE6E6E6 }, { "TextMuted", 0xA9A9A9 },
+            { "TextDisabled", 0x777777 }, { "Positive", 0x7ABF83 },
+            { "Warning", 0xD6AD5C }, { "Error", 0xE47777 },
         }};
 
         float valid_scale(float scale) noexcept
@@ -94,16 +94,16 @@ namespace editor
     {
         ++inspectorStyleDepth;
         using T = InspectorThemeTokens;
-        ImGui::PushStyleColor(ImGuiCol_Text, theme_rgb(0xF1F3F2));
+        ImGui::PushStyleColor(ImGuiCol_Text, ThemeColorValue(ThemeColor::Text));
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, theme_rgb(T::Label));
         ImGui::PushStyleColor(ImGuiCol_FrameBg, theme_rgb(T::Field));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme_rgb(0x252B29));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme_rgb(0x28384B));
-        ImGui::PushStyleColor(ImGuiCol_CheckboxSelectedBg, theme_rgb(0x23344E));
-        ImGui::PushStyleColor(ImGuiCol_Border, theme_rgb(0x242827));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ThemeColorValue(ThemeColor::Panel));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ThemeColorValue(ThemeColor::PanelRaised));
+        ImGui::PushStyleColor(ImGuiCol_CheckboxSelectedBg, ThemeColorValue(ThemeColor::Primary, 0.18f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ThemeColorValue(ThemeColor::Border));
         ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme_rgb(0x3D4441));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme_rgb(0x384657));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ThemeColorValue(ThemeColor::PanelRaised));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ThemeColorValue(ThemeColor::Selection));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
             ImVec2(ThemePixels(6.f), ThemePixels(T::RowGap)));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing,
@@ -124,15 +124,15 @@ namespace editor
         using T = HierarchyThemeTokens;
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme_rgb(T::Row));
         ImGui::PushStyleColor(ImGuiCol_FrameBg, theme_rgb(T::Row));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme_rgb(0x252B29));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme_rgb(0x28384B));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ThemeColorValue(ThemeColor::Panel));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ThemeColorValue(ThemeColor::PanelRaised));
         ImGui::PushStyleColor(ImGuiCol_Header, theme_rgb(T::SelectedRow));
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme_rgb(0x2A302D));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ThemeColorValue(ThemeColor::PanelRaised));
         ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme_rgb(T::SelectedRow));
         ImGui::PushStyleColor(ImGuiCol_Button, theme_rgb(T::Row));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme_rgb(0x293A4F));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme_rgb(0x334864));
-        ImGui::PushStyleColor(ImGuiCol_Border, theme_rgb(0x3E4340));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ThemeColorValue(ThemeColor::PanelRaised));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ThemeColorValue(ThemeColor::Selection));
+        ImGui::PushStyleColor(ImGuiCol_Border, ThemeColorValue(ThemeColor::Border));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
             ImVec2(ThemePixels(T::ToolbarGap), ThemePixels(T::ToolbarGap)));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ThemePixels(3.f));
@@ -169,7 +169,7 @@ namespace editor
         style.FramePadding = ImVec2(T::ControlPaddingX,
             (T::ControlHeight - T::BodyFontSize) * 0.5f);
         style.FrameRounding = T::ControlRadius;
-        style.FrameBorderSize = 0.f;
+        style.FrameBorderSize = 1.f;
         style.ItemSpacing = ImVec2(T::ItemGapX, T::RowHeight - T::BodyFontSize);
         style.ItemInnerSpacing = ImVec2(T::ItemInnerGapX, T::ItemGapY);
         style.CellPadding = ImVec2(T::CellPaddingX, T::CompactGap);
@@ -196,19 +196,8 @@ namespace editor
         set(ImGuiCol_PopupBg, C::Panel);
         set(ImGuiCol_Border, C::Border);
         set(ImGuiCol_BorderShadow, C::Canvas, 0.f);
-        // 입력칸은 창 바탕과 **다른 단**에 선다 (PHASE 21).
-        //
-        // 예전에는 이 칸도 `Canvas` 였다. `ImGuiCol_WindowBg` 와 같은 값이라
-        // 손대기 전에는 칸의 경계가 아예 보이지 않았고, hover 해야
-        // `FrameBgHovered` 가 떠올라 드러났다. 화면에서 확인한 결함이다.
-        //
-        // s&box 는 반대 방향으로 같은 일을 한다 — 패널 `#242424` 위에 입력칸
-        // `#181818` 로 한 단 **어둡게** 둔다(`Sandbox.Tools/Theme.cs` 의
-        // `WidgetBackground`·`ControlBackground`). 우리 팔레트에서는 `Canvas`
-        // 가 이미 가장 어두워 더 내려갈 자리가 없으므로 같은 크기의 단을 위로
-        // 둔다. 대비는 1.24:1 로 s&box 의 1.19:1 보다 조금 넓다.
-        //
-        // 이 값이 다시 `Canvas` 로 돌아가면 자가 검사가 붉어진다.
+        // Flat neutral surfaces retain a visible step between fields and panels.
+        // Blue is reserved for focus, selection markers and primary actions.
         set(ImGuiCol_FrameBg, C::Chrome);
         set(ImGuiCol_FrameBgHovered, C::PanelRaised);
         set(ImGuiCol_FrameBgActive, C::Selection);
@@ -221,12 +210,12 @@ namespace editor
         set(ImGuiCol_ScrollbarGrabHovered, C::Selection);
         set(ImGuiCol_ScrollbarGrabActive, C::Primary);
         set(ImGuiCol_CheckMark, C::Primary);
-        set(ImGuiCol_CheckboxSelectedBg, C::Canvas);
+        set(ImGuiCol_CheckboxSelectedBg, C::Primary, 0.18f);
         set(ImGuiCol_SliderGrab, C::Primary);
         set(ImGuiCol_SliderGrabActive, C::Primary);
         set(ImGuiCol_Button, C::Panel);
         set(ImGuiCol_ButtonHovered, C::PanelRaised);
-        set(ImGuiCol_ButtonActive, C::Primary);
+        set(ImGuiCol_ButtonActive, C::Selection);
         set(ImGuiCol_Header, C::Panel);
         set(ImGuiCol_HeaderHovered, C::Selection);
         set(ImGuiCol_HeaderActive, C::Selection);
