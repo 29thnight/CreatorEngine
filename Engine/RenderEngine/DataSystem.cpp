@@ -1591,6 +1591,38 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                     }
                 }
             }
+            // A legacy inline material property ({m_name, m_textureGuid}) is bound by
+            // FinalizeMaterialRuntime through TryAcquire with the property's own
+            // color space. Prepare exactly that variant; the generic GUID discovery
+            // below requests only the default variant, which that lookup never hits.
+            if (const auto property = node["m_name"], texture = node["m_textureGuid"];
+                property && property.IsScalar() && texture && texture.IsScalar())
+            {
+                FileGuid guid;
+                if (Uuid::TryParse(texture.AsString(), guid.m_guid) && guid != FileGuid{} && preparation->catalog)
+                {
+                    const AssetDepot::AssetLink<Texture> textureLink{ { experiment::AssetId{ guid.m_guid }, {} } };
+                    experiment::cooked::ResolvedAssetEntry resolved;
+                    if (preparation->catalog->Find(textureLink.ToReference(), resolved)
+                        == experiment::cooked::AssetLookupStatus::Found)
+                    {
+                        const auto name = property.Scalar();
+                        AssetDepot::TextureAssetVariant variant;
+                        variant.colorSpace =
+                            name == standard_material::property::BaseColorMap
+                                || name == standard_material::property::EmissiveMap
+                            ? AssetDepot::TextureAssetColorSpace::Srgb
+                            : name == standard_material::property::NormalMap
+                                || name == standard_material::property::OrmMap
+                                || name == standard_material::property::AoMap
+                            ? AssetDepot::TextureAssetColorSpace::Linear
+                            : AssetDepot::TextureAssetColorSpace::Source;
+                        preparation->descriptorRequests.try_emplace(std::pair{ textureLink, variant },
+                            RequestTextureAsyncFromSnapshot(textureLink, variant, preparation->catalog,
+                                preparation->epoch));
+                    }
+                }
+            }
             if (const auto material = node["m_Material"]; material && material.IsMap())
             {
                 std::vector<std::byte> bytes;
