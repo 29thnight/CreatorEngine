@@ -163,12 +163,26 @@ namespace editor::widgets
                 ImGui::SameLine(0.f, gap);
             }
 
+            const ImVec2 group_min = ImGui::GetCursorScreenPos();
             draw_badge(static_cast<axis>(index), badge_width, height);
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(field_width);
+            // Keep the existing field ID, hit rectangle and input behavior. The
+            // badge and field share one outline rather than a seam through X/Y/Z.
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
             changed |= drag_property_float(kAxisFieldIds[index], request.values + index,
                 request.speed, request.min, request.max, request.format, 0, true);
+            ImGui::PopStyleVar();
+            const ImGuiContext& context = *ImGui::GetCurrentContext();
+            const bool focused = ImGui::IsItemActive() ||
+                (ImGui::IsItemFocused() && context.NavCursorVisible);
+            const ThemeColor border = focused ? ThemeColor::Primary
+                : ImGui::IsItemHovered() ? ThemeColor::BorderStrong : ThemeColor::Border;
+            ImGui::GetWindowDrawList()->AddRect(group_min,
+                ImVec2(group_min.x + badge_width + field_width, group_min.y + height),
+                ImGui::GetColorU32(ThemeColorValue(border)), style.FrameRounding,
+                ImDrawFlags_RoundCornersAll, 1.f);
         }
 
         ImGui::PopStyleVar();

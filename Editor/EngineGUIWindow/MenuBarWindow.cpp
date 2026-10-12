@@ -814,7 +814,9 @@ void MenuBarWindow::RenderMenuBar()
             {
                 ImGui::SetCursorScreenPos(ImVec2(countLeft, tabY));
                 ImGui::PushID(slot);
-                ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(countColor[slot]));
+                const editor::ThemeColor color = countValues[slot] == 0
+                    ? editor::ThemeColor::TextMuted : countColor[slot];
+                ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(color));
                 if (draw_status_tab("##Count", countText[slot].c_str(), nullptr,
                     ImVec2(countWidths[slot], tabHeight), logOpen, true, slot == 2))
                 {
@@ -885,8 +887,17 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::SetCursorScreenPos(ImVec2(progressLeft + inset, tabY + tabHeight - lineHeight));
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, kStatusDivider);
-                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, editor::ThemeColorValue(editor::ThemeColor::Primary, .65f));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, editor::ThemeColorValue(editor::ThemeColor::Primary, .45f));
+                // Keep the original item/hover strip; only its painted line becomes thinner.
+                ImDrawList* const draw = ImGui::GetWindowDrawList();
+                constexpr const char* kProgressWidget = "MenuBarWindow.status_progress";
+                editor::clipping::enter_widget(kProgressWidget, draw->_ClipRectStack.Size);
+                const float paintHeight = std::min(editor::ThemePixels(1.f), lineHeight);
+                draw->PushClipRect(ImVec2(progressLeft + inset, tabY + tabHeight - paintHeight),
+                    ImVec2(progressLeft + progressWidth - inset, tabY + tabHeight), true);
                 ImGui::ProgressBar(progressFraction, ImVec2(progressWidth - inset * 2.f, lineHeight), "");
+                draw->PopClipRect();
+                editor::clipping::leave_widget(kProgressWidget, draw->_ClipRectStack.Size);
                 ImGui::PopStyleColor(2);
                 ImGui::PopStyleVar();
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))

@@ -10,34 +10,18 @@ namespace editor::widgets
 {
     namespace
     {
-        // 네 모습이 서로 달라야 쓸모가 있다. 그런데 이 테마는
-        // `ImGuiCol_HeaderHovered` 와 `ImGuiCol_HeaderActive` 를 **같은 값**
-        // (`Selection`)으로 설정한다(`EditorTheme.cpp`). 그래서 원본처럼
-        // Header 계열 세 칸에 기대면 hover 를 살려도 눈에 보이는 차이가 없다 —
-        // 닫힌 것이 hover 되면 열린 것과 똑같이 보인다. Header 칸을 버리고
-        // 토큰을 직접 읽는다.
-        //
-        // 넷 다 **불투명**이다. 반투명을 먼저 써 봤다가 버렸다 — 알파는 깔린
-        // 색에 따라 결과가 달라지고, 계산해 보니 Selection 45% 가 Panel 위에서
-        // 0x41 이라 열림(PanelRaised 0x48)과 6/255 밖에 안 벌어졌다. 같은
-        // 머리줄이 Inspector(ChildBg=Panel)와 창 바닥(Canvas)에서 다른 색이 되는
-        // 것도 곤란하다. 사다리는 단조롭게 올라간다.
-        //
-        //   닫힘    Panel        0x343434
-        //   열림    PanelRaised  0x484848
-        //   hover   Selection    0x525252
-        //   누름    Primary      0x2E70EA  (테마가 ButtonActive 에 쓰는 강조색과
-        //                                   같다 — 누르는 느낌이 버튼과 일치한다)
+        // Four neutral levels preserve collapsed/open/hover/held feedback.
+        // The keyboard cursor and enabled checkbox own the blue accent.
         ThemeColor surface_token(section_header_surface surface) noexcept
         {
             switch (surface)
             {
-            case section_header_surface::Open:    return ThemeColor::PanelRaised;
-            case section_header_surface::Hovered: return ThemeColor::Selection;
-            case section_header_surface::Held:    return ThemeColor::Primary;
+            case section_header_surface::Open:    return ThemeColor::Panel;
+            case section_header_surface::Hovered: return ThemeColor::PanelRaised;
+            case section_header_surface::Held:    return ThemeColor::Selection;
             case section_header_surface::Closed:
             case section_header_surface::Count:
-            default:                              return ThemeColor::Panel;
+            default:                              return ThemeColor::Chrome;
             }
         }
 

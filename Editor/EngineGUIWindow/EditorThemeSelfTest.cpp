@@ -406,7 +406,7 @@ namespace editor
             constexpr std::array<const char*, 4> names{
                 "closed", "open", "hovered", "held" };
             constexpr std::array<std::uint32_t, 4> expected{
-                0x2E2E2E, 0x383838, 0x454545, 0x4B91E2 };
+                0x262626, 0x2E2E2E, 0x383838, 0x454545 };
 
             for (std::size_t index = 0; index < surfaces.size(); ++index)
             {

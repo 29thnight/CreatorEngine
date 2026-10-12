@@ -155,14 +155,21 @@ namespace editor::widgets
                 ((input_allowed && 0 == (g.CurrentItemFlags & ImGuiItemFlags_Disabled))
                      ? 0u : ::editor::state::disabled),
                 frame);
-            return TempInputScalar(frame, id, label, ImGuiDataType_Float, value,
+            PushStyleColor(ImGuiCol_Border, ThemeColorValue(ThemeColor::Primary));
+            const bool changed = TempInputScalar(frame, id, label, ImGuiDataType_Float, value,
                 format, clamp ? &min : nullptr, clamp ? &max : nullptr);
+            PopStyleColor();
+            return changed;
         }
         const ImU32 background = GetColorU32(g.ActiveId == id ? ImGuiCol_FrameBgActive :
             hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
         window->DrawList->AddRectFilled(frame.Min, frame.Max, background,
             style.FrameRounding, joined_left ? ImDrawFlags_RoundCornersRight : ImDrawFlags_RoundCornersAll);
+        const bool focused = g.ActiveId == id || (g.NavId == id && g.NavCursorVisible);
+        PushStyleColor(ImGuiCol_Border, ThemeColorValue(focused
+            ? ThemeColor::Primary : hovered ? ThemeColor::BorderStrong : ThemeColor::Border));
         RenderFrameBorder(frame.Min, frame.Max, style.FrameRounding);
+        PopStyleColor();
         // 여기부터는 이 위젯이 직접 그린다 — 그리기 책임이 확정된 자리에서
         // 신고한다. `ItemAdd` 직후에 신고하면 위의 위임 경로까지 "내가 그린다"
         // 로 적히고, 그러면 판정이 옳은 동작을 위반으로 읽는다.

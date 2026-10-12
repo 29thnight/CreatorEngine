@@ -101,7 +101,7 @@ namespace
 			kRowFlags | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen);
 	}
 
-	// Neutral selection keeps the blue object label readable; hover stays selected.
+	// Keep the selected surface neutral; the short left marker carries the accent.
 	int push_selected_row_colors(bool isSelected)
 	{
 		if (!isSelected) return 0;
@@ -166,7 +166,7 @@ namespace
 	// The toolbar and context menu use the same creation operations and Undo path.
 	void draw_creation_menu(Scene* scene)
 	{
-		if (ImGui::MenuItem("Create Empty", "Ctrl + Shift + N"))
+		if (ImGui::MenuItem("Create Empty", "Ctrl+Shift+N"))
 			EditorObjectOperations::Create(scene, "Entity", GameObjectType::Empty);
 
         const auto create_light = [scene](const char* name, LightType type)
@@ -275,6 +275,17 @@ void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_fl
     const int rowColors = push_selected_row_colors(isSelected);
     ImGui::TreeNodeEx(id.c_str(), flags);
     ImGui::PopStyleColor(rowColors);
+    if (isSelected)
+    {
+        // Decoration only: retain the tree item's selection, navigation and drag bounds.
+        const ImVec2 itemMin = ImGui::GetItemRectMin();
+        const ImVec2 itemMax = ImGui::GetItemRectMax();
+        const float insetY = (itemMax.y - itemMin.y) * .2f;
+        const float markerLeft = ImGui::GetCurrentWindow()->WorkRect.Min.x + editor::ThemePixels(1.f);
+        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(markerLeft, itemMin.y + insetY),
+            ImVec2(markerLeft + editor::ThemePixels(2.f), itemMax.y - insetY),
+            ImGui::GetColorU32(editor::ThemeColorValue(editor::ThemeColor::Primary)));
+    }
 
     // 화살표를 눌렀다면 목록을 다시 세울 근거가 생긴 것이다. 검색 중에는 걸린
     // 것을 전부 펼쳐 두므로(옛 동작) 누름을 적지 않는다 — 검색을 끈 뒤에 엉뚱한
@@ -398,11 +409,21 @@ void HierarchyWindow::Draw()
 				m_searchFilter.InputBuf, IM_COUNTOF(m_searchFilter.InputBuf)))
 				m_searchFilter.Build();
 
-			if (ImGui::BeginPopup("HierarchyCreateMenu"))
-			{
-				if (sceneReady) draw_creation_menu(scene);
-				ImGui::EndPopup();
-			}
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingX),
+                    editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingY)));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuGapX),
+                    editor::ThemePixels(editor::EditorThemeTokens::MenuGapY)));
+            if (ImGui::BeginPopup("HierarchyCreateMenu"))
+            {
+                if (sceneReady)
+                {
+                    draw_creation_menu(scene);
+                }
+                ImGui::EndPopup();
+            }
+            ImGui::PopStyleVar(2);
 			if (!sceneReady)
 			{
 				ImGui::TextDisabled(SceneManagers->IsSceneLoading() ? "Loading scene..." : "No active scene");
@@ -467,25 +488,31 @@ void HierarchyWindow::Draw()
 					}
 				}
 
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                    ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingX),
+                        editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingY)));
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                    ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuGapX),
+                        editor::ThemePixels(editor::EditorThemeTokens::MenuGapY)));
 				if (ImGui::BeginPopup("HierarchyMenu"))
 				{
-					if (ImGui::MenuItem("		Undo", "		Ctrl + Z"))
+					if (ImGui::MenuItem("Undo", "Ctrl+Z"))
 					{
 						EditorObjectOperations::UndoRedo(false);
 					}
-					if (ImGui::MenuItem("		Redo", "		Ctrl + Y"))
+					if (ImGui::MenuItem("Redo", "Ctrl+Y"))
 					{
 						EditorObjectOperations::UndoRedo(true);
 					}
-					if (ImGui::MenuItem("       Copy", "       Ctrl + C", nullptr, !scene->m_selectedEntities.empty()))
+					if (ImGui::MenuItem("Copy", "Ctrl+C", nullptr, !scene->m_selectedEntities.empty()))
 					{
 						m_clipboard = copy_selection(scene);
 					}
-					if (ImGui::MenuItem("       Paste", "	Ctrl + V", nullptr, !m_clipboard.empty()))
+					if (ImGui::MenuItem("Paste", "Ctrl+V", nullptr, !m_clipboard.empty()))
 					{
 						paste_selection(scene, m_clipboard);
 					}
-					if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected && !EditorObjectOperations::IsEditLocked(selectedSceneObject, true)))
+					if (ImGui::MenuItem("Delete", "Del", nullptr, isSceneObjectSelected && !EditorObjectOperations::IsEditLocked(selectedSceneObject, true)))
 					{
 						if (selectedSceneObject)
 						{
@@ -510,6 +537,7 @@ void HierarchyWindow::Draw()
 					}
 					ImGui::EndPopup();
 				}
+                ImGui::PopStyleVar(2);
 
 				if (selectedSceneObject && ImGui::IsWindowFocused() &&
 					!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false))
