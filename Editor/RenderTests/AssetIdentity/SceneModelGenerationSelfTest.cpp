@@ -132,6 +132,39 @@ namespace RenderTest
             if (isRobot) ++tally.robotRenderers;
             if (!renderer.m_Material) return;
 
+            // Imported model materials are material graphs since METEOR; their
+            // textures live in the graph instance's slot table, not in legacy
+            // property values. Each slot must resolve to its generation texture.
+            if (const auto& instance = renderer.m_Material->GetMaterialGraphInstance())
+            {
+                for (const material_graph::InstanceTexture& texture : instance->textures)
+                {
+                    ++tally.textureProps;
+                    if (nullptr == generation->FindTexture(texture.assetId.value))
+                        continue; // 외부 텍스처 자산 — 이 축 밖
+                    ++tally.embeddedProps;
+                    if (isRobot) ++tally.robotEmbedded;
+                    const own::shared_owner<const Texture> expected =
+                        DataSystems->ResolveModelGenerationTexture(*generation, texture.assetId.value);
+                    const std::string slot = entityName + ".slot" + std::to_string(texture.slot);
+                    if (!texture.owner)
+                    {
+                        ++tally.missingTextures;
+                        tally.Note("missing " + slot);
+                    }
+                    else if (expected && texture.owner->m_assetId == expected->m_assetId)
+                    {
+                        ++tally.generationTextures;
+                    }
+                    else
+                    {
+                        ++tally.otherTextures;
+                        tally.Note("other " + slot);
+                    }
+                }
+                return;
+            }
+
             for (const MaterialPropertyValue& value : renderer.m_Material->m_propertyValues)
             {
                 if (value.m_name.empty() || FileGuid{} == value.m_textureGuid) continue;
