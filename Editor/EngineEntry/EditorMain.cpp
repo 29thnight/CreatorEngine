@@ -711,6 +711,14 @@ void Editor::EditorMain::Finalize()
 	// 정리 뒤 파괴)보다 이쪽이 안전하다.
 	Meta::UndoSystemFinalize();
 
+	// ★ 에디터 렌더러(ImGui 셸)도 **프로파일러보다 먼저** 놓는다. 셸은 자기 DX12
+	//   디바이스를 가진 RHI 제출 스레드의 마지막 클라이언트다. 멤버라 ~EditorMain
+	//   에서야 소멸하면 RHI 스레드가 프로파일러 종료 뒤에 끝나 [RHIThread] 스트림이
+	//   주인 없이 남았다(종료 줄 abandoned=1). 표시 스레드는 위에서 멈췄으므로 ImGui
+	//   메시지를 넘기는 쪽도 없다.
+	m_editorRenderer.reset();
+	std::printf("[SHUTDOWN] EditorRenderer 반환\n");
+
 	// ★ 워커를 **프로파일러보다 먼저** 멈춘다. 풀은 전역이라 소멸자가
 	//   main 이 끝난 뒤에 돌고, 그때는 프로파일러가 이미 닫혀 있다 —
 	//   그래서 워커의 종료 훅이 한 번도 안 불리고 스트림 여덟이 주인 없이

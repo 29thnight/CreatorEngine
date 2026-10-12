@@ -272,14 +272,18 @@ namespace ce
         //   스트림 수는 요약에 있지만, 요약을 읽을 수 있는 시점에는 이미
         //   서비스가 내려가 있다. 한 줄을 남긴다 — 0 이 아니면 종료 전에
         //   unregister_thread 를 부르지 않은 스레드가 있다는 뜻이다.
-        std::fprintf(stderr,
+        //   깨끗한 종료는 stdout 으로, 놓친 스트림이 있을 때만 stderr 로 낸다 —
+        //   "stderr 가 비어야 통과" 하는 회귀 게이트가 실제 결함만 보게 한다.
+        const auto abandoned = m_abandonedStreams.load(std::memory_order_relaxed);
+        const auto retained = retained_stream_count();
+        std::FILE* const sink = (0 != abandoned || 0 != retained) ? stderr : stdout;
+        std::fprintf(sink,
             "[profiler] shutdown abandoned=%llu retained=%zu foreign=%llu%s%s\n",
-            static_cast<unsigned long long>(m_abandonedStreams.load(std::memory_order_relaxed)),
-            retained_stream_count(),
+            static_cast<unsigned long long>(abandoned), retained,
             static_cast<unsigned long long>(m_retiredForeign.load(std::memory_order_relaxed)),
             abandonedNames.empty() ? "" : " - ",
             abandonedNames.c_str());
-        std::fflush(stderr);
+        std::fflush(sink);
     }
 
     void profiler_service::destroy_stream_locked(std::size_t index)
