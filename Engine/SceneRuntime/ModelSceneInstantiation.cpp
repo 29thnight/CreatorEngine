@@ -106,33 +106,37 @@ namespace ModelSceneInstantiation
         {
             const auto& node = nodes[i];
             if (i != 0 && node.parent >= i) return reject();
-            std::size_t parent = i == 0 ? 0 : attachPoints[node.parent];
+            // Preserve each source node once. Meshes sharing it are siblings,
+            // otherwise FBX node scale is multiplied once per material split.
+            std::size_t anchor{};
+            if (i == 0)
+            {
+                impl->objects[0].transform = node.localTransform;
+                impl->objects[0].writeTransform = true;
+            }
+            else
+            {
+                anchor = impl->objects.size();
+                impl->objects.push_back({ node.name, attachPoints[node.parent], assets::kInvalidModelAssetIndex,
+                    node.localTransform, true });
+            }
+            attachPoints[i] = anchor;
+            boneCandidates.try_emplace(node.name, anchor);
             for (const auto& meshId : node.meshes)
             {
-                auto mesh = meshIndices.find(meshId);
+                const auto mesh = meshIndices.find(meshId);
                 if (mesh == meshIndices.end()) return reject();
-                if (nodes.size() == 1 && node.meshes.size() == 1)
+                if (node.meshes.size() == 1)
                 {
-                    auto& root = impl->objects[0];
-                    root.mesh = mesh->second;
-                    root.transform = node.localTransform;
-                    root.writeTransform = true;
+                    impl->objects[anchor].mesh = mesh->second;
                 }
                 else
                 {
-                    impl->objects.push_back({ node.name, parent, mesh->second,
-                        node.localTransform, true });
-                    parent = impl->objects.size() - 1;
+                    const auto& meshName = meshes[mesh->second].name;
+                    impl->objects.push_back({ meshName.empty() ? node.name : meshName, anchor, mesh->second,
+                        math::matrix4x4::identity(), false });
                 }
             }
-            if (i != 0 && node.meshes.empty())
-            {
-                impl->objects.push_back({ node.name, parent, assets::kInvalidModelAssetIndex,
-                    node.localTransform, true });
-                parent = impl->objects.size() - 1;
-                boneCandidates.try_emplace(node.name, parent);
-            }
-            attachPoints[i] = parent;
         }
         if (impl->hasBones)
         {
@@ -477,7 +481,6 @@ namespace ModelSceneInstantiation
                 {
                     auto* renderer = object->AddComponent<MeshRenderer>();
                     renderer->SetEnabled(false);
-                    renderer->m_isSkinnedMesh = state.hasBones;
                     // 새 renderer는 아직 재질이 없다. 텍스처 owner가 준비된 재질을
                     // 뒤에 붙여, 이 스레드에서 이미지 캐시 miss를 처리하지 않는다.
                     if (state.granular.descriptor)

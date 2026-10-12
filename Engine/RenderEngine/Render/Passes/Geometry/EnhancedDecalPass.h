@@ -6,7 +6,7 @@
 
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../../GpuGeometryVisibility.h"
-#include "EnhancedGBufferPass.h"
+#include "SceneSurfaceTargets.h"
 
 // 데칼 패스 (PHASE 3-6, 미구현 패스 이식 2차).
 //
@@ -67,6 +67,9 @@ public:
     struct Item
     {
         math::matrix4x4 worldMatrix{};
+        math::matrix4x4 previousWorldMatrix{};
+        uint64_t temporalObjectId{}, temporalIncarnation{};
+        bool temporalHistoryValid{};
 
         // 셋 다 null일 수 있으나 하나는 있어야 한다. 어느 것이 있느냐가
         // 곧 어느 채널을 켤지를 정한다(DX11의 g_useFlags와 같은 규칙).
@@ -107,10 +110,11 @@ public:
 
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
+    std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph&, const EnhancedFrameContext&, std::array<RGHandle, 5>);
 
     /// 덧칠 대상. GBuffer 출력을 그대로 받는다 — 데칼은 새 타깃을 만들지 않고
     /// 이미 그려진 GBuffer에 얹는다.
-    void SetInputs(const EnhancedGBufferPass::Outputs& inputs) { m_inputs = inputs; }
+    void SetInputs(const SceneSurfaceTargets::Outputs& inputs) { m_inputs = inputs; }
 
     /// 이번 프레임에 그릴 데칼. PrepareFrame이 텍스처를 올리고 배치를 짠다.
     void SetDecals(const std::vector<Item>& decals,
@@ -121,7 +125,7 @@ public:
     }
 
     bool HasPreparedDecals() const { return !m_batches.empty(); }
-    const EnhancedGBufferPass::Outputs& GetOutputs() const { return m_outputs; }
+    const SceneSurfaceTargets::Outputs& GetOutputs() const { return m_outputs; }
     std::array<RGHandle, 3> GetBaseline() const
     {
         return { m_copiedDiffuse, m_copiedOrm, m_copiedNormal };
@@ -156,9 +160,11 @@ private:
         uint32_t      sliceX{ 1 };
         uint32_t      sliceY{ 1 };
         int32_t       sliceNum{ 0 };
+        math::matrix4x4 previousWorld{};
+        uint32_t historyValid{}, temporalPadding[3]{};
     };
 
-    static_assert(sizeof(InstanceData) == 144);
+    static_assert(sizeof(InstanceData) == 224);
     static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     /// 한 번의 DrawInstanced로 그릴 묶음. 텍스처 셋이 같고 큐에서 연속한 것들.
@@ -179,8 +185,8 @@ private:
         uint32_t        mipLevels[3]{};
     };
 
-    EnhancedGBufferPass::Outputs m_inputs{};
-    EnhancedGBufferPass::Outputs m_outputs{};
+    SceneSurfaceTargets::Outputs m_inputs{};
+    SceneSurfaceTargets::Outputs m_outputs{};
     std::vector<Item>            m_decals;
     own::shared_owner<TextureFramePins> m_texturePins;
     bool                         m_keepAlive{ false };
@@ -210,5 +216,6 @@ private:
 
     // 채널 조합마다 하나. 조합이 곧 어느 타깃에 쓸지라 PSO가 갈린다.
     RHIPipelineHandle m_pipelines[kChannelCount]{};
+    RHIPipelineHandle m_temporalPipeline;
 };
 

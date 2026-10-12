@@ -2,6 +2,7 @@
 
 #include "RenderBackend.h"
 #include "RenderPassSettings.h"
+#include "TemporalProductSettings.h"
 
 #include <mutex>
 #include <cmath>
@@ -42,6 +43,7 @@ public:
 
     RenderBackend GetRenderBackend() const noexcept { return m_renderBackend; }
     const std::wstring& GetStartupSceneName() const noexcept { return m_startupSceneName; }
+    const TemporalProductSettings& GetTemporalProductSettings() const noexcept { return m_temporalProductSettings; }
     AnimationBudgetSettings GetAnimationBudgetSettings() const noexcept
     {
         const std::scoped_lock lock(m_animationBudgetMutex);
@@ -83,6 +85,7 @@ private:
 
     const RuntimeRenderBackendPolicy m_backendPolicy;
     RenderBackend m_renderBackend{ RenderBackend::DX12 };
+    TemporalProductSettings m_temporalProductSettings{};
     mutable std::mutex m_renderPassSettingsMutex;
     RenderPassSettings m_renderPassSettings{};
     std::wstring m_startupSceneName{ L"SampleScene" };

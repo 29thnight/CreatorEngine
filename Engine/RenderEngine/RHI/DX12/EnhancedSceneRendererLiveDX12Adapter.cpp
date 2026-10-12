@@ -31,6 +31,10 @@
 
 namespace
 {
+    // Dense multi-surface METEOR scenes exceed 1024 scopes before shadows execute.
+    // 4096 scopes reserve 24576 timestamps / 192 KiB readback over three frames.
+    // Overflow remains an explicit measurement failure beyond this bound.
+    constexpr uint32_t kLiveProfilerPassCapacity = 4096;
     void LiveDx12WriteJsonString(std::ostream& output, const std::string& value)
     {
         constexpr char hex[] = "0123456789abcdef";
@@ -74,6 +78,15 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         DisplayToken token{ kInvalidDisplayToken };
         ComPtr<ID3D12Resource> texture;
         HANDLE sharedHandle{ nullptr };
+        std::array<ComPtr<ID3D12Resource>, 4> temporalTextures;
+        std::array<HANDLE, 4> temporalHandles{};
+        RHITemporalDisplayResources temporalResources;
+        TemporalFrame temporalFrame;
+        TemporalMeasurementProvenance temporalProvenance;
+        TemporalExtent temporalRenderExtent, temporalDisplayExtent;
+        std::shared_ptr<const void> temporalLifetime;
+        bool temporalSealed{ false };
+        bool temporalNativeGateActive{ false };
         uint64_t producerCompletion{};
         bool producerComplete{};
         bool producerCompletionLost{};
@@ -97,7 +110,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     EnhancedRenderGraph::QueueEndpoint graphics;
     bool ownedQueueExecution{false};
     std::optional<uint32_t> queueExecutionModeOverride;
-    uint32_t profilerPassCapacity{256};
+    uint32_t profilerPassCapacity{kLiveProfilerPassCapacity};
     uint64_t queueSubmissions{0};
     uint64_t queueBatches{0};
     uint64_t queueBarriers{0};
@@ -115,6 +128,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
 
     static constexpr size_t kMaxTimingSignatureBytes = 1024 * 1024;
     EnhancedGpuMeasurementHistory gpuMeasurements;
+    bool reportedTimingSignatureMismatch{false};
     struct MeasurementSubmission
     {
         GpuFrameToken token;
@@ -122,6 +136,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         uint32_t mode{0};
         GpuFrameToken computeToken;
         bool collectMeasurements{false};
+        uint64_t backendGeneration{0};
     };
     std::array<MeasurementSubmission, kFrameCount> measurementSubmissions{};
 
@@ -311,7 +326,10 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     // Every execution mode uses the primary graphics queue, so switching mode
     // preserves both the graphics clock and the warm pass-measurement history.
     ID3D12CommandQueue* profilerQueue = impl.resources.GetCommandQueue();
-    constexpr uint32_t defaultProfilerPassCapacity = 256;
+    // Per-mesh METEOR transform passes alone reach ~2 per draw; 256 slots were
+    // exhausted at ~128 draws, leaving later passes (shadows, lighting) untimed.
+    // Multi-surface MatGrid 8x8 also exceeds 1024; reserve bounded headroom.
+    constexpr uint32_t defaultProfilerPassCapacity = kLiveProfilerPassCapacity;
     uint32_t profilerPassCapacity = defaultProfilerPassCapacity;
 #if defined(_DEBUG)
     // 회귀 검사용으로만 질의 슬롯을 좁힌다. 실제 pass 실행은 그대로 두고
@@ -476,6 +494,13 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownInterop()
             if (nullptr != display.sharedHandle) ::CloseHandle(display.sharedHandle);
             display.sharedHandle = nullptr;
             display.texture.Reset();
+            for (auto& handle : display.temporalHandles)
+            {
+                if (handle) ::CloseHandle(handle);
+                handle = nullptr;
+            }
+            display.temporalTextures = {};
+            display.temporalLifetime.reset();
         }
         displays.clear();
     };
@@ -551,6 +576,11 @@ void EnhancedSceneRendererLiveDX12Adapter::AbortFrame()
     m_impl->resources.AbortFrame();
 }
 
+bool EnhancedSceneRendererLiveDX12Adapter::WaitForLastFrameSubmission(std::string& outError)
+{
+    return m_impl->resources.WaitForLastFrameSubmission(outError);
+}
+
 bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
 {
     Impl& impl = *m_impl;
@@ -603,7 +633,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
     {
         impl.measurementSubmissions[impl.currentProfilerToken.ringSlot].domain = domain;
     }
-    const auto* view = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
+    auto* view = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
         impl.profiler.Calibration().cpuTicksPerSecond);
     bool checkedSignature = false;
     bool signatureMatches = false;
@@ -616,9 +646,32 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
         // 한 번의 조회는 한 그래프의 패스만 방문한다. 큰 선언 원문은 한 번만 비교한다.
         if (!checkedSignature)
         {
+            if (const auto* matching = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
+                    impl.profiler.Calibration().cpuTicksPerSecond, identity.graphSignature))
+                view = matching;
             signatureMatches = view->graphSignature == identity.graphSignature ||
                 *view->graphSignature == *identity.graphSignature;
             checkedSignature = true;
+            if (!signatureMatches && impl.evidenceTelemetry && !impl.reportedTimingSignatureMismatch)
+            {
+                // One bounded diagnostic per process; retain exact declarations
+                // so a missing cost history is distinguishable from a changing graph.
+                const auto hex = [](const std::string& bytes)
+                {
+                    constexpr char digits[] = "0123456789abcdef";
+                    std::string result;
+                    result.reserve(bytes.size() * 2);
+                    for (const unsigned char value : bytes)
+                    {
+                        result.push_back(digits[value >> 4]);
+                        result.push_back(digits[value & 15]);
+                    }
+                    return result;
+                };
+                std::printf("[rg8.signature] {\"previous\":\"%s\",\"current\":\"%s\"}\n",
+                    hex(*view->graphSignature).c_str(), hex(*identity.graphSignature).c_str());
+                impl.reportedTimingSignatureMismatch = true;
+            }
         }
         const auto& costs = view->nanoseconds;
         return signatureMatches && identity.passIndex < costs.size() ? costs[identity.passIndex] : std::nullopt;
@@ -630,6 +683,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
         return false;
     }
     recordingMilliseconds = execution.recordingMilliseconds;
+    if (impl.currentProfilerToken.IsValid() && impl.currentProfilerToken.ringSlot < impl.measurementSubmissions.size())
+        impl.measurementSubmissions[impl.currentProfilerToken.ringSlot].backendGeneration = GetBackendGeneration();
     ++impl.queueSubmissions;
     impl.computeSubmissions += execution.computeBatches;
     impl.queueBatches += execution.submittedBatches;
@@ -651,6 +706,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
              << ",\"effectiveExecutionMode\":" << diagnostics.effectiveExecutionMode
              << ",\"measurementDomain\":\"" << RGMeasurementDomainName(domain) << '"'
              << ",\"fallbackReason\":\"" << RGQueueFallbackReasonName(diagnostics.schedule.fallbackReason) << '"'
+             << ",\"measurementHistory\":\"" << (!view ? "missing-or-stale" :
+                 !signatureMatches ? "signature-mismatch" : "signature-matched") << '"'
              << ",\"backendGeneration\":" << GetBackendGeneration()
              << ",\"frameId\":" << token.engineFrameId << ",\"viewId\":" << token.renderViewId
              << ",\"submissionId\":" << token.submissionId << ",\"captureGeneration\":" << token.captureGeneration
@@ -685,6 +742,9 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
              << ",\"eligibleComputePasses\":" << diagnostics.schedule.eligibleComputePasses
              << ",\"rejectedStatePasses\":" << diagnostics.schedule.rejectedStatePasses
              << ",\"measuredPasses\":" << diagnostics.schedule.measuredPasses
+             << ",\"placementTrials\":" << diagnostics.schedule.placementTrials
+             << ",\"dependencyMilliseconds\":" << diagnostics.schedule.dependencyMilliseconds
+             << ",\"simulationMilliseconds\":" << diagnostics.schedule.simulationMilliseconds
              << ",\"missingMeasurementPasses\":" << diagnostics.schedule.missingMeasurementPasses << ",\"entries\":[";
         const char* separator = "";
         for (const auto& entry : diagnostics.schedule.entries)
@@ -828,6 +888,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::ConsumeSubmissionFailure(std::string&
     return false;
 }
 
+IRHIDeviceResources& EnhancedSceneRendererLiveDX12Adapter::DeviceResources()
+{
+    return m_impl->resources;
+}
+
 IRenderDeviceServices& EnhancedSceneRendererLiveDX12Adapter::Resources()
 {
     return m_impl->resources;
@@ -912,6 +977,123 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     return true;
 }
 
+bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
+    DisplayToken token, TemporalExtent renderExtent, TemporalExtent displayExtent,
+    RHITemporalDisplayResources& output, std::string& outError)
+{
+    output = {};
+    if (!renderExtent.IsValid() || !displayExtent.IsValid())
+    {
+        outError = "Temporal shared export needs valid render/display extents";
+        return false;
+    }
+    auto& impl = *m_impl;
+    for (auto& display : impl.activeDisplays)
+    {
+        if (display.token != token) continue;
+        if (display.temporalTextures[0])
+        {
+            if (display.temporalRenderExtent == renderExtent && display.temporalDisplayExtent == displayExtent)
+            {
+                output = display.temporalResources;
+                display.temporalSealed = false;
+                display.temporalLifetime.reset();
+                return true;
+            }
+            // The renderer calls this only after selecting a producer-complete,
+            // nonpending slot under displayLifetimeMutex. Check the consumer
+            // half again before a render-scale-only extent change replaces copies.
+            if (!CanReuseDisplayTexture(token))
+            {
+                outError = "Temporal extent change still has an SDK/display consumer";
+                return false;
+            }
+            for (const auto handle : {display.temporalResources.hudlessColor, display.temporalResources.uiColor,
+                display.temporalResources.depth, display.temporalResources.motionVectors})
+                if (handle.IsValid()) impl.resources.ReleaseTexture(handle);
+            for (auto& handle : display.temporalHandles) { if (handle) CloseHandle(handle); handle = nullptr; }
+            display.temporalTextures = {};
+            display.temporalResources = {};
+            display.temporalLifetime.reset();
+            display.temporalSealed = false;
+        }
+        constexpr DXGI_FORMAT formats[]{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
+            DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R16G16_FLOAT};
+        std::array<Impl::ComPtr<ID3D12Resource>, 4> textures;
+        std::array<HANDLE, 4> handles{};
+        std::array<RHITextureHandle, 4> registered{};
+        const auto rollback = [&]
+        {
+            for (size_t index = 0; index < handles.size(); ++index)
+            {
+                if (handles[index]) CloseHandle(handles[index]);
+                if (registered[index].IsValid()) impl.resources.ReleaseTexture(registered[index]);
+            }
+        };
+        for (size_t index = 0; index < textures.size(); ++index)
+        {
+            const auto extent = index < 2 ? displayExtent : renderExtent;
+            D3D12_HEAP_PROPERTIES heap{};
+            heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+            D3D12_RESOURCE_DESC description{};
+            description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            description.Width = extent.width;
+            description.Height = extent.height;
+            description.DepthOrArraySize = description.MipLevels = 1;
+            description.Format = formats[index];
+            description.SampleDesc.Count = 1;
+            // No simultaneous-access flag: producer and consumer synchronize by
+            // completion + lease and return each copy to COPY_DEST before reuse.
+            if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED,
+                    &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textures[index]))) ||
+                FAILED(impl.resources.GetDevice()->CreateSharedHandle(textures[index].Get(), nullptr,
+                    GENERIC_ALL, nullptr, &handles[index])))
+            {
+                rollback();
+                outError = "Could not allocate full temporal shared display inputs";
+                return false;
+            }
+            registered[index] = impl.resources.RegisterExternalTexture(textures[index].Get());
+            if (!registered[index].IsValid())
+            {
+                rollback();
+                outError = "Could not register temporal shared display inputs";
+                return false;
+            }
+        }
+        display.temporalTextures = std::move(textures);
+        display.temporalHandles = handles;
+        display.temporalResources = {registered[0], registered[1], registered[2], registered[3]};
+        display.temporalRenderExtent = renderExtent;
+        display.temporalDisplayExtent = displayExtent;
+        output = display.temporalResources;
+        return true;
+    }
+    outError = "Temporal shared display token is not active";
+    return false;
+}
+
+void EnhancedSceneRendererLiveDX12Adapter::SealTemporalDisplayFrame(DisplayToken token,
+    const TemporalFrame& frame, const TemporalMeasurementProvenance& provenance,
+    std::shared_ptr<const void> lifetimeToken, bool nativeGateActive)
+{
+    for (auto& display : m_impl->activeDisplays)
+    {
+        if (display.token != token)
+        {
+            continue;
+        }
+        display.temporalFrame = frame;
+        display.temporalProvenance = provenance;
+        display.temporalNativeGateActive = nativeGateActive;
+        display.temporalLifetime = std::move(lifetimeToken);
+        display.temporalSealed = display.temporalTextures[0] &&
+            frame.renderExtent == display.temporalRenderExtent &&
+            frame.displayExtent == display.temporalDisplayExtent && ValidateTemporalFrame(frame).IsSuccess();
+        return;
+    }
+}
+
 void EnhancedSceneRendererLiveDX12Adapter::RetireDisplayTexture(DisplayToken token)
 {
     if (kInvalidDisplayToken == token) return;
@@ -942,6 +1124,15 @@ void EnhancedSceneRendererLiveDX12Adapter::CollectRetiredDisplays()
         {
             CloseHandle(display.sharedHandle);
             display.sharedHandle = nullptr;
+        }
+        for (const auto handle : {display.temporalResources.hudlessColor, display.temporalResources.uiColor,
+            display.temporalResources.depth, display.temporalResources.motionVectors})
+            if (handle.IsValid()) impl.resources.ReleaseTexture(handle);
+        display.temporalResources = {};
+        for (auto& handle : display.temporalHandles)
+        {
+            if (handle) CloseHandle(handle);
+            handle = nullptr;
         }
         return true;
     });
@@ -975,7 +1166,29 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
             // 호출자는 생산자 슬롯 선택과 같은 뮤텍스를 쥔다. sink는 잠금을
             // 놓기 전에 이 참조를 확보해야 하며 CPU 드로우 데이터가 아직
             // 기록·제출되지 않은 동안에도 참조를 유지한다.
-            return sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+            const auto textureId = sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+            if (textureId)
+            {
+                sink.OpenTemporalRealFrame(display.temporalProvenance);
+            }
+            if (textureId && sink.AcceptsTemporalFrames() && display.temporalSealed)
+            {
+                RHITemporalDisplayPacket packet;
+                packet.frame = display.temporalFrame;
+                packet.provenance = display.temporalProvenance;
+                for (size_t index = 0; index < packet.sharedHandles.size(); ++index)
+                {
+                    packet.sharedHandles[index] = display.temporalHandles[index];
+                }
+                packet.consumerLease = display.consumerLease;
+                // Dedicated shared copies do not alias graph pool memory. Retain
+                // the optional source owner too when supplied by the graph.
+                packet.lifetimeToken = display.temporalLifetime ? display.temporalLifetime : display.consumerLease;
+                packet.valid = true;
+                packet.nativeGateActive = display.temporalNativeGateActive;
+                sink.OpenTemporalFrame(packet);
+            }
+            return textureId;
         }
     }
     return 0;
@@ -1086,7 +1299,8 @@ GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
         m_impl->measurementSubmissions[token.ringSlot] = {token,
             diagnosticCapture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal,
             GetQueueExecutionMode(), computeToken,
-            m_impl->ownedQueueExecution || m_impl->evidenceTelemetry || m_impl->queueExecutionModeOverride.has_value()};
+            m_impl->ownedQueueExecution || m_impl->evidenceTelemetry || m_impl->queueExecutionModeOverride.has_value(),
+            GetBackendGeneration()};
     }
     return m_impl->currentProfilerToken;
 }
@@ -1365,7 +1579,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
              << (submission ? submission->mode : UINT32_MAX)
              << ",\"measurementDomain\":\""
              << (submission ? RGMeasurementDomainName(submission->domain) : "unknown") << '"'
-             << ",\"backendGeneration\":" << GetBackendGeneration()
+             << ",\"backendGeneration\":" << (submission ? submission->backendGeneration : 0)
              << ",\"frameId\":" << origin.engineFrameId << ",\"viewId\":" << origin.renderViewId
              << ",\"submissionId\":" << origin.submissionId << ",\"captureGeneration\":" << origin.captureGeneration
              << ",\"cpuSubmitTick\":" << origin.cpuSubmitTick

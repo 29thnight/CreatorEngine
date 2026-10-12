@@ -39,7 +39,7 @@ bool Fail(std::string& error, std::string message)
             {
                 std::error_code ignored;
                 std::filesystem::remove(staging, ignored);
-                return Fail(error, "LX Scene shader source write failed.");
+                return Fail(error, "METEOR Scene shader source write failed.");
             }
         }
         // Same-content tickets can overlap after an explicit invalidation. Never
@@ -50,7 +50,7 @@ bool Fail(std::string& error, std::string message)
             std::filesystem::remove(staging, ignored);
             if (!matches())
             {
-                return Fail(error, "LX Scene shader source publication failed.");
+                return Fail(error, "METEOR Scene shader source publication failed.");
             }
         }
         return true;
@@ -78,6 +78,7 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     };
     // ShaderMeta describes generated entry contracts, including the installed
     // common Forward+ alpha consumer.
+    graphics("LXSceneTemporal", "LXSceneTemporalVS", "LXSceneTemporalPS", ShaderPassQueue::Opaque, true);
     graphics("GBuffer", "LXSceneVS", "LXSceneGBufferPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneDepth", "LXSceneVS", "LXSceneDepthPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
@@ -113,6 +114,8 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
     {
         if (only && *only != backend) continue;
         targets.push_back({backend, "LXSceneVS", "vs_6_0"});
+        targets.push_back({backend, "LXSceneTemporalVS", "vs_6_0"});
+        targets.push_back({backend, "LXSceneTemporalPS", "ps_6_0"});
         targets.push_back({backend, "LXSceneMS", "ms_6_5"});
         for (const auto entry : {"LXSceneGBufferPS", "LXSceneDepthPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
@@ -153,19 +156,19 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     if (program.volume && program.slang.find("#define LX_MATERIAL_VOLUME_HOMOGENEOUS 1\n") == std::string::npos)
     {
         return Fail(error,
-                    "LX Scene Volume requires homogeneous coefficients; spatially varying Volume is unsupported.");
+                    "METEOR Scene Volume requires homogeneous coefficients; spatially varying Volume is unsupported.");
     }
     std::ifstream host(shaderDirectory / "Includes/MaterialGraphSceneHost.slang", std::ios::binary);
     const std::string suffix{std::istreambuf_iterator<char>(host), {}};
     if (!host || suffix.empty())
     {
-        return Fail(error, "LX Scene compiler cannot read its canonical host shader.");
+        return Fail(error, "METEOR Scene compiler cannot read its canonical host shader.");
     }
     std::error_code ioError;
     std::filesystem::create_directories(sourceFile.parent_path(), ioError);
     if (ioError)
     {
-        return Fail(error, "LX Scene shader cache directory failed: " + ioError.message());
+        return Fail(error, "METEOR Scene shader cache directory failed: " + ioError.message());
     }
     std::string hostSource = BuildBoundSource(program) + suffix;
     if (program.volume) hostSource += "\n#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
@@ -240,11 +243,11 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         product.shaders.size() != expected.size() ||
         (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV))
     {
-        return Fail(error, "LX cooked Scene host identity or complete stage set is missing.");
+        return Fail(error, "METEOR cooked Scene host identity or complete stage set is missing.");
     }
     if (!HasSceneBackend(product, backend))
     {
-        return Fail(error, "LX cooked Scene product was compiled without the running backend.");
+        return Fail(error, "METEOR cooked Scene product was compiled without the running backend.");
     }
     SceneShaderSet candidate;
     candidate.layout = product.layout;
@@ -255,7 +258,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         if (std::tie(target.binary, target.entry, target.profile) !=
             std::tie(recorded.binary, recorded.entry, recorded.profile))
         {
-            return Fail(error, "LX cooked Scene stage/profile differs from its feature requirements.");
+            return Fail(error, "METEOR cooked Scene stage/profile differs from its feature requirements.");
         }
         const auto name = target.binary == RHIShaderBinary::Dxil ? "dxil" : "spirv";
         const auto shader = std::ranges::find_if(product.shaders, [&](const auto& artifact) {
@@ -263,7 +266,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         });
         if (shader == product.shaders.end() || shader->bytecode.empty())
         {
-            return Fail(error, "LX cooked Scene bytecode is missing.");
+            return Fail(error, "METEOR cooked Scene bytecode is missing.");
         }
         if (target.binary != backend)
         {
@@ -272,6 +275,8 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
         const std::pair<std::string_view, Member> members[]{{"LXSceneVS", &SceneShaderSet::vertex},
                                                             {"LXSceneDepthPS", &SceneShaderSet::depth},
+                                                            {"LXSceneTemporalVS", &SceneShaderSet::temporalVertex},
+                                                            {"LXSceneTemporalPS", &SceneShaderSet::temporal},
                                                             {"LXSceneMS", &SceneShaderSet::mesh},
                                                             {"LXSceneShadowMS", &SceneShaderSet::shadowMesh},
                                                             {"LXSceneGBufferPS", &SceneShaderSet::gbuffer},
@@ -288,7 +293,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         const auto member = std::ranges::find(members, target.entry, &std::pair<std::string_view, Member>::first);
         if (member == std::end(members))
         {
-            return Fail(error, "LX cooked Scene entry has no installed consumer.");
+            return Fail(error, "METEOR cooked Scene entry has no installed consumer.");
         }
         (candidate.*member->second).bytecode.Assign(shader->bytecode.data(), shader->bytecode.size());
     }

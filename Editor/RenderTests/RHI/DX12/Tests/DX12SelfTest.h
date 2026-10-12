@@ -95,7 +95,7 @@ namespace DX12Test
     ///
     /// 다섯 타깃에 서로 다른 값을 쓰게 해 둔 이유가 여기 있다 — 한 타깃만
     /// 기록되고 나머지가 비어 있어도 '그려지긴 한다'로 보이는 것을 막는다.
-    bool RunGBufferTest(std::string& outLog);
+
 
     /// 씬 연결 검증 (PHASE 3-6, 씬 연결 슬라이스).
     ///
@@ -108,7 +108,7 @@ namespace DX12Test
     {
         uint64_t drawCandidates{}, lights{}, draws{}, meshUploads{}, generationUploads{}, uploadKB{}, coverage{}, pixels{}, texturedDraws{};
     };
-    bool RunSceneBindingTest(std::string& outLog, SceneBindingReport* report = nullptr);
+
 
     // DX11과의 픽셀 대조(RunPixelCompareTest)는 DX11 SceneRenderer와 함께
     // 제거했다. 그 검증은 DX11 GBuffer 텍스처를 읽는 것이 본체라 기준이
@@ -164,17 +164,10 @@ namespace DX12Test
     /// 구석이 1이면 컬링이 안 도는 것이다 — 둘 다 조용히 지나가는 부류다.
     bool RunForwardPlusTest(std::string& outLog);
 
-    /// Forward+ 셰이딩 검증 (PHASE 3-6).
-    ///
-    /// 타일 목록으로 그린 그림과 전 광원 루프로 그린 그림을 픽셀로 대조한다.
-    /// 컬링 검증(RunForwardPlusTest)이 목록의 숫자를 보는 데 반해 여기서는
-    /// 그 목록을 쓴 결과를 본다 — 목록이 맞아도 셰이더가 잘못 읽으면
-    /// 숫자 검증은 통과하고 화면만 틀린다.
-    ///
-    /// 배치를 광원 격자로 짠 이유가 여기 있다. 광원 하나짜리로 대조하면
-    /// 광원이 안 닿는 곳은 참조 경로도 0이라, 컬링이 통째로 틀려도 두 결과가
-    /// 같아 통과한다 — 공짜 통과를 막는 것이 배치의 목적이다.
-    bool RunForwardPlusShadeTest(std::string& outLog);
+    /// METEOR 반투명 스트림: 타일 광원 컬링 + METEOR.Scene.Blended가 덮은 픽셀만
+    /// 바꾸고 불투명 깊이를 보존하는지 실제 쿠킹 경로로 검증한다.
+    bool RunBlendedStreamTest(std::string& outLog);
+
 
 
     /// SSAO 검증 (PHASE 3-6, 신규 SSAO).
@@ -203,6 +196,7 @@ namespace DX12Test
     /// 합친 패스(Uber)는 특히 그렇다 — 넷이 한 셰이더에 들어 있어서 하나가
     /// 빠져도 '어딘가 조금 다르다'로만 보인다.
     bool RunPostChainTest(std::string& outLog);
+    bool RunTemporalHistoryTest(std::string& outLog);
 
 
     /// UI 패스 검증 (PHASE 3-6, 신규 UI).
@@ -259,7 +253,6 @@ namespace DX12Test
     /// 둘 다 A/B로 잰다: 스치는 빛의 맨바닥에서 경사 항 끔/켬의 여드름 수,
     /// 분할 경계를 가로지르는 줄무늬에서 블렌딩 끔/켬의 차이 픽셀 수.
     /// '끈 쪽이 실제로 실패'까지 확인한다 — 켠 쪽만 보면 조건이 약해도 통과한다.
-    bool RunShadowQualityTest(std::string& outLog);
 
     /// 스카이박스 패스 검증 (PHASE 3-6).
     ///
@@ -285,7 +278,7 @@ namespace DX12Test
     /// 광원 0개 씬에서 출력 = 앰비언트뿐으로 만들어 셋을 단정한다:
     /// 끔 = 검정(기존 동작 보존), 반구 IBL의 법선 방향성(바닥 빨강·천장
     /// 초록 — 뒤집히면 색이 맞바뀐다), 매끈 금속의 스플릿섬 정반사.
-    bool RunIBLShadeTest(std::string& outLog);
+
 
     /// GBuffer 스키닝 검증 (PHASE 3-6).
     ///

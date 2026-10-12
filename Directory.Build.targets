@@ -345,4 +345,15 @@
   <Import Project="$(MSBuildThisFileDirectory)Player\PlayerBoundary.targets"
           Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and ('$(MSBuildProjectName)' == 'Player' or $([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(MSBuildThisFileDirectory)Engine\')))" />
 
+  <!-- FidelityFX SDK 1.1.4's optional Vulkan static backend imports the Vulkan
+       loader even when a supplied dispatch table is used. Preserve the engine's
+       existing rule: a DX12 launch must not require vulkan-1.dll at startup.
+       The private FSR Vulkan factory checks VulkanApi::IsLoaderReady first. -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(CreatorEnableFsrVulkan)' == 'true' and ('$(ConfigurationType)' == 'Application' or '$(ConfigurationType)' == 'DynamicLibrary')">
+    <Link>
+      <DelayLoadDLLs>vulkan-1.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+      <AdditionalDependencies>delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
 </Project>

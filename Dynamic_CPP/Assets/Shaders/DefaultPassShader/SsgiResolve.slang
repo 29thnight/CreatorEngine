@@ -5,8 +5,11 @@
 Texture2D<float4> gTrace         : register(t0);
 Texture2D<float>  gDepth         : register(t1);
 Texture2D<float4> gNormal        : register(t2);
-Texture2D<float4> gHistory       : register(t3);
-Texture2D<float>  gHistoryDepth  : register(t4);
+Texture2D<float2> gMotion        : register(t3);
+Texture2D<float> gResponsive     : register(t4);
+Texture2D<float> gReactive       : register(t5);
+Texture2D<float4> gHistory       : register(t6);
+Texture2D<float>  gHistoryDepth  : register(t7);
 
 #ifdef __spirv__
 [[vk::image_format("rgba16f")]]
@@ -24,6 +27,8 @@ cbuffer ResolveParams : register(b0)
     float    gDepthTolerance;
     float    gPad0;
     float2   gPad1;
+    uint gHasMotion, gRenderWidth, gRenderHeight, gMotionPadding;
+    float2 gJitterDelta, gTemporalPadding;
 };
 
 float3 ViewFromDepth(float2 uv, float depth)
@@ -60,9 +65,16 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         if (prevClip.w > 0.0001f)
         {
             prevClip /= prevClip.w;
-            const float2 prevUV = float2(prevClip.x * 0.5f + 0.5f, 0.5f - prevClip.y * 0.5f);
+            float2 prevUV = float2(prevClip.x * 0.5f + 0.5f, 0.5f - prevClip.y * 0.5f);
+            if (gHasMotion != 0u)
+            {
+                const uint2 pixel=min(uint2(uv*float2(gRenderWidth,gRenderHeight)),uint2(gRenderWidth-1,gRenderHeight-1));
+                if(max(gResponsive.Load(int3(pixel,0)),gReactive.Load(int3(pixel,0)))>0.5)
+                { gResolved[id.xy]=float4(current.rgb,1);return; }
+                prevUV=uv+(gMotion.Load(int3(pixel,0))+gJitterDelta)/float2(gRenderWidth,gRenderHeight);
+            }
 
-            if (all(prevUV >= 0.0f) && all(prevUV <= 1.0f))
+            if (all(prevUV >= 0.0f) && all(prevUV < 1.0f))
             {
                 const int2 prevCoord = int2(prevUV * gSize);
                 const float prevDepth = gHistoryDepth.Load(int3(prevCoord, 0));

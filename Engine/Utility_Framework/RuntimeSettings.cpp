@@ -4,6 +4,7 @@
 #include "PathFinder.h"
 #include "ReflectionTypedYml.h"
 #include "AuthoringParsedDocument.h"
+#include "TemporalProductSettingsIO.h"
 
 #include <cstdio>
 #include <cmath>
@@ -82,6 +83,19 @@ bool RuntimeSettings::Load() noexcept
         if (root["renderPassSettings"])
         {
             Meta::Typed::DeserializeObjectFrom(renderPassSettings, root["renderPassSettings"]);
+        }
+        const auto featureNode = root[m_backendPolicy == RuntimeRenderBackendPolicy::FixedDX12
+            ? "editorRenderFeatures" : "renderFeatures"];
+        TemporalProductSettings temporalProductSettings;
+        temporalProductSettings.fallbackAa = renderPassSettings.aa.isApply;
+        if (!TemporalProductSettingsIO::Read(featureNode, temporalProductSettings))
+        {
+            Debug::PrintLog(spdlog::level::err, "Invalid or unsupported render feature settings schema.");
+            return false;
+        }
+        if (featureNode)
+        {
+            renderPassSettings.aa.isApply = temporalProductSettings.fallbackAa;
         }
 
         RenderBackend renderBackend = RenderBackend::DX12;
@@ -165,6 +179,7 @@ bool RuntimeSettings::Load() noexcept
         }
 
         m_renderPassSettings = std::move(renderPassSettings);
+        m_temporalProductSettings = std::move(temporalProductSettings);
         m_renderBackend = renderBackend;
         m_startupSceneName = startupScene.wstring();
         m_animationBudgetSettings = animationBudget;

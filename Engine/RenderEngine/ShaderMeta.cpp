@@ -22,6 +22,12 @@ namespace
     constexpr std::size_t kMaxKeywordValues = 16;
     constexpr std::size_t kMaxPasses = 32;
 
+    std::string PathText(const std::filesystem::path& path)
+    {
+        const auto utf8Path = path.u8string();
+        return { utf8Path.begin(), utf8Path.end() };
+    }
+
     bool Fail(std::string_view context, std::string_view detail,
         std::string& outError)
     {
@@ -624,23 +630,34 @@ bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
     ShaderMeta& outMeta, std::string& outError,
     std::array<std::uint8_t, 32>* outDocumentDigest)
 {
-    if (".shadermeta" != documentPath.extension().string())
-        return Fail(documentPath.string(), "확장자가 .shadermeta가 아니다", outError);
-    if (".shadermeta" != sourceOriginPath.extension().string())
-        return Fail(sourceOriginPath.string(),
+    if (documentPath.extension() != ".shadermeta")
+    {
+        return Fail(PathText(documentPath), "확장자가 .shadermeta가 아니다", outError);
+    }
+    if (sourceOriginPath.extension() != ".shadermeta")
+    {
+        return Fail(PathText(sourceOriginPath),
             "source origin 확장자가 .shadermeta가 아니다", outError);
+    }
 
     std::error_code error;
     const std::uintmax_t bytes = std::filesystem::file_size(documentPath, error);
-    if (error) return Fail(documentPath.string(), "파일 크기를 읽지 못했다", outError);
+    if (error)
+    {
+        return Fail(PathText(documentPath), "파일 크기를 읽지 못했다", outError);
+    }
     if (0 == bytes || bytes > kMaxMetaBytes)
-        return Fail(documentPath.string(), "파일이 비었거나 1MiB 상한을 넘었다", outError);
+    {
+        return Fail(PathText(documentPath), "파일이 비었거나 1MiB 상한을 넘었다", outError);
+    }
 
     std::string documentError;
     const Authoring::ParsedDocument document =
-        Authoring::ParsedDocument::ParseFile(documentPath.string(), documentError);
+        Authoring::ParsedDocument::ParseFilePath(documentPath, documentError);
     if (!document)
-        return Fail(documentPath.string(), "문서 해석 실패: " + documentError, outError);
+    {
+        return Fail(PathText(documentPath), "문서 해석 실패: " + documentError, outError);
+    }
     ShaderMeta candidate;
     if (!ParseDocument(document.Root(), sourceOriginPath, guid, candidate, outError))
     {
@@ -669,13 +686,17 @@ bool ShaderMetaLoader::Parse(std::string_view text,
     ShaderMeta& outMeta, std::string& outError)
 {
     if (text.empty() || text.size() > kMaxMetaBytes)
-        return Fail(originPath.string(), "입력이 비었거나 1MiB 상한을 넘었다", outError);
+    {
+        return Fail(PathText(originPath), "입력이 비었거나 1MiB 상한을 넘었다", outError);
+    }
 
     std::string parseError;
     const Authoring::ParsedDocument document =
         Authoring::ParsedDocument::ParseText(std::string(text), parseError);
     if (!document)
-        return Fail(originPath.string(), "YAML 해석 실패: " + parseError, outError);
+    {
+        return Fail(PathText(originPath), "YAML 해석 실패: " + parseError, outError);
+    }
     return ParseDocument(document.Root(), originPath, guid, outMeta, outError);
 }
 
@@ -687,47 +708,64 @@ static bool ParseShaderMetaDocument(const Authoring::ReadNode& root,
     try
     {
         if (guid == FileGuid{})
-            return Fail(originPath.string(), "asset GUID가 nil이다", outError);
+        {
+            return Fail(PathText(originPath), "asset GUID가 nil이다", outError);
+        }
         if (!ValidateMap(root,
             { "schema", "name", "source", "properties", "keywords", "passes", "generatedMaterial" },
-            originPath.string(), outError)) return false;
+            PathText(originPath), outError))
+        {
+            return false;
+        }
 
         const Authoring::ReadNode schemaNode = root["schema"];
         if (!schemaNode || !schemaNode.IsScalar())
-            return Fail(originPath.string(), "필수 schema scalar가 없다", outError);
+        {
+            return Fail(PathText(originPath), "필수 schema scalar가 없다", outError);
+        }
         const std::uint32_t schema = schemaNode.As<std::uint32_t>();
         if (ShaderMeta::kSchemaVersion != schema)
-            return Fail(originPath.string(), "지원하지 않는 schema version "
+        {
+            return Fail(PathText(originPath), "지원하지 않는 schema version "
                 + std::to_string(schema), outError);
+        }
 
         ShaderMeta meta;
         meta.guid = guid;
         meta.schemaVersion = schema;
         meta.originPath = originPath.lexically_normal();
-        if (!ReadIdentifier(root, "name", originPath.string(), meta.name, outError))
+        if (!ReadIdentifier(root, "name", PathText(originPath), meta.name, outError))
+        {
             return false;
+        }
 
         std::string sourceName;
-        if (!ReadRequiredScalar(root, "source", originPath.string(), sourceName, outError))
+        if (!ReadRequiredScalar(root, "source", PathText(originPath), sourceName, outError))
+        {
             return false;
+        }
         if (sourceName.size() > kMaxSourceBytes)
-            return Fail(originPath.string(), "source 경로가 너무 길다", outError);
+        {
+            return Fail(PathText(originPath), "source 경로가 너무 길다", outError);
+        }
         const std::filesystem::path authoredSource(sourceName);
         if (!IsSafeRelativeSource(authoredSource))
-            return Fail(originPath.string(),
+        {
+            return Fail(PathText(originPath),
                 "source는 상위 이동 없는 상대 .hlsl|.slang 경로여야 한다", outError);
+        }
         meta.source = authoredSource.lexically_normal();
         const std::filesystem::path resolved = meta.ResolveSource(originPath);
         std::error_code sourceError;
         if (!cookedMetadata && !sourceBytes &&
             (!std::filesystem::is_regular_file(resolved, sourceError) || sourceError))
         {
-            return Fail(originPath.string(), "source 파일이 없다: " + resolved.string(), outError);
+            return Fail(PathText(originPath), "source 파일이 없다: " + PathText(resolved), outError);
         }
 
         if (cookedMetadata && root["generatedMaterial"])
         {
-            return Fail(originPath.string(),
+            return Fail(PathText(originPath),
                 "generated metadata requires its verified cooked material program", outError);
         }
 
@@ -738,7 +776,9 @@ static bool ParseShaderMetaDocument(const Authoring::ReadNode& root,
             return false;
 
         if (sourceBytes && !meta.generatedMaterial)
-            return Fail(originPath.string(), "cooked source bytes require generated material metadata", outError);
+        {
+            return Fail(PathText(originPath), "cooked source bytes require generated material metadata", outError);
+        }
 
         outMeta = std::move(meta);
         outError.clear();
@@ -750,7 +790,7 @@ static bool ParseShaderMetaDocument(const Authoring::ReadNode& root,
     //   변환 실패(`As<T>()`)처럼 검증 도중 던지는 것들을 계속 받는다.
     catch (const std::exception& exception)
     {
-        return Fail(originPath.string(),
+        return Fail(PathText(originPath),
             "ShaderMeta 검증 실패: " + std::string(exception.what()), outError);
     }
 }

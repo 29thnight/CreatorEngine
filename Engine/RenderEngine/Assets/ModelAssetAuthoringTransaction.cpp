@@ -538,30 +538,16 @@ namespace assets
                 return false;
             }
 
-            experiment::AssetId gbufferShader{};
-            experiment::AssetId forwardShader{};
-            if (!ck::ReadMetaAssetId(assetRoot /
-                "Shaders/DefaultPassShader/GBuffer.shadermeta.meta",
-                gbufferShader, failure))
-            {
-                return false;
-            }
-            if (!ck::ReadMetaAssetId(assetRoot /
-                "Shaders/DefaultPassShader/Forward.shadermeta.meta",
-                forwardShader, failure))
-            {
-                return false;
-            }
-
             std::vector<std::string> resolutionFailures;
             im::ConversionOptions options{};
             options.modelAssetId = experiment::AssetId{ sidecar.assetId };
             options.modelName = logicalSource.stem().string();
             options.resolveShaderAsset =
-                [&](const im::ImportedMaterial& material, std::size_t)
+                [&](const im::ImportedMaterial&, std::size_t index)
                 {
-                    return material.alphaMode == im::AlphaMode::Blend
-                        ? forwardShader : gbufferShader;
+                    // The shader identity is the actual graph published by this
+                    // transaction, independent of alpha mode or legacy ShaderMeta.
+                    return experiment::AssetId{ModelMaterialGraphId(materialIds.at(index).value)};
                 };
             options.resolveMaterialAsset =
                 [&](const im::ImportedMaterial&, std::size_t index)
@@ -859,7 +845,12 @@ namespace assets
         std::uint32_t lodLevels = geometrySettings.lodLevels;
         if (request.buildMeshlets.has_value())
         {
-            buildMeshlets = *request.buildMeshlets;
+            if (!*request.buildMeshlets)
+            {
+                Mbc3AddIssue(result, "importSettings.buildMeshlets", "METEOR requires cooked meshlets; indexed-only import is forbidden.");
+                return result;
+            }
+            buildMeshlets = true;
         }
 
         if (request.lodLevels.has_value())

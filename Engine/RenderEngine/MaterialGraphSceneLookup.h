@@ -3,7 +3,7 @@
 #include "LXMaterialPipeline.h"
 
 #include "MaterialGraphIblBake.h"
-#include "Render/Passes/Geometry/EnhancedGBufferPass.h"
+#include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 
 #include <map>
 #include <mutex>

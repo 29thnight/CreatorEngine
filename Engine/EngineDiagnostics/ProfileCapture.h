@@ -187,12 +187,34 @@ namespace ce
         profile_tick               tick_end = 0;
         frame_events events;
         std::vector<profile_counter_sample> counters;
+        std::vector<profile_render_measurement> render_measurements;
 
         std::uint64_t dropped_events = 0;
 
         std::size_t memory_bytes() const
         {
-            return events.memory_bytes() + counters.capacity() * sizeof(profile_counter_sample);
+            return events.memory_bytes() + counters.capacity() * sizeof(profile_counter_sample) +
+                render_measurements.capacity() * sizeof(profile_render_measurement);
+        }
+
+        const profile_render_measurement* render_measurement_for(const profile_event& event) const
+        {
+            const profile_render_measurement* match = nullptr;
+            for (const auto& sample : render_measurements)
+            {
+                if (sample.axis == profile_render_axis::gpu_pass && sample.engine_frame == event.frame &&
+                    sample.marker == event.marker && sample.tick_begin == event.tick_begin &&
+                    sample.tick_end == event.tick_end && sample.event_submission == event.submission &&
+                    sample.event_view == event.view && sample.queue == event.queue)
+                {
+                    if (match)
+                    {
+                        return nullptr; // Narrow legacy keys may collide; never guess.
+                    }
+                    match = &sample;
+                }
+            }
+            return match;
         }
     };
 
@@ -368,6 +390,8 @@ namespace ce
                              const std::shared_ptr<const event_chunk>& page = {},
                              std::uint32_t offset = 0);
         void drain_deferred_spans();
+        void place_render_measurement(const profile_render_measurement& sample);
+        void drain_render_measurements();
 
         // 늦게 온 CPU 구간. GPU 와 규칙이 다르다 — GPU 는 **제출한 프레임**에
         // 귀속하지만(§5.4), CPU 구간은 **끝난 시각이 속한 프레임**이 제 자리다.
@@ -389,6 +413,7 @@ namespace ce
         // 이 목록이 무한히 자라지 않게 하기 위해서다.
         static constexpr std::size_t kMaxDeferredSpans = 4096;
         std::vector<profile_event> m_deferredSpans;
+        std::vector<profile_render_measurement> m_deferredRenderMeasurements;
         std::uint64_t m_lateSpansPlaced = 0;
         std::uint64_t m_lateSpansDropped = 0;
         std::uint64_t m_staleChunksDropped = 0;

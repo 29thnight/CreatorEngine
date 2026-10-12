@@ -15,6 +15,9 @@ struct DecalInstance
     uint     sliceX;
     uint     sliceY;
     int      sliceNum;
+    float4x4 previousWorld;
+    uint historyValid;
+    uint3 temporalPadding;
 };
 StructuredBuffer<DecalInstance> gInstances : register(t7);
 Texture2D<uint> gOwners : register(t8);
@@ -30,6 +33,8 @@ cbuffer DecalFrame : register(b0)
     float2   gScreenDimensions;
     uint     gHasOwners;
     uint     gInstanceBase;
+    float4x4 gCurrentUnjittered;
+    float4x4 gPreviousUnjittered;
 };
 
 #define USE_DIFFUSE (1 << 0)
@@ -168,4 +173,33 @@ PSOut PSMain(VSOut input)
     output.orm = (instance.useFlags & USE_ORM) != 0
         ? float4(orm, baseOrm.a) : float4(0, 0, 1, 0);
     return output;
+}
+
+Texture2D<float> gTemporalDepth : register(t9);
+struct TemporalDecalOutput
+{
+    float2 motion : SV_Target0; float reactive : SV_Target1;
+    float transparency : SV_Target2; float responsive : SV_Target3;
+};
+TemporalDecalOutput TemporalPS(VSOut input)
+{
+    const DecalInstance instance=gInstances[input.instance];
+    const float2 uv=input.position.xy/gScreenDimensions;
+    const float z=gDepth.Sample(gPointSampler,uv).r;
+    if(z>=1 || abs(gTemporalDepth.Load(int3(uint2(input.position.xy),0))-z)>0.00001)discard;
+    float4 view=mul(float4(uv*float2(2,-2)+float2(-1,1),z,1),gInverseProjection);view/=view.w;
+    const float4 world=mul(view,gInverseView);
+    const float3 local=mul(world,instance.inverseWorld).xyz;
+    if(any(abs(local)>0.5))discard;
+    float2 decalUV=local.xz+0.5;decalUV.y=1-decalUV.y;
+    decalUV=(decalUV+float2(instance.sliceNum%instance.sliceX,instance.sliceNum/instance.sliceX))/float2(instance.sliceX,instance.sliceY);
+    const float alpha=(instance.useFlags & USE_DIFFUSE)!=0?gDecalDiffuse.Sample(gLinearSampler,decalUV).a:1;
+    if(alpha<=0.01)discard;
+    const float4 current=mul(world,gCurrentUnjittered);
+    const float4 previous=mul(mul(float4(local,1),instance.previousWorld),gPreviousUnjittered);
+    const bool valid=instance.historyValid!=0 && current.w>0.000001 && previous.w>0.000001 && all(isfinite(previous));
+    TemporalDecalOutput result;
+    result.motion=valid?(previous.xy/previous.w-current.xy/current.w)*gScreenDimensions*float2(.5,-.5):float2(0);
+    result.reactive=1;result.transparency=saturate(alpha);result.responsive=valid?0:1;
+    return result;
 }

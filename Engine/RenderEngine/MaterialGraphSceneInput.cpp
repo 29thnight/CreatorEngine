@@ -10,7 +10,11 @@
 #include <atomic>
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <limits>
+#include <set>
+#include <tuple>
+#include <map>
 
 namespace material_graph
 {
@@ -87,7 +91,7 @@ namespace material_graph
                               std::string& error,
                               own::shared_owner<const assets::ModelAssetGenerationPins> modelPins,
                               own::shared_owner<InstanceFramePins> materialPins,
-                              const assets::ModelGeometryPreparationPins* geometryPins)
+                              const assets::ModelGeometryPreparationPins* geometryPins, const SceneViewInput* previous)
     {
         ce::profile_scope profile{ce::marker<"MaterialSceneInputSeal">()};
         const auto& camera = view.camera;
@@ -105,6 +109,29 @@ namespace material_graph
         {
             return false;
         }
+        // Asset identity and draw ordering do not distinguish independently
+        // moving objects. Reject ambiguous correspondence instead of selecting
+        // whichever previous draw happens to appear first.
+        std::set<std::tuple<std::uint64_t, std::uint64_t, std::uint64_t, assets::ModelMeshHandle>> temporalIdentities;
+        for (const auto& draw : draws)
+        {
+            if (draw.temporalObjectId && !temporalIdentities.emplace(draw.temporalObjectId,
+                draw.temporalIncarnation, draw.temporalInstanceId, draw.modelMeshView.handle).second)
+            {
+                return Fail(error, "Scene view contains duplicate temporal object/instance/mesh identities.");
+            }
+        }
+        const bool previousViewMatches = previous && previous->View().sceneEpoch == view.sceneEpoch &&
+            previous->View().viewId == view.viewId && previous->View().historyRevision == view.historyRevision &&
+            previous->View().temporalFrame.historyRevision == view.temporalFrame.historyRevision &&
+            previous->View().width == view.width && previous->View().height == view.height &&
+            previous->View().frameId < view.frameId;
+        using TemporalKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t, assets::ModelMeshHandle>;
+        std::map<TemporalKey, const SceneDrawInput*> previousDraws;
+        if (previousViewMatches && !view.temporalFrame.reset)
+            for (const auto& old : previous->Draws())
+                previousDraws.emplace(TemporalKey{old.temporalObjectId, old.temporalIncarnation,
+                    old.temporalInstanceId, old.mesh}, &old);
         auto candidate = own::make_shared<SceneViewInput>(ConstructionKey{});
         candidate->modelPins_ = std::move(modelPins);
         auto collectedPins = materialPins ? own::shared_owner<InstanceFramePins>{}
@@ -145,6 +172,9 @@ namespace material_graph
             }
             SceneDrawInput input;
             input.sourceIndex = sourceIndex;
+            input.temporalObjectId = draw.temporalObjectId;
+            input.temporalIncarnation = draw.temporalIncarnation;
+            input.temporalInstanceId = draw.temporalInstanceId;
             input.geometryKey = draw.geometryKey;
             input.viewDepth = math::dot(draw.worldMatrix.translation() - view.camera.eyePosition, view.camera.forward);
             if (!std::isfinite(input.viewDepth)) return Fail(error, "Scene draw has a non-finite sorting depth.");
@@ -220,6 +250,44 @@ namespace material_graph
                 error = "Scene graph geometry " + std::to_string(draw.geometryKey) + ": " + error;
                 return false;
             }
+            // Reuse immutable previous poses only for exact current topology/LOD;
+            // otherwise rebuild them so moving/skinned vertex IDs still correspond.
+            input.previousGeometry = input.geometry;
+            if (previousViewMatches && !view.temporalFrame.reset && draw.temporalObjectId)
+            {
+                const auto found = previousDraws.find({input.temporalObjectId, input.temporalIncarnation,
+                    input.temporalInstanceId, input.mesh});
+                const auto* old = found == previousDraws.end() ? nullptr : found->second;
+                if (old && old->geometry &&
+                    old->geometry->Source()->Bones().size() == draw.boneCount)
+                {
+                    if (input.geometry->SharesSceneTopology(*old->geometry))
+                    {
+                        const auto& current = *input.geometry->Source();
+                        const auto& prior = *old->geometry->Source();
+                        const bool samePose = std::memcmp(&current.World(), &prior.World(), sizeof(math::matrix4x4)) == 0 &&
+                            (current.Bones().empty() || std::memcmp(current.Bones().data(), prior.Bones().data(),
+                                current.Bones().size_bytes()) == 0);
+                        input.previousGeometry = samePose ? input.geometry : old->geometry;
+                    }
+                    else
+                    {
+                        auto previousDraw = selectedDraw;
+                        previousDraw.worldMatrix = old->geometry->Source()->World();
+                        std::vector<math::matrix4x4> bones;
+                        for (const auto& packed : old->geometry->Source()->Bones())
+                        {
+                            auto transposed = math::matrix4x4::identity();
+                            std::memcpy(transposed.m, packed.rows, sizeof(packed.rows));
+                            bones.push_back(math::transpose(transposed));
+                        }
+                        previousDraw.bonePalette = bones.empty() ? nullptr : bones.data();
+                        if (!MeshSurfacePlan::BuildForScene(previousDraw, candidate->surface_, budget.mesh,
+                            input.previousGeometry, error)) return false;
+                    }
+                    input.temporalHistoryValid = true;
+                }
+            }
             // Camera screen error must not lower the detail of a nearby light's
             // casters. Until a light-space error budget is supplied, shadows keep LOD0.
             input.shadowGeometry = input.geometry;
@@ -259,6 +327,15 @@ namespace material_graph
                 total.chunks += shadowChunks;
                 total.cpuPayloadBytes += shadowCost.cpuPayloadBytes;
                 total.gpuPayloadBytes += shadowCost.gpuPayloadBytes;
+            }
+            if (input.previousGeometry != input.geometry)
+            {
+                const auto& oldCost = input.previousGeometry->Cost();
+                if (oldCost.cpuPayloadBytes > budget.cpuPayloadBytes - total.cpuPayloadBytes ||
+                    oldCost.gpuPayloadBytes > budget.gpuPayloadBytes - total.gpuPayloadBytes)
+                    return Fail(error, "Temporal previous geometry exceeds the view payload budget.");
+                total.cpuPayloadBytes += oldCost.cpuPayloadBytes;
+                total.gpuPayloadBytes += oldCost.gpuPayloadBytes;
             }
             candidate->draws_.push_back(std::move(input));
         }

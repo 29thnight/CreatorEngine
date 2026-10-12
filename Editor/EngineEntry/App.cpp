@@ -39,7 +39,9 @@
 #include "../../Engine/Utility_Framework/WarmupLedger.h"
 #include "WinProcProxy.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "Render/Temporal/TemporalRuntimeControl.h"
 #include "SceneManager.h"
+#include "TimeSystem.h"
 #include <shellapi.h>
 #include <chrono>
 #include <cstdio>
@@ -149,7 +151,22 @@ std::filesystem::path EditorPathArgument(const wchar_t* option)
 
     bool InitializeEditorHostSettings() noexcept
     {
-        return EditorSettingsStore::Get().Initialize();
+        if (!EditorSettingsStore::Get().Initialize()) return false;
+        try
+        {
+            const auto directory = ResolveProcessExecutableDirectory() / L"Temporal";
+            // CreatorEditor.vcxproj's existing project GUID identifies this
+            // custom-engine integration; it is not an NVIDIA application ID.
+            TemporalRuntimeControl::Get().RegisterEditorUpscalingHost(
+                std::filesystem::is_directory(directory) ? directory.wstring() : std::wstring{},
+                "6b06c95b-fedc-45bf-a2ea-095122e18e8b");
+            return true;
+        }
+        catch (const std::exception& error)
+        {
+            std::fprintf(stderr, "[Temporal] Editor runtime deployment setup failed: %s\n", error.what());
+            return false;
+        }
     }
 
 	EngineLaunchConfig MakeEditorLaunchConfig()
@@ -395,7 +412,7 @@ uint32_t Core::App::PublishRenderFrame()
 	// 카메라 목록을 만들기 전에 적용해야 이번 프레임 밀봉에 반영된다.
 	if (ConsoleCommandSystem::IsEditorCameraFollowing())
 	{
-		ConsoleCommandSystem::MatchEditorCameraToGameCamera();
+		ConsoleCommandSystem::MatchEditorCameraToGameCamera(false);
 	}
 
 	// 씬 오버레이(저작 보조) 뷰 선언은 Host 몫이다(E4-5) — 에디터 카메라는
@@ -417,7 +434,7 @@ uint32_t Core::App::PublishRenderFrame()
 	if (editorDemanded && nullptr != editorCamera)
 	{
 		views[viewCount++] = {
-			{ kEnhancedEditorViewId, 1 },
+			{ kEnhancedEditorViewId, editorCamera->GetSourceIdentity() },
 			editorCamera->CaptureFrameSnapshot(),
 			EnhancedLiveDisplayTarget::Editor,
 			EnhancedLiveViewFlags::SceneOverlay |
@@ -454,7 +471,8 @@ uint32_t Core::App::PublishRenderFrame()
 		EnhancedSceneRenderer::BuildLiveFramePacket(
 		static_cast<float>(m_main->GetFrameDeltaTime()),
 		views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
-    renderFrame.profilingEngineFrame = Time->GetFrameCount();
+    renderFrame.sourceEngineFrame = Time->GetFrameCount();
+    renderFrame.sourceEngineFrameAvailable = true;
     const uint64_t publishedFrameId = renderFrame.frameId;
     // 카메라·gizmo 입력은 값/소유 handle로 확보했다. delta 병합과 queue 역압력은
     // 기존 PublishLiveFrame 경로에 남기되 그 대기는 scene lock 밖에서 한다.

@@ -5,7 +5,10 @@ using CreatorEngine;
 int checks = 0;
 void Check(bool value, string name)
 {
-    if (!value) throw new InvalidOperationException(name);
+    if (!value)
+    {
+        throw new InvalidOperationException(name);
+    }
     ++checks;
 }
 
@@ -27,7 +30,39 @@ Check((uint)CharacterCollisionFlags.Simulating == 8 && (uint)CharacterCollisionF
 var assembly = typeof(Physics).Assembly;
 var native = assembly.GetType("CreatorEngine.Native", true)!;
 var version = native.GetField("ExpectedVersion", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
-Check((int)version.GetRawConstantValue()! == 40, "ABI version");
+var apiVersion = (int)version.GetRawConstantValue()!;
+Check(apiVersion == 41, "current host ABI version");
+// Validate the current physics PODs and append-only host table together.
+// The camera-cut slot follows the v40 physics extensions without moving them.
+var apiTable = assembly.GetType("CreatorEngine.ScriptApiTable", true)!;
+long Offset(string name) => Marshal.OffsetOf(apiTable, name).ToInt64();
+Check(Offset("Version") == 0 && Offset("StructSize") == sizeof(int), "API table header layout");
+Check(Offset("Asset_RequestTyped") == Offset("Asset_ListRoots") + IntPtr.Size,
+    "v35 request slot appended after v34");
+Check(Offset("Asset_TryAcquireTyped") == Offset("Asset_RequestTyped") + IntPtr.Size,
+    "v35 resident slot layout");
+Check(Offset("Body_Remove") == Offset("Asset_TryAcquireTyped") + IntPtr.Size,
+    "v40 body removal slot preserves the typed asset prefix");
+Check(Offset("Body_ShapeRole") == Offset("Body_Remove") + IntPtr.Size,
+    "v40 shape role slot layout");
+Check(Offset("Camera_NotifyCameraCut") == Offset("Body_ShapeRole") + IntPtr.Size,
+    "v41 camera cut appended without moving physics or asset slots");
+Check(Marshal.SizeOf(apiTable) == Offset("Camera_NotifyCameraCut") + IntPtr.Size,
+    "full current API table size includes the appended camera cut slot");
+var bodyRemove = apiTable.GetField("Body_Remove")!.FieldType;
+Check(bodyRemove.IsFunctionPointer && bodyRemove.GetFunctionPointerReturnType() == typeof(int) &&
+    bodyRemove.GetFunctionPointerParameterTypes().SequenceEqual(new[] { typeof(ObjectHandle), typeof(ulong) }),
+    "body removal function pointer signature");
+var bodyShapeRole = apiTable.GetField("Body_ShapeRole")!.FieldType;
+Check(bodyShapeRole.IsFunctionPointer && bodyShapeRole.GetFunctionPointerReturnType() == typeof(int) &&
+    bodyShapeRole.GetFunctionPointerParameterTypes().SequenceEqual(new[]
+    {
+        typeof(ObjectHandle), typeof(ulong), typeof(uint), typeof(byte).MakePointerType()
+    }), "shape role function pointer signature");
+var cameraCut = apiTable.GetField("Camera_NotifyCameraCut")!.FieldType;
+Check(cameraCut.IsFunctionPointer && cameraCut.GetFunctionPointerReturnType() == typeof(void) &&
+    cameraCut.GetFunctionPointerParameterTypes().SequenceEqual(new[] { typeof(ObjectHandle) }),
+    "camera cut function pointer signature");
 var summary = assembly.GetType("CreatorEngine.NativePhysicsQueryResult", true)!;
 Check(Marshal.SizeOf(summary) == 12, "query summary layout");
 
@@ -75,7 +110,7 @@ Check(Marshal.OffsetOf<CharacterMovementState>(nameof(CharacterMovementState.For
 Check(character.Jump() == PhysicsError.WrongPhase, "unbound jump");
 Check(character.ForceVelocity(default, 1) == PhysicsError.WrongPhase, "unbound force");
 Check(character.CancelForcedVelocity() == PhysicsError.WrongPhase, "unbound cancel");
-Console.WriteLine($"PHYSICS_SCRIPT_ABI_OK checks={checks} version=40");
+Console.WriteLine($"PHYSICS_SCRIPT_ABI_OK checks={checks} version={apiVersion}");
 
 var contactType = typeof(PhysicsHit).Assembly.GetType("CreatorEngine.NativeContact")!;
 Check(Marshal.SizeOf(contactType) == 128, "contact ABI size");

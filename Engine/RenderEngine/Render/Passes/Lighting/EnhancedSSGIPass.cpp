@@ -8,6 +8,7 @@
 #include "EnhancedSSGIShaders.h"
 
 #include <algorithm>
+#include <bit>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // 남은 단계(순서대로 채운다):
@@ -70,6 +71,8 @@ namespace
         float         depthTolerance{ 0.f };
         float         pad0{ 0.f };
         float         pad1[2]{};
+        uint32_t hasMotion{}, renderWidth{}, renderHeight{}, motionPadding{};
+        float jitterDeltaX{}, jitterDeltaY{}, temporalPadding[2]{};
     };
 
     struct FilterParams
@@ -314,14 +317,21 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     }
     m_history = history;
     m_historyDepth = depth;
-    m_historyValid = false;
+    // A new extent has no previous radiance/depth or sample sequence. This
+    // also covers recreation without an accompanying shared temporal reset.
+    ResetHistory();
     m_historyState.fill(RHIResourceState::ShaderResource);
     m_historyDepthState.fill(RHIResourceState::ShaderResource);
     return true;
 }
 bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
-    (void)outError;
+    if (!context.temporalDiagnosticCapture && m_tuning.intensity <= 0.f)
+    {
+        ResetHistory();
+        return true;
+    }
+    if (context.temporalFrame.realFrameId && context.temporalFrame.reset) ResetHistory();
 
     // GI 해상도는 화면의 1/2. 0이 되지 않게 하한을 둔다 — 창을 아주 작게
     // 줄이면 Dispatch가 0이 되고, 그러면 조용히 아무것도 안 그린다.
@@ -343,7 +353,7 @@ bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::st
 
     // 프레임마다 노이즈를 돌리기 위한 인덱스. 시간축이 샘플 수를 대신하려면
     // 프레임마다 다른 방향을 봐야 한다.
-    ++m_frameIndex;
+    // Next sample is consumed only by an accepted submission.
 
     // 히스토리 슬롯을 번갈아 쓴다. 이번 프레임이 쓰는 것과 지난 프레임이
     // 쓴 것이 달라야 한다 — 같으면 읽으면서 쓰게 된다.
@@ -388,6 +398,16 @@ void EnhancedSSGIPass::ReleaseHistory(const EnhancedFrameContext& context)
 
 void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    // Handles belong to this graph, including frames where GI is bypassed.
+    m_output = m_traceResult = m_resolved = m_filtered = {};
+    m_hiZMips.fill({});
+    m_historyHandle.fill({});
+    m_historyDepthHandle.fill({});
+    if (!context.temporalDiagnosticCapture && m_tuning.intensity <= 0.f)
+    {
+        ResetHistory();
+        return;
+    }
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
@@ -403,7 +423,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     const bool hasCamera = context.camera != nullptr;
     const auto viewProjection = hasCamera
         ? context.camera->view * context.camera->projection : math::matrix4x4{};
-    m_resourceRetirement.WatchRecording([this] { ResetHistory(); }, [this, hasCamera, viewProjection]
+    const uint32_t writeIndex = (m_historyIndex + 1) % kHistoryCount;
+    const uint32_t sampleFrame = m_frameIndex + 1;
+    m_resourceRetirement.WatchRecording({}, [this, hasCamera, viewProjection, writeIndex, sampleFrame]
     {
         if (hasCamera)
         {
@@ -411,8 +433,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             m_hasPreviousFrame = true;
         }
         m_historyValid = true;
+        m_historyIndex = writeIndex;
+        m_frameIndex = sampleFrame;
     });
-    m_historyIndex = (m_historyIndex + 1) % kHistoryCount;
+
 
     // ── 히스토리를 그래프에 들인다 (R4-2b) ──
     //
@@ -566,6 +590,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 encoder.Dispatch((targetWidth + 7) / 8, (targetHeight + 7) / 8, 1);
             });
         graph.DeclareComputeCompatible(buildPass);
+        graph.DeclareRecordingIndependent(buildPass);
     }
 
     // ── 2단계: 트레이스 ──
@@ -602,7 +627,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.depthWidth = m_giWidth;
                 params.depthHeight = m_giHeight;
                 params.mipCount = m_hiZMipCount;
-                params.frameIndex = m_frameIndex;
+                params.frameIndex = m_frameIndex + 1;
                 // 라이팅이 없으면 대체물(Hi-Z 0)이 꽂히므로 그 해상도를 준다.
                 params.lightingWidth = m_inputs.lighting.IsValid() ? context.width : m_giWidth;
                 params.lightingHeight = m_inputs.lighting.IsValid() ? context.height : m_giHeight;
@@ -668,6 +693,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 encoder.Dispatch((m_giWidth + 7) / 8, (m_giHeight + 7) / 8, 1);
             });
         graph.DeclareComputeCompatible(tracePass);
+        graph.DeclareRecordingIndependent(tracePass);
     }
 
     // ── 3~5단계 공통 ──
@@ -754,6 +780,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         // The keep-alive flag on Composite is a culling root, not a CPU side
         // effect. These callbacks only read declared inputs and dispatch a UAV.
         graph.DeclareComputeCompatible(stagePass);
+        graph.DeclareRecordingIndependent(stagePass);
     };
 
     // ── 3단계: 리졸브(재투영 + 누적) ──
@@ -765,15 +792,26 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             params.inverseView = math::transpose(context.camera->inverseView);
         }
         params.previousViewProjection = math::transpose(m_previousViewProjection);
+        if (context.temporalFrame.camera.valid)
+        {
+            const auto view=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.viewMatrix);
+            const auto projection=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.projectionMatrix);
+            const auto previous=std::bit_cast<math::matrix4x4>(context.temporalFrame.camera.clipToPreviousClip);
+            params.previousViewProjection=math::transpose(view*projection*previous);
+        }
+        params.hasMotion=m_inputs.motionVectors.IsValid() && m_inputs.responsiveMask.IsValid() && m_inputs.reactiveMask.IsValid();
+        params.renderWidth=context.width;params.renderHeight=context.height;
+        params.jitterDeltaX=context.temporalFrame.previousJitterX-context.temporalFrame.jitterX;
+        params.jitterDeltaY=context.temporalFrame.previousJitterY-context.temporalFrame.jitterY;
         params.width = m_giWidth;
         params.height = m_giHeight;
-        params.hasHistory = (m_historyValid && m_hasPreviousFrame) ? 1u : 0u;
+        params.hasHistory = (m_historyValid && m_hasPreviousFrame && (!context.temporalFrame.realFrameId || !context.temporalFrame.reset)) ? 1u : 0u;
         params.maxAccum = kMaxAccumFrames;
         // 실측으로 조일 값이다. 너무 크면 다른 표면을 같은 것으로 보고,
         // 너무 작으면 정지 상태에서도 히스토리를 버린다.
         params.depthTolerance = m_tuning.accumDepthTolerance;
 
-        const uint32_t readIndex = (m_historyIndex + kHistoryCount - 1) % kHistoryCount;
+        const uint32_t readIndex = m_historyIndex;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({m_traceResult, RHIResourceState::ShaderResource, readAccess});
@@ -785,6 +823,12 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         if (m_inputs.normal.IsValid())
         {
             usages.push_back({m_inputs.normal, RHIResourceState::ShaderResource, readAccess});
+        }
+        if (params.hasMotion)
+        {
+            usages.push_back({m_inputs.motionVectors,RHIResourceState::ShaderResource,readAccess});
+            usages.push_back({m_inputs.responsiveMask,RHIResourceState::ShaderResource,readAccess});
+            usages.push_back({m_inputs.reactiveMask,RHIResourceState::ShaderResource,readAccess});
         }
         usages.push_back({m_resolved, RHIResourceState::UnorderedAccess, writeAccess});
 
@@ -809,6 +853,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         // 없는 것만 대체물로 채운다.
         std::vector<RGHandle> ordered{m_traceResult, m_hiZMips[0]};
         ordered.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
+        ordered.push_back(params.hasMotion ? m_inputs.motionVectors : m_hiZMips[0]);
+        ordered.push_back(params.hasMotion ? m_inputs.responsiveMask : m_hiZMips[0]);
+        ordered.push_back(params.hasMotion ? m_inputs.reactiveMask : m_hiZMips[0]);
 
         std::vector<RHITextureHandle> orderedExternal{m_history[readIndex], m_historyDepth[readIndex]};
 
@@ -916,18 +963,18 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         // SRV → COPY_DEST → SRV 전이를 걸었고, 그 앞뒤 상태를 단정하고 있었다.
         if (versioned)
         {
-            m_historyHandle[m_historyIndex] = graph.Write(m_historyHandle[m_historyIndex]);
-            m_historyDepthHandle[m_historyIndex] = graph.Write(m_historyDepthHandle[m_historyIndex]);
+            m_historyHandle[writeIndex] = graph.Write(m_historyHandle[writeIndex]);
+            m_historyDepthHandle[writeIndex] = graph.Write(m_historyDepthHandle[writeIndex]);
         }
-        usages.push_back({m_historyHandle[m_historyIndex], RHIResourceState::CopyDest, writeAccess});
-        usages.push_back({m_historyDepthHandle[m_historyIndex], RHIResourceState::CopyDest, writeAccess});
+        usages.push_back({m_historyHandle[writeIndex], RHIResourceState::CopyDest, writeAccess});
+        usages.push_back({m_historyDepthHandle[writeIndex], RHIResourceState::CopyDest, writeAccess});
 
-        const RGHandle historyTarget = m_historyHandle[m_historyIndex];
-        const RGHandle historyDepthTarget = m_historyDepthHandle[m_historyIndex];
+        const RGHandle historyTarget = m_historyHandle[writeIndex];
+        const RGHandle historyDepthTarget = m_historyDepthHandle[writeIndex];
 
         // Keep the persistent-history copy on graphics; the compute author
         // declarations above intentionally cover only the dispatch stages.
-        graph.AddPass(
+        const auto historyPass = graph.AddPass(
             "SSGI.StoreHistory", usages,
             [this, historyTarget, historyDepthTarget](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 RHIEncoder& encoder = *executeContext.encoder;
@@ -938,6 +985,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                                      executeContext.ResolveHandle(m_hiZMips[0]));
             },
             true);
+        // Copy commands consume GPU results only; handles are fixed by Declare.
+        // Graphics queue ownership stays unchanged.
+        graph.DeclareRecordingIndependent(historyPass);
     }
 
 }

@@ -303,6 +303,12 @@
     <ClInclude Include="RuntimeSettings.h">
       <Filter>RuntimeSettings</Filter>
     </ClInclude>
+    <ClInclude Include="TemporalProductSettings.h">
+      <Filter>RuntimeSettings</Filter>
+    </ClInclude>
+    <ClInclude Include="TemporalProductSettingsIO.h">
+      <Filter>RuntimeSettings</Filter>
+    </ClInclude>
     <ClInclude Include="SpinLock.h">
       <Filter>Core.Memory\SpinLock</Filter>
     </ClInclude>

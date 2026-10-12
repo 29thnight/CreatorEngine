@@ -5,15 +5,19 @@
 #include "MaterialGraphSurfaceBatch.h"
 #include "Render/Graph/EnhancedRenderPass.h"
 
+#include <span>
+#include <vector>
+
 namespace material_graph
 {
 struct MeshSurfaceBufferPool;
 struct MeshSurfaceStaticBuffers;
 struct MeshSurfaceStaticCache;
+struct MeshTransformDispatch;
 struct MeshSurfaceCacheStats
 {
     std::uint64_t uploads{}, uploadedBytes{}, hits{}, residentBytes{}, entries{};
-    std::uint64_t transforms{}, transformHits{}, cachedOutputBytes{};
+    std::uint64_t transforms{}, transformHits{}, cachedOutputBytes{}, cachedOutputs{};
 };
 class MeshSurfacePlan;
 
@@ -35,6 +39,10 @@ class MeshSurfaceInput
     std::span<const PackedBoneMatrix> Bones() const { return poseOwner_ ? poseOwner_->Bones() : std::span<const PackedBoneMatrix>(bones_); }
     std::span<const float> Lods() const { return staticOwner_ ? staticOwner_->Lods() : std::span<const float>(lods_); }
     std::uint32_t Count() const { return static_cast<std::uint32_t>(Lods().size()); }
+    const experiment::MeshletPayload& Meshlets() const { return staticOwner_ ? staticOwner_->Meshlets() : meshlets_; }
+    std::span<const uint32_t> SourceVertexIds() const { return staticOwner_ ? staticOwner_->SourceVertexIds() : std::span<const uint32_t>(sourceVertexIds_); }
+    uint32_t SourceVertexCount() const { return staticOwner_ ? staticOwner_->SourceVertexCount() : sourceVertexCount_; }
+    uint32_t SourcePrimitiveCount() const { return staticOwner_ ? staticOwner_->SourcePrimitiveCount() : sourcePrimitiveCount_; }
     bool Matches(const MeshSurfaceInput& other) const;
 
   private:
@@ -49,6 +57,9 @@ class MeshSurfaceInput
     SurfaceView view_;
     std::vector<std::byte> vertices_;
     std::vector<std::uint32_t> indices_;
+    experiment::MeshletPayload meshlets_;
+    std::vector<std::uint32_t> sourceVertexIds_;
+    uint32_t sourcePrimitiveCount_{}, sourceVertexCount_{};
     std::vector<PackedBoneMatrix> bones_;
     std::vector<float> lods_;
     // A per-frame pose can share validated, immutable product bytes with the
@@ -106,6 +117,7 @@ class MeshSurfacePlan
     const std::shared_ptr<const MeshSurfaceInput>& Source() const { return source_; }
     const MeshSurfacePlanCost& Cost() const { return cost_; }
     bool Matches(const MeshSurfacePlan& other) const;
+    bool SharesSceneTopology(const MeshSurfacePlan& other) const;
 
   private:
     MeshSurfacePlan() = default;
@@ -164,6 +176,10 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     uint32_t MeshletCount() const;
     RGHandle GraphMeshlets(const EnhancedRenderGraph& graph) const;
     bool Declare(EnhancedRenderGraph& graph, std::string& error) const;
+    // One transform pass, one readiness pass and one reuse pass for the whole
+    // set, so graph and profiler pass counts do not grow with the mesh count.
+    static bool DeclareBatch(EnhancedRenderGraph& graph, std::span<const MeshSurfaceBatch* const> batches,
+                             std::string& error);
     void MarkSubmitted(RHICompletionPoint completion) const { completion_ = completion; }
     bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;
 
@@ -171,6 +187,14 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     friend class MeshSurfaceEvaluator;
     MeshSurfaceBatch() = default;
     bool RecordCommands(RHIEncoder& encoder, std::string& error) const;
+    static bool PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                                std::shared_ptr<MeshTransformDispatch>& result, std::string& error);
+    static bool RecordDispatch(RHIEncoder& encoder,
+                               std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                               const MeshTransformDispatch& dispatch, std::string& error);
+    // Imports inputs/output and appends this mesh's usages; adds no pass.
+    bool DeclareResources(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& inputs,
+                          bool& reused, std::string& error) const;
     IRenderDeviceServices* device_{};
     RHIBufferHandle buffer_;
     std::shared_ptr<MeshSurfaceBufferPool> bufferPool_;
@@ -178,19 +202,19 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     // Reuse only immutable, completed outputs. Recording/descriptors stay local.
     std::shared_ptr<const MeshSurfaceBatch> transformedOwner_;
     mutable std::uint64_t lastReuseRecording_{};
+    mutable std::uint64_t lastUsedGeneration_{};
     mutable RHICompletionPoint completion_{};
     mutable RHIResourceState bufferState_{RHIResourceState::Common};
     std::shared_ptr<const MeshSurfaceInput> input_;
     std::shared_ptr<const MeshSurfaceBatch> source_;
     std::vector<MeshSurfaceSample> samples_;
     std::uint32_t count_{};
-    std::uint64_t recordingId_{};
+    std::uint64_t recordingId_{}, auditRealFrame_{}, auditView_{};
     std::uint64_t descriptorVersion_{};
     std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
     // Immediate sampler ownership must not make this a prepared world transform.
     std::shared_ptr<const LX::Runtime::ComputeGeneration> samplePipeline_;
-    RHIBufferSlice vertices_, bones_, lods_, uniform_;
-    RHIBindingTable output_;
+
     std::weak_ptr<const MeshSurfaceBatch> self_;
     mutable std::atomic<unsigned> recordedStages_{};
     mutable std::atomic<bool> declared_{};
@@ -217,8 +241,12 @@ class MeshSurfaceEvaluator
     // Prepare after PrepareParallel, then Declare before raster/material consumers.
     // This records the current pose inside the same graph without an earlier submit.
     bool Prepare(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
-                 std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error, bool cacheStatic = false);
+                 std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error, bool cacheStatic = false,
+                 std::uint64_t auditRealFrame = 0, std::uint64_t auditView = 0);
     void NotifyCompleted(std::uint64_t completed) const;
+    // Advance once per upload recording, including empty scene frames. Active
+    // outputs have scene lifetime; only unused, completed owners are retired.
+    void BeginFrame(std::uint64_t recording);
     MeshSurfaceCacheStats CacheStats() const;
     // Interpolate UV/world frame at exact sample locations BEFORE graph evaluation
     // and IBL bake. This never interpolates already evaluated materials/radiance.
@@ -234,5 +262,6 @@ class MeshSurfaceEvaluator
     std::shared_ptr<MeshSurfaceStaticCache> staticCache_;
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformedCache_;
     std::uint64_t transformedBytes_{}, transforms_{}, transformHits_{};
+    std::uint64_t cacheRecording_{}, cacheGeneration_{};
 };
 } // namespace material_graph

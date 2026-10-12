@@ -85,6 +85,8 @@
     <ClInclude Include="EngineMode.h" />
     <ClInclude Include="EnginePaths.h" />
     <ClInclude Include="RuntimeSettings.h" />
+    <ClInclude Include="TemporalProductSettings.h" />
+    <ClInclude Include="TemporalProductSettingsIO.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="ProgressSink.h" />
     <ClInclude Include="TypeDefinition.h" />

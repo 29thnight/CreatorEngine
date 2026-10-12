@@ -8,11 +8,11 @@ namespace experiment::cooked
     // Independent CEMF3 payloads. These do not change the CEMC v11 contract.
     inline constexpr std::uint32_t kModelDescriptorRepresentation = 2u;
     inline constexpr std::uint32_t kModelGeometryRepresentation = 1u;
-    inline constexpr std::uint32_t kModelGeometryArtifactVersion = 1u;
+    inline constexpr std::uint32_t kModelGeometryArtifactVersion = 2u;
     inline constexpr std::uint32_t kSkeletonRepresentation = 1u;
     inline constexpr std::uint32_t kAnimationClipRepresentation = 1u;
-    // Version 4 retains v3 Material edges and persists the captured collider policy.
-    inline constexpr std::uint32_t kModelDescriptorVersion = 4u;
+    // Version 5 requires the canonical LX profile-2 geometry contract.
+    inline constexpr std::uint32_t kModelDescriptorVersion = 5u;
     inline constexpr std::uint32_t kSkeletonArtifactVersion = 1u;
     inline constexpr std::uint32_t kAnimationClipArtifactVersion = 1u;
     inline constexpr std::size_t kModelSubAssetMaxBytes = 256u * 1024u * 1024u;
@@ -113,8 +113,7 @@ namespace experiment::cooked
         std::span<const AssetDependency> dependencies, std::string& failure);
     [[nodiscard]] bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value,
         std::vector<std::byte>& out, std::string& failure);
-    // 정본 geometry 오류는 실패한다. 손상된 선택적 meshlet/LOD만 버릴 수 있게
-    // section을 따로 경계 짓고 indexed fallback 경고를 선택적으로 돌려준다.
+    // Geometry, meshlet and LOD errors reject the complete artifact; force recook.
     [[nodiscard]] bool ReadModelGeometryArtifact(std::span<const std::byte> bytes,
         ModelGeometryArtifact& out, std::string& failure,
         std::vector<std::string>* warnings = nullptr);

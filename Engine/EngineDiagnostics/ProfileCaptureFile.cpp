@@ -42,6 +42,7 @@ namespace ce::detail::capture_file_impl
         frames      = 4,
         counters    = 5,
         counter_descriptors = 6,
+        render_measurements = 7,
     };
     constexpr std::uint32_t kChunkVersion = 1;
 
@@ -271,6 +272,22 @@ namespace ce::detail::capture_file_impl
                 out.put(sample.cpu.session);
                 out.put(sample.cpu.tick);
                 out.put(sample.cpu.task);
+            }
+        }
+        return out.take();
+    }
+
+    std::vector<std::byte> encode_render_measurements(const capture_session& capture)
+    {
+        byte_writer out;
+        out.put(capture.frame_count());
+        for (const auto& frame : capture.frames())
+        {
+            out.put(frame.engine_frame);
+            out.put(static_cast<std::uint32_t>(frame.render_measurements.size()));
+            for (const auto& sample : frame.render_measurements)
+            {
+                encode_render_measurement(out, sample);
             }
         }
         return out.take();
@@ -514,6 +531,34 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
+    parse_result parse_render_measurements(byte_reader in, std::vector<frame_record>& frames,
+                                            bool allow_presenter)
+    {
+        std::uint32_t count = 0;
+        if (!in.get(count) || count != frames.size() || !in.can_hold(count, 8))
+        {
+            return std::unexpected(capture_file_error::malformed);
+        }
+        for (auto& frame : frames)
+        {
+            std::uint32_t engineFrame = 0, samples = 0;
+            if (!in.get(engineFrame) || engineFrame != frame.engine_frame || !in.get(samples) ||
+                !in.can_hold(samples, kRenderMeasurementWireBytes))
+            {
+                return std::unexpected(capture_file_error::malformed);
+            }
+            frame.render_measurements.resize(samples);
+            for (auto& sample : frame.render_measurements)
+            {
+                if (!decode_render_measurement(in, sample, allow_presenter) || sample.engine_frame != frame.engine_frame)
+                {
+                    return std::unexpected(capture_file_error::malformed);
+                }
+            }
+        }
+        return finish(in);
+    }
+
     // ── 머리와 청크 표 ───────────────────────────────────────────────────────
     struct chunk_entry
     {
@@ -544,7 +589,7 @@ namespace ce::detail::capture_file_impl
         {
             return std::unexpected(capture_file_error::truncated);
         }
-        if (version > kCaptureFileVersion)
+        if (version != 1 && version != 2 && version != 4 && version != kCaptureFileVersion)
         {
             return std::unexpected(capture_file_error::unsupported_version);
         }
@@ -607,13 +652,14 @@ namespace ce
     std::vector<std::byte> encode_capture(const capture_session& capture)
     {
         using namespace ce::detail::capture_file_impl;
-        const std::array<std::pair<chunk_type, std::vector<std::byte>>, 6> chunks{ {
+        const std::array<std::pair<chunk_type, std::vector<std::byte>>, 7> chunks{ {
             { chunk_type::environment, encode_environment(capture) },
             { chunk_type::markers,     encode_markers(capture) },
             { chunk_type::threads,     encode_threads(capture) },
             { chunk_type::frames,      encode_frames(capture) },
             { chunk_type::counters,    encode_counters(capture) },
             { chunk_type::counter_descriptors, encode_counter_descriptors(capture) },
+            { chunk_type::render_measurements, encode_render_measurements(capture) },
         } };
 
         byte_writer out;
@@ -625,7 +671,8 @@ namespace ce
         for (const auto& [type, body] : chunks)
         {
             out.put(static_cast<std::uint32_t>(type));
-            out.put((type == chunk_type::frames || type == chunk_type::threads || type == chunk_type::counters) ? std::uint32_t{2} : kChunkVersion);
+            out.put((type == chunk_type::frames || type == chunk_type::threads || type == chunk_type::counters ||
+                     type == chunk_type::render_measurements) ? std::uint32_t{2} : kChunkVersion);
             out.put(offset);
             out.put(static_cast<std::uint64_t>(body.size()));
             out.put(crc32(body));
@@ -650,7 +697,7 @@ namespace ce
         {
             return std::unexpected(capture_file_error::resource_limit);
         }
-        std::size_t size = 16 + 6 * 32 + 13 + 4 + 4 + 4 + 12 + 4;
+        std::size_t size = 16 + 7 * 32 + 13 + 4 + 4 + 4 + 12 + 4 + 4;
         const auto add = [&](std::size_t count)
         {
             if (size > max_wire_bytes || count > max_wire_bytes - size)
@@ -677,17 +724,28 @@ namespace ce
             }
         }
         std::size_t counter_count = 0;
+        std::size_t measurement_count = 0;
         for (const auto& frame : capture.frames())
         {
             if (frame.counters.size() > 4096 || frame.events.size() > 2097152 ||
-                !add(40 + frame.events.size() * 62 + frame.counters.size() * 34))
+                frame.render_measurements.size() > 65536 ||
+                !add(48 + frame.events.size() * 62 + frame.counters.size() * 34 +
+                    frame.render_measurements.size() * kRenderMeasurementWireBytes))
             {
                 return std::unexpected(capture_file_error::resource_limit);
             }
             counter_count += frame.counters.size();
-            if (counter_count > 1048576)
+            measurement_count += frame.render_measurements.size();
+            if (counter_count > 1048576 || measurement_count > 1048576)
             {
                 return std::unexpected(capture_file_error::resource_limit);
+            }
+            for (const auto& sample : frame.render_measurements)
+            {
+                if (!sample.valid() || sample.engine_frame != frame.engine_frame)
+                {
+                    return std::unexpected(capture_file_error::malformed);
+                }
             }
         }
         for (const auto& counter : capture.counter_descriptors())
@@ -726,9 +784,10 @@ namespace ce
         std::uint32_t seen = 0;
         std::uint64_t events = 0;
         std::uint64_t counters = 0;
+        std::uint64_t measurements = 0;
         for (const auto& entry : *table)
         {
-            if (entry.type < 1 || entry.type > 6 || (seen & (1u << entry.type)) != 0)
+            if (entry.type < 1 || entry.type > 7 || (seen & (1u << entry.type)) != 0)
             {
                 return std::unexpected(capture_file_error::malformed);
             }
@@ -748,7 +807,7 @@ namespace ce
                 return std::unexpected(capture_file_error::malformed);
             }
             std::uint32_t count = 0;
-            if (!in.get(count) || count > ((entry.type == 4 || entry.type == 5) ? 4096u : 65535u))
+            if (!in.get(count) || count > ((entry.type == 4 || entry.type == 5 || entry.type == 7) ? 4096u : 65535u))
             {
                 return std::unexpected(capture_file_error::resource_limit);
             }
@@ -766,6 +825,14 @@ namespace ce
                 else if (entry.type == 6)
                 {
                     valid = in.skip(6) && string_fits() && string_fits();
+                }
+                else if (entry.type == 7)
+                {
+                    std::uint32_t samples = 0;
+                    valid = in.skip(4) && in.get(samples);
+                    measurements += samples;
+                    valid = valid && samples <= 65536 && measurements <= 1048576 &&
+                        in.skip(static_cast<std::size_t>(samples) * kRenderMeasurementWireBytes);
                 }
                 else
                 {
@@ -823,6 +890,10 @@ namespace ce
         std::uint32_t               seen = 0;   // 필수 청크 넷의 비트
         std::span<const std::byte> countersBody{};
         std::uint32_t countersVersion = 1;
+        std::span<const std::byte> measurementsBody{};
+        std::uint32_t formatVersion = 0;
+        byte_reader header(bytes.subspan(kMagic.size()));
+        header.get(formatVersion);
 
         for (const chunk_entry& entry : *table)
         {
@@ -832,13 +903,21 @@ namespace ce
             {
                 return std::unexpected(capture_file_error::checksum_mismatch);
             }
-            if (entry.version > ((entry.type == static_cast<std::uint32_t>(chunk_type::frames) || entry.type == static_cast<std::uint32_t>(chunk_type::threads) || entry.type == static_cast<std::uint32_t>(chunk_type::counters)) ? 2u : kChunkVersion))
+            const bool measurementChunk = entry.type == static_cast<std::uint32_t>(chunk_type::render_measurements);
+            const bool measurementVersionSupported =
+                (formatVersion == 4 && entry.version == 1) ||
+                (formatVersion == kCaptureFileVersion && entry.version == 2);
+            if ((measurementChunk && !measurementVersionSupported) ||
+                (!measurementChunk && (entry.version == 0 || entry.version >
+                    ((entry.type == static_cast<std::uint32_t>(chunk_type::frames) ||
+                      entry.type == static_cast<std::uint32_t>(chunk_type::threads) ||
+                      entry.type == static_cast<std::uint32_t>(chunk_type::counters)) ? 2u : kChunkVersion))))
             {
                 return std::unexpected(capture_file_error::unsupported_version);
             }
 
             parse_result parsed{};
-            const std::uint32_t bit = (entry.type >= 1 && entry.type <= 6) ? (1u << entry.type) : 0u;
+            const std::uint32_t bit = (entry.type >= 1 && entry.type <= 7) ? (1u << entry.type) : 0u;
             if (0 != (seen & bit))
             {
                 return std::unexpected(capture_file_error::malformed);   // 같은 청크가 둘
@@ -856,6 +935,7 @@ namespace ce
             case chunk_type::counters: countersBody = body; countersVersion = entry.version; break;
             case chunk_type::counter_descriptors:
                 parsed = parse_counter_descriptors(byte_reader(body), counterDescriptors); break;
+            case chunk_type::render_measurements: measurementsBody = body; break;
             default:
                 // 모르는 청크는 건너뛴다 — 같은 형식 버전 안에서 덧붙인 것이다.
                 // CRC 는 이미 봤으므로 손상은 아니다.
@@ -872,6 +952,18 @@ namespace ce
         {
             return std::unexpected(capture_file_error::malformed);
         }
+        if ((formatVersion == 4 || formatVersion == kCaptureFileVersion) != ((seen & (1u << 7)) != 0))
+        {
+            return std::unexpected(capture_file_error::malformed);
+        }
+        if ((seen & (1u << 7)) != 0)
+        {
+            if (const auto parsed = parse_render_measurements(byte_reader(measurementsBody), frames,
+                                                              formatVersion == kCaptureFileVersion); !parsed)
+            {
+                return std::unexpected(parsed.error());
+            }
+        }
         if (!countersBody.empty())
         {
             if (const parse_result parsed = parse_counters(byte_reader(countersBody), frames,
@@ -883,6 +975,13 @@ namespace ce
         const std::size_t knownCounters = counterDescriptors.empty() ? 5 : counterDescriptors.size();
         for (const frame_record& frame : frames)
         {
+            for (const auto& sample : frame.render_measurements)
+            {
+                if (sample.axis == profile_render_axis::gpu_pass && sample.marker >= markers.size())
+                {
+                    return std::unexpected(capture_file_error::malformed);
+                }
+            }
             for (const profile_counter_sample& sample : frame.counters)
             {
                 if (static_cast<std::uint16_t>(sample.id) > knownCounters)
@@ -982,7 +1081,7 @@ namespace ce
         std::uint32_t version = 0;
         std::memcpy(&version, header.data() + 8, sizeof(version));
         const auto count = (*recording)->frame_count();
-        if (version == kRecordingFileVersion)
+        if (version == 3 || version == 5 || version == kRecordingFileVersion)
         {
             const auto selected = static_cast<std::uint32_t>((std::min)(count, std::uint64_t{kDefaultRetainedFrames}));
             return (*recording)->load_range(count - selected, selected);

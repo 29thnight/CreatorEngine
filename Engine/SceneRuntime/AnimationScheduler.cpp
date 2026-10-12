@@ -535,6 +535,12 @@ void AnimationScheduler::Update(float deltaTime)
     for (Animator* animator : currentAnimators)
     {
         if (nullptr == animator || !animator->IsEnabled()) continue;
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        if (animator->GetInstance().diagnosticPoseOverride)
+        {
+            continue;
+        }
+#endif
         const bool hasExpiredController = std::any_of(animator->m_animationControllers.begin(),
             animator->m_animationControllers.end(),
             [](const std::shared_ptr<AnimationController>& controller) { return !controller; });

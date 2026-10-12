@@ -1,6 +1,9 @@
 #include "RHI/DX12/DX12Format.h"
-#include "Render/Passes/Geometry/EnhancedGBufferPass.h"
+#include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
+#include "GraphSceneFixture.h"
+#include "RHI/RHIModelMeshletUpload.h"
+
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -16,6 +19,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <mathematics/transform.hpp>
 #include <vector>
 
@@ -206,7 +212,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     frameContext.width = kSkinWidth;
     frameContext.height = kSkinHeight;
 
-    EnhancedGBufferPass gbuffer;
+    GraphSceneFixture gbuffer;
     if (!gbuffer.Initialize(frameContext, error))
     {
         outLog += "[1/5] GBuffer 초기화 실패: " + error + "\n";
@@ -276,6 +282,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         SkinCapture& outCapture) -> bool
     {
         frameContext.draws = &draws;
+        ++frameContext.frameId;
 
         if (!resources.BeginFrame(error))
         {
@@ -322,7 +329,8 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
             outLog += "EndFrame 실패: " + error + "\n";
             return false;
         }
-        resources.WaitForGpu();
+        if (!gbuffer.Publish(resources, frameContext.frameId, error) ||
+            !GraphSceneFixture::CompleteSubmission(resources, error)) return false;
 
         if (!resources.MapReadback(readback, outCapture.image, error))
         {
@@ -500,30 +508,25 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     // GBuffer만 스키닝하면 캐릭터는 움직이는데 그림자는 바인드 포즈로 남는다.
     // 그 증상은 '그림자가 좀 이상하다'로만 보여서 오래 방치되기 쉽다.
     //
-    // 그림자 맵을 직접 읽는 대신 캐스터 통계로 본다 — 스킨드 PSO로 그린
-    // 인스턴스가 실제로 있어야 하고, 팔레트도 올라가 있어야 한다.
+    // 캐스터는 제품과 같은 재질 그래프 경로로 그린다. 같은 장면을 바인드 포즈와
+    // 본을 흔든 포즈로 두 번 그려 맵이 실제로 달라지는지 본다 — 캐스터 수를 세는
+    // 것보다 강하다. 그림자가 팔레트를 무시하면 두 맵이 같아진다.
     if (passed)
     {
         RHIReadback shadowReadback{};
-        {
-            std::string readbackError;
-            if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
-                EnhancedShadowPass::kShadowMapSize, FromDXGI(DXGI_FORMAT_R32_FLOAT), 1,
-                shadowReadback, readbackError))
-            {
-                outLog += "[5/5] 그림자 리드백 생성 실패: " + readbackError + "\n";
-                passed = false;
-            }
-        }
-
         EnhancedShadowPass shadow;
-        if (!passed)
+        GraphSceneFixture casters;
+        char suiteFlag[8]{};
+        size_t suiteBytes{};
+        const bool suite = getenv_s(&suiteBytes, suiteFlag, sizeof(suiteFlag), "CREATOR_METEOR_SHADOW_CASE_SUITE") == 0 &&
+            std::strcmp(suiteFlag, "1") == 0;
+        if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
+                EnhancedShadowPass::kShadowMapSize, FromDXGI(DXGI_FORMAT_R32_FLOAT), 3,
+                shadowReadback, error) ||
+            !shadow.Initialize(frameContext, error) ||
+            !casters.Initialize(frameContext, error, suite ? .5f : 1.f))
         {
-            // 리드백 생성이 실패했으면 아래를 돌릴 이유가 없다.
-        }
-        else if (!shadow.Initialize(frameContext, error))
-        {
-            outLog += "[5/5] 그림자 초기화 실패: " + error + "\n";
+            outLog += "[5/5] 그림자 준비 실패: " + error + "\n";
             passed = false;
         }
         else
@@ -538,77 +541,292 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
             lights[0].color = math::color(1.f, 1.f, 1.f, 1.f);
             frameContext.lights = &lights;
             frameContext.draws = &draws;
-
-            if (!resources.BeginFrame(error) ||
-                !shadow.PrepareFrame(frameContext, error))
+            // 캐스터 드로우는 같은 팔레트 포인터를 들고 간다. 봉인이 프레임마다
+            // 그 시점의 포즈를 복사한다.
+            const std::vector<std::string> cases = suite
+                ? std::vector<std::string>{"base", "alpha-pass", "alpha-equal", "alpha-reject",
+                    "face-front", "face-back", "face-double", "transform", "boundary-near", "boundary-far", "far", "multi"}
+                : std::vector<std::string>{"base"};
+            for (const auto& caseName : cases)
             {
-                outLog += "[5/5] 그림자 준비 실패: " + error + "\n";
-                passed = false;
+            std::vector<EnhancedDrawItem> shadowCasters{
+                casters.Caster(draws[0]), casters.Caster(draws[1]) };
+            frameContext.shadowDraws = &shadowCasters;
+            auto& staticCaster = shadowCasters[1];
+            if (caseName.starts_with("alpha-"))
+            {
+                staticCaster.coverage.flags |= EnhancedMaterialCoverage::Masked;
+                staticCaster.coverage.cutoff = caseName == "alpha-pass" ? .4f : caseName == "alpha-equal" ? .5f : .6f;
             }
-            else
+            if (caseName.starts_with("face-"))
             {
+                if (caseName != "face-front")
+                {
+                    auto reversed = staticIndices;
+                    for (size_t triangle = 0; triangle < reversed.size(); triangle += 3)
+                        std::swap(reversed[triangle + 1], reversed[triangle + 2]);
+                    staticCaster = casters.Draw(casters.AddMesh(staticVertices, reversed), draws[1].worldMatrix);
+                }
+                if (caseName != "face-double") staticCaster.coverage.flags = EnhancedMaterialCoverage::Enabled;
+            }
+            if (caseName == "transform")
+            {
+                auto& world = staticCaster.worldMatrix;
+                world.m[0][0] = -1.7f; world.m[1][1] = .6f; world.m[2][2] = 1.2f;
+                world.m[0][1] = .3f;
+                world.m[3][0] = 8.f; world.m[3][1] = 3.f; world.m[3][2] = 2.f;
+            }
+            if (caseName.starts_with("boundary-"))
+            {
+                if (!shadow.PrepareGraphFrame(frameContext, error)) { passed = false; break; }
+                const float split = shadow.GetShadowData().splitDepths.x;
+                const float offset = caseName == "boundary-near" ? -.01f : .01f;
+                auto& world = staticCaster.worldMatrix;
+                // Tilt the quad across the camera's first split, with its center
+                // on either side. Camera here looks along +Z from (0,0,-10).
+                world.m[0][2] = .8f;
+                world.m[3][2] = split + offset - 10.f - 2.4f;
+                outLog += "SHADOW_BOUNDARY case=" + caseName + " split=" + std::to_string(split) +
+                    " centerDepth=" + std::to_string(split + offset) + " minDepth=" +
+                    std::to_string(split + offset - .4f) + " maxDepth=" + std::to_string(split + offset + .4f) + "\n";
+            }
+            if (caseName == "far")
+            {
+                auto& world = staticCaster.worldMatrix;
+                world.m[3][0] = -lightDirection.x * 1000.f;
+                world.m[3][1] = -lightDirection.y * 1000.f;
+                world.m[3][2] = -lightDirection.z * 1000.f;
+                const float depth = 10.f + world.m[3][2];
+                if (depth >= camera.nearPlane && depth <= camera.farPlane) passed = false;
+                outLog += "SHADOW_FAR viewDepth=" + std::to_string(depth) + " near=" +
+                    std::to_string(camera.nearPlane) + " far=" + std::to_string(camera.farPlane) + "\n";
+            }
+            if (caseName == "multi")
+            {
+                std::vector<Vertex> grid;
+                std::vector<uint32_t> indices;
+                for (unsigned y = 0; y <= 16; ++y)
+                    for (unsigned x = 0; x <= 16; ++x)
+                    {
+                        Vertex vertex{};
+                        vertex.position = {2.5f + x / 16.f, -1.f + y / 8.f, 0.f};
+                        vertex.normal = {0.f, 0.f, -1.f};
+                        grid.push_back(vertex);
+                    }
+                for (unsigned y = 0; y < 16; ++y)
+                    for (unsigned x = 0; x < 16; ++x)
+                    {
+                        const auto a = y * 17 + x;
+                        indices.insert(indices.end(), {a, a + 1, a + 18, a, a + 18, a + 17});
+                    }
+                staticCaster = casters.Draw(casters.AddMesh(grid, indices), draws[1].worldMatrix);
+                // Row bands form distinct meshlets; stretch across cascade clips
+                // so compaction must retain a proper subset, not just all/none.
+                staticCaster.worldMatrix.m[1][1] = 32.f;
+                outLog += "SHADOW_MULTI vertices=289 triangles=512 worldScaleY=32\n";
+            }
+            if (suite) outLog += "SHADOW_CASE case=" + caseName + " alpha=0.5 flags=" +
+                std::to_string(staticCaster.coverage.flags) + " cutoff=" + std::to_string(staticCaster.coverage.cutoff) + "\n";
+
+            const auto renderShadow = [&](RHIReadbackImage& outMap,
+                const char* label, std::array<math::matrix4x4, 3>& matrices) -> bool
+            {
+                ++frameContext.frameId;
+                if (!resources.BeginFrame(error) || !casters.Prepare(frameContext, shadow, error))
+                {
+                    outLog += "[5/5] 그림자 준비 실패: " + error + "\n";
+                    return false;
+                }
                 // ★ 그래프는 제출 이후까지 살아 있어야 한다.
                 EnhancedRenderGraph graph(resources);
-                shadow.Declare(graph, frameContext);
-
-                // ★ 소비자를 붙여야 한다.
-                //
-                // 그림자 패스는 hasSideEffect=false로 선언된다 — 실전에서는
-                // Deferred가 읽으므로 역방향 도달로 살아남지만, 여기에는 그
-                // 소비자가 없어 그래프가 통째로 걷어낸다. 실제로 첫 실행이
-                // '드로우 0 · 컬링 0'으로 그 사실을 알려 줬다(컬링 0이 결정적
-                // 단서다 — 판정까지 갔으면 컬린 수라도 셌을 것이다).
-                //
-                // 리드백을 붙이면 소비자가 생기는 동시에 '그림자 맵에 실제로
-                // 깊이가 남았는가'도 볼 수 있다.
-                const RGHandle shadowMap = shadow.GetShadowMap();
+                const RGHandle shadowMap = casters.Declare(graph, shadow, frameContext);
+                const auto outputs = casters.ShadowMeshletOutputs();
+                struct Readbacks {
+                    IRenderDeviceServices& device;
+                    std::vector<std::array<RHIReadback, 4>> rows;
+                    ~Readbacks() { for (auto& row : rows) for (auto& item : row) device.ReleaseReadback(item); }
+                } lists{resources};
+                if (outputs.empty()) { outLog += "Missing shadow compute outputs.\n"; return false; }
+                for (const auto& output : outputs) {
+                    const auto& geometry = output.frame->MeshletGeometry(output.bin);
+                    auto& row = lists.rows.emplace_back();
+                    if (!resources.CreateBufferReadback(20, row[0], error) ||
+                        !resources.CreateBufferReadback(geometry->MeshletCount() * 4, row[1], error) ||
+                        !resources.CreateBufferReadback(geometry->Count() * sizeof(material_graph::SurfacePoint), row[2], error) ||
+                        !resources.CreateBufferReadback(geometry->Meshlets().size, row[3], error)) return false;
+                    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                    output.frame->AddReadUsages(graph, uses);
+                    for (auto& use : uses) use.state = RHIResourceState::CopySource;
+                    uses.push_back({geometry->GraphOutput(graph), RHIResourceState::CopySource,
+                        graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read});
+                    uses.push_back({geometry->GraphMeshlets(graph), RHIResourceState::CopySource,
+                        graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read});
+                    graph.AddPass("Skinning.ShadowListReadback", uses, [output, row](const auto& execution) {
+                        execution.encoder->CopyBufferToReadback(row[0], output.frame->Arguments(), output.frame->ArgsOffset(output.bin));
+                        execution.encoder->CopyBufferToReadback(row[1], output.frame->VisibleIds(output.frame->MeshletOutputOffset(output.bin),
+                            output.frame->MeshletGeometry(output.bin)->MeshletCount()).buffer,
+                            std::uint64_t(output.frame->MeshletOutputOffset(output.bin)) * sizeof(std::uint32_t));
+                        execution.encoder->CopyBufferToReadback(row[2], output.frame->MeshletGeometry(output.bin)->Buffer());
+                        const auto data = output.frame->MeshletGeometry(output.bin)->Meshlets();
+                        execution.encoder->CopyBufferToReadback(row[3], data.buffer, data.offset);
+                    }, true);
+                }
+                // 리드백이 소비자다 — 없으면 그래프가 그림자 패스를 걷어낸다.
                 graph.AddPass("Skinning.ShadowReadback",
                     { { shadowMap, RHIResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        // 첫 캐스케이드만(서브리소스 0).
-                        executeContext.encoder->CopyToReadback(
-                            shadowReadback, executeContext.ResolveHandle(shadowMap), 0, 0);
+                        for (unsigned cascade = 0; cascade < 3; ++cascade)
+                            executeContext.encoder->CopyToReadback(
+                                shadowReadback, executeContext.ResolveHandle(shadowMap), cascade, cascade);
                     }, true);
-
-                if (!graph.Compile(error) ||
-                    !graph.Execute(error))
+                if (!graph.Compile(error) || !graph.Execute(error))
                 {
                     outLog += "[5/5] 그림자 실행 실패: " + error + "\n";
-                    passed = false;
+                    return false;
                 }
-
-                if (!resources.EndFrame(error))
+                if (!resources.EndFrame(error) || !casters.Publish(resources, frameContext.frameId, error) ||
+                    !GraphSceneFixture::CompleteSubmission(resources, error))
                 {
-                    outLog += "[5/5] EndFrame 실패: " + error + "\n";
-                    passed = false;
+                    outLog += "[5/5] 그림자 제출 실패: " + error + "\n";
+                    return false;
                 }
                 resources.WaitForGpu();
-
-                // 그림자 맵에 실제로 깊이가 남았는지 — 클리어 값(1.0)이 아닌
-                // 텍셀 수. 통계만 보면 '드로우는 냈는데 아무것도 안 그려진'
-                // 경우를 통과시킨다.
-                uint32_t shadowTexels = 0;
+                if (!resources.MapReadback(shadowReadback, outMap, error))
                 {
-                    RHIReadbackImage shadowCaptured{};
-                    std::string readbackError;
-                    if (resources.MapReadback(shadowReadback, shadowCaptured, readbackError))
-                    {
-                        for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
-                            for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
-                            {
-                                if (shadowCaptured.At(x, y, 0) < 0.999f) ++shadowTexels;
-                            }
+                    outLog += "[5/5] 그림자 리드백 실패: " + error + "\n";
+                    return false;
+                }
+                for (size_t outputIndex = 0; outputIndex < outputs.size(); ++outputIndex) {
+                    const auto& output = outputs[outputIndex];
+                    const auto& geometry = output.frame->MeshletGeometry(output.bin);
+                    std::array<RHIReadbackImage, 4> images;
+                    for (unsigned i = 0; i < 4; ++i)
+                        if (!resources.MapReadback(lists.rows[outputIndex][i], images[i], error)) return false;
+                    const auto args = images[0].Elements<RHIDrawIndexedIndirectArguments>();
+                    const auto ids = images[1].Elements<std::uint32_t>();
+                    const auto points = images[2].Elements<material_graph::SurfacePoint>();
+                    const auto count = geometry->MeshletCount();
+                    if (images[0].ElementCount<RHIDrawIndexedIndirectArguments>() != 1 || args[0].indexCount > count || args[0].instanceCount != 1 || args[0].firstIndex != 1 ||
+                        images[1].ElementCount<std::uint32_t>() != count || images[2].ElementCount<material_graph::SurfacePoint>() != geometry->Count()) { outLog += "Invalid shadow list capacity/arguments.\n"; return false; }
+                    const auto& topology = geometry->Input()->Meshlets();
+                    if (topology.descriptors.size() != count) return false;
+                    const auto& sealed = *geometry->Input();
+                    RHIModelMeshletUpload packed;
+                    if (!PackMeteorMeshletGpuPayload(topology, sealed.Count(), sealed.Geometry().vertexStride,
+                        sealed.Geometry().vertexAttributeMask, sealed.Geometry().sourceLodIndex,
+                        sealed.SourcePrimitiveCount(), sealed.SourceVertexCount(), sealed.SourceVertexIds(), packed, error)) return false;
+                    if (images[3].data.size() != packed.bytes.size() ||
+                        std::memcmp(images[3].data.data(), packed.bytes.data(), packed.bytes.size()) != 0)
+                    { outLog += "METEOR GPU cooked meshlet payload identity mismatch.\n"; return false; }
+                    outLog += "MESHLET_GPU_PAYLOAD case=" + caseName + " label=" + label + " cascade=" +
+                        std::to_string(output.cascade) + " bytes=" + std::to_string(packed.bytes.size()) +
+                        " schema=2 profile=2 identity=exact\n";
+                    std::vector<bool> survivors(count);
+                    for (unsigned i = 0; i < args[0].indexCount; ++i) {
+                        if (ids[i] >= count || survivors[ids[i]]) { outLog += "Invalid/duplicate survivor ID.\n"; return false; }
+                        survivors[ids[i]] = true;
+                    }
+                    const auto& matrix = shadow.GetShadowData().lightViewProjection[output.cascade];
+                    unsigned required{}, missing{}, extra{};
+                    for (unsigned meshlet = 0; meshlet < count; ++meshlet) {
+                        const auto& descriptor = topology.descriptors[meshlet];
+                        unsigned outside = 63;
+                        for (unsigned vertex = 0; vertex < descriptor.vertexCount; ++vertex) {
+                            const auto& p = points[topology.vertexRemap[descriptor.vertexOffset + vertex]].position;
+                            const float pos[4]{p[0], p[1], p[2], 1}; float clip[4]{};
+                            for (unsigned c = 0; c < 4; ++c) for (unsigned r = 0; r < 4; ++r) clip[c] += pos[r] * matrix.m[r][c];
+                            const float epsilon = std::max({1.f, std::abs(clip[0]), std::abs(clip[1]), std::abs(clip[2]), std::abs(clip[3])}) * 1e-5f;
+                            unsigned mask{};
+                            if (std::ranges::all_of(clip, [](float v) { return std::isfinite(v); }))
+                                mask = (clip[0] < -clip[3] - epsilon ? 1u : 0u) | (clip[0] > clip[3] + epsilon ? 2u : 0u) |
+                                    (clip[1] < -clip[3] - epsilon ? 4u : 0u) | (clip[1] > clip[3] + epsilon ? 8u : 0u) |
+                                    (clip[2] < -epsilon ? 16u : 0u) | (clip[2] > clip[3] + epsilon ? 32u : 0u);
+                            outside &= mask;
+                        }
+                        const bool expected = outside == 0;
+                        required += expected; missing += expected && !survivors[meshlet]; extra += !expected && survivors[meshlet];
+                    }
+                    outLog += "SHADOW_LIST " + std::string(suite ? "case=" + caseName + " " : "") + "label=" + label +
+                        " cascade=" + std::to_string(output.cascade) + " draw=" + std::to_string(outputIndex / 3) +
+                        " candidates=" + std::to_string(count) + " required=" + std::to_string(required) +
+                        " survivors=" + std::to_string(args[0].indexCount) + " missing=" + std::to_string(missing) +
+                        " extra=" + std::to_string(extra) + "\n";
+                    if (missing) { outLog += "CPU-required meshlet missing from GPU list.\n"; return false; }
+                    if (suite && caseName == "multi" && output.cascade == 0 && count > 1 &&
+                        (required == 0 || required == count)) {
+                        outLog += "Multi-meshlet fixture did not exercise partial compaction.\n"; return false;
                     }
                 }
+                const auto routes = casters.RecordedShadowMeshletDrawCounts();
+                for (unsigned cascade = 0; cascade < 3; ++cascade)
+                {
+                    matrices[cascade] = shadow.GetShadowData().lightViewProjection[cascade];
+                    outLog += std::string("SHADOW_ROUTE ") + (suite ? "case=" + caseName + " " : "") + "label=" + label + " cascade=" +
+                        std::to_string(cascade) + " meshDispatches=" + std::to_string(routes[cascade]) + "\n";
+                    if (routes[cascade] == 0)
+                    {
+                        outLog += "Requested shadow route was not recorded.\n";
+                        return false;
+                    }
+                }
+                char directory[32768]{};
+                size_t directoryBytes{};
+                if (getenv_s(&directoryBytes, directory, sizeof(directory), "CREATOR_METEOR_SHADOW_CAPTURE_DIR") == 0 &&
+                    directoryBytes > 1)
+                {
+                    std::filesystem::create_directories(directory);
+                    const auto capturePath = suite ? std::filesystem::path(directory) / caseName : std::filesystem::path(directory);
+                    std::filesystem::create_directories(capturePath);
+                    for (unsigned cascade = 0; cascade < 3; ++cascade)
+                    {
+                        const auto stem = std::string(label) + "-C" + std::to_string(cascade);
+                        std::ofstream pixels(capturePath / (stem + ".f32"), std::ios::binary);
+                        for (unsigned y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
+                            for (unsigned x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
+                            {
+                                const float value = outMap.At(x, y, 0, cascade);
+                                pixels.write(reinterpret_cast<const char*>(&value), sizeof(value));
+                            }
+                        pixels.close();
+                        std::ofstream matrix(capturePath / (stem + ".matrix"), std::ios::binary);
+                        matrix.write(reinterpret_cast<const char*>(&matrices[cascade]), sizeof(matrices[cascade]));
+                        matrix.close();
+                        if (!pixels || !matrix) { outLog += "Shadow evidence write failed.\n"; return false; }
+                    }
+                }
+                return true;
+            };
+
+            RHIReadbackImage bindPose{}, posed{};
+            std::array<math::matrix4x4, 3> bindMatrices{}, posedMatrices{};
+            const math::matrix4x4 posedBone = palette[1];
+            palette[1] = math::matrix4x4::identity();
+            bool rendered = renderShadow(bindPose, "meshlet-bind", bindMatrices);
+            palette[1] = posedBone;
+            rendered = rendered && renderShadow(posed, "meshlet-posed", posedMatrices);
+
+            if (!rendered)
+            {
+                passed = false;
+            }
+            else
+            {
+
+                // 클리어 값(1.0)이 아닌 텍셀과 두 포즈 사이에 달라진 텍셀.
+                uint32_t shadowTexels = 0;
+                uint32_t movedTexels = 0;
+                for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
+                    for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
+                    {
+                        if (posed.At(x, y, 0) < 0.999f) ++shadowTexels;
+                        if (std::fabs(posed.At(x, y, 0) - bindPose.At(x, y, 0)) > 1e-6f) ++movedTexels;
+                    }
 
                 char line[256]{};
                 std::snprintf(line, sizeof(line),
-                    "[5/5] 그림자 캐스터 — 드로우 %u · 스킨드 %u · 팔레트 %u · 컬링 %u"
-                    " · 맵 텍셀 %u\n",
-                    shadow.GetLastDrawCount(), shadow.GetLastSkinnedDrawCount(),
-                    shadow.GetLastBonePaletteCount(), shadow.GetLastCulledCount(),
-                    shadowTexels);
+                    "[5/5] 그래프 그림자 캐스터 — 명령 %u · 맵 텍셀 %u · 포즈로 바뀐 텍셀 %u\n",
+                    casters.ShadowDrawCount(), shadowTexels, movedTexels);
                 outLog += line;
 
                 if (0 == shadowTexels)
@@ -616,21 +834,18 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     outLog += "그림자 맵이 비었다 — 드로우는 났는데 깊이가 안 남았다\n";
                     passed = false;
                 }
-
-                if (0 == shadow.GetLastSkinnedDrawCount())
+                if (0 == movedTexels)
                 {
-                    outLog += "그림자에 스킨드 캐스터가 없다 — 그림자만 바인드 포즈로 남는다\n";
-                    passed = false;
-                }
-                if (1 != shadow.GetLastBonePaletteCount())
-                {
-                    outLog += "그림자 팔레트 수가 1이 아니다 — 수집이 GBuffer와 다르다\n";
+                    outLog += "본을 흔들어도 그림자 맵이 그대로다 — 그림자만 바인드 포즈로 남는다\n";
                     passed = false;
                 }
             }
-
-            shadow.Shutdown();
+            }
+            frameContext.shadowDraws = nullptr;
         }
+        casters.Shutdown();
+        shadow.Shutdown();
+        resources.ReleaseReadback(shadowReadback);
     }
 
     std::string validation;

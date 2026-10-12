@@ -288,7 +288,7 @@ namespace material_graph
         RHIBufferDesc description;
         description.bytes = candidate->Count() * sizeof(IblBakePoint);
         description.allowUnorderedAccess = true;
-        description.debugName = L"LX.Material.SurfacePoints";
+        description.debugName = L"METEOR.Material.SurfacePoints";
         if (!device.CreateBuffer(description, candidate->buffer_, error))
         {
             return false;
@@ -373,7 +373,7 @@ namespace material_graph
             input = graph.FindImportedBuffer(mesh_->Buffer());
             if (!input.IsValid())
             {
-                input = graph.ImportBuffer(mesh_->Buffer(), RHIResourceState::ShaderResource, "LX.Surface.Geometry");
+                input = graph.ImportBuffer(mesh_->Buffer(), RHIResourceState::ShaderResource, "METEOR.Surface.Geometry");
             }
         }
         if (declared_.exchange(true))
@@ -382,7 +382,7 @@ namespace material_graph
         }
         graph_ = &graph;
         graphEpoch_ = graph.ResourceEpoch();
-        graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.Surface.Evaluated");
+        graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "METEOR.Surface.Evaluated");
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
         const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
@@ -397,14 +397,14 @@ namespace material_graph
             auto texture = graph.FindImportedTexture(binding.resource);
             if (!texture.IsValid())
             {
-                texture = graph.ImportTexture(binding.resource, RHIResourceState::ShaderResource, "LX.Surface.Texture");
+                texture = graph.ImportTexture(binding.resource, RHIResourceState::ShaderResource, "METEOR.Surface.Texture");
             }
             if (std::ranges::none_of(usages, [&](const auto& usage) { return usage.handle.index == texture.index; }))
             {
                 usages.push_back({texture, RHIResourceState::ShaderResource, read});
             }
         }
-        graph.AddPass("LX.EvaluateMaterialSurface", usages, [owner](const auto& context) {
+        graph.AddPass("METEOR.EvaluateMaterialSurface", usages, [owner](const auto& context) {
             std::string error;
             if (!context.graph || !context.encoder || !owner->GraphOutput(*context.graph).IsValid() ||
                 !owner->RecordCommands(*context.encoder, error))
@@ -414,7 +414,7 @@ namespace material_graph
             }
         });
         graph.AddPass(
-            "LX.EvaluatedSurfaceReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
+            "METEOR.EvaluatedSurfaceReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
             [owner](const auto&) {
                 if (!owner->IsPreparedForGraph())
                 {

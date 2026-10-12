@@ -31,13 +31,11 @@ cbuffer GeometryVisibilityConstants : register(b0)
     uint geometryVisibilityCandidateCount;
     uint geometryVisibilityBinCount;
     uint geometryVisibilityPlaneMask;
-    uint geometryVisibilityMode;
+    uint geometryVisibilityPadding;
     float4 geometryVisibilityProjectionColumns[4];
     uint2 geometryVisibilityViewSize;
     uint geometryVisibilityOcclusionLevels;
     uint geometryVisibilityProjectionValid;
-    float4 geometryShadowReceiverSphere;
-    float4 geometryShadowLightDirection;
 };
 
 StructuredBuffer<GeometryVisibilityCandidate> geometryVisibilityCandidates : register(t0);
@@ -62,48 +60,11 @@ bool GeometryVisibilityIndex(uint3 group, uint lane, uint count, out uint index)
     return index < count;
 }
 
-bool GeometryShadowSphereVisible(float4 sphere)
-{
-    // Same receiver-cylinder predicate as native CPU shadows. A camera-visible
-    // list or camera depth pyramid is never an input to shadow selection.
-    const float3 direction = geometryShadowLightDirection.xyz;
-    const float directionLengthSquared = dot(direction, direction);
-    if (!all(isfinite(geometryShadowReceiverSphere)) || geometryShadowReceiverSphere.w <= 0.0f ||
-        !all(isfinite(direction)) || !isfinite(directionLengthSquared) ||
-        abs(directionLengthSquared - 1.0f) > 0.0001f)
-    {
-        return true;
-    }
-    const float3 offset = sphere.xyz - geometryShadowReceiverSphere.xyz;
-    const float along = dot(offset, direction);
-    const float3 perpendicular = offset - direction * along;
-    const float perpendicularDistance = length(perpendicular);
-    const float radius = geometryShadowReceiverSphere.w + sphere.w;
-    // Subtraction can lose low bits at large world coordinates. Account for
-    // the original magnitudes, dot/length rounding, and the light direction's
-    // finite normalization error before using a boundary as a rejection proof.
-    const float centerMagnitude = dot(abs(sphere.xyz) + abs(geometryShadowReceiverSphere.xyz), float3(1.0f));
-    const float offsetMagnitude = dot(abs(offset), float3(1.0f));
-    const float tolerance = max(0.0001f, (centerMagnitude + abs(radius)) * 0.000001f
-        + offsetMagnitude * abs(directionLengthSquared - 1.0f) * 4.0f);
-    const float conservativeRadius = radius + tolerance;
-    if (!all(isfinite(offset)) || !isfinite(along) || !isfinite(perpendicularDistance) || !isfinite(radius) ||
-        !isfinite(tolerance) || !isfinite(conservativeRadius))
-    {
-        return true;
-    }
-    return along <= conservativeRadius && perpendicularDistance <= conservativeRadius;
-}
-
 bool GeometrySphereVisible(GeometryVisibilityCandidate candidate)
 {
     if ((candidate.flags & 1u) != 0u || !all(isfinite(candidate.sphere)) || candidate.sphere.w <= 0.0f)
     {
         return true;
-    }
-    if (geometryVisibilityMode == 1u)
-    {
-        return GeometryShadowSphereVisible(candidate.sphere);
     }
     for (uint planeIndex = 0u; planeIndex < 6u; ++planeIndex)
     {
@@ -171,7 +132,7 @@ void GeometryVisibilityCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupInde
         return;
     }
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
-    if (geometryVisibilityMode == 0u && GeometrySphereOccluded(candidate.sphere, (candidate.flags & 3u) != 0u,
+    if (GeometrySphereOccluded(candidate.sphere, (candidate.flags & 3u) != 0u,
         geometryVisibilityProjectionColumns, geometryVisibilityViewSize,
         geometryVisibilityOcclusionLevels, geometryVisibilityProjectionValid))
     {
@@ -186,4 +147,55 @@ void GeometryVisibilityCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupInde
     uint slot;
     InterlockedAdd(geometryIndirectArguments[candidate.bin].instanceCount, 1u, slot);
     geometryVisibleIds[candidate.outputOffset + slot] = candidate.sourceIndex;
+}
+
+// Dedicated shadow compaction. Arguments use the existing 20-byte allocation;
+// DispatchMeshIndirect consumes only its first 12 bytes (survivors, 1, 1).
+#include "Includes/MaterialGraphSurfacePoint.slang"
+StructuredBuffer<LXSurfacePoint> shadowMeshletVertices : register(t18);
+#include "Includes/LxMeshletGpuContract.slang"
+ByteAddressBuffer shadowMeshletTopology : register(t19);
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void ShadowMeshletResetCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
+{
+    uint bin;
+    if (!GeometryVisibilityIndex(group, lane, geometryVisibilityBinCount, bin)) return;
+    GeometryIndirectArguments args;
+    args.indexCount = 0u; args.instanceCount = 1u; args.firstIndex = 1u;
+    args.baseVertex = 0; args.firstInstance = 0u;
+    geometryIndirectArguments[bin] = args;
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
+{
+    uint meshlet;
+    if (!GeometryVisibilityIndex(group, lane, geometryVisibilityCandidateCount, meshlet)) return;
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(shadowMeshletTopology, meshlet);
+    const uint count = descriptor.vertexCount;
+    uint outside = geometryVisibilityProjectionValid != 0u ? 63u : 0u;
+    for (uint vertex = 0u; vertex < count; ++vertex)
+    {
+        const float4 position = float4(shadowMeshletVertices[LXMeshletVertex(shadowMeshletTopology, descriptor, vertex)].position.xyz, 1);
+        const float4 clip = float4(dot(position, geometryVisibilityProjectionColumns[0]),
+            dot(position, geometryVisibilityProjectionColumns[1]),
+            dot(position, geometryVisibilityProjectionColumns[2]), dot(position, geometryVisibilityProjectionColumns[3]));
+        const float epsilon = max(1.0, max(abs(clip.w), max(abs(clip.x), max(abs(clip.y), abs(clip.z))))) * 0.00001;
+        uint mask = 0u;
+        if (all(isfinite(clip)))
+            mask = (clip.x < -clip.w - epsilon ? 1u : 0u) | (clip.x > clip.w + epsilon ? 2u : 0u) |
+                (clip.y < -clip.w - epsilon ? 4u : 0u) | (clip.y > clip.w + epsilon ? 8u : 0u) |
+                (clip.z < -epsilon ? 16u : 0u) | (clip.z > clip.w + epsilon ? 32u : 0u);
+        outside &= mask;
+    }
+    if (outside == 0u)
+    {
+        uint slot;
+        InterlockedAdd(geometryIndirectArguments[geometryVisibilityPadding].indexCount, 1u, slot);
+        // Exactly one invocation per source meshlet; capacity equals candidates.
+        geometryVisibleIds[geometryVisibilityViewSize.x + slot] = meshlet;
+    }
 }

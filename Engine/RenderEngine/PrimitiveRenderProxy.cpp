@@ -71,6 +71,7 @@ FoliageRenderProxy::CaptureDrawSources() const
 				*bounds,
 				instance->m_worldMatrix);
 			draw.foliageTypeID = static_cast<uint32>(typeIndex);
+            draw.temporalIdentity = instance->m_temporalIdentity;
 			draws.push_back(std::move(draw));
 		}
 	}

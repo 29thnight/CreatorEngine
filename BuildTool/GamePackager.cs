@@ -58,6 +58,7 @@ internal static class GamePackager
             foreach (var directory in new[] { baseRoot, generated, merged }) Directory.CreateDirectory(directory);
             var packageRevision = "WORKTREE"; int baseCount;
             BootstrapResult? bootstrap = null;
+            string? renderFeatures = prebuiltContent || mode == "Tracked" ? null : RenderFeatureSettings.FromProject(Path.Combine(project, "ProjectSetting/EngineSettings.asset"));
             CookResult? cook = null;
             GenerationResult? generation = null;
             if (prebuiltContent)
@@ -72,6 +73,7 @@ internal static class GamePackager
                 {
                     var snapshot = await PackageInputs.Snapshot(context, repository, project, Path.Combine(work, "TrackedSnapshot"), gitCommit);
                     template = Path.Combine(snapshot, "Tools/packaging/templates/EngineSettings.runtime.yml"); packageRevision = gitCommit;
+                    renderFeatures = RenderFeatureSettings.FromProject(Path.Combine(snapshot, "Dynamic_CPP/ProjectSetting/EngineSettings.asset"));
                     baseCount = PackageInputs.CopyProject(Path.Combine(snapshot, "Dynamic_CPP"), baseRoot, context.Cancellation);
                 }
                 else if (mode == "Workspace") baseCount = await PackageInputs.CopyWorkspace(context, repository, project, baseRoot);
@@ -142,7 +144,7 @@ internal static class GamePackager
             context.Log("[5/6 Pak]", "stage");
             if (!prebuiltContent)
             {
-                PackageInputs.Materialize(template, Path.Combine(generated, "ProjectSetting/EngineSettings.asset"), options.Get("startup-scene"), options.Get("render-backend"));
+                PackageInputs.Materialize(template, Path.Combine(generated, "ProjectSetting/EngineSettings.asset"), options.Get("startup-scene"), options.Get("render-backend"), renderFeatures);
                 // Automatic graph compilation also creates a private Library cache
                 // below Base. Only the two package mounts belong to runtime content.
                 foreach (var mount in new[] { "Assets", "ProjectSetting" })

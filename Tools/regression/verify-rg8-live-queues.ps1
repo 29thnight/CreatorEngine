@@ -20,7 +20,7 @@ $native = Get-Content (Join-Path $NativeEvidence 'execution-result.json') -Raw |
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 $runtime = Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
 if ($native.schemaVersion -ne 2 -or $native.acceptanceSchema -ne 3 -or
-    $native.checks -ne 428 -or $native.scheduleChecks -ne 111 -or
+    $native.checks -ne 428 -or $native.scheduleChecks -ne 121 -or
     !$native.passed -or !$native.fullRegression -or !$native.nativeQueueExecutionTested -or
     !$native.positiveOverlapExecutionTested -or !$native.negativeFallbackExecutionTested -or
     !$native.declarationOrderTested -or !$native.readReadOwnershipTested -or !$native.frameRetirementTested -or

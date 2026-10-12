@@ -481,7 +481,7 @@ namespace material_graph
             texture.height = context.height;
             texture.format = RHIFormat::RGBA32Float;
             texture.allowRenderTarget = true;
-            texture.debugName = L"LX.Scene.LookupInput";
+            texture.debugName = L"METEOR.Scene.LookupInput";
             for (auto& input : candidate->inputs_)
             {
                 if (candidate->capture_ && !device_->CreateTexture(texture, input, error))
@@ -491,13 +491,13 @@ namespace material_graph
             }
             buffer.bytes = sampleCount * sizeof(IblBakeSample);
             buffer.allowUnorderedAccess = true;
-            buffer.debugName = L"LX.Scene.LookupSamples";
+            buffer.debugName = L"METEOR.Scene.LookupSamples";
             if (!device_->CreateBuffer(buffer, candidate->samples_, error))
             {
                 return false;
             }
             buffer.bytes = sizeof(SceneLookupStats);
-            buffer.debugName = L"LX.Scene.LookupStatistics";
+            buffer.debugName = L"METEOR.Scene.LookupStatistics";
             if (!device_->CreateBuffer(buffer, candidate->statistics_, error))
             {
                 return false;
@@ -507,7 +507,7 @@ namespace material_graph
         {
             buffer.bytes = sizeof(IblBakeSample);
             buffer.allowUnorderedAccess = false;
-            buffer.debugName = L"LX.Scene.EmptyPreviousLookup";
+            buffer.debugName = L"METEOR.Scene.EmptyPreviousLookup";
             if (!device_->CreateBuffer(buffer, candidate->emptyPrevious_, error))
             {
                 return false;
@@ -606,7 +606,7 @@ namespace material_graph
             auto handle = graph.FindImportedTexture(texture);
             if (!handle.IsValid())
             {
-                handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "LX.Scene.RuntimeIBL");
+                handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "METEOR.Scene.RuntimeIBL");
             }
             uses.push_back({handle, RHIResourceState::PixelShaderResource, read});
         }
@@ -632,12 +632,12 @@ namespace material_graph
             if (inputs_[i].IsValid())
             {
                 graphInputs_[i] =
-                    graph.ImportTexture(inputs_[i], inputStates_[i], "LX.Scene.LookupInput", &inputStates_[i]);
+                    graph.ImportTexture(inputs_[i], inputStates_[i], "METEOR.Scene.LookupInput", &inputStates_[i]);
             }
         }
-        graphSamples_ = graph.ImportBuffer(samples_, sampleState_, "LX.Scene.LookupSamples", &sampleState_);
+        graphSamples_ = graph.ImportBuffer(samples_, sampleState_, "METEOR.Scene.LookupSamples", &sampleState_);
         graphStatistics_ =
-            graph.ImportBuffer(statistics_, statisticState_, "LX.Scene.LookupStatistics", &statisticState_);
+            graph.ImportBuffer(statistics_, statisticState_, "METEOR.Scene.LookupStatistics", &statisticState_);
         return graphInputs_;
     }
 
@@ -684,7 +684,7 @@ namespace material_graph
         {
             // 런타임 sample은 fragment 레지스터에서 계산한다. 이 패스는
             // offline sample 통계로 오해하지 않도록 mode 표지만 기록한다.
-            graph.AddPass("LX.Scene.RuntimeLookupMetadata",
+            graph.AddPass("METEOR.Scene.RuntimeLookupMetadata",
                           {{graphStatistics_, RHIResourceState::UnorderedAccess, writeAccess}},
                           [owner](const auto& execution) {
                               owner->CheckCurrent(*execution.graph);
@@ -718,14 +718,14 @@ namespace material_graph
                 if (!imported.IsValid())
                 {
                     imported = graph.ImportTexture(previous->inputs_[i], previous->inputStates_[i],
-                                                   "LX.Scene.PreviousLookupInput", &previous->inputStates_[i]);
+                                                   "METEOR.Scene.PreviousLookupInput", &previous->inputStates_[i]);
                 }
                 uses.push_back({imported, RHIResourceState::ShaderResource, readAccess});
             }
             auto imported = graph.FindImportedBuffer(previous->samples_);
             if (!imported.IsValid())
             {
-                imported = graph.ImportBuffer(previous->samples_, previous->sampleState_, "LX.Scene.PreviousLookup",
+                imported = graph.ImportBuffer(previous->samples_, previous->sampleState_, "METEOR.Scene.PreviousLookup",
                                               &previous->sampleState_);
             }
             uses.push_back({imported, RHIResourceState::ShaderResource, readAccess});
@@ -735,7 +735,7 @@ namespace material_graph
             auto imported = graph.FindImportedBuffer(emptyPrevious_);
             if (!imported.IsValid())
             {
-                imported = graph.ImportBuffer(emptyPrevious_, RHIResourceState::Common, "LX.Scene.EmptyPreviousLookup");
+                imported = graph.ImportBuffer(emptyPrevious_, RHIResourceState::Common, "METEOR.Scene.EmptyPreviousLookup");
             }
             uses.push_back({imported, RHIResourceState::ShaderResource, readAccess});
         }
@@ -744,7 +744,7 @@ namespace material_graph
             auto imported = graph.FindImportedTexture(environment_);
             if (!imported.IsValid())
             {
-                imported = graph.ImportTexture(environment_, RHIResourceState::PixelShaderResource, "LX.Scene.HDR");
+                imported = graph.ImportTexture(environment_, RHIResourceState::PixelShaderResource, "METEOR.Scene.HDR");
             }
             uses.push_back({imported, RHIResourceState::ShaderResource, readAccess});
         }
@@ -757,11 +757,11 @@ namespace material_graph
             auto imported = graph.FindImportedTexture(texture);
             if (!imported.IsValid())
             {
-                imported = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "LX.Scene.IBL");
+                imported = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "METEOR.Scene.IBL");
             }
             uses.push_back({imported, RHIResourceState::ShaderResource, readAccess});
         }
-        graph.AddPass("LX.Scene.LookupBake", uses, [owner, previous, owners](const auto& execution) {
+        graph.AddPass("METEOR.Scene.LookupBake", uses, [owner, previous, owners](const auto& execution) {
             owner->CheckCurrent(*execution.graph);
             std::array<RHIBindingDesc, 24> descriptions;
             for (unsigned i = 0; i < 11; ++i)
@@ -851,7 +851,7 @@ namespace material_graph
             }
         }
         graph.AddPass(
-            "LX.Scene.LookupReady", uses,
+            "METEOR.Scene.LookupReady", uses,
             [owner](const auto& execution) {
                 owner->CheckCurrent(*execution.graph);
                 owner->stages_.fetch_or(2);

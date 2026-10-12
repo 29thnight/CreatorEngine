@@ -46,19 +46,10 @@ bool RunVulkanWireFrameTest(std::string& outLog);
 /// 배치와 PrepareFrame 업로드 수명을 DX12/Vulkan 전체 RGBA로 대조한다.
 bool RunVulkanUITest(std::string& outLog);
 
-/// 동일한 합성 mesh/camera/light로 EnhancedShadowPass를 두 백엔드에서 실행해
-/// depth-only PSO, cascade array slice view와 첫 slice depth 픽셀을 대조한다.
-bool RunVulkanShadowTest(std::string& outLog);
-bool RunVulkanGBufferTest(std::string& outLog);
-bool RunVulkanForwardTest(std::string& outLog);
-bool RunVulkanDeferredTest(std::string& outLog);
-bool RunPbrShaderParityTest(std::string& outLog);
-bool RunPbrCoverageTest(std::string& outLog);
-bool RunPbrOcclusionTest(std::string& outLog);
-bool RunPbrEmissionTest(std::string& outLog);
-bool RunPbrTransformTest(std::string& outLog);
-bool RunPbrUvTest(std::string& outLog);
-bool RunPbrMipTest(std::string& outLog);
+
+
+
+
 /// PBR-W8 — 세대 원자 밀봉의 값 신원·저작 digest·draw 장부. GPU를 켜지 않는다.
 bool RunPbrSealTest(std::string& outLog);
 /// PBR-W9 — 두 제품 캡처(보통 DX12/Vulkan)의 float32 readback을 실제로 맞댄다.
@@ -69,9 +60,9 @@ bool RunPbrCaptureCompare(const std::string& leftDirectory,
 /// PBR-W1 — 실장면 캡처에서 normal-map 저작 유무의 정본이 하나인지 본다.
 /// 같은 프레임에 노멀맵 있는 draw 와 없는 draw 가 함께 있어야 성립한다.
 bool RunPbrNormalPairVerification(const std::string& directory, std::string& outLog);
-bool RunVulkanDecalTest(std::string& outLog);
-bool RunVulkanSSAOTest(std::string& outLog);
-bool RunVulkanSSGITest(std::string& outLog);
+
+
+
 bool RunVulkanSSSTest(std::string& outLog);
 bool RunVulkanSSRTest(std::string& outLog);
 bool RunVulkanVolumetricFogTest(std::string& outLog);

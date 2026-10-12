@@ -101,6 +101,7 @@ FrameCameraSnapshot Camera::CaptureFrameSnapshot(float aspectRatio) const
 	snapshot.farPlane = m_farPlane > snapshot.nearPlane
 		? m_farPlane : snapshot.nearPlane + 0.4f;
 	snapshot.isOrthographic = m_isOrthographic;
+	snapshot.cameraCutRevision = m_cameraCutRevision;
 	return snapshot;
 }
 
@@ -126,5 +127,9 @@ std::optional<math::bounding_frustum> Camera::TryGetFrustum(float aspectRatio) c
 
 void Camera::MoveToTarget(math::vector3 targetPosition)
 {
-	m_eyePosition = targetPosition;
+    if (!(m_eyePosition == targetPosition))
+    {
+        m_eyePosition = targetPosition;
+        NotifyCameraCut();
+    }
 }

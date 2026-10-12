@@ -3,6 +3,7 @@
 #include <limits>
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
+#include "TemporalMotionFixture.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
 #include "FoliageComponent.h"
@@ -368,6 +369,10 @@ void SceneManager::RetireScene(Scene* scene)
     {
         return;
     }
+    if (scene == m_activeScene.load())
+    {
+        TemporalMotionFixture::Cancel("Fixture scene is being retired");
+    }
     if (&scene->ManagedDomain() != &m_gcDomain)
     {
         throw std::logic_error("SceneManager cannot retire a Scene from another GC domain");
@@ -438,6 +443,7 @@ void SceneManager::SetActiveScene(Scene* scene)
     }
     if (m_activeScene.load() != scene)
     {
+        TemporalMotionFixture::Cancel("Active scene is changing");
         AdvanceSceneContextEpoch();
         m_activeScene = scene;
     }
@@ -691,7 +697,11 @@ void SceneManager::InputEvents(float deltaSecond)
 void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
 {
     SynchronizeAudioWorld();
-    if (!m_activeScene) return;
+    if (!m_activeScene)
+    {
+        TemporalMotionFixture::TickAfterAnimation();
+        return;
+    }
 
     {
         ce::profile_scope _profile{ ce::marker<"Update">() };
@@ -765,6 +775,7 @@ void SceneManager::DrainAIUpdates()
 
 void SceneManager::Decommissioning()
 {
+    TemporalMotionFixture::Cancel("Scene manager is shutting down");
     SetDecommissioning();
     DrainSceneLoads();
     DrainAIUpdates();

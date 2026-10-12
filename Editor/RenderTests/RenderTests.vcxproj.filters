@@ -115,20 +115,17 @@
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedBlendedStreamTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\GraphSceneFixture.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
@@ -156,12 +153,6 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp">
       <Filter>RHI\DX12\Tests\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\PbrShaderParityTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\PbrSealLedgerTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>

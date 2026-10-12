@@ -339,6 +339,9 @@ public:
     // Incremental construction cannot be captured as an authored scene halfway through.
     void BeginIncrementalConstruction() { ++m_incrementalConstructions; }
     void EndIncrementalConstruction() { if (m_incrementalConstructions) --m_incrementalConstructions; }
+    // A marked diagnostic root is still serializable until EndFramePass removes
+    // its slots. Keep the save barrier attached to its exact scene incarnation.
+    void ProtectTransientDiagnosticRoot(EntityHandle root);
     void OnBeforeSerialize() const;
 
 	// Strong scene-graph edges. External users borrow pointers or resolve handles;
@@ -489,6 +492,8 @@ private:
 
     [[reflgen::ignore]]
     std::uint32_t m_incrementalConstructions{ 0 };
+    [[reflgen::ignore]]
+    std::vector<EntityHandle> m_transientDiagnosticRoots;
 
     // 씬 생성마다 단조 증가하는 일련번호 발급. SceneManager::m_scenes에서의
     // 위치(vector index)는 쓰지 않는다 — 씬이 삭제되면 그 위치가 다음 씬에게

@@ -12,6 +12,8 @@
 #include "PathFinder.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
 #include <algorithm>
+#include <filesystem>
+#include <string>
 #include <type_traits>
 #include <sstream>
 #include <unordered_set>

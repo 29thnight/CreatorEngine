@@ -40,32 +40,7 @@ VerifiedProduct SubsurfaceProduct(const std::filesystem::path& root)
     std::vector<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && (program->features & 0x1000u), "SSS graph feature extraction");
-    const auto file = root / "Build/Obj/MaterialProductProbe/subsurface-product.slang";
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n";
-    const CompileTarget targets[]{{RHIShaderBinary::Dxil, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::Dxil, "LXSceneColorPS", "ps_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneColorPS", "ps_6_0"}};
-    RHIShaderCompileOptions options;
-    options.strictMath = true;
-    options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = capabilities.subsurface = true;
-    VerifiedProduct product;
-    RHIShaderPermutation permutation;
-    std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "SSS product permutation");
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    std::string messages;
-    for (const auto& diagnostic : diagnostics)
-    {
-        messages += diagnostic.message + "\n";
-    }
-    Check(verified, "Verify SSS product: " + messages);
+    const auto product = CookedScene(*program, "subsurface-product");
     Check(product.selection.tier == Tier::Special && product.selection.route == Route::Forward,
           "SSS automatically selects Special Forward");
     return product;
@@ -140,8 +115,8 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     SceneHost host;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "SSS mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -153,13 +128,18 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     camera.view = camera.projection = math::matrix4x4::identity();
     camera.eyePosition = math::vector3(0, 0, 2);
     context.camera = &camera;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error), "SSS actual Scene passes");
+
     WaitSceneProgram(host, context, generation);
     for (unsigned features : {0x3000u})
     {
+        // A distinct generation, so the ready SSS program cannot answer for it.
         Generation unsupportedValue(*generation);
-        unsupportedValue.cooked.product.program.features = features;
-        unsupportedValue.cooked.product.program.volume = (features & 0x2000u) != 0;
+        unsupportedValue.generation += 100;
+        auto& unsupportedProgram = unsupportedValue.cooked.product.program;
+        unsupportedProgram.features = features;
+        unsupportedProgram.volume = (features & 0x2000u) != 0;
+        unsupportedProgram.semanticKey.insert(unsupportedProgram.semanticKey.size() - SceneHostIdentity.size(),
+                                              "|uninstalled-volume");
         const auto unsupported = own::make_shared<const Generation>(std::move(unsupportedValue));
         Check(!host.RequestProgram(context, unsupported, error), "Uninstalled Volume remains rejected");
     }
@@ -218,14 +198,13 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const std::array draws{a.draw, b.draw};
             SceneInputView view{context.frameId, context.sceneEpoch, 91, 1, 24, 24, camera};
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal(view, draws, {}, input, error), "SSS Scene seal " + error);
+            Check(SealScene(view, draws, {}, input, error), "SSS Scene seal " + error);
             Check(device.BeginFrame(error), "SSS begin frame");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
             const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "SSS residency " + error);
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
-                  "SSS actual Scene pass preparation " + error);
+
             auto graph = std::make_shared<EnhancedRenderGraph>(device);
             if (workers)
             {
@@ -248,6 +227,8 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                   "SSS budget failure preserves accepted frame");
             gbuffer.Declare(*graph, context);
             const auto outputs = gbuffer.GetOutputs();
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             host.DeclareGBuffer(*graph, outputs);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
@@ -262,9 +243,9 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                 execution.encoder->BindRenderTargets(target);
                 execution.encoder->ClearRenderTargets(target, clear);
             });
-            deferred.SetInputs(outputs);
-            deferred.SetAmbientOcclusion(ao);
-            deferred.Declare(*graph, context);
+
+
+            lighting = SceneHost::DeclareHdrTarget(*graph, context);
             std::array<RHIReadback, 14> readbacks;
             const auto copyTexture = [&](unsigned index, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(24, 24, format, 1, readbacks[index], error), "SSS texture readback");
@@ -275,10 +256,10 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     },
                     true);
             };
-            copyTexture(0, deferred.GetOutput(), RHIFormat::RGBA16Float);
+            copyTexture(0, lighting, RHIFormat::RGBA16Float);
             copyTexture(1, outputs.depth, RHIFormat::D32Float);
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
-            copyTexture(2, deferred.GetOutput(), RHIFormat::RGBA16Float);
+            lighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
+            copyTexture(2, lighting, RHIFormat::RGBA16Float);
             copyTexture(3, outputs.depth, RHIFormat::D32Float);
             copyTexture(4, outputs.bitmask, RHIFormat::R32Uint);
             for (unsigned field = 0; field < 7; ++field)
@@ -362,7 +343,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     {
                         Check(std::memcmp(mapped[0].data.data() + y * mapped[0].rowPitch + x * 8,
                                           mapped[2].data.data() + y * mapped[2].rowPitch + x * 8, 8) == 0,
-                              "SSS preserves legacy/background HDR");
+                              "SSS preserves METEOR cleared background HDR");
                         continue;
                     }
                     const double scale = fixture == 1 && owner(x, y) == 0x80000001u ? 0 : 1;
@@ -498,7 +479,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
               " spread=" + std::to_string(spread) + " boundaries=" + std::to_string(boundaries));
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
-    deferred.Shutdown();
+
     meshes.Shutdown();
     std::string messages;
     const auto validationMessages = device.DrainDebugMessages(messages);

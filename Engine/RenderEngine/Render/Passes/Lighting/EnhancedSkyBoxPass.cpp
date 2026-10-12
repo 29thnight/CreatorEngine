@@ -192,7 +192,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
     usages.push_back({ m_depth, ownsDepth
         ? RHIResourceState::DepthWrite : RHIResourceState::DepthRead, depthAccess });
 
-    graph.AddPass(GetName(), usages,
+    const auto pass = graph.AddPass(GetName(), usages,
         [this, &context, ownsColor, ownsDepth](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
@@ -247,6 +247,8 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             encoder.Draw(36, 1);
         },
         m_keepAlive);
+    // Frame inputs are prepared before recording; no callback CPU outputs are consumed.
+    graph.DeclareRecordingIndependent(pass);
 }
 
 void EnhancedSkyBoxPass::Shutdown()

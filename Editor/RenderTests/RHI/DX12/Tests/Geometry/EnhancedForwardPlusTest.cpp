@@ -1,7 +1,7 @@
 // Forward+ 자가 검증 (E5에서 EnhancedForwardPass.cpp 말미에서 분리 —
 // 프로덕션 패스 파일이 테스트 헤더(DX12TestTextureRegistration)를 물던
 // 역결합이 래칫의 상향 간선으로 드러났다).
-#include "Render/Passes/Geometry/EnhancedForwardPass.h"
+#include "Render/Passes/Lighting/EnhancedLightTilePass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -30,7 +30,7 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
     constexpr uint32_t kWidth = 128;
     constexpr uint32_t kHeight = 128;
 
-    outLog += "── Forward+ 검증 (PHASE 3-6) ──\n";
+    outLog += "── METEOR 타일 광원 컬링 검증 ──\n";
 
     std::string error;
 
@@ -74,10 +74,10 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
     frameContext.camera = &camera;
     frameContext.lights = &lights;
 
-    EnhancedForwardPass forward;
+    EnhancedLightTilePass forward;
     if (!forward.Initialize(frameContext, error))
     {
-        outLog += "[1/3] Forward+ 초기화 실패: " + error + "\n";
+        outLog += "[1/3] 타일 광원 컬링 초기화 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
@@ -183,15 +183,14 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
 
         EnhancedRenderGraph graph(resources);
 
-        EnhancedForwardPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
+        const RGHandle testDepth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fwd.TestDepth");
-        forward.SetInputs(inputs);
+        forward.SetDepth(testDepth);
 
         forward.Declare(graph, frameContext);
 
         // 타일 카운트 리드백.
-        const uint32_t tileGrid = kWidth / EnhancedForwardPass::kTileSize;   // 8
+        const uint32_t tileGrid = kWidth / EnhancedLightTilePass::kTileSize;   // 8
         const uint32_t tileTotal = tileGrid * tileGrid;
 
         RHIReadback readback{};
@@ -211,7 +210,7 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
             // 예전에는 UAV → COPY_SOURCE → UAV 전이를 손으로 걸며 before를
             // '늘 UAV'로 단정했다.
             graph.AddPass("Fwd.Readback",
-                { { inputs.depth,                 RHIResourceState::ShaderResource },
+                { { testDepth,                    RHIResourceState::ShaderResource },
                   { forward.GetTileCountHandle(), RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
@@ -311,6 +310,6 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
     psoManager.Shutdown();
     resources.Shutdown();
 
-    outLog += passed ? "Forward+ 검증 통과\n" : "Forward+ 검증 실패\n";
+    outLog += passed ? "타일 광원 컬링 검증 통과\n" : "타일 광원 컬링 검증 실패\n";
     return passed;
 }

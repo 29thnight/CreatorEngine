@@ -1,5 +1,8 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
+> 2026-10-11 TR0 material 후속: 실제 Debug/Release empty·Aria 측정, lossless native 기록·정상 종료·저장 population/geometry/전경 감사 통과. 단일 offscreen view 332×182, draw 3·전경 깊이 픽셀 858; 제품 viewport/마스터 비교 수용은 별도. RG8 전체 workload·UI 육안·제품 budget·actual generated/외부 계측은 잔여이며 TR0 기성 0, PHASE 4.5 12/71(17%) 유지. [실행 기록](../analysis/TemporalMeasurementConsumers20261010.md).
+
+> 2026-10-10 PR #169: SDK 활성 DX12 Debug/Release 실행 증거로 TR1(8)·TU5(4)를 종료한다. PHASE 4.5는 16행 중 2행 완료·기성 12/71·잔여 59(17%), 전체 추정 563·기성 138·잔여 425(+별도 미산정)다. 품질 전수·FG·물리 지연/지원 행렬은 progress·기성 0을 유지한다. [종료 체크포인트](../analysis/TemporalClosureCheckpoint20261010.md). 아래 이전 기록은 당시 스냅샷이다.
 2026-10-09 RG8 graphics 전용 텍스처 상태 유지: 백엔드가 상태 유지를 보장하고 compute 사용이 없는 텍스처의 불필요한 COMMON 왕복을 제거했다. Release 실행 434·계획 119·전체 RG 회귀 통과, 제품 384개 출력 비교 오차 0, 제품 GPU 검증 모드 1·2 오류 0. 배리어 중앙값은 767→422개지만 실제 overlap은 5/64프레임이며 GPU 개선은 일관되지 않았다. RG8 progress·기성 0·기본 OFF 유지. [구현·측정 경계](../analysis/RenderRg8GraphicsRetention20261009.md).
 
 2026-10-09 RG8 순서 탐색: 패스 이름 없이 earliest-start와 compute 입력 우선 순서를 비교하도록 구현했다. Release 실행 428·계획 119·전체 RG 회귀 통과. TestShadow async 64프레임 중 30프레임에서 실제 overlap을 확인했지만 GPU 중앙값은 기본 경로보다 느렸다. RG8 progress·기성 0·기본 OFF 유지. [구현·측정 경계](../analysis/RenderRg8OrderSearch20261009.md).
@@ -50,14 +53,14 @@ IBL/Surface/Raster reference API는 D/R 각각 3정책·일반 63 frames·공유
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | 0 |
 | **4.25** | Graph→ShaderMeta/Slang·공통 재질·Blender 수용 | 11 | 40 + 미산정 | 32 | 8 + 미산정 |
 | **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 74 | 26 |
-| **4.5** | 모션/히스토리·업스케일·프레임 생성, DX12 수용 | 16 | 71 | 0 | 71 |
+| **4.5** | 모션/히스토리·업스케일·프레임 생성, DX12 수용 | 16 | 71 | 12 | 59 |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 32 | 0 | 32 |
 | **4.7** | UV1·BVH·DX12 백그라운드 라이트맵 | 8 | 35 | 2 | 33 |
 | **4.75** | probe/AO·shadow·display/post·Environment | 4 | 28 | 0 | 28 |
 | **4.8** | GPU-driven·확률 조명·DXR 설계·구현 공수 확정 | 4 | 9 | 0 | 9 |
 | **4.85** | 공통 RT·Path Tracing·Hybrid·ReSTIR PT Enhanced·tetrahedral cages | 14 | 208 | 0 | 208 |
 | **4.9** | RenderDoc DX12/Vulkan 캡처 → 리소스 확인 → 픽셀별 비교 | 6 | 22 | 0 | 22 |
-| **현재 합계** | | **92** | **563 + 미산정** | **126** | **437 + 미산정** |
+| **현재 합계** | | **92** | **563 + 미산정** | **138** | **425 + 미산정** |
 
 **2026-10-01 사용자 지시 반영:** Vulkan 실행 비교·교차 동등성·픽셀 수용은 4.9가 단독 소유한다.
 4~4.85는 RHI 중립 구현을 유지하면서 **DX12 Debug/Release의 변경 전후 회귀**로 닫는다.

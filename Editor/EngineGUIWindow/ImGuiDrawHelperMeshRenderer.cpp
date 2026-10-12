@@ -28,6 +28,7 @@
 #include <cstdio>
 #include "PathFinder.h"
 #include <filesystem>
+#include <string_view>
 #include <d3d11shader.h>
 #include <algorithm>
 #include <cstring>
@@ -249,7 +250,7 @@ namespace
                 {
                     error = "Enter a valid material name.";
                 }
-                else if (std::filesystem::exists(path) || DataSystems->FindCachedMaterial(std::string_view(name)))
+                else if (std::filesystem::exists(path) || DataSystems->FindCachedMaterial(std::string_view{name}))
                 {
                     error = "That name already exists. Choose another name.";
                 }

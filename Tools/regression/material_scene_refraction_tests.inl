@@ -46,34 +46,9 @@ VerifiedProduct RefractionProduct(const std::filesystem::path& root, bool hybrid
     std::vector<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && (program->features & 0x0800u), "Refraction feature extraction");
-    const auto file = root / "Build/Obj/MaterialProductProbe" /
-                      (hybrid ? "refraction-hybrid-product.slang"
-                       : film ? "refraction-film-product.slang"
-                              : "refraction-product.slang");
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n";
-    const CompileTarget targets[]{{RHIShaderBinary::Dxil, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::Dxil, "LXSceneColorPS", "ps_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneColorPS", "ps_6_0"}};
-    RHIShaderCompileOptions options;
-    options.strictMath = options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = capabilities.subsurface = capabilities.refraction = true;
-    RHIShaderPermutation permutation;
-    std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "Refraction permutation");
-    VerifiedProduct product;
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    std::string messages;
-    for (const auto& diagnostic : diagnostics)
-    {
-        messages += diagnostic.message + "\n";
-    }
-    Check(verified, "Refraction verification: " + messages);
+    const auto product = CookedScene(*program, hybrid ? "refraction-hybrid-product"
+                                               : film ? "refraction-film-product"
+                                                      : "refraction-product");
     Check(product.selection.tier == Tier::Special && product.selection.route == Route::Forward, "Refraction route");
     return product;
 }
@@ -120,8 +95,9 @@ Vector SceneTransmissionIntegral(const MaterialProbe::Reference::Material& glass
 void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                         own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
-                        const own::shared_owner<const Instance>& background)
+                        const own::shared_owner<const Instance>& surfaceBackground)
 {
+    const auto background = SceneCooked(surfaceBackground);
     const std::array products{RefractionProduct(root, false), RefractionProduct(root, true),
                               RefractionProduct(root, false, true)};
     GenerationStore store;
@@ -144,9 +120,9 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     SceneHost host;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Refraction mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
-    EnhancedForwardPass forward;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
+    EnhancedLightTilePass tiles;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -166,7 +142,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     context.lights = &lights;
     const std::vector<EnhancedDrawItem> forwardDraws;
     context.forwardDraws = &forwardDraws;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) && forward.Initialize(context, error), "Refraction actual Scene passes");
+    Check(tiles.Initialize(context, error), "Refraction actual Scene passes");
     WaitSceneProgram(host, context, background->generation);
     for (const auto& generation : generations)
     {
@@ -193,7 +169,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                       [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; }, instance, error),
                   "Refraction instance " + error);
             auto glass = MakeGeometry(false, fixture != 3), backdrop = MakeGeometry(false, true),
-                 legacy = MakeGeometry(false, true);
+                 occluder = MakeGeometry(false, true);
             Vector normal = fixture == 3   ? Unit({.7, 0, -.714142843})
                             : fixture == 0 ? Vector{0, 0, -1}
                                            : Vector{.6, 0, -.8};
@@ -227,7 +203,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                   : fixture == 2 ? 2.f
                                  : .9375f,
                   fixture == 2 ? -2.f : -.9375f, fixture == 2 ? 2.f : .9375f, .75f, 7102, {0, 0, 1});
-            plane(legacy, -.25f, .25f, -.25f, .25f, .1f, 7103, {0, 0, 1});
+            plane(occluder, -.25f, .25f, -.25f, .25f, .1f, 7103, {0, 0, 1});
             glass.draw.materialGraphInstance = instance;
             backdrop.draw.materialGraphInstance = background;
             glass.draw.materialGraphSlot = 31;
@@ -240,17 +216,13 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             {
                 glass.draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
             }
-            Check(Uuid::TryParse("44444444-4444-8444-8444-444444444444", legacy.draw.modelMeshView.handle.meshId),
-                  "Refraction legacy identity");
-            std::vector<EnhancedDrawItem> oldDraws{legacy.draw};
-            if (fixture == 2)
-            {
-                oldDraws.clear();
-            }
-            context.draws = &oldDraws;
-            const std::array draws{glass.draw, backdrop.draw};
+            occluder.draw.materialGraphInstance = background;
+            occluder.draw.materialGraphSlot = 33;
+            std::vector draws{glass.draw, backdrop.draw};
+            if (fixture != 2) draws.push_back(occluder.draw);
+            context.draws = &draws;
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 92, 1, 24, 24, camera}, draws, {}, input,
+            Check(SealScene({context.frameId, context.sceneEpoch, 92, 1, 24, 24, camera}, draws, {}, input,
                                        error),
                   "Refraction Scene seal " + error);
             Check(device.BeginFrame(error), "Refraction frame begin");
@@ -258,7 +230,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             meshes.BeginFrame(context.frameId);
             const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) && forward.PrepareFrame(context, error),
+            Check(tiles.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);
             auto graph = std::make_shared<EnhancedRenderGraph>(device);
             if (workers)
@@ -278,6 +250,8 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             ++failures;
             gbuffer.Declare(*graph, context);
             const auto outputs = gbuffer.GetOutputs();
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             host.DeclareGBuffer(*graph, outputs);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
@@ -292,13 +266,13 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                 execution.encoder->BindRenderTargets(target);
                 execution.encoder->ClearRenderTargets(target, clear);
             });
-            deferred.SetInputs(outputs);
-            deferred.SetAmbientOcclusion(ao);
-            deferred.Declare(*graph, context);
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
-            forward.SetInputs({outputs.depth, deferred.GetOutput()});
-            forward.SetGraphMaterials(&host);
-            forward.Declare(*graph, context);
+
+
+            lighting = SceneHost::DeclareHdrTarget(*graph, context);
+            lighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
+            tiles.SetDepth(outputs.depth);
+            tiles.Declare(*graph, context);
+            const auto blended = host.DeclareBlendedStream(*graph, lighting, {}, tiles.GetLighting());
             const auto surfaceOutputs = host.ForwardSurfaceOutputs();
             std::array<RHIReadback, 11> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
@@ -312,7 +286,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             };
             copy(0, accepted->GraphBackgroundColor(*graph), RHIFormat::RGBA16Float);
             copy(1, accepted->GraphBackgroundDepth(*graph), RHIFormat::D32Float);
-            copy(2, forward.GetOutput(), RHIFormat::RGBA16Float);
+            copy(2, blended, RHIFormat::RGBA16Float);
             copy(3, surfaceOutputs.depth, RHIFormat::D32Float);
             copy(4, surfaceOutputs.bitmask, RHIFormat::R32Uint);
             copy(10, outputs.depth, RHIFormat::D32Float);
@@ -609,8 +583,8 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
           "Refraction fixture coverage");
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
-    deferred.Shutdown();
-    forward.Shutdown();
+
+    tiles.Shutdown();
     meshes.Shutdown();
     std::string messages;
     const auto validation = device.DrainDebugMessages(messages);

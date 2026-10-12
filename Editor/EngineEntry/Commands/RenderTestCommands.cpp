@@ -67,6 +67,7 @@
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
 #include "FoliageComponent.h"      // I5: Foliage 게이트
+#include "TemporalMotionFixture.h"
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
 #include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
@@ -266,114 +267,21 @@ namespace ConsoleCmd
         return CommandCore::Ok("vk.texturecodec 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_vk_shadow(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_dx12_blended(const ConsoleCommandContext& ctx)
     {
         std::string log;
-        const bool passed = RunVulkanShadowTest(log);
-
+        const bool passed = DX12Test::RunBlendedStreamTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
         std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, std::string("[vk.shadow] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.shadow %s\n", passed ? "통과" : "실패");
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
+        std::printf("[CLI] dx12.blended %s\n", verdict.c_str());
         CommandCore::CommandData data = CommandCore::CommandData::Object();
         data.Set("log", CommandCore::CommandData::String(log));
         data.Set("passed", CommandCore::CommandData::Bool(passed));
         if (!passed)
         {
-            return CommandCore::Fail("rendertest.failed", "vk.shadow 실패", std::move(data));
+            return CommandCore::Fail("rendertest.failed", "dx12.blended 실패", std::move(data));
         }
-        return CommandCore::Ok("vk.shadow 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_vk_gbuffer(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanGBufferTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, std::string("[vk.gbuffer] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.gbuffer %s\n", passed ? "통과" : "실패");
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "vk.gbuffer 실패", std::move(data));
-        }
-        return CommandCore::Ok("vk.gbuffer 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_vk_forward(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanForwardTest(result);
-        std::printf("%s", result.c_str());
-        Debug::PrintLog(spdlog::level::warn, std::string("[vk.forward] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(result));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "vk.forward 실패", std::move(data));
-        }
-        return CommandCore::Ok("vk.forward 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_vk_deferred(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanDeferredTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[vk.deferred] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.deferred %s\n", passed ? "통과" : "실패");
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(result));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "vk.deferred 실패", std::move(data));
-        }
-        return CommandCore::Ok("vk.deferred 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_vk_decal(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanDecalTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[vk.decal] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.decal %s\n", passed ? "통과" : "실패");
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(result));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "vk.decal 실패", std::move(data));
-        }
-        return CommandCore::Ok("vk.decal 통과", std::move(data));
+        return CommandCore::Ok("dx12.blended 통과", std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_dx12_forward(const ConsoleCommandContext& ctx)
@@ -399,32 +307,22 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.forward 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_forwardshade(const ConsoleCommandContext& ctx)
+
+
+
+
+    static CommandCore::CommandResult Cmd_dx12_temporalhistory(const ConsoleCommandContext& ctx)
     {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("dx12.temporalhistory takes no arguments");
         std::string log;
-        const bool passed = DX12Test::RunForwardPlusShadeTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, "[dx12.forwardshade] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.forwardshade %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        const bool passed = DX12Test::RunTemporalHistoryTest(log);
+        auto data = CommandCore::CommandData::Object();
         data.Set("log", CommandCore::CommandData::String(log));
         data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.forwardshade 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.forwardshade 통과", std::move(data));
+        data.Set("scope", CommandCore::CommandData::String("production-history-contract-and-SDK-configuration; no dispatch or pixel acceptance"));
+        if (!passed) return CommandCore::Fail("rendertest.failed", "Temporal history contract failed", std::move(data));
+        return CommandCore::Ok("Temporal history contract passed", std::move(data));
     }
-
-
-
-
 
     static CommandCore::CommandResult Cmd_dx12_post(const ConsoleCommandContext& ctx)
     {
@@ -498,28 +396,16 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.gizmoscene 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_shadowquality(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_dx12_meshletcontract(const ConsoleCommandContext&)
     {
-        // 그림자 품질 검증(PHASE 3-6 — 경사 비례 편향·캐스케이드 경계 블렌딩).
         std::string log;
-        const bool passed = DX12Test::RunShadowQualityTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, "[dx12.shadowquality] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.shadowquality %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        const bool passed = RenderTest::RunExperimentVertexLayoutSelfTest(log);
+        auto data = CommandCore::CommandData::Object();
         data.Set("log", CommandCore::CommandData::String(log));
         data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.shadowquality 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.shadowquality 통과", std::move(data));
+        std::printf("[CLI] dx12.meshletcontract %s\n%s", passed ? "PASS" : "FAIL", log.c_str());
+        return passed ? CommandCore::Ok("METEOR cooked/GPU identity contracts passed; GPU execution is separate", std::move(data))
+            : CommandCore::Fail("rendertest.failed", "METEOR meshlet contract failed", std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_dx12_skinning(const ConsoleCommandContext& ctx)
@@ -590,78 +476,6 @@ namespace ConsoleCmd
 
 
 
-    static CommandCore::CommandResult Cmd_dx12_scene(const ConsoleCommandContext& ctx)
-    {
-        // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
-        DX12Test::SceneBindingReport report;
-        std::string log;
-        const bool passed = DX12Test::RunSceneBindingTest(log, &report);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, "[dx12.scene] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("drawCandidates", CommandCore::CommandData::Int(report.drawCandidates));
-        data.Set("lights", CommandCore::CommandData::Int(report.lights));
-        data.Set("draws", CommandCore::CommandData::Int(report.draws));
-        data.Set("meshUploads", CommandCore::CommandData::Int(report.meshUploads));
-        data.Set("generationUploads", CommandCore::CommandData::Int(report.generationUploads));
-        data.Set("uploadKB", CommandCore::CommandData::Int(report.uploadKB));
-        data.Set("coverage", CommandCore::CommandData::Int(report.coverage));
-        data.Set("pixels", CommandCore::CommandData::Int(report.pixels));
-        data.Set("texturedDraws", CommandCore::CommandData::Int(report.texturedDraws));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.scene 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.scene 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_dx12_gbuffer(const ConsoleCommandContext& ctx)
-    {
-        // GBuffer 패스 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunGBufferTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, "[dx12.gbuffer] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.gbuffer %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.gbuffer 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.gbuffer 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_render_pbr_parity(const ConsoleCommandContext& ctx)
-    {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrShaderParityTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.parity] ") + result);
-        std::printf("%s[CLI] render.pbr.parity %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.parity.failed", "PBR verification failed", std::move(data));
-    }
-
     static CommandCore::CommandResult Cmd_render_pbr_sealstatus(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This command accepts no arguments");
@@ -677,12 +491,6 @@ namespace ConsoleCmd
         data.Set("encoderDrops", count(seal.encoderDrops));
         data.Set("drawCount", count(seal.lastDrawCount));
         data.Set("batchCount", count(seal.lastBatchCount));
-        data.Set("gbufferStamped", count(seal.gbufferStamped));
-        data.Set("gbufferUnstamped", count(seal.gbufferUnstamped));
-        data.Set("gbufferViolations", count(seal.gbufferViolations));
-        data.Set("forwardStamped", count(seal.forwardStamped));
-        data.Set("forwardUnstamped", count(seal.forwardUnstamped));
-        data.Set("forwardViolations", count(seal.forwardViolations));
         data.Set("textureUploadFailures", count(seal.textureUploadFailures));
         data.Set("modelGenerationPairs", count(seal.modelGenerationPairs));
         data.Set("mixedGenerationModels", count(seal.mixedGenerationModels));
@@ -745,88 +553,88 @@ namespace ConsoleCmd
             : CommandCore::Fail("render.pbr.seal.failed", "PBR seal verification failed", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_render_pbr_coverage(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_render_temporal_motion_fixture(const ConsoleCommandContext& ctx)
     {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrCoverageTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.coverage] ") + result);
-        std::printf("%s[CLI] render.pbr.coverage %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.coverage.failed", "PBR verification failed", std::move(data));
+        using namespace CommandCore;
+        const bool sdkStartup = ctx.parts.size() == 3 && ctx.parts[2] == "sdk-startup";
+        const bool sdkQuality = sdkStartup || (ctx.parts.size() == 3 && ctx.parts[2] == "sdk-sequence");
+        if (ctx.parts.size() != 2 && !sdkQuality)
+        {
+            return InvalidArguments("render.temporal.motion.fixture <new-absolute-directory> [sdk-sequence|sdk-startup]");
+        }
+        std::string error;
+        bool busy = false;
+        bool admitted = TemporalMotionFixture::Begin(ctx.parts[1], error, &busy, sdkQuality, sdkStartup);
+        if (!admitted && !busy)
+        {
+            return Fail("render.temporal.motion.fixture.rejected", error);
+        }
+        // GT must never wait on the render mutex. Retry transient contention on
+        // later ticks, while retaining the original scene and a bounded deadline.
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        ctx.system.WaitForResult([directory = ctx.parts[1], admitted, sdkQuality, sdkStartup,
+            sceneEpoch = SceneManagers->SceneContextEpoch(), deadline]() mutable -> std::optional<CommandResult>
+        {
+            if (!admitted)
+            {
+                if (SceneManagers->SceneContextEpoch() != sceneEpoch)
+                    return Fail("render.temporal.motion.fixture.rejected", "Scene changed before fixture admission");
+                if (std::chrono::steady_clock::now() >= deadline)
+                    return Fail("render.temporal.motion.fixture.rejected", "Renderer remained busy during fixture admission");
+                std::string error;
+                bool busy = false;
+                admitted = TemporalMotionFixture::Begin(directory, error, &busy, sdkQuality, sdkStartup);
+                if (!admitted)
+                {
+                    if (busy) return std::nullopt;
+                    return Fail("render.temporal.motion.fixture.rejected", error);
+                }
+            }
+            const auto status = TemporalMotionFixture::GetStatus();
+            if (status.state == TemporalMotionFixtureState::Preparing || status.state == TemporalMotionFixtureState::Running)
+            {
+                return std::nullopt;
+            }
+            auto data = CommandData::Object();
+            data.Set("directory", CommandData::String(status.directory));
+            data.Set("acceptance", CommandData::String("unverified-requires-independent-oracle"));
+            if (status.state != TemporalMotionFixtureState::Complete)
+            {
+                return Fail("render.temporal.motion.fixture.failed", status.error, std::move(data));
+            }
+            return Ok(sdkQuality ? "Recorded SDK sequence; run the independent image oracle" : "Recorded seven route/control pairs; run the independent motion oracle", std::move(data));
+        }, true);
+        return Ok();
     }
 
-    static CommandCore::CommandResult Cmd_render_pbr_occlusion(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_render_temporal_history_capture(const ConsoleCommandContext& ctx)
     {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrOcclusionTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.occlusion] ") + result);
-        std::printf("%s[CLI] render.pbr.occlusion %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.occlusion.failed", "PBR verification failed", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_render_pbr_emission(const ConsoleCommandContext& ctx)
-    {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrEmissionTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.emission] ") + result);
-        std::printf("%s[CLI] render.pbr.emission %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.emission.failed", "PBR verification failed", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_render_pbr_transform(const ConsoleCommandContext& ctx)
-    {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrTransformTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.transform] ") + result);
-        std::printf("%s[CLI] render.pbr.transform %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.transform.failed", "PBR verification failed", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_render_pbr_uv(const ConsoleCommandContext& ctx)
-    {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrUvTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.uv] ") + result);
-        std::printf("%s[CLI] render.pbr.uv %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.uv.failed", "PBR verification failed", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_render_pbr_mip(const ConsoleCommandContext& ctx)
-    {
-        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
-        std::string result;
-        const bool passed = RunPbrMipTest(result);
-        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.mip] ") + result);
-        std::printf("%s[CLI] render.pbr.mip %s\n", result.c_str(), passed ? "PASS" : "FAIL");
-        auto data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(result));
-        return passed ? CommandCore::Ok({}, std::move(data))
-            : CommandCore::Fail("render.pbr.mip.failed", "PBR verification failed", std::move(data));
+        using namespace CommandCore;
+        if (ctx.parts.size() == 2 && ctx.parts[1] == "status")
+        {
+            const auto status = EnhancedSceneRenderer::GetLivePbrCaptureStatus();
+            auto data = CommandData::Object();
+            data.Set("complete", CommandData::Bool(status.state == EnhancedPbrCaptureState::Complete));
+            data.Set("ready", CommandData::Bool(status.historyObservationReady));
+            data.Set("failed", CommandData::Bool(status.state == EnhancedPbrCaptureState::Failed));
+            data.Set("directory", CommandData::String(status.directory));
+            data.Set("frameId", CommandData::Int(status.frameId));
+            data.Set("error", CommandData::String(status.error));
+            return Ok({}, std::move(data));
+        }
+        if (ctx.parts.size() == 2 && ctx.parts[1] == "cancel")
+        {
+            EnhancedSceneRenderer::CancelLivePbrCapture();
+            return Ok();
+        }
+        if ((ctx.parts.size() != 3 && ctx.parts.size() != 4) || (ctx.parts[2] != "1" && ctx.parts[2] != "8") ||
+            (ctx.parts.size() == 4 && ctx.parts[3] != "fixed-sdk-clock"))
+            return InvalidArguments("render.temporal.history.capture <new-absolute-directory> <1|8> [fixed-sdk-clock] | status | cancel");
+        std::string error;
+        if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], EnhancedLiveDisplayTarget::Game,
+            error, false, {}, {}, {}, false, false, false, {}, nullptr, ctx.parts[2] == "1" ? 1u : 8u, ctx.parts.size() == 4))
+            return Fail("render.temporal.history.capture.rejected", error);
+        return Ok("Armed; perform a live cut or resize, then poll status");
     }
 
     static CommandCore::CommandResult Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
@@ -835,18 +643,23 @@ namespace ConsoleCmd
         if (ctx.parts.size() < 2 || ctx.parts.size() > 7
             || (ctx.parts.size() >= 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor" && ctx.parts[2] != "material")
             || (ctx.parts.size() >= 4 && ctx.parts[3] != "controlled" && ctx.parts[3] != "controlled-replay"
-                && ctx.parts[3] != "controlled-lattice-replay"))
-            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]");
+                && ctx.parts[3] != "controlled-lattice-replay" && ctx.parts[3] != "motion" && ctx.parts[3] != "observed")
+            || (ctx.parts.size() >= 4 && (ctx.parts[3] == "motion" || ctx.parts[3] == "observed") && ctx.parts.size() != 4))
+        {
+            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [observed|motion|controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]");
+        }
         std::string error;
         const auto target = ctx.parts.size() >= 3 && ctx.parts[2] == "editor"
             ? EnhancedLiveDisplayTarget::Editor : ctx.parts.size() >= 3 && ctx.parts[2] == "material"
             ? EnhancedLiveDisplayTarget::MaterialPreview : EnhancedLiveDisplayTarget::Game;
         if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error,
-                ctx.parts.size() >= 4, ctx.parts.size() >= 5 ? ctx.parts[4] : std::string{},
+                ctx.parts.size() >= 4 && ctx.parts[3] != "motion" && ctx.parts[3] != "observed", ctx.parts.size() >= 5 ? ctx.parts[4] : std::string{},
                 ctx.parts.size() >= 6 ? ctx.parts[5] : std::string{},
                 ctx.parts.size() == 7 ? ctx.parts[6] : std::string{},
                 ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-replay",
-                ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-lattice-replay"))
+                ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-lattice-replay",
+                ctx.parts.size() >= 4 && ctx.parts[3] == "motion", {}, nullptr, 0, false,
+                ctx.parts.size() >= 4 && ctx.parts[3] == "observed"))
             return Fail("render.pbr.capture.rejected", error);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
         ctx.system.WaitForResult([deadline]() -> std::optional<CommandResult>
@@ -1180,30 +993,6 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.ibl 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_iblshade(const ConsoleCommandContext& ctx)
-    {
-        // IBL 앰비언트 소비 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunIBLShadeTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug::PrintLog(spdlog::level::warn, "[dx12.iblshade] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.iblshade %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.iblshade 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.iblshade 통과", std::move(data));
-    }
-
     static CommandCore::CommandResult Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions" && ctx.parts[1] != "transient" && ctx.parts[1] != "queue-contract" && ctx.parts[1] != "queue-native" && ctx.parts[1] != "queue-ownership" && ctx.parts[1] != "queue-schedule" && ctx.parts[1] != "queue-execution"))
@@ -1360,34 +1149,23 @@ namespace ConsoleCmd
         reg.Result({ "dx12.selftest" }, &Cmd_dx12_selftest);
         reg.Result({ "vk.grid" }, &Cmd_vk_grid);
         reg.Result({ "vk.texturecodec" }, &Cmd_vk_texturecodec);
-        reg.Result({ "vk.shadow" }, &Cmd_vk_shadow);
-        reg.Result({ "vk.gbuffer" }, &Cmd_vk_gbuffer);
-        reg.Result({ "vk.forward" }, &Cmd_vk_forward);
-        reg.Result({ "vk.deferred" }, &Cmd_vk_deferred);
-        reg.Result({ "render.pbr.parity" }, &Cmd_render_pbr_parity);
         reg.Result({ "render.pbr.seal" }, &Cmd_render_pbr_seal);
         reg.Result({ "render.pbr.compare" }, &Cmd_render_pbr_compare);
         reg.Result({ "render.pbr.normalpair" }, &Cmd_render_pbr_normalpair);
         reg.Result({ "render.pbr.sealstatus" }, &Cmd_render_pbr_sealstatus);
-        reg.Result({ "render.pbr.coverage" }, &Cmd_render_pbr_coverage);
-        reg.Result({ "render.pbr.occlusion" }, &Cmd_render_pbr_occlusion);
-        reg.Result({ "render.pbr.emission" }, &Cmd_render_pbr_emission);
-        reg.Result({ "render.pbr.transform" }, &Cmd_render_pbr_transform);
-        reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
-        reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
         reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
+        reg.Result({ "render.temporal.motion.fixture" }, &Cmd_render_temporal_motion_fixture, SceneAccess::BorrowLiveState);
+        reg.Result({ "render.temporal.history.capture" }, &Cmd_render_temporal_history_capture, SceneAccess::OwnedState);
         reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
-        reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);
-        reg.Result({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);
+        reg.Result({ "dx12.blended" }, &Cmd_dx12_blended);
         reg.Result({ "dx12.post" }, &Cmd_dx12_post);
+        reg.Result({ "dx12.temporalhistory" }, &Cmd_dx12_temporalhistory);
         reg.Result({ "dx12.ui" }, &Cmd_dx12_ui);
         reg.Result({ "dx12.gizmoscene" }, &Cmd_dx12_gizmoscene);
-        reg.Result({ "dx12.shadowquality" }, &Cmd_dx12_shadowquality);
+        reg.Result({ "dx12.meshletcontract" }, &Cmd_dx12_meshletcontract);
         reg.Result({ "dx12.skinning" }, &Cmd_dx12_skinning);
         reg.Result({ "render.livecheck" }, &Cmd_render_livecheck);
-        reg.Result({ "dx12.scene" }, &Cmd_dx12_scene);
-        reg.Result({ "dx12.gbuffer" }, &Cmd_dx12_gbuffer);
         reg.Result({ "dx12.ssao" }, &Cmd_dx12_ssao);
         reg.Result({ "dx12.ssgi" }, &Cmd_dx12_ssgi);
         reg.Result({ "dx12.ssr" }, &Cmd_dx12_ssr);
@@ -1400,7 +1178,6 @@ namespace ConsoleCmd
         reg.Result({ "dx12.gizmoline" }, &Cmd_dx12_gizmoline);
         reg.Result({ "dx12.decal" }, &Cmd_dx12_decal);
         reg.Result({ "dx12.ibl" }, &Cmd_dx12_ibl);
-        reg.Result({ "dx12.iblshade" }, &Cmd_dx12_iblshade);
         reg.Result({ "dx12.rendergraph" }, &Cmd_dx12_rendergraph);
         reg.Result({ "dx12.parallel" }, &Cmd_dx12_parallel);
         reg.Result({ "vk.parallel" }, &Cmd_vk_parallel);

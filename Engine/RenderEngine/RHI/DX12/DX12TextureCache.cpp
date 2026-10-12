@@ -191,7 +191,8 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     memcpy(staging.cpuAddress, rgba, 4);
 
     DX12PersistentHeap::Allocation allocation;
-    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COPY_DEST,
+    // COMMON creation; the copy promotes to COPY_DEST (see UploadFromCpuPixels).
+    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COMMON,
         name, allocation, outError))
         return false;
 
@@ -393,7 +394,13 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     }
 
     DX12PersistentHeap::Allocation allocation;
-    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COPY_DEST,
+    // Created in COMMON: the copy implicitly promotes it to COPY_DEST and the
+    // explicit COPY_DEST -> PIXEL_SHADER_RESOURCE barrier below is unchanged.
+    // A COPY_DEST creation state made GPU-based validation report the texture
+    // as COPY_DEST at its first draw, although the flushed upload list ran first
+    // on the same queue; later frames were clean. COMMON is also the creation
+    // state Microsoft recommends for resources first written by copies.
+    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COMMON,
         debugName, allocation, outError))
         return false;
 

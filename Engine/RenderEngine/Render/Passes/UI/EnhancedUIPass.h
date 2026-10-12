@@ -110,6 +110,7 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
+    void SetSeparateLayer(bool value) { m_separateLayer = value; }
     void SetRects(const std::vector<Rect>* rects,
         own::shared_owner<TextureFramePins> texturePins = {})
     {
@@ -184,6 +185,7 @@ private:
     own::shared_owner<TextureFramePins> m_texturePins;
     Inputs   m_inputs{};
     RHIFormat m_outputFormat{ kOutputFormat };
+    bool m_separateLayer{};
     RGHandle m_output;
 
     const std::vector<Rect>* m_rects{ nullptr };

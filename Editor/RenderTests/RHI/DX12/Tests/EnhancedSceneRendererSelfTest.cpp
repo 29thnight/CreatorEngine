@@ -1,3 +1,4 @@
+#include "RHI/DX12/Tests/Geometry/GraphSceneFixture.h"
 #include "../../../../../Tools/regression/material_owner_checks.h"
 #include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
@@ -19,8 +20,8 @@
 #include "Render/Scene/EnhancedLatticeReplayInput.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
 #include "Render/Core/PassResourceRetirement.h"
-#include "Render/Passes/Geometry/EnhancedGBufferPass.h"
-#include "Render/Passes/Geometry/EnhancedDeferredPass.h"
+#include "Render/Passes/Geometry/SceneSurfaceTargets.h"
+#include "MaterialGraphSceneHost.h"
 #include "MaterialGraphSceneLookup.h"
 #include "MaterialGraphSceneRefraction.h"
 #include "MaterialGraphSceneSubsurface.h"
@@ -32,8 +33,9 @@
 //   다른 파일에서 끌어와 주고 있어서 없어도 빌드가 됐는데, 파일 하나를
 //   프로젝트에 더한 것만으로 묶음이 바뀌어 갑자기 터졌다.
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
+#include "Geometry/GraphSceneFixture.h"
 #include "Render/Passes/Lighting/EnhancedSSGIPass.h"
-#include "Render/Passes/Geometry/EnhancedForwardPass.h"
+#include "Render/Passes/Lighting/EnhancedLightTilePass.h"
 #include "Render/Passes/Geometry/EnhancedSpritePass.h"
 #include "Render/Passes/Lighting/EnhancedSSAOPass.h"
 #include "Render/Passes/PostProcess/EnhancedPostChainPass.h"
@@ -1151,7 +1153,7 @@ passes:
                 return false;
             }
             EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
-            EnhancedGBufferPass gbuffer;
+            SceneSurfaceTargets gbuffer;
             gbuffer.Declare(graph, frame);
             owner->DeclareInputs(graph);
             bool rejected = false;
@@ -1282,36 +1284,20 @@ passes:
         draw.materialGraphInstance = instance;
         draw.worldMatrix = math::matrix4x4::identity();
         draw.coverage.flags = EnhancedMaterialCoverage::Enabled;
-        auto& mesh = draw.modelMeshView;
-        if (!Uuid::TryParse("11111111-1111-8111-8111-111111111111", mesh.handle.modelId) ||
-            !Uuid::TryParse("22222222-2222-8222-8222-222222222222", mesh.handle.meshId))
+        GraphSceneFixture geometryFixture;
+        std::vector<::Vertex> vertices(4);
+        const std::array<math::vector3, 4> positions{{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}}};
+        for (size_t i = 0; i < vertices.size(); ++i)
         {
-            error = "RG5 special mesh identity failed";
-            return false;
+            vertices[i].position = positions[i];
+            vertices[i].normal = {0,0,1};
+            vertices[i].tangent = {1,0,0};
         }
-        mesh.handle.generation = 1;
-        mesh.vertexAttributeMask = assets::kModelVertexMasks.front();
-        mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
-        mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);
-        const std::array<std::array<float, 3>, 4> positions{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
-        const std::array<std::uint32_t, 12> indices{0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3};
-        std::vector<std::byte> vertices(4 * mesh.vertexStride);
-        const std::array<float, 3> normal{0, 0, 1};
-        const std::array<float, 4> tangent{1, 0, 0, 1};
-        for (unsigned i = 0; i < 4; ++i)
-        {
-            const auto write = [&](assets::VertexAttribute attribute, const void* source, std::size_t bytes) {
-                std::memcpy(vertices.data() + i * mesh.vertexStride +
-                                assets::OffsetOf(mesh.vertexAttributeMask, attribute), source, bytes);
-            };
-            write(assets::VertexAttribute::Position, positions[i].data(), 12);
-            write(assets::VertexAttribute::Normal, normal.data(), 12);
-            write(assets::VertexAttribute::Tangent, tangent.data(), 16);
-        }
-        mesh.vertexData = vertices.data();
-        mesh.vertexBytes = vertices.size();
-        mesh.indexData = indices.data();
-        mesh.indexCount = indices.size();
+        const auto fixtureGeometry = geometryFixture.Draw(geometryFixture.AddMesh(vertices, {0,2,1,0,1,3,0,3,2,1,2,3}), draw.worldMatrix);
+        draw.modelMeshView = fixtureGeometry.modelMeshView;
+        auto descriptorPins = own::make_shared<assets::ModelAssetGenerationPins>();
+        assets::ModelGeometryPreparationPins geometryPins;
+        geometryFixture.BuildPins(*descriptorPins, geometryPins);
         auto second = draw;
         second.geometryKey = 2;
         const std::array<EnhancedDrawItem, 2> draws{draw, second};
@@ -1319,7 +1305,7 @@ passes:
         view.camera.view = math::matrix4x4::identity();
         view.camera.projection = math::matrix4x4::identity();
         own::shared_owner<const SceneViewInput> input;
-        if (!SceneViewInput::Seal(view, draws, {}, input, error))
+        if (!SceneViewInput::Seal(view, draws, {}, input, error, descriptorPins, {}, &geometryPins))
         {
             return false;
         }
@@ -1348,6 +1334,7 @@ passes:
         bindings->instancePinIndex = instancePins->Retain(instance);
         bindings->instance = instancePins->Borrow(bindings->instancePinIndex);
         bindings->instancePins = std::move(instancePins);
+        const std::array<float, 3> normal{0, 0, 1};
         const auto constants = resources.UploadConstants(normal.data(), sizeof(normal));
         const SceneVolumeBinding binding{bindings, coefficientFixture.GetGeneration(), constants};
         const std::array<SceneVolumeBinding, 2> coefficientBindings{binding, binding};
@@ -1381,7 +1368,7 @@ passes:
                 error = "RG5 mesh world version declaration failed: " + error;
                 return false;
             }
-            EnhancedGBufferPass gbuffer;
+            SceneSurfaceTargets gbuffer;
             gbuffer.Declare(graph, frame);
             lookup->DeclareInputs(graph);
             refraction->DeclareInputs(graph);
@@ -1465,8 +1452,8 @@ passes:
             unsigned refractionReads = 0, reflectionReads = 0;
             for (const auto& pass : snapshot.passes)
             {
-                const bool refractionPass = pass.name == "LX.Scene.RefractionBake";
-                const bool reflectionPass = pass.name == "LX.Scene.SubsurfaceReflection";
+                const bool refractionPass = pass.name == "METEOR.Scene.RefractionBake";
+                const bool reflectionPass = pass.name == "METEOR.Scene.SubsurfaceReflection";
                 const auto expectedLookupVersion = refractionPass ? ++refractionReads :
                     reflectionPass ? ++reflectionReads : 0;
                 unsigned lookupReads = 0;
@@ -1532,7 +1519,7 @@ passes:
             desc.allowRenderTarget = true;
             desc.name = "RG5.SurfaceColor";
             auto lighting = graph.Write(graph.CreateTexture(desc));
-            EnhancedGBufferPass::Outputs surface;
+            SceneSurfaceTargets::Outputs surface;
             for (auto* color : {&surface.diffuse, &surface.metalRough, &surface.normal, &surface.emissive, &surface.bitmask})
             {
                 *color = graph.CreateTexture(desc);
@@ -1549,7 +1536,7 @@ passes:
             for (unsigned iteration = 0; iteration < 3; ++iteration)
             {
                 const auto copiedDepth = graph.Write(surface.depth);
-                graph.AddPass("Forward+.GraphDepthCopy",
+                graph.AddPass("METEOR.Blended.DepthCopy",
                     {{opaqueDepth, RHIResourceState::CopySource, RGAccessMode::Read},
                      {copiedDepth, RHIResourceState::CopyDest, RGAccessMode::Write}}, nullptr);
                 surface.depth = copiedDepth;
@@ -1565,10 +1552,10 @@ passes:
                 {
                     uses.push_back({color, RHIResourceState::RenderTarget, RGAccessMode::Write});
                 }
-                graph.AddPass("Forward+.GraphSurface", uses, nullptr);
-                // Simulate a Code -> Graph -> Code stream using the production
+                graph.AddPass("METEOR.Blended.Surface", uses, nullptr);
+                // Simulate three consecutive blended draws using the production
                 // color version function, including the returned handle handoff.
-                for (const auto* name : {"Forward+.CodeBefore", "Forward+.GraphBlend", "Forward+.CodeAfter"})
+                for (const auto* name : {"METEOR.Blended.Color0", "METEOR.Blended.Color1", "METEOR.Blended.Color2"})
                 {
                     const auto previous = lighting;
                     lighting = AdvanceSceneColor(graph, lighting);
@@ -1634,11 +1621,280 @@ passes:
         return true;
     }
 
-    bool ValidateRg5ForwardDeclarations(DX12DeviceResources& resources, std::string& error)
+    bool ValidateMeteorTransformDispatch(DX12DeviceResources& resources, std::string& error, std::string& log)
+    {
+        DX12PSOManager pipelines;
+        DX12RootSignatureCache roots;
+        if (!pipelines.Initialize(&resources, L"dx12_lx_transform.cache", error) ||
+            !roots.Initialize(&resources, error)) return false;
+        EnhancedFrameContext context{};
+        context.resources = &resources; context.psoManager = &pipelines; context.rootSignatures = &roots;
+        context.width = context.height = 32;
+        GraphSceneFixture fixture;
+        if (!fixture.Initialize(context, error)) return false;
+        LX::Runtime::CompiledCompute shader;
+        material_graph::MeshSurfaceEvaluator evaluator;
+        if (!LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphMeshSurface.slang").string(),
+                "LXTransformMesh", {}, {}, shader, error) ||
+            !evaluator.Initialize(resources, roots, pipelines, shader.stage.bytecode, error,
+                                  std::move(shader.description))) return false;
+        for (const auto dimensions : std::array<std::array<uint32_t, 2>, 6>{{
+                 {1,33}, {16,33}, {64,33}, {256,33}, {512,33}, {512,4095}}})
+        {
+            const uint32_t count = dimensions[0], pointCount = dimensions[1];
+            std::vector<Vertex> vertices(pointCount), skinned(pointCount);
+            std::vector<uint32_t> indices(pointCount);
+            for (uint32_t i = 0; i < pointCount; ++i)
+            {
+                vertices[i].position = {float(i / 3) * .01f, float(i % 3) * .01f, .25f};
+                vertices[i].normal = {0, 0, 1}; vertices[i].tangent = {1, 0, 0}; vertices[i].bitangent = {0, 1, 0};
+                vertices[i].uv0 = {float(i) / 64.f, float(i) / 128.f};
+                skinned[i] = vertices[i]; skinned[i].boneWeights = {1, 0, 0, 0};
+                indices[i] = i;
+            }
+            const auto staticMesh = fixture.AddMesh(vertices, indices), skinMesh = fixture.AddMesh(skinned, indices);
+            if (!resources.BeginFrame(error)) return false;
+            std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> owners;
+            std::vector<const material_graph::MeshSurfaceBatch*> batches;
+            std::vector<RHIReadback> readbacks(count);
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                auto world = math::matrix4x4::identity();
+                world.m[0][0] = 1.f + float(i % 5) * .1f; world.m[1][1] = 1.25f;
+                world.m[3][0] = float(i); world.m[3][1] = -float(i) * .5f;
+                auto draw = fixture.Draw(i % 2 ? skinMesh : staticMesh, world);
+                auto bone = math::matrix4x4::identity(); bone.m[3][0] = float(i % 7) * .1f;
+                if (i % 2) { draw.bonePalette = &bone; draw.boneCount = 1; }
+                const std::vector<float> lods(pointCount, float(i % 4) * .5f);
+                std::shared_ptr<const material_graph::MeshSurfaceInput> input;
+                const material_graph::SurfaceView view{{0, 0, 1000, 0}, 1, 1, uint64_t(i + 1)};
+                std::shared_ptr<const material_graph::MeshSurfaceBatch> batch;
+                if (!material_graph::MeshSurfaceInput::Seal(draw, view, lods, input, error) ||
+                    !evaluator.Prepare(resources, input, batch, error) ||
+                    !resources.CreateBufferReadback(pointCount * sizeof(material_graph::SurfacePoint), readbacks[i], error))
+                    return false;
+                batches.push_back(batch.get()); owners.push_back(std::move(batch));
+            }
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+            if (!material_graph::MeshSurfaceBatch::DeclareBatch(graph, batches, error)) return false;
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                const auto output = owners[i]->GraphOutput(graph);
+                graph.AddPass("METEOR.Transform.Readback", {{output, RHIResourceState::CopySource, RGAccessMode::Read}},
+                    [output, readback = readbacks[i]](const auto& execution) {
+                        execution.encoder->CopyBufferToReadback(readback, execution.graph->ResolveBufferHandle(output));
+                    }, true);
+            }
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot)) return false;
+            const auto named = [&](const char* name) {
+                return std::ranges::count_if(snapshot.passes, [&](const auto& pass) { return !pass.culled && pass.name == name; });
+            };
+            if (named("METEOR.TransformMeshWorld") != 1 || named("METEOR.MeshWorldReady") != 1) {
+                error = "METEOR first-transform pass count grew with job count"; return false;
+            }
+            const auto before = resources.GetImmediateEncoder().GetComputeDispatchCount();
+            if (!graph.Execute(error)) return false;
+            if (resources.GetImmediateEncoder().GetComputeDispatchCount() != before + 1) {
+                error = "METEOR first-transform native dispatch count is not exactly one"; return false;
+            }
+            if (!resources.EndFrame(error)) return false;
+            resources.WaitForGpu();
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                RHIReadbackImage image;
+                if (!resources.MapReadback(readbacks[i], image, error)) return false;
+                const auto actual = image.Elements<material_graph::SurfacePoint>();
+                if (image.ElementCount<material_graph::SurfacePoint>() != pointCount ||
+                    !owners[i]->ValidateReadback({actual, pointCount}, error)) return false;
+                for (uint32_t v = 0; v < pointCount; ++v)
+                {
+                    const double shift = i % 2 ? double(float(i % 7) * .1f) : 0.;
+                    const double x = (double(vertices[v].position.x) + shift) * double(1.f + float(i % 5) * .1f) + i;
+                    const double y = double(vertices[v].position.y) * 1.25 - double(i) * .5;
+                    if (std::abs(actual[v].position[0] - x) > 1e-4 ||
+                        std::abs(actual[v].position[1] - y) > 1e-4 || std::abs(actual[v].position[2] - .25) > 1e-6 ||
+                        actual[v].uvLod[0] != vertices[v].uv0.x || actual[v].uvLod[1] != vertices[v].uv0.y ||
+                        actual[v].uvLod[3] != float(i % 4) * .5f || std::abs(actual[v].normal[2] - 1.f) > 1e-6f ||
+                        std::abs(actual[v].tangent[0] - (1.f + float(i % 5) * .1f) / std::max(1.25f, 1.f + float(i % 5) * .1f)) > 1e-6f ||
+                        std::abs(actual[v].bitangent[1] - 1.25f / std::max(1.25f, 1.f + float(i % 5) * .1f)) > 1e-6f) {
+                        char detail[512]{};
+                        std::snprintf(detail, sizeof(detail), "METEOR transform reference mismatch job=%u vertex=%u position=(%.9g,%.9g,%.9g) expected=(%.9g,%.9g,.25) uv=(%.9g,%.9g) expected=(%.9g,%.9g) lod=%.9g normalZ=%.9g tangentX=%.9g bitangentY=%.9g",
+                            i, v, actual[v].position[0], actual[v].position[1], actual[v].position[2], x, y,
+                            actual[v].uvLod[0], actual[v].uvLod[1], vertices[v].uv0.x, vertices[v].uv0.y,
+                            actual[v].uvLod[3], actual[v].normal[2], actual[v].tangent[0], actual[v].bitangent[1]);
+                        error = detail; return false;
+                    }
+                }
+                resources.ReleaseReadback(readbacks[i]);
+            }
+            log += "METEOR_TRANSFORM_GPU_OK jobs=" + std::to_string(count) + " points=" + std::to_string(count * pointCount) +
+                   " transformPasses=1 readyPasses=1 nativeDispatches=1 mixedStaticSkinned=" + std::to_string(count > 1 ? 1 : 0) + " oracle=independent\n";
+        }
+        resources.WaitForGpu();
+        fixture.Shutdown();
+        return true;
+    }
+
+    bool ValidateMeteorTransformResidency(DX12DeviceResources& resources, std::string& error, std::string& log)
+    {
+        DX12PSOManager pipelines;
+        DX12RootSignatureCache roots;
+        if (!pipelines.Initialize(&resources, L"dx12_lx_residency.cache", error) ||
+            !roots.Initialize(&resources, error)) return false;
+        EnhancedFrameContext context{};
+        context.resources = &resources; context.psoManager = &pipelines; context.rootSignatures = &roots;
+        context.width = context.height = 32;
+        GraphSceneFixture fixture;
+        if (!fixture.Initialize(context, error)) return false;
+        LX::Runtime::CompiledCompute shader;
+        material_graph::MeshSurfaceEvaluator evaluator;
+        if (!LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphMeshSurface.slang").string(),
+                "LXTransformMesh", {}, {}, shader, error) ||
+            !evaluator.Initialize(resources, roots, pipelines, shader.stage.bytecode, error,
+                                  std::move(shader.description))) return false;
+        constexpr uint32_t count = 512, points = 1026;
+        std::vector<Vertex> vertices(points);
+        std::vector<uint32_t> indices(points);
+        for (uint32_t i = 0; i < points; ++i) {
+            vertices[i].position = {float(i / 3) * .01f, float(i % 3) * .01f, .25f};
+            vertices[i].normal = {0,0,1}; vertices[i].tangent = {1,0,0}; vertices[i].bitangent = {0,1,0};
+            indices[i] = i;
+        }
+        const auto mesh = fixture.AddMesh(vertices, indices);
+        std::vector<std::shared_ptr<const material_graph::MeshSurfaceInput>> inputs(count);
+        const std::vector<float> lods(points, 0.f);
+        const material_graph::SurfaceView view{{0,0,1000,0},1,1,1};
+        for (uint32_t i = 0; i < count; ++i) {
+            auto world = math::matrix4x4::identity(); world.m[3][0] = float(i);
+            if (!material_graph::MeshSurfaceInput::Seal(fixture.Draw(mesh, world), view, lods, inputs[i], error)) return false;
+        }
+        // Delayed evaluator completion publication must not age out an active
+        // immutable key before it first becomes eligible for reuse.
+        std::shared_ptr<const material_graph::MeshSurfaceInput> pendingInput;
+        auto pendingWorld = math::matrix4x4::identity(); pendingWorld.m[3][0] = -3.f;
+        if (!material_graph::MeshSurfaceInput::Seal(fixture.Draw(mesh, pendingWorld), view, lods, pendingInput, error)) return false;
+        for (uint32_t round = 0; round < 5; ++round) {
+            if (round == 4) evaluator.NotifyCompleted(resources.GetCompletedFenceValue());
+            if (!resources.BeginFrame(error)) return false;
+            std::shared_ptr<const material_graph::MeshSurfaceBatch> owner;
+            if (!evaluator.Prepare(resources, pendingInput, owner, error, true)) return false;
+            const material_graph::MeshSurfaceBatch* batch = owner.get();
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+            if (!material_graph::MeshSurfaceBatch::DeclareBatch(graph, {&batch,1}, error)) return false;
+            graph.AddPass("METEOR.Pending.Consumer", {{owner->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
+            const auto before = resources.GetImmediateEncoder().GetComputeDispatchCount();
+            if (!graph.Compile(error) || !graph.Execute(error) ||
+                resources.GetImmediateEncoder().GetComputeDispatchCount() != before + (round < 4 ? 1 : 0)) {
+                if (error.empty()) error = "METEOR delayed completion did not gate reuse";
+                return false;
+            }
+            if (!resources.EndFrame(error)) return false;
+            owner->MarkSubmitted({resources.GetLastSignaledFenceValue()});
+            resources.WaitForGpu();
+            if (round == 4 && evaluator.CacheStats().cachedOutputs != 4) {
+                error = "METEOR active pending key aged out before completion publication"; return false;
+            }
+        }
+        pendingInput.reset();
+        log += "LX_RESIDENCY_PENDING_OK recordings=5 pendingOwnersPreserved=4 completedNativeDispatches=0\n";
+        std::shared_ptr<const material_graph::MeshSurfaceBatch> pinned;
+        for (uint32_t round = 0; round < 4; ++round) {
+            if (round == 3) {
+                auto world = math::matrix4x4::identity(); world.m[3][0] = 3.f;
+                if (!material_graph::MeshSurfaceInput::Seal(fixture.Draw(mesh, world), view, lods, inputs[0], error)) return false;
+            }
+            if (!resources.BeginFrame(error)) return false;
+            std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> owners;
+            std::vector<const material_graph::MeshSurfaceBatch*> batches;
+            std::vector<RHIReadback> readbacks(count);
+            for (uint32_t i = 0; i < count; ++i) {
+                std::shared_ptr<const material_graph::MeshSurfaceBatch> batch;
+                if (!evaluator.Prepare(resources, inputs[i], batch, error, true) ||
+                    !resources.CreateBufferReadback(points * sizeof(material_graph::SurfacePoint), readbacks[i], error)) return false;
+                batches.push_back(batch.get()); owners.push_back(std::move(batch));
+            }
+            if (!round) pinned = owners.front();
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+            if (!material_graph::MeshSurfaceBatch::DeclareBatch(graph, batches, error)) return false;
+            for (uint32_t i = 0; i < count; ++i) {
+                const auto output = owners[i]->GraphOutput(graph);
+                graph.AddPass("METEOR.Residency.Readback", {{output, RHIResourceState::CopySource, RGAccessMode::Read}},
+                    [output, readback = readbacks[i]](const auto& execution) {
+                        execution.encoder->CopyBufferToReadback(readback, execution.graph->ResolveBufferHandle(output));
+                    }, true);
+                graph.AddPass("METEOR.Residency.Restore", {{output, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
+            }
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot)) return false;
+            const auto named = [&](const char* name) {
+                return std::ranges::count_if(snapshot.passes, [&](const auto& pass) {return !pass.culled && pass.name == name;});
+            };
+            const uint32_t expected = round == 0 || round == 3 ? 1 : 0;
+            const auto before = resources.GetImmediateEncoder().GetComputeDispatchCount();
+            if (named("METEOR.TransformMeshWorld") != expected || named("METEOR.MeshWorldReady") != expected ||
+                !graph.Execute(error) || resources.GetImmediateEncoder().GetComputeDispatchCount() != before + expected) {
+                if (error.empty()) error = "METEOR active residency transformed unchanged outputs";
+                return false;
+            }
+            if (!resources.EndFrame(error)) return false;
+            for (const auto& owner : owners) owner->MarkSubmitted({resources.GetLastSignaledFenceValue()});
+            resources.WaitForGpu(); evaluator.NotifyCompleted(resources.GetCompletedFenceValue());
+            for (uint32_t i = 0; i < count; ++i) {
+                RHIReadbackImage image;
+                if (!resources.MapReadback(readbacks[i], image, error)) return false;
+                const auto actual = image.Elements<material_graph::SurfacePoint>();
+                if (image.ElementCount<material_graph::SurfacePoint>() != points ||
+                    !owners[i]->ValidateReadback({actual, points}, error)) return false;
+                for (uint32_t v = 0; v < points; ++v) {
+                    const auto x = vertices[v].position.x + float(round == 3 && i == 0 ? 3 : i);
+                    if (std::abs(actual[v].position[0] - x) > 1e-4f ||
+                        std::abs(actual[v].position[1] - vertices[v].position.y) > 1e-6f ||
+                        std::abs(actual[v].position[2] - .25f) > 1e-6f) {
+                        error = "METEOR resident output differs from independent world reference"; return false;
+                    }
+                }
+                resources.ReleaseReadback(readbacks[i]);
+            }
+            const auto stats = evaluator.CacheStats();
+            if (stats.cachedOutputs < count || stats.cachedOutputBytes <= (32ull << 20) || stats.entries < count) {
+                error = "METEOR active scene was restricted by former cache budgets"; return false;
+            }
+            log += "LX_RESIDENCY_GPU_OK round=" + std::to_string(round) + " jobs=512 points=525312 transformPasses=" +
+                std::to_string(expected) + " readyPasses=" + std::to_string(expected) + " nativeDispatches=" +
+                std::to_string(expected) + " oracle=independent\n";
+        }
+        inputs.clear();
+        for (uint32_t round = 0; round < 3; ++round) {
+            if (!resources.BeginFrame(error)) return false;
+            evaluator.BeginFrame(resources.GetCurrentUploadRecordingId());
+            if (!resources.EndFrame(error)) return false;
+            resources.WaitForGpu(); evaluator.NotifyCompleted(resources.GetCompletedFenceValue());
+        }
+        if (evaluator.CacheStats().cachedOutputs != 1) {
+            error = "METEOR unused output retirement released pinned owner or retained idle scene"; return false;
+        }
+        pinned.reset();
+        if (!resources.BeginFrame(error)) return false;
+        evaluator.BeginFrame(resources.GetCurrentUploadRecordingId());
+        if (!resources.EndFrame(error)) return false;
+        resources.WaitForGpu(); evaluator.NotifyCompleted(resources.GetCompletedFenceValue());
+        if (evaluator.CacheStats().cachedOutputs != 0 || evaluator.CacheStats().cachedOutputBytes != 0 ||
+            evaluator.CacheStats().entries > 256 || evaluator.CacheStats().residentBytes > (128ull << 20)) {
+            error = "METEOR output retirement leaked idle outputs"; return false;
+        }
+        log += "LX_RESIDENCY_RETIRE_OK activeOver32MiB=1 uniqueInputs=512 pinnedPreserved=1 idleOutputs=0\n";
+        fixture.Shutdown();
+        return true;
+    }
+
+    // Light tiles are one compute writer of both tile buffers; blended shading
+    // reads them. No legacy access survives in the versioned declaration.
+    bool ValidateRg5LightTileDeclarations(DX12DeviceResources& resources, std::string& error)
     {
         DX12PSOManager psoManager;
         DX12RootSignatureCache rootSignatures;
-        if (!psoManager.Initialize(&resources, L"dx12_rg5_forward.cache", error) ||
+        if (!psoManager.Initialize(&resources, L"dx12_rg5_lighttiles.cache", error) ||
             !rootSignatures.Initialize(&resources, error))
         {
             return false;
@@ -1650,11 +1906,9 @@ passes:
         frame.width = 4;
         frame.height = 4;
         std::vector<EnhancedLight> lights;
-        std::vector<EnhancedDrawItem> draws;
         frame.lights = &lights;
-        frame.forwardDraws = &draws;
-        EnhancedForwardPass forward;
-        if (!forward.Initialize(frame, error) || !forward.PrepareFrame(frame, error))
+        EnhancedLightTilePass tiles;
+        if (!tiles.Initialize(frame, error) || !tiles.PrepareFrame(frame, error))
         {
             return false;
         }
@@ -1670,84 +1924,55 @@ passes:
                 resources.AbortFrame();
             }
         } recording{resources};
-        // Synthetic draw ordering tests declaration batches; GPU draw execution
-        // is covered separately by the product regression scene.
-        draws.resize(3);
-        draws[0].geometryKey = 2;
-        draws[1].geometryKey = 1;
-        draws[2].geometryKey = 3;
-        for (auto& draw : draws)
-        {
-            draw.worldMatrix = math::matrix4x4::identity();
-        }
         for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
         {
-            for (const bool ownColor : {false, true})
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+            SceneSurfaceTargets gbuffer;
+            gbuffer.Declare(graph, frame);
+            tiles.SetDepth(gbuffer.GetOutputs().depth);
+            tiles.Declare(graph, frame);
+            const auto& lighting = tiles.GetLighting();
+            if (!lighting.graphCounts.IsValid() || !lighting.graphIndices.IsValid() || !lighting.lights.IsValid())
             {
-                EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
-                EnhancedGBufferPass gbuffer;
-                EnhancedShadowPass shadow;
-                EnhancedDeferredPass deferred;
-                gbuffer.Declare(graph, frame);
-                shadow.Declare(graph, frame);
-                deferred.SetInputs(gbuffer.GetOutputs());
-                deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
-                deferred.Declare(graph, frame);
-                EnhancedForwardPass::Inputs inputs{};
-                inputs.depth = gbuffer.GetOutputs().depth;
-                if (!ownColor)
+                error = "RG5 light tiles did not publish their buffers";
+                return false;
+            }
+            graph.AddPass("RG5.LightTileConsumer",
+                {{lighting.graphCounts, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                 {lighting.graphIndices, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+            {
+                return false;
+            }
+            size_t tileWrites = 0;
+            for (const auto& pass : snapshot.passes)
+            {
+                for (const auto& usage : pass.usages)
                 {
-                    inputs.lighting = deferred.GetOutput();
-                }
-                forward.SetInputs(inputs);
-                forward.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
-                forward.Declare(graph, frame);
-                graph.AddPass("RG5.ForwardConsumer",
-                    {{forward.GetOutput(), RHIResourceState::CopySource, RGAccessMode::Read}}, nullptr, true);
-                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
-                if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
-                {
-                    return false;
-                }
-                size_t shades = 0;
-                size_t tileWrites = 0;
-                for (const auto& pass : snapshot.passes)
-                {
-                    for (const auto& usage : pass.usages)
+                    if (usage.access == RGAccessMode::LegacyState)
                     {
-                        if (usage.access == RGAccessMode::LegacyState)
+                        error = "RG5 light tile chain still uses legacy access";
+                        return false;
+                    }
+                    if (pass.name == "METEOR.Scene.LightTiles" && usage.kind == RGResourceKind::Buffer)
+                    {
+                        if (usage.access != RGAccessMode::Write || usage.version != 1)
                         {
-                            error = "RG5 Forward Code chain still uses legacy access";
+                            error = "RG5 light tile buffers lack Write/v1";
                             return false;
                         }
-                        if (pass.name == "Forward+.Cull" && usage.kind == RGResourceKind::Buffer)
-                        {
-                            if (usage.access != RGAccessMode::Write || usage.version != 1)
-                            {
-                                error = "RG5 Forward tile buffers lack Write/v1";
-                                return false;
-                            }
-                            ++tileWrites;
-                        }
+                        ++tileWrites;
                     }
-                    if (pass.name == "Forward+.Shade")
-                    {
-                        ++shades;
-                        const auto& color = pass.usages.front();
-                        if (color.access != RGAccessMode::ReadWrite || color.version != shades)
-                        {
-                            error = "RG5 Forward batches lost consecutive Modify versions";
-                            return false;
-                        }
-                    }
-                }
-                if (shades != 3 || tileWrites != 2 || forward.GetOutput().version != 3)
-                {
-                    error = "RG5 Forward batch or output identity mismatch";
-                    return false;
                 }
             }
+            if (tileWrites != 2)
+            {
+                error = "RG5 light tile writer identity mismatch";
+                return false;
+            }
         }
+        tiles.Shutdown();
         error.clear();
         return true;
     }
@@ -1780,18 +2005,18 @@ passes:
                 for (uint32_t iteration = 0; iteration < 2; ++iteration)
                 {
                     EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
-                    EnhancedGBufferPass gbuffer;
+                    SceneSurfaceTargets gbuffer;
                     EnhancedShadowPass shadow;
-                    EnhancedDeferredPass deferred;
+                    RGHandle lighting;
                     gbuffer.Declare(graph, frame);
-                    shadow.Declare(graph, frame);
+                    shadow.DeclareGraphTargets(graph, frame);
                     const auto inputs = gbuffer.GetOutputs();
                     ao.SetInputs({inputs.depth, inputs.normal});
                     ao.Declare(graph, frame);
-                    deferred.SetInputs(inputs);
-                    deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
-                    deferred.SetAmbientOcclusion(ao.GetOutput());
-                    deferred.Declare(graph, frame);
+
+
+
+                    lighting = material_graph::SceneHost::DeclareHdrTarget(graph, frame);
                     EnhancedSSGIPass::Inputs giInputs{};
                     giInputs.depth = inputs.depth;
                     if (optionalInputs)
@@ -1799,7 +2024,7 @@ passes:
                         giInputs.normal = inputs.normal;
                         giInputs.diffuse = inputs.diffuse;
                         giInputs.metalRough = inputs.metalRough;
-                        giInputs.lighting = deferred.GetOutput();
+                        giInputs.lighting = lighting;
                         giInputs.ambientOcclusion = ao.GetOutput();
                     }
                     gi.SetInputs(giInputs);
@@ -1886,18 +2111,16 @@ passes:
             for (const bool standalone : {false, true})
             {
                 EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
-                EnhancedGBufferPass gbuffer;
+                SceneSurfaceTargets gbuffer;
                 EnhancedShadowPass shadow;
-                EnhancedDeferredPass deferred;
                 RGHandle lighting;
                 if (!standalone)
                 {
                     gbuffer.Declare(graph, frame);
-                    shadow.Declare(graph, frame);
-                    deferred.SetInputs(gbuffer.GetOutputs());
-                    deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
-                    deferred.Declare(graph, frame);
-                    lighting = deferred.GetOutput();
+                    shadow.DeclareGraphTargets(graph, frame);
+
+
+                    lighting = material_graph::SceneHost::DeclareHdrTarget(graph, frame);
                     // Keep an old-version reader alive to require WAR before SkyBox modifies color.
                     graph.AddPass("RG5.OldLighting", {{lighting, RHIResourceState::CopySource, RGAccessMode::Read}},
                                   nullptr, true);
@@ -1921,7 +2144,7 @@ passes:
                 {
                     return false;
                 }
-                const auto expectedPasses = standalone ? 2u : 6u;
+                const auto expectedPasses = standalone ? 2u : 5u;
                 if (snapshot.executeOrder.size() != expectedPasses)
                 {
                     error = "RG5 consumer chain was unexpectedly culled";
@@ -1940,10 +2163,38 @@ passes:
                 }
                 if (!standalone)
                 {
+                    uint32_t reader = UINT32_MAX, skyPass = UINT32_MAX;
+                    size_t hdrClears = 0;
+                    for (uint32_t index = 0; index < snapshot.passes.size(); ++index)
+                    {
+                        const auto& pass = snapshot.passes[index];
+                        if (pass.name == "RG5.OldLighting") reader = index;
+                        if (pass.name == "SkyBox") skyPass = index;
+                        if (pass.name == "METEOR.Scene.HdrClear")
+                        {
+                            ++hdrClears;
+                            if (pass.usages.size() != 1 || pass.usages[0].resource != lighting.index ||
+                                pass.usages[0].access != RGAccessMode::Write)
+                            {
+                                error = "METEOR HDR must have one initial writer without lighting inputs";
+                                return false;
+                            }
+                        }
+                        if (pass.name == "Deferred")
+                        {
+                            error = "Removed Deferred pass reappeared in METEOR consumer chain";
+                            return false;
+                        }
+                    }
+                    if (hdrClears != 1)
+                    {
+                        error = "METEOR HDR first writer is missing or duplicated";
+                        return false;
+                    }
                     bool hasWar = false;
                     for (const auto& edge : snapshot.versionEdges)
                     {
-                        if (edge.resource == lighting.index && edge.producer == 3 && edge.consumer == 4 &&
+                        if (edge.resource == lighting.index && edge.producer == reader && edge.consumer == skyPass &&
                             edge.reason == EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::WAR)
                         {
                             hasWar = true;
@@ -2032,7 +2283,7 @@ passes:
             for (const bool reverse : {false, true})
             {
                 EnhancedRenderGraph graph(services, mode);
-                EnhancedGBufferPass gbuffer;
+                SceneSurfaceTargets gbuffer;
                 EnhancedShadowPass shadow;
                 EnhancedFrameContext frame{};
                 frame.width = 4;
@@ -2040,11 +2291,11 @@ passes:
                 if (reverse)
                 {
                     gbuffer.Declare(graph, frame);
-                    shadow.Declare(graph, frame);
+                    shadow.DeclareGraphTargets(graph, frame);
                 }
                 else
                 {
-                    shadow.Declare(graph, frame);
+                    shadow.DeclareGraphTargets(graph, frame);
                     gbuffer.Declare(graph, frame);
                 }
                 const auto output = gbuffer.GetOutputs();
@@ -4482,19 +4733,31 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         outLog += "RG5_CONSUMERS_FAILED " + error + "\n";
         return false;
     }
-    outLog += "RG5_CONSUMERS_OK Deferred/SkyBox policies=2 paths=2 Modify/WAR/depth\n";
+    outLog += "RG5_CONSUMERS_OK LX-HDR/SkyBox policies=2 paths=2 Modify/WAR/depth\n";
     if (!ValidateRg5IndirectDeclarations(resources, error))
     {
         outLog += "RG5_INDIRECT_FAILED " + error + "\n";
         return false;
     }
     outLog += "RG5_INDIRECT_OK SSAO/SSGI policies=2 optional=2 frames=2 history-v1\n";
-    if (!ValidateRg5ForwardDeclarations(resources, error))
     {
-        outLog += "RG5_FORWARD_FAILED " + error + "\n";
+        char* transformCases{}; size_t length{};
+        const bool enabled = _dupenv_s(&transformCases, &length, "CREATOR_METEOR_TRANSFORM_CASES") == 0 &&
+                             transformCases && transformCases[0] == '1';
+        std::free(transformCases);
+        if (enabled && (!ValidateMeteorTransformDispatch(resources, error, outLog) ||
+                        !ValidateMeteorTransformResidency(resources, error, outLog)))
+        {
+            outLog += "METEOR_TRANSFORM_GPU_FAILED " + error + "\n";
+            return false;
+        }
+    }
+    if (!ValidateRg5LightTileDeclarations(resources, error))
+    {
+        outLog += "RG5_LIGHTTILES_FAILED " + error + "\n";
         return false;
     }
-    outLog += "RG5_FORWARD_OK Code policies=2 paths=2 batches=3 tile-v1 color-v3\n";
+    outLog += "RG5_LIGHTTILES_OK policies=2 writer=1 tile-v1\n";
     if (!ValidateRg5LookupDeclarations(resources, error))
     {
         outLog += "RG5_LOOKUP_FAILED " + error + "\n";
@@ -4803,37 +5066,68 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         DX12CommandListPool pool;
         if(!pool.Initialize(resources,4,DX12DeviceResources::kFrameCount,error)) return false;
         std::vector<uint8_t> expected;
-        for(const int variant:{0,1,2,4,-4})
+        for(const int variant:{0,1,2,4,-4,8,16,32})
         {
             if(!resources.BeginFrame(error)) return false;
             pool.BeginFrame(0);
             EnhancedRenderGraph g(resources,RGSchedulingMode::ExplicitVersioned);
             g.SetParallelRecordCostThreshold(variant<0 ? 100 : 0);
+            const bool independentGpu = variant==8 || variant==16;
+            const bool balancedFixture = variant>=16;
+            g.SetRecordingWorkloadBalance(balancedFixture);
             RGTextureDesc d{}; d.width=resources.GetWidth(); d.height=resources.GetHeight(); d.allowRenderTarget=true; d.name="RG4.A";
             std::copy_n(DX12DeviceResources::kClearColor,4,d.clearColor);
             const auto a=g.Write(g.CreateTexture(d)); d.name="RG4.B";
             const auto b=g.Write(g.CreateTexture(d));
-            std::atomic<uint32_t> slices{0}, independent{0}; std::atomic<bool> copied{false};
-            const uint32_t wantedSlices=variant>1 ? static_cast<uint32_t>(variant) : 1u;
-            g.AddPass("readback",{{b,RHIResourceState::CopySource,RGAccessMode::Read}},
+            std::atomic<uint32_t> slices{0}, independent{0}, padding{0}; std::atomic<bool> copied{false};
+            const uint32_t wantedSlices=(independentGpu || balancedFixture) ? 1u : variant>1 ? static_cast<uint32_t>(variant) : 1u;
+            const auto readbackPass=g.AddPass("readback",{{b,RHIResourceState::CopySource,RGAccessMode::Read}},
                 [&](const EnhancedRenderGraph::ExecuteContext& c){
-                    if(!copied.load()) throw std::runtime_error("consumer recorded before copy");
+                    if(!independentGpu && !copied.load()) throw std::runtime_error("consumer recorded before copy");
                     c.encoder->CopyToReadback(resources.GetFrameReadback(),c.ResolveHandle(b));
                 },true);
-            g.AddPass("copy",{{a,RHIResourceState::CopySource,RGAccessMode::Read},{b,RHIResourceState::CopyDest,RGAccessMode::Write}},
+            const auto copyPass=g.AddPass("copy",{{a,RHIResourceState::CopySource,RGAccessMode::Read},{b,RHIResourceState::CopyDest,RGAccessMode::Write}},
                 [&](const EnhancedRenderGraph::ExecuteContext& c){
-                    if(slices.load()!=wantedSlices) throw std::runtime_error("consumer recorded before producer slices joined");
+                    if(!independentGpu && slices.load()!=wantedSlices) throw std::runtime_error("consumer recorded before producer slices joined");
                     c.encoder->CopyTexture(c.ResolveHandle(b),c.ResolveHandle(a)); copied.store(true);
                 });
-            g.AddSplitPass("clear",{{a,RHIResourceState::RenderTarget,RGAccessMode::Write}},
+            const auto clearPass=g.AddSplitPass("clear",{{a,RHIResourceState::RenderTarget,RGAccessMode::Write}},
                 [&](const EnhancedRenderGraph::ExecuteContext& c,uint32_t slice,uint32_t count){
                     if(count!=wantedSlices) throw std::runtime_error("split/fallback count mismatch");
                     if(slice==0) { const RHITextureHandle colors[]={c.ResolveHandle(a)};
                         c.encoder->ClearRenderTargets(resources.CreateRenderTargets(colors),DX12DeviceResources::kClearColor); }
                     ++slices;
-                },4,false,1);
+                },(independentGpu || balancedFixture) ? 1u : 4u,false,balancedFixture ? 64u : 1u);
             g.AddPass("independent",{},[&](const EnhancedRenderGraph::ExecuteContext&){++independent;},true);
-            if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{2,1,0,3}) return false;
+            if(independentGpu)
+            {
+                // CPU observations above are read only after the whole join;
+                // only GPU resources flow from clear -> copy -> readback.
+                g.DeclareRecordingIndependent(copyPass);
+                g.DeclareRecordingIndependent(readbackPass);
+                bool rejectedSideEffect=false, rejectedSplit=false;
+                try { g.DeclareRecordingSideEffect(copyPass); }
+                catch(const std::logic_error&) { rejectedSideEffect=true; }
+                try { g.DeclareRecordingIndependent(clearPass); }
+                catch(const std::logic_error&) { rejectedSplit=true; }
+                if(!rejectedSideEffect || !rejectedSplit) return false;
+            }
+            if(balancedFixture)
+            {
+                // Deterministic hints exercise a different contiguous cut.
+                // Unannotated CPU consumers must reject the added joins.
+                for(int i=0;i<4;++i)
+                    g.AddPass("balance.padding",{},[&](const auto&){++padding;},true);
+            }
+            const auto order = balancedFixture ? std::vector<uint16_t>{2,1,0,3,4,5,6,7} : std::vector<uint16_t>{2,1,0,3};
+            if(!g.Compile(error) || g.GetExecuteOrder()!=order) return false;
+            if(independentGpu)
+            {
+                bool rejectedCompiled=false;
+                try { g.DeclareRecordingIndependent(readbackPass); }
+                catch(const std::logic_error&) { rejectedCompiled=true; }
+                if(!rejectedCompiled) return false;
+            }
             RHISubmissionTicket ticket;
             if(variant==0) { if(!g.Execute(error)) return false; }
             else {
@@ -4842,13 +5136,20 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
                 RHIRecordedBatch batch;
                 if(!g.RecordParallel(pool,static_cast<uint32_t>(std::abs(variant)),desc,batch,error) ||
                     !GetRHISubmissionThread().EnqueueRecordedBatch(&resources,resources,std::move(batch),ticket,error)) return false;
+                if(!resources.EndFrame(error)) return false;
+                resources.WaitForGpu();
+                if(!GetRHISubmissionThread().Wait(ticket,error)) return false;
                 const auto stats=g.GetStats();
-                if(stats.recordUnits!=wantedSlices+3 || stats.recordingWaveCount!=(variant>1 ? 3u : 1u) ||
+                if(stats.recordUnits!=wantedSlices+3+(balancedFixture ? 4u : 0u) || stats.recordingWaveCount!=(variant==2 ? 3u : variant==4 || variant==32 ? 2u : 1u) ||
                     stats.parallelDeclined!=(variant<0)) return false;
+                if(independentGpu && (stats.recordingJobDispatchCount!=1 || stats.recordingWorkerJobCount!=4)) return false;
+                if(balancedFixture && (stats.recordingBalanced!=(variant==16) || padding.load()!=4)) return false;
             }
-            if(!resources.EndFrame(error)) return false;
-            resources.WaitForGpu();
-            if(variant!=0 && !GetRHISubmissionThread().Wait(ticket,error)) return false;
+            if(variant==0)
+            {
+                if(!resources.EndFrame(error)) return false;
+                resources.WaitForGpu();
+            }
             if(independent.load()!=1 || slices.load()!=wantedSlices) return false;
             RHIReadbackImage image{};
             if(!resources.MapReadback(resources.GetFrameReadback(),image,error)) return false;
@@ -4856,7 +5157,9 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
             else if(expected!=image.data) { outLog+="RG4_GPU_FAILED image mismatch\n"; return false; }
             std::string drop; if(pool.DrainEncoderDrops(drop)!=0) return false;
         }
+        outLog+="RG4_GPU_BALANCED_OK weighted nonempty contiguous targets pixels=0 fallback preserves CPU joins\n";
         outLog+="RG4_GPU_OK immediate workers=1/2/4 fallback split join compiled-order pixels=0 drops=0\n";
+        outLog+="RG4_GPU_INDEPENDENT_OK four-target GPU RAW ordered pixels=0 CPU joins retained for unannotated callbacks\n";
     }
 
     // ── [6/7] 실제 실행 + 픽셀 확인 ──
@@ -5007,2122 +5310,6 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
     resources.Shutdown();
 
     outLog += passed ? "렌더 그래프 검증 통과\n" : "렌더 그래프 검증 실패\n";
-    return passed;
-}
-
-bool DX12Test::RunGBufferTest(std::string& outLog)
-{
-    using Microsoft::WRL::ComPtr;
-
-    constexpr uint32_t kWidth = 128;
-    constexpr uint32_t kHeight = 128;
-
-    DX12DeviceResources resources;
-    std::string error;
-    if (!resources.Initialize(kWidth, kHeight, error))
-    {
-        outLog += "[1/3] 디바이스 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    DX12PSOManager psoManager;
-    if (!psoManager.Initialize(&resources, L"dx12_gbuffer.cache", error))
-    {
-        outLog += "[1/3] PSO 매니저 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    DX12RootSignatureCache rootSignatures;
-    if (!rootSignatures.Initialize(&resources, error))
-    {
-        outLog += "[1/3] 루트 시그니처 캐시 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    // ★ 이 검증은 오래 빨간불이었고 아무도 못 봤다.
-    //
-    // 2차 슬라이스(b57cb128)에서 GBuffer 패스의 내장 삼각형을 걷어내고
-    // context.draws를 그리도록 바꿨는데, 이 검증은 draws를 채우지 않았다.
-    // 그래서 그 뒤로 줄곧 아무것도 안 그렸고 다섯 타깃이 전부 0으로 읽혔다.
-    // "타깃별 픽셀 확인 실패"라는 한 줄만 남아서, 그것이 '그림이 틀렸다'가
-    // 아니라 '그리지도 않았다'라는 것을 아무도 읽지 않았다.
-    //
-    // 검증이 자기 기하를 들게 고친다. 패스가 씬에서 그림을 받는 구조가 된
-    // 이상, 검증도 씬 노릇을 해야 한다.
-    DX12MeshCache meshCache;
-    DX12TextureCache textureCache;
-    if (!meshCache.Initialize(&resources, error) ||
-        !textureCache.Initialize(&resources, error))
-    {
-        outLog += "[1/3] 캐시 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    // 카메라를 주지 않으므로 뷰·투영은 항등이고, 정점 좌표가 곧 클립 좌표다.
-    // -0.8~0.8을 덮게 두면 화면 중앙은 반드시 그려진 곳이 된다.
-    std::vector<Vertex> quadVertices(4);
-        const math::vector3 quadCorners[4] = {
-        { -0.8f, -0.8f, 0.5f }, { -0.8f, 0.8f, 0.5f },
-        {  0.8f,  0.8f, 0.5f }, {  0.8f, -0.8f, 0.5f },
-    };
-        const math::vector2 quadUVs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
-    for (uint32_t i = 0; i < 4; ++i)
-    {
-        quadVertices[i].position = quadCorners[i];
-        quadVertices[i].normal = { 0.f, 0.f, -1.f };
-        quadVertices[i].uv0 = quadUVs[i];
-        quadVertices[i].tangent = { 1.f, 0.f, 0.f };
-        quadVertices[i].bitangent = { 0.f, 1.f, 0.f };
-    }
-    std::vector<uint32> quadIndices = { 0, 1, 2, 0, 2, 3 };
-    Mesh quadMesh("GBufferTest.Quad", std::move(quadVertices), std::move(quadIndices));
-
-    // 재질 값은 다섯 타깃이 서로 다른 값을 갖도록 고른다. 한 타깃만 기록되고
-    // 나머지가 0으로 남는 경우를 잡는 것이 이 검증의 목적이라, 값들이 서로
-    // 구분되지 않으면 검사 자체가 무의미해진다.
-    std::vector<EnhancedDrawItem> draws(1);
-    draws[0].mesh = &quadMesh;
-    draws[0].worldMatrix = math::matrix4x4::identity();
-    draws[0].baseColorFactor = { 0.2f, 0.4f, 0.6f, 1.f };
-    draws[0].metallic = 0.25f;
-    draws[0].roughness = 0.75f;
-    draws[0].useNormalMap = 0;
-
-    EnhancedFrameContext frameContext{};
-    frameContext.resources = &resources;
-    frameContext.psoManager = &psoManager;
-    frameContext.rootSignatures = &rootSignatures;
-    frameContext.meshCache = &meshCache;
-    frameContext.textureCache = &textureCache;
-    frameContext.width = kWidth;
-    frameContext.height = kHeight;
-    frameContext.draws = &draws;
-
-    EnhancedGBufferPass gbuffer;
-    if (!gbuffer.Initialize(frameContext, error))
-    {
-        outLog += "[1/3] GBuffer 패스 초기화 실패: " + error + "\n";
-        return false;
-    }
-    outLog += "[1/3] 패스 초기화 완료 — 정점·인덱스 버퍼, MRT 5 PSO, 깊이\n";
-
-    // ── [2/3] 그래프에 선언하고 실행 ──
-    //
-    // PrepareFrame이 Declare보다 먼저이고, 프레임 안이어야 한다 — 메시·텍스처
-    // 업로드가 커맨드를 기록하기 때문이다. 순서가 뒤집히면 배치가 비어 있고,
-    // 그것이 바로 이 검증이 오래 빨간불이던 모습이다.
-    if (!resources.BeginFrame(error)) { outLog += "[2/3] Begin 실패\n"; return false; }
-
-    if (!gbuffer.PrepareFrame(frameContext, error))
-    {
-        outLog += "[2/3] PrepareFrame 실패: " + error + "\n";
-        return false;
-    }
-
-    EnhancedRenderGraph graph(resources);
-    gbuffer.Declare(graph, frameContext);
-    const auto outputs = gbuffer.GetOutputs();
-
-    // 리드백을 위해 각 타깃을 COPY_SOURCE로 옮기는 패스를 붙인다.
-    // 배리어는 그래프가 만든다 — 여기서 손으로 넣지 않는 것이 요점이다.
-    // 바이트 수·행 간격은 리드백이 포맷에서 알아낸다(R2c-b2) — 여기 남는 것은
-    // "어느 타깃을 무슨 포맷으로 뜨는가"뿐이다.
-    struct ReadbackTarget
-    {
-        const char*      name;
-        RGHandle         handle;
-        DXGI_FORMAT      format;
-        RHIReadback      readback;
-        RHIReadbackImage image;
-    };
-
-    std::vector<ReadbackTarget> targets = {
-        { "Diffuse",    outputs.diffuse,    DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
-        { "MetalRough", outputs.metalRough, DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
-        { "Normal",     outputs.normal,     DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
-        { "Emissive",   outputs.emissive,   DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
-        { "Bitmask",    outputs.bitmask,    DXGI_FORMAT_R32_UINT,           {}, {} },
-    };
-
-    for (auto& target : targets)
-    {
-        std::string readbackError;
-        if (!resources.CreateReadback(kWidth, kHeight, FromDXGI(target.format), 1,
-            target.readback, readbackError))
-        {
-            outLog += "[2/3] 리드백 버퍼 생성 실패: " + readbackError + "\n";
-            return false;
-        }
-    }
-
-    std::vector<EnhancedRenderGraph::RGPassUsage> readbackUsages;
-    for (const auto& target : targets)
-    {
-        readbackUsages.push_back({ target.handle, RHIResourceState::CopySource });
-    }
-
-    graph.AddPass("gbuffer_readback", readbackUsages,
-        [&targets, &resources](const EnhancedRenderGraph::ExecuteContext& context)
-        {
-            for (const auto& target : targets)
-            {
-                context.encoder->CopyToReadback(target.readback,
-                    context.ResolveHandle(target.handle));
-            }
-        }, true);
-
-    if (!graph.Compile(error))
-    {
-        outLog += "[2/3] 그래프 Compile 실패: " + error + "\n";
-        return false;
-    }
-
-    if (!graph.Execute(error))
-    {
-        outLog += "[2/3] 그래프 Execute 실패: " + error + "\n";
-        return false;
-    }
-    if (!resources.EndFrame(error)) { outLog += "[2/3] End 실패\n"; return false; }
-    resources.WaitForGpu();
-
-    const auto graphStats = graph.GetStats();
-    // ★ 배치 수를 함께 찍는다.
-    //
-    // 이것이 없어서 '그리지도 않았다'가 '그림이 틀렸다'로 읽혔다. 0이면
-    // 픽셀을 볼 것도 없이 여기가 원인이다.
-    outLog += "[2/3] 드로우 " + std::to_string(gbuffer.GetLastDrawCount())
-        + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
-    outLog += "[2/3] 그래프 실행 완료 — 패스 " + std::to_string(graphStats.passesExecuted)
-        + " · transient " + std::to_string(graphStats.transientCreated)
-        + " · 배리어 " + std::to_string(graphStats.barriersEmitted)
-        + "건을 " + std::to_string(graphStats.barrierBatches) + "번에 삽입\n";
-
-    // ── [3/3] 타깃별 픽셀 확인 ──
-    //
-    // 셰이더가 타깃마다 다른 값을 쓰므로, 각 타깃이 기대값을 갖는지 따로 본다.
-    // 하나만 기록되고 나머지가 0으로 남는 경우를 잡는 것이 이 검사의 목적이다.
-    // 쿼드가 -0.8~0.8을 덮으므로 화면 중앙은 반드시 그려진 곳이다.
-    const uint32_t sampleX = kWidth / 2;
-    const uint32_t sampleY = kHeight / 2;
-
-    bool passed = true;
-    std::string detail;
-
-    for (size_t i = 0; i < targets.size(); ++i)
-    {
-        auto& target = targets[i];
-
-        {
-            std::string readbackError;
-            if (!resources.MapReadback(target.readback, target.image, readbackError))
-            {
-                outLog += "[3/3] " + std::string(target.name) + " Map 실패: "
-                    + readbackError + "\n";
-                return false;
-            }
-        }
-
-        bool ok = false;
-        std::string got;
-
-        if (DXGI_FORMAT_R32_UINT == target.format)
-        {
-            const uint32_t value = static_cast<uint32_t>(target.image.At(sampleX, sampleY, 0));
-            ok = (0xABCDu == value);
-            got = std::to_string(value);
-        }
-        else
-        {
-            const float r = target.image.At(sampleX, sampleY, 0);
-            const float g = target.image.At(sampleX, sampleY, 1);
-            const float b = target.image.At(sampleX, sampleY, 2);
-
-            char buffer[96]{};
-            std::snprintf(buffer, sizeof(buffer), "(%.3f %.3f %.3f)", r, g, b);
-            got = buffer;
-
-            // ★ 기대값은 지금 셰이더와 지금 폴백이 쓰는 것이다.
-            //
-            // 이 기대값은 두 번 낡았다. 처음에는 내장 삼각형 시절 상수
-            // (Diffuse=uv, MetalRough=(0.25,0.75,0), Emissive=(0,0.5,1))였고,
-            // 다음에는 '모든 슬롯 흰색 폴백' 시절 값(MetalRough b=1.25,
-            // Emissive=흰색)이었다. IBL 소비 검증이 흰색 일괄 폴백의 문제
-            // (전부 자체발광·확산 사망)를 잡으면서 폴백이 슬롯 의미별로
-            // 바뀌었다 — ORM 중립 (1,1,0) · emissive 검정. 그래서:
-            //
-            //   Diffuse    = 흰색 x baseColorFactor      = (0.2, 0.4, 0.6)
-            //   MetalRough = (orm.r, orm.g x roughness, orm.b + metallic)
-            //              = (1, 1 x 0.75, 0 + 0.25)     = (1, 0.75, 0.25)
-            //   Normal     = (0,0,-1) x 0.5 + 0.5        = (0.5, 0.5, 0)
-            //   Emissive   = 검정 폴백                   = (0, 0, 0)
-            //   Bitmask    = 0xABCD
-            //
-            // Emissive의 0 단정이 미덥지 않으면 '안 그려진 것과 구분되는가'를
-            // 물어야 한다 — 그 구분은 Diffuse·Bitmask가 같은 픽셀에서 0이
-            // 아닌 것으로 이미 잡혀 있다(다섯 타깃을 따로 보는 이유가 이것이다).
-            constexpr float kEpsilon = 0.01f;
-            switch (i)
-            {
-            case 0: // Diffuse = baseColorFactor
-                ok = std::fabs(r - 0.2f) < kEpsilon && std::fabs(g - 0.4f) < kEpsilon
-                    && std::fabs(b - 0.6f) < kEpsilon;
-                break;
-            case 1: // MetalRough = (1, 1 x roughness, 0 + metallic)
-                ok = std::fabs(r - 1.f) < kEpsilon && std::fabs(g - 0.75f) < kEpsilon
-                    && std::fabs(b - 0.25f) < kEpsilon;
-                break;
-            case 2: // Normal = (0,0,-1) 인코딩 → (0.5, 0.5, 0)
-                ok = std::fabs(r - 0.5f) < kEpsilon && std::fabs(b - 0.f) < kEpsilon;
-                break;
-            case 3: // Emissive = 검정 폴백(자체발광 없음이 기본값이라는 뜻)
-                ok = std::fabs(r - 0.f) < kEpsilon && std::fabs(g - 0.f) < kEpsilon
-                    && std::fabs(b - 0.f) < kEpsilon;
-                break;
-            default:
-                break;
-            }
-        }
-
-        if (!ok) passed = false;
-        detail += std::string("      ") + target.name + " " + (ok ? "통과" : "실패")
-            + " " + got + "\n";
-    }
-
-    outLog += "[3/3] 타깃별 픽셀 확인 " + std::string(passed ? "통과" : "실패") + "\n" + detail;
-
-    std::string messages;
-    const uint32_t problems = resources.DrainDebugMessages(messages);
-    if (0 != problems)
-    {
-        passed = false;
-        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
-    }
-
-    gbuffer.Shutdown();
-    rootSignatures.Shutdown();
-    psoManager.Shutdown();
-    resources.Shutdown();
-
-    outLog += passed ? "GBuffer 패스 검증 통과\n" : "GBuffer 패스 검증 실패\n";
-    return passed;
-}
-
-bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* report)
-{
-    if (report) *report = {};
-    using Microsoft::WRL::ComPtr;
-
-    // ★ 단계마다 즉시 찍는다.
-    //
-    // outLog는 함수가 끝나야 호출부가 출력하므로, 도중에 멈추면 통째로
-    // 사라진다 — scene.switch와 dx12.compare에서 같은 자리에 두 번 물렸다.
-    // 이 검증은 특히 위험하다: renderAndCount를 스무 번 넘게 부르고 그중
-    // 규모 측정 구간은 드로우 1만을 넘긴다. 조용해지면 '멈춘 것'인지
-    // '느린 것'인지부터 갈려야 하는데, 마커가 없으면 그 질문조차 못 한다.
-    const auto step = [](const char* what)
-    {
-        std::printf("[dx12.scene] %s\n", what);
-        std::fflush(stdout);
-    };
-    step("진입");
-
-    constexpr uint32_t kWidth = 256;
-    constexpr uint32_t kHeight = 256;
-
-    // ── [1/4] 씬에서 카메라 스냅샷과 드로우 목록을 뽑는다 ──
-    //
-    // 프록시를 그대로 넘기지 않고 필요한 것만 복사한다. 렌더가 게임 자료구조를
-    // 직접 읽으면 3-2에서 걷어낸 부류(렌더가 게임 상태를 만짐)가 되살아난다.
-    Scene* activeScene = SceneManagers->GetActiveScene();
-    CameraComponent* sceneCamera = (nullptr != activeScene)
-        ? activeScene->Cameras().GetPrimaryCamera() : nullptr;
-    RenderScene* renderScene = SceneManagers->GetRenderScene();
-
-    if (nullptr == sceneCamera)
-    {
-        outLog += "[1/4] 활성 카메라가 없다(에디터 실행 중에만 의미 있는 검증)\n";
-        return false;
-    }
-
-    if (nullptr == renderScene)
-    {
-        outLog += "[1/4] 활성 RenderScene이 없다\n";
-        return false;
-    }
-
-    // 이 검증은 GT에서 RenderScene snapshot을 직접 읽는다. headless script가
-    // wait N으로 프레임을 빠르게 생산하면 bounded RenderThread queue가 아직 새 씬의
-    // create delta를 적용하기 전일 수 있다. 그 상태의 0개는 씬/모델 실패가 아니라
-    // producer-consumer 진행도 차이이므로, 호출 시점까지 발행된 packet만 drain한다.
-    // 일반 프레임 경로에는 동기 대기를 넣지 않는다.
-    // 상한은 10초 그대로다. 이 대기는 '이미 발행된 것을 RT가 소화했는가'만
-    // 재고, RT의 첫 프레임(ShaderMeta 반영 — slang reflect)을 덮으라고 둔 것이
-    // 아니다. 그 첫 프레임은 Release 에서도 약 24초다.
-    // ★ 2026-09-17 정정: 09-14 에는 '게임 스레드가 여기 묶이면 RT 도 진행 못 한다'
-    //   고 적었지만, cdb 스택으로는 RT 가 게임 스레드와 무관하게
-    //   ApplyGBufferShaderMeta → MaterialTextureTable::Reflect 안에서 돌고 있었다.
-    //   09-14 의 '60초로 올려도 그대로' 는 다시 재현하지 않았다 — 근거로 쓰지 마라.
-    //   예열은 **프레임 수(wait N)가 아니라 `render.live.wait`** 가 책임진다 —
-    //   Release 의 wait 2000 은 몇 초 만에 지나가 여기서 pending 2 · active 1 로
-    //   넘어졌다(verify-model-scene-consumption).
-    constexpr uint32_t kRenderThreadDrainTimeoutMs = 10000;
-    if (!EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(
-            kRenderThreadDrainTimeoutMs))
-    {
-        const EnhancedRenderThreadStats stats =
-            EnhancedSceneRenderer::GetLiveRenderThreadStats();
-        outLog += "[1/4] RenderThread drain 시간 초과 — pending " +
-            std::to_string(stats.pending) + " · active " +
-            std::to_string(stats.inProgress) + "\n";
-        return false;
-    }
-
-    const FrameCameraSnapshot cameraSnapshot = sceneCamera->CaptureFrameSnapshot();
-
-    // 커맨드 빌드 스레드가 채워 둔 deferred 큐를 그대로 읽는다. 프록시를 넘기지
-    // 않고 메시 포인터와 월드 행렬만 복사한다 — 렌더가 게임 자료구조를 들고
-    // 다니면 3-2에서 걷어낸 부류가 되살아난다.
-
-    // 큐 하나를 드로우 목록으로 옮긴다. deferred와 forward가 같은 복사
-    // 규칙을 쓰므로 함수로 뽑았다 — 두 곳에 같은 코드를 두면 한쪽만 고치고
-    // 다른 쪽을 잊는 부류의 버그가 생긴다.
-    // This isolated legacy draw fixture has no sealed material packet. Its
-    // owner table pins every texture alias until all render probes finish.
-    auto sceneTexturePins = own::make_shared<TextureFramePins>();
-    const auto copyQueue = [&](const auto& queue,
-        std::vector<EnhancedDrawItem>& deferred,
-        std::vector<EnhancedDrawItem>& forward)
-    {
-        for (const auto& basePtr : queue)
-        {
-            const MeshRenderProxy* proxy =
-                (nullptr != basePtr) ? basePtr->As<MeshRenderProxy>() : nullptr;
-            if (nullptr == proxy) continue;
-            // MBC7/MBC9 — 제품 poolMesh와 같은 typed 축. generation이 유일한
-            // 지오메트리 출처다.
-            RHIModelMeshView modelView{};
-            if (!proxy->m_modelGeneration
-                || !BuildRHIModelMeshView(*proxy->m_modelGeneration,
-                    proxy->m_modelMeshIndex, modelView))
-            {
-                continue;
-            }
-
-            EnhancedDrawItem item{};
-            item.worldMatrix = proxy->m_worldMatrix;
-            item.modelMeshView = modelView;
-            {
-                const math::aabb& bounds = proxy->m_modelGeneration
-                    ->Meshes()[proxy->m_modelMeshIndex].bounds;
-                item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
-            }
-
-            // 본 팔레트는 캡처 배치의 불변 아레나가 소유한다. 프록시가 아레나를
-            // 붙들고 있어 이 프레임 동안 포인터가 살아 있다.
-            //
-            // 조건은 DX11 GBufferPass의 분류와 같다 — 팔레트가 있어도
-            // m_isAnimationEnabled가 꺼져 있으면 DX11은 바인드 포즈로 그린다.
-            const math::matrix4x4* palette = proxy->m_paletteArena
-                ? proxy->m_paletteArena->resolve(proxy->m_paletteOffset,
-                    proxy->m_boneCount) : nullptr;
-            if (proxy->m_isAnimationEnabled
-                && (HashedGuid::kInvalidId != proxy->m_animatorGuid)
-                && palette)
-            {
-                item.bonePalette = palette;
-                item.boneCount = proxy->m_boneCount;
-                item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
-
-                // I6-B4-pre 진단 — 하네스가 **실제로 받은** 팔레트의 digest.
-                // animator.status가 Animator::m_FinalTransforms에서 뜬
-                // 값과 같은 방식(1/4096 양자화 FNV)으로 접는다. 두 값이
-                // 같으면 운반은 옳고 결함은 그 뒤(셰이더/CB), 다르면 운반
-                // 구간이다. 실제 본 수만 읽어 범위 밖 접근을 피한다.
-                {
-                    auto fold = [](const math::matrix4x4* palette,
-                        std::size_t count) -> std::uint32_t
-                    {
-                        std::uint32_t digest = 2166136261u;
-                        for (std::size_t bone = 0; bone < count; ++bone)
-                        {
-                            const float* values = &palette[bone].m[0][0];
-                            for (int element = 0; element < 16; ++element)
-                            {
-                                const std::int32_t quantized =
-                                    static_cast<std::int32_t>(std::lround(
-                                        static_cast<double>(values[element])
-                                        * 4096.0));
-                                std::uint32_t bits =
-                                    static_cast<std::uint32_t>(quantized);
-                                for (int byte = 0; byte < 4; ++byte)
-                                {
-                                    digest ^= (bits >> (byte * 8)) & 0xFFu;
-                                    digest *= 16777619u;
-                                }
-                            }
-                        }
-                        return digest;
-                    };
-                    static int reported = 0;
-                    if (reported < 4)
-                    {
-                        ++reported;
-                        std::printf("[dx12.scene] bonePalette 수신 — animator=%llu "
-                            "count=%u digest=%08X\n",
-                            (unsigned long long)item.animatorKey,
-                            item.boneCount,
-                            fold(item.bonePalette, item.boneCount));
-                    }
-                }
-            }
-
-            // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
-            bool isTransparent = false;
-            if (const auto* material = proxy->m_Material ? &*proxy->m_Material.borrow() : nullptr)
-            {
-                const auto pinTexture = [&](const own::shared_owner<const Texture>& owner)
-                {
-                    return sceneTexturePins->Borrow(sceneTexturePins->Retain(owner));
-                };
-                item.baseColor = pinTexture(material->GetBaseColorMapShared());
-                item.normalMap = pinTexture(material->GetNormalMapShared());
-                item.occRoughMetal = pinTexture(material->GetOccRoughMetalMapShared());
-                item.emissive = pinTexture(material->GetEmissiveMapShared());
-
-                item.baseColorFactor = material->m_materialInfo.m_baseColor;
-                item.metallic = material->m_materialInfo.m_metallic;
-                item.roughness = material->m_materialInfo.m_roughness;
-                item.useNormalMap =
-                    (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
-                isTransparent =
-                    MaterialRenderingMode::Transparent == material->m_renderingMode;
-            }
-
-            (isTransparent ? forward : deferred).push_back(item);
-        }
-    };
-
-    std::vector<EnhancedDrawItem> draws;
-    std::vector<EnhancedDrawItem> forwardDraws;
-    copyQueue(renderScene->GetPrimitiveProxySnapshot(), draws, forwardDraws);
-
-    // ★ deferred 큐만 센다.
-    //
-    // 이 수는 GBuffer의 텍스처 업로드 단정이 쓰는 값이다. 두 큐를 합쳐 세면
-    // 씬이 전부 forward로 갔을 때 "baseColor는 4건인데 업로드가 0" 이라는
-    // 오진이 나온다 — GBuffer는 그릴 것이 없었을 뿐이다. 실제로 그렇게 찍혔고,
-    // 그건 두 큐 복사를 한 함수로 묶으면서 카운터까지 딸려 들어간 탓이었다.
-    uint32_t materialsWithTexture = 0;
-    for (const EnhancedDrawItem& item : draws)
-    {
-        if (nullptr != item.baseColor) ++materialsWithTexture;
-    }
-
-    // 광원도 씬에서 뽑아 셰이더가 쓰는 형태로 복사한다. 엔진의 Light는 감쇠
-    // 계수와 그림자 행렬까지 들고 있어 그대로 상수 버퍼에 올리기엔 크다.
-    std::vector<EnhancedLight> lights;
-    // 라이브와 같은 선별을 쓴다. 여기만 전수로 실으면 "검증은 통과하는데
-    // 실전만 다른 그림"이 되고, 그 부류는 원인을 찾기가 특히 나쁘다.
-    lights = SelectLightsForView(
-        renderScene->GetLightProxySnapshot(), cameraSnapshot).lights;
-
-    // UI 큐를 사각형으로.
-    //
-    // ★ 카메라 하나가 아니라 전부를 훑는다.
-    //
-    //   UI는 캔버스에 속하지 카메라에 속하지 않는다. 처음에 씬 카메라
-    //   하나의 큐만 봤더니 캔버스를 소환해도 사각형이 늘 0이었다 —
-    //   UI 프록시가 다른 카메라의 RenderPassData에 들어 있었기 때문이다.
-    //   그 상태로 두면 '변환이 틀렸다'와 '엉뚱한 곳을 봤다'가 구분되지
-    //   않는다.
-    //
-    // Overlay 이미지·SDF 텍스트를 펼치고, 스프라이트시트 등 건너뛴 수를 남겨
-    // '아직 안 되는 것'과 '되는데 안 나오는 것'을 가른다.
-    std::vector<EnhancedUIPass::Rect> uiRects;
-    uint32_t uiSkipped = 0;
-    {
-        std::vector<UIRenderProxy*> flat;
-
-        // ★ 카메라마다 무엇이 들어 있는지 남긴다.
-        //
-        //   'UI 0'만 보면 큐가 빈 것인지 아예 볼 카메라가 없는 것인지
-        //   구분되지 않는다 — 고칠 곳이 다르다.
-        //   (UIRenderDataBuffer 카운트도 여기 있었으나 그 버퍼 자체를
-        //   걷어냈다 — RenderPassData.h의 철거 주석 참고, 2026-08-20.)
-        const uint32_t cameraCount = static_cast<uint32_t>(
-            activeScene->Cameras().GetRegisteredCameras().size());
-        const uint32_t validCount = nullptr != sceneCamera ? 1u : 0u;
-        const RenderScene::UIProxySnapshot uiSnapshot = renderScene->GetUIProxySnapshot();
-        flat.reserve(uiSnapshot.size());
-        for (const auto& proxy : uiSnapshot)
-            if (proxy) flat.push_back(proxy.get());
-
-        outLog += "      UI 원천 — 카메라 " + std::to_string(cameraCount)
-            + "(유효 " + std::to_string(validCount) + ")"
-            + " · 큐 " + std::to_string(flat.size()) + "\n";
-
-        uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
-            flat.data(), flat.size(), uiRects, 0.f, 0.f, &*sceneTexturePins.borrow());
-    }
-
-    if (report) { report->drawCandidates = draws.size(); report->lights = lights.size(); }
-    outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->GetInstanceID())
-        + " · 드로우 후보 " + std::to_string(draws.size())
-        + " · 포워드 " + std::to_string(forwardDraws.size())
-        + " · 광원 " + std::to_string(lights.size())
-        + " · UI " + std::to_string(uiRects.size())
-        + "(건너뜀 " + std::to_string(uiSkipped) + ")\n";
-
-    step("[1/4] 씬 입력 확보 완료");
-
-    // ── [2/4] DX12 쪽 준비 ──
-    DX12DeviceResources resources;
-    std::string error;
-    if (!resources.Initialize(kWidth, kHeight, error))
-    {
-        outLog += "[2/4] 디바이스 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    DX12PSOManager psoManager;
-    DX12RootSignatureCache rootSignatures;
-    DX12MeshCache meshCache;
-    DX12TextureCache textureCache;
-    if (!psoManager.Initialize(&resources, L"dx12_scene.cache", error) ||
-        !rootSignatures.Initialize(&resources, error) ||
-        !meshCache.Initialize(&resources, error) ||
-        !textureCache.Initialize(&resources, error))
-    {
-        outLog += "[2/4] 보조 시스템 초기화 실패: " + error + "\n";
-        return false;
-    }
-    EnhancedFrameContext frameContext{};
-    frameContext.resources = &resources;
-    frameContext.psoManager = &psoManager;
-    frameContext.rootSignatures = &rootSignatures;
-    frameContext.meshCache = &meshCache;
-    frameContext.textureCache = &textureCache;
-    frameContext.width = kWidth;
-    frameContext.height = kHeight;
-    frameContext.camera = &cameraSnapshot;
-    frameContext.draws = &draws;
-    frameContext.forwardDraws = &forwardDraws;
-    frameContext.lights = &lights;
-
-    EnhancedGBufferPass gbuffer;
-    if (!gbuffer.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] GBuffer 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    // Deferred가 GBuffer를 읽으므로 뿌리 표시를 뗀다 — 그래도 살아남아야 하고,
-    // 그것이 3-5 컬링이 실전에서 동작한다는 확인이다.
-    gbuffer.SetKeepAlive(false);
-
-    EnhancedShadowPass shadow;
-    if (!shadow.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] 그림자 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    EnhancedDeferredPass deferred;
-    EnhancedSSGIPass     ssgi;
-    if (!deferred.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] Deferred 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    if (!ssgi.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] SSGI 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    EnhancedForwardPass forward;
-    if (!forward.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] Forward+ 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    EnhancedSSAOPass ssao;
-    if (!ssao.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] SSAO 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    // 포스트 체인 결과가 살아 있는지 확인하는 작은 목적지. 내용은 안 본다 —
-    // 소비자가 있다는 사실만으로 그래프가 체인을 걷어내지 않는다.
-    RHIReadback postChainProbe{};
-    {
-        std::string readbackError;
-        if (!resources.CreateReadback(kProbeTexels, 1,
-            EnhancedPostChainPass::kLDRFormat, 1, postChainProbe, readbackError))
-        {
-            outLog += "[2/4] 포스트 체인 프로브 생성 실패: " + readbackError + "\n";
-            return false;
-        }
-    }
-
-    EnhancedUIPass uiPass;
-    if (!uiPass.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] UI 초기화 실패: " + error + "\n";
-        return false;
-    }
-    uiPass.SetRects(&uiRects, sceneTexturePins);
-
-    EnhancedPostChainPass postChain;
-    if (!postChain.Initialize(frameContext, error))
-    {
-        outLog += "[2/4] 포스트 체인 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    DX12GpuProfiler profiler;
-    // SSGI가 붙어 패스가 스무 개를 넘는다(Hi-Z 밉 여덟 + 트레이스·리졸브·
-    // 필터·합성·히스토리). 질의는 패스당 둘이라 넉넉히 잡는다 — 모자라면
-    // 뒤쪽 패스의 시간이 조용히 0으로 나온다.
-    if (!profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
-        64, DX12DeviceResources::kFrameCount, error))
-    {
-        outLog += "[2/4] GPU 프로파일러 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    // 깊이를 리드백할 버퍼. 커버리지(그려진 픽셀 수)를 세는 데 쓴다.
-    RHIReadback depthReadback{};
-    {
-        std::string readbackError;
-        if (!resources.CreateReadback(kWidth, kHeight, FromDXGI(DXGI_FORMAT_R32_FLOAT), 1,
-            depthReadback, readbackError))
-        {
-            outLog += "[2/4] 깊이 리드백 버퍼 생성 실패\n";
-            return false;
-        }
-    }
-
-    // 한 번 그리고 커버리지를 센다. 카메라를 바꿔 두 번 부른다.
-    // 라이팅 결과 리드백. 16비트 float 4채널이라 픽셀당 8바이트.
-    RHIReadback lightingReadback{};
-    {
-        std::string readbackError;
-        if (!resources.CreateReadback(kWidth, kHeight,
-            FromDXGI(DXGI_FORMAT_R16G16B16A16_FLOAT), 1, lightingReadback, readbackError))
-        {
-            outLog += "[2/4] 라이팅 리드백 버퍼 생성 실패\n";
-            return false;
-        }
-    }
-
-    // 그림자 맵 리드백. 깊이 전용 렌더가 실제로 무언가를 기록했는지 세는 데 쓴다.
-    RHIReadback shadowReadback{};
-    {
-        std::string readbackError;
-        if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
-            EnhancedShadowPass::kShadowMapSize, FromDXGI(DXGI_FORMAT_R32_FLOAT),
-            EnhancedShadowPass::kCascadeCount, shadowReadback, readbackError))
-        {
-            outLog += "[2/4] 그림자 리드백 버퍼 생성 실패\n";
-            return false;
-        }
-    }
-
-    std::vector<DX12GpuProfiler::PassTiming> timings;
-    EnhancedRenderGraph::Stats lastGraphStats{};
-
-    // 실제 씬 패스를 병렬 경로에 태우기 위한 것. 람다가 참조로 잡는다.
-    DX12CommandListPool commandPool;
-    // 워커를 패스 수 이상으로 둔다.
-    //
-    // 4개로 뒀을 때 연속 블록 배분이 Shadow와 GBuffer를 한 워커에 몰았다
-    // (패스 6 · 워커 4 → 0,0,1,2,2,3). 그 둘이 이 그래프에서 가장 무거운
-    // 패스라 병렬화 효과가 거의 사라졌다. 워커가 패스 수 이상이면 1:1이 된다.
-    if (!commandPool.Initialize(resources, 8,
-        DX12DeviceResources::kFrameCount, error))
-    {
-        outLog += "[2/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
-        return false;
-    }
-
-    bool     useParallelRecording = false;
-    uint32_t parallelWorkers = 1;
-    double   lastRecordMilliseconds = 0.0;
-
-    // 교차점을 재는 동안에는 되무름을 끈다(0). 켜 두면 임계값 아래 규모에서
-    // 병렬 시간이 순차와 같아져, 정작 재려던 '얼마나 지는가'가 가려진다.
-    // 되무름이 실제로 도는지는 측정이 끝난 뒤 기본값으로 따로 확인한다.
-    uint32_t parallelCostThreshold = 0;
-
-    // 규모 측정에서 재질을 가르지 않은 경우와 가른 경우의 배치 수.
-    // 둘이 같으면 재질 키가 죽어 두 모드가 같은 씬이 된 것이다.
-    uint32_t uniformBatchCount = 0;
-    uint32_t variedBatchCount = 0;
-
-    // 되무름 확인 결과.
-    bool     declineObserved = false;
-    uint32_t declineCost = 0;
-    uint32_t declineWorkers = 0;
-    uint32_t declineCoverage = 0;
-
-    // 렌더마다 바꿔 가며 넣는 그림자 설정. 람다가 참조로 잡는다.
-    constexpr float kTestShadowBias = 0.0015f;
-
-    bool     shadowEnabled = false;
-    float    shadowBias = kTestShadowBias;
-    bool     captureShadowMap = false;
-
-    // 켜면 lighting_readback이 라이팅 대신 SSGI 합성 결과를 복사한다.
-    // 같은 크기·포맷이라 버퍼를 하나 더 만들 이유가 없다.
-    bool     captureSSGIOutput = false;
-    // SSAO의 방향 회전에 쓸 프레임 번호. 고정하면 잡음이 화면에 박혀
-    // 디노이즈가 지우지 못한다.
-    uint32_t ssaoFrameIndex = 0;
-    uint32_t shadowOccluders = 0;
-    std::array<uint32_t, EnhancedShadowPass::kCascadeCount> cascadeOccluders{};
-
-    // 렌더 호출 번호. 조용해졌을 때 몇 번째에서 멈췄는지가 곧 위치다.
-    uint32_t renderCallIndex = 0;
-
-    const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
-        uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError,
-        std::vector<DX12GpuProfiler::PassTiming>& outTimings,
-        EnhancedRenderGraph::Stats& outGraphStats,
-        double& outAverageLuminance) -> bool
-    {
-        ++renderCallIndex;
-        std::printf("[dx12.scene]   render #%u (드로우 후보 %zu · 병렬 %s)\n",
-            renderCallIndex, draws.size(), useParallelRecording ? "켬" : "끔");
-        std::fflush(stdout);
-
-        frameContext.camera = &camera;
-
-        if (!resources.BeginFrame(outStepError)) return false;
-        commandPool.BeginFrame(0);
-        // 자가 검증은 제출 하나를 끝까지 기다렸다 읽는다 — 표는 그래도 받아 둔다.
-        const GpuFrameToken profilerToken = profiler.BeginFrame(0, 0, 0);
-
-        // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
-        shadow.SetBias(shadowBias);
-        if (!shadow.PrepareFrame(frameContext, outStepError)) return false;
-        if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
-        if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
-        if (!ssgi.PrepareFrame(frameContext, outStepError)) return false;
-        if (!forward.PrepareFrame(frameContext, outStepError)) return false;
-        if (!ssao.PrepareFrame(frameContext, outStepError)) return false;
-        if (!postChain.PrepareFrame(frameContext, outStepError)) return false;
-        if (!uiPass.PrepareFrame(frameContext, outStepError)) return false;
-        outDrawCount = gbuffer.GetLastDrawCount();
-
-        EnhancedRenderGraph graph(resources);
-        graph.SetProfiler(&profiler);
-        graph.SetParallelRecordCostThreshold(parallelCostThreshold);
-
-        // 그림자를 먼저 선언한다. 선언 순서가 실행 순서라, Deferred가 읽기 전에
-        // 써 두는 것이 선언으로 표현된다 — 뒤집으면 컴파일이 잡아 준다.
-        shadow.Declare(graph, frameContext);
-
-        gbuffer.Declare(graph, frameContext);
-        const auto outputs = gbuffer.GetOutputs();
-
-        deferred.SetInputs(outputs);
-
-        EnhancedShadowData shadowData = shadow.GetShadowData();
-        shadowData.enabled = shadowData.enabled && shadowEnabled;
-        deferred.SetShadow(shadow.GetShadowMap(), shadowData);
-
-        // ── SSAO ──
-        //
-        // GBuffer 뒤, Deferred 앞이다. 라이팅이 AO를 곱해 쓰는 것이 최종
-        // 목적지이므로 그 전에 만들어져야 하고, 입력(깊이·노멀)은 GBuffer가
-        // 채운다. 순서가 뒤집히면 그래프가 컴파일에서 잡는다
-        // ("아직 아무도 안 쓴 것을 읽는다").
-        {
-            EnhancedSSAOPass::Inputs ssaoInputs{};
-            ssaoInputs.depth = outputs.depth;
-            ssaoInputs.normal = outputs.normal;
-            ssao.SetInputs(ssaoInputs);
-        }
-        ssao.SetFrameIndex(ssaoFrameIndex++);
-        ssao.Declare(graph, frameContext);
-
-        deferred.Declare(graph, frameContext);
-
-        // ── SSGI ──
-        //
-        // Deferred 뒤에 온다. 간접광의 광원이 직접광 결과이기 때문이다 —
-        // 순서가 뒤집히면 아직 아무도 안 쓴 것을 읽게 되고, 그래프가
-        // 컴파일에서 잡는다("선언 순서가 데이터 흐름과 어긋난다").
-        {
-            EnhancedSSGIPass::Inputs ssgiInputs{};
-            ssgiInputs.depth = outputs.depth;
-            ssgiInputs.normal = outputs.normal;
-            ssgiInputs.diffuse = outputs.diffuse;
-            ssgiInputs.metalRough = outputs.metalRough;
-            ssgiInputs.lighting = deferred.GetOutput();
-
-            // AO는 간접광에만 곱한다. SSAO가 안 돌았으면 비어 있고,
-            // 그러면 합성이 AO 없이(=1) 간다.
-            ssgiInputs.ambientOcclusion = ssao.GetOutput();
-            ssgi.SetInputs(ssgiInputs);
-        }
-        ssgi.Declare(graph, frameContext);
-
-        // ── Forward+ ──
-        //
-        // 불투명 셰이딩이 끝난 뒤에 온다. 포워드 물체는 GBuffer에 기록되지
-        // 않고 자기 색을 직접 계산하므로 deferred 결과 위에 얹히는 것이 맞고,
-        // 깊이는 GBuffer가 채운 것을 그대로 써서 불투명 기하에 가려진다.
-        //
-        // 컬링은 그 깊이에서 타일 min/max를 뽑는다 — GBuffer가 이미 채웠으므로
-        // 공짜다. 이것이 Forward+를 deferred 뒤에 두는 이유이기도 하다.
-        {
-            EnhancedForwardPass::Inputs forwardInputs{};
-            forwardInputs.depth = outputs.depth;
-            forwardInputs.lighting = ssgi.GetOutput().IsValid()
-                ? ssgi.GetOutput() : deferred.GetOutput();
-            forward.SetInputs(forwardInputs);
-        }
-        forward.Declare(graph, frameContext);
-
-        // ── 포스트 체인 ──
-        //
-        // 맨 뒤다. 조명·간접광·포워드가 다 얹힌 HDR을 받아 블룸·톤맵·
-        // 비네트·그레이딩·FXAA를 걸어 LDR로 내보낸다.
-        //
-        // 입력은 SSGI 합성 결과가 있으면 그것, 없으면 Deferred 결과다 —
-        // 간접광이 얹히기 전의 그림에 톤맵을 걸면 노출이 다르게 잡힌다.
-        {
-            EnhancedPostChainPass::Inputs postInputs{};
-            postInputs.color = ssgi.GetOutput().IsValid()
-                ? ssgi.GetOutput() : deferred.GetOutput();
-            postChain.SetInputs(postInputs);
-        }
-        postChain.Declare(graph, frameContext);
-
-        // ── UI ──
-        //
-        // 포스트 체인 뒤다. UI에 톤맵·비네트가 걸리면 안 된다 —
-        // 화면에 붙는 것이라 작가가 지정한 색이 그대로 나와야 하고,
-        // 비네트가 구석의 버튼을 어둡게 만들면 그건 버그다.
-        uiPass.Declare(graph, frameContext);
-
-        // ★ 포스트 체인 결과를 읽는 자리를 둔다.
-        //
-        // 이것이 없으면 그래프가 체인을 통째로 걷어낸다(블룸 5단 + Uber +
-        // FXAA = 11패스). 실제로 그렇게 물렸고, 씬 검증의 '패스가 걷어내졌다'
-        // 단정이 잡아 줬다.
-        //
-        // 최종 목적지는 화면이지만 이 검증은 화면에 안 내보내므로, 결과가
-        // 살아 있다는 것만 확인하는 작은 복사를 둔다. 3-9에서 스왑체인이
-        // 붙으면 그쪽이 진짜 소비자가 되고 이 패스는 없어진다.
-        if (postChain.GetOutput().IsValid() && postChainProbe.IsValid())
-        {
-            const RGHandle postHandle = postChain.GetOutput();
-            graph.AddPass("post_probe",
-                { { postHandle, RHIResourceState::CopySource } },
-                [&, postHandle](const EnhancedRenderGraph::ExecuteContext& executeContext)
-                {
-                    executeContext.encoder->CopyPartialToReadback(
-                        postChainProbe, executeContext.ResolveHandle(postHandle));
-                }, true);
-        }
-
-        // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
-        // 안다 — 재질 때 "업로드 0인데 통과"를 겪었으므로 같은 함정을 막는다.
-        // SSGI 출력도 사용에 넣는다. 플래그에 따라 어느 쪽을 복사할지가
-        // 기록 시점에 갈리는데, 배리어는 선언으로 정해지므로 둘 다 선언해야
-        // 어느 쪽을 읽어도 상태가 맞다.
-        std::vector<EnhancedRenderGraph::RGPassUsage> readbackUsages{
-            { deferred.GetOutput(), RHIResourceState::CopySource } };
-        if (ssgi.GetOutput().IsValid())
-        {
-            readbackUsages.push_back({ ssgi.GetOutput(), RHIResourceState::CopySource });
-        }
-
-        graph.AddPass("lighting_readback", readbackUsages,
-            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
-                const bool useSSGI = captureSSGIOutput && ssgi.GetOutput().IsValid();
-                executeContext.encoder->CopyToReadback( lightingReadback,
-                    executeContext.ResolveHandle(useSSGI ? ssgi.GetOutput() : deferred.GetOutput()));
-            }, true);
-
-        graph.AddPass("depth_readback", { { outputs.depth, RHIResourceState::CopySource } },
-            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
-                executeContext.encoder->CopyToReadback( depthReadback,
-                    executeContext.ResolveHandle(outputs.depth));
-            }, true);
-
-        // 그림자 맵도 한 번은 되읽는다. 깊이 전용 렌더가 정말로 기록했는지는
-        // 결과를 봐야 알고, 안 그러면 '맵은 비었는데 통과'가 가능하다.
-        if (captureShadowMap)
-        {
-            graph.AddPass("shadow_readback",
-                { { shadow.GetShadowMap(), RHIResourceState::CopySource } },
-                [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
-                {
-                    // 캐스케이드마다 서브리소스가 하나씩이고, 리드백의 장 하나가
-                    // 그 하나를 받는다. 배열을 한 번에 옮기는 복사는 없다.
-                    for (uint32_t slice = 0; slice < EnhancedShadowPass::kCascadeCount; ++slice)
-                    {
-                        executeContext.encoder->CopyToReadback( shadowReadback,
-                            executeContext.ResolveHandle(shadow.GetShadowMap()), slice, slice);
-                    }
-                }, true);
-        }
-
-        if (!graph.Compile(outStepError)) return false;
-
-        // 컬링이 GBuffer를 살렸는지 확인한다. 소비자(Deferred)가 읽는데도
-        // 걷어냈다면 화면이 비고, 원인이 컬링이라는 것을 알아채기 어렵다.
-        outGraphStats = graph.GetStats();
-
-        // ── 기록 시간 측정 ──
-        //
-        // 병렬화가 줄이는 것은 CPU 기록 시간이다. GPU 시간은 같은 커맨드를
-        // 같은 순서로 실행하므로 줄지 않는다 — 그쪽을 근거로 삼으면 '병렬화가
-        // 효과 없다'는 잘못된 결론이 나온다.
-        const auto recordBegin = std::chrono::steady_clock::now();
-
-        RHIRecordedBatch recordedBatch;
-        RHISubmissionTicket recordedTicket;
-        if (useParallelRecording)
-        {
-            RHIRecordedBatchDesc batchDesc{};
-            batchDesc.frameId = renderCallIndex;
-            batchDesc.backendGeneration =
-                GetRHISubmissionThread().GetOwnerGeneration(&resources);
-            if (!graph.RecordParallel(commandPool, parallelWorkers,
-                batchDesc, recordedBatch, outStepError) ||
-                !GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
-                    resources, std::move(recordedBatch), recordedTicket,
-                    outStepError))
-            {
-                return false;
-            }
-            outGraphStats = graph.GetStats();
-        }
-        else
-        {
-            if (!graph.Execute(outStepError)) return false;
-        }
-
-        lastRecordMilliseconds = std::chrono::duration<double, std::milli>(
-            std::chrono::steady_clock::now() - recordBegin).count();
-
-        profiler.ResolveFrame(resources.GetCommandList(), profilerToken);
-        if (!resources.EndFrame(outStepError)) return false;
-        resources.WaitForGpu();
-        const RHILifecycleResult& lifecycle = resources.GetLastLifecycleResult();
-        if (!lifecycle.IsClean() ||
-            RHILifecycleCommand::OfflineReadbackCapture != lifecycle.command)
-        {
-            outStepError =
-                "DX12 offline lifecycle pending task/batch/retirement가 0이 아니다";
-            return false;
-        }
-        if (useParallelRecording &&
-            !GetRHISubmissionThread().Wait(recordedTicket, outStepError)) return false;
-
-        DX12GpuProfiler::FrameTimings frameTimings;
-        if (!profiler.Collect(profilerToken, frameTimings, outStepError)) return false;
-        profiler.MergeSlices(frameTimings, outTimings);
-
-        RHIReadbackImage depthCaptured{};
-        if (!resources.MapReadback(depthReadback, depthCaptured, outStepError))
-        {
-            return false;
-        }
-
-        // 깊이 1.0은 아무것도 안 그려진 곳이다(클리어 값).
-        outCovered = 0;
-        for (uint32_t y = 0; y < kHeight; ++y)
-            for (uint32_t x = 0; x < kWidth; ++x)
-            {
-                if (depthCaptured.At(x, y, 0) < 0.999f) ++outCovered;
-            }
-
-        // 그림자 맵에 기록된 텍셀 수. 1.0은 클리어 값 그대로라 '가리는 것 없음'이다.
-        if (captureShadowMap)
-        {
-            shadowOccluders = 0;
-            cascadeOccluders.fill(0);
-
-            RHIReadbackImage shadowCaptured{};
-            std::string shadowError;
-            if (resources.MapReadback(shadowReadback, shadowCaptured, shadowError))
-            {
-                // 캐스케이드별로 따로 센다. 합계만 보면 한 장만 채워져도
-                // 통과하는데, 그건 캐스케이드가 도는 것이 아니다.
-                for (uint32_t cascade = 0; cascade < EnhancedShadowPass::kCascadeCount; ++cascade)
-                    for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
-                        for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
-                        {
-                            if (shadowCaptured.At(x, y, 0, cascade) < 0.999f)
-                            {
-                                ++shadowOccluders;
-                                ++cascadeOccluders[cascade];
-                            }
-                        }
-            }
-        }
-
-        // 라이팅 결과의 평균 밝기. 광원이 닿지 않으면 0에 가깝다.
-        outAverageLuminance = 0.0;
-
-        RHIReadbackImage litCaptured{};
-        std::string litError;
-        if (resources.MapReadback(lightingReadback, litCaptured, litError))
-        {
-            double sum = 0.0;
-            for (uint32_t y = 0; y < kHeight; ++y)
-                for (uint32_t x = 0; x < kWidth; ++x)
-                {
-                    sum += (litCaptured.At(x, y, 0) + litCaptured.At(x, y, 1)
-                        + litCaptured.At(x, y, 2)) / 3.0;
-                }
-            outAverageLuminance = sum / (kWidth * kHeight);
-        }
-
-        return true;
-    };
-
-    step("[3/4] 씬 카메라 렌더");
-
-    // ── [3/4] 씬 카메라로 렌더 ──
-    double luminanceLit = 0.0;
-    double luminanceMoved = 0.0;
-    uint32_t coveredA = 0;
-    uint32_t drawCountA = 0;
-
-    // 첫 렌더가 기준선이다 — 그림자를 켜고, 그림자 맵도 한 번 되읽는다.
-    shadowEnabled = true;
-    captureShadowMap = true;
-    if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error, timings, lastGraphStats, luminanceLit))
-    {
-        outLog += "[3/4] 렌더 실패: " + error + "\n";
-        return false;
-    }
-
-    captureShadowMap = false;
-
-    // ── SSGI 전후 그림을 남긴다 ──
-    //
-    // 스윕 숫자로는 두께·거리의 옳은 값을 정할 수 없었다(합성 씬은 깊이와
-    // 노멀이 서로 모순이라 총 히트 비율이 아무것에도 반응하지 않는다).
-    // 최종 판정은 결국 실제 씬의 그림이다. 라이팅만(끔)과 SSGI 합성(켬)을
-    // 나란히 저장해 눈으로 비교할 수 있게 한다.
-    {
-        const auto savePng = [&](std::string_view path) -> bool
-        {
-            RHIReadbackImage captured{};
-            std::string readbackError;
-            if (!resources.MapReadback(lightingReadback, captured, readbackError)) return false;
-
-            // R16G16B16A16_FLOAT → R8G8B8A8. 노출을 낮춰 담는다.
-            //
-            // ★ 처음에는 감마만 입혔더니 끔/켬 PNG가 바이트까지 동일했다.
-            //   라이팅이 대부분 1.0을 넘어 클램프됐고, 포화된 픽셀에는 GI를
-            //   더해도 같은 흰색이 된다 — 차이를 재려는 그림이 차이를 가리고
-            //   있었다. 0.35배로 낮춰 밝은 영역에도 여유를 남긴다.
-            constexpr float kExposure = 0.35f;
-
-            std::vector<uint8_t> rgba(static_cast<size_t>(kWidth) * kHeight * 4);
-
-            for (uint32_t y = 0; y < kHeight; ++y)
-            {
-                for (uint32_t x = 0; x < kWidth; ++x)
-                {
-                    for (uint32_t channel = 0; channel < 3; ++channel)
-                    {
-                        const float linear = (std::min)(1.f,
-                            (std::max)(0.f, captured.At(x, y, channel) * kExposure));
-                        rgba[(static_cast<size_t>(y) * kWidth + x) * 4 + channel] =
-                            static_cast<uint8_t>(powf(linear, 1.f / 2.2f) * 255.f + 0.5f);
-                    }
-                    rgba[(static_cast<size_t>(y) * kWidth + x) * 4 + 3] = 255;
-                }
-            }
-
-            DirectX::Image image{};
-            image.width = kWidth;
-            image.height = kHeight;
-            image.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            image.rowPitch = static_cast<size_t>(kWidth) * 4;
-            image.slicePitch = image.rowPitch * kHeight;
-            image.pixels = rgba.data();
-
-            const std::string narrow(path);
-            const std::wstring wide(narrow.begin(), narrow.end());
-            return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
-                DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), wide.c_str()));
-        };
-
-        // 기준선 렌더의 리드백이 아직 라이팅(끔)을 들고 있다.
-        const file::path pictureRoot = PathFinder::TestArtifactPath("DX12/SSGI");
-        std::error_code pictureDirectoryError{};
-        file::create_directories(pictureRoot, pictureDirectoryError);
-        const bool savedOff = savePng((pictureRoot / "dx12_ssgi_off.png").string());
-
-        // SSGI 합성을 상수 변형별로 저장한다. intensity와 추적 거리의 옳은
-        // 값은 숫자로 정할 수 없었으므로(합성 스윕의 한계) 그림을 나란히
-        // 놓고 고른다.
-        captureSSGIOutput = true;
-        uint32_t coveredTemp = 0;
-        uint32_t drawTemp = 0;
-        double luminanceTemp = 0.0;
-        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-        EnhancedRenderGraph::Stats statsTemp{};
-        uint32_t savedCount = 0;
-
-        struct PictureCase { float intensity; float distance; const char* path; };
-        const PictureCase pictureCases[] = {
-            { 0.5f, 8.f,  "dx12_ssgi_i05_d8.png" },
-            { 1.0f, 8.f,  "dx12_ssgi_on.png" },
-            { 2.0f, 8.f,  "dx12_ssgi_i20_d8.png" },
-            { 1.0f, 2.f,  "dx12_ssgi_i10_d2.png" },
-            { 1.0f, 32.f, "dx12_ssgi_i10_d32.png" },
-        };
-
-        const EnhancedSSGIPass::Tuning savedTuning = ssgi.GetTuning();
-
-        for (const PictureCase& pictureCase : pictureCases)
-        {
-            EnhancedSSGIPass::Tuning tuning = savedTuning;
-            tuning.intensity = pictureCase.intensity;
-            tuning.traceDistance = pictureCase.distance;
-            ssgi.SetTuning(tuning);
-
-            if (renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-                timingsTemp, statsTemp, luminanceTemp)
-                && savePng((pictureRoot / pictureCase.path).string()))
-            {
-                ++savedCount;
-            }
-        }
-
-        ssgi.SetTuning(savedTuning);
-        captureSSGIOutput = false;
-
-        outLog += std::string("      SSGI 그림 — 끔 ") + (savedOff ? "저장" : "실패")
-            + " · 변형 " + std::to_string(savedCount) + "/5 저장\n";
-    }
-
-    // 기준선 렌더의 그림자 상태를 여기서 붙잡는다.
-    //
-    // 패스가 들고 있는 상태를 나중에 읽으면 그 사이의 렌더가 덮어쓴다. 실제로
-    // 뒤에 오는 '광원 0개' 렌더가 방향광을 못 찾아 m_hasDirectionalLight를
-    // false로 만들었고, 그 값으로 판정하는 바람에 그림자 단정이 통째로
-    // 건너뛰어지고도 통과가 나왔다 — 재질 때와 같은 부류의 조용한 통과다.
-    const bool     baselineHasDirectional = shadow.HasDirectionalLight();
-    const uint32_t baselineShadowCasters = shadow.GetLastDrawCount();
-    const uint32_t baselineShadowCulled = shadow.GetLastCulledCount();
-    const uint32_t baselineShadowBatches = shadow.GetLastBatchCount();
-    const uint32_t baselineShadowOccluders = shadowOccluders;
-    const auto     baselineCascadeOccluders = cascadeOccluders;
-    const EnhancedShadowData baselineShadowData = shadow.GetShadowData();
-
-    const auto meshStats = meshCache.GetStats();
-    const auto textureStats = textureCache.GetStats();
-    outLog += "      재질 — 텍스처 업로드 " + std::to_string(textureStats.uploads)
-        + "(" + std::to_string(textureStats.bytesUploaded / 1024) + "KB)"
-        + " · 히트 " + std::to_string(textureStats.hits)
-        + " · 실패 " + std::to_string(textureStats.failures)
-        + " · baseColor 있는 드로우 " + std::to_string(materialsWithTexture) + "\n";
-    outLog += "      키잉 — 드로우 " + std::to_string(gbuffer.GetLastDrawCount())
-        + " · 메시 " + std::to_string(gbuffer.GetLastMeshCount())
-        + " · 재질 " + std::to_string(gbuffer.GetLastMaterialCount())
-        + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
-    if (report)
-    {
-        report->draws = drawCountA;
-        report->meshUploads = meshStats.uploads;
-        report->generationUploads = meshStats.modelGenerationUploads;
-        report->uploadKB = meshStats.bytesUploaded / 1024;
-        report->coverage = coveredA;
-        report->pixels = kWidth * kHeight;
-        report->texturedDraws = materialsWithTexture;
-    }
-    outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
-        + " · 메시 업로드 " + std::to_string(meshStats.uploads)
-        + "(generation " + std::to_string(meshStats.modelGenerationUploads) + ", "
-        + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
-        + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
-
-    // 그래프가 GBuffer를 살렸는지. Deferred가 읽으므로 뿌리 표시 없이 살아남아야 한다.
-    // Forward+가 실제 씬에서 무엇을 했는지. 포워드 큐가 비면 셰이딩은
-    // 선언되지 않는 것이 정상이라, 그 사실을 수로 남겨야 "안 도는 것"과
-    // "그릴 것이 없는 것"이 구분된다.
-    // UI가 무엇을 했는지. 사각형 수와 배치 수를 나란히 남긴다 —
-    // 둘이 같으면 배칭이 한 건도 안 묶은 것이고, 그건 그림으로 안 드러난다.
-    outLog += "      UI — 사각형 " + std::to_string(uiPass.GetLastRectCount())
-        + " · 배치 " + std::to_string(uiPass.GetLastBatchCount())
-        + " · 건너뜀 " + std::to_string(uiSkipped) + "\n";
-
-    // 포스트 체인이 무엇을 했는지. 최종 LDR이 선언됐는지와 블룸 단수를
-    // 남긴다 — 안 돌면 '선언 안 됨'으로 드러난다.
-    outLog += "      포스트 체인 — 최종 " + std::string(
-        postChain.GetOutput().IsValid() ? "선언됨" : "생략")
-        + " · 블룸 " + std::to_string(postChain.GetBloomMipCount()) + "단\n";
-    // I5-D34c: 큐 크기와 별도로 패스의 실발행 계수(배치)를 남긴다 — 큐에는
-    // 있는데 배치 구성이 조용히 버리는 결함(PSO 부재·레이아웃 fail-closed)은
-    // 큐 크기만 봐서는 원리적으로 안 보인다.
-    outLog += "      Forward+ — 포워드 드로우 " + std::to_string(forwardDraws.size())
-        + "(발행 " + std::to_string(forward.GetLastDrawCount())
-        + " · 배치 " + std::to_string(forward.GetLastBatchCount()) + ")"
-        + " · 셰이딩 " + std::string(forward.GetOutput().IsValid()
-            ? "선언됨" : "생략(포워드 큐 비어 있음)") + "\n";
-
-    outLog += "      그래프 — 선언 " + std::to_string(lastGraphStats.passesDeclared)
-        + " · 컬링 " + std::to_string(lastGraphStats.passesCulled)
-        + " · 실행 " + std::to_string(lastGraphStats.passesExecuted)
-        + " · 배리어 " + std::to_string(lastGraphStats.barriersEmitted)
-        + "건을 " + std::to_string(lastGraphStats.barrierBatches) + "번에\n";
-
-    // 패스별 GPU 시간. 3-6의 성능 판정이 여기서 시작된다 — DX11 대비 비교는
-    // 같은 씬을 양쪽으로 그릴 수 있게 되는 시점(재질 연결 후)에 붙인다.
-    double totalMs = 0.0;
-    for (const auto& timing : timings)
-    {
-        char line[128]{};
-        std::snprintf(line, sizeof(line), "      GPU %-18s %.4f ms\n",
-            timing.name.c_str(), timing.milliseconds);
-        outLog += line;
-        totalMs += timing.milliseconds;
-    }
-    {
-        char line[96]{};
-        std::snprintf(line, sizeof(line), "      GPU %-18s %.4f ms\n", "(합계)", totalMs);
-        outLog += line;
-    }
-
-    step("[4/4] 이동 카메라");
-
-    // ── [4/4] 카메라를 옮겨 다시 렌더 ──
-    //
-    // 이것이 이 검증의 핵심이다. 상수 버퍼가 실제로 셰이더에 닿지 않으면
-    // 두 결과가 같다 — '그려지긴 하는데 카메라를 무시한다'를 잡는다.
-    FrameCameraSnapshot movedCamera = cameraSnapshot;
-        movedCamera.view = cameraSnapshot.view
-            * math::translation_matrix(math::vector3{ 0.f, 0.f, 500.f });
-
-    uint32_t coveredB = 0;
-    uint32_t drawCountB = 0;
-    std::vector<DX12GpuProfiler::PassTiming> timingsB;
-    EnhancedRenderGraph::Stats statsB{};
-    if (!renderAndCount(movedCamera, coveredB, drawCountB, error, timingsB, statsB, luminanceMoved))
-    {
-        outLog += "[4/4] 이동 카메라 렌더 실패: " + error + "\n";
-        return false;
-    }
-
-    bool passed = true;
-    std::string verdict;
-
-    step("[4/4] 광원 소비");
-
-    // ── 광원이 실제로 셰이더에 닿는가 ──
-    //
-    // 광원을 비운 채로 한 번 더 그려 밝기를 비교한다. 상수가 안 닿으면 두 결과가
-    // 같고, 그러면 '광원 목록은 넘겼는데 라이팅은 안 된다'를 못 잡는다.
-    // 카메라 상수 때 쓴 것과 같은 논리다.
-    double luminanceUnlit = 0.0;
-    if (!lights.empty())
-    {
-        const std::vector<EnhancedLight> noLights;
-        frameContext.lights = &noLights;
-
-        uint32_t coveredDark = 0;
-        uint32_t drawCountDark = 0;
-        std::vector<DX12GpuProfiler::PassTiming> timingsDark;
-        EnhancedRenderGraph::Stats statsDark{};
-        if (!renderAndCount(cameraSnapshot, coveredDark, drawCountDark, error,
-            timingsDark, statsDark, luminanceUnlit))
-        {
-            outLog += "[4/4] 광원 0 렌더 실패: " + error + "\n";
-            return false;
-        }
-        frameContext.lights = &lights;
-    }
-
-    char luminanceLine[160]{};
-    std::snprintf(luminanceLine, sizeof(luminanceLine),
-        "      라이팅 — 광원 %zu개 밝기 %.5f · 광원 0개 밝기 %.5f\n",
-        lights.size(), luminanceLit, luminanceUnlit);
-    outLog += luminanceLine;
-
-    step("[4/4] 그림자 소비");
-
-    // ── 그림자가 실제로 셰이더에 닿는가 ──
-    //
-    // 그림자를 끈 것과 비교만 하면 씬 배치에 답이 좌우된다 — 가리는 것이 없는
-    // 씬에서는 켜나 끄나 같고, 그러면 '그림자 경로가 통째로 죽었다'와 구분되지
-    // 않는다. 그래서 편향을 음수로 밀어 모든 표면이 자기 그림자에 걸리는 렌더를
-    // 하나 더 한다. 그림자 맵을 읽고 비교 샘플러가 도는 이상 반드시 어두워지므로,
-    // 배치와 무관하게 ③④를 판정할 수 있다.
-    double luminanceNoShadow = 0.0;
-    double luminanceForced = 0.0;
-    const bool shadowTestable = baselineHasDirectional && 0 != drawCountA;
-    if (shadowTestable)
-    {
-        uint32_t coveredTemp = 0;
-        uint32_t drawTemp = 0;
-        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-        EnhancedRenderGraph::Stats statsTemp{};
-
-        shadowEnabled = false;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceNoShadow))
-        {
-            outLog += "[4/4] 그림자 끔 렌더 실패: " + error + "\n";
-            return false;
-        }
-
-        shadowEnabled = true;
-        shadowBias = -1.f;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceForced))
-        {
-            outLog += "[4/4] 그림자 강제 렌더 실패: " + error + "\n";
-            return false;
-        }
-        shadowBias = kTestShadowBias;
-    }
-
-    step("[4/4] 캐스터 컬링");
-
-    // ── 캐스터 컬링이 실제로 자르는가 ──
-    //
-    // 기준선에서 컬링 0이 나오는 것은 정상이다(작은 씬에서는 모든 오브젝트가
-    // 모든 캐스케이드에 걸린다). 문제는 그 0이 '자를 것이 없었다'와 '판정이 늘
-    // 참이다'를 구분하지 못한다는 것이다. 그래서 잘릴 수밖에 없는 것을 하나
-    // 넣어 본다 — 광원 방향에 수직으로 멀리 옮긴 드로우는 어느 캐스케이드에도
-    // 그림자를 드리울 수 없으므로 셋 다에서 걸러져야 한다.
-    uint32_t culledWithFarCaster = 0;
-    if (shadowTestable)
-    {
-        math::vector3 lightDir{ baselineShadowData.lightDirection.x,
-            baselineShadowData.lightDirection.y, baselineShadowData.lightDirection.z };
-
-        const math::vector3 axis = (std::fabs(lightDir.x) < 0.9f)
-            ? math::vector3{ 1.f, 0.f, 0.f } : math::vector3{ 0.f, 1.f, 0.f };
-        const math::vector3 perpendicular = math::normalize(math::cross(lightDir, axis));
-
-        // 마지막 캐스케이드가 덮는 거리보다 훨씬 멀리. 경계 근처에 두면
-        // 판정이 맞는지 애매해진다.
-        const math::vector3 offset = perpendicular * (baselineShadowData.splitDepths.z * 100.f);
-
-        std::vector<EnhancedDrawItem> farDraws = draws;
-        EnhancedDrawItem farCaster = draws.front();
-        farCaster.worldMatrix = farCaster.worldMatrix *
-            math::translation_matrix(math::vector3{ offset.x, offset.y, offset.z });
-        farDraws.push_back(farCaster);
-
-        frameContext.draws = &farDraws;
-
-        uint32_t coveredTemp = 0;
-        uint32_t drawTemp = 0;
-        double luminanceTemp = 0.0;
-        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-        EnhancedRenderGraph::Stats statsTemp{};
-
-        shadowEnabled = true;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceTemp))
-        {
-            outLog += "[4/4] 캐스터 컬링 렌더 실패: " + error + "\n";
-            return false;
-        }
-        culledWithFarCaster = shadow.GetLastCulledCount();
-
-        frameContext.draws = &draws;
-    }
-
-    step("[4/4] 재질 키잉");
-
-    // ── 드로우별 재질 키잉이 사는가 ──
-    //
-    // 같은 메시를 재질만 바꿔 두 번 그린다. 전에는 재질을 메시로 키잉해서
-    // 두 번째가 첫 번째의 텍스처로 그려졌는데, 실제 씬에서는 메시마다 재질이
-    // 달라 그 상태로도 통과했다 — 그래서 일부러 겹치는 경우를 만든다.
-    // 씬의 재질에 기대지 않는다. 이 씬의 baseColor가 전부 비어 있으면
-    // '다른 재질'을 만들 수 없어 단정이 조용히 통과한다 — 실제로 그랬다.
-    // 그래서 검증용 텍스처 둘을 직접 만들어 포인터를 갈라 놓는다.
-    uint32_t keyedMaterialCount = 0;
-    uint32_t keyedBatchCount = 0;
-    if (!draws.empty())
-    {
-        // ★ 신원(m_assetId)만 갈리면 되지만 **CPU 픽셀은 있어야 한다.**
-        //   T6(2026-08-08)은 빈 Texture 로 충분했다 — 그때 캐시는 픽셀 없는 텍스처에
-        //   흰색을 주고 넘어갔다. 709eafe5(09-06)부터 MaterialTextureTable::Upload 가
-        //   업로드 오류를 프레임 실패로 올려, 이 단계가 'CPU 픽셀이 없어 DX12로 올릴 수
-        //   없다' 로 넘어졌다. 앞선 RenderThread drain 시간 초과와 캐시 리스너 크래시에
-        //   가려 09-17 까지 아무도 이 줄에 닿지 못했다.
-        const uint8_t keyPixelA[4] = { 255, 0, 0, 255 };
-        const uint8_t keyPixelB[4] = { 0, 0, 255, 255 };
-        auto keyTextureA = Texture::CreateFromPixels(1, 1, "sceneKeyA",
-            RHIFormat::RGBA8Unorm, keyPixelA);
-        auto keyTextureB = Texture::CreateFromPixels(1, 1, "sceneKeyB",
-            RHIFormat::RGBA8Unorm, keyPixelB);
-
-        if (nullptr != keyTextureA && nullptr != keyTextureB)
-        {
-            std::vector<EnhancedDrawItem> sameMeshDraws;
-
-            EnhancedDrawItem first = draws.front();
-            first.baseColor = (keyTextureA ? &*keyTextureA.borrow() : nullptr);
-            sameMeshDraws.push_back(first);
-
-            EnhancedDrawItem variant = draws.front();   // 메시는 같다
-            variant.baseColor = (keyTextureB ? &*keyTextureB.borrow() : nullptr);            // 재질만 다르다
-            sameMeshDraws.push_back(variant);
-
-            frameContext.draws = &sameMeshDraws;
-
-            // PrepareFrame을 직접 부르지 않고 렌더를 한 번 돌린다.
-            //
-            // PrepareFrame은 업로드를 위해 커맨드 리스트에 기록하는데, 프레임
-            // 밖에서 부르면 닫힌 리스트를 만진다("This API cannot be called on
-            // a closed command list" 4건이 실제로 나왔다). 프레임 경계를 여는
-            // 경로가 이미 있으니 그것을 쓴다.
-            uint32_t coveredTemp = 0;
-            uint32_t drawTemp = 0;
-            double luminanceTemp = 0.0;
-            std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-            EnhancedRenderGraph::Stats statsTemp{};
-
-            if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-                timingsTemp, statsTemp, luminanceTemp))
-            {
-                outLog += "[4/4] 재질 키잉 렌더 실패: " + error + "\n";
-                return false;
-            }
-            keyedMaterialCount = gbuffer.GetLastMaterialCount();
-            keyedBatchCount = gbuffer.GetLastBatchCount();
-
-            frameContext.draws = &draws;
-        }
-
-        keyTextureA.reset();
-        keyTextureB.reset();
-    }
-
-    step("[4/4] 정반사");
-
-    // ── 정반사 항이 사는가 ──
-    //
-    // 같은 씬을 거칠기 0과 1로 그려 밝기를 비교한다. 확산 감쇠만 있던 예전
-    // 셰이더에서도 값은 달라지지만, 그때는 거칠기가 밝기를 '깎기만' 했다.
-    // GGX가 들어오면 거친 쪽이 더 어두운 관계가 유지되면서 차이가 커진다.
-    double luminanceSmooth = 0.0;
-    double luminanceRough = 0.0;
-    {
-        std::vector<EnhancedDrawItem> smoothDraws = draws;
-        std::vector<EnhancedDrawItem> roughDraws = draws;
-        for (auto& item : smoothDraws) { item.roughness = 0.05f; item.metallic = 0.f; }
-        for (auto& item : roughDraws) { item.roughness = 1.0f; item.metallic = 0.f; }
-
-        uint32_t coveredTemp = 0;
-        uint32_t drawTemp = 0;
-        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-        EnhancedRenderGraph::Stats statsTemp{};
-
-        frameContext.draws = &smoothDraws;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceSmooth))
-        {
-            outLog += "[4/4] 매끈한 재질 렌더 실패: " + error + "\n";
-            return false;
-        }
-
-        frameContext.draws = &roughDraws;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceRough))
-        {
-            outLog += "[4/4] 거친 재질 렌더 실패: " + error + "\n";
-            return false;
-        }
-
-        frameContext.draws = &draws;
-    }
-
-    {
-        char line[224]{};
-        std::snprintf(line, sizeof(line),
-            "      재질 경로 — 같은 메시 두 재질 키 %u개 · 거칠기 0.05 밝기 %.5f"
-            " · 거칠기 1.0 밝기 %.5f\n",
-            keyedMaterialCount, luminanceSmooth, luminanceRough);
-        outLog += line;
-    }
-
-    step("[4/4] 병렬 기록");
-
-    // ── 실제 씬 패스를 병렬 경로에 태운다 ──
-    //
-    // 여기까지의 병렬 검증은 클리어만 하는 인공 패스였다. 실제 패스는 업로드
-    // upload segment·descriptor page·PSO를 모두 쓰므로, 그 조합에서도 결과가 같은지는 따로
-    // 봐야 한다.
-    //
-    // 재는 것은 CPU 기록 시간이다. 병렬화가 줄이는 것이 그것이고, GPU 시간은
-    // 같은 커맨드를 같은 순서로 실행하므로 줄지 않는다.
-    double sequentialRecordMs = 0.0;
-    double parallelRecordMs = 0.0;
-    double parallelLuminance = 0.0;
-    uint32_t parallelCovered = 0;
-    uint32_t parallelWorkersUsed = 0;
-
-    if (0 != drawCountA)
-    {
-        constexpr uint32_t kMeasureRuns = 20;
-
-        uint32_t coveredTemp = 0;
-        uint32_t drawTemp = 0;
-        double luminanceTemp = 0.0;
-        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-        EnhancedRenderGraph::Stats statsTemp{};
-
-        // 한 번은 버린다. 첫 실행에는 PSO 조회·힙 준비 같은 일회성 비용이 섞인다.
-        useParallelRecording = false;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceTemp))
-        {
-            outLog += "[4/4] 순차 기록 예열 실패: " + error + "\n";
-            return false;
-        }
-
-        double sequentialTotal = 0.0;
-        for (uint32_t run = 0; run < kMeasureRuns; ++run)
-        {
-            if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-                timingsTemp, statsTemp, luminanceTemp))
-            {
-                outLog += "[4/4] 순차 기록 실패: " + error + "\n";
-                return false;
-            }
-            sequentialTotal += lastRecordMilliseconds;
-        }
-        sequentialRecordMs = sequentialTotal / kMeasureRuns;
-
-        useParallelRecording = true;
-        parallelWorkers = 6;
-        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceTemp))
-        {
-            outLog += "[4/4] 병렬 기록 예열 실패: " + error + "\n";
-            return false;
-        }
-
-        double parallelTotal = 0.0;
-        for (uint32_t run = 0; run < kMeasureRuns; ++run)
-        {
-            if (!renderAndCount(cameraSnapshot, parallelCovered, drawTemp, error,
-                timingsTemp, statsTemp, parallelLuminance))
-            {
-                outLog += "[4/4] 병렬 기록 실패: " + error + "\n";
-                return false;
-            }
-            parallelTotal += lastRecordMilliseconds;
-        }
-        parallelRecordMs = parallelTotal / kMeasureRuns;
-        parallelWorkersUsed = statsTemp.recordWorkers;
-
-        useParallelRecording = false;
-        parallelWorkers = 1;
-    }
-
-    {
-        char line[288]{};
-        std::snprintf(line, sizeof(line),
-            "      병렬 기록 — 순차 %.4f ms · 병렬 %.4f ms(워커 %u) · %.2f배"
-            " · 커버리지 %u vs %u · 밝기 %.5f vs %.5f\n",
-            sequentialRecordMs, parallelRecordMs, parallelWorkersUsed,
-            (parallelRecordMs > 0.0) ? (sequentialRecordMs / parallelRecordMs) : 0.0,
-            coveredA, parallelCovered, luminanceLit, parallelLuminance);
-        outLog += line;
-    }
-
-    step("[4/4] 규모 측정 (여기가 가장 무겁다)");
-
-    // ── 규모를 키워 다시 잰다 ──
-    //
-    // 병렬화가 이기려면 기록 비용이 동기화 비용을 넘어야 한다. 패스 6·드로우
-    // 11에서는 기록이 너무 싸서 무엇을 해도 진다. 드로우를 늘려 그 경계가
-    // 어디인지 본다 — '병렬화가 값을 하는가'가 아니라 '언제부터 하는가'가
-    // 답해야 할 질문이다.
-    if (0 != drawCountA)
-    {
-        // ★ 규모를 크게 잡는 이유는 Release 실측 때문이다.
-        //
-        // 처음에는 {4, 16, 64}였다. Debug에서는 그 안에 교차점이 있는 것처럼
-        // 보였는데(기록량 1419에서 1.37배), Release로 재니 2827에서도 0.72배로
-        // 병렬이 졌다. 순차 기록이 Debug 5~6 ms에서 Release 0.36 ms로 15배
-        // 빨라지면서 워커를 깨우는 비용이 상대적으로 훨씬 커진 것이다.
-        //
-        // 즉 Debug에서 본 교차점은 Debug의 것이었다. 실제 경계를 보려면
-        // 그보다 한참 큰 규모까지 훑어야 한다.
-        constexpr uint32_t kScales[] = { 4, 64, 256, 1024 };
-        constexpr uint32_t kMeasureRuns = 10;
-
-        // ── 재질을 갈라 놓을 텍스처 ──
-        //
-        // 지금까지의 규모 확대는 같은 메시 11종을 복제해서 재질이 전부 같았다.
-        // 그러면 인스턴싱이 최대로 먹어 드로우 11264가 배치 11개로 묶이는데,
-        // 그것은 병렬 기록에 최악의 조건이다 — 나눌 것이 배치 11개뿐이다.
-        //
-        // 실제 씬은 재질이 다양해 배치가 수백 개다. 그 조건에서도 병렬이
-        // 지는지 봐야 '병렬 기록은 값을 못 한다'를 말할 수 있다. 지금까지는
-        // '이 조건에서는 값을 못 했다'까지만 확인한 것이었다.
-        //
-        // 4x4 텍스처를 여러 개 만들어 복제마다 돌려 쓴다. 픽셀 내용은 상관없다
-        // — 재질 키가 포인터라 객체가 다르기만 하면 배치가 갈린다.
-        constexpr uint32_t kMaterialVariants = 64;
-        std::vector<own::shared_owner<const Texture>> variantTextures;
-        variantTextures.reserve(kMaterialVariants);
-        for (uint32_t index = 0; index < kMaterialVariants; ++index)
-        {
-            // 신원만 필요하지만 CPU 픽셀은 있어야 한다(위 재질 키잉 주석 참조).
-            const uint8_t pixel[4] = { static_cast<uint8_t>(index * 4u), 128, 128, 255 };
-            auto texture = Texture::CreateFromPixels(1, 1,
-                "sceneVariant" + std::to_string(index), RHIFormat::RGBA8Unorm, pixel);
-            if (texture)
-            {
-                variantTextures.push_back(std::move(texture));
-            }
-        }
-
-        // 재질을 가르지 않은 경우와 가른 경우를 나란히 잰다. 하나만 재면
-        // 배치 수가 결과를 얼마나 좌우하는지 알 수 없다.
-        struct MaterialMode
-        {
-            const char* label;
-            bool        varyMaterial;
-        };
-        constexpr MaterialMode kMaterialModes[] = {
-            { "재질 1종", false },
-            { "재질 다종", true },
-        };
-
-        for (const MaterialMode& mode : kMaterialModes)
-        {
-        if (mode.varyMaterial && variantTextures.empty()) continue;
-
-        for (uint32_t scale : kScales)
-        {
-            std::vector<EnhancedDrawItem> scaled;
-            scaled.reserve(draws.size() * scale);
-            for (uint32_t copy = 0; copy < scale; ++copy)
-            {
-                for (const auto& item : draws)
-                {
-                    EnhancedDrawItem clone = item;
-                    // 화면 밖으로 흩는다. 픽셀 비용이 아니라 기록 비용을 재는
-                    // 것이므로, 겹쳐 그려 픽셀을 태우면 무엇을 재는지 흐려진다.
-                    clone.worldMatrix = item.worldMatrix * math::translation_matrix(
-                        math::vector3{ static_cast<float>(copy) * 12.f, 0.f, 0.f });
-
-                    if (mode.varyMaterial)
-                    {
-                        clone.baseColor = (variantTextures[copy % variantTextures.size()] ? &*variantTextures[copy % variantTextures.size()].borrow() : nullptr);
-                    }
-
-                    scaled.push_back(clone);
-                }
-            }
-
-            frameContext.draws = &scaled;
-
-            uint32_t coveredTemp = 0;
-            uint32_t drawTemp = 0;
-            double luminanceTemp = 0.0;
-            std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
-            EnhancedRenderGraph::Stats statsTemp{};
-
-            const auto measure = [&](bool parallelMode, double& outMilliseconds) -> bool
-            {
-                useParallelRecording = parallelMode;
-                parallelWorkers = parallelMode ? 6u : 1u;
-
-                if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-                    timingsTemp, statsTemp, luminanceTemp))
-                {
-                    return false;
-                }
-
-                // 평균이 아니라 중앙값을 쓴다.
-                //
-                // 같은 빌드로 세 번 재니 순차 시간이 4.14 · 5.66 · 5.66 ms로
-                // ±18% 흔들렸다. OS 스케줄링이나 다른 프로세스가 한 번 끼면
-                // 그 실행만 크게 늘어나는데, 평균은 그것을 그대로 받는다.
-                // 중앙값은 이상치 하나에 움직이지 않는다.
-                std::vector<double> samples;
-                samples.reserve(kMeasureRuns);
-                for (uint32_t run = 0; run < kMeasureRuns; ++run)
-                {
-                    if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-                        timingsTemp, statsTemp, luminanceTemp))
-                    {
-                        return false;
-                    }
-                    samples.push_back(lastRecordMilliseconds);
-                }
-                std::sort(samples.begin(), samples.end());
-                outMilliseconds = samples[samples.size() / 2];
-                return true;
-            };
-
-            double scaledSequential = 0.0;
-            double scaledParallel = 0.0;
-            if (!measure(false, scaledSequential) || !measure(true, scaledParallel))
-            {
-                outLog += "[4/4] 규모 측정 실패: " + error + "\n";
-                return false;
-            }
-
-            char line[288]{};
-            std::snprintf(line, sizeof(line),
-                "        [%s] 드로우 %zu(배치 %u) — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
-                " · 기록 단위 %u(워커 %u) · 기록량 %u%s\n",
-                mode.label,
-                scaled.size(), gbuffer.GetLastBatchCount(), scaledSequential, scaledParallel,
-                (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0,
-                statsTemp.recordUnits, statsTemp.recordWorkers,
-                statsTemp.totalRecordCost,
-                statsTemp.parallelDeclined ? "(순차로 되무름)" : "");
-            outLog += line;
-
-            // 재질을 갈랐는데 배치가 안 갈렸다면 이 측정은 아무것도 재지
-            // 않은 것이다 — 두 모드가 같은 씬이 되므로 비교가 성립하지 않는다.
-            // 실제로 재질 키가 죽어 있으면 이렇게 된다.
-            if (mode.varyMaterial)
-            {
-                variedBatchCount = gbuffer.GetLastBatchCount();
-            }
-            else
-            {
-                uniformBatchCount = gbuffer.GetLastBatchCount();
-            }
-
-            // 병렬 경로의 패스별 GPU 시간. 마지막 규모에서만 찍는다 —
-            // 이 값이 다음 최적화의 근거가 된다. 무엇이 무거운지 모르면
-            // 어디를 쪼갤지 정할 수 없다.
-            if (mode.varyMaterial && scale == kScales[std::size(kScales) - 1])
-            {
-                for (const auto& timing : timingsTemp)
-                {
-                    char timingLine[160]{};
-                    std::snprintf(timingLine, sizeof(timingLine),
-                        "          GPU(병렬) %-22s %.4f ms\n",
-                        timing.name.c_str(), timing.milliseconds);
-                    outLog += timingLine;
-                }
-            }
-        }
-        }
-
-        variantTextures.clear();
-
-        frameContext.draws = &draws;
-
-        step("[4/4] 되무름 확인");
-
-    // ── 되무름이 실제로 도는가 ──
-        //
-        // 임계값을 기본값으로 되돌리고 원래 씬(작은 규모)을 병렬로 요청한다.
-        // 되물러야 맞다. 이것을 확인하지 않으면 임계값이 조용히 죽어 있어도
-        // 모른다 — 그러면 작은 씬에서 계속 손해를 보면서 '병렬이니 빠르겠지'로
-        // 넘어간다.
-        parallelCostThreshold = EnhancedRenderGraph::kParallelRecordCostThreshold;
-        useParallelRecording = true;
-        parallelWorkers = 6;
-
-        uint32_t declineCovered = 0;
-        uint32_t declineDraws = 0;
-        double   declineLuminance = 0.0;
-        std::vector<DX12GpuProfiler::PassTiming> declineTimings;
-        EnhancedRenderGraph::Stats declineStats{};
-
-        if (renderAndCount(cameraSnapshot, declineCovered, declineDraws, error,
-            declineTimings, declineStats, declineLuminance))
-        {
-            declineObserved = declineStats.parallelDeclined;
-            declineCost = declineStats.totalRecordCost;
-            declineWorkers = declineStats.recordWorkers;
-            declineCoverage = declineCovered;
-        }
-        else
-        {
-            outLog += "[4/4] 되무름 확인 렌더 실패: " + error + "\n";
-            return false;
-        }
-
-        parallelCostThreshold = 0;
-        useParallelRecording = false;
-        parallelWorkers = 1;
-    }
-
-    {
-        char line[224]{};
-        std::snprintf(line, sizeof(line),
-            "      되무름 — 기록량 %u(임계 %u) · %s · 워커 %u · 커버리지 %u\n",
-            declineCost, EnhancedRenderGraph::kParallelRecordCostThreshold,
-            declineObserved ? "순차로 되무름" : "병렬 유지",
-            declineWorkers, declineCoverage);
-        outLog += line;
-    }
-
-    char shadowLine[320]{};
-    std::snprintf(shadowLine, sizeof(shadowLine),
-        "      그림자 — 방향광 %s · 캐스터 %u(배치 %u · 컬링 %u) · 분할 %.1f/%.1f/%.1f"
-        " · 캐스케이드 텍셀 %u/%u/%u · 먼 캐스터 컬링 %u"
-        " · 끔 %.5f · 켬 %.5f · 강제 %.5f\n",
-        baselineHasDirectional ? "있음" : "없음", baselineShadowCasters,
-        baselineShadowBatches, baselineShadowCulled,
-        baselineShadowData.splitDepths.x, baselineShadowData.splitDepths.y,
-        baselineShadowData.splitDepths.z,
-        baselineCascadeOccluders[0], baselineCascadeOccluders[1], baselineCascadeOccluders[2],
-        culledWithFarCaster,
-        luminanceNoShadow, luminanceLit, luminanceForced);
-    outLog += shadowLine;
-
-    // ★ 그릴 것이 없으면 이 단정은 판정할 수 없다.
-    //
-    // 처음에는 draws를 보지 않고 밝기만 비교했는데, 씬의 재질을 전부 투명으로
-    // 바꿔 보니(전부 forward 큐로 감) "광원이 셰이더에 닿지 않는다"고 나왔다.
-    // 광원은 멀쩡했고 Deferred가 칠할 기하가 하나도 없었을 뿐이다.
-    // 원인을 잘못 지목하는 진단은 없느니만 못하다 — 그 방향으로 몇 시간을
-    // 쓰게 만든다.
-    if (draws.empty())
-    {
-        outLog += "      ※ 불투명 드로우가 없어 라이팅 단정은 판정하지 않았다"
-                  "(씬의 재질이 전부 forward 큐로 갔다)\n";
-    }
-    else if (!lights.empty() && luminanceLit <= luminanceUnlit + 1e-5)
-    {
-        passed = false;
-        verdict = "광원을 " + std::to_string(lights.size())
-            + "개 넘겼는데 밝기가 광원 0개일 때와 같다 — 광원이 셰이더에 닿지 않는다";
-    }
-    // 병렬 경로가 순차와 같은 그림을 내는가.
-    //
-    // 실제 패스는 upload segment·descriptor page·PSO를 다 쓴다. 인공 패스로 확인한
-    // 동일성이 여기서도 성립하는지는 따로 봐야 한다 — allocator에서 잘라 간 구간이
-    // 어긋나면 커버리지가 아니라 밝기 쪽에서 먼저 드러난다.
-    else if (0 != drawCountA && coveredA != parallelCovered)
-    {
-        passed = false;
-        verdict = "병렬 기록의 커버리지가 순차와 다르다("
-            + std::to_string(coveredA) + " vs " + std::to_string(parallelCovered) + ")";
-    }
-    else if (0 != drawCountA && std::fabs(luminanceLit - parallelLuminance) > 1e-4)
-    {
-        passed = false;
-        verdict = "병렬 기록의 밝기가 순차와 다르다 — 링에서 잘라 간 구간이 어긋났을 수 있다";
-    }
-    else if (0 != drawCountA && parallelWorkersUsed <= 1)
-    {
-        passed = false;
-        verdict = "병렬로 요청했는데 워커가 하나다 — 비교가 성립하지 않는다";
-    }
-    // 인스턴싱이 도는가.
-    //
-    // 같은 메시에 서로 다른 재질 둘을 넣었으므로 배치가 둘이어야 한다.
-    // 하나면 재질이 다른 것까지 묶은 것이고, 셋 이상이면 묶이지 않은 것이다.
-    else if (!draws.empty() && 2 != keyedBatchCount)
-    {
-        passed = false;
-        verdict = "같은 메시에 서로 다른 재질 둘을 넣었는데 배치가 "
-            + std::to_string(keyedBatchCount) + "개다 — 인스턴싱 병합이 어긋났다";
-    }
-    // 드로우별 재질 키잉. 같은 메시에 재질 둘을 넣었으므로 키가 둘이어야 한다.
-    else if (!draws.empty() && 2 != keyedMaterialCount)
-    {
-        passed = false;
-        verdict = "같은 메시에 서로 다른 재질 둘을 넣었는데 재질 키가 "
-            + std::to_string(keyedMaterialCount)
-            + "개다 — 재질이 메시로 키잉되어 뒤엣것이 무시된다";
-    }
-    // 정반사 항. 거칠기가 밝기를 바꾸지 못하면 BRDF가 결과에 닿지 않는 것이다.
-    else if (0 != drawCountA && std::fabs(luminanceSmooth - luminanceRough) <= 1e-5)
-    {
-        passed = false;
-        verdict = "거칠기를 0.05와 1.0으로 바꿔 그렸는데 밝기가 같다"
-            " — 정반사 항이 결과에 닿지 않는다";
-    }
-    // 깊이 전용 렌더가 무언가 기록했는가(①②).
-    else if (shadowTestable && 0 == baselineShadowOccluders)
-    {
-        passed = false;
-        verdict = "그림자 캐스터가 " + std::to_string(baselineShadowCasters)
-            + "건인데 그림자 맵이 클리어 값 그대로다 — 깊이 전용 렌더나 라이트 행렬이 어긋났다";
-    }
-    // 캐스케이드가 실제로 셋 다 도는가.
-    //
-    // 합계만 보면 한 장만 채워져도 통과한다. 그건 배열을 만들어 놓고 슬라이스
-    // 0에만 그리는 상태와 구분되지 않는다 — 캐스케이드를 넣은 의미가 사라진다.
-    else if (shadowTestable && (0 == baselineCascadeOccluders[0] ||
-        0 == baselineCascadeOccluders[1] || 0 == baselineCascadeOccluders[2]))
-    {
-        passed = false;
-        verdict = "캐스케이드 기록 텍셀이 "
-            + std::to_string(baselineCascadeOccluders[0]) + "/"
-            + std::to_string(baselineCascadeOccluders[1]) + "/"
-            + std::to_string(baselineCascadeOccluders[2])
-            + " — 빈 캐스케이드가 있다(슬라이스별 DSV나 캐스터 컬링 판정을 볼 것)";
-    }
-    else if (0 != variedBatchCount && variedBatchCount <= uniformBatchCount)
-    {
-        passed = false;
-        verdict = "재질을 갈랐는데 배치가 " + std::to_string(variedBatchCount)
-            + "로 재질 1종의 " + std::to_string(uniformBatchCount)
-            + "보다 크지 않다 — 두 모드가 같은 씬이라 병렬 비교가 성립하지 않는다";
-    }
-    else if (0 != declineCost && !declineObserved)
-    {
-        // 기록량이 임계값 아래인데 병렬로 갔다면 되무름이 죽은 것이다.
-        passed = false;
-        verdict = "기록량 " + std::to_string(declineCost) + "(임계 "
-            + std::to_string(EnhancedRenderGraph::kParallelRecordCostThreshold)
-            + ")인데 병렬로 갔다 — 되무름이 동작하지 않는다";
-    }
-    else if (declineObserved && declineCoverage != coveredA)
-    {
-        // 되물렀는데 그림이 달라지면 순차 경로가 병렬 경로와 다른 일을 한 것이다.
-        passed = false;
-        verdict = "되무른 뒤 커버리지가 " + std::to_string(declineCoverage)
-            + "로 기준 " + std::to_string(coveredA) + "과 다르다";
-    }
-    else if (baselineShadowBatches > baselineShadowCasters)
-    {
-        // 배치가 캐스터보다 많으면 인스턴스가 안 묶인 정도가 아니라 빈 드로우를
-        // 내고 있다는 뜻이다. 둘이 같은 것은 정상이다 — 메시가 전부 다른 씬이면
-        // 묶일 것이 없다.
-        passed = false;
-        verdict = "그림자 배치가 " + std::to_string(baselineShadowBatches)
-            + "개인데 캐스터는 " + std::to_string(baselineShadowCasters)
-            + "개다 — 인스턴스 없는 드로우를 내고 있다";
-    }
-    // 캐스터 컬링이 자를 수 있는가. 잘릴 수밖에 없는 것을 하나 넣었으므로
-    // 캐스케이드 셋에서 각각 한 번씩 걸러져야 한다.
-    else if (shadowTestable && culledWithFarCaster < EnhancedShadowPass::kCascadeCount)
-    {
-        passed = false;
-        verdict = "그림자를 드리울 수 없는 캐스터를 넣었는데 컬링이 "
-            + std::to_string(culledWithFarCaster) + "건뿐이다(기대 "
-            + std::to_string(EnhancedShadowPass::kCascadeCount)
-            + ") — 캐스터 컬링 판정이 늘 참이다";
-    }
-    // 분할이 단조 증가하는가. 뒤집히면 셰이더의 캐스케이드 선택이 조용히 틀린다.
-    else if (shadowTestable &&
-        !(baselineShadowData.splitDepths.x < baselineShadowData.splitDepths.y &&
-          baselineShadowData.splitDepths.y < baselineShadowData.splitDepths.z))
-    {
-        passed = false;
-        verdict = "캐스케이드 분할이 단조 증가하지 않는다";
-    }
-    // 그림자 맵을 SRV로 읽고 비교 샘플러가 도는가(③④).
-    else if (shadowTestable && luminanceForced >= luminanceNoShadow - 1e-5)
-    {
-        passed = false;
-        verdict = "편향을 음수로 밀어 전부 가려지게 했는데 밝기가 그대로다"
-            " — 그림자 맵이 셰이더에 닿지 않는다";
-    }
-    // 그림자가 밝게 만들면 부호가 뒤집힌 것이다.
-    else if (shadowTestable && luminanceLit > luminanceNoShadow + 1e-5)
-    {
-        passed = false;
-        verdict = "그림자를 켰더니 오히려 밝아졌다 — 비교 방향이나 UV가 뒤집혔다";
-    }
-    // 재질에 baseColor가 있는데 텍스처가 하나도 안 올라갔다면 재질 경로가
-    // 통째로 건너뛰어진 것이다. 이 단정이 없어서 실제로 그 상태로 통과한 적이
-    // 있다(업로드 0건인데 검증 통과) — 확인하지 못한 것과 확인했고 문제없는
-    // 것은 다르다.
-    // ★ 아래 체인은 앞 체인과 별개다. 앞에서 이미 실패했으면 들어가지 않는다.
-    //
-    // 예전에는 그냥 이어 붙어 있어서, 앞에서 잡은 실패의 사유가 이 체인의 마지막
-    // else("카메라 이동으로 커버리지가 바뀌었다")에 덮여 사라졌다. 실패로는
-    // 끝나지만 왜 실패했는지가 성공 메시지로 바뀌어 있었다 — 실제로 재질 키잉
-    // 단정을 넣고 나서 그 모양으로 한 번 속았다.
-    const auto finalTextureStats = textureCache.GetStats();
-    if (!passed)
-    {
-        // 사유는 앞에서 정했다. 여기서 덮지 않는다.
-    }
-    else if (passed && 0 != materialsWithTexture && 0 == finalTextureStats.uploads)
-    {
-        passed = false;
-        verdict = "재질에 baseColor가 " + std::to_string(materialsWithTexture)
-            + "건 있는데 텍스처 업로드가 0이다 — 재질 경로가 건너뛰어졌다";
-    }
-    // 컬링 확인. GBuffer가 걷어내졌다면 이후 단정이 전부 무의미하다.
-    else if (passed && 0 != lastGraphStats.passesCulled)
-    {
-        passed = false;
-        verdict = "Deferred가 읽는데도 패스가 "
-            + std::to_string(lastGraphStats.passesCulled) + "개 걷어내졌다";
-    }
-    else if (0 == drawCountA)
-    {
-        // 씬이 비어 있으면 연결 자체를 확인할 수 없다. 통과로 처리하면
-        // '아무것도 안 그렸는데 통과'가 되므로 실패로 알린다.
-        //
-        // 포워드 큐가 차 있는 경우를 따로 적는다. 씬에 물체가 멀쩡히 있는데도
-        // "메시를 배치하라"고 하면 엉뚱한 곳을 보게 된다 — 이 검증이 보는 것은
-        // deferred 경로뿐이라는 사실이 메시지에 들어 있어야 한다.
-        passed = false;
-        verdict = (!uiRects.empty())
-            ? ("deferred 드로우가 0건이다(UI는 " + std::to_string(uiRects.size())
-                + "건) — 이 검증은 deferred 경로를 보므로 메시가 필요하다")
-            : forwardDraws.empty()
-            ? "드로우가 0건이다 — 씬에 메시를 배치한 뒤 다시 실행할 것"
-            : ("deferred 드로우가 0건이다(포워드는 "
-                + std::to_string(forwardDraws.size())
-                + "건) — 이 검증은 deferred 경로를 보므로 불투명 재질이 필요하다");
-    }
-    else if (0 == coveredA)
-    {
-        passed = false;
-        verdict = "드로우는 있는데 깊이에 아무것도 기록되지 않았다";
-    }
-    else if (coveredA == coveredB)
-    {
-        passed = false;
-        verdict = "카메라를 옮겨도 커버리지가 같다 — 상수 버퍼가 셰이더에 닿지 않는다";
-    }
-    else
-    {
-        verdict = "카메라 이동으로 커버리지가 " + std::to_string(coveredA)
-            + " → " + std::to_string(coveredB) + "로 바뀌었다";
-    }
-
-    outLog += "[4/4] " + std::string(passed ? "통과" : "실패") + " — " + verdict + "\n";
-
-    std::string messages;
-    const uint32_t problems = resources.DrainDebugMessages(messages);
-    if (0 != problems)
-    {
-        passed = false;
-        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
-    }
-
-    textureCache.Shutdown();
-    profiler.Shutdown();
-    ssgi.Shutdown();
-    deferred.Shutdown();
-    shadow.Shutdown();
-    gbuffer.Shutdown();
-    meshCache.Shutdown();
-    rootSignatures.Shutdown();
-    psoManager.Shutdown();
-    commandPool.Shutdown();
-    resources.Shutdown();
-
-    outLog += passed ? "씬 연결 검증 통과\n" : "씬 연결 검증 실패\n";
     return passed;
 }
 

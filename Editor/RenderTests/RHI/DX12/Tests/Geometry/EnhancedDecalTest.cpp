@@ -314,12 +314,12 @@ bool DX12Test::RunDecalTest(std::string& outLog)
             desc.Height = kDecalHeight;
             desc.DepthOrArraySize = 1;
             desc.MipLevels = 1;
-            desc.Format = ToDXGI(EnhancedGBufferPass::kDepthFormat);
+            desc.Format = ToDXGI(SceneSurfaceTargets::kDepthFormat);
             desc.SampleDesc.Count = 1;
             desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
             D3D12_CLEAR_VALUE clearValue{};
-            clearValue.Format = ToDXGI(EnhancedGBufferPass::kDepthFormat);
+            clearValue.Format = ToDXGI(SceneSurfaceTargets::kDepthFormat);
             clearValue.DepthStencil.Depth = 1.f;
 
             if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
@@ -445,7 +445,7 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
         EnhancedRenderGraph graph(resources);
 
-        EnhancedGBufferPass::Outputs inputs{};
+        SceneSurfaceTargets::Outputs inputs{};
         inputs.diffuse = graph.ImportTexture(diffuseRegistration.Handle(),
             RHIResourceState::RenderTarget, "Decal.GBufferDiffuse");
         inputs.normal = graph.ImportTexture(normalRegistration.Handle(),

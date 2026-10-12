@@ -33,10 +33,23 @@ struct FrameCameraSnapshot
     float farPlane{ 0.f };
     bool  isOrthographic{ false };
 
+    // Explicit discontinuities only. Camera source identity remains in the
+    // sealed view key; ordinary translation/rotation must not advance this.
+    std::uint64_t cameraCutRevision{ 0 };
+
     // 에디터 진단용 신원이다. 런타임·재생 캡처 카메라는 0이며, 렌더 슬롯과
     // CPU 표시 업로드를 거칠 때도 픽셀을 만든 카메라와 같은 묶음으로 운반한다.
     std::uint64_t editorInputSequence{ 0 };
     std::uint64_t editorCameraRevision{ 0 };
+
+    bool HasSameTemporalHistory(const FrameCameraSnapshot& previous) const noexcept
+    {
+        // Compare unjittered projection inputs against the last submitted
+        // frame, never the raster-jittered camera or the last attempted frame.
+        return cameraCutRevision == previous.cameraCutRevision &&
+            projection == previous.projection && isOrthographic == previous.isOrthographic &&
+            fov == previous.fov && nearPlane == previous.nearPlane && farPlane == previous.farPlane;
+    }
 };
 
 static_assert(std::is_standard_layout_v<FrameCameraSnapshot>);

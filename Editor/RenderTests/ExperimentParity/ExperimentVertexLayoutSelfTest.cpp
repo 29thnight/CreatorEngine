@@ -1,7 +1,11 @@
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 
 #include "RHI/ModelVertexInputLayout.h"
-#include "MaterialGraphMeshletTopology.h"
+#include "Experiment/Import/MeshletBuilder.h"
+#include "Experiment/Cooked/CookedModelSubAssetCodec.h"
+#include "MaterialGraphGeometryContract.h"
+#include "RHI/RHIModelMeshletUpload.h"
+#include "RHI/DX12/Tests/Geometry/GraphSceneFixture.h"
 #include "Mesh.h" // legacy ::Vertex — 전환표 단정용
 
 #include <algorithm>
@@ -193,7 +197,8 @@ namespace RenderTest
             {
                 for (unsigned x = 0; x < 16; ++x)
                 {
-                    vertices[y * 16 + x] = {float(x), float(y), 0, 0, 0, 1, 1, 0, 0, 1, 0, 0};
+                    // Current core layout: position, normal, UV0, tangent.xyzw.
+                    vertices[y * 16 + x] = {float(x), float(y), 0, 0, 0, 1, 0, 0, 1, 0, 0, 1};
                 }
             }
             std::vector<uint32_t> indices;
@@ -212,51 +217,106 @@ namespace RenderTest
             geometry.vertexAttributeMask = assets::kCoreVertexAttributes;
             geometry.indexData = indices.data();
             geometry.indexCount = static_cast<uint32_t>(indices.size());
-            std::vector<uint32_t> words;
-            const bool built = material_graph::BuildSceneMeshletTopology(geometry, words, error);
-            check.Check(built, "LX meshlet topology build: " + error);
+            experiment::Mesh authored;
+            check.Check(authored.vertices.AssignPacked(geometry.vertexAttributeMask, vertices.size(),
+                {reinterpret_cast<const std::byte*>(vertices.data()), geometry.vertexBytes}), "METEOR authored vertex contract");
+            authored.indices = indices;
+            authored.bounds = math::aabb::from_min_max({0, 0, 0}, {15, 11, 0});
+            experiment::MeshletPayload cooked;
+            const bool built = experiment::importer::BuildMeshlets(authored, cooked, error);
+            check.Check(built, "METEOR cooked topology: " + error);
             if (built)
             {
-                std::vector<std::array<uint32_t, 3>> expected, actual;
-                for (size_t i = 0; i < indices.size(); i += 3)
+                bool exact = cooked.descriptors.size() > 1;
+                for (size_t m = 0; m < cooked.descriptors.size(); ++m)
                 {
-                    expected.push_back({indices[i], indices[i + 1], indices[i + 2]});
-                }
-                bool valid = words.size() >= 4 && words[0] > 1;
-                for (uint32_t m = 0; valid && m < words[0]; ++m)
-                {
-                    const auto d = words[1] + m * 4;
-                    valid = d + 3 < words.size();
-                    if (!valid)
+                    const auto& d = cooked.descriptors[m];
+                    exact = exact && d.clusterId == m;
+                    for (uint32_t triangle = 0; triangle < d.triangleCount; ++triangle)
                     {
-                        break;
-                    }
-                    const auto v = words[2] + words[d], t = words[3] + words[d + 1];
-                    const auto vc = words[d + 2], tc = words[d + 3];
-                    valid = vc <= 64 && tc <= 126 && v + vc <= words.size() && t + tc * 3 <= words.size();
-                    for (uint32_t tri = 0; valid && tri < tc; ++tri)
-                    {
-                        std::array<uint32_t, 3> decoded{};
+                        const auto primitive = cooked.primitiveRemap[d.primitiveOffset + triangle];
+                        exact = exact && primitive == d.primitiveOffset + triangle;
                         for (uint32_t corner = 0; corner < 3; ++corner)
+                            exact = exact && cooked.vertexRemap[d.vertexOffset + cooked.triangleIndices[d.triangleOffset + triangle * 3 + corner]] == indices[primitive * 3 + corner];
+                    }
+                }
+                check.Check(exact, "METEOR cooked clusters retain source primitive and corner identity");
+                RHIModelMeshletUpload upload;
+                check.Check(PackMeteorMeshletGpuPayload(cooked, vertices.size(), geometry.vertexStride,
+                    geometry.vertexAttributeMask, 3, geometry.indexCount / 3, static_cast<uint32_t>(vertices.size()), {}, upload, error), "LX canonical GPU packing");
+                RHIMeshletBufferHeader header{};
+                if (upload.bytes.size() >= sizeof(header)) std::memcpy(&header, upload.bytes.data(), sizeof(header));
+                check.Check(header.schemaVersion == 2 && header.sourceLodIndex == 3 && header.meshletCount == cooked.descriptors.size()
+                    && header.descriptorStride == sizeof(experiment::MeshletDescriptor) && header.sourcePrimitiveCount == indices.size() / 3,
+                    "METEOR GPU header has explicit cluster/LOD/primitive contract");
+                experiment::cooked::ModelGeometryArtifact artifact;
+                artifact.mesh = authored;
+                artifact.mesh.meshlets = cooked;
+                std::vector<std::byte> encoded;
+                const bool encodedOk = experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error);
+                check.Check(encodedOk, "METEOR cooked geometry encoding: " + error);
+                experiment::cooked::ModelGeometryArtifact decoded;
+                const bool decodedOk = experiment::cooked::ReadModelGeometryArtifact(encoded, decoded, error);
+                check.Check(decodedOk, "METEOR cooked geometry round trip: " + error);
+                auto old = encoded;
+                if (old.size() > 7) { const uint32_t version = 1; std::memcpy(old.data() + 4, &version, sizeof(version)); }
+                check.Check(!experiment::cooked::ReadModelGeometryArtifact(old, decoded, error), "METEOR rejects prior cooked geometry version");
+                artifact.mesh.meshlets = {};
+                check.Check(!experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error), "METEOR cooker rejects indexed-only geometry");
+                material_graph::SceneGeometryIdentity identity{0x1122334455667788ull, 11, 12, 13, 14, 3, 330};
+                check.Check(identity.geometryKey == 0x1122334455667788ull && identity.materialSlot == 14 &&
+                    identity.instanceId == 13 && identity.lodIndex == 3 && sizeof(identity) == 64, "METEOR geometry/instance/material/LOD scalar ABI");
+                GraphSceneFixture fixture;
+                std::vector<::Vertex> fixtureVertices(vertices.size());
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    fixtureVertices[i].position = {vertices[i][0], vertices[i][1], vertices[i][2]};
+                    fixtureVertices[i].normal = {0, 0, 1};
+                    fixtureVertices[i].tangent = {1, 0, 0};
+                }
+                const auto meshIndex = fixture.AddMesh(fixtureVertices, indices);
+                const auto draw = fixture.Draw(meshIndex, math::matrix4x4::identity());
+                material_graph::MeshSurfacePlanBudget chunkBudget;
+                chunkBudget.maxChunkPoints = 64;
+                std::shared_ptr<const material_graph::MeshSurfacePlan> plan;
+                check.Check(material_graph::MeshSurfacePlan::BuildForScene(draw, {{0, 0, -5}, 1, 1, 1}, chunkBudget,
+                    plan, error), "METEOR cooked cluster-aligned chunk partition");
+                if (plan)
+                {
+                    uint32_t nextCluster{}, nextPrimitive{};
+                    bool retained = plan->Chunks().size() > 1;
+                    for (const auto& chunk : plan->Chunks())
+                    {
+                        const auto& input = *chunk.input;
+                        const auto& topology = input.Meshlets();
+                        retained = retained && input.SourceVertexCount() == vertices.size();
+                        for (const auto& d : topology.descriptors)
                         {
-                            const auto local = words[t + tri * 3 + corner];
-                            valid = valid && local < vc;
-                            if (valid)
+                            retained = retained && d.clusterId == nextCluster++;
+                            for (uint32_t tri = 0; tri < d.triangleCount; ++tri)
                             {
-                                decoded[corner] = words[v + local];
+                                const auto primitive = topology.primitiveRemap[d.primitiveOffset + tri];
+                                retained = retained && primitive == nextPrimitive++;
+                                for (uint32_t corner = 0; corner < 3; ++corner)
+                                {
+                                    const auto local = topology.vertexRemap[d.vertexOffset + topology.triangleIndices[d.triangleOffset + tri * 3 + corner]];
+                                    retained = retained && input.SourceVertexIds()[local] == indices[primitive * 3 + corner];
+                                }
                             }
                         }
-                        if (valid)
-                        {
-                            actual.push_back(decoded);
-                        }
                     }
+                    check.Check(retained && nextPrimitive == indices.size() / 3, "METEOR chunking preserves cooked cluster/primitive/source-vertex identity");
                 }
-                check.Check(valid && actual == expected, "LX meshlet stream preserves every oriented source triangle");
+                auto bad = cooked;
+                ++bad.descriptors[0].clusterId;
+                check.Check(!experiment::importer::ValidateMeshlets(authored, bad, error), "METEOR rejects changed cluster identity");
+                bad = cooked; bad.primitiveRemap[0] = bad.primitiveRemap[1];
+                check.Check(!experiment::importer::ValidateMeshlets(authored, bad, error), "METEOR rejects duplicate primitive identity");
+                bad = cooked; bad.settings.profileVersion = 1;
+                check.Check(!PackMeteorMeshletGpuPayload(bad, vertices.size(), geometry.vertexStride,
+                    geometry.vertexAttributeMask, 0, geometry.indexCount / 3, static_cast<uint32_t>(vertices.size()), {}, upload, error), "METEOR rejects old GPU payload without conversion");
+                check.Check(!experiment::importer::ValidateMeshlets(authored, {}, error), "METEOR rejects missing cooked topology");
             }
-            geometry.vertexStride = 0;
-            check.Check(!material_graph::BuildSceneMeshletTopology(geometry, words, error),
-                "LX meshlet topology rejects an invalid sealed layout");
         }
 
         char summary[120]{};

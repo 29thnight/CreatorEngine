@@ -38,6 +38,11 @@ public:
 
 	void MoveToTarget(math::vector3 targetPosition);
 
+    // Call after a teleport/cut, before sealing the next render frame. Normal
+    // Transform movement does not imply a cut; lens changes are detected from
+    // the submitted unjittered projection by the temporal history consumer.
+    void NotifyCameraCut() noexcept { ++m_cameraCutRevision; }
+
 	math::quaternion rotate{};
 
 	static constexpr math::vector3 kForward = math::vector3::unit_z();
@@ -69,6 +74,9 @@ public:
 	[[reflgen::ignore]]
 	bool m_isOrthographic{ false };
 
+private:
+    [[reflgen::ignore]]
+    std::uint64_t m_cameraCutRevision{ 0 };
 };
 
 static_assert(std::is_same_v<decltype(Camera::rotate), math::quaternion>);

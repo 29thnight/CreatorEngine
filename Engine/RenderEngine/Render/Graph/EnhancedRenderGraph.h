@@ -1,4 +1,5 @@
 #pragma once
+#include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
 #include <cstddef>
@@ -283,6 +284,7 @@ public:
 
     struct Stats
     {
+        bool structuralScheduleReused{false}; // State/barrier/allocation plans are rebuilt every frame.
         uint32_t passesDeclared{ 0 };
         uint32_t passesCulled{ 0 };
         uint32_t passesExecuted{ 0 };
@@ -317,7 +319,10 @@ public:
         bool     parallelDeclined{ false };
         uint32_t totalRecordCost{ 0 };
         uint32_t dependencyWaveCount{0}; // DAG depth in passes, not elapsed GPU time.
+        uint32_t recordingJobDispatchCount{0};
+        uint32_t recordingWorkerJobCount{0};
         uint32_t recordingWaveCount{0}; // Includes command-target append constraints.
+        bool recordingBalanced{false}; // CPU work hint used without adding joins.
     };
 
     /// 병렬로 갈 최소 기록량. 이 아래에서는 워커를 깨우는 비용이 기록보다 크다.
@@ -358,6 +363,10 @@ public:
     {
         m_parallelCostThreshold = threshold;
     }
+
+    // Opt-in CPU partition hint; GPU order/barriers and the decline threshold
+    // are unchanged. A candidate that adds recording waves is rejected.
+    void SetRecordingWorkloadBalance(bool enabled) { RequireQueueIdle(); m_recordingWorkloadBalance = enabled; }
 
     void Reset();
 
@@ -508,6 +517,11 @@ public:
     /// ★ 디바이스를 받지 않는다 (G-1). 그래프는 생성자에서 device service를
     ///   이미 들고 있으므로 호출부가 같은 값을 도로 넘기지 않는다.
     bool Compile(std::string& outError);
+    struct StructuralSchedule;
+    // Source must be a frozen submitted graph; only immutable structural metadata is copied.
+    void InheritStructuralSchedule(const EnhancedRenderGraph& previous);
+    void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous);
+    std::shared_ptr<const StructuralSchedule> SnapshotStructuralSchedule() const;
 
     struct QueueHint
     {
@@ -532,6 +546,9 @@ public:
         RGQueueFallbackReason fallbackReason{RGQueueFallbackReason::None};
         uint32_t eligibleComputePasses{0}, rejectedStatePasses{0};
         uint32_t measuredPasses{0}, missingMeasurementPasses{0};
+        // CPU planning subtotals; these are not GPU costs or calibrated predictions.
+        uint32_t placementTrials{0};
+        double dependencyMilliseconds{0}, simulationMilliseconds{0};
     };
     struct QueueCostModel
     {
@@ -553,6 +570,13 @@ public:
         QueueSchedule& output, std::string& outError) const;
 
     void DeclareComputeCompatible(RGPassId pass);
+    // Author opt-in: this unsplit callback consumes only immutable prepared CPU
+    // inputs, never another callback's CPU output. Any observation it writes is
+    // private/atomic and read only after the whole recording join. GPU resource
+    // dependencies still control execute order, barriers and list submission;
+    // they do not require a CPU recording join for this consumer. Unannotated
+    // callbacks retain conservative joins. Not a compute-queue declaration.
+    void DeclareRecordingIndependent(RGPassId pass);
     // A culling root is not a CPU side effect. This opt-in additionally orders
     // every live pass before/after the callback and prevents parallel recording.
     void DeclareRecordingSideEffect(RGPassId pass);
@@ -704,6 +728,7 @@ public:
         // 뷰 귀속은 게시자가 채운다. 그래프 복사본은 GPU 리소스를 소유하지 않는다.
         uint64_t viewId{0}, frameId{0}, historyRevision{0}, sceneEpoch{0};
         uint32_t width{0}, height{0};
+        TemporalMeasurementProvenance temporalProvenance;
         uint64_t copyNanoseconds{0};
         // Vector/string capacities; allocator bookkeeping is excluded.
         size_t StorageBytes() const
@@ -837,6 +862,7 @@ private:
         bool                     culled{ false };
         bool                     computeCompatible{ false };
         bool                     recordingSideEffect{ false };
+        bool                     recordingIndependent{ false };
         // ★ 이 패스 직전에 한 번에 낸다. 계획 단계는 네 중립 배열만 만들고,
         //   기록 시점에 `RHIBarrierBatch`로 묶어 백엔드 인코더에 넘긴다.
         std::vector<RHITransition>    transitions;
@@ -914,29 +940,21 @@ private:
     std::vector<uint16_t> m_criticalPath;
     // Queue assignment is part of state compatibility. Whole-resource access is
     // conservative for all subresources until declarations expose a narrower range.
-    struct QueueReadEpoch
-    {
-        std::vector<uint16_t> frontier;
-        std::vector<uint16_t> before;
-        RHIResourceState state{RHIResourceState::Common};
-        RHIQueueKind queue{RHIQueueKind::Graphics};
-        bool immutableRead{false};
-    };
-    void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
+    struct QueuePlanningScratch;
+    void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
         std::vector<std::vector<uint16_t>>& predecessors,
-        std::vector<std::vector<uint16_t>>& successors,
-        std::vector<QueueReadEpoch>& resources) const;
+        std::vector<std::vector<uint16_t>>& successors) const;
     bool IsComputeStateCompatible(uint16_t pass) const;
     // Two-queue list simulation. Returns the predicted span and, if requested,
     // the submission order. reorder=false keeps the compiled order.
     uint64_t SimulateQueues(const std::vector<RHIQueueKind>& queues, const std::vector<uint64_t>& costs,
         const std::vector<std::vector<uint16_t>>& predecessors,
         const std::vector<std::vector<uint16_t>>& successors,
-        bool reorder, std::vector<uint16_t>* order) const;
+        bool reorder, std::vector<uint16_t>* order, QueuePlanningScratch& scratch) const;
     uint64_t SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
         const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
-        const std::vector<std::vector<uint16_t>>& successors, bool reorder, bool prioritizeComputeInputs,
-        std::vector<uint16_t>* order) const;
+        const std::vector<std::vector<uint16_t>>& successors, bool reorder,
+        std::vector<uint16_t>* order, QueuePlanningScratch& scratch, bool prioritizeComputeInputs) const;
     void UpdateResourceUses();
     QueueCostModel m_queueCostModel;
     RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};
@@ -945,9 +963,27 @@ private:
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;
     std::vector<DiagnosticSnapshot::VersionEdge> m_versionEdges;
+    // One successful structural schedule per graph owner, retained across Reset.
+    // No native handles, callbacks, allocation plans or barrier states are cached.
+public:
+    // Opaque CPU-only snapshot; may outlive GPU retirement of the source graph.
+    struct StructuralSchedule
+    {
+    private:
+        friend class EnhancedRenderGraph;
+        std::shared_ptr<const std::string> key;
+        std::vector<uint16_t> order, criticalPath;
+        std::vector<int32_t> waves;
+        std::vector<bool> culled;
+        std::vector<DiagnosticSnapshot::VersionEdge> edges;
+    };
+private:
+    StructuralSchedule m_structuralSchedule;
+
     Stats m_stats;
 
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
+    bool m_recordingWorkloadBalance{false};
     uint64_t m_resourceEpoch{1};
     uint64_t m_compileGeneration{0};
     IRHIParallelCommandPool* m_preparedPool{nullptr};

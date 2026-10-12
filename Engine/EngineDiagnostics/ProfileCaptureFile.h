@@ -10,12 +10,13 @@
 //   않았으면 이 파일은 남의 빌드의 id 와 읽는 기계의 주파수로 풀려, 틀린
 //   이름과 틀린 길이를 그럴듯하게 그렸을 것이다.
 //
-// 스냅샷 v1/v2 형식(모든 정수는 little-endian, 연속 녹화 v3 API는 아래 참조):
+// Snapshot v1/v2/v4/v6 (little-endian); continuous recording v3/v5/v7 below.
 //
 //   header      magic "CEPROF\0\0" · u32 format_version · u32 chunk_count
 //   chunk table chunk_count × { u32 type · u32 version · u64 offset · u64 size ·
 //                               u32 crc32 · u32 reserved }
 //   chunks      environment · markers · threads · frames · counters(optional)
+//               · render_measurements (v4: chunk 7 version 1; v6: version 2)
 //   counter chunk v1: id(u16)/value(f64); v2 adds CPU session/tick/task (3*u64).
 //
 // ★ 이벤트는 **필드 하나씩** 쓴다. `profile_event` 를 통째로 복사하면 구조체의
@@ -36,12 +37,19 @@
 
 namespace ce
 {
-    // 메모리 스냅샷 직렬화는 v2를 유지한다. 연속 파일은 아래의 v3 스트림을 쓴다.
-    // 알 수 없는 새 버전은 뜻을 추측하지 않고 거절한다(§8.1).
-    inline constexpr std::uint32_t kCaptureFileVersion = 2;
+    // Snapshot v6 adds CPU presenter-return evidence; event layout stays v2.
+    // Versions 3/5/7 are continuous streams, never snapshots.
+    inline constexpr std::uint32_t kCaptureFileVersion = 6;
     // v1 events: 38 wire bytes. v2 frames append three u64 CPU ownership IDs (62 bytes).
     // v2 thread vocabulary adds physics_worker; existing track values stay unchanged.
-    // Native producer pages are version 2 / 64-byte records, independent of file layout.
+    // Native producer pages are version 3 / 64-byte events plus a bounded
+    // render-measurement sidecar, independent of the file layout. Snapshot v1/v2
+    // and continuous v3 decode without measurements: unknown stays unknown.
+    // Snapshot chunk7v1: u32 frame count, then (u32 engine frame, u32 sample
+    // count, count * 100-byte profile_render_measurement). Continuous v5 appends
+    // u32 sample count + the same records after each frame's old events/counters.
+    // Snapshot v6/chunk7v2 and continuous v7 admit axis 3 (CPU presenter return).
+    // The tagged record remains 100 bytes; v4/v5 admit only old axes 1/2.
 
     // 왜 못 읽었는가. ★ 하나로 뭉치지 않는다 — "파일이 잘렸다" 와 "누가 고쳤다"
     // 와 "더 새 빌드가 썼다" 는 사용자가 할 일이 다르다.
@@ -72,7 +80,7 @@ namespace ce
     decode_capture(std::span<const std::byte> bytes);
 
     // IPC entry points preflight allocation/count/work limits before calling the
-    // unchanged v2 codec. No partial snapshot is presented as a complete one.
+    // versioned codec. No partial snapshot is presented as a complete one.
     std::expected<std::vector<std::byte>, capture_file_error>
     encode_capture_bounded(const capture_session& capture, std::size_t max_wire_bytes);
     std::expected<capture_session_ptr, capture_file_error>
@@ -92,7 +100,7 @@ namespace ce
     std::expected<capture_session_ptr, capture_file_error>
     load_capture(const std::filesystem::path& path);
     // 연속 녹화는 600프레임 UI 캐시와 별개인 추가 전용 스트림을 쓴다.
-    inline constexpr std::uint32_t kRecordingFileVersion = 3;
+    inline constexpr std::uint32_t kRecordingFileVersion = 7;
 
     enum class recording_state : std::uint8_t
     {

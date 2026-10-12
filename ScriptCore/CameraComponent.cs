@@ -20,6 +20,13 @@ namespace CreatorEngine;
 /// </summary>
 public sealed class CameraComponent : NativeComponent
 {
+    /// <summary>
+    /// Discard temporal history after a camera cut or a teleport of the owner's
+    /// Transform. Call before the next frame is captured. Ordinary movement
+    /// does not need this; projection changes invalidate history automatically.
+    /// </summary>
+    public void NotifyCameraCut() => Native.CameraNotifyCameraCut(OwnerHandle);
+
     /// <summary>수직 시야각(도). 원근 투영에만 쓴다.</summary>
     public float FieldOfView
     {

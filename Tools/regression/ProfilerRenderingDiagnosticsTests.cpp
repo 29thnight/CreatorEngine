@@ -1,6 +1,4 @@
-// Source-only regression fixture. UNEXECUTED: the requested migration explicitly
-// forbids builds/tests/runs. Compile separately with ProfilerRenderingDiagnostics.cpp
-// when execution is authorized; this is intentionally outside product projects.
+// Standalone diagnostics codec and delayed GPU/display association regressions.
 #include "../../Engine/EngineDiagnostics/ProfilerRenderingDiagnostics.h"
 
 #include <bit>
@@ -63,7 +61,38 @@ namespace rendering_diagnostics_tests
         original.lastGpuViewId = 42;
         original.lastGpuFrameId = 73;
         original.lastGpuSubmissionId = 101;
+        original.gpuTemporalProvenance = { 1, 2, 1, 0, 73, 42, 5, 0, 1280, 720, 1920, 1080, false };
+        original.temporalProvenance = original.gpuTemporalProvenance;
+        original.gpuTemporalProvenance.publicationFrameId = 73;
+        original.temporalProvenance.publicationFrameId = 73;
+        original.gpuTemporalProvenance.spatialProvenanceAvailable = true;
+        original.gpuTemporalProvenance.spatialMode = 2;
+        original.gpuTemporalProvenance.deepDvcApplied = true;
+        original.temporalProvenance = original.gpuTemporalProvenance;
         original.passTimings = { { "Shadow", 1.5 }, { "GBuffer", .75 } };
+        check(matches_gpu_measurement(original, original.views[0]), "reconstructed real display matches", failures);
+        check(!matches_gpu_measurement(original, original.views[1]), "other view rejected", failures);
+        auto rejectDisplay = [&](auto mutate, const char* name)
+        {
+            auto changed = original;
+            mutate(changed);
+            check(!matches_gpu_measurement(changed, changed.views[0]), name, failures);
+        };
+        rejectDisplay([](auto& s) { s.views[0].completedWidth++; }, "resized display rejects old GPU sample");
+        rejectDisplay([](auto& s) { s.views[0].completedFrameId++; }, "new display rejects old GPU sample");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.publicationFrameId++; }, "different publication rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.realFrameId = 0; }, "missing real source rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.sceneEpoch = 0; }, "missing scene rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.renderWidth = 0; }, "missing render extent rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.displayHeight = 0; }, "missing display extent rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.generatedOrdinal = 1; }, "generated ordinal cannot be real");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.frameKind = 2; s.gpuTemporalProvenance.generatedOrdinal = 1;
+            s.gpuTemporalProvenance.frameGenerator = 1; }, "generated output has no GPU pass cost");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.frameKind = 0; }, "unknown frame rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.upscaler = 0; }, "reconstructed provider missing rejected");
+        rejectDisplay([](auto& s) { s.lastGpuSubmissionId = 0; }, "missing submission rejected");
+        rejectDisplay([](auto& s) { s.views[0].ready = false; }, "unready display rejected");
+        rejectDisplay([](auto& s) { s.passTimings.clear(); }, "no measured passes rejected");
         original.validationMessages = { "first observed warning", "second warning" };
         original.lastError = "example renderer error";
         const auto encoded = encode_rendering(original);
@@ -76,6 +105,61 @@ namespace rendering_diagnostics_tests
         }
         check(decode_rendering(encoded, decoded), "round trip accepted", failures);
         check(encode_rendering(decoded) == encoded, "round trip preserves every serialized field", failures);
+        check(decoded.gpuTemporalProvenance.renderWidth == 1280 &&
+            decoded.gpuTemporalProvenance.displayWidth == 1920 &&
+            decoded.gpuTemporalProvenance.realFrameId == 73 &&
+            decoded.gpuTemporalProvenance.spatialProvenanceAvailable &&
+            decoded.gpuTemporalProvenance.spatialMode == 2 && decoded.gpuTemporalProvenance.deepDvcApplied,
+            "GPU sample retains exact resolution and real-frame identity", failures);
+        auto spatialFrame = original;
+        spatialFrame.gpuTemporalProvenance.resolutionState = 4;
+        spatialFrame.gpuTemporalProvenance.upscaler = 0;
+        spatialFrame.gpuTemporalProvenance.spatialMode = 1;
+        check(decode_rendering(encode_rendering(spatialFrame), decoded) &&
+            decoded.gpuTemporalProvenance.resolutionState == 4 && decoded.gpuTemporalProvenance.spatialMode == 1,
+            "NIS scaling resolution survives v3 round trip", failures);
+        spatialFrame.gpuTemporalProvenance.spatialMode = 2;
+        check(encode_rendering(spatialFrame).empty(), "spatial scaling cannot be labeled sharpen-only", failures);
+        spatialFrame = original;
+        spatialFrame.gpuTemporalProvenance.spatialProvenanceAvailable = false;
+        check(encode_rendering(spatialFrame).empty(), "unknown spatial provenance cannot claim applied effects", failures);
+        spatialFrame = original;
+        spatialFrame.gpuTemporalProvenance.spatialMode = 3;
+        check(encode_rendering(spatialFrame).empty(), "unknown spatial mode rejected", failures);
+
+        // With the three prefix strings empty, the explicit wire fields before
+        // provenance occupy 614 bytes. A v2 provenance record is 57 bytes; v3
+        // appends availability, mode and applied-DVC (one byte each).
+        constexpr std::size_t provenanceOffset = 614;
+        constexpr std::size_t oldProvenanceBytes = 57;
+        constexpr std::size_t provenanceBytes = oldProvenanceBytes + 3;
+        auto legacyV2 = encoded;
+        legacyV2.erase(legacyV2.begin() + provenanceOffset + provenanceBytes + oldProvenanceBytes,
+            legacyV2.begin() + provenanceOffset + 2 * provenanceBytes);
+        legacyV2.erase(legacyV2.begin() + provenanceOffset + oldProvenanceBytes,
+            legacyV2.begin() + provenanceOffset + provenanceBytes);
+        overwrite(legacyV2, 4, std::uint32_t{2});
+        check(decode_rendering(legacyV2, decoded) && decoded.gpuTemporalProvenance.realFrameId == 73 &&
+            !decoded.gpuTemporalProvenance.spatialProvenanceAvailable &&
+            !decoded.temporalProvenance.spatialProvenanceAvailable,
+            "legacy v2 keeps temporal identity but spatial effects unknown", failures);
+        rendering_snapshot legacyRoundTrip;
+        check(decode_rendering(encode_rendering(decoded), legacyRoundTrip) &&
+            !legacyRoundTrip.gpuTemporalProvenance.spatialProvenanceAvailable,
+            "re-encoding legacy provenance does not fabricate spatial exclusion", failures);
+        auto legacyV1 = encoded;
+        legacyV1.erase(legacyV1.begin() + provenanceOffset, legacyV1.begin() + provenanceOffset + 2 * provenanceBytes);
+        overwrite(legacyV1, 4, std::uint32_t{1});
+        check(decode_rendering(legacyV1, decoded) && decoded.gpuTemporalProvenance.frameKind == 0 &&
+            !decoded.gpuTemporalProvenance.spatialProvenanceAvailable && decoded.passTimings.size() == 2,
+            "legacy v1 keeps timings without inventing frame/effect provenance", failures);
+        check(decode_rendering(encoded, decoded), "restore current payload after legacy checks", failures);
+        auto mixedFrame = original;
+        mixedFrame.gpuTemporalProvenance.generatedOrdinal = 1;
+        check(encode_rendering(mixedFrame).empty(), "generated ordinal cannot be counted as real", failures);
+        auto missingResolution = original;
+        missingResolution.gpuTemporalProvenance.renderWidth = 0;
+        check(encode_rendering(missingResolution).empty(), "missing temporal resolution rejected", failures);
         check(decoded.views[0].viewId != decoded.views[1].viewId &&
             decoded.lastGpuViewId == decoded.views[0].viewId,
             "GPU sample retains selected-view identity", failures);
@@ -95,6 +179,18 @@ namespace rendering_diagnostics_tests
         malformed = encoded;
         overwrite(malformed, 4, rendering_schema_version + 1);
         reject(malformed, "unsupported schema", failures);
+        malformed = encoded;
+        overwrite(malformed, 4, std::uint32_t{0});
+        reject(malformed, "zero schema", failures);
+        malformed = encoded;
+        overwrite(malformed, 4, std::uint32_t{2});
+        reject(malformed, "v3 bytes cannot be relabeled v2", failures);
+        malformed = encoded;
+        malformed[provenanceOffset + oldProvenanceBytes] = std::byte{2};
+        reject(malformed, "noncanonical spatial availability", failures);
+        malformed = encoded;
+        malformed[provenanceOffset + oldProvenanceBytes + 2] = std::byte{2};
+        reject(malformed, "noncanonical applied DVC flag", failures);
         malformed = encoded;
         malformed[8] = std::byte{ 2 }; // v1 backend field
         reject(malformed, "unknown backend", failures);

@@ -998,12 +998,15 @@ struct RHIReadback
 /// remain logical byte offsets. Padding never changes authored stream indices.
 struct alignas(16) RHIMeshletBufferHeader
 {
-    uint32_t schemaVersion{ 1 }, profileVersion{}, meshletCount{}, descriptorOffset{};
+    uint32_t schemaVersion{ 2 }, profileVersion{}, meshletCount{}, descriptorOffset{};
     uint32_t descriptorStride{}, vertexRemapOffset{}, vertexRemapCount{}, triangleOffset{};
     uint32_t triangleByteCount{}, primitiveRemapOffset{}, primitiveRemapCount{}, vertexCount{};
-    uint32_t vertexStride{}, vertexAttributeMask{}, reserved[2]{};
+    uint32_t vertexStride{}, vertexAttributeMask{}, sourceLodIndex{}, sourcePrimitiveCount{};
+    uint32_t sourceVertexRemapOffset{}, sourceVertexRemapCount{}, sourceVertexCount{}, reserved{};
 };
-static_assert(sizeof(RHIMeshletBufferHeader) == 64);
+static_assert(sizeof(RHIMeshletBufferHeader) == 80);
+static_assert(offsetof(RHIMeshletBufferHeader, sourceVertexRemapOffset) == 64);
+static_assert(offsetof(RHIMeshletBufferHeader, sourceVertexCount) == 72);
 static_assert(offsetof(RHIMeshletBufferHeader, descriptorStride) == 16);
 static_assert(offsetof(RHIMeshletBufferHeader, triangleByteCount) == 32);
 static_assert(offsetof(RHIMeshletBufferHeader, vertexStride) == 48);

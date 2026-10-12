@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>메시렛 그래프 적합성</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --ink: #1c1f24;
+  --muted: #5d6470;
+  --line: #ddd8cc;
+  --accent: #b2451f;
+  --good: #2f7a4d;
+  --warn: #a66a00;
+  --bad: #b23a3a;
+  --chip: #efe9dc;
+  --code: #f1ede4;
+  --shadow: 0 1px 2px rgba(28, 31, 36, .06), 0 8px 24px rgba(28, 31, 36, .05);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --surface: #1d2026; --ink: #e8e6e1; --muted: #a2a8b3; --line: #31353d;
+    --accent: #f08a5d; --good: #6cc48f; --warn: #e2b04a; --bad: #ef7d7d; --chip: #282c33; --code: #23262c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2026; --ink: #e8e6e1; --muted: #a2a8b3; --line: #31353d;
+  --accent: #f08a5d; --good: #6cc48f; --warn: #e2b04a; --bad: #ef7d7d; --chip: #282c33; --code: #23262c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 "IBM Plex Sans KR", system-ui, sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 80px; }
+header.hero { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
+.kicker { font: 600 12px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; margin: 10px 0 12px; }
+h2 { font-size: 22px; margin: 48px 0 12px; display: flex; gap: 12px; align-items: baseline; }
+h2 .num { font: 600 13px "JetBrains Mono", monospace; color: var(--accent); }
+h3 { font-size: 16px; margin: 0 0 6px; }
+.meta { color: var(--muted); font-size: 13px; }
+.meta a, footer a { color: var(--accent); }
+code { font: 13px "JetBrains Mono", monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.verdict { background: var(--surface); border-left: 4px solid var(--good); border-radius: var(--radius); padding: 18px 22px; box-shadow: var(--shadow); }
+.verdict .big { font-size: 20px; font-weight: 700; margin: 0 0 6px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
+.mermaid svg { max-width: 100%; height: auto; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; }
+.tag { display: inline-block; font: 600 11px/1.6 "JetBrains Mono", monospace; padding: 0 8px; border-radius: 999px; white-space: nowrap; }
+.tag.ok { color: var(--good); border: 1px solid var(--good); }
+.tag.ext { color: var(--warn); border: 1px solid var(--warn); }
+.tag.gap { color: var(--bad); border: 1px solid var(--bad); }
+.ext-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 820px) { .ext-grid { grid-template-columns: 1fr; } }
+.ext-grid .card ul { margin: 6px 0 0; padding-left: 20px; }
+.caution { list-style: none; padding: 0; margin: 0; }
+.caution li { padding: 12px 0 12px 16px; border-left: 3px solid var(--warn); margin-bottom: 10px; background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; padding-right: 16px; }
+.stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 900px) { .stages { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .stages { grid-template-columns: 1fr; } }
+.stage { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.stage.now { border-top-color: var(--good); }
+.stage.later { border-top-color: var(--warn); }
+.stage.long { border-top-color: var(--bad); }
+.stage .step { font: 700 12px "JetBrains Mono", monospace; color: var(--muted); }
+.stage ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+<header class="hero">
+  <div class="kicker">Analysis · 2026-10-11</div>
+  <h1>현재 렌더 그래프 체제로 RE ENGINE식 메시렛 파이프라인을 수용할 수 있는가</h1>
+  <p class="meta">선행 문서: <a href="ReEngineMeshletComparison20261011.html">RE ENGINE 메시렛 파이프라인 비교</a>.
+  검토 대상: <code>EnhancedRenderGraph</code>, <code>LivePipelineDesc</code>/<code>LivePassNode</code>, <code>RHIEncoder</code>, <code>RHIFormat</code>,
+  <code>GpuGeometryOcclusion</code>, <code>GpuMeshletVisibility</code>.</p>
+</header>
+
+<section class="verdict">
+  <p class="big">소스 검토 결론: 그래프 체제를 유지하는 설계가 가능하다.</p>
+  막히는 곳은 그래프가 아니라 아래쪽 RHI(64-bit atomic, 포맷, 바인드리스)와 위쪽 머티리얼 시스템(미분, 속성 재구성)이다.
+  현재 검토에서 그래프 확장 후보는 아래 두 가지다. RE식 전체 파이프라인을 구현·실행해 수용한 결과는 아니다.
+</section>
+
+<h2><span class="num">01</span>RE 단계를 그래프 노드로 옮기기</h2>
+<p>RE 파이프라인도 프레임마다 패스 구조는 고정되어 있고, 각 패스의 작업량만 GPU가 indirect 인자로 정한다.
+우리 그래프도 CPU가 패스를 선언하고 GPU가 indirect로 작업량을 정한다. 메시렛 컬링이 이미 이 방식이다(<code>DispatchMeshIndirect</code>, CPU readback 없음).
+아래 노드는 모두 기존 <code>LivePassNode</code>의 reads/writes/modifies 블랙보드 계약으로 표현할 수 있다.</p>
+<div class="card">
+<pre class="mermaid">
+flowchart LR
+  H[("이전 프레임 HiZ<br/>imported history")] --> C1["Cull.Phase1<br/>compute"]
+  C1 --> R1["VB.Raster1<br/>HW mesh / SW compute"]
+  R1 --> Z["HiZ.Build"]
+  Z --> C2["Cull.Phase2<br/>가려졌던 목록만"]
+  C2 --> R2["VB.Raster2"]
+  R2 --> S["VB.Sort<br/>키 · 버킷 · 인자"]
+  S --> V["VB.VertexPrecompute<br/>async compute 후보"]
+  V --> G["VB.Shade × N 버킷<br/>버킷별 DrawIndirect"]
+  Z -. "다음 프레임" .-> H
+</pre>
+</div>
+
+<h2><span class="num">02</span>요구 사항별 현재 상태</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>RE 요구 사항</th><th>현재 상태</th><th>판정</th></tr></thead>
+  <tbody>
+    <tr><td>GPU가 개수를 정하는 indirect 작업</td><td><code>DispatchMeshIndirect</code>, <code>DrawIndexedIndirect</code>, <code>IndirectArgument</code> 상태 전이</td><td><span class="tag ok">있음</span></td></tr>
+    <tr><td>컬링 결과 목록 같은 중간 버퍼</td><td><code>RGBufferDesc</code> transient 버퍼, 힙 앨리어싱(<code>AliasHeapMemory</code>)</td><td><span class="tag ok">있음</span> RE의 "앨리어싱 메모리로 자동 회수"와 같은 개념</td></tr>
+    <tr><td>같은 리소스에 UAV 연속 쓰기</td><td>그래프가 UAV 배리어 발행</td><td><span class="tag ok">있음</span></td></tr>
+    <tr><td>이전 프레임 HiZ · 그림자 맵</td><td>SSGI·Fog ping-pong history와 <code>TemporalViewState</code> 카메라 컷 리셋 규칙이 존재. 단 <code>GpuGeometryOcclusion</code>은 설계상 history 없음</td><td><span class="tag ext">확장 필요</span></td></tr>
+    <tr><td>비동기 컴퓨트</td><td>RG8 큐 스케줄링(<code>BuildQueueSchedule</code>, 측정 기반 compute 배치)</td><td><span class="tag ok">있음</span></td></tr>
+    <tr><td>메시 셰이더</td><td>DX12 / Vulkan RHI에 <code>DispatchMesh</code> 구현이 존재. 실제 LX 그림자의 Vulkan 실행·리소스·픽셀 수용은 <a href="../plans/BackendParityPlan.md">PHASE 4.9</a>로 이관.</td><td><span class="tag ok">있음</span></td></tr>
+    <tr><td>가시성 버퍼 64-bit atomic(SW 래스터)</td><td><code>RHIFormat</code>에 R64·RG32Uint 없음, SM 6.6 64-bit atomic 경로 없음</td><td><span class="tag gap">RHI 부족</span></td></tr>
+    <tr><td>바인드리스 머티리얼</td><td>FSR 백엔드 외 없음. 루트 시그니처·디스크립터 테이블 모델</td><td><span class="tag gap">RHI 부족</span> 가장 큰 작업</td></tr>
+    <tr><td>버킷 셰이딩</td><td>버킷 수(셰이더 종류)는 CPU가 알므로 버킷마다 <code>DrawIndirect</code> 1회</td><td><span class="tag ok">가능</span> multi-draw count 버퍼 없이도 RE 수준(약 50~60회)</td></tr>
+    <tr><td>셰이더 미분 · 속성 재구성</td><td>머티리얼 그래프(LX)는 래스터 미분 전제</td><td><span class="tag gap">머티리얼 재작업</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="num">03</span>그래프에 필요한 확장 두 가지</h2>
+<div class="ext-grid">
+  <div class="card">
+    <h3>① 순서 무관 동시 쓰기(commutative writer) 선언</h3>
+    <ul>
+      <li><code>ExplicitVersioned</code>는 단일 writer 버전 체인이다. Raster1-HW / Raster1-SW / Raster2-HW / Raster2-SW가 같은 가시성 버퍼에 쓰면 버전 4개로 직렬화되고 사이마다 UAV 배리어가 들어간다.</li>
+      <li>정확성 문제는 없지만, SW 래스터를 async compute로 HW 래스터와 겹치는 최적화는 막힌다.</li>
+      <li>해결: <code>DeclareRecordingIndependent</code>와 비슷한 opt-in으로 "atomic max 전용 순서 무관 쓰기 그룹"을 선언하고, 그룹 안에서는 배리어를 생략한다. 처음에는 직렬화된 상태로 시작해도 된다.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>② history 리소스 도우미</h3>
+    <ul>
+      <li>이전 프레임 HiZ와 그림자 맵을 SSGI history처럼 per-view로 import하고 ping-pong하는 일을 공통화한다.</li>
+      <li>구조 스케줄 캐시(<code>structuralSchedules</code>, 크기 2)는 "주기 2" 모양을 전제로 한다. HiZ ping-pong 주기가 SSGI와 같으면 재사용이 유지되지만, 다르면 캐시 적중이 0이 된다. 정확성 문제는 아니다.</li>
+    </ul>
+  </div>
+</div>
+
+<h2><span class="num">04</span>주의할 점</h2>
+<ul class="caution">
+  <li><strong>구조 캐시 무효화.</strong> 버킷 수(장면의 셰이더 종류)가 바뀌면 그래프 모양이 바뀌어 캐시가 무효화된다. 버킷을 "장면에 존재하는 셰이더 집합"으로 묶어 두면 프레임마다 흔들리지 않는다.</li>
+  <li><strong>현재 프레임 오클루더 방식과의 공존.</strong> 지금 방식은 history가 없어 temporal 검증(정확한 픽셀 oracle)과 잘 맞는다. 2단계 컬링은 이전 HiZ에 의존하므로 fixture·진단 캡처 경로에서는 현재 방식으로 폴백하는 스위치를 남긴다.</li>
+  <li><strong>Temporal 모션 벡터.</strong> RE는 정점 사전 계산에서 이전 HPOS를 함께 출력한다. 가시성 버퍼로 가면 <code>Temporal.Inputs</code>(GBuffer 단계 모션)도 VB 셰이딩 쪽으로 옮겨야 하고, 앞서 지적한 소비자 목록 하드코딩 문제가 여기서 다시 드러난다.</li>
+</ul>
+
+<h2><span class="num">05</span>단계 제안</h2>
+<div class="stages">
+  <div class="stage now"><div class="step">STEP 1 · 기존 그래프 활용</div><ul><li>LX 그림자 DX12 compute 생존 목록 구현·정확도·변이·반복 성능 검증 (<a href="../plans/ShadowMeshletGpuCullingPlan.html">계획</a>)</li><li>속성 압축</li></ul></div>
+  <div class="stage later"><div class="step">STEP 2 · history 도우미</div><ul><li>2단계 오클루전(카메라)</li><li>2단계 오클루전(방향광 그림자)</li></ul></div>
+  <div class="stage long"><div class="step">STEP 3 · RHI 확장</div><ul><li>64-bit atomic</li><li>R64 · RG32Uint 포맷</li><li>바인드리스</li><li>→ 가시성 버퍼 · SW 래스터</li></ul></div>
+  <div class="stage long"><div class="step">STEP 4 · 머티리얼 VB 변형</div><ul><li>버킷 셰이딩</li><li>정점 사전 계산</li><li>commutative writer 확장</li></ul></div>
+</div>
+<p class="meta" style="margin-top:12px">1·2단계는 현재 그래프를 활용하는 설계 후보다. STEP 1의 표준 그림자 캐스터 확장은 폐기했고 LX만 대상으로 한다. 기존 회귀 이전·제한된 측정과 <a href="LxShadowBaseline20261011.md">2026-10-11 DX12 D/R 회귀·backOff 제거 변이</a>는 확인했다. <a href="LxShadowEquivalence20261012.md">두 합성 메시·두 포즈의 3장 경로 비트 동치</a>와 <a href="LxShadowMeshletOmission20261012.md">보이는 사각형 메시렛 누락 변이 거부·정상 대조군</a>도 당시 D/R에서 확인했다. <a href="LxShadowCases20261012.md">12개 합성 장면 확대</a>도 해당 보고서의 D/R의 72쌍 동치·독립 대조 조건·변이 거부를 통과했다. 텍스처 알파 패턴 등 일반 수용과 compute 사전 컬링 수용은 남아 있다. Vulkan 검증은 PHASE 4.9 소유이며 DX12 작업의 선행이 아니다. 3·4단계는 RHI와 머티리얼 쪽 재설계다.</p>
+
+<p class="meta"><a href="LxShadowRepeatedPerformance20261012.md">2026-10-12 반복 측정</a>에서 4096 슬롯·현재 Release 3개 합성 장면·24회 기록을 확인했다. 경계 CPU audit 거부율 C0/C1 17.45%/10.81%도 포함한다. GPU 평균합 비교의 변동성 기준 미통과로 compute 착수 근거는 충족하지 못했다. 위 동치·변이 결과는 당시 binary 증거이며 새 계측 빌드와 구분한다.</p>
+<p class="meta">2026-10-12 사용자 지시로 DX12 compute 생존 목록을 구현했다. 최종 D/R 선택 정확도·변이·회귀는 통과했으며 Release 3장면·24회 compute 포함 성능 이득은 미수용이다. PHASE 4.9 Vulkan 이관은 유지한다. <a href="LxShadowComputeCulling20261012.md">구현과 현재 검증 기록</a>.</p>
+<p class="meta">2026-10-12 현재 구조 갱신: 일반 GBuffer 표면 구현·구경로 테스트·비교 토글을 삭제하고 LX 단일 배선으로 전환했다. Scene ABI 21의 강제 리임포트·재쿠킹 계약을 적용한다. 이전 동치·성능 판정은 당시 바이너리 기록이다. <a href="LxSceneBigBangCutover20261012.md">실제 삭제 목록·현재 배선·검증</a>.</p>
+<p class="meta">메시렛 계약 후속: 현재 LX는 쿠커의 단일 클러스터·원본 삼각형 ID를 사용하며 런타임 재클러스터링을 삭제했다. Scene ABI 22 · CEMC 13 · geometry artifact 2 · meshlet profile/builder 2로 갱신했다. 이전 산출물은 강제 리임포트·재쿠킹 대상이다. <a href="LxMeshletGeometryContract20261012.md">현재 데이터 계약과 검증</a>.</p>
+<footer>CreatorEngine docs/analysis · 작성 2026-10-11 · 브랜치 <code>codex/pr169-build-fixes</code> 기준 · 그래프 적합성은 소스 구조 검토 · LX 그림자 제한 측정은 별도 계획 참고 · 전체 파이프라인 실행 수용 미확인</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function () {
+  var root = document.documentElement.getAttribute('data-theme');
+  var dark = root === 'dark' || (root !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict',
+      fontFamily: '"IBM Plex Sans KR", system-ui, sans-serif', flowchart: { htmlLabels: true, curve: 'basis' } });
+  }
+})();
+</script>
+</body>
+</html>

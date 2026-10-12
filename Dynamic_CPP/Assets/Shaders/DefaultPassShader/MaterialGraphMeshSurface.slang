@@ -2,41 +2,56 @@
 #include "Includes/MaterialEvaluation.slang"
 #include "Includes/PackedBones.slang"
 
-cbuffer LXMeshConstants : register(b0)
+struct LXTransformJob
 {
-    row_major float4x4 lx_meshWorld;
-    uint4 lx_meshCountStrideMaskBones;
-    uint4 lx_meshOffsets0;
-    uint4 lx_meshOffsets1;
+    row_major float4x4 world;
+    uint4 countStrideMaskBones;
+    uint4 offsets0;
+    uint4 offsets1;
+    uint4 inputOffsets;
 };
-ByteAddressBuffer lx_meshVertices : register(t0);
-StructuredBuffer<PackedBone> lx_meshBones : register(t1);
-StructuredBuffer<float> lx_meshLods : register(t2);
-RWStructuredBuffer<LXSurfacePoint> lx_meshOutput : register(u0);
+cbuffer LXMeshConstants : register(b0) { uint4 lx_meshDispatch; };
+ByteAddressBuffer lx_meshInputs : register(t0);
+StructuredBuffer<LXTransformJob> lx_meshJobs : register(t1);
+StructuredBuffer<uint2> lx_meshGroups : register(t2);
+RWStructuredBuffer<LXSurfacePoint> lx_meshOutputs[4096] : register(u0);
+
+PackedBone LXLoadTransformBone(uint base, uint index)
+{
+    PackedBone bone;
+    base += index * 48;
+    bone.row0 = asfloat(lx_meshInputs.Load4(base));
+    bone.row1 = asfloat(lx_meshInputs.Load4(base + 16));
+    bone.row2 = asfloat(lx_meshInputs.Load4(base + 32));
+    return bone;
+}
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void LXTransformMesh(uint3 id : SV_DispatchThreadID)
+void LXTransformMesh(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
 {
-    if (id.x >= lx_meshCountStrideMaskBones.x)
-    {
-        return;
-    }
-    const uint base = id.x * lx_meshCountStrideMaskBones.y;
-    float3 position = asfloat(lx_meshVertices.Load3(base + lx_meshOffsets0.x));
-    const float3 normal = asfloat(lx_meshVertices.Load3(base + lx_meshOffsets0.y));
-    const float2 uv = asfloat(lx_meshVertices.Load2(base + lx_meshOffsets0.z));
-    const float4 tangent = asfloat(lx_meshVertices.Load4(base + lx_meshOffsets1.x));
+    const uint groupIndex = groupId.x + groupId.y * lx_meshDispatch.y;
+    if (groupIndex >= lx_meshDispatch.x) return;
+    const uint2 group = lx_meshGroups[groupIndex];
+    if (group.x >= lx_meshDispatch.z) return;
+    const LXTransformJob job = lx_meshJobs[group.x];
+    const uint vertex = group.y + threadId.x;
+    if (vertex >= job.countStrideMaskBones.x) return;
+    const uint base = job.inputOffsets.x + vertex * job.countStrideMaskBones.y;
+    float3 position = asfloat(lx_meshInputs.Load3(base + job.offsets0.x));
+    const float3 normal = asfloat(lx_meshInputs.Load3(base + job.offsets0.y));
+    const float2 uv = asfloat(lx_meshInputs.Load2(base + job.offsets0.z));
+    const float4 tangent = asfloat(lx_meshInputs.Load4(base + job.offsets1.x));
     const float3 bitangent = cross(normal, tangent.xyz) * tangent.w;
-    float3x3 frameTransform = (float3x3)lx_meshWorld;
-    if (lx_meshCountStrideMaskBones.w != 0)
+    float3x3 frameTransform = (float3x3)job.world;
+    if (job.countStrideMaskBones.w != 0)
     {
-        const float4 weights = asfloat(lx_meshVertices.Load4(base + lx_meshOffsets1.w));
+        const float4 weights = asfloat(lx_meshInputs.Load4(base + job.offsets1.w));
         if (weights.x > 0.0)
         {
-            const uint packedIndices = lx_meshVertices.Load(base + lx_meshOffsets1.z);
+            const uint packedIndices = lx_meshInputs.Load(base + job.offsets1.z);
             const uint4 indices = (packedIndices >> uint4(0, 8, 16, 24)) & 255u;
-            float4x4 skin = weights.x * UnpackBone(lx_meshBones[indices.x]);
+            float4x4 skin = weights.x * UnpackBone(LXLoadTransformBone(job.inputOffsets.y, indices.x));
             [unroll]
             for (uint i = 1; i < 4; ++i)
             {
@@ -44,7 +59,7 @@ void LXTransformMesh(uint3 id : SV_DispatchThreadID)
                 [branch]
                 if (weights[i] > 0.0)
                 {
-                    skin += weights[i] * UnpackBone(lx_meshBones[indices[i]]);
+                    skin += weights[i] * UnpackBone(LXLoadTransformBone(job.inputOffsets.y, indices[i]));
                 }
             }
             position = mul(float4(position, 1), skin).xyz;
@@ -52,14 +67,17 @@ void LXTransformMesh(uint3 id : SV_DispatchThreadID)
         }
     }
     LXSurfacePoint result;
-    result.uvLod = float4(uv, 0, lx_meshLods[id.x]);
-    result.position = float4(mul(float4(position, 1), lx_meshWorld).xyz, 0);
+    result.uvLod = float4(uv, 0, asfloat(lx_meshInputs.Load(job.inputOffsets.z + vertex * 4)));
+    result.position = float4(mul(float4(position, 1), job.world).xyz, 0);
     float3 n, t, b;
     TransformPbrFrame(normal, tangent.xyz, bitangent, frameTransform, n, t, b);
     result.normal = float4(n, 0);
     result.tangent = float4(t, 0);
     result.bitangent = float4(b, 0);
-    lx_meshOutput[id.x] = result;
+    // group.x comes from the thread group alone, and a compute wave never spans
+    // groups, so the index is wave-uniform. NonUniformResourceIndex is not needed
+    // and would pull SPIR-V past its spirv_1_3 profile.
+    lx_meshOutputs[group.x][vertex] = result;
 }
 
 struct LXMeshSample
@@ -76,7 +94,8 @@ cbuffer LXSampleConstants : register(b2)
 StructuredBuffer<LXSurfacePoint> lx_sampleVertices : register(t4);
 StructuredBuffer<uint> lx_sampleIndices : register(t5);
 StructuredBuffer<LXMeshSample> lx_sampleRequests : register(t6);
-RWStructuredBuffer<LXSurfacePoint> lx_sampleOutput : register(u1);
+// Past the transform's u0..u4095 output table, which shares this module.
+RWStructuredBuffer<LXSurfacePoint> lx_sampleOutput : register(u4096);
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

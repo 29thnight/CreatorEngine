@@ -1,4 +1,5 @@
 #include "ProfilerRenderingDiagnostics.h"
+#include "ProfileRenderMeasurement.h"
 
 #include <bit>
 #include <cmath>
@@ -7,6 +8,34 @@
 
 namespace ce::profiler_viewer::diagnostics
 {
+    bool matches_gpu_measurement(const rendering_snapshot& snapshot, const rendering_display& display)
+    {
+        const auto& p = snapshot.gpuTemporalProvenance;
+        profile_render_provenance proof;
+        proof.frame_kind = p.frameKind;
+        proof.resolution_state = p.resolutionState;
+        proof.upscaler = p.upscaler;
+        proof.frame_generator = p.frameGenerator;
+        proof.real_frame_id = p.realFrameId;
+        proof.view_id = p.viewId;
+        proof.scene_epoch = p.sceneEpoch;
+        proof.publication_frame_id = p.publicationFrameId;
+        proof.generated_ordinal = p.generatedOrdinal;
+        proof.render_width = p.renderWidth;
+        proof.render_height = p.renderHeight;
+        proof.display_width = p.displayWidth;
+        proof.display_height = p.displayHeight;
+        proof.native_gate_active = p.nativeGateActive;
+        proof.spatial_provenance_available = p.spatialProvenanceAvailable;
+        proof.spatial_mode = p.spatialMode;
+        proof.deep_dvc_applied = p.deepDvcApplied;
+        return display.ready && display.viewId != 0 && display.completedFrameId != 0 &&
+            snapshot.lastGpuSubmissionId != 0 && !snapshot.passTimings.empty() &&
+            snapshot.lastGpuViewId == display.viewId && snapshot.lastGpuFrameId == display.completedFrameId &&
+            proof.valid() && proof.frame_kind == 1 && proof.scene_epoch != 0 &&
+            proof.view_id == display.viewId && proof.publication_frame_id == display.completedFrameId &&
+            proof.display_width == display.completedWidth && proof.display_height == display.completedHeight;
+    }
     namespace rendering_codec
     {
         constexpr std::uint32_t magic = 0x44524c50; // PLRD
@@ -175,7 +204,7 @@ namespace ce::profiler_viewer::diagnostics
         }
 
         template <typename Archive, typename Snapshot>
-        void visit(Archive& archive, Snapshot& value)
+        void visit(Archive& archive, Snapshot& value, std::uint32_t version)
         {
             fields(archive, value.backend, value.enabled, value.pipelineReady, value.width, value.height,
                 value.framesRendered, value.framesIdle, value.framesInFlight, value.consumedFrameId,
@@ -211,6 +240,35 @@ namespace ce::profiler_viewer::diagnostics
             fields(archive, value.cpuMs, value.gpuMs, value.gpuCollects, value.gpuCollectMismatches,
                 value.gpuQueryOverflowPasses, value.lastGpuFrameId, value.lastGpuSubmissionId,
                 value.lastGpuViewId);
+            const auto provenance = [&](auto& p)
+            {
+                fields(archive, p.frameKind, p.resolutionState, p.upscaler, p.frameGenerator,
+                    p.realFrameId, p.viewId, p.sceneEpoch, p.generatedOrdinal,
+                    p.renderWidth, p.renderHeight, p.displayWidth, p.displayHeight, p.nativeGateActive,
+                    p.publicationFrameId);
+                if (version >= 3)
+                {
+                    fields(archive, p.spatialProvenanceAvailable, p.spatialMode, p.deepDvcApplied);
+                }
+                archive.valid = archive.valid && p.frameKind <= 2 &&
+                    p.resolutionState <= (version >= 3 ? 4 : 3) &&
+                    p.upscaler <= 3 && p.frameGenerator <= 3 &&
+                    (p.frameKind == 0 || (p.realFrameId != 0 && p.resolutionState != 0 &&
+                        p.renderWidth != 0 && p.renderHeight != 0 &&
+                        p.displayWidth != 0 && p.displayHeight != 0)) &&
+                    (p.frameKind != 1 || p.generatedOrdinal == 0) &&
+                    (p.frameKind != 2 || (p.generatedOrdinal != 0 && p.frameGenerator != 0)) &&
+                    p.spatialMode <= 2 &&
+                    (p.spatialProvenanceAvailable || (p.spatialMode == 0 && !p.deepDvcApplied)) &&
+                    (p.resolutionState != 4 || (p.spatialProvenanceAvailable && p.spatialMode == 1 &&
+                        p.upscaler == 0 && p.renderWidth <= p.displayWidth && p.renderHeight <= p.displayHeight)) &&
+                    (p.spatialMode != 1 || p.resolutionState == 4);
+            };
+            if (version >= 2)
+            {
+                provenance(value.temporalProvenance);
+                provenance(value.gpuTemporalProvenance);
+            }
             archive.text(value.lastGpuCollectError, maximum_rendering_text_bytes);
             archive.field(value.graveyardCount);
             archive.text(value.lastError, maximum_rendering_text_bytes);
@@ -244,7 +302,7 @@ namespace ce::profiler_viewer::diagnostics
         writer.bytes.reserve(4096);
         writer.field(rendering_codec::magic);
         writer.field(rendering_schema_version);
-        rendering_codec::visit(writer, snapshot);
+        rendering_codec::visit(writer, snapshot, rendering_schema_version);
         if (!writer.valid)
         {
             return {};
@@ -263,12 +321,12 @@ namespace ce::profiler_viewer::diagnostics
         std::uint32_t version{};
         reader.field(magic);
         reader.field(version);
-        if (!reader.valid || magic != rendering_codec::magic || version != rendering_schema_version)
+        if (!reader.valid || magic != rendering_codec::magic || version == 0 || version > rendering_schema_version)
         {
             return false;
         }
         rendering_snapshot candidate;
-        rendering_codec::visit(reader, candidate);
+        rendering_codec::visit(reader, candidate, version);
         if (!reader.valid || reader.position != bytes.size())
         {
             return false;

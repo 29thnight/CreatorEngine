@@ -13,6 +13,7 @@ param(
     [string]$ExecutablePath = '',
     [ValidateRange(2,128)][int]$GraphSamples = 2,
     [ValidateRange(0,500)][int]$PerformanceSamples = 0,
+    [switch]$KeepRawCaptures,
     [ValidateSet('dependency-order','legacy-declaration-order')][string]$ExpectedGraphContract = 'dependency-order'
 )
 Set-StrictMode -Version Latest
@@ -23,6 +24,15 @@ if ($Backend -contains 'vulkan') {
 }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)
+. (Join-Path $PSScriptRoot 'ArtifactRetention.ps1')
+Assert-ArtifactCapacity $output
+$fixtureBytes = (Get-ChildItem -LiteralPath $FixtureProject -Recurse -File |
+    Where-Object { $_.FullName -match '[\\/](Assets|ProjectSetting|Saved)[\\/]' } |
+    Measure-Object Length -Sum).Sum
+# Bounded estimate: two private inputs and at most 512 MiB per accepted capture.
+# Preparation/replay captures additionally recheck the floor before each request.
+$estimatedGiB = (2 * $fixtureBytes / 1GB) + ($GraphSamples + 2) * 0.5 + 1
+Assert-ArtifactCapacity $output (30 + $estimatedGiB)
 if (Test-Path -LiteralPath $output) { throw 'Use a new artifact directory; previous baselines are preserved' }
 New-Item -ItemType Directory -Path $output | Out-Null
 # Optional diagnostics use their own processes, captures and failure report.
@@ -32,6 +42,7 @@ if ($ReplayExtensions -and !$ReplayDiagnosticsRun) {
         FixtureProject=$FixtureProject; Scene=$Scene; Python=$Python; WarmupFrames=$WarmupFrames;
         ExecutablePath=$ExecutablePath; GraphSamples=$GraphSamples; PerformanceSamples=$PerformanceSamples;
         ExpectedGraphContract=$ExpectedGraphContract}
+    $baselineArgs.KeepRawCaptures=$KeepRawCaptures
     & $PSCommandPath @baselineArgs -OutputDirectory "$output/baseline"
     $baselineNativeExitCode=Get-Variable LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue
     $baseline=Get-Content "$output/baseline/result.json" -Raw | ConvertFrom-Json
@@ -52,6 +63,7 @@ if ($ReplayExtensions -and !$ReplayDiagnosticsRun) {
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 if ($ExecutablePath) { $exe=[IO.Path]::GetFullPath($ExecutablePath) }
 $artifactTool = Join-Path $PSScriptRoot 'base0_artifacts.py'
+. (Join-Path $PSScriptRoot 'NativeRealMeasurementGate.ps1')
 $cameraReplayTool = Join-Path $PSScriptRoot 'base0_camera_replay.py'
 $drawReplayTool = Join-Path $PSScriptRoot 'base0_draw_replay.py'
 $latticeReplayTool = Join-Path $PSScriptRoot 'base0_lattice_replay.py'
@@ -59,6 +71,8 @@ $timingProbe=Join-Path $repo "Bin/x64-$Configuration/Tools/Base0VulkanTimingProb
 $sources = @(Get-ChildItem "$repo/Engine", "$repo/Editor", "$repo/Dynamic_CPP/Assets/Shaders/DefaultPassShader" -Recurse -File |
     Where-Object Extension -In '.cpp','.h','.slang','.vcxproj','.props','.targets')
 $sources += Get-Item $PSCommandPath, $artifactTool, $cameraReplayTool, $drawReplayTool, $latticeReplayTool,
+    (Join-Path $PSScriptRoot 'NativeRealMeasurementGate.ps1'),
+    (Join-Path $PSScriptRoot 'ArtifactRetention.ps1'),
     (Join-Path $PSScriptRoot 'complete-render-base0.ps1'),
     (Join-Path $PSScriptRoot 'base0_vulkan_timing_probe.cpp'),
     (Join-Path $PSScriptRoot 'generate-film-sensitivity-upload.py'),
@@ -78,6 +92,7 @@ $report = [ordered]@{
     deferred=@('PHASE 4.9: RenderDoc capture, resource inspection, and cross-backend pixel comparison')
     completionContract='dx12-static-baseline-v2'; replayExtensionsRequested=[bool]$ReplayExtensions
     expectedGraphContract=$ExpectedGraphContract; graphSamples=$GraphSamples; performanceSamples=$PerformanceSamples
+    estimatedArtifactGiB=$estimatedGiB; startFreeGiB=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($output)).AvailableFreeSpace/1GB
     knownGaps=@('Optional generic sealed frame packet replay','MAT-9 SSS/transmission quality','MAT-9 texture/normal/route/area-light acceptance',
         'MAT-9 moving-camera/tier/cold-warm performance')
     runs=@(); failures=@(); complete=$false; graphFixturesPassed=$false; vulkanTimingFixturePassed=$false
@@ -112,20 +127,30 @@ try {
             $case=Join-Path $output "$api-$repeat"
             $project=Join-Path $case 'Project'
             New-Item -ItemType Directory -Path $project | Out-Null
+            Assert-ArtifactCapacity $output
             foreach ($folder in @('Assets','ProjectSetting','Saved')) {
                 $source=Join-Path $FixtureProject $folder
                 if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination $project -Recurse }
             }
+            [IO.Directory]::CreateDirectory("$project/Assets/Shaders") | Out-Null
             Copy-Item -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders/DefaultPassShader" -Destination "$project/Assets/Shaders" -Recurse -Force
             $settings="$project/ProjectSetting/EngineSettings.asset"
             if (!(Test-Path $settings)) { throw 'Fixture must include explicit EngineSettings.asset' }
             $text=Get-Content $settings -Raw
             # The same native graph fixtures are a separate gate from live pixels.
             if ($api -eq 'dx12' -and $repeat -eq 0) {
+                # Native self-tests may save a 64x64 UI layout. They must not
+                # prepare the product project's first process differently from
+                # the second independent process.
+                $graphProject=Join-Path $case 'GraphFixtureProject'
+                [IO.Directory]::CreateDirectory("$graphProject/Assets/Shaders") | Out-Null
+                Copy-Item -LiteralPath "$project/Assets/Shaders/DefaultPassShader" `
+                    -Destination "$graphProject/Assets/Shaders" -Recurse
+                Copy-Item -LiteralPath "$project/ProjectSetting" -Destination $graphProject -Recurse
                 $commands="$case/graph-fixtures.txt"
                 $fixtureArgs=if($ReplayExtensions){' replay-extensions'}else{''}
                 [IO.File]::WriteAllText($commands,"dx12.rendergraph$fixtureArgs`nquit`n")
-                $fixtureProcess=Start-Process $exe -ArgumentList @('--development-project',$project,
+                $fixtureProcess=Start-Process $exe -ArgumentList @('--development-project',$graphProject,
                     '--commandlet-script',$commands,'--result-file',"$case/graph-fixtures.results.jsonl") `
                     -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru `
                     -RedirectStandardOutput "$case/graph-fixtures.stdout.log" -RedirectStandardError "$case/graph-fixtures.stderr.log"
@@ -178,6 +203,7 @@ try {
                 # A new client per poll can exhaust Windows ephemeral sockets.
                 $commandSession=[Microsoft.PowerShell.Commands.WebRequestSession]::new()
                 function Cmd([string]$Name,[string[]]$Arguments=@(),[switch]$AllowFailure) {
+                    if($Name -eq 'render.live.capture'){Assert-ArtifactCapacity $output 30.5}
                     $body=@{command=$Name;args=@($Arguments);mode='async'} | ConvertTo-Json -Compress
                     $r=Invoke-RestMethod "$base/command" -Method Post -Headers $headers -WebSession $commandSession -ContentType 'application/json' -Body $body -TimeoutSec 650
                     if($Name -eq 'quit'){return}
@@ -197,7 +223,27 @@ try {
                     return $r.data
                 }
                 Cmd 'play.foreground_override' @('off') | Out-Null
-                Cmd 'scene.switch' @("$project/Assets/Scenes/$Scene") | Out-Null
+                if ($PerformanceSamples) {
+                    Cmd 'temporal.upscale' @('none') | Out-Null
+                    Cmd 'temporal.fg' @('none') | Out-Null
+                    Cmd 'temporal.nis' @('off') | Out-Null
+                    Cmd 'temporal.deepdvc' @('off') | Out-Null
+                }
+                # Prepare model generations before scene asset handoff. A cold
+                # model import may otherwise invalidate the scene request.
+                foreach($model in @(Get-ChildItem "$project/Assets" -Recurse -File -Filter '*.glb')){
+                    Cmd 'model.loadcached' @($model.FullName) | Out-Null
+                }
+                $sceneRequest=Cmd 'scene.switch' @("$project/Assets/Scenes/$Scene")
+                $sceneDeadline=[DateTime]::UtcNow.AddSeconds(180)
+                do {
+                    $sceneStatus=Cmd 'scene.load.status' @([string]$sceneRequest.requestId)
+                    if([DateTime]::UtcNow -gt $sceneDeadline){throw 'Scene preparation deadline'}
+                    if(!$sceneStatus.complete){Start-Sleep -Milliseconds 100}
+                } until($sceneStatus.complete)
+                if($sceneStatus.state -ne 'Ready'){throw 'Scene preparation did not complete Ready'}
+                $run.sceneRequestId=$sceneStatus.requestId
+                $run.scenePreparationState=$sceneStatus.state
                 # Scene activation can precede camera publication and cold material readiness.
                 Cmd 'render.live.fence' @('600') | Out-Null
                 Cmd 'camera.editor' @('follow','on') | Out-Null
@@ -226,15 +272,39 @@ try {
                     $samples=@()
                     $sampleDeadline=[DateTime]::UtcNow.AddSeconds(300)
                     $lastGpuFrame=-1
+                    $pendingCpuRetries=0
+                    $captureTimingRetries=0
                     while ($samples.Count -lt $PerformanceSamples) {
                         $live=Cmd 'dx12.live'
                         if ($live.gpu.frame -ne $lastGpuFrame -and $live.gpu.passes.Count -gt 0) {
-                            if ($live.status -notmatch 'Native record CPU — last ([0-9.]+) ms') { throw 'Native record CPU diagnostic missing' }
-                            $cpuRecord=[double]::Parse($Matches[1],[Globalization.CultureInfo]::InvariantCulture)
+                            if($live.gpuTemporalProvenance.nativeGateActive -or
+                               $live.nativeRecord.temporalProvenance.nativeGateActive -or
+                               @($live.gpu.passes | Where-Object name -Like 'PBR.Capture.*').Count){
+                                ++$captureTimingRetries
+                                if([DateTime]::UtcNow -gt $sampleDeadline){throw 'Capture timing did not retire before normal sample deadline'}
+                                Start-Sleep -Milliseconds 20
+                                continue
+                            }
+                            # The typed CPU snapshot comes from the same short
+                            # debug publication lock as its submission identity.
+                            # No renderer-state lock or textual status parsing.
+                            if(!$live.nativeRecord.samples){
+                                ++$pendingCpuRetries
+                                if([DateTime]::UtcNow -gt $sampleDeadline){throw 'CPU snapshot remained unmeasured until sample deadline'}
+                                Start-Sleep -Milliseconds 20
+                                continue
+                            }
+                            Assert-NativeRealMeasurement $live
+                            if($live.nativeRecord.axis -ne 'native-graph-record-cpu-not-full-frame'){throw 'Native record CPU axis missing'}
+                            $cpuRecord=[double]$live.nativeRecord.ms
                             if ($live.gpu.queryOverflowPasses -ne 0 -or $live.gpu.droppedTotal -ne 0 -or
                                 $live.gpu.mismatches -ne 0 -or $live.gpu.spanViolations -ne 0 -or
                                 $live.gpu.sliceUnderflows -ne 0) { throw 'Invalid live GPU timing window' }
                             $samples+= [ordered]@{gpuFrame=$live.gpu.frame;cpuRecordMs=$cpuRecord;gpuMs=$live.gpu.ms;
+                                temporalProvenance=$live.temporalProvenance;gpuTemporalProvenance=$live.gpuTemporalProvenance;
+                                framesRenderedAxis=$live.framesRenderedAxis;gpu=$live.gpu;display=$live.display;
+                                nativeRecord=$live.nativeRecord;
+                                cpuAxis='native-graph-record-cpu-not-full-frame';gpuAxis='real-frame-pass-sum-not-wall-time';
                                 queryOverflow=$live.gpu.queryOverflowPasses;dropped=$live.gpu.droppedTotal;passes=$live.gpu.passes}
                             $lastGpuFrame=$live.gpu.frame
                         }
@@ -242,6 +312,8 @@ try {
                         Start-Sleep -Milliseconds 20
                     }
                     $samples | ConvertTo-Json -Depth 20 | Set-Content "$case/live-performance.json" -Encoding utf8
+                    $run.cpuSnapshotPendingRetries=$pendingCpuRetries
+                    $run.captureTimingRetries=$captureTimingRetries
                 }
                 # Cold import may advance model sidecar generation. Freeze the
                 # current prepared input, while preserving raw source immutability.
@@ -454,6 +526,15 @@ try {
     $report.completionScope=if($ReplayDiagnosticsRun){'optional-replay-diagnostics'}else{'single-configuration-baseline'}
     $report.phaseComplete=$false # Requires both current configurations and their cross-configuration comparison.
     $report.artifactGatesPassed=$report.failures.Count -eq 0
+    if($report.artifactGatesPassed -and !$KeepRawCaptures){
+        Remove-ArtifactPixels $output -KeepDirectories @($report.runs[0].captures[0])
+        $report.rawPixelReplayScope='first process capture-0 only; other historical verdicts and manifests retained'
+        Complete-ArtifactRetention $output ('base0-native-'+$Configuration)
+    } elseif($report.artifactGatesPassed) {
+        $report.rawPixelReplayScope='all captures pinned for pending comparison'
+        Complete-ArtifactRetention $output ('base0-native-'+$Configuration) -KeepRawCaptures
+    }
+    $report.endFreeGiB=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($output)).AvailableFreeSpace/1GB
     $report | ConvertTo-Json -Depth 20 | Set-Content "$output/result.json" -Encoding utf8
     if($report.failures.Count){throw ($report.failures -join "`n")}
     Write-Output "BASE0_ARTIFACT_GATES_OK $Configuration $output complete=$($report.complete)"

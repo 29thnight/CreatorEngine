@@ -153,7 +153,7 @@ void Run(const std::filesystem::path& root)
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 2, 1, 1, 1);
     const std::array<std::uint8_t, 8> pixels{128, 64, 32, 255, 255, 192, 160, 255};
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), pixels.data(), pixels.size());
-    const auto texture = Texture::CreateSharedFromImage("LX.RenderBindings.SRGB", std::move(image));
+    const auto texture = Texture::CreateSharedFromImage("METEOR.RenderBindings.SRGB", std::move(image));
     Check(!!texture, "Actual CPU texture");
     auto normalProduct = product;
     normalProduct.program.semanticKey += "|bc5-storage-binding-fixture";
@@ -179,7 +179,7 @@ void Run(const std::filesystem::path& root)
     auto* block = normalImage.MutablePixelsAt(*normalImage.Find(0, 0));
     std::memset(block, 0, 16);
     block[0] = block[1] = block[8] = block[9] = std::byte{128};
-    const auto normalTexture = Texture::CreateSharedFromImage("LX.RenderBindings.BC5", std::move(normalImage));
+    const auto normalTexture = Texture::CreateSharedFromImage("METEOR.RenderBindings.BC5", std::move(normalImage));
     Check(!!normalTexture, "Actual CPU BC5 normal block");
     own::shared_owner<const Instance> normalInstance;
     Check(BuildInstance(normalGeneration, {normalGraph, {{900, .31}}, {}},
@@ -234,7 +234,7 @@ void Run(const std::filesystem::path& root)
     targetDescription.height = 1;
     targetDescription.format = RHIFormat::RGBA32Float;
     targetDescription.allowRenderTarget = true;
-    targetDescription.debugName = L"LX.MaterialBinding.Target";
+    targetDescription.debugName = L"METEOR.MaterialBinding.Target";
     Check(device.CreateTexture(targetDescription, target, error), "Actual render target");
     RHIReadback readback;
     Check(device.CreateReadback(4, 1, targetDescription.format, 1, readback, error), "Actual readback");

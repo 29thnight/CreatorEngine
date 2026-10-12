@@ -205,6 +205,7 @@ public:
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};
 		uint32 foliageTypeID{};
+        std::uint64_t temporalIdentity{};
 	};
 
 	// 인스턴스 목록이 바뀔 때마다 타입별 색인을 다시 만든다.

@@ -1,5 +1,5 @@
 // Independent alpha recurrence, identity refraction, and Beer-Lambert transport
-// across the real shared Code/Graph Forward+ stream.
+// across the real blended stream (light tiles + SceneHost), volume composed first.
 own::shared_owner<const Generation> ForwardTransportProduct(const std::filesystem::path& root, unsigned kind)
 {
     LXMaterialAsset asset;
@@ -96,8 +96,8 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
     }
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Transport mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedForwardPass forward;
+    SceneSurfaceTargets gbuffer;
+    EnhancedLightTilePass tiles;
     SceneHost host;
     EnhancedFrameContext context;
     context.resources = &device;
@@ -121,15 +121,8 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
     auto divided = light;
     divided.color = math::color(.1f / 65, .09f / 65, .08f / 65, 1);
     const std::vector<EnhancedLight> manyLights(65, divided);
-    const bool initialized = gbuffer.Initialize(context, error) && forward.Initialize(context, error);
-    Check(initialized, "Transport native passes " + error);
-    ShaderMeta meta;
-    const ShaderMetaHandle codeHandle{990, 1};
-    const bool codeReady =
-        ShaderMetaLoader::LoadFile(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Forward.shadermeta",
-                                   FileGuid{"DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD"}, meta, error) &&
-        forward.ApplyShaderMeta(context, codeHandle, meta, {}, error);
-    Check(codeReady, "Transport Code contract " + error);
+    const bool initialized = tiles.Initialize(context, error);
+    Check(initialized, "Transport light tiles " + error);
     InternalPath::GetInstance()->AssetAuthoringEnabled = false;
     for (const auto& generation : generations)
     {
@@ -165,7 +158,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             std::cout << "LX_FORWARD_TRANSPORT_BEGIN fixture=" << fixture << std::endl;
             Drain drain{device};
             context.frameId = 9000 + policy * 24 + fixture;
-            std::vector<EnhancedDrawItem> code, graphDraws;
+            std::vector<EnhancedDrawItem> graphDraws;
             const bool medium = fixture >= 15 && fixture < 23;
             context.lights = fixture == 23 ? &manyLights : &lights;
             const auto instance = [&](unsigned kind, double alpha, std::array<double, 4> color) {
@@ -187,44 +180,14 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                 draw.worldMatrix[3, 2] = depth;
                 draw.coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::DoubleSided |
                                       EnhancedMaterialCoverage::Blended;
-                if (kind == 4)
+                // Kind 4 is a second emissive product draw with its own identity.
+                draw.materialGraphInstance = instance(kind == 4 ? 0 : kind, alpha, color);
+                draw.materialGraphSlot = 9200 + kind;
+                if (fixture == 12 && kind == 2)
                 {
-                    auto snapshot = std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
-                    snapshot->shaderMetaHandle = codeHandle;
-                    snapshot->keywordSelections.assign(meta.keywords.size(), 0);
-                    std::shared_ptr<const ShaderMetaBindingLayout> layout;
-                    Check(forward.EnsureShaderMetaVariant(context, codeHandle, meta, snapshot->keywordSelections,
-                                                          snapshot->permutationKey, layout, error),
-                          "Transport Code variant");
-                    snapshot->bindingLayout = *layout;
-                    ExperimentMaterialSealing::SealSource source;
-                    source.material.blendMode = experiment::MaterialBlendMode::Transparent;
-                    source.material.properties = {
-                        {"baseColor", math::color(0, 0, 0, alpha).rgba()},
-                        {"metallic", 1.f},
-                        {"emissive", math::vector3(float(color[0]), float(color[1]), float(color[2]))},
-                        {"emissiveStrength", 1.f}};
-                    Check(ExperimentMaterialSealing::SealCore(source, meta, *layout, snapshot->propertyBytes,
-                                                              snapshot->textureBindings, error,
-                                                              &snapshot->runtimeInstance, codeHandle) &&
-                              ExperimentMaterialSealing::SealCoverage(source, *layout, snapshot->propertyBytes,
-                                                                      snapshot->coverage, error) &&
-                              forward.CaptureShaderVariant(*snapshot) && snapshot->IsValid(),
-                          "Transport Code sealing");
-                    EnhancedMaterialSeal::Stamp(*snapshot, kind + 1, 1, 1, context.sceneEpoch, context.frameId);
-                    draw.forwardMaterialSnapshot = std::move(snapshot);
-                    code.push_back(std::move(draw));
+                    draw.coverage.flags &= ~EnhancedMaterialCoverage::Blended;
                 }
-                else
-                {
-                    draw.materialGraphInstance = instance(kind, alpha, color);
-                    draw.materialGraphSlot = 9200 + kind;
-                    if (fixture == 12 && kind == 2)
-                    {
-                        draw.coverage.flags &= ~EnhancedMaterialCoverage::Blended;
-                    }
-                    graphDraws.push_back(std::move(draw));
-                }
+                graphDraws.push_back(std::move(draw));
             };
             if (fixture < 3)
             {
@@ -286,13 +249,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             if (fixture == 4 || fixture == 10 || fixture == 20 || fixture == 22)
             {
                 std::reverse(graphDraws.begin(), graphDraws.end());
-                std::reverse(code.begin(), code.end());
             }
-            context.forwardDraws = &code;
             const std::vector<EnhancedDrawItem> empty;
             context.draws = &empty;
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, {},
+            Check(SealScene({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, {},
                                        input, error) &&
                       host.SelectReadyInput(context, input, input, error) && input->Draws().size() == graphDraws.size(),
                   "All transport draws accepted");
@@ -300,7 +261,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
             const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
-            Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
+            Check(tiles.PrepareFrame(context, error) &&
                       host.PrepareResidency(context, input, error),
                   "Transport preparation");
             const bool versioned = policy != 0;
@@ -340,6 +301,8 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                execution.encoder->BindRenderTargets(target);
                                execution.encoder->ClearDepthTarget(target, fixture == 6 ? .1f : .9f);
                            });
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             outputs = host.DeclareGBuffer(*graph, outputs);
             RGTextureDesc desc;
             desc.width = desc.height = 16;
@@ -370,10 +333,10 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                }
                            });
             color = host.DeclareColor(*graph, outputs, color, ao, {});
-            forward.SetInputs({outputs.depth, color});
-            forward.SetGraphMaterials(&host);
-            forward.Declare(*graph, context);
-            const auto final = forward.GetOutput();
+            const auto composed = host.DeclareVolume(*graph, color, outputs.depth, {});
+            tiles.SetDepth(outputs.depth);
+            tiles.Declare(*graph, context);
+            const auto final = host.DeclareBlendedStream(*graph, composed, {}, tiles.GetLighting());
             Check(final.IsValid(), "Transport shared output");
             std::array<RHIReadback, 3> readbacks;
             const std::array handles{final, outputs.depth, outputs.bitmask};
@@ -403,7 +366,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                 }
                 Check((final.index == color.index && final.version > color.version) ||
                           (medium && final.index != color.index &&
-                           snapshot.resources[final.index].name == "LX.Scene.VolumeColor"),
+                           snapshot.resources[final.index].name == "METEOR.Scene.VolumeColor"),
                       "Mixed stream returns its updated color or Volume output");
                 bool outputWritten = false;
                 for (const auto& pass : snapshot.passes)
@@ -513,7 +476,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                         {
                             const std::array<float, 3> emission = fixture == 1 ? std::array<float, 3>{.1f, .6f, .2f}
                                                                                : std::array<float, 3>{.2f, .1f, .7f};
-                            Near(value, emission[c], "Graph and Code emission fixture renders", .001);
+                            Near(value, emission[c], "Emissive product fixture renders", .001);
                         }
                     }
                 }
@@ -576,7 +539,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                   << " transforms=" << cache.transforms << " transformHits=" << cache.transformHits << '\n';
     }
     host.ShutdownAfterIdle();
-    forward.Shutdown();
+    tiles.Shutdown();
     gbuffer.Shutdown();
     meshes.Shutdown();
     InternalPath::GetInstance()->AssetAuthoringEnabled = true;

@@ -85,6 +85,8 @@ namespace Player
 		void Update();
 		void InvokeResizeFlag();
 		void NotifyRenderFramePublished(uint64_t frameId);
+        uint64_t GetTemporalRealFrameId() const { return m_temporalFrameReady ? m_temporalRealFrameId : 0; }
+        void DiscardTemporalRealFrame();
 		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
 
 	private:
@@ -112,6 +114,8 @@ namespace Player
         std::shared_ptr<Presentation> m_presentation;
         std::atomic_bool m_presentationFailed{false};
         std::atomic<uint64_t> m_submittedGameFrameId{0};
+        uint64_t m_temporalRealFrameId{0};
+        bool m_temporalFrameReady{false};
         bool m_displayAvailable{false};
         bool m_presentationStopped{false};
         bool m_finalized{false};

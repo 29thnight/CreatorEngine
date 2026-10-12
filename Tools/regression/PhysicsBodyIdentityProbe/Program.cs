@@ -11,7 +11,10 @@ unsafe class Program
     static void Check(bool value, string name)
     {
         ++checks;
-        if (!value) throw new InvalidOperationException(name);
+        if (!value)
+        {
+            throw new InvalidOperationException(name);
+        }
     }
 
     static void Main()
@@ -24,7 +27,11 @@ unsafe class Program
             Body_Find = &Find,
             Body_Read = &Read,
             Body_Velocity = &Velocity,
-            Body_Remove = &Remove
+            Body_Remove = &Remove,
+            // Required host entries are stubbed; this probe exercises body identity only.
+            Asset_RequestTyped = &AssetUnavailable,
+            Asset_TryAcquireTyped = &AssetUnavailable,
+            Camera_NotifyCameraCut = &CameraCut
         };
         Check(Native.Bind(&api), "bind current ABI");
 
@@ -66,7 +73,10 @@ unsafe class Program
     static int Read(ObjectHandle owner, ulong id, PhysicsBodyState* output)
     {
         *output = default;
-        if (owner != Owner || id == 0 || id != current) return (int)PhysicsError.StaleHandle;
+        if (owner != Owner || id == 0 || id != current)
+        {
+            return (int)PhysicsError.StaleHandle;
+        }
         output->Mass = 1;
         output->LinearVelocity = new(velocity, 0, 0);
         return (int)PhysicsError.None;
@@ -75,7 +85,10 @@ unsafe class Program
     [UnmanagedCallersOnly]
     static int Velocity(ObjectHandle owner, ulong id, Float3 linear, Float3 angular)
     {
-        if (owner != Owner || id == 0 || id != current) return (int)PhysicsError.StaleHandle;
+        if (owner != Owner || id == 0 || id != current)
+        {
+            return (int)PhysicsError.StaleHandle;
+        }
         velocity = linear.X;
         return (int)PhysicsError.None;
     }
@@ -83,8 +96,27 @@ unsafe class Program
     [UnmanagedCallersOnly]
     static int Remove(ObjectHandle owner, ulong id)
     {
-        if (owner != Owner || id == 0 || id != current) return (int)PhysicsError.StaleHandle;
+        if (owner != Owner || id == 0 || id != current)
+        {
+            return (int)PhysicsError.StaleHandle;
+        }
         current = 0;
         return (int)PhysicsError.None;
+    }
+
+    [UnmanagedCallersOnly]
+    static int AssetUnavailable(AssetLinkABI* link, uint concreteType,
+        TextureAssetVariantABI* variant, AssetToken* token)
+    {
+        if (token != null)
+        {
+            *token = default;
+        }
+        return (int)AssetBindingResult.UnsupportedType;
+    }
+
+    [UnmanagedCallersOnly]
+    static void CameraCut(ObjectHandle owner)
+    {
     }
 }

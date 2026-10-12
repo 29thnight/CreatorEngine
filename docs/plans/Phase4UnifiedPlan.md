@@ -1,5 +1,7 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
+> 2026-10-10 PR #169: SDK 활성 DX12 Debug/Release 실행 증거로 TR1(8)·TU5(4)를 종료한다. PHASE 4.5는 16행 중 2행 완료·기성 12/71·잔여 59(17%), 전체 추정 563·기성 138·잔여 425(+별도 미산정)다. 품질 전수·FG·물리 지연/지원 행렬은 progress·기성 0을 유지한다. [종료 체크포인트](../analysis/TemporalClosureCheckpoint20261010.md). 아래 이전 기록은 당시 스냅샷이다.
+
 > 2026-10-09 후속 구조 재감사: RG8 제품 완료를 철회하고 progress·기성 0으로 정정한다. [감사 근거](../analysis/RenderRg7Rg8StructuralAudit20261009.md). 아래 종료 문구보다 이 판정과 현재 공수 원장이 우선한다.
 
 > 2026-10-09 현재: RG8 구현/검증/성능·메모리 채택 판정을 완료했다. [최종 근거](../analysis/RenderRg8Closure20261009.md). 개선 미입증으로 기본 OFF·기성 16인일이며 PHASE 4.3에는 RG9만 남는다. 아래 과거 계획과 추정은 당시 스냅샷이다.
@@ -415,47 +417,48 @@ cutover), `Q0`(`L4`의 큐 계약)이며, `SRP-1` 병합 기각 판정은
 
 ---
 
-## 7. PHASE 4.5 — 시간축 재구성 계층, 86일
+## 7. PHASE 4.5 — 시간축 재구성 계층, 71일
 
 정본은 [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md)이며 이 절은 공수와
-선후만 싣는다. `BASE-0`은 PHASE 4.3 §6.1이 소유하며 이 페이즈는 입력으로 받는다.
+선후만 싣는다. 2026-10-01 DX12 범위 재산정(16행/71일)을 반영한다. PR #169의 소스 구현 진행과 실행 수용 완료는 별도이며 기성을 올리지 않는다. `BASE-0`은 PHASE 4.3 §6.1이 소유하며 이 페이즈는 입력으로 받는다.
 
-### 7.1 트랙 TR — 시간축 기반, 25일
+2026-10-09 소스 보완은 Editor/Player portable 기본값·cook/pre-device 소비·환경/CLI 우선순위, 요청/지원/활성 MFG count, 명시적 camera cut/projection history, CPU frame/render 신원 분리와 `.ceprof` snapshot v6·stream v7 sidecar/live PLRD v3 (legacy v4/v5 읽기 유지), development-only TU/FG fault·측정 fail-closed·CPU presenter-return 연속 기록를 포함한다. legacy provenance는 unknown이다. Presenter 관측은 CPU Present 결과이며 물리 display timing이 아니다. 전체 7-route 모션 씬·제출 순서·pixel 소유권 driver와 strict v2 oracle은 소스 작성/정적 검토 범위이며 실행하지 않았다. 실제 자산·직전 제출·positive/disabled-control 픽셀과 indexed/meshlet 경로 증거가 필요하며 legacy analytic 입력과 증거 누락은 INCOMPLETE다. FG fault/staging은 capability/configure/prepare/Present/실제 drain 이후 host acknowledgement와 FSR 전용 evaluate를 작성했으며, 실제 device loss/소비 지연/물리 표시 검증과 다르다. W9는 temporal 설정 부분만 보완했으며 전체 완료가 아니다. 빌드·테스트·스크립트·native/하드웨어 수용은 전부 미실행이고 상태/기성은 늘리지 않는다. [정확한 구현/미구현 범위](TemporalVendorIntegration20261009.md#product-defaults-history-and-profiler-gap-closure--source-only-checkpoint).
+
+### 7.1 트랙 TR — 시간축 기반, 21일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `TR0` | 계측 무해화 계약 — 측정 표면의 해상도·프레임 종류 선언 | · | BASE-0 | 4 |
-| `TR1` | 모션 벡터 생산 — static/skinned/instanced/decal/알파 | · | BASE-0 | 10 |
-| `TR2` | 렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스 | · | TR1 | 6 |
+| `TR0` | 계측 무해화 계약 — 측정 표면의 해상도·프레임 종류 선언 | · | BASE-0 | 3 |
+| `TR1` | 모션 벡터 생산 — static/skinned/instanced/decal/알파 | · | BASE-0 | 8 |
+| `TR2` | 렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스 | · | TR1 | 5 |
 | `TR3` | 히스토리·이전 프레임 행렬 공용 계약 | · | TR2 | 5 |
 
-### 7.2 트랙 TU — 업스케일, 24일
+### 7.2 트랙 TU — 업스케일, 20일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `TU0` | 벤더 중립 Upscaler 인터페이스·기능 질의·폴백 사슬 | · | TR3 | 4 |
-| `TU1` | 무-upscale 기준 경로·A/B 대조군 | · | TU0 | 3 |
-| `TU2` | FSR 백엔드 — 벤더 중립 베이스라인 | · | TU0 | 6 |
-| `TU3` | DLSS Super Resolution 백엔드 | · | TU2 | 4 |
+| `TU0` | 벤더 중립 Upscaler 인터페이스·기능 질의·폴백 사슬 | · | TR3 | 3 |
+| `TU1` | 무-upscale 기준 경로·A/B 대조군 | · | TU0 | 2 |
+| `TU2` | FSR 백엔드 — 벤더 중립 베이스라인 | · | TU0 | 5 |
+| `TU3` | DLSS Super Resolution 백엔드 | · | TU2 | 3 |
 | `TU4` | XeSS 백엔드 | · | TU2 | 3 |
 | `TU5` | PostChain 앞 삽입·슬롯 schema 크기 유도 | · | TU2 | 4 |
 
-### 7.3 트랙 FG — 프레임 생성, 32일
+### 7.3 트랙 FG — 프레임 생성, 26일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `FG0` | present 소유권·proxy swapchain·frame pacing 계약 | · | TU5 | 10 |
-| `FG1` | 지연 마커 — Reflex·Anti-Lag 2, 게임 루프 경유 | · | FG0 | 5 |
-| `FG2` | FSR 3 Frame Generation 백엔드 | · | FG0 | 8 |
-| `FG3` | DLSS Frame Generation 백엔드 | · | FG2 | 5 |
+| `FG0` | present 소유권·proxy swapchain·frame pacing 계약 | · | TU5 | 8 |
+| `FG1` | 지연 마커 — Reflex·Anti-Lag 2, 게임 루프 경유 | · | FG0 | 4 |
+| `FG2` | FSR 3 Frame Generation 백엔드 | · | FG0 | 6 |
+| `FG3` | DLSS Frame Generation 백엔드 | · | FG2 | 4 |
 | `FG4` | HUD-less 백버퍼·UI 합성·에디터 금지 강제 | · | FG2 | 4 |
 
-### 7.4 통합 게이트 — 5일
+### 7.4 통합 게이트 — 4일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `TFG9` | 지원 행렬 전수·폴백 사슬·계측 단정·성능/지연 판정 | · | TU3, TU4, FG3, FG4 | 5 |
-
+| `TFG9` | 지원 행렬 전수·폴백 사슬·계측 단정·성능/지연 판정 | · | TU3, TU4, FG3, FG4 | 4 |
 ---
 
 ## 8. PHASE 4.75 — 남은 렌더 파이프라인, 95.5일

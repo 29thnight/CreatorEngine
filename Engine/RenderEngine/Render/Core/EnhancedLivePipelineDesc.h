@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <array>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -52,11 +53,18 @@ namespace LiveSlots
     constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
     constexpr const char* kGBufferDepth      = "GBuffer.Depth";
 
+    constexpr const char* kTemporalMotion = "Temporal.Motion";
+    constexpr const char* kTemporalReactive = "Temporal.Reactive";
+    constexpr const char* kTemporalTransparency = "Temporal.Transparency";
+    constexpr const char* kTemporalResponsive = "Temporal.Responsive";
+    constexpr const char* kTemporalDepth = "Temporal.Depth";
+    constexpr const char* kHudlessLdr = "Display.Hudless";
+    constexpr const char* kUiLayer = "Display.UI";
     constexpr const char* kShadowMap         = "Shadow.Map";
     constexpr const char* kAmbientOcclusion  = "Scene.AmbientOcclusion";
 
-    /// 라이팅 결과. Deferred가 발행하고 SkyBox·SSGI·Forward+·SSS·SSR·Fog가
-    /// 차례로 수정한다 — 지금 코드의 litColor 체인이 이 슬롯 하나다.
+    /// 라이팅 결과. METEOR.Scene.Color가 발행하고 SkyBox·SSGI·SSS·SSR·Volume·
+    /// Blended·Sprite·Fog·Upscale이 차례로 수정한다.
     constexpr const char* kLitColor          = "Scene.LitColor";
 
     /// 포스트 체인 뒤의 LDR. 화면 UI와 기여 오버레이가 이 위에 얹힌다.
@@ -115,6 +123,7 @@ struct LiveFrameBinding
     uint32_t         viewIndex{ 0 };
     RHITextureHandle sharedTarget{};
     RHIReadback      readbackTarget{};
+    std::array<RHITextureHandle,4> temporalTargets{};
 
     // 뷰의 표시 성격(LiveViewFlags 비트 조합). 화면 UI는 kScreenSpaceUI 뷰에만,
     // Host가 기여한 씬 오버레이는 kSceneOverlay 뷰에만 그린다 — 게임 뷰는
@@ -178,7 +187,17 @@ struct LivePassNode
     std::function<void(LiveBlackboard&, EnhancedRenderGraph&,
         const EnhancedFrameContext&, const LiveFrameBinding&)> declare;
 
+    /// 이번 프레임에 reads의 이 슬롯을 실제로 소비하는가. 비면 활성일 때 항상 소비한다.
+    /// 선택적 생산자(Temporal.Inputs)가 소비자 이름을 몰라도 되게 하는 근거다.
+    std::function<bool(const std::string& slot, const EnhancedFrameContext&, const LiveFrameBinding&)> consumes;
+    /// LitColor 출력이 표시 해상도인가(시간 업스케일). 캡처 단계 크기의 근거.
+    std::function<bool(const LiveFrameBinding&)> displayResolutionOutput;
+
     bool IsActive() const { return !active || active(); }
+    bool OutputsDisplayResolution(const LiveFrameBinding& binding) const
+    {
+        return displayResolutionOutput && displayResolutionOutput(binding);
+    }
 };
 
 struct LivePassNodeSnapshot
@@ -231,6 +250,10 @@ public:
     void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
         const EnhancedFrameContext& context, const LiveFrameBinding& binding,
         const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare = {}) const;
+
+    /// 활성 노드 중 이 슬롯을 reads로 두고 이번 프레임에 소비하는 노드가 있는가.
+    bool HasConsumer(const std::string& slot, const EnhancedFrameContext& context,
+        const LiveFrameBinding& binding) const;
 
     /// 렌더 디버그 창용. 노드 이름 · 활성 상태 · 슬롯 연결을 사람이 읽는 형태로.
     ///

@@ -1,5 +1,6 @@
 #include "MaterialGraphMeshSurface.h"
-#include "MaterialGraphMeshletTopology.h"
+#include "MaterialGraphSceneAccess.h"
+#include "RHI/RHIModelMeshletUpload.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 
 #include <algorithm>
@@ -7,6 +8,8 @@
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <deque>
 #include <limits>
 #include <map>
@@ -212,15 +215,31 @@ namespace material_graph
             result.entries = entries.size();
             return result;
         }
+        void TrimIdle()
+        {
+            std::lock_guard lock(mutex);
+            for (auto it = entries.begin(); it != entries.end() &&
+                 (stats.residentBytes > maxBytes || entries.size() > maxEntries);) {
+                const auto& entry = *it;
+                if (entry.use_count() == 1 && entry->state == RHIUploadTransactionState::Resident &&
+                    entry->completion <= completed) {
+                    stats.residentBytes -= entry->bytes;
+                    it = entries.erase(it);
+                } else ++it;
+            }
+        }
         bool Acquire(std::shared_ptr<const MeshSurfaceInput> identity,
                      std::shared_ptr<MeshSurfaceStaticBuffers>& result, std::string& error)
         {
             const auto recording = device.GetCurrentUploadRecordingId();
             const auto& geometry = identity->Geometry();
-            std::vector<uint32_t> topology{0, 0, 0, 0};
+            RHIModelMeshletUpload topology;
+            // Transform-only consumers may have no meshlets. Scene admission
+            // rejects missing cooked topology before reaching this cache.
+            topology.bytes.resize(sizeof(RHIMeshletBufferHeader));
             std::uint64_t sizes[]{geometry.vertexBytes,
                                         std::uint64_t(geometry.indexCount) * sizeof(std::uint32_t),
-                                        identity->Lods().size_bytes(), topology.size() * sizeof(uint32_t)};
+                                        identity->Lods().size_bytes(), topology.bytes.size()};
             auto bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
             {
                 std::lock_guard lock(mutex);
@@ -236,22 +255,16 @@ namespace material_graph
                         return true;
                     }
                 }
-                char meshFlag[8]{};
-                size_t meshFlagBytes{};
-                getenv_s(&meshFlagBytes, meshFlag, sizeof(meshFlag), "CREATOR_LX_MESHLETS");
-                const bool buildMeshlets = std::strcmp(meshFlag, "0") != 0 &&
-                    device.GetMeshShaderCapabilities().meshShader;
-                if (buildMeshlets)
-                {
-                    // At most one descriptor (4), three remaps and three local
-                    // indices per triangle. Reserve before any topology work.
-                    sizes[3] = 16ull + std::uint64_t(geometry.indexCount / 3) * 40ull;
-                    bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
-                }
-                if (bytes > maxBytes)
-                {
-                    return true; // Budget pressure uses the transient path.
-                }
+                // Resident hits reuse the exact immutable GPU payload. Serialize
+                // and validate only a cold entry, never once per draw/frame.
+                if (identity->Meshlets().HasMeshlets() &&
+                    !PackMeteorMeshletGpuPayload(identity->Meshlets(), identity->Count(), geometry.vertexStride,
+                        geometry.vertexAttributeMask, geometry.sourceLodIndex, identity->SourcePrimitiveCount(),
+                        identity->SourceVertexCount(), identity->SourceVertexIds(), topology, error)) return false;
+                sizes[3] = topology.bytes.size();
+                bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
+                // Budgets trim idle entries, never reject the live scene's
+                // immutable inputs. Output owners pin entries until retirement.
                 for (auto it = entries.begin();
                      it != entries.end() && (stats.residentBytes + bytes > maxBytes || entries.size() >= maxEntries);)
                 {
@@ -267,27 +280,15 @@ namespace material_graph
                         ++it;
                     }
                 }
-                if (stats.residentBytes + bytes > maxBytes || entries.size() >= maxEntries)
-                {
-                    return true;
-                }
-                if (buildMeshlets)
-                {
-                    if (!BuildSceneMeshletTopology(geometry, topology, error))
-                    {
-                        return false;
-                    }
-                    sizes[3] = topology.size() * sizeof(uint32_t);
-                    bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
-                }
+
             }
             auto entry = std::make_shared<MeshSurfaceStaticBuffers>(device);
             entry->identity = std::move(identity);
             entry->bytes = bytes;
             entry->recording = recording;
-            entry->meshletCount = topology[0];
+            entry->meshletCount = topology.meshletCount;
             RHIBufferSlice* destinations[]{&entry->vertices, &entry->indices, &entry->lods, &entry->meshlets};
-            const wchar_t* names[]{L"LX.Mesh.StaticVertices", L"LX.Mesh.StaticIndices", L"LX.Mesh.StaticLods", L"LX.Mesh.Meshlets"};
+            const wchar_t* names[]{L"METEOR.Mesh.StaticVertices", L"METEOR.Mesh.StaticIndices", L"METEOR.Mesh.StaticLods", L"METEOR.Mesh.Meshlets"};
             RHIUploadRequest requests[4];
             for (std::size_t i = 0; i < 4; ++i)
             {
@@ -306,7 +307,7 @@ namespace material_graph
             {
                 return false;
             }
-            const void* sources[]{geometry.vertexData, geometry.indexData, entry->identity->Lods().data(), topology.data()};
+            const void* sources[]{geometry.vertexData, geometry.indexData, entry->identity->Lods().data(), topology.bytes.data()};
             for (std::size_t i = 0; i < 4; ++i)
             {
                 if (!entry->staging[i].IsWritable())
@@ -346,7 +347,7 @@ namespace material_graph
     {
         if (!staticBuffers_ || staticBuffers_->graph != &graph || staticBuffers_->graphEpoch != graphEpoch_)
         {
-            throw std::runtime_error("LX meshlet topology has no current graph declaration.");
+            throw std::runtime_error("METEOR meshlet topology has no current graph declaration.");
         }
         return staticBuffers_->graphBuffers[3];
     }
@@ -362,6 +363,7 @@ namespace material_graph
         stats.transforms = transforms_;
         stats.transformHits = transformHits_;
         stats.cachedOutputBytes = transformedBytes_;
+        stats.cachedOutputs = transformedCache_.size();
         return stats;
     }
 
@@ -453,6 +455,9 @@ namespace material_graph
         }
         auto candidate = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
         candidate->geometry_ = geometry;
+        candidate->sourcePrimitiveCount_ = geometry.indexCount / 3;
+        candidate->sourceVertexCount_ = static_cast<uint32_t>(geometry.vertexBytes / geometry.vertexStride);
+        if (const auto* meshlets = geometry.Meshlets()) candidate->meshlets_ = *meshlets;
         candidate->world_ = draw.worldMatrix;
         candidate->view_ = view;
         candidate->lods_.assign(lods.begin(), lods.end());
@@ -579,6 +584,9 @@ namespace material_graph
         const std::uint64_t boneBytes = std::uint64_t(draw.boneCount) * sizeof(PackedBoneMatrix);
         cost.cpuPayloadBytes = geometry.vertexBytes + std::uint64_t(geometry.indexCount) * sizeof(std::uint32_t) +
                                lods.size_bytes() + boneBytes;
+        if (const auto* cooked = geometry.Meshlets())
+            cost.cpuPayloadBytes += cooked->descriptors.size() * sizeof(experiment::MeshletDescriptor) +
+                cooked->vertexRemap.size() * 4ull + cooked->triangleIndices.size() + cooked->primitiveRemap.size() * 4ull;
         if (cost.cpuPayloadBytes > budget.maxCpuPayloadBytes)
         {
             return Fail(error, "Mesh surface partition source exceeds its CPU payload budget.");
@@ -606,6 +614,35 @@ namespace material_graph
             description.firstTriangle = firstTriangle;
         };
         const auto finish = [&]() {
+            chunk->sourceVertexIds_ = *sourceVertices;
+            chunk->sourcePrimitiveCount_ = cost.triangles;
+            chunk->sourceVertexCount_ = cost.sourceVertices;
+            const auto& cooked = source.Meshlets();
+            chunk->meshlets_.settings = cooked.settings;
+            chunk->meshlets_.geometryDigest = cooked.geometryDigest;
+            const uint32_t end = description.firstTriangle + static_cast<uint32_t>(chunk->indices_.size() / 3);
+            for (const auto& original : cooked.descriptors)
+            {
+                if (original.primitiveOffset < description.firstTriangle || original.primitiveOffset >= end) continue;
+                if (original.primitiveOffset + original.triangleCount > end)
+                    throw std::runtime_error("METEOR partition split a cooked cluster.");
+                auto descriptor = original;
+                descriptor.vertexOffset = static_cast<uint32_t>(chunk->meshlets_.vertexRemap.size());
+                descriptor.triangleOffset = static_cast<uint32_t>(chunk->meshlets_.triangleIndices.size());
+                descriptor.primitiveOffset = static_cast<uint32_t>(chunk->meshlets_.primitiveRemap.size());
+                for (uint32_t i = 0; i < original.vertexCount; ++i)
+                {
+                    const auto index = cooked.vertexRemap[original.vertexOffset + i];
+                    if (remap[index] == unused) throw std::runtime_error("METEOR cooked cluster lost a source vertex.");
+                    chunk->meshlets_.vertexRemap.push_back(remap[index]);
+                }
+                const auto first = cooked.triangleIndices.begin() + original.triangleOffset;
+                chunk->meshlets_.triangleIndices.insert(chunk->meshlets_.triangleIndices.end(), first, first + original.triangleCount * 3);
+                const auto primitive = cooked.primitiveRemap.begin() + original.primitiveOffset;
+                chunk->meshlets_.primitiveRemap.insert(chunk->meshlets_.primitiveRemap.end(), primitive, primitive + original.triangleCount);
+                chunk->meshlets_.descriptors.push_back(descriptor);
+            }
+            chunk->meshlets_.lod0 = {0, static_cast<uint32_t>(chunk->meshlets_.descriptors.size())};
             chunk->geometry_.vertexData = chunk->vertices_.data();
             chunk->geometry_.vertexBytes = chunk->vertices_.size();
             chunk->geometry_.indexData = chunk->indices_.data();
@@ -620,8 +657,32 @@ namespace material_graph
             candidate->chunks_.push_back(std::move(description));
         };
         start(0);
+        uint32_t clusterIndex{};
+        const auto& clusters = source.Meshlets().descriptors;
         for (std::uint32_t triangle = 0; triangle < cost.triangles; ++triangle)
         {
+            if (clusterIndex < clusters.size() && clusters[clusterIndex].primitiveOffset == triangle)
+            {
+                const auto& cluster = clusters[clusterIndex++];
+                const uint64_t topologyBytes = sizeof(experiment::MeshletDescriptor) + cluster.vertexCount * 8ull + cluster.triangleCount * 7ull;
+                if (topologyBytes > budget.maxCpuPayloadBytes - cost.cpuPayloadBytes ||
+                    topologyBytes + sizeof(RHIMeshletBufferHeader) > budget.maxGpuPayloadBytes - cost.gpuPayloadBytes)
+                    return Fail(error, "METEOR cooked topology exceeds its CPU/GPU payload budget.");
+                cost.cpuPayloadBytes += topologyBytes;
+                cost.gpuPayloadBytes += topologyBytes + sizeof(RHIMeshletBufferHeader);
+                uint32_t clusterAddition{};
+                for (uint32_t i = 0; i < cluster.vertexCount; ++i)
+                    clusterAddition += remap[source.Meshlets().vertexRemap[cluster.vertexOffset + i]] == unused;
+                if (cluster.vertexCount > budget.maxChunkPoints)
+                    return Fail(error, "METEOR chunk budget cannot contain a cooked cluster.");
+                if (chunk->Count() + clusterAddition > budget.maxChunkPoints)
+                {
+                    finish();
+                    if (candidate->chunks_.size() >= budget.maxChunks)
+                        return Fail(error, "METEOR partition exceeds its chunk count budget.");
+                    start(triangle);
+                }
+            }
             const std::array indices{source.indices_[std::size_t(triangle) * 3],
                                      source.indices_[std::size_t(triangle) * 3 + 1],
                                      source.indices_[std::size_t(triangle) * 3 + 2]};
@@ -634,7 +695,7 @@ namespace material_graph
                     ++additional;
                 }
             }
-            if (chunk->Count() + additional > budget.maxChunkPoints)
+            if (clusters.empty() && chunk->Count() + additional > budget.maxChunkPoints)
             {
                 finish();
                 if (candidate->chunks_.size() >= budget.maxChunks)
@@ -645,7 +706,7 @@ namespace material_graph
                 additional = static_cast<std::uint32_t>(indices[0] != indices[1] && indices[0] != indices[2]) +
                              static_cast<std::uint32_t>(indices[1] != indices[2]) + 1;
             }
-            const std::uint64_t cpuAddition = std::uint64_t(additional) * (geometry.vertexStride + 8ull) + 12 +
+            const std::uint64_t cpuAddition = std::uint64_t(additional) * (geometry.vertexStride + 12ull) + 12 +
                                               (chunk->indices_.empty() ? boneBytes : 0);
             // Payload only: source upload + world/material/bake buffers and index/LOD.
             // Descriptor allocation, alignment, texture residency and frame overlap
@@ -692,6 +753,17 @@ namespace material_graph
         return chunkLimit_ == other.chunkLimit_ && source_->Matches(*other.source_);
     }
 
+    bool MeshSurfacePlan::SharesSceneTopology(const MeshSurfacePlan& other) const
+    {
+        const auto root = [](const MeshSurfacePlan* plan) {
+            while (plan->staticOwner_) plan = plan->staticOwner_.get();
+            return plan;
+        };
+        // The immutable cached partition includes exact generation, source LOD,
+        // layout and chunk budget. A cache eviction is a conservative miss.
+        return root(this) == root(&other);
+    }
+
     bool MeshSurfacePlan::BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view,
                                         std::span<const float> lods, const MeshSurfacePlanBudget& budget,
                                         std::shared_ptr<const MeshSurfacePlan>& result, std::string& error)
@@ -736,6 +808,8 @@ namespace material_graph
         constexpr std::size_t maxEntries = 64;
 
         const auto& geometry = draw.modelMeshView;
+        if (!geometry.Meshlets() || geometry.Meshlets()->settings.profileVersion != experiment::kMeshletProfileVersion)
+            return Fail(error, "METEOR Scene requires current cooked meshlet topology; force reimport/recook.");
         const Key key{geometry.handle, geometry.sourceLodIndex};
         const auto sameBudget = [](const MeshSurfacePlanBudget& a, const MeshSurfacePlanBudget& b) {
             return a.maxSourceVertices == b.maxSourceVertices && a.maxTriangles == b.maxTriangles &&
@@ -936,7 +1010,7 @@ namespace material_graph
             return Fail(error, "Mesh surface evaluator needs a compiled host artifact on its owning device.");
         }
         const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),
-                                                  RHILayout::Srv(2), RHILayout::UavBufferTable(1, 0)};
+                                                  RHILayout::Srv(2), RHILayout::UavBufferTable(4096, 0)};
         RHIPipelineLayoutDesc layoutDescription;
         layoutDescription.params = parameters;
         const auto layout = roots.GetOrCreate(layoutDescription, error);
@@ -971,6 +1045,23 @@ namespace material_graph
         }
     }
 
+    void MeshSurfaceEvaluator::BeginFrame(std::uint64_t recording)
+    {
+        if (!recording || recording == cacheRecording_) return;
+        cacheRecording_ = recording;
+        ++cacheGeneration_;
+        const auto completed = bufferPool_ ? bufferPool_->completed.load(std::memory_order_acquire) : 0;
+        std::erase_if(transformedCache_, [&](const auto& batch) {
+            // Keep the preceding two recordings for motion/history and queue
+            // overlap. Submitted consumers independently retain their owners.
+            if (cacheGeneration_ - batch->lastUsedGeneration_ <= 2 || batch.use_count() != 1 ||
+                (batch->completion_.IsValid() && batch->completion_.value > completed)) return false;
+            transformedBytes_ -= std::uint64_t(batch->Count()) * sizeof(SurfacePoint);
+            return true;
+        });
+        if (staticCache_) staticCache_->TrimIdle();
+    }
+
     bool MeshSurfaceEvaluator::Record(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
                                       std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error)
     {
@@ -998,7 +1089,7 @@ namespace material_graph
 
     bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
                                        std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error,
-                                       bool cacheStatic)
+                                       bool cacheStatic, std::uint64_t auditRealFrame, std::uint64_t auditView)
     {
         ce::profile_scope profile{ce::marker<"MaterialMeshGpuPrepare">()};
         if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || !device.GetCurrentUploadRecordingId() ||
@@ -1011,25 +1102,14 @@ namespace material_graph
         candidate->input_ = std::move(input);
         candidate->count_ = candidate->input_->Count();
         candidate->recordingId_ = device.GetCurrentUploadRecordingId();
+        candidate->auditRealFrame_ = auditRealFrame; candidate->auditView_ = auditView;
         candidate->descriptorVersion_ = device.GetDescriptorVersionToken();
         candidate->pipeline_ = pipeline_;
         const auto& source = *candidate->input_;
         if (cacheStatic)
         {
-            // Drop completed, unreferenced output owners before static admission;
-            // otherwise each retained output pins an otherwise evictable static entry.
-            if (transformedCache_.size() >= 256)
-            {
-                std::erase_if(transformedCache_, [&](const auto& batch)
-                {
-                    if (batch.use_count() != 1)
-                    {
-                        return false;
-                    }
-                    transformedBytes_ -= std::uint64_t(batch->Count()) * sizeof(SurfacePoint);
-                    return true;
-                });
-            }
+            BeginFrame(candidate->recordingId_);
+            candidate->lastUsedGeneration_ = cacheGeneration_;
             if (!staticCache_)
             {
                 staticCache_ = std::make_shared<MeshSurfaceStaticCache>(device);
@@ -1049,11 +1129,7 @@ namespace material_graph
                 {
                     const auto& prior = *previous->input_;
                     if (previous->staticBuffers_->identity != candidate->staticBuffers_->identity ||
-                        previous->pipeline_ != pipeline_ || !previous->IsReadyForEvaluation() ||
-                        !previous->completion_.IsValid() ||
-                        previous->completion_.value > bufferPool_->completed.load(std::memory_order_acquire) ||
-                        previous->bufferState_ != RHIResourceState::ShaderResource ||
-                        previous->lastReuseRecording_ == candidate->recordingId_ ||
+                        previous->pipeline_ != pipeline_ || !previous->staticBuffers_->usable ||
                         std::memcmp(&prior.World(), &source.World(), sizeof(math::matrix4x4)) != 0 ||
                         prior.Bones().size() != source.Bones().size() ||
                         (!source.Bones().empty() &&
@@ -1061,12 +1137,20 @@ namespace material_graph
                     {
                         continue;
                     }
+                    // An unchanged key remains active even while its earlier
+                    // submission is pending. Completion gates reuse, not lifetime.
+                    previous->lastUsedGeneration_ = cacheGeneration_;
+                    if (!previous->IsReadyForEvaluation() || !previous->completion_.IsValid() ||
+                        previous->completion_.value > bufferPool_->completed.load(std::memory_order_acquire) ||
+                        previous->bufferState_ != RHIResourceState::ShaderResource ||
+                        previous->lastReuseRecording_ == candidate->recordingId_) continue;
                     // Eye/view revision belongs to the fresh frame input: this kernel
                     // produces world geometry only and never reads the camera.
                     candidate->transformedOwner_ = previous;
                     candidate->buffer_ = previous->buffer_;
                     candidate->self_ = candidate;
                     previous->lastReuseRecording_ = candidate->recordingId_;
+                    previous->lastUsedGeneration_ = cacheGeneration_;
                     ++transformHits_;
                     result = std::move(candidate);
                     error.clear();
@@ -1077,7 +1161,7 @@ namespace material_graph
         RHIBufferDesc description;
         description.bytes = candidate->Count() * sizeof(SurfacePoint);
         description.allowUnorderedAccess = true;
-        description.debugName = L"LX.Material.MeshWorldPoints";
+        description.debugName = L"METEOR.Material.MeshWorldPoints";
         candidate->bufferPool_ = bufferPool_;
         if ((!candidate->bufferPool_ ||
              !candidate->bufferPool_->Acquire(description.bytes, candidate->buffer_, candidate->bufferState_)) &&
@@ -1085,79 +1169,11 @@ namespace material_graph
         {
             return false;
         }
-        struct Constants
-        {
-            math::matrix4x4 world;
-            std::array<std::uint32_t, 4> countStrideMaskBones;
-            std::array<std::uint32_t, 8> offsets;
-        };
-        Constants constants{source.World(),
-                            {candidate->Count(), source.Geometry().vertexStride, source.Geometry().vertexAttributeMask,
-                             static_cast<std::uint32_t>(source.Bones().size())},
-                            {}};
-        for (const auto& attribute : assets::kVertexAttributeTable)
-        {
-            constants.offsets[static_cast<std::size_t>(attribute.attribute)] =
-                assets::OffsetOf(source.Geometry().vertexAttributeMask, attribute.attribute);
-        }
-        const auto vertex = candidate->staticBuffers_
-                                ? candidate->staticBuffers_->vertices
-                                : device.AllocateUpload({source.Geometry().vertexBytes, RHIUploadUsage::Raw, 16});
-        const auto boneBytes = std::max(sizeof(PackedBoneMatrix), source.Bones().size_bytes());
-        const auto bones = device.AllocateUpload({boneBytes, RHIUploadUsage::Raw, 16});
-        const auto lods = candidate->staticBuffers_
-                              ? candidate->staticBuffers_->lods
-                              : device.AllocateUpload({source.Lods().size_bytes(), RHIUploadUsage::Raw, 16});
-        const auto uniform = device.UploadConstants(&constants, sizeof(constants));
-        const auto output = RHIBindingDesc::UavBuffer(candidate->buffer_, candidate->Count(), sizeof(SurfacePoint));
-        const auto table = device.CreateBindings({&output, 1});
-        if (!vertex.IsValid() || !bones.IsWritable() || !lods.IsValid() || !uniform.IsValid() || !table.IsValid() ||
-            candidate->recordingId_ != device.GetCurrentUploadRecordingId() ||
-            candidate->descriptorVersion_ != device.GetDescriptorVersionToken())
-        {
-            return Fail(error, "Mesh surface allocation failed or changed recording/descriptors; retry with the "
-                               "accepted batch retained.");
-        }
-        if (!candidate->staticBuffers_)
-        {
-            if (!vertex.IsWritable() || !lods.IsWritable())
-            {
-                return Fail(error, "Mesh input upload is not writable.");
-            }
-            std::memcpy(vertex.cpuAddress, source.Geometry().vertexData, source.Geometry().vertexBytes);
-            std::memcpy(lods.cpuAddress, source.Lods().data(), source.Lods().size_bytes());
-        }
-        if (source.Bones().empty())
-        {
-            const auto identity = PackedBoneMatrix::Identity();
-            std::memcpy(bones.cpuAddress, &identity, sizeof(identity));
-        }
-        else
-        {
-            std::memcpy(bones.cpuAddress, source.Bones().data(), source.Bones().size_bytes());
-        }
-        candidate->vertices_ = vertex;
-        candidate->bones_ = bones;
-        candidate->lods_ = lods;
-        candidate->uniform_ = uniform;
-        candidate->output_ = table;
         candidate->self_ = candidate;
         if (cacheStatic && candidate->staticBuffers_)
         {
-            // Eviction drops only the cache reference. Submitted frames retain their
-            // owners until completion, including any later readers of this output.
-            constexpr std::uint64_t maxOutputBytes = 32ull << 20;
-            while (!transformedCache_.empty() &&
-                   (transformedCache_.size() >= 256 || transformedBytes_ + description.bytes > maxOutputBytes))
-            {
-                transformedBytes_ -= std::uint64_t(transformedCache_.front()->Count()) * sizeof(SurfacePoint);
-                transformedCache_.erase(transformedCache_.begin());
-            }
-            if (description.bytes <= maxOutputBytes)
-            {
-                transformedCache_.push_back(candidate);
-                transformedBytes_ += description.bytes;
-            }
+            transformedCache_.push_back(candidate);
+            transformedBytes_ += description.bytes;
             ++transforms_;
         }
         result = std::move(candidate);
@@ -1180,28 +1196,248 @@ namespace material_graph
                    : RGHandle{};
     }
 
-    bool MeshSurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error) const
+    struct MeshTransformDispatch
     {
-        if (!IsPreparedForGraph() || (recordedStages_.fetch_or(1) & 1) != 0)
+        static constexpr uint32_t MaxJobs = 4096, GroupWidth = 65535;
+        struct Job
         {
-            recordedStages_.fetch_or(4);
-            return Fail(error, "Mesh transform has stale uploads/descriptors or was already recorded.");
+            math::matrix4x4 world;
+            std::array<uint32_t, 4> countStrideMaskBones;
+            std::array<uint32_t, 8> offsets;
+            std::array<uint32_t, 4> inputOffsets;
+        };
+        struct Group { uint32_t job, firstVertex; };
+        static_assert(sizeof(Job) == 128 && sizeof(Group) == 8);
+        RHIBufferSlice uniform, inputs, jobs, groups;
+        RHIBindingTable outputs;
+        uint32_t groupCount{}, dispatchX{}, dispatchY{};
+        uint64_t pointCount{}, inputBytes{};
+    };
+
+    bool MeshSurfaceBatch::PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                                           std::shared_ptr<MeshTransformDispatch>& result, std::string& error)
+    {
+        if (batches.empty() || batches.size() > MeshTransformDispatch::MaxJobs)
+            return Fail(error, "METEOR transform work list requires 1..4096 jobs; no alternate dispatch route.");
+        auto dispatch = std::make_shared<MeshTransformDispatch>();
+        auto& device = *batches.front()->device_;
+        ce::profile_scope prepareScope{ce::marker<"MaterialMeshDispatchPrepare">()};
+        std::vector<std::byte> inputs;
+        std::vector<MeshTransformDispatch::Job> jobs;
+        std::vector<MeshTransformDispatch::Group> groups;
+        std::vector<RHIBindingDesc> outputs;
+        std::map<std::pair<uintptr_t, size_t>, uint32_t> immutableInputs;
+        const auto append = [&](const void* data, size_t bytes, bool deduplicate) -> uint32_t {
+            const auto key = std::pair{reinterpret_cast<uintptr_t>(data), bytes};
+            if (deduplicate) {
+                const auto found = immutableInputs.find(key);
+                if (found != immutableInputs.end()) return found->second;
+            }
+            const auto offset = (inputs.size() + 15u) & ~size_t(15u);
+            if (offset + bytes > (256ull << 20))
+                throw std::runtime_error("METEOR transform packed input exceeds 256 MiB; no fallback.");
+            inputs.resize(offset + bytes);
+            if (bytes) std::memcpy(inputs.data() + offset, data, bytes);
+            if (deduplicate) immutableInputs.emplace(key, static_cast<uint32_t>(offset));
+            return static_cast<uint32_t>(offset);
+        };
+        for (const auto& batch : batches)
+        {
+            if (!batch->IsPreparedForGraph() || batch->device_ != &device ||
+                batch->pipeline_ != batches.front()->pipeline_ || batch->transformedOwner_)
+                return Fail(error, "METEOR transform jobs require one fresh pipeline/device/recording.");
+            const auto& source = *batch->input_;
+            MeshTransformDispatch::Job job{source.World(),
+                {batch->Count(), source.Geometry().vertexStride, source.Geometry().vertexAttributeMask,
+                 static_cast<uint32_t>(source.Bones().size())}, {}, {}};
+            for (const auto& attribute : assets::kVertexAttributeTable)
+                job.offsets[static_cast<size_t>(attribute.attribute)] =
+                    assets::OffsetOf(source.Geometry().vertexAttributeMask, attribute.attribute);
+            job.inputOffsets[0] = append(source.Geometry().vertexData, source.Geometry().vertexBytes, true);
+            job.inputOffsets[1] = append(source.Bones().data(), source.Bones().size_bytes(), true);
+            job.inputOffsets[2] = append(source.Lods().data(), source.Lods().size_bytes(), true);
+            dispatch->pointCount += batch->Count();
+            const auto jobIndex = static_cast<uint32_t>(jobs.size());
+            jobs.push_back(job);
+            for (uint32_t first = 0; first < batch->Count(); first += 32)
+                groups.push_back({jobIndex, first});
+            outputs.push_back(RHIBindingDesc::UavBuffer(batch->buffer_, batch->Count(), sizeof(SurfacePoint)));
         }
-        encoder.SetPipeline(RHIBindPoint::Compute, pipeline_->GetHandle());
-        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform_);
-        encoder.SetRootBuffer(RHIBindPoint::Compute, 1, vertices_);
-        encoder.SetRootBuffer(RHIBindPoint::Compute, 2, bones_);
-        encoder.SetRootBuffer(RHIBindPoint::Compute, 3, lods_);
-        encoder.SetBindings(RHIBindPoint::Compute, 4, output_);
-        encoder.Dispatch((Count() + 31) / 32, 1, 1);
+        if (groups.empty() || groups.size() > uint64_t(MeshTransformDispatch::GroupWidth) * 65535)
+            return Fail(error, "METEOR transform group list exceeds one 2D dispatch.");
+        dispatch->groupCount = static_cast<uint32_t>(groups.size());
+        dispatch->dispatchY = (dispatch->groupCount + MeshTransformDispatch::GroupWidth - 1) / MeshTransformDispatch::GroupWidth;
+        dispatch->dispatchX = (dispatch->groupCount + dispatch->dispatchY - 1) / dispatch->dispatchY;
+        const std::array<uint32_t, 4> constants{dispatch->groupCount, dispatch->dispatchX,
+                                               static_cast<uint32_t>(jobs.size()), 0};
+        dispatch->uniform = device.UploadConstants(constants.data(), sizeof(constants));
+        const auto upload = [&](const void* data, size_t bytes) {
+            auto slice = device.AllocateUpload({bytes, RHIUploadUsage::Raw, 16});
+            if (slice.IsWritable()) std::memcpy(slice.cpuAddress, data, bytes);
+            return slice;
+        };
+        dispatch->inputBytes = inputs.size() + jobs.size() * sizeof(jobs.front()) + groups.size() * sizeof(groups.front());
+        dispatch->inputs = upload(inputs.data(), inputs.size());
+        dispatch->jobs = upload(jobs.data(), jobs.size() * sizeof(jobs.front()));
+        dispatch->groups = upload(groups.data(), groups.size() * sizeof(groups.front()));
+        // Only live descriptors are allocated; all group job IDs are CPU sealed below jobCount.
+        dispatch->outputs = device.CreateBindings(outputs);
+        if (!dispatch->uniform.IsValid() || !dispatch->inputs.IsWritable() || !dispatch->jobs.IsWritable() ||
+            !dispatch->groups.IsWritable() || !dispatch->outputs.IsValid() ||
+            !std::ranges::all_of(batches, [](const auto& batch) { return batch->IsPreparedForGraph(); }))
+            return Fail(error, "METEOR transform work-list allocation changed recording/descriptors.");
+        result = std::move(dispatch);
         error.clear();
         return true;
     }
 
-    bool MeshSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const
+    bool MeshSurfaceBatch::RecordDispatch(RHIEncoder& encoder,
+                                          std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                                          const MeshTransformDispatch& dispatch, std::string& error)
+    {
+        ce::profile_scope recordScope{ce::marker<"MaterialMeshDispatchRecord">()};
+        for (const auto& batch : batches)
+        {
+            if (!batch->IsPreparedForGraph() || (batch->recordedStages_.fetch_or(1) & 1) != 0)
+            {
+                batch->recordedStages_.fetch_or(4);
+                return Fail(error, "METEOR transform job has stale uploads/descriptors or was already recorded.");
+            }
+        }
+        encoder.SetPipeline(RHIBindPoint::Compute, batches.front()->pipeline_->GetHandle());
+        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, dispatch.uniform);
+        encoder.SetRootBuffer(RHIBindPoint::Compute, 1, dispatch.inputs);
+        encoder.SetRootBuffer(RHIBindPoint::Compute, 2, dispatch.jobs);
+        encoder.SetRootBuffer(RHIBindPoint::Compute, 3, dispatch.groups);
+        encoder.SetBindings(RHIBindPoint::Compute, 4, dispatch.outputs);
+        const auto before = encoder.GetComputeDispatchCount();
+        encoder.Dispatch(dispatch.dispatchX, dispatch.dispatchY, 1);
+        const auto after = encoder.GetComputeDispatchCount();
+        if (before != UINT64_MAX && after != before + 1)
+            return Fail(error, "METEOR transform failed to record exactly one native dispatch.");
+        static const bool audit = [] {
+            char* value{}; size_t length{};
+            const bool enabled = _dupenv_s(&value, &length, "CREATOR_METEOR_TRANSFORM_AUDIT") == 0 &&
+                                 value && value[0] == '1';
+            std::free(value); return enabled;
+        }();
+        if (audit)
+            std::fprintf(stderr, "METEOR_TRANSFORM_DISPATCH recording=%llu jobs=%zu points=%llu groups=%u x=%u y=%u native=%llu inputBytes=%llu frame=%llu view=%llu qpc=%llu\n",
+                static_cast<unsigned long long>(batches.front()->recordingId_), batches.size(),
+                static_cast<unsigned long long>(dispatch.pointCount), dispatch.groupCount,
+                dispatch.dispatchX, dispatch.dispatchY,
+                static_cast<unsigned long long>(before == UINT64_MAX ? UINT64_MAX : after - before),
+                static_cast<unsigned long long>(dispatch.inputBytes),
+                static_cast<unsigned long long>(batches.front()->auditRealFrame_),
+                static_cast<unsigned long long>(batches.front()->auditView_),
+                static_cast<unsigned long long>(ce::profiler_service::now()));
+        error.clear();
+        return true;
+    }
+
+    bool MeshSurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error) const
     {
         const auto owner = self_.lock();
-        if (!owner || &graph.DeviceServices() != device_ || !IsPreparedForGraph() || recordedStages_.load() != 0 ||
+        if (!owner) return Fail(error, "METEOR transform requires a retained owner.");
+        const std::shared_ptr<const MeshSurfaceBatch> batches[]{owner};
+        std::shared_ptr<MeshTransformDispatch> dispatch;
+        return PrepareDispatch(batches, dispatch, error) && RecordDispatch(encoder, batches, *dispatch, error);
+    }
+
+    bool MeshSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const
+    {
+        const MeshSurfaceBatch* const batches[]{this};
+        return DeclareBatch(graph, batches, error);
+    }
+
+    bool MeshSurfaceBatch::DeclareBatch(EnhancedRenderGraph& graph, std::span<const MeshSurfaceBatch* const> batches,
+                                        std::string& error)
+    {
+        std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformed, reused;
+        std::vector<EnhancedRenderGraph::RGPassUsage> transformUses, readyUses, reuseUses;
+        for (const auto* batch : batches)
+        {
+            const auto owner = batch ? batch->self_.lock() : nullptr;
+            if (!owner)
+            {
+                return Fail(error, "Mesh declaration needs a retained batch owner.");
+            }
+            bool isReuse = false;
+            auto& uses = owner->transformedOwner_ ? reuseUses : transformUses;
+            if (!owner->DeclareResources(graph, uses, isReuse, error))
+            {
+                return false;
+            }
+            if (isReuse)
+            {
+                reused.push_back(owner);
+                continue;
+            }
+            const auto readAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
+                                        ? RGAccessMode::Read
+                                        : RGAccessMode::LegacyState;
+            readyUses.push_back({owner->graphOutput_, RHIResourceState::ShaderResource, readAccess});
+            transformed.push_back(owner);
+        }
+        // Instances of one mesh share static inputs; a pass lists each version once.
+        NormalizeSceneReads(graph, transformUses);
+        NormalizeSceneReads(graph, reuseUses);
+        if (!reused.empty())
+        {
+            graph.AddPass(
+                "METEOR.MeshWorldReuse", reuseUses,
+                [reused](const auto&) {
+                    for (const auto& owner : reused)
+                    {
+                        if (!owner->IsPreparedForGraph())
+                        {
+                            owner->recordedStages_.fetch_or(4);
+                            throw std::runtime_error("Stale reused mesh recording.");
+                        }
+                        owner->recordedStages_.store(3);
+                    }
+                },
+                true);
+        }
+        if (transformed.empty())
+        {
+            error.clear();
+            return true;
+        }
+        std::shared_ptr<MeshTransformDispatch> dispatch;
+        if (!PrepareDispatch(transformed, dispatch, error)) return false;
+        graph.AddPass("METEOR.TransformMeshWorld", transformUses, [transformed, dispatch](const auto& context) {
+            for (const auto& owner : transformed)
+                if (!context.graph || !owner->GraphOutput(*context.graph).IsValid())
+                    throw std::runtime_error("METEOR transform output belongs to another graph.");
+            std::string failure;
+            if (!context.encoder || !RecordDispatch(*context.encoder, transformed, *dispatch, failure))
+                throw std::runtime_error("METEOR batched transform recording failed: " + failure);
+        });
+        graph.AddPass(
+            "METEOR.MeshWorldReady", readyUses,
+            [transformed](const auto&) {
+                for (const auto& owner : transformed)
+                {
+                    if (!owner->IsPreparedForGraph())
+                    {
+                        owner->recordedStages_.fetch_or(4);
+                        throw std::runtime_error("Stale mesh readiness recording.");
+                    }
+                    owner->recordedStages_.fetch_or(2);
+                }
+            },
+            true);
+        error.clear();
+        return true;
+    }
+
+    bool MeshSurfaceBatch::DeclareResources(EnhancedRenderGraph& graph,
+                                            std::vector<EnhancedRenderGraph::RGPassUsage>& inputs, bool& reused,
+                                            std::string& error) const
+    {
+        reused = false;
+        if (&graph.DeviceServices() != device_ || !IsPreparedForGraph() || recordedStages_.load() != 0 ||
             declared_.exchange(true))
         {
             return Fail(error, "Mesh declaration needs a fresh prepared world transform on its owning recording.");
@@ -1211,7 +1447,6 @@ namespace material_graph
         const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
         graph_ = &graph;
         graphEpoch_ = graph.ResourceEpoch();
-        std::vector<EnhancedRenderGraph::RGPassUsage> inputs;
         if (staticBuffers_)
         {
             auto& buffers = *staticBuffers_;
@@ -1227,7 +1462,7 @@ namespace material_graph
                         handles[i],
                         needsCopy ? RHIResourceState::Common
                                   : (i == 1 ? RHIResourceState::IndexBuffer : RHIResourceState::ShaderResource),
-                        "LX.Mesh.StaticInput");
+                        "METEOR.Mesh.StaticInput");
                 }
                 if (needsCopy)
                 {
@@ -1242,7 +1477,7 @@ namespace material_graph
                             buffer = graph.Write(buffer);
                         }
                     }
-                    graph.AddPass("LX.MeshInputUpload",
+                    graph.AddPass("METEOR.MeshInputUpload",
                                   {{buffers.graphBuffers[0], RHIResourceState::CopyDest, writeAccess},
                                    {buffers.graphBuffers[1], RHIResourceState::CopyDest, writeAccess},
                                    {buffers.graphBuffers[2], RHIResourceState::CopyDest, writeAccess},
@@ -1271,21 +1506,11 @@ namespace material_graph
             }
         }
         auto& state = transformedOwner_ ? transformedOwner_->bufferState_ : bufferState_;
-        graphOutput_ = graph.ImportBuffer(buffer_, state, "LX.Mesh.WorldPoints", &state);
+        graphOutput_ = graph.ImportBuffer(buffer_, state, "METEOR.Mesh.WorldPoints", &state);
         if (transformedOwner_)
         {
             inputs.push_back({graphOutput_, RHIResourceState::ShaderResource, readAccess});
-            graph.AddPass(
-                "LX.MeshWorldReuse", inputs,
-                [owner](const auto&) {
-                    if (!owner->IsPreparedForGraph())
-                    {
-                        owner->recordedStages_.fetch_or(4);
-                        throw std::runtime_error("Stale reused mesh recording.");
-                    }
-                    owner->recordedStages_.store(3);
-                },
-                true);
+            reused = true;
             error.clear();
             return true;
         }
@@ -1294,26 +1519,6 @@ namespace material_graph
             graphOutput_ = graph.Write(graphOutput_);
         }
         inputs.push_back({graphOutput_, RHIResourceState::UnorderedAccess, writeAccess});
-        graph.AddPass("LX.TransformMeshWorld", inputs, [owner](const auto& context) {
-            std::string failure;
-            if (!context.graph || !context.encoder || !owner->GraphOutput(*context.graph).IsValid() ||
-                !owner->RecordCommands(*context.encoder, failure))
-            {
-                owner->recordedStages_.fetch_or(4);
-                throw std::runtime_error("Mesh graph recording failed: " + failure);
-            }
-        });
-        graph.AddPass(
-            "LX.MeshWorldReady", {{graphOutput_, RHIResourceState::ShaderResource, readAccess}},
-            [owner](const auto&) {
-                if (!owner->IsPreparedForGraph())
-                {
-                    owner->recordedStages_.fetch_or(4);
-                    throw std::runtime_error("Stale mesh readiness recording.");
-                }
-                owner->recordedStages_.fetch_or(2);
-            },
-            true);
         error.clear();
         return true;
     }
@@ -1327,7 +1532,7 @@ namespace material_graph
             return Fail(error, "Mesh surface sampler needs a compiled artifact on its initialized transform device.");
         }
         const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(2), RHILayout::Srv(4), RHILayout::Srv(5),
-                                                  RHILayout::Srv(6), RHILayout::UavBufferTable(1, 1)};
+                                                  RHILayout::Srv(6), RHILayout::UavBufferTable(1, 4096)};
         const auto layout = roots.GetOrCreate({parameters}, error);
         if (!layout.IsValid())
         {
@@ -1384,7 +1589,7 @@ namespace material_graph
         RHIBufferDesc description;
         description.bytes = candidate->Count() * sizeof(SurfacePoint);
         description.allowUnorderedAccess = true;
-        description.debugName = L"LX.Material.TriangleSamples";
+        description.debugName = L"METEOR.Material.TriangleSamples";
         if (!device.CreateBuffer(description, candidate->buffer_, error))
         {
             return false;

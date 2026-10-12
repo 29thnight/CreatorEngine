@@ -8,7 +8,7 @@
 #include <queue>
 #include <limits>
 #include <chrono>
-#include <tuple>
+#include <array>
 #include <mutex>
 #include <bit>
 
@@ -1572,11 +1572,14 @@ bool EnhancedRenderGraph::ValidateFinalStates(std::string& outError) const
             return false;
         }
         const auto& resource = m_resources[handle.index];
-        if (!resource.imported || resource.IsBuffer() || requirement.state < RHIResourceState::Common ||
-            requirement.state > RHIResourceState::VertexAndShaderResource ||
-            requirement.state == RHIResourceState::IndexBuffer ||
-            requirement.state == RHIResourceState::IndirectArgument ||
-            requirement.state == RHIResourceState::VertexAndShaderResource)
+        // Pooled imported buffers return to Common. Keep other buffer final
+        // states outside this contract until their usage/capabilities are validated.
+        const bool invalidKindState = resource.IsBuffer()
+            ? requirement.state != RHIResourceState::Common
+            : (requirement.state == RHIResourceState::IndexBuffer || requirement.state == RHIResourceState::IndirectArgument ||
+               requirement.state == RHIResourceState::VertexAndShaderResource);
+        if (!resource.imported || invalidKindState || requirement.state < RHIResourceState::Common ||
+            requirement.state > RHIResourceState::VertexAndShaderResource)
         {
             outError = "Invalid imported final state: " + resource.name;
             return false;
@@ -1894,8 +1897,11 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             continue;
         }
         auto& pass = m_passes[m_executeOrder[resource.lastUse]];
-        const bool firstFinalBarrier = pass.finalTransitions.empty();
-        pass.finalTransitions.push_back({resource.handle, resource.state, requirement.state});
+        const bool firstFinalBarrier = pass.finalTransitions.empty() && pass.finalBufferTransitions.empty();
+        if (resource.IsBuffer())
+            pass.finalBufferTransitions.push_back({resource.buffer, resource.state, requirement.state});
+        else
+            pass.finalTransitions.push_back({resource.handle, resource.state, requirement.state});
         resource.state = requirement.state;
         ++m_stats.barriersEmitted;
         if (firstFinalBarrier)
@@ -2205,6 +2211,26 @@ void EnhancedRenderGraph::BuildDependencyWaves()
     }
 }
 
+void EnhancedRenderGraph::InheritStructuralSchedule(const EnhancedRenderGraph& previous)
+{
+    RequireQueueIdle();
+    m_structuralSchedule = previous.m_structuralSchedule;
+    m_compiled = false;
+}
+
+void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous)
+{
+    RequireQueueIdle();
+    if (previous) m_structuralSchedule = *previous;
+    m_compiled = false;
+}
+
+std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> EnhancedRenderGraph::SnapshotStructuralSchedule() const
+{
+    return m_structuralSchedule.key
+        ? std::make_shared<const StructuralSchedule>(m_structuralSchedule) : nullptr;
+}
+
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
     if (!m_queueLease.expired() || m_queueExecutionAttempted)
@@ -2242,14 +2268,43 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
         return false;
     }
 
-    if (!BuildOrder(outError)) return false;
-    if (!ValidateRepeatedPasses(outError))
+    if (!ValidateRepeatedPasses(outError)) return false;
+    // Normalize the previous compilation's reachability before constructing the
+    // authored-contract key. Exact byte comparison avoids hash collision reuse.
+    for (auto& pass : m_passes) pass.culled = false;
+    BuildTimingSignature();
+    const auto structuralKey = m_timingSignature;
+    const bool reuse = m_structuralSchedule.key && *m_structuralSchedule.key == *structuralKey;
+    if (reuse)
     {
-        return false;
+        m_executeOrder = m_structuralSchedule.order;
+        m_dependencyWaves = m_structuralSchedule.waves;
+        m_criticalPath = m_structuralSchedule.criticalPath;
+        m_versionEdges = m_structuralSchedule.edges;
+        for (size_t i = 0; i < m_passes.size(); ++i) m_passes[i].culled = m_structuralSchedule.culled[i];
+        m_stats.passesCulled = static_cast<uint32_t>(m_passes.size() - m_executeOrder.size());
+        m_stats.structuralScheduleReused = true;
+        for (const auto wave : m_dependencyWaves)
+            if (wave >= 0) m_stats.dependencyWaveCount = (std::max)(m_stats.dependencyWaveCount, static_cast<uint32_t>(wave + 1));
+        ce::profile_instant(ce::marker<"RenderGraphScheduleReused">());
     }
-
-    CullPasses();
-    BuildDependencyWaves();
+    else
+    {
+        if (!BuildOrder(outError)) return false;
+        CullPasses();
+        BuildDependencyWaves();
+        // Bound retained metadata. Large/diagnostic graphs still compile normally.
+        if (structuralKey->size() <= 1024 * 1024 && m_passes.size() <= 4096)
+        {
+            m_structuralSchedule.key = structuralKey;
+            m_structuralSchedule.order = m_executeOrder;
+            m_structuralSchedule.waves = m_dependencyWaves;
+            m_structuralSchedule.criticalPath = m_criticalPath;
+            m_structuralSchedule.edges = m_versionEdges;
+            m_structuralSchedule.culled.clear();
+            for (const auto& pass : m_passes) m_structuralSchedule.culled.push_back(pass.culled);
+        }
+    }
 
     if (!CreateTransients(outError)) return false;
 
@@ -2286,12 +2341,23 @@ void EnhancedRenderGraph::DeclareComputeCompatible(RGPassId pass)
 void EnhancedRenderGraph::DeclareRecordingSideEffect(RGPassId pass)
 {
     RequireQueueIdle();
-    if (!pass.IsValid() || pass.index >= m_passes.size() || m_compiled)
+    if (!pass.IsValid() || pass.index >= m_passes.size() || m_compiled || m_passes[pass.index].recordingIndependent)
     {
         throw std::logic_error("Recording side effects must be declared before compilation on a valid pass");
     }
     m_passes[pass.index].recordingSideEffect = true;
     m_passes[pass.index].hasSideEffect = true;
+}
+
+void EnhancedRenderGraph::DeclareRecordingIndependent(RGPassId pass)
+{
+    RequireQueueIdle();
+    if (!pass.IsValid() || pass.index >= m_passes.size() || m_compiled ||
+        m_passes[pass.index].recordingSideEffect || m_passes[pass.index].splitExecute)
+    {
+        throw std::logic_error("Independent recording requires an unsplit pass without external CPU side effects before compilation");
+    }
+    m_passes[pass.index].recordingIndependent = true;
 }
 
 void EnhancedRenderGraph::BuildTimingSignature()
@@ -2319,6 +2385,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
         {
             number(usage.handle.index);
             number(usage.handle.version);
+            number(m_scheduling != RGSchedulingMode::ExplicitVersioned || ValidVersionHandle(usage.handle));
             number(static_cast<uint64_t>(usage.handle.kind));
             number(static_cast<uint64_t>(usage.state));
             number(static_cast<uint64_t>(usage.access));
@@ -2331,11 +2398,17 @@ void EnhancedRenderGraph::BuildTimingSignature()
     number(m_extendLifetimes);
     number(m_poison);
     number(m_resources.size());
+    std::unordered_set<uint32_t> importedTextureIds, importedBufferIds;
     for (const auto& resource : m_resources)
     {
         name(resource.name);
         number(resource.imported);
         number(resource.bufferKind);
+        if (resource.imported)
+        {
+            auto& identities = resource.IsBuffer() ? importedBufferIds : importedTextureIds;
+            number(identities.insert(resource.IsBuffer() ? resource.buffer.id : resource.handle.id).second);
+        }
         if (resource.bufferKind)
         {
             number(resource.bufferDesc.bytes);
@@ -2457,20 +2530,40 @@ bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
     return true;
 }
 
-void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>& queues,
-    std::vector<std::vector<uint16_t>>& predecessors,
-    std::vector<std::vector<uint16_t>>& successors,
-    std::vector<QueueReadEpoch>& resources) const
+struct EnhancedRenderGraph::QueuePlanningScratch
 {
-    // Candidate trials share capacity, never edges or state from the last trial.
-    for (auto* lists : {&predecessors, &successors})
+    struct Timer
     {
-        lists->resize(m_passes.size());
-        for (auto& list : *lists)
-        {
-            list.clear();
-        }
-    }
+        double& subtotal;
+        std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+        ~Timer() { subtotal += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); }
+    };
+    double dependencyMilliseconds{0}, simulationMilliseconds{0};
+    struct ReadEpoch
+    {
+        std::vector<uint16_t> frontier, before;
+        RHIResourceState state{RHIResourceState::Common};
+        RHIQueueKind queue{RHIQueueKind::Graphics};
+        bool immutableRead{false};
+    };
+    std::vector<ReadEpoch> resources;
+    std::vector<uint32_t> position, remaining;
+    std::vector<uint64_t> earliest, finish;
+    std::vector<uint8_t> feedsCompute;
+    std::array<std::vector<uint16_t>, 2> ready, future;
+};
+
+void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
+    std::vector<std::vector<uint16_t>>& predecessors,
+    std::vector<std::vector<uint16_t>>& successors) const
+{
+    QueuePlanningScratch::Timer timer{scratch.dependencyMilliseconds};
+    // Trials change queue ownership, not the pass count. Preserve each adjacency
+    // list's storage instead of allocating the entire DAG for every trial.
+    predecessors.resize(m_passes.size());
+    successors.resize(m_passes.size());
+    for (auto& list : std::span{predecessors.data(), predecessors.size()}) list.clear();
+    for (auto& list : std::span{successors.data(), successors.size()}) list.clear();
     const auto add = [&](uint16_t producer, uint16_t consumer)
     {
         if (producer == consumer || m_passes[producer].culled || m_passes[consumer].culled)
@@ -2480,12 +2573,13 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
         predecessors[consumer].push_back(producer);
         successors[producer].push_back(consumer);
     };
-    for (const auto& edge : m_versionEdges)
+    for (const auto& edge : std::span{m_versionEdges.data(), m_versionEdges.size()})
     {
         add(static_cast<uint16_t>(edge.producer), static_cast<uint16_t>(edge.consumer));
     }
+    auto& resources = scratch.resources;
     resources.resize(m_resources.size());
-    for (auto& epoch : resources)
+    for (auto& epoch : std::span{resources.data(), resources.size()})
     {
         epoch.frontier.clear();
         epoch.before.clear();
@@ -2493,9 +2587,10 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
         epoch.queue = RHIQueueKind::Graphics;
         epoch.immutableRead = false;
     }
-    for (const auto pass : m_executeOrder)
+    for (const auto pass : std::span{m_executeOrder.data(), m_executeOrder.size()})
     {
-        for (const auto& usage : m_passes[pass].usages)
+        const auto& usages = m_passes[pass].usages;
+        for (const auto& usage : std::span{usages.data(), usages.size()})
         {
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
             {
@@ -2516,7 +2611,7 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
                 epoch.before.swap(epoch.frontier);
                 epoch.frontier.clear();
             }
-            for (const auto predecessor : epoch.before)
+            for (const auto predecessor : std::span{epoch.before.data(), epoch.before.size()})
             {
                 add(predecessor, pass);
             }
@@ -2528,32 +2623,36 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
     }
     for (auto* lists : {&predecessors, &successors})
     {
-        for (auto& list : *lists)
+        for (auto& list : std::span{lists->data(), lists->size()})
         {
-            std::sort(list.begin(), list.end());
-            list.erase(std::unique(list.begin(), list.end()), list.end());
+            if (list.size() > 1)
+            {
+                // These local lists cannot reallocate during sorting. Pointer
+                // ranges avoid repeatedly registering short-lived MSVC Debug
+                // vector iterators while retaining the same bounds and edges.
+                auto* first = list.data();
+                auto* last = first + list.size();
+                std::sort(first, last);
+                list.resize(static_cast<size_t>(std::unique(first, last) - first));
+            }
         }
     }
 }
 
 uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& queues,
     const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
-    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order) const
+    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order,
+    QueuePlanningScratch& scratch) const
 {
-    const auto baseline = SimulateQueueOrder(queues, costs, predecessors, successors, reorder, false, order);
-    if (!reorder)
-    {
-        return baseline;
-    }
+    QueuePlanningScratch::Timer timer{scratch.simulationMilliseconds};
+    const auto baseline = SimulateQueueOrder(queues, costs, predecessors, successors, reorder, order, scratch, false);
+    if (!reorder) return baseline;
     std::vector<uint16_t> candidateOrder;
-    const auto candidate = SimulateQueueOrder(queues, costs, predecessors, successors, true, true,
-        order ? &candidateOrder : nullptr);
+    const auto candidate = SimulateQueueOrder(queues, costs, predecessors, successors, true,
+        order ? &candidateOrder : nullptr, scratch, true);
     if (candidate < baseline)
     {
-        if (order)
-        {
-            *order = std::move(candidateOrder);
-        }
+        if (order) *order = std::move(candidateOrder);
         return candidate;
     }
     return baseline;
@@ -2561,92 +2660,156 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
 
 uint64_t EnhancedRenderGraph::SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
     const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
-    const std::vector<std::vector<uint16_t>>& successors, bool reorder, bool prioritizeComputeInputs,
-    std::vector<uint16_t>* order) const
+    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order,
+    QueuePlanningScratch& scratch, bool prioritizeComputeInputs) const
 {
     const uint64_t handoff = m_queueCostModel.handoffNanoseconds;
     const auto addTime = [](uint64_t left, uint64_t right)
     {
         return right > UINT64_MAX - left ? UINT64_MAX : left + right;
     };
-    std::vector<uint32_t> position(m_passes.size(), UINT32_MAX);
-    for (uint32_t index = 0; index < m_executeOrder.size(); ++index)
+    auto& position = scratch.position;
+    const auto compiled = std::span{m_executeOrder.data(), m_executeOrder.size()};
+    position.assign(m_passes.size(), UINT32_MAX);
+    for (uint32_t index = 0; index < compiled.size(); ++index)
     {
-        position[m_executeOrder[index]] = index;
+        position[compiled[index]] = index;
     }
     // Ancestors of compute work go first among equally ready graphics passes so
     // compute starts early; everything else keeps compiled order on ties.
-    std::vector<bool> feedsCompute(m_passes.size(), false);
+    auto& feedsCompute = scratch.feedsCompute;
+    feedsCompute.assign(m_passes.size(), false);
     bool usesCompute = false;
-    for (auto it = m_executeOrder.rbegin(); it != m_executeOrder.rend(); ++it)
+    for (size_t index = compiled.size(); index-- > 0;)
     {
-        usesCompute = usesCompute || queues[*it] == RHIQueueKind::Compute;
-        for (const auto next : successors[*it])
+        const auto pass = compiled[index];
+        usesCompute = usesCompute || queues[pass] == RHIQueueKind::Compute;
+        const auto& nextPasses = successors[pass];
+        for (const auto next : std::span{nextPasses.data(), nextPasses.size()})
         {
             if (queues[next] == RHIQueueKind::Compute || feedsCompute[next])
             {
-                feedsCompute[*it] = true;
+                feedsCompute[pass] = true;
                 break;
             }
         }
     }
-    std::vector<uint32_t> remaining(m_passes.size(), 0);
-    std::vector<uint64_t> earliest(m_passes.size(), 0), finish(m_passes.size(), 0);
-    std::vector<uint16_t> ready;
-    for (const auto pass : m_executeOrder)
-    {
-        remaining[pass] = static_cast<uint32_t>(predecessors[pass].size());
-        if (remaining[pass] == 0)
-        {
-            ready.push_back(pass);
-        }
-    }
+    auto& remaining = scratch.remaining;
+    auto& earliest = scratch.earliest;
+    auto& finish = scratch.finish;
+    auto& ready = scratch.ready;
+    auto& future = scratch.future;
+    remaining.assign(m_passes.size(), 0);
+    earliest.assign(m_passes.size(), 0);
+    finish.assign(m_passes.size(), 0);
     // The first compute batch always waits for the graphics prologue, even
     // without a resource edge. It cannot start before this modeled handoff.
     uint64_t queueFree[2]{0, usesCompute ? handoff : 0};
     const auto slot = [&](uint16_t pass) { return queues[pass] == RHIQueueKind::Compute ? 1 : 0; };
     const auto start = [&](uint16_t pass) { return (std::max)(earliest[pass], queueFree[slot(pass)]); };
+    const auto rank = [&](uint16_t pass)
+    {
+        return position[pass] + (reorder && !feedsCompute[pass] ? static_cast<uint32_t>(m_executeOrder.size()) : 0u);
+    };
+    const auto readyLater = [&](uint16_t left, uint16_t right) { return rank(left) > rank(right); };
+    const auto deferred = [&](uint16_t pass)
+    {
+        return prioritizeComputeInputs && !feedsCompute[pass] && queues[pass] != RHIQueueKind::Compute;
+    };
+    const auto better = [&](uint16_t left, uint16_t right)
+    {
+        return std::tuple{deferred(left), reorder ? start(left) : 0, rank(left)} <
+            std::tuple{deferred(right), reorder ? start(right) : 0, rank(right)};
+    };
+    const auto futureLater = [&](uint16_t left, uint16_t right)
+    {
+        if (deferred(left) != deferred(right)) return deferred(left) > deferred(right);
+        return earliest[left] > earliest[right] || (earliest[left] == earliest[right] && readyLater(left, right));
+    };
+    for (uint32_t queue = 0; queue < 2; ++queue)
+    {
+        ready[queue].clear();
+        future[queue].clear();
+        ready[queue].reserve(m_executeOrder.size());
+        future[queue].reserve(m_executeOrder.size());
+    }
+    const auto enqueue = [&](uint16_t pass)
+    {
+        const auto queue = slot(pass);
+        if (!reorder || earliest[pass] <= queueFree[queue])
+        {
+            ready[queue].push_back(pass);
+            std::push_heap(ready[queue].data(), ready[queue].data() + ready[queue].size(), readyLater);
+        }
+        else
+        {
+            future[queue].push_back(pass);
+            std::push_heap(future[queue].data(), future[queue].data() + future[queue].size(), futureLater);
+        }
+    };
+    for (const auto pass : compiled)
+    {
+        remaining[pass] = static_cast<uint32_t>(predecessors[pass].size());
+        if (remaining[pass] == 0) enqueue(pass);
+    }
     if (order)
     {
         order->clear();
         order->reserve(m_executeOrder.size());
     }
-    // Earliest start, then compute ancestors, then compiled position.
-    const auto key = [&](uint16_t pass)
+    // Each queue has two heaps. Future work is ordered by immutable dependency
+    // readiness. Once the queue clock catches up, all those starts are clamped
+    // to queueFree and must instead be ordered by ancestor/compiled-position rank.
+    // Compare only the two queue heads: same list policy, O(P log P + E) rather
+    // than rescanning a potentially wide frontier for every dispatched pass.
+    while (!ready[0].empty() || !ready[1].empty() || !future[0].empty() || !future[1].empty())
     {
-        // Compare a compute-input-first order with the earliest-start baseline.
-        // This may leave a queue idle; the caller keeps it only if the whole
-        // modeled frame finishes earlier. Pass names never enter the decision.
-        const bool deferred = prioritizeComputeInputs && !feedsCompute[pass] &&
-            queues[pass] != RHIQueueKind::Compute;
-        return reorder ? std::tuple<bool, uint64_t, bool, uint32_t>{deferred, start(pass), !feedsCompute[pass], position[pass]} :
-            std::tuple<bool, uint64_t, bool, uint32_t>{false, 0, false, position[pass]};
-    };
-    while (!ready.empty())
-    {
-        auto best = ready.begin();
-        for (auto it = ready.begin() + 1; it != ready.end(); ++it)
+        uint16_t heads[2]{RGPassId::kInvalid, RGPassId::kInvalid};
+        for (uint32_t queue = 0; queue < 2; ++queue)
         {
-            if (key(*it) < key(*best))
+            while (!future[queue].empty() && earliest[future[queue].front()] <= queueFree[queue])
             {
-                best = it;
+                const auto pass = future[queue].front();
+                std::pop_heap(future[queue].data(), future[queue].data() + future[queue].size(), futureLater);
+                future[queue].pop_back();
+                enqueue(pass);
             }
+            if (!ready[queue].empty()) heads[queue] = ready[queue].front();
+            else if (!future[queue].empty()) heads[queue] = future[queue].front();
+            if (!ready[queue].empty() && !future[queue].empty() &&
+                better(future[queue].front(), heads[queue])) heads[queue] = future[queue].front();
         }
-        const auto pass = *best;
-        ready.erase(best);
+        auto pass = heads[0];
+        if (pass == RGPassId::kInvalid) pass = heads[1];
+        else if (heads[1] != RGPassId::kInvalid)
+        {
+            if (better(heads[1], pass)) pass = heads[1];
+        }
+        const auto queue = slot(pass);
+        if (!ready[queue].empty() && ready[queue].front() == pass)
+        {
+            std::pop_heap(ready[queue].data(), ready[queue].data() + ready[queue].size(), readyLater);
+            ready[queue].pop_back();
+        }
+        else
+        {
+            std::pop_heap(future[queue].data(), future[queue].data() + future[queue].size(), futureLater);
+            future[queue].pop_back();
+        }
         finish[pass] = addTime(start(pass), costs[pass]);
         queueFree[slot(pass)] = finish[pass];
         if (order)
         {
             order->push_back(pass);
         }
-        for (const auto next : successors[pass])
+        const auto& nextPasses = successors[pass];
+        for (const auto next : std::span{nextPasses.data(), nextPasses.size()})
         {
             const uint64_t available = addTime(finish[pass], queues[next] != queues[pass] ? handoff : 0);
             earliest[next] = (std::max)(earliest[next], available);
             if (--remaining[next] == 0)
             {
-                ready.push_back(next);
+                enqueue(next);
             }
         }
     }
@@ -2742,10 +2905,12 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         return true;
     }
     std::vector<std::vector<uint16_t>> predecessors, successors;
-    std::vector<QueueReadEpoch> dependencyResources;
     const std::vector<RHIQueueKind> serial(m_passes.size(), RHIQueueKind::Graphics);
     std::vector<RHIQueueKind> queues = serial;
-    BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
+    // Scratch is local to this planning invocation: reuse allocations between
+    // trials without caching measurements, ownership epochs or another frame's DAG.
+    QueuePlanningScratch scratch;
+    BuildQueueDependencies(queues, scratch, predecessors, successors);
     std::vector<uint16_t> order = m_executeOrder;
     if (!overlap)
     {
@@ -2753,10 +2918,10 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         {
             queues[pass] = RHIQueueKind::Compute;
         }
-        BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
+        BuildQueueDependencies(queues, scratch, predecessors, successors);
         if (plan.predictionComplete)
         {
-            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr);
+            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr, scratch);
         }
     }
     // Missing samples and saturated arithmetic are not evidence of a benefit.
@@ -2766,19 +2931,21 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         const bool reorder = m_orderPolicy == RGOrderPolicy::DependencyOrder;
         uint64_t best = plan.predictedSerialNanoseconds;
         std::vector<std::vector<uint16_t>> trialPredecessors, trialSuccessors;
-        const auto attempt = [&](const std::vector<uint16_t>& passes)
+        std::vector<RHIQueueKind> trial;
+        const auto attempt = [&](std::span<const uint16_t> passes)
         {
-            auto trial = queues;
+            ++plan.placementTrials;
+            trial = queues;
             for (const auto pass : passes)
             {
                 trial[pass] = trial[pass] == RHIQueueKind::Compute ? RHIQueueKind::Graphics : RHIQueueKind::Compute;
             }
-            BuildQueueDependencies(trial, trialPredecessors, trialSuccessors, dependencyResources);
-            const auto span = SimulateQueues(trial, costs, trialPredecessors, trialSuccessors, reorder, nullptr);
+            BuildQueueDependencies(trial, scratch, trialPredecessors, trialSuccessors);
+            const auto span = SimulateQueues(trial, costs, trialPredecessors, trialSuccessors, reorder, nullptr, scratch);
             if (span < best)
             {
                 best = span;
-                queues = std::move(trial);
+                queues = trial;
             }
         };
         // A dependent chain of candidates (SSAO raw -> filter) only pays off as a
@@ -2819,12 +2986,12 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         }
         for (const auto pass : candidates)
         {
-            attempt({pass});
+            attempt(std::span<const uint16_t>{&pass, 1});
         }
         if (plan.predictedSerialNanoseconds - best >= m_queueCostModel.minimumGainNanoseconds)
         {
-            BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
-            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, reorder, &order);
+            BuildQueueDependencies(queues, scratch, predecessors, successors);
+            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, reorder, &order, scratch);
         }
         else
         {
@@ -2832,7 +2999,9 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             plan.fallbackReason = RGQueueFallbackReason::InsufficientGain;
         }
     }
-    BuildQueueDependencies(queues, predecessors, successors, dependencyResources);
+    BuildQueueDependencies(queues, scratch, predecessors, successors);
+    plan.dependencyMilliseconds = scratch.dependencyMilliseconds;
+    plan.simulationMilliseconds = scratch.simulationMilliseconds;
     for (const auto pass : order)
     {
         plan.usesCompute = plan.usesCompute || queues[pass] == RHIQueueKind::Compute;
@@ -3189,23 +3358,99 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     {
         unitWorker[i] = static_cast<uint32_t>(i * workers / unitCount);
     }
-    std::vector<uint32_t> unitWave(unitCount,0);
-    uint32_t waveCount=1;
-    if(m_scheduling==RGSchedulingMode::ExplicitVersioned && workers>1)
+    std::vector<uint32_t> unitWave(unitCount, 0);
+    uint32_t waveCount = 1;
+    m_stats.recordingBalanced = false;
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
     {
         std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
-        for(const auto& edge:m_versionEdges) predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
-        std::vector<uint32_t> passWave(m_passes.size(),0), targetWave(workers,0);
-        for(size_t begin=0;begin<unitCount;)
+        for (const auto& edge : m_versionEdges)
+            predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
+        std::vector<uint32_t> passWave(m_passes.size()), targetWave(workers);
+        std::vector<uint32_t> passSingleTarget(m_passes.size());
+        const auto planWaves = [&](const std::vector<uint32_t>& targets, std::vector<uint32_t>& waves)
         {
-            size_t end=begin+1;
-            while(end<unitCount && units[end].order==units[begin].order) ++end;
-            const auto pass=m_executeOrder[units[begin].order];
-            uint32_t wave=0;
-            for(const auto producer:predecessors[pass]) wave=(std::max)(wave,passWave[producer]+1);
-            for(size_t i=begin;i<end;++i) wave=(std::max)(wave,targetWave[unitWorker[i]]);
-            for(size_t i=begin;i<end;++i) { unitWave[i]=wave; targetWave[unitWorker[i]]=wave; }
-            passWave[pass]=wave; waveCount=(std::max)(waveCount,wave+1); begin=end;
+            std::fill(passWave.begin(), passWave.end(), 0);
+            std::fill(targetWave.begin(), targetWave.end(), 0);
+            std::fill(passSingleTarget.begin(), passSingleTarget.end(), UINT32_MAX);
+            uint32_t count = 1;
+            for (size_t begin = 0; begin < unitCount;)
+            {
+                size_t end = begin + 1;
+                while (end < unitCount && units[end].order == units[begin].order) ++end;
+                const auto pass = m_executeOrder[units[begin].order];
+                uint32_t wave = 0;
+                const uint32_t singleTarget = end - begin == 1 ? targets[begin] : UINT32_MAX;
+                for (const auto producer : predecessors[pass])
+                {
+                    // Unannotated/split consumers retain CPU joins. Independent
+                    // GPU consumers still keep all GPU list order/barriers.
+                    const uint32_t join = singleTarget != UINT32_MAX &&
+                        (passSingleTarget[producer] == singleTarget || m_passes[pass].recordingIndependent) ? 0u : 1u;
+                    wave = (std::max)(wave, passWave[producer] + join);
+                }
+                passSingleTarget[pass] = singleTarget;
+                for (size_t i = begin; i < end; ++i) wave = (std::max)(wave, targetWave[targets[i]]);
+                for (size_t i = begin; i < end; ++i) { waves[i] = wave; targetWave[targets[i]] = wave; }
+                passWave[pass] = wave;
+                count = (std::max)(count, wave + 1);
+                begin = end;
+            }
+            return count;
+        };
+        waveCount = planWaves(unitWorker, unitWave);
+        if (m_recordingWorkloadBalance && unitCount > workers)
+        {
+            // These are CPU command-recording work units, never GPU timings.
+            // Base callback + declared resource uses + declared draw-batch cost.
+            // Split callbacks share the declared work; every slice has overhead.
+            std::vector<uint64_t> costs(unitCount);
+            uint64_t total = 0;
+            for (size_t i = 0; i < unitCount; ++i)
+            {
+                const auto index = m_executeOrder[units[i].order];
+                const auto& pass = m_passes[index];
+                const uint64_t declared = uint64_t(pass.recordCost) / units[i].sliceCount;
+                // Physical history-buffer states alternate between frames. Using
+                // emitted barrier counts would move CPU partition boundaries and
+                // make capture join counts nondeterministic for identical inputs.
+                uint64_t resourceUses = pass.usages.size();
+                for (const auto& phase : pass.phases)
+                    resourceUses += uint64_t(phase.usages.size()) * pass.repeatCount;
+                const uint64_t bindingWork = units[i].slice == 0 ? resourceUses : 0;
+                costs[i] = (std::min)(uint64_t(UINT32_MAX), 1 + declared + bindingWork);
+                total += costs[i];
+            }
+            // Contiguous nonempty blocks: target order remains GPU execute order.
+            std::vector<uint32_t> candidate(unitCount);
+            uint64_t prefix = 0;
+            uint32_t target = 0;
+            for (size_t i = 0; i < unitCount; ++i)
+            {
+                const uint32_t desired = static_cast<uint32_t>((std::min)(uint64_t(workers - 1), prefix * workers / total));
+                if (i && target + 1 < workers &&
+                    (desired > target || unitCount - i <= workers - 1 - target)) ++target;
+                candidate[i] = target;
+                prefix += costs[i];
+            }
+            const auto peak = [&](const std::vector<uint32_t>& targets)
+            {
+                std::vector<uint64_t> sums(workers);
+                for (size_t i = 0; i < unitCount; ++i) sums[targets[i]] += costs[i];
+                return *std::max_element(sums.begin(), sums.end());
+            };
+            if (peak(candidate) < peak(unitWorker))
+            {
+                std::vector<uint32_t> candidateWaves(unitCount);
+                const uint32_t candidateCount = planWaves(candidate, candidateWaves);
+                if (candidateCount <= waveCount)
+                {
+                    unitWorker = std::move(candidate);
+                    unitWave = std::move(candidateWaves);
+                    waveCount = candidateCount;
+                    m_stats.recordingBalanced = true;
+                }
+            }
         }
     }
     std::vector<std::vector<size_t>> workerUnits(workers);
@@ -3213,6 +3458,9 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     {
         workerUnits[unitWorker[i]].push_back(i);
     }
+    m_stats.recordingWaveCount = waveCount;
+    m_stats.recordingJobDispatchCount = 0;
+    m_stats.recordingWorkerJobCount = 0;
     std::vector<size_t> workerCursors(workers, 0);
     uint32_t activeWave=0; // owner changes only after every recording Job has joined
 
@@ -3261,6 +3509,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
                 const RecordUnit& unit = units[i];
                 Pass& pass = m_passes[m_executeOrder[unit.order]];
+
 
                 // 순차 경로와 같은 이유로 조각마다 새로 만든다(Execute 주석 참고).
                 // 워커마다 자기 커맨드 리스트라 조각끼리도 섞이지 않아야 한다.
@@ -3342,7 +3591,20 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                 if (!isSingleWorkerWave(wave))
                 {
                     activeWave = wave++;
-                    pool.RunParallel(recordRange, workers);
+                    // Dispatch only targets with units in this wave. The owner
+                    // still joins every submitted job before advancing the wave.
+                    std::vector<uint32_t> active;
+                    for (uint32_t worker = 0; worker < workers; ++worker)
+                    {
+                        const auto cursor = workerCursors[worker];
+                        if (cursor < workerUnits[worker].size() &&
+                            unitWave[workerUnits[worker][cursor]] == activeWave)
+                            active.push_back(worker);
+                    }
+                    m_stats.recordingJobDispatchCount += 1;
+                    m_stats.recordingWorkerJobCount += static_cast<uint32_t>(active.size());
+                    pool.RunParallel([&](uint32_t job) { recordRange(active[job]); },
+                        static_cast<uint32_t>(active.size()));
                     continue;
                 }
                 const uint32_t runBegin = wave;
@@ -3351,6 +3613,8 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     ++wave;
                 }
                 const uint32_t runEnd = wave;
+                ++m_stats.recordingJobDispatchCount;
+                ++m_stats.recordingWorkerJobCount;
                 pool.RunParallel([&](uint32_t)
                 {
                     for (uint32_t run = runBegin; run < runEnd && !failed.load(std::memory_order_relaxed); ++run)

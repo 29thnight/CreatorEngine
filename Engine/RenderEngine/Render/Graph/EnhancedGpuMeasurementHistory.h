@@ -34,23 +34,33 @@ public:
     {
         const auto& samples = Samples(domain);
         const auto found = samples.find(viewId);
-        return found == samples.end() ? nullptr : &found->second;
+        return found == samples.end() ? nullptr : &found->second.latest;
     }
 
     const Sample* FindFresh(RGMeasurementDomain domain, const GpuFrameToken& current,
-        uint64_t cpuTicksPerSecond) const
+        uint64_t cpuTicksPerSecond, const std::shared_ptr<const std::string>& signature = {}) const
     {
-        const auto* sample = Find(domain, current.renderViewId);
-        if (!current.IsValid() || !sample || !sample->graphSignature || cpuTicksPerSecond == 0 ||
+        const auto fresh = [&](const Sample* sample)
+        {
+            return current.IsValid() && sample && sample->graphSignature && cpuTicksPerSecond != 0 &&
+            (!signature || sample->graphSignature == signature || *sample->graphSignature == *signature) &&
+            !(
             sample->token.submissionId >= current.submissionId ||
             sample->token.engineFrameId > current.engineFrameId ||
             current.engineFrameId - sample->token.engineFrameId > kMaxFrameAge ||
             sample->token.cpuSubmitTick > current.cpuSubmitTick ||
-            current.cpuSubmitTick - sample->token.cpuSubmitTick > cpuTicksPerSecond / 2)
+            current.cpuSubmitTick - sample->token.cpuSubmitTick > cpuTicksPerSecond / 2);
+        };
+        const auto* latest = Find(domain, current.renderViewId);
+        if (fresh(latest)) return latest;
+        // Alternating history-buffer roles are distinct valid declarations.
+        // Match exact signatures; never merge costs across graph variants.
+        if (signature && latest && latest->graphSignature)
         {
-            return nullptr;
+            for (const auto& sample : Samples(domain).at(current.renderViewId).variants)
+                if (fresh(&sample)) return &sample;
         }
-        return sample;
+        return nullptr;
     }
 
     void Discard(RGMeasurementDomain domain, const GpuFrameToken& token)
@@ -64,9 +74,9 @@ public:
         // token later must not restore a sample invalidated by this failure.
         auto& samples = Samples(domain);
         MakeRoom(samples, token.renderViewId);
-        auto& sample = samples[token.renderViewId];
-        sample = {};
-        sample.token = token;
+        auto& entry = samples[token.renderViewId];
+        entry = {};
+        entry.latest.token = token;
     }
 
     bool Store(RGMeasurementDomain domain, Sample sample)
@@ -80,13 +90,27 @@ public:
         auto& samples = Samples(domain);
         MakeRoom(samples, sample.token.renderViewId);
         const auto viewId = sample.token.renderViewId;
-        samples[viewId] = std::move(sample);
+        auto& entry = samples[viewId];
+        if (entry.latest.graphSignature)
+        {
+            const auto equal = [](const auto& a, const auto& b)
+            { return a == b || (a && b && *a == *b); };
+            std::erase_if(entry.variants, [&](const Sample& old)
+            { return equal(old.graphSignature, sample.graphSignature); });
+            if (!equal(entry.latest.graphSignature, sample.graphSignature))
+                entry.variants.push_back(std::move(entry.latest));
+            if (entry.variants.size() >= kMaxSignaturesPerView)
+                entry.variants.erase(entry.variants.begin());
+        }
+        entry.latest = std::move(sample);
         return true;
     }
 
 private:
-    using DomainSamples = std::unordered_map<uint64_t, Sample>;
+    struct Entry { Sample latest; std::vector<Sample> variants; };
+    using DomainSamples = std::unordered_map<uint64_t, Entry>;
     static constexpr size_t kMaxViews = 8;
+    static constexpr size_t kMaxSignaturesPerView = 4;
     static constexpr uint64_t kMaxFrameAge = 8;
     std::array<DomainSamples, 2> m_domains;
 
@@ -107,7 +131,7 @@ private:
             const auto oldest = std::min_element(samples.begin(), samples.end(),
                 [](const auto& left, const auto& right)
                 {
-                    return left.second.token.cpuSubmitTick < right.second.token.cpuSubmitTick;
+                    return left.second.latest.token.cpuSubmitTick < right.second.latest.token.cpuSubmitTick;
                 });
             samples.erase(oldest);
         }

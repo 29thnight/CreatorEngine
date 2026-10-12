@@ -4,18 +4,22 @@
 #include "EnhancedCameraReplayInput.h"
 #include "EnhancedDrawReplayInput.h"
 #include "EnhancedLatticeReplayInput.h"
+#include "../Temporal/TemporalRuntimeControl.h"
+#include "../Temporal/TemporalMeasurementProvenance.h"
 #include <optional>
 #include <stdexcept>
 #include "../Core/EnhancedLivePipelineDesc.h"
-#include "../Passes/Geometry/EnhancedGBufferPass.h"
+#include "../Passes/Geometry/SceneSurfaceTargets.h"
 #include "../Graph/EnhancedDrawSealLedger.h"
 #include "../../Texture.h"
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../MaterialGraphSceneInput.h"
+#include "../../MaterialGraphSceneHost.h"
 #include <AuthoringRymlErrorPolicy.h>
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
 #include <c4/yml/emit.hpp>
+#include <c4/format.hpp>
 #include <filesystem>
 #include <fstream>
 #include <cmath>
@@ -26,11 +30,31 @@
 // readbacks. Release must run after submission completion (or frame abort).
 struct EnhancedPbrCapture
 {
+    // Acquired when the request is created, before the next frame is configured.
+    std::optional<TemporalNativeCaptureExclusion> nativeExclusion;
+    explicit EnhancedPbrCapture(bool forceNative = true)
+    {
+        if (forceNative) nativeExclusion.emplace();
+    }
+    uint32_t historyOrdinal{}, historyAcceptedBefore{};
+    bool historyFixedSdkClock{false};
+    static constexpr float kHistorySdkMilliseconds = 1000.f / 60.f;
+    uint64_t historyResetFrame{}, historyResetRevision{}, historySeenSubmission{};
+    uint64_t historyView{}, historyScene{}, historyCutRevision{};
+    TemporalMeasurementProvenance temporalProvenance;
+    uint64_t capturedViewId{}, capturedSceneEpoch{}, capturedRealFrameId{};
     EnhancedLivePbrCaptureStatus result;
     EnhancedLiveBackend resourceBackend{ EnhancedLiveBackend::DX12 };
     EnhancedLiveDisplayTarget target{ EnhancedLiveDisplayTarget::Game };
     uint64_t afterFrameId{};
     bool controlled{ false }; // Static scene repeatability; not a simulation clock.
+    bool observeTemporal{ false }; // Actual displayed reconstruction, not a native golden.
+    bool motionValidation{ false }; // Native, non-reset motion input observation.
+    EnhancedTemporalFixtureStamp expectedFixture;
+    EnhancedTemporalFixtureSubmission previousFixtureSubmission;
+    EnhancedTemporalFixtureSubmission fixtureSubmission;
+    TemporalFrame capturedTemporalFrame;
+    uint64_t capturedPreviousSubmittedFrame{};
     bool replayExtensions{ false }; // Optional archive/replay diagnostics, not BASE-0 acceptance.
     bool latticeReplayExtension{ false }; // Independent material archive opt-in.
     std::optional<EnhancedCameraReplayInput> cameraReplay;
@@ -40,7 +64,7 @@ struct EnhancedPbrCapture
     std::optional<EnhancedLatticeReplayInput> latticeReplay;
     std::vector<uint8_t> latticeInputBytes;
     ryml::Tree manifest;
-    std::array<RHIReadback, 7> readbacks{};
+    std::array<RHIReadback, 12> readbacks{};
     struct StageReadback
     {
         std::string name;
@@ -54,6 +78,23 @@ struct EnhancedPbrCapture
     };
     std::vector<StageReadback> stageReadbacks;
     std::vector<StageDiagnostic> stages;
+
+    bool DeclareHistory(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
+        RGHandle handle, uint32_t width, uint32_t height, std::string& error)
+    {
+        if (!historyOrdinal) return true;
+        if (!handle.IsValid()) { error = "history capture requires active SSGI"; return false; }
+        RHIReadback readback{};
+        if (!resources.CreateReadback(width, height, RHIFormat::RGBA16Float, 1, readback, error)) return false;
+        stages.push_back({"ssgi-history", stageReadbacks.size()});
+        stageReadbacks.push_back({"ssgi-history", handle, readback});
+        graph.AddPass("PBR.SSGIHistory", {{handle, RHIResourceState::CopySource,
+            graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder ? RGAccessMode::Read : RGAccessMode::LegacyState}},
+            [handle, readback](const EnhancedRenderGraph::ExecuteContext& context) {
+                context.encoder->CopyToReadback(readback, context.ResolveHandle(handle));
+            }, true);
+        return true;
+    }
 
     bool DeclareStage(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         const LiveBlackboard& blackboard, const LivePassNode& node,
@@ -140,6 +181,10 @@ struct EnhancedPbrCapture
         result.state = EnhancedPbrCaptureState::Recording;
         resourceBackend = backend;
         result.frameId = frame.frameId;
+        capturedViewId = view.key.viewId;
+        capturedSceneEpoch = frame.sceneEpoch;
+        capturedRealFrameId = view.displayTarget == EnhancedLiveDisplayTarget::Game && frame.temporalRealFrameId
+            ? frame.temporalRealFrameId : frame.frameId;
         Authoring::EnsureRymlErrorPolicy();
         auto root = manifest.rootref();
         root |= ryml::MAP;
@@ -147,7 +192,33 @@ struct EnhancedPbrCapture
         root["source"] << "product-live";
         root["backend"] << (backend == EnhancedLiveBackend::DX12 ? "dx12" : "vulkan");
         root["frameId"] << frame.frameId;
+        root["sourceRealFrameId"] << capturedRealFrameId;
         root["requestedAfterFrameId"] << afterFrameId;
+        if (historyOrdinal)
+        {
+            root["historyRecovery"] |= ryml::MAP;
+            auto h = root["historyRecovery"];
+            h["ordinal"] << historyOrdinal;
+            h["fixedSdkClock"] << c4::fmt::boolalpha(historyFixedSdkClock);
+            h["acceptedBefore"] << historyAcceptedBefore;
+            h["resetRealFrameId"] << historyResetFrame;
+            h["historyRevision"] << historyResetRevision;
+            h["cameraCutRevision"] << historyCutRevision;
+            h["viewId"] << historyView;
+            h["sceneEpoch"] << historyScene;
+        }
+        if (motionValidation)
+        {
+            root["fixtureBindingRequired"] << c4::fmt::boolalpha(expectedFixture.IsValid());
+            root["motionEvidence"] << (expectedFixture.IsValid()
+                ? "exact-tagged-fixture" : "unbound-motion-observation");
+            root["fixtureSessionId"] << frame.temporalFixture.sessionId;
+            root["fixtureStepId"] << frame.temporalFixture.stepId;
+            root["fixturePredecessorStepId"] << frame.temporalFixture.predecessorStepId;
+            root["fixtureInputSha256"] << frame.temporalFixture.inputSha256;
+            root["fixturePredecessorInputSha256"] << frame.temporalFixture.predecessorInputSha256;
+            root["fixtureCoalesced"] << c4::fmt::boolalpha(frame.temporalFixtureCoalesced);
+        }
         root["sceneEpoch"] << frame.sceneEpoch;
         root["viewId"] << view.key.viewId;
         root["historyRevision"] << view.key.historyRevision;
@@ -155,14 +226,9 @@ struct EnhancedPbrCapture
         root["height"] << frame.height;
         root["totalSeconds"] << frame.totalSeconds;
         root["deltaSeconds"] << frame.deltaSeconds;
-        root["captureMode"] << (controlled
+        root["captureMode"] << (observeTemporal ? "temporal-observation-v1" : historyOrdinal ? "temporal-history-recovery-v1" : expectedFixture.sdkQuality ? "temporal-sdk-sequence-v1" : motionValidation ? "temporal-motion-v1" : controlled
             ? (cameraReplay && (frame.totalSeconds != 0.f || frame.deltaSeconds != 0.f)
                 ? "camera-clock-replay-v1" : "static-repeatability-v1") : "observation");
-        root["frameKind"] << "real";
-        root["renderWidth"] << frame.width;
-        root["renderHeight"] << frame.height;
-        root["displayWidth"] << frame.width;
-        root["displayHeight"] << frame.height;
         root["skyBoxEnabled"] << frame.skyBoxEnabled;
         root["viewFlags"] << static_cast<uint32_t>(view.viewFlags);
         root["cameraInputContract"] << "camera-clock-v1";
@@ -276,6 +342,126 @@ struct EnhancedPbrCapture
         root["sealLedger"]["recorded"] << false;
     }
 
+    void WriteTemporalProvenance(ryml::NodeRef node) const
+    {
+        const auto& provenance = temporalProvenance;
+        node["temporalProvenanceSchemaVersion"] << 2;
+        node["frameKind"] << TemporalMeasuredFrameKindName(provenance.frameKind);
+        node["realFrameId"] << provenance.realFrameId;
+        node["generatedOrdinal"] << provenance.generatedOrdinal;
+        node["renderWidth"] << provenance.renderExtent.width;
+        node["renderHeight"] << provenance.renderExtent.height;
+        node["displayWidth"] << provenance.displayExtent.width;
+        node["displayHeight"] << provenance.displayExtent.height;
+        node["upscaler"] << TemporalMeasuredProviderName(provenance.upscaler);
+        node["frameGenerator"] << TemporalMeasuredProviderName(provenance.frameGenerator);
+        node["resolutionState"] << TemporalResolutionStateName(provenance.resolutionState);
+        node["spatialMode"] << SpatialScalingModeName(provenance.spatialMode);
+        node["deepDvcApplied"] << c4::fmt::boolalpha(provenance.deepDvcApplied);
+        node["temporalNativeGateActive"] << c4::fmt::boolalpha(provenance.nativeGateActive);
+    }
+
+    void RecordTemporalProvenance(const TemporalMeasurementProvenance& provenance)
+    {
+        temporalProvenance = provenance;
+        auto root = manifest.rootref();
+        WriteTemporalProvenance(root);
+        root["goldenEligible"] << (!historyOrdinal && !expectedFixture.sdkQuality && provenance.IsGoldenEligible());
+        // Graph timing is collected before submission. Refresh its frame/effect
+        // labels when Commit supplies the successfully submitted provenance.
+        if (root.has_child("measurement"))
+        {
+            WriteTemporalProvenance(root["measurement"]);
+        }
+    }
+
+    void RecordTemporalInputs(const TemporalFrame& frame, uint64_t previousSubmittedFrame, TemporalQuality quality = TemporalQuality::Quality)
+    {
+        capturedTemporalFrame = frame;
+        capturedPreviousSubmittedFrame = previousSubmittedFrame;
+        if (historyOrdinal)
+        {
+            auto h = manifest.rootref()["historyRecovery"];
+            h["sdkFrameMilliseconds"] << frame.frameTimeMilliseconds;
+            h["upscaleQuality"] << static_cast<uint32_t>(quality);
+            h["capturedReset"] << c4::fmt::boolalpha(frame.reset);
+            h["previousSubmittedRealFrameId"] << previousSubmittedFrame;
+        }
+        if (!motionValidation)
+        {
+            return;
+        }
+        auto node = manifest.rootref()["temporalMotion"];
+        node |= ryml::MAP;
+        node["schemaVersion"] << 2;
+        node["sdkQuality"] << c4::fmt::boolalpha(expectedFixture.sdkQuality);
+        node["sdkFrameMilliseconds"] << frame.frameTimeMilliseconds;
+        node["upscaleQuality"] << static_cast<uint32_t>(quality);
+        node["source"] << "final-production-temporal-inputs";
+        node["direction"] << "current-to-previous";
+        node["units"] << "render-pixels";
+        node["origin"] << "top-left";
+        node["jitterIncluded"] << c4::fmt::boolalpha(false);
+        node["historyReset"] << c4::fmt::boolalpha(frame.reset);
+        node["historyGeneration"] << frame.historyRevision;
+        node["realFrameId"] << frame.realFrameId;
+        // Read before this frame commits; do not infer adjacency from realFrameId.
+        // Published packets may be skipped without advancing temporal history.
+        node["previousSubmittedRealFrameId"] << previousSubmittedFrame;
+        node["fixtureSessionId"] << expectedFixture.sessionId;
+        node["fixtureStepId"] << expectedFixture.stepId;
+        node["fixturePredecessorStepId"] << expectedFixture.predecessorStepId;
+        node["fixtureInputSha256"] << expectedFixture.inputSha256;
+        node["fixturePredecessorInputSha256"] << expectedFixture.predecessorInputSha256;
+        node["previousSubmittedFixtureSessionId"] << previousFixtureSubmission.stamp.sessionId;
+        node["previousSubmittedFixtureStepId"] << previousFixtureSubmission.stamp.stepId;
+        node["previousSubmittedFixtureInputSha256"] << previousFixtureSubmission.stamp.inputSha256;
+        node["previousSubmittedFixtureSourceVerified"] << c4::fmt::boolalpha(previousFixtureSubmission.sourceVerified);
+        node["previousSubmittedSourceFrameId"] << previousFixtureSubmission.sourceFrameId;
+        node["previousSubmittedViewId"] << previousFixtureSubmission.viewId;
+        node["previousSubmittedSceneEpoch"] << previousFixtureSubmission.sceneEpoch;
+        node["previousSubmittedHistoryRevision"] << previousFixtureSubmission.historyRevision;
+        node["previousSubmittedHistoryGeneration"] << previousFixtureSubmission.historyGeneration;
+        node["renderWidth"] << frame.renderExtent.width;
+        node["renderHeight"] << frame.renderExtent.height;
+        node["jitterX"] << frame.jitterX;
+        node["jitterY"] << frame.jitterY;
+        node["previousJitterX"] << frame.previousJitterX;
+        node["previousJitterY"] << frame.previousJitterY;
+        node["pixelAcceptance"] << "requires-independent-fixture-comparison";
+    }
+
+    void RecordFixtureSubmission(const EnhancedTemporalFixtureSubmission& submitted)
+    {
+        fixtureSubmission = submitted;
+        if (!motionValidation)
+        {
+            return;
+        }
+        auto node = manifest.rootref()["fixtureSubmission"];
+        node |= ryml::MAP;
+        node["valid"] << c4::fmt::boolalpha(submitted.valid);
+        node["sourceVerified"] << c4::fmt::boolalpha(submitted.sourceVerified);
+        node["sessionId"] << submitted.stamp.sessionId;
+        node["stepId"] << submitted.stamp.stepId;
+        node["requestedPredecessorStepId"] << submitted.stamp.predecessorStepId;
+        node["predecessorStepId"] << submitted.predecessorStepId;
+        node["inputSha256"] << submitted.stamp.inputSha256;
+        node["requestedPredecessorInputSha256"] << submitted.stamp.predecessorInputSha256;
+        node["predecessorInputSha256"] << submitted.predecessorInputSha256;
+        node["viewId"] << submitted.viewId;
+        node["sceneEpoch"] << submitted.sceneEpoch;
+        node["historyRevision"] << submitted.historyRevision;
+        node["historyGeneration"] << submitted.historyGeneration;
+        node["sourceFrameId"] << submitted.sourceFrameId;
+        node["realFrameId"] << submitted.realFrameId;
+        node["predecessorSourceFrameId"] << submitted.predecessorSourceFrameId;
+        node["predecessorRealFrameId"] << submitted.predecessorRealFrameId;
+        node["historyReset"] << c4::fmt::boolalpha(submitted.historyReset);
+        node["coalesced"] << c4::fmt::boolalpha(submitted.coalesced);
+        node["submissionProof"] << "native-submit-succeeded-and-temporal-history-committed";
+    }
+
     void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
     {
         if (!input)
@@ -327,13 +513,9 @@ struct EnhancedPbrCapture
         }
     }
 
-    // 패스가 이번 프레임의 배치를 확정한 뒤에 부른다. draw snapshot만으로는
-    // 알 수 없는 축(어느 PSO로 그렸는가, 어떤 sampler를 걸었는가, descriptor
-    // 배치가 갈리지 않았는가)을 여기서 적는다.
-    void RecordSealLedger(const EnhancedDrawSealLedger& gbuffer,
-        std::uint64_t gbufferSampler,
-        const EnhancedDrawSealLedger& forward, std::uint64_t forwardSampler,
-        std::uint64_t encoderDrops, const std::string& lastEncoderDrop,
+    // Frame-wide recording health after graph recording completes. Encoder
+    // drops and replaced texture uploads make captured pixels non-authoritative.
+    void RecordRenderLedger(std::uint64_t encoderDrops, const std::string& lastEncoderDrop,
         std::uint32_t textureUploadFailures)
     {
         auto root = manifest.rootref();
@@ -345,44 +527,47 @@ struct EnhancedPbrCapture
         // W9 — 업로드 실패를 흰색으로 덮은 횟수. 저작으로 없는 슬롯의 중립값은
         // 여기 들어가지 않는다. 0이 아니면 화면의 흰색을 재질로 읽으면 안 된다.
         ledger["textureUploadFailures"] << textureUploadFailures;
-        const auto appendPass = [&](const char* name,
-            const EnhancedDrawSealLedger& source, std::uint64_t samplerIdentity)
+    }
+
+    // Called after the submitted graph has completed. A selected PSO alone is
+    // insufficient: entries are appended only after successful draw/dispatch
+    // recording, then joined before native submission is acknowledged.
+    void RecordGeometryRoutes(const material_graph::SceneHost& sceneHost)
+    {
+        const auto audit = sceneHost.RecordedGeometryRoutes();
+        if (audit.sourceFrameId != 0 && (audit.sourceFrameId != result.frameId ||
+            audit.sceneEpoch != capturedSceneEpoch || audit.viewId != capturedViewId))
         {
-            auto node = ledger[ryml::to_csubstr(name)];
-            node |= ryml::MAP;
-            node["frameId"] << source.frameId;
-            node["sceneEpoch"] << source.sceneEpoch;
-            node["samplerIdentity"] << samplerIdentity;
-            node["stamped"] << source.counters.stamped;
-            node["unstamped"] << source.counters.unstamped;
-            node["staleFrame"] << source.counters.staleFrame;
-            node["valueMismatch"] << source.counters.valueMismatch;
-            node["pipelineConflict"] << source.counters.pipelineConflict;
-            node["bindingConflict"] << source.counters.bindingConflict;
-            node["skipped"] << source.counters.skipped;
-            node["dropped"] << source.recordDrops.Total();
-            node["violations"] << source.Violations();
-            node["lastReason"] << source.lastReason;
-            auto bindings = node["bindings"];
-            bindings |= ryml::SEQ;
-            for (const auto& [sealHash, binding] : source.bindings)
-            {
-                auto entry = bindings.append_child();
-                entry |= ryml::MAP;
-                entry["sealHash"] << sealHash;
-                entry["pipelineId"] << binding.pipelineId;
-                entry["textureDigest"] << binding.textureDigest;
-                entry["samplerIdentity"] << binding.samplerIdentity;
-                // W0 — 이 셋이 draw 별 신원의 세 축이다. draw 쪽 `seal.hash` 로
-                // 여기 `sealHash` 를 조인하면 draw 마다의 PSO·sampler·descriptor
-                // 버전이 나온다. 값을 여기 두는 이유는 같은 밀봉을 공유하는
-                // draw 들이 **같은 바인딩을 써야 한다**는 것이 W8 의 불변식이라,
-                // draw 마다 복사하면 그 불변식이 표에서 안 보이게 되기 때문이다.
-                entry["descriptorVersion"] << binding.descriptorVersion;
-            }
-        };
-        appendPass("gbuffer", gbuffer, gbufferSampler);
-        appendPass("forward", forward, forwardSampler);
+            throw std::runtime_error("recorded geometry route audit belongs to a different capture frame");
+        }
+        auto node = manifest.rootref()["geometryRoutes"];
+        node |= ryml::MAP;
+        node["source"] << "joined-command-recording-after-native-submission";
+        node["pass"] << "METEOR.Scene.GBuffer";
+        node["sourceFrameId"] << result.frameId;
+        node["sceneEpoch"] << capturedSceneEpoch;
+        node["viewId"] << capturedViewId;
+        node["emptyScene"] << c4::fmt::boolalpha((audit.sourceFrameId == 0));
+        const auto meshletCount = static_cast<uint32_t>(std::count_if(audit.draws.begin(), audit.draws.end(),
+            [](const auto& draw) { return draw.meshShader; }));
+        node["recordedMeshletBatchCount"] << meshletCount;
+        node["recordedMeshletDispatchCount"] << meshletCount;
+        node["gpuVisibleCountAvailable"] << false;
+        auto selected = node["selected"];
+        selected |= ryml::SEQ;
+        for (const auto& route : audit.draws)
+        {
+            auto entry = selected.append_child();
+            entry |= ryml::MAP;
+            entry["geometryKey"] << route.geometryKey;
+            entry["temporalObjectId"] << route.temporalObjectId;
+            entry["temporalInstanceId"] << route.temporalInstanceId;
+            entry["sourcePipeline"] << route.sourcePipeline;
+            entry["recordedPipeline"] << route.recordedPipeline;
+            entry["meshletCount"] << route.meshletCount;
+            entry["meshShader"] << c4::fmt::boolalpha(route.meshShader);
+            entry["indirect"] << route.indirect;
+        }
     }
 
     bool RecordCompiledGraph(const EnhancedRenderGraph& graph, double recordMs, double compileMs)
@@ -614,6 +799,9 @@ struct EnhancedPbrCapture
             }
         }
         root["measurement"] |= ryml::MAP;
+        // All timing/memory values below belong to this submitted real frame,
+        // never to a generated presentation or a newer status snapshot.
+        WriteTemporalProvenance(root["measurement"]);
         root["measurement"]["cpuRecordMs"] << recordMs;
         root["measurement"]["cpuGraphCompileMs"] << compileMs;
         root["measurement"]["cpuTransientPrepareMs"] << graph.GetStats().transientPrepareCpuMs;
@@ -632,7 +820,9 @@ struct EnhancedPbrCapture
         heaps["leasedHeaps"] << heapMemory.leasedHeaps;
         root["measurement"]["scope"] << "capture-submission-including-readbacks";
         root["measurement"]["domain"] << RGMeasurementDomainName(graph.GetMeasurementDomain());
-        root["measurement"]["normalFrameComparable"] << false;
+        // ryml's bool serializer emits numeric 0; preserve the JSON boolean
+        // contract consumed by the strict capture/performance-domain audit.
+        root["measurement"]["normalFrameComparable"] << "false";
         root["measurement"]["gpuStatus"] << "unsupported";
         root["measurement"]["gpuReason"] << "backend has no product pass timestamp collector";
         return true;
@@ -702,21 +892,29 @@ struct EnhancedPbrCapture
 
     bool Declare(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         const LiveBlackboard& blackboard, uint32_t width, uint32_t height,
-        std::string& error)
+        std::string& error, uint32_t displayWidth = 0, uint32_t displayHeight = 0)
     {
         graph.SetMeasurementDomain(RGMeasurementDomain::Capture);
         constexpr const char* slots[] = { LiveSlots::kGBufferDiffuse,
             LiveSlots::kGBufferMetalRough, LiveSlots::kGBufferNormal,
             LiveSlots::kGBufferEmissive, LiveSlots::kGBufferDepth,
-            LiveSlots::kLitColor, LiveSlots::kDisplayLdr };
-        for (uint32_t i = 0; i < readbacks.size(); ++i)
+            LiveSlots::kLitColor, LiveSlots::kDisplayLdr,
+            LiveSlots::kTemporalMotion, LiveSlots::kTemporalReactive,
+            LiveSlots::kTemporalTransparency, LiveSlots::kTemporalResponsive, LiveSlots::kTemporalDepth };
+        const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
+        for (uint32_t i = 0; i < count; ++i)
         {
             const auto handle = blackboard.Get(slots[i]);
             if (!handle.IsValid()) { error = std::string("missing capture output: ") + slots[i]; return false; }
-            const auto format = i < 4 ? EnhancedGBufferPass::GetRenderTargetFormat(i)
-                : i == 4 ? RHIFormat::D32Float
-                : i == 5 ? RHIFormat::RGBA16Float : RHIFormat::RGBA8Unorm;
-            if (!resources.CreateReadback(width, height, format, 1, readbacks[i], error))
+            const auto format = i < 4 ? SceneSurfaceTargets::GetRenderTargetFormat(i)
+                : i == 4 || i == 11 ? RHIFormat::D32Float
+                : i == 5 ? RHIFormat::RGBA16Float
+                : i == 6 ? RHIFormat::RGBA8Unorm
+                : i == 7 ? RHIFormat::RG16Float : RHIFormat::R16Float;
+            const bool displaySized = i == 5 || i == 6;
+            const auto copyWidth = displaySized && displayWidth ? displayWidth : width;
+            const auto copyHeight = displaySized && displayHeight ? displayHeight : height;
+            if (!resources.CreateReadback(copyWidth, copyHeight, format, 1, readbacks[i], error))
                 return false;
             const auto readback = readbacks[i];
             graph.AddPass(std::string("PBR.Capture.") + slots[i],
@@ -732,21 +930,92 @@ struct EnhancedPbrCapture
     bool Save(IRenderDeviceServices& resources, const EnhancedRenderGraph::Stats& stats,
         std::string& error, uint32_t validationCount, const std::string& validation)
     {
+        if (historyOrdinal && (capturedTemporalFrame.realFrameId != capturedRealFrameId ||
+            capturedTemporalFrame.historyRevision != historyResetRevision ||
+            capturedViewId != historyView || capturedSceneEpoch != historyScene ||
+            historyAcceptedBefore + 1 != historyOrdinal ||
+            (historyOrdinal == 1 && (!capturedTemporalFrame.reset || capturedRealFrameId != historyResetFrame)) ||
+            (historyOrdinal == 8 && (capturedTemporalFrame.reset || capturedPreviousSubmittedFrame < historyResetFrame))))
+        { error = "history recovery capture did not match its submitted reset sequence"; Fail(error); return false; }
+        if (motionValidation && (capturedTemporalFrame.reset ||
+            capturedPreviousSubmittedFrame == 0 ||
+            capturedPreviousSubmittedFrame >= capturedRealFrameId ||
+            capturedTemporalFrame.realFrameId != capturedRealFrameId))
+        {
+            error = "motion observation requires a matching non-reset real frame with submitted history";
+            Fail(error);
+            return false;
+        }
+        if (motionValidation && expectedFixture.IsValid() && (capturedTemporalFrame.reset ||
+            expectedFixture.predecessorStepId == 0 ||
+            !fixtureSubmission.valid || fixtureSubmission.historyReset || fixtureSubmission.coalesced ||
+            fixtureSubmission.stamp != expectedFixture ||
+            fixtureSubmission.sourceFrameId != result.frameId ||
+            fixtureSubmission.realFrameId != capturedRealFrameId ||
+            fixtureSubmission.viewId != capturedViewId ||
+            fixtureSubmission.sceneEpoch != capturedSceneEpoch ||
+            !previousFixtureSubmission.sourceVerified ||
+            previousFixtureSubmission.stamp.sessionId != expectedFixture.sessionId ||
+            previousFixtureSubmission.stamp.stepId != expectedFixture.predecessorStepId ||
+            previousFixtureSubmission.stamp.inputSha256 != expectedFixture.predecessorInputSha256 ||
+            fixtureSubmission.predecessorStepId != expectedFixture.predecessorStepId ||
+            fixtureSubmission.predecessorSourceFrameId != previousFixtureSubmission.sourceFrameId ||
+            fixtureSubmission.predecessorInputSha256 != previousFixtureSubmission.stamp.inputSha256 ||
+            fixtureSubmission.predecessorRealFrameId != previousFixtureSubmission.realFrameId ||
+            capturedPreviousSubmittedFrame != previousFixtureSubmission.realFrameId ||
+            capturedTemporalFrame.realFrameId != capturedRealFrameId ||
+            fixtureSubmission.historyGeneration != capturedTemporalFrame.historyRevision ||
+            previousFixtureSubmission.historyGeneration != capturedTemporalFrame.historyRevision ||
+            previousFixtureSubmission.historyRevision != fixtureSubmission.historyRevision))
+        {
+            error = "motion capture requires the exact submitted fixture session/step/predecessor pair";
+            Fail(error);
+            return false;
+        }
+        const bool eligible = (historyOrdinal || observeTemporal)
+            ? temporalProvenance.IsValid() && !temporalProvenance.nativeGateActive &&
+                temporalProvenance.frameKind == TemporalMeasuredFrameKind::Real &&
+                temporalProvenance.frameGenerator == TemporalProvider::None &&
+                temporalProvenance.spatialMode == SpatialScalingMode::Off && !temporalProvenance.deepDvcApplied &&
+                (temporalProvenance.resolutionState == TemporalResolutionState::Native ||
+                 temporalProvenance.resolutionState == TemporalResolutionState::Reconstructed)
+            : expectedFixture.sdkQuality ? IsSdkQualityFixtureProvenance(temporalProvenance)
+            : temporalProvenance.IsGoldenEligible();
+        if (!eligible || temporalProvenance.realFrameId != capturedRealFrameId ||
+            temporalProvenance.publicationFrameId != result.frameId ||
+            temporalProvenance.viewId != capturedViewId || temporalProvenance.sceneEpoch != capturedSceneEpoch)
+        {
+            error = "capture requires eligible observed real-frame provenance for this frame";
+            Fail(error);
+            return false;
+        }
         try
         {
-            const std::filesystem::path root(result.directory);
+            const auto root = std::filesystem::u8path(result.directory);
             constexpr const char* names[] = { "baseColor", "metalRough", "normal",
-                "emissive", "depth", "preToneHdr", "display" };
+                "emissive", "depth", "preToneHdr", "display", "temporalMotionRG",
+                "temporalReactive", "temporalTransparency", "temporalResponsive", "temporalDepth" };
             auto rootNode = manifest.rootref();
             rootNode["validationCount"] << validationCount;
             rootNode["validation"] << validation;
             rootNode["attachments"] |= ryml::SEQ;
             bool finite = true;
-            for (uint32_t i = 0; i < readbacks.size(); ++i)
+            const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
+            for (uint32_t i = 0; i < count; ++i)
             {
                 RHIReadbackImage image;
                 if (!resources.MapReadback(readbacks[i], image, error)) return false;
-                const uint32_t channels = i == 4 ? 1 : 4;
+                if (motionValidation && (!image.IsValid() ||
+                    image.width != ((i == 5 || i == 6) ? capturedTemporalFrame.displayExtent.width : capturedTemporalFrame.renderExtent.width) ||
+                    image.height != ((i == 5 || i == 6) ? capturedTemporalFrame.displayExtent.height : capturedTemporalFrame.renderExtent.height) ||
+                    (i == 7 && image.format != RHIFormat::RG16Float) ||
+                    (i >= 8 && i <= 10 && image.format != RHIFormat::R16Float) ||
+                    (i == 11 && image.format != RHIFormat::D32Float)))
+                {
+                    error = "motion capture readback extent or format mismatch";
+                    return false;
+                }
+                const uint32_t channels = i == 7 ? 2 : i == 4 || i >= 8 ? 1 : 4;
                 std::vector<float> pixels;
                 pixels.reserve(static_cast<size_t>(image.width) * image.height * channels);
                 float minimum = std::numeric_limits<float>::max();
@@ -778,6 +1047,12 @@ struct EnhancedPbrCapture
                 attachment["channels"] << channels;
                 attachment["width"] << image.width;
                 attachment["height"] << image.height;
+                attachment["frameKind"] << TemporalMeasuredFrameKindName(temporalProvenance.frameKind);
+                attachment["realFrameId"] << temporalProvenance.realFrameId;
+                attachment["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
+                attachment["temporalProvenanceSchemaVersion"] << 2;
+                attachment["spatialMode"] << SpatialScalingModeName(temporalProvenance.spatialMode);
+                attachment["deepDvcApplied"] << c4::fmt::boolalpha(temporalProvenance.deepDvcApplied);
                 attachment["nonfinite"] << nonfinite;
                 attachment["min"] << minimum;
                 attachment["max"] << maximum;
@@ -837,7 +1112,7 @@ struct EnhancedPbrCapture
                 item["name"] << stage.name;
                 item["file"] << readback.name + ".f32";
                 item["readbackStage"] << readback.name;
-                item["sharedReadback"] << (stage.name != readback.name);
+                item["sharedReadback"] << c4::fmt::boolalpha((stage.name != readback.name));
                 item["resource"] << readback.source.index;
                 item["version"] << readback.source.version;
                 item["kind"] << static_cast<uint32_t>(readback.source.kind);
@@ -889,6 +1164,7 @@ struct EnhancedPbrCapture
                 if (!packet) { error = "Lattice replay input write failed"; return false; }
             }
             result.state = EnhancedPbrCaptureState::Complete;
+            nativeExclusion.reset();
             return true;
         }
         catch (const std::exception& exception) { error = exception.what(); return false; }
@@ -923,5 +1199,6 @@ struct EnhancedPbrCapture
     {
         result.state = EnhancedPbrCaptureState::Failed;
         result.error = error;
+        nativeExclusion.reset();
     }
 };

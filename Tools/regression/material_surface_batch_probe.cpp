@@ -140,7 +140,7 @@ own::shared_owner<const Texture> Image()
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
     std::memcpy(image.MutablePixelsAt(*image.Find(1, 0)), kMip.data(), sizeof(kMip));
-    return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Spatial.Image", std::move(image));
 }
 
 own::shared_owner<const Texture> Cube(const Environment& environment)
@@ -151,7 +151,7 @@ own::shared_owner<const Texture> Cube(const Environment& environment)
         const auto value = Pack4(environment[face], 1);
         std::memcpy(image.MutablePixelsAt(*image.Find(0, face)), value.data(), sizeof(value));
     }
-    return Texture::CreateSharedFromImage("LX.Spatial.Environment", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Spatial.Environment", std::move(image));
 }
 
 std::vector<SurfacePoint> Points()

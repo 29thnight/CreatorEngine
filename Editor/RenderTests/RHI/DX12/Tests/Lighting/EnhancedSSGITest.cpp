@@ -10,6 +10,7 @@
 #include "Render/Passes/Lighting/EnhancedSSGIShaders.h"
 #include "RHI/RHIShaderCompiler.h"
 #include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <wrl/client.h>
 
@@ -50,6 +51,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
     }
 
     DX12PSOManager psoManager;
+    RHIPipelineHandle fixtureDepthPso{};
     DX12RootSignatureCache rootSignatures;
     if (!psoManager.Initialize(&resources, L"dx12_ssgi.cache", error) ||
         !rootSignatures.Initialize(&resources, error))
@@ -220,7 +222,8 @@ bool DX12Test::RunSSGITest(std::string& outLog)
             depthPsoDesc.csSize = depthBlob.Size();
             depthPsoDesc.layout = depthRoot;
 
-            const RHIPipelineHandle depthPso = psoManager.GetOrCreateCompute(depthPsoDesc, error);
+            fixtureDepthPso = psoManager.GetOrCreateCompute(depthPsoDesc, error);
+            const RHIPipelineHandle depthPso = fixtureDepthPso;
             if (!depthPso.IsValid())
             {
                 outLog += "[3/3] 테스트 깊이 PSO 실패: " + error + "\n";
@@ -462,6 +465,216 @@ bool DX12Test::RunSSGITest(std::string& outLog)
                     outLog += "[3/3] 누적을 잴 픽셀이 없다 — 전부 하늘로 판정됐다\n";
                     passed = false;
                 }
+            }
+        }
+
+        // Deterministic GPU oracle: eight accepted frames must have identical
+        // RGBA history whether each is preceded by an abandoned preparation,
+        // declaration or fully recorded graph. The abandoned camera differs,
+        // so accidental previous-camera promotion is observable as well.
+        const auto sequence = [&](int abortStage, std::vector<float>& pixels) {
+            ssgi.ResetHistory();
+            for (unsigned frame = 0; frame < kTestFrames; ++frame)
+            {
+                if (abortStage >= 0)
+                {
+                    const auto savedCamera = camera;
+                    camera.view.m[3][0] += 0.2f;
+                    camera.inverseView = math::inverse(camera.view);
+                    if (!resources.BeginFrame(error)) return false;
+                    bool ok = ssgi.PrepareFrame(frameContext, error);
+                    if (ok && abortStage >= 1)
+                    {
+                        EnhancedRenderGraph abandoned(resources);
+                        EnhancedSSGIPass::Inputs input{};
+                        input.depth = abandoned.ImportTexture(depthRegistration.Handle(), RHIResourceState::ShaderResource, "Abort.Depth");
+                        input.normal = abandoned.ImportTexture(normalRegistration.Handle(), RHIResourceState::ShaderResource, "Abort.Normal");
+                        ssgi.SetInputs(input);
+                        ssgi.Declare(abandoned, frameContext);
+                        abandoned.AddPass("Abort.Readback", {{ssgi.GetResolvedResult(),RHIResourceState::CopySource}},
+                            [&](const EnhancedRenderGraph::ExecuteContext& execution) {
+                                execution.encoder->CopyToReadback(readback, execution.ResolveHandle(ssgi.GetResolvedResult()));
+                            }, true);
+                        ok = abandoned.Compile(error);
+                        if (ok && abortStage == 2) ok = abandoned.Execute(error);
+                        // No queue admission: recorded commands and history writes
+                        // are abandoned while their graph is still alive.
+                        resources.AbortFrame();
+                    }
+                    else resources.AbortFrame();
+                    camera = savedCamera;
+                    if (!ok) return false;
+                }
+                if (!resources.BeginFrame(error)) return false;
+                if (!ssgi.PrepareFrame(frameContext, error)) { resources.AbortFrame(); return false; }
+                EnhancedRenderGraph accepted(resources);
+                EnhancedSSGIPass::Inputs input{};
+                input.depth = accepted.ImportTexture(depthRegistration.Handle(),RHIResourceState::ShaderResource,"Accepted.Depth");
+                input.normal = accepted.ImportTexture(normalRegistration.Handle(),RHIResourceState::ShaderResource,"Accepted.Normal");
+                ssgi.SetInputs(input);
+                ssgi.Declare(accepted,frameContext);
+                accepted.AddPass("Accepted.Readback", {{ssgi.GetResolvedResult(),RHIResourceState::CopySource}},
+                    [&](const EnhancedRenderGraph::ExecuteContext& execution) {
+                        execution.encoder->CopyToReadback(readback,execution.ResolveHandle(ssgi.GetResolvedResult()));
+                    },true);
+                if (!accepted.Compile(error) || !accepted.Execute(error)) { resources.AbortFrame(); return false; }
+                if (!resources.EndFrame(error)) return false;
+                resources.WaitForGpu();
+            }
+            RHIReadbackImage image{};
+            if (!resources.MapReadback(readback,image,error) || !image.IsValid() || image.width != giW || image.height != giH) return false;
+            pixels.clear();
+            for (unsigned y=0;y<giH;++y)
+                for (unsigned x=0;x<giW;++x)
+                    for (unsigned channel=0;channel<4;++channel) pixels.push_back(image.At(x,y,channel));
+            return true;
+        };
+        if (passed)
+        {
+            std::vector<float> reference;
+            passed = sequence(-1,reference);
+            for (int abortStage=0;abortStage<3 && passed;++abortStage)
+            {
+                std::vector<float> recovered;
+                passed = sequence(abortStage,recovered);
+                float maximumError = 0.f;
+                if (passed && recovered.size() == reference.size())
+                    for (size_t index=0;index<reference.size();++index)
+                    {
+                        if (!std::isfinite(reference[index]) || !std::isfinite(recovered[index])) { passed=false; break; }
+                        maximumError = (std::max)(maximumError,std::abs(reference[index]-recovered[index]));
+                    }
+                else passed=false;
+                passed &= maximumError <= 0.000001f;
+                char line[192]{};
+                std::snprintf(line,sizeof(line),"SSGI abort recovery stage=%d samples=%zu maxError=%.9g passed=%d\n",
+                    abortStage,recovered.size(),maximumError,passed ? 1 : 0);
+                outLog += line;
+            }
+            if (!passed) outLog += "SSGI aborted recording changed accepted history: " + error + "\n";
+        }
+
+        // Compare warmed reset/resize histories against a newly initialized
+        // pass using correctly sized procedural GPU inputs.
+        if (passed)
+        {
+            struct RecoveryCase { const char* name; uint32_t width, height; bool reset; };
+            const RecoveryCase cases[] = {
+                {"camera-cut",256,256,true}, {"resize-down",128,192,true},
+                {"resize-up",384,320,true}, {"extent-only",192,128,false},
+            };
+            for (const auto& test : cases)
+            {
+                std::vector<float> warm;
+                if (!sequence(-1,warm)) { passed=false; break; }
+                auto context = frameContext;
+                context.width=test.width;
+                context.height=test.height;
+                RHITextureHandle depthInput{}, normalInput{};
+                RHITextureDesc desc{};
+                desc.width=test.width; desc.height=test.height;
+                desc.allowUnorderedAccess=true;
+                desc.initialState=RHIResourceState::UnorderedAccess;
+                desc.format=RHIFormat::R32Float;
+                bool ok=resources.CreateTexture(desc,depthInput,error);
+                desc.format=RHIFormat::RGBA16Float;
+                ok=ok && resources.CreateTexture(desc,normalInput,error);
+                if (ok && resources.BeginFrame(error))
+                {
+                    struct { uint32_t w,h; float nearP,farP; } data{test.width,test.height,0.1f,100.f};
+                    const auto cb=resources.AllocateUpload(RHIUploadRequest{sizeof(data),RHIUploadUsage::ConstantBuffer,1});
+                    const RHIBindingDesc bindings[]={RHIBindingDesc::Uav2D(depthInput,RHIFormat::R32Float),RHIBindingDesc::Uav2D(normalInput,RHIFormat::RGBA16Float)};
+                    const auto table=resources.CreateBindings(bindings);
+                    ok=cb.IsValid() && table.IsValid();
+                    if (ok)
+                    {
+                        memcpy(cb.cpuAddress,&data,sizeof(data));
+                        auto* cmd=resources.GetCommandList();
+                        resources.BindDescriptorHeaps(cmd);
+                        const auto entry=resources.Resolve(fixtureDepthPso);
+                        cmd->SetComputeRootSignature(entry.signature);
+                        cmd->SetPipelineState(entry.pipeline);
+                        cmd->SetComputeRootConstantBufferView(0,resources.Resolve(cb.buffer)->GetGPUVirtualAddress()+cb.offset);
+                        cmd->SetComputeRootDescriptorTable(1,DX12ToGpuHandle(table.backend));
+                        cmd->Dispatch((test.width+7)/8,(test.height+7)/8,1);
+                        const RHITransition transitions[]={
+                            {depthInput,RHIResourceState::UnorderedAccess,RHIResourceState::ShaderResource},
+                            {normalInput,RHIResourceState::UnorderedAccess,RHIResourceState::ShaderResource}};
+                        resources.TransitionResources(transitions);
+                        ok=resources.EndFrame(error);
+                        resources.WaitForGpu();
+                    }
+                    else resources.AbortFrame();
+                }
+                else ok=false;
+                const uint32_t w=test.width/EnhancedSSGIPass::kResolutionDivisor;
+                const uint32_t h=test.height/EnhancedSSGIPass::kResolutionDivisor;
+                RHIReadback capture{};
+                ok=ok && resources.CreateReadback(w,h,EnhancedSSGIPass::kGIFormat,1,capture,error);
+                const auto render=[&](EnhancedSSGIPass& pass,bool reset,std::vector<float>& first,std::vector<float>& last) {
+                    for (uint32_t f=0;f<kTestFrames;++f)
+                    {
+                        context.temporalFrame.realFrameId=f+1;
+                        context.temporalFrame.reset=reset && f==0;
+                        if (!resources.BeginFrame(error)) return false;
+                        if (!pass.PrepareFrame(context,error)) { resources.AbortFrame(); return false; }
+                        EnhancedRenderGraph graph(resources);
+                        EnhancedSSGIPass::Inputs input{};
+                        input.depth=graph.ImportTexture(depthInput,RHIResourceState::ShaderResource,"Recovery.Depth");
+                        input.normal=graph.ImportTexture(normalInput,RHIResourceState::ShaderResource,"Recovery.Normal");
+                        pass.SetInputs(input); pass.Declare(graph,context);
+                        graph.AddPass("Recovery.Readback",{{pass.GetResolvedResult(),RHIResourceState::CopySource}},
+                            [&](const EnhancedRenderGraph::ExecuteContext& execution) {
+                                execution.encoder->CopyToReadback(capture,execution.ResolveHandle(pass.GetResolvedResult()));
+                            },true);
+                        if (!graph.Compile(error) || !graph.Execute(error)) { resources.AbortFrame(); return false; }
+                        if (!resources.EndFrame(error)) return false;
+                        resources.WaitForGpu();
+                        if (f==0 || f==kTestFrames-1)
+                        {
+                            RHIReadbackImage image{};
+                            if (!resources.MapReadback(capture,image,error) || !image.IsValid() || image.width!=w || image.height!=h) return false;
+                            auto& values=f==0 ? first : last;
+                            for (uint32_t y=0;y<h;++y) for (uint32_t x=0;x<w;++x)
+                                for (uint32_t c=0;c<4;++c) values.push_back(image.At(x,y,c));
+                        }
+                    }
+                    return true;
+                };
+                std::vector<float> first,last,freshFirst,freshLast;
+                ok=ok && render(ssgi,test.reset,first,last);
+                EnhancedSSGIPass fresh;
+                ok=ok && fresh.Initialize(context,error);
+                ok=ok && render(fresh,false,freshFirst,freshLast);
+                for (unsigned checkpoint=0;checkpoint<2 && ok;++checkpoint)
+                {
+                    const auto& actual=checkpoint==0 ? first : last;
+                    const auto& expected=checkpoint==0 ? freshFirst : freshLast;
+                    float maxError=0;
+                    size_t surfaces=0;
+                    double accumulation=0;
+                    ok=actual.size()==size_t(w)*h*4 && actual.size()==expected.size();
+                    for (size_t i=0;i<actual.size() && ok;++i)
+                    {
+                        ok=std::isfinite(actual[i]) && std::isfinite(expected[i]);
+                        maxError=(std::max)(maxError,std::abs(actual[i]-expected[i]));
+                        if (i%4==3 && actual[i]>0) {
+                            ++surfaces; accumulation+=actual[i];
+                            if (checkpoint==0 && actual[i]!=1.f) ok=false;
+                        }
+                    }
+                    const double average=surfaces ? accumulation/surfaces : 0;
+                    ok=ok && maxError<=0.000001f && surfaces>0 && (checkpoint==0 || average>=4);
+                    char line[256]{};
+                    std::snprintf(line,sizeof(line),"SSGI reset recovery case=%s frame=%u extent=%ux%u samples=%zu maxError=%.9g surfaces=%zu accumulation=%.9g passed=%d\n",
+                        test.name,checkpoint==0 ? 1u : kTestFrames,w,h,actual.size(),maxError,surfaces,average,ok ? 1 : 0);
+                    outLog+=line;
+                }
+                fresh.Shutdown();
+                resources.ReleaseReadback(capture);
+                if (depthInput.IsValid()) resources.ReleaseTexture(depthInput);
+                if (normalInput.IsValid()) resources.ReleaseTexture(normalInput);
+                if (!ok) { passed=false; outLog+="SSGI reset recovery failed: "+error+"\n"; break; }
             }
         }
 
@@ -805,6 +1018,48 @@ bool DX12Test::RunSSGITest(std::string& outLog)
                 + "건뿐이다 — UAV→SRV 전이가 빠졌다\n";
             passed = false;
         }
+        // An intensity-zero frame has no GI graph resources. Diagnostic captures
+        // still demand all attachments, and re-enabling must resume a fresh history.
+        const auto enabledTuning = ssgi.GetTuning();
+        auto disabledTuning = enabledTuning;
+        disabledTuning.intensity = 0.f;
+        ssgi.SetTuning(disabledTuning);
+        EnhancedRenderGraph bypass(resources);
+        passed &= ssgi.PrepareFrame(frameContext, error);
+        ssgi.Declare(bypass, frameContext);
+        passed &= !ssgi.GetOutput().IsValid() && !ssgi.GetResolvedResult().IsValid()
+            && !ssgi.GetTraceResult().IsValid() && !ssgi.GetFilteredResult().IsValid();
+        passed &= bypass.Compile(error) && bypass.GetStats().passesDeclared == 0;
+        for (const bool diagnostic : {true, false})
+        {
+            frameContext.temporalDiagnosticCapture = diagnostic;
+            ssgi.SetTuning(diagnostic ? disabledTuning : enabledTuning);
+            if (!resources.BeginFrame(error)) { passed = false; break; }
+            EnhancedRenderGraph resumed(resources);
+            EnhancedSSGIPass::Inputs input{};
+            input.depth = resumed.ImportTexture(depthRegistration.Handle(), RHIResourceState::ShaderResource, "Demand.Depth");
+            input.normal = resumed.ImportTexture(normalRegistration.Handle(), RHIResourceState::ShaderResource, "Demand.Normal");
+            ssgi.SetInputs(input);
+            if (!ssgi.PrepareFrame(frameContext, error)) { resources.AbortFrame(); passed = false; break; }
+            ssgi.Declare(resumed, frameContext);
+            const auto target = ssgi.GetResolvedResult();
+            passed &= target.IsValid();
+            resumed.AddPass("Demand.Readback", {{target, RHIResourceState::CopySource}},
+                [&](const EnhancedRenderGraph::ExecuteContext& execution) {
+                    execution.encoder->CopyToReadback(readback, execution.ResolveHandle(target));
+                }, true);
+            if (!resumed.Compile(error) || !resumed.Execute(error) || !resources.EndFrame(error))
+            { passed = false; break; }
+            resources.WaitForGpu();
+            RHIReadbackImage image;
+            if (!resources.MapReadback(readback, image, error)) { passed = false; break; }
+            for (uint32_t y = 0; y < image.height; ++y)
+                for (uint32_t x = 0; x < image.width; ++x)
+                    passed &= std::isfinite(image.At(x, y, 0));
+        }
+        frameContext.temporalDiagnosticCapture = false;
+        ssgi.SetTuning(enabledTuning);
+        outLog += "SSGI consumer bypass / diagnostic retention / re-enable GPU checks completed\n";
         normalRegistration.Reset();
         depthRegistration.Reset();
     }

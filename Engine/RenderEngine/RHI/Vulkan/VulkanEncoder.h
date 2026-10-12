@@ -146,6 +146,24 @@ public:
         ClearUnimplemented();
     }
 
+    // External SDK dispatch changes pipeline/descriptor bindings but must restore
+    // resource layouts promised to the graph. Preserve recorded image layouts,
+    // command ownership and diagnostic counters; only binding caches are stale.
+    void InvalidateExternalBindings()
+    {
+        for (size_t i = 0; i < 2; ++i)
+        {
+            m_boundPipeline[i] = {};
+            m_pending[i].clear();
+            m_descriptorsDirty[i] = false;
+            m_boundSetLayout[i] = VK_NULL_HANDLE;
+            m_boundLayoutHandle[i] = {};
+            m_boundLayout[i] = VK_NULL_HANDLE;
+        }
+    }
+
+    bool UsesResources(const VulkanResourceTable* resources) const { return m_resources == resources; }
+
     void ClearUnimplemented()
     {
         m_unimplemented = 0;
@@ -193,6 +211,7 @@ public:
     bool DispatchMesh(uint32_t x, uint32_t y, uint32_t z) override;
     bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
+    uint64_t GetComputeDispatchCount() const override { return m_computeDispatches; }
 
     /// 불투명 값을 표의 슬롯으로 읽어 백엔드 실물로 푼다 (5c-4c).
     ///
@@ -276,6 +295,7 @@ public:
     void EndRenderTargets();
 
 private:
+    uint64_t m_computeDispatches{};
     std::vector<VkImageMemoryBarrier2> m_imageBarrierScratch;
     std::vector<VkBufferMemoryBarrier2> m_bufferBarrierScratch;
     // ★ 여기 "백엔드 전용 경로 (계약 밖)" 공개 구간이 있었다 — 렌더 타깃

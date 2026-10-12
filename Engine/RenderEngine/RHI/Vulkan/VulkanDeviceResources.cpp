@@ -1,3 +1,6 @@
+#include "../Temporal/XeSSUpscaler.h"
+#include "../../Render/Temporal/TemporalRuntimeControl.h"
+#include <set>
 #include "VulkanDeviceResources.h"
 #include "../RHIRecordedBatch.h"
 #include "VulkanPipelineCache.h"
@@ -308,6 +311,37 @@ bool VulkanDeviceResources::CreateInstance(bool enableValidation, std::string& o
     appInfo.pEngineName = "CreatorEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_3;
+#if CREATOR_ENABLE_XESS_VULKAN_SDK
+    const auto temporalSettings = TemporalRuntimeControl::Get().Snapshot().settings;
+    if (temporalSettings.enabled && temporalSettings.requestedUpscaler == TemporalProvider::XeSS)
+    {
+        auto bootstrap = std::make_unique<XeSSUpscalerVulkan>();
+        auto status = bootstrap->Load(temporalSettings.runtimeDirectory.c_str());
+        uint32_t count = 0, minimumVersion = 0;
+        const char* const* names = nullptr;
+        if (status.IsSuccess()) status = bootstrap->QueryRequiredInstanceExtensions(count, names, minimumVersion);
+        if (status.IsSuccess())
+            for (uint32_t i = 0; i != count; ++i)
+                if (!names || !names[i] || !VkHasExtension(extensions, names[i]))
+                    status = { TemporalStatus::FeatureUnsupported };
+        m_temporalXeSSResult = status;
+        if (status.IsSuccess())
+        {
+            for (uint32_t i = 0; i != count; ++i)
+                if (std::none_of(enabledExtensions.begin(), enabledExtensions.end(),
+                    [&](const char* value) { return std::strcmp(value, names[i]) == 0; }))
+                    enabledExtensions.push_back(names[i]);
+            appInfo.apiVersion = (std::max)(appInfo.apiVersion, minimumVersion);
+            m_temporalXeSSDirectory = temporalSettings.runtimeDirectory;
+            m_temporalXeSSBootstrap = std::move(bootstrap);
+        }
+        else TemporalRuntimeControl::Get().PublishDiagnostic([&](auto& snapshot)
+        {
+            snapshot.lastUpscaleResult = status;
+            snapshot.diagnostic = "XeSS Vulkan instance requirements unavailable; native renderer retained";
+        });
+    }
+#endif
 
     // ★ 메신저 생성 정보를 인스턴스의 pNext 에 건다. 그래야 vkCreateInstance
     //   자체와 vkDestroyInstance 도 검증을 받는다 — 나중에 따로 만들면 그
@@ -575,14 +609,85 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     features2.features.drawIndirectFirstInstance = availableFeatures.features.drawIndirectFirstInstance;
     features2.pNext = &features11;
 
+    void* featureChain = &features2;
+#if CREATOR_ENABLE_XESS_VULKAN_SDK
+    const auto nativeFeature2 = features2;
+    const auto nativeFeature11 = features11;
+    const auto nativeFeature12 = features12;
+    const auto nativeFeature13 = features13;
+    const auto nativeRobustness = robustness;
+    const auto nativeMesh = meshFeatures;
+    const size_t nativeExtensionCount = deviceExtensions.size();
+    const auto restoreNativeFeatures = [&]
+    {
+        features2 = nativeFeature2; features11 = nativeFeature11;
+        features12 = nativeFeature12; features13 = nativeFeature13;
+        robustness = nativeRobustness; meshFeatures = nativeMesh;
+        featureChain = &features2;
+        deviceExtensions.resize(nativeExtensionCount);
+    };
+    if (m_temporalXeSSBootstrap)
+    {
+        uint32_t count = 0;
+        const char* const* names = nullptr;
+        auto status = m_temporalXeSSBootstrap->QueryRequiredDeviceExtensions(m_instance, m_physicalDevice, count, names);
+        uint32_t availableCount = 0;
+        vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &availableCount, nullptr);
+        std::vector<VkExtensionProperties> available(availableCount);
+        vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &availableCount, available.data());
+        if (status.IsSuccess())
+            for (uint32_t i = 0; i != count; ++i)
+                if (!names || !names[i] || !VkHasExtension(available, names[i]))
+                    status = { TemporalStatus::FeatureUnsupported };
+        if (status.IsSuccess())
+        {
+            for (uint32_t i = 0; i != count; ++i)
+                if (std::none_of(deviceExtensions.begin(), deviceExtensions.end(),
+                    [&](const char* value) { return std::strcmp(value, names[i]) == 0; }))
+                    deviceExtensions.push_back(names[i]);
+            // Give XeSS the existing writable Features2 chain; it patches in
+            // place, instead of concatenating duplicate feature structures.
+            status = m_temporalXeSSBootstrap->PatchRequiredDeviceFeatures(m_instance, m_physicalDevice, featureChain);
+            std::set<VkStructureType> types;
+            for (auto* node = static_cast<VkBaseOutStructure*>(featureChain); status.IsSuccess() && node; node = node->pNext)
+                if (types.size() >= 64 || !types.insert(node->sType).second)
+                    status = { TemporalStatus::InvalidInput };
+        }
+        m_temporalXeSSResult = status;
+        if (!status.IsSuccess())
+        {
+            restoreNativeFeatures();
+            m_temporalXeSSBootstrap.reset();
+            m_temporalXeSSDirectory.clear();
+            TemporalRuntimeControl::Get().PublishDiagnostic([&](auto& snapshot)
+            {
+                snapshot.lastUpscaleResult = status;
+                snapshot.diagnostic = "XeSS Vulkan device requirements unavailable; native renderer retained";
+            });
+        }
+    }
+#endif
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
-    deviceInfo.pNext = &features2;
+    deviceInfo.pNext = featureChain;
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
     deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-    const VkResult created = vkCreateDevice(m_physicalDevice, &deviceInfo, nullptr, &m_device);
+    VkResult created = vkCreateDevice(m_physicalDevice, &deviceInfo, nullptr, &m_device);
+#if CREATOR_ENABLE_XESS_VULKAN_SDK
+    if (created != VK_SUCCESS && m_temporalXeSSBootstrap)
+    {
+        m_temporalXeSSResult = { TemporalStatus::FeatureUnsupported, created };
+        restoreNativeFeatures();
+        deviceInfo.pNext = featureChain;
+        deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
+        m_temporalXeSSBootstrap.reset();
+        m_temporalXeSSDirectory.clear();
+        created = vkCreateDevice(m_physicalDevice, &deviceInfo, nullptr, &m_device);
+    }
+#endif
     if (VK_SUCCESS != created)
     {
         outError = "vkCreateDevice 실패 — " + ResultToString(created);
@@ -726,6 +831,10 @@ void VulkanDeviceResources::Shutdown()
             m_timeline = VK_NULL_HANDLE;
         }
 
+#if CREATOR_ENABLE_XESS_VULKAN_SDK
+        m_temporalXeSSBootstrap.reset();
+        m_temporalXeSSDirectory.clear();
+#endif
         vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
     }
@@ -1951,4 +2060,13 @@ uint32_t VulkanDeviceResources::FindMemoryType(uint32_t typeBits,
         if (typeAllowed && hasProperties) return i;
     }
     return UINT32_MAX;
+}
+
+bool VulkanDeviceResources::SupportsTemporalXeSS(const std::wstring& directory) const
+{
+#if CREATOR_ENABLE_XESS_VULKAN_SDK
+    return m_temporalXeSSBootstrap && m_temporalXeSSDirectory == directory;
+#else
+    return false;
+#endif
 }

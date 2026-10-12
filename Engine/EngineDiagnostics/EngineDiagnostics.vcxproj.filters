@@ -17,6 +17,7 @@
     <ClInclude Include="ProfilerViewerTransport.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="ProfilerLiveDiagnostics.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="ProfilerRenderingDiagnostics.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="ProfileRenderMeasurement.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ProfilerViewerProcess.cpp"><Filter>Source Files</Filter></ClCompile>

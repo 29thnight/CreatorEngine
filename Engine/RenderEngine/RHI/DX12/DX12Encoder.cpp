@@ -404,6 +404,7 @@ void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
         return;
     }
     m_commandList->Dispatch(x, y, z);
+    ++m_computeDispatches;
 }
 
 // 뷰는 디바이스 서비스의 힙에 있다. 인코더는 그 힙을 뒤지지 않고 서비스에

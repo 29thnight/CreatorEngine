@@ -21,9 +21,9 @@ namespace editor::profiler_view
 {
 	namespace
 	{
-		// 예산선. 60/30 FPS.
-		constexpr double kBudget60 = 1000.0 / 60.0;
-		constexpr double kBudget30 = 1000.0 / 30.0;
+		// Diagnostic reference lines, independent of project acceptance policy.
+		constexpr double kReference16Ms = 1000.0 / 60.0;
+		constexpr double kReference33Ms = 1000.0 / 30.0;
 
 		// ★ 막대 폭은 **고정**이다. 폭을 프레임 수로 나누면 프레임이 쌓일수록
 		//   막대가 얇아지고, 같은 프레임이 매 스냅샷 다른 자리로 옮겨 간다.
@@ -56,11 +56,11 @@ namespace editor::profiler_view
 			{
 				return IM_COL32(120, 200, 255, 255);
 			}
-			if (milliseconds > kBudget30)
+			if (milliseconds > kReference33Ms)
 			{
 				return IM_COL32(220, 90, 80, 255);
 			}
-			if (milliseconds > kBudget60)
+			if (milliseconds > kReference16Ms)
 			{
 				return IM_COL32(220, 180, 80, 255);
 			}
@@ -88,6 +88,8 @@ namespace editor::profiler_view
 			return;
 		}
 
+		ImGui::TextUnformatted("Engine frame boundary time (ms)");
+		ImGui::TextWrapped("16.67 / 33.33 ms reference lines; project budget is not configured here.");
 		const std::span<const ce::frame_record> frames = capture->frames();
 		const std::uint32_t availableFirst = view.available_first();
 		const std::uint32_t availableLast = view.available_last();
@@ -197,7 +199,7 @@ namespace editor::profiler_view
 		//   벗어나 프레임 번호 자 위에 얹힌다.
 		const float labelHeight = ImGui::GetTextLineHeight();
 		float lastLabelY = -1000.0f;
-		for (const double level : { scale, kBudget30, kBudget60 })
+		for (const double level : { scale, kReference33Ms, kReference16Ms })
 		{
 			if (level > scale)
 			{
@@ -254,7 +256,7 @@ namespace editor::profiler_view
 		{
 			if (const ce::frame_record* frame = record_of(frame_at(ImGui::GetIO().MousePos.x)))
 			{
-				ImGui::SetTooltip("frame %u\n%.3f ms\n이벤트 %zu",
+				ImGui::SetTooltip("engine frame %u\nEngine boundary %.3f ms\n이벤트 %zu",
 				                  frame->engine_frame,
 				                  ticks_to_milliseconds(frame->tick_end - frame->tick_begin),
 				                  frame->events.size());

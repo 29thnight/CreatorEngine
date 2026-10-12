@@ -116,6 +116,26 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (!m_pso.IsValid()) return false;
 
+    const RHIPipelineLayoutParam depthParams[] = { RHILayout::Cbv(0), RHILayout::SrvTable(1, 0) };
+    RHIPipelineLayoutDesc depthRootDesc{};
+    depthRootDesc.params = depthParams;
+    const auto depthRoot = context.rootSignatures->GetOrCreate(depthRootDesc, outError);
+    if (!depthRoot.IsValid()) return false;
+    RHIShaderBlob depthVs, depthPs;
+    if (!RHIShaderCompiler::CompileFile("OverlayDepth.slang", "VSMain", "vs_5_0", depthVs, outError) ||
+        !RHIShaderCompiler::CompileFile("OverlayDepth.slang", "PSMain", "ps_5_0", depthPs, outError)) return false;
+    RHIGraphicsPipelineDesc depthPipeline{};
+    depthPipeline.layout = depthRoot;
+    depthPipeline.vsBytecode = depthVs.Data(); depthPipeline.vsSize = depthVs.Size();
+    depthPipeline.psBytecode = depthPs.Data(); depthPipeline.psSize = depthPs.Size();
+    depthPipeline.topologyType = RHITopologyType::Triangle;
+    depthPipeline.depthEnable = true;
+    depthPipeline.depthFunc = RHICompareOp::Always;
+    depthPipeline.dsvFormat = kDepthFormat;
+    depthPipeline.numRenderTargets = 0;
+    m_depthCopyPso = context.psoManager->GetOrCreate(depthPipeline, outError);
+    if (!m_depthCopyPso.IsValid()) return false;
+
     return true;
 }
 
@@ -156,7 +176,12 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 입력이 있으면 그 위에 그리고, 없으면 자체 transient를 만든다.
     // 자체 생성일 때만 지운다 — 남의 그림 위에 지우면 그림이 사라진다.
     const bool ownsColor = !m_inputs.color.IsValid();
-    const bool ownsDepth = !m_inputs.depth.IsValid();
+    // Post-reconstruction overlays cannot bind a render-resolution DSV to
+    // their display-resolution color target. Unjitter depth as well as resize.
+    const bool resampleDepth = m_inputs.depth.IsValid() &&
+        (context.width != m_width || context.height != m_height ||
+            context.temporalFrame.jitterX != 0.f || context.temporalFrame.jitterY != 0.f);
+    const bool ownsDepth = !m_inputs.depth.IsValid() || resampleDepth;
 
     if (ownsColor)
     {
@@ -189,23 +214,55 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     }
 
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (resampleDepth)
+    {
+        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+            m_depth = graph.Write(m_depth);
+        const auto source = m_inputs.depth;
+        const auto destination = m_depth;
+        const auto params = math::vector4(float(m_width), float(m_height),
+            context.temporalFrame.jitterX, context.temporalFrame.jitterY);
+        const auto displayDepthPass = graph.AddPass("Grid.DisplayDepth", {
+            { source, RHIResourceState::PixelShaderResource, explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState },
+            { destination, RHIResourceState::DepthWrite, explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState } },
+            [this, resources = context.resources, source, destination, params](const auto& execute)
+            {
+                const auto depthTarget = RHIDepthTargetDesc::Depth(execute.ResolveHandle(destination), kDepthFormat);
+                const auto targets = resources->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depthTarget);
+                const RHIBindingDesc bindings[] = { RHIBindingDesc::Srv2D(execute.ResolveHandle(source), RHIFormat::R32Float) };
+                const auto table = resources->CreateBindings(bindings);
+                const auto cb = resources->UploadConstants(&params, sizeof(params));
+                if (!targets.IsValid() || !table.IsValid() || !cb.IsValid()) return;
+                auto& encoder = *execute.encoder;
+                encoder.SetViewportAndScissor(m_width, m_height);
+                encoder.BindRenderTargets(targets);
+                encoder.SetPipeline(RHIBindPoint::Graphics, m_depthCopyPso);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+                encoder.SetBindings(RHIBindPoint::Graphics, 1, table);
+                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+                encoder.Draw(3, 1);
+            });
+        // This callback reads prepared frame inputs and records into its own
+        // target. The depth producer is a GPU dependency, not a CPU result.
+        graph.DeclareRecordingIndependent(displayDepthPass);
+    }
     if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
     {
         m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
-        m_depth = ownsDepth ? graph.Write(m_depth) : graph.Modify(m_depth);
+        m_depth = ownsDepth && !resampleDepth ? graph.Write(m_depth) : graph.Modify(m_depth);
     }
     const auto colorAccess = explicitAccess
         ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
     const auto depthAccess = explicitAccess
-        ? (ownsDepth ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+        ? (ownsDepth && !resampleDepth ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
     const auto output = m_output;
     const auto depth = m_depth;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
     usages.push_back({ depth, RHIResourceState::DepthWrite, depthAccess });
 
-    graph.AddPass(GetName(), usages,
-        [this, &context, ownsColor, ownsDepth, output, depth](
+    const auto gridPass = graph.AddPass(GetName(), usages,
+        [this, &context, ownsColor, ownsDepth, resampleDepth, output, depth](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             // 커맨드는 인코더에만 적는다(R3). commandList가 아직 남은 것은
@@ -229,7 +286,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
                 encoder.ClearRenderTargets(targets, kClear);
             }
-            if (ownsDepth)
+            if (ownsDepth && !resampleDepth)
             {
                 encoder.ClearDepthTarget(targets, 1.f);
             }
@@ -261,6 +318,10 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             encoder.Draw(4, 1);
         },
         m_keepAlive);
+    // Width, camera/style and resource handles are frozen by Prepare/Declare.
+    // No other callback writes inputs consumed here. Keep all GPU depth/color
+    // dependencies and list order; only the conservative CPU join is omitted.
+    graph.DeclareRecordingIndependent(gridPass);
 }
 
 void EnhancedGridPass::Shutdown()
@@ -269,4 +330,5 @@ void EnhancedGridPass::Shutdown()
     m_height = 0;
 
     m_pso = {};
+    m_depthCopyPso = {};
 }

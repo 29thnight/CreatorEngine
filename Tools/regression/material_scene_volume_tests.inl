@@ -41,45 +41,8 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface)
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && program->volume && program->slang.find("LX_MATERIAL_VOLUME_HOMOGENEOUS 1") != std::string::npos,
           "Uniform Volume classification");
-    const auto file =
-        root / "Build/Obj/MaterialProductProbe" / (surface ? "volume-surface-product.slang" : "volume-product.slang");
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n"
-        << "#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
-    std::vector<CompileTarget> targets;
-    for (auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
-    {
-        if (surface)
-        {
-            targets.push_back({backend, "LXSceneVS", "vs_6_0"});
-            targets.push_back({backend, "LXSceneColorPS", "ps_6_0"});
-        }
-        targets.push_back({backend, "LXSceneVolumeCoefficientCS", "cs_6_0"});
-    }
-    RHIShaderCompileOptions options;
-    options.strictMath = options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = capabilities.refraction = capabilities.volume = true;
-    RHIShaderPermutation permutation;
+    const auto product = CookedScene(*program, surface ? "volume-surface-product" : "volume-product");
     std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "Volume permutation");
-    VerifiedProduct product;
-    for (const auto& target : targets)
-    {
-        RHIShaderCompiler::VerifiedShader shader;
-        const bool compiled = RHIShaderCompiler::VerifyFile(file.string(), target.entry, target.profile, target.binary,
-                                                            permutation, shader, error, options);
-        Check(compiled, "Volume shader " + target.entry + ": " + error);
-    }
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    for (const auto& diagnostic : diagnostics)
-    {
-        error += diagnostic.message + "\n";
-    }
-    Check(verified, "Volume product verification " + error);
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
         LX::Runtime::ComputeShaderDescription identity;
@@ -218,8 +181,9 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const own::shared_owner<const Texture>& image, const own::shared_owner<const Texture>& cube,
-                    const own::shared_owner<const Instance>& background)
+                    const own::shared_owner<const Instance>& surfaceBackground)
 {
+    const auto background = SceneCooked(surfaceBackground);
     const std::array products{VolumeProduct(root, false), VolumeProduct(root, true)};
     GenerationStore store;
     experiment::AssetId graphId;
@@ -241,9 +205,9 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     SceneHost host;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Volume mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
-    EnhancedForwardPass forward;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
+    EnhancedLightTilePass tiles;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -263,7 +227,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     SceneHost rejectedHost;
     Check(!rejectedHost.RequestProgram(context, spatial, error) && error.find("homogeneous") != std::string::npos,
           "Spatial Volume is rejected before native preparation");
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) && forward.Initialize(context, error), "Volume actual Scene passes");
+    Check(tiles.Initialize(context, error), "Volume actual Scene passes");
     WaitSceneProgram(host, context, background->generation);
     for (const auto& generation : generations)
     {
@@ -347,13 +311,10 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             backdrop.draw.materialGraphInstance = background;
             backdrop.draw.materialGraphSlot = 73;
             Check(Uuid::TryParse("CCCCCCCC-CCCC-8CCC-8CCC-CCCCCCCCCCCC", occluder.draw.modelMeshView.handle.meshId),
-                  "Volume legacy occluder");
-            std::vector<EnhancedDrawItem> oldDraws;
-            if (fixture == 0 || fixture == 3)
-            {
-                oldDraws.push_back(occluder.draw);
-            }
-            context.draws = &oldDraws;
+                  "Volume METEOR occluder");
+            occluder.draw.materialGraphInstance = background;
+            occluder.draw.materialGraphSlot = 74;
+            const bool hasOccluder = fixture == 0 || fixture == 3;
             std::vector<EnhancedLight> lights;
             if (fixture == 6 || fixture == 10)
             {
@@ -365,17 +326,24 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             }
             context.lights = &lights;
             std::vector draws{volume.draw, backdrop.draw};
+            if (hasOccluder) draws.push_back(occluder.draw);
             if (fixture == 3)
             {
                 draws.push_back(overlap.draw);
             }
+            context.draws = &draws;
             SceneInputBudget sealBudget;
             if (fixture == 5)
             {
                 sealBudget.mesh.maxChunkPoints = 3;
+                experiment::MeshletBuildSettings settings;
+                settings.maxVertices = 3;
+                for (auto& draw : draws)
+                    Check(cookedMeshes.Cook(draw.modelMeshView, draw.modelMeshView, error, settings),
+                          "Author small cooked Volume clusters " + error);
             }
             own::shared_owner<const SceneViewInput> input;
-            const bool sealed = SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
+            const bool sealed = SealScene({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
                                                      draws, sealBudget, input, error);
             Check(sealed, "Volume seal " + error);
             Check(device.BeginFrame(error), "Volume frame begin");
@@ -384,8 +352,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const auto environment =
                 fixture != 6 && fixture != 10 ? textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle : RHITextureHandle{};
             Check(host.PrepareResidency(context, input, error), "Volume residency " + error);
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
-                  "Volume Scene prepare " + error);
+
             auto graph = std::make_shared<EnhancedRenderGraph>(device);
             if (workers)
             {
@@ -442,7 +409,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 open.modelMeshView.indexCount -= 3;
                 open.geometryKey += 100;
                 own::shared_owner<const SceneViewInput> invalid;
-                Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera}, {&open, 1}, {},
+                Check(SealScene({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera}, {&open, 1}, {},
                                            invalid, error),
                       "Open boundary input remains structurally valid");
                  const bool prepared = host.Prepare(context, invalid, environment, {}, {}, {}, validBudget, error, 1);
@@ -451,7 +418,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 std::vector<std::array<float, 2>> many(11, {.2f, .6f});
                 auto excessive = VolumeBoxes(many, 9900, false);
                 excessive.draw.materialGraphInstance = volume.draw.materialGraphInstance;
-                Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
+                Check(SealScene({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
                                            {&excessive.draw, 1}, {}, invalid, error),
                       "Excessive Volume input seal");
                  const bool admitted = host.Prepare(context, invalid, environment, {}, {}, {}, validBudget, error, 1);
@@ -460,6 +427,8 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             }
             gbuffer.Declare(*graph, context);
             const auto outputs = gbuffer.GetOutputs();
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             host.DeclareGBuffer(*graph, outputs);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 16;
@@ -474,10 +443,10 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 execution.encoder->BindRenderTargets(target);
                 execution.encoder->ClearRenderTargets(target, clear);
             });
-            deferred.SetInputs(outputs);
-            deferred.SetAmbientOcclusion(ao);
-            deferred.Declare(*graph, context);
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, shadowMap);
+
+
+            lighting = SceneHost::DeclareHdrTarget(*graph, context);
+            lighting = host.DeclareColor(*graph, outputs, lighting, ao, shadowMap);
             std::array<RHIReadback, 8> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(16, 16, format, 1, readbacks[i], error), "Volume readback");
@@ -488,14 +457,13 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     },
                     true);
             };
-            copy(0, deferred.GetOutput(), RHIFormat::RGBA16Float);
-            forward.SetInputs({outputs.depth, deferred.GetOutput()});
-            forward.SetGraphMaterials(&host);
-            forward.SetShadow(shadowMap, shadow);
-            Check(forward.PrepareFrame(context, error), "Volume common Forward preparation");
-            forward.Declare(*graph, context);
-            const auto final = forward.GetOutput().IsValid() ? forward.GetOutput()
-                : host.DeclareVolume(*graph, deferred.GetOutput(), outputs.depth, shadowMap);
+            copy(0, lighting, RHIFormat::RGBA16Float);
+            // Product order: the medium composes once, then the blended stream.
+            Check(tiles.PrepareFrame(context, error), "Volume light tile preparation");
+            const auto composed = host.DeclareVolume(*graph, lighting, outputs.depth, shadowMap);
+            tiles.SetDepth(outputs.depth);
+            tiles.Declare(*graph, context);
+            const auto final = host.DeclareBlendedStream(*graph, composed, shadowMap, tiles.GetLighting());
             copy(1, final, RHIFormat::RGBA16Float);
             copy(2, outputs.depth, RHIFormat::D32Float);
             copy(3, outputs.bitmask, RHIFormat::R32Uint);
@@ -553,7 +521,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 {
                     const bool covered =
                         hybrid ? x >= 5 && x < 11 && y >= 5 && y < 11 : x >= 2 && x < 14 && y >= 2 && y < 14;
-                    const bool occluded = !oldDraws.empty() && x < 8;
+                    const bool occluded = hasOccluder && x < 8;
                     Near(mapped[2].At(x, y, 0),
                          hybrid     ? .92 / 2.9
                          : occluded ? .4
@@ -676,8 +644,8 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     }
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
-    deferred.Shutdown();
-    forward.Shutdown();
+
+    tiles.Shutdown();
     meshes.Shutdown();
     std::string messages;
     const auto validation = device.DrainDebugMessages(messages);

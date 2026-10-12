@@ -120,7 +120,7 @@ try {
             } until ($result.state -eq 'completed')
         }
         @{command=$name;args=@($arguments);result=$result} | ConvertTo-Json -Depth 50 -Compress | Add-Content "$out/results.jsonl" -Encoding utf8
-        if ($allowPreparing -and $result.code -eq 'render.pbr.capture.failed' -and $result.message -eq 'LX Scene requested material program is still preparing.') { return $null }
+        if ($allowPreparing -and $result.code -eq 'render.pbr.capture.failed' -and $result.message -eq 'METEOR Scene requested material program is still preparing.') { return $null }
         if ($result.status -ne 'succeeded') { throw "$name failed: $($result.code) $($result.message)" }
         return $result.data
     }

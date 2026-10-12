@@ -15,6 +15,7 @@
 #include "PakHelper.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
+#include "TimeSystem.h"
 
 #include <shellapi.h>
 
@@ -354,6 +355,7 @@ void Player::App::Run()
 	.Then([&]
 	{
 		m_main->Update();
+        if (m_main->GetTemporalRealFrameId() == 0) return;
 
 		// 프레임 경계 밀봉 — 에디터와 같은 자리, 게임 카메라 하나만 넘긴다.
 		// 씬 오버레이 뷰 선언(E4-5)은 Editor 전용이라 Player는 항상 false다.
@@ -378,12 +380,16 @@ void Player::App::Run()
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(m_main->GetFrameDeltaTime()),
 			views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
-		renderFrame.profilingEngineFrame = Time->GetFrameCount();
-    const uint64_t publishedFrameId = renderFrame.frameId;
+        renderFrame.sourceEngineFrame = Time->GetFrameCount();
+        renderFrame.sourceEngineFrameAvailable = true;
+        renderFrame.temporalRealFrameId = m_main->GetTemporalRealFrameId();
+		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 		{
 			m_main->NotifyRenderFramePublished(publishedFrameId);
 		}
+        else m_main->DiscardTemporalRealFrame();
+        if (viewCount == 0) m_main->DiscardTemporalRealFrame();
 	});
 }
 

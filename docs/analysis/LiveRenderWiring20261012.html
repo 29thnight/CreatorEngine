@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>METEOR 라이브 배선</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f4ef; --surface: #ffffff; --ink: #1c1f24; --muted: #5d6470; --line: #ddd8cc;
+  --accent: #b2451f; --good: #2f7a4d; --warn: #a66a00; --bad: #b23a3a; --chip: #efe9dc; --code: #f1ede4;
+  --shadow: 0 1px 2px rgba(28, 31, 36, .06), 0 8px 24px rgba(28, 31, 36, .05);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --surface: #1d2026; --ink: #e8e6e1; --muted: #a2a8b3; --line: #31353d;
+    --accent: #f08a5d; --good: #6cc48f; --warn: #e2b04a; --bad: #ef7d7d; --chip: #282c33; --code: #23262c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2026; --ink: #e8e6e1; --muted: #a2a8b3; --line: #31353d;
+  --accent: #f08a5d; --good: #6cc48f; --warn: #e2b04a; --bad: #ef7d7d; --chip: #282c33; --code: #23262c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 "IBM Plex Sans KR", system-ui, sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 80px; }
+header.hero { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
+.kicker { font: 600 12px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; margin: 10px 0 12px; }
+h2 { font-size: 22px; margin: 48px 0 12px; display: flex; gap: 12px; align-items: baseline; }
+h2 .num { font: 600 13px "JetBrains Mono", monospace; color: var(--accent); }
+h3 { font-size: 16px; margin: 24px 0 8px; }
+.meta { color: var(--muted); font-size: 13px; }
+code { font: 13px "JetBrains Mono", monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.verdict { background: var(--surface); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 18px 22px; box-shadow: var(--shadow); }
+.verdict ul { margin: 6px 0 0; padding-left: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
+.mermaid svg { max-width: 100%; height: auto; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; min-width: 820px; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.tag { display: inline-block; font: 600 11px/1.6 "JetBrains Mono", monospace; padding: 0 8px; border-radius: 999px; white-space: nowrap; }
+.tag.ok { color: var(--good); border: 1px solid var(--good); }
+.tag.ext { color: var(--warn); border: 1px solid var(--warn); }
+.tag.gap { color: var(--bad); border: 1px solid var(--bad); }
+.caution { list-style: none; padding: 0; margin: 0; }
+.caution li { padding: 12px 16px; border-left: 3px solid var(--warn); margin-bottom: 10px; background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; }
+.caution li.bad { border-left-color: var(--bad); }
+.caution li.good { border-left-color: var(--good); }
+footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+<header class="hero">
+  <div class="kicker">docs/analysis · 2026-10-12 · 배선 정리 반영</div>
+  <h1>METEOR 라이브 배선 현황과 RE 엔진까지 남은 작업</h1>
+  <p class="meta"><b>METEOR</b>는 LX 머티리얼을 그리는 장면 렌더러다(정식 명칭은 <code>MaterialGraphSceneHost.h</code> 머리 주석 한 곳에 둔다). <b>LX</b>(Lattice eXperiment)는 노드 언어 자체(<code>LX::Runtime</code>, LX 머티리얼)를 가리키며 이후 비주얼 스크립트·BT에도 쓰인다. 대상은 DX12 라이브 경로이며 커밋 <code>dc8233a90</code>(PR #172) 기준이다. 배선 서술은 소스 구조이고, 04장의 실행 결과는 이번 정리에서 직접 돌린 검증이다.</p>
+</header>
+
+<div class="verdict">
+  <strong>요약</strong>
+  <ul>
+    <li>노드 <b>23개(+에디터 기여 4개)</b>를 5단계(기하 → 래스터 → 불투명 조명 → 반투명·매질 → 시간·표시)로 정리했다. 그래프를 빌드하는 구조는 그대로다. 노드 순서는 슬롯 버전과 동순위 tie-break만 정하고, 실행 순서는 그래프가 리소스 의존성으로 컴파일한다.</li>
+    <li>변환·컬링은 <code>METEOR.Scene.Geometry</code>·<code>METEOR.Scene.Cull</code> 노드가 맡는다. 이제 소비자의 부수 효과가 아니다. SceneHost가 Geometry → Cull → Shadow/Surface 선언 순서를 강제한다.</li>
+    <li>구 <code>EnhancedForwardPass</code>를 삭제했다. 타일 광원 컬링은 <code>EnhancedLightTilePass</code>, 반투명 정렬·셰이딩은 <code>SceneHost::DeclareBlendedStream</code>이 맡는다.</li>
+    <li>볼륨 합성은 반투명 앞 한 곳(<code>METEOR.Scene.Volume</code>)에서만 일어난다. SSS·SSR은 반투명 앞으로 옮겼다. 반투명면은 더 이상 SSS·SSR을 받지 않으며, 이는 의도된 화면 변화다.</li>
+    <li>Temporal 하드코딩을 없앴다. 소비자 목록 대신 각 노드가 <code>consumes</code>로 자기 조건을 밝히고, 캡처의 이름 비교 대신 <code>displayResolutionOutput</code>을 쓴다.</li>
+  </ul>
+</div>
+
+<h2><span class="num">01</span>한 프레임의 실행 순서</h2>
+<div class="card"><pre class="mermaid">
+flowchart TB
+  A["desc.PrepareAll<br/>노드별 prepare · cascade 행렬 · 데칼 목록 · 타일 버퍼"] --> B
+  subgraph PSR["PrepareSceneRecording"]
+    B["graphMaterials.PrepareResidency"] --> C["graph.PrepareParallel<br/>업로드 기록 경계"]
+    C --> D["animationPalettes.UploadForCurrentRecording"]
+    D --> E["decal / sprite PrepareGpuVisibility"]
+    E --> F["graphMaterials.Prepare<br/>SceneViewInput 밀봉 · 카메라/그림자 목록 준비"]
+  end
+  F --> G["desc.DeclareAll<br/>단계 순서대로 declare"]
+  G --> H["graph.Compile<br/>의존성 스케줄"]
+  H --> I{"소유 큐 실행?"}
+  I -- 예 --> J1["SubmitOwnedGraph"] --> K1["EndFrame"] --> L1["PublishSubmittedCache"]
+  I -- 아니오 --> J2["RecordParallel 4 스레드"] --> K2["EnqueueRecordedBatch"] --> L2["PublishSubmittedCache + 티켓"] --> M2["EndFrame"]
+</pre></div>
+
+<h2><span class="num">02</span>노드 배선</h2>
+<p>둥근 상자는 블랙보드 슬롯이다. 실선은 발행, 굵은 선은 수정, 점선은 읽기다. Geometry·Cull은 슬롯 없이 SceneHost 선언 순서로 묶인다(의존성은 그래프 리소스가 표현한다).</p>
+<div class="card"><pre class="mermaid">
+flowchart TB
+  subgraph S1["1 · 기하"]
+    G1["METEOR.Scene.Geometry<br/>변환 dispatch 1"] -.선언 순서.-> G2["METEOR.Scene.Cull<br/>카메라 + cascade 3 목록 · 깊이 사전 패스·HZB"]
+  end
+  subgraph S2["2 · 래스터"]
+    R1["METEOR.Scene.Shadow"] --> SM(["Shadow.Map"])
+    R2["METEOR.Scene.Surface<br/>Targets + GBuffer + Decal"] --> GB(["GBuffer.* 6장"])
+  end
+  G2 -.-> R1
+  G2 -.-> R2
+  subgraph S3["3 · 불투명 조명"]
+    T1["Temporal.Inputs<br/>소비자가 있을 때만"] --> TM(["Temporal.* 5장"])
+    A1["SSAO"] --> AO(["AmbientOcclusion"])
+    C1["METEOR.Scene.Color<br/>HDR 생성·클리어"] --> LC(["Scene.LitColor"])
+    LC ==> O1["SkyBox → SSGI → SSS → SSR"]
+  end
+  GB -.-> T1
+  GB -.-> A1
+  GB -.-> C1
+  SM -.-> C1
+  AO -.-> C1
+  subgraph S4["4 · 반투명·매질"]
+    V1["METEOR.Scene.Volume<br/>단일 합성"] ==> L1["METEOR.Scene.LightTiles"] ==> B1["METEOR.Scene.Blended<br/>뒤에서 앞으로"]
+    B1 ==> F1["Sprite → VolumetricFog"]
+  end
+  O1 ==> V1
+  SM -.-> B1
+  subgraph S5["5 · 시간·표시"]
+    U1["Temporal.SpriteMotion → Temporal.Upscale"] ==> P1["PostChain → SpatialPost"] --> LDR(["DisplayLdr"])
+    LDR ==> P2["Temporal.DisplayInputs → UI → 에디터 기여 → live_present"]
+  end
+  F1 ==> U1
+  TM -.-> U1
+</pre></div>
+
+<div class="table-wrap" style="margin-top:16px"><table>
+<thead><tr><th>#</th><th>노드</th><th>reads</th><th>writes / modifies</th><th>그래프에 넣는 패스</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>METEOR.Scene.Geometry</td><td>—</td><td>—</td><td><code>METEOR.TransformMeshWorld</code>(native dispatch 1) · <code>METEOR.MeshWorldReady</code> · <code>METEOR.MeshWorldReuse</code> · 필요 시 <code>METEOR.MeshInputUpload</code></td></tr>
+<tr><td>2</td><td>METEOR.Scene.Cull</td><td>—</td><td>—</td><td><code>METEOR.ShadowMeshlet.Reset/Cull</code> x3 · <code>METEOR.Scene.OccluderDepth</code> · <code>Geometry.Occlusion.N</code> · <code>Geometry.Visibility.Reset/CullOcclusion</code></td></tr>
+<tr><td>3</td><td>METEOR.Scene.Shadow</td><td>—</td><td>W Shadow.Map</td><td><code>Shadow.Clear</code> · <code>METEOR.Scene.Shadow.C0/C1/C2</code></td></tr>
+<tr><td>4</td><td>METEOR.Scene.Surface</td><td>—</td><td>W GBuffer 6장</td><td>타깃 클리어 · <code>METEOR.Scene.GBuffer</code> · 데칼(있을 때)</td></tr>
+<tr><td>5</td><td>Temporal.Inputs</td><td>Depth</td><td>W Temporal 5장</td><td><code>HasConsumer</code>가 참이거나 진단 캡처일 때만</td></tr>
+<tr><td>6</td><td>SSAO</td><td>Depth·Normal</td><td>W AO</td><td>SSAO</td></tr>
+<tr><td>7</td><td>METEOR.Scene.Color</td><td>AO·Shadow</td><td>W LitColor · M GBuffer</td><td><code>METEOR.Scene.HdrClear</code> → 조건부 Lookup·Subsurface·RuntimeEffects → <code>METEOR.Scene.Color</code> → 굴절</td></tr>
+<tr><td>8–11</td><td>SkyBox · SSGI · SSS · SSR</td><td>Depth (+GBuffer·Temporal)</td><td>M LitColor</td><td>불투명 후처리. SSGI는 강도 &gt; 0일 때만 Temporal 소비</td></tr>
+<tr><td>12</td><td>METEOR.Scene.Volume</td><td>Depth·Shadow</td><td>M LitColor</td><td>볼륨 합성(프레임당 한 번, 반투명 앞)</td></tr>
+<tr><td>13</td><td>METEOR.Scene.LightTiles</td><td>Depth</td><td>—</td><td>반투명 드로우가 있을 때만 <code>METEOR.Scene.LightTiles</code></td></tr>
+<tr><td>14</td><td>METEOR.Scene.Blended</td><td>Depth·Shadow</td><td>M LitColor</td><td>드로우마다 <code>METEOR.Blended.DepthCopy/Surface</code>(필요 시) · <code>METEOR.Blended.Color</code></td></tr>
+<tr><td>15–16</td><td>Sprite · VolumetricFog</td><td>Depth (+Shadow)</td><td>M LitColor</td><td>Fog는 <code>active</code> 조건부</td></tr>
+<tr><td>17–18</td><td>Temporal.SpriteMotion · Temporal.Upscale</td><td>Temporal 5장</td><td>M Temporal · M LitColor</td><td>Upscale은 <code>displayResolutionOutput</code>로 캡처 해상도를 알린다</td></tr>
+<tr><td>19–22</td><td>PostChain · SpatialPost · Temporal.DisplayInputs · UI</td><td>LitColor / DisplayLdr</td><td>W/M DisplayLdr · W Hudless/UiLayer</td><td>톤맵·블룸·FXAA · 공간 후처리 · UI</td></tr>
+<tr><td>+</td><td>에디터 기여</td><td>—</td><td>M DisplayLdr</td><td>Grid · WireFrame · GizmoIcon · GizmoLine</td></tr>
+<tr><td>23</td><td>live_present</td><td>DisplayLdr·Hudless·UiLayer·Temporal</td><td>—</td><td>Temporal 깊이·모션은 FG 대상이 묶였을 때만 소비</td></tr>
+</tbody></table></div>
+
+<h2><span class="num">03</span>METEOR SceneHost 내부 패스</h2>
+<div class="card"><pre class="mermaid">
+flowchart TB
+  subgraph GEO["DeclareGeometry"]
+    T1["METEOR.TransformMeshWorld<br/>작업 목록 · Dispatch 1회"] --> T2["METEOR.MeshWorldReady"]
+    T3["METEOR.MeshWorldReuse"]
+  end
+  subgraph CULL["DeclareCulling"]
+    S1["METEOR.ShadowMeshlet.Reset/Cull x3"]
+    G1["METEOR.Scene.OccluderDepth"] --> G2["Geometry.Occlusion.N"] --> G3["Geometry.Visibility.CullOcclusion"]
+  end
+  subgraph RAS["DeclareShadow · DeclareGBuffer"]
+    S3["METEOR.Scene.Shadow.C0 → C1 → C2"]
+    G4["METEOR.Scene.GBuffer"]
+  end
+  subgraph COL["DeclareColor · DeclareVolume · DeclareBlendedStream"]
+    C2["METEOR.Scene.Color"] --> V["METEOR.Scene.VolumeComposite"] --> B["METEOR.Blended.Color xN"]
+  end
+  T2 --> S1
+  T2 --> G1
+  S1 --> S3
+  G3 --> G4
+  T2 --> G4
+  S3 --> C2
+  G4 --> C2
+</pre></div>
+
+<h2><span class="num">04</span>이번 정리에서 바뀐 것</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>항목</th><th>이전</th><th>지금</th></tr></thead>
+<tbody>
+<tr><td>변환·컬링</td><td>첫 <code>Declare*</code>(Shadow)가 변환을, Shadow·GBuffer가 각자 컬링을 덤으로 선언</td><td><code>DeclareGeometry</code>·<code>DeclareCulling</code> 공개 단계와 전용 노드. 순서가 틀리면 예외</td></tr>
+<tr><td>표면</td><td>Targets·GBuffer·Decal 노드 3개</td><td><code>METEOR.Scene.Surface</code> 노드 1개(내부 패스 동일)</td></tr>
+<tr><td>반투명</td><td>구 <code>EnhancedForwardPass</code>(2,438줄)가 타일 컬링·정렬·위임. ShaderMeta 셰이딩·배치·가시성은 죽은 코드</td><td><code>EnhancedLightTilePass</code> + <code>DeclareBlendedStream</code>. 구 패스·셰이딩 테스트 삭제</td></tr>
+<tr><td>볼륨</td><td>반투명이 있으면 Forward+ 안, 없으면 SSR 뒤</td><td>SSR 뒤·반투명 앞 한 곳</td></tr>
+<tr><td>불투명 후처리</td><td>Forward → Sprite → SSS → SSR</td><td>SSS → SSR → Volume → 반투명 → Sprite</td></tr>
+<tr><td>Temporal</td><td>소비자 목록 하드코딩, 캡처의 <code>"Temporal.Upscale"</code> 이름 비교</td><td><code>LivePassNode::consumes</code> · <code>HasConsumer</code> · <code>displayResolutionOutput</code></td></tr>
+<tr><td>이름</td><td><code>LX.*</code> 패스·리소스, "LX Scene" 메시지, <code>LxMeshletGpuPayload</code>, <code>CREATOR_LX_*</code>, <code>verify-lx-*</code></td><td><code>METEOR.*</code>, "METEOR …", <code>MeteorMeshletGpuPayload</code>, <code>CREATOR_METEOR_*</code>, <code>verify-meteor-*</code>. 노드 언어 쪽 LX는 유지</td></tr>
+<tr><td>캡처 ledger</td><td>구 Forward seal ledger 항목 포함</td><td>프레임 공통 항목만(인코더 드롭·텍스처 업로드 실패)</td></tr>
+</tbody></table></div>
+
+<h3>검증 결과 (2026-10-12)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>검사</th><th>Release</th><th>Debug</th></tr></thead>
+<tbody>
+<tr><td>솔루션 빌드</td><td><span class="tag ok">통과</span></td><td><span class="tag ok">통과</span></td></tr>
+<tr><td><code>verify-meteor-scene-cutover.ps1</code> (meshletcontract·skinning·rendergraph·빈/모델 장면 캡처, GPU 기반 validation)</td><td><span class="tag ok">통과</span> 픽셀 252/252, validation 0</td><td><span class="tag ok">통과</span> 전체 검증 4회 연속 GBV 0건 — 05장 해결 1·2</td></tr>
+<tr><td>RG5 final (<code>RG5_FINAL_GPU_OK</code>, PostChain 병렬 기록, GPU 기반 validation)</td><td>—</td><td><span class="tag ok">통과</span> 25/25 (수정 전 약 7회에 1회 실패)</td></tr>
+<tr><td><code>dx12.blended</code> (신규: 타일 1 · 반투명 1 · 덮은 픽셀만 변화 · 불투명 깊이 보존)</td><td><span class="tag ok">통과</span> 중앙 0.0886 · 구석 0 · validation 0</td><td><span class="tag ok">통과</span></td></tr>
+<tr><td><code>dx12.forward</code> (타일 컬링) · <code>dx12.rendergraph</code> (RG5 타일 선언 포함) · <code>dx12.skinning</code></td><td><span class="tag ok">통과</span></td><td><span class="tag ok">통과</span>(기본 validation)</td></tr>
+</tbody></table></div>
+
+<h2><span class="num">05</span>해결한 문제와 남은 문제</h2>
+<ul class="caution">
+  <li class="good"><b>해결 1 — PostChain 병렬 기록과 GPU 기반 validation.</b> GPU 기반 validation(<code>CREATOR_DX12_VALIDATION=gpu</code>)에서 <code>PostChain.ToneMapped</code>가 COMMON 레이아웃 그대로 UAV로 디스패치된다는 오류가 간헐적으로 났다(약 7회에 1회). 포인터 단위 로그로 보니 그래프 계획과 기록된 배리어는 정상이었다. 오류는 transient pool 없이 매 프레임 RT+UAV 텍스처를 새로 만드는 RG5 final 테스트에서만 났다. 테스트에 <code>RGTransientPool</code>을 붙이자 25/25 통과했다. <code>DeclareRecordingIndependent</code>를 빼서 고쳐진 것처럼 보였던 한 번의 결과는 간헐성 때문이었고, 그 변경은 되돌렸다. 수정: <code>EnhancedFinalRg5Tests.h</code>.</li>
+  <li class="good"><b>해결 2 — <code>DirectionalLightGizmo</code> 첫 드로우의 COPY_DEST 레이아웃.</b> 테스트 뒤 라이브 장면까지 도는 전체 Debug 검증에서 약 2회에 1회, 갓 업로드한 기즈모 텍스처의 첫 드로우가 <code>LEGACY_COPY_DEST</code> 레이아웃으로 보고됐다. 업로드는 같은 큐에서 먼저 제출됐고(fence 16 → 17), 오류는 첫 사용 때 한 번만 났다. 이후 약 1000프레임은 깨끗했다. <code>DX12TextureCache</code>가 업로드 텍스처를 COPY_DEST 대신 COMMON으로 만들게 바꿨다. 복사가 일어나면 COPY_DEST로 자동 전환되고, 그 뒤 배리어는 그대로다. 수정 후 전체 Debug 검증 4회와 Release 1회에서 오류 0건이었다. 원인은 GBV가 새 리소스를 생성 시 상태로 추적하는 방식으로 추정하며, 증명하지는 못했다. 엔진은 Agility SDK 없이 OS 기본 런타임을 쓴다.</li>
+  <li class="bad"><b>기존 문제 — 머티리얼 프로브.</b> Raster·Matched 프로브(<code>MaterialRasterSurfaceProbe</code>)는 새 API로 옮겨 빌드되지만, 공통 준비 단계에서 멈춘다. 합성 메시에 쿠킹된 메시렛 토폴로지가 없기 때문이다(메시렛 계약 전환 이후 필수). <code>MaterialCommonConsumerProbe</code>는 GBuffer 전환 이후 이미 컴파일되지 않는다. 프로브 안의 인자 평가 순서 버그(오류 메시지가 비어 보이던 원인)는 고쳤다.</li>
+  <li><b>남은 LX 표기.</b> 셰이더 진입점·Scene 패스 이름(<code>LXSceneVS</code> 등)과 <code>LxMeshletGpuContract.slang</code>은 쿠킹된 Scene 제품에 기록된다. 그래서 바꾸려면 Scene ABI를 올리고 재쿠킹해야 하며, 별도 작업으로 남긴다. 과거 분석 기록(<code>docs/analysis/Lx*.md</code>)은 당시 명칭 그대로 보존한다.</li>
+  <li><b>Forward ShaderMeta 자산.</b> <code>Forward*.shadermeta</code>·<code>ForwardShade.slang</code>·<code>ExperimentMaterialSealing</code>의 Forward 축은 렌더러가 더 이상 소비하지 않는다. 에디터 코드 머티리얼 저작 체계와 엮여 있어 이번에는 남겼다.</li>
+  <li><b>오래된 스크립트.</b> <code>verify-pipeline-composition.ps1</code>(GBuffer·Deferred·Forward+ 노드 요구)와 <code>verify-pbr-soak.ps1</code>(GBuffer·Forward seal 필드)는 이전 전환부터 맞지 않는 상태다.</li>
+  <li><b>성능.</b> GPU 시간 비교는 전원 상태를 통제하지 않으면 판정할 수 없다(저활용 시 P5 강등). 성능은 각 작업과 함께 측정하며 원인을 찾는다.</li>
+</ul>
+
+<h2><span class="num">06</span>RE 엔진 파이프라인까지 남은 작업</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>작업</th><th>현재</th><th>비고</th></tr></thead>
+<tbody>
+<tr><td colspan="4"><b>A. 기하·데이터</b></td></tr>
+<tr><td>A1</td><td>정점 속성 양자화</td><td><span class="tag gap">없음</span></td><td>쿠커·MS 디코드, 강제 재쿠킹</td></tr>
+<tr><td>A2</td><td>GPU LOD 선택</td><td><span class="tag ext">부분</span> CPU 선택, 그림자 LOD0</td><td>클러스터 계층 쿠킹</td></tr>
+<tr><td>A3</td><td>정적 메시 월드 변환 제거</td><td><span class="tag ext">부분</span> 결과 캐시 256개·32MiB</td><td><code>METEOR.Scene.Geometry</code> 노드 안에서 교체</td></tr>
+<tr><td>A4</td><td>클러스터 스트리밍</td><td><span class="tag gap">없음</span></td><td>A2와 계층 공유</td></tr>
+<tr><td colspan="4"><b>B. 컬링 (<code>METEOR.Scene.Cull</code> 노드 안에서 진행)</b></td></tr>
+<tr><td>B1</td><td>카메라 메시렛 compute 컬링</td><td><span class="tag ext">부분</span> 인스턴스 단위 + MS 내부 거부</td><td>그림자 목록 인프라 재사용</td></tr>
+<tr><td>B2</td><td>2단계 오클루전</td><td><span class="tag ext">대체</span> 깊이 사전 패스 + 현재 HZB</td><td>history 리소스 일반화</td></tr>
+<tr><td>B3</td><td>GPU 작업 분배</td><td><span class="tag gap">없음</span> CPU bin, 65535 제한</td><td>B1과 함께</td></tr>
+<tr><td>B4</td><td>그림자 고도화</td><td><span class="tag ext">부분</span></td><td>광원별 2단계·정적 캐시·비동기 compute</td></tr>
+<tr><td colspan="4"><b>C. 래스터·셰이딩</b></td></tr>
+<tr><td>C1</td><td>RHI 64-bit atomic·포맷</td><td><span class="tag gap">없음</span></td><td>C2 선행</td></tr>
+<tr><td>C2</td><td>가시성 버퍼 + SW 래스터</td><td><span class="tag gap">없음</span></td><td><code>METEOR.Scene.Surface</code> 노드를 대체</td></tr>
+<tr><td>C3</td><td>바인드리스 머티리얼</td><td><span class="tag gap">없음</span></td><td>가장 큰 RHI 작업</td></tr>
+<tr><td>C4</td><td>머티리얼 패킷 셰이딩</td><td><span class="tag gap">없음</span></td><td>Temporal 입력·데칼 이동. 셰이더 LX→METEOR 식별자 정리와 같은 ABI 증가에 묶기 좋다</td></tr>
+<tr><td>C5</td><td>그래프 commutative writer</td><td><span class="tag gap">없음</span></td><td>C2와 함께</td></tr>
+<tr><td colspan="4"><b>D. 검증·인프라</b></td></tr>
+<tr><td>D1</td><td>전원 상태를 기록하는 측정</td><td><span class="tag ext">진행 중</span></td><td>작업마다 측정하며 원인 확인</td></tr>
+<tr><td>D2</td><td>프로브 메시렛 쿠킹 복구</td><td><span class="tag gap">고장</span></td><td>05장 머티리얼 프로브</td></tr>
+<tr><td>D3</td><td>Vulkan 동등성</td><td><span class="tag ext">보류</span> PHASE 4.9</td><td>RenderDoc 최종 비교</td></tr>
+<tr><td>D4</td><td>Temporal 하드코딩</td><td><span class="tag ok">완료</span></td><td>이번 정리</td></tr>
+</tbody></table></div>
+
+<h3>장기: RE 형태</h3>
+<div class="card"><pre class="mermaid">
+flowchart TB
+  G["METEOR.Scene.Geometry<br/>정적은 오브젝트 공간"] --> C1["1차 컬링<br/>이전 프레임 HiZ · GPU 작업 분배"]
+  C1 --> R1["1차 래스터<br/>HW MS + SW → 가시성 버퍼"]
+  R1 --> H["HiZ"] --> C2["2차 컬링"] --> R2["2차 래스터"]
+  R2 --> K["머티리얼 분류 · 셰이더 ID 패킷"] --> S["패킷 셰이딩 · 바인드리스"]
+  S --> L["조명 · 불투명 후처리"] --> B["반투명 · 매질"] --> D["시간 · 표시"]
+  C1 --> SH["그림자 2단계 컬링 · 정적 캐시"] --> L
+</pre></div>
+
+<h2><span class="num">07</span>소스 위치</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>내용</th><th>위치</th></tr></thead>
+<tbody>
+<tr><td>노드 목록</td><td><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp</code> · <code>BuildPipelineDesc</code></td></tr>
+<tr><td>노드 계약·소비자 질의</td><td><code>Render/Core/EnhancedLivePipelineDesc.h/.cpp</code> · <code>consumes</code>, <code>HasConsumer</code>, <code>displayResolutionOutput</code></td></tr>
+<tr><td>METEOR SceneHost</td><td><code>MaterialGraphSceneHost.h/.cpp</code> · <code>DeclareGeometry/Culling/Shadow/GBuffer/Color/Volume/BlendedStream</code></td></tr>
+<tr><td>타일 광원 컬링</td><td><code>Render/Passes/Lighting/EnhancedLightTilePass.h/.cpp</code></td></tr>
+<tr><td>메시 변환</td><td><code>MaterialGraphMeshSurface.cpp</code> · <code>DeclareBatch</code>, <code>PrepareDispatch</code></td></tr>
+<tr><td>검증</td><td><code>Tools/regression/verify-meteor-scene-cutover.ps1</code> · <code>Editor/RenderTests/.../Geometry/EnhancedBlendedStreamTest.cpp</code>(<code>dx12.blended</code>)</td></tr>
+</tbody></table></div>
+
+<footer>CreatorEngine docs/analysis · 2026-10-12 · 브랜치 <code>codex/pr169-build-fixes</code> · PR #172 · 관련: LxSceneBigBangCutover20261012.md, LxHdrCutover20261012.md, LxMeshletGeometryContract20261012.md, LxTransformDispatch20261012.md (당시 명칭 보존)</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function () {
+  var root = document.documentElement.getAttribute('data-theme');
+  var dark = root === 'dark' || (root !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict',
+      fontFamily: '"IBM Plex Sans KR", system-ui, sans-serif', flowchart: { htmlLabels: true, curve: 'basis' } });
+  }
+})();
+</script>
+</body>
+</html>

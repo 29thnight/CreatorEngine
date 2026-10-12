@@ -450,7 +450,7 @@ namespace experiment::cooked
                 wire.Integer(descriptor.vertexOffset); wire.Integer(descriptor.triangleOffset);
                 wire.Integer(descriptor.primitiveOffset); wire.Integer(descriptor.vertexCount);
                 wire.Integer(descriptor.triangleCount); wire.Integer(descriptor.flags);
-                wire.Integer(descriptor.reserved[0]); wire.Integer(descriptor.reserved[1]);
+                wire.Integer(descriptor.clusterId); wire.Integer(descriptor.reserved);
                 for (const auto scalar : descriptor.sphereCenter)
                 {
                     wire.Float(scalar);
@@ -495,8 +495,8 @@ namespace experiment::cooked
                 descriptor.vertexCount = wire.Integer<std::uint32_t>();
                 descriptor.triangleCount = wire.Integer<std::uint32_t>();
                 descriptor.flags = wire.Integer<std::uint32_t>();
-                descriptor.reserved[0] = wire.Integer<std::uint32_t>();
-                descriptor.reserved[1] = wire.Integer<std::uint32_t>();
+                descriptor.clusterId = wire.Integer<std::uint32_t>();
+                descriptor.reserved = wire.Integer<std::uint32_t>();
                 for (auto& scalar : descriptor.sphereCenter)
                 {
                     scalar = wire.Float();
@@ -898,8 +898,7 @@ namespace experiment::cooked
             }, diagnostic);
             if (!meshletsValid)
             {
-                value.mesh.meshlets = {};
-                diagnostics.push_back(diagnostic + "; retaining indexed geometry");
+                throw std::runtime_error(diagnostic + "; force reimport/recook required");
             }
             const bool lodsValid = Checked([&]
             {
@@ -911,8 +910,7 @@ namespace experiment::cooked
             }, diagnostic);
             if (!lodsValid)
             {
-                value.mesh.coarseLods = {};
-                diagnostics.push_back(diagnostic + "; retaining LOD0 geometry");
+                throw std::runtime_error(diagnostic + "; force reimport/recook required");
             }
             if (warnings)
             {

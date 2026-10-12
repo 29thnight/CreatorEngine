@@ -25,6 +25,25 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
+    // Source-authored regression coverage for portable render-feature projection.
+    // These checks are not executed by the source-only implementation task.
+    var renderSettingsPath = Path.Combine(root, "EngineSettings.asset");
+    Check(RenderFeatureSettings.FromProject(renderSettingsPath).Contains("upscaler: none"), "Missing settings did not use native defaults");
+    File.WriteAllText(renderSettingsPath, "renderPassSettings:\n  aa:\n    isApply: false\nbuild: {}\n");
+    Check(RenderFeatureSettings.FromProject(renderSettingsPath).Contains("fallbackAa: false"), "Legacy AA-off preference was lost");
+    File.WriteAllText(renderSettingsPath, "build:\n  renderFeatures:\n    schemaVersion: 1\n    frameGenerator: dlss\n    interpolatedFrameCount: 3\n    quality: native-aa\n");
+    var projectedFeatures = RenderFeatureSettings.FromProject(renderSettingsPath);
+    Check(projectedFeatures.Contains("interpolatedFrameCount: 3") && projectedFeatures.Contains("quality: native-aa"), "Portable feature settings were not projected");
+    var materializedFeatures = RenderFeatureSettings.Apply("startupSceneName: Main.creator\nrenderFeatures:\n  enabled: false\nrenderPassSettings:\n  aa: {}\n", projectedFeatures);
+    Check(materializedFeatures.Contains("startupSceneName: Main.creator") && materializedFeatures.Contains("renderPassSettings:"), "Feature projection changed unrelated settings");
+    Check(materializedFeatures.IndexOf("renderFeatures:", StringComparison.Ordinal) == materializedFeatures.LastIndexOf("renderFeatures:", StringComparison.Ordinal), "Duplicate feature root emitted");
+    foreach (var rejectedField in new[] { "schemaVersion: 2", "runtimeDirectory: C:/SDK", "spatialSharpness: NaN", "interpolatedFrameCount: 0", "upscaler: unsupported", "spatialRenderScale: 0.1", "quality: quality\n    quality: native-aa" })
+    {
+        File.WriteAllText(renderSettingsPath, "build:\n  renderFeatures:\n    " + rejectedField + "\n");
+        Reject(() => RenderFeatureSettings.FromProject(renderSettingsPath), "Invalid portable field accepted: " + rejectedField);
+    }
+    File.WriteAllText(renderSettingsPath, "build:\n  renderFeatures: {}\n");
+    Check(RenderFeatureSettings.FromProject(renderSettingsPath).Contains("frameGenerator: none"), "Empty feature map did not migrate to native defaults");
     foreach (var retired in new[] { "Runtime/Common/fmod.dll", "Runtime/Common/FMODL.DLL", "fmodstudio.dll", "fmodstudioL.dll", "miniaudio.dll" })
     {
         Reject(() => Metadata.AssertSourceOnlyAudio([retired]), "Retired audio dependency accepted: " + retired);

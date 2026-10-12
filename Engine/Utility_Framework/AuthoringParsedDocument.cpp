@@ -106,6 +106,28 @@ namespace Authoring
 		return ParseTextWithContext(bytes, error, utf8Path);
 	}
 
+	ParsedDocument ParsedDocument::ParseFilePath(const std::filesystem::path& path, std::string& error)
+	{
+		const auto utf8Path = path.u8string();
+		const std::string context(utf8Path.begin(), utf8Path.end());
+		std::ifstream input(path, std::ios::binary);
+		if (!input)
+		{
+			error = "파일을 열 수 없다: " + context;
+			return ParsedDocument{};
+		}
+		std::ostringstream buffer;
+		buffer << input.rdbuf();
+		const std::string bytes = buffer.str();
+		const std::span<const std::byte> byteView{
+			reinterpret_cast<const std::byte*>(bytes.data()), bytes.size() };
+		if (IsCookedDocument(byteView))
+		{
+			return ParseCooked(byteView, error);
+		}
+		return ParseTextWithContext(bytes, error, context);
+	}
+
 	ParsedDocument ParsedDocument::ParseCooked(
 		std::span<const std::byte> bytes, std::string& error)
 	{

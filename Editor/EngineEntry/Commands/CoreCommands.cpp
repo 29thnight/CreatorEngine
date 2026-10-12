@@ -45,6 +45,7 @@
 #include "RegisterEditorMenuManual.h"
 #include "CommandSupport.h"
 
+#include "CommandCore/TemporalCommands.h"
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -550,15 +551,17 @@ namespace ConsoleCmd
         const HWND hwnd = window ? window->GetHandle() : nullptr;
         if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return PreconditionFailed("window.unavailable", "No editor window"); }
 
-        // 클라이언트 영역이 요청 크기가 되도록 창 전체 크기를 역산한다.
-        RECT desired{ 0, 0, width, height };
-        const LONG style = ::GetWindowLong(hwnd, GWL_STYLE);
-        const LONG exStyle = ::GetWindowLong(hwnd, GWL_EXSTYLE);
-        if (!::AdjustWindowRectEx(&desired, style, FALSE, exStyle))
-            return Fail("window.resize_failed", "AdjustWindowRectEx failed");
+        // Custom editor chrome replaces the standard caption in NCCALCSIZE.
+        // AdjustWindowRectEx still adds that caption and oversizes the client.
+        // Use this window's actual non-client margins at its current DPI.
+        RECT outer{}, clientBefore{};
+        if (!::GetWindowRect(hwnd, &outer) || !::GetClientRect(hwnd, &clientBefore))
+            return Fail("window.resize_failed", "Cannot read host window margins");
+        const int outerWidth = width + (outer.right-outer.left) - (clientBefore.right-clientBefore.left);
+        const int outerHeight = height + (outer.bottom-outer.top) - (clientBefore.bottom-clientBefore.top);
 
         if (!::SetWindowPos(hwnd, nullptr, 0, 0,
-            desired.right - desired.left, desired.bottom - desired.top,
+            outerWidth, outerHeight,
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
             return Fail("window.resize_failed", "SetWindowPos failed");
 
@@ -601,6 +604,14 @@ namespace ConsoleCmd
         auto data = CommandData::Object();
         data.Set("width", CommandData::Int(clientW));
         data.Set("height", CommandData::Int(clientH));
+        // The screen-size bus follows the rendered viewport. Retain its legacy
+        // fields and report the actual host client rect separately for restore.
+        const auto* window = CoreWindow::GetForCurrentInstance();
+        RECT hostClient{};
+        const bool hostKnown = window && ::GetClientRect(window->GetHandle(), &hostClient);
+        data.Set("hostClientKnown", CommandData::Bool(hostKnown));
+        data.Set("hostClientWidth", CommandData::Int(hostKnown ? hostClient.right-hostClient.left : 0));
+        data.Set("hostClientHeight", CommandData::Int(hostKnown ? hostClient.bottom-hostClient.top : 0));
         return Ok({}, std::move(data));
     }
 
@@ -2253,8 +2264,29 @@ namespace ConsoleCmd
     }
 
 
+    static CommandCore::CommandResult Cmd_temporal(const ConsoleCommandContext& ctx)
+    {
+        return CommandCore::ExecuteTemporalCommand(ctx.parts, TemporalPresentationTarget::EditorViewport);
+    }
+
     void RegisterCoreCommands(Registrar& reg)
     {
+        reg.Result({ "temporal.deepdvc" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.fallback" }, &Cmd_temporal, SceneAccess::OwnedState);
+#if CE_DEVELOPMENT && !CE_SHIPPING
+        reg.Result({ "temporal.fault" }, &Cmd_temporal, SceneAccess::OwnedState);
+#endif
+        reg.Result({ "temporal.fg" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.latency" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.metadata" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.motion" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.nis" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.reflex" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.reset" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.runtime" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.status" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.support" }, &Cmd_temporal, SceneAccess::OwnedState);
+        reg.Result({ "temporal.upscale" }, &Cmd_temporal, SceneAccess::OwnedState);
         reg.Result({ "help" }, &Cmd_help);
         reg.Result({ "commands.list" }, &Cmd_commands_list);
         reg.Result({ "commands.describe" }, &Cmd_commands_describe);

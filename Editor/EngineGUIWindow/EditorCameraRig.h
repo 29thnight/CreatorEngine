@@ -29,6 +29,7 @@ public:
 
     Camera& GetCamera() noexcept { return m_camera; }
     const Camera& GetCamera() const noexcept { return m_camera; }
+    std::uint64_t GetSourceIdentity() const noexcept { return m_sourceIdentity; }
 
     FrameCameraSnapshot CaptureFrameSnapshot(float aspectRatio = 0.f) const;
 
@@ -38,8 +39,11 @@ public:
     void HandleMovement(bool enabled);
     void PublishPresentationDiagnostics(const EnhancedLiveDisplayTexture& displayed, bool imageDrawn);
     void ResetToDefaultPose() noexcept;
-    void ApplySnapshot(const FrameCameraSnapshot& snapshot) noexcept;
-    void SetPose(const math::vector3& position, const math::quaternion& rotation) noexcept;
+    void ApplySnapshot(const FrameCameraSnapshot& snapshot, std::uint64_t sourceIdentity,
+        bool cameraCut = true) noexcept;
+    void SetPose(const math::vector3& position, const math::quaternion& rotation,
+        bool cameraCut = true) noexcept;
+    void NotifyCameraCut() noexcept { m_camera.NotifyCameraCut(); }
 
     float* SpeedPtr() noexcept { return &m_speed; }
 
@@ -52,9 +56,12 @@ private:
 
     struct PresentationInput;
     std::unique_ptr<PresentationInput> m_presentationInput;
+    std::uint64_t m_sourceIdentity{ 0 };
     std::uint64_t m_inputSequence{ 0 };
     mutable std::uint64_t m_cameraRevision{ 0 };
     mutable FrameCameraSnapshot m_lastCapturedCamera{};
+    std::uint64_t m_followSourceIdentity{ 0 };
+    std::uint64_t m_followSourceCutRevision{ 0 };
     Camera m_camera{};
     float m_speed{ 10.f };
     float m_speedMul{ 1.f };

@@ -161,6 +161,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="TemporalMotionFixture.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="TemporalMotionFixtureAssets.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="TemporalMotionFixture.h" />
+    <ClInclude Include="TemporalMotionFixtureAssets.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="ModelConsumptionDiagnostics.cpp" />
     <ClCompile Include="ModelSceneInstantiation.cpp" />
     <ClCompile Include="AnimationEventBridge.cpp" />

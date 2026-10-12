@@ -199,7 +199,7 @@ bool IblBaker::PrepareInputs(IRenderDeviceServices& device, const IblEnvironment
     RHIBufferDesc description;
     description.bytes = count * sizeof(IblBakeSample);
     description.allowUnorderedAccess = true;
-    description.debugName = L"LX.Material.IblBake";
+    description.debugName = L"METEOR.Material.IblBake";
     if (!device.CreateBuffer(description, candidate->buffer_, error))
     {
         return false;
@@ -287,7 +287,7 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
         input = graph.FindImportedBuffer(gpuPoints_->Buffer());
         if (!input.IsValid())
         {
-            input = graph.ImportBuffer(gpuPoints_->Buffer(), RHIResourceState::ShaderResource, "LX.IBL.Surface");
+            input = graph.ImportBuffer(gpuPoints_->Buffer(), RHIResourceState::ShaderResource, "METEOR.IBL.Surface");
         }
     }
     if (declared_.exchange(true))
@@ -298,11 +298,11 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
     auto environment = graph.FindImportedTexture(environment_.cube.handle);
     if (!environment.IsValid())
     {
-        environment = graph.ImportTexture(environment_.cube.handle, RHIResourceState::ShaderResource, "LX.IBL.Cube");
+        environment = graph.ImportTexture(environment_.cube.handle, RHIResourceState::ShaderResource, "METEOR.IBL.Cube");
     }
     graph_ = &graph;
     graphEpoch_ = graph.ResourceEpoch();
-    graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.IBL.Result");
+    graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "METEOR.IBL.Result");
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
     const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
@@ -310,7 +310,7 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
     {
         graphOutput_ = graph.Write(graphOutput_);
     }
-    graph.AddPass("LX.BakePhysicalIBL",
+    graph.AddPass("METEOR.BakePhysicalIBL",
                   {{input, RHIResourceState::ShaderResource, read},
                    {environment, RHIResourceState::ShaderResource, read},
                    {graphOutput_, RHIResourceState::UnorderedAccess, write}},
@@ -324,7 +324,7 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
                       }
                   });
     graph.AddPass(
-        "LX.PhysicalIBLReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
+        "METEOR.PhysicalIBLReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
         [owner](const auto&) {
             if (!owner->IsCurrent())
             {

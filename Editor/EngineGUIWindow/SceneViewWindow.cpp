@@ -422,10 +422,14 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
             edits.push_back(EditorObjectOperations::CapturePropertyEdit(target->Transform_(), {"position", "rotation"}));
             target->Transform_().SetWorldRotation(cam->rotate, TransformWriteReason::Gizmo);
             target->Transform_().SetWorldPosition(cam->m_eyePosition, TransformWriteReason::Gizmo);
+            if (CameraComponent* targetCamera = target->GetComponent<CameraComponent>())
+            {
+                targetCamera->NotifyCameraCut();
+            }
         }
         EditorObjectOperations::CommitPropertyEdits(std::move(edits));
 	}
-	else if (ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyDown(ImGuiKey_F)) {
+	else if (ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyPressed(ImGuiKey_F, false)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)

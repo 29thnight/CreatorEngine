@@ -47,6 +47,7 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
+#include <cmath>
 #include "EnhancedRenderDebugWindow.h"
 #include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
@@ -408,6 +409,33 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    static CommandCore::CommandData LiveTemporalProvenanceData(
+        const TemporalMeasurementProvenance& temporal)
+    {
+        using namespace CommandCore;
+        auto data = CommandData::Object();
+        data.Set("schemaVersion", CommandData::Int(2));
+        data.Set("valid", CommandData::Bool(temporal.IsValid()));
+        data.Set("frameKind", CommandData::String(TemporalMeasuredFrameKindName(temporal.frameKind)));
+        data.Set("realFrameId", CommandData::String(std::to_string(temporal.realFrameId)));
+        data.Set("publicationFrameId", CommandData::String(std::to_string(temporal.publicationFrameId)));
+        data.Set("viewId", CommandData::String(std::to_string(temporal.viewId)));
+        data.Set("sceneEpoch", CommandData::String(std::to_string(temporal.sceneEpoch)));
+        data.Set("generatedOrdinal", CommandData::Int(temporal.generatedOrdinal));
+        data.Set("renderWidth", CommandData::Int(temporal.renderExtent.width));
+        data.Set("renderHeight", CommandData::Int(temporal.renderExtent.height));
+        data.Set("displayWidth", CommandData::Int(temporal.displayExtent.width));
+        data.Set("displayHeight", CommandData::Int(temporal.displayExtent.height));
+        data.Set("upscaler", CommandData::String(TemporalMeasuredProviderName(temporal.upscaler)));
+        data.Set("frameGenerator", CommandData::String(TemporalMeasuredProviderName(temporal.frameGenerator)));
+        data.Set("resolutionState", CommandData::String(TemporalResolutionStateName(temporal.resolutionState)));
+        data.Set("spatialMode", CommandData::String(SpatialScalingModeName(temporal.spatialMode)));
+        data.Set("deepDvcApplied", CommandData::Bool(temporal.deepDvcApplied));
+        data.Set("nativeGateActive", CommandData::Bool(temporal.nativeGateActive));
+        data.Set("goldenEligible", CommandData::Bool(temporal.IsGoldenEligible()));
+        return data;
+    }
+
     static CommandCore::CommandResult Cmd_dx12_live(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -440,6 +468,21 @@ namespace ConsoleCmd
         data.Set("framesRendered", CommandData::Int(snapshot.framesRendered));
         data.Set("framesIdle", CommandData::Int(snapshot.framesIdle));
         data.Set("framesInFlight", CommandData::Int(snapshot.framesInFlight));
+        data.Set("framesRenderedAxis", CommandData::String("completed-real-view-renders-not-display-presentations"));
+        // Each value was retained with its own submission. A newer submitted
+        // frame must never relabel an older completed GPU timing measurement.
+        data.Set("temporalProvenance", LiveTemporalProvenanceData(snapshot.temporalProvenance));
+        data.Set("gpuTemporalProvenance", LiveTemporalProvenanceData(snapshot.gpuTemporalProvenance));
+        auto nativeRecord = CommandData::Object();
+        nativeRecord.Set("ms", CommandData::Double(snapshot.nativeRecordMs));
+        nativeRecord.Set("recordingWaves", CommandData::Int(snapshot.nativeRecordWaves));
+        nativeRecord.Set("jobDispatches", CommandData::Int(snapshot.nativeRecordDispatches));
+        nativeRecord.Set("workerJobs", CommandData::Int(snapshot.nativeRecordJobs));
+        nativeRecord.Set("balanced", CommandData::Bool(snapshot.nativeRecordBalanced));
+        nativeRecord.Set("samples", CommandData::Int(snapshot.nativeRecordSamples));
+        nativeRecord.Set("axis", CommandData::String("native-graph-record-cpu-not-full-frame"));
+        nativeRecord.Set("temporalProvenance", LiveTemporalProvenanceData(snapshot.nativeRecordProvenance));
+        data.Set("nativeRecord", std::move(nativeRecord));
 
         // 진입 나이는 실프레임 packet 캡처 이후 시간이며 입력-광자 지연이 아니다.
         // 픽셀 제출 없이 CPU 소비만 진행할 수 있으므로 세 신원을 나누어 낸다.
@@ -859,6 +902,22 @@ namespace ConsoleCmd
         data.Set("historyRevision", CommandData::Int(snapshot->historyRevision));
         data.Set("width", CommandData::Int(snapshot->width));
         data.Set("height", CommandData::Int(snapshot->height));
+        const auto& temporal = snapshot->temporalProvenance;
+        data.Set("temporalProvenanceSchemaVersion", CommandData::Int(2));
+        data.Set("frameKind", CommandData::String(TemporalMeasuredFrameKindName(temporal.frameKind)));
+        data.Set("realFrameId", CommandData::Int(temporal.realFrameId));
+        data.Set("publicationFrameId", CommandData::Int(temporal.publicationFrameId));
+        data.Set("generatedOrdinal", CommandData::Int(temporal.generatedOrdinal));
+        data.Set("renderWidth", CommandData::Int(temporal.renderExtent.width));
+        data.Set("renderHeight", CommandData::Int(temporal.renderExtent.height));
+        data.Set("displayWidth", CommandData::Int(temporal.displayExtent.width));
+        data.Set("displayHeight", CommandData::Int(temporal.displayExtent.height));
+        data.Set("upscaler", CommandData::String(TemporalMeasuredProviderName(temporal.upscaler)));
+        data.Set("frameGenerator", CommandData::String(TemporalMeasuredProviderName(temporal.frameGenerator)));
+        data.Set("resolutionState", CommandData::String(TemporalResolutionStateName(temporal.resolutionState)));
+        data.Set("spatialMode", CommandData::String(SpatialScalingModeName(temporal.spatialMode)));
+        data.Set("deepDvcApplied", CommandData::Bool(temporal.deepDvcApplied));
+        data.Set("temporalNativeGateActive", CommandData::Bool(temporal.nativeGateActive));
         data.Set("dependencyHash", CommandData::String(std::to_string(snapshot->dependencyHash)));
         data.Set("copyMs", CommandData::Double(snapshot->copyNanoseconds / 1000000.0));
         data.Set("storageBytes", CommandData::Int(snapshot->StorageBytes()));
@@ -1109,6 +1168,21 @@ namespace ConsoleCmd
         return Ok("검증 레이어 문제 0", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_ssgi_intensity(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("render.ssgi.intensity <0..4>");
+        float intensity{};
+        if (!ParseNumber(ctx.parts[1], intensity) || !std::isfinite(intensity) || intensity < 0.f || intensity > 4.f)
+            return InvalidArguments("SSGI intensity must be finite and within 0..4");
+        auto tuning = EnhancedSceneRenderer::GetLiveTuning();
+        tuning.ssgi.intensity = intensity;
+        EnhancedSceneRenderer::SetLiveTuning(tuning);
+        auto data = CommandData::Object();
+        data.Set("requestedIntensity", CommandData::Double(intensity));
+        return Ok("SSGI tuning requested; render.live.wait observes the next consumed packet", std::move(data));
+    }
+
     void RegisterRenderDebugCommands(Registrar& reg)
     {
         reg.Result({ "light.proxy" }, &Cmd_light_proxy);
@@ -1121,6 +1195,7 @@ namespace ConsoleCmd
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "render.live.fence" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
+        reg.Result({ "render.ssgi.intensity" }, &Cmd_render_ssgi_intensity, SceneAccess::OwnedState);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
         reg.Result({ "render.graph" }, &Cmd_render_graph);

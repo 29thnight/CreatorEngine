@@ -161,7 +161,7 @@ int main(int argc, char** argv)
         Material replaced(restored);
         check(data->DeserializeMaterialPayload(replaced, Authoring::NodeViewAccess::Make(legacyRoot)) &&
                   !replaced.HasMaterialGraph() && replaced.m_name == legacy.m_name,
-              "Explicit legacy document replacement clears LX state after successful decode");
+              "Explicit legacy document replacement clears METEOR state after successful decode");
 
         // Switch only the authoring capability; the mounted CEMF registry already
         // points at copied sources in this isolated fixture package.

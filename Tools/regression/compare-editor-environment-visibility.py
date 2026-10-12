@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import sys
+from base0_artifacts import audit_pixel_measurement
 
 parser = argparse.ArgumentParser()
 parser.add_argument('directory', type=Path)
@@ -15,6 +16,7 @@ root = args.directory
 def attachment(capture, name):
     folder = root / capture
     manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8-sig'))
+    audit_pixel_measurement(manifest)
     entry = next(a for a in manifest['attachments'] if a['name'] == name)
     data = array('f')
     data.frombytes((folder / entry['file']).read_bytes())

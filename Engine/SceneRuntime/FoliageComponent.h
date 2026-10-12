@@ -49,6 +49,9 @@ public:
     [[nodiscard]] AssetDepot::AssetRequestStatus GetAssetBindingStatus(uint32 typeID) const;
 
     void AddFoliageInstance(const FoliageInstance& instance);
+    // Owner-thread transform edit. Identity is retained across submitted poses.
+    bool UpdateFoliageInstance(std::uint64_t identity, const math::vector3& position,
+        const math::vector3& rotation, const math::vector3& scale);
     void RemoveFoliageInstance(size_t index);
 
     void AddInstanceFromTerrain(TerrainComponent* terrain, const FoliageInstance& instance);

@@ -1,5 +1,6 @@
 #include "PhysicsTransformPolicy.h"
 #include "Scene.h"
+#include "TemporalMotionFixture.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-5
@@ -1670,8 +1671,29 @@ void Scene::AddRootEntity(std::string_view name)
 
 void Scene::OnBeforeSerialize() const
 {
+    for (const auto root : m_transientDiagnosticRoots)
+    {
+        if (Resolve(root))
+        {
+            throw std::runtime_error("A transient diagnostic is active or awaiting scene cleanup. Save after cleanup completes.");
+        }
+    }
     if (m_incrementalConstructions != 0)
         throw std::runtime_error("Model placement is still in progress. Save after it completes or cancel the load.");
+}
+
+void Scene::ProtectTransientDiagnosticRoot(EntityHandle root)
+{
+    RequireManagedMutable();
+    if (!Resolve(root))
+    {
+        throw std::logic_error("Transient diagnostic root does not belong to this live scene");
+    }
+    std::erase_if(m_transientDiagnosticRoots, [this](EntityHandle previous)
+    {
+        return Resolve(previous) == nullptr;
+    });
+    m_transientDiagnosticRoots.push_back(root);
 }
 
 Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::Index parentIndex)
@@ -3367,6 +3389,9 @@ void Scene::LateUpdate(float deltaSecond)
     // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.
     m_soundSystem.LateUpdate(deltaSecond);
 
+    // Publish diagnostic poses and visibility after animation, but before the
+    // proxy seal. The frame stamp must describe this frame's proxy values.
+    TemporalMotionFixture::TickAfterAnimation();
     UpdateRenderData();
 
     // 기존 post-physics FlushAITicks보다 앞에서 한 번만 큐를 채운다. 완료가

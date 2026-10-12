@@ -279,7 +279,13 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
         EnhancedPostChainPass::Inputs inputs{};
         inputs.color = hdrHandle;
         post.SetInputs(inputs);
-        post.Declare(graph, frameContext);
+        // Production declares with a temporary display-resolution context.
+        // Invalidate it before recording to catch callbacks retaining its reference.
+        {
+            auto declarationContext = frameContext;
+            post.Declare(graph, declarationContext);
+            declarationContext.resources = nullptr;
+        }
 
         const RGHandle finalHandle = post.GetOutput();
         const RGHandle preAAHandle = post.GetPreAAOutput();

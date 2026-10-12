@@ -24,10 +24,9 @@ struct GpuPassTimingIdentity
 
 /// 한 GPU 제출을 가리키는 표(§3.3).
 ///
-/// ★ 엔진 프레임과 제출은 1:1 이 아니다. 씬뷰와 게임뷰가 함께 있으면 한
-///   `engineFrameId` 에 제출이 둘 생긴다. 그래서 둘을 가른다 — 프레임 그래프와
-///   CPU Hierarchy 는 `engineFrameId` 를 기준으로 서고, GPU 구간은 `submissionId` 를
-///   기준으로 선다.
+/// Render publication and GPU submission are not 1:1. Scene and Game views can
+/// submit separately from one publication. engineFrameId retains that render
+/// publication identity; sourceEngineFrame is the distinct CPU-profiler owner.
 ///
 /// ★ `ringSlot` 을 **수집 키**로 쓴다. 이것이 없었을 때 수집은 "지금 기록 중인
 ///   슬롯" 을 읽었고, 실측에서 수집의 83% 가 남의 제출을 읽고 있었다(§0.5.10).
@@ -53,6 +52,11 @@ struct GpuFrameToken
     // Capture admission belongs to this submission, never the collection frame.
     // Zero means diagnostic timing only; it must not enter a later capture.
     uint64_t captureGeneration{ 0 };
+
+    // Copied from the originating host packet, never sampled at GPU completion.
+    // Missing host ownership must not be guessed from engineFrameId.
+    uint32_t sourceEngineFrame{ 0 };
+    bool sourceEngineFrameAvailable{ false };
 
     bool IsValid() const { return kInvalidRingSlot != ringSlot; }
 };

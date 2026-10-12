@@ -148,6 +148,7 @@ namespace ce
 		{
 			event_chunk* next = chunk_list->next;
 			chunk_list->count = 0;
+			chunk_list->render_measurement_count = 0;
 			chunk_list->next = head;
 			head = chunk_list;
 			++count;
@@ -327,13 +328,13 @@ namespace ce
         m_inHonor = false;
     }
 
-    void thread_stream::write(const profile_event& value, std::uint64_t generation, bool late_ingest)
+    bool thread_stream::write(const profile_event& value, std::uint64_t generation, bool late_ingest)
     {
         if (generation != m_generation.load(std::memory_order_acquire))
         {
             // 이전 회차의 늦은 종료는 새 캡처의 용량 손실이 아니다.
             m_staleEvents.fetch_add(1, std::memory_order_relaxed);
-            return;
+            return false;
         }
         if (m_writer && m_writer->late_ingest != late_ingest)
         {
@@ -342,13 +343,14 @@ namespace ce
         if (!ensure_chunk(generation))
         {
             m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
-            return;
+            return false;
         }
         m_writer->late_ingest = late_ingest;
         m_writer->events[m_writer->count] = value;
         m_writer->events[m_writer->count].thread_slot = static_cast<std::uint16_t>(m_info.slot);
         ++m_writer->count;
         ++m_sequence;
+        return true;
     }
 
     void thread_stream::seal_current(bool writing)
@@ -357,7 +359,7 @@ namespace ce
         {
             event_chunk* chunk = m_writer;
             m_writer = nullptr;
-            if (chunk->count == 0)
+            if (chunk->count == 0 && chunk->render_measurement_count == 0)
             {
                 m_pool.release(chunk);
             }
@@ -654,7 +656,76 @@ namespace ce
         value.queue = gpu.queue;
         // GPU는 Stop의 제출 cutoff까지 늦게 도착한다. CPU의 admission cutoff를
         // 적용하지 않고, 제출할 때 잡은 세대를 그대로 청크에 싣는다.
-        write(value, generation, true);
+        if (write(value, generation, true) && gpu.provenance.frame_kind != 0)
+        {
+            profile_render_measurement sample;
+            sample.engine_frame = frame;
+            sample.axis = profile_render_axis::gpu_pass;
+            sample.queue = gpu.queue;
+            sample.event_view = gpu.view;
+            sample.event_submission = gpu.submission;
+            sample.marker = id;
+            sample.submission_id = gpu.submission_id;
+            sample.tick_begin = begin;
+            sample.tick_end = end;
+            sample.provenance = gpu.provenance;
+            write_render_measurement(sample, generation);
+        }
+    }
+
+    void thread_stream::write_presenter_return(const profile_render_measurement& sample,
+                                              std::uint64_t generation)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        // Match CPU instant admission: Stop sees in-flight ownership, and an
+        // already frozen generation cannot admit a new observation afterward.
+        m_pendingState.fetch_or(kPendingAdmission, std::memory_order_seq_cst);
+        honor_seal_request();
+        if (generation == m_generation.load(std::memory_order_acquire) &&
+            generation != m_frozenGeneration.load(std::memory_order_seq_cst))
+        {
+            // Share the owner's ordinary CPU page. Existing frame/Stop seal
+            // requests flush it at the next owner safe point; no per-Present
+            // page allocation or blocking collector handoff is introduced.
+            write_render_measurement(sample, generation, false);
+        }
+        honor_seal_request();
+        m_pendingState.fetch_and(static_cast<std::uint8_t>(~kPendingAdmission), std::memory_order_release);
+    }
+
+    void thread_stream::write_render_measurement(const profile_render_measurement& sample,
+                                                std::uint64_t generation, bool late_ingest)
+    {
+        if (!owned_by_caller())
+        {
+            return;
+        }
+        honor_seal_request();
+        if (generation != m_generation.load(std::memory_order_acquire))
+        {
+            m_staleEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        if (!sample.valid())
+        {
+            m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        if (m_writer && m_writer->late_ingest != late_ingest)
+        {
+            seal_current(true);
+        }
+        if (!ensure_chunk(generation))
+        {
+            m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        m_writer->late_ingest = late_ingest;
+        m_writer->render_measurements[m_writer->render_measurement_count++] = sample;
+        ++m_sequence;
     }
 
     void thread_stream::write_instant(marker_id id, profile_tick tick, std::uint32_t frame,

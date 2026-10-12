@@ -115,6 +115,11 @@ namespace editor::menus
         return assets::IsModelAuthoringSource(target.path);
     }
 
+    void reimport_model(const asset_target& target)
+    {
+        run_command("assets.model.reimport", { "assets.model.reimport", model_source_argument(target.path) });
+    }
+
     void enable_model_meshlets(const asset_target& target)
     {
         run_command("assets.model.meshlets", { "assets.model.meshlets", model_source_argument(target.path), "true" });

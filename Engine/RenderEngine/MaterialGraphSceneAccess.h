@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Render/Passes/Geometry/EnhancedGBufferPass.h"
+#include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -12,8 +12,8 @@ namespace material_graph
         return graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned ? graph.Modify(lighting) : lighting;
     }
 
-    inline EnhancedGBufferPass::Outputs AdvanceSceneSurface(EnhancedRenderGraph& graph,
-                                                            EnhancedGBufferPass::Outputs inputs,
+    inline SceneSurfaceTargets::Outputs AdvanceSceneSurface(EnhancedRenderGraph& graph,
+                                                            SceneSurfaceTargets::Outputs inputs,
                                                             RGAccessMode colorAccess)
     {
         if (colorAccess != RGAccessMode::Write && colorAccess != RGAccessMode::ReadWrite)
