@@ -89,7 +89,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                               geometry.draw.materialGraphInstance, error),
                           "Decal instance " + error);
                     own::shared_owner<const SceneViewInput> input;
-                    Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 97 + tier, 1, 16, 16, camera},
+                    Check(SealScene({context.frameId, context.sceneEpoch, 97 + tier, 1, 16, 16, camera},
                                                {&geometry.draw, 1}, {}, input, error),
                           "Decal seal " + error);
                     Check(device.BeginFrame(error), "Decal begin");

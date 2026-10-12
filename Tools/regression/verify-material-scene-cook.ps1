@@ -6,7 +6,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/ArtifactRetention.ps1"
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+Assert-ArtifactCapacity $repo
 if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     $VisualStudioInstallation = @(& $vswhere -latest -products '*' `
@@ -22,6 +24,7 @@ $sources = @(
         Where-Object Extension -In '.cpp', '.h', '.slang', '.vcxproj', '.props', '.targets'
     Get-ChildItem $PSScriptRoot -File | Where-Object Name -Match '^material_(raster|scene|ibl|runtime)|^principled_layered_reference'
     Get-Item (Join-Path $PSScriptRoot 'MaterialRasterSurfaceProbe.vcxproj'), $PSCommandPath,
+        (Join-Path $PSScriptRoot 'support/CookedMeshFixture.h'),
         (Join-Path $repo 'Directory.Build.props'), (Join-Path $repo 'Directory.Build.targets'),
         (Join-Path $repo 'EngineOutput.props')
 ) | Sort-Object FullName -Unique
@@ -43,6 +46,7 @@ foreach ($configuration in @('Debug', 'Release')) {
     }
     $probe = Join-Path $repo "Bin/x64-$configuration/Tools/MaterialRasterSurfaceProbe/MaterialRasterSurfaceProbe.exe"
     $cooker = Join-Path $repo "Bin/x64-$configuration/Tools/AssetCooker/AssetCooker.exe"
+    Assert-ArtifactCapacity $repo
     $caseRoot = Join-Path $output ("SceneCook-$configuration-" + [Guid]::NewGuid().ToString('N'))
     $assets = Join-Path $caseRoot 'Assets'
     New-Item -ItemType Directory -Path $assets | Out-Null

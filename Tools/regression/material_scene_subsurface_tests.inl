@@ -40,32 +40,7 @@ VerifiedProduct SubsurfaceProduct(const std::filesystem::path& root)
     std::vector<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && (program->features & 0x1000u), "SSS graph feature extraction");
-    const auto file = root / "Build/Obj/MaterialProductProbe/subsurface-product.slang";
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n";
-    const CompileTarget targets[]{{RHIShaderBinary::Dxil, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::Dxil, "LXSceneColorPS", "ps_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneColorPS", "ps_6_0"}};
-    RHIShaderCompileOptions options;
-    options.strictMath = true;
-    options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = capabilities.subsurface = true;
-    VerifiedProduct product;
-    RHIShaderPermutation permutation;
-    std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "SSS product permutation");
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    std::string messages;
-    for (const auto& diagnostic : diagnostics)
-    {
-        messages += diagnostic.message + "\n";
-    }
-    Check(verified, "Verify SSS product: " + messages);
+    const auto product = CookedScene(*program, "subsurface-product");
     Check(product.selection.tier == Tier::Special && product.selection.route == Route::Forward,
           "SSS automatically selects Special Forward");
     return product;
@@ -157,9 +132,14 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     WaitSceneProgram(host, context, generation);
     for (unsigned features : {0x3000u})
     {
+        // A distinct generation, so the ready SSS program cannot answer for it.
         Generation unsupportedValue(*generation);
-        unsupportedValue.cooked.product.program.features = features;
-        unsupportedValue.cooked.product.program.volume = (features & 0x2000u) != 0;
+        unsupportedValue.generation += 100;
+        auto& unsupportedProgram = unsupportedValue.cooked.product.program;
+        unsupportedProgram.features = features;
+        unsupportedProgram.volume = (features & 0x2000u) != 0;
+        unsupportedProgram.semanticKey.insert(unsupportedProgram.semanticKey.size() - SceneHostIdentity.size(),
+                                              "|uninstalled-volume");
         const auto unsupported = own::make_shared<const Generation>(std::move(unsupportedValue));
         Check(!host.RequestProgram(context, unsupported, error), "Uninstalled Volume remains rejected");
     }
@@ -218,7 +198,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const std::array draws{a.draw, b.draw};
             SceneInputView view{context.frameId, context.sceneEpoch, 91, 1, 24, 24, camera};
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal(view, draws, {}, input, error), "SSS Scene seal " + error);
+            Check(SealScene(view, draws, {}, input, error), "SSS Scene seal " + error);
             Check(device.BeginFrame(error), "SSS begin frame");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);

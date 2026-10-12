@@ -100,13 +100,13 @@ if ($VerifyAssetCooker) {
                 $meta.generatedMaterial.graph -ne '11111111-1111-4111-8111-111111111111' -or
                 $meta.generatedMaterial.sourceSha256 -ne $actualSourceHash -or
                 @($meta.properties).Count -ne 1 -or $meta.properties[0].parameterId -ne 900 -or
-                @($meta.passes).Count -ne 6 -or
-                (@($meta.passes.name | Sort-Object) -join ',') -ne 'Forward,GBuffer,LXSceneColor,LXSceneLookup0,LXSceneLookup1,Shadow') {
+                @($meta.passes).Count -ne 8 -or
+                (@($meta.passes.name | Sort-Object) -join ',') -ne 'Forward,GBuffer,LXSceneColor,LXSceneDepth,LXSceneLookup0,LXSceneLookup1,LXSceneTemporal,Shadow') {
                 throw "Actual $configuration generated pair contract mismatch."
             }
             $forward = @($meta.passes | Where-Object name -EQ 'Forward')[0]
             if ($forward.queue -ne 'transparent' -or $forward.state.blend -ne 'alpha' -or $forward.state.depthWrite) {
-                throw "Actual $configuration Forward+ alpha contract mismatch."
+                throw "Actual $configuration METEOR blended stream alpha contract mismatch."
             }
             if ($null -ne $metaHash -and ($metaHash -ne $actualMetaHash -or $sourceHash -ne $actualSourceHash)) {
                 throw "Actual $configuration repeated cook changed its source pair."

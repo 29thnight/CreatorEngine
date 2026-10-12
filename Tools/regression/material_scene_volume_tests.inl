@@ -41,45 +41,8 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface)
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && program->volume && program->slang.find("LX_MATERIAL_VOLUME_HOMOGENEOUS 1") != std::string::npos,
           "Uniform Volume classification");
-    const auto file =
-        root / "Build/Obj/MaterialProductProbe" / (surface ? "volume-surface-product.slang" : "volume-product.slang");
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n"
-        << "#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
-    std::vector<CompileTarget> targets;
-    for (auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
-    {
-        if (surface)
-        {
-            targets.push_back({backend, "LXSceneVS", "vs_6_0"});
-            targets.push_back({backend, "LXSceneColorPS", "ps_6_0"});
-        }
-        targets.push_back({backend, "LXSceneVolumeCoefficientCS", "cs_6_0"});
-    }
-    RHIShaderCompileOptions options;
-    options.strictMath = options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = capabilities.refraction = capabilities.volume = true;
-    RHIShaderPermutation permutation;
+    const auto product = CookedScene(*program, surface ? "volume-surface-product" : "volume-product");
     std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "Volume permutation");
-    VerifiedProduct product;
-    for (const auto& target : targets)
-    {
-        RHIShaderCompiler::VerifiedShader shader;
-        const bool compiled = RHIShaderCompiler::VerifyFile(file.string(), target.entry, target.profile, target.binary,
-                                                            permutation, shader, error, options);
-        Check(compiled, "Volume shader " + target.entry + ": " + error);
-    }
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    for (const auto& diagnostic : diagnostics)
-    {
-        error += diagnostic.message + "\n";
-    }
-    Check(verified, "Volume product verification " + error);
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
         LX::Runtime::ComputeShaderDescription identity;
@@ -218,8 +181,9 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const own::shared_owner<const Texture>& image, const own::shared_owner<const Texture>& cube,
-                    const own::shared_owner<const Instance>& background)
+                    const own::shared_owner<const Instance>& surfaceBackground)
 {
+    const auto background = SceneCooked(surfaceBackground);
     const std::array products{VolumeProduct(root, false), VolumeProduct(root, true)};
     GenerationStore store;
     experiment::AssetId graphId;
@@ -372,9 +336,14 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             if (fixture == 5)
             {
                 sealBudget.mesh.maxChunkPoints = 3;
+                experiment::MeshletBuildSettings settings;
+                settings.maxVertices = 3;
+                for (auto& draw : draws)
+                    Check(cookedMeshes.Cook(draw.modelMeshView, draw.modelMeshView, error, settings),
+                          "Author small cooked Volume clusters " + error);
             }
             own::shared_owner<const SceneViewInput> input;
-            const bool sealed = SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
+            const bool sealed = SealScene({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
                                                      draws, sealBudget, input, error);
             Check(sealed, "Volume seal " + error);
             Check(device.BeginFrame(error), "Volume frame begin");
@@ -440,7 +409,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 open.modelMeshView.indexCount -= 3;
                 open.geometryKey += 100;
                 own::shared_owner<const SceneViewInput> invalid;
-                Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera}, {&open, 1}, {},
+                Check(SealScene({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera}, {&open, 1}, {},
                                            invalid, error),
                       "Open boundary input remains structurally valid");
                  const bool prepared = host.Prepare(context, invalid, environment, {}, {}, {}, validBudget, error, 1);
@@ -449,7 +418,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 std::vector<std::array<float, 2>> many(11, {.2f, .6f});
                 auto excessive = VolumeBoxes(many, 9900, false);
                 excessive.draw.materialGraphInstance = volume.draw.materialGraphInstance;
-                Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
+                Check(SealScene({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
                                            {&excessive.draw, 1}, {}, invalid, error),
                       "Excessive Volume input seal");
                  const bool admitted = host.Prepare(context, invalid, environment, {}, {}, {}, validBudget, error, 1);

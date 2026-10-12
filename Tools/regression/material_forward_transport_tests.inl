@@ -253,7 +253,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             const std::vector<EnhancedDrawItem> empty;
             context.draws = &empty;
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, {},
+            Check(SealScene({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, {},
                                        input, error) &&
                       host.SelectReadyInput(context, input, input, error) && input->Draws().size() == graphDraws.size(),
                   "All transport draws accepted");

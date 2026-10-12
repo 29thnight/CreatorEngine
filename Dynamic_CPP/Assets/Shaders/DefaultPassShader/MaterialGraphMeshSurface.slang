@@ -74,7 +74,10 @@ void LXTransformMesh(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThread
     result.normal = float4(n, 0);
     result.tangent = float4(t, 0);
     result.bitangent = float4(b, 0);
-    lx_meshOutputs[NonUniformResourceIndex(group.x)][vertex] = result;
+    // group.x comes from the thread group alone, and a compute wave never spans
+    // groups, so the index is wave-uniform. NonUniformResourceIndex is not needed
+    // and would pull SPIR-V past its spirv_1_3 profile.
+    lx_meshOutputs[group.x][vertex] = result;
 }
 
 struct LXMeshSample
@@ -91,7 +94,8 @@ cbuffer LXSampleConstants : register(b2)
 StructuredBuffer<LXSurfacePoint> lx_sampleVertices : register(t4);
 StructuredBuffer<uint> lx_sampleIndices : register(t5);
 StructuredBuffer<LXMeshSample> lx_sampleRequests : register(t6);
-RWStructuredBuffer<LXSurfacePoint> lx_sampleOutput : register(u1);
+// Past the transform's u0..u4095 output table, which shares this module.
+RWStructuredBuffer<LXSurfacePoint> lx_sampleOutput : register(u4096);
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

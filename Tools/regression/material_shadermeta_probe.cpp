@@ -269,7 +269,8 @@ SamplerState lx_sampler_0 : register(s0, space1);
         Check(!entry.path().filename().string().starts_with(".candidate-"), "Failed candidate cleaned");
         if (entry.is_directory()) ++directories;
     }
-    Check(directories == 1, "No failed candidate generation published");
+    Check(accepted.metaPath.parent_path() != textureOnlyMeta.metaPath.parent_path() && directories == 2,
+        "Only the two successful fixture generations were published");
 
     const auto mixed = work / "mixed";
     std::filesystem::create_directories(mixed);
@@ -307,7 +308,7 @@ SamplerState lx_sampler_0 : register(s0, space1);
         ShaderMeta meta;
         Check(ShaderMetaLoader::LoadFile(entry.path() / "material.shadermeta", guid, meta, error) &&
             meta.generatedMaterial && meta.properties.size() == 1 && meta.properties[0].parameterId == 900 &&
-            meta.passes.size() == 6, "Actual Scene generation has common metadata/complete declared stage pairs including Forward");
+            meta.passes.size() == 8, "Actual METEOR generation has complete Temporal/Depth/surface/blended/shadow stage pairs");
         ++scenePairs;
     }
     Check(scenePairs == 1, "One verified production pair");
@@ -386,7 +387,8 @@ SamplerState lx_sampler_0 : register(s0, space1);
                 "Existing authored ShaderMeta remains valid: " + error);
             ++legacyFiles;
         }
-    Check(legacyFiles == 6, "Existing authored corpus tested");
+    // GBuffer.shadermeta left with the deleted GBuffer pass; METEOR generates its own.
+    Check(legacyFiles == 5, "Existing authored corpus tested");
     std::cout << "MAT7_SHADERMETA_ADAPTER_OK checks=" << checks
         << " backends=2 typedProperties=8 samplers=1 legacyFiles=" << legacyFiles
         << " commonPacking=bitExact deterministic=true failurePreserved=true sceneCompiler=true cookedGenerated=true sourceFree=true\n";

@@ -28,7 +28,9 @@ foreach ($configuration in $Configurations) {
     $previousValidation = $env:CREATOR_DX12_VALIDATION
     try {
         $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed\x64-windows\debug\bin' } else { 'vcpkg_installed\x64-windows\bin' }
-        $env:PATH = (Join-Path $repo $dependencyRoot) + ';' + $previousPath
+        $nestedRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed\x64-windows\x64-windows\debug\bin' } else { 'vcpkg_installed\x64-windows\x64-windows\bin' }
+        $dependencyPaths = @($dependencyRoot,$nestedRoot) | ForEach-Object { Join-Path $repo $_ } | Where-Object { Test-Path -LiteralPath $_ }
+        $env:PATH = ($dependencyPaths -join ';') + ';' + $previousPath
         $env:CREATOR_DX12_VALIDATION = 'gpu'
         $result = @(& $exe $repo 2>&1)
         $resultExit = $LASTEXITCODE
@@ -37,7 +39,7 @@ foreach ($configuration in $Configurations) {
         $env:CREATOR_DX12_VALIDATION = $previousValidation
     }
     $result | Set-Content -LiteralPath (Join-Path $output "raster-surface-$configuration.log") -Encoding utf8
-    if ($resultExit -ne 0 -or @($result | Where-Object { $_ -match '^LX_MATERIAL_RASTER_SURFACE_OK checks=\d+ gpuComponents=\d+ frames=7 compiled=24 covered=\d+ background=\d+ far=\d+ fractionalLods=\d+ .* graphFrames=21 graphLists=35 graphFailures=6 sharedDepthFrames=24 sharedDepthPixels=[1-9]\d* coplanarPixels=[1-9]\d* skinnedDepthFrames=6 meshFailures=4 sceneInputFrames=24 sceneInputFailures=24 sceneCompositionFrames=59 sceneCompositionPixels=[1-9]\d* sceneCompositionFailures=330 sceneLookupBaked=[1-9]\d* sceneLookupReused=[1-9]\d* sceneLookupMutationFrames=10 sceneLookupFullFrames=2 sceneLookupFullPixels=[1-9]\d* sceneLookupFullColdMs=[\d.eE+-]+ sceneLookupFullWarmMs=[\d.eE+-]+ sceneTextureFrames=8 sceneTexturePixels=[1-9]\d* sceneTextureFractionalLods=[1-9]\d* sceneTextureClampedLods=[1-9]\d* maxTextureFilterError=[\d.eE+-]+ sceneGenerationFrames=5 sceneGenerationFallbacks=0 sceneGenerationRejectedRequests=7 sceneGenerationAborts=1 sceneGenerationPendingSubmissions=1 sceneGenerationStale=1 sceneGenerationCompiles=6 sceneGenerationWorkers=6 sceneGenerationPsoWorkers=[1-9]\d* sceneLookupApproximateFrames=10 sceneLookupApproximated=[1-9]\d* sceneLookupApproximatePixels=[1-9]\d*$' }).Count -ne 1) {
+    if ($resultExit -ne 0 -or @($result | Where-Object { $_ -match '^LX_MATERIAL_RASTER_SURFACE_OK checks=\d+ gpuComponents=\d+ frames=7 compiled=24 covered=\d+ background=\d+ far=\d+ fractionalLods=\d+ .* graphFrames=21 graphLists=35 graphFailures=6 sharedDepthFrames=24 sharedDepthPixels=[1-9]\d* coplanarPixels=[1-9]\d* skinnedDepthFrames=6 meshFailures=4 sceneInputFrames=24 sceneInputFailures=24 sceneCompositionFrames=59 sceneCompositionPixels=[1-9]\d* sceneCompositionFailures=330 sceneLookupBaked=[1-9]\d* sceneLookupReused=[1-9]\d* sceneLookupMutationFrames=10 sceneLookupFullFrames=2 sceneLookupFullPixels=[1-9]\d* sceneLookupFullColdMs=[\d.eE+-]+ sceneLookupFullWarmMs=[\d.eE+-]+ sceneTextureFrames=8 sceneTexturePixels=[1-9]\d* sceneTextureFractionalLods=[1-9]\d* sceneTextureClampedLods=[1-9]\d* maxTextureFilterError=[\d.eE+-]+ sceneGenerationFrames=5 sceneGenerationFallbacks=0 sceneGenerationRejectedRequests=7 sceneGenerationAborts=1 sceneGenerationPendingSubmissions=1 sceneGenerationStale=1 sceneGenerationCompiles=0 sceneGenerationWorkers=0 sceneGenerationPsoWorkers=[1-9]\d* sceneLookupApproximateFrames=10 sceneLookupApproximated=[1-9]\d* sceneLookupApproximatePixels=[1-9]\d*$' }).Count -ne 1) {
         throw "Material spatial surface runtime failed ($configuration): $($result -join "`n")"
     }
     "LX_MATERIAL_RASTER_SURFACE_CONFIGURATION_OK configuration=$configuration"

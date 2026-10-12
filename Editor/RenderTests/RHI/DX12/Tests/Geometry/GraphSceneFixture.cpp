@@ -3,7 +3,7 @@
 #include "Assets/AssetIdentityProfile.h"
 #include "Assets/ModelMaterialGraph.h"
 #include "Assets/ModelVertexLayout.h"
-#include "Experiment/Import/MeshletBuilder.h"
+#include "../../../../../../Tools/regression/support/CookedMeshFixture.h"
 #include "DataSystem.h"
 #include "MaterialGraphSceneInput.h"
 #include "Mesh.h"
@@ -152,81 +152,14 @@ std::uint32_t GraphSceneFixture::AddMesh(const std::vector<Vertex>& vertices,
 
 void GraphSceneFixture::CookMesh(uint32_t index)
 {
-    struct FixtureBytes final : experiment::cooked::ArtifactByteSource
-    {
-        bool Size(std::string_view, uint64_t&, std::string& error) const override
-            { error = "Fixture geometry is already decoded"; return false; }
-        bool ReadAt(std::string_view, uint64_t, std::span<std::byte>, std::string& error) const override
-            { error = "Fixture geometry is already decoded"; return false; }
-    };
     auto& stored = m_meshes[index];
-    const auto previous = stored.view;
-    experiment::Mesh authored;
-    if (!authored.vertices.AssignPacked(previous.vertexAttributeMask, stored.vertices.size() / previous.vertexStride,
-        {reinterpret_cast<const std::byte*>(stored.vertices.data()), stored.vertices.size()}))
-        throw std::runtime_error("METEOR fixture packed vertex layout rejected");
-    authored.indices = stored.indices;
+    CookedMeshFixture cooked;
     std::string error;
-    if (!experiment::importer::BuildMeshlets(authored, authored.meshlets, error))
-        throw std::runtime_error("METEOR fixture cooking failed: " + error);
-    auto payload = own::make_shared<assets::ModelGeometryPayload>();
-    auto& mesh = payload->mesh;
-    mesh.vertexAttributeMask = previous.vertexAttributeMask;
-    mesh.vertexStride = previous.vertexStride;
-    mesh.vertexLayoutHash = previous.vertexLayoutHash;
-    mesh.vertexBytes.assign(authored.vertices.Bytes().begin(), authored.vertices.Bytes().end());
-    mesh.indices = stored.indices;
-    mesh.meshlets = std::move(authored.meshlets);
-    auto& summary = payload->meshletSummary;
-    summary.settings = mesh.meshlets.settings;
-    summary.geometryDigest = mesh.meshlets.geometryDigest;
-    summary.descriptorCount = static_cast<uint32_t>(mesh.meshlets.descriptors.size());
-    summary.vertexRemapCount = static_cast<uint32_t>(mesh.meshlets.vertexRemap.size());
-    summary.triangleIndexCount = static_cast<uint32_t>(mesh.meshlets.triangleIndices.size());
-    summary.primitiveRemapCount = static_cast<uint32_t>(mesh.meshlets.primitiveRemap.size());
-    summary.lod0 = mesh.meshlets.lod0;
-    stored.descriptor = own::make_shared<assets::ModelMeshDescriptor>();
-    auto& descriptor = *stored.descriptor;
-    descriptor.meshId = previous.handle.meshId;
-    descriptor.vertexAttributeMask = mesh.vertexAttributeMask;
-    descriptor.vertexStride = mesh.vertexStride;
-    descriptor.vertexLayoutHash = mesh.vertexLayoutHash;
-    descriptor.vertexCount = static_cast<uint32_t>(mesh.vertexBytes.size() / mesh.vertexStride);
-    descriptor.indexCount = static_cast<uint32_t>(mesh.indices.size());
-    descriptor.meshlets = summary;
-    descriptor.skinned = assets::Has(mesh.vertexAttributeMask, assets::VertexAttribute::BoneIndices);
-    if (descriptor.skinned)
-    {
-        uint32_t bones = 1;
-        for (uint32_t vertex = 0; vertex < descriptor.vertexCount; ++vertex)
-            for (uint32_t lane = 0; lane < 4; ++lane)
-                bones = std::max(bones, 1u + uint32_t(std::to_integer<uint8_t>(mesh.vertexBytes[vertex * mesh.vertexStride +
-                    assets::OffsetOf(mesh.vertexAttributeMask, assets::VertexAttribute::BoneIndices) + lane])));
-        auto skeleton = own::make_shared<assets::ModelSkeletonStorage>();
-        skeleton->skeleton.bones.resize(bones);
-        descriptor.skeleton = own::make_shared<assets::ModelSkeletonPayload>(std::move(skeleton), experiment::cooked::ResolvedAssetEntry{}, 0);
-        descriptor.requiredBoneCount = payload->requiredBoneCount = bones;
-    }
-    auto& origin = descriptor.origin;
-    origin.entry.asset.key.assetId.value = descriptor.meshId;
-    origin.entry.asset.kind = experiment::cooked::CookedAssetKind::Mesh;
-    origin.blob.kind = experiment::cooked::CookedAssetKind::Mesh;
-    origin.blob.contentSha256 = mesh.meshlets.geometryDigest;
-    origin.blob.byteSize = mesh.vertexBytes.size() + mesh.indices.size() * 4;
-    origin.blob.representation = 1;
-    origin.blob.schemaVersion = experiment::cooked::kModelGeometryArtifactVersion;
-    origin.byteSource = own::make_shared<FixtureBytes>();
-    origin.resolverRevision = origin.mountId.value = origin.manifestRevision = 1;
-    origin.assetSetId.value = previous.handle.modelId;
-    descriptor.geometryKey.contentSha256 = origin.blob.contentSha256;
-    descriptor.geometryKey.byteSize = origin.blob.byteSize;
-    descriptor.geometryKey.kind = origin.blob.kind;
-    descriptor.geometryKey.representation = origin.blob.representation;
-    descriptor.geometryKey.schemaVersion = origin.blob.schemaVersion;
-    payload->key = descriptor.geometryKey;
-    stored.payload = std::move(payload);
-    if (!BuildRHIModelMeshView(descriptor, *stored.payload, stored.view))
-        throw std::runtime_error("METEOR fixture cooked typed geometry rejected");
+    if (!CookMeshFixture(stored.view, cooked, error))
+        throw std::runtime_error("METEOR fixture: " + error);
+    stored.descriptor = std::move(cooked.descriptor);
+    stored.payload = std::move(cooked.payload);
+    stored.view = cooked.view;
 }
 
 std::uint32_t GraphSceneFixture::AddView(const RHIModelMeshView& source)

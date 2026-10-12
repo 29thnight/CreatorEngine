@@ -312,7 +312,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         }
         SceneInputView view{context.frameId, context.sceneEpoch, 1, 1, 64, 64, camera};
         own::shared_owner<const SceneViewInput> input;
-        CheckWith(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, input, error), "Matched Scene seal ", error);
+        CheckWith(SealScene(view, {&geometry.draw, 1}, {}, input, error), "Matched cooked Scene seal ", error);
         CheckWith(device.BeginFrame(error), "Matched begin ", error);
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<unsigned>(context.frameId));

@@ -3,6 +3,7 @@
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "Render/Graph/ShadowCasterBounds.h"
 #include "support/MaterialGraphScenePacket.h"
+#include "support/CookedMeshFixture.h"
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphSceneLod.h"
 #include "MaterialGraphSceneHost.h"
@@ -502,6 +503,26 @@ Geometry MakeGeometry(bool nearClip, bool reverse)
     return geometry;
 }
 
+// METEOR Scene seals only cooked granular geometry. The probe authors loose
+// meshes, so every Scene seal goes through SealScene: complete loose views are
+// cooked once per distinct content and sealed with their pin tables. Incomplete
+// views stay loose, so malformed inputs keep their own rejection.
+CookedMeshLibrary cookedMeshes;
+
+bool SealScene(const SceneInputView& view, std::span<const EnhancedDrawItem> draws, const SceneInputBudget& budget,
+               own::shared_owner<const SceneViewInput>& result, std::string& error)
+{
+    std::vector<EnhancedDrawItem> cooked(draws.begin(), draws.end());
+    for (auto& draw : cooked)
+        Check(cookedMeshes.Resolve(draw.modelMeshView, draw.modelMeshView, error), "Fixture meshlet cooking " + error);
+    auto pins = own::make_shared<assets::ModelAssetGenerationPins>();
+    assets::ModelGeometryPreparationPins geometry;
+    cookedMeshes.Pin(cooked, *pins, geometry);
+    if (pins->meshes.empty())
+        return SceneViewInput::Seal(view, cooked, budget, result, error);
+    return SceneViewInput::Seal(view, cooked, budget, result, error, std::move(pins), {}, &geometry);
+}
+
 // Independent double reference: screen barycentrics -> reciprocal-W correction.
 // Fine derivatives compare the two lane positions of the pixel's 2x2 quad.
 struct Reference
@@ -966,7 +987,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     view.camera.eyePosition = {0, 0, 2};
     own::shared_owner<const SceneViewInput> accepted;
     std::string error;
-    const bool sealed = SceneViewInput::Seal(view, {&draw, 1}, {}, accepted, error);
+    const bool sealed = SealScene(view, {&draw, 1}, {}, accepted, error);
     Check(sealed, "Scene input seal " + error);
     {
         // The producer, queued source, sealed view, and render binding each
@@ -979,7 +1000,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
         queuedDraw.materialGraphInstance = queuedSource->instance;
         queuedDraw.coverage = queuedSource->coverage;
         own::shared_owner<const SceneViewInput> queuedView;
-        Check(SceneViewInput::Seal(view, {&queuedDraw, 1}, {}, queuedView, error),
+        Check(SealScene(view, {&queuedDraw, 1}, {}, queuedView, error),
               "Queued CPU ownership fixture seals " + error);
         own::weak_owner<const SceneViewInput> viewLookup(queuedView);
         queuedSource.reset();
@@ -1003,7 +1024,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     {
         const std::array repeated{draw, draw};
         own::shared_owner<const SceneViewInput> sharedInput;
-        Check(SceneViewInput::Seal(view, repeated, {}, sharedInput, error) &&
+        Check(SealScene(view, repeated, {}, sharedInput, error) &&
             sharedInput->MaterialPins()->Size() == 1 &&
             sharedInput->Draws()[0].materialPinIndex == sharedInput->Draws()[1].materialPinIndex,
             "Repeated Scene draws share one immutable instance pin and store only indices/views");
@@ -1021,7 +1042,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     otherView.camera.eyePosition.x = .3f;
     otherView.camera.projection.m[0][0] = 2;
     own::shared_owner<const SceneViewInput> second;
-    Check(SceneViewInput::Seal(otherView, {&draw, 1}, {}, second, error), "Second Scene view");
+    Check(SealScene(otherView, {&draw, 1}, {}, second, error), "Second Scene view");
     Check(second->Surface().viewRevision != accepted->Surface().viewRevision &&
               second->Surface().geometryRevision != accepted->Surface().geometryRevision &&
               second->Surface().eye[0] == .3f && accepted->Surface().eye[0] == 0 &&
@@ -1030,7 +1051,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     draw.worldMatrix.m[3][0] = 3;
     draw.materialGraphInstance = instances[1];
     own::shared_owner<const SceneViewInput> changed;
-    Check(SceneViewInput::Seal(view, {&draw, 1}, {}, changed, error), "Changed world/instance seal");
+    Check(SealScene(view, {&draw, 1}, {}, changed, error), "Changed world/instance seal");
     Check(changed->Surface().geometryRevision != accepted->Surface().geometryRevision &&
               material_graph_test::SamePinnedObject(changed->Draws()[0].material, instances[1]) && material_graph_test::SamePinnedObject(accepted->Draws()[0].material, instances[0]) &&
               changed->Draws()[0].geometry->Chunks()[0].input->World().m[3][0] == 3 && firstMesh->World().m[3][0] == 0,
@@ -1135,7 +1156,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
             break;
         }
         const auto previous = accepted;
-        Check(!SceneViewInput::Seal(invalidView, invalidDraws, budget, accepted, error) && material_graph_test::SamePinnedObject(accepted, previous) &&
+        Check(!SealScene(invalidView, invalidDraws, budget, accepted, error) && material_graph_test::SamePinnedObject(accepted, previous) &&
                   !error.empty(),
               "Scene input failure preserves the complete previous view fixture=" + std::to_string(failure));
         ++sceneInputFailures;
@@ -1158,7 +1179,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
             invalid.bonePalette = &oneBone;
         }
         const auto previous = accepted;
-        Check(!SceneViewInput::Seal(view, {&invalid, 1}, {}, accepted, error)
+        Check(!SealScene(view, {&invalid, 1}, {}, accepted, error)
                   && material_graph_test::SamePinnedObject(accepted, previous) && !error.empty(),
               "Malformed shadow bounds input rejected before dereference");
     }
@@ -1181,24 +1202,24 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
             selectedDraws.push_back(candidate);
     }
     own::shared_owner<const SceneViewInput> selectedInput;
-    Check(selectedDraws.size() == 2 && SceneViewInput::Seal(view, selectedDraws, {}, selectedInput, error)
+    Check(selectedDraws.size() == 2 && SealScene(view, selectedDraws, {}, selectedInput, error)
               && selectedInput->Draws().size() == 2,
           "Pre-budget union keeps visible/offscreen caster but rejects 4098 unrelated graph draws");
     std::cout << "CSM_SELECTION_BUDGET_OK candidates=4100 sealed=2\n";
     auto coverageDraw = geometry.draw;
     coverageDraw.coverage.flags |= EnhancedMaterialCoverage::Masked;
     own::shared_owner<const SceneViewInput> masked;
-    Check(SceneViewInput::Seal(view, {&coverageDraw, 1}, {}, masked, error) &&
+    Check(SealScene(view, {&coverageDraw, 1}, {}, masked, error) &&
               masked->Draws()[0].queue == SceneCoverage::Masked,
           "Input capture preserves masked coverage without declaring a raster transport");
     coverageDraw.coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended;
     own::shared_owner<const SceneViewInput> blended;
-    Check(SceneViewInput::Seal(view, {&coverageDraw, 1}, {}, blended, error) &&
+    Check(SealScene(view, {&coverageDraw, 1}, {}, blended, error) &&
               blended->Draws()[0].queue == SceneCoverage::Blended,
           "Input coverage queue is independent of physical material route");
     own::shared_owner<const SceneViewInput> empty;
     ++view.sceneEpoch;
-    Check(SceneViewInput::Seal(view, {}, {}, empty, error) && empty->Draws().empty() && empty->Cost().chunks == 0 &&
+    Check(SealScene(view, {}, {}, empty, error) && empty->Draws().empty() && empty->Cost().chunks == 0 &&
               empty->View().sceneEpoch == 3,
           "Empty/new Scene view cannot retain old draws");
 }
@@ -1293,7 +1314,7 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         sourceDraws[i].coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::DoubleSided;
     }
     own::shared_owner<const SceneViewInput> sceneInput;
-    Check(SceneViewInput::Seal(selectedView, sourceDraws, {}, sceneInput, error), "Selected Scene view seal " + error);
+    Check(SealScene(selectedView, sourceDraws, {}, sceneInput, error), "Selected Scene view seal " + error);
     Check(sceneInput->Draws().size() == 2 && sceneInput->Cost().chunks == 2,
           "Selected Scene view retains both material partitions");
     const auto view = sceneInput->Surface();
@@ -1591,9 +1612,9 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
         const auto previous = mesh;
         if (failure == 0)
         {
+            // Prepare reserves only the output; the batched transform uploads its
+            // inputs when declared. A prefix flushed by that upload must reject it.
             device.flushOnUpload = true;
-            Check(!evaluator.Prepare(device, input, mesh, error) && mesh == previous,
-                  "Mesh allocation prefix preserves the previous packet");
         }
         else if (failure == 1)
         {
@@ -1606,6 +1627,7 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
         }
         Check(!mesh->Declare(graph, error) && !mesh->IsReadyForEvaluation(),
               "Stale mesh uploads cannot be declared in a later recording");
+        device.flushOnUpload = false;
         device.AbortFrame();
         ++meshFailures;
     }
@@ -1834,39 +1856,114 @@ struct SceneSubmissionGate
     ~SceneSubmissionGate() { Release(); }
 };
 
-own::shared_owner<const Instance> SceneReload(const own::shared_owner<const Instance>& original, double offset,
-                                            bool invalid = false)
+// The Scene host consumes only cooked Scene products; it never compiles a
+// material at runtime. The probe cooks its surface programs exactly as the
+// AssetCooker does (CompileSceneProduct, running backend only) and keeps each
+// instance's description and textures.
+bool CookSceneProduct(LX::LXMaterialProgram program, const own::shared_owner<const Instance>& source,
+                      const std::string& name, VerifiedProduct& product, std::string& error)
 {
-    Generation generationValue(*original->generation);
-    generationValue.generation += 1000 + unsigned(offset * 100);
-    {
-        auto& program = generationValue.cooked.product.program;
-        const std::string needle = ".ior = parameters.lx_p900;";
-        const auto position = program.slang.find(needle);
-        Check(position != std::string::npos, "Reload fixture owns the IOR expression");
-        program.slang.replace(position, needle.size(), ".ior = parameters.lx_p900 + " + std::to_string(offset) + ";");
-        if (invalid)
-        {
-            program.slang += "\nthis is an invalid Scene shader;\n";
-        }
-        program.semanticKey += "|scene-reload:" + std::to_string(offset) + (invalid ? ":invalid" : "");
-        generationValue.cooked.boundSource = BuildBoundSource(program);
-        generationValue.cooked.metadata = WriteMaterialProgramMetadata(program);
-    }
+    if (program.semanticKey.ends_with(SceneHostIdentity))
+        program.semanticKey.resize(program.semanticKey.size() - SceneHostIdentity.size());
+    const auto* paths = InternalPath::GetInstance();
+    return CompileSceneProduct(program, paths->ShaderSourcePath / "DefaultPassShader",
+                               paths->CacheRoot / (name + ".slang"), {}, product, error,
+                               source->description.graphId.value, RHIShaderCompiler::GetOutput());
+}
+
+// A generated feature fixture cooked exactly as the AssetCooker does: the full
+// Scene stage set for both backends.
+VerifiedProduct CookedScene(const LX::LXMaterialProgram& program, const std::string& name)
+{
+    const auto* paths = InternalPath::GetInstance();
+    VerifiedProduct product;
+    std::string error;
+    const bool compiled = CompileSceneProduct(program, paths->ShaderSourcePath / "DefaultPassShader",
+                                              paths->CacheRoot / (name + ".slang"), {}, product, error);
+    Check(compiled, "Cook Scene product " + name + ": " + error);
+    return product;
+}
+
+own::shared_owner<const Instance> SceneInstance(const own::shared_owner<const Instance>& source, VerifiedProduct product,
+                                                unsigned generationNumber)
+{
+    Generation generationValue;
+    generationValue.assetId = source->description.graphId;
+    generationValue.generation = generationNumber;
+    generationValue.cooked = {std::move(product), {}, {}};
     const auto generation = own::make_shared<const Generation>(std::move(generationValue));
     own::shared_owner<const Instance> result;
     std::string error;
     Check(BuildInstance(
-              generation, original->description,
+              generation, source->description,
               [&](const experiment::AssetId& id, LXColorSpace space, std::string&) {
-                  const auto found = std::ranges::find_if(original->textures, [&](const auto& texture) {
+                  const auto found = std::ranges::find_if(source->textures, [&](const auto& texture) {
                       return texture.assetId == id && texture.colorSpace == space;
                   });
-                  return found == original->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
+                  return found == source->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
               },
               result, error),
-          "Reload immutable instance " + error);
+          "Cooked Scene instance " + error);
     return result;
+}
+
+// One cooked Scene instance per surface instance for the probe's lifetime.
+own::shared_owner<const Instance> SceneCooked(const own::shared_owner<const Instance>& source)
+{
+    static std::vector<std::pair<own::shared_owner<const Instance>, own::shared_owner<const Instance>>> cooked;
+    if (source->generation->cooked.product.program.semanticKey.ends_with(SceneHostIdentity))
+        return source;
+    for (const auto& [surface, scene] : cooked)
+        if (material_graph_test::SamePinnedObject(surface, source))
+            return scene;
+    VerifiedProduct product;
+    std::string error;
+    const bool compiled = CookSceneProduct(source->generation->cooked.product.program, source,
+                                           "scene-" + std::to_string(cooked.size()), product, error);
+    Check(compiled, "Cook Scene product " + error);
+    auto scene = SceneInstance(source, std::move(product), source->generation->generation);
+    cooked.emplace_back(source, scene);
+    return scene;
+}
+
+std::array<own::shared_owner<const Instance>, 2> SceneCooked(const std::array<own::shared_owner<const Instance>, 2>& sources)
+{
+    return {SceneCooked(sources[0]), SceneCooked(sources[1])};
+}
+
+// A content reload is a recook: the edited program becomes a new cooked Scene
+// generation, and an invalid edit is rejected by the cooker, before any host.
+own::shared_owner<const Instance> SceneReload(const own::shared_owner<const Instance>& original, double offset)
+{
+    auto program = original->generation->cooked.product.program;
+    const std::string needle = ".ior = parameters.lx_p900;";
+    const auto position = program.slang.find(needle);
+    Check(position != std::string::npos, "Reload fixture owns the IOR expression");
+    program.slang.replace(position, needle.size(), ".ior = parameters.lx_p900 + " + std::to_string(offset) + ";");
+    if (program.semanticKey.ends_with(SceneHostIdentity))
+        program.semanticKey.resize(program.semanticKey.size() - SceneHostIdentity.size());
+    program.semanticKey += "|scene-reload:" + std::to_string(offset);
+    VerifiedProduct product;
+    std::string error;
+    const auto name = "scene-reload-" + std::to_string(unsigned(offset * 100));
+    const bool compiled = CookSceneProduct(program, original, name, product, error);
+    Check(compiled, "Recook reloaded Scene product " + error);
+    auto invalid = program;
+    invalid.slang += "\nthis is an invalid Scene shader;\n";
+    VerifiedProduct rejected;
+    Check(!CookSceneProduct(invalid, original, name + "-invalid", rejected, error) && !error.empty(),
+          "The cooker rejects an invalid Scene shader edit");
+    return SceneInstance(original, std::move(product), original->generation->generation + 1000 + unsigned(offset * 100));
+}
+
+// A cooked product missing one stage: the host must reject it at admission.
+own::shared_owner<const Instance> SceneIncomplete(const own::shared_owner<const Instance>& valid)
+{
+    auto product = valid->generation->cooked.product;
+    product.targets.pop_back();
+    product.shaders.pop_back();
+    product.program.semanticKey.insert(product.program.semanticKey.size() - SceneHostIdentity.size(), "|incomplete");
+    return SceneInstance(valid, std::move(product), valid->generation->generation + 1);
 }
 
 void WaitSceneFailure(SceneHost& host, const EnhancedFrameContext& context,
@@ -1890,7 +1987,8 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
                       const own::shared_owner<const Generation>& generation)
 {
     std::string error;
-    Check(host.RequestProgram(context, generation, error), "Scene asynchronous request " + error);
+    const bool requested = host.RequestProgram(context, generation, error);
+    Check(requested, "Scene asynchronous request " + error);
     // A cold Vulkan driver can spend minutes preparing a Layered pipeline set.
     // This is a correctness timeout, not a product latency acceptance target.
     const auto deadline = std::chrono::steady_clock::now() +
@@ -1907,10 +2005,11 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
 
 void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                          ProbeTextures& textures, ProbePool& pool,
-                         const std::array<own::shared_owner<const Instance>, 2>& instances, own::shared_owner<const Texture> cube,
-                         const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0,
-                         bool currentFrameDepth = false)
+                         const std::array<own::shared_owner<const Instance>, 2>& surfaceInstances,
+                         own::shared_owner<const Texture> cube, const Environment& environmentColors,
+                         const SheenTable& table, unsigned expanded = 0, bool currentFrameDepth = false)
 {
+    const auto instances = SceneCooked(surfaceInstances);
     std::string error;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Scene composition mesh cache");
@@ -1940,15 +2039,15 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 
     for (const auto& instance : instances)
         WaitSceneProgram(host, context, instance->generation);
-    Check(host.ProgramStats().workerExecutions == (PathFinder::IsAssetAuthoringEnabled() ? 2u : 0u),
-          "Editor uses workers and cooked Player skips Scene shader compilation");
+    Check(host.ProgramStats().workerExecutions == 0 && host.ProgramStats().compileSubmissions == 0,
+          "Scene consumes cooked bytecode without shader workers or compilation");
     own::shared_owner<const Instance> reloadB, reloadC, badShader, badPso, changedReload;
     std::unique_ptr<SceneWorkerGate> preparationGate;
     if (expanded == 4)
     {
         reloadB = SceneReload(instances[0], .4);
         reloadC = SceneReload(instances[0], .6);
-        badShader = SceneReload(instances[0], .8, true);
+        badShader = SceneIncomplete(SceneReload(instances[0], .8));
         badPso = SceneReload(instances[0], .2);
         auto description = reloadC->description;
         description.parameters.push_back({900, 1.6});
@@ -1975,7 +2074,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         std::array coldDraws{coldCore.draw, coldLayered.draw};
         SceneInputView coldView{context.frameId, context.sceneEpoch, 71, 1, context.width, context.height, camera};
         own::shared_owner<const SceneViewInput> cold;
-        const auto coldSealed = SceneViewInput::Seal(coldView, coldDraws, {}, cold, error);
+        const auto coldSealed = SealScene(coldView, coldDraws, {}, cold, error);
         Check(coldSealed, "Cold pending slot seal " + error);
         // Target initialization must work without any native material pipeline.
         Check(device.BeginFrame(error), "Graph-only target frame begin");
@@ -2191,14 +2290,14 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (fixture == 4)
                 std::swap(graphDraws[0], graphDraws[1]);
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal(view, graphDraws, {}, input, error), "Scene composition seal " + error);
+            Check(SealScene(view, graphDraws, {}, input, error), "Scene composition seal " + error);
             own::shared_owner<const Instance> selectedCore;
             if (expanded == 4)
             {
                 auto conflicting = graphDraws;
                 conflicting[1].materialGraphSlot = 11;
                 own::shared_owner<const SceneViewInput> conflict;
-                Check(SceneViewInput::Seal(view, conflicting, {}, conflict, error),
+                Check(SealScene(view, conflicting, {}, conflict, error),
                       "Conflicting slot input remains sealed");
                 auto retained = input;
                 Check(!host.SelectReadyInput(context, conflict, retained, error) && material_graph_test::SamePinnedObject(retained, input),
@@ -2206,7 +2305,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 auto staleView = view;
                 ++staleView.frameId;
                 own::shared_owner<const SceneViewInput> staleEmpty;
-                Check(SceneViewInput::Seal(staleView, {}, {}, staleEmpty, error) &&
+                Check(SealScene(staleView, {}, {}, staleEmpty, error) &&
                           !host.SelectReadyInput(context, staleEmpty, retained, error) && material_graph_test::SamePinnedObject(retained, input),
                       "A stale empty view cannot clear current Material slots");
                 const auto requestedInput = input;
@@ -2462,7 +2561,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 auto newerDraws = graphDraws;
                 newerDraws[0].materialGraphInstance = badShader;
                 own::shared_owner<const SceneViewInput> newer;
-                Check(SceneViewInput::Seal(view, newerDraws, {}, newer, error) &&
+                Check(SealScene(view, newerDraws, {}, newer, error) &&
                           !host.SelectReadyInput(context, newer, newer, error),
                       "An unready newer request supersedes publication without selecting a fallback");
             }
@@ -2794,8 +2893,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     if (expanded == 4)
     {
         const auto stats = host.ProgramStats();
-        Check(stats.compileSubmissions == 6 && stats.workerExecutions == 6 && stats.failedPreparations == 2,
-              "Each exact generation compiles once on a worker, including two memoized failures");
+        Check(stats.compileSubmissions == 0 && stats.workerExecutions == 0 && stats.failedPreparations == 2,
+              "Every generation loads cooked bytecode; the incomplete product and the PSO failure are memoized");
         Check(stats.stalePublications == 1 && stats.failedSubmissions == 0 && stats.activeSlots == 0 &&
                   stats.retainedRecordings == 0,
               "Stale submission cannot replace an active slot and completion releases owners");
@@ -2828,7 +2927,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         SceneInputView view{context.frameId, context.sceneEpoch, 701, 1,
                             context.width, context.height, camera};
         own::shared_owner<const SceneViewInput> retained;
-        Check(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, retained, error),
+        Check(SealScene(view, {&geometry.draw, 1}, {}, retained, error),
               "Quarantine input seals " + error);
         Check(device.BeginFrame(error), "Quarantine recording opens");
         textures.BeginFrame(context.frameId);
@@ -3427,7 +3526,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
 #ifdef LX_PROBE_VULKAN
             RunCsmVulkanInFlight(device);
 #endif
-            RunSceneShadow(device, roots, pipelines, textures, pool, root, image);
+            RunSceneShadow(device, roots, pipelines, textures, pool, root, image, instances[0]);
             RunSceneDecal(device, roots, pipelines, textures, pool, root, image, cube, mode == "--rg5-decal");
         }
         else if (mode == "--decal-only" || mode == "--rg5-decal")
@@ -3485,7 +3584,8 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             RHIShaderCompileOptions options;
             options.fineDerivatives = file.find("MaterialGraphRasterSurface.slang") != std::string::npos;
             const bool compiled = RHIShaderCompiler::CompileFile(file, entry, profile, shader, error, options);
-            Check(compiled, std::string(entry) + ": " + error);
+            Check(compiled, std::string(entry) + (backend == RHIShaderBinary::SpirV ? " (SPIR-V): " : " (DXIL): ") +
+                                error);
         };
         compile((path / "MaterialGraphMeshSurface.slang").string(), "LXTransformMesh", "cs_6_0", transform);
         const auto file = (path / "MaterialGraphRasterSurface.slang").string();

@@ -2,8 +2,8 @@
 #include "material_owner_checks.h"
 #include "MaterialGraphProduct.h"
 #include "MaterialGraphShaderMeta.h"
-#include "Render/Passes/Geometry/SceneSurfaceTargets.h"
-#include "Render/Passes/Geometry/EnhancedForwardPass.h"
+#include "MaterialGraphSceneCompiler.h"
+#include "../../Lattice/Material/LXMaterialGraph.h"
 
 #include <algorithm>
 #include <cstring>
@@ -78,11 +78,26 @@ void RunMaterialPipelineRuntimeTests(const std::filesystem::path& repository)
     };
     const auto shaderRoot = repository / "Dynamic_CPP/Assets/Shaders/DefaultPassShader";
     std::string error;
-    ShaderMeta gbufferMeta, forwardMeta;
-    check(ShaderMetaLoader::LoadFile(shaderRoot / "GBuffer.shadermeta",
-        FileGuid{"77777777-7777-4777-8777-777777777777"}, gbufferMeta, error), "GBuffer fixture: " + error);
-    check(ShaderMetaLoader::LoadFile(shaderRoot / "Forward.shadermeta",
-        FileGuid{"88888888-8888-4888-8888-888888888888"}, forwardMeta, error), "Forward fixture: " + error);
+    LX::LXMaterialAsset asset;
+    const auto surface = asset.CreateNode("ShaderNodeBsdfPrincipled", 0, 0);
+    const auto outputNode = asset.CreateNode("ShaderNodeOutputMaterial", 300, 0);
+    asset.activeOutput = outputNode;
+    const auto pin = [&](LX::Id node, const char* name, LX::Direction direction) {
+        for (const auto& candidate : asset.graph.FindNode(node)->pins)
+            if (candidate.Identifier() == name && candidate.direction == direction) return candidate.id;
+        throw std::runtime_error("Missing METEOR fixture pin");
+    };
+    check(asset.graph.Connect(pin(surface, "BSDF", LX::Direction::Output),
+        pin(outputNode, "Surface", LX::Direction::Input)).has_value(), "METEOR fixture connection");
+    const auto program = LX::GenerateMaterialSlang(asset);
+    check(bool(program), "METEOR fixture generation");
+    const auto cookFile = repository / "Build/Obj/MaterialProductProbe/pipeline-meteor.slang";
+    std::filesystem::create_directories(cookFile.parent_path());
+    material_graph::VerifiedProduct product;
+    check(material_graph::CompileSceneProduct(*program, shaderRoot, cookFile, {}, product, error,
+        FileGuid{"77777777-7777-4777-8777-777777777777"}),
+        "Cook METEOR pipeline fixture: " + error);
+    check(bool(product.materialShader), "Cooked METEOR fixture owns generated ShaderMeta");
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
         RHIShaderCompiler::ScopedOutput output(backend);
@@ -140,58 +155,22 @@ void RunMaterialPipelineRuntimeTests(const std::filesystem::path& repository)
                 "Compute compile failure retains previous complete artifact");
         }
         PipelineCache cache;
-        RootCache roots;
-        EnhancedFrameContext context;
-        context.psoManager = &cache;
-        context.rootSignatures = &roots;
-        SceneSurfaceTargets gbuffer;
-        EnhancedForwardPass forward;
-        const ShaderMetaHandle ghandle{777, 1}, fhandle{888, 1};
-        check(gbuffer.ApplyShaderMeta(context, ghandle, gbufferMeta, {}, error), "Actual GBuffer LX compile: " + error);
-        check(forward.ApplyShaderMeta(context, fhandle, forwardMeta, {}, error), "Actual Forward LX compile: " + error);
-        for (const auto keyword : {std::uint16_t{0}, std::uint16_t{1}})
+        material_graph::SceneShaderSet stages;
+        LX::Runtime::GraphicsShaderDescription shader;
+        check(material_graph::LoadSceneShaders(product, backend, stages, error) &&
+            material_graph::DescribeGraphicsShader(product, backend, "LXSceneVS", "LXSceneGBufferPS", shader, error),
+            "Source-free METEOR stage load: " + error);
+        check(material_graph_test::SamePinnedObject(shader.shader, product.materialShader),
+            "Cooked METEOR graphics keeps its exact ShaderMeta owner");
+        RHIGraphicsPipelineDesc sceneDesc;
+        sceneDesc.layout = {1};
+        sceneDesc.vsBytecode = stages.vertex.bytecode.Data(); sceneDesc.vsSize = stages.vertex.bytecode.Size();
+        sceneDesc.psBytecode = stages.gbuffer.bytecode.Data(); sceneDesc.psSize = stages.gbuffer.bytecode.Size();
+        sceneDesc.numRenderTargets = 1; sceneDesc.rtvFormats[0] = RHIFormat::RGBA16Float;
+        LX::Runtime::GraphicsPipeline scene;
+        check(scene.Create(cache, sceneDesc, shader, error), "METEOR cooked graphics owner: " + error);
         {
-            EnhancedMaterialDrawSnapshot gs;
-            EnhancedForwardMaterialDrawSnapshot fs;
-            gs.shaderMetaHandle = ghandle; fs.shaderMetaHandle = fhandle;
-            gs.keywordSelections = {keyword}; fs.keywordSelections = {keyword};
-            std::shared_ptr<const ShaderMetaBindingLayout> glayout, flayout;
-            check(gbuffer.EnsureShaderMetaVariant(context, ghandle, gbufferMeta, gs.keywordSelections,
-                gs.permutationKey, glayout, error), "GBuffer native variant: " + error);
-            check(forward.EnsureShaderMetaVariant(context, fhandle, forwardMeta, fs.keywordSelections,
-                fs.permutationKey, flayout, error), "Forward native variant: " + error);
-            gs.bindingLayout = *glayout; fs.bindingLayout = *flayout;
-            check(gbuffer.CaptureShaderVariant(gs) && forward.CaptureShaderVariant(fs) &&
-                fs.pipelineGenerations.size() == gs.pipelineGenerations.size() * 2,
-                "Native Code draws retain common LX pipeline owners");
-            for (const auto& generation : gs.pipelineGenerations)
-            {
-                const auto& identity = generation->shader.compile;
-                check(identity.backend == backend && !identity.vertexDependencies.empty() &&
-                    !identity.pixelDependencies.empty() && !identity.referencePath &&
-                    LX::Runtime::ResolveGraphicsGeneration(gs.pipelineGenerations, ghandle, gs.permutationKey,
-                        gs.bindingLayout, identity.vertexAttributeMask, false) == generation,
-                    "GBuffer exact backend/dependency/mask owner selection");
-            }
-            for (const auto& generation : fs.pipelineGenerations)
-            {
-                const auto& identity = generation->shader.compile;
-                check(identity.backend == backend && identity.permutation.Size() >= 3 &&
-                    !identity.vertexDependencies.empty() && !identity.pixelDependencies.empty() &&
-                    LX::Runtime::ResolveGraphicsGeneration(fs.pipelineGenerations, fhandle, fs.permutationKey,
-                        fs.bindingLayout, identity.vertexAttributeMask, identity.referencePath) == generation,
-                    "Forward exact host/mask/reference owner selection");
-            }
-            check(!LX::Runtime::ResolveGraphicsGeneration(gs.pipelineGenerations, ShaderMetaHandle{777,2},
-                gs.permutationKey, gs.bindingLayout, 0, false), "Draw rejects a foreign shader generation");
-            const auto retained = gs.pipelineGenerations;
-            auto invalidMeta = gbufferMeta;
-            invalidMeta.source = "absent.slang";
-            check(!gbuffer.ApplyShaderMeta(context, ShaderMetaHandle{777,2}, invalidMeta, {}, error) &&
-                gbuffer.CaptureShaderVariant(gs) && gs.pipelineGenerations == retained,
-                "Compile failure preserves accepted native LX draw owners");
-
-            const auto original = retained.front();
+            const auto original = scene.GetGeneration();
             LX::Runtime::GraphicsPipeline request;
             {
                 auto desc = original->pipeline.GetDesc();
@@ -208,9 +187,9 @@ void RunMaterialPipelineRuntimeTests(const std::filesystem::path& repository)
                 request.GetDesc().vsSize) == 0 && std::string_view(request.GetDesc().inputElements[0].semantic) == "POSITION",
                 "Common graphics generation owns temporary bytecode and semantic strings");
             auto invalidShader = original->shader;
-            invalidShader.compile.vertexDependencies.clear();
+            invalidShader.compile.vertexEntry.clear();
             check(!request.Replace(cache, original->pipeline.GetDesc(), invalidShader, {}, error) &&
-                request.GetGeneration() == accepted, "Incomplete identity cannot replace accepted generation");
+                request.GetGeneration() == accepted, "Missing cooked vertex entry cannot replace accepted generation");
             cache.fail = true;
             check(!request.Replace(cache, original->pipeline.GetDesc(), original->shader, {}, error) &&
                 request.GetGeneration() == accepted && cache.invalidations == 0,
@@ -238,32 +217,7 @@ void RunMaterialPipelineRuntimeTests(const std::filesystem::path& repository)
                 "Successful async retry publishes complete owned generation");
             cache.shared = {};
         }
-        EnhancedMaterialDrawSnapshot oldG;
-        EnhancedForwardMaterialDrawSnapshot oldF;
-        oldG.shaderMetaHandle = ghandle; oldF.shaderMetaHandle = fhandle;
-        oldG.keywordSelections = {0}; oldF.keywordSelections = {0};
-        std::shared_ptr<const ShaderMetaBindingLayout> oldGL, oldFL;
-        check(gbuffer.EnsureShaderMetaVariant(context, ghandle, gbufferMeta, oldG.keywordSelections,
-            oldG.permutationKey, oldGL, error) &&
-            forward.EnsureShaderMetaVariant(context, fhandle, forwardMeta, oldF.keywordSelections,
-                oldF.permutationKey, oldFL, error), "Prepare retained pre-reload frame");
-        oldG.bindingLayout = *oldGL; oldF.bindingLayout = *oldFL;
-        check(gbuffer.CaptureShaderVariant(oldG) && forward.CaptureShaderVariant(oldF), "Capture retained pre-reload frame");
-        const auto oldGOwners = oldG.pipelineGenerations, oldFOwners = oldF.pipelineGenerations;
-        const ShaderMetaHandle nextG{777,2}, nextF{888,2};
-        check(gbuffer.ApplyShaderMeta(context, nextG, gbufferMeta, {}, error) &&
-            forward.ApplyShaderMeta(context, nextF, forwardMeta, {}, error) && cache.invalidations == 0,
-            "New PSO preparation does not retire previous frame before sealing succeeds");
-        check(gbuffer.CaptureShaderVariant(oldG) && forward.CaptureShaderVariant(oldF) &&
-            oldG.pipelineGenerations == oldGOwners && oldF.pipelineGenerations == oldFOwners,
-            "A failed later seal can retain exact pre-reload Code draw generations");
-        check(gbuffer.CommitShaderMetaFrame(context, std::span(&ghandle,1), {}) == 0 &&
-            forward.CommitShaderMetaFrame(context, std::span(&fhandle,1), {}) == 0 && cache.invalidations == 0,
-            "Retained old frame keeps native PSOs live");
-        check(gbuffer.CommitShaderMetaFrame(context, std::span(&nextG,1), {}) == 2 &&
-            forward.CommitShaderMetaFrame(context, std::span(&nextF,1), {}) == 2 && cache.invalidations > 0,
-            "Successful new frame commit retires only unused old variants");
     }
     std::cout << "MAT7_PIPELINE_RUNTIME_OK checks=" << checks
-              << " nativeCode=true dxil=true spirv=true capturedOwners=true candidateFirst=true\n";
+              << " meteorCooked=true mockPso=true dxil=true spirvCompile=true capturedOwners=true candidateFirst=true\n";
 }

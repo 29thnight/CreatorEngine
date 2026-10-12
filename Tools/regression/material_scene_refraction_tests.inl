@@ -46,34 +46,9 @@ VerifiedProduct RefractionProduct(const std::filesystem::path& root, bool hybrid
     std::vector<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && (program->features & 0x0800u), "Refraction feature extraction");
-    const auto file = root / "Build/Obj/MaterialProductProbe" /
-                      (hybrid ? "refraction-hybrid-product.slang"
-                       : film ? "refraction-film-product.slang"
-                              : "refraction-product.slang");
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n";
-    const CompileTarget targets[]{{RHIShaderBinary::Dxil, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::Dxil, "LXSceneColorPS", "ps_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneVS", "vs_6_0"},
-                                  {RHIShaderBinary::SpirV, "LXSceneColorPS", "ps_6_0"}};
-    RHIShaderCompileOptions options;
-    options.strictMath = options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = capabilities.subsurface = capabilities.refraction = true;
-    RHIShaderPermutation permutation;
-    std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "Refraction permutation");
-    VerifiedProduct product;
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    std::string messages;
-    for (const auto& diagnostic : diagnostics)
-    {
-        messages += diagnostic.message + "\n";
-    }
-    Check(verified, "Refraction verification: " + messages);
+    const auto product = CookedScene(*program, hybrid ? "refraction-hybrid-product"
+                                               : film ? "refraction-film-product"
+                                                      : "refraction-product");
     Check(product.selection.tier == Tier::Special && product.selection.route == Route::Forward, "Refraction route");
     return product;
 }
@@ -120,8 +95,9 @@ Vector SceneTransmissionIntegral(const MaterialProbe::Reference::Material& glass
 void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                         own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
-                        const own::shared_owner<const Instance>& background)
+                        const own::shared_owner<const Instance>& surfaceBackground)
 {
+    const auto background = SceneCooked(surfaceBackground);
     const std::array products{RefractionProduct(root, false), RefractionProduct(root, true),
                               RefractionProduct(root, false, true)};
     GenerationStore store;
@@ -246,7 +222,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             if (fixture != 2) draws.push_back(occluder.draw);
             context.draws = &draws;
             own::shared_owner<const SceneViewInput> input;
-            Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 92, 1, 24, 24, camera}, draws, {}, input,
+            Check(SealScene({context.frameId, context.sceneEpoch, 92, 1, 24, 24, camera}, draws, {}, input,
                                        error),
                   "Refraction Scene seal " + error);
             Check(device.BeginFrame(error), "Refraction frame begin");

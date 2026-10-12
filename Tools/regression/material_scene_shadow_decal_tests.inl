@@ -1,6 +1,7 @@
-void CheckCsmContracts(RecordingChangeDevice& device)
+void CheckCsmContracts(RecordingChangeDevice& device, const own::shared_owner<const Instance>& instance)
 {
     EnhancedDrawItem caster;
+    caster.materialGraphInstance = instance;
     caster.boundCenter = {4, 0, 0};
     caster.boundRadius = 1;
     caster.worldMatrix = math::matrix4x4::identity();
@@ -34,7 +35,7 @@ void CheckCsmContracts(RecordingChangeDevice& device)
     context.camera = &camera; context.lights = &lights; context.shadowDraws = &casters;
     EnhancedShadowPass pass;
     std::string error;
-    Check(pass.PrepareFrame(context, error), "CSM isolated preparation " + error);
+    Check(pass.PrepareGraphFrame(context, error), "CSM isolated preparation " + error);
     const auto data = pass.GetShadowData();
     Check(data.enabled && data.splitDepths.w == 2, "CSM owns selected directional index");
     Check(data.splitDepths.z == 200.f && data.splitDepths.x < 25.f, "CSM independent near coverage");
@@ -52,7 +53,7 @@ void CheckCsmContracts(RecordingChangeDevice& device)
           "CSM upstream offscreen caster lies inside expanded light depth");
     camera.isOrthographic = true; camera.nearPlane = -10;
     camera.projection = math::orthographic_off_center_lh(-4, 6, -3, 7, -10, 1000);
-    Check(pass.PrepareFrame(context, error), "CSM orthographic preparation");
+    Check(pass.PrepareGraphFrame(context, error), "CSM orthographic preparation");
     const auto orthographic = pass.GetShadowData();
     for (const auto& matrix : orthographic.lightViewProjection)
         for (const auto& row : matrix.m)
@@ -60,8 +61,8 @@ void CheckCsmContracts(RecordingChangeDevice& device)
     camera.nearPlane = -100; camera.farPlane = 100;
     camera.projection = math::orthographic_off_center_lh(-1, 1, -1, 1, -100, 100);
     for (auto& light : lights) light.direction = {1, 0, 0, 0};
-    context.shadowDraws = nullptr;
-    Check(pass.PrepareFrame(context, error), "CSM negative split preparation");
+    casters.clear();
+    Check(pass.PrepareGraphFrame(context, error), "CSM negative split preparation");
     const auto negative = pass.GetShadowData();
     const float split = negative.splitDepths.x;
     for (float z : {split - .01f, split + .01f, shadow_math::BlendStart(split, .15f) + .01f, -32.f})
@@ -130,47 +131,7 @@ VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layer
     std::vector<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(bool(program), "Shadow/Decal generation");
-    const auto file =
-        root / "Build/Obj/MaterialProductProbe" / (layered ? "shadow-decal-layered.slang" : "shadow-decal-core.slang");
-    std::ofstream(file, std::ios::binary | std::ios::trunc)
-        << BuildBoundSource(*program) << "\n#include \"MaterialGraphSceneHost.slang\"\n";
-    std::vector<CompileTarget> targets;
-    for (auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
-    {
-        for (const char* entry : {"LXSceneVS", "LXSceneColorPS"})
-        {
-            targets.push_back({backend, entry, std::string_view(entry).ends_with("VS") ? "vs_6_0" : "ps_6_0"});
-        }
-    }
-    RHIShaderCompileOptions options;
-    options.strictMath = options.fineDerivatives = true;
-    options.includeDirectories.push_back(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes");
-    RHIShaderPermutation permutation;
-    std::string error;
-    Check(permutation.Set("LX_MATERIAL_ROUTE", "2", error) && permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error),
-          "Shadow/Decal permutation");
-    Capabilities capabilities;
-    capabilities.coreForward = capabilities.layeredLookup = true;
-    VerifiedProduct product;
-    for (auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
-    {
-        for (const char* entry : {"LXSceneShadowVS", "LXSceneShadowPS"})
-        {
-            RHIShaderCompiler::VerifiedShader shader;
-            Check(RHIShaderCompiler::VerifyFile(file.string(), entry,
-                                                std::string_view(entry).ends_with("VS") ? "vs_6_0" : "ps_6_0", backend,
-                                                permutation, shader, error, options),
-                  "Shadow shader " + error);
-        }
-    }
-    const bool verified =
-        VerifyProduct(*program, file, targets, permutation, options, capabilities, {}, product, diagnostics);
-    for (const auto& diagnostic : diagnostics)
-    {
-        error += diagnostic.message + "\n";
-    }
-    Check(verified, "Shadow/Decal verification " + error);
-    return product;
+    return CookedScene(*program, layered ? "shadow-decal-layered" : "shadow-decal-core");
 }
 
 void ShadowDecalPlane(Geometry& geometry, float u = .875f)
@@ -238,9 +199,9 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
 
 void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                    const own::shared_owner<const Texture>& image)
+                    const own::shared_owner<const Texture>& image, const own::shared_owner<const Instance>& instance)
 {
-    CheckCsmContracts(device);
+    CheckCsmContracts(device, instance);
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
     experiment::AssetId id;
@@ -359,9 +320,20 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 Check(BuildInstance(volumeGeneration, {id, {}, {}}, {}, volume.draw.materialGraphInstance, error),
                       "Pure Volume shadow instance");
             }
-            Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 95, 1, 16, 16, camera},
-                                       {fixture == 12 ? &volume.draw : &geometry.draw, 1}, sealBudget, input, error),
-                  "Shadow seal " + error);
+            const SceneInputView shadowView{context.frameId, context.sceneEpoch, 95, 1, 16, 16, camera};
+            if (fixture == 10)
+            {
+                Check(!SealScene(shadowView, {&geometry.draw, 1}, sealBudget, input, error) && !error.empty(),
+                      "Shadow rejects a budget that splits a cooked cluster");
+                experiment::MeshletBuildSettings settings;
+                settings.maxVertices = 3;
+                Check(cookedMeshes.Cook(geometry.draw.modelMeshView, geometry.draw.modelMeshView, error, settings),
+                      "Author smaller cooked shadow clusters " + error);
+                std::cout << "SHADOW_COOKED_CLUSTER_BOUNDARY_OK incompatibleBudgetRejected=1 recookedMaxVertices=3\n";
+            }
+            const bool sealed = SealScene(shadowView,
+                {fixture == 12 ? &volume.draw : &geometry.draw, 1}, sealBudget, input, error);
+            Check(sealed, "Shadow seal " + error);
             if (fixture != 12)
             {
                 const auto& sealed = input->Draws()[0].geometry->Source()->Geometry();

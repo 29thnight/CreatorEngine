@@ -1532,7 +1532,7 @@ namespace material_graph
             return Fail(error, "Mesh surface sampler needs a compiled artifact on its initialized transform device.");
         }
         const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(2), RHILayout::Srv(4), RHILayout::Srv(5),
-                                                  RHILayout::Srv(6), RHILayout::UavBufferTable(1, 1)};
+                                                  RHILayout::Srv(6), RHILayout::UavBufferTable(1, 4096)};
         const auto layout = roots.GetOrCreate({parameters}, error);
         if (!layout.IsValid())
         {

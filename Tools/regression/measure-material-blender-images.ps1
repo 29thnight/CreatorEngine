@@ -30,7 +30,9 @@ $previousShaderRoot=$env:CREATOR_MAT9_SHADER_ROOT
 $previousApproximate=$env:CREATOR_MAT9_LOOKUP_APPROXIMATE
 try {
  $dependency=if($Configuration -eq 'Debug'){'vcpkg_installed/x64-windows/debug/bin'}else{'vcpkg_installed/x64-windows/bin'}
- $env:PATH=(Join-Path $repo $dependency)+';'+$previousPath
+ $nestedDependency=if($Configuration -eq 'Debug'){'vcpkg_installed/x64-windows/x64-windows/debug/bin'}else{'vcpkg_installed/x64-windows/x64-windows/bin'}
+ $bins=@($dependency,$nestedDependency)|ForEach-Object {Join-Path $repo $_}|Where-Object {Test-Path -LiteralPath $_}
+ $env:PATH=($bins -join ';')+';'+$previousPath
  $env:CREATOR_DX12_VALIDATION='gpu'
  if($ShaderRoot) { $env:CREATOR_MAT9_SHADER_ROOT=(Resolve-Path -LiteralPath $ShaderRoot).Path }
  else { $env:CREATOR_MAT9_SHADER_ROOT=$null }

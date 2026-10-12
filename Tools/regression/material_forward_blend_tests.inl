@@ -71,7 +71,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     const std::array<float, 4> depths{.2f, .35f, .45f, .6f};
     const std::array<float, 4> alpha{.25f, .4f, .6f, .5f};
     const std::array<float, 4> background{.04f, .06f, .09f, 1};
-    unsigned pixels{}, frames{};
+    unsigned pixels{}, frames{}, expectedPublications{};
     // Four isolated colors, mixed sequential and parallel, reverse collection,
     // reverse camera sorting, opaque occlusion, and >64-light overflow/reference.
     for (unsigned fixture = 0; fixture < 12; ++fixture)
@@ -106,9 +106,10 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         context.draws = &empty;
         SceneInputView view{context.frameId, context.sceneEpoch, 99, 1, 16, 16, camera};
         own::shared_owner<const SceneViewInput> input;
-        Check(SceneViewInput::Seal(view, graphDraws, {}, input, error) &&
+        Check(SealScene(view, graphDraws, {}, input, error) &&
                   host.SelectReadyInput(context, input, input, error), "Mixed sealed input " + error);
         Check(input->Draws().size() == graphDraws.size(), "No ready alpha graph omitted");
+        expectedPublications += static_cast<unsigned>(input->Draws().size());
         Check(device.BeginFrame(error), "Mixed begin " + error);
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
@@ -251,8 +252,11 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(validationCount == 0, "Mixed GPU validation " + validation);
         ++frames;
     }
-    Check(host.ProgramStats().compileSubmissions == 0 && host.ProgramStats().publications == 20,
-          "Cooked Graph Blend retains submitted generations without source compilation");
+    const auto finalStats = host.ProgramStats();
+    Check(expectedPublications == 36 && finalStats.compileSubmissions == 0 &&
+              finalStats.publications == expectedPublications,
+          "Cooked Graph Blend publishes every submitted draw without source compilation: actual=" +
+              std::to_string(finalStats.publications) + " expected=" + std::to_string(expectedPublications));
     host.ShutdownAfterIdle();
     tiles.Shutdown();
     gbuffer.Shutdown();
