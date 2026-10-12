@@ -12,6 +12,8 @@
 #include "PathFinder.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
 #include <algorithm>
+#include <filesystem>
+#include <string>
 #include <type_traits>
 #include <sstream>
 #include <unordered_set>
@@ -122,7 +124,9 @@ bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::p
                 // Match the existing scene menu: owner-thread admission and
                 // asynchronous dependency preparation retain the current scene
                 // until the complete replacement is ready for activation.
-                ConsoleCommandSystem::Get().EnqueueStructured({ "scene.open_async", scene.string() });
+                const auto sceneUtf8 = std::filesystem::path(scene).u8string();
+                ConsoleCommandSystem::Get().EnqueueStructured({ "scene.open_async",
+                    std::string(sceneUtf8.begin(), sceneUtf8.end()) });
             }
             ImGui::CloseCurrentPopup();
         }

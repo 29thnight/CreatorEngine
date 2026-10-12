@@ -140,4 +140,6 @@ namespace ce::profiler_viewer::diagnostics
     // decode never changes output. Old payloads cannot prove spatial exclusion.
     std::vector<std::byte> encode_rendering(const rendering_snapshot& snapshot);
     bool decode_rendering(std::span<const std::byte> bytes, rendering_snapshot& snapshot);
+    // Delayed GPU data must identify this completed display, including its extent.
+    bool matches_gpu_measurement(const rendering_snapshot& snapshot, const rendering_display& display);
 }

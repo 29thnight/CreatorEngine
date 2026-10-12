@@ -1352,6 +1352,14 @@ assets::ModelAssetGeneration::Shared DataSystem::ReadPreparedModel(
     return preparation->model;
 }
 
+bool DataSystem::IsModelPreparationInvalidated(const ModelPreparation& preparation) const
+{
+    std::lock_guard lock(m_assetPreparationMutex);
+    return preparation && (preparation->cancelled.load(std::memory_order_acquire)
+        || preparation->epoch != m_assetPreparationEpoch
+        || preparation->resolverRevision != m_assetDepotRevision);
+}
+
 bool DataSystem::PublishPreparedModel(const ModelPreparation& preparation, std::string& error)
 {
     if (!preparation || !preparation->work.is_complete())
@@ -2913,9 +2921,20 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 		// Uncooked loads/reloads may ask the Editor to repair derived data, then
 		// retry this strict reader exactly once. Callers release authoring locks
 		// before applying a reload; the repair itself never calls this loader.
-		if (allowEditorRecovery && !fromCatalog && PathFinder::IsAssetAuthoringEnabled()
+		if (allowEditorRecovery && PathFinder::IsAssetAuthoringEnabled() && !sourcePath.empty()
 			&& AssetAuthoringPort::RecoverModel(sourcePath, guid))
         {
+            if (fromCatalog)
+            {
+                // A mounted Editor cook is derived data too. Once authoring
+                // recovery validates the canonical Library generation, retire
+                // this failed catalog selection before the single strict retry.
+                std::lock_guard admissionLock(m_assetPreparationMutex);
+                if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch
+                    || resolverRevision != m_assetDepotRevision) return {};
+                std::lock_guard catalogLock(m_cookedCatalogMutex);
+                m_cookedStaleAssets.emplace(guid);
+            }
             return LoadAndPublishModelAssetGeneration(guid, false, publish, loadEpoch, resolverRevision);
         }
 		const std::string detail = loaded.issues.empty()
@@ -4347,8 +4366,11 @@ bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const file::path& sourc
         if (!source)
             return false;
     }
-    if (catalog)
+    if (catalog && !catalog->DerivedRoot().empty())
     {
+        // An empty/AssetSet-only resolver has no legacy loose artifact store.
+        // Unmounted Editor graphs must reach authoring compilation rather than
+        // throwing while opening an empty backing path.
         const experiment::cooked::LooseArtifactByteSource bytes(catalog->DerivedRoot());
         if (material_graph::LoadCookedGeneration(*catalog, bytes, id, source ? &*source : nullptr, result, failure) &&
             result.product.materialShader)

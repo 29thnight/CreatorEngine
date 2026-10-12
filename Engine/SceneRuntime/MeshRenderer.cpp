@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "AuthoringParsedDocument.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "ReflectionYml.h"
 #include "DataSystem.h"
@@ -1224,6 +1225,12 @@ bool MeshRenderer::BindModelGeneration(
     m_meshRequested = false;
 	m_modelGeneration = std::move(generation);
 	m_modelMeshIndex = meshIndex;
+    // A model skeleton does not make every mesh skinned (for example a rigid
+    // weapon attached to a character bone). Geometry determines the pose ABI.
+    const auto attributes = m_modelGeneration->Meshes()[meshIndex].vertexAttributeMask;
+    m_isSkinnedMesh = assets::Has(attributes, assets::VertexAttribute::BoneIndices)
+        && assets::Has(attributes, assets::VertexAttribute::BoneWeights);
+    m_isNeedUpdateCulling = true;
 	m_meshAssetId = FileGuid(m_modelGeneration->Meshes()[meshIndex].meshId);
 	m_modelGuid = FileGuid(m_modelGeneration->Identity().modelId);
 	// 재질의 embedded texture owner는 이 generation closure가 정본이다. 전역
@@ -1233,6 +1240,7 @@ bool MeshRenderer::BindModelGeneration(
 	{
 		DataSystems->BindModelGenerationTextures(*m_Material, *m_modelGeneration);
 	}
+    PublishRenderProxyDirty(ProxyDirty::Payload | ProxyDirty::Material);
 	return true;
 }
 

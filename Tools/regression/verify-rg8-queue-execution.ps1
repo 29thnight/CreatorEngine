@@ -11,8 +11,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $expectedChecks = 428
 $expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=3 checks=428 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false' + "`n"
-$expectedScheduleChecks = 111
-$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=111 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
+$expectedScheduleChecks = 121
+$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=121 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath($OutputDirectory)
@@ -195,7 +195,7 @@ try
             'RG5_PRODUCERS_OK passes=GBuffer/Shadow modes=3 orders=2 outputs=7 RAW=7',
             'RG5_CONSUMERS_OK Deferred/SkyBox policies=2 paths=2 Modify/WAR/depth',
             'RG5_INDIRECT_OK SSAO/SSGI policies=2 optional=2 frames=2 history-v1',
-            'RG5_FORWARD_OK Code policies=2 paths=2 batches=3 tile-v1 color-v3',
+            'RG5_LIGHTTILES_OK policies=2 writer=1 tile-v1',
             'RG5_LOOKUP_OK policies=2 capture=11 iterations=2 outputs-v2 WAR range-rejection',
             'RG5_SPECIAL_OK policies=2 Refraction/SSS-v2 Volume-coeff-v1/output-v0 WAR duplicate-rejection',
             'RG5_SURFACE_OK policies=2 iterations=3 depth-v5 color-v9 dedup WAR writable/state-rejection',

@@ -18,9 +18,8 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 
 $passes = @(
-    "Engine\RenderEngine\Render\Passes\Geometry\EnhancedGBufferPass",
-    "Engine\RenderEngine\Render\Passes\Geometry\EnhancedForwardPass",
-    "Engine\RenderEngine\Render\Passes\Geometry\EnhancedShadowPass")
+    "Engine\RenderEngine\Render\Passes\Geometry\EnhancedForwardPass"
+)
 
 $fail = @()
 $uploadOnly = 0
@@ -55,6 +54,11 @@ foreach ($pass in $passes) {
     } else { $keyUsers++ }
 }
 
+# METEOR surface identity comes from the sealed input, not a legacy Mesh pointer.
+$lxHost = Get-Content (Join-Path $repoRoot 'Engine/RenderEngine/MaterialGraphSceneHost.cpp') -Raw
+if ($lxHost -match 'draw\.mesh\b' -or $lxHost -notmatch 'source\.geometryKey') {
+    $fail += 'METEOR SceneHost must consume sealed geometry identity without legacy Mesh pointers'
+}
 # ④ 창구 자체가 서 있는가.
 $identity = Join-Path $repoRoot "Engine\RenderEngine\Render\Graph\EnhancedDrawIdentity.h"
 if (-not (Test-Path -LiteralPath $identity)) {

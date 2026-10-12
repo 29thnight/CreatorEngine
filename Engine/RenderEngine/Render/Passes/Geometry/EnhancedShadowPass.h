@@ -2,45 +2,25 @@
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <algorithm>
-#include "../../Graph/ShadowMath.h"
-#include <atomic>
-#include <map>
-#include <unordered_map>
 #include <vector>
-#include <wrl/client.h>
+#include "../../Graph/ShadowMath.h"
 
 #include "../../Graph/EnhancedRenderPass.h"
-#include "../../Graph/PackedBoneMatrix.h"
-#include "../../../GpuGeometryVisibility.h"
-// ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
-//   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
-//   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
-#include "../../../RHI/RHIParallelCommandPool.h"
 
 // 그림자 패스 (PHASE 3-6, 세 번째 패스).
 //
-// 방향광 하나에 대한 3단 캐스케이드. 1차에서는 단일 캐스케이드로 뚫어야 할 넷을
-// 먼저 확인했고(①깊이 전용 렌더 ②라이트 공간 행렬 ③다음 패스에서 SRV로 읽기
-// ④비교 샘플러) 이제 그 위에 캐스케이드를 얹는다.
+// 방향광 하나에 대한 3단 캐스케이드. 이 패스는 캐스케이드를 정하고 맵을
+// 선언·클리어하는 것까지만 맡는다. 캐스터는 재질 그래프 경로
+// (material_graph::SceneHost::DeclareShadow)가 이 맵에 그린다 — 제품 장면의
+// 모든 드로우가 그래프 재질이고, 예전의 표준 재질 캐스터 경로는 제거했다.
 //
-// 캐스케이드가 있어야 하는 이유는 해상도 배분이다. 한 장으로 프러스텀 전체를
-// 덮으면 텍셀 하나가 먼 곳에서는 몇 미터를 담당하게 되고, 가까운 곳에 맞추면
-// 먼 곳이 통째로 빠진다. 카메라 거리에 따라 여러 장을 나눠 덮으면 눈에 가까운
-// 곳일수록 촘촘해진다.
-//
-// 세 가지 설계 결정:
+// 두 가지 설계 결정:
 //
 //   맵을 텍스처 배열로 둔다. 텍스처 셋보다 낫다 — 리소스가 하나라 배리어도
 //   하나고(전이가 전체 서브리소스 단위다), 셰이더에서 캐스케이드 번호가
 //   좌표의 일부라 분기 없이 고를 수 있다. 아틀라스(가로로 이어 붙이기)보다도
 //   낫다 — 아틀라스는 UV를 다시 매핑해야 하고 경계에서 필터가 옆 캐스케이드를
 //   물어 온다.
-//
-//   캐스케이드마다 그릴 것을 추린다. 세 장을 그냥 다 그리면 정점 처리가 세
-//   배가 된다. 캐스케이드 경계 구를 광원 방향으로 늘린 원기둥에 메시의 경계
-//   구가 닿는지만 보면 되고, 이 판정은 싸다(내적 하나와 길이 하나).
-//   '가리는 것'은 상자 밖에 있어도 상자 안에 그림자를 드리울 수 있으므로
-//   상자만으로 자르면 그림자가 사라진다 — 늘리는 이유가 그것이다.
 //
 //   분할은 PSSM(로그·균등 혼합)으로 정한다. 저작 비율을 고정으로 두면 far가
 //   바뀔 때마다 손봐야 하는데, 혼합식은 near/far에서 유도되므로 따라온다.
@@ -58,15 +38,14 @@ public:
     const char* GetName() const override { return "Shadow"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
-    bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Caster bounds come from context.shadowDraws; every caster is a graph draw.
     bool PrepareGraphFrame(const EnhancedFrameContext& context, std::string& outError);
+    // Declares and clears the cascade array. Graph casters draw into it afterward.
     void DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
-    bool HasGpuVisibilityCandidates() const { return m_hasGpuVisibilityCandidates; }
-    // Call after the upload prefix/PrepareParallel boundary, before Declare.
-    // Optional GPU prerequisites may deliberately retain the CPU route.
-    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
-    void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
-    void Shutdown() override;
+    void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override
+    {
+        DeclareGraphTargets(graph, context);
+    }
 
     RGHandle GetShadowMap() const { return m_shadowMap; }
 
@@ -75,26 +54,6 @@ public:
 
     // 그림자를 드리울 방향광을 찾았는가. 없으면 그림자 없이 도는 것이 정상이다.
     bool HasDirectionalLight() const { return m_hasDirectionalLight; }
-
-    // Exact instance counts are available only on the CPU visibility route.
-    // GPU compaction deliberately has no synchronous visibility readback.
-    // 컬링이 도는지는 뺀 수가 말해 준다 — 0만 나오면 판정이 늘 참인 것이다.
-    uint32_t GetLastDrawCount() const { return m_lastDrawCount.load(std::memory_order_relaxed); }
-    uint32_t GetLastCulledCount() const { return m_lastCulledCount.load(std::memory_order_relaxed); }
-
-    // 실제로 낸 드로우 콜 수. 드로우 수와 나란히 봐야 병합이 도는지 알 수 있다 —
-    // GBuffer에서 배치 수를 안 찍었다가 병합이 통째로 죽어 있는 것을 놓칠 뻔했다.
-    uint32_t GetLastBatchCount() const { return m_lastBatchCount.load(std::memory_order_relaxed); }
-
-    /// Exact skinned-instance count on the CPU route; unknown on the GPU route.
-    uint32_t GetLastSkinnedDrawCount() const
-    {
-        return m_lastSkinnedDrawCount.load(std::memory_order_relaxed);
-    }
-    uint32_t GetLastBonePaletteCount() const
-    {
-        return static_cast<uint32_t>(m_boneOffsets.size());
-    }
 
     // 기본 편향. 캐스케이드별로는 반지름 비만큼 키워 쓴다.
     // Compatibility setter: old normalized depth at a 4-radius depth span.
@@ -123,7 +82,7 @@ public:
     void SetFilter(EnhancedShadowFilter filter) { m_filter = filter; }
     EnhancedShadowFilter GetFilter() const { return m_filter; }
 
-    /// Cascade values describe the last PrepareFrame; submission counters update during Record.
+    /// Cascade values describe the last PrepareGraphFrame.
     /// 길이는 월드 단위다 — 텍셀 폭을 장면의 물체 크기와 바로 대 보라는 것이다.
     struct CascadeStats
     {
@@ -141,7 +100,9 @@ public:
         math::vector3 lightDirection{};
         float         shadowDistance{ 0.f };
         float         slopeScale{ 0.f };
-        uint32_t      casterCandidates{ 0 }; // 이 패스가 맡은(재질 그래프가 아닌) 캐스터
+        uint32_t      casterCandidates{ 0 }; // 그래프 캐스터 후보(셀 수 있는 CPU 입력)
+        // Retained for the profiler archive layout. This pass owns no caster
+        // visibility; graph shadow visibility counts stay on the GPU.
         bool          gpuVisibilityActive{ false };
         bool          visibilityCountsExact{ true };
         uint64_t      gpuSubmittedCandidates{ 0 };
@@ -152,38 +113,6 @@ public:
     DebugStats GetDebugStats() const;
 
 private:
-    // 월드 행렬은 여기서 빠졌다 — 인스턴스 버퍼(t0)로 옮겼다. 광원 행렬은
-    // 캐스케이드마다 한 번만 바뀌므로 상수 버퍼에 남는다.
-    struct ShadowConstants
-    {
-        math::matrix4x4 lightViewProjection{};
-    };
-
-    static_assert(sizeof(ShadowConstants) == 64u);
-    static_assert(std::is_trivially_copyable_v<ShadowConstants>);
-
-    /// 인스턴스 하나. HLSL의 ShadowInstance와 배치가 같아야 한다.
-    /// 정적 경로도 같은 구조를 읽는다(boneOffset을 무시할 뿐).
-    struct ShadowInstance
-    {
-        math::matrix4x4 world{};
-        uint32_t      boneOffset{ kNoSkinning };
-        uint32_t      coverageFlags{};
-        float         cutoff{0.5f};
-        float         baseAlpha{1.f};
-        std::array<float, 4> uvU{1, 0, 0, 0};
-        std::array<float, 4> uvV{0, 1, 0, 0};
-        uint32_t boneCount{};
-        std::array<uint32_t, 3> padding{};
-    };
-
-    static_assert(sizeof(ShadowInstance) == 128u);
-    static_assert(offsetof(ShadowInstance, boneCount) == 112u);
-    static_assert(offsetof(ShadowInstance, padding) == 116u);
-    static_assert(std::is_trivially_copyable_v<ShadowInstance>);
-
-    static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
-
     // 한 캐스케이드가 덮는 범위. 컬링 판정에 중심과 반지름이 필요해서 행렬만
     // 들고 있지 않는다.
     struct Cascade
@@ -195,40 +124,9 @@ private:
         float          depthSpan{ 1.f };
     };
 
-    struct Geometry
-    {
-        RHIMeshBinding entry{};
-        float                boundRadius{ 0.f };
-    };
-
-    // One immutable LOD0 batch, shared by every cascade's independent cull.
-    struct GpuBatch
-    {
-        RHIMeshBinding geometry{};
-        RHIPipelineHandle pipeline{};
-        RHIBindingTable alphaBinding{};
-        RHIBufferSlice instances{};
-        uint32_t instanceCount{};
-        uint32_t visibilityBin{};
-        uint32_t visibleIdOffset{};
-    };
-
-    bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
-    ShadowInstance MakeInstance(const EnhancedDrawItem& draw, bool skinned) const;
-    RHIPipelineHandle PipelineFor(const RHIMeshBinding& geometry, bool skinned) const;
-    bool TryPrepareGpuVisibility(const EnhancedFrameContext& context);
-
-    /// 조각 수. 캐스케이드가 최소 단위이고 그 위로는 드로우 수를 본다.
-    uint32_t ComputeSliceCount() const;
     void ComputeCascades(const EnhancedFrameContext& context);
 
-    // 이 메시가 해당 캐스케이드에 그림자를 드리울 수 있는가.
-    bool CastsInto(const Cascade& cascade, const math::vector3& center, float radius) const;
-
     RGHandle m_shadowMap;
-
-    // I6-C — 키를 신원 값으로.
-    std::unordered_map<std::size_t, Geometry> m_drawGeometry;
     std::array<Cascade, kCascadeCount>  m_cascades{};
 
     EnhancedShadowData m_shadowData{};
@@ -246,40 +144,8 @@ private:
     // 거리에서 가장자리가 지글거리고, 비스듬한 면에서 계단이 드러났다(2026-10-04
     // 렌더 디버그 보기로 확인).
     EnhancedShadowFilter m_filter{ EnhancedShadowFilter::Tent5x5 };
-    // 병렬 기록에서는 여러 워커가 동시에 센다. 단순 증가면 값이 조용히
-    // 작아지고, 그러면 '컬링이 도는가'라는 단정이 우연히 통과한다.
-    uint32_t              m_lastCasterCandidates{ 0 };
-    std::atomic<uint32_t> m_lastDrawCount{ 0 };
-    std::atomic<uint32_t> m_lastCulledCount{ 0 };
-    std::atomic<uint32_t> m_lastBatchCount{ 0 };
-    std::atomic<uint32_t> m_lastSkinnedDrawCount{ 0 };
-    std::atomic<uint64_t> m_lastGpuSubmittedCandidates{ 0 };
-    std::atomic<uint64_t> m_lastGpuSubmittedBins{ 0 };
-    bool m_gpuVisibilityActive{ false };
-    bool m_hasGpuVisibilityCandidates{ false };
+    uint32_t           m_lastCasterCandidates{ 0 };
 
-    // 메시 기준으로 정렬한 드로우 인덱스. 원본을 건드리지 않으려고 인덱스만 든다.
-    std::vector<size_t> m_sortedDraws;
-    std::vector<size_t> m_batchStarts{0};
+    // 캐스터 경계 구. 광원 쪽 backOff가 캐스케이드 밖 가림막까지 덮도록 쓴다.
     std::vector<shadow_math::Sphere> m_casterBounds;
-    // Fitting keeps the existing source bounds; rejection needs a separate proof.
-    std::vector<uint8_t> m_conservativeCasters;
-    std::vector<GpuBatch> m_gpuBatches;
-    uint32_t m_identityCount{};
-    GpuGeometryVisibility m_visibility;
-    std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, kCascadeCount> m_visibilityFrames{};
-
-    // 프레임의 본 팔레트(GBuffer와 같은 수집 규칙). 스킨드 캐스터가 없으면 빈다.
-    std::vector<PackedBoneMatrix>           m_bonePalettes;
-    std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
-    std::unordered_map<uint64_t, uint32_t> m_boneCounts;
-
-    RHISamplerTable m_sampler;
-    std::vector<RHITextureEntry> m_alphaTextures;
-    RHIPipelineHandle m_pso;
-    RHIPipelineHandle m_skinnedPso;
-    // I5-D34b: experiment packed(68B) 스킨 짝 — BLENDINDICES가 RGBA8Uint@48이라
-    // legacy 스킨 PSO(RGBA32Float@64)로는 팔레트 밖을 짚는다. 정적 experiment
-    // 메시는 POSITION@0이 legacy와 같아 m_pso를 그대로 쓴다.
-    std::map<uint32_t, RHIPipelineHandle> m_modelPsos;
 };

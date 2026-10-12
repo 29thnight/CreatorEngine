@@ -254,6 +254,18 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- Explicit deployment of the installed SDKs for local Editor verification. -->
+  <Target Name="DeployEditorTemporalRuntimes" AfterTargets="Build"
+          Condition="'$(CreatorDeployTemporalRuntime)' == 'true' And '$(Platform)' == 'x64'">
+    <ItemGroup>
+      <EditorTemporalRuntime Include="$(CreatorStreamlineRoot)\bin\x64\sl.interposer.dll;$(CreatorStreamlineRoot)\bin\x64\sl.common.dll;$(CreatorStreamlineRoot)\bin\x64\sl.dlss.dll;$(CreatorStreamlineRoot)\bin\x64\nvngx_dlss.dll"
+          Condition="'$(CreatorEnableDlssStreamline)' == 'true'" />
+      <EditorTemporalRuntime Include="$(CreatorXeSSRoot)\bin\libxess.dll"
+          Condition="'$(CreatorEnableXeSS)' == 'true'" />
+    </ItemGroup>
+    <MakeDir Directories="$(TargetDir)Temporal" />
+    <Copy SourceFiles="@(EditorTemporalRuntime)" DestinationFolder="$(TargetDir)Temporal" SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

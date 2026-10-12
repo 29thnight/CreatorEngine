@@ -104,7 +104,7 @@ int wmain(int argc,wchar_t** argv)
         EnhancedIBLGenerator generator;
         EnvironmentRequire(generator.Initialize(context,error),error);
         EnvironmentRequire(device.BeginFrame(error),error);
-        const auto uploaded=textures.GetOrUpload((texture ? &*texture.borrow() : nullptr),error);
+        const auto uploaded=textures.GetOrUpload(&*texture.borrow(),texture->NonRehydratableImage(),error);
         EnvironmentRequire(error.empty() && uploaded.IsValid() && !uploaded.isCube,"Environment source upload: "+error);
         EnvironmentRequire(generator.Generate(context,uploaded.handle,uploaded.format,cube,brdf,error),error);
         EnvironmentRequire(generator.QueueCookedCapture(output,identity,error),error);

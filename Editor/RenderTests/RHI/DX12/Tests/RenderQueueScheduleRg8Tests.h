@@ -110,7 +110,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         struct OverlapGraph
         {
             std::unique_ptr<EnhancedRenderGraph> graph;
-            RGPassId shadow, gbuffer, raw, filter, deferred;
+            RGPassId shadow, gbuffer, raw, filter, lxColor;
             uint32_t depthResource{0}, filteredResource{0};
             std::vector<EnhancedRenderGraph::QueueHint> hints;
         };
@@ -163,15 +163,15 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             result.filter = g.AddPass("ao-filter", {
                 {raw, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {filtered, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            std::vector<EnhancedRenderGraph::RGPassUsage> deferredUsages{
+            std::vector<EnhancedRenderGraph::RGPassUsage> lxColorUsages{
                 {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {filtered, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {color, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
             if (withShadow)
             {
-                deferredUsages.push_back({shadowMap, RHIResourceState::ShaderResource, RGAccessMode::Read});
+                lxColorUsages.push_back({shadowMap, RHIResourceState::ShaderResource, RGAccessMode::Read});
             }
-            result.deferred = g.AddPass("deferred", deferredUsages, body, true);
+            result.lxColor = g.AddPass("METEOR.Scene.Color", lxColorUsages, body, true);
             if (declare)
             {
                 g.DeclareComputeCompatible(result.raw);
@@ -185,7 +185,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             result.hints.push_back({result.gbuffer, false, 500'000});
             result.hints.push_back({result.raw, true, 200'000});
             result.hints.push_back({result.filter, true, 200'000});
-            result.hints.push_back({result.deferred, false, 300'000});
+            result.hints.push_back({result.lxColor, false, 300'000});
             return result;
         };
         const auto positionOf = [](const EnhancedRenderGraph::QueueSchedule& schedule, RGPassId pass)
@@ -215,6 +215,52 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         overlapModel.minimumGainNanoseconds = 50'000;
         const uint32_t callbacksBeforeOverlap = callbacks;
         {
+            // A wide graphics frontier must keep declaration ties even when its
+            // compute ancestor is authored last and hoisted to the front. Expected
+            // spans are hand-derived: 6920 us serial, 6420 us with 500 us hidden.
+            EnhancedRenderGraph wide(device, RGSchedulingMode::ExplicitVersioned,
+                RGOrderPolicy::DependencyOrder);
+            wide.SetQueueCostModel(overlapModel);
+            std::vector<EnhancedRenderGraph::QueueHint> wideHints;
+            std::vector<RGPassId> graphics;
+            for (uint32_t index = 0; index < 64; ++index)
+            {
+                graphics.push_back(wide.AddPass("independent", {}, body, true));
+                wideHints.push_back({graphics.back(), false, 100'000});
+            }
+            auto input = wide.Write(wide.CreateBuffer({256, true, false, "wide-input"}));
+            auto output = wide.Write(wide.CreateBuffer({256, true, false, "wide-output"}));
+            auto root = wide.AddPass("root", {{input, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
+            auto work = wide.AddPass("work", {
+                {input, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
+            wide.DeclareComputeCompatible(work);
+            auto join = wide.AddPass("join", {{output, RHIResourceState::ShaderResource, RGAccessMode::Read}}, body, true);
+            wideHints.insert(wideHints.end(), {{root, false, 10'000}, {work, true, 500'000}, {join, false, 10'000}});
+            require(wide.Compile(error) && wide.BuildQueueSchedule(caps, wideHints, 1000, plan, error), error);
+            require(plan.usesCompute && plan.entries.size() == 67 && plan.predictedSerialNanoseconds == 6'920'000 &&
+                plan.predictedNanoseconds == 6'420'000, "Wide frontier overlap prediction mismatch.");
+            bool ordered = plan.entries[0].pass == root.index && plan.entries[1].pass == graphics[0].index &&
+                plan.entries[2].pass == work.index && plan.entries.back().pass == join.index;
+            for (size_t index = 1; index < graphics.size(); ++index)
+                ordered = ordered && plan.entries[index + 2].pass == graphics[index].index;
+            require(ordered, "Wide ready frontier lost ancestor priority or compiled-position ties.");
+            const auto expected = plan;
+            wideHints[65].measuredGpuNanoseconds = 0;
+            EnhancedRenderGraph::QueueSchedule fallback, restored;
+            const bool fallbackBuilt = wide.BuildQueueSchedule(caps, wideHints, 1000, fallback, error);
+            wideHints[65].measuredGpuNanoseconds = 500'000;
+            const bool restoredBuilt = wide.BuildQueueSchedule(caps, wideHints, 1000, restored, error);
+            require(fallbackBuilt && !fallback.usesCompute && fallback.waits.empty() && keepsCompiledOrder(fallback, wide) &&
+                restoredBuilt &&
+                restored.predictedNanoseconds == expected.predictedNanoseconds &&
+                std::equal(restored.entries.begin(), restored.entries.end(), expected.entries.begin(), expected.entries.end(),
+                    [](const auto& a, const auto& b) { return a.pass == b.pass && a.queue == b.queue; }) &&
+                std::equal(restored.waits.begin(), restored.waits.end(), expected.waits.begin(), expected.waits.end(),
+                    [](const auto& a, const auto& b) { return a.producer == b.producer && a.consumer == b.consumer && a.resource == b.resource; }),
+                "Changing measurements retained stale frontier/ownership state.");
+        }
+        {
             auto subject = buildOverlap(true, true, &overlapModel);
             require(subject.graph->GetExecuteOrder().front() == subject.shadow.index, "Fixture compiled order changed.");
             require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
@@ -223,14 +269,14 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
                 plan.eligibleComputePasses == 2 && plan.measuredPasses == 5 && plan.missingMeasurementPasses == 0,
                 "Overlap prediction or eligibility diagnostics mismatch.");
             require(plan.entries.front().pass == subject.gbuffer.index &&
-                positionOf(plan, subject.shadow) < positionOf(plan, subject.deferred),
+                positionOf(plan, subject.shadow) < positionOf(plan, subject.lxColor),
                 "Compute ancestor was not hoisted ahead of independent graphics work.");
             require(queueOf(plan, subject.raw) == RHIQueueKind::Compute &&
                 queueOf(plan, subject.filter) == RHIQueueKind::Compute &&
                 queueOf(plan, subject.shadow) == RHIQueueKind::Graphics &&
-                queueOf(plan, subject.deferred) == RHIQueueKind::Graphics, "Overlap queue placement mismatch.");
+                queueOf(plan, subject.lxColor) == RHIQueueKind::Graphics, "Overlap queue placement mismatch.");
             require(positionOf(plan, subject.gbuffer) < positionOf(plan, subject.raw) &&
-                positionOf(plan, subject.raw) < positionOf(plan, subject.deferred),
+                positionOf(plan, subject.raw) < positionOf(plan, subject.lxColor),
                 "Physical resource use order changed.");
             const auto waits = [&](RGPassId from, RGPassId to, uint32_t resource)
             {
@@ -240,12 +286,12 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
                 });
             };
             require(waits(subject.gbuffer, subject.raw, subject.depthResource) &&
-                waits(subject.filter, subject.deferred, subject.filteredResource) &&
+                waits(subject.filter, subject.lxColor, subject.filteredResource) &&
                 std::all_of(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
                 {
                     return positionOf(plan, RGPassId{wait.producer}) < positionOf(plan, RGPassId{wait.consumer});
                 }), "Cross-queue waits missing or not topological.");
-            require(waits(subject.raw, subject.deferred, subject.depthResource),
+            require(waits(subject.raw, subject.lxColor, subject.depthResource),
                 "Same-state read/read physical ownership wait missing.");
             EnhancedRenderGraph::QueueSchedule repeated;
             require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, repeated, error) &&
@@ -582,9 +628,38 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             history.Clear();
             require(!history.Find(RGMeasurementDomain::Normal, 7) &&
                 !history.Find(RGMeasurementDomain::Capture, 28), "History reset retained a measurement domain.");
+            const auto alternate = std::make_shared<const std::string>("alternate-history-role");
+            require(history.Store(RGMeasurementDomain::Normal, {signature, {uint64_t{7}}, token(30,7,30,2000)}) &&
+                history.Store(RGMeasurementDomain::Normal, {alternate, {uint64_t{9}}, token(31,7,31,2001)}) &&
+                history.FindFresh(RGMeasurementDomain::Normal, token(32,7,32,2010),1000,signature) &&
+                history.FindFresh(RGMeasurementDomain::Normal, token(32,7,32,2010),1000,alternate),
+                "Alternating graph declarations lost warm costs.");
+            require(history.Store(RGMeasurementDomain::Normal, {signature, {uint64_t{11}}, token(32,7,32,2002)}) &&
+                history.FindFresh(RGMeasurementDomain::Normal, token(33,7,33,2010),1000,signature)->nanoseconds[0] == 11 &&
+                history.FindFresh(RGMeasurementDomain::Normal, token(33,7,33,2010),1000,alternate)->nanoseconds[0] == 9,
+                "Updating one declaration overwrote another declaration's costs.");
+            require(!history.FindFresh(RGMeasurementDomain::Capture, token(33,7,33,2010),1000,signature) &&
+                !history.FindFresh(RGMeasurementDomain::Normal, token(42,7,42,2010),1000,signature) &&
+                !history.FindFresh(RGMeasurementDomain::Normal, token(33,7,33,2010),1000,
+                    std::make_shared<const std::string>("unknown")), "Variant lookup bypassed domain, age or signature guards.");
+            for(uint64_t i=0;i<5;++i)
+                history.Store(RGMeasurementDomain::Normal, {std::make_shared<const std::string>("variant-"+std::to_string(i)),
+                    {i},token(40+i,7,40+i,2100+i)});
+            require(!history.FindFresh(RGMeasurementDomain::Normal,token(45,7,45,2110),1000,
+                    std::make_shared<const std::string>("variant-0")) &&
+                history.FindFresh(RGMeasurementDomain::Normal,token(45,7,45,2110),1000,
+                    std::make_shared<const std::string>("variant-1")), "Per-view signature cache was unbounded or evicted too early.");
+            history.Discard(RGMeasurementDomain::Normal,token(46,7,46,2200));
+            require(!history.Store(RGMeasurementDomain::Normal,{alternate,{uint64_t{9}},token(45,7,45,2110)}) &&
+                !history.FindFresh(RGMeasurementDomain::Normal,token(47,7,47,2210),1000,
+                    std::make_shared<const std::string>("variant-4")), "Failure watermark restored an older graph variant.");
+            require(history.Store(RGMeasurementDomain::Normal,{signature,{uint64_t{12}},token(47,7,47,2210)}) &&
+                history.FindFresh(RGMeasurementDomain::Normal,token(48,7,48,2220),1000,signature) &&
+                !history.FindFresh(RGMeasurementDomain::Normal,token(48,7,48,2220),1000,alternate),
+                "Recovery resurrected pre-failure variants.");
         }
         require(callbacks == callbacksBeforeOverlap, "Overlap planning executed a callback.");
-        constexpr uint32_t kExpectedChecks = 111;
+        constexpr uint32_t kExpectedChecks = 121;
         if (checks != kExpectedChecks)
         {
             throw std::runtime_error("Queue schedule acceptance check count changed.");

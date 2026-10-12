@@ -1,4 +1,4 @@
-"""Authored byte-level reader fixtures; not executed in this change.
+"""Byte-level reader and measurement admission contract fixtures.
 
 Synthetic bytes test rejection/codec contracts only, never GPU acceptance.
 """
@@ -97,6 +97,8 @@ class TemporalPerformanceEvidenceTests(unittest.TestCase):
         self.assertLess(body.index('m_state.load('), body.index('write_presenter_return('))
         self.assertLess(body.index('expected_generation == 0'), body.index('write_presenter_return('))
         self.assertLess(body.index('expected_generation != generation'), body.index('write_presenter_return('))
+        self.assertLess(body.index('m_gpuFrameRangeReady.load('), body.index('write_presenter_return('))
+        self.assertLess(body.index('sample.engine_frame < m_recordStartFrame.load('), body.index('write_presenter_return('))
         owner = (Path(__file__).resolve().parents[2] / 'Player/PlayerTemporalDX12.cpp').read_text(encoding='utf-8-sig')
         owner = owner.split('static void PublishPresent(', 1)[1].split('void Publish(', 1)[0]
         self.assertLess(owner.index('profiler.capture_generation()'), owner.index('profiler.state()'))

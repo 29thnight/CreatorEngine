@@ -26,6 +26,8 @@ param(
 # Attach to an already running Editor or development Player command service.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../regression/ArtifactRetention.ps1')
+if($Stage -eq 'motion-fixture'){Assert-ArtifactCapacity $OutputDirectory}
 $endpoint = Get-Content -LiteralPath $EndpointFile -Raw | ConvertFrom-Json
 if ([int]$endpoint.port -lt 1 -or [int]$endpoint.port -gt 65535 -or !$endpoint.token) {
     throw 'Invalid command-service endpoint'
@@ -38,7 +40,10 @@ $script:sequence = 0
 
 function Invoke-TemporalCommand([string]$Name, [string[]]$Arguments = @()) {
     $script:sequence++
-    $body = @{ command=$Name; args=@($Arguments); mode='sync'; correlationId="temporal-$script:sequence" } | ConvertTo-Json -Compress
+    # Long fixture recording must use operation polling, not the service's
+    # default five-second synchronous wait (HTTP timeout alone does not change it).
+    $mode = if ($Name -eq 'render.temporal.motion.fixture') { 'async' } else { 'sync' }
+    $body = @{ command=$Name; args=@($Arguments); mode=$mode; correlationId="temporal-$script:sequence" } | ConvertTo-Json -Compress
     $result = Invoke-RestMethod "$base/command" -Method Post -Headers $headers -WebSession $session `
         -ContentType 'application/json' -Body $body -TimeoutSec $TimeoutSeconds
     # A command's HTTP operation may complete before its render/present generation.
@@ -177,6 +182,11 @@ try {
             }
             $fixtureDirectory = [IO.Path]::GetFullPath((Join-Path $OutputDirectory 'motion-fixture'))
             $recording = Invoke-TemporalCommand 'render.temporal.motion.fixture' @($fixtureDirectory)
+            $fixture = Get-Content -LiteralPath (Join-Path $fixtureDirectory 'fixture.json') -Raw | ConvertFrom-Json
+            if ($fixture.singleSubmissionPerMeasuredStep -ne $true) {
+                throw 'Fresh motion fixture must declare one submission per measured pose'
+            }
+            $report.singleSubmissionPerMeasuredStep = $true
             $oraclePath = Join-Path $OutputDirectory 'motion-oracle.json'
             & $PythonExecutable (Join-Path $PSScriptRoot 'Compare-TemporalMotion.py') `
                 --capture $fixtureDirectory --fixture (Join-Path $fixtureDirectory 'fixture.json') --output $oraclePath
@@ -193,7 +203,8 @@ try {
             $data = $recording.data
         }
         'reset' {
-            $data = Set-Temporal 'temporal.reset'
+            $receipt = Invoke-TemporalCommand 'temporal.reset'
+            $data = Wait-SubmittedTemporal ([string]$receipt.data.receiptGeneration) ([uint64]$before.lastRealFrameId)
             Require-RealMetadata $data
             if ([uint64]$data.historyRevision -le [uint64]$before.historyRevision) {
                 throw 'Acknowledged request did not advance production history revision'

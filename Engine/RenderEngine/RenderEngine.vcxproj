@@ -357,17 +357,14 @@
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
-    <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
+    <ClCompile Include="Render\Passes\Geometry\SceneSurfaceTargets.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12MeshCache.cpp" />
     <ClCompile Include="RHI\DX12\DX12GpuProfiler.cpp" />
     <ClCompile Include="RHI\DX12\DX12TextureCache.cpp" />
-    <ClCompile Include="Render\Passes\Geometry\EnhancedDeferredPass.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp" />
-    <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp" />
+    <ClCompile Include="Render\Passes\Lighting\EnhancedLightTilePass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp" />
     <ClCompile Include="Render\Passes\UI\EnhancedUIPass.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp" />
@@ -479,9 +476,6 @@
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="GpuGeometryOcclusion.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="GpuMeshletVisibility.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Experiment\Import\MeshLodBuilder.cpp">
@@ -775,7 +769,7 @@
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
-    <ClInclude Include="MaterialGraphMeshletTopology.h" />
+    <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphRasterSurface.h" />
     <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
@@ -847,7 +841,6 @@
     <ClInclude Include="Experiment\MeshletData.h" />
     <ClInclude Include="Experiment\MeshLodData.h" />
     <ClInclude Include="Experiment\Import\MeshLodBuilder.h" />
-    <ClInclude Include="GpuMeshletVisibility.h" />
     <ClInclude Include="GpuGeometryOcclusion.h" />
     <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
     <ClInclude Include="Experiment\Import\MeshletBuilder.h" />
@@ -879,9 +872,7 @@
     <ClInclude Include="RHI\DX12\DX12UploadRing.h" />
     <ClInclude Include="RHI\Vulkan\VulkanPersistentHeap.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedDecalPass.h" />
-    <ClInclude Include="Render\Passes\Geometry\EnhancedDeferredPass.h" />
-    <ClInclude Include="Render\Passes\Geometry\EnhancedForwardPass.h" />
-    <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h" />
+    <ClInclude Include="Render\Passes\Geometry\SceneSurfaceTargets.h" />
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h" />
     <ClInclude Include="Assets\CookedEnvironment.h" />
     <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h" />
@@ -890,6 +881,7 @@
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />
     <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h" />
+    <ClInclude Include="Render\Passes\Lighting\EnhancedLightTilePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSAOPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIShaders.h" />
@@ -945,6 +937,7 @@
     <ClCompile Include="Render\Temporal\SpatialPostEffectsHost.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="RHI\Temporal\TemporalDeviceDX12.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalUpscalePass.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="Render\Temporal\TemporalRuntimeControl.h" />
     <ClInclude Include="Render\Temporal\TemporalUpscalerHost.h" />
     <ClInclude Include="Render\Temporal\SpatialPostEffects.h" />
@@ -952,6 +945,7 @@
     <ClInclude Include="RHI\Temporal\TemporalDeviceDX12.h" />
     <ClInclude Include="Render\Temporal\TemporalMeasurementProvenance.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.h" />
+    <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalUpscalePass.h" />
     <ClInclude Include="Render\Scene\EnhancedTemporalViewState.h" />
   </ItemGroup>
   <ItemGroup>

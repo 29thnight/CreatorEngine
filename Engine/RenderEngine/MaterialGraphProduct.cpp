@@ -427,6 +427,12 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
         return false;
     };
     const auto& program = product.program;
+    if (program.semanticKey.find("|lx-scene-host:") != std::string::npos &&
+        !program.semanticKey.ends_with(SceneHostIdentity))
+    {
+        error = "Old METEOR Scene ABI requires force reimport/recook; compatibility products are rejected.";
+        return false;
+    }
     if (budget.compiledBytes > UINT32_MAX || program.semanticKey.empty() || program.semanticKey.size() > TextLimit ||
         program.slang.empty() || program.slang.size() > TextLimit || program.parameters.size() > 128 ||
         program.resources.size() > 128 || program.sourceMap.size() > 4096 || product.targets.empty() ||

@@ -1,5 +1,9 @@
 # PHASE 4.x 공수 재산정 원장
 
+> 2026-10-11 TR0 material 후속: 실제 Debug/Release empty·Aria 측정, lossless native 기록·정상 종료·저장 population/geometry/전경 감사 통과. 단일 offscreen view 332×182, draw 3·전경 깊이 픽셀 858; 제품 viewport/마스터 비교 수용은 별도. RG8 전체 workload·UI 육안·제품 budget·actual generated/외부 계측은 잔여이며 TR0 기성 0, PHASE 4.5 12/71(17%) 유지. [실행 기록](../analysis/TemporalMeasurementConsumers20261010.md).
+
+> 2026-10-10 PR #169: SDK 활성 DX12 Debug/Release 실행 증거로 TR1(8)·TU5(4)를 종료한다. PHASE 4.5는 16행 중 2행 완료·기성 12/71·잔여 59(17%), 전체 추정 563·기성 138·잔여 425(+별도 미산정)다. 품질 전수·FG·물리 지연/지원 행렬은 progress·기성 0을 유지한다. [종료 체크포인트](../analysis/TemporalClosureCheckpoint20261010.md). 아래 이전 기록은 당시 스냅샷이다.
+
 2026-10-07 PR 감사 당시: RG6·RG-V는 병합된 소스를 반영해 progress로 표시하되 기성 0, 추정/잔여 공수는 유지한다. [감사 근거](../analysis/MergedPrReview20261007.md).
 
 2026-10-07 후속: 최종 조합·reference·실제 Editor capture/fixture 수용을 완료해 RG5를 done, 기성 10인일로 회수했다. [최종 증거](../analysis/RenderRg5FinalAcceptance20261007.md). 이후 RG6의 별도 진단/기본 제품 D/R 독립 live 전후 비교·100회 결정성·비용·validation·정상 종료를 수용하여 기성 4인일을 추가 회수했다. [RG6 증거](../analysis/RenderRg6Acceptance20261007.md). 이후 RG-V 기본 native viewer의 D/R 실제 reader·scene/resize·변이·비용·정상 종료를 수용해 4인일을 추가 회수했다. [RG-V 증거](../analysis/GraphRecoveryRgV20261007.md). MAT-9와 C# 연결·alias/queue/range 확장·Vulkan runtime은 올리지 않는다.
@@ -39,14 +43,14 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 | 4 | 18 | 18 | 18 | 0 | 완료 이력 유지 |
 | 4.25 | 34 | 40 + 미산정 | 32 | 8 + 미산정 | 기존 기반 보존, 공통 재질 통합 재개방과 SSS/투과·Blender/route·성능 회수 |
 | 4.3 | 119 + Q0/RG-V 미산정 | 100 | 74 | 26 | BASE-0·RG1~RG7·RG-V·Q0 수용; RG8 구조 수정·RG9 잔여 |
-| 4.5 | 86 | 71 | 0 | 71 | 중립 SDK 계약 유지, DX12 구현/수용, Vulkan 비교 제외 |
+| 4.5 | 86 | 71 | 12 | 59 | 중립 SDK 계약 유지, DX12 구현/수용, Vulkan 비교 제외 |
 | 4.6 | 미산정 | 32 | 0 | 32 | native IR부터 C#/Roslyn/제품 전환까지 7행 최초 산정 |
 | 4.7 | 35 | 35 | 2 | 33 | 원래 DX12 베이크 범위; UV1/BVH/취소·progressive 범위 유지 |
 | 4.75 | 20 + ENV 미산정 | 28 | 0 | 28 | DX12 품질 18 + ENV 전체 route 10 |
 | 4.8 | 5.5 + 구현 미산정 | 9 + 구현 미산정 | 0 | 9 + 구현 미산정 | GPU Scene/IBL/AS 공유 설계와 실제 구현 공수 확정 보강 |
 | 4.85 | 별도 RT/HY/EXP 미산정 | 208 | 0 | 208 | 기본 환경 116 + Hybrid 확장 28 + ReSTIR 28 + cage 36; RT/HY/EXP 중복 제거 |
 | 4.9 | 미산정 | 22 | 0 | 22 | RenderDoc 6행, 캡처/리소스/픽셀/수정/재캡처 |
-| **합계** | **317.5 + 미산정** | **563 + 별도 미산정** | **126** | **437 + 별도 미산정** | **신규 산정 74 + RTP 208 - 기존 범위 조정 36.5 = +245.5; BASE-0 4·RG1 8·RG2 10·RG3 8·RG4 6·RG5 10·RG6 4·RG-V 4·RG7 14·Q0 6 회수; RG8 회수 철회** |
+| **합계** | **317.5 + 미산정** | **563 + 별도 미산정** | **138** | **425 + 별도 미산정** | **신규 산정 74 + RTP 208 - 기존 범위 조정 36.5 = +245.5; BASE-0 4·RG1 8·RG2 10·RG3 8·RG4 6·RG5 10·RG6 4·RG-V 4·RG7 14·Q0 6 회수; RG8 회수 철회; TR1 8·TU5 4 회수** |
 
 ## ID별 재산정
 
@@ -85,22 +89,22 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 | 4.3 | `RG8` | 25 | 16 | progress | 2026-10-09 구조 재감사로 완료/기성 16 회수 철회·기성 0. 기존 정확성/수명 회귀 보존. 후속 수정 1·2에서 batch·recording pool·공통 barrier 계획 적용 및 D/R 150 실행·24 계획·전체 RG 회귀 통과(RenderRg8Barriers20261009.md). 단일 큐 compiled 계획 재사용. 다중 큐 보수적 경계 전이, overlap 없는 SSAO 배치, RG7 조합 거부는 잔여. 기본 OFF 유지. 근거 RenderRg7Rg8StructuralAudit20261009.md |
 | 4.3 | `RG9` | 15 | 10 | todo | range/subresource/split 7 + Inspector 확장/회귀 3; 기본 viewer는 RG-V |
 | 4.3 | `RG-V` | 미산정 | 4 | done | 기본 native snapshot reader/UI·D/R 실제 view/scene/resize·변이·비용·exit 0 수용. C# IR/alias/queue/range는 후속 페이즈 |
-| 4.5 | `TR0` | 4 | 3 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TR1` | 10 | 8 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TR2` | 6 | 5 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TR3` | 5 | 5 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TU0` | 4 | 3 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TU1` | 3 | 2 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TU2` | 6 | 5 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TU3` | 4 | 3 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TU4` | 3 | 3 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TU5` | 4 | 4 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `FG0` | 10 | 8 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `FG1` | 5 | 4 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `FG2` | 8 | 6 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `FG3` | 5 | 4 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `FG4` | 4 | 4 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
-| 4.5 | `TFG9` | 5 | 4 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
+| 4.5 | `TR0` | 4 | 3 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TR1` | 10 | 8 | done | 7-route 실제 모션·D/R GPU/history 회귀 완료; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TR2` | 6 | 5 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TR3` | 5 | 5 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TU0` | 4 | 3 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TU1` | 3 | 2 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TU2` | 6 | 5 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TU3` | 4 | 3 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TU4` | 3 | 3 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TU5` | 4 | 4 | done | 실제 provider 8전환·표시 해상도·PostChain/UI 순서·GPU UI 회귀 완료; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `FG0` | 10 | 8 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `FG1` | 5 | 4 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `FG2` | 8 | 6 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `FG3` | 5 | 4 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `FG4` | 4 | 4 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
+| 4.5 | `TFG9` | 5 | 4 | progress | 소스 구현/부분 실행; 행 전체 수용은 미완료·기성 0; TemporalClosureCheckpoint20261010.md |
 | 4.6 | `CSRP-0` | 미산정 | 3 | todo | 현행 19 node/per-view/Host 소비자·DX12 fixture 실측 3 |
 | 4.6 | `CSRP-1` | 미산정 | 6 | todo | immutable native IR/schema/registry 4 + negative fixture 2 |
 | 4.6 | `CSRP-2` | 미산정 | 5 | todo | typed C# builder/interop 세대 게시 3 + 예외/스레드/fence 검증 2 |

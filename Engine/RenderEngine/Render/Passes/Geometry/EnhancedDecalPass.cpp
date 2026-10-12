@@ -173,7 +173,7 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         desc.depthEnable = true;
         desc.depthWriteMask = RHIDepthWrite::Zero;
         desc.depthFunc = RHICompareOp::LessEqual;
-        desc.dsvFormat = EnhancedGBufferPass::kDepthFormat;
+        desc.dsvFormat = SceneSurfaceTargets::kDepthFormat;
 
         desc.independentBlend = true;
         desc.renderTargetBlend[0] = MakeDecalBlend(0 != (channel & kChannelDiffuse));
@@ -181,9 +181,9 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         desc.renderTargetBlend[2] = MakeDecalBlend(0 != (channel & kChannelOrm));
 
         desc.numRenderTargets = 3;
-        desc.rtvFormats[0] = EnhancedGBufferPass::GetRenderTargetFormat(0); // Diffuse
-        desc.rtvFormats[1] = EnhancedGBufferPass::GetRenderTargetFormat(2); // Normal
-        desc.rtvFormats[2] = EnhancedGBufferPass::GetRenderTargetFormat(1); // MetalRough
+        desc.rtvFormats[0] = SceneSurfaceTargets::GetRenderTargetFormat(0); // Diffuse
+        desc.rtvFormats[1] = SceneSurfaceTargets::GetRenderTargetFormat(2); // Normal
+        desc.rtvFormats[2] = SceneSurfaceTargets::GetRenderTargetFormat(1); // MetalRough
 
         m_pipelines[channel] = context.psoManager->GetOrCreate(desc, outError);
         if (!m_pipelines[channel].IsValid())
@@ -458,15 +458,15 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
     desc.width = m_width;
     desc.height = m_height;
 
-    desc.format = EnhancedGBufferPass::GetRenderTargetFormat(0);
+    desc.format = SceneSurfaceTargets::GetRenderTargetFormat(0);
     desc.name = "Decal.CopiedDiffuse";
     m_copiedDiffuse = graph.CreateTexture(desc);
 
-    desc.format = EnhancedGBufferPass::GetRenderTargetFormat(2);
+    desc.format = SceneSurfaceTargets::GetRenderTargetFormat(2);
     desc.name = "Decal.CopiedNormal";
     m_copiedNormal = graph.CreateTexture(desc);
 
-    desc.format = EnhancedGBufferPass::GetRenderTargetFormat(1);
+    desc.format = SceneSurfaceTargets::GetRenderTargetFormat(1);
     desc.name = "Decal.CopiedOrm";
     m_copiedOrm = graph.CreateTexture(desc);
     if (versioned)
@@ -571,7 +571,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             // ★ 읽기 전용 깊이. 이것이 없으면 같은 리소스를 SRV로도 읽는 것이
             // 불법이 된다 — 깊이 사본을 없앤 근거가 이 한 줄이다.
             const auto depthDesc = RHIDepthTargetDesc::DepthReadOnly(executeContext.ResolveHandle(outputs.depth),
-                                                                     EnhancedGBufferPass::kDepthFormat);
+                                                                     SceneSurfaceTargets::kDepthFormat);
 
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid())

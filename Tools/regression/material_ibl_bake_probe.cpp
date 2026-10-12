@@ -50,7 +50,7 @@ own::shared_owner<const Texture> Cube(const Environment& environment)
             std::memcpy(pixels + i * sizeof(value), value.data(), sizeof(value));
         }
     }
-    return Texture::CreateSharedFromImage("LX.IblBake.Environment", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.IblBake.Environment", std::move(image));
 }
 
 std::vector<IblBakePoint> Points()
@@ -165,7 +165,7 @@ void Run(const std::filesystem::path& root)
     targetDescription.height = 1;
     targetDescription.format = RHIFormat::RGBA32Float;
     targetDescription.allowRenderTarget = true;
-    targetDescription.debugName = L"LX.IblBake.Consumer";
+    targetDescription.debugName = L"METEOR.IblBake.Consumer";
     RHITextureHandle target;
     RHIReadback pixelReadback;
     Check(device.CreateTexture(targetDescription, target, error) &&

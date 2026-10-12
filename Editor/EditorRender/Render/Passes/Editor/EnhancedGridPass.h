@@ -101,4 +101,5 @@ private:
     uint32_t m_height{ 0 };
 
     RHIPipelineHandle m_pso;
+    RHIPipelineHandle m_depthCopyPso;
 };

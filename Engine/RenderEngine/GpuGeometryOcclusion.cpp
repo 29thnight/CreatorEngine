@@ -201,6 +201,7 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
         // The prepared view is immutable during recording; the callback only
         // binds declared SRV/UAV resources and dispatches through its encoder.
         graph.DeclareComputeCompatible(buildPass);
+        graph.DeclareRecordingIndependent(buildPass);
         source = target;
         width = constants.targetWidth;
         height = constants.targetHeight;

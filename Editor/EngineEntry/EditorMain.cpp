@@ -810,6 +810,12 @@ void Editor::EditorMain::Update()
 {
 	{
 		ce::profile_scope _profile{ ce::marker<"GameLogic">() };
+		// LateUpdate can install/remove diagnostic entities. Presentation reads
+		// their child vectors under this same mutex; protecting only EndOfFrame
+		// leaves its HierarchyFlatView iterators racing fixture preparation.
+		std::unique_lock<std::mutex> fixtureSceneLock(m_sceneStructureMutex, std::defer_lock);
+		if (TemporalMotionFixture::RequiresSceneWriteBoundary())
+			fixtureSceneLock.lock();
 		Time->Tick([this]
 		{
 			m_frameDeltaTime = Runtime::ResolveFrameDelta();

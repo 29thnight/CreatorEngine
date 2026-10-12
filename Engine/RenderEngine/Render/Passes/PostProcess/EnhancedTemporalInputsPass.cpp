@@ -18,6 +18,7 @@ bool EnhancedTemporalInputsPass::Initialize(const EnhancedFrameContext& context,
 }
 void EnhancedTemporalInputsPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    m_outputs.fill({});
     const bool versioned=graph.GetSchedulingMode()==RGSchedulingMode::ExplicitVersioned;
     const bool explicitAccess=graph.GetSchedulingMode()!=RGSchedulingMode::DeclarationOrder;
     const auto read=explicitAccess?RGAccessMode::Read:RGAccessMode::LegacyState;
@@ -33,8 +34,9 @@ void EnhancedTemporalInputsPass::Declare(EnhancedRenderGraph& graph, const Enhan
     }
     const auto outputs=m_outputs;
     const auto depth=m_depth;
-    graph.AddPass("Temporal.DepthCopy",{{depth,RHIResourceState::CopySource,read},{outputs[4],RHIResourceState::CopyDest,write}},
+    const auto depthCopyPass=graph.AddPass("Temporal.DepthCopy",{{depth,RHIResourceState::CopySource,read},{outputs[4],RHIResourceState::CopyDest,write}},
         [depth,outputs](const auto& execute){execute.encoder->CopyTexture(execute.ResolveHandle(outputs[4]),execute.ResolveHandle(depth));});
+    graph.DeclareRecordingIndependent(depthCopyPass);
     struct Constants
     {
         math::matrix4x4 inverseProjection,inverseView,currentProjection,previousProjection;
@@ -65,4 +67,5 @@ void EnhancedTemporalInputsPass::Declare(EnhancedRenderGraph& graph, const Enhan
             encoder.SetBindings(RHIBindPoint::Compute,2,targets);encoder.Dispatch((constants.width+7)/8,(constants.height+7)/8,1);
         }, true);
     graph.DeclareComputeCompatible(pass);
+    graph.DeclareRecordingIndependent(pass);
 }

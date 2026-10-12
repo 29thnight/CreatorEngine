@@ -1,6 +1,7 @@
 #include "EnhancedLivePipelineDesc.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <initializer_list>
@@ -223,6 +224,18 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
         node.declare(blackboard, graph, context, binding);
         if (afterDeclare) afterDeclare(node, blackboard);
     }
+}
+
+bool LivePipelineDesc::HasConsumer(const std::string& slot, const EnhancedFrameContext& context,
+    const LiveFrameBinding& binding) const
+{
+    for (const LivePassNode& node : m_nodes)
+    {
+        if (!node.IsActive()) continue;
+        if (std::find(node.reads.begin(), node.reads.end(), slot) == node.reads.end()) continue;
+        if (!node.consumes || node.consumes(slot, context, binding)) return true;
+    }
+    return false;
 }
 
 std::string LivePipelineDesc::Dump() const

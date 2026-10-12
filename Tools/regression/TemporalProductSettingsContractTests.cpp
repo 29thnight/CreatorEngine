@@ -165,6 +165,12 @@ int main()
     SetEnvironment("CREATOR_TEMPORAL_UPSCALER", "none");
     SetEnvironment("CREATOR_TEMPORAL_INTERPOLATED_FRAME_COUNT", "2");
     SetEnvironment("CREATOR_TEMPORAL_REFLEX", "off");
+    SetEnvironment("CREATOR_TEMPORAL_DLSS_PROJECT_ID", "fixture-project");
+#ifdef _WIN32
+    _wputenv_s(L"CREATOR_TEMPORAL_RUNTIME_DIRECTORY", L"C:/Temporal/\uac80\uc99d SDK");
+#else
+    SetEnvironment("CREATOR_TEMPORAL_RUNTIME_DIRECTORY", "/tmp/temporal-sdk");
+#endif
     auto& control = TemporalRuntimeControl::Get();
     control.InitializeProjectDefaults(saved);
     const auto startup = control.Snapshot();
@@ -175,6 +181,15 @@ int main()
     Expect(startup.requestedSettings.requestedFrameGenerator == TemporalProvider::XeSS &&
         startup.requestedSettings.quality == TemporalQuality::NativeAA,
         "absent environment keys preserve saved startup intent");
+    Expect(startup.requestedSettings.dlssProjectId == "fixture-project",
+        "project identity environment override is copied into startup settings");
+#ifdef _WIN32
+    Expect(startup.requestedSettings.runtimeDirectory == L"C:/Temporal/\uac80\uc99d SDK",
+        "wide environment override preserves Unicode runtime directory");
+#else
+    Expect(startup.requestedSettings.runtimeDirectory == L"/tmp/temporal-sdk",
+        "absolute runtime directory environment override is preserved");
+#endif
     Expect(!startup.rendererObserved && !startup.playerObserved && !startup.playerLatencyHostRegistered &&
         startup.configuredInterpolatedFrameCount == 0 && startup.activeInterpolatedFrameCount == 0,
         "startup preference creates no support or active-frame evidence");

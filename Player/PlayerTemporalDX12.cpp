@@ -469,7 +469,7 @@ bool TemporalDX12::Configure(HWND window, uint32_t width, uint32_t height, std::
     state.stopped = state.failed = state.markerFailure = false;
     state.presentationReady = false;
     state.pendingRecovery = false;
-    state.openedRealFrame = 0;
+    state.openedRealFrame = {};
     state.reflexSleepSupported = state.reflexMarkersSupported = state.reflexConflict = false;
     state.capabilities.clear();
     state.dlss = state.resources.GetTemporalDlssSession();

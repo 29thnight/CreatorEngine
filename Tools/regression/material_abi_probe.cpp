@@ -28,7 +28,7 @@ int wmain(int argc, wchar_t** argv)
 
         for (bool spirv : {false, true})
         {
-            for (const char* file : {"GBuffer.slang", "ForwardShade.slang", "ForwardWater.slang", "ForwardWind.slang"})
+            for (const char* file : {"ForwardShade.slang", "ForwardWater.slang", "ForwardWind.slang"})
             {
                 for (bool packed : {false, true})
                 {
@@ -48,21 +48,9 @@ int wmain(int argc, wchar_t** argv)
                     }
                 }
             }
-            requireCompile("Deferred.slang", "VSMain", SLANG_STAGE_VERTEX, spirv, {});
-            requireCompile("Deferred.slang", "PSMain", SLANG_STAGE_FRAGMENT, spirv, {});
             requireCompile("ForwardShade.slang", "PSMain", SLANG_STAGE_FRAGMENT, spirv, {"REFERENCE_PATH=1"});
 
-            for (const char* mask : {"0x4000", "0x40000000"})
-            {
-                if (compiler.Compile(shaders / "GBuffer.slang", "PSMain", SLANG_STAGE_FRAGMENT, spirv,
-                                     {std::string("LX_MATERIAL_FEATURE_MASK=") + mask}, error) ||
-                    error.find("supports only known features") == std::string::npos)
-                {
-                    throw std::runtime_error("Unsupported mask was not rejected: " + std::string(mask) + "\n" + error);
-                }
-                ++rejected;
-            }
-            for (const char* file : {"GBuffer.slang", "ForwardShade.slang", "Deferred.slang"})
+            for (const char* file : {"ForwardShade.slang"})
             {
                 for (const char* mask : {"0x007F", "0x00FF", "0x017F", "0x027F", "0x047F"})
                 {

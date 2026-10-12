@@ -32,6 +32,7 @@
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
 #include <c4/yml/emit.hpp>
+#include <c4/format.hpp>
 #include <mathematics/transform.hpp>
 #include <array>
 #include <chrono>
@@ -55,7 +56,7 @@ namespace
 
     enum class Phase
     {
-        Assets, Bindings, Baseline, Current, Control,
+        Assets, Bindings, Baseline, Current, ArmControl, Control, SdkBaselineCapture, SdkArm, SdkCapture,
     };
     struct BuildResult
     {
@@ -73,6 +74,12 @@ namespace
         std::size_t route{};
         std::uint32_t width{}, height{};
         bool serializationGuard{};
+        bool sdkQuality{};
+        bool sdkStartup{};
+        TemporalProvider sdkProvider{TemporalProvider::None};
+        TemporalQuality sdkQualitySetting{TemporalQuality::Quality};
+        unsigned sdkStep{1};
+        std::vector<EnhancedTemporalFixtureSubmission> sdkWarmup;
         gc::root_ref<Scene> scene;
         gc::root_ref<Entity> root, moving, receiver;
         gc::root_ref<Component> routeComponent;
@@ -304,7 +311,7 @@ namespace
         {
             throw std::runtime_error("Cannot bind real fixture geometry");
         }
-        renderer->SetMaterial(Material::InstantiateShared(material.get()));
+        renderer->SetMaterial(Material::InstantiateShared(&*material.borrow()));
         renderer->SetLODEnabled(false);
         return renderer;
     }
@@ -318,7 +325,8 @@ namespace
         stamp.predecessorStepId = offset == 0 ? 0 : baseline + offset - 1;
         stamp.inputSha256 = session.inputHash;
         stamp.predecessorInputSha256 = offset == 0 ? std::string{} : session.inputHash;
-        stamp.allowMeshlets = session.route == 6;
+        stamp.sdkQuality = session.sdkQuality;
+        stamp.sdkWarmupSubmissions = session.sdkQuality ? (session.sdkStartup ? 1u : 34u) : 0u;
         return stamp;
     }
 
@@ -355,6 +363,10 @@ namespace
                 }
             }
         }
+        // Setters publish local dirties; proxy construction reads stored world
+        // values. Resolve UI layout and spatial transforms before tagging this
+        // pose, otherwise the first tagged frame still carries the old pose.
+        session.scene->SyncDerivedState(TransformSyncPoint::LateUpdate);
     }
 
     void StartRoute(Session& session)
@@ -450,6 +462,15 @@ namespace
             }
         }
         Pose(session, false);
+        if (session.sdkQuality)
+        {
+            session.moving->Transform_().SetPosition({-2.f, 0.f, 4.f});
+            session.receiver = Create(session, "__TemporalSdkBackground")->root_from_this();
+            session.receiver->Transform_().SetPosition({0.f, 0.f, 6.f});
+            session.receiver->Transform_().SetScale({12.f, 12.f, 1.f});
+            BindMesh(*session.receiver, session.staticMesh.Snapshot().asset, session.receiverMaterial.Snapshot().asset);
+            session.scene->SyncDerivedState(TransformSyncPoint::LateUpdate);
+        }
         session.phase = Phase::Bindings;
     }
 
@@ -502,10 +523,11 @@ namespace
         return true;
     }
 
-    void DescribeCamera(ryml::NodeRef node)
+    void DescribeCamera(ryml::NodeRef node, bool sdkQuality = false)
     {
         node |= ryml::MAP;
-        node["projection"] << "orthographic";
+        node["projection"] << (sdkQuality ? "perspective" : "orthographic");
+        if (sdkQuality) node["verticalFovDegrees"] << 90;
         Vector(node["position"], {});
         node["width"] << 8;
         node["height"] << 8;
@@ -519,7 +541,7 @@ namespace
         root["extent"] |= ryml::SEQ;
         root["extent"].append_child() << session.width;
         root["extent"].append_child() << session.height;
-        DescribeCamera(root["camera"]);
+        DescribeCamera(root["camera"], session.sdkQuality);
         auto assets = root["inputAssets"];
         assets |= ryml::SEQ;
         for (const auto& [path, hash] : session.inputAssets)
@@ -536,7 +558,6 @@ namespace
         node |= ryml::MAP;
         node["name"] << kRoutes[session.route];
         node["route"] << kRoutes[session.route];
-        node["allowMeshlets"] << (session.route == 6);
         node["sessionId"] << session.id;
         node["baselineStepId"] << session.route * 3 + 1;
         node["currentStepId"] << session.route * 3 + 2;
@@ -629,6 +650,42 @@ namespace
         node["captures"] |= ryml::MAP;
     }
 
+    void SealSdkInput(Session& session)
+    {
+        ryml::Tree input;
+        auto root = input.rootref(); root |= ryml::MAP;
+        DescribeInputs(root, session);
+        auto camera = root["camera"];
+        camera["projection"] << "perspective";
+        camera["verticalFovDegrees"] << 90;
+        root["sdkFrameMilliseconds"] << (1000.f / 60.f);
+        root["provider"] << TemporalMeasuredProviderName(session.sdkProvider);
+        root["quality"] << static_cast<unsigned>(session.sdkQualitySetting);
+        root["foregroundHalfSize"] << 1;
+        root["backgroundZ"] << 6;
+        root["warmupMinAcceptedSubmissions"] << (session.sdkStartup ? 1 : 32);
+        root["exactWarmupSubmissions"] << (session.sdkStartup ? 1 : 34);
+        root["warmupSource"] << "render-thread-submission-ledger";
+        root["historyObservationMode"] << (session.sdkStartup ? "first-observed-non-reset" : "warmed");
+        root["steps"] |= ryml::SEQ;
+        for (unsigned step = 0; step <= 17; ++step)
+        {
+            auto node = root["steps"].append_child(); node |= ryml::MAP;
+            node["stepId"] << step + 1;
+            node["visible"] << c4::fmt::boolalpha(step <= 9);
+            const auto pose = step == 0 ? 0u : std::min(step - 1, 8u);
+            Vector(node["position"], {-2.f + .5f * float(pose), 0.f, 4.f});
+        }
+        const auto path = std::filesystem::u8path(session.status.directory);
+        session.inputHash = WriteJson(path / "input-assets/sdk-sequence.json", input);
+        auto out = session.manifest.rootref();
+        out["input"] |= ryml::MAP;
+        out["input"]["path"] << "input-assets/sdk-sequence.json";
+        out["input"]["sha256"] << session.inputHash;
+        out["sessionId"] << session.id;
+        out["captures"] |= ryml::SEQ;
+    }
+
     void RecordCapture(Session& session, const char* name)
     {
         const auto relative = std::string(kRoutes[session.route]) + "/" + name;
@@ -708,7 +765,8 @@ namespace
         auto* camera = cameraEntity->AddComponent<CameraComponent>();
         session.camera = camera->root_from_this();
         camera->SetPrimary(true);
-        camera->GetCamera()->m_isOrthographic = true;
+        camera->GetCamera()->m_isOrthographic = !session.sdkQuality;
+        camera->GetCamera()->m_fov = 90.f;
         camera->GetCamera()->m_viewWidth = 8.f;
         camera->GetCamera()->m_viewHeight = 8.f;
         camera->GetCamera()->m_nearPlane = .1f;
@@ -716,8 +774,9 @@ namespace
         camera->NotifyCameraCut();
         auto root = session.manifest.rootref();
         root |= ryml::MAP;
-        root["schema"] << "temporal.motion.executed-fixture.v2";
+        root["schema"] << (session.sdkStartup ? "temporal.sdk.startup.v1" : session.sdkQuality ? "temporal.sdk.sequence.v2" : "temporal.motion.executed-fixture.v2");
         root["acceptance"] << "unverified-requires-independent-oracle";
+        root["singleSubmissionPerMeasuredStep"] << true;
         DescribeInputs(root, session);
         root["cases"] |= ryml::SEQ;
         session.status.state = TemporalMotionFixtureState::Running;
@@ -725,8 +784,9 @@ namespace
     }
 }
 
-bool TemporalMotionFixture::Begin(const std::string& directory, std::string& error)
+bool TemporalMotionFixture::Begin(const std::string& directory, std::string& error, bool* busy, bool sdkQuality, bool sdkStartup)
 {
+    if (busy) *busy = false;
     if (g_session && Active(*g_session))
     {
         error = "A motion fixture session is already active";
@@ -741,7 +801,8 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
     EnhancedLivePbrCaptureStatus capture;
     if (!EnhancedSceneRenderer::TryGetLivePbrCaptureStatus(capture))
     {
-        error = "Renderer is busy; retry fixture admission after the current capture completes";
+        if (busy) *busy = true;
+        error = "Renderer state is temporarily locked; retry fixture admission";
         return false;
     }
     if (capture.state == EnhancedPbrCaptureState::Pending || capture.state == EnhancedPbrCaptureState::Recording)
@@ -782,7 +843,18 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         session->height = display.completedHeight;
         session->status = { TemporalMotionFixtureState::Preparing, directory, {}, {} };
         session->deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
-        session->exclusion.emplace();
+        session->sdkQuality = sdkQuality;
+        session->sdkStartup = sdkStartup;
+        if (sdkStartup && !sdkQuality)
+            throw std::runtime_error("SDK startup requires SDK diagnostic mode");
+        const auto temporal = TemporalRuntimeControl::Get().Snapshot();
+        session->sdkProvider = temporal.settings.requestedUpscaler;
+        session->sdkQualitySetting = temporal.settings.quality;
+        if (sdkQuality && (!temporal.settings.enabled || temporal.nativeCaptureExclusionActive ||
+            (session->sdkProvider != TemporalProvider::Fsr && session->sdkProvider != TemporalProvider::XeSS &&
+                session->sdkProvider != TemporalProvider::Dlss)))
+            throw std::runtime_error("SDK sequence requires enabled FSR/DLSS/XeSS without native capture exclusion");
+        if (!sdkQuality) session->exclusion.emplace();
         session->build = std::make_shared<BuildResult>();
         std::filesystem::create_directories(destination.parent_path());
         if (!std::filesystem::create_directory(destination))
@@ -794,7 +866,7 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         TemporalMotionFixtureAssetOptions options;
         options.targetPlatform = "win-x64";
         options.targetAbi = CreatorContentAbi::Token;
-        options.shaderDirectory = PathFinder::ShaderPath();
+        options.shaderDirectory = PathFinder::ShaderPath() / "DefaultPassShader";
         options.cacheDirectory = destination / "compiler-cache";
         const auto result = session->build;
         session->buildJob = ce::get_job_scheduler().submit([result, options, destination]
@@ -830,6 +902,11 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
     }
 }
 
+bool TemporalMotionFixture::RequiresSceneWriteBoundary() noexcept
+{
+    return g_session && Active(*g_session);
+}
+
 void TemporalMotionFixture::TickAfterAnimation()
 {
     if (!g_session || !Active(*g_session))
@@ -858,9 +935,17 @@ void TemporalMotionFixture::TickAfterAnimation()
             throw std::runtime_error("Scene ownership changed during motion fixture");
         }
         const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot().Get(EnhancedLiveDisplayTarget::Game);
-        if (display.completedWidth != session.width || display.completedHeight != session.height)
+        // Replacing the original camera with the transient fixture camera can
+        // temporarily withdraw the completed Game image. Keep polling the owned
+        // capture/submission even then: a fast producer can repeatedly withdraw
+        // the image at this GT seam. Exact submission/capture proofs guard the
+        // camera and native extent; a real nonzero resize still invalidates input.
+        if (display.completedWidth && display.completedHeight &&
+            (display.completedWidth != session.width || display.completedHeight != session.height))
         {
-            throw std::runtime_error("Game view extent changed during motion fixture");
+            throw std::runtime_error("Game view extent changed during motion fixture: "
+                + std::to_string(session.width) + "x" + std::to_string(session.height) + " -> "
+                + std::to_string(display.completedWidth) + "x" + std::to_string(display.completedHeight));
         }
         for (const auto& [reference, enabled] : session.previousComponents)
         {
@@ -875,6 +960,13 @@ void TemporalMotionFixture::TickAfterAnimation()
             || (session.animator && session.animator->IsDestroyMark())))
         {
             throw std::runtime_error("Fixture content was modified while its capture was pending");
+        }
+        if (session.sdkQuality)
+        {
+            const auto temporal = TemporalRuntimeControl::Get().Snapshot();
+            if (!temporal.settings.enabled || temporal.settings.requestedUpscaler != session.sdkProvider ||
+                temporal.settings.quality != session.sdkQualitySetting || temporal.nativeCaptureExclusionActive)
+                throw std::runtime_error("SDK sequence controls changed during the owned diagnostic");
         }
         if (session.phase == Phase::Assets)
         {
@@ -907,7 +999,8 @@ void TemporalMotionFixture::TickAfterAnimation()
             {
                 return;
             }
-            SealCaseInput(session);
+            if (session.sdkQuality) SealSdkInput(session);
+            else SealCaseInput(session);
             EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, 0));
             session.phase = Phase::Baseline;
             return;
@@ -919,6 +1012,19 @@ void TemporalMotionFixture::TickAfterAnimation()
             {
                 return;
             }
+            if (session.sdkQuality)
+            {
+                // Copy every accepted RT baseline submission, not merely those
+                // observed by the slower GT. RT holds the final baseline until
+                // capture admission, fixing both history length and jitter phase.
+                session.sdkWarmup = EnhancedSceneRenderer::GetTemporalFixtureWarmup(EnhancedLiveDisplayTarget::Game);
+                const auto required = session.sdkStartup ? 1u : 34u;
+                if (session.sdkWarmup.size() != required || submitted.baselineSubmissions != required) return;
+                if (!Capture(session, "baseline", 1)) return;
+                EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, 1));
+                session.phase = Phase::SdkBaselineCapture;
+                return;
+            }
             if (!Capture(session, "current", 1))
             {
                 return;
@@ -926,6 +1032,29 @@ void TemporalMotionFixture::TickAfterAnimation()
             Pose(session, true);
             EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, 1));
             session.phase = Phase::Current;
+            return;
+        }
+        if (session.phase == Phase::SdkArm)
+        {
+            const auto name = "frame-" + std::to_string(session.sdkStep);
+            if (!Capture(session, name.c_str(), session.sdkStep + 1)) return;
+            if (session.sdkStep <= 8)
+                session.moving->Transform_().SetPosition({-2.f + .5f * float(session.sdkStep), 0.f, 4.f});
+            else session.routeComponent->SetEnabled(false);
+            session.scene->SyncDerivedState(TransformSyncPoint::LateUpdate);
+            EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, session.sdkStep + 1));
+            session.phase = Phase::SdkCapture;
+            return;
+        }
+        if (session.phase == Phase::ArmControl)
+        {
+            // Retry only admission. Re-polling the completed capture first
+            // consumes the fair-lock opportunity and wakes RT before this
+            // second lock attempt, starving fast Release producers.
+            if (!Capture(session, "control", 2)) return;
+            session.routeComponent->SetEnabled(false);
+            EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, 2));
+            session.phase = Phase::Control;
             return;
         }
         EnhancedLivePbrCaptureStatus capture;
@@ -941,16 +1070,43 @@ void TemporalMotionFixture::TickAfterAnimation()
         {
             return;
         }
+        if (session.phase == Phase::SdkBaselineCapture)
+        {
+            auto root = session.manifest.rootref();
+            auto baseline = root["baseline"]; baseline |= ryml::MAP;
+            baseline["path"] << "static/baseline";
+            baseline["manifestSha256"] << HashFile(std::filesystem::u8path(session.status.directory) / "static/baseline/manifest.json");
+            baseline["stepId"] << 2;
+            root["warmup"] |= ryml::SEQ;
+            for (const auto& submitted : session.sdkWarmup)
+            {
+                auto node = root["warmup"].append_child(); node |= ryml::MAP;
+                node["realFrameId"] << submitted.realFrameId;
+                node["sourceFrameId"] << submitted.sourceFrameId;
+                node["viewId"] << submitted.viewId;
+                node["sceneEpoch"] << submitted.sceneEpoch;
+                node["historyRevision"] << submitted.historyRevision;
+                node["historyGeneration"] << submitted.historyGeneration;
+            }
+            session.phase = Phase::SdkArm;
+            return;
+        }
+        if (session.phase == Phase::SdkCapture)
+        {
+            const auto relative = "static/frame-" + std::to_string(session.sdkStep);
+            auto node = session.manifest.rootref()["captures"].append_child(); node |= ryml::MAP;
+            node["path"] << relative; node["manifestSha256"] << HashFile(std::filesystem::u8path(session.status.directory) / relative / "manifest.json");
+            node["stepId"] << session.sdkStep + 2;
+            if (++session.sdkStep <= 16) { session.phase = Phase::SdkArm; return; }
+            WriteJson(std::filesystem::u8path(session.status.directory) / "fixture.json", session.manifest);
+            session.pendingTerminal = TemporalMotionFixtureState::Complete;
+            if (Cleanup(session)) session.status.state = session.pendingTerminal;
+            return;
+        }
         if (session.phase == Phase::Current)
         {
             RecordCapture(session, "current");
-            if (!Capture(session, "control", 2))
-            {
-                return;
-            }
-            session.routeComponent->SetEnabled(false);
-            EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, 2));
-            session.phase = Phase::Control;
+            session.phase = Phase::ArmControl;
             return;
         }
         RecordCapture(session, "control");
@@ -1024,8 +1180,14 @@ void TemporalMotionFixture::ShutdownAfterRenderJoin() noexcept
     g_session.reset();
 }
 #else
-bool TemporalMotionFixture::Begin(const std::string&, std::string& error)
+bool TemporalMotionFixture::RequiresSceneWriteBoundary() noexcept
 {
+    return false;
+}
+
+bool TemporalMotionFixture::Begin(const std::string&, std::string& error, bool* busy, bool, bool)
+{
+    if (busy) *busy = false;
     error = "Temporal motion fixtures require a non-shipping development Editor";
     return false;
 }

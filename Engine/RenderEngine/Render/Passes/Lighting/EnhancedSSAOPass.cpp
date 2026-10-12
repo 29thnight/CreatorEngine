@@ -261,7 +261,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         m_keepAlive);
     // These callbacks use only compute commands and declare every GPU resource.
     graph.DeclareComputeCompatible(aoPass);
+    graph.DeclareRecordingIndependent(aoPass);
     graph.DeclareComputeCompatible(filterPass);
+    graph.DeclareRecordingIndependent(filterPass);
 }
 
 void EnhancedSSAOPass::Shutdown()

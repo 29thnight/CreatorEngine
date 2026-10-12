@@ -206,7 +206,9 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-    const auto declareStage = [&graph, &context, versioned, explicitAccess, readAccess](
+    // Graph callbacks run after the caller's temporary frame context is destroyed.
+    // The frame resource service outlives recording; capture its pointer by value.
+    const auto declareStage = [&graph, resources = context.resources, versioned, explicitAccess, readAccess](
         const char* name, RHIPipelineHandle pso,
         RGHandle srcA, RGHandle srcB, RGHandle& dst,
         const PostParams& params, uint32_t dispatchW, uint32_t dispatchH,
@@ -228,13 +230,13 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         usages.push_back({ dst, RHIResourceState::UnorderedAccess, outputAccess });
 
         const auto stagePass = graph.AddPass(name, usages,
-            [&context, pso, srcA, srcB, dst, params, dispatchW, dispatchH, dispatchRecorded]
+            [resources, pso, srcA, srcB, dst, params, dispatchW, dispatchH, dispatchRecorded]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 // device를 더 들지 않는다 — 뷰 생성이 CreateBindings로 넘어가면서
                 // 이 패스가 디바이스에 닿을 이유가 사라졌다(R2가 노리는 것이 이것이다).
 
-                const auto cb = context.resources->UploadConstants(
+                const auto cb = resources->UploadConstants(
                     &params, sizeof(PostParams));
                 if (!cb.IsValid()) return;
                 // ★ SRV는 늘 둘을 자른다.
@@ -253,7 +255,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 //   풀어 `GetDesc()` 를 읽었다. (V4 에서 사라진다고 적어
                 //   두었으나 사라진 것은 왕복이 아니라 **DX12 왕복**이다.)
                 const auto formatOf = [&](RHITextureHandle h)
-                { return context.resources->DescribeTexture(h).format; };
+                { return resources->DescribeTexture(h).format; };
 
                 // 포맷을 리소스에서 그대로 읽어 명시한다. 이 패스는 밉 하나짜리
                 // 2D만 다루므로 Default(nullptr 설명)로도 같지만, 원래 코드가
@@ -266,8 +268,8 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                     RHIBindingDesc::Uav2D(dstResource, formatOf(dstResource)),
                 };
 
-                const RHIBindingTable srvTable = context.resources->CreateBindings(srvBindings);
-                const RHIBindingTable uavTable = context.resources->CreateBindings(uavBindings);
+                const RHIBindingTable srvTable = resources->CreateBindings(srvBindings);
+                const RHIBindingTable uavTable = resources->CreateBindings(uavBindings);
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
@@ -289,6 +291,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         // observation has one writer and is read only after all callbacks join;
         // it does not choose or synchronize another pass.
         graph.DeclareComputeCompatible(stagePass);
+        graph.DeclareRecordingIndependent(stagePass);
     };
 
     // ── 블룸 체인 ──

@@ -73,7 +73,8 @@ public:
 		const ce::physics::CollisionGeometrySource& replacement);
 	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
-	bool RecoverModel(const file::path& source, FileGuid expectedId);
+    bool RecoverModel(const file::path& source, FileGuid expectedId);
+    bool ReimportModel(const file::path& source);
 	bool SetModelMeshletsAndReimport(const file::path& source, bool enabled);
 	bool SetModelLodsAndReimport(const file::path& source, std::uint32_t levels);
     [[nodiscard]] static bool IsTextureSource(const file::path& source);

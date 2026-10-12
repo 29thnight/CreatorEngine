@@ -1,4 +1,4 @@
-// Pixel-level alpha composition across the real Code and cooked Graph consumers.
+// Pixel-level alpha composition of the cooked blended stream (light tiles + SceneHost).
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
                      std::array<own::shared_owner<const Instance>, 2> instances, own::shared_owner<const Texture> cube)
@@ -23,8 +23,8 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     }
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Forward mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedForwardPass forward;
+    SceneSurfaceTargets gbuffer;
+    EnhancedLightTilePass tiles;
     SceneHost host(ce::get_job_scheduler());
     EnhancedFrameContext context;
     context.resources = &device;
@@ -41,13 +41,8 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     context.camera = &camera;
     std::vector<EnhancedLight> lights;
     context.lights = &lights;
-    const bool initialized = gbuffer.Initialize(context, error) && forward.Initialize(context, error);
-    Check(initialized, "Forward native initialization " + error);
-    ShaderMeta codeMeta;
-    const ShaderMetaHandle codeHandle{889, 1};
-    Check(ShaderMetaLoader::LoadFile(root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Forward.shadermeta",
-              FileGuid{"88888888-8888-4888-8888-888888888888"}, codeMeta, error) &&
-              forward.ApplyShaderMeta(context, codeHandle, codeMeta, {}, error), "Code Forward LX contract " + error);
+    const bool initialized = tiles.Initialize(context, error);
+    Check(initialized, "Light tile initialization " + error);
     // Scene consumers must load the sealed bytecode, with no editor compilation.
     InternalPath::GetInstance()->AssetAuthoringEnabled = false;
     for (const auto& instance : instances) WaitSceneProgram(host, context, instance->generation);
@@ -86,7 +81,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         context.frameId = 12000 + fixture;
         lights.assign(fixture >= 10 ? 65 : 1, light);
         camera.forward = math::vector3(0, 0, fixture == 7 ? 1.f : -1.f);
-        std::vector<EnhancedDrawItem> code, graphDraws;
+        std::vector<EnhancedDrawItem> graphDraws;
         for (unsigned i = 0; i < 4; ++i)
         {
             if (fixture < 4 && fixture != i) continue;
@@ -95,42 +90,18 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             draw.worldMatrix[3, 2] = depths[i];
             const float a = fixture < 4 ? 1 : fixture == 9 ? 0 : alpha[i];
             draw.coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended;
-            draw.baseColorFactor = i == 0 ? math::color(.9f, .1f, .2f, a) : math::color(.1f, .2f, .9f, a);
-            if (i == 1 || i == 2)
-            {
-                auto description = instances[i - 1]->description;
-                description.parameters.push_back({902, double(a)});
-                Check(BuildInstance(instances[i - 1]->generation, description,
-                          [&](const experiment::AssetId&, LXColorSpace, std::string&) {
-                              return instances[i - 1]->textures[0].owner;
-                          }, draw.materialGraphInstance, error), "Alpha override " + error);
-                draw.materialGraphSlot = 700 + i;
-                graphDraws.push_back(std::move(draw));
-            }
-            else
-            {
-                auto snapshot = std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
-                snapshot->shaderMetaHandle = codeHandle;
-                snapshot->keywordSelections.assign(codeMeta.keywords.size(), 0);
-                std::shared_ptr<const ShaderMetaBindingLayout> layout;
-                Check(forward.EnsureShaderMetaVariant(context, codeHandle, codeMeta, snapshot->keywordSelections,
-                          snapshot->permutationKey, layout, error), "Code Forward variant " + error);
-                snapshot->bindingLayout = *layout;
-                ExperimentMaterialSealing::SealSource source;
-                source.material.blendMode = experiment::MaterialBlendMode::Transparent;
-                source.material.properties = {{"baseColor", draw.baseColorFactor.rgba()}};
-                Check(ExperimentMaterialSealing::SealCore(source, codeMeta, *layout, snapshot->propertyBytes,
-                          snapshot->textureBindings, error, &snapshot->runtimeInstance, codeHandle) &&
-                          ExperimentMaterialSealing::SealCoverage(source, *layout, snapshot->propertyBytes,
-                          snapshot->coverage, error) && forward.CaptureShaderVariant(*snapshot) && snapshot->IsValid(),
-                      "Code immutable LX draw sealing " + error);
-                EnhancedMaterialSeal::Stamp(*snapshot, i + 1, 1, 1, context.sceneEpoch, context.frameId);
-                draw.forwardMaterialSnapshot = std::move(snapshot);
-                code.push_back(std::move(draw));
-            }
+            // Two cooked tiers, each used by two draws with independent alpha overrides.
+            const auto& tierInstance = instances[i % 2];
+            auto description = tierInstance->description;
+            description.parameters.push_back({902, double(a)});
+            Check(BuildInstance(tierInstance->generation, description,
+                      [&](const experiment::AssetId&, LXColorSpace, std::string&) {
+                          return tierInstance->textures[0].owner;
+                      }, draw.materialGraphInstance, error), "Alpha override " + error);
+            draw.materialGraphSlot = 700 + i;
+            graphDraws.push_back(std::move(draw));
         }
-        if (fixture == 6) { std::reverse(code.begin(), code.end()); std::reverse(graphDraws.begin(), graphDraws.end()); }
-        context.forwardDraws = &code;
+        if (fixture == 6) std::reverse(graphDraws.begin(), graphDraws.end());
         const std::vector<EnhancedDrawItem> empty;
         context.draws = &empty;
         SceneInputView view{context.frameId, context.sceneEpoch, 99, 1, 16, 16, camera};
@@ -143,7 +114,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
         const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
         Check(environment.IsValid(), "Alpha environment upload");
-        Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
+        Check(tiles.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error), "Mixed preparation " + error);
         auto graph = std::make_shared<EnhancedRenderGraph>(device);
         const unsigned workers = fixture == 5 || fixture == 6 || fixture == 11 ? 4 : 0;
@@ -174,6 +145,8 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->BindRenderTargets(target);
                     execution.encoder->ClearDepthTarget(target, .1f);
                 });
+        host.DeclareGeometry(*graph);
+        host.DeclareCulling(*graph);
         host.DeclareGBuffer(*graph, outputs);
         RGTextureDesc colorDesc;
         colorDesc.width = colorDesc.height = 16;
@@ -196,13 +169,13 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->ClearRenderTargets(target, h.index == color.index ? background.data() : white);
                 }
             });
-        if (!graphDraws.empty()) host.DeclareColor(*graph, outputs, color, ao, {});
-        forward.SetInputs({outputs.depth, color});
-        forward.SetGraphMaterials(&host);
-        forward.SetUseReferencePath(fixture == 11);
-        forward.Declare(*graph, context);
+        const auto opaque = host.DeclareColor(*graph, outputs, color, ao, {});
+        tiles.SetUseReferencePath(fixture == 11);
+        tiles.SetDepth(outputs.depth);
+        tiles.Declare(*graph, context);
+        const auto blended = host.DeclareBlendedStream(*graph, opaque, {}, tiles.GetLighting());
         std::array<RHIReadback, 3> readbacks;
-        const std::array handles{color, outputs.depth, outputs.bitmask};
+        const std::array handles{blended, outputs.depth, outputs.bitmask};
         const std::array formats{RHIFormat::RGBA16Float, RHIFormat::D32Float, RHIFormat::R32Uint};
         for (unsigned i = 0; i < 3; ++i)
         {
@@ -232,7 +205,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(device.EndFrame(error), "Mixed end " + error);
         if (!workers) completion = {device.GetLastSignaledFenceValue()};
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Mixed submission drain");
-        if (!graphDraws.empty()) Check(host.PublishSubmittedCache(context.frameId, completion, error, ticket), "Alpha publication " + error);
+        Check(host.PublishSubmittedCache(context.frameId, completion, error, ticket), "Alpha publication " + error);
         device.WaitForGpu();
         std::array<RHIReadbackImage, 3> mapped;
         for (unsigned i = 0; i < 3; ++i) Check(device.MapReadback(readbacks[i], mapped[i], error), "Mixed map");
@@ -266,7 +239,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     }
                     if (fixture == 11)
                         Check(std::abs(value - mixedReference[actual.size() - 1]) <= .001 + .002 * std::abs(value),
-                              "65-light tiled overflow equals whole-light reference for Code and Graph");
+                              "65-light tiled overflow equals the whole-light reference");
                 }
             }
         if (fixture < 4) solo[fixture] = actual;
@@ -278,13 +251,13 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(validationCount == 0, "Mixed GPU validation " + validation);
         ++frames;
     }
-    Check(host.ProgramStats().compileSubmissions == 0 && host.ProgramStats().publications == 18,
+    Check(host.ProgramStats().compileSubmissions == 0 && host.ProgramStats().publications == 20,
           "Cooked Graph Blend retains submitted generations without source compilation");
     host.ShutdownAfterIdle();
-    forward.Shutdown();
+    tiles.Shutdown();
     gbuffer.Shutdown();
     meshes.Shutdown();
     InternalPath::GetInstance()->AssetAuthoringEnabled = true;
     std::cout << "LX_MATERIAL_FORWARD_BLEND_OK frames=" << frames << " pixels=" << pixels
-              << " checks=" << checks << " graphCompiles=0 mixed=true parallel=true overflowLights=65 validation=0\n";
+              << " checks=" << checks << " graphCompiles=0 stream=true parallel=true overflowLights=65 validation=0\n";
 }

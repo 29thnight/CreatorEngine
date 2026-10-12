@@ -3,7 +3,7 @@ own::shared_owner<const Texture> DecalImage(std::array<float, 4> value)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), value.data(), sizeof(value));
-    return Texture::CreateSharedFromImage("LX.Decal.Image", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Decal.Image", std::move(image));
 }
 
 void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines, ProbeTextures& textures,
@@ -31,8 +31,8 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     SceneHost host;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Decal mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
     EnhancedDecalPass decal;
     EnhancedFrameContext context;
     context.resources = &device;
@@ -52,7 +52,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     light.color = {2, 1, .5f, 1};
     const std::vector<EnhancedLight> lights{light};
     context.lights = &lights;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) && decal.Initialize(context, error),
+    Check(decal.Initialize(context, error),
           "Actual Decal Scene passes " + error);
     for (const auto& generation : generations)
     {
@@ -108,8 +108,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     item.normal = fixture == 4 ? (normal ? &*normal.borrow() : nullptr) : nullptr;
                     decal.SetDecals(fixture >= 1 && fixture <= 6 ? std::vector{item}
                                                                  : std::vector<EnhancedDecalPass::Item>{});
-                    Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
-                              decal.PrepareFrame(context, error),
+                    Check(decal.PrepareFrame(context, error),
                           "Decal preparation " + error);
                     const bool versioned = policy != 0;
                     const auto readAccess = versioned ? RGAccessMode::Read : RGAccessMode::LegacyState;
@@ -122,11 +121,13 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                         pool.BeginFrame(static_cast<unsigned>(context.frameId));
                         Check(graph->PrepareParallel(pool, error), "Decal prefix " + error);
                     }
-                    Check(gbuffer.PrepareGpuVisibility(context, error) && decal.PrepareGpuVisibility(context, error),
+                    Check(decal.PrepareGpuVisibility(context, error),
                           "Decal GPU visibility preparation " + error);
                     Check(host.Prepare(context, input, environment, {}, {}, {}, {}, error, 1),
                           "Decal host prepare " + error);
                     gbuffer.Declare(*graph, context);
+                    host.DeclareGeometry(*graph);
+                    host.DeclareCulling(*graph);
                     auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
                     auto decalInputs = outputs;
                     if (fixture == 6)
@@ -200,10 +201,10 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                                        execution.encoder->BindRenderTargets(targets);
                                        execution.encoder->ClearRenderTargets(targets, clear);
                                    });
-                    deferred.SetInputs(outputs);
-                    deferred.SetAmbientOcclusion(ambient);
-                    deferred.Declare(*graph, context);
-                    const auto color = host.DeclareColor(*graph, outputs, deferred.GetOutput(), ambient, {});
+
+
+                    lighting = SceneHost::DeclareHdrTarget(*graph, context);
+                    const auto color = lighting = host.DeclareColor(*graph, outputs, lighting, ambient, {});
                     std::array<RHIReadback, 9> readbacks;
                     const auto copyTexture = [&](unsigned index, RGHandle texture, RHIFormat format) {
                         Check(device.CreateReadback(16, 16, format, 1, readbacks[index], error),
@@ -364,9 +365,9 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                             }
                             if ((fixture == 2 || fixture == 3) && inside)
                             {
-                                Near(actual[2].At(x, y, 0), .28, "LX Decal occlusion", 8e-4);
+                                Near(actual[2].At(x, y, 0), .28, "METEOR Decal occlusion", 8e-4);
                                 Near(actual[2].At(x, y, 1), .18, "Existing Decal ORM channel 1", 8e-4);
-                                Near(actual[2].At(x, y, 2), .77, "LX Decal metallic", 8e-4);
+                                Near(actual[2].At(x, y, 2), .77, "METEOR Decal metallic", 8e-4);
                             }
                             for (unsigned c = 0; c < 3; ++c)
                             {
@@ -392,7 +393,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     }
     host.ShutdownAfterIdle();
     decal.Shutdown();
-    deferred.Shutdown();
+
     gbuffer.Shutdown();
     meshes.Shutdown();
     std::cout << "LX_MATERIAL_SCENE_DECAL_OK frames=" << frames << " altered=" << alteredPixels

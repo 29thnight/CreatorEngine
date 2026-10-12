@@ -1,5 +1,4 @@
-// Source-only TR0 fixture. Not built or executed in this change.
-// Link TemporalRuntimeControl.cpp when the user authorizes native validation.
+// Standalone TR0 provenance, display association and scoped exclusion regression.
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalMeasurementProvenance.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
 #include <cassert>
@@ -15,6 +14,14 @@ int main()
     assert(frame.IsValid() && !frame.IsGoldenEligible());
     frame.nativeGateActive = true;
     assert(frame.IsGoldenEligible());
+    frame.publicationFrameId = 29;
+    assert(frame.MatchesRealDisplay(4, 29, 1920, 1080));
+    assert(!frame.MatchesRealDisplay(4, 30, 1920, 1080));
+    assert(!frame.MatchesRealDisplay(5, 29, 1920, 1080));
+    assert(!frame.MatchesRealDisplay(4, 29, 1280, 720));
+    auto missingScene = frame;
+    missingScene.sceneEpoch = 0;
+    assert(!missingScene.MatchesRealDisplay(4, 29, 1920, 1080));
     auto mutation = frame;
     mutation.renderExtent.width = 0;
     assert(!mutation.IsValid() && !mutation.IsGoldenEligible());
@@ -24,11 +31,13 @@ int main()
     mutation.frameKind = TemporalMeasuredFrameKind::Generated;
     mutation.frameGenerator = TemporalProvider::Fsr;
     assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    assert(!mutation.MatchesRealDisplay(4, 29, 1920, 1080));
     mutation = frame;
     mutation.upscaler = TemporalProvider::Dlss;
     mutation.resolutionState = TemporalResolutionState::Reconstructed;
     mutation.renderExtent = {1280, 720};
     assert(mutation.IsValid() && !mutation.IsGoldenEligible());
+    assert(mutation.MatchesRealDisplay(4, 29, 1920, 1080));
     mutation = frame;
     mutation.spatialMode = SpatialScalingMode::NisScale;
     mutation.resolutionState = TemporalResolutionState::SpatialScaled;

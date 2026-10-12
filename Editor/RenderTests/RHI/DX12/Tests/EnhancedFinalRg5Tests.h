@@ -124,6 +124,16 @@ namespace
             std::array<std::vector<float>, fixtures> references;
             std::array<uint32_t, 7> contributions{};
             std::vector<float> historyPixels;
+            // Product graphs reuse transients through a pool. Recreating and
+            // destroying them every frame is not a renderer path under test.
+            RGTransientPool transientPool;
+            Cleanup transientRelease{[&] {
+                resources.WaitForGpu();
+                for (auto& [key, entries] : transientPool.freeList)
+                    for (const auto& entry : entries) resources.ReleaseTexture(entry.handle);
+                transientPool.freeList.clear();
+                transientPool.ClearAliasingCache();
+            }};
             for (uint32_t policy = 0; policy < 3; ++policy)
             {
                 for (uint32_t fixture = 0; fixture < fixtures; ++fixture)
@@ -175,6 +185,7 @@ namespace
                     EnhancedRenderGraph graph(resources,
                         policy == 0 ? RGSchedulingMode::DeclarationOrder : RGSchedulingMode::ExplicitVersioned,
                         policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
+                    graph.SetTransientPool(&transientPool);
                     const auto read = policy == 0 ? RGAccessMode::LegacyState : RGAccessMode::Read;
                     const auto write = policy == 0 ? RGAccessMode::LegacyState : RGAccessMode::Write;
                     const auto clear = [&](const char* name, RHIFormat format, std::array<float, 4> value, uint32_t layers = 1) {
@@ -372,8 +383,40 @@ namespace
                             require(pixels[1] != historyPixels, "Fog reset retained prior light");
                         }
                     }
+                    // Drain first: argument evaluation order would otherwise build
+                    // the message before the drain fills it.
                     std::string messages;
-                    require(resources.DrainDebugMessages(messages) == 0, "Final GPU validation: " + messages);
+                    const uint32_t problems = resources.DrainDebugMessages(messages);
+                    if (problems != 0)
+                    {
+                        // Diagnosis: the planned lifetime, aliasing and barriers of
+                        // every PostChain resource in this exact compiled graph.
+                        std::string plan;
+                        for (uint32_t r = 0; r < snapshot.resources.size(); ++r)
+                        {
+                            const auto& res = snapshot.resources[r];
+                            if (res.name.rfind("PostChain.", 0) != 0 || !res.used) continue;
+                            plan += " [" + res.name + " r" + std::to_string(r) + " use=" + std::to_string(res.firstUse) +
+                                ".." + std::to_string(res.lastUse) + " alias=" +
+                                (res.aliasGroup == UINT32_MAX ? std::string("-") : std::to_string(res.aliasGroup)) +
+                                " init=" + std::to_string(int(res.initialState)) + "]";
+                        }
+                        for (uint32_t order = 0; order < snapshot.executeOrder.size(); ++order)
+                        {
+                            const auto& pass = snapshot.passes[snapshot.executeOrder[order]];
+                            std::string barriers;
+                            for (const auto& b : pass.barriers)
+                            {
+                                if (snapshot.resources[b.resource].name.rfind("PostChain.", 0) != 0) continue;
+                                barriers += " r" + std::to_string(b.resource) + (b.aliasing ? ":alias" : b.uav ? ":uav" :
+                                    ":" + std::to_string(int(b.before)) + ">" + std::to_string(int(b.after))) +
+                                    (b.afterPass ? "@after" : "");
+                            }
+                            if (!barriers.empty()) plan += " {" + std::to_string(order) + " " + pass.name + barriers + "}";
+                        }
+                        require(false, "Final GPU validation policy=" + std::to_string(policy) +
+                            " fixture=" + std::to_string(fixture) + ": " + messages + " PLAN" + plan);
+                    }
                 }
             }
             for (const auto count : contributions)

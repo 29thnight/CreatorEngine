@@ -164,7 +164,7 @@ void editor::SceneViewportOverlay::Draw(
     };
     const auto showMenu = [&] {
         ImGui::MenuItem("Orientation gizmo", nullptr, &showViewGizmo);
-        ImGui::MenuItem("FPS", nullptr, &showFps);
+        ImGui::MenuItem("View update rate", nullptr, &showFps);
         ImGui::MenuItem("SkyBox", nullptr, &showSkyBox);
         if (ImGui::MenuItem("Grid settings")) open_window(EditorWindowName::kGridSettings);
         ImGui::MenuItem("Render Statistics", nullptr, &showStatistics);
@@ -338,11 +338,21 @@ void editor::SceneViewportOverlay::Draw(
             refresh = ImGui::GetTime();
         }
         const auto& scene = displayed.frame;
-        char label[224]{};
-        char gpu[40] = "GPU unavailable";
-        if (costs.lastGpuViewId == kEnhancedEditorViewId && costs.lastGpuSubmissionId && !costs.passTimings.empty())
-            std::snprintf(gpu, sizeof(gpu), "GPU %.2f ms", costs.gpuMs);
-        std::snprintf(label, sizeof(label), "%u x %u   %.1f FPS\nEnhanced / %s   %s\n%s",
+        char label[384]{};
+        char gpu[224] = "GPU pass sum unavailable";
+        const auto& proof = costs.gpuTemporalProvenance;
+        if (scene.ready && costs.lastGpuViewId == kEnhancedEditorViewId &&
+            costs.lastGpuFrameId != 0 && costs.lastGpuFrameId <= scene.completedFrameId && costs.lastGpuSubmissionId &&
+            !costs.passTimings.empty() && proof.MatchesRealDisplay(kEnhancedEditorViewId,
+                costs.lastGpuFrameId, scene.completedWidth, scene.completedHeight))
+            // The bounded UI cache may precede the visible image. Its source
+            // publication and age remain explicit rather than claiming a new measurement.
+            std::snprintf(gpu, sizeof(gpu), "GPU sample pass sum %.2f ms / real #%llu\nRender %u x %u / display %u x %u\nSample age %llu publications",
+                costs.gpuMs, static_cast<unsigned long long>(proof.realFrameId),
+                proof.renderExtent.width, proof.renderExtent.height,
+                proof.displayExtent.width, proof.displayExtent.height,
+                static_cast<unsigned long long>(scene.completedFrameId - costs.lastGpuFrameId));
+        std::snprintf(label, sizeof(label), "%u x %u   View updates %.1f/s\nEnhanced / %s   %s\n%s",
             scene.completedWidth, scene.completedHeight, sceneFps, displayed.backend == EnhancedLiveBackend::Vulkan ? "Vulkan" : "DX12",
             scene.ready ? "ready" : "preparing", gpu);
         const ImVec2 textSize = ImGui::CalcTextSize(label);
@@ -357,8 +367,8 @@ void editor::SceneViewportOverlay::Draw(
     }
     if (showFps && !showStatistics && canvas.valid)
     {
-        char label[32]{};
-        std::snprintf(label, sizeof(label), "Scene %.1f FPS", sceneFps);
+        char label[48]{};
+        std::snprintf(label, sizeof(label), "Scene updates %.1f/s", sceneFps);
         const ImVec2 size = ImGui::CalcTextSize(label);
         const float pad = ThemePixels(7.f);
         const ImVec2 max{imageMax.x - pad, imageMax.y - pad};

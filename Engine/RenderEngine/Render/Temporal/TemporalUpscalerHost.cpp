@@ -15,16 +15,21 @@ namespace
     TemporalResult DrainTemporalRenderer(IRHIDeviceResources* resources)
     {
         std::string error;
+        // SDK contexts use this renderer owner's submitted work. Wait for its
+        // GPU retirements, not just CPU submission, before destroying a context.
+        // PipelineRebuild deliberately does not permit a global lifecycle drain.
+        const auto retire = [&](const void* owner) {
+            auto& submission = GetRHISubmissionThread();
+            if (!submission.Drain(owner, error)) return false;
+            const auto state = submission.GetOwnerStats(owner);
+            return state.registered && !state.faulted && !state.submissionBlocked && state.IsIdle();
+        };
         bool drained = false;
         if (auto* dx = dynamic_cast<DX12DeviceResources*>(resources))
-            drained = dx->DrainForLifecycle(RHILifecycleCommand::PipelineRebuild, error) &&
-                dx->GetLastLifecycleResult().command != RHILifecycleCommand::UnrecoverableDeviceError &&
-                dx->GetLastLifecycleResult().IsClean() && dx->GetDevice() &&
+            drained = retire(dx) && dx->GetDevice() &&
                 SUCCEEDED(dx->GetDevice()->GetDeviceRemovedReason());
         else if (auto* vk = dynamic_cast<VulkanDeviceResources*>(resources))
-            drained = vk->DrainForLifecycle(RHILifecycleCommand::PipelineRebuild, error) &&
-                vk->GetLastLifecycleResult().command != RHILifecycleCommand::UnrecoverableDeviceError &&
-                vk->GetLastLifecycleResult().IsClean();
+            drained = retire(vk);
         return { drained ? TemporalStatus::Success : TemporalStatus::SdkFailure };
     }
 #if CREATOR_ENABLE_FSR_SDK

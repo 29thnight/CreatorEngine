@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "LXMaterialPipeline.h"
 #include "GpuGeometryOcclusion.h"
@@ -9,6 +9,7 @@
 #include <mathematics/vector4.hpp>
 
 #include <cstdint>
+#include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -17,12 +18,14 @@
 #include <vector>
 
 struct EnhancedFrameContext;
+namespace material_graph { class MeshSurfaceBatch; }
 
 // A recording owns its candidates, compacted IDs and indirect arguments. Buffers
 // are never overwritten by another view/frame or released while submitted work
 // can still read them. Call ShutdownAfterIdle before destroying the device.
 class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 {
+    struct BufferPool;
   public:
     static constexpr std::uint32_t kConservative = 1;
     static constexpr std::uint32_t kNoOcclusion = 2;
@@ -74,11 +77,13 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         Frame& operator=(const Frame&) = delete;
 
         void Declare(EnhancedRenderGraph& graph) const;
+        static void DeclareMeshletBatch(EnhancedRenderGraph& graph,
+            std::span<const std::shared_ptr<const Frame>> frames);
         // Optional second geometry stage: depth must be an earlier RG2 version
         // from this exact view/recording, standard-Z (clear 1, Less/LessEqual).
         // It must not be the version written by this frame's geometry consumer.
         // Tested draws must use these bounds/projection without custom pixel
-        // depth or depth bias. The LX GBuffer caller supplies this contract.
+        // depth or depth bias. The METEOR GBuffer caller supplies this contract.
         // No history is kept or reprojected. Call before AddReadUsages/Declare.
         void DeclareWithOcclusion(EnhancedRenderGraph& graph, RGHandle occluderDepth) const;
         void DeclareWithOcclusion(EnhancedRenderGraph& graph,
@@ -87,6 +92,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
                            std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
         RHIBufferSlice VisibleIds(std::uint32_t outputOffset, std::uint32_t count) const;
         RHIBufferHandle Arguments() const { return m_arguments; }
+        const std::shared_ptr<const material_graph::MeshSurfaceBatch>& MeshletGeometry(std::uint32_t bin) const { return m_meshletGeometries.at(bin); }
+        std::uint32_t MeshletOutputOffset(std::uint32_t bin) const { return m_meshletOffsets.at(bin); }
         PreparedStats GetPreparedStats() const { return m_preparedStats; }
         std::uint64_t ArgsOffset(std::uint32_t bin) const;
 
@@ -96,12 +103,18 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
         void Dispatch(RHIEncoder& encoder, bool reset, RHIBindingTable depth = {}) const;
 
+        std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
+        std::vector<std::uint32_t> m_meshletOffsets;
+        std::vector<RHIBufferSlice> m_meshletConstants;
         PreparedStats m_preparedStats{};
         IRenderDeviceServices* m_device{};
         std::uint64_t m_recording{}, m_descriptors{};
         std::uint32_t m_candidateCount{}, m_binCount{}, m_outputCount{};
         std::uint32_t m_width{}, m_height{}, m_occlusionLevelCount{};
         RHIBufferHandle m_visibleIds, m_arguments;
+        std::shared_ptr<BufferPool> m_bufferPool;
+        std::uint64_t m_visibleBytes{}, m_argumentBytes{};
+        mutable std::atomic<bool> m_poolReusable{true};
         RHIBufferSlice m_candidates, m_bins, m_constants;
         RHIBindingTable m_outputs;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_reset, m_cull;
@@ -123,7 +136,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     // The matrix uses the engine's row-vector convention and zero-to-one clip Z.
     // All candidates of a bin share its aligned outputOffset. Bin output ranges
     // must not overlap; sourceIndex is an opaque caller-owned ID (an instance
-    // index or an LX owner ID). Empty inputs and unsupported devices return
+    // index or a METEOR owner ID). Empty inputs and unsupported devices return
     // success with a null result; unsupported devices use direct fallback.
     // currentFrameOcclusion prepares the optional standard-Z second stage;
     // Declare alone still uses frustum-only visibility on compatibility graphs.
@@ -135,17 +148,14 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
                  std::span<const Candidate> candidates, std::span<const Bin> bins,
                  std::shared_ptr<const Frame>& result, std::string& error,
                  bool currentFrameOcclusion = false);
-    // Independent native shadow selection. The receiver cylinder extends toward
-    // the light without a near cap, matching EnhancedShadowPass::CastsInto.
-    // lightDirection.xyz is normalized; w is reserved. No camera/HZB rejection
-    // is enabled here. Unknown bounds/skin contracts use kConservative.
-    bool PrepareShadow(const EnhancedFrameContext& context, const math::vector4& receiverSphere,
-                       const math::vector4& lightDirection, std::span<const Candidate> candidates,
-                       std::span<const Bin> bins, std::shared_ptr<const Frame>& result, std::string& error);
-
     // Optional-pipeline preflight before choosing any prepass/main geometry route.
     // False may disable the whole view's HZB without allocating candidate buffers.
     bool PrepareOcclusionPipelines(const EnhancedFrameContext& context, std::string& error);
+
+    // Posed world-space vertices, exact light projection, no camera/HZB rejection.
+    bool PrepareMeshlets(const EnhancedFrameContext& context, const math::matrix4x4& projection,
+        std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
+        std::shared_ptr<const Frame>& result, std::string& error);
 
     // Direct draws use the same vertex-ID indirection with an identity mapping.
     static RHIBufferSlice UploadIdentity(const EnhancedFrameContext& context, std::uint32_t count,
@@ -160,16 +170,14 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         bool submitted{}, quarantined{};
     };
 
-    struct ShadowCullVolume
-    {
-        math::vector4 receiverSphere{}, lightDirection{};
-    };
     bool PrepareInternal(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                          std::span<const Candidate> candidates, std::span<const Bin> bins,
                          std::shared_ptr<const Frame>& result, std::string& error,
-                         bool currentFrameOcclusion, const ShadowCullVolume* shadow);
+                         bool currentFrameOcclusion,
+                         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries = {});
 
     bool Initialize(const EnhancedFrameContext& context, std::string& error);
+    bool InitializeMeshlets(const EnhancedFrameContext& context, std::string& error);
     bool InitializeOcclusion(const EnhancedFrameContext& context, std::string& error);
     void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;
     void OnUploadCompleted(std::uint64_t completed) override;
@@ -177,7 +185,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     void OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion) override;
 
     IRenderDeviceServices* m_device{};
-    LX::Runtime::ComputePipeline m_reset, m_cull;
+    std::shared_ptr<BufferPool> m_bufferPool;
+    LX::Runtime::ComputePipeline m_reset, m_cull, m_meshletReset, m_meshletCull;
     LX::Runtime::ComputePipeline m_occlusionCull;
     GpuGeometryOcclusion m_depthPyramid;
     std::mutex m_recordingMutex;

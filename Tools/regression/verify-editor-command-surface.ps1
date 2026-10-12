@@ -65,9 +65,9 @@ if (-not $SkipCommandlets) {
             $results = @(Get-Content -LiteralPath $resultPath | ForEach-Object { $_ | ConvertFrom-Json })
             Assert ($results.Count -eq 1) 'Commandlet must emit exactly one terminal result'
             if ($case.Name -eq 'list' -and $case.Exit -eq 0) {
-                Assert ($results[0].data.names -contains 'experiment.cooked' -and $results[0].data.names -contains 'dx12.gbuffer' -and $results[0].data.names -contains 'dx12.selftest') 'Commandlet discovery is missing a domain'
+                Assert ($results[0].data.names -contains 'experiment.cooked' -and $results[0].data.names -contains 'dx12.skinning' -and $results[0].data.names -contains 'dx12.selftest') 'Commandlet discovery is missing a domain'
                 Assert (-not ($results[0].data.names -contains 'object.rename')) 'Product editing leaked into Commandlet discovery'
-                foreach ($name in @('model.async', 'render.pbr.capture', 'render.pbr.parity', 'render.pbr.coverage', 'render.pbr.occlusion', 'render.pbr.emission', 'render.pbr.transform', 'render.pbr.uv', 'render.pbr.mip')) {
+                foreach ($name in @('model.async', 'render.pbr.capture', 'dx12.skinning', 'dx12.rendergraph')) {
                     Assert ($results[0].data.names -contains $name) "Integrated Commandlet missing: $name"
                 }
             }
@@ -95,7 +95,7 @@ if (-not $SkipCommandlets) {
     # 이름은 한 곳에서만 적는다. 아래 단정이 이 목록에서 개수를 유도하므로,
     # Commandlet 이 은퇴해 이름이 빠져도 단정이 저절로 따라온다 — 수를 손으로
     # 박아 두었던 탓에 0ec60573(68개 은퇴)이 이름 하나를 빼고 간 뒤로 붉었다.
-    $commandletNames = @('model.async status', 'render.pbr.parity', 'render.pbr.capture')
+    $commandletNames = @('model.async status', 'dx12.skinning', 'render.pbr.capture')
     @($commandletNames + 'quit') | Set-Content -LiteralPath $ordinary -Encoding utf8
     if (Test-Path -LiteralPath $ordinaryResults) { Remove-Item -LiteralPath $ordinaryResults }
     $proc = Start-GateEditor @('--script', ('"'+$ordinary+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$ordinaryResults+'"')) 'ordinary-batch'

@@ -7,8 +7,8 @@ param(
     [ValidateRange(5,600)][int]$TimeoutSeconds = 180
 )
 
-# Authored, unexecuted. Attach to a separately authorized running development
-# Player. This records engine provenance/observations, not physical latency.
+# Attach to a running development Player. This records engine
+# provenance/observations, not physical latency.
 # Run the external instrument separately; retain its untouched raw export.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -56,10 +56,10 @@ function Wait-EvidenceRecording([string]$State) {
     $limit = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
         $data = Invoke-EvidenceCommand 'profile.save' @('status')
-        if ($data.recording.state -eq 'failed') { throw 'Profile writer failed' }
+        if ($data.writer.state -eq 'failed') { throw 'Profile writer failed' }
         if ([DateTime]::UtcNow -ge $limit) { throw "Profile writer did not reach $State" }
-        if ($data.recording.state -ne $State) { Start-Sleep -Milliseconds 50 }
-    } until ($data.recording.state -eq $State)
+        if ($data.writer.state -ne $State) { Start-Sleep -Milliseconds 50 }
+    } until ($data.writer.state -eq $State)
     return $data
 }
 

@@ -27,7 +27,10 @@ foreach ($configuration in @('Debug', 'Release')) {
     $previousValidation = $env:CREATOR_DX12_VALIDATION
     try {
         $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed\x64-windows\debug\bin' } else { 'vcpkg_installed\x64-windows\bin' }
-        $env:PATH = (Join-Path $repo $dependencyRoot) + ';' + $previousPath
+        # The deployed runtime layout is also used by PR/worktree builds that
+        # share the dependency cache instead of retaining local vcpkg binaries.
+        $env:PATH = (Join-Path $repo "Bin\x64-$configuration\Runtime\Common") + ';' +
+            (Join-Path $repo $dependencyRoot) + ';' + $previousPath
         $env:CREATOR_DX12_VALIDATION = 'gpu'
         $result = @(& $exe $repo 2>&1)
         $resultExit = $LASTEXITCODE

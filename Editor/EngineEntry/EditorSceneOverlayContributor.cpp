@@ -26,6 +26,32 @@ namespace
         EnhancedWireFramePass wireframe;
         EnhancedGizmoIconPass gizmoIcon;
         EnhancedGizmoLinePass gizmoLine;
+        FrameCameraSnapshot displayCamera;
+        EnhancedFrameContext displayContext;
+
+        const EnhancedFrameContext& DisplayContext(const EnhancedFrameContext& input)
+        {
+            displayContext = input;
+            displayContext.width = input.displayWidth ? input.displayWidth : input.width;
+            displayContext.height = input.displayHeight ? input.displayHeight : input.height;
+            if (input.camera)
+            {
+                displayCamera = *input.camera;
+                // Reconstruction removes raster jitter. Authoring overlays must
+                // use the same stable projection as the reconstructed image.
+                if (input.temporalFrame.realFrameId && input.width && input.height)
+                {
+                    for (unsigned row = 0; row < 4; ++row)
+                    {
+                        displayCamera.projection.m[row][0] -= 2.f * input.temporalFrame.jitterX / float(input.width) * input.camera->projection.m[row][3];
+                        displayCamera.projection.m[row][1] += 2.f * input.temporalFrame.jitterY / float(input.height) * input.camera->projection.m[row][3];
+                    }
+                    displayCamera.inverseProjection = math::inverse(displayCamera.projection);
+                }
+                displayContext.camera = &displayCamera;
+            }
+            return displayContext;
+        }
     };
 }
 
@@ -56,6 +82,10 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
     {
         LivePassNode node;
         node.name = "Grid";
+        node.prepare = [bundle](const EnhancedFrameContext& ctx, std::string& err, uint32_t)
+        {
+            return bundle->grid.PrepareFrame(bundle->DisplayContext(ctx), err);
+        };
         node.instance = [bundle](uint32_t) -> EnhancedRenderPass*
         {
             return &bundle->grid;
@@ -93,7 +123,7 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
         node.prepare = [bundle](const EnhancedFrameContext& ctx,
             std::string& err, uint32_t) -> bool
         {
-            auto input = ctx;
+            auto input = bundle->DisplayContext(ctx);
             const auto* gizmoRenderer = GizmoRenderer::GetActive();
             if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay)
                 || !gizmoRenderer || !gizmoRenderer->IsWireFrameEnabled())
@@ -161,7 +191,7 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
             {
                 bundle->gizmoIcon.SetIcons(&gizmoScene->icons);
             }
-            return bundle->gizmoIcon.PrepareFrame(ctx, err);
+            return bundle->gizmoIcon.PrepareFrame(bundle->DisplayContext(ctx), err);
         };
         node.declare = [bundle](LiveBlackboard& bb, EnhancedRenderGraph& graph,
             const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
@@ -199,7 +229,7 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
             {
                 bundle->gizmoLine.SetVertices(gizmoScene->lineVertices);
             }
-            return bundle->gizmoLine.PrepareFrame(ctx, err);
+            return bundle->gizmoLine.PrepareFrame(bundle->DisplayContext(ctx), err);
         };
         node.declare = [bundle](LiveBlackboard& bb, EnhancedRenderGraph& graph,
             const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)

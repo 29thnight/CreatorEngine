@@ -191,9 +191,9 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     CheckWith(roots.Initialize(&device, error) && pipelines.Initialize(&device, L"", error) &&
               textures.Initialize(&device, error) && meshes.Initialize(&device, error), "Matched caches ", error);
     SceneHost host;
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
-    EnhancedForwardPass forward;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
+    EnhancedLightTilePass tiles;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -216,8 +216,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     context.draws = &empty;
     std::vector<EnhancedLight> lights;
     context.lights = &lights;
-    CheckWith(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) &&
-              forward.Initialize(context, error), "Matched Scene passes ", error);
+    CheckWith(tiles.Initialize(context, error), "Matched Scene passes ", error);
     std::filesystem::copy_file(fixture / "sphere.bin", output / "sphere.bin");
     auto geometry = ReadMatchedGeometry(output / "sphere.bin");
     const Environment environment{{{1,1,1},{1,1,1},{1,1,1},{1,1,1},{1,1,1},{1,1,1}}};
@@ -355,12 +354,8 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
                   "Matched pass GPU timers");
         }
         const auto prepareStart=std::chrono::steady_clock::now();
-        // The old frame-1 check required the host to reject a Blended draw
-        // ("Blended composition is not installed"). 8bfd0be5 installed the common
-        // Forward+ composition for Blended and transmission draws, so that premise
-        // no longer holds; those draws now go through the Forward+ pass below.
-        const bool prepared = gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
-                              forward.PrepareFrame(context, error) &&
+        // Blended and transmission draws go through the blended stream below.
+        const bool prepared = tiles.PrepareFrame(context, error) &&
                               host.PrepareResidency(context, input, error) &&
                               host.Prepare(context, input, environmentHandle, irradianceHandle, prefilteredHandle, {}, lookupBudget, error,
                                            hdr ? hdri.GetGeneration() : 1,
@@ -371,6 +366,8 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         auto graph = std::make_shared<EnhancedRenderGraph>(device);
         gbuffer.Declare(*graph, context);
         const auto outputs = gbuffer.GetOutputs();
+        host.DeclareGeometry(*graph);
+        host.DeclareCulling(*graph);
         host.DeclareGBuffer(*graph, outputs);
         RGTextureDesc aoDesc;
         aoDesc.width = aoDesc.height = 64;
@@ -387,21 +384,17 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
                            execution.encoder->BindRenderTargets(target);
                            execution.encoder->ClearRenderTargets(target, clear);
                        });
-        deferred.SetInputs(outputs);
-        deferred.SetAmbientOcclusion(ao);
-        deferred.Declare(*graph, context);
-        const auto lit = host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
-        // Same order as the product renderer: the Forward+ pass declares every
-        // Blended/transmission draw (glass) over the lit color, and the graph
-        // Volume when it has forward draws; the LX.Scene.Volume step then declares
-        // the Volume if Forward+ skipped (DeclareVolume runs once per frame).
-        // Declaring only the Volume left glass out of the Forward+ stream, and the
-        // cache publication rejected the incomplete stream.
-        forward.SetInputs({outputs.depth, lit});
-        forward.SetGraphMaterials(&host);
-        forward.Declare(*graph, context);
-        const auto forwardColor = forward.GetOutput().IsValid() ? forward.GetOutput() : lit;
-        const auto color = host.DeclareVolume(*graph, forwardColor, outputs.depth, {});
+
+
+        lighting = SceneHost::DeclareHdrTarget(*graph, context);
+        const auto lit = host.DeclareColor(*graph, outputs, lighting, ao, {});
+        // Same order as the product renderer: the medium composes once over the
+        // opaque scene, then the blended stream draws every Blended/transmission
+        // draw (glass). Publication rejects a stream that omits a blended draw.
+        const auto composed = host.DeclareVolume(*graph, lit, outputs.depth, {});
+        tiles.SetDepth(outputs.depth);
+        tiles.Declare(*graph, context);
+        const auto color = host.DeclareBlendedStream(*graph, composed, {}, tiles.GetLighting());
         RHIReadback readback;
         CheckWith(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback ", error);
         graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource}},
@@ -506,7 +499,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     }
     host.ShutdownAfterIdle();
     hdri.Shutdown();
-    gbuffer.Shutdown(); deferred.Shutdown(); forward.Shutdown(); meshes.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown();
+    gbuffer.Shutdown();  tiles.Shutdown(); meshes.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown();
     device.Shutdown();
     std::filesystem::copy_file(fixture / "manifest.json",output / "reference-manifest.json");
     std::cout << "MAT9_MATCHED_IMAGES_OK cases=" << cases.size() << " validation=0 checks=" << checks << '\n';

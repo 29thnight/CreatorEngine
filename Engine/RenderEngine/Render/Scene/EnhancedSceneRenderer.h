@@ -86,7 +86,8 @@ struct EnhancedTemporalFixtureStamp
     uint64_t predecessorStepId{};
     std::string inputSha256;
     std::string predecessorInputSha256;
-    bool allowMeshlets{ true }; // Fixture route choice, sealed with the pose.
+    bool sdkQuality{ false }; // Explicit perspective SDK diagnostic; never native golden.
+    uint32_t sdkWarmupSubmissions{}; // Bounded RT submissions, independent of GT polling.
 
     bool IsValid() const
     {
@@ -126,7 +127,34 @@ struct EnhancedTemporalFixtureSubmission
     bool coalesced{};
     bool sourceVerified{}; // Exact tagged pose submitted; independent of its incoming pair.
     bool valid{};
+    uint32_t baselineSubmissions{};
 };
+
+inline bool IsSdkQualityFixtureProvenance(const TemporalMeasurementProvenance& p)
+{
+    return p.IsValid() && !p.nativeGateActive && p.frameKind == TemporalMeasuredFrameKind::Real &&
+        (p.upscaler == TemporalProvider::Fsr || p.upscaler == TemporalProvider::Dlss ||
+            p.upscaler == TemporalProvider::XeSS) &&
+        p.frameGenerator == TemporalProvider::None && p.spatialMode == SpatialScalingMode::Off &&
+        !p.deepDvcApplied && p.resolutionState == TemporalResolutionState::Reconstructed;
+}
+
+// Readback may hold a diagnostic pose over many GT ticks. Once submitted,
+// measured steps must not advance temporal history again; queued older poses
+// must not replace the exact predecessor of the next measured step. Baselines
+// can repeat to establish non-reset history. Ordinary untagged views are free.
+inline bool ShouldSkipTemporalFixtureStep(const EnhancedTemporalFixtureSubmission& previous,
+    const EnhancedTemporalFixtureStamp& incoming, const EnhancedLiveViewKey& key, uint64_t sceneEpoch)
+{
+    return incoming.IsValid() && previous.sourceVerified &&
+        previous.stamp.sessionId == incoming.sessionId &&
+        previous.viewId == key.viewId && previous.historyRevision == key.historyRevision &&
+        previous.sceneEpoch == sceneEpoch &&
+        (previous.stamp.stepId > incoming.stepId ||
+            (previous.stamp.stepId == incoming.stepId && (incoming.predecessorStepId != 0 ||
+                (incoming.sdkQuality && incoming.sdkWarmupSubmissions != 0 &&
+                    previous.baselineSubmissions >= incoming.sdkWarmupSubmissions))));
+}
 
 inline bool operator==(const EnhancedLiveViewKey& left,
     const EnhancedLiveViewKey& right)
@@ -797,6 +825,13 @@ struct EnhancedLiveDebugSnapshot
     std::array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> shadow{};
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
+    // Last successful native graph recording, retained with its own submission.
+    // This is independent of the asynchronously completed GPU timing window.
+    double nativeRecordMs{ 0.0 };
+    uint64_t nativeRecordSamples{ 0 };
+    uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
+    bool nativeRecordBalanced{false};
+    TemporalMeasurementProvenance nativeRecordProvenance;
 
     /// GPU 수집 장부. mismatches 가 0 이 아니면 Collect(token)이 그 제출의
     /// 표를 확인하지 못해 수치를 거절한 횟수다.
@@ -877,6 +912,7 @@ enum class EnhancedPbrCaptureState : uint8_t { None, Pending, Recording, Complet
 struct EnhancedLivePbrCaptureStatus
 {
     EnhancedPbrCaptureState state{ EnhancedPbrCaptureState::None };
+    bool historyObservationReady{false}; // RT crossed the request's publication boundary.
     uint64_t frameId{};
     std::string directory;
     std::string error;
@@ -892,7 +928,8 @@ namespace EnhancedSceneRenderer
         const std::string& cameraReplayPath = {}, const std::string& drawReplayPath = {},
         const std::string& latticeReplayPath = {}, bool replayExtensions = false,
         bool latticeReplayExtension = false, bool motionValidation = false,
-        const EnhancedTemporalFixtureStamp& expectedFixture = {}, bool* busy = nullptr);
+        const EnhancedTemporalFixtureStamp& expectedFixture = {}, bool* busy = nullptr, uint32_t historyOrdinal = 0, bool historyFixedSdkClock = false,
+        bool observeTemporal = false);
     EnhancedLivePbrCaptureStatus GetLivePbrCaptureStatus();
     void CancelLivePbrCapture(const EnhancedTemporalFixtureStamp& expectedFixture = {});
     // GT fixture polling must not wait behind RT capture readback/file output.
@@ -914,6 +951,7 @@ namespace EnhancedSceneRenderer
     void ClearTemporalFixtureSession(uint64_t sessionId);
     EnhancedTemporalFixtureSubmission GetTemporalFixtureSubmission(
         EnhancedLiveDisplayTarget target);
+    std::vector<EnhancedTemporalFixtureSubmission> GetTemporalFixtureWarmup(EnhancedLiveDisplayTarget target);
 
     // ── 메인 런타임 렌더러 (PHASE 3-9 승격) ──
     //
@@ -1120,12 +1158,9 @@ namespace EnhancedSceneRenderer
         uint64_t encoderDrops{ 0 };
         uint32_t lastDrawCount{ 0 };
         uint32_t lastBatchCount{ 0 };
-        uint32_t gbufferStamped{ 0 };
-        uint32_t gbufferUnstamped{ 0 };
-        uint32_t gbufferViolations{ 0 };
-        uint32_t forwardStamped{ 0 };
-        uint32_t forwardUnstamped{ 0 };
-        uint32_t forwardViolations{ 0 };
+
+
+
         uint32_t textureUploadFailures{ 0 };
         // W9 — 직전 GBuffer 밀봉이 본 모델 generation(재임포트 자극 여부).
         uint32_t modelGenerationPairs{ 0 };

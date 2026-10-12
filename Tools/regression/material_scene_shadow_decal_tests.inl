@@ -235,14 +235,12 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
     Check(errors == 0, "Shadow/Decal GPU validation " + messages);
 }
 
-#include "csm_legacy_batch_tests.inl"
 
 void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const own::shared_owner<const Texture>& image)
 {
     CheckCsmContracts(device);
-    RunCsmLegacyBatches(device, roots, pipelines, textures);
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
     experiment::AssetId id;
@@ -410,6 +408,8 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                                    execution.encoder->ClearDepthTarget(target, clear);
                                }
                            });
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             host.DeclareShadow(*graph, map);
             if (shadow.enabled)
             {

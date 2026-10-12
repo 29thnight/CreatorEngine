@@ -548,6 +548,8 @@ private:
 struct EnhancedFrameContext
 {
     uint32_t viewFlags{};
+    // Diagnostic captures retain intermediate attachments even when an effect is disabled.
+    bool temporalDiagnosticCapture{false};
     bool forwardLightingConsumer{true}; // Isolated cull/readback fixtures remain explicit consumers.
     own::shared_owner<const material_graph::SceneViewInput> graphSceneInput;
     IRenderDeviceServices*     resources{ nullptr };

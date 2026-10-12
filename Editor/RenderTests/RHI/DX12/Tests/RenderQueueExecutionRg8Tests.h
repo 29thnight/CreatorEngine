@@ -410,6 +410,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             finalTextureDesc.width = finalTextureDesc.height = 8;
             finalTextureDesc.allowRenderTarget = true;
             finalTextureDesc.format = RHIFormat::RGBA8Unorm;
+            finalTextureDesc.clearColor[0] = 0.25f;
+            finalTextureDesc.clearColor[1] = 0.5f;
+            finalTextureDesc.clearColor[2] = 0.75f;
+            finalTextureDesc.clearColor[3] = 1.0f;
             require(device.CreateBuffer(importedDesc, storage->prefixBuffer, error) &&
                 device.CreateTexture(finalTextureDesc, storage->texture, error), error);
             auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,

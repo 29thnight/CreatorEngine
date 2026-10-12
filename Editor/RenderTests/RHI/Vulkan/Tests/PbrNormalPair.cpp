@@ -16,7 +16,7 @@
 //   진작 끝나 있었고 Debug 빌드도 통과했다. 계획서 §1 이 "실제 Gunner/primitive
 //   런타임 장면 판정은 아직 하지 않음" 으로 남겨 둔 것이 정확히 이 검사다.
 //   격리 fixture 는 이 축을 못 재운다 — 스냅샷이 없는 경계에서는 draw.useNormalMap
-//   폴백이 쓰이기 때문이다(EnhancedGBufferPass.cpp:439). 제품 경로의 정본이
+//   폴백이 쓰이기 때문이다(SceneSurfaceTargets.cpp:439). 제품 경로의 정본이
 //   스냅샷이라는 것은 **스냅샷이 있는 프레임**에서만 확인된다.
 //
 // ★ 왜 픽셀이 아니라 manifest 를 읽나 ─ 캡처는 attachment 를 통째로 남기지

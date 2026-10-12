@@ -38,7 +38,7 @@ if ($LASTEXITCODE -ne 0) {
 $result = @(& $exe $repo 2>&1)
 $result | Set-Content -LiteralPath (Join-Path $output 'compile.log') -Encoding utf8
 if ($LASTEXITCODE -ne 0 -or
-    @($result | Where-Object { $_ -eq 'MATERIAL_ABI_COMPILE_OK compiled=70 rejected=58' }).Count -ne 1) {
+    @($result | Where-Object { $_ -eq 'MATERIAL_ABI_COMPILE_OK compiled=50 rejected=18' }).Count -ne 1) {
     throw "Material ABI compile gate failed: $($result -join "`n")"
 }
 $result

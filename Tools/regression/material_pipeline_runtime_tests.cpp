@@ -2,7 +2,7 @@
 #include "material_owner_checks.h"
 #include "MaterialGraphProduct.h"
 #include "MaterialGraphShaderMeta.h"
-#include "Render/Passes/Geometry/EnhancedGBufferPass.h"
+#include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Passes/Geometry/EnhancedForwardPass.h"
 
 #include <algorithm>
@@ -144,7 +144,7 @@ void RunMaterialPipelineRuntimeTests(const std::filesystem::path& repository)
         EnhancedFrameContext context;
         context.psoManager = &cache;
         context.rootSignatures = &roots;
-        EnhancedGBufferPass gbuffer;
+        SceneSurfaceTargets gbuffer;
         EnhancedForwardPass forward;
         const ShaderMetaHandle ghandle{777, 1}, fhandle{888, 1};
         check(gbuffer.ApplyShaderMeta(context, ghandle, gbufferMeta, {}, error), "Actual GBuffer LX compile: " + error);

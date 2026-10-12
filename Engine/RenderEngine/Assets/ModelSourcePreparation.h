@@ -7,7 +7,7 @@ namespace assets
 {
     struct ModelGeometryImportSettings final
     {
-        bool buildMeshlets{};
+        bool buildMeshlets{true}; // Mandatory LX cooking policy, not a route switch.
         std::uint32_t lodLevels{};
         bool createMeshCollider{};
     };

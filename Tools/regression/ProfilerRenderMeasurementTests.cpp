@@ -1,6 +1,6 @@
-// Source-only fixtures. Authored, NOT built or executed in this change.
-// Link the standalone EngineDiagnostics profiler sources when execution is authorized.
+// Standalone EngineDiagnostics codec, ownership and recording regressions.
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
+#include "../../Engine/EngineDiagnostics/ProfileService.h"
 
 #include <array>
 #include <cassert>
@@ -495,6 +495,39 @@ namespace profiler_render_measurement_tests
 
 int main()
 {
+    // A Record request can name an older frame than the first collected
+    // boundary. Unadmitted presenter observations must not become orphan loss.
+    {
+        ce::profiler_service service;
+        service.initialize();
+        service.record(20);
+        service.wait_until_idle();
+        const auto generation = service.capture_generation();
+        auto before = profiler_render_measurement_tests::presenter(20, 1).presenter;
+        before.observed_tick = ce::profiler_service::now();
+        service.publish_presenter_return(before, generation);
+        service.publish_frame(25);
+        service.wait_until_idle();
+        auto after = profiler_render_measurement_tests::presenter(26, 2).presenter;
+        after.observed_tick = ce::profiler_service::now();
+        service.publish_presenter_return(after, generation);
+        service.publish_frame(26);
+        service.wait_until_idle();
+        service.pause();
+        service.wait_until_idle();
+        const auto captured = service.capture();
+        assert(captured && captured->complete());
+        unsigned count = 0;
+        for (const auto& frame : captured->frames())
+            for (const auto& sample : frame.render_measurements)
+                if (sample.axis == ce::profile_render_axis::cpu_presenter_return)
+                {
+                    assert(frame.engine_frame == 26 && sample.presenter.sequence == 2);
+                    ++count;
+                }
+        assert(count == 1);
+        service.shutdown();
+    }
     profiler_render_measurement_tests::codec_and_legacy();
     profiler_render_measurement_tests::streaming_and_selected_windows();
     profiler_render_measurement_tests::producer_and_late_frame_ownership();

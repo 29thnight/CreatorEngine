@@ -977,6 +977,22 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         }
     }
 
+	bool ReimportModel(const file::path& requestedSource)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path source = file::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, file::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source)) return false;
+		const FileGuid existing = LoadGuidFromMeta(file::path(source.string() + ".meta"));
+		if (!assets::IsUuidV8(existing.m_guid) || CreateMetaLocked(source, {}, existing) != existing)
+			return false;
+		m_failedModelRecovery.erase(source);
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			RuntimeAssetType::Model, existing, source });
+		return true;
+	}
+
 	bool SetModelMeshletsAndReimport(const file::path& requestedSource, bool enabled)
 	{
 		std::lock_guard lock(m_authoringMutex);
@@ -3040,6 +3056,11 @@ bool EditorAssetDatabase::IsInitialized() const noexcept
 bool EditorAssetDatabase::RecoverModel(const file::path& source, FileGuid expectedId)
 {
 	return m_impl && m_impl->RecoverModel(source, expectedId);
+}
+
+bool EditorAssetDatabase::ReimportModel(const file::path& source)
+{
+    return m_impl && m_impl->ReimportModel(source);
 }
 
 EditorAssetDatabase::ModelRecoveryStats EditorAssetDatabase::GetModelRecoveryStats() const

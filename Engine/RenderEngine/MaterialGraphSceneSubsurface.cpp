@@ -144,7 +144,7 @@ namespace material_graph
         texture.height = context.height;
         texture.format = RHIFormat::RGBA32Float;
         texture.allowRenderTarget = true;
-        texture.debugName = L"LX.Scene.SubsurfaceInput";
+        texture.debugName = L"METEOR.Scene.SubsurfaceInput";
         for (auto& input : candidate->inputs_)
         {
             if (!device_->CreateTexture(texture, input, error))
@@ -155,13 +155,13 @@ namespace material_graph
         RHIBufferDesc buffer;
         buffer.bytes = count * sizeof(SceneSubsurfaceReflection);
         buffer.allowUnorderedAccess = true;
-        buffer.debugName = L"LX.Scene.SubsurfaceReflection";
+        buffer.debugName = L"METEOR.Scene.SubsurfaceReflection";
         if (!device_->CreateBuffer(buffer, candidate->reflection_, error))
         {
             return false;
         }
         buffer.bytes = count * 16;
-        buffer.debugName = L"LX.Scene.SubsurfaceIrradiance";
+        buffer.debugName = L"METEOR.Scene.SubsurfaceIrradiance";
         if (!device_->CreateBuffer(buffer, candidate->irradiance_, error))
         {
             return false;
@@ -225,10 +225,10 @@ namespace material_graph
         CheckCurrent(graph);
         for (unsigned i = 0; i < inputs_.size(); ++i)
         {
-            graphInputs_[i] = graph.ImportTexture(inputs_[i], RHIResourceState::Common, "LX.Scene.SubsurfaceInput");
+            graphInputs_[i] = graph.ImportTexture(inputs_[i], RHIResourceState::Common, "METEOR.Scene.SubsurfaceInput");
         }
-        graphReflection_ = graph.ImportBuffer(reflection_, RHIResourceState::Common, "LX.Scene.SubsurfaceReflection");
-        graphIrradiance_ = graph.ImportBuffer(irradiance_, RHIResourceState::Common, "LX.Scene.SubsurfaceIrradiance");
+        graphReflection_ = graph.ImportBuffer(reflection_, RHIResourceState::Common, "METEOR.Scene.SubsurfaceReflection");
+        graphIrradiance_ = graph.ImportBuffer(irradiance_, RHIResourceState::Common, "METEOR.Scene.SubsurfaceIrradiance");
         return graphInputs_;
     }
 
@@ -277,7 +277,7 @@ namespace material_graph
             uses.push_back({graph.FindImportedTexture(environment_), RHIResourceState::ShaderResource, readAccess});
         }
         graph.AddPass(
-            "LX.Scene.SubsurfaceReflection", uses, [owner, descriptions, owners](const auto& execution) mutable {
+            "METEOR.Scene.SubsurfaceReflection", uses, [owner, descriptions, owners](const auto& execution) mutable {
                 owner->CheckCurrent(*execution.graph);
                 descriptions[12] = RHIBindingDesc::Srv2D(execution.ResolveHandle(owners), RHIFormat::R32Uint);
                 const auto table = owner->device_->CreateBindings(descriptions);
@@ -317,7 +317,7 @@ namespace material_graph
         {
             uses.push_back({input, RHIResourceState::ShaderResource, readAccess});
         }
-        graph.AddPass("LX.Scene.SubsurfaceFilter", uses, [owner, owners](const auto& execution) {
+        graph.AddPass("METEOR.Scene.SubsurfaceFilter", uses, [owner, owners](const auto& execution) {
             owner->CheckCurrent(*execution.graph);
             std::array<RHIBindingDesc, 13> descriptions;
             for (unsigned i = 0; i < 7; ++i)

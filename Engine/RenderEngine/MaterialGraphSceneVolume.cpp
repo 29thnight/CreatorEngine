@@ -249,7 +249,7 @@ namespace material_graph
         RHIBufferDesc buffer;
         buffer.bytes = objects * sizeof(SceneVolumeCoefficient);
         buffer.allowUnorderedAccess = true;
-        buffer.debugName = L"LX.Scene.VolumeCoefficients";
+        buffer.debugName = L"METEOR.Scene.VolumeCoefficients";
         if (!device_->CreateBuffer(buffer, candidate->coefficients_, error))
         {
             return false;
@@ -337,7 +337,7 @@ namespace material_graph
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
         const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
-        graphCoefficients_ = graph.ImportBuffer(coefficients_, RHIResourceState::Common, "LX.Scene.VolumeCoefficients");
+        graphCoefficients_ = graph.ImportBuffer(coefficients_, RHIResourceState::Common, "METEOR.Scene.VolumeCoefficients");
         if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
         {
             graphCoefficients_ = graph.Write(graphCoefficients_);
@@ -361,7 +361,7 @@ namespace material_graph
                 }
             }
         }
-        graph.AddPass("LX.Scene.VolumeCoefficients", uses, [owner, draws](const auto& execution) {
+        graph.AddPass("METEOR.Scene.VolumeCoefficients", uses, [owner, draws](const auto& execution) {
             owner->CheckCurrent(*execution.graph);
             auto& encoder = *execution.encoder;
             for (const auto& draw : draws)
@@ -396,7 +396,7 @@ namespace material_graph
         desc.format = RHIFormat::RGBA16Float;
         desc.allowUnorderedAccess = true;
         desc.allowRenderTarget = true;
-        desc.name = "LX.Scene.VolumeColor";
+        desc.name = "METEOR.Scene.VolumeColor";
         output_ = graph.CreateTexture(desc);
         if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
         {
@@ -418,7 +418,7 @@ namespace material_graph
         }
         const auto owner = self_.lock();
         graph.AddPass(
-            "LX.Scene.VolumeComposite", uses, [owner, lighting, depth, shadow, outputHandle](const auto& execution) {
+            "METEOR.Scene.VolumeComposite", uses, [owner, lighting, depth, shadow, outputHandle](const auto& execution) {
                 owner->CheckCurrent(*execution.graph);
                 const RHIBindingDesc inputs[]{
                     RHIBindingDesc::Srv2D(execution.ResolveHandle(lighting), RHIFormat::RGBA16Float),
@@ -462,7 +462,7 @@ namespace material_graph
             // The external Scene/texture cache admits this cube in pixel-readable
             // state on the next frame. Volume compute must restore that contract.
             graph.AddPass(
-                "LX.Scene.VolumeEnvironmentRestore",
+                "METEOR.Scene.VolumeEnvironmentRestore",
                 {{graph.FindImportedTexture(environment_), RHIResourceState::PixelShaderResource, readAccess}},
                 [owner](const auto& execution) { owner->CheckCurrent(*execution.graph); }, true);
         }

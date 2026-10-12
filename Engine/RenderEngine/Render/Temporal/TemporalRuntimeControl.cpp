@@ -2,10 +2,39 @@
 #include <charconv>
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <string_view>
 
 namespace
 {
+    std::optional<std::string> ReadEnvironment(const char* key)
+    {
+#ifdef _WIN32
+        char* value = nullptr;
+        std::size_t size = 0;
+        const auto result = _dupenv_s(&value, &size, key);
+        const std::unique_ptr<char, decltype(&std::free)> owned(value, &std::free);
+        if (result != 0 || !owned) { return std::nullopt; }
+        return std::string(owned.get());
+#else
+        if (const auto* value = std::getenv(key)) { return std::string(value); }
+        return std::nullopt;
+#endif
+    }
+
+#ifdef _WIN32
+    std::optional<std::wstring> ReadEnvironment(const wchar_t* key)
+    {
+        wchar_t* value = nullptr;
+        std::size_t size = 0;
+        const auto result = _wdupenv_s(&value, &size, key);
+        const std::unique_ptr<wchar_t, decltype(&std::free)> owned(value, &std::free);
+        if (result != 0 || !owned) { return std::nullopt; }
+        return std::wstring(owned.get());
+    }
+#endif
+
     TemporalProvider ProductProvider(std::string_view value)
     {
         if (value == "fsr") { return TemporalProvider::Fsr; }
@@ -31,9 +60,9 @@ namespace
         bool valid = true;
         const auto text = [](const char* key, std::string& value)
         {
-            if (const auto* overrideValue = std::getenv(key))
+            if (const auto overrideValue = ReadEnvironment(key))
             {
-                value = overrideValue;
+                value = *overrideValue;
             }
         };
         text("CREATOR_TEMPORAL_UPSCALER", product.upscaler);
@@ -43,18 +72,18 @@ namespace
         text("CREATOR_NIS_MODE", product.spatialMode);
         const auto boolean = [](const char* key, bool& value)
         {
-            if (const auto* overrideValue = std::getenv(key))
+            if (const auto overrideValue = ReadEnvironment(key))
             {
-                value = std::string_view{ overrideValue } == "1";
+                value = *overrideValue == "1";
             }
         };
         boolean("CREATOR_TEMPORAL_ENABLED", product.enabled);
         boolean("CREATOR_DEEPDVC", product.digitalVibrance);
         const auto number = [&valid](const char* key, auto& value)
         {
-            if (const auto* overrideValue = std::getenv(key))
+            if (const auto overrideValue = ReadEnvironment(key))
             {
-                const std::string_view source{ overrideValue };
+                const std::string_view source{ *overrideValue };
                 const auto parsed = std::from_chars(source.data(), source.data() + source.size(), value);
                 if (source.empty() || parsed.ec != std::errc{} || parsed.ptr != source.data() + source.size())
                 {
@@ -71,14 +100,14 @@ namespace
         settings = valid && ValidateTemporalProductSettings(product)
             ? TemporalRuntimeSettingsFromProduct(product) : TemporalRuntimeSettings{};
 #ifdef _WIN32
-        if (const auto* directory = _wgetenv(L"CREATOR_TEMPORAL_RUNTIME_DIRECTORY"))
+        if (const auto directory = ReadEnvironment(L"CREATOR_TEMPORAL_RUNTIME_DIRECTORY"))
 #else
-        if (const auto* directory = std::getenv("CREATOR_TEMPORAL_RUNTIME_DIRECTORY"))
+        if (const auto directory = ReadEnvironment("CREATOR_TEMPORAL_RUNTIME_DIRECTORY"))
 #endif
         {
             try
             {
-                const std::filesystem::path path(directory);
+                const std::filesystem::path path(*directory);
                 if (path.is_absolute())
                 {
                     settings.runtimeDirectory = path.wstring();
@@ -89,9 +118,9 @@ namespace
                 settings.runtimeDirectory.clear();
             }
         }
-        if (const auto* project = std::getenv("CREATOR_TEMPORAL_DLSS_PROJECT_ID"))
+        if (const auto project = ReadEnvironment("CREATOR_TEMPORAL_DLSS_PROJECT_ID"))
         {
-            settings.dlssProjectId = project;
+            settings.dlssProjectId = *project;
         }
     }
 }
@@ -206,6 +235,18 @@ void TemporalRuntimeControl::RegisterPlayerLatencyHost()
 {
     std::lock_guard lock(m_mutex);
     m_snapshot.playerLatencyHostRegistered = true;
+}
+
+void TemporalRuntimeControl::RegisterEditorUpscalingHost(const std::wstring& deployedDirectory,
+    const std::string& projectId)
+{
+    std::lock_guard lock(m_mutex);
+    // Environment/runtime overrides remain authoritative. Installing the SDK
+    // does not change the user's requested AA or enable Player-only features.
+    if (m_snapshot.settings.runtimeDirectory.empty()) m_snapshot.settings.runtimeDirectory = deployedDirectory;
+    if (m_snapshot.settings.dlssProjectId.empty()) m_snapshot.settings.dlssProjectId = projectId;
+    m_snapshot.editorUpscalingHostRegistered = true;
+    ++m_snapshot.requestedGeneration;
 }
 
 TemporalRuntimeSnapshot TemporalRuntimeControl::Snapshot() const

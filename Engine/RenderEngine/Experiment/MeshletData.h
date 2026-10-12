@@ -8,8 +8,8 @@
 
 namespace experiment
 {
-    inline constexpr std::uint32_t kMeshletProfileVersion = 1u;
-    inline constexpr std::uint32_t kMeshletBuilderVersion = 1u;
+    inline constexpr std::uint32_t kMeshletProfileVersion = 2u;
+    inline constexpr std::uint32_t kMeshletBuilderVersion = 2u;
     inline constexpr std::uint32_t kMeshletMeshoptimizerVersion = 1020u;
     inline constexpr std::uint32_t kMeshletMaxVertices = 64u;
     inline constexpr std::uint32_t kMeshletMaxTriangles = 126u;
@@ -43,7 +43,8 @@ namespace experiment
         std::uint32_t vertexCount{};
         std::uint32_t triangleCount{};
         std::uint32_t flags{};
-        std::uint32_t reserved[2]{};
+        std::uint32_t clusterId{}; // Stable ordinal within this geometry LOD.
+        std::uint32_t reserved{};
         float sphereCenter[3]{};
         float sphereRadius{};
         float coneApex[3]{};

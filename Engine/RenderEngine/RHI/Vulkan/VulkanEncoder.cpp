@@ -491,6 +491,7 @@ void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
         return;
     }
     vkCmdDispatch(m_commandBuffer, x, y, z);
+    ++m_computeDispatches;
 }
 
 // ── 아직 못 하는 것 ──

@@ -3,7 +3,7 @@
 This is an importer, not an input-to-photon instrument. It requires original raw
 artifacts, declared instrument/clock/axis, exact recorded real-frame identities,
 and explicit acceptance limits. CPU markers and aggregate SDK counters are never
-accepted as photon timestamps or presentation intervals. Source-only authoring.
+accepted as photon timestamps or presentation intervals.
 """
 import argparse
 import csv
@@ -67,16 +67,34 @@ def recorded_presenters(profile, summary):
         for sample in frame['measurements']:
             if sample['axis'] != 3 or not sample['valid']:
                 continue
-            observed = dict(sample, provider=providers[sample['provider']], faultMode=faults[sample['faultMode']],
+            observed = dict(sample, presenterSequence=sample['sequence'],
+                            provider=providers[sample['provider']], faultMode=faults[sample['faultMode']],
                             nativeGateActive=bool(sample['nativeGateActive']), valid=True,
                             result=dict(status='success' if sample['status'] == 0 else 'not_success',
                                         nativeCode=sample['nativeCode']))
             key = identity(observed)
-            # Multiple attempts on one source cannot be collapsed into latest.
-            require(key not in result, 'Ambiguous repeated presenter attempt for one real-frame identity')
-            result[key] = observed
+            # Preserve every attempt. External sources must select the exact
+            # sequence when one real frame has multiple Present calls.
+            attempts = result.setdefault(key, [])
+            require(not any(item['presenterSequence'] == observed['presenterSequence'] for item in attempts),
+                    'Duplicate presenter sequence for one real-frame identity')
+            attempts.append(observed)
     require(result, 'No identified continuous presenter observations')
     return result
+
+
+def presenter_for_row(presenter, row, key):
+    require(key in presenter, 'External sample has no exact immutable presenter observation; gaps are unavailable')
+    attempts = presenter[key]
+    sequence = row.get('presenterSequence', '').strip()
+    if sequence:
+        sequence = int(sequence)
+        require(sequence > 0, 'Missing presenter sequence')
+        matches = [item for item in attempts if item.get('presenterSequence') == sequence]
+        require(len(matches) == 1, 'External presenter sequence does not match the recorded source identity')
+        return matches[0]
+    require(len(attempts) == 1, 'Ambiguous repeated presenter attempt; external presenterSequence is required')
+    return attempts[0]
 
 
 def analyze(path):
@@ -104,8 +122,9 @@ def analyze(path):
             'Exactly one FG-off and one FG-on run are required')
     require(all(type(run['fgEnabled']) is bool for run in manifest['runs']), 'FG enable values must be JSON booleans')
     policy = manifest['acceptance']
-    minimum = int(policy['minimumSamples'])
-    require(minimum >= 20, 'At least 20 independent samples/intervals per run are required')
+    minimum = policy['minimumSamples']
+    require(type(minimum) is int and minimum >= 20,
+            'At least 20 independent samples/intervals per run are required as a JSON integer')
     profiler = load_profiler()
     reports, compared = {}, []
     for run in manifest['runs']:
@@ -125,9 +144,9 @@ def analyze(path):
                 if not observed or observed['valid'] is not True:
                     continue
                 key = identity(observed)
-                require(key not in presenter or presenter[key] == observed,
+                require(key not in presenter or presenter[key] == [observed],
                         'Conflicting immutable presenter observations for one source frame')
-                presenter[key] = observed
+                presenter[key] = [observed]
         real = {}
         for frame in profile['frames']:
             for sample in frame['measurements']:
@@ -154,8 +173,7 @@ def analyze(path):
             sample_ids.add(sample_id)
             key = identity(row)
             require(key in real, 'External sample is not linked to this run\'s recorded real frame')
-            require(key in presenter, 'External sample has no exact immutable presenter observation; gaps are unavailable')
-            present = presenter[key]
+            present = presenter_for_row(presenter, row, key)
             require(present['result']['status'] == 'success' and int(present['result']['nativeCode']) == 0 and
                     present['faultMode'] == 'none' and
                     present['nativeGateActive'] is False and int(present['requestGeneration']) > 0 and
@@ -181,7 +199,7 @@ def analyze(path):
                 require((frame_kind == 'real' and ordinal == 0) or
                         (frame_kind == 'generated' and 0 < ordinal <= int(present['interpolatedFrameCount']) and
                          run['fgEnabled']), 'Invalid observed presentation identity')
-                presented = key + (frame_kind, ordinal)
+                presented = key + (present.get('presenterSequence'), frame_kind, ordinal)
                 require(presented not in observed, 'Duplicate observed presentation')
                 observed.add(presented)
                 timestamp = finite(row['presentationTimestampMs'], 'presentation timestamp')

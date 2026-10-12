@@ -1180,6 +1180,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	}
 	else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 	{
+		SelectAsset(directory);
 		ImGui::OpenPopup("ContentAssetTileMenu");
 	}
 
@@ -1197,7 +1198,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 		// Delete 인라인 구현이 여기 있었다 — 트리 쪽과 **같은 코드의 복제**였고,
 		// 둘 다 확인도 Undo 도 없이 file::remove 를 불렀다. 선언 하나
 		// (editor_core_menus 의 delete_asset, confirm 붙음)가 둘을 대체한다.
-		if (ImGui::MenuItem("Open Save Directory"))
+		if (ImGui::MenuItem("Open in File Explorer"))
 		{
 			EditorPlatform::Get().RevealInFileExplorer(directory);
 		}

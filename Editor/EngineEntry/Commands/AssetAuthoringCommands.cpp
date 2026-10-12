@@ -1992,8 +1992,19 @@ namespace ConsoleCmd
         return CommandCore::Ok("Model LOD setting saved and a new generation published; see authoring warnings for skipped meshes.");
     }
 
+    static CommandCore::CommandResult Cmd_assets_model_reimport(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2)
+            return CommandCore::InvalidArguments("assets.model.reimport <source-path>");
+        if (!EditorAssetDatabase::Get().ReimportModel(ModelImportSourcePath(ctx.parts[1])))
+            return CommandCore::Fail("assets.model.reimport.failed",
+                "Model reimport failed; the previous published generation remains unchanged.");
+        return CommandCore::Ok("Model reimported with its existing identity and import settings.");
+    }
+
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "assets.model.reimport" }, &Cmd_assets_model_reimport);
         reg.Result({ "assets.model.meshlets" }, &Cmd_assets_model_meshlets);
         reg.Result({ "assets.model.lods" }, &Cmd_assets_model_lods);
         reg.Result({ "scene.loadjobs" }, &Cmd_scene_loadjobs);

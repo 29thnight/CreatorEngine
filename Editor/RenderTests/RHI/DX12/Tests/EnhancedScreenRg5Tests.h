@@ -110,7 +110,7 @@ namespace
                 RHITextureDesc depthDesc{};
                 depthDesc.width = 16;
                 depthDesc.height = 16;
-                depthDesc.format = EnhancedGBufferPass::kDepthFormat;
+                depthDesc.format = SceneSurfaceTargets::kDepthFormat;
                 depthDesc.allowDepthStencil = true;
                 depthDesc.clearDepth = 0.5f;
                 if (!resources.CreateTexture(depthDesc, depthResource.handle, error))
@@ -126,7 +126,7 @@ namespace
                     "RG5.Screen.DepthClear", {{depth, RHIResourceState::DepthWrite, write}},
                     [depth, &resources](const EnhancedRenderGraph::ExecuteContext &ec) {
                         const auto target =
-                            RHIDepthTargetDesc::Depth(ec.ResolveHandle(depth), EnhancedGBufferPass::kDepthFormat);
+                            RHIDepthTargetDesc::Depth(ec.ResolveHandle(depth), SceneSurfaceTargets::kDepthFormat);
                         const auto targets =
                             resources.CreateRenderTargets(std::span<const RHITextureHandle>{}, &target);
                         ec.encoder->ClearDepthTarget(targets, 0.5f);

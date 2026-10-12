@@ -423,7 +423,7 @@ namespace material_graph
             capture.height = SceneRuntimeTileExtent;
             capture.format = RHIFormat::RGBA32Float;
             capture.allowRenderTarget = true;
-            capture.debugName = L"LX.Scene.RuntimeEffectTile";
+            capture.debugName = L"METEOR.Scene.RuntimeEffectTile";
             for (auto& input : bundle.inputs)
             {
                 if (!device_->CreateTexture(capture, input, error))
@@ -434,7 +434,7 @@ namespace material_graph
             capture.format = RHIFormat::D32Float;
             capture.allowRenderTarget = false;
             capture.allowDepthStencil = true;
-            capture.debugName = L"LX.Scene.RuntimeTileDepth";
+            capture.debugName = L"METEOR.Scene.RuntimeTileDepth";
             if (!device_->CreateTexture(capture, bundle.tileDepth, error))
             {
                 return false;
@@ -445,14 +445,14 @@ namespace material_graph
                 texture.width = context.width;
                 texture.height = context.height;
                 texture.format = RHIFormat::RGBA16Float;
-                texture.debugName = L"LX.Scene.RuntimeRefractionColor";
+                texture.debugName = L"METEOR.Scene.RuntimeRefractionColor";
                 if (!device_->CreateTexture(texture, bundle.color, error))
                 {
                     return false;
                 }
                 texture.format = RHIFormat::D32Float;
                 texture.allowDepthStencil = true;
-                texture.debugName = L"LX.Scene.RuntimeRefractionDepth";
+                texture.debugName = L"METEOR.Scene.RuntimeRefractionDepth";
                 if (!device_->CreateTexture(texture, bundle.depth, error))
                 {
                     return false;
@@ -546,15 +546,15 @@ namespace material_graph
         for (unsigned i = 0; i < graphInputs_.size(); ++i)
         {
             graphInputs_[i] = graph.ImportTexture(bundle_->inputs[i], bundle_->inputStates[i],
-                                                 "LX.Scene.RuntimeEffectTile", &bundle_->inputStates[i]);
+                                                 "METEOR.Scene.RuntimeEffectTile", &bundle_->inputStates[i]);
         }
         graphTileDepth_ = graph.ImportTexture(bundle_->tileDepth, bundle_->tileDepthState,
-                                              "LX.Scene.RuntimeTileDepth", &bundle_->tileDepthState);
+                                              "METEOR.Scene.RuntimeTileDepth", &bundle_->tileDepthState);
         if (transmission_)
         {
-            graphColor_ = graph.ImportTexture(bundle_->color, bundle_->colorState, "LX.Scene.RuntimeRefractionColor",
+            graphColor_ = graph.ImportTexture(bundle_->color, bundle_->colorState, "METEOR.Scene.RuntimeRefractionColor",
                                               &bundle_->colorState);
-            graphDepth_ = graph.ImportTexture(bundle_->depth, bundle_->depthState, "LX.Scene.RuntimeRefractionDepth",
+            graphDepth_ = graph.ImportTexture(bundle_->depth, bundle_->depthState, "METEOR.Scene.RuntimeRefractionDepth",
                                               &bundle_->depthState);
         }
     }
@@ -576,7 +576,7 @@ namespace material_graph
         const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
         const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
         const auto owner = self_.lock();
-        graph.AddPass("LX.Scene.RuntimeRefractionBackground",
+        graph.AddPass("METEOR.Scene.RuntimeRefractionBackground",
                       {{color, RHIResourceState::CopySource, read}, {depth, RHIResourceState::CopySource, read},
                        {graphColor_, RHIResourceState::CopyDest, write}, {graphDepth_, RHIResourceState::CopyDest, write}},
                       [owner, color, depth](const auto& execution) {

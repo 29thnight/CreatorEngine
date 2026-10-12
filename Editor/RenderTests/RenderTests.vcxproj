@@ -125,11 +125,10 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedBlendedStreamTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\GraphSceneFixture.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp" />
@@ -138,9 +137,8 @@
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedTemporalHistoryTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp" />
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />
-    <ClCompile Include="RHI\Vulkan\Tests\PbrShaderParityTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\PbrSealLedgerTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\PbrCaptureCompare.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\PbrNormalPair.cpp" />

@@ -119,6 +119,10 @@ void RenderScene::RegisterCommand(ImageComponent* imagePtr)
 
 void RenderScene::UpdateCommand(ImageComponent* imagePtr)
 {
+	if (nullptr == imagePtr) return;
+	// Layout can resolve after UITickSystem. Snapshot the resolved rect at the
+	// proxy publication boundary rather than retaining the preceding tick's pose.
+	imagePtr->RefreshTransformFromRect();
 	EnqueueProxyDelta(ProxyCommand(imagePtr, GetSceneEpoch()));
 }
 

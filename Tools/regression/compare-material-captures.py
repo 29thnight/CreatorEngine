@@ -5,6 +5,7 @@ import json
 import math
 import sys
 from pathlib import Path
+from base0_artifacts import audit_pixel_measurement
 
 
 def main():
@@ -15,6 +16,8 @@ def main():
     args = parser.parse_args()
     left = json.loads((args.left / "manifest.json").read_text(encoding="utf-8-sig"))
     right = json.loads((args.right / "manifest.json").read_text(encoding="utf-8-sig"))
+    audit_pixel_measurement(left)
+    audit_pixel_measurement(right)
     for key in ("width", "height", "camera", "lights", "captureMode", "sampleIndex", "historyPolicy"):
         if left.get(key) != right.get(key):
             raise ValueError(f"Capture inputs differ: {key}")

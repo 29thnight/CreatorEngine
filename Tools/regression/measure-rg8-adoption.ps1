@@ -1,29 +1,50 @@
 #Requires -Version 7.0
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [ValidateRange(4,32)][int]$Samples=8,
+    [ValidateSet('Debug','Release')][string]$Configuration='Release',
+    [ValidateRange(4,32)][int]$Samples=4,
     [ValidateRange(16,256)][int]$WarmupFrames=16,
     [ValidateRange(32,512)][int]$NormalCandidates=64,
     [switch]$TimingOnly,
     [switch]$ValidateGpu,
+    # Bounded supplemental workload proof; never substitutes for the full matrix.
+    [switch]$WorkloadOnly,
     # Collection fallback only; it cannot establish a same-process comparison.
     [switch]$SeparateProcesses,
     # Explicit fixture scenes may provide real positive-overlap/fallback workloads.
     # A scene name alone is not evidence; the strict audit checks actual intervals.
-    [string]$ScenePath=''
+    [string]$ScenePath='',
+    [string]$FixtureProject='',
+    [ValidateRange(640,1920)][int]$WindowWidth=640,
+    [ValidateRange(480,1080)][int]$WindowHeight=480
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'NativeRealMeasurementGate.ps1')
+. (Join-Path $PSScriptRoot 'ArtifactRetention.ps1')
+Assert-ArtifactCapacity $OutputDirectory
 if($ValidateGpu -and $TimingOnly){throw 'GPU validation is correctness-only, not a timing measurement'}
+# Reserve conservatively for 64 full-window RGBA readbacks per capture plus
+# telemetry. The actual scene viewport is smaller; this is a storage bound,
+# never a performance metric. Recheck the 30 GiB floor before every readback.
+$captureRunCount=if($WorkloadOnly){if($ValidateGpu){1}else{2}}elseif($ValidateGpu){2}else{6}
+$estimatedRawGiB=if($TimingOnly){0}else{
+    [double]$WindowWidth*$WindowHeight*16*64*($Samples+1)*$captureRunCount/1GB}
+$estimatedTelemetryGiB=if($TimingOnly){[math]::Max(1,$NormalCandidates/64.0)}else{1}
+Assert-ArtifactCapacity $OutputDirectory (30+$estimatedRawGiB+$estimatedTelemetryGiB)
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out=[IO.Path]::GetFullPath($OutputDirectory)
-if(!$ScenePath){$ScenePath="$repo/Dynamic_CPP/Assets/Scenes/TestShadow.creator"}
+if(!$FixtureProject){$FixtureProject="$repo/Dynamic_CPP"}
+$FixtureProject=[IO.Path]::GetFullPath($FixtureProject)
+if(!(Test-Path -LiteralPath "$FixtureProject/Assets")){throw 'Missing explicit fixture project Assets'}
+if(!$ScenePath){$ScenePath="$FixtureProject/Assets/Scenes/TestShadow.creator"}
 $ScenePath=[IO.Path]::GetFullPath($ScenePath)
 if(!(Test-Path -LiteralPath $ScenePath)){throw "Missing explicit workload scene: $ScenePath"}
 if(Test-Path $out){throw 'Use a new evidence directory'}
 if(Get-Process CreatorEditor -ErrorAction SilentlyContinue){throw 'Close the existing Editor before measurement'}
 New-Item -ItemType Directory $out | Out-Null
-$exe="$repo/Bin/x64-Release/Editor/CreatorEditor.exe"
-$binary=@{head=(git -C $repo rev-parse HEAD);exe=(Get-FileHash $exe).Hash;runtime=(Get-FileHash "$repo/Bin/x64-Release/Editor/CreatorEditor.runtime.dll").Hash}
+$exe="$repo/Bin/x64-$Configuration/Editor/CreatorEditor.exe"
+$runtimeDll=Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
+$binary=@{configuration=$Configuration;head=(git -C $repo rev-parse HEAD);exe=(Get-FileHash $exe).Hash;runtime=(Get-FileHash $runtimeDll).Hash}
 $binary | ConvertTo-Json | Set-Content "$out/binary.json"
 $purpose=if($ValidateGpu){'gpu-validation'}elseif($TimingOnly){'normal-timing'}else{'capture-correctness'}
 $sameProcessRequested=$TimingOnly -and !$SeparateProcesses
@@ -32,7 +53,11 @@ $sameProcess=@{requested=[bool]$sameProcessRequested;supported=$false;establishe
     boundary=$(if($sameProcessRequested){'render-owner-next-frame'}else{'process-initialization'});
     reason=$(if($sameProcessRequested){'Runtime command support and completed same-process matrix are not yet verified'}
         else{'Separate-process collection; same-process OFF/ON is not established'})}
-$context=@{schemaVersion=2;acceptanceSchema=3;scene=$ScenePath;evidencePurpose=$purpose;
+$context=@{schemaVersion=2;acceptanceSchema=3;configuration=$Configuration;scene=$ScenePath;sceneSha256=(Get-FileHash $ScenePath).Hash;
+    fixtureProject=$FixtureProject;windowWidth=$WindowWidth;windowHeight=$WindowHeight;evidencePurpose=$purpose;
+    supplementalWorkloadOnly=[bool]$WorkloadOnly;
+    storageBudget=@{minimumFreeGiB=30;estimatedRawGiB=$estimatedRawGiB;estimatedTelemetryGiB=$estimatedTelemetryGiB;
+        reservePurpose='conservative-full-window-readback-bound';defaultSamples=4};
     processOrder=$(if($sameProcessRequested){'same-process-forward-reverse'}else{'separate-process-forward-reverse'});
     sameProcessOffOn=$sameProcess;
     cpuScope='view-prepare-build-compile-record-schedule-submit-retirement-enqueue';
@@ -50,6 +75,7 @@ $context | ConvertTo-Json -Depth 10 | Set-Content "$out/measurement-context.json
 
 function Test-NormalSnapshot($live)
 {
+    try { Assert-NativeRealMeasurement $live } catch { return $false }
     return ($live.gpu.clockValid -and $live.gpu.queueSpanMs -gt 0 -and
         $live.gpu.busyMs -le $live.gpu.queueSpanMs + 0.00001 -and
         $live.gpu.submission -gt 0 -and $live.display.width -gt 0 -and $live.display.height -gt 0 -and
@@ -178,14 +204,16 @@ function Export-NormalSamples($telemetry,$candidates,[int]$mode,[string]$directo
     ConvertTo-Json -InputObject @($joined) -Depth 70 | Set-Content "$directory/normal-samples.json"
     if($selected.Count -ne 32)
     {
-        throw "Insufficient warm ordinary frames with full cost and calibrated interval evidence: $($selected.Count)/32; see normal-selection.json"
+        Write-Output "RG8_NORMAL_REJECTED mode=$mode frames=$($selected.Count)/32; see $directory/normal-selection.json"
     }
 }
 $runs=@()
-$orders=if($ValidateGpu){@('Forward')}else{@('Forward','Reverse')}
+$selectionFailures=@()
+$orders=if($ValidateGpu -or $WorkloadOnly){@('Forward')}else{@('Forward','Reverse')}
 foreach($order in $orders)
 {
-    $modes=if($ValidateGpu){@(1,2)}elseif($order -eq 'Forward'){@(0,1,2)}else{@(2,1,0)}
+    $modes=if($WorkloadOnly){if($TimingOnly -or $ValidateGpu){@(2)}else{@(0,2)}}
+        elseif($ValidateGpu){@(1,2)}elseif($order -eq 'Forward'){@(0,1,2)}else{@(2,1,0)}
     $groups=if($sameProcessRequested){@(@{modes=$modes;name="$order-process"})}
         else{@($modes | ForEach-Object { @{modes=@($_);name="$order-$_"} })}
     foreach($group in $groups)
@@ -202,11 +230,15 @@ foreach($order in $orders)
         $start.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
         $start.RedirectStandardOutput=$true
         $start.RedirectStandardError=$true
-        foreach($arg in @('--development-project',"$repo/Dynamic_CPP",'--command-service'))
+        foreach($arg in @('--development-project',$FixtureProject,'--smoke-offscreen','--command-service'))
         {
             $start.ArgumentList.Add($arg)
         }
         $start.Environment['CREATOR_DX12_VALIDATION']=if($ValidateGpu){'gpu'}else{'off'}
+        $start.Environment['CREATOR_TEMPORAL_UPSCALER']='none'
+        $start.Environment['CREATOR_TEMPORAL_FRAME_GENERATOR']='none'
+        $start.Environment['CREATOR_NIS_MODE']='off'
+        $start.Environment['CREATOR_DEEPDVC']='0'
         $start.Environment['CREATOR_RENDERGRAPH_QUEUE_EXECUTION']="$($group.modes[0])"
         $start.Environment['CREATOR_RG8_EVIDENCE']='1'
         $start.Environment['CREATOR_RENDERGRAPH_ALIASING']='0'
@@ -224,9 +256,10 @@ foreach($order in $orders)
             {
                 if($process.HasExited){throw 'Editor exited during startup'}
                 $endpoint=$null
-                if(Test-Path "$repo/Dynamic_CPP/Library/CommandService/endpoint.json")
+                if(Test-Path "$FixtureProject/Library/CommandService/endpoint.json")
                 {
-                    $endpoint=Get-Content "$repo/Dynamic_CPP/Library/CommandService/endpoint.json" -Raw | ConvertFrom-Json
+                    try { $endpoint=[IO.File]::ReadAllText("$FixtureProject/Library/CommandService/endpoint.json") | ConvertFrom-Json }
+                    catch [IO.IOException] { $endpoint=$null } # Atomic endpoint replacement can race this read.
                 }
                 if([DateTime]::UtcNow -gt $deadline){throw 'Endpoint timeout'}
                 Start-Sleep -Milliseconds 100
@@ -251,9 +284,10 @@ foreach($order in $orders)
                         if([DateTime]::UtcNow -gt $until){throw "$name timeout"}
                     }until($result.state -eq 'completed')
                 }
+                if($result.PSObject.Properties['result']){$result=$result.result}
                 @{command=$name;arguments=$arguments;result=$result} | ConvertTo-Json -Depth 70 -Compress | Add-Content "$case/commands.jsonl"
                 if($name -eq 'quit'){return $result}
-                if($allowPreparing -and $result.message -eq 'LX Scene requested material program is still preparing.'){return $null}
+                if($allowPreparing -and $result.message -eq 'METEOR Scene requested material program is still preparing.'){return $null}
                 if($result.status -ne 'succeeded'){throw "$name failed: $($result.message)"}
                 return $result.data
             }
@@ -267,18 +301,19 @@ foreach($order in $orders)
             }until($state.complete)
             Cmd 'editor.viewport' @('scene') | Out-Null
             Cmd 'editor.renderscale' @('auto') | Out-Null
-            if($TimingOnly)
+            Cmd 'window.resize' @("$WindowWidth","$WindowHeight") | Out-Null
+            # Instrumented driver PSOs can take longer than the capture command's
+            # 60-second Pending deadline. Warm ordinary frames before requesting
+            # any readback; never extend/waive the capture correctness timeout.
+            # Confirm ordinary rendering is live before requesting a mode
+            # boundary. This readiness check never creates a capture domain.
+            $ready=Cmd 'dx12.live' @('on')
+            $deadline=[DateTime]::UtcNow.AddSeconds($(if($ValidateGpu){600}else{180}))
+            while(!$ready.ready -or !(Test-NormalSnapshot $ready))
             {
-                # Confirm ordinary rendering is live before requesting a mode
-                # boundary. This readiness check never creates a capture domain.
-                $ready=Cmd 'dx12.live' @('on')
-                $deadline=[DateTime]::UtcNow.AddSeconds(180)
-                while(!$ready.ready -or !(Test-NormalSnapshot $ready))
-                {
-                    if([DateTime]::UtcNow -gt $deadline){throw 'Ordinary DX12 rendering did not become ready'}
-                    Start-Sleep -Milliseconds 100
-                    $ready=Cmd 'dx12.live'
-                }
+                if([DateTime]::UtcNow -gt $deadline){throw 'Ordinary DX12 rendering did not become ready'}
+                Start-Sleep -Milliseconds 100
+                $ready=Cmd 'dx12.live'
             }
             foreach($mode in $group.modes)
             {
@@ -328,7 +363,9 @@ foreach($order in $orders)
                         if((Test-NormalSnapshot $live) -and $live.gpu.frame -gt $appliedFrame -and !$seen.ContainsKey($identity))
                         {
                             $seen[$identity]=$true
-                            $sample=@{utcMs=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();gpu=$live.gpu;display=$live.display}
+                            $sample=@{utcMs=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();gpu=$live.gpu;display=$live.display;
+                                temporalProvenance=$live.temporalProvenance;gpuTemporalProvenance=$live.gpuTemporalProvenance;
+                                framesRenderedAxis=$live.framesRenderedAxis}
                             if($warm.Count -lt $WarmupFrames)
                             {
                                 $warm+=$sample
@@ -350,6 +387,7 @@ foreach($order in $orders)
                     $attempt=0
                     do
                     {
+                        Assert-ArtifactCapacity $out
                         $warm=Cmd 'render.live.capture' @("$case/warm-$attempt",'editor','controlled') $true
                         ++$attempt
                         if($attempt -gt 40){throw 'Warm preparation timeout'}
@@ -360,6 +398,7 @@ foreach($order in $orders)
                 $captureSamples=if($TimingOnly){0}else{$Samples}
                 for($index=0;$index -lt $captureSamples;++$index)
                 {
+                    Assert-ArtifactCapacity $out
                     Cmd 'render.live.capture' @("$case/sample-$index",'editor','controlled') | Out-Null
                     Write-Output "RG8_SAMPLE order=$order mode=$mode sample=$index"
                     Start-Sleep -Milliseconds 250
@@ -405,10 +444,11 @@ foreach($order in $orders)
                 $telemetry[$tag]+=($Matches[2] | ConvertFrom-Json)
             }
         }
-        if((Get-FileHash $exe).Hash -ne $binary.exe -or (Get-FileHash "$repo/Bin/x64-Release/Editor/CreatorEditor.runtime.dll").Hash -ne $binary.runtime)
+        if((Get-FileHash $exe).Hash -ne $binary.exe -or (Get-FileHash $runtimeDll).Hash -ne $binary.runtime)
         {
             throw 'Binary changed during measurement'
         }
+        $telemetry | ConvertTo-Json -Depth 70 | Set-Content "$processCase/queue-evidence.json"
         foreach($run in $pendingRuns)
         {
             $case=$run.path
@@ -422,17 +462,20 @@ foreach($order in $orders)
             {
                 # Full process logs retain transitions, late retirements and
                 # aggregate counters. The audit filters mode only after joins.
-                foreach($file in @('stdout.log','stderr.log','memory-continuous.jsonl'))
+                foreach($file in @('stdout.log','stderr.log','memory-continuous.jsonl','queue-evidence.json'))
                 {
-                    Copy-Item "$processCase/$file" "$case/$file"
+                    # Immutable completed-process logs are shared, not copied
+                    # three times for the same-process mode matrix.
+                    New-Item -ItemType HardLink -Path "$case/$file" -Target "$processCase/$file" | Out-Null
                 }
             }
-            $telemetry | ConvertTo-Json -Depth 70 | Set-Content "$case/queue-evidence.json"
             if($TimingOnly)
             {
                 $candidates=@(Get-Content "$case/normal-candidates.json" -Raw | ConvertFrom-Json)
                 Export-NormalSamples $telemetry $candidates $mode $case
-                Write-Output "RG8_NORMAL order=$order mode=$mode frames=32 domain=normal"
+                $selection=Get-Content "$case/normal-selection.json" -Raw | ConvertFrom-Json
+                if($selection.selectedCount -ne 32){$selectionFailures+="$order-$mode"}
+                else{Write-Output "RG8_NORMAL order=$order mode=$mode frames=32 domain=normal"}
             }
             $runs+=$run
             ConvertTo-Json -InputObject @($runs) -Depth 10 | Set-Content "$out/runs.json"
@@ -441,8 +484,13 @@ foreach($order in $orders)
 }
 if($sameProcessRequested)
 {
-    $sameProcess.established=$true
-    $sameProcess.reason='Both mode orders collected within their original Editor process; full acceptance and calibrated model validation remain required'
+    $sameProcess.established=$selectionFailures.Count -eq 0
+    $sameProcess.reason=if($WorkloadOnly){'Supplemental workload collection only; no forward/reverse acceptance'}
+        else{'Both mode orders collected within their original Editor process; full acceptance and calibrated model validation remain required'}
     $context | ConvertTo-Json -Depth 10 | Set-Content "$out/measurement-context.json"
+}
+if($selectionFailures.Count -gt 0)
+{
+    throw "Completed matrix, but strict normal evidence failed: $($selectionFailures -join ', ')"
 }
 'RG8_MEASUREMENT_COMPLETE'

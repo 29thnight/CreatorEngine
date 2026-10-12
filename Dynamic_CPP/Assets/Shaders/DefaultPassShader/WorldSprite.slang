@@ -122,9 +122,11 @@ TemporalSpriteOutput TemporalPS(TemporalVSOut input)
     TemporalSpriteOutput output;
     output.motion = valid ? (input.previousClip.xy / input.previousClip.w -
         input.currentClip.xy / input.currentClip.w) * gScreenDimensions * float2(0.5, -0.5) : float2(0);
-    // One/InvSrcAlpha unions each mask, preserving earlier translucent layers.
-    output.reactive = float4(reactive, 0, 0, reactive);
+    // Coverage, rather than mask strength, weights the underlying surface.
+    // An opaque history-valid sprite replaces an invalid background mask;
+    // translucent sprites retain the uncovered portion of earlier layers.
+    output.reactive = float4(reactive, 0, 0, alpha);
     output.transparency = float4(alpha, 0, 0, alpha);
-    output.responsive = float4(responsive, 0, 0, responsive);
+    output.responsive = float4(responsive, 0, 0, alpha);
     return output;
 }

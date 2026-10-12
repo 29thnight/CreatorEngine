@@ -1,5 +1,6 @@
 #include "PhysicsTransformPolicy.h"
 #include "Scene.h"
+#include "TemporalMotionFixture.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-5
@@ -3388,6 +3389,9 @@ void Scene::LateUpdate(float deltaSecond)
     // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.
     m_soundSystem.LateUpdate(deltaSecond);
 
+    // Publish diagnostic poses and visibility after animation, but before the
+    // proxy seal. The frame stamp must describe this frame's proxy values.
+    TemporalMotionFixture::TickAfterAnimation();
     UpdateRenderData();
 
     // 기존 post-physics FlushAITicks보다 앞에서 한 번만 큐를 채운다. 완료가

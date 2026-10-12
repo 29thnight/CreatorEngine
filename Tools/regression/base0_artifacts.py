@@ -337,12 +337,28 @@ def audit_temporal_capture_provenance(m):
             "measurement provenance differs from captured frame")
 
 
+def audit_pixel_measurement(m):
+    """Shared exclusion/identity gate for consumers that read only some pixels."""
+    require(m["source"] == "product-live" and m["captureMode"] == "static-repeatability-v1",
+            "not a controlled product capture")
+    audit_temporal_capture_provenance(m)
+    require(m["attachments"], "missing pixel attachments")
+    names = set()
+    for a in m["attachments"]:
+        require(a["name"] not in names, "duplicate pixel attachment")
+        names.add(a["name"])
+        require(all(a[key] == m[key] for key in ("temporalProvenanceSchemaVersion", "frameKind", "realFrameId",
+                "generatedOrdinal", "spatialMode", "deepDvcApplied")), "attachment temporal identity")
+        require(a["width"] == m["width"] and a["height"] == m["height"] and a["nonfinite"] == 0,
+                "attachment extent/finite")
+
+
 def audit_manifest(m):
     require(m["source"] == "product-live" and m["captureMode"] == "static-repeatability-v1",
             "not a controlled product capture")
     require(m["historyPolicy"] == "restart-ssgi-fog" and m["totalSeconds"] == m["deltaSeconds"] == 0
             and m["sampleIndex"] == 0, "uncontrolled render clock/history")
-    audit_temporal_capture_provenance(m)
+    audit_pixel_measurement(m)
     require(m["validationCount"] == 0 and truth(m["finite"]), "validation/nonfinite failure")
     require(truth(m["sealLedger"]["recorded"]), "missing binding ledger")
     require(m["ibl"] == dict(baseSamples=1024, reflectionSamples=4096,
@@ -544,9 +560,16 @@ def mutations(directory, output):
         c = copy.deepcopy(m); c["compiledGraph"]["passes"][0]["usages"][0]["kind"] = 9; reject("wrong-resource-kind", c)
         c = copy.deepcopy(m)
         capture = next(p for p in c["compiledGraph"]["passes"] if p["name"] == "PBR.Capture.Display.LDR")
-        require(capture["usages"][0]["version"] > 0, "display capture requires produced version")
-        capture["usages"][0]["version"] -= 1
-        reject("stale-display-version", c)
+        usage = capture["usages"][0]
+        # Create may produce logical version zero; it is not an imported or
+        # unproduced version merely because the number is zero.
+        if usage["version"] > 0:
+            usage["version"] -= 1
+            reject("stale-display-version", c)
+        else:
+            resource = c["compiledGraph"]["resources"][usage["resource"]]
+            usage["version"] = resource["versionCount"]
+            reject("nonexistent-display-version", c)
     c = copy.deepcopy(m); c["compiledGraph"]["resources"][0]["lastUse"] += 1; reject("lifetime", c)
     c = copy.deepcopy(m); c["measurement"]["gpuStatus"] = "failed"; reject("GPU-unavailable", c)
     c = copy.deepcopy(m); c["ibl"]["reflectionSamples"] = 1024; reject("quality-reduction", c)

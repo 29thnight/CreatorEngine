@@ -1,9 +1,9 @@
-"""Read CEPROF snapshots (1/2/4) and finalized recordings (3/5).
+"""Read CEPROF snapshots (1/2/4/6) and finalized recordings (3/5/7).
 
 Engine-frame duration, real-view render cost and presented cadence are distinct.
 Only recorded, exact-key provenance can qualify render measurements. Old files
 remain readable but cannot acquire provenance from current live settings.
-Authored for later authorized execution; no acceptance result is checked in.
+Execution artifacts retain their own binary identity and acceptance scope.
 """
 import argparse
 import collections
@@ -274,6 +274,7 @@ def analyze(path):
     events, counters = collections.defaultdict(list), collections.defaultdict(list)
     cpu_sessions, cpu_ticks, cpu_tasks, counter_owners = set(), set(), set(), set()
     boundary, gpu_events, matched_gpu, invalid_provenance = 0, 0, 0, 0
+    schedule_reuses = 0
     measurements, presenter, groups = [], [], collections.defaultdict(lambda: {'cpu': [], 'gpu': [], 'realFrames': set()})
     for frame in frames:
         gpu_keys = collections.Counter(sample_key(m) for m in frame['measurements'] if m['axis'] == 2)
@@ -293,6 +294,7 @@ def analyze(path):
             groups[key]['realFrames'].add((m['realFrameId'], m['publicationFrameId']))
         for e in frame['events']:
             require(e['marker'] < len(capture['markers']) and e['slot'] in capture['threads'], 'Unknown marker/thread')
+            schedule_reuses += capture['markers'][e['marker']]['name'] == 'RenderGraphScheduleReused'
             owner = e['cpu']
             if owner[0]:
                 cpu_sessions.add(owner[0])
@@ -353,6 +355,7 @@ def analyze(path):
                 cpuOwnership=dict(sessions=len(cpu_sessions), ticks=len(cpu_ticks), tasks=len(cpu_tasks)),
                 temporalPerformanceGateEligible=eligible, realFramePerformanceGateEligible=real,
                 nativeRealPerformanceGateEligible=native,
+                structuralScheduleReuseEvents=schedule_reuses,
                 nativeQualityGateEligible=bool(native and all(m['nativeGateActive'] for m in measurements)),
                 pixelAcceptance=False, presentationPacingAcceptance=False, latencyAcceptance=False,
                 temporalProvenanceStatus='recorded-exact-key' if eligible else 'missing-incomplete-or-ambiguous',

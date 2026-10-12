@@ -114,7 +114,7 @@ $manifest = Get-Content (Join-Path $packageRoot 'package-manifest.json') -Raw | 
 if ($manifest.verification -ne 'passed' -or $manifest.cook.byFolder.MaterialPrograms -ne 3 -or
     $manifest.cook.byFolder.Materials -ne 1 -or $manifest.cook.SourceCounts.'--shadergraph' -ne 3 -or
     $manifest.smoke.textParserCalls -ne 0 -or $manifest.smoke.cookedSceneDocuments -lt 1 -or
-    !($package -match '\[lx.scene.program\] source=cooked graph=11111111-1111-4111-8111-111111111111 ready=[1-9]\d* sceneCompiles=0')) {
+    !($package -match '\[meteor.scene.program\] source=cooked graph=11111111-1111-4111-8111-111111111111 ready=[1-9]\d* sceneCompiles=0')) {
     throw 'Published package is missing the real cooked Scene material readiness evidence.'
 }
 # Runtime and PAK bytes must still match the manifest after the Player run.

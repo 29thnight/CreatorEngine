@@ -45,7 +45,7 @@ try {
     $prefix = 'AutoRecovery_' + [guid]::NewGuid().ToString('N').Substring(0,8)
     $sourceBytes = [IO.File]::ReadAllBytes((Join-Path $project 'Assets/Models/Prim_Cube.glb'))
     $commands = @()
-    foreach ($name in @('missing','oldformat','record','sidecar','badsource','watch','identity','async')) {
+    foreach ($name in @('missing','oldformat','record','sidecar','badsource','watch','identity','async','manual')) {
         $path = Join-Path $project "Assets/Models/${prefix}_${name}.glb"
         $probes[$name] = @{path=$path;meta="$path.meta";id='';generation=0;directory=''}
         [IO.File]::WriteAllBytes($path, $sourceBytes)
@@ -116,11 +116,25 @@ try {
         $again = Load-Probe $name
         Assert ($again.data.generation -eq $row.data.generation -and $again.data.recoveryAttempts -eq $expectedAttempts) "$name repeated a successful repair"
     }
+    # Explicit reimport must work without changing import settings or model ID,
+    # and must replace a generation already resident in the runtime cache.
+    $manualBefore = Load-Probe 'manual'
+    Assert ($manualBefore.status -eq 'succeeded') 'Manual reimport setup load failed'
+    $manualMeta = [IO.File]::ReadAllText($probes.manual.meta)
+    $manualSettings = [regex]::Match($manualMeta, '(?ms)^importSettings:.*?(?=^\S|\z)').Value
+    $manual = Invoke-Cmd 'assets.model.reimport' @($probes.manual.path)
+    Assert ($manual.status -eq 'succeeded') 'Explicit reimport failed'
+    $manualAfter = Load-Probe 'manual'
+    Assert ($manualAfter.status -eq 'succeeded' -and $manualAfter.data.modelId -eq $probes.manual.id -and $manualAfter.data.generation -gt $manualBefore.data.generation) 'Manual reimport retained a stale resident generation or changed identity'
+    Assert ([regex]::Match([IO.File]::ReadAllText($probes.manual.meta), '(?ms)^importSettings:.*?(?=^\S|\z)').Value -eq $manualSettings -and $manualSettings.Length -gt 0) 'Manual reimport changed import settings'
+
     $failed = Load-Probe 'badsource'
     $again = Load-Probe 'badsource'
     Assert ($failed.status -eq 'failed' -and $again.status -eq 'failed') 'Invalid source was accepted'
     Assert ($failed.data.recoveryAttempts -eq 5 -and $again.data.recoveryAttempts -eq 5 -and $again.data.recoverySuppressed -ge 1) 'Unchanged failed input was reimported repeatedly'
     $originalMeta = [IO.File]::ReadAllText($probes.badsource.meta)
+    $manualFailure = Invoke-Cmd 'assets.model.reimport' @($probes.badsource.path)
+    Assert ($manualFailure.status -eq 'failed' -and [IO.File]::ReadAllText($probes.badsource.meta) -eq $originalMeta) 'Failed manual reimport replaced the canonical generation'
     Assert ([long][regex]::Match($originalMeta,'(?m)^generation: (\d+)').Groups[1].Value -eq $probes.badsource.generation) 'Failed recovery changed canonical generation'
 
     # Actual OS watcher -> authoring -> queued runtime replacement, no manual import.

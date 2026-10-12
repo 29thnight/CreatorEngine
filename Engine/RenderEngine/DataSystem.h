@@ -335,6 +335,7 @@ public:
     assets::ModelAssetGeneration::Shared ReadPreparedModel(
         const ModelPreparation& preparation, std::string& error) const;
     bool PublishPreparedModel(const ModelPreparation& preparation, std::string& error);
+    bool IsModelPreparationInvalidated(const ModelPreparation& preparation) const;
     struct SceneAssetPreparation;
     // A short root-publication linearization guard, not an asset residency pin.
     // No mutex stays held while scene deserializers/callbacks run. Its caller must

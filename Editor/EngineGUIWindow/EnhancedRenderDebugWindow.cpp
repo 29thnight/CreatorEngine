@@ -55,6 +55,21 @@ namespace EnhancedRenderDebugUi
 		return "Unknown";
 	}
 
+    const char* TemporalFallbackReason(TemporalStatus status)
+    {
+        switch (status)
+        {
+        case TemporalStatus::SdkNotBuilt: return "This build does not include the selected SDK.";
+        case TemporalStatus::RuntimeUnavailable: return "The selected SDK's runtime files could not be loaded.";
+        case TemporalStatus::IntegrationRequired: return "The selected SDK was not prepared at startup. Restart after configuring its runtime.";
+        case TemporalStatus::BackendUnsupported: return "The selected SDK does not support this rendering backend.";
+        case TemporalStatus::FeatureUnsupported: return "The selected SDK rejected the hardware or required feature.";
+        case TemporalStatus::InvalidInput: return "The selected SDK rejected its configuration or frame inputs.";
+        case TemporalStatus::SdkVersionMismatch: return "The installed SDK runtime version is incompatible.";
+        default: return "The selected SDK could not produce a frame.";
+        }
+    }
+
 	bool DrawAntiAliasingSettings(EnhancedLiveTuning::PostChain& post)
 	{
 		if (!ImGui::TreeNodeEx("Anti-aliasing / Upscaling", ImGuiTreeNodeFlags_DefaultOpen))
@@ -116,6 +131,15 @@ namespace EnhancedRenderDebugUi
 				? TemporalAaLabel(snapshot.activeUpscaler, snapshot.observedUpscaleQuality)
 				: snapshot.fxaaApplied ? "FXAA" : "Off";
 			ImGui::Text("Last submitted AA: %s", activeAa);
+            if (!snapshot.nativeCaptureExclusionActive &&
+                snapshot.observedGeneration == snapshot.requestedGeneration &&
+                snapshot.requestedSettings.requestedUpscaler != TemporalProvider::None &&
+                snapshot.activeUpscaler != snapshot.requestedSettings.requestedUpscaler &&
+                !snapshot.requestedUpscaleResult.IsSuccess())
+            {
+                ImGui::TextColored(kWarnColor, "Fallback active: %s", activeAa);
+                ImGui::TextWrapped("%s", TemporalFallbackReason(snapshot.requestedUpscaleResult.status));
+            }
 			if (snapshot.temporalAaApplied)
 			{
 				constexpr const char* qualityNames[]{ "Native AA (1:1)", "Quality", "Balanced", "Performance", "Ultra performance" };
@@ -946,7 +970,7 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 	ImGui::TextColored(kDimColor,
 		"Other live passes expose no tunable parameters:");
 	ImGui::TextColored(kDimColor,
-		"  GBuffer, Deferred, Forward+, SkyBox, Grid, Gizmo, UI");
+		"  METEOR geometry/cull/shadow/surface/color/blended, SkyBox, Grid, Gizmo, UI");
 	ImGui::TextColored(kDimColor,
 		"SSR / SSS have Tuning but are not wired into the live graph yet,");
 	ImGui::TextColored(kDimColor,

@@ -1,3 +1,4 @@
+#include "Experiment/Import/MeshletBuilder.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 
 #include "Experiment/Cooked/CookedAssetManifest.h"
@@ -462,6 +463,12 @@ namespace RenderTest
             animator.defaultClip = ex::AnimationClipIndex(0);
             draft.animator = animator;
 
+            for (auto& mesh : draft.meshes)
+            {
+                std::string error;
+                if (!ex::importer::BuildMeshlets(mesh, mesh.meshlets, error))
+                    throw std::runtime_error("LX cooked fixture failed: " + error);
+            }
             return draft;
         }
 

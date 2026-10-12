@@ -1,5 +1,5 @@
-// Authored, UNEXECUTED CPU contract fixture. Does not claim SDK/hardware/pixel
-// acceptance. Link the real TemporalReconstruction.cpp/TemporalRuntimeControl.cpp.
+// CPU contracts, executed by verify-temporal-foundation.ps1 in Debug/Release.
+// Does not claim SDK/hardware/pixel acceptance.
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalReconstruction.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
 #include <array>
@@ -82,6 +82,29 @@ int main()
     Expect(selection.upscaler == TemporalProvider::None && selection.frameGenerator == TemporalProvider::None,
         "unsupported fallback is native, not fabricated FSR support");
     TemporalFrameGenerationConfig config;
+    // Independent query records from TU and FG must merge by axis. A stale,
+    // conflicting result must never silently win based on snapshot order.
+    std::array<TemporalCapabilities, 3> split{};
+    split[0].provider = split[1].provider = TemporalProvider::Dlss;
+    split[0].upscaling = { TemporalStatus::Success };
+    split[1].frameGeneration = { TemporalStatus::FeatureUnsupported, 17 };
+    split[2].provider = TemporalProvider::Fsr;
+    split[2].upscaling = split[2].frameGeneration = { TemporalStatus::Success };
+    selection = SelectTemporalProviders(TemporalProvider::Dlss, TemporalProvider::Dlss, TemporalBackend::DX12, split);
+    Expect(selection.upscaler == TemporalProvider::Dlss && selection.frameGenerator == TemporalProvider::Fsr &&
+        selection.requestedFrameGenerator.nativeCode == 17, "split capability axes retain independent SDK result");
+    split[1].upscaling = { TemporalStatus::RuntimeUnavailable, 126 };
+    for (unsigned order = 0; order != 2; ++order)
+    {
+        selection = SelectTemporalProviders(TemporalProvider::Dlss, TemporalProvider::None, TemporalBackend::DX12, split);
+        Expect(selection.upscaler == TemporalProvider::Fsr && selection.frameGenerator == TemporalProvider::None &&
+            selection.requestedUpscaler.status == TemporalStatus::InvalidInput,
+            "conflicting query snapshots fail closed without enabling disabled FG");
+        const auto temporary = split[0]; split[0] = split[1]; split[1] = temporary;
+    }
+    selection = SelectTemporalProviders(TemporalProvider::None, TemporalProvider::None, TemporalBackend::DX12, split);
+    Expect(selection.upscaler == TemporalProvider::None && selection.frameGenerator == TemporalProvider::None,
+        "explicit native request cannot be overridden by available or contradictory SDKs");
     config.target = TemporalPresentationTarget::EditorViewport;
     Expect(ValidateTemporalFrameGenerationConfig(config).status == TemporalStatus::EditorViewportForbidden,
         "Editor FG rejected before resource/native setup");

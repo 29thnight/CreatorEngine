@@ -590,6 +590,8 @@ def compare_product(capture, fixture_path, fixture):
             require(control["realFrameId"] > current["realFrameId"] and
                     control["viewId"] == current["viewId"] and control["sceneEpoch"] == current["sceneEpoch"],
                     "control is not a later submission in the same fixture view")
+            if fixture.get("singleSubmissionPerMeasuredStep", False):
+                measured_step_continuity(current, control)
             probes = geometry_probes(case, fixture["camera"], extent)
             if case["route"] == "alpha":
                 probes = alpha_coverage(base, case, probes, assets)
@@ -604,6 +606,7 @@ def compare_product(capture, fixture_path, fixture):
                         "weighted/instance motion collapses to a rigid fallback")
             report["cases"].append({"route": case["route"], "realFrameId": current["realFrameId"],
                 "previousSubmittedRealFrameId": current["temporalMotion"]["previousSubmittedRealFrameId"],
+                "controlPreviousSubmittedRealFrameId": control["temporalMotion"]["previousSubmittedRealFrameId"],
                 "inputSha256": case["input"]["sha256"], "attachmentHashes": hashes,
                 "controlAttachmentHashes": control_hashes, "probes": results,
                 "passed": all(p["passed"] for p in results)})
@@ -622,6 +625,11 @@ def compare(capture, fixture_path):
     if fixture.get("schema") == PRODUCT_SCHEMA:
         return compare_product(capture, fixture_path, fixture)
     return compare_legacy(capture, fixture_path)
+
+
+def measured_step_continuity(current, control):
+    require(control["temporalMotion"]["previousSubmittedRealFrameId"] == current["realFrameId"],
+            "held measured pose advanced history before the next step")
 
 
 def main():

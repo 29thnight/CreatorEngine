@@ -142,7 +142,7 @@ own::shared_owner<const Texture> Image()
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
     std::memcpy(image.MutablePixelsAt(*image.Find(1, 0)), kMip.data(), sizeof(kMip));
-    return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Spatial.Image", std::move(image));
 }
 
 own::shared_owner<const Texture> Cube(const Environment& environment)
@@ -153,7 +153,7 @@ own::shared_owner<const Texture> Cube(const Environment& environment)
         const auto value = Pack4(environment[face], 1);
         std::memcpy(image.MutablePixelsAt(*image.Find(0, face)), value.data(), sizeof(value));
     }
-    return Texture::CreateSharedFromImage("LX.Spatial.Environment", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Spatial.Environment", std::move(image));
 }
 
 std::vector<SurfacePoint> Points()
@@ -494,6 +494,8 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
         movedDraw.worldMatrix.m[3][0] += 3.f;
         Check(MeshSurfacePlan::BuildForScene(movedDraw, nextView, sceneLods, {}, sceneNext, error),
               "Scene partition pose rebind: " + error);
+        Check(sceneNext->SharesSceneTopology(*sceneFirst),
+              "Temporal previous pose can reuse the same immutable topology after camera/object movement");
         Check(sceneNext->Cost().points == sceneFirst->Cost().points &&
                   sceneNext->Chunks().size() == sceneFirst->Chunks().size() &&
                   sceneNext->Source()->Geometry().vertexData == sceneFirst->Source()->Geometry().vertexData &&
@@ -520,6 +522,8 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
         Check(MeshSurfacePlan::BuildForScene(geometry.draw, view, rasterBudget, rasterPlan, error) &&
                   rasterPlan->Chunks().size() == 1 && rasterPlan->Cost().points == 8199,
               "Raster partition is independent of the IBL compute point limit");
+        Check(!rasterPlan->SharesSceneTopology(*sceneFirst),
+              "Temporal previous pose must rebuild when the chunk topology changes");
         VerifyPartition(geometry, *rasterPlan, rasterBudget.maxChunkPoints);
         Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, rasterBudget, same, error),
               "IBL batch retains its original compute point limit");
@@ -1111,6 +1115,123 @@ void Run(const std::filesystem::path& root)
     }
     RecordingChangeDevice device;
     Check(device.Initialize(64, 64, error), "Native device: " + error);
+    {
+        RHIBufferHandle pooled;
+        RHIBufferDesc description;
+        description.bytes = 64;
+        description.allowUnorderedAccess = true;
+        Check(device.CreateBuffer(description, pooled, error), "Imported final-state fixture buffer");
+        for (const auto mode : {RGSchedulingMode::DeclarationOrder, RGSchedulingMode::ExplicitSingleWriter,
+                                RGSchedulingMode::ExplicitVersioned})
+        {
+            Check(device.BeginFrame(error), "Imported buffer reuse begin");
+            {
+                EnhancedRenderGraph graph(device, mode);
+                auto buffer = graph.ImportBuffer(pooled, RHIResourceState::Common, "Test.PooledBuffer");
+                graph.RequireImportedFinalState(buffer, RHIResourceState::Common);
+                if (mode == RGSchedulingMode::ExplicitVersioned) buffer = graph.Write(buffer);
+                graph.AddPass("Test.PooledBuffer.Write", {{buffer, RHIResourceState::UnorderedAccess,
+                    mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Write}},
+                    [](const auto&) {}, true);
+                Check(graph.Compile(error), "Imported buffer final-state compile: " + error);
+                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                Check(graph.CaptureDiagnosticSnapshot(snapshot) && snapshot.passes.size() == 1,
+                      "Imported buffer final-state diagnostics");
+                Check(std::ranges::any_of(snapshot.passes[0].barriers, [](const auto& barrier) {
+                    return barrier.afterPass && barrier.before == RHIResourceState::UnorderedAccess &&
+                        barrier.after == RHIResourceState::Common;
+                }), "Pooled buffer returns to Common after its final consumer");
+                Check(graph.Execute(error), "Imported buffer final-state execution: " + error);
+            }
+            Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error),
+                  "Imported buffer final-state submission");
+            device.WaitForGpu();
+        }
+        for (const auto mode : {RGSchedulingMode::DeclarationOrder, RGSchedulingMode::ExplicitSingleWriter,
+                                RGSchedulingMode::ExplicitVersioned})
+        {
+            EnhancedRenderGraph cached(device, mode);
+            RGHandle stale;
+            for (unsigned iteration = 0; iteration < 3; ++iteration)
+            {
+                Check(device.BeginFrame(error), "Schedule cache fixture begin");
+                auto input = cached.ImportBuffer(pooled, iteration == 2 ? RHIResourceState::ShaderResource :
+                    RHIResourceState::Common, "Schedule.Buffer");
+                if (mode == RGSchedulingMode::ExplicitVersioned) input = cached.Write(input);
+                cached.AddPass("Schedule.Write", {{input, RHIResourceState::UnorderedAccess,
+                    mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Write}},
+                    [](const auto&) {}, true);
+                Check(cached.Compile(error), "Schedule cache compile: " + error);
+                Check(cached.GetStats().structuralScheduleReused == (iteration != 0), "Identical structure reuses schedule across Reset");
+                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                Check(cached.CaptureDiagnosticSnapshot(snapshot) && snapshot.passes.size() == 1,
+                    "Schedule cache diagnostics");
+                Check(std::ranges::any_of(snapshot.passes[0].barriers, [&](const auto& barrier) {
+                    return !barrier.afterPass && barrier.before == (iteration == 2 ? RHIResourceState::ShaderResource :
+                        RHIResourceState::Common) && barrier.after == RHIResourceState::UnorderedAccess;
+                }), "Initial buffer state is replanned, never cached");
+                if (iteration == 1)
+                {
+                    EnhancedRenderGraph next(device, mode);
+                    auto metadata = cached.SnapshotStructuralSchedule();
+                    cached.Reset(); // The submitted graph may retire before the next declaration.
+                    next.InheritStructuralSchedule(metadata);
+                    auto nextInput = next.ImportBuffer(pooled, RHIResourceState::ShaderResource, "Schedule.Buffer");
+                    if (mode == RGSchedulingMode::ExplicitVersioned) nextInput = next.Write(nextInput);
+                    next.AddPass("Schedule.Write", {{nextInput, RHIResourceState::UnorderedAccess,
+                        mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Write}},
+                        [](const auto&) {}, true);
+                    Check(next.Compile(error) && next.GetStats().structuralScheduleReused,
+                        "Fresh graph inherits CPU metadata after source resource retirement");
+                }
+                stale = input;
+                cached.Reset();
+                device.AbortFrame(); // Synthetic state changes inspect plans, not native execution.
+            }
+            Check(device.BeginFrame(error), "Schedule mutation begin");
+            auto changed = cached.ImportBuffer(pooled, RHIResourceState::Common, "Schedule.Buffer");
+            if (mode == RGSchedulingMode::ExplicitVersioned) changed = cached.Write(changed);
+            cached.AddPass("Schedule.Write", {{changed, RHIResourceState::UnorderedAccess,
+                mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Write}},
+                [](const auto&) {}, false);
+            Check(cached.Compile(error) && !cached.GetStats().structuralScheduleReused &&
+                cached.GetStats().passesExecuted == 1, "Imported writer reachability survives changed root flags without cache hit");
+            cached.Reset();
+            device.AbortFrame();
+            if (mode == RGSchedulingMode::ExplicitVersioned)
+            {
+                Check(device.BeginFrame(error), "Stale schedule handle begin");
+                auto fresh = cached.ImportBuffer(pooled, RHIResourceState::Common, "Schedule.Buffer");
+                fresh = cached.Write(fresh);
+                cached.AddPass("Schedule.Write", {{stale, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                    [](const auto&) {}, true);
+                Check(!cached.Compile(error), "Stale epoch never reuses a cached valid schedule");
+                cached.Reset();
+                device.AbortFrame();
+            }
+        }
+        {
+            RHIBufferHandle second;
+            Check(device.CreateBuffer(description, second, error), "Duplicate import cache fixture buffer");
+            Check(device.BeginFrame(error), "Duplicate import cache fixture begin");
+            EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
+            for (const bool duplicate : {false, true})
+            {
+                auto first = graph.ImportBuffer(pooled, RHIResourceState::Common, "Import.First");
+                auto next = graph.ImportBuffer(duplicate ? pooled : second, RHIResourceState::Common, "Import.Second");
+                first = graph.Write(first); next = graph.Write(next);
+                graph.AddPass("Import.Write", {{first, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+                    {next, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [](const auto&) {}, true);
+                Check(graph.Compile(error) == !duplicate, "Physical import identity changes cannot bypass validation through cache");
+                graph.Reset();
+            }
+            device.AbortFrame();
+            device.ReleaseBuffer(second);
+        }
+        device.ReleaseBuffer(pooled);
+        std::string messages;
+        Check(device.DrainDebugMessages(messages) == 0, "Imported buffer reuse GPU validation: " + messages);
+    }
     {
         Check(device.BeginFrame(error), "Culling fixture begin");
         {

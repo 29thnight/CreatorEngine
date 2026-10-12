@@ -678,6 +678,41 @@ namespace ConsoleCmd
         return EditorObjectOperations::Duplicate(target, ctx.parts.size() == 3 ? ctx.parts[2] : "");
     }
 
+    // Bounded production-scene fixture: all clones are committed in one command,
+    // before the next render packet, so their first world transforms are simultaneous.
+    static CommandCore::CommandResult Cmd_scene_lxtransform_fixture(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 3) return InvalidArguments("scene.lxtransform.fixture <seed> <count:1..512>");
+        uint32_t count{};
+        const auto& value = ctx.parts[2];
+        const auto parsed = std::from_chars(value.data(), value.data() + value.size(), count);
+        if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || !count || count > 512)
+            return InvalidArguments("METEOR transform fixture count must be 1..512.");
+        EntityHandle seed;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], seed);
+        if (!resolved.IsSuccess()) return resolved;
+        const auto width = static_cast<uint32_t>(std::ceil(std::sqrt(double(count))));
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            const auto name = "LXTransformProbe_" + std::to_string(i);
+            auto duplicated = EditorObjectOperations::Duplicate(seed, name);
+            if (!duplicated.IsSuccess()) return duplicated;
+            EntityHandle clone;
+            auto found = EditorObjectOperations::ResolveTarget(name, clone);
+            if (!found.IsSuccess()) return found;
+            // None of these worlds matches the retained seed's completed transform.
+            auto transformed = EditorObjectOperations::Transform(clone,
+                {float(i % width) * 3.f + 1.f, 0.f, float(i / width) * 3.f + 1.f},
+                math::quaternion_from_pitch_yaw_roll(0.f, 0.f, 0.f), {1.f, 1.f, 1.f});
+            if (!transformed.IsSuccess()) return transformed;
+        }
+        CommandData data;
+        data.Set("created", CommandData::Int(count));
+        data.Set("atomicRenderPacket", CommandData::Bool(true));
+        return Ok("METEOR first-transform fixture created through product duplication and transform operations", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_object_parent(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("object.parent <target> <parent|->");
@@ -1342,6 +1377,74 @@ namespace ConsoleCmd
 		return CommandCore::Ok("prefab.corpus.digest", std::move(data));
 	}
 
+    static CommandCore::CommandResult Cmd_camera_cut(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("camera.cut <target>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        auto* scene = SceneManagers->GetActiveScene();
+        auto* object = scene ? scene->Resolve(target) : nullptr;
+        auto* camera = object ? object->GetComponent<CameraComponent>() : nullptr;
+        if (!camera) return PreconditionFailed("camera.unavailable", "Target has no CameraComponent");
+        camera->NotifyCameraCut();
+        auto data = CommandData::Object();
+        data.Set("cameraCutRevision", CommandData::String(std::to_string(
+            camera->CaptureFrameSnapshot().cameraCutRevision)));
+        return Ok("Camera cut requested; renderer observation is separate", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_camera_lens_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2 && ctx.parts.size() != 5)
+            return InvalidArguments("camera.lens.probe <target> [vertical-fov near far]");
+        float values[3]{};
+        if (ctx.parts.size() == 5)
+        {
+            for (size_t i = 0; i < 3; ++i)
+            {
+                const auto& text = ctx.parts[i + 2];
+                const auto parsed = std::from_chars(text.data(), text.data() + text.size(), values[i]);
+                if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || !std::isfinite(values[i]))
+                    return InvalidArguments("Lens values must be finite numbers");
+            }
+            if (values[0] <= 1.f || values[0] >= 179.f || values[1] <= 0.f || values[2] <= values[1])
+                return InvalidArguments("Require 1 < FOV < 179 and 0 < near < far");
+        }
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        auto* scene = SceneManagers->GetActiveScene();
+        auto* object = scene ? scene->Resolve(target) : nullptr;
+        auto* component = object ? object->GetComponent<CameraComponent>() : nullptr;
+        if (!component) return PreconditionFailed("camera.unavailable", "Target has no CameraComponent");
+        auto* camera = component->GetCamera();
+        if (camera->m_isOrthographic)
+            return PreconditionFailed("camera.projection", "Lens probe requires a perspective camera");
+        const auto lens = [&]() {
+            auto data = CommandData::Object();
+            data.Set("fov", CommandData::Double(camera->m_fov));
+            data.Set("near", CommandData::Double(camera->m_nearPlane));
+            data.Set("far", CommandData::Double(camera->m_farPlane));
+            data.Set("cameraCutRevision", CommandData::String(std::to_string(component->CaptureFrameSnapshot().cameraCutRevision)));
+            return data;
+        };
+        auto data = CommandData::Object();
+        data.Set("before", lens());
+        if (ctx.parts.size() == 5)
+        {
+            // Development fixture only: do not synthesize a cut. The normal
+            // submitted projection comparison must discover this change.
+            camera->m_fov = values[0];
+            camera->m_nearPlane = values[1];
+            camera->m_farPlane = values[2];
+        }
+        data.Set("lens", lens());
+        return Ok("Lens fixture state; renderer observation is separate", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_camera_editor(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1763,6 +1866,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "scene.order" }, &Cmd_scene_order);
         reg.Result({ "object.rootref" }, &Cmd_object_rootref);
         reg.Result({ "object.duplicate" }, &Cmd_object_duplicate);
+        reg.Result({ "scene.lxtransform.fixture" }, &Cmd_scene_lxtransform_fixture);
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
         reg.Result({ "scene.populate" }, &Cmd_scene_populate);
         reg.Result({ "physics.shapes" }, &Cmd_physics_shapes);
@@ -1777,6 +1881,8 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "prefab.overrides" }, &Cmd_prefab_overrides);
         reg.Result({ "prefab.update" }, &Cmd_prefab_update);
         reg.Result({ "camera.editor" }, &Cmd_camera_editor);
+        reg.Result({ "camera.cut" }, &Cmd_camera_cut);
+        reg.Result({ "camera.lens.probe" }, &Cmd_camera_lens_probe);
         reg.Result({ "component.list" }, &Cmd_component_list);
         reg.Result({ "prefab.create" }, &Cmd_prefab_create);
         reg.Result({ "play", "stop" }, &Cmd_play);

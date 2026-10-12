@@ -1,8 +1,11 @@
 # Recorded and external temporal evidence
 
-Everything described here is authored source, not an executed result. Only run
-with separate execution authorization, an already running development instance,
-appropriate trusted SDK deployment and the required hardware.
+Execution is scoped by each recorded checkpoint. Native Development Player v7
+owner recording has Debug/Release execution in the
+[consumer checkpoint](../../docs/analysis/TemporalMeasurementConsumers20261010.md).
+The external latency/pacing importer and the matrices below retain their own
+SDK, hardware and artifact acceptance requirements; native CPU owner recording
+does not establish generated output or physical display acceptance.
 
 ## TU fault fallback
 
@@ -222,23 +225,29 @@ file if the instrument already writes the required calibrated columns.
 Latency CSV columns:
 
 ```text
-sampleId,realFrameId,publicationFrameId,viewId,sceneEpoch,inputTimestampMs,photonTimestampMs
+sampleId,realFrameId,publicationFrameId,viewId,sceneEpoch,presenterSequence,inputTimestampMs,photonTimestampMs
 ```
 
 Pacing CSV columns, in observed timestamp order:
 
 ```text
-sampleId,realFrameId,publicationFrameId,viewId,sceneEpoch,frameKind,generatedOrdinal,presentationTimestampMs
+sampleId,realFrameId,publicationFrameId,viewId,sceneEpoch,presenterSequence,frameKind,generatedOrdinal,presentationTimestampMs
 ```
 
 The frame IDs on a generated presentation identify its source real frame. A real
 presentation has ordinal 0; a generated presentation has ordinal 1 through the
-actual presenter's configured count. IDs/ordinals may not repeat. FG-on pacing
+actual presenter's configured count. The same real source may have repeated
+Present attempts. `presenterSequence` selects its exact recorded v6/v7 owner
+observation; it must match both the sequence and the four source identity fields.
+No latest-attempt inference is performed. The column may be omitted only when
+that source has exactly one immutable observation (including legacy captures).
+Pacing identities `(source, presenterSequence, frameKind, generatedOrdinal)` may
+not repeat. Latency trials remain unique per source real frame. FG-on pacing
 requires observed generated presentations. This association must be supplied by
 the measurement source; aggregate DLSS/FSR counters cannot supply it. Lack of
 source association remains missing evidence, not a synthetic generated identity.
 
-`acceptance.minimumSamples` must be at least 20. Latency additionally requires
+`acceptance.minimumSamples` must be a JSON integer of at least 20. Latency additionally requires
 `maximumOnP95Ms` and `maximumP95RegressionMs`; source clock uncertainty is added
 conservatively to these comparisons. Pacing requires
 `maximumOnP95IntervalMs` and `maximumOnIntervalMs`. Limits must be chosen for the

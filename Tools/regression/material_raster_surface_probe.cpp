@@ -9,8 +9,7 @@
 #include "MaterialGraphSceneCompiler.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/PakAudioClipByteSource.h"
-#include "Render/Passes/Geometry/EnhancedDeferredPass.h"
-#include "Render/Passes/Geometry/EnhancedForwardPass.h"
+#include "Render/Passes/Lighting/EnhancedLightTilePass.h"
 #include "Render/Scene/ExperimentMaterialSealing.h"
 #include "Render/Graph/EnhancedMaterialSealHash.h"
 #include "Render/Passes/Geometry/EnhancedDecalPass.h"
@@ -321,7 +320,7 @@ own::shared_owner<const Texture> Image()
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
     std::memcpy(image.MutablePixelsAt(*image.Find(1, 0)), kMip.data(), sizeof(kMip));
-    return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Spatial.Image", std::move(image));
 }
 
 struct FootprintExtent
@@ -357,7 +356,7 @@ own::shared_owner<const Texture> FootprintImage(bool second, bool resized = fals
             for (unsigned x = 0; x < width; ++x)
                 pixels[y * width + x] = FootprintTexel(second, mip, x, y, width, height);
     }
-    return Texture::CreateSharedFromImage(second ? "LX.Footprint.Data" : "LX.Footprint.SRGB", std::move(image));
+    return Texture::CreateSharedFromImage(second ? "METEOR.Footprint.Data" : "METEOR.Footprint.SRGB", std::move(image));
 }
 
 double ImageLod(const FootprintExtent& extent, unsigned width, unsigned height, double scale)
@@ -422,7 +421,7 @@ own::shared_owner<const Texture> Cube(const Environment& environment)
         const auto value = Pack4(environment[face], 1);
         std::memcpy(image.MutablePixelsAt(*image.Find(0, face)), value.data(), sizeof(value));
     }
-    return Texture::CreateSharedFromImage("LX.Spatial.Environment", std::move(image));
+    return Texture::CreateSharedFromImage("METEOR.Spatial.Environment", std::move(image));
 }
 
 IblBakePoint ExpectedPoint(const SurfacePoint& input, const SurfaceView& view, float ior, float level, bool layered)
@@ -967,7 +966,8 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     view.camera.eyePosition = {0, 0, 2};
     own::shared_owner<const SceneViewInput> accepted;
     std::string error;
-    Check(SceneViewInput::Seal(view, {&draw, 1}, {}, accepted, error), "Scene input seal " + error);
+    const bool sealed = SceneViewInput::Seal(view, {&draw, 1}, {}, accepted, error);
+    Check(sealed, "Scene input seal " + error);
     {
         // The producer, queued source, sealed view, and render binding each
         // hand off actual ownership. A weak lookup is never the durable anchor.
@@ -1922,8 +1922,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     IRHIUploadTransactionListener* hostListener{};
     const auto psoWorkerBaseline = NativePsoWorkers(pipelines);
     FailingScenePipelines failingPipelines(pipelines);
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -1937,8 +1937,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     camera.view = camera.projection = math::matrix4x4::identity();
     camera.eyePosition = math::vector3(0, 0, 2);
     context.camera = &camera;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error),
-          "Actual Scene GBuffer/Deferred initialization " + error);
+
     for (const auto& instance : instances)
         WaitSceneProgram(host, context, instance->generation);
     Check(host.ProgramStats().workerExecutions == (PathFinder::IsAssetAuthoringEnabled() ? 2u : 0u),
@@ -1980,14 +1979,14 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         Check(coldSealed, "Cold pending slot seal " + error);
         // Target initialization must work without any native material pipeline.
         Check(device.BeginFrame(error), "Graph-only target frame begin");
-        EnhancedGBufferPass graphTargets;
+        SceneSurfaceTargets graphTargets;
         EnhancedShadowPass graphShadow;
         std::vector<EnhancedDrawItem> graphCasters(coldDraws.begin(), coldDraws.end());
         const auto previousCasters = context.shadowDraws;
         context.shadowDraws = &graphCasters;
         Check(graphShadow.PrepareGraphFrame(context, error), "Graph-only cascade preparation");
         EnhancedRenderGraph clearGraph(device, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
-        graphTargets.DeclareGraphTargets(clearGraph, context);
+        graphTargets.Declare(clearGraph, context);
         graphShadow.DeclareGraphTargets(clearGraph, context);
         std::array<RHIReadback, 2> cleared;
         Check(device.CreateReadback(context.width, context.height, RHIFormat::D32Float, 1, cleared[0], error) &&
@@ -2103,8 +2102,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             camera.eyePosition = expanded == 1 && step >= 2 ? math::vector3(.1f, .05f, 2) : math::vector3(0, 0, 2);
             // Scene coverage rejects back faces. Use the actual backend's
             // clockwise front winding, rather than the two-sided raster fixture.
-            auto core = MakeGeometry(false, true), layered = MakeGeometry(false, true),
-                 legacy = MakeGeometry(false, true);
+            auto core = MakeGeometry(false, true), layered = MakeGeometry(false, true);
             const auto rewrite = [&](Geometry& geometry, float dx, float scale, float z, std::size_t key) {
                 if (expanded == 2)
                     scale *= .04f;
@@ -2139,11 +2137,6 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 rewrite(core, -.15f, .9f, .3f, 5001);
             const bool coplanar = fixture == 3 || fixture == 4;
             rewrite(layered, coplanar ? -.2f : .25f, .9f, coplanar ? .3f : .4f, 5002);
-            rewrite(legacy, -.4f, .5f, .1f, 5003);
-            // Distinct model cache identity for the actual legacy uploader.
-            Check(Uuid::TryParse("33333333-3333-8333-8333-333333333333", legacy.draw.modelMeshView.handle.meshId) &&
-                      legacy.draw.modelMeshView.IsComplete(),
-                  "Actual legacy uploader receives a valid typed UUIDv8 view");
             core.draw.materialGraphInstance = fixture == 5 ? maskedCore : instances[0];
             if (expanded == 4)
             {
@@ -2184,11 +2177,6 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (fixture == 5 || fixture == 6)
                 core.draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
             layered.draw.materialGraphInstance = instances[1];
-            legacy.draw.baseColorFactor = math::color(.3f, .6f, .2f, fixture == 1 ? 0.f : 1.f);
-            if (fixture == 1 || fixture == 2)
-                legacy.draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
-            std::vector<EnhancedDrawItem> oldDraws{legacy.draw};
-            context.draws = &oldDraws;
             const auto lightDirection = Unit({.35, -.2, .8});
             EnhancedLight light;
             light.direction =
@@ -2198,6 +2186,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             context.lights = &lights;
             SceneInputView view{context.frameId, context.sceneEpoch, 71, 1, context.width, context.height, camera};
             std::array<EnhancedDrawItem, 2> graphDraws{core.draw, layered.draw};
+            std::vector<EnhancedDrawItem> lxDraws(graphDraws.begin(), graphDraws.end());
+            context.draws = &lxDraws;
             if (fixture == 4)
                 std::swap(graphDraws[0], graphDraws[1]);
             own::shared_owner<const SceneViewInput> input;
@@ -2261,8 +2251,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
             const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(environment.IsValid(), "Scene reference environment");
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
-                  "Actual Scene pass preparation " + error);
+
             const auto resident = host.PrepareResidency(context, input, error);
             Check(resident, "Scene texture residency " + error);
             auto graph = std::make_shared<EnhancedRenderGraph>(device,
@@ -2299,7 +2288,9 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 ++sceneCompositionFailures;
             }
             gbuffer.Declare(*graph, context);
-            const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs(), !currentFrameDepth);
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
+            const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
             RGTextureDesc aoDesc;
             aoDesc.width = context.width;
             aoDesc.height = context.height;
@@ -2322,9 +2313,9 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                                execution.encoder->BindRenderTargets(target);
                                execution.encoder->ClearRenderTargets(target, value);
                            });
-            deferred.SetInputs(outputs);
-            deferred.SetAmbientOcclusion(ao);
-            deferred.Declare(*graph, context);
+
+
+            lighting = SceneHost::DeclareHdrTarget(*graph, context);
             std::array<RHIReadback, 5> readbacks;
             const std::array formats{RHIFormat::RGBA16Float, RHIFormat::RGBA16Float, RHIFormat::R32Uint,
                                      RHIFormat::D32Float, RHIFormat::D32Float};
@@ -2340,7 +2331,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     },
                     true);
             };
-            copy(0, deferred.GetOutput());
+            copy(0, lighting);
             copy(3, outputs.depth);
 #ifndef LX_PROBE_VULKAN
             Microsoft::WRL::ComPtr<ID3D12QueryHeap> timer;
@@ -2363,7 +2354,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     true);
             }
 #endif
-            const auto sceneLighting = host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
+            const auto sceneLighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
             std::array<RHIReadback, 11> pointReadbacks;
             RHIReadback sampleReadback;
             if (inspectPoint)
@@ -2427,7 +2418,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 bool rejected = false;
                 try
                 {
-                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, deferred.GetOutput(), ao, {});
+                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, lighting, ao, {});
                 }
                 catch (const std::runtime_error&)
                 {
@@ -2606,7 +2597,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             for (unsigned i = 0; i < 5; ++i)
                 Check(device.MapReadback(readbacks[i], mapped[i], error), "Scene readback map");
             std::array<unsigned, 2> visible{};
-            unsigned legacyPixels{};
+            unsigned backgroundPixels{};
             for (unsigned y = 0; y < context.height; ++y)
             {
                 Check(std::memcmp(mapped[3].data.data() + y * mapped[3].rowPitch,
@@ -2620,8 +2611,9 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     {
                         for (unsigned c = 0; c < 4; ++c)
                             Check(mapped[0].At(x, y, c) == mapped[1].At(x, y, c),
-                                  "Legacy/background color remains intact");
-                        legacyPixels += owner == 0xABCDu;
+                                  "METEOR cleared background remains intact");
+                        Check(owner == 0, "METEOR background has no retired surface owner");
+                        ++backgroundPixels;
                         continue;
                     }
                     Check(owner == 0x80000001u || owner == 0x80000002u, "Exact Scene material owner");
@@ -2779,7 +2771,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(visible[fixture == 4 || fixture == 5 || (expanded == 4 && step == 11) ? 1 : 0] > 10,
                   "Core/Layered Scene pixels are visible fixture=" + std::to_string(fixture) +
                       " workers=" + std::to_string(workers) + " core=" + std::to_string(visible[0]) +
-                      " layered=" + std::to_string(visible[1]) + " legacy=" + std::to_string(legacyPixels) +
+                      " layered=" + std::to_string(visible[1]) + " background=" + std::to_string(backgroundPixels) +
                       " depthCenter=" + std::to_string(mapped[3].At(12, 12, 0)));
             if (!coplanar)
                 Check(visible[1] > 10, "Far material remains independently visible");
@@ -2788,9 +2780,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (coplanar)
                 Check(visible[fixture == 4 ? 0 : 1] == 0, "Coplanar color cannot overwrite the depth winner");
             if (fixture == 5)
-                Check(visible[0] == 0, "LX masked alpha discards without stealing depth or color");
-            Check(fixture == 1 ? legacyPixels == 0 : legacyPixels > 5,
-                  "Actual legacy opaque/masked shared-depth policy");
+                Check(visible[0] == 0, "METEOR masked alpha discards without stealing depth or color");
+            Check(backgroundPixels > 5, "METEOR clear covers pixels outside graph surfaces");
             for (auto& readback : readbacks)
                 device.ReleaseReadback(readback);
             graph.reset();
@@ -2867,7 +2858,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         host.ShutdownAfterIdle();
     }
     gbuffer.Shutdown();
-    deferred.Shutdown();
+
     meshes.Shutdown();
 }
 
@@ -3050,19 +3041,19 @@ void RunIssueResourceLifetime(RecordingChangeDevice& device, ProbeRoots& roots, 
         }
     }
     {
-        EnhancedForwardPass pass;
+        EnhancedLightTilePass pass;
         auto opaqueOnly = context;
         opaqueOnly.forwardLightingConsumer = false;
         Check(pass.PrepareFrame(opaqueOnly, error) && device.ownedBuffers.empty(),
-              "Opaque graph-only view does not allocate Forward light-culling buffers");
+              "Opaque graph-only view does not allocate light-tile buffers");
         EnhancedRenderGraph graph(device);
         pass.Declare(graph, opaqueOnly);
-        Check(device.ownedBuffers.empty(), "Opaque graph-only view does not declare Forward culling work");
+        Check(device.ownedBuffers.empty(), "Opaque graph-only view does not declare light-tile work");
         pass.Shutdown();
     }
     for (unsigned fail = 1; fail <= 2; ++fail)
     {
-        EnhancedForwardPass pass;
+        EnhancedLightTilePass pass;
         device.bufferAttempt = 0;
         device.failBufferAt = fail;
         Check(!pass.PrepareFrame(context, error) && device.ownedBuffers.empty(),
@@ -3396,7 +3387,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     {
         RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 0, true);
         std::string validation;
-        Check(device.DrainDebugMessages(validation) == 0, "LX meshlet/depth/HZB validation " + validation);
+        Check(device.DrainDebugMessages(validation) == 0, "METEOR meshlet/depth/HZB validation " + validation);
         ShutdownNative(device, roots, pipelines, textures, pool);
         std::cout << "LX_MESHLET_CULL_LOD_HZB_OK frames=" << sceneCompositionFrames
             << " checks=" << checks << " gpuComponents=" << gpuComponents << " validation=0\n";

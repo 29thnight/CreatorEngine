@@ -59,8 +59,23 @@ BP-0/1에서 같은 입력의 cold pipeline 준비 위치와 worker/PSO 단계�
 - 모든 수용 항목에 입력 manifest, `.rdc` 두 벌, event/리소스 대응표, 원본 추출 데이터, 수치 결과, Debug/Release·장치 신원, 수정 전후 재캡처 경로를 연결한다.
 - 미지원 기능은 capability와 fallback 근거로 별도 기록한다. Vulkan에 없는 기능을 조용히 생략하고 동등하다고 판정하지 않는다.
 
+### 2026-10-11 LX 그림자 메시렛 검증 이관
+
+[그림자 메시렛 GPU 컬링 계획](ShadowMeshletGpuCullingPlan.html)의 후속 목록 6번은 사용자 결정으로 PHASE 4.9에 이관한다. `vk.shadow` 제거와 PBR 테스트의 그림자 축 정리는 대체 검증 완료를 뜻하지 않는다. Vulkan 제품 LX 그림자의 실제 `DispatchMeshIndirect` 실행, DX12/Vulkan 캐스케이드 3장 및 알파 마스크·스키닝 리소스/픽셀 비교는 BP-0~5가 소유하며 현재 수용 증거는 미확인이다.
+
+원 작업은 DX12 Debug/Release 기준선·경로 동치·누락 변이와 성능 근거를 확보한 뒤 입력 manifest, 소스/binary 해시, 캐스케이드 깊이 원본·판정 결과를 인계한다. 4.9에서는 같은 입력의 실제 제품 프레임을 RenderDoc으로 캡처하고 event/리소스 대응·검증 레이어 결과를 확인한다. 이번 이관은 BP 완료나 기존 22인일 추정 변경이 아니며, Vulkan 실행·교차 비교를 LX DX12 작업의 선행으로 역연결하지 않는다.
+
+2026-10-12 [DX12 반복 측정](../analysis/LxShadowRepeatedPerformance20261012.md)의 3개 합성 장면·24회 manifest/프로파일은 보존했다. 4096 슬롯으로 계측 누락을 해결했지만 변동성 때문에 성능 이득은 미수용이다. 이 결과는 Vulkan 실행 또는 BP 완료 증거가 아니다.
+
+2026-10-12 사용자 지시로 착수 성능 조건을 해제하여 [DX12 compute 사전 컬링](../analysis/LxShadowComputeCulling20261012.md)을 구현했다. Scene host ABI는 20이며 이전 cooked Scene 제품은 재생성한다. GPU 생존 목록·indirect 인자·월드 변환 정점 리드백과 합성 깊이 맵 동치를 확인한 DX12 증거를 인계한다. SpirV에서는 새 경로를 활성화하지 않았으며 Vulkan 실행·교차 비교와 BP 완료 여부는 여전히 PHASE 4.9에서 판정한다.
+
 ## 5. 인계받은 관측 기록
 
 2026-09-14~19의 sampler/시각 고정/기동 `gCubeMap`/`vk.*` 기록은 [PBR 계획](PBRWiringStabilizationPlan.md)의 해당 날짜를 따른다. 오래된 기동 결함은 4.9 착수 시 현재 binary에서 재현 여부를 확인하고 수정 완료로 가정하지 않는다.
 
 2026-10-01에 BASE-0에서 범위를 벗어나 수행한 비교와 수정은 [BASE-0 기록](../analysis/RenderBase0Baseline.md)에 보존한다. history guard 수정 뒤 Debug/Release 교차 잔여는 HDR 466픽셀(max 0.435546875), display 186픽셀(max 0.011764705)이며 SSGI 이후 시작한다. 이는 RenderDoc 검증 전 참고 자료다. **4.9는 미착수이며 이 기록을 BP 완료 공수로 올리지 않는다. BASE-0의 실패 조건으로도 사용하지 않는다.**
+
+
+## LX Scene 단일 배선 후속 — 2026-10-12
+
+일반 GBuffer 구현과 구경로 테스트·A/B 도구를 제거했다. Scene ABI 21과 모델 CEMC 12를 사용하며 이전 리소스는 강제 리임포트·재쿠킹한다. 현재 변경과 검증 판정은 [LX 전환 보고서](../analysis/LxSceneBigBangCutover20261012.md)를 따른다. Vulkan 신규 배선 실행 검증은 PHASE 4.9에 남는다.

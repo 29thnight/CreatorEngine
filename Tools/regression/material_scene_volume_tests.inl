@@ -241,9 +241,9 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     SceneHost host;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "Volume mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
-    EnhancedForwardPass forward;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
+    EnhancedLightTilePass tiles;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -263,7 +263,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     SceneHost rejectedHost;
     Check(!rejectedHost.RequestProgram(context, spatial, error) && error.find("homogeneous") != std::string::npos,
           "Spatial Volume is rejected before native preparation");
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) && forward.Initialize(context, error), "Volume actual Scene passes");
+    Check(tiles.Initialize(context, error), "Volume actual Scene passes");
     WaitSceneProgram(host, context, background->generation);
     for (const auto& generation : generations)
     {
@@ -347,13 +347,10 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             backdrop.draw.materialGraphInstance = background;
             backdrop.draw.materialGraphSlot = 73;
             Check(Uuid::TryParse("CCCCCCCC-CCCC-8CCC-8CCC-CCCCCCCCCCCC", occluder.draw.modelMeshView.handle.meshId),
-                  "Volume legacy occluder");
-            std::vector<EnhancedDrawItem> oldDraws;
-            if (fixture == 0 || fixture == 3)
-            {
-                oldDraws.push_back(occluder.draw);
-            }
-            context.draws = &oldDraws;
+                  "Volume METEOR occluder");
+            occluder.draw.materialGraphInstance = background;
+            occluder.draw.materialGraphSlot = 74;
+            const bool hasOccluder = fixture == 0 || fixture == 3;
             std::vector<EnhancedLight> lights;
             if (fixture == 6 || fixture == 10)
             {
@@ -365,10 +362,12 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             }
             context.lights = &lights;
             std::vector draws{volume.draw, backdrop.draw};
+            if (hasOccluder) draws.push_back(occluder.draw);
             if (fixture == 3)
             {
                 draws.push_back(overlap.draw);
             }
+            context.draws = &draws;
             SceneInputBudget sealBudget;
             if (fixture == 5)
             {
@@ -384,8 +383,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const auto environment =
                 fixture != 6 && fixture != 10 ? textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle : RHITextureHandle{};
             Check(host.PrepareResidency(context, input, error), "Volume residency " + error);
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
-                  "Volume Scene prepare " + error);
+
             auto graph = std::make_shared<EnhancedRenderGraph>(device);
             if (workers)
             {
@@ -460,6 +458,8 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             }
             gbuffer.Declare(*graph, context);
             const auto outputs = gbuffer.GetOutputs();
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             host.DeclareGBuffer(*graph, outputs);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 16;
@@ -474,10 +474,10 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 execution.encoder->BindRenderTargets(target);
                 execution.encoder->ClearRenderTargets(target, clear);
             });
-            deferred.SetInputs(outputs);
-            deferred.SetAmbientOcclusion(ao);
-            deferred.Declare(*graph, context);
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, shadowMap);
+
+
+            lighting = SceneHost::DeclareHdrTarget(*graph, context);
+            lighting = host.DeclareColor(*graph, outputs, lighting, ao, shadowMap);
             std::array<RHIReadback, 8> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(16, 16, format, 1, readbacks[i], error), "Volume readback");
@@ -488,14 +488,13 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     },
                     true);
             };
-            copy(0, deferred.GetOutput(), RHIFormat::RGBA16Float);
-            forward.SetInputs({outputs.depth, deferred.GetOutput()});
-            forward.SetGraphMaterials(&host);
-            forward.SetShadow(shadowMap, shadow);
-            Check(forward.PrepareFrame(context, error), "Volume common Forward preparation");
-            forward.Declare(*graph, context);
-            const auto final = forward.GetOutput().IsValid() ? forward.GetOutput()
-                : host.DeclareVolume(*graph, deferred.GetOutput(), outputs.depth, shadowMap);
+            copy(0, lighting, RHIFormat::RGBA16Float);
+            // Product order: the medium composes once, then the blended stream.
+            Check(tiles.PrepareFrame(context, error), "Volume light tile preparation");
+            const auto composed = host.DeclareVolume(*graph, lighting, outputs.depth, shadowMap);
+            tiles.SetDepth(outputs.depth);
+            tiles.Declare(*graph, context);
+            const auto final = host.DeclareBlendedStream(*graph, composed, shadowMap, tiles.GetLighting());
             copy(1, final, RHIFormat::RGBA16Float);
             copy(2, outputs.depth, RHIFormat::D32Float);
             copy(3, outputs.bitmask, RHIFormat::R32Uint);
@@ -553,7 +552,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 {
                     const bool covered =
                         hybrid ? x >= 5 && x < 11 && y >= 5 && y < 11 : x >= 2 && x < 14 && y >= 2 && y < 14;
-                    const bool occluded = !oldDraws.empty() && x < 8;
+                    const bool occluded = hasOccluder && x < 8;
                     Near(mapped[2].At(x, y, 0),
                          hybrid     ? .92 / 2.9
                          : occluded ? .4
@@ -676,8 +675,8 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     }
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
-    deferred.Shutdown();
-    forward.Shutdown();
+
+    tiles.Shutdown();
     meshes.Shutdown();
     std::string messages;
     const auto validation = device.DrainDebugMessages(messages);

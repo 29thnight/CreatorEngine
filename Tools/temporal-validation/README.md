@@ -1,6 +1,25 @@
 # PHASE 4.5 staged live commands
 
-These sources and scripts are authored, **not executed** in this change. They do not constitute compile, hardware, shader, pixel, performance or latency acceptance. The authoritative scope remains `docs/plans/TemporalReconstructionPlan.md` and `TemporalVendorIntegration20261009.md`.
+Source and script presence alone does not constitute execution acceptance. Recorded checkpoints below and `docs/plans/TemporalReconstructionPlan.md` define the executed scope; other stages retain their own hardware, pixel, performance and latency gates. `TemporalVendorIntegration20261009.md` records the integration boundaries.
+
+## 2026-10-10 closure regression entry points
+
+The [current checkpoint](../../docs/analysis/TemporalClosureCheckpoint20261010.md) closes TR1 and TU5 on SDK-enabled DX12 Debug/Release. Other rows retain their full acceptance requirements. Local run identities and binary hashes are in `Artifacts/PR169/closure-checkpoint-20261010.json`.
+
+- `Tools/regression/verify-temporal-native-evidence.ps1 -Config Debug -Stage motion` runs the actual seven-route pixel oracle and history regression. `-Stage profile` checks complete native-real measurement identities and actual structural schedule reuse; `-DisableScheduleCache` requires zero reuse.
+- `Tools/regression/verify-temporal-input-demand.ps1 -Editor <absolute-editor-path>` checks SSGI ON/OFF, native/DLSS input demand, reactivation, commandlet UI pixels and basic validation.
+- `Tools/regression/verify-temporal-sdk-quality.ps1 -Config Debug -Provider dlss -Quality quality` launches an isolated project and requires actual requested SDK output, strict quality provenance, validation and normal shutdown. The accepted checkpoint is warmed Quality, not the complete startup/reset/provider matrix.
+- `Tools/regression/verify-temporal-editor-overlay.ps1 -Editor <absolute-editor-path> -FullViewport -RequireRequestedProviders` checks fixed-camera overlay alignment and actual compiled graph upscale/PostChain/UI ordering.
+
+Replace Debug with Release for the other configuration. SDK compilation and `CreatorDeployTemporalRuntime=true` are separate requirements; the runtime directory is `Bin/x64-<Config>/Editor/Temporal`. Preserve failed attempts and use fresh output directories. A passing native profiler identity gate alone does not establish a master performance comparison or physical presentation latency.
+
+TR0 follow-up: `Tools/regression/verify-temporal-golden-exclusion.ps1 -Config Debug` checks controlled golden captures under non-native startup intent, before/after intent preservation, GPU pixels and 29 failure mutations. `Tools/regression/test-render-measurement-wire.py <actual-v7-recording.ceprof> --output <result.json>` exercises 12 semantic wire mutations with recomputed CRCs. The [measurement checkpoint](../../docs/analysis/TemporalMeasurementCheckpoint20261010.md) records Debug/Release execution and the retained TR0 completion boundary.
+
+The [consumer checkpoint](../../docs/analysis/TemporalMeasurementConsumers20261010.md) inventories the remaining surfaces. `analyze-render-budget.py <capture> --view <id> --render <w> <h> --display <w> <h> --maximum-p95-cpu-ms <explicit-limit> --output <result.json>` applies a CPU render-submit budget to one native-real population; no product default or displayed FPS is inferred. `Tools/regression/verify-temporal-player-recording.ps1 -Config Release -Package <cooked-package>` validates native v7 continuous Player owner observations in an isolated package copy. It does not supply generated output or physical presentation evidence.
+
+`Tools/regression/verify-native-real-consumer.ps1 -Configuration Debug` collects isolated live snapshots and exercises the shared material/RG8 native preflight, including 62 metadata/state/axis rejections. `Tools/regression/RG8NativeMeasurementTests.py <results.jsonl> --output <result.json>` exercises the production RG8 file-admission helper with 52 rejections, including mismatched GPU frame/view/display identities. RG8 normal rows now retain temporal metadata; old rows without it fail instead of inheriting current settings. These checks do not execute the full material empty/robot stages or the RG8 adoption workload comparison.
+
+Diagnostic UI units: Scene updates/s is the rate of promoted view textures. FrameOverview shows engine frame boundary time and diagnostic 16.67/33.33ms reference lines, with no project budget configured there. Rendering shows CPU live render time across views and the selected view's GPU pass-duration sum; overlapping pass durations can count twice. These surfaces do not report physical display FPS or input-to-photon latency. See `Artifacts/PR169/tr0-ui-label-checkpoint.json` for the UI build/runtime scope and retained visual acceptance boundary.
 
 ## Existing command hosts
 
@@ -110,13 +129,30 @@ The driver changes runtime settings only for its chosen mutation stage or explic
 
 ## Acceptance still required
 
+For the deterministic seven-route GPU motion experiment, use an Editor endpoint
+with a live Game view and a stable native extent:
+
+```powershell
+./Tools/temporal-validation/Invoke-TemporalStage.ps1 -EndpointFile C:/Project/Library/CommandService/endpoint.json -Stage motion-fixture -OutputDirectory C:/Evidence/new-motion-run -TimeoutSeconds 300
+```
+
+This stage submits the fixture command asynchronously and polls its operation;
+the command service's five-second synchronous wait is too short for asset
+preparation and fourteen readbacks. The output directory must be new. Recording
+completion alone does not pass: the independent oracle checks exact submitted
+pose/predecessor ownership, route disappearance in the disabled control, and
+analytic motion vectors from the actual GPU bytes. JSON evidence flags are
+booleans. Fixture poses resolve world transforms and UI layout before the same
+frame's proxy publication. Renderer admission retries transient lock contention
+without blocking the game thread or accepting a stale predecessor.
+
 Live PLRD v3 diagnostics carry the submitted spatial mode and DeepDVC dispatch flag; legacy v1/v2 diagnostics decode spatial state as unknown, never assumed Off. Native capture gates require `temporalProvenanceSchemaVersion=2`, `spatialMode=off` and `deepDvcApplied=false` in addition to completed native-real-frame evidence. Older or missing provenance cannot qualify a golden baseline. `.ceprof` snapshot v4 introduced chunk 7 and continuous v5 introduced the per-frame tail containing exact-key CPU-render-submit/GPU-pass measurements and immutable source provenance. Snapshot v6/chunk 7 v2 and continuous v7 now add a distinct CPU presenter-owner return payload within the same 100-byte record size. Full real, publication, scene, view and submission identities remain intact; presenter points additionally retain owner QPC, sequence, configuration generations and native result. Snapshot v1/v2/v4 and continuous v3/v5 remain readable; absent provenance or presenter data is never invented. The 600-frame live window remains separate from the full stream. `summarize-material-profile.py --require-native-real` rejects lost, missing, generated, unknown, mixed-effect or ambiguous GPU provenance, rather than annotating old samples from `temporal.status`. Presenter points do not enter render-cost/native-quality gates and do not prove GPU/SDK completion, OS display or physical photon timing; see [Evidence.md](Evidence.md).
 
 The material performance runner now waits for recording startup, writer finalization and asynchronous save completion, forces image features off and checks the saved file. `completedRealViewRendersPerSecond` is the global completed-view-render rate, not physical display FPS or a single view's rate. Per-view CPU submit and GPU pass costs are grouped separately in the file summary; overlapping pass times are not a frame critical-path or latency measurement. Native quality metadata eligibility does not establish pixel equivalence. Armed developer faults deliberately invalidate native/temporal measurement proof while retaining source IDs and factual native capture suppression.
 
-See [External measurement and fault acceptance](Evidence.md) for the actual acquisition/import tools, required instrument/raw artifacts, exact presenter-frame association, and authored TU fault matrix. `Record-TemporalEvidence.ps1` saves a complete profile plus sampled immutable presenter responses for a separately running external instrument. `analyze-temporal-evidence.py` accepts physical input-to-photon samples or individual presentation timestamps, never CPU markers or aggregate generated-frame counts. Missing polled presenter frames are rejected, not inferred. None of these tools has been executed here.
+See [External measurement and fault acceptance](Evidence.md) for acquisition/import tools, required instrument/raw artifacts, exact presenter-frame association, and the TU fault matrix. `Record-TemporalEvidence.ps1` saves a complete profile plus sampled immutable presenter responses for a separately running external instrument. `analyze-temporal-evidence.py` accepts physical input-to-photon samples or individual presentation timestamps, never CPU markers or aggregate generated-frame counts. Repeated v6/v7 Present attempts require an exact external `presenterSequence`; missing associations are rejected. `Tools/regression/TemporalExternalEvidenceTests.py --native <actual-player.ceprof> --output <result.json>` exercises importer contracts and native repeated-attempt association. Debug/Release native records and 27 importer contract tests passed at the [consumer checkpoint](../../docs/analysis/TemporalMeasurementConsumers20261010.md). External instrument latency/pacing and actual generated output acceptance remain unverified.
 
-Run Debug/Release DX12 compilation and actual TR/TU/FG acceptance only after separate execution authorization. The raw motion capture producer, independent analytic vector checker and source fixtures are authored; the deterministic route-owning static/skinned/instanced/decal/alpha scene driver is still missing implementation. [Motion fixture details](MotionFixtures.md) explains why numeric agreement returns incomplete route acceptance, not TR1 PASS. Development DX12 FG host-failure injection is authored as documented below; per-output SDK presentation timestamp producers and an in-engine physical latency instrument remain absent; the importer deliberately uses external measured evidence instead. Hardware matrix, pixels, jitter/resize/camera-cut resets, provider fallback, final-consumer lifetime and real-frame/performance/latency acceptance are unrun. Mutations deleting extent metadata or relabeling generated frames must fail gates. Source publication and diagnostic command success do not close those gates. Vulkan runtime parity remains PHASE 4.9.
+Run Debug/Release DX12 compilation and actual TR/TU/FG acceptance only after separate execution authorization. The raw motion capture producer, independent analytic vector checker and source fixtures are authored; the deterministic seven-route scene driver is implemented and requires fresh GPU capture/oracle evidence per tested binary and device. [Motion fixture details](MotionFixtures.md) distinguishes legacy numeric-only evidence from the submitted-step and route-ownership experiment. Development DX12 FG host-failure injection is authored as documented below; per-output SDK presentation timestamp producers and an in-engine physical latency instrument remain absent; the importer deliberately uses external measured evidence instead. Hardware matrix, pixels, jitter/resize/camera-cut resets, provider fallback, final-consumer lifetime and real-frame/performance/latency acceptance are unrun. Mutations deleting extent metadata or relabeling generated frames must fail gates. Source publication and diagnostic command success do not close those gates. Vulkan runtime parity remains PHASE 4.9.
 
 ## Pre-device startup settings and optional latency support
 
@@ -126,13 +162,13 @@ For the independent Streamline routes, set `CREATOR_TEMPORAL_REFLEX=off|on|on-bo
 
 `CreatorEnableAntiLag2=true` with `CreatorAntiLag2Root` selects the external official Anti-Lag2 v2.0.0a header for FSR latency control. The wrapper uses runtime `Initialize` support, pre-input `Update`, real render-submission marking and FSR's official context binding. `latencyResult`/`latencyProvider` remain independent from FG support; a marker is not an input-to-photon measurement. No SDK or driver is installed by the commands.
 
-Authored fixtures include `Tools/regression/TemporalRuntimeContractTests.cpp`, `TemporalMeasurementProvenanceTests.cpp`, `TemporalFaultControlTests.cpp`, `TemporalPerformanceEvidenceTests.py` and the profiler codec/diagnostics fixtures. They exercise production contracts and byte-level rejection, not a mock successful provider. They remain uncompiled/unexecuted here. Motion numeric fixtures still need their deterministic route-owning scene driver and actual GPU captures; CPU checks do not stand in for those routes.
+Authored fixtures include `Tools/regression/TemporalRuntimeContractTests.cpp`, `TemporalMeasurementProvenanceTests.cpp`, `TemporalFaultControlTests.cpp`, `TemporalPerformanceEvidenceTests.py` and the profiler codec/diagnostics fixtures. They exercise production contracts and byte-level rejection, not a mock successful provider. They remain uncompiled/unexecuted here. Motion acceptance requires the deterministic route-owning scene driver and actual GPU captures; CPU checks do not stand in for those routes.
 
 For a separately authorized CPU-contract run from an existing Visual Studio developer shell (no SDK required):
 
 ```powershell
 New-Item -ItemType Directory -Force Artifacts/TemporalContracts | Out-Null
-cl.exe /nologo /std:c++20 /EHsc Tools/regression/TemporalRuntimeContractTests.cpp Engine/RenderEngine/Render/Temporal/TemporalReconstruction.cpp Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.cpp /Fe:Artifacts/TemporalContracts/runtime-contracts.exe
+cl.exe /nologo /std:c++20 /EHsc /utf-8 /IEngine/Utility_Framework Tools/regression/TemporalRuntimeContractTests.cpp Engine/RenderEngine/Render/Temporal/TemporalReconstruction.cpp Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.cpp /Fe:Artifacts/TemporalContracts/runtime-contracts.exe
 if ($LASTEXITCODE -ne 0) { throw 'CPU contract fixture compilation failed' }
 & ./Artifacts/TemporalContracts/runtime-contracts.exe
 if ($LASTEXITCODE -ne 0) { throw 'CPU contract fixture failed' }
@@ -165,6 +201,138 @@ The motion stage needs a live fixture containing every reported motion route; an
 
 The SDK build switches apply consistently to the solution and final consumers: `Configuration=Debug` or `Release`, `Platform=x64`, `EngineShipping=false`; then enable only the authorized supplied SDKs using `CreatorEnableFsrDx12=true`, `CreatorFsrRoot`, `CreatorFsrLibraries`; `CreatorEnableDlssStreamline=true`, `CreatorStreamlineRoot`; `CreatorEnableXeSS=true`, `CreatorXeSSRoot`; and optionally `CreatorEnableAntiLag2=true`, `CreatorAntiLag2Root`. FSR requires full paths to the externally source-built upscaler/optical-flow/interpolation/DX12-backend libraries and their import dependencies. These settings neither fetch nor build an SDK. Never enable both FSR native backend static libraries in the same binary. See the [pinned integration requirements](../../docs/plans/TemporalVendorIntegration20261009.md) before any separately authorized build or runtime deployment.
 
+### DX12 temporal history contract
+
+`dx12.temporalhistory` runs the production `EnhancedTemporalViewState::Begin` /
+`Commit` code with a real DX12 device and native, FSR and XeSS SDK configuration.
+Supply the installed trusted runtime directory through
+`CREATOR_TEMPORAL_RUNTIME_DIRECTORY`; a missing requested SDK fails the test.
+Run the command asynchronously and save the completed operation's structured
+`data.passed`, `data.scope` and `data.log` in a fresh evidence directory.
+
+The assertions cover independent rational Halton samples, render-pixel raster
+jitter, native and SDK native-AA 1:1 extents, quality resolution separation,
+aborted preparation, continuous camera movement, cut/FOV/explicit reset/resize,
+logical view and scene/source history changes. The test drives Commit itself:
+it does not submit a graph, evaluate SDK pixels or prove visual quality. Pair it
+with live `upscale` and `reset` stages; reset now requires a fresh submitted
+observation with the exact request generation and advancing history revision.
+
+### Live resize and camera-cut history recovery
+
+Create a disposable Editor scene with one active camera at position zero, select
+the Game viewport, and run `Verify-TemporalHistoryRecovery.ps1 -EndpointFile ...
+-CameraTarget Camera -OutputDirectory <new-directory>`. The driver moves that
+camera, invokes `camera.cut`, and resizes the actual hidden or visible host
+window twice for each of native, FSR and XeSS. It restores the original host
+client dimensions and camera position. Use a disposable fixture because the
+camera's cut revision is intentionally advanced and the provider preference is
+changed. `window.info` retains the screen-bus `width/height` fields and separately
+reports `hostClientKnown/hostClientWidth/hostClientHeight` for window restoration.
+
+`temporal.status.lastHistoryReset` retains the last committed reset frame's
+identity, source, extents, provider and canonical first jitter even when polling
+a later frame. Preparation and aborted recordings cannot replace it. The
+driver requires a fresh matching view/scene/generation, actual temporal AA
+dispatch, advancing history and observed GPU completion of the reset frame.
+It rejects a normal camera move that resets history and verifies continuous
+frames after resize. The normal-move check waits for `submittedCameraPosition`
+to reach the new position; a fresh frame of the old pose cannot pass. Enabled
+DX12 validation with zero problems/dropped messages and exact host window
+restoration are mandatory. These are live history/AA recovery observations; they do
+not inspect pixels, assess reconstruction quality or measure physical display
+timing. Native golden captures retain their existing forced exclusion contract.
+
+`Tools/regression/TemporalHistoryRecoveryGateTests.ps1 -EvidenceFile
+<recovery.json>` loads only the driver's pure reset predicate. It accepts the
+nine recorded native/FSR/XeSS reset observations and must reject nine mutations
+of reset identity, revision, first jitter, extent, view, scene and provider.
+
+### SSGI GPU history after abort and reset
+
+`dx12.ssgi` is registered only in the process-scoped commandlet table. Run
+`Verify-SSGIAbortRecovery.ps1` with a disposable development project:
+
+```powershell
+./Tools/temporal-validation/Verify-SSGIAbortRecovery.ps1 `
+    -EditorExecutable 'C:/checkout/Bin/x64-Debug/Editor/CreatorEditor.exe' `
+    -ProjectPath 'C:/fixtures/SSGIProject' `
+    -RuntimeDirectory 'C:/temporal-runtime' `
+    -OutputDirectory 'C:/new/ssgi-debug-evidence'
+```
+
+Repeat with the Release executable and a fresh output directory. The runner
+requires successful structured SSGI results, all three abort comparisons and
+eight reset/recreation comparisons,
+enabled basic DX12 validation with zero messages/problems/drops, and process
+exit code zero. It records the runtime binary hash and stops its own process on
+timeout. Use ordinary build/deployment steps to provide the runtime dependencies.
+
+The GPU test renders a procedural sphere/ground fixture and compares eight
+accepted frames with sequences that insert an abandoned preparation, declaration
+or fully recorded graph before each accepted frame. The abandoned camera differs
+from the accepted camera. Every recovered 128x128 RGBA history value must be
+finite and match the uninterrupted sequence within 1e-6; map/extent failures
+reject the run.
+
+The same test warms eight frames, then compares a production SSGI pass against a
+newly initialized pass on the first and eighth frame following a shared cut
+reset, shared resize reset at two extents, or extent-only texture recreation.
+The full render inputs are 256x256, 128x192, 384x320 and 192x128; depth/normal
+textures are initialized on the GPU at each actual input extent. All finite
+RGBA values must match within 1e-6, with nonempty surface samples, first-frame
+accumulation exactly one and eighth-frame average at least four. The reset
+signal is supplied directly to `PrepareFrame`; the cut fixture keeps the same
+pose. This establishes reset-consumer pixel recovery, independently of the live
+camera/window routing checks described above. It does not establish a moving
+camera's image quality. Device loss, shared view-history consolidation, SDK
+reconstruction quality and end-to-end live cut/resize pixel capture remain
+separate acceptance work.
+
+### Live SSGI camera-cut and window-resize pixels
+
+Use a disposable scene with one active zero-position camera, a directional
+light, and the static cube/floor model in `fixtures/SSGIRecovery.gltf`. Import
+and place it through the normal `model.load` and `model.place` commands, then
+select the Game viewport. This fixture uses real GBuffer geometry and nonzero
+SSGI radiance. Run:
+
+```powershell
+./Tools/temporal-validation/Verify-LiveSSGIRecovery.ps1 `
+    -EndpointFile 'C:/fixture/Library/CommandService/endpoint.json' `
+    -CameraTarget Camera -OutputDirectory 'C:/new/live-ssgi-evidence'
+```
+
+The driver defaults to native rendering; `-Provider fsr|xess -Quality <quality>`
+selects and requires actual requested SDK reconstruction. It moves the actual camera to X=0.2, and
+checks the submitted pose. It arms `render.temporal.history.capture <new-dir>
+<1|8> [fixed-sdk-clock]` before invoking `camera.cut` or `window.resize`, then polls that command's
+`status` subcommand. This capture mode preserves the temporal state and observes
+the first or eighth accepted frame following the next reset. It rejects changes
+of view, scene or history generation, excludes FG/spatial processing, and records the
+reset/cut identities and accepted predecessor. Ordinary PBR/golden capture keeps
+its native exclusion and controlled-history behavior. History recovery captures
+are explicitly ineligible for golden acceptance. They must be cancelled with
+`render.temporal.history.capture cancel` if the triggering event is abandoned.
+
+The 13 captures contain an old-pose control and six recovery/reference pairs:
+camera cut and actual host resizes to 960x640/1280x720, each at frame 1 and 8.
+A new cut at the same pose and target extent provides each reference. The
+independent Python oracle checks raw float bytes, actual depth changes on camera
+movement, nonempty radiance/surface pixels, first-frame accumulation exactly 1
+and later average at least 4. All SSGI RGBA values must agree within 1e-6; the
+final GPU display texture allows at most one 8-bit code step. Geometry extents
+and submitted identities must match, and DX12 validation/restoration must pass.
+`records.json`, per-capture manifests/images, `pixels.json`, and `recovery.json`
+preserve both results and failure evidence. The driver restores the host window
+and camera position; it intentionally leaves the tested provider preference.
+
+Run `Tools/regression/LiveSSGIRecoveryOracleTests.py --directory <live-directory>
+--output <new-directory>` to accept the recorded captures and reject twelve native or nineteen SDK
+identity/clock/quality/pixel corruptions (add `--provider` and `--quality` for SDK data). Corrupted copies are stored separately from the
+original evidence. Scope is native SSGI and the final GPU display image, not
+physical scanout, SDK reconstruction quality or native-versus-legacy equivalence.
+
 ### Development FG failure scenarios
 
 `-Stage fg-fault-fallback -FaultMode fg-prepare -Provider fsr -ExpectedFallback none`
@@ -175,3 +343,200 @@ successful requested-provider baseline is mandatory. The injected result remains
 separate from real native Present, generated output and final consumption. The
 final-consumption fault rejects only a host acknowledgement after genuine drain;
 it never fabricates GPU completion. All these sources/fixtures are unexecuted.
+
+### Repeated provider teardown
+
+With a running Editor game viewport or development Player rendering real frames,
+verify native/FSR/XeSS transitions sequentially:
+
+```powershell
+./Tools/temporal-validation/Verify-TemporalProviderTransitions.ps1 `
+    -EndpointFile $endpoint -OutputDirectory 'C:/new/transition-evidence' -TimeoutSeconds 60
+```
+
+This requires working FSR and XeSS runtimes. It checks actual submitted AA,
+provider teardown, generation acknowledgement, and native FXAA restoration.
+`transitions.json` records each completed step and its elapsed time; failures keep
+the completed steps and the failing stage's evidence. It does not establish
+image quality, visible presentation cadence, or input latency acceptance.
+
+Choose `CREATOR_DX12_VALIDATION=basic` before launching for the ordinary transition
+check. A separate `gpu` run may need a longer explicit timeout because GPU-based
+validation instruments SDK shaders and can trigger expensive driver compilation.
+Preserve a timeout as a failed bounded run; do not relabel it as a pass merely
+because a later observation shows the provider active.
+
+### SDK reset recovery comparison
+
+With `-Provider fsr|xess`, the live recovery driver explicitly requests
+`fixed-sdk-clock`: only the targeted SDK packet delta is normalized to 1000/60 ms
+while the capture is pending/recording. Simulation and camera clocks remain live.
+The history manifest records this condition and captured SDK quality; the oracle
+rejects missing/mismatched clocks, provider fallback, wrong quality or duplicate FXAA.
+FSR uses delta-dependent temporal processing, so ordinary variable-time sequences
+are not assumed to produce identical reconstruction pixels. Their failures are
+retained separately rather than increasing pixel tolerances.
+
+Input attachments and SSGI are read at the actual render extent; reconstructed HDR
+and final display are read at display extent. Besides SSGI/display comparisons,
+reconstructed HDR must agree within 1e-6. A successful recovery comparison proves
+reset recovery under this explicit SDK-clock condition; continuous motion,
+ghosting/disocclusion quality and physical scanout require separate acceptance.
+
+The final output checks also require nonconstant RGB content and a genuine RGB
+change between old/moved camera captures, independently of the depth-change
+check. Constant reconstructed HDR/display mutations must be rejected.
+
+PR #169 executed checkpoint: `Artifacts/PR169/sdk-pixels/results.json` accepts
+20 DX12 Debug/Release FSR/XeSS combinations across all five requested qualities.
+260 GPU captures / 120 recovery-reference comparisons have zero SSGI, reconstructed
+HDR and final display error under the explicit matched SDK clock. All outputs are
+nonconstant and change with the real camera pose. The per-case baseline rejects
+17 mutations; the four Quality cases additionally reject two constant outputs
+each. Original golden captures, 468 temporal assertions and SSGI regressions pass
+in both configurations. Unmatched variable-time FSR failures remain preserved.
+This checkpoint does not accept continuous-motion ghosting/disocclusion quality,
+variable-time image quality, native-versus-legacy equivalence or physical scanout.
+
+## Continuous SDK interior/disocclusion diagnostic
+
+`render.temporal.motion.fixture <new-absolute-directory> sdk-sequence` records an
+explicit perspective-camera diagnostic using the selected FSR/XeSS provider.
+Unlike the native seven-route mode it does not acquire native exclusion and its
+captures are never golden eligible. The v2 fixture observes at least 32 distinct
+accepted baseline submissions with one view/scene/history, captures a stationary
+baseline with zero motion and verified HDR/ownership, then submits eight foreground translations
+of 0.5 world units, followed by eight foreground-disabled frames. Each measured
+pose submits once; the next capture must retain the exact preceding capture's
+source/real identity, view, scene, and history generation, including the first
+moving frame linked to the captured baseline. There are 17 captures per run.
+Only SDK packet delta
+is fixed to 1000/60 ms; CPU/readback pacing and physical scanout are not tested.
+
+`Verify-TemporalSdkSequence.ps1 -EndpointFile <absolute-endpoint-file> -OutputDirectory <new-absolute-directory> -Provider fsr|xess -Quality native-aa|quality|balanced|performance|ultra-performance`
+selects the requested quality with FG/NIS/DeepDVC disabled, records the owned fixture, then runs
+`Compare-TemporalSdkSequence.py`. The fixture temporarily isolates and restores
+the authoring scene; the verifier leaves the selected temporal settings active.
+The oracle checks authored asset/input hashes, actual SDK provenance, all GPU
+bytes for finiteness and exact dimensions, projected foreground/background
+ownership and depth, motion in render pixels, and uninterrupted predecessors.
+For newly exposed/background-recovery interiors, HDR residual is measured against
+the same frame's pre-upscale input; final GPU display residual uses a stable
+pixel in the final foreground-disabled recovery capture, whose authored state,
+submission identity, source HDR/depth, full bytes and output are also verified.
+This avoids comparing pixels with different spatial post-processing effects.
+The recovery reference is not independent proof of absolute display tone mapping;
+its HDR is separately checked against pre-upscale input. Both residuals are divided by foreground /
+background contrast. Predetermined limits are mean <= 0.10 and p95 <= 0.25,
+minimum contrast 0.03, and a two-render-pixel boundary exclusion. This narrow
+opaque-quad interior test does not accept silhouette edges, other material
+routes, unmeasured extents, variable-time SDK packets, or physical display.
+Native AA requires identical render/display extents; the other qualities require
+smaller render extents. The verifier binds the requested quality to the authored
+sequence and every capture. At low input heights the unchanged two-render-pixel
+guard can leave no disocclusion interior; that case fails instead of weakening
+the mask or thresholds. Resize the host window before recording, and report the
+actual Game display extent from the authored input rather than the host size.
+Quality threshold failures are collected for all sixteen frames in
+`qualityFailures`; the report remains `passed: false` and the CLI exits with 1.
+Malformed bytes or missing submission/ownership proof still fail immediately.
+
+`Tools/regression/TemporalSdkSequenceOracleTests.py --capture <executed-fixture> --output <new-mutation-directory>`
+checks acceptance of existing GPU evidence and rejection of thirteen quality / identity /
+clock / reset / pixel corruptions. It preserves the original evidence and does
+not generate GPU evidence. Local execution reports are under
+`Artifacts/PR169/sdk-sequence`, `Artifacts/PR169/sdk-quality-matrix`, and
+`Artifacts/PR169/sdk-baseline`; completed scope is recorded in the phase plan.
+
+The SDK sequence verifier requires the v2 captured/warmed baseline. The Python
+checker keeps legacy v1 review available, but `--require-baseline` rejects v1.
+Warmup acceptance applies to continuous motion from the captured stable pose.
+It does not accept the original cold/appearance behavior or the entire quality
+and extent matrix on a newly built binary. Preserve original failed records.
+
+The verifier's `-Startup` switch records the separate `sdk-startup` diagnostic
+(`temporal.sdk.startup.v1`). It starts capture admission after at least one
+observed non-reset baseline submission instead of deliberately waiting for 32.
+Renderer contention may add observations and frames; reports record both the
+observation count and the real-frame gap to the captured baseline. The checker
+rejects 32 or more observations or a gap of 32 or more real frames. This bounds
+the observed interval, not the lifetime of the SDK context before observation.
+All 17 captures, submitted predecessors, input ownership and existing quality
+thresholds are checked as in v2. `--require-startup` and `--require-baseline`
+reject the other mode. This is an early observed non-reset sequence, not proof
+of the reset frame or a new object's first appearance. The final display
+baseline check still measures contrast/uniformity rather than absolute tone
+mapping. Failed historical captures remain failed.
+
+`Verify-TemporalResetQuality.ps1 -EndpointFile <endpoint> -OutputDirectory <new-directory> -FixturePath <loaded-copy-of-SSGIRecovery.gltf> -Provider fsr|xess -Quality <quality>`
+uses the existing first-submission history readback to record two distinct live
+camera cuts. Run it in an idle scratch Editor scene with the authored cube/floor
+fixture at identity transform, a primary camera at the origin, and a light.
+It leaves the selected SDK settings active. The caller owns scene setup and
+restoration. The verifier checks basic DX12 validation and releases the capture
+before offline analysis; cleanup failure is recorded without losing its receipt.
+All command and operation-poll requests close their connections.
+
+`Compare-TemporalResetQuality.py` verifies the actual first reset submission,
+cut receipt, view/scene/history, SDK/quality/fixed clock, authored fixture hash,
+sealed material and draw, full finite readback bytes and SDK input/output extents.
+It selects foreground/background interiors from input color/depth/normal and a
+two-render-pixel cardinal/corner neighborhood, whose input HDR variation is at
+most 0.02. At least 64 input and output pixels per region and contrast 0.03 are
+required. Reconstructed HDR is compared with that frame's pre-upscale HDR using
+reset sample-zero jitter (0, -1/6); normalized mean/p95 limits remain 0.10/0.25.
+The separately captured SDK stage must equal the reconstructed HDR attachment.
+The two resets' SSGI/HDR/final GPU display must repeat within 1e-6. This proves
+repeatability of final display, not independent absolute tone-map correctness.
+An insufficient interior mask fails rather than reducing the guard or limits.
+
+`Tools/regression/TemporalResetQualityOracleTests.py` mutates existing executed
+reset evidence. Its nonconstant HDR-bias case changes both reset outputs and SDK
+stage images equally, so repeatability and nonempty-output checks cannot hide
+failure of the independent input/HDR threshold. Execution artifacts are under
+`Artifacts/PR169/sdk-reset`. Scope excludes first object appearance, silhouettes,
+non-smooth surfaces, variable-time packets, physical scanout and the original
+opaque-quad cold-motion failure. It does not replace the entire quality matrix.
+# Artifact storage
+
+GPU capture entry points now require at least 30 GiB of actual free space. Native,
+golden, SDK quality, material, reset and SSGI drivers retain one latest successful
+raw run per family; rollover occurs only after their required acceptance checks.
+Use `-KeepRawCaptures` to pin an additional original needed by a pending comparison.
+SDK sequence and RG8 collection check capacity but leave final retention to the
+outer acceptance driver. Failed runs are never silently treated as successes.
+
+SDK sequence/reset mutation tests immediately discard raw `.f32` copies after
+their expected rejection, preserving manifests and reasons. Unexpected acceptance
+keeps that case for investigation. Cleanup ledgers distinguish retained historical
+verdicts from replayable pixels. Review repeated failures before retrying a large
+capture and measure recovery using disk free space, since hardlinks inflate summed
+file lengths. See [PR169 retention evidence](../../docs/analysis/ArtifactRetention20261011.md).
+
+### DLSS quality / resize reset recovery
+
+`Tools/regression/verify-temporal-transitions.ps1 -Config Debug -Quality quality -VerifyHistoryContract`
+launches an isolated SDK-enabled Editor (repeat with Release). The live driver
+`Verify-TemporalTransitions.ps1` waits for render-thread capture readiness before
+changing quality or window size, then captures accepted reset ordinals 1 and 8
+and camera-cut references. Five quality cases cover Quality-to-other modes and
+Balanced-to-Quality, with host resize to 960x640 and 1280x720 from 1400x900.
+`Compare-TemporalTransitions.py` checks submitted identity, fixed SDK clock,
+unchanged camera/FOV, display aspect, geometry, SSGI, HDR and final GPU pixels.
+It does not claim every directed quality pair or physical presentation timing.
+
+The launcher requires zero DX12 validation messages and normal exit before
+pruning to the `quality-1` representative; verdicts, manifests and hashes remain.
+`TemporalTransitionOracleTests.py` checks rejected receipt/provenance mutations
+using that retained capture without cloning pixel payloads.
+
+### Perspective lens reset
+
+`Tools/regression/verify-temporal-transitions.ps1 -Config Debug -Quality quality -Scenario lens -VerifyHistoryContract`
+(and Release) runs an isolated Editor Game viewport. The default scenario remains `transitions`.
+
+The live `camera.lens.probe <target> [vertical-fov near far]` raw fixture changes perspective lens values without emitting a camera cut or undo transaction. It is a diagnostic command, not the editor authoring workflow. FOV must be strictly between 1 and 179 degrees and clip planes must satisfy `0 < near < far`; invalid inputs leave the camera unchanged.
+
+The lens scenario checks FOV 45/90, near .25 and far 100 from the 60/.1/500 baseline, at accepted reset ordinals 1 and 8. Same-state camera-cut captures are references; analytic projection coefficients and unchanged camera pose/cut revision distinguish actual lens changes from synthetic resets. Eight identical-value assignments must preserve history across later submissions. Baseline restoration is also compared. Each run records 18 captures, 9 comparisons, 8 no-op checks and 6 invalid-input rejections. Fixed SDK time and a static fixture limit this evidence; it does not cover orthographic transitions, continuous zoom, arbitrary projection matrices or general visual quality.
+
+Successful runs retain only `fov-45-1` after pixel checks and normal exit. All verdicts/manifests/hashes remain. `TemporalLensOracleTests.py` rejects changed lens receipts, mixed reset/control identity and invalid projection matrices using this representative without copying raw pixels.

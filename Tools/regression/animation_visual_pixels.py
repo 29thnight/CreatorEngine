@@ -2,6 +2,7 @@
 import json
 import sys
 from pathlib import Path
+from base0_artifacts import audit_pixel_measurement
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -27,6 +28,7 @@ def main(work):
     for name, report in reports.items():
         folder = work / name
         manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))
+        audit_pixel_measurement(manifest)
         pixels = {}
         for attachment in manifest["attachments"]:
             data = np.fromfile(folder / attachment["file"], dtype="<f4")

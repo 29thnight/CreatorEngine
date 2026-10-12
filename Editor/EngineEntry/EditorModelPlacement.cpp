@@ -46,6 +46,7 @@ namespace Editor
         EntityHandle root;
         bool modelPublished{ false };
         bool positionApplied{ false };
+        unsigned preparationRetries{};
         std::size_t applyFrames{};
         std::size_t loadingFrames{};
         double prepareMs{};
@@ -332,6 +333,47 @@ namespace Editor
         }
     }
 
+    bool ModelPlacement::RetryInvalidatedPreparation(const own::shared_owner<Request>& request)
+    {
+        // No scene entities exist before publication. A derived-data rebuild or
+        // generated material watcher may invalidate this ticket during Prepare.
+        // Retry the source request, never publish the obsolete generation.
+        if (request->root.IsValid() || request->modelPublished || request->preparationRetries >= 3
+            || request->cancelled.load(std::memory_order_acquire)
+            || request->assetRoot != PathFinder::Relative()
+            || request->project.lock() != SceneManagers->ProjectLayers()
+            || !DataSystems->IsModelPreparationInvalidated(request->modelPreparation)) return false;
+        const auto previousRecipe = request->preparation;
+        auto preparation = DataSystems->PrepareModelAssetByPath(request->path);
+        if (!preparation) return false;
+        request->prepared.reset();
+        request->modelPreparation = std::move(preparation);
+        request->error.clear();
+        request->ready.store(false, std::memory_order_release);
+        ++request->preparationRetries;
+        job_group work;
+        work.add([request] { Prepare(request); });
+        std::array<job_handle, 2> dependencies;
+        std::size_t dependencyCount = 0;
+        const auto modelWork = DataSystems->ModelPreparationCompletion(request->modelPreparation);
+        if (modelWork.valid()) dependencies[dependencyCount++] = modelWork;
+        if (previousRecipe.valid()) dependencies[dependencyCount++] = previousRecipe;
+        try
+        {
+            request->preparation = ce::get_job_scheduler().submit_after(
+                std::span<const job_handle>(dependencies.data(), dependencyCount), std::move(work));
+        }
+        catch (const std::exception& error)
+        {
+            request->error = error.what();
+            request->ready.store(true, std::memory_order_release);
+            return false;
+        }
+        std::printf("[model.async] retry invalidated preparation path=%s attempt=%u\n",
+            request->path.c_str(), request->preparationRetries);
+        return true;
+    }
+
     void ModelPlacement::Tick()
     {
         auto& state = *m_impl;
@@ -406,6 +448,7 @@ namespace Editor
             }
             if (!request->prepared)
             {
+                if (RetryInvalidatedPreparation(request)) continue;
                 Debug::PrintLog(spdlog::level::err, request->error);
                 ++state.failed;
                 request->modelPreparation.reset();
@@ -420,6 +463,7 @@ namespace Editor
                 std::string error;
                 if (!DataSystems->PublishPreparedModel(request->modelPreparation, error))
                 {
+                    if (RetryInvalidatedPreparation(request)) continue;
                     Debug::PrintLog(spdlog::level::err, error);
                     ++state.failed;
                     request->prepared.reset();

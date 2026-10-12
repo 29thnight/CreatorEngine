@@ -8,6 +8,7 @@ from pathlib import Path
 import statistics
 
 import base0_artifacts as artifacts
+from native_real_measurement import verify_normal_temporal
 
 
 def read(path):
@@ -25,6 +26,44 @@ def distribution(values):
                 p95=values[math.ceil(.95 * len(values)) - 1], minimum=values[0], maximum=values[-1])
 
 
+def audit_live_measurement(sample):
+    verify_normal_temporal(sample)
+    artifacts.require(sample.get('cpuAxis') == 'native-graph-record-cpu-not-full-frame' and
+                      sample.get('gpuAxis') == 'real-frame-pass-sum-not-wall-time', 'missing live timing axes')
+    artifacts.require(sample['gpuFrame'] == sample['gpu']['frame'] and
+                      sample['gpuMs'] == sample['gpu']['ms'], 'stored timing/GPU source mismatch')
+    distribution([sample['cpuRecordMs'], sample['gpuMs']])
+
+
+def audit_live_population(samples, expected_count=100):
+    artifacts.require(len(samples) == expected_count, 'live sample population count')
+    for sample in samples:
+        audit_live_measurement(sample)
+        native = sample['nativeRecord']
+        artifacts.require(native['samples'] > 0 and native['axis'] == sample['cpuAxis'] and
+                          native['ms'] == sample['cpuRecordMs'], 'native CPU snapshot identity/value missing')
+        cpu_origin = dict(sample, temporalProvenance=native['temporalProvenance'])
+        verify_normal_temporal(cpu_origin)
+        artifacts.require(native['temporalProvenance'].get('nativeGateActive') is False and
+                          sample['gpuTemporalProvenance'].get('nativeGateActive') is False and
+                          not any(p['name'].startswith('PBR.Capture.') for p in sample['passes']),
+                          'capture/readback timing mixed into normal population')
+        artifacts.require(sample['queryOverflow'] == sample['dropped'] == 0, 'GPU coverage lost')
+    frames = [sample['gpuFrame'] for sample in samples]
+    cpu_samples = [sample['nativeRecord']['samples'] for sample in samples]
+    artifacts.require(all(right > left for left, right in zip(frames, frames[1:])),
+                      'live GPU samples duplicated or reordered')
+    artifacts.require(all(right > left for left, right in zip(cpu_samples, cpu_samples[1:])),
+                      'native CPU samples duplicated or reordered')
+    return dict(cpuRecordMs=distribution([sample['cpuRecordMs'] for sample in samples]),
+                gpuPassSumMs=distribution([sample['gpuMs'] for sample in samples]),
+                firstGpuFrame=frames[0], lastGpuFrame=frames[-1],
+                uniqueCpuMeasurements=len(set(cpu_samples)),
+                firstCpuSample=cpu_samples[0], lastCpuSample=cpu_samples[-1],
+                cpuAxis='native-graph-record-cpu-not-full-frame',
+                gpuAxis='real-frame-pass-sum-not-wall-time')
+
+
 def compare(reference, product, output):
     a, aid, ap = artifacts.load_capture(reference)
     b, bid, bp = artifacts.load_capture(product)
@@ -35,12 +74,32 @@ def compare(reference, product, output):
                       bg['orderContract'] == 'dependency-order', 'cutover graph contracts')
     before_passes, after_passes = [Counter(p['name'] for p in g['passes']) for g in (ag, bg)]
     before_resources, after_resources = [Counter(r['name'] for r in g['resources']) for g in (ag, bg)]
-    expected_passes = Counter({f'Geometry.Occlusion.{i}': 1 for i in range(6)})
+    # GpuGeometryOcclusion::LevelCount rounds each dimension up until 1x1.
+    width, height, levels = a['renderWidth'], a['renderHeight'], 0
+    while True:
+        width, height = (width + 1) // 2, (height + 1) // 2
+        levels += 1
+        if width <= 1 and height <= 1:
+            break
+    expected_passes = Counter({f'Geometry.Occlusion.{i}': 1 for i in range(levels)})
     expected_passes['Geometry.Visibility.CullOcclusion'] = 1
-    expected_resources = Counter({f'Geometry.Occlusion.{i}': 1 for i in range(6)})
+    expected_resources = Counter({f'Geometry.Occlusion.{i}': 1 for i in range(levels)})
     expected_resources['GizmoIcon.Texture'] = 2
+    # Authored LX-only geometry has no preceding traditional occluder depth.
+    if before_passes['METEOR.Scene.GBuffer'] and not before_passes['GBuffer']:
+        expected_passes['METEOR.Scene.OccluderDepth'] = 1
+        expected_resources['METEOR.Scene.OccluderDepth'] = 1
+    expected_removed = Counter({'Geometry.Visibility.Cull': 1})
+    # EnhancedPbrCapture::DeclareStage shares only proven identical versioned
+    # handles. Named images remain present and still undergo pixel comparison.
+    shared = [stage for stage in b['diagnosticStages'] if stage['sharedReadback']]
+    for stage in shared:
+        node_name = stage['name'].split('-', 2)[2]
+        artifacts.require(node_name in {'METEOR.Scene.Blended', 'Sprite', 'SSS', 'SSR', 'METEOR.Scene.Volume', 'Temporal.Upscale'},
+                          'unexpected shared stage suppression')
+        expected_removed['PBR.Stage.' + node_name] += 1
     artifacts.require(after_passes - before_passes == expected_passes and
-                      before_passes - after_passes == Counter({'Geometry.Visibility.Cull': 1}),
+                      before_passes - after_passes == expected_removed,
                       'unexpected cutover pass delta')
     artifacts.require(after_resources - before_resources == expected_resources and
                       not before_resources - after_resources, 'unexpected cutover resource delta')
@@ -78,7 +137,7 @@ def compare(reference, product, output):
                   referenceStats=a['graph'], productStats=b['graph'],
                   productCriticalPath=[bg['passes'][i]['name'] for i in bg['criticalPath']],
                   productDependencyWaves=bg['dependencyWaves'],
-                  graphComparison='audited-mode-dependent-geometry-and-icon-declarations-v1',
+                  graphComparison='audited-mode-dependent-geometry-icon-and-shared-readback-v2',
                   addedPasses=dict(after_passes - before_passes), removedPasses=dict(before_passes - after_passes),
                   addedResources=dict(after_resources - before_resources), attachments=results)
     (output / 'comparison.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
@@ -117,25 +176,44 @@ def main():
             exe = (root / 'Reference' / f'x64-{config}' / 'Editor' / 'CreatorEditor.exe') if kind == 'Reference' else Path(result['executable'])
             artifacts.require(sha(exe) == result['executableSha256'] and
                               sha(exe.with_name('CreatorEditor.runtime.dll')) == result['runtimeSha256'], label + ' binary mismatch')
+            artifacts.require(len({run['pid'] for run in result['runs']}) == 2, 'independent process identities')
             live_samples, capture_samples, per_process = [], [], []
             for run in result['runs']:
                 artifacts.require(run['passed'] and run['exitCode'] == 0 and not run['forcedTermination'], 'unclean exit')
                 ledger = (run['assetIdentity'], run['environmentSha256'], run['tuningIdentity'])
                 artifacts.require(fixture_identity is None or ledger == fixture_identity, 'asset/environment/tuning identity differs')
                 fixture_identity = ledger
+                artifacts.require(run['scenePreparationState'] == 'Ready' and int(run['sceneRequestId']) > 0, 'scene not prepared')
                 case = Path(run['directory'])
+                validation = read(case / 'validation.json')
+                artifacts.require(validation['layerEnabled'] and validation['mode'] == 'gpu' and validation['problems'] == validation['droppedMessages'] == 0, 'GPU validation/coverage failed')
                 deterministic = read(case / 'determinism.json')
                 artifacts.require(deterministic['passed'] and deterministic['samples'] == (100 if run['repeat'] == 0 else 2), 'determinism samples')
                 input_hashes.add(deterministic['inputHash'])
                 samples = read(case / 'live-performance.json')
-                artifacts.require(len(samples) == 100 and len({s['gpuFrame'] for s in samples}) == 100, 'unique live GPU samples')
-                artifacts.require(all(s['queryOverflow'] == s['dropped'] == 0 for s in samples), 'GPU coverage lost')
+                population = audit_live_population(samples)
+                rows = [json.loads(line) for line in (case / 'responses.jsonl').read_text(encoding='utf-8-sig').splitlines()]
+                snapshots = [row['data'] for row in rows if row['command'] == 'dx12.live' and row['status'] == 'succeeded']
+                for sample in samples:
+                    artifacts.require(any(all(sample[field] == snapshot[field] for field in
+                        ('gpu', 'display', 'temporalProvenance', 'gpuTemporalProvenance', 'framesRenderedAxis', 'nativeRecord'))
+                        and sample['cpuRecordMs'] == snapshot['nativeRecord']['ms'] for snapshot in snapshots),
+                        'stored population differs from actual command response')
+                artifacts.require(population['cpuRecordMs']['maximum'] > 0 and population['gpuPassSumMs']['maximum'] > 0,
+                                  'unmeasured population')
+                mutation = read(case / 'mutations.json')
+                artifacts.require(mutation['passed'] and mutation['mutations'], 'artifact mutation gate missing')
+                artifacts.require(read(case / 'repeatability/comparison.json')['passed'], 'repeat pixel gate failed')
                 live_samples.extend(samples)
                 captures = [read(Path(p) / 'manifest.json') for p in run['captures']]
+                artifacts.require(len(captures) == (100 if run['repeat'] == 0 else 2), 'capture population missing')
+                for manifest in captures:
+                    artifacts.audit_manifest(manifest)
                 artifacts.require(all(m['compiledGraph']['orderContract'] == expected for m in captures), 'captured mode differs')
                 capture_samples.extend(captures)
                 per_process.append(dict(repeat=run['repeat'], cpuRecordMs=distribution([s['cpuRecordMs'] for s in samples]),
                                         gpuMs=distribution([s['gpuMs'] for s in samples])))
+            artifacts.require(read(directory / 'dx12-process-repeatability/comparison.json')['passed'], 'process pixel gate failed')
             pass_times = {}
             for sample in live_samples:
                 for p in sample['passes']:
@@ -151,7 +229,13 @@ def main():
                                  captureMemoryMB=distribution([m['measurement']['memory']['usedMB'] for m in capture_samples]))
             results[label] = str(directory / 'result.json')
     artifacts.require(len(input_hashes) == 1, 'inputs differ across builds/processes')
-    artifacts.require(read(root / 'cutover-mutations.json')['passed'], 'cutover comparator mutation gate')
+    mutation = read(root / 'cutover-mutations.json')
+    artifacts.require(mutation['passed'] and set(mutation['rejections']) == {'sealed-input', 'unexpected-pass', 'pixel-damage'}, 'cutover comparator mutation gate')
+    population_mutations = read(root / 'population-mutations.json')
+    artifacts.require(population_mutations['passed'] and population_mutations['totalRejections'] == 120 and
+                      len(population_mutations['processes']) == 8 and
+                      all(len(cases) == 15 for cases in population_mutations['processes'].values()),
+                      'live population mutation gate missing')
     for config in ('Debug', 'Release'):
         for repeat in (0, 1):
             label = f'{config}-process-{repeat}'
@@ -162,6 +246,9 @@ def main():
     verdict = dict(schemaVersion=1, rg6Complete=True, earnedDays=4, results=results,
                    inputHash=next(iter(input_hashes)), comparisons=comparisons, productCrossConfiguration=cross,
                    timings=timings, comparatorSha256=sha(Path(__file__)),
+                   liveSamples=800, graphCaptures=408, independentProcesses=8,
+                   populationMutationRejections=120, cutoverComparatorMutationRejections=3,
+                   TR0Complete=False, TR0Status='progress', phase45EarnedDays=12, phase45TotalDays=71,
                    scope='same current source, diagnostic legacy build versus default dependency build; mode-dependent geometry included',
                    excluded=['historical whole-PR performance attribution', 'MAT-9 performance/quality', 'RG-V UI', 'PHASE 4.9 Vulkan'])
     (root / 'final-result.json').write_text(json.dumps(verdict, indent=2), encoding='utf-8')

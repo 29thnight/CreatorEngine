@@ -4,7 +4,7 @@
 #include "../../../Texture.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../Graph/ShadowCasterBounds.h"
-#include "EnhancedGBufferPass.h"
+#include "SceneSurfaceTargets.h"
 
 #include <algorithm>
 #include <bit>
@@ -85,7 +85,7 @@ bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext &context, st
     // 두 PSO 모두 같은 render target binding을 사용한다. Overlay 배치는 depth
     // test만 끌 뿐 D32 attachment 자체는 붙어 있으므로 Vulkan dynamic rendering
     // 호환성을 위해 attachment format은 양쪽 파이프라인에 선언해야 한다.
-    desc.dsvFormat = EnhancedGBufferPass::kDepthFormat;
+    desc.dsvFormat = SceneSurfaceTargets::kDepthFormat;
 
     desc.depthEnable = false;
     m_overlayPso = context.psoManager->GetOrCreate(desc, outError);
@@ -375,7 +375,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
             if (depth.IsValid())
             {
                 const auto depthTarget =
-                    RHIDepthTargetDesc::DepthReadOnly(ec.ResolveHandle(depth), EnhancedGBufferPass::kDepthFormat);
+                    RHIDepthTargetDesc::DepthReadOnly(ec.ResolveHandle(depth), SceneSurfaceTargets::kDepthFormat);
                 targets = context.resources->CreateRenderTargets(colors, &depthTarget);
             }
             else
@@ -513,7 +513,7 @@ std::array<RGHandle, 5> EnhancedSpritePass::DeclareTemporal(EnhancedRenderGraph&
             std::array<RHITextureHandle, 4> colors;
             for (unsigned i = 0; i < colors.size(); ++i) colors[i] = execute.ResolveHandle(outputs[i]);
             const auto depth = RHIDepthTargetDesc::Depth(
-                execute.ResolveHandle(outputs[4]), EnhancedGBufferPass::kDepthFormat);
+                execute.ResolveHandle(outputs[4]), SceneSurfaceTargets::kDepthFormat);
             const auto targets = context.resources->CreateRenderTargets(colors, &depth);
             if (!targets.IsValid()) throw std::runtime_error("Temporal sprite render targets unavailable.");
             const uint64_t bytes = sizeof(Instance) * static_cast<uint64_t>(m_instances.size());

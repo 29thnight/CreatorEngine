@@ -142,7 +142,7 @@ namespace RenderTest
                             cookedValue.Scalar(), cookedError);
                     if (!embeddedSource || !embeddedCooked
                         || !RuntimeDocumentEquivalent(
-                            embeddedSource.Root(), embeddedCooked->Root().Read(), assetRoot,
+                            embeddedSource.Root(), embeddedCooked->Root(), assetRoot,
                             source["m_propertyName"].Scalar()))
                         return false;
                     continue;
@@ -534,7 +534,7 @@ namespace RenderTest
                 {
                     const auto override = Authoring::DecodeCookedDocumentTextEnvelope(
                         document.Root()["Override"]["m_valueYaml"].Scalar(), error);
-                    check.Check(override && override->Root().Read().AsString() == kTextureGuid,
+                    check.Check(override && override->Root().AsString() == kTextureGuid,
                         "prefab decal scalar override lowers before CEDO envelope encoding");
                 }
                 std::string unchanged;

@@ -55,7 +55,7 @@ foreach ($configuration in $Configurations) {
         }
         $result | Set-Content -LiteralPath (Join-Path $output "$prefix-$configuration.log") -Encoding utf8
         if ($runExit -ne 0 -or @($result | Where-Object {
-            $_ -match '^LX_MATERIAL_FORWARD_BLEND_OK frames=12 pixels=4608 checks=[1-9]\d* graphCompiles=0 mixed=true parallel=true overflowLights=65 validation=0$'
+            $_ -match '^LX_MATERIAL_FORWARD_BLEND_OK frames=12 pixels=4608 checks=[1-9]\d* graphCompiles=0 stream=true parallel=true overflowLights=65 validation=0$'
         }).Count -ne 1) { throw "Forward Blend runtime failed: $backend/$configuration; see $prefix-$configuration.log" }
         foreach ($entry in $snapshot) {
             if ((Get-FileHash -LiteralPath $entry.path -Algorithm SHA256).Hash -ne $entry.hash) {

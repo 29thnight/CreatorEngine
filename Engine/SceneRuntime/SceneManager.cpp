@@ -722,9 +722,6 @@ void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
         ce::profile_scope _profile{ ce::marker<"LateUpdate">() };
         m_activeScene.load()->LateUpdate(deltaSecond);
     }
-    // Diagnostic palette/pose publication is after both animation batches and
-    // ordinary LateUpdate, before the sole render-proxy seal. Never a worker.
-    TemporalMotionFixture::TickAfterAnimation();
 }
 
 void SceneManager::SceneRendering(float deltaSecond)

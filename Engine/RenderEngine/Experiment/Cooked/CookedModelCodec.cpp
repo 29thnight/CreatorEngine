@@ -920,7 +920,7 @@ namespace experiment::cooked
             }
             if (!complete)
             {
-                Reject(issues, "meshlets", "Missing optional meshlet sections; using indexed geometry.");
+                Reject(issues, "meshlets", "Missing optional meshlet sections; force reimport/recook required.");
             }
             else if (ViewArray(bytes, section(SectionKind::MeshletMeshes), acceleration, issues, "meshlets.meshes")
                 && ViewArray(bytes, section(SectionKind::MeshletDescriptors), descriptors, issues, "meshlets.descriptors")
@@ -955,7 +955,7 @@ namespace experiment::cooked
                     && primitiveEnd == primitives.size();
                 if (!rangesValid)
                 {
-                    Reject(issues, "meshlets", "Meshlet mesh count or stream partition is invalid; using indexed geometry.");
+                    Reject(issues, "meshlets", "Meshlet mesh count or stream partition is invalid; force reimport/recook required.");
                 }
                 else
                 {
@@ -969,7 +969,7 @@ namespace experiment::cooked
                             || !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
                         {
                             Reject(issues, "meshlets." + mesh.name,
-                                "Meshlet stream range is invalid; using indexed geometry.");
+                                "Meshlet stream range is invalid; force reimport/recook required.");
                             continue;
                         }
                         const bool empty = source.descriptorCount == 0u && source.vertexCount == 0u
@@ -980,7 +980,7 @@ namespace experiment::cooked
                             || source.primitiveCount != mesh.indices.size() / 3u))
                         {
                             Reject(issues, "meshlets." + mesh.name,
-                                "Meshlet stream counts do not match indexed topology; using indexed geometry.");
+                                "Meshlet stream counts do not match indexed topology; force reimport/recook required.");
                             continue;
                         }
                         MeshletPayload& payload = mesh.meshlets;
@@ -1001,12 +1001,14 @@ namespace experiment::cooked
                         {
                             payload = {};
                             Reject(issues, "meshlets." + mesh.name,
-                                failure + "; using indexed geometry.");
+                                failure + "; force reimport/recook required.");
                         }
                     }
                 }
             }
         }
+
+        if (!issues.empty()) return false; // Cooked METEOR topology is mandatory.
 
         {
             std::span<const std::byte> lodBytes;
@@ -1279,6 +1281,7 @@ namespace experiment::cooked
             Reject(issues, "strings", "문자열 참조가 테이블 밖을 가리킨다.");
             return false;
         }
+        if (!issues.empty()) return false; // No LOD0/indexed recovery.
         outDraft = std::move(decoded);
         return true;
     }

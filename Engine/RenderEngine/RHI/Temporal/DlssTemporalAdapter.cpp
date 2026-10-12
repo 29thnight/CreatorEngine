@@ -5,6 +5,7 @@
 #endif
 
 #include <cassert>
+#include <cstdio>
 
 #if CREATOR_ENABLE_DLSS_STREAMLINE && defined(_WIN32)
 #ifndef NOMINMAX
@@ -41,6 +42,11 @@ namespace
 {
     std::atomic<bool> g_runtimeClaimed{ false };
     std::atomic<int64_t> g_presentationError{ 0 };
+
+    void OnStreamlineLog(sl::LogType type, const char* message)
+    {
+        if (message) std::fprintf(stderr, "[Streamline:%u] %s\n", static_cast<unsigned>(type), message);
+    }
 
     TemporalResult ToResult(sl::Result result)
     {
@@ -503,6 +509,7 @@ TemporalResult DlssTemporalAdapter::Initialize(const DlssInitialization& initial
     if (initialization.loadDeepDvc) { features[count++] = sl::kFeatureDeepDVC; }
     const wchar_t* pluginPath = state.configuration.pluginDirectory.c_str();
     sl::Preferences preferences;
+    preferences.logMessageCallback = OnStreamlineLog;
     preferences.pathsToPlugins = &pluginPath;
     preferences.numPathsToPlugins = 1;
     preferences.featuresToLoad = features;
@@ -753,6 +760,13 @@ TemporalResult DlssTemporalAdapter::GetOptimalSettings(TemporalQuality quality, 
         return { TemporalStatus::InvalidInput };
     sl::DLSSOptions options;
     options.mode = ToMode(quality);
+    // Pin modes with a reproducible first-disocclusion regression under the
+    // default model, including quality/extent transitions after explicit resets.
+    options.dlaaPreset = sl::DLSSPreset::ePresetJ;
+    options.qualityPreset = sl::DLSSPreset::ePresetJ;
+    options.balancedPreset = sl::DLSSPreset::ePresetJ;
+    options.performancePreset = sl::DLSSPreset::ePresetJ;
+    options.ultraPerformancePreset = sl::DLSSPreset::ePresetJ;
     options.outputWidth = displayExtent.width;
     options.outputHeight = displayExtent.height;
     sl::DLSSOptimalSettings optimal;
@@ -927,6 +941,13 @@ TemporalResult DlssTemporalAdapter::DispatchUpscaling(uint32_t viewportId, uint6
         return { TemporalStatus::FeatureUnsupported };
     sl::DLSSOptions options;
     options.mode = ToMode(quality);
+    // Pin modes with a reproducible first-disocclusion regression under the
+    // default model, including quality/extent transitions after explicit resets.
+    options.dlaaPreset = sl::DLSSPreset::ePresetJ;
+    options.qualityPreset = sl::DLSSPreset::ePresetJ;
+    options.balancedPreset = sl::DLSSPreset::ePresetJ;
+    options.performancePreset = sl::DLSSPreset::ePresetJ;
+    options.ultraPerformancePreset = sl::DLSSPreset::ePresetJ;
     options.outputWidth = frame->displayExtent.width;
     options.outputHeight = frame->displayExtent.height;
     options.preExposure = frame->preExposure;
@@ -959,7 +980,10 @@ TemporalResult DlssTemporalAdapter::DispatchUpscaling(uint32_t viewportId, uint6
         { &color, sl::kBufferTypeScalingInputColor, sl::eValidUntilEvaluate, &renderExtent },
         { &depth, sl::kBufferTypeDepth, sl::eValidUntilEvaluate, &renderExtent },
         { &motion, sl::kBufferTypeMotionVectors, sl::eValidUntilEvaluate, &vectorsExtent },
-        { resources.exposure.resource ? &exposure : nullptr, sl::kBufferTypeExposure,
+        // Local tags must always point to a Resource wrapper. Streamline
+        // dereferences the wrapper even for optional inputs; an empty native
+        // resource inside the wrapper selects automatic exposure safely.
+        { &exposure, sl::kBufferTypeExposure,
             sl::eValidUntilEvaluate, &exposureExtent },
         { &output, sl::kBufferTypeScalingOutputColor, sl::eValidUntilEvaluate, &displayExtent }
     };

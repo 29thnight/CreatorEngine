@@ -1,4 +1,5 @@
 #include "ProfilerRenderingDiagnostics.h"
+#include "ProfileRenderMeasurement.h"
 
 #include <bit>
 #include <cmath>
@@ -7,6 +8,34 @@
 
 namespace ce::profiler_viewer::diagnostics
 {
+    bool matches_gpu_measurement(const rendering_snapshot& snapshot, const rendering_display& display)
+    {
+        const auto& p = snapshot.gpuTemporalProvenance;
+        profile_render_provenance proof;
+        proof.frame_kind = p.frameKind;
+        proof.resolution_state = p.resolutionState;
+        proof.upscaler = p.upscaler;
+        proof.frame_generator = p.frameGenerator;
+        proof.real_frame_id = p.realFrameId;
+        proof.view_id = p.viewId;
+        proof.scene_epoch = p.sceneEpoch;
+        proof.publication_frame_id = p.publicationFrameId;
+        proof.generated_ordinal = p.generatedOrdinal;
+        proof.render_width = p.renderWidth;
+        proof.render_height = p.renderHeight;
+        proof.display_width = p.displayWidth;
+        proof.display_height = p.displayHeight;
+        proof.native_gate_active = p.nativeGateActive;
+        proof.spatial_provenance_available = p.spatialProvenanceAvailable;
+        proof.spatial_mode = p.spatialMode;
+        proof.deep_dvc_applied = p.deepDvcApplied;
+        return display.ready && display.viewId != 0 && display.completedFrameId != 0 &&
+            snapshot.lastGpuSubmissionId != 0 && !snapshot.passTimings.empty() &&
+            snapshot.lastGpuViewId == display.viewId && snapshot.lastGpuFrameId == display.completedFrameId &&
+            proof.valid() && proof.frame_kind == 1 && proof.scene_epoch != 0 &&
+            proof.view_id == display.viewId && proof.publication_frame_id == display.completedFrameId &&
+            proof.display_width == display.completedWidth && proof.display_height == display.completedHeight;
+    }
     namespace rendering_codec
     {
         constexpr std::uint32_t magic = 0x44524c50; // PLRD

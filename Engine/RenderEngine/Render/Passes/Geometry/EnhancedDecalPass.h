@@ -6,7 +6,7 @@
 
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../../GpuGeometryVisibility.h"
-#include "EnhancedGBufferPass.h"
+#include "SceneSurfaceTargets.h"
 
 // 데칼 패스 (PHASE 3-6, 미구현 패스 이식 2차).
 //
@@ -114,7 +114,7 @@ public:
 
     /// 덧칠 대상. GBuffer 출력을 그대로 받는다 — 데칼은 새 타깃을 만들지 않고
     /// 이미 그려진 GBuffer에 얹는다.
-    void SetInputs(const EnhancedGBufferPass::Outputs& inputs) { m_inputs = inputs; }
+    void SetInputs(const SceneSurfaceTargets::Outputs& inputs) { m_inputs = inputs; }
 
     /// 이번 프레임에 그릴 데칼. PrepareFrame이 텍스처를 올리고 배치를 짠다.
     void SetDecals(const std::vector<Item>& decals,
@@ -125,7 +125,7 @@ public:
     }
 
     bool HasPreparedDecals() const { return !m_batches.empty(); }
-    const EnhancedGBufferPass::Outputs& GetOutputs() const { return m_outputs; }
+    const SceneSurfaceTargets::Outputs& GetOutputs() const { return m_outputs; }
     std::array<RGHandle, 3> GetBaseline() const
     {
         return { m_copiedDiffuse, m_copiedOrm, m_copiedNormal };
@@ -185,8 +185,8 @@ private:
         uint32_t        mipLevels[3]{};
     };
 
-    EnhancedGBufferPass::Outputs m_inputs{};
-    EnhancedGBufferPass::Outputs m_outputs{};
+    SceneSurfaceTargets::Outputs m_inputs{};
+    SceneSurfaceTargets::Outputs m_outputs{};
     std::vector<Item>            m_decals;
     own::shared_owner<TextureFramePins> m_texturePins;
     bool                         m_keepAlive{ false };

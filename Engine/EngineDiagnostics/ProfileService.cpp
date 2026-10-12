@@ -756,12 +756,20 @@ namespace ce
         }
         const auto generation = m_generation.load(std::memory_order_acquire);
         if (expected_generation == 0 || expected_generation != generation ||
-            m_state.load(std::memory_order_acquire) != recorder_state::recording)
+            m_state.load(std::memory_order_acquire) != recorder_state::recording ||
+            !m_gpuFrameRangeReady.load(std::memory_order_acquire))
         {
             return;
         }
         profile_render_measurement sample;
         sample.engine_frame = current_frame();
+        // Record is asynchronous: the requested first frame may precede the
+        // first boundary actually collected. Presenter observations from that
+        // unadmitted prefix have no CPU frame and must not enter the capture.
+        if (sample.engine_frame < m_recordStartFrame.load(std::memory_order_acquire))
+        {
+            return;
+        }
         sample.axis = profile_render_axis::cpu_presenter_return;
         sample.presenter = observation;
         stream->write_presenter_return(sample, generation);

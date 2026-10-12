@@ -80,6 +80,17 @@ struct TemporalPresenterObservation
     bool valid{ false }; // Exact source identity is available; inspect result separately.
 };
 
+// Latched only when a reset frame commits. Polling a later normal frame must
+// not lose the reset's jitter, extents or source identity. This is submission
+// evidence, not GPU completion or visual quality evidence.
+struct TemporalHistoryResetObservation
+{
+    uint64_t realFrameId{}, historyRevision{}, viewId{}, sceneEpoch{}, cameraCutRevision{};
+    TemporalExtent renderExtent, displayExtent;
+    TemporalProvider provider{ TemporalProvider::None };
+    float jitterX{}, jitterY{};
+};
+
 struct TemporalRuntimeSnapshot
 {
     TemporalRuntimeSettings settings;
@@ -90,11 +101,13 @@ struct TemporalRuntimeSnapshot
     TemporalResult testFaultResult; // Deliberate rejection, never an SDK/native return code.
     bool nativeCaptureExclusionActive{ false };
     bool playerLatencyHostRegistered{ false }; // Explicit host capability, not SDK/hardware support.
+    bool editorUpscalingHostRegistered{ false }; // Preload SR before device creation for live AA switching.
     uint64_t viewId{ 0 }, sceneEpoch{ 0 };
     TemporalPresentationTarget presentationTarget{ TemporalPresentationTarget::Unbound };
     uint64_t requestedGeneration{ 0 }, observedGeneration{ 0 }, playerObservedGeneration{ 0 };
     uint64_t lastRealFrameId{ 0 }, historyResetGeneration{ 0 };
     TemporalFrame frame;
+    TemporalHistoryResetObservation lastHistoryReset;
     std::vector<TemporalCapabilities> capabilities;
     TemporalProvider selectedUpscaler{ TemporalProvider::None }, selectedFrameGenerator{ TemporalProvider::None };
     TemporalProvider activeUpscaler{ TemporalProvider::None }, activeFrameGenerator{ TemporalProvider::None };
@@ -140,6 +153,7 @@ public:
     // Player calls once before any graphics-device creation. Editor/default
     // hosts never opt in to plugins requiring a game-loop timing owner.
     void RegisterPlayerLatencyHost();
+    void RegisterEditorUpscalingHost(const std::wstring& deployedDirectory, const std::string& projectId);
     void AcquireNativeCaptureExclusion();
     void ReleaseNativeCaptureExclusion();
     // Updates execute under a short CPU mutex. Do not call SDKs/GPU waits in them.

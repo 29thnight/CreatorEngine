@@ -46,6 +46,14 @@ struct TemporalMeasurementProvenance
             spatialMode == SpatialScalingMode::Off && !deepDvcApplied &&
             renderExtent == displayExtent && resolutionState == TemporalResolutionState::Native;
     }
+    bool MatchesRealDisplay(uint64_t completedViewId, uint64_t completedPublicationId,
+        uint32_t completedWidth, uint32_t completedHeight) const
+    {
+        return IsValid() && frameKind == TemporalMeasuredFrameKind::Real &&
+            sceneEpoch != 0 && viewId != 0 && publicationFrameId != 0 &&
+            viewId == completedViewId && publicationFrameId == completedPublicationId &&
+            displayExtent.width == completedWidth && displayExtent.height == completedHeight;
+    }
     void InvalidateAcceptanceEvidence()
     {
         // Keep immutable source identities/extents for presenter correlation.

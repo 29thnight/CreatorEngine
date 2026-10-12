@@ -146,7 +146,7 @@ namespace material_graph
         texture.height = context.height;
         texture.format = RHIFormat::RGBA32Float;
         texture.allowRenderTarget = true;
-        texture.debugName = L"LX.Scene.RefractionInput";
+        texture.debugName = L"METEOR.Scene.RefractionInput";
         for (auto& input : candidate->inputs_)
         {
             if (!device_->CreateTexture(texture, input, error))
@@ -157,7 +157,7 @@ namespace material_graph
         RHIBufferDesc buffer;
         buffer.bytes = count * sizeof(SceneRefractionSample);
         buffer.allowUnorderedAccess = true;
-        buffer.debugName = L"LX.Scene.RefractionSamples";
+        buffer.debugName = L"METEOR.Scene.RefractionSamples";
         if (!device_->CreateBuffer(buffer, candidate->samples_, error))
         {
             return false;
@@ -221,9 +221,9 @@ namespace material_graph
         CheckCurrent(graph);
         for (unsigned i = 0; i < inputs_.size(); ++i)
         {
-            graphInputs_[i] = graph.ImportTexture(inputs_[i], RHIResourceState::Common, "LX.Scene.RefractionInput");
+            graphInputs_[i] = graph.ImportTexture(inputs_[i], RHIResourceState::Common, "METEOR.Scene.RefractionInput");
         }
-        graphSamples_ = graph.ImportBuffer(samples_, RHIResourceState::Common, "LX.Scene.RefractionSamples");
+        graphSamples_ = graph.ImportBuffer(samples_, RHIResourceState::Common, "METEOR.Scene.RefractionSamples");
         return graphInputs_;
     }
 
@@ -252,11 +252,11 @@ namespace material_graph
             desc.width = width_;
             desc.height = height_;
             desc.format = RHIFormat::RGBA16Float;
-            desc.name = "LX.Scene.OpaqueColor";
+            desc.name = "METEOR.Scene.OpaqueColor";
             backgroundColor_ = graph.CreateTexture(desc);
             desc.format = RHIFormat::D32Float;
             desc.allowDepthStencil = true;
-            desc.name = "LX.Scene.OpaqueDepth";
+            desc.name = "METEOR.Scene.OpaqueDepth";
             backgroundDepth_ = graph.CreateTexture(desc);
         }
         if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
@@ -267,7 +267,7 @@ namespace material_graph
         const auto backgroundColor = backgroundColor_;
         const auto backgroundDepth = backgroundDepth_;
         const auto owner = self_.lock();
-        graph.AddPass("LX.Scene.RefractionBackground",
+        graph.AddPass("METEOR.Scene.RefractionBackground",
                       {{lighting, RHIResourceState::CopySource, readAccess},
                        {depth, RHIResourceState::CopySource, readAccess},
                        {backgroundColor_, RHIResourceState::CopyDest, writeAccess},
@@ -329,7 +329,7 @@ namespace material_graph
             }
         }
         graph.AddPass(
-            "LX.Scene.RefractionBake", uses,
+            "METEOR.Scene.RefractionBake", uses,
             [owner, descriptions, owners, shadow, backgroundColor, backgroundDepth](const auto& execution) mutable {
                 owner->CheckCurrent(*execution.graph);
                 descriptions[13] =

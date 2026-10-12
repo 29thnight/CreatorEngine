@@ -14,6 +14,7 @@
 #include <limits>
 #include <set>
 #include <tuple>
+#include <map>
 
 namespace material_graph
 {
@@ -125,6 +126,12 @@ namespace material_graph
             previous->View().temporalFrame.historyRevision == view.temporalFrame.historyRevision &&
             previous->View().width == view.width && previous->View().height == view.height &&
             previous->View().frameId < view.frameId;
+        using TemporalKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t, assets::ModelMeshHandle>;
+        std::map<TemporalKey, const SceneDrawInput*> previousDraws;
+        if (previousViewMatches && !view.temporalFrame.reset)
+            for (const auto& old : previous->Draws())
+                previousDraws.emplace(TemporalKey{old.temporalObjectId, old.temporalIncarnation,
+                    old.temporalInstanceId, old.mesh}, &old);
         auto candidate = own::make_shared<SceneViewInput>(ConstructionKey{});
         candidate->modelPins_ = std::move(modelPins);
         auto collectedPins = materialPins ? own::shared_owner<InstanceFramePins>{}
@@ -243,31 +250,41 @@ namespace material_graph
                 error = "Scene graph geometry " + std::to_string(draw.geometryKey) + ": " + error;
                 return false;
             }
-            // Rebuild the previous pose against CURRENT topology/LOD so vertex IDs
-            // correspond exactly, including independently moving/skinned instances.
+            // Reuse immutable previous poses only for exact current topology/LOD;
+            // otherwise rebuild them so moving/skinned vertex IDs still correspond.
             input.previousGeometry = input.geometry;
             if (previousViewMatches && !view.temporalFrame.reset && draw.temporalObjectId)
             {
-                const auto old = std::ranges::find_if(previous->Draws(), [&](const auto& value) {
-                    return value.temporalObjectId == input.temporalObjectId &&
-                        value.temporalIncarnation == input.temporalIncarnation &&
-                        value.temporalInstanceId == input.temporalInstanceId && value.mesh == input.mesh;
-                });
-                if (old != previous->Draws().end() && old->geometry &&
+                const auto found = previousDraws.find({input.temporalObjectId, input.temporalIncarnation,
+                    input.temporalInstanceId, input.mesh});
+                const auto* old = found == previousDraws.end() ? nullptr : found->second;
+                if (old && old->geometry &&
                     old->geometry->Source()->Bones().size() == draw.boneCount)
                 {
-                    auto previousDraw = selectedDraw;
-                    previousDraw.worldMatrix = old->geometry->Source()->World();
-                    std::vector<math::matrix4x4> bones;
-                    for (const auto& packed : old->geometry->Source()->Bones())
+                    if (input.geometry->SharesSceneTopology(*old->geometry))
                     {
-                        auto transposed = math::matrix4x4::identity();
-                        std::memcpy(transposed.m, packed.rows, sizeof(packed.rows));
-                        bones.push_back(math::transpose(transposed));
+                        const auto& current = *input.geometry->Source();
+                        const auto& prior = *old->geometry->Source();
+                        const bool samePose = std::memcmp(&current.World(), &prior.World(), sizeof(math::matrix4x4)) == 0 &&
+                            (current.Bones().empty() || std::memcmp(current.Bones().data(), prior.Bones().data(),
+                                current.Bones().size_bytes()) == 0);
+                        input.previousGeometry = samePose ? input.geometry : old->geometry;
                     }
-                    previousDraw.bonePalette = bones.empty() ? nullptr : bones.data();
-                    if (!MeshSurfacePlan::BuildForScene(previousDraw, candidate->surface_, budget.mesh,
-                        input.previousGeometry, error)) return false;
+                    else
+                    {
+                        auto previousDraw = selectedDraw;
+                        previousDraw.worldMatrix = old->geometry->Source()->World();
+                        std::vector<math::matrix4x4> bones;
+                        for (const auto& packed : old->geometry->Source()->Bones())
+                        {
+                            auto transposed = math::matrix4x4::identity();
+                            std::memcpy(transposed.m, packed.rows, sizeof(packed.rows));
+                            bones.push_back(math::transpose(transposed));
+                        }
+                        previousDraw.bonePalette = bones.empty() ? nullptr : bones.data();
+                        if (!MeshSurfacePlan::BuildForScene(previousDraw, candidate->surface_, budget.mesh,
+                            input.previousGeometry, error)) return false;
+                    }
                     input.temporalHistoryValid = true;
                 }
             }

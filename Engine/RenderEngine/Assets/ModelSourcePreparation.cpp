@@ -24,17 +24,9 @@ namespace assets
             failure = "importSettings: expected a map";
             return false;
         }
-        const auto enabled = settings ? settings["buildMeshlets"] : Authoring::ReadNode{};
-        if (enabled)
-        {
-            const auto text = enabled.IsScalar() ? enabled.AsString() : std::string{};
-            if (text != "true" && text != "false")
-            {
-                failure = "importSettings.buildMeshlets: expected true or false";
-                return false;
-            }
-            value.buildMeshlets = text == "true";
-        }
+        // Source metadata may predate mandatory METEOR topology. Reimport always
+        // authors the current policy; old cooked payloads remain rejected.
+        value.buildMeshlets = true;
         const auto levels = settings ? settings["lodLevels"] : Authoring::ReadNode{};
         if (levels)
         {

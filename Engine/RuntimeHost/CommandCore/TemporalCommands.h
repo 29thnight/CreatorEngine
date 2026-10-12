@@ -247,6 +247,10 @@ namespace CommandCore
             data.Set("renderExtent", ExtentData(snapshot.frame.renderExtent));
             data.Set("displayExtent", ExtentData(snapshot.frame.displayExtent));
             data.Set("cameraValid", CommandData::Bool(snapshot.frame.camera.valid));
+            auto submittedCameraPosition = CommandData::Array();
+            for (const auto coordinate : snapshot.frame.camera.position)
+                submittedCameraPosition.Append(CommandData::Double(coordinate));
+            data.Set("submittedCameraPosition", std::move(submittedCameraPosition));
             data.Set("depthInverted", CommandData::Bool(snapshot.frame.depthInverted));
             data.Set("depthInfinite", CommandData::Bool(snapshot.frame.depthInfinite));
             data.Set("highDynamicRange", CommandData::Bool(snapshot.frame.highDynamicRange));
@@ -258,6 +262,19 @@ namespace CommandCore
             data.Set("configuredInterpolatedFrameCount", CommandData::Int(snapshot.configuredInterpolatedFrameCount));
             data.Set("activeInterpolatedFrameCount", CommandData::Int(snapshot.activeInterpolatedFrameCount));
             data.Set("historyRevision", Identity(snapshot.frame.historyRevision));
+            const auto& observedReset = snapshot.lastHistoryReset;
+            auto resetData = CommandData::Object();
+            resetData.Set("realFrameId", Identity(observedReset.realFrameId));
+            resetData.Set("historyRevision", Identity(observedReset.historyRevision));
+            resetData.Set("viewId", Identity(observedReset.viewId));
+            resetData.Set("sceneEpoch", Identity(observedReset.sceneEpoch));
+            resetData.Set("cameraCutRevision", Identity(observedReset.cameraCutRevision));
+            resetData.Set("renderExtent", ExtentData(observedReset.renderExtent));
+            resetData.Set("displayExtent", ExtentData(observedReset.displayExtent));
+            resetData.Set("provider", CommandData::String(ProviderName(observedReset.provider)));
+            resetData.Set("jitterX", CommandData::Double(observedReset.jitterX));
+            resetData.Set("jitterY", CommandData::Double(observedReset.jitterY));
+            data.Set("lastHistoryReset", std::move(resetData));
             data.Set("reset", CommandData::Bool(snapshot.frame.reset));
             data.Set("jitterX", CommandData::Double(snapshot.frame.jitterX));
             data.Set("jitterY", CommandData::Double(snapshot.frame.jitterY));
@@ -577,7 +594,7 @@ namespace CommandCore
             {
                 return InvalidArguments("temporal.runtime <absolute-trusted-directory> [dlss-project-id]");
             }
-            const auto directory = std::filesystem::u8path(parts[1]);
+            const std::filesystem::path directory(std::u8string(parts[1].begin(), parts[1].end()));
             std::error_code error;
             if (!directory.is_absolute() || !std::filesystem::is_directory(directory, error) || error)
             {

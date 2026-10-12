@@ -61,6 +61,7 @@ public:
     void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view);
 
 private:
+    uint64_t m_computeDispatches{};
     std::vector<D3D12_RESOURCE_BARRIER> m_barrierScratch;
     /// 슬라이스를 GPU 주소로 푼다. 링은 리소스가 하나라 표 조회가 배열
     /// 인덱싱 한 번이다 — Allocate 의 175ns 에 비하면 묻힌다(encoderbench 로 잰다).
@@ -78,6 +79,7 @@ public:
     bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
 
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
+    uint64_t GetComputeDispatchCount() const override { return m_computeDispatches; }
 
     void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
     void ClearRenderTargets(const RHIRenderTargetBinding& binding,

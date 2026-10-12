@@ -222,6 +222,8 @@ public:
     virtual bool DispatchMeshIndirect(RHIBufferHandle, uint64_t = 0) { return false; }
 
     virtual void Dispatch(uint32_t x, uint32_t y, uint32_t z) = 0;
+    // Native command recording count; unavailable encoders explicitly return the sentinel.
+    virtual uint64_t GetComputeDispatchCount() const { return UINT64_MAX; }
 
     // ── 렌더 타깃 (R4-1) ──
     //

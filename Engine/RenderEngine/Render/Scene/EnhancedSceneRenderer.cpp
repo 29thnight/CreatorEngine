@@ -4,6 +4,7 @@
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedTemporalViewState.h"
 #include "../Passes/PostProcess/EnhancedTemporalInputsPass.h"
+#include "../Passes/PostProcess/EnhancedTemporalUpscalePass.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 #include "EnhancedPbrCapture.h"
 #include "RuntimeSettings.h"
@@ -14,11 +15,10 @@
 #include "../Graph/EnhancedMaterialSealHash.h"
 #include "AuthoredMaterialDigest.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
-#include "../Passes/Geometry/EnhancedGBufferPass.h"
+#include "../Passes/Geometry/SceneSurfaceTargets.h"
 #include "../Passes/Geometry/EnhancedShadowPass.h"
-#include "../Passes/Geometry/EnhancedDeferredPass.h"
 #include "../Passes/Lighting/EnhancedSSGIPass.h"
-#include "../Passes/Geometry/EnhancedForwardPass.h"
+#include "../Passes/Lighting/EnhancedLightTilePass.h"
 #include "../Passes/Geometry/EnhancedSpritePass.h"
 #include "../Passes/Lighting/EnhancedSSAOPass.h"
 #include "../Passes/Lighting/EnhancedSSRPass.h"
@@ -114,6 +114,8 @@ namespace EnhancedSceneRenderer
             static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> previous;
         std::array<EnhancedTemporalFixtureSubmission,
             static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> acknowledged;
+        std::array<std::vector<EnhancedTemporalFixtureSubmission>,
+            static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> warmup;
     };
 
     TemporalFixtureExchange& FixtureExchange()
@@ -150,7 +152,7 @@ namespace EnhancedSceneRenderer
             previous.stamp.sessionId == frame.temporalFixture.sessionId &&
             previous.stamp.stepId == frame.temporalFixture.predecessorStepId &&
             previous.stamp.inputSha256 == frame.temporalFixture.predecessorInputSha256 &&
-            previous.stamp.allowMeshlets == frame.temporalFixture.allowMeshlets &&
+            previous.stamp.sdkQuality == frame.temporalFixture.sdkQuality &&
             previous.viewId == key.viewId && previous.sceneEpoch == frame.sceneEpoch &&
             previous.historyRevision == key.historyRevision &&
             previous.historyGeneration == temporal.frame.historyRevision &&
@@ -189,12 +191,26 @@ namespace EnhancedSceneRenderer
         submitted.predecessorInputSha256 = previous.stamp.inputSha256;
         submitted.sourceVerified = submitted.stamp.IsValid() && !submitted.historyReset &&
             submitted.stamp.sessionId == exchange.published.sessionId &&
-            !submitted.coalesced && temporal.provenance.IsGoldenEligible() &&
+            !submitted.coalesced && (submitted.stamp.sdkQuality
+                ? IsSdkQualityFixtureProvenance(temporal.provenance) : temporal.provenance.IsGoldenEligible()) &&
             temporal.submittedFrame == submitted.realFrameId &&
             temporal.provenance.publicationFrameId == frame.frameId;
         submitted.valid = submitted.sourceVerified &&
             (submitted.stamp.predecessorStepId == 0 ||
                 MatchesTemporalFixturePredecessor(previous, frame, key, temporal, previousRealFrameId));
+        auto& warmup = exchange.warmup[index];
+        if (submitted.stamp.sdkQuality && submitted.stamp.predecessorStepId == 0)
+        {
+            if (!submitted.valid || previous.stamp != submitted.stamp ||
+                previous.historyGeneration != submitted.historyGeneration)
+                warmup.clear();
+            if (submitted.valid && submitted.stamp.sdkWarmupSubmissions <= 128 &&
+                warmup.size() < submitted.stamp.sdkWarmupSubmissions)
+            {
+                submitted.baselineSubmissions = static_cast<uint32_t>(warmup.size() + 1);
+                warmup.push_back(submitted);
+            }
+        }
         // Always track the true prior submission, including untagged or invalid
         // inputs. An old acknowledged baseline cannot conceal an intervening draw.
         exchange.previous[index] = submitted;
@@ -490,12 +506,12 @@ namespace
 
     /// 블랙보드에 흩어져 있는 여섯 슬롯을 GBuffer 출력 구조로 다시 묶는다.
     ///
-    /// 데칼과 Deferred가 Outputs를 통째로 받기 때문에 필요하다. 슬롯을 낱개로
+    /// 데칼과 LX가 Outputs를 통째로 받기 때문에 필요하다. 슬롯을 낱개로
     /// 두는 이유는 그것이 실제 의존 관계이기 때문이고(데칼은 셋만 수정한다),
     /// 묶는 비용은 핸들 여섯 개 복사뿐이다.
-    EnhancedGBufferPass::Outputs GatherGBufferOutputs(const LiveBlackboard& blackboard)
+    SceneSurfaceTargets::Outputs GatherGBufferOutputs(const LiveBlackboard& blackboard)
     {
-        EnhancedGBufferPass::Outputs outputs{};
+        SceneSurfaceTargets::Outputs outputs{};
         outputs.diffuse    = blackboard.Get(LiveSlots::kGBufferDiffuse);
         outputs.metalRough = blackboard.Get(LiveSlots::kGBufferMetalRough);
         outputs.normal     = blackboard.Get(LiveSlots::kGBufferNormal);
@@ -629,13 +645,12 @@ namespace
         //   시간축 누적을 하는 유일한 라이브 패스라서 그렇다(아래 CameraView
         //   주석 참조). 나머지 패스는 프레임 안에서 입력→출력이 끝나므로
         //   카메라가 둘이어도 한 인스턴스로 충분하다.
-        EnhancedGBufferPass   gbuffer;
+        SceneSurfaceTargets   gbuffer;
         material_graph::SceneHost graphMaterials;
         own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedShadowPass    shadow;
         EnhancedDecalPass     decal;
-        EnhancedDeferredPass  deferred;
-        EnhancedForwardPass   forward;
+        EnhancedLightTilePass lightTiles;
         EnhancedSpritePass    sprite;
         EnhancedSSAOPass      ssao;
         EnhancedSSSPass       sss;
@@ -644,6 +659,7 @@ namespace
         EnhancedIBLGenerator  ibl;
         EnhancedPostChainPass postChain;
         EnhancedTemporalInputsPass temporalInputs;
+        EnhancedTemporalUpscalePass temporalUpscale;
         EnhancedUIPass temporalUi;
         bool                  iblGenerated{ false };
         RHITextureHandle      fogCloudNeutralHandle;
@@ -721,6 +737,9 @@ namespace
             EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
             EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
             DisplaySlot      slots[kSlotsPerView];
+            // Keep two CPU-only shapes: ping-pong history changes logical read/write
+            // slots every submission. Neither entry retains native resources.
+            std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>, 2> structuralSchedules;
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
             uint64_t         promotionCount{ 0 }; // GPU 완료 뒤 표시로 승격한 횟수
@@ -770,9 +789,10 @@ namespace
     template <typename PipelineT, typename CommandPoolT>
     bool PrepareSceneRecording(PipelineT& pipeline, EnhancedRenderGraph& graph,
         CommandPoolT& commandPool, RHIShaderBinary output, bool& preparationDeferred,
-        bool allowMeshlets, EnhancedPbrCapture* capture, std::string& error,
+        EnhancedPbrCapture* capture, std::string& error,
         const std::function<bool(std::string&)>& prepareBoundary = {})
     {
+        graph.SetRecordingWorkloadBalance(kLiveGraphScheduling == RGSchedulingMode::ExplicitVersioned);
         RHIShaderCompiler::ScopedOutput outputScope(output);
         auto& context = pipeline.frameContext;
         if (!pipeline.graphMaterials.PrepareResidency(context, pipeline.graphInput, error))
@@ -798,7 +818,7 @@ namespace
                 pipeline.ibl.GetPrefilteredMap(), pipeline.shadow.GetShadowData(),
                 material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate,
                     .lookupRuntimeEvaluation = true}, error, pipeline.ibl.GetGeneration(),
-                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap(), allowMeshlets))
+                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap()))
         {
             preparationDeferred = pipeline.graphMaterials.PreparationDeferred();
             return false;
@@ -860,13 +880,12 @@ namespace
         std::string stashedLastEncoderDrop;
 
         EnhancedShadowPass shadow;
-        EnhancedGBufferPass gbuffer;
+        SceneSurfaceTargets gbuffer;
         material_graph::SceneHost graphMaterials;
         own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedDecalPass decal;
         EnhancedSSAOPass ssao;
-        EnhancedDeferredPass deferred;
-        EnhancedForwardPass forward;
+        EnhancedLightTilePass lightTiles;
         EnhancedSpritePass sprite;
         EnhancedSSSPass sss;
         EnhancedSSRPass ssr;
@@ -874,6 +893,7 @@ namespace
         EnhancedIBLGenerator ibl;
         EnhancedPostChainPass postChain;
         EnhancedTemporalInputsPass temporalInputs;
+        EnhancedTemporalUpscalePass temporalUpscale;
         EnhancedUIPass temporalUi;
         // 기즈모 체인은 Host 기여 노드가 소유한다(E4-2) — DX12 쪽과 같다.
         EnhancedUIPass ui;
@@ -1046,7 +1066,7 @@ namespace
             if (!desc.InitializeAll(frameContext,
                 static_cast<uint32_t>(EnhancedSceneRenderer::kMaxLiveCameraViews),
                 outError) || !ibl.Initialize(frameContext, outError)) return false;
-            gbuffer.SetKeepAlive(false);
+
             // SSGI가 AO를 실제로 소비하므로 SSAO를 별도 루트로 살릴 필요가 없다.
             ssao.SetKeepAlive(false);
 
@@ -1399,8 +1419,7 @@ namespace
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
             if (!PrepareSceneRecording(*this, graph, commandPool, RHIShaderBinary::SpirV,
-                    preparationDeferred, !sourceFrame.temporalFixture.IsValid() ||
-                        sourceFrame.temporalFixture.allowMeshlets, capture, outError))
+                    preparationDeferred, capture, outError))
             {
                 return false;
             }
@@ -1582,9 +1601,7 @@ namespace
                 const uint32_t drops = commandPool.DrainEncoderDrops(lastDrop);
                 stashedEncoderDrops += drops;
                 if (!lastDrop.empty()) stashedLastEncoderDrop = lastDrop;
-                capture->RecordSealLedger(gbuffer.GetSealLedger(),
-                    gbuffer.GetSamplerIdentity(), forward.GetSealLedger(),
-                    forward.GetSamplerIdentity(), stashedEncoderDrops,
+                capture->RecordRenderLedger(stashedEncoderDrops,
                     stashedLastEncoderDrop, textureCache.GetUploadFailureCount());
                 capture->RecordGeometryRoutes(graphMaterials);
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
@@ -2016,6 +2033,33 @@ namespace
             if (!pbrCapture || pbrCapture->result.state != EnhancedPbrCaptureState::Pending
                 || pbrCapture->target != view.displayTarget
                 || frame.frameId <= pbrCapture->afterFrameId) return nullptr;
+            if (pbrCapture->historyOrdinal)
+            {
+                pbrCapture->result.historyObservationReady = true;
+                if (!activeTemporal)
+                { pbrCapture->Fail("Recovery capture requires an active temporal view"); return nullptr; }
+                auto& c = *pbrCapture;
+                const auto& t = *activeTemporal;
+                if (t.frame.reset)
+                {
+                    if (c.historyAcceptedBefore)
+                    { c.Fail("History reset was superseded before capture"); return nullptr; }
+                    c.historyResetFrame = t.frame.realFrameId;
+                    c.historyResetRevision = t.frame.historyRevision;
+                    c.historyView = t.viewId; c.historyScene = t.sceneEpoch;
+                    c.historyCutRevision = t.pendingHistoryCamera.cameraCutRevision;
+                    c.historySeenSubmission = 0;
+                }
+                else
+                {
+                    if (!c.historyResetFrame) return nullptr;
+                    if (t.viewId != c.historyView || t.sceneEpoch != c.historyScene || t.frame.historyRevision != c.historyResetRevision)
+                    { c.Fail("History capture view, scene or revision changed"); return nullptr; }
+                    if (t.submittedFrame && t.submittedFrame != c.historySeenSubmission)
+                    { c.historySeenSubmission = t.submittedFrame; ++c.historyAcceptedBefore; }
+                }
+                if (c.historyAcceptedBefore + 1 != c.historyOrdinal) return nullptr;
+            }
             if (pbrCapture->motionValidation && pbrCapture->expectedFixture.IsValid())
             {
                 const auto& expected = pbrCapture->expectedFixture;
@@ -2054,7 +2098,8 @@ namespace
             }
             if (activeTemporal)
             {
-                pbrCapture->RecordTemporalInputs(activeTemporal->frame, activeTemporal->submittedFrame);
+                pbrCapture->RecordTemporalInputs(activeTemporal->frame, activeTemporal->submittedFrame,
+                    activeTemporal->reconstructionSettings.quality);
             }
             return pbrCapture.get();
         }
@@ -2199,6 +2244,39 @@ namespace
         // status/검증/PIX wait가 RT의 pipeline 포인터와 통계를 직접 읽을 때만
         // 잡는다. 일반 CE display 조회는 더 좁은 displayLifetimeMutex를 쓴다.
         mutable std::mutex renderStateMutex;
+        // Explicit GT capture controls use try-locks. A continuously busy RT
+        // must give a failed caller a later admission opportunity between frames.
+        std::atomic<bool> captureControlRequested{ false };
+        std::mutex captureControlMutex;
+        std::condition_variable captureControlWake;
+
+        bool TryLockCaptureControl(std::unique_lock<std::mutex>& lock)
+        {
+            if (!lock.try_lock())
+            {
+                std::lock_guard controlLock(captureControlMutex);
+                captureControlRequested.store(true);
+                return false;
+            }
+            {
+                std::lock_guard controlLock(captureControlMutex);
+                captureControlRequested.store(false);
+            }
+            captureControlWake.notify_all();
+            return true;
+        }
+
+        void YieldToCaptureControl()
+        {
+            if (!captureControlRequested.load()) return;
+            std::unique_lock lock(captureControlMutex);
+            // An abandoned diagnostic cannot stop rendering indefinitely. GT
+            // never waits here; it retries its original ownership-checked request.
+            captureControlWake.wait_for(lock, std::chrono::milliseconds(50), [this] {
+                return !captureControlRequested.load();
+            });
+            captureControlRequested.store(false);
+        }
         ProxyCommandQueueController::Batch activeDeltaBatch; // RT 전용
         bool activeFrameDrainOnly{ false }; // 종료는 delta만 순서대로 소비하고 새 GPU 작업은 제출하지 않는다
 
@@ -2702,14 +2780,22 @@ namespace
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         double   lastNativeRecordMs{ 0.0 };
+        TemporalMeasurementProvenance nativeRecordProvenance;
+        uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
+        bool nativeRecordBalanced{false};
         double   totalNativeRecordMs{ 0.0 };
         double   maxNativeRecordMs{ 0.0 };
         uint64_t nativeRecordSamples{ 0 };
         std::string lastError;
 
-        void AddNativeRecordSample(double milliseconds)
+        void AddNativeRecordSample(double milliseconds, const TemporalMeasurementProvenance& provenance, const EnhancedRenderGraph::Stats& stats)
         {
             lastNativeRecordMs = milliseconds;
+            nativeRecordProvenance = provenance;
+            nativeRecordWaves = stats.recordingWaveCount;
+            nativeRecordDispatches = stats.recordingJobDispatchCount;
+            nativeRecordJobs = stats.recordingWorkerJobCount;
+            nativeRecordBalanced = stats.recordingBalanced;
             totalNativeRecordMs += milliseconds;
             maxNativeRecordMs = (std::max)(maxNativeRecordMs, milliseconds);
             ++nativeRecordSamples;
@@ -2836,17 +2922,6 @@ namespace
             debugSnapshot.resizeGeneration = resizeGeneration;
             debugSnapshot.drawCount = lastDrawCount;
             debugSnapshot.batchCount = lastBatchCount;
-            const auto* geometryPass = pipeline ? &pipeline->gbuffer
-                : (vulkanPipeline ? &vulkanPipeline->gbuffer : nullptr);
-            debugSnapshot.preparedMeshletBatchCount = geometryPass
-                ? geometryPass->GetLastMeshletBatchCount() : 0u;
-            debugSnapshot.meshletFallback = geometryPass
-                ? geometryPass->GetLastMeshletFallback() : std::string{};
-            debugSnapshot.currentFrameOcclusion = geometryPass && geometryPass->HasCurrentFrameOcclusion();
-            debugSnapshot.occlusionFallback = geometryPass
-                ? geometryPass->GetLastOcclusionFallback() : std::string{};
-            debugSnapshot.skinningFallback = geometryPass
-                ? geometryPass->GetLastSkinningFallback() : std::string{};
             debugSnapshot.indexedIndirectSupported = false;
             debugSnapshot.nonIndexedIndirectSupported = false;
             debugSnapshot.preparedGpuCandidates = 0;
@@ -2868,8 +2943,6 @@ namespace
                     debugSnapshot.indexedIndirectSupported = capabilities.indexedDraw;
                     debugSnapshot.nonIndexedIndirectSupported = capabilities.nonIndexedDraw;
                 }
-                addVisibility(source.gbuffer.GetGpuVisibilityStats());
-                addVisibility(source.forward.GetGpuVisibilityStats());
                 addVisibility(source.decal.GetGpuVisibilityStats());
                 addVisibility(source.sprite.GetGpuVisibilityStats());
                 addVisibility(source.graphMaterials.CameraVisibilityStats());
@@ -2891,6 +2964,13 @@ namespace
             debugSnapshot.uiBatchCount = lastUIBatchCount;
             debugSnapshot.shadow = viewShadowStats;
             debugSnapshot.cpuMs = lastCpuMs;
+            debugSnapshot.nativeRecordMs = lastNativeRecordMs;
+            debugSnapshot.nativeRecordSamples = nativeRecordSamples;
+            debugSnapshot.nativeRecordWaves = nativeRecordWaves;
+            debugSnapshot.nativeRecordDispatches = nativeRecordDispatches;
+            debugSnapshot.nativeRecordJobs = nativeRecordJobs;
+            debugSnapshot.nativeRecordBalanced = nativeRecordBalanced;
+            debugSnapshot.nativeRecordProvenance = nativeRecordProvenance;
             debugSnapshot.gpuMs = lastGpuMs;
             debugSnapshot.gpuCollects = gpuCollects;
             debugSnapshot.gpuDroppedSlices = gpuDroppedSlices;
@@ -3063,7 +3143,7 @@ namespace
             }
 
             traceBuild("passes.end");
-            p.gbuffer.SetKeepAlive(false);
+
 
             // IBL 생성기는 패스가 아니라 생성기다 — 그래프에 선언하지 않고
             // 프레임 시작에 큐브맵·조도·프리필터를 만들어 소비 패스에 건넨다.
@@ -3446,10 +3526,37 @@ namespace
         {
             p.desc.Clear();
 
-            // ── 그림자 ──
+            // ── 1 · 기하: 월드 변환과 가시성 결정 ──
+            //
+            // 변환·컬링은 소비자의 부수 효과가 아니라 자기 노드다. SceneHost가
+            // Geometry → Cull → Shadow/Surface 선언 순서를 강제하므로 노드를
+            // 옮기면 그림을 보기 전에 예외로 드러난다. 의존성은 그래프 리소스가
+            // 표현하므로 블랙보드 슬롯은 쓰지 않는다.
             {
                 LivePassNode node;
-                node.name = "Shadow";
+                node.name = "METEOR.Scene.Geometry";
+                node.declare = [&p](LiveBlackboard&, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    p.graphMaterials.DeclareGeometry(graph);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.Cull";
+                node.declare = [&p](LiveBlackboard&, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    p.graphMaterials.DeclareCulling(graph);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 2 · 래스터: 그림자 ──
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.Shadow";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
                 node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
                 node.prepare = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
@@ -3466,13 +3573,24 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
-            // ── GBuffer ──
+            // ── 2 · 래스터: 표면 ──
+            //
+            // 타깃 생성·클리어, 표면 래스터, 데칼까지 같은 GBuffer 6장의 한
+            // 단계다. 데칼은 새 타깃 없이 확산·노멀·ORM에 덧칠하고, 색 단계가
+            // 그 기준값을 쓰도록 입력을 등록한다. 데칼이 없으면 데칼 패스는
+            // 아무것도 선언하지 않는다.
             {
                 LivePassNode node;
-                node.name = "GBuffer";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gbuffer; };
-                node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
-                node.prepare = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
+                node.name = "METEOR.Scene.Surface";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.decal; };
+                // 데칼 PrepareFrame이 텍스처를 올리고 배치를 짜므로 이번
+                // 프레임 목록이 그 앞에 들어가야 한다.
+                node.prepare = [this, &p](const EnhancedFrameContext& ctx,
+                    std::string& err, uint32_t) -> bool
+                {
+                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
+                    return p.decal.PrepareFrame(ctx, err);
+                };
                 node.writes = {
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
@@ -3481,79 +3599,24 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.gbuffer.DeclareGraphTargets(graph, ctx);
-                    const auto outputs = p.gbuffer.GetOutputs();
+                    p.gbuffer.Declare(graph, ctx);
+                    auto outputs = p.graphMaterials.DeclareGBuffer(graph, p.gbuffer.GetOutputs());
+                    p.decal.SetInputs(outputs);
+                    p.decal.Declare(graph, ctx);
+                    const auto decalOutputs = p.decal.GetOutputs();
+                    outputs.diffuse = decalOutputs.diffuse;
+                    outputs.normal = decalOutputs.normal;
+                    outputs.metalRough = decalOutputs.metalRough;
+                    if (p.decal.HasPreparedDecals())
+                    {
+                        p.graphMaterials.DeclareDecalInputs(graph, decalOutputs, p.decal.GetBaseline());
+                    }
                     bb.Set(LiveSlots::kGBufferDiffuse,    outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
                     bb.Set(LiveSlots::kGBufferNormal,     outputs.normal);
                     bb.Set(LiveSlots::kGBufferEmissive,   outputs.emissive);
                     bb.Set(LiveSlots::kGBufferBitmask,    outputs.bitmask);
                     bb.Set(LiveSlots::kGBufferDepth,      outputs.depth);
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            {
-                LivePassNode node;
-                node.name = "LX.Scene.GBuffer";
-                node.modifies = {
-                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
-                    LiveSlots::kGBufferNormal, LiveSlots::kGBufferEmissive,
-                    LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth,
-                };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext&, const LiveFrameBinding&)
-                {
-                    // Graph-only GBuffer owns no native occluder raster. LX
-                    // builds its current-frame depth before HZB and main color.
-                    const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb), false);
-                    bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
-                    bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
-                    bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
-                    bb.Set(LiveSlots::kGBufferEmissive, outputs.emissive);
-                    bb.Set(LiveSlots::kGBufferBitmask, outputs.bitmask);
-                    bb.Set(LiveSlots::kGBufferDepth, outputs.depth);
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            // ── 데칼 ──
-            //
-            // GBuffer 바로 뒤, SSAO·Deferred 앞이다(DX11과 같은 자리).
-            // 새 타깃을 만들지 않고 확산·노멀·ORM에 덧칠하므로 핸들이 그대로다 —
-            // 그래서 writes가 아니라 modifies이고, 값이 안 바뀌어도 규약은 같다.
-            // 데칼이 하나도 없으면 패스가 아무것도 선언하지 않는다.
-            {
-                LivePassNode node;
-                node.name = "Decal";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.decal; };
-                // 데칼만 준비가 특별하다 — PrepareFrame이 텍스처를 올리고
-                // 배치를 짜므로 이번 프레임 목록이 그 앞에 들어가야 한다.
-                node.prepare = [this, &p](const EnhancedFrameContext& ctx,
-                    std::string& err, uint32_t) -> bool
-                {
-                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
-                    return p.decal.PrepareFrame(ctx, err);
-                };
-                node.reads = { LiveSlots::kGBufferDepth };
-                node.modifies = {
-                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferNormal,
-                    LiveSlots::kGBufferMetalRough,
-                };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
-                {
-                    const auto inputs = GatherGBufferOutputs(bb);
-                    p.decal.SetInputs(inputs);
-                    p.decal.Declare(graph, ctx);
-                    const auto outputs = p.decal.GetOutputs();
-                    bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
-                    bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
-                    bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
-                    if (p.decal.HasPreparedDecals())
-                    {
-                        p.graphMaterials.DeclareDecalInputs(graph, outputs, p.decal.GetBaseline());
-                    }
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3565,7 +3628,12 @@ namespace
                 node.reads={LiveSlots::kGBufferDepth};
                 node.writes={LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                     LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
-                node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding&) {
+                node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding& binding) {
+                    // Produced only for an active reader that consumes it this frame
+                    // (each reader states its own condition) or a diagnostic capture.
+                    const bool required = ctx.temporalDiagnosticCapture ||
+                        p.desc.HasConsumer(LiveSlots::kTemporalMotion, ctx, binding);
+                    if (!required) return; // Reset blackboard contains no temporal handles for this view.
                     p.temporalInputs.SetDepth(bb.Get(LiveSlots::kGBufferDepth));p.temporalInputs.Declare(graph,ctx);
                     auto targets=p.graphMaterials.DeclareTemporal(graph,p.temporalInputs.Outputs());
                     targets=p.decal.DeclareTemporal(graph,ctx,targets);
@@ -3584,66 +3652,43 @@ namespace
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kGBufferNormal };
                 node.writes = { LiveSlots::kAmbientOcclusion };
                 node.declare = [this, &p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
                     EnhancedSSAOPass::Inputs inputs{};
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
                     p.ssao.SetInputs(inputs);
-                    p.ssao.SetFrameIndex(controlledCaptureFrame ? 0 : ssaoFrameIndex++);
+                    // Rotation follows the owning view's accepted sample sequence.
+                    // Other views and aborted recordings cannot consume its seed.
+                    p.ssao.SetFrameIndex(controlledCaptureFrame ? 0 : ctx.temporalFrame.realFrameId
+                        ? static_cast<uint32_t>(p.views[binding.viewIndex].temporal.jitterIndex)
+                        : ssaoFrameIndex++);
                     p.ssao.Declare(graph, ctx);
                     bb.Set(LiveSlots::kAmbientOcclusion, p.ssao.GetOutput());
                 };
                 p.desc.AddNode(std::move(node));
             }
 
-            // ── Deferred (라이팅 결과의 최초 발행자) ──
-            //
-            // 그림자를 Forward+에도 같이 준다. 한쪽만 받으면 같은 자리에서
-            // 불투명은 그늘인데 투명만 밝은, 물체와 무관한 경계가 생긴다.
-            // 받는 쪽만이다 — 투명은 그림자 맵에 그려지지 않는다.
             {
                 LivePassNode node;
-                node.name = "Deferred";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.deferred; };
-                node.reads = {
-                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
-                    LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
-                    LiveSlots::kGBufferDepth,   LiveSlots::kShadowMap,
-                    LiveSlots::kAmbientOcclusion,
-                };
-                node.writes = { LiveSlots::kLitColor };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
-                {
-                    p.deferred.SetInputs(GatherGBufferOutputs(bb));
-                    p.deferred.SetAmbientOcclusion(bb.Get(LiveSlots::kAmbientOcclusion));
-                    p.deferred.SetShadow(bb.Get(LiveSlots::kShadowMap), p.shadow.GetShadowData());
-                    p.forward.SetShadow(bb.Get(LiveSlots::kShadowMap), p.shadow.GetShadowData());
-                    p.deferred.Declare(graph, ctx);
-                    bb.Set(LiveSlots::kLitColor, p.deferred.GetOutput());
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            {
-                LivePassNode node;
-                node.name = "LX.Scene.Color";
+                node.name = "METEOR.Scene.Color";
                 node.reads = {
                     LiveSlots::kAmbientOcclusion, LiveSlots::kShadowMap,
                 };
                 // Refraction completes the opaque HDR first, then installs the
                 // closest transmitting surface in the shared GBuffer and depth.
+                node.writes = { LiveSlots::kLitColor };
                 node.modifies = {
-                    LiveSlots::kLitColor, LiveSlots::kGBufferDepth, LiveSlots::kGBufferBitmask,
+                    LiveSlots::kGBufferDepth, LiveSlots::kGBufferBitmask,
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal, LiveSlots::kGBufferEmissive,
                 };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
+                    const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);
                     bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareColor(graph, GatherGBufferOutputs(bb),
-                        bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kAmbientOcclusion),
+                        hdr, bb.Get(LiveSlots::kAmbientOcclusion),
                         bb.Get(LiveSlots::kShadowMap)));
                 };
                 p.desc.AddNode(std::move(node));
@@ -3651,7 +3696,7 @@ namespace
 
             // ── 스카이박스 ──
             //
-            // HDR 조명 타깃에, SSGI보다 먼저 합성한다. Deferred 출력은 RTV
+            // HDR 조명 타깃에, SSGI보다 먼저 합성한다. METEOR HDR 출력은 RTV
             // 사용이 가능하지만 SSGI 출력은 UAV 전용이므로 SSGI 뒤에 붙이면
             // RTV 생성부터 잘못된다.
             {
@@ -3696,6 +3741,11 @@ namespace
                     LiveSlots::kAmbientOcclusion, LiveSlots::kTemporalMotion, LiveSlots::kTemporalResponsive,LiveSlots::kTemporalReactive,
                 };
                 node.modifies = { LiveSlots::kLitColor };
+                // Disabled GI passes its input through and needs no temporal data.
+                node.consumes = [&p](const std::string&, const EnhancedFrameContext&, const LiveFrameBinding& binding)
+                {
+                    return p.views[binding.viewIndex].ssgi.GetTuning().intensity > 0.f;
+                };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
@@ -3721,66 +3771,9 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
-            // ── 투명(Forward+) ──
-            //
-            // 라이팅 결과에 직접 알파 블렌딩으로 얹는다. 별도 타깃에 그려 두고
-            // 나중에 합성하지 않는 이유는 EnhancedForwardPass::Declare의 주석에
-            // 있다(프리멀티플라이드 알파와 겹친 면의 누적 알파).
-            {
-                LivePassNode node;
-                node.name = "Forward+";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.forward; };
-                node.initialize = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
-                {
-                    return p.forward.InitializeGraphLighting(ctx, error);
-                };
-                node.reads = { LiveSlots::kGBufferDepth };
-                node.modifies = { LiveSlots::kLitColor };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
-                {
-                    EnhancedForwardPass::Inputs inputs{};
-                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
-                    inputs.lighting = bb.Get(LiveSlots::kLitColor);
-                    p.forward.SetInputs(inputs);
-                    p.forward.SetGraphMaterials(&p.graphMaterials);
-                    p.forward.Declare(graph, ctx);
-                    if (p.forward.GetOutput().IsValid())
-                    {
-                        bb.Set(LiveSlots::kLitColor, p.forward.GetOutput());
-                    }
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            // ── 월드 스프라이트 / 3D Canvas ──
-            // SpriteRenderer와 Scene View의 Canvas 이미지, World Space UI를
-            // 투명 패스 뒤 HDR에 얹는다. 깊이는 항목별로 선택한다.
-            {
-                LivePassNode node;
-                node.name = "Sprite";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.sprite; };
-                node.reads = { LiveSlots::kGBufferDepth };
-                node.modifies = { LiveSlots::kLitColor };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
-                {
-                    EnhancedSpritePass::Inputs inputs{};
-                    inputs.color = bb.Get(LiveSlots::kLitColor);
-                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
-                    p.sprite.SetInputs(inputs);
-                    p.sprite.Declare(graph, ctx);
-                    if (p.sprite.GetOutput().IsValid())
-                    {
-                        bb.Set(LiveSlots::kLitColor, p.sprite.GetOutput());
-                    }
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
             // ── 서브서피스 스캐터링 ──
             //
-            // 투명 뒤, SSR 앞이다(DX11과 같은 자리 — Forward → SSS → SSR).
+            // 불투명 후처리. SSR·반투명 앞이다 — 반투명면은 피부 확산을 받지 않는다.
             // 꺼져 있으면 패스가 스스로 입력을 흘리므로 active를 달지 않는다 —
             // 노드를 건너뛰는 것과 결과가 같고, 패스 하나에 규약을 두는 편이
             // 자가 검증(dx12.sss)이 보는 것과 어긋나지 않는다.
@@ -3808,7 +3801,8 @@ namespace
 
             // ── 스크린 스페이스 반사 ──
             //
-            // SSS 뒤, 포그 앞이다. 반사색을 뜨는 원본이 곧 반사를 얹을 그림이라
+            // SSS 뒤, 반투명 앞이다(반투명면은 SSR을 받지 않는다). 반사색을 뜨는
+            // 원본이 곧 반사를 얹을 그림이라
             // color가 둘 다를 겸한다.
             {
                 LivePassNode node;
@@ -3840,11 +3834,12 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
-            // Material media compose the completed Scene before tone mapping.
+            // Material media compose the completed opaque scene exactly once,
+            // before blended surfaces; blended shading reads the same coefficients.
             // Volume-only boundaries never become opaque GBuffer depth owners.
             {
                 LivePassNode node;
-                node.name = "LX.Scene.Volume";
+                node.name = "METEOR.Scene.Volume";
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3855,6 +3850,64 @@ namespace
                 };
                 p.desc.AddNode(std::move(node));
             }
+            // ── 4 · 반투명: 타일 광원 컬링 → 반투명 스트림 ──
+            //
+            // 불투명 깊이로 타일별 광원 목록을 만들고, 반투명 드로우를 뒤에서
+            // 앞으로 셰이딩한다. 별도 타깃에 그려 합성하지 않고 장면 HDR에
+            // 직접 블렌드한다(프리멀티플라이드 알파와 겹친 면의 누적 알파).
+            // 반투명 드로우가 없는 프레임은 둘 다 아무것도 선언하지 않는다.
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.LightTiles";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.lightTiles; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.lightTiles.SetDepth(bb.Get(LiveSlots::kGBufferDepth));
+                    p.lightTiles.Declare(graph, ctx);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.Blended";
+                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareBlendedStream(graph,
+                        bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kShadowMap), p.lightTiles.GetLighting()));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 월드 스프라이트 / 3D Canvas ──
+            // SpriteRenderer와 Scene View의 Canvas 이미지, World Space UI를
+            // 반투명 스트림 뒤 HDR에 얹는다. 깊이는 항목별로 선택한다.
+            {
+                LivePassNode node;
+                node.name = "Sprite";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.sprite; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedSpritePass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    p.sprite.SetInputs(inputs);
+                    p.sprite.Declare(graph, ctx);
+                    if (p.sprite.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, p.sprite.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
             // ── 볼류메트릭 포그 (뷰마다 인스턴스 · 꺼질 수 있다) ──
             //
             // 라이팅 결과 위에, 톤맵 앞에 얹는다(DX11과 같은 자리).
@@ -3980,6 +4033,7 @@ namespace
                     const char* slots[]{LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                         LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
                     std::array<RGHandle,5> targets;for(unsigned i=0;i<5;++i)targets[i]=bb.Get(slots[i]);
+                    if (!targets[0].IsValid()) return; // No temporal consumers in this view.
                     targets=p.sprite.DeclareTemporal(graph,ctx,targets);
                     for(unsigned i=0;i<5;++i)bb.Set(slots[i],targets[i]);
                 };
@@ -3991,67 +4045,31 @@ namespace
             {
                 LivePassNode node;
                 node.name = "Temporal.Upscale";
+                node.instance = [&p](uint32_t)->EnhancedRenderPass* { return &p.temporalUpscale; };
                 node.reads = { LiveSlots::kTemporalMotion, LiveSlots::kTemporalDepth, LiveSlots::kTemporalReactive,
                     LiveSlots::kTemporalTransparency, LiveSlots::kTemporalResponsive };
                 node.modifies = { LiveSlots::kLitColor };
+                node.consumes = [&p](const std::string&, const EnhancedFrameContext&, const LiveFrameBinding& binding)
+                {
+                    return p.views[binding.viewIndex].temporal.upscaler.Provider() != TemporalProvider::None;
+                };
+                node.displayResolutionOutput = [&p](const LiveFrameBinding& binding)
+                {
+                    return p.views[binding.viewIndex].temporal.upscaler.Provider() != TemporalProvider::None;
+                };
 
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
                     auto& temporal = p.views[binding.viewIndex].temporal;
-                    auto& host = temporal.upscaler;
-                    if (host.Provider() == TemporalProvider::None)
-                    {
-                        if (!temporal.spatialPost.Scales() && (ctx.width != ctx.displayWidth || ctx.height != ctx.displayHeight))
-                        {
-                            throw std::runtime_error("Native temporal fallback must render at display resolution.");
-                        }
-                        return;
-                    }
-                    RGTextureDesc desc;
-                    desc.width = ctx.displayWidth;
-                    desc.height = ctx.displayHeight;
-                    desc.format = RHIFormat::RGBA16Float;
-                    desc.allowUnorderedAccess = true;
-                    desc.allowRenderTarget = true;
-                    desc.name = "Temporal.ReconstructedHDR";
-                    auto output = graph.CreateTexture(desc);
-                    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-                    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
-                    {
-                        output = graph.Write(output);
-                    }
-                    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-                    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
-                    const std::array<RGHandle, 6> inputs{ bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kTemporalDepth),
-                        bb.Get(LiveSlots::kTemporalMotion), bb.Get(LiveSlots::kTemporalReactive),
-                        bb.Get(LiveSlots::kTemporalTransparency), bb.Get(LiveSlots::kTemporalResponsive) };
-                    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-                    for (auto input : inputs)
-                    {
-                        uses.push_back({ input, RHIResourceState::ShaderResource, read });
-                    }
-                    uses.push_back({ output, RHIResourceState::UnorderedAccess, write });
-                    const auto frame = ctx.temporalFrame;
-                    graph.AddPass("Temporal.Upscale", uses, [&temporal, inputs, output, frame](const auto& execute)
-                    {
-                        TemporalUpscaleInputs packet;
-                        packet.frame = frame;
-                        packet.color = execute.ResolveHandle(inputs[0]);
-                        packet.depth = execute.ResolveHandle(inputs[1]);
-                        packet.motionVectors = execute.ResolveHandle(inputs[2]);
-                        packet.reactiveMask = execute.ResolveHandle(inputs[3]);
-                        packet.transparencyMask = execute.ResolveHandle(inputs[4]);
-                        packet.responsiveMask = execute.ResolveHandle(inputs[5]);
-                        packet.output = execute.ResolveHandle(output);
-                        const auto result = temporal.upscaler.Evaluate(packet, *execute.encoder);
-                        if (!result.IsSuccess())
-                        {
-                            throw std::runtime_error("Temporal upscale recording failed; discard this frame and rebuild at fallback extent.");
-                        }
-                        temporal.temporalAaApplied = true;
-                    });
-                    bb.Set(LiveSlots::kLitColor, output);
+                    p.temporalUpscale.SetInputs(temporal.upscaler,
+                        {bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kTemporalDepth),
+                         bb.Get(LiveSlots::kTemporalMotion), bb.Get(LiveSlots::kTemporalReactive),
+                         bb.Get(LiveSlots::kTemporalTransparency), bb.Get(LiveSlots::kTemporalResponsive)},
+                        temporal.spatialPost.Scales(), temporal.temporalAaApplied,
+                        p.postChain.GetTuning().toneMapEnabled ? p.postChain.GetTuning().exposure : 1.f);
+                    p.temporalUpscale.Declare(graph, ctx);
+                    bb.Set(LiveSlots::kLitColor, p.temporalUpscale.GetOutput());
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -4201,6 +4219,14 @@ namespace
                 LivePassNode node;
                 node.name = "live_present";
                 node.reads = { LiveSlots::kDisplayLdr,LiveSlots::kHudlessLdr,LiveSlots::kUiLayer,LiveSlots::kTemporalDepth,LiveSlots::kTemporalMotion };
+                // Temporal depth/motion are exported only to bound frame-generation targets.
+                node.consumes = [&p](const std::string& slot, const EnhancedFrameContext&, const LiveFrameBinding& binding)
+                {
+                    if (slot != LiveSlots::kTemporalDepth && slot != LiveSlots::kTemporalMotion) return true;
+                    return binding.temporalTargets[2].IsValid() || binding.temporalTargets[3].IsValid() ||
+                        p.views[binding.viewIndex].temporal.reconstructionSettings.requestedFrameGenerator
+                            != TemporalProvider::None;
+                };
                 node.declare = [](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding& binding)
                 {
@@ -5789,6 +5815,12 @@ namespace
                 viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             const uint64_t realFrame = viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
                 packet.temporalRealFrameId ? packet.temporalRealFrameId : packet.frameId;
+            // Start a sealed SDK diagnostic at a known jitter/history boundary.
+            // No ordinary view or later measured step is reset by this rendezvous.
+            if (packet.temporalFixture.IsValid() && packet.temporalFixture.sdkQuality &&
+                viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
+                PreviousTemporalFixtureSubmission(viewPacket.displayTarget).stamp.sessionId != packet.temporalFixture.sessionId)
+                view.temporal.Invalidate();
             const auto configure = [&](IRHIDeviceResources& resources, TemporalBackend backend) {
                 return view.temporal.Begin(resources, backend, control, viewPacket.camera, realFrame,
                     viewPacket.key.viewId, packet.sceneEpoch, viewPacket.key.historyRevision,
@@ -5799,11 +5831,23 @@ namespace
             if constexpr (std::is_same_v<PipelineT,LivePipeline>) result=configure(dx12.DeviceResources(),TemporalBackend::DX12);
             else result=configure(p.resources,TemporalBackend::Vulkan);
             if (!result.IsSuccess()) { lastError="Temporal view configuration failed"; return false; }
+            // Explicit diagnostic clock: normalize only the SDK delta for this observed
+            // game-view sequence. Simulation/camera clocks and ordinary rendering remain live.
+            if (pbrCapture && pbrCapture->historyFixedSdkClock && pbrCapture->result.state != EnhancedPbrCaptureState::Complete &&
+                pbrCapture->result.state != EnhancedPbrCaptureState::Failed && pbrCapture->target == viewPacket.displayTarget)
+                view.temporal.frame.frameTimeMilliseconds = EnhancedPbrCapture::kHistorySdkMilliseconds;
+            if (packet.temporalFixture.IsValid() && packet.temporalFixture.sdkQuality &&
+                viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game)
+                view.temporal.frame.frameTimeMilliseconds = EnhancedPbrCapture::kHistorySdkMilliseconds;
             view.temporal.provenance.publicationFrameId = packet.frameId;
             p.frameContext.width=view.temporal.frame.renderExtent.width;
             p.frameContext.height=view.temporal.frame.renderExtent.height;
             p.frameContext.displayWidth=packet.width;p.frameContext.displayHeight=packet.height;
             p.frameContext.temporalFrame=view.temporal.frame;
+            p.frameContext.temporalDiagnosticCapture = controlledCaptureFrame || packet.temporalFixture.IsValid() ||
+                (pbrCapture && pbrCapture->target == viewPacket.displayTarget &&
+                    pbrCapture->result.state != EnhancedPbrCaptureState::Complete &&
+                    pbrCapture->result.state != EnhancedPbrCaptureState::Failed);
             if (view.temporal.frame.reset) { view.ssgi.ResetHistory();view.fog.ResetHistory(); }
             view.temporal.pendingDecals.clear();
             for (auto& decal:decals)
@@ -6299,7 +6343,7 @@ namespace
                 }
                 if (!sealed)
                 {
-                    lastError = "LX Scene input sealing failed: " + inputError;
+                    lastError = "METEOR Scene input sealing failed: " + inputError;
                     ++frameFailures;
                     return false;
                 }
@@ -6426,10 +6470,6 @@ namespace
             if (!p.ibl.TouchCooked(p.frameContext,outError)) return false;
             // Bind the retained environment maps for this frame's consumers.
             p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), p.frameContext.resources->DescribeTexture(p.ibl.GetCubeMap()).format, 1);
-            p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
-            p.forward.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
 
             // 기즈모 데이터(gizmoData)의 프레임별 feed는 기여 노드의 prepare가
             // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
@@ -6567,8 +6607,8 @@ namespace
                 }
             }
 
-            lastDrawCount = p.gbuffer.GetLastDrawCount();
-            lastBatchCount = p.gbuffer.GetLastBatchCount();
+            lastDrawCount = static_cast<uint32_t>(p.graphInput ? p.graphInput->Draws().size() : 0);
+            lastBatchCount = p.graphMaterials.PreparedMeshletDrawCount();
 			profileFrameDrawCount += lastDrawCount;
 			profileFrameBatchCount += lastBatchCount;
             lastDecalCount = p.decal.GetLastDecalCount();
@@ -6586,8 +6626,16 @@ namespace
             if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink && temporalSink->AcceptsTemporalFrames() &&
                 !dx12.CreateTemporalDisplayTextures(slot.interopToken,view.temporal.frame.renderExtent,
                     view.temporal.frame.displayExtent,slot.temporalResources,outError)) return false;
-            slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
+            auto nextGraph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
                 kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
+            // Submitted graphs remain immutable for display/FG/GPU consumers.
+            // Copy only structural metadata; never reset or mutate the old graph.
+            const bool reuseStructuralSchedule = ReadLivePostFlag("CREATOR_RENDERGRAPH_SCHEDULE_CACHE", true);
+            const auto priorSchedule = view.structuralSchedules[1]
+                ? view.structuralSchedules[1] : view.structuralSchedules[0];
+            if (reuseStructuralSchedule)
+                nextGraph->InheritStructuralSchedule(priorSchedule);
+            slot.graph = std::move(nextGraph);
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetQueueExecutionMode(dx12.GetQueueExecutionMode());
             graph.SetMeasurementDomain(capture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal);
@@ -6610,8 +6658,7 @@ namespace
                 ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
                 : std::function<bool(std::string&)>{};
             if (!PrepareSceneRecording(p, graph, dx12.CommandPool(), RHIShaderBinary::Dxil,
-                    preparationDeferred, !sourceFrame.temporalFixture.IsValid() ||
-                        sourceFrame.temporalFixture.allowMeshlets, capture, outError, queueBoundary))
+                    preparationDeferred, capture, outError, queueBoundary))
             {
                 return false;
             }
@@ -6661,11 +6708,15 @@ namespace
                     [&](const LivePassNode& node, const LiveBlackboard& board) {
                         if (capture && stageCaptureOk)
                             stageCaptureOk = capture->DeclareStage(dx12.Resources(), graph, board, node,
-                                p.width, p.height, outError);
+                                node.OutputsDisplayResolution(binding) ? p.frameContext.displayWidth : p.frameContext.width,
+                                node.OutputsDisplayResolution(binding) ? p.frameContext.displayHeight : p.frameContext.height, outError);
                     });
                 if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(dx12.Resources(), graph, p.blackboard,
-                        p.width, p.height, outError)) return false;
+                        p.frameContext.width, p.frameContext.height, outError, p.frameContext.displayWidth, p.frameContext.displayHeight)) return false;
+                if (capture && !capture->DeclareHistory(dx12.Resources(), graph, view.ssgi.GetResolvedResult(),
+                        (std::max)(1u, p.frameContext.width / EnhancedSSGIPass::kResolutionDivisor),
+                        (std::max)(1u, p.frameContext.height / EnhancedSSGIPass::kResolutionDivisor), outError)) return false;
 
                 if (!p.blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
                 {
@@ -6679,6 +6730,13 @@ namespace
             }
 
             RHIRecordedBatchDesc batchDesc{};
+            if (reuseStructuralSchedule)
+            {
+                view.structuralSchedules[1] = std::move(view.structuralSchedules[0]);
+                view.structuralSchedules[0] = graph.GetStats().structuralScheduleReused
+                    ? priorSchedule : graph.SnapshotStructuralSchedule();
+            }
+            else view.structuralSchedules.fill({});
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
             batchDesc.displayToken = slot.interopToken;
@@ -6806,10 +6864,10 @@ namespace
                 snapshot.presentationTarget=temporalSink && temporalSink->AcceptsTemporalFrames() &&
                     view.displayTarget==EnhancedLiveDisplayTarget::Game?TemporalPresentationTarget::PlayerSwapchain:TemporalPresentationTarget::EditorViewport;
                 view.temporal.PublishSubmitted(snapshot);
-                snapshot.motionVectorsValid=true;
+                snapshot.motionVectorsValid=p.blackboard.Get(LiveSlots::kTemporalMotion).IsValid();
                 snapshot.motionStaticValid=false;snapshot.motionSkinnedValid=false;snapshot.motionInstancedValid=false;
                 snapshot.motionAlphaValid=false;
-                if(p.graphInput)for(const auto& draw:p.graphInput->Draws())
+                if(snapshot.motionVectorsValid && p.graphInput)for(const auto& draw:p.graphInput->Draws())
                 {
                     if(!draw.temporalHistoryValid)continue;
                     snapshot.motionStaticValid|=draw.geometry->Source()->Bones().empty();
@@ -6817,8 +6875,8 @@ namespace
                     snapshot.motionInstancedValid|=draw.temporalInstanceId!=0;
                     snapshot.motionAlphaValid|=draw.queue!=material_graph::SceneCoverage::Opaque;
                 }
-                snapshot.motionDecalValid=p.decal.HasPreparedDecals() && !view.temporal.frame.reset;
-                snapshot.motionAlphaValid|=p.sprite.GetLastTemporalRecordedItemCount()!=0 &&
+                snapshot.motionDecalValid=snapshot.motionVectorsValid && p.decal.HasPreparedDecals() && !view.temporal.frame.reset;
+                snapshot.motionAlphaValid|=snapshot.motionVectorsValid && p.sprite.GetLastTemporalRecordedItemCount()!=0 &&
                     std::any_of(worldSprites.begin(),worldSprites.end(),[](const auto& item){return item.previousWorldValid;});
             });
             if (queueModeRequest.requestId != 0)
@@ -6902,9 +6960,7 @@ namespace
                 std::string validation;
                 const uint32_t validationCount = dx12.DrainDebugMessages(validation);
                 // W8: Vulkan 경로와 같은 자리에 같은 기록을 남긴다.
-                capture->RecordSealLedger(p.gbuffer.GetSealLedger(),
-                    p.gbuffer.GetSamplerIdentity(), p.forward.GetSealLedger(),
-                    p.forward.GetSamplerIdentity(), encoderDrops, lastEncoderDrop,
+                capture->RecordRenderLedger(encoderDrops, lastEncoderDrop,
                     dx12.TextureCache().GetUploadFailureCount());
                 capture->RecordGeometryRoutes(p.graphMaterials);
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
@@ -7480,10 +7536,21 @@ namespace
                                     origin.fullSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
                                     origin.temporalProvenance = view.slots[slotIndex].temporalProvenance;
 
+                                    // The portable event key includes its marker but no query
+                                    // ordinal. Distinct zero-cost scopes can share name and
+                                    // timestamp ticks; give each collected scope a unique marker
+                                    // within this submission, without inventing elapsed time.
+                                    std::string scopeName;
+                                    scopeName.reserve(128);
+                                    uint32_t scopeOrdinal = 0;
                                     for (const EnhancedLiveGpuSlice& slice : slices)
                                     {
+                                        scopeName.assign(slice.name);
+                                        scopeName += " [gpu scope ";
+                                        scopeName += std::to_string(++scopeOrdinal);
+                                        scopeName += ']';
                                         origin.queueId = slice.queueId;
-                                        sink.on_span(slice.name.c_str(), slice.beginCpuTick,
+                                        sink.on_span(scopeName.c_str(), slice.beginCpuTick,
                                                      slice.endCpuTick, frameLabel, origin);
                                         ++state.gpuSpansEmitted;
                                     }
@@ -8144,8 +8211,13 @@ namespace
             FrameSubmission& newest = renderQueue.back();
             const size_t mergedDeltaCount = newest.deltas.size() + submission.deltas.size();
 
-            if (mergedDeltaCount > kMaxDeltasPerSubmission)
+            if (mergedDeltaCount > kMaxDeltasPerSubmission ||
+                submission.frame.temporalFixture.IsValid() || newest.frame.temporalFixture.IsValid())
             {
+                // Exact-step diagnostics cannot discard a held predecessor or
+                // merge its proxy values into a later step. Apply ordinary queue
+                // backpressure while a fixture is tagged; keep latest-input
+                // coalescing for normal frames.
                 // lifecycle delta는 버릴 수 없다. 이 극단적인 경우에만 producer를
                 // 잠깐 세워 packet queue와 payload 양쪽의 상한을 지킨다.
                 ++renderBackPressureWaits;
@@ -8686,8 +8758,16 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     EnhancedLiveDisplayTarget target, std::string& outError, bool controlled,
     const std::string& cameraReplayPath, const std::string& drawReplayPath, const std::string& latticeReplayPath,
     bool replayExtensions, bool latticeReplayExtension, bool motionValidation,
-    const EnhancedTemporalFixtureStamp& expectedFixture, bool* busy)
+    const EnhancedTemporalFixtureStamp& expectedFixture, bool* busy, uint32_t historyOrdinal, bool historyFixedSdkClock, bool observeTemporal)
 {
+    if (observeTemporal && (controlled || motionValidation || historyOrdinal ||
+        target == EnhancedLiveDisplayTarget::MaterialPreview ||
+        !cameraReplayPath.empty() || !drawReplayPath.empty() || !latticeReplayPath.empty() ||
+        expectedFixture != EnhancedTemporalFixtureStamp{}))
+    {
+        outError = "observed capture requires an editor/game view without replay or fixture controls";
+        return false;
+    }
     if (busy)
     {
         *busy = false;
@@ -8698,6 +8778,13 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
         outError = "motion capture requires an observed editor/game view without controlled replay";
         return false;
     }
+    if (historyFixedSdkClock && !historyOrdinal)
+    { outError = "fixed SDK clock requires a history observation capture"; return false; }
+    if (historyOrdinal && ((historyOrdinal != 1 && historyOrdinal != 8) || controlled || motionValidation ||
+        target != EnhancedLiveDisplayTarget::Game || !cameraReplayPath.empty() || !drawReplayPath.empty() || !latticeReplayPath.empty()))
+    { outError = "history capture requires an observed game view, ordinal 1 or 8, without replay"; return false; }
+    if (expectedFixture.sdkQuality && (!motionValidation || target != EnhancedLiveDisplayTarget::Game))
+    { outError = "SDK sequence capture requires an exact tagged Game motion diagnostic"; return false; }
     const bool hasFixtureExpectation = expectedFixture != EnhancedTemporalFixtureStamp{};
     if (motionValidation && hasFixtureExpectation &&
         (!expectedFixture.IsValid() || expectedFixture.predecessorStepId == 0))
@@ -8751,7 +8838,7 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     std::unique_lock<std::mutex> lock(state.renderStateMutex, std::defer_lock);
     if (busy)
     {
-        if (!lock.try_lock())
+        if (!state.TryLockCaptureControl(lock))
         {
             *busy = true;
             outError.clear();
@@ -8775,9 +8862,22 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     if (motionValidation && expectedFixture.IsValid())
     {
         const auto previous = PreviousTemporalFixtureSubmission(target);
+        if (busy && !previous.sourceVerified &&
+            previous.stamp.sessionId == expectedFixture.sessionId &&
+            previous.stamp.stepId == expectedFixture.predecessorStepId &&
+            previous.stamp.sdkQuality == expectedFixture.sdkQuality &&
+            previous.stamp.inputSha256 == expectedFixture.predecessorInputSha256)
+        {
+            // A previously acknowledged baseline may have been followed by a
+            // coalesced/reset draw of the same held pose. Wait for a fresh proven
+            // predecessor rather than arming from the stale acknowledgement.
+            *busy = true;
+            outError.clear();
+            return false;
+        }
         if (!previous.sourceVerified || previous.stamp.sessionId != expectedFixture.sessionId ||
             previous.stamp.stepId != expectedFixture.predecessorStepId ||
-            previous.stamp.allowMeshlets != expectedFixture.allowMeshlets ||
+            previous.stamp.sdkQuality != expectedFixture.sdkQuality ||
             previous.stamp.inputSha256 != expectedFixture.predecessorInputSha256)
         {
             outError = "motion capture must be armed after its predecessor submits and before its current step";
@@ -8788,7 +8888,10 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     const auto path = std::filesystem::u8path(directory);
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
     { outError = "capture requires a new absolute directory: " + directory; return false; }
-    state.pbrCapture = std::make_unique<EnhancedPbrCapture>();
+    state.pbrCapture = std::make_unique<EnhancedPbrCapture>(!observeTemporal && historyOrdinal == 0 && !expectedFixture.sdkQuality);
+    state.pbrCapture->historyOrdinal = historyOrdinal;
+    state.pbrCapture->observeTemporal = observeTemporal;
+    state.pbrCapture->historyFixedSdkClock = historyFixedSdkClock;
     state.pbrCapture->target = target;
     state.pbrCapture->controlled = controlled;
     state.pbrCapture->motionValidation = motionValidation;
@@ -8818,8 +8921,8 @@ bool EnhancedSceneRenderer::TryGetLivePbrCaptureStatus(EnhancedLivePbrCaptureSta
     const EnhancedTemporalFixtureStamp& expectedFixture)
 {
     LiveState& state = GetLiveState();
-    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::try_to_lock);
-    if (!lock.owns_lock())
+    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::defer_lock);
+    if (!state.TryLockCaptureControl(lock))
     {
         return false;
     }
@@ -8851,8 +8954,8 @@ void EnhancedSceneRenderer::CancelLivePbrCapture(const EnhancedTemporalFixtureSt
 bool EnhancedSceneRenderer::TryCancelLivePbrCapture(const EnhancedTemporalFixtureStamp& expectedFixture)
 {
     LiveState& state = GetLiveState();
-    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::try_to_lock);
-    if (!lock.owns_lock())
+    std::unique_lock<std::mutex> lock(state.renderStateMutex, std::defer_lock);
+    if (!state.TryLockCaptureControl(lock))
     {
         return false;
     }
@@ -8876,6 +8979,7 @@ void EnhancedSceneRenderer::PublishTemporalFixtureStep(const EnhancedTemporalFix
     {
         exchange.previous = {};
         exchange.acknowledged = {};
+        exchange.warmup = {};
     }
     exchange.published = stamp;
 }
@@ -8889,6 +8993,7 @@ void EnhancedSceneRenderer::ClearTemporalFixtureSession(uint64_t sessionId)
         exchange.published = {};
         exchange.previous = {};
         exchange.acknowledged = {};
+        exchange.warmup = {};
     }
 }
 
@@ -8904,6 +9009,15 @@ EnhancedTemporalFixtureSubmission EnhancedSceneRenderer::GetTemporalFixtureSubmi
     return exchange.acknowledged[static_cast<size_t>(target)];
 }
 
+std::vector<EnhancedTemporalFixtureSubmission> EnhancedSceneRenderer::GetTemporalFixtureWarmup(
+    EnhancedLiveDisplayTarget target)
+{
+    if (target >= EnhancedLiveDisplayTarget::Count) return {};
+    auto& exchange = FixtureExchange();
+    std::lock_guard<std::mutex> lock(exchange.mutex);
+    return exchange.warmup[static_cast<size_t>(target)];
+}
+
 bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMilliseconds)
 {
     return GetLiveState().WaitForRenderThreadIdle(timeoutMilliseconds);
@@ -8912,6 +9026,7 @@ bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMillisec
 void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 {
     LiveState& state = GetLiveState();
+    state.YieldToCaptureControl();
     // Declared before the lock so old CPU pixels are freed after it is released.
     own::unique_owner<PreparedEnvironment> retiredEnvironment;
     std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::defer_lock);
@@ -9228,6 +9343,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             {
                 continue;
             }
+            if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
+                ShouldSkipTemporalFixtureStep(PreviousTemporalFixtureSubmission(viewPacket.displayTarget),
+                    frame.temporalFixture, viewPacket.key, frame.sceneEpoch))
+            {
+                continue;
+            }
+
             bool captured = false;
             {
                 RenderThreadPhaseScope capture(RenderPhase::view_capture);
@@ -9362,8 +9484,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     if (!lastDrop.empty()) state.lastEncoderDrop = lastDrop;
                 }
             }
-            state.lastDrawCount = p.gbuffer.GetLastDrawCount();
-            state.lastBatchCount = p.gbuffer.GetLastBatchCount();
+            state.lastDrawCount = static_cast<uint32_t>(p.graphInput ? p.graphInput->Draws().size() : 0);
+            state.lastBatchCount = p.graphMaterials.PreparedMeshletDrawCount();
 			state.profileFrameDrawCount += state.lastDrawCount;
 			state.profileFrameBatchCount += state.lastBatchCount;
             state.lastDecalCount = p.decal.GetLastDecalCount();
@@ -9379,20 +9501,20 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             state.viewShadowStats[targetIndex] = CaptureShadowStats(p);
             state.lastGpuMs = 0.0; // Vulkan timestamp profiler는 후속 성능 슬라이스
             state.lastPassTimings = {
-                { "Shadow", 0.0 }, { "GBuffer", 0.0 },
+                { "METEOR.Scene.Shadow.C0", 0.0 }, { "METEOR.Scene.GBuffer", 0.0 },
                 { "Decal", 0.0 }, { "SSAO.Compute", 0.0 }, { "SSAO.Filter", 0.0 },
-                { "Deferred", 0.0 }, { "SkyBox", 0.0 },
+                { "METEOR.Scene.HdrClear", 0.0 }, { "SkyBox", 0.0 },
                 { "SSGI.HiZ", 0.0 }, { "SSGI.Trace", 0.0 },
                 { "SSGI.Resolve", 0.0 }, { "SSGI.Filter", 0.0 },
                 { "SSGI.Composite", 0.0 }, { "SSGI.StoreHistory", 0.0 },
-                { "Forward+", 0.0 }, { "Sprite", 0.0 },
+                { "METEOR.Scene.LightTiles", 0.0 }, { "METEOR.Blended.Color", 0.0 }, { "Sprite", 0.0 },
                 { "SSS", 0.0 }, { "SSR", 0.0 },
                 { "VolumetricFog", 0.0 }, { "PostChain", 0.0 }, { "UI", 0.0 },
                 { "Grid", 0.0 }, { "WireFrame", 0.0 },
                 { "GizmoIcon", 0.0 }, { "GizmoLine", 0.0 },
                 { "live_present", 0.0 } };
             ++totalPending;
-            state.AddNativeRecordSample(p.lastNativeRecordMs);
+            state.AddNativeRecordSample(p.lastNativeRecordMs, p.views[viewIndex].temporal.provenance, p.lastGraphStats);
             renderedAny = true;
         }
 
@@ -9612,6 +9734,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             continue;
         }
 
+        if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
+            ShouldSkipTemporalFixtureStep(PreviousTemporalFixtureSubmission(viewPacket.displayTarget),
+                frame.temporalFixture, viewPacket.key, frame.sceneEpoch))
+        {
+            continue;
+        }
+
         bool captured = false;
         {
             RenderThreadPhaseScope capture(RenderPhase::view_capture);
@@ -9621,6 +9750,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         if (!captured)
         {
             ++state.framesIdle;
+            if (!state.lastError.empty() && state.reportedValidation.insert(state.lastError).second)
+            {
+                Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] View capture failed: " + state.lastError);
+                std::printf("[render.view.capture] failed view=%llu error=%s\n",
+                    static_cast<unsigned long long>(viewPacket.key.viewId), state.lastError.c_str());
+                std::fflush(stdout);
+            }
             continue;
         }
 
@@ -9709,6 +9845,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             if (state.reportedValidation.insert(state.lastError).second)
             {
                 Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+                std::printf("[meteor.scene.frame] failed error=%s\n", state.lastError.c_str());
             }
 
             if (LiveState::kMaxConsecutiveFrameFailures <= state.consecutiveFrameFailures)
@@ -9731,7 +9868,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         ++totalPending;
         state.gpuMaxPendingSubmissions = (std::max)(
             state.gpuMaxPendingSubmissions, static_cast<uint32_t>(totalPending));
-        state.AddNativeRecordSample(p.lastNativeRecordMs);
+        state.AddNativeRecordSample(p.lastNativeRecordMs, view->slots[renderSlot].temporalProvenance, p.lastGraphStats);
         renderedAny = true;
     }
 
@@ -10054,36 +10191,21 @@ EnhancedSceneRenderer::GetLiveSealDiagnostics()
     out.enabled = state.enabled;
     out.framesRendered = state.framesRendered;
     out.encoderDrops = state.encoderDrops;
+    out.frameId = state.consumedFrameId;
     out.lastDrawCount = state.lastDrawCount;
     out.lastBatchCount = state.lastBatchCount;
     out.modelGenerationPairs = state.lastModelGenerationPairs;
     out.mixedGenerationModels = state.lastMixedGenerationModels;
     out.mixedNewestGeneration = state.lastMixedNewestGeneration;
 
-    const auto read = [&out](const EnhancedGBufferPass& gbuffer,
-        const EnhancedForwardPass& forward, uint32_t textureFailures)
-    {
-        const EnhancedDrawSealLedger& gb = gbuffer.GetSealLedger();
-        const EnhancedDrawSealLedger& fw = forward.GetSealLedger();
-        out.frameId = gb.frameId;
-        out.gbufferStamped = gb.counters.stamped;
-        out.gbufferUnstamped = gb.counters.unstamped;
-        out.gbufferViolations = gb.Violations();
-        out.forwardStamped = fw.counters.stamped;
-        out.forwardUnstamped = fw.counters.unstamped;
-        out.forwardViolations = fw.Violations();
-        out.textureUploadFailures = textureFailures;
-    };
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
         if (const VulkanLivePipeline* pipeline = state.vulkanPipeline.get())
-            read(pipeline->gbuffer, pipeline->forward,
-                pipeline->textureCache.GetUploadFailureCount());
+            out.textureUploadFailures = pipeline->textureCache.GetUploadFailureCount();
     }
-    else if (const LivePipeline* pipeline = state.pipeline.get())
+    else if (state.pipeline)
     {
-        read(pipeline->gbuffer, pipeline->forward,
-            state.dx12.TextureCache().GetUploadFailureCount());
+        out.textureUploadFailures = state.dx12.TextureCache().GetUploadFailureCount();
     }
     return out;
 }
@@ -10411,22 +10533,11 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     {
         const ViewLightSelection& sel = state.lastLightSelection;
         const uint32_t visible = static_cast<uint32_t>(sel.lights.size());
-        const uint32_t deferredCap = EnhancedDeferredPass::kMaxLights;
-        const uint32_t overCap = (visible > deferredCap) ? (visible - deferredCap) : 0u;
-
         char lightLine[192]{};
         std::snprintf(lightLine, sizeof(lightLine),
-            "\n  광원 — 씬 %u개 · 뷰 %u개(절두체 밖 %u) · Deferred 한도 %u",
-            sel.sceneLights, visible, sel.culledByFrustum, deferredCap);
+            "\n  광원 — 씬 %u개 · 뷰 %u개(절두체 밖 %u) · METEOR 조명",
+            sel.sceneLights, visible, sel.culledByFrustum);
         status += lightLine;
-
-        if (0 != overCap)
-        {
-            char overLine[96]{};
-            std::snprintf(overLine, sizeof(overLine),
-                " · 한도 초과 %u개(기여도 낮은 쪽부터 빠진다)", overCap);
-            status += overLine;
-        }
 
         // 소수(≤6개)일 때는 프록시 내용물을 그대로 보인다. "컬링이 안 된다"가
         // 판정 버그인지 낡은 데이터인지는 이 줄이 가른다 — PIX 검증에서 그

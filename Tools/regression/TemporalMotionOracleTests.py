@@ -15,6 +15,17 @@ ORACLE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ORACLE)
 
 
+class MeasuredStepContinuityTests(unittest.TestCase):
+    def test_exact_measured_predecessor_is_accepted(self):
+        ORACLE.measured_step_continuity({"realFrameId": 20},
+            {"temporalMotion": {"previousSubmittedRealFrameId": 20}})
+
+    def test_intervening_held_pose_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "held measured pose advanced history"):
+            ORACLE.measured_step_continuity({"realFrameId": 20},
+                {"temporalMotion": {"previousSubmittedRealFrameId": 21}})
+
+
 class TemporalMotionOracleTests(unittest.TestCase):
     def setUp(self):
         self.fixture = json.loads((ROOT / "Tools/regression/fixtures/temporal-motion/analytic-probes.json").read_text())
@@ -216,7 +227,7 @@ class ProductOwnershipOracleTests(unittest.TestCase):
     def test_recorded_labels_without_independent_instances_are_rejected(self):
         def manifest(frame, entries):
             return {"frameId": frame, "viewId": 3, "sceneEpoch": 4, "geometryRoutes": {
-                "source": "joined-command-recording-after-native-submission", "pass": "LX.Scene.GBuffer",
+                "source": "joined-command-recording-after-native-submission", "pass": "METEOR.Scene.GBuffer",
                 "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4, "selected": entries}}
         entry = {"geometryKey": 10, "temporalObjectId": 20, "temporalInstanceId": 30,
                  "meshShader": False}
@@ -230,7 +241,7 @@ class ProductOwnershipOracleTests(unittest.TestCase):
     def test_decal_control_must_keep_same_receiver(self):
         def manifest(frame, object_id):
             return {"frameId": frame, "viewId": 3, "sceneEpoch": 4, "geometryRoutes": {
-                "source": "joined-command-recording-after-native-submission", "pass": "LX.Scene.GBuffer",
+                "source": "joined-command-recording-after-native-submission", "pass": "METEOR.Scene.GBuffer",
                 "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4, "selected": [
                     {"geometryKey": 10, "temporalObjectId": object_id, "temporalInstanceId": 0,
                      "meshShader": False}]}}

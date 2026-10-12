@@ -485,6 +485,25 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         }
     }
 
+    // Opt-in diagnostic for unattended assertions: preserve the throwing stack
+    // before the CRT terminates the process. Never continue past the assertion.
+#ifdef _DEBUG
+    if (GetEnvironmentVariableW(L"CREATOR_ASSERT_STACK", nullptr, 0) != 0)
+    {
+        SuppressCrtDialogs();
+        _CrtSetReportHookW2(_CRT_RPTHOOK_INSTALL, [](int type, wchar_t* message, int*) -> int {
+            if (type == _CRT_ASSERT)
+            {
+                CONTEXT context{};
+                RtlCaptureContext(&context);
+                const auto stack = BuildStackTrace(context);
+                std::fprintf(stderr, "[CRT assertion] %ls\n%s", message, stack.c_str());
+                std::fflush(stderr);
+            }
+            return FALSE;
+        });
+    }
+#endif
     if (wantConsole)
     {
         // 스크립트로 돌리는 실행에서는 크래시 때 대화상자를 띄우지 않는다 —

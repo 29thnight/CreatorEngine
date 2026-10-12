@@ -369,7 +369,6 @@
     <ClCompile Include="Experiment\Import\VertexWelding.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
-    <ClCompile Include="GpuMeshletVisibility.cpp" />
     <ClCompile Include="GpuGeometryOcclusion.cpp" />
     <ClCompile Include="Experiment\Import\MeshLodBuilder.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
@@ -455,13 +454,7 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedDecalPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="Render\Passes\Geometry\EnhancedDeferredPass.cpp">
-      <Filter>Render\Passes\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp">
-      <Filter>Render\Passes\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
+    <ClCompile Include="Render\Passes\Geometry\SceneSurfaceTargets.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="GpuGeometryVisibility.cpp">
@@ -474,6 +467,9 @@
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedSkyBoxPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedLightTilePass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp">
@@ -797,7 +793,6 @@
     <ClInclude Include="Experiment\Import\VertexWelding.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
-    <ClInclude Include="GpuMeshletVisibility.h" />
     <ClInclude Include="GpuGeometryOcclusion.h" />
     <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
     <ClInclude Include="Experiment\MeshLodData.h">
@@ -983,13 +978,7 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedDecalPass.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="Render\Passes\Geometry\EnhancedDeferredPass.h">
-      <Filter>Render\Passes\Geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="Render\Passes\Geometry\EnhancedForwardPass.h">
-      <Filter>Render\Passes\Geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h">
+    <ClInclude Include="Render\Passes\Geometry\SceneSurfaceTargets.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="GpuGeometryVisibility.h">
@@ -1002,6 +991,9 @@
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Lighting\EnhancedSkyBoxPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedLightTilePass.h">
       <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSAOPass.h">
@@ -1295,6 +1287,7 @@
     <ClCompile Include="Render\Temporal\SpatialPostEffectsHost.cpp"><Filter>Render\Temporal</Filter></ClCompile>
     <ClCompile Include="RHI\Temporal\TemporalDeviceDX12.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
     <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.cpp"><Filter>Render\Temporal</Filter></ClCompile>
+    <ClCompile Include="Render\Passes\PostProcess\EnhancedTemporalUpscalePass.cpp"><Filter>Render\Temporal</Filter></ClCompile>
     <ClInclude Include="Render\Temporal\TemporalRuntimeControl.h"><Filter>Render\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Temporal\TemporalUpscalerHost.h"><Filter>Render\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Temporal\SpatialPostEffects.h"><Filter>Render\Temporal</Filter></ClInclude>
@@ -1302,6 +1295,7 @@
     <ClInclude Include="RHI\Temporal\TemporalDeviceDX12.h"><Filter>RHI\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Temporal\TemporalMeasurementProvenance.h"><Filter>Render\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalInputsPass.h"><Filter>Render\Temporal</Filter></ClInclude>
+    <ClInclude Include="Render\Passes\PostProcess\EnhancedTemporalUpscalePass.h"><Filter>Render\Temporal</Filter></ClInclude>
     <ClInclude Include="Render\Scene\EnhancedTemporalViewState.h"><Filter>Render\Temporal</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -279,7 +279,7 @@ namespace experiment::importer
         {
             if (payload.IsEmpty())
             {
-                return true;
+                return mesh.indices.empty() || MeshletFail(diagnostic, "METEOR geometry requires cooked meshlets; force reimport/recook.");
             }
             if (!MeshletSettingsSupported(expectedSettings) || !MeshletSettingsSupported(payload.settings)
                 || !MeshletSettingsEqual(payload.settings, expectedSettings))
@@ -325,7 +325,7 @@ namespace experiment::importer
                     return MeshletFail(diagnostic, "Meshlet descriptor has an invalid, overlapping or noncontiguous range.");
                 }
                 if ((descriptor.flags & ~(kMeshletConeValid | kMeshletRequiresDeformedBounds)) != 0
-                    || descriptor.reserved[0] != 0 || descriptor.reserved[1] != 0 || descriptor.reservedBounds != 0
+                    || descriptor.clusterId != &descriptor - payload.descriptors.data() || descriptor.reserved != 0 || descriptor.reservedBounds != 0
                     || ((descriptor.flags & kMeshletRequiresDeformedBounds) != 0) != deformed
                     || (deformed && (descriptor.flags & kMeshletConeValid) != 0))
                 {
@@ -375,7 +375,7 @@ namespace experiment::importer
                         actual[corner] = payload.vertexRemap[vertexEnd + local];
                     }
                     const auto primitive = payload.primitiveRemap[primitiveEnd + triangle];
-                    if (primitive >= seenPrimitives.size() || seenPrimitives[primitive] != 0)
+                    if (primitive != primitiveEnd + triangle || primitive >= seenPrimitives.size() || seenPrimitives[primitive] != 0)
                     {
                         return MeshletFail(diagnostic, "Meshlet primitive remap is not a source-triangle permutation.");
                     }
@@ -455,9 +455,11 @@ namespace experiment::importer
             std::vector<std::uint8_t> triangles(mesh.indices.size());
             // meshoptimizer 1.2 supports 126 triangles directly and writes tightly
             // packed micro-indices. Do not retain the old multiple-of-four rule.
-            const std::size_t meshletCount = meshopt_buildMeshlets(built.data(), vertices.data(), triangles.data(),
-                mesh.indices.data(), mesh.indices.size(), positions.front().data(), positions.size(),
-                sizeof(MeshletPosition), settings.maxVertices, settings.maxTriangles, settings.coneWeight);
+            // METEOR raster derivatives require exact primitive and corner order.
+            // One authoritative cooked partition; runtime never reclusters it.
+            const std::size_t meshletCount = meshopt_buildMeshletsScan(built.data(), vertices.data(), triangles.data(),
+                mesh.indices.data(), mesh.indices.size(), positions.size(),
+                settings.maxVertices, settings.maxTriangles);
             if (meshletCount == 0 || meshletCount > meshletBound)
             {
                 return MeshletFail(diagnostic, "Meshlet builder returned an invalid descriptor count.");
@@ -497,6 +499,7 @@ namespace experiment::importer
                     return MeshletFail(diagnostic, "Meshlet builder returned an invalid source range.");
                 }
                 MeshletDescriptor descriptor{};
+                descriptor.clusterId = static_cast<std::uint32_t>(meshlet);
                 descriptor.vertexOffset = static_cast<std::uint32_t>(payload.vertexRemap.size());
                 descriptor.triangleOffset = static_cast<std::uint32_t>(payload.triangleIndices.size());
                 descriptor.primitiveOffset = static_cast<std::uint32_t>(payload.primitiveRemap.size());

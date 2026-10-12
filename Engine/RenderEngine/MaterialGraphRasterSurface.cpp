@@ -185,7 +185,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
     for (std::size_t i = 0; i < targets_.size(); ++i)
     {
-        auto texture = graph.ImportTexture(targets_[i], RHIResourceState::Common, "LX.Raster.Frame");
+        auto texture = graph.ImportTexture(targets_[i], RHIResourceState::Common, "METEOR.Raster.Frame");
         if (versioned)
         {
             texture = graph.Write(texture);
@@ -197,7 +197,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     auto depth = graph.FindImportedTexture(depth_);
     if (!depth.IsValid())
     {
-        depth = graph.ImportTexture(depth_, RHIResourceState::Common, "LX.Raster.Depth");
+        depth = graph.ImportTexture(depth_, RHIResourceState::Common, "METEOR.Raster.Depth");
     }
     if (depthSource_)
     {
@@ -224,11 +224,11 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
         }
         if (!vertex.IsValid())
         {
-            vertex = graph.ImportBuffer(mesh->Buffer(), RHIResourceState::ShaderResource, "LX.Raster.Vertices");
+            vertex = graph.ImportBuffer(mesh->Buffer(), RHIResourceState::ShaderResource, "METEOR.Raster.Vertices");
         }
         captureUsage.push_back({vertex, RHIResourceState::ShaderResource, read});
     }
-    auto output = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.Raster.Pixels");
+    auto output = graph.ImportBuffer(buffer_, RHIResourceState::Common, "METEOR.Raster.Pixels");
     if (versioned)
     {
         output = graph.Write(output);
@@ -237,7 +237,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     graphEpoch_ = graph.ResourceEpoch();
     graphOutput_ = output;
     resolveUsage.push_back({output, RHIResourceState::UnorderedAccess, write});
-    graph.AddPass("LX.OpaqueRasterCapture", captureUsage, [owner](const auto& context) {
+    graph.AddPass("METEOR.OpaqueRasterCapture", captureUsage, [owner](const auto& context) {
         if (!owner->IsCurrent() || !context.graph || !context.encoder ||
             !owner->GraphOutput(*context.graph).IsValid() || (owner->recordedStages_.fetch_or(1) & 1) != 0)
         {
@@ -268,7 +268,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
             encoder.DrawIndexed(owner->meshes_[i]->Input()->Geometry().indexCount, 1);
         }
     });
-    graph.AddPass("LX.ResolveVisibleSurface", resolveUsage, [owner](const auto& context) {
+    graph.AddPass("METEOR.ResolveVisibleSurface", resolveUsage, [owner](const auto& context) {
         if (!owner->IsCurrent() || !context.graph || !context.encoder ||
             !owner->GraphOutput(*context.graph).IsValid() || (owner->recordedStages_.fetch_or(2) & 2) != 0)
         {
@@ -284,7 +284,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     });
     // Preserve the capture/resolve chain and transition the external consumer input.
     graph.AddPass(
-        "LX.VisibleSurfaceReady", {{output, RHIResourceState::ShaderResource, read}},
+        "METEOR.VisibleSurfaceReady", {{output, RHIResourceState::ShaderResource, read}},
         [owner](const auto&) {
             if (!owner->IsCurrent())
             {
@@ -437,7 +437,7 @@ bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const Ra
     texture.height = request.height;
     texture.format = RHIFormat::RGBA32Float;
     texture.allowRenderTarget = true;
-    texture.debugName = L"LX.Raster.WorldFrame";
+    texture.debugName = L"METEOR.Raster.WorldFrame";
     for (auto& target : candidate->targets_)
     {
         if (!device.CreateTexture(texture, target, error))
@@ -448,11 +448,11 @@ bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const Ra
     texture.format = RHIFormat::D32Float;
     texture.allowRenderTarget = false;
     texture.allowDepthStencil = true;
-    texture.debugName = L"LX.Raster.Depth";
+    texture.debugName = L"METEOR.Raster.Depth";
     RHIBufferDesc buffer;
     buffer.bytes = candidate->Count() * sizeof(SurfacePoint);
     buffer.allowUnorderedAccess = true;
-    buffer.debugName = L"LX.Raster.VisiblePixels";
+    buffer.debugName = L"METEOR.Raster.VisiblePixels";
     if (candidate->depthSource_)
     {
         candidate->depth_ = candidate->depthSource_->Depth();

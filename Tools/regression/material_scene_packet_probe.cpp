@@ -142,7 +142,7 @@ own::shared_owner<const Texture> TextureFixture(bool cube)
             std::memcpy(pixels, color.data(), sizeof(color));
         }
     }
-    return Texture::CreateSharedFromImage(cube ? "LX.Scene.Environment" : "LX.Scene.Image", std::move(image));
+    return Texture::CreateSharedFromImage(cube ? "METEOR.Scene.Environment" : "METEOR.Scene.Image", std::move(image));
 }
 
 struct QueueGate

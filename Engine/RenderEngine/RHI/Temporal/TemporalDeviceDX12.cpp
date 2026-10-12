@@ -53,16 +53,18 @@ std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
     }
     const auto control = TemporalRuntimeControl::Get().Snapshot();
     const auto& settings = control.settings;
+    const bool editorDlss = CREATOR_ENABLE_DLSS_STREAMLINE && control.editorUpscalingHostRegistered &&
+        !settings.runtimeDirectory.empty() && !settings.dlssProjectId.empty();
     const bool requestReflex = control.playerLatencyHostRegistered && settings.reflexMode != TemporalLatencyMode::Off &&
         !(settings.enabled && settings.requestedFrameGenerator == TemporalProvider::XeSS);
     const bool requestSpatial = settings.spatialPost.nisMode != SpatialScalingMode::Off ||
         settings.spatialPost.deepDvcEnabled;
-    if (!requestReflex && !requestSpatial && (!settings.enabled ||
+    if (!editorDlss && !requestReflex && !requestSpatial && (!settings.enabled ||
         (settings.requestedUpscaler == TemporalProvider::None &&
             settings.requestedFrameGenerator == TemporalProvider::None)))
     { result = { TemporalStatus::NotQueried }; return {}; }
     auto owner = std::make_shared<TemporalDeviceDX12>();
-    const bool useDlss = requestReflex || requestSpatial || (settings.enabled &&
+    const bool useDlss = editorDlss || requestReflex || requestSpatial || (settings.enabled &&
         (settings.requestedUpscaler == TemporalProvider::Dlss ||
             (control.playerLatencyHostRegistered && settings.requestedFrameGenerator == TemporalProvider::Dlss)));
     if (!useDlss)
@@ -89,7 +91,7 @@ std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
     init.engineVersion = "CreatorEngine";
     // Do not make SR depend on the optional FG/Reflex DLL set, or vice versa.
     // Adding the other axis later requires a fresh pre-device SDK session.
-    init.loadUpscaling = settings.enabled && settings.requestedUpscaler == TemporalProvider::Dlss;
+    init.loadUpscaling = editorDlss || (settings.enabled && settings.requestedUpscaler == TemporalProvider::Dlss);
     init.loadFrameGeneration = control.playerLatencyHostRegistered && settings.enabled &&
         settings.requestedFrameGenerator == TemporalProvider::Dlss;
     init.loadReflex = requestReflex;

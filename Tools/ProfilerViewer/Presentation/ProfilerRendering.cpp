@@ -26,7 +26,10 @@ namespace editor::profiler_view
         void LabeledValue(const char* label, const char* value, const ImVec4& color)
         {
             ImGui::TextColored(kDimColor, "%s", label);
-            ImGui::SameLine(125.f * ImGui::GetStyle().FontScaleMain * ImGui::GetStyle().FontScaleDpi);
+            const float valueColumn = (std::max)(
+                125.f * ImGui::GetStyle().FontScaleMain * ImGui::GetStyle().FontScaleDpi,
+                ImGui::GetCursorPosX() + ImGui::CalcTextSize(label).x + ImGui::GetStyle().ItemSpacing.x);
+            ImGui::SameLine(valueColumn);
             ImGui::TextColored(color, "%s", value);
         }
 
@@ -186,7 +189,7 @@ namespace editor::profiler_view
                 static_cast<unsigned long long>(displayed.framesRendered),
                 static_cast<unsigned long long>(displayed.framesIdle),
                 static_cast<unsigned long long>(displayed.framesInFlight));
-            LabeledValue("Frames", buffer);
+            LabeledValue("Real view renders", buffer);
 
             // 묘지가 자라기만 하면 DisableLive가 놓은 공유 객체를 아무도
             // 회수하지 않고 있다는 뜻이다(ShutdownLive까지 남는다).
@@ -343,16 +346,7 @@ namespace editor::profiler_view
         constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
         ImGui::Combo("View", &selectedTarget, targets, 3);
         const auto& view = displayed.views[static_cast<std::size_t>(selectedTarget)];
-        const bool gpuMatches = view.ready && view.viewId == displayed.lastGpuViewId &&
-            displayed.lastGpuSubmissionId && !displayed.passTimings.empty() &&
-            displayed.gpuTemporalProvenance.frameKind == 1 &&
-            displayed.gpuTemporalProvenance.generatedOrdinal == 0 &&
-            displayed.gpuTemporalProvenance.publicationFrameId == displayed.lastGpuFrameId &&
-            displayed.lastGpuFrameId == view.completedFrameId &&
-            displayed.gpuTemporalProvenance.viewId == displayed.lastGpuViewId &&
-            displayed.gpuTemporalProvenance.resolutionState != 0 &&
-            displayed.gpuTemporalProvenance.renderWidth && displayed.gpuTemporalProvenance.renderHeight &&
-            displayed.gpuTemporalProvenance.displayWidth && displayed.gpuTemporalProvenance.displayHeight;
+        const bool gpuMatches = matches_gpu_measurement(displayed, view);
         ImGui::Text("Completed frame %llu / view %llu / %u x %u / %s",
             static_cast<unsigned long long>(view.completedFrameId), static_cast<unsigned long long>(view.viewId),
             view.completedWidth, view.completedHeight, view.ready ? "ready" : "unavailable");
@@ -392,13 +386,15 @@ namespace editor::profiler_view
         }
 
         // ── 프레임 비용 ──
-        if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Timing, " Frame cost">, ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Timing, " Render timing">, ImGuiTreeNodeFlags_DefaultOpen))
         {
             char buffer[64]{};
             std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.cpuMs);
-            LabeledValue("CPU (all views)", buffer);
+            LabeledValue("CPU live render (all views)", buffer);
             std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.gpuMs);
-            LabeledValue("GPU (selected view)", gpuMatches ? buffer : "unavailable");
+            LabeledValue("GPU pass sum (selected view)", gpuMatches ? buffer : "unavailable");
+            ImGui::TextWrapped("GPU pass sum adds measured pass durations; overlapping passes may count twice. "
+                "View renders and CPU timing do not measure monitor presentation or input-to-photon latency.");
             const auto& p = displayed.gpuTemporalProvenance;
             if (gpuMatches)
             {

@@ -37,6 +37,7 @@
 #include "../../Engine/Utility_Framework/WarmupLedger.h"
 #include "WinProcProxy.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "Render/Temporal/TemporalRuntimeControl.h"
 #include "SceneManager.h"
 #include "TimeSystem.h"
 #include <shellapi.h>
@@ -148,7 +149,22 @@ std::filesystem::path EditorPathArgument(const wchar_t* option)
 
     bool InitializeEditorHostSettings() noexcept
     {
-        return EditorSettingsStore::Get().Initialize();
+        if (!EditorSettingsStore::Get().Initialize()) return false;
+        try
+        {
+            const auto directory = ResolveProcessExecutableDirectory() / L"Temporal";
+            // CreatorEditor.vcxproj's existing project GUID identifies this
+            // custom-engine integration; it is not an NVIDIA application ID.
+            TemporalRuntimeControl::Get().RegisterEditorUpscalingHost(
+                std::filesystem::is_directory(directory) ? directory.wstring() : std::wstring{},
+                "6b06c95b-fedc-45bf-a2ea-095122e18e8b");
+            return true;
+        }
+        catch (const std::exception& error)
+        {
+            std::fprintf(stderr, "[Temporal] Editor runtime deployment setup failed: %s\n", error.what());
+            return false;
+        }
     }
 
 	EngineLaunchConfig MakeEditorLaunchConfig()

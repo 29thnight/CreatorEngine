@@ -31,6 +31,10 @@
 
 namespace
 {
+    // Dense multi-surface METEOR scenes exceed 1024 scopes before shadows execute.
+    // 4096 scopes reserve 24576 timestamps / 192 KiB readback over three frames.
+    // Overflow remains an explicit measurement failure beyond this bound.
+    constexpr uint32_t kLiveProfilerPassCapacity = 4096;
     void LiveDx12WriteJsonString(std::ostream& output, const std::string& value)
     {
         constexpr char hex[] = "0123456789abcdef";
@@ -106,7 +110,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     EnhancedRenderGraph::QueueEndpoint graphics;
     bool ownedQueueExecution{false};
     std::optional<uint32_t> queueExecutionModeOverride;
-    uint32_t profilerPassCapacity{256};
+    uint32_t profilerPassCapacity{kLiveProfilerPassCapacity};
     uint64_t queueSubmissions{0};
     uint64_t queueBatches{0};
     uint64_t queueBarriers{0};
@@ -124,6 +128,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
 
     static constexpr size_t kMaxTimingSignatureBytes = 1024 * 1024;
     EnhancedGpuMeasurementHistory gpuMeasurements;
+    bool reportedTimingSignatureMismatch{false};
     struct MeasurementSubmission
     {
         GpuFrameToken token;
@@ -131,6 +136,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         uint32_t mode{0};
         GpuFrameToken computeToken;
         bool collectMeasurements{false};
+        uint64_t backendGeneration{0};
     };
     std::array<MeasurementSubmission, kFrameCount> measurementSubmissions{};
 
@@ -320,7 +326,10 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     // Every execution mode uses the primary graphics queue, so switching mode
     // preserves both the graphics clock and the warm pass-measurement history.
     ID3D12CommandQueue* profilerQueue = impl.resources.GetCommandQueue();
-    constexpr uint32_t defaultProfilerPassCapacity = 256;
+    // Per-mesh METEOR transform passes alone reach ~2 per draw; 256 slots were
+    // exhausted at ~128 draws, leaving later passes (shadows, lighting) untimed.
+    // Multi-surface MatGrid 8x8 also exceeds 1024; reserve bounded headroom.
+    constexpr uint32_t defaultProfilerPassCapacity = kLiveProfilerPassCapacity;
     uint32_t profilerPassCapacity = defaultProfilerPassCapacity;
 #if defined(_DEBUG)
     // 회귀 검사용으로만 질의 슬롯을 좁힌다. 실제 pass 실행은 그대로 두고
@@ -624,7 +633,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
     {
         impl.measurementSubmissions[impl.currentProfilerToken.ringSlot].domain = domain;
     }
-    const auto* view = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
+    auto* view = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
         impl.profiler.Calibration().cpuTicksPerSecond);
     bool checkedSignature = false;
     bool signatureMatches = false;
@@ -637,9 +646,32 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
         // 한 번의 조회는 한 그래프의 패스만 방문한다. 큰 선언 원문은 한 번만 비교한다.
         if (!checkedSignature)
         {
+            if (const auto* matching = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
+                    impl.profiler.Calibration().cpuTicksPerSecond, identity.graphSignature))
+                view = matching;
             signatureMatches = view->graphSignature == identity.graphSignature ||
                 *view->graphSignature == *identity.graphSignature;
             checkedSignature = true;
+            if (!signatureMatches && impl.evidenceTelemetry && !impl.reportedTimingSignatureMismatch)
+            {
+                // One bounded diagnostic per process; retain exact declarations
+                // so a missing cost history is distinguishable from a changing graph.
+                const auto hex = [](const std::string& bytes)
+                {
+                    constexpr char digits[] = "0123456789abcdef";
+                    std::string result;
+                    result.reserve(bytes.size() * 2);
+                    for (const unsigned char value : bytes)
+                    {
+                        result.push_back(digits[value >> 4]);
+                        result.push_back(digits[value & 15]);
+                    }
+                    return result;
+                };
+                std::printf("[rg8.signature] {\"previous\":\"%s\",\"current\":\"%s\"}\n",
+                    hex(*view->graphSignature).c_str(), hex(*identity.graphSignature).c_str());
+                impl.reportedTimingSignatureMismatch = true;
+            }
         }
         const auto& costs = view->nanoseconds;
         return signatureMatches && identity.passIndex < costs.size() ? costs[identity.passIndex] : std::nullopt;
@@ -651,6 +683,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
         return false;
     }
     recordingMilliseconds = execution.recordingMilliseconds;
+    if (impl.currentProfilerToken.IsValid() && impl.currentProfilerToken.ringSlot < impl.measurementSubmissions.size())
+        impl.measurementSubmissions[impl.currentProfilerToken.ringSlot].backendGeneration = GetBackendGeneration();
     ++impl.queueSubmissions;
     impl.computeSubmissions += execution.computeBatches;
     impl.queueBatches += execution.submittedBatches;
@@ -672,6 +706,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
              << ",\"effectiveExecutionMode\":" << diagnostics.effectiveExecutionMode
              << ",\"measurementDomain\":\"" << RGMeasurementDomainName(domain) << '"'
              << ",\"fallbackReason\":\"" << RGQueueFallbackReasonName(diagnostics.schedule.fallbackReason) << '"'
+             << ",\"measurementHistory\":\"" << (!view ? "missing-or-stale" :
+                 !signatureMatches ? "signature-mismatch" : "signature-matched") << '"'
              << ",\"backendGeneration\":" << GetBackendGeneration()
              << ",\"frameId\":" << token.engineFrameId << ",\"viewId\":" << token.renderViewId
              << ",\"submissionId\":" << token.submissionId << ",\"captureGeneration\":" << token.captureGeneration
@@ -706,6 +742,9 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
              << ",\"eligibleComputePasses\":" << diagnostics.schedule.eligibleComputePasses
              << ",\"rejectedStatePasses\":" << diagnostics.schedule.rejectedStatePasses
              << ",\"measuredPasses\":" << diagnostics.schedule.measuredPasses
+             << ",\"placementTrials\":" << diagnostics.schedule.placementTrials
+             << ",\"dependencyMilliseconds\":" << diagnostics.schedule.dependencyMilliseconds
+             << ",\"simulationMilliseconds\":" << diagnostics.schedule.simulationMilliseconds
              << ",\"missingMeasurementPasses\":" << diagnostics.schedule.missingMeasurementPasses << ",\"entries\":[";
         const char* separator = "";
         for (const auto& entry : diagnostics.schedule.entries)
@@ -1260,7 +1299,8 @@ GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
         m_impl->measurementSubmissions[token.ringSlot] = {token,
             diagnosticCapture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal,
             GetQueueExecutionMode(), computeToken,
-            m_impl->ownedQueueExecution || m_impl->evidenceTelemetry || m_impl->queueExecutionModeOverride.has_value()};
+            m_impl->ownedQueueExecution || m_impl->evidenceTelemetry || m_impl->queueExecutionModeOverride.has_value(),
+            GetBackendGeneration()};
     }
     return m_impl->currentProfilerToken;
 }
@@ -1539,7 +1579,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
              << (submission ? submission->mode : UINT32_MAX)
              << ",\"measurementDomain\":\""
              << (submission ? RGMeasurementDomainName(submission->domain) : "unknown") << '"'
-             << ",\"backendGeneration\":" << GetBackendGeneration()
+             << ",\"backendGeneration\":" << (submission ? submission->backendGeneration : 0)
              << ",\"frameId\":" << origin.engineFrameId << ",\"viewId\":" << origin.renderViewId
              << ",\"submissionId\":" << origin.submissionId << ",\"captureGeneration\":" << origin.captureGeneration
              << ",\"cpuSubmitTick\":" << origin.cpuSubmitTick

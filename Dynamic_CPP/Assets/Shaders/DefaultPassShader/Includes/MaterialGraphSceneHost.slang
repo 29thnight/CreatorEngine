@@ -48,6 +48,15 @@ cbuffer LXSceneConstants : register(b0)
     float4x4 lx_temporalPreviousProjection;
     uint lx_temporalHistoryValid;
     uint3 lx_temporalPadding;
+    uint2 lx_geometryKey;
+    uint2 lx_geometryObjectId;
+    uint2 lx_geometryIncarnation;
+    uint2 lx_geometryInstanceId;
+    uint2 lx_geometryMaterialSlot;
+    uint lx_geometryLodIndex;
+    uint lx_geometryPrimitiveCount;
+    uint lx_geometryIdentityVersion;
+    uint3 lx_geometryIdentityPadding;
 };
 
 StructuredBuffer<LXSurfacePoint> lx_vertices : register(t0);
@@ -215,22 +224,23 @@ LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceI
 
 // Chunk-local topology over the same transformed vertices used by LXSceneVS.
 // Scene preparation pins this immutable stream through submission completion.
-StructuredBuffer<uint> lx_meshlets : register(t155);
+#include "LxMeshletGpuContract.slang"
+ByteAddressBuffer lx_meshlets : register(t155);
 
 groupshared uint lx_meshletOutside;
 
 // Intersect the outside-plane masks of the actual posed vertices. A common
 // plane proves the entire convex hull is outside; crossings/unknowns survive.
-bool LXSceneMeshletVisible(uint remap, uint count, uint lane, float4x4 projection)
+bool LXSceneMeshletVisible(LXMeshletDescriptor descriptor, uint lane, float4x4 projection)
 {
     if (lane == 0u)
     {
         lx_meshletOutside = 63u;
     }
     GroupMemoryBarrierWithGroupSync();
-    if (lane < count)
+    if (lane < descriptor.vertexCount)
     {
-        const float4 clip = mul(float4(lx_vertices[lx_meshlets[remap + lane]].position.xyz, 1), projection);
+        const float4 clip = mul(float4(lx_vertices[LXMeshletVertex(lx_meshlets, descriptor, lane)].position.xyz, 1), projection);
         const float epsilon = max(1.0, max(abs(clip.w), max(abs(clip.x), max(abs(clip.y), abs(clip.z))))) * 0.00001;
         uint mask = 0u;
         if (all(isfinite(clip)))
@@ -254,12 +264,10 @@ bool LXSceneMeshletVisible(uint remap, uint count, uint lane, float4x4 projectio
 void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
 {
-    const uint descriptor = lx_meshlets[1] + group.x * 4u;
-    const uint remap = lx_meshlets[2] + lx_meshlets[descriptor];
-    const uint indices = lx_meshlets[3] + lx_meshlets[descriptor + 1u];
-    const uint vertexCount = lx_meshlets[descriptor + 2u];
-    const uint triangleCount = lx_meshlets[descriptor + 3u];
-    const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_viewProjection);
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, group.x);
+    const uint vertexCount = descriptor.vertexCount;
+    const uint triangleCount = descriptor.triangleCount;
+    const bool visible = LXSceneMeshletVisible(descriptor, lane, lx_viewProjection);
     SetMeshOutputCounts(visible ? vertexCount : 0u, visible ? triangleCount : 0u);
     if (!visible)
     {
@@ -267,13 +275,12 @@ void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     }
     if (lane < vertexCount)
     {
-        LXSceneVertex vertex = LXSceneVertexAt(lx_meshlets[remap + lane], lx_drawOwner, lx_viewProjection);
+        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection);
         vertices[lane] = vertex;
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
-        const uint index = indices + triangle * 3u;
-        triangles[triangle] = uint3(lx_meshlets[index], lx_meshlets[index + 1u], lx_meshlets[index + 2u]);
+        triangles[triangle] = LXMeshletTriangle(lx_meshlets, descriptor, triangle);
     }
 }
 
@@ -315,8 +322,20 @@ cbuffer LXSceneShadowConstants : register(b4)
     float4x4 lx_shadowViewProjection;
     uint lx_shadowCoverage;
     float lx_shadowCutoff;
-    uint2 lx_shadowPadding;
+    uint lx_shadowPadding0;
+    uint lx_shadowPadding;
+    uint2 lx_shadowGeometryKey;
+    uint2 lx_shadowGeometryObjectId;
+    uint2 lx_shadowGeometryIncarnation;
+    uint2 lx_shadowGeometryInstanceId;
+    uint2 lx_shadowGeometryMaterialSlot;
+    uint lx_shadowGeometryLodIndex;
+    uint lx_shadowGeometryPrimitiveCount;
+    uint lx_shadowGeometryIdentityVersion;
+    uint3 lx_shadowGeometryIdentityPadding;
 };
+
+StructuredBuffer<uint> lx_shadowMeshletIds : register(t157);
 
 [shader("vertex")]
 LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
@@ -330,12 +349,11 @@ LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
 void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
 {
-    const uint descriptor = lx_meshlets[1] + group.x * 4u;
-    const uint remap = lx_meshlets[2] + lx_meshlets[descriptor];
-    const uint indices = lx_meshlets[3] + lx_meshlets[descriptor + 1u];
-    const uint vertexCount = lx_meshlets[descriptor + 2u];
-    const uint triangleCount = lx_meshlets[descriptor + 3u];
-    const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowViewProjection);
+    const uint meshlet = lx_shadowMeshletIds[group.x];
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, meshlet);
+    const uint vertexCount = descriptor.vertexCount;
+    const uint triangleCount = descriptor.triangleCount;
+    const bool visible = LXSceneMeshletVisible(descriptor, lane, lx_shadowViewProjection);
     SetMeshOutputCounts(visible ? vertexCount : 0u, visible ? triangleCount : 0u);
     if (!visible)
     {
@@ -343,12 +361,11 @@ void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     }
     if (lane < vertexCount)
     {
-        vertices[lane] = LXSceneVertexAt(lx_meshlets[remap + lane], 0u, lx_shadowViewProjection);
+        vertices[lane] = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), 0u, lx_shadowViewProjection);
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
-        const uint index = indices + triangle * 3u;
-        triangles[triangle] = uint3(lx_meshlets[index], lx_meshlets[index + 1u], lx_meshlets[index + 2u]);
+        triangles[triangle] = LXMeshletTriangle(lx_meshlets, descriptor, triangle);
     }
 }
 

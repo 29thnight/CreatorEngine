@@ -15,6 +15,7 @@ struct EnhancedTemporalViewState
     TemporalUpscalerHost upscaler;
     SpatialPostEffectsHost spatialPost;
     TemporalFrame frame;
+    TemporalHistoryResetObservation lastHistoryReset;
     TemporalMeasurementProvenance provenance;
     FrameCameraSnapshot rasterCamera;
     FrameCameraSnapshot pendingHistoryCamera, previousHistoryCamera;
@@ -146,6 +147,10 @@ struct EnhancedTemporalViewState
         previousInput = std::move(input);
         previousHistoryCamera = pendingHistoryCamera;
         committedHistoryGeneration = frame.historyRevision;
+        if (frame.reset)
+            lastHistoryReset = { frame.realFrameId, frame.historyRevision, viewId, sceneEpoch,
+                pendingHistoryCamera.cameraCutRevision, frame.renderExtent, frame.displayExtent,
+                upscaler.Provider(), frame.jitterX, frame.jitterY };
         previousViewProjection = std::bit_cast<math::matrix4x4>(frame.camera.viewMatrix) *
             std::bit_cast<math::matrix4x4>(frame.camera.projectionMatrix);
         previousRender = frame.renderExtent; previousDisplay = frame.displayExtent;
@@ -169,6 +174,7 @@ struct EnhancedTemporalViewState
     {
         snapshot.observedGeneration = settingsGeneration;
         snapshot.viewId = viewId; snapshot.sceneEpoch = sceneEpoch; snapshot.frame = frame;
+        snapshot.lastHistoryReset = lastHistoryReset;
         snapshot.selectedUpscaler = upscaler.Provider();
         snapshot.activeUpscaler = temporalAaApplied ? upscaler.Provider() : TemporalProvider::None;
         snapshot.lastUpscaleResult = upscaler.LastResult();

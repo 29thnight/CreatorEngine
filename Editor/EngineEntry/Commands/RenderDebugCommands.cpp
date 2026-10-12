@@ -47,6 +47,7 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
+#include <cmath>
 #include "EnhancedRenderDebugWindow.h"
 #include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
@@ -472,6 +473,16 @@ namespace ConsoleCmd
         // frame must never relabel an older completed GPU timing measurement.
         data.Set("temporalProvenance", LiveTemporalProvenanceData(snapshot.temporalProvenance));
         data.Set("gpuTemporalProvenance", LiveTemporalProvenanceData(snapshot.gpuTemporalProvenance));
+        auto nativeRecord = CommandData::Object();
+        nativeRecord.Set("ms", CommandData::Double(snapshot.nativeRecordMs));
+        nativeRecord.Set("recordingWaves", CommandData::Int(snapshot.nativeRecordWaves));
+        nativeRecord.Set("jobDispatches", CommandData::Int(snapshot.nativeRecordDispatches));
+        nativeRecord.Set("workerJobs", CommandData::Int(snapshot.nativeRecordJobs));
+        nativeRecord.Set("balanced", CommandData::Bool(snapshot.nativeRecordBalanced));
+        nativeRecord.Set("samples", CommandData::Int(snapshot.nativeRecordSamples));
+        nativeRecord.Set("axis", CommandData::String("native-graph-record-cpu-not-full-frame"));
+        nativeRecord.Set("temporalProvenance", LiveTemporalProvenanceData(snapshot.nativeRecordProvenance));
+        data.Set("nativeRecord", std::move(nativeRecord));
 
         // 진입 나이는 실프레임 packet 캡처 이후 시간이며 입력-광자 지연이 아니다.
         // 픽셀 제출 없이 CPU 소비만 진행할 수 있으므로 세 신원을 나누어 낸다.
@@ -1157,6 +1168,21 @@ namespace ConsoleCmd
         return Ok("검증 레이어 문제 0", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_ssgi_intensity(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("render.ssgi.intensity <0..4>");
+        float intensity{};
+        if (!ParseNumber(ctx.parts[1], intensity) || !std::isfinite(intensity) || intensity < 0.f || intensity > 4.f)
+            return InvalidArguments("SSGI intensity must be finite and within 0..4");
+        auto tuning = EnhancedSceneRenderer::GetLiveTuning();
+        tuning.ssgi.intensity = intensity;
+        EnhancedSceneRenderer::SetLiveTuning(tuning);
+        auto data = CommandData::Object();
+        data.Set("requestedIntensity", CommandData::Double(intensity));
+        return Ok("SSGI tuning requested; render.live.wait observes the next consumed packet", std::move(data));
+    }
+
     void RegisterRenderDebugCommands(Registrar& reg)
     {
         reg.Result({ "light.proxy" }, &Cmd_light_proxy);
@@ -1169,6 +1195,7 @@ namespace ConsoleCmd
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "render.live.fence" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
+        reg.Result({ "render.ssgi.intensity" }, &Cmd_render_ssgi_intensity, SceneAccess::OwnedState);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
         reg.Result({ "render.graph" }, &Cmd_render_graph);

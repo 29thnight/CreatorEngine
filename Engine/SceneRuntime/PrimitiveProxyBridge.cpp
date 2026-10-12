@@ -60,10 +60,10 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
             {
                 // Independent v3 clips may only animate transitional geometry
                 // after its ordered bones and complete bind transforms match.
-                m_isAnimationEnabled = component->m_meshDescriptor
+                m_isAnimationEnabled = m_isSkinnedMesh && (component->m_meshDescriptor
                     ? animator->IsSkinBindingCompatible(*component->m_meshDescriptor)
                     : component->m_modelGeneration
-                        && animator->IsSkinBindingCompatible(*component->m_modelGeneration);
+                        && animator->IsSkinBindingCompatible(*component->m_modelGeneration));
                 if (m_isAnimationEnabled)
                 {
                     m_animatorGuid = animator->GetInstanceID();

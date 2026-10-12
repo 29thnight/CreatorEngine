@@ -196,14 +196,12 @@ namespace
             corrupt = bytes;
             corrupt[8] ^= std::byte{ 1u };
             Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure), "geometry ABI mismatch accepted");
-            // 100B 정본 헤더와 vertex/index 뒤의 선택적 meshlet digest만 손상시킨다.
-            // derived 데이터 오류가 정상 indexed geometry까지 버리면 안 된다.
+            // Current-only METEOR geometry rejects corruption; no indexed recovery.
             const auto meshletSection = 100u + 3u * value.mesh.vertices.Stride() + 3u * 4u;
             corrupt = bytes;
             corrupt[meshletSection + 4u + 24u] ^= std::byte{ 1u };
-            Require(ck::ReadModelGeometryArtifact(corrupt, decoded, failure, &warnings) &&
-                !warnings.empty() && decoded.mesh.meshlets.IsEmpty() && decoded.mesh.indices == value.mesh.indices,
-                "optional meshlet corruption lost valid indexed geometry");
+            Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure, &warnings) && !failure.empty(),
+                "METEOR accepted corrupt cooked meshlets via indexed recovery");
             if (skinned)
             {
                 corrupt = bytes;
@@ -288,6 +286,7 @@ namespace
                     vertex.boneWeights.fill(0.0f);
                     Require(bindPose.mesh.vertices.Append(vertex, &uv1, &color), "bind-pose fixture vertex");
                 }
+                Require(experiment::importer::BuildMeshlets(bindPose.mesh, bindPose.mesh.meshlets, failure), "bind-pose LX cooking");
                 std::vector<std::byte> bindPoseBytes;
                 ck::ModelGeometryArtifact restoredBindPose;
                 Require(ck::WriteModelGeometryArtifact(bindPose, bindPoseBytes, failure) &&
@@ -370,8 +369,8 @@ namespace
         std::string failure;
         Require(assets::ReadModelGeometryImportSettings("importSettings:\n  buildMeshlets: true\n  lodLevels: 3\n", settings, failure) &&
             settings.buildMeshlets && settings.lodLevels == 3u, "persisted geometry settings lost");
-        Require(!assets::ReadModelGeometryImportSettings("importSettings:\n  buildMeshlets: maybe\n", settings, failure),
-            "invalid persisted meshlet setting accepted");
+        Require(assets::ReadModelGeometryImportSettings("importSettings:\n  buildMeshlets: false\n", settings, failure) && settings.buildMeshlets,
+            "obsolete source flag disabled mandatory LX cooking");
         Require(!assets::ReadModelGeometryImportSettings("importSettings:\n  lodLevels: 8\n", settings, failure),
             "invalid persisted LOD count accepted");
     }

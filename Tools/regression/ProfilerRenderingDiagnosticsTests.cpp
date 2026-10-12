@@ -1,6 +1,4 @@
-// Source-only regression fixture. UNEXECUTED: the requested migration explicitly
-// forbids builds/tests/runs. Compile separately with ProfilerRenderingDiagnostics.cpp
-// when execution is authorized; this is intentionally outside product projects.
+// Standalone diagnostics codec and delayed GPU/display association regressions.
 #include "../../Engine/EngineDiagnostics/ProfilerRenderingDiagnostics.h"
 
 #include <bit>
@@ -72,6 +70,29 @@ namespace rendering_diagnostics_tests
         original.gpuTemporalProvenance.deepDvcApplied = true;
         original.temporalProvenance = original.gpuTemporalProvenance;
         original.passTimings = { { "Shadow", 1.5 }, { "GBuffer", .75 } };
+        check(matches_gpu_measurement(original, original.views[0]), "reconstructed real display matches", failures);
+        check(!matches_gpu_measurement(original, original.views[1]), "other view rejected", failures);
+        auto rejectDisplay = [&](auto mutate, const char* name)
+        {
+            auto changed = original;
+            mutate(changed);
+            check(!matches_gpu_measurement(changed, changed.views[0]), name, failures);
+        };
+        rejectDisplay([](auto& s) { s.views[0].completedWidth++; }, "resized display rejects old GPU sample");
+        rejectDisplay([](auto& s) { s.views[0].completedFrameId++; }, "new display rejects old GPU sample");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.publicationFrameId++; }, "different publication rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.realFrameId = 0; }, "missing real source rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.sceneEpoch = 0; }, "missing scene rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.renderWidth = 0; }, "missing render extent rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.displayHeight = 0; }, "missing display extent rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.generatedOrdinal = 1; }, "generated ordinal cannot be real");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.frameKind = 2; s.gpuTemporalProvenance.generatedOrdinal = 1;
+            s.gpuTemporalProvenance.frameGenerator = 1; }, "generated output has no GPU pass cost");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.frameKind = 0; }, "unknown frame rejected");
+        rejectDisplay([](auto& s) { s.gpuTemporalProvenance.upscaler = 0; }, "reconstructed provider missing rejected");
+        rejectDisplay([](auto& s) { s.lastGpuSubmissionId = 0; }, "missing submission rejected");
+        rejectDisplay([](auto& s) { s.views[0].ready = false; }, "unready display rejected");
+        rejectDisplay([](auto& s) { s.passTimings.clear(); }, "no measured passes rejected");
         original.validationMessages = { "first observed warning", "second warning" };
         original.lastError = "example renderer error";
         const auto encoded = encode_rendering(original);

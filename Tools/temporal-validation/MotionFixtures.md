@@ -1,7 +1,27 @@
 # TR1 independent motion and route-ownership fixture
 
-Status: source-authored, **unexecuted**. No compiler, shader, runtime or checker
-was run. The descriptor schema name does not assert successful execution.
+The deterministic driver is implemented. Acceptance requires a fresh product
+capture and an independent oracle PASS; the descriptor schema name alone does
+not assert successful execution. Local PR #169 verification artifacts are kept
+under `Artifacts/PR169/motion` and are not published acceptance evidence for
+other devices or binaries.
+
+## Exact measured-step submission
+
+The driver declares `singleSubmissionPerMeasuredStep: true`. A measured pose is
+submitted once while GT waits for its GPU readback. Repeated baseline poses may
+warm non-reset history; queued older poses cannot replace a newer measured
+predecessor. The admission rule is restricted to tagged Game-view diagnostics
+with matching session, view, scene and source history identities. Untagged
+rendering and new identities keep their normal admission behavior.
+
+For this declaration the independent oracle requires the control's actual
+`previousSubmittedRealFrameId` to equal the positive capture's `realFrameId`.
+Matching step labels alone cannot conceal intervening held-pose submissions.
+Historical descriptors without the declaration retain their original scope.
+This is a native diagnostic prerequisite for continuous SDK image testing; the
+current orthographic fixture still excludes SDKs and does not accept ghosting
+or disocclusion quality.
 
 ## Product readback
 
@@ -31,20 +51,35 @@ agreement always leaves `routeCoverageValidated: false`; it cannot return exit 0
 
 ## Product descriptor: temporal.motion.executed-fixture.v2
 
-The new scene driver and oracle are source-authored and unexecuted. Future
-execution needs a supported device and separate authorization. The comparator
+The scene driver runs through an Editor command-service endpoint with a live
+Game view at a stable native extent. The comparator
 opens actual product manifests and float bytes and accepts only a complete
 seven-route experiment: static, skinned, instanced, meshlet, alpha, decal, sprite.
 
-Future authorized invocation (documented only, not run):
+Invocation (use a new output directory):
 
 ```powershell
-./Tools/temporal-validation/Invoke-TemporalStage.ps1 -EndpointFile C:/Player/endpoint.json -Stage motion-fixture -OutputDirectory C:/Evidence/motion -TimeoutSeconds 300
+./Tools/temporal-validation/Invoke-TemporalStage.ps1 -EndpointFile C:/Project/Library/CommandService/endpoint.json -Stage motion-fixture -OutputDirectory C:/Evidence/motion -TimeoutSeconds 300
 ```
 
 Sprite motion uses a child RectTransform's anchored position under a fixed
 WorldSpace Canvas, producing the authored world-space translation through the
 normal UI layout and sprite proxy publication path.
+
+The command is asynchronous because compilation and fourteen readbacks exceed
+the command service's synchronous wait. Admission retries only transient renderer
+lock contention. Pose updates resolve UI/spatial derived state before the proxy
+seal, and image publication reads the latest resolved rect. The fixture's step
+stamp and the rendered values therefore travel in the same frame. Evidence flags
+are JSON booleans; numeric substitutes do not pass the oracle.
+Control-capture admission runs in its own phase after recording the completed
+current capture. A retry does not first acquire/release the status lock and lose
+the renderer's admission opportunity. Temporary display-image withdrawal does
+not pause submission/capture polling; nonzero extent changes still invalidate
+the experiment.
+Tagged fixture packets use bounded-queue backpressure instead of latest-input
+coalescing, preserving actual predecessor frames even when the producer outruns
+the renderer. Normal untagged frames retain their existing coalescing policy.
 
 Root fields:
 

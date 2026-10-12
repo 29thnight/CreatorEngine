@@ -17,6 +17,7 @@ import statistics
 from pathlib import Path
 import numpy as np
 from base0_artifacts import audit_temporal_capture_provenance
+from native_real_measurement import verify_normal_temporal
 
 
 def check(condition, message):
@@ -197,7 +198,8 @@ def verify_timing(timing, diagnostics=None):
 def verify_native(path, binary):
     native = read(path)
     same_binary(native["binary"], binary)
-    check(native["schemaVersion"] == 2 and native["acceptanceSchema"] == 3 and native["passed"] and native["fullRegression"] and
+    check(native["schemaVersion"] == 2 and native["acceptanceSchema"] == 3 and
+          native["checks"] == 428 and native["scheduleChecks"] == 121 and native["passed"] and native["fullRegression"] and
           native["nativeQueueExecutionTested"] and native["frameRetirementTested"] and
           native["positiveOverlapExecutionTested"] and native["negativeFallbackExecutionTested"] and
           native["declarationOrderTested"] and native["readReadOwnershipTested"] and
@@ -504,8 +506,10 @@ def main():
                   "Mode switch was not acknowledged at the render-owner frame boundary")
         cpu_costs, full_cpu_costs, compile_costs = [], [], []
         schedule_costs, record_costs, submit_costs, executor_costs, overlap_costs = [], [], [], [], []
+        dependency_costs, simulation_costs, placement_trials = [], [], []
         fallback_counts, effective_modes = {}, {}
         for row in rows:
+            verify_normal_temporal(row)
             gpu = row["gpu"]
             check(mode_switch is None or gpu["frame"] > mode_switch["appliedFrame"],
                   "Pre-switch/in-flight frame was counted as a warm new-mode sample")
@@ -536,6 +540,18 @@ def main():
                 submission = executions[key]
                 check(submission["measurementDomain"] == "normal" and submission["schedule"]["predictionComplete"],
                       "Normal samples contain capture scheduling costs or unwarmed timing history")
+                planning = submission["schedule"]
+                check(all(isinstance(planning.get(k), (int, float)) and not isinstance(planning[k], bool) and
+                          math.isfinite(planning[k]) and planning[k] >= 0 for k in
+                          ("dependencyMilliseconds", "simulationMilliseconds")) and
+                      isinstance(planning.get("placementTrials"), int) and not isinstance(planning["placementTrials"], bool) and
+                      planning["placementTrials"] >= 0 and
+                      planning["dependencyMilliseconds"] + planning["simulationMilliseconds"] <=
+                      submission["execution"]["scheduleMilliseconds"] + 0.001,
+                      "Missing/nonfinite planning subtotals or subtotals exceed scheduling CPU scope")
+                dependency_costs.append(planning["dependencyMilliseconds"])
+                simulation_costs.append(planning["simulationMilliseconds"])
+                placement_trials.append(planning["placementTrials"])
                 record_costs.append(submission["execution"]["recordingMilliseconds"])
                 executor_costs.append(submission["execution"]["totalMilliseconds"])
                 reason, effective = submission["fallbackReason"], submission["effectiveExecutionMode"]
@@ -560,6 +576,9 @@ def main():
                    "cpuRecordingMs": distribution(record_costs) if record_costs else None,
                    "cpuSubmissionMs": distribution(submit_costs),
                    "cpuExecutorTotalMs": distribution(executor_costs) if executor_costs else None,
+                   "cpuDependencyPlanningMs": distribution(dependency_costs) if dependency_costs else None,
+                   "cpuQueueSimulationMs": distribution(simulation_costs) if simulation_costs else None,
+                   "placementTrials": distribution(placement_trials) if placement_trials else None,
                    "fallbackReasons": fallback_counts, "effectiveExecutionModes": effective_modes,
                    "measuredOverlapMs": distribution(overlap_costs),
                    "normalWindowUsagePeakBytes": max(r["usedBytes"] for r in window),

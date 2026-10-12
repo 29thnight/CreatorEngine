@@ -140,8 +140,8 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     SceneHost host;
     ProbeMeshes meshes;
     Check(meshes.Initialize(&device, error), "SSS mesh cache");
-    EnhancedGBufferPass gbuffer;
-    EnhancedDeferredPass deferred;
+    SceneSurfaceTargets gbuffer;
+    RGHandle lighting;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -153,7 +153,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     camera.view = camera.projection = math::matrix4x4::identity();
     camera.eyePosition = math::vector3(0, 0, 2);
     context.camera = &camera;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error), "SSS actual Scene passes");
+
     WaitSceneProgram(host, context, generation);
     for (unsigned features : {0x3000u})
     {
@@ -224,8 +224,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             meshes.BeginFrame(context.frameId);
             const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "SSS residency " + error);
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
-                  "SSS actual Scene pass preparation " + error);
+
             auto graph = std::make_shared<EnhancedRenderGraph>(device);
             if (workers)
             {
@@ -248,6 +247,8 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                   "SSS budget failure preserves accepted frame");
             gbuffer.Declare(*graph, context);
             const auto outputs = gbuffer.GetOutputs();
+            host.DeclareGeometry(*graph);
+            host.DeclareCulling(*graph);
             host.DeclareGBuffer(*graph, outputs);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
@@ -262,9 +263,9 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                 execution.encoder->BindRenderTargets(target);
                 execution.encoder->ClearRenderTargets(target, clear);
             });
-            deferred.SetInputs(outputs);
-            deferred.SetAmbientOcclusion(ao);
-            deferred.Declare(*graph, context);
+
+
+            lighting = SceneHost::DeclareHdrTarget(*graph, context);
             std::array<RHIReadback, 14> readbacks;
             const auto copyTexture = [&](unsigned index, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(24, 24, format, 1, readbacks[index], error), "SSS texture readback");
@@ -275,10 +276,10 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     },
                     true);
             };
-            copyTexture(0, deferred.GetOutput(), RHIFormat::RGBA16Float);
+            copyTexture(0, lighting, RHIFormat::RGBA16Float);
             copyTexture(1, outputs.depth, RHIFormat::D32Float);
-            host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
-            copyTexture(2, deferred.GetOutput(), RHIFormat::RGBA16Float);
+            lighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
+            copyTexture(2, lighting, RHIFormat::RGBA16Float);
             copyTexture(3, outputs.depth, RHIFormat::D32Float);
             copyTexture(4, outputs.bitmask, RHIFormat::R32Uint);
             for (unsigned field = 0; field < 7; ++field)
@@ -362,7 +363,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     {
                         Check(std::memcmp(mapped[0].data.data() + y * mapped[0].rowPitch + x * 8,
                                           mapped[2].data.data() + y * mapped[2].rowPitch + x * 8, 8) == 0,
-                              "SSS preserves legacy/background HDR");
+                              "SSS preserves METEOR cleared background HDR");
                         continue;
                     }
                     const double scale = fixture == 1 && owner(x, y) == 0x80000001u ? 0 : 1;
@@ -498,7 +499,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
               " spread=" + std::to_string(spread) + " boundaries=" + std::to_string(boundaries));
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
-    deferred.Shutdown();
+
     meshes.Shutdown();
     std::string messages;
     const auto validationMessages = device.DrainDebugMessages(messages);
