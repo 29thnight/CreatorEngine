@@ -2541,6 +2541,21 @@ DataSystem::SceneAssetHandoff DataSystem::BeginSceneAssetHandoff(
     return SceneAssetHandoff(*this);
 }
 
+bool DataSystem::IsSceneAssetPreparationOutdated(
+    const own::shared_owner<SceneAssetPreparation>& preparation) const
+{
+    if (!preparation)
+    {
+        return false;
+    }
+    std::lock_guard lock(m_assetPreparationMutex);
+    // The same conditions BeginSceneAssetHandoff reports as Stale, excluding
+    // shutdown: an asset invalidation or mount moved past this preparation.
+    return !m_assetPreparationStopping && preparation->projectRoot == PathFinder::Relative()
+        && (m_assetInvalidationDepth != 0u || preparation->epoch != m_assetPreparationEpoch
+            || preparation->resolverRevision != m_assetDepotRevision);
+}
+
 bool DataSystem::IsSceneAssetPreparationCurrent(
     const own::shared_owner<SceneAssetPreparation>& preparation) const
 {

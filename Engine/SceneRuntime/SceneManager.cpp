@@ -1311,7 +1311,44 @@ struct SceneManager::PendingSceneLoad
     size_t m_activationEpoch = 0;
     bool m_autoActivate = false;
     bool m_cancelled = false; // Only the owner reads/writes this flag.
+    std::uint32_t m_outdatedRetries = 0;
 };
+
+namespace
+{
+    // An editor asset change or texture publication during preparation makes the
+    // request outdated, not wrong. It prepares again against current assets a
+    // bounded number of times; a genuine failure still terminates immediately.
+    constexpr std::uint32_t kMaxOutdatedSceneRetries = 8;
+}
+
+// No SceneManager/Scene/Entity capture. The owner waits for preparation before
+// reading its document, bundle or asset handle. Even one worker can progress:
+// enqueue the asset batch and return; never wait inside this callback.
+void SceneManager::SubmitScenePreparation(const own::shared_owner<PendingSceneLoad>& load)
+{
+    load->m_preparation = ce::get_job_scheduler().submit([load]
+    {
+        ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
+        load->m_document = ParseSceneDocument(load->m_path);
+        auto bundleNode = load->m_document.Root()["m_requiredLoadAssetsBundle"];
+        if (!bundleNode)
+        {
+            bundleNode = load->m_document.Root()["AssetsBundle"];
+        }
+        if (bundleNode && !bundleNode.IsNull())
+            for (const auto asset : bundleNode["assets"])
+                if (asset["assetTypeID"] && asset["assetName"])
+                {
+                    AssetEntry entry{};
+                    entry.assetTypeID = asset["assetTypeID"].As<int>();
+                    entry.assetName = asset["assetName"].AsString();
+                    if (!load->m_bundle.ContainsAsset(entry)) load->m_bundle.AddAsset(entry);
+                }
+        load->m_assets = DataSystems->PrepareSceneAssets(
+            load->m_document.Root(), load->m_bundle, load->m_path);
+    });
+}
 
 void SceneManager::RequireSceneLoadOwner() const
 {
@@ -1361,30 +1398,7 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
     ++m_pendingSceneLoadCount;
     try
     {
-        // No SceneManager/Scene/Entity capture. The owner waits for preparation before
-        // reading its document, bundle or asset handle. Even one worker can progress:
-        // enqueue the asset batch and return; never wait inside this callback.
-        load->m_preparation = ce::get_job_scheduler().submit([load]
-        {
-            ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
-            load->m_document = ParseSceneDocument(load->m_path);
-            auto bundleNode = load->m_document.Root()["m_requiredLoadAssetsBundle"];
-            if (!bundleNode)
-            {
-                bundleNode = load->m_document.Root()["AssetsBundle"];
-            }
-            if (bundleNode && !bundleNode.IsNull())
-                for (const auto asset : bundleNode["assets"])
-                    if (asset["assetTypeID"] && asset["assetName"])
-                    {
-                        AssetEntry entry{};
-                        entry.assetTypeID = asset["assetTypeID"].As<int>();
-                        entry.assetName = asset["assetName"].AsString();
-                        if (!load->m_bundle.ContainsAsset(entry)) load->m_bundle.AddAsset(entry);
-                    }
-            load->m_assets = DataSystems->PrepareSceneAssets(
-                load->m_document.Root(), load->m_bundle, load->m_path);
-        });
+        SubmitScenePreparation(load);
     }
     catch (const std::exception& e)
     {
@@ -1549,7 +1563,10 @@ void SceneManager::CompleteSceneLoads(bool wait)
             {
                 failed = true;
                 failure = error;
-                if (!load->m_cancelled)
+                // An outdated preparation that will prepare again is not an error.
+                const bool retryable = load->m_outdatedRetries < kMaxOutdatedSceneRetries
+                    && DataSystems->IsSceneAssetPreparationOutdated(load->m_assets);
+                if (!load->m_cancelled && !retryable)
                 {
                     Debug::PrintLog(spdlog::level::err, error);
                 }
@@ -1574,6 +1591,28 @@ void SceneManager::CompleteSceneLoads(bool wait)
         auto handoff = !load->m_cancelled && !m_exitCommand
             ? DataSystems->BeginSceneAssetHandoff(load->m_assets, handoffStatus)
             : DataSystem::SceneAssetHandoff{};
+        if ((failed || !handoff) && !load->m_cancelled && !load->m_superseded && !m_exitCommand
+            && load->m_outdatedRetries < kMaxOutdatedSceneRetries
+            && DataSystems->IsSceneAssetPreparationOutdated(load->m_assets))
+        {
+            ++load->m_outdatedRetries;
+            DataSystems->CancelSceneAssets(load->m_assets);
+            load->m_assets.reset();
+            Debug::PrintLog(spdlog::level::info, "Scene preparation outdated by an asset change; preparing again ("
+                + std::to_string(load->m_outdatedRetries) + "/" + std::to_string(kMaxOutdatedSceneRetries) + "): "
+                + load->m_path);
+            try
+            {
+                SubmitScenePreparation(load);
+                ++i;
+                continue;
+            }
+            catch (const std::exception& e)
+            {
+                failed = true;
+                failure = e.what();
+            }
+        }
         if (!failed && !load->m_cancelled && !m_exitCommand && !handoff)
         {
             failed = true;
