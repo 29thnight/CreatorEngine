@@ -179,6 +179,67 @@ namespace
             "rename did not preserve the exact source/sidecar pair");
         Require(second->GetImageView(oldImage.asset).Width() == 2u,
             "rename invalidated an accepted old owner");
+
+    }
+
+    void RunCacheRecovery(const file::path& root)
+    {
+        auto& data = *DataSystem::GetInstance();
+        auto& editor = EditorAssetDatabase::Get();
+        const auto moved = root / "Assets" / "Textures" / "moved.png";
+        const FileGuid guid("22222222-2222-4222-8222-222222222222");
+        const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+        experiment::cooked::TextureImportSettings settings;
+        settings.colorSpace = experiment::cooked::TextureColorSpace::Linear;
+        const auto firstWidth = 4u;
+        std::string failure;
+        // Exercise disk-cache recovery through the real Editor importer. Both
+        // recipes already have nonempty content-addressed directories, so a
+        // plain staging rename cannot repair either a record or artifact fault.
+        const auto generations = root / "Library" / "TextureAssetGenerations";
+        std::vector<std::pair<file::path, std::string>> records;
+        std::vector<std::pair<file::path, std::string>> artifacts;
+        for (const auto& entry : file::directory_iterator(generations))
+        {
+            const auto recordPath = entry.path() / "generation.record";
+            if (!file::exists(recordPath)) continue;
+            records.emplace_back(recordPath, Read(recordPath));
+            std::ifstream record(recordPath);
+            std::string line;
+            std::getline(record, line); // magic
+            std::getline(record, line); // texture identity
+            std::getline(record, line); // artifact path
+            const auto artifactPath = entry.path() / line;
+            artifacts.emplace_back(artifactPath, Read(artifactPath));
+        }
+        Require(records.size() == 2u, "expected two immutable recipe generations");
+        for (const auto* faults : {&records, &artifacts})
+        {
+            for (const auto& [path, bytes] : *faults) Write(path, "damaged cache");
+            data.Initialize();
+            Require(editor.Initialize(), "cache recovery editor initialization failed");
+            Await(editor, data, moved, true);
+            for (const auto dimension : {0u, 2u})
+            {
+                settings.maxDimension = dimension;
+                Require(editor.SetTextureImportSettingsAndReimport(moved, settings, failure),
+                    "damaged cache recovery request rejected");
+                Await(editor, data, moved, true);
+                const auto texture = data.TryAcquire<Texture>(link);
+                const auto image = data.TryAcquire<Texture::CodecImage>(texture);
+                Require(texture && image && texture->GetImageView(image).Width() ==
+                    (dimension ? dimension : firstWidth), "damaged cache recovery pixels differ");
+            }
+            for (const auto& [path, bytes] : records)
+                Require(Read(path) == bytes, "damaged record was not restored exactly");
+            for (const auto& [path, bytes] : artifacts)
+                Require(Read(path) == bytes, "damaged artifact was not restored exactly");
+            for (const auto& entry : file::directory_iterator(generations))
+                Require(!entry.path().filename().string().starts_with("stage-"),
+                    "repair left a staging or quarantine directory");
+            editor.Shutdown();
+            data.Finalize();
+        }
     }
 }
 
@@ -198,6 +259,9 @@ int main(int argc, char** argv)
     {
         ce::get_job_scheduler().start(2u);
         Run(file::absolute(argv[1]), file::absolute(argv[2]));
+        EditorAssetDatabase::Get().Shutdown();
+        DataSystem::GetInstance()->Finalize();
+        RunCacheRecovery(file::absolute(argv[1]));
         std::cout << "TEXTURE_IMPORT_LIFECYCLE_OK checks=" << checks << '\n';
     }
     catch (const std::exception& error)

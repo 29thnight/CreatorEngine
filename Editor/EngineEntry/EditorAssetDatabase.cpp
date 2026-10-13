@@ -1981,6 +1981,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                     }
                     else
                     {
+                        // Serialize publication and recovery between this Editor's
+                        // cooks. Never remove a valid generation that won the race.
+                        static std::mutex publicationMutex;
+                        std::lock_guard publicationLock(publicationMutex);
                         file::rename(staging, generations / key, renameError);
                         if (!renameError)
                         {
@@ -1988,7 +1992,38 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                         }
                         else if (!ReadTextureGenerationRecord(generations / key, record))
                         {
-                            failure = "Could not publish the texture generation: " + renameError.message();
+                            // A corrupt existing directory cannot be overwritten by
+                            // rename. Move it aside only after the replacement is
+                            // complete, and restore it if publication fails.
+                            const auto damaged = generations /
+                                ("stage-" + FileGuid::CreateRandomV4().ToString().substr(0, 8));
+                            std::error_code repairError;
+                            file::rename(generations / key, damaged, repairError);
+                            if (!repairError)
+                            {
+                                file::rename(staging, generations / key, repairError);
+                                if (!repairError)
+                                {
+                                    generationCleanup.Release();
+                                    ScopedPathCleanup damagedCleanup;
+                                    damagedCleanup.target = damaged;
+                                }
+                                else
+                                {
+                                    std::error_code restoreError;
+                                    file::rename(damaged, generations / key, restoreError);
+                                    failure = "Could not replace the damaged texture generation: "
+                                        + repairError.message();
+                                    if (restoreError)
+                                        failure += "; damaged generation retained at " + damaged.string()
+                                            + ": " + restoreError.message();
+                                }
+                            }
+                            else
+                            {
+                                failure = "Could not quarantine the damaged texture generation: "
+                                    + repairError.message();
+                            }
                         }
                     }
                 }
