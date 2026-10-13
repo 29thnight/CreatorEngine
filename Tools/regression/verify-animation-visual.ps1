@@ -19,11 +19,10 @@ $model = Join-Path $repo 'Dynamic_CPP/Assets/Models/CreatorRobot.glb'
 $scene = Join-Path $repo 'Dynamic_CPP/Assets/Scenes/FT_Primitives.creator'
 # scene.switch is queued since 2026-10-09: it returns a request and activates at a
 # later frame boundary. Play must start on FT_Primitives, so wait for activation and
-# record the first request's state (a fresh process numbers it 1). The Editor
-# republishes every authored texture at startup and each publication supersedes
-# in-flight scene preparation, so the switch is issued after that settles.
+# record the first request's state (a fresh process numbers it 1). A startup
+# texture publication that outdates the preparation is retried by SceneManager.
 $commands = @(
-    'wait 1500', ('scene.switch "' + $scene + '"'), 'wait 600', 'scene.load.status 1', 'window.resize 1280 900',
+    ('scene.switch "' + $scene + '"'), 'wait 900', 'scene.load.status 1', 'window.resize 1280 900',
     'play', 'wait 2', 'play.pause',
     ('animation.visual.probe setup "' + $model + '"'),
     # A cold live frame took 63.4s in the Phase 13 DDOL gate; 60s truncated it.
