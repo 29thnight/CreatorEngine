@@ -3888,7 +3888,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         const auto first = SceneCooked(instances[0]);
         auto obsolete = first->generation->cooked.product;
         obsolete.program.semanticKey.replace(obsolete.program.semanticKey.size() - SceneHostIdentity.size(),
-            SceneHostIdentity.size(), "|lx-scene-host:28");
+            SceneHostIdentity.size(), "|lx-scene-host:29");
         SceneShaderSet rejected; std::string rejection;
         Check(!LoadSceneShaders(obsolete, RHIShaderBinary::Dxil, rejected, rejection), "Previous visibility payload ABI must be recooked");
         auto description = first->description;

@@ -45,11 +45,11 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     WaitSceneProgram(host, context, material->generation);
     auto old = material->generation->cooked.product;
     old.program.semanticKey.replace(old.program.semanticKey.size() - SceneHostIdentity.size(), SceneHostIdentity.size(),
-                                    "|lx-scene-host:28");
+                                    "|lx-scene-host:29");
     SceneShaderSet rejected;
     Check(!LoadSceneShaders(old, RHIShaderBinary::Dxil, rejected, error),
           "Hybrid ABI rejects old HW-only cooked stages");
-    unsigned frames{}, hwPixels{}, swPixels{};
+    unsigned frames{}, hwPixels{}, swPixels{}, occluderPixels{}, historyFrames{};
     for (unsigned fixture = 0; fixture < 7; ++fixture)
         for (unsigned workers : {0u, 1u, 4u})
         {
@@ -148,15 +148,22 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             const auto output = host.DeclareGBuffer(*graph, targets.GetOutputs());
             host.DeclareHistory(*graph, output.depth);
             const auto hybrid = host.HybridVisibility();
+            const auto occluder = host.OccluderVisibility();
+            const auto occluderDepth = host.OccluderDepth();
             const auto table = host.FrameGeometry();
             Check(bool(hybrid), "Hybrid prepared owner");
-            std::array<RHIReadback, 5> readbacks;
+            Check(occluder && occluder->depthOnly && occluderDepth.IsValid() && occluder->visible != hybrid->visible,
+                  "Occluder stage owns its first list and depth-only resolve");
+            const bool historyFirstStage = host.CameraDepthMeshletWork()->UsesHistory();
+            historyFrames += historyFirstStage;
+            std::array<RHIReadback, 6> readbacks;
             Check(
                 device.CreateReadback(context.width, context.height, RHIFormat::RG32Uint, 1, readbacks[0], error) &&
                     device.CreateReadback(context.width, context.height, RHIFormat::D32Float, 1, readbacks[1], error) &&
                     device.CreateReadback(context.width, context.height, RHIFormat::R32Uint, 1, readbacks[2], error) &&
                     device.CreateBufferReadback(hybrid->KeyBytes(), readbacks[3], error) &&
-                    device.CreateBufferReadback(hybrid->meshlets * 4, readbacks[4], error),
+                    device.CreateBufferReadback(hybrid->meshlets * 4, readbacks[4], error) &&
+                    device.CreateReadback(context.width, context.height, RHIFormat::D32Float, 1, readbacks[5], error),
                 "Hybrid readbacks " + error);
             graph->AddPass(
                 "Probe.Hybrid.Readback",
@@ -164,13 +171,15 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                  {output.depth, RHIResourceState::CopySource, RGAccessMode::Read},
                  {output.bitmask, RHIResourceState::CopySource, RGAccessMode::Read},
                  {hybrid->graphKeys, RHIResourceState::CopySource, RGAccessMode::Read},
-                 {hybrid->graphRoutes, RHIResourceState::CopySource, RGAccessMode::Read}},
+                 {hybrid->graphRoutes, RHIResourceState::CopySource, RGAccessMode::Read},
+                 {occluderDepth, RHIResourceState::CopySource, RGAccessMode::Read}},
                 [=](const auto& e) {
                     e.encoder->CopyToReadback(readbacks[0], e.ResolveHandle(output.visibility));
                     e.encoder->CopyToReadback(readbacks[1], e.ResolveHandle(output.depth));
                     e.encoder->CopyToReadback(readbacks[2], e.ResolveHandle(output.bitmask));
                     e.encoder->CopyBufferToReadback(readbacks[3], hybrid->keys);
                     e.encoder->CopyBufferToReadback(readbacks[4], hybrid->routes);
+                    e.encoder->CopyToReadback(readbacks[5], e.ResolveHandle(occluderDepth));
                 },
                 true);
             const bool compiled = graph->Compile(error);
@@ -182,34 +191,47 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(p != snap.passes.end(), "Hybrid pass " + std::string(name));
                 return *p;
             };
-            const auto& hw = find("METEOR.Scene.Visibility.HW");
-            const auto& sw = find("METEOR.Scene.Visibility.SW");
-            const auto& classify = find("METEOR.Scene.Visibility.Classify");
-            const auto& resolve = find("METEOR.Scene.Visibility.Resolve");
-            for (const auto* writer : {&hw, &sw})
-            {
-                Check(classify.compiledIndex < writer->compiledIndex && writer->compiledIndex < resolve.compiledIndex,
-                      "Classification and merge enclose both raster producers");
-                Check(std::ranges::any_of(writer->usages,
-                                          [&](const auto& u) {
-                                              return u.resource == hybrid->graphKeys.index &&
-                                                     u.access == RGAccessMode::AtomicMin64;
-                                          }),
-                      "Both producers declare the same atomic reduction");
-                Check(std::ranges::none_of(writer->usages,
-                                           [](const auto& u) {
-                                               return u.state == RHIResourceState::RenderTarget ||
-                                                      u.state == RHIResourceState::DepthWrite;
+            // Both stages share one producer contract: classify -> HW/SW atomic
+            // siblings -> resolve. The occluder resolve feeds the current HZB.
+            const auto stage = [&](const std::string& prefix, const SceneHybridVisibility& owner) {
+                const auto& hw = find(prefix + ".HW");
+                const auto& sw = find(prefix + ".SW");
+                const auto& classify = find(prefix + ".Classify");
+                const auto& resolve = find(prefix + ".Resolve");
+                for (const auto* writer : {&hw, &sw})
+                {
+                    Check(classify.compiledIndex < writer->compiledIndex && writer->compiledIndex < resolve.compiledIndex,
+                          prefix + " classification and merge enclose both raster producers");
+                    Check(std::ranges::any_of(writer->usages,
+                                              [&](const auto& u) {
+                                                  return u.resource == owner.graphKeys.index &&
+                                                         u.access == RGAccessMode::AtomicMin64;
+                                              }),
+                          prefix + " producers declare the same atomic reduction");
+                    Check(std::ranges::none_of(writer->usages,
+                                               [](const auto& u) {
+                                                   return u.state == RHIResourceState::RenderTarget ||
+                                                          u.state == RHIResourceState::DepthWrite;
+                                               }),
+                          prefix + " has no raster attachment dependency");
+                }
+                Check(std::ranges::none_of(snap.versionEdges,
+                                           [&](const auto& e) {
+                                               return (e.producer == hw.authoredIndex && e.consumer == sw.authoredIndex) ||
+                                                      (e.producer == sw.authoredIndex && e.consumer == hw.authoredIndex);
                                            }),
-                      "No obsolete raster attachment dependency");
-            }
-            Check(std::ranges::none_of(snap.versionEdges,
-                                       [&](const auto& e) {
-                                           return (e.producer == hw.authoredIndex && e.consumer == sw.authoredIndex) ||
-                                                  (e.producer == sw.authoredIndex && e.consumer == hw.authoredIndex);
-                                       }),
-                  "Sibling atomic writers have no false ordering edge");
-            Check(resolve.compiledIndex < find("METEOR.Scene.Material.CountTiles").compiledIndex,
+                      prefix + " sibling atomic writers have no false ordering edge");
+                return resolve.compiledIndex;
+            };
+            const auto occluderResolve = stage("METEOR.Scene.Occluder", *occluder);
+            const auto finalResolve = stage("METEOR.Scene.Visibility", *hybrid);
+            Check(occluderResolve < find("Geometry.Occlusion.0").compiledIndex &&
+                      find("Geometry.Occlusion.0").compiledIndex < find("METEOR.Scene.Visibility.Classify").compiledIndex,
+                  "Occluder depth builds the HZB before final culling and classification");
+            Check(std::ranges::none_of(snap.passes,
+                                       [](const auto& p) { return p.name == "METEOR.Scene.OccluderDepth"; }),
+                  "No separate depth-only occluder raster");
+            Check(finalResolve < find("METEOR.Scene.Material.CountTiles").compiledIndex,
                   "Tile assignment reads merged visibility");
             if (workers)
             {
@@ -233,8 +255,8 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error), "Hybrid submit");
             device.WaitForGpu();
             Check(GetRHISubmissionThread().Drain(&device, error), "Hybrid retirement");
-            std::array<RHIReadbackImage, 5> images;
-            for (unsigned n = 0; n < 5; ++n)
+            std::array<RHIReadbackImage, 6> images;
+            for (unsigned n = 0; n < 6; ++n)
                 Check(device.MapReadback(readbacks[n], images[n], error), "Hybrid readback map");
             for (unsigned record = 1; record < table->records.size(); ++record)
             {
@@ -283,6 +305,14 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                               " pixel=" + std::to_string(x) + "," + std::to_string(y) +
                               " expected=" + std::to_string(expectedOwner) + " actual=" + std::to_string(actualOwner));
                     Near(std::bit_cast<float>(depthBits), z, "Independent hybrid depth plane", 2e-6);
+                    uint32_t occluderBits;
+                    std::memcpy(&occluderBits, images[5].data.data() + y * images[5].rowPitch + x * 4, 4);
+                    // The first list is a subset of the final union: never nearer, and identical
+                    // when no history narrows it (frustum-only first stage).
+                    Check(std::bit_cast<float>(occluderBits) >= std::bit_cast<float>(depthBits) &&
+                              (historyFirstStage || occluderBits == depthBits),
+                          "Occluder depth is the first-stage HW/SW resolve pixel=" + std::to_string(x) + "," + std::to_string(y));
+                    ++occluderPixels;
                     if (record)
                     {
                         Check(key == visibilityKey && key == ((uint64_t(depthBits) << 32) | address),
@@ -312,5 +342,6 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     host.ShutdownAfterIdle();
     meshes.Shutdown();
     std::cout << "METEOR_HYBRID_VISIBILITY_OK frames=" << frames
-              << " cases=7 partitions=3 validation=0 hwPixels=" << hwPixels << " swPixels=" << swPixels << '\n';
+              << " cases=7 partitions=3 validation=0 hwPixels=" << hwPixels << " swPixels=" << swPixels
+              << " occluderPixels=" << occluderPixels << " historyFrames=" << historyFrames << '\n';
 }

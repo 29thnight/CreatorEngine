@@ -60,16 +60,29 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 <body>
 <main>
 <header class="hero">
-  <div class="kicker">docs/analysis · 2026-10-14 · C2 HW/SW 혼합 가시성 · 오류 검증 통과</div>
+  <div class="kicker">docs/analysis · 2026-10-14 · C2 HW/SW 혼합 가시성(1차 occluder 포함) · 오류 검증 통과</div>
   <h1>METEOR 라이브 배선 현황과 RE 엔진까지 남은 작업</h1>
   <p class="meta"><b>METEOR</b>는 LX 머티리얼을 그리는 장면 렌더러다(정식 명칭은 <code>MaterialGraphSceneHost.h</code> 머리 주석 한 곳에 둔다). <b>LX</b>(Lattice eXperiment)는 노드 언어 자체(<code>LX::Runtime</code>, LX 머티리얼)를 가리키며 이후 비주얼 스크립트·BT에도 쓰인다. 대상은 DX12 라이브 경로이며 <code>master</code>(PR #169·#172 병합 이후) 기준이다. 배선 서술은 현재 소스 구조다. 이번 HW/SW 변경의 검증은 상단 카드에, 04장의 2026-10-12 결과는 이전 단계 이력으로 구분한다.</p>
 </header>
 
+<div class="card" id="occluder-hybrid"><h3>현재 구현: 1차 occluder 깊이의 HW/SW 혼합 경로 통합 (2026-10-14)</h3>
+<p>B2의 1차 깊이 사전 패스(<code>METEOR.Scene.OccluderDepth</code>, 깊이 전용 HW 래스터)를 없앴다. 1차 목록(이전 HZB 또는 프러스텀)은 최종 표면과 같은 생산자 계약을 쓴다: <code>METEOR.Scene.Occluder.Initialize → Classify → HW · SW(AtomicMin64 형제) → Resolve</code>. Resolve는 병합된 키에서 깊이만 기록하고(<code>METEOR.Scene.Occluder.Depth</code>), 현재 프레임 HZB(<code>Geometry.Occlusion.N</code>)가 그 깊이를 읽은 뒤 복구 컬링과 최종 <code>METEOR.Scene.Visibility.*</code>가 이어진다. 호환 경로나 깊이 전용 래스터 분기는 없다.</p>
+<p>배선 정리: 최종 표면과 occluder의 HW 생산자를 <code>SceneHost::DeclareHardwareVisibility</code> 하나로 합쳤다. 각 단계는 자기 목록·명령(<code>Commands.Depth</code> / <code>Commands.Surface</code>)·키 버퍼만 읽기로 선언한다. 쓰지 않게 된 <code>LXSceneDepthPS</code> 진입점과 PSO를 제거하고 Scene host ABI <b>30</b>, cooked program v<b>8</b>로 올렸다(재쿠킹 필요). 카메라 메시렛이 없는 프레임은 opaque 깊이를 쓰는 생산자가 없으므로 현재 프레임 HZB를 만들지 않는다.</p>
+<p>검증 중 발견한 기존 오류: C3 바인드리스 샘플러 표(36개)가 <code>SceneHost</code>마다 DX12 샘플러 힙(상한 2048)에 새 범위로 잡혀 해제되지 않았다. 호스트를 여러 번 만드는 <code>--scene-only</code>가 "bindless sampler table allocation failed"로 실패했다. <code>DX12SamplerHeap::CreateRange</code>가 같은 조합의 범위를 재사용하도록 고쳤다. Vulkan 샘플러 경로는 Phase 4.9에서 확인한다.</p>
+<p><b>검증 결과(오류 검출만, 성능 측정 없음).</b> 모두 GPU 기반 validation 켬, 정상 종료, 소스 해시 안정.</p>
+<ul>
+<li>Release 프로브 14개 모드 통과: scene(59프레임·검사 34,009,342), hybrid(21프레임, occluder 깊이 9,975픽셀을 최종 깊이와 픽셀 단위 비교), HW visibility, reconstruction, meshlet/HZB(24프레임·검사 2,311,874), shadow·decal, forward blend, subsurface, refraction, volume, forward transport, material·temporal·layer bucket. GBV 범위 알림 id=1044는 14건 보존. 근거: <code>Build/Verification/MeteorOccluderHybrid20261014/Release-Gate/verdict.json</code></li>
+<li>Release Editor 실제 장면: occluder·최종 단계의 패스 순서, 원자적 형제 생산자, HZB가 occluder 깊이를 읽는 배선을 캡처에서 확인. 피복/조명 252픽셀, Deferred 패스 0, validation problems 0. 근거: <code>Editor-Release-Accepted/verdict.json</code>. 첫 실행은 검사 스크립트가 다음 프레임 이력 HZB와 같은 이름의 패스를 구분하지 못해 실패했고 실패 기록을 보존했다(<code>Editor-Release</code>).</li>
+<li>Debug: hybrid(21프레임)·meshlet/HZB 프로브 통과, 소스 해시 안정. 근거: <code>Debug-Hybrid/verdict.json</code>. Debug Editor는 실행하지 않았다.</li>
+<li>hybrid 프로브는 이력 없는 1차 단계만 다룬다(<code>historyFrames=0</code>). 이력 기반 1차 단계의 occluder는 meshlet/HZB 장면 게이트(24프레임, 이력 재사용 포함)로 검증했다.</li>
+</ul>
+</div>
+
 <div class="card" id="hybrid-visibility"><h3>현재 구현: HW/SW 분배 · SW 래스터 · 원자적 깊이 병합 (2026-10-14)</h3>
 <p>최종 카메라 메시렛 목록을 GPU가 분류한다. 화면 내부의 8×8 픽셀 이하 비마스크 불투명 메시렛은 SW, 큰 메시렛·마스크·클리핑 경계는 HW가 맡는다. 두 생산자는 같은 <code>uint64</code> 버퍼에 <code>InterlockedMin</code>을 수행한다. 상위 32비트는 standard-Z 깊이, 하위 32비트는 프레임 삼각형 주소다. 동일 깊이는 더 작은 주소가 이긴다. HW에는 별도 RTV/DSV가 없고, <code>Visibility.Resolve</code> 한 곳만 최종 RG32 가시성과 D32 깊이를 기록한다.</p>
-<p>Prepare가 버퍼·불변 기하 테이블·PSO를 준비하고, Surface 선언이 생산자를 명시적으로 등록한다. RenderPassGraph의 <code>AtomicMin64</code>는 HW/SW 사이 가짜 순서 간선을 만들지 않고 두 생산자를 모두 resolve 전에 보존한다. 타일 분배·머티리얼 복원·조명과 다음 프레임 HZB는 확정된 출력만 읽는다. Scene host ABI는 <b>29</b>이며 ABI 28 이하 쿠킹 결과는 재쿠킹해야 한다. 구 HW 출력 경로나 호환 디코더는 없다.</p>
+<p>Prepare가 버퍼·불변 기하 테이블·PSO를 준비하고, Surface 선언이 생산자를 명시적으로 등록한다. RenderPassGraph의 <code>AtomicMin64</code>는 HW/SW 사이 가짜 순서 간선을 만들지 않고 두 생산자를 모두 resolve 전에 보존한다. 타일 분배·머티리얼 복원·조명과 다음 프레임 HZB는 확정된 출력만 읽는다. Scene host ABI는 <b>30</b>이며 ABI 29 이하 쿠킹 결과는 재쿠킹해야 한다. 구 HW 출력 경로나 호환 디코더는 없다.</p>
 <p>연결 정리: HW 전용 가시성 타깃과 HW/SW 사이의 직렬 의존성을 제거했다. 특수 효과도 공통 가시성 주소 해석 함수를 사용한다. HW 키 출력은 <code>u1</code>, 볼륨 출력은 <code>u0</code>로 분리했다. 생산자는 최종 depth/visibility를 첨부하거나 읽지 않으며, 두 결과는 resolve가 소유한다.</p>
-<p>SW는 cooked topology와 posed 정점을 읽어 8비트 서브픽셀 top-left 피복·양면 판정·픽셀 중심 깊이를 계산한다. 현재는 전체 메시렛 용량에 대한 GPU 분배 후 HW/제외 그룹이 즉시 반환한다. SW 목록 압축·간접 dispatch와 크기 임계값 튜닝은 성능 작업이다. B2의 <code>OccluderDepth</code>는 여전히 1차 HW 깊이 패스다. 1차·복구 두 래스터 자체를 혼합 가시성 생산자로 통합하는 RE 형태의 후속 정리는 남아 있다.</p>
+<p>SW는 cooked topology와 posed 정점을 읽어 8비트 서브픽셀 top-left 피복·양면 판정·픽셀 중심 깊이를 계산한다. 현재는 전체 메시렛 용량에 대한 GPU 분배 후 HW/제외 그룹이 즉시 반환한다. SW 목록 압축·간접 dispatch와 크기 임계값 튜닝은 성능 작업이다. B2의 1차 occluder 깊이도 같은 생산자 계약으로 전환했다(아래 카드). 복구 단계의 메시렛은 최종 합집합에 포함되어 최종 혼합 래스터가 처리한다.</p>
 <pre class="mermaid">
 flowchart LR
  G["posed geometry + frame table"] --> C["Visibility.Classify"]
@@ -260,7 +273,14 @@ flowchart TB
   P["Prepare<br/>프레임 기하·SRV 테이블·버킷·정렬 구간·명령·매질"] --> GEO["METEOR.Scene.Geometry"]
   subgraph CULL["METEOR.Scene.Cull · 명시적 생산자 선언"]
     S["그림자 컬링"] --> SC["Commands.Shadow.*.Build"]
-    F["이전 HZB 1차 컬링"] --> DC["Commands.Depth.Build"] --> D["OccluderDepth"]
+    F["이전 HZB 1차 컬링"] --> DC["Commands.Depth.Build"]
+    F --> OC["Occluder.Classify"]
+    DC --> OH["Occluder.HW · UAV-only"]
+    OC --> OH
+    OC --> OS["Occluder.SW · compute"]
+    OH --> OK[("Occluder AtomicMin64 keys")]
+    OS --> OK
+    OK --> D["Occluder.Resolve · depth only"]
     D --> H["현재 HZB · 복구/합집합 컬링"]
     H --> MC["Commands.Surface.Build"]
     H --> IC["Commands.Layer / Blended.*.Build"]
@@ -313,7 +333,7 @@ flowchart TB
 <thead><tr><th>#</th><th>노드</th><th>reads</th><th>writes / modifies</th><th>그래프에 넣는 패스</th></tr></thead>
 <tbody>
 <tr><td>1</td><td>METEOR.Scene.Geometry</td><td>—</td><td>—</td><td><code>METEOR.TransformMeshWorld</code>(native dispatch 1) · <code>METEOR.MeshWorldReady</code> · <code>METEOR.MeshWorldReuse</code> · <code>METEOR.Scene.Geometry.Table.Upload</code> · 필요 시 <code>METEOR.MeshInputUpload</code></td></tr>
-<tr><td>2</td><td>METEOR.Scene.Cull</td><td>—</td><td>—</td><td><code>METEOR.ShadowMeshlet.Reset/Cull</code> x3 · <code>METEOR.Scene.OccluderDepth</code> · <code>Geometry.Occlusion.N</code> · <code>Geometry.Visibility.Reset/CullOcclusion</code> · <code>METEOR.Scene.Commands.{Depth,Surface,Layer,Temporal,Shadow.*,Blended.*}.Build</code></td></tr>
+<tr><td>2</td><td>METEOR.Scene.Cull</td><td>—</td><td>—</td><td><code>METEOR.ShadowMeshlet.Reset/Cull</code> x3 · <code>METEOR.Scene.Occluder.{Initialize,Classify,HW,SW,Resolve}</code> · <code>Geometry.Occlusion.N</code> · <code>Geometry.Visibility.Reset/CullOcclusion</code> · <code>METEOR.Scene.Commands.{Depth,Surface,Layer,Temporal,Shadow.*,Blended.*}.Build</code></td></tr>
 <tr><td>3</td><td>METEOR.Scene.Shadow</td><td>—</td><td>W Shadow.Map</td><td><code>Shadow.Clear</code> · <code>METEOR.Scene.Shadow.C0/C1/C2</code></td></tr>
 <tr><td>4</td><td>METEOR.Scene.Surface</td><td>—</td><td>W 표면 5장 + Depth + Visibility</td><td>타깃 초기화 → <code>Visibility.Initialize/Classify</code> → <code>Visibility.HW + SW</code>(AtomicMin64) → <code>Visibility.Resolve</code> → <code>Material.Reset/CountTiles/BuildRanges/ScatterTiles</code> → <code>METEOR.Scene.Material.Resolve</code> → 데칼</td></tr>
 <tr><td>5</td><td>METEOR.Scene.History</td><td>Depth</td><td>다음 프레임 HZB 이력</td><td>최종 깊이 피라미드. 제출 승인·완료 후 이력 발행</td></tr>
@@ -411,13 +431,13 @@ flowchart TB
 <tr><td>A4</td><td>클러스터 스트리밍</td><td><span class="tag gap">없음</span></td><td>A2와 계층 공유</td></tr>
 <tr><td colspan="4"><b>B. 컬링 (<code>METEOR.Scene.Cull</code> 노드 안에서 진행)</b></td></tr>
 <tr><td>B1</td><td>카메라 메시렛 compute 컬링</td><td><span class="tag ok">구현·오류 검증</span> posed 정점 프러스텀 + 메시렛별 HZB</td><td>B2에서 1차 이력 목록·현재 HZB 복구로 확장. 표면은 GPU 목록·간접 인자만 소비하며 현재 HZB를 인스턴스와 공유. DX12 Debug/Release 검증 통과, 성능 측정 보류. <a href="MeteorCameraMeshletCulling20261013.md">근거</a></td></tr>
-<tr><td>B2</td><td>2단계 오클루전</td><td><span class="tag ok">구현·오류 검증</span> 완료된 제출의 이전 HZB → 현재 posed bounds 재투영 → 1차 깊이 → 현재 HZB → 제외 후보 복구. 첫 목록과 복구 목록의 합집합을 최종 표면이 소비</td><td>최종 불투명 깊이로 다음 이력 생성. 장면·view·extent·카메라 컷·렌즈·history revision 변경 시 무효화. DX12 Debug/Release 프로브·Release Editor 통과. 최종 표면은 C2 혼합 가시성으로 전환. 1차 OccluderDepth는 HW 유지. 성능·Vulkan은 보류</td></tr>
+<tr><td>B2</td><td>2단계 오클루전</td><td><span class="tag ok">구현·오류 검증</span> 완료된 제출의 이전 HZB → 현재 posed bounds 재투영 → 1차 깊이 → 현재 HZB → 제외 후보 복구. 첫 목록과 복구 목록의 합집합을 최종 표면이 소비</td><td>최종 불투명 깊이로 다음 이력 생성. 장면·view·extent·카메라 컷·렌즈·history revision 변경 시 무효화. DX12 Debug/Release 프로브·Release Editor 통과. 최종 표면과 1차 occluder 깊이 모두 C2 혼합 가시성(HW/SW atomic key → resolve)으로 전환. 성능·Vulkan은 보류</td></tr>
 <tr><td>B3</td><td>GPU 작업 분배</td><td><span class="tag ext">부분</span> GPU 열거·압축·2D 간접 인자</td><td>각 뷰의 컬링 단계마다 bin 전체를 단일 native cull dispatch로 처리(최대 4096 bin). 카메라는 이전 HZB 1차·현재 HZB 복구 두 단계이며 이력이 없으면 1차는 프러스텀만 검사. 카메라 불투명 메시렛은 GPU root 명령 생성 + 셰이더 버킷당 간접 실행으로 전환·오류 검증 완료. CPU는 셰이더 종류별 PSO를 유지하며 메시·인스턴스별 제출을 제거. 그림자도 캐스케이드·셰이더 버킷별 간접 실행으로 전환하고 Release/Debug 오류 검증 완료. Temporal replay는 순서를 보존하는 연속 PSO 구간별 간접 실행으로 전환하고 Release/Debug 오류 검증 완료. 일반 정렬 반투명 색상은 연속 PSO 구간별 indexed 간접 실행으로 전환(아래 검증 카드 참조). 굴절·SSS 캡처/runtime effect도 레이어 내부 청크를 간접 범위로 통합(아래 검증 카드 참조). 레이어 간 배경·캡처 의존성에 따른 CPU 스케줄 경계는 남음. 하드웨어 한도 초과는 준비 실패</td></tr>
 <tr><td>B4</td><td>그림자 고도화</td><td><span class="tag ext">부분</span></td><td>광원별 2단계·정적 캐시·비동기 compute</td></tr>
 <tr><td colspan="4"><b>C. 래스터·셰이딩</b></td></tr>
 <tr><td>C1</td><td>RHI 64-bit atomic·포맷</td><td><span class="tag ok">DX12 buffer 구현 · 오류 검증</span></td><td>SM6.6 buffer uint64 min, typed 포맷 기능 별도 조회. C2 혼합 래스터가 사용하는 계약. Vulkan 런타임 Phase 4.9</td></tr>
-<tr><td>C2</td><td>가시성 버퍼 + SW 래스터</td><td><span class="tag ok">최종 표면 구현 · 오류 검증</span> GPU 분류·HW/SW atomic key 생산·최종 depth/visibility resolve</td><td>가시성 기반 속성/머티리얼 복원과 GPU 타일 작업 분배 연결. 1차 깊이·복구를 각각 혼합 래스터로 통합하는 후속 배선 정리는 남음. 현재 검증 결과는 상단 카드 참조</td></tr>
-<tr><td>C3</td><td>바인드리스 머티리얼</td><td><span class="tag done">DX12 구현 · 오류 검증</span></td><td>DX12 LX 공유 텍스처 테이블(4096), 공통 샘플러(36), b15 descriptor 인덱스. Scene host ABI 29 · cooked material v7 (HW/SW 원자적 가시성 생산자 계약): 이전 쿠킹 결과는 거부하고 재쿠킹. Vulkan 런타임 동등성은 Phase 4.9.</td></tr>
+<tr><td>C2</td><td>가시성 버퍼 + SW 래스터</td><td><span class="tag ok">1차 occluder · 최종 표면 구현 · 오류 검증</span> 두 단계가 같은 GPU 분류·HW/SW atomic key 생산·resolve 계약을 쓴다. 1차는 depth만, 최종은 depth/visibility를 resolve</td><td>가시성 기반 속성/머티리얼 복원과 GPU 타일 작업 분배 연결. 깊이 전용 HW 래스터(<code>LXSceneDepthPS</code>)와 그 PSO는 제거. 현재 검증 결과는 상단 카드 참조</td></tr>
+<tr><td>C3</td><td>바인드리스 머티리얼</td><td><span class="tag done">DX12 구현 · 오류 검증</span></td><td>DX12 LX 공유 텍스처 테이블(4096), 공통 샘플러(36), b15 descriptor 인덱스. Scene host ABI 30 · cooked material v8 (occluder도 HW/SW 생산자 계약, 깊이 전용 진입점 제거): 이전 쿠킹 결과는 거부하고 재쿠킹. Vulkan 런타임 동등성은 Phase 4.9.</td></tr>
 <tr><td>C4</td><td>머티리얼 패킷 셰이딩</td><td><span class="tag ext">부분</span> GPU 타일 작업 분배·가시성 기반 복원 구현</td><td>현재 CountTiles → BuildRanges → ScatterTiles → 간접 Material.Resolve/Color. Temporal 입력·데칼은 별도 패스로 남아 있으며, 머티리얼 패킷으로 통합하는 후속 작업이 필요</td></tr>
 <tr><td>C5</td><td>그래프 commutative writer</td><td><span class="tag ok">단일 큐 AtomicMin64 · 오류 검증</span></td><td>초기화 → 다중 생산자 → 전체 join. 그룹 내부 불필요 간선·배리어 제거. 단일 큐 계약</td></tr>
 <tr><td colspan="4"><b>D. 검증·인프라</b></td></tr>

@@ -149,11 +149,11 @@ namespace material_graph
         // rejects a frame whose earlier stage was not declared on this graph.
         // METEOR.Scene.Geometry: one world-transform declaration for camera and shadow draws.
         void DeclareGeometry(EnhancedRenderGraph& graph) const;
-        // METEOR.Scene.Cull: shadow meshlet lists, occluder depth, pyramid and camera culling.
+        // METEOR.Scene.Cull: shadow meshlet lists, hybrid occluder depth, pyramid and camera culling.
         void DeclareCulling(EnhancedRenderGraph& graph) const;
         void DeclareHistory(EnhancedRenderGraph& graph, RGHandle depth) const;
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
-        // METEOR owns its current-frame depth prepass and pyramid.
+        // Final hybrid visibility, then material reconstruction into the GBuffer.
         SceneSurfaceTargets::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
                                                     const SceneSurfaceTargets::Outputs& inputs) const;
         // Baseline is the existing Decal pass snapshot, ordered diffuse, ORM, normal.
@@ -181,6 +181,9 @@ namespace material_graph
         std::shared_ptr<const SceneFrameGeometry> FrameGeometry() const;
         std::shared_ptr<const SceneMaterialWork> MaterialWork() const;
         std::shared_ptr<const SceneHybridVisibility> HybridVisibility() const;
+        std::shared_ptr<const SceneHybridVisibility> OccluderVisibility() const;
+        // Resolved occluder depth (HZB source) of the current graph declaration.
+        RGHandle OccluderDepth() const;
         bool HasDraws() const;
         // Live callers provide the exact graph batch ticket; pending completion is
         // polled without waiting. An empty ticket requires prior successful CPU drain.
@@ -249,6 +252,10 @@ namespace material_graph
                                   std::string& error);
         void PollSubmittedFrames();
         static void RequireGeometry(const Frame& frame, const EnhancedRenderGraph& graph);
+        // One HW producer per hybrid stage: occluder (first list, depth commands)
+        // or final surface (recovered union, surface commands).
+        static void DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const Frame>& frame,
+                                              bool occluder);
         static void RequireCulling(const Frame& frame, const EnhancedRenderGraph& graph);
         RGHandle DeclareShading(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
                                 RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,

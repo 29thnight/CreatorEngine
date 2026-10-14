@@ -372,6 +372,7 @@ void DX12SamplerHeap::Shutdown()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_cache.clear();
+    m_rangeCache.clear();
     m_heap.Reset();
     m_device.Reset();
     m_capacity = 0;
@@ -423,7 +424,18 @@ D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::CreateRange(std::span<const RHISamp
 
     const uint32_t count = static_cast<uint32_t>(descs.size());
 
+    std::vector<uint64_t> key;
+    key.reserve(count);
+    for (const auto& desc : descs) key.push_back(ComputeHash(desc));
+
     std::lock_guard<std::mutex> guard(m_mutex);
+
+    const auto found = m_rangeCache.find(key);
+    if (found != m_rangeCache.end())
+    {
+        m_stats.hits += count;
+        return found->second;
+    }
 
     if (m_used + count > m_capacity)
     {
@@ -445,6 +457,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::CreateRange(std::span<const RHISamp
 
     handle = m_gpuBase;
     handle.ptr += static_cast<UINT64>(base) * m_incrementSize;
+    m_rangeCache.emplace(std::move(key), handle);
     return handle;
 }
 

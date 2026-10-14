@@ -3,6 +3,7 @@
 #include "../RHIDescriptorVersionPolicy.h"
 #include <atomic>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <mutex>
@@ -299,8 +300,9 @@ public:
     /// 기대하는 것은 위험하다 — 사이에 다른 호출이 끼면 조용히 어긋나고,
     /// 증상은 '샘플러가 뒤바뀐다'라 원인이 멀다. 범위가 필요하면 이쪽을 쓴다.
     ///
-    /// 중복 제거는 하지 않는다. 범위는 종류가 적고(패스마다 한둘) 캐시하려면
-    /// 조합 전체를 키로 잡아야 하는데 이득이 없다.
+    /// 같은 조합의 범위는 같은 핸들을 돌려준다. 샘플러는 불변이고 힙에서
+    /// 해제되지 않으므로, 소유자(예: METEOR 바인드리스 36개 테이블)가 다시
+    /// 만들어질 때마다 새 범위를 잡으면 상한(2048)이 결국 고갈된다.
     D3D12_GPU_DESCRIPTOR_HANDLE CreateRange(std::span<const RHISamplerDesc> descs);
 
     static uint64_t ComputeHash(const RHISamplerDesc& desc);
@@ -322,6 +324,8 @@ private:
 
     mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, D3D12_GPU_DESCRIPTOR_HANDLE> m_cache;
+    // 키는 범위의 샘플러별 해시 전체(순서 포함)다.
+    std::map<std::vector<uint64_t>, D3D12_GPU_DESCRIPTOR_HANDLE> m_rangeCache;
     Stats m_stats;
 };
 

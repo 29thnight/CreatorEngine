@@ -103,3 +103,10 @@ ResolvePixel ResolvePS(ResolveVertex input)
     ResolvePixel result;result.visibility=key==~uint64_t(0)?uint2(0):uint2(uint(key),uint(key>>32u));
     result.depth=key==~uint64_t(0)?1.0:asfloat(result.visibility.y);return result;
 }
+// Occluder stage: the same merged key, depth only (HZB source).
+[shader("fragment")]
+float ResolveDepthPS(ResolveVertex input) : SV_Depth
+{
+    uint2 pixel=uint2(input.position.xy);uint64_t key=completedKeys[pixel.y*width+pixel.x];
+    return key==~uint64_t(0)?1.0:asfloat(uint(key>>32u));
+}

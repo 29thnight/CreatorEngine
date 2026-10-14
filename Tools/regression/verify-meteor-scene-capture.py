@@ -61,6 +61,27 @@ if not args.empty:
         assert any(u['resource'] == target and u['access'] == 2 for u in merge['usages']), 'Resolve owns final outputs'
     assert merge['compiledIndex'] < tiles['compiledIndex']
     assert any(u['resource'] == visibility and u['access'] == 1 for u in tiles['usages'])
+    # The first-stage occluder uses the same producer contract and resolves depth only.
+    assert not any(row['name'] == 'METEOR.Scene.OccluderDepth' for row in graph['passes']), 'Depth-only occluder raster remains'
+    o_init = pass_named('METEOR.Scene.Occluder.Initialize')
+    o_classify = pass_named('METEOR.Scene.Occluder.Classify')
+    o_hw = pass_named('METEOR.Scene.Occluder.HW')
+    o_sw = pass_named('METEOR.Scene.Occluder.SW')
+    o_merge = pass_named('METEOR.Scene.Occluder.Resolve')
+    o_keys = resources['METEOR.Scene.Occluder.Keys']
+    o_depth = resources['METEOR.Scene.Occluder.Depth']
+    for writer in (o_hw, o_sw):
+        assert o_init['compiledIndex'] < o_classify['compiledIndex'] < writer['compiledIndex'] < o_merge['compiledIndex']
+        assert len([u for u in writer['usages'] if u['resource'] == o_keys and u['access'] == 4]) == 1
+        assert not any(u['resource'] == o_depth for u in writer['usages']), 'Occluder writer has an attachment dependency'
+    assert not any({edge['producer'], edge['consumer']} == {o_hw['authoredIndex'], o_sw['authoredIndex']}
+                   for edge in graph['versionEdges']), 'False ordering between occluder raster writers'
+    assert any(u['resource'] == o_depth and u['access'] == 2 for u in o_merge['usages']), 'Occluder resolve owns its depth'
+    # The next-frame history pyramid shares the level pass names; select the current HZB by its source.
+    hzb = [row for row in graph['passes'] if row['name'] == 'Geometry.Occlusion.0' and not row['culled'] and
+           any(u['resource'] == o_depth and u['access'] == 1 for u in row['usages'])]
+    assert len(hzb) == 1, 'Exactly one current HZB reads the occluder depth'
+    assert o_merge['compiledIndex'] < hzb[0]['compiledIndex'] < classify['compiledIndex']
     hybrid_wiring = True
 pixels = {}
 for attachment in manifest['attachments']:

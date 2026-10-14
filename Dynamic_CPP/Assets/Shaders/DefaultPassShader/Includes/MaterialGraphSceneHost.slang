@@ -395,15 +395,6 @@ void LXSceneShadowPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
     ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_shadowCutoff, lx_shadowCoverage, frontFace);
 }
 
-[shader("fragment")]
-void LXSceneDepthPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
-{
-    input = LXScenePixelCenter(input);
-    const LXMaterialContext context = LXSceneContext(input);
-    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
-    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_cutoff, lx_coverage, frontFace);
-}
-
 MaterialInputs LXSceneDecalInputs(MaterialInputs raw, LXSceneVertex input, bool frontFace)
 {
     if (lx_decalEnabled == 0u)

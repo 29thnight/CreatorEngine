@@ -101,7 +101,7 @@ if ($VerifyAssetCooker) {
                 $meta.generatedMaterial.sourceSha256 -ne $actualSourceHash -or
                 @($meta.properties).Count -ne 1 -or $meta.properties[0].parameterId -ne 900 -or
                 @($meta.passes).Count -ne 8 -or
-                (@($meta.passes.name | Sort-Object) -join ',') -ne 'Forward,GBuffer,LXSceneColor,LXSceneDepth,LXSceneLookup0,LXSceneLookup1,LXSceneTemporal,Shadow') {
+                (@($meta.passes.name | Sort-Object) -join ',') -ne 'Forward,GBuffer,LXSceneColor,LXSceneLookup0,LXSceneLookup1,LXSceneTemporal,METEORVisibility,Shadow') {
                 throw "Actual $configuration generated pair contract mismatch."
             }
             $forward = @($meta.passes | Where-Object name -EQ 'Forward')[0]

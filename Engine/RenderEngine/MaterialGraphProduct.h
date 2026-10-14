@@ -19,7 +19,8 @@ namespace material_graph
 // 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
 // 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
 // 23: camera compute meshlet IDs and GPU-finalized 2D indirect dispatch ABI.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:29";
+// 30: occluder depth uses the HW/SW visibility producer; LXSceneDepthPS removed.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:30";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
@@ -220,7 +221,7 @@ struct CookedProgram
 
 // Scene mesh shaders consume GPU-compacted meshlet IDs and 2D indirect work.
 // Previous products cannot be rebound to this host; assets must be recooked.
-inline constexpr std::uint32_t CookedProgramVersion = 7;
+inline constexpr std::uint32_t CookedProgramVersion = 8;
 bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,

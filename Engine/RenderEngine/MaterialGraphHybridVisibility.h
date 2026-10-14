@@ -10,10 +10,11 @@ namespace material_graph
 struct HybridVisibilityPipelines final
 {
     std::array<LX::Runtime::ComputePipeline, 3> compute;
-    LX::Runtime::GraphicsPipeline resolve;
+    // Final surface writes visibility + depth; the occluder stage writes depth only.
+    LX::Runtime::GraphicsPipeline resolve, resolveDepth;
     bool Prepare(const EnhancedFrameContext& context, std::string& error)
     {
-        if (resolve.IsValid())
+        if (resolve.IsValid() && resolveDepth.IsValid())
             return true;
         const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0),
                                               RHILayout::Srv(0),
@@ -47,32 +48,44 @@ struct HybridVisibilityPipelines final
             }
         const RHIPipelineLayoutParam finalParams[]{RHILayout::Cbv(0), RHILayout::Srv(3, RHIShaderVisibility::Pixel)};
         const auto finalLayout = context.rootSignatures->GetOrCreate({finalParams, {}}, error);
-        LX::Runtime::CompiledGraphics shader;
-        if (!finalLayout.IsValid() ||
-            !LX::Runtime::CompileGraphics(source, "ResolveVS", "ResolvePS", {}, options, shader, error))
+        if (!finalLayout.IsValid())
             return false;
-        RHIGraphicsPipelineDesc desc;
-        desc.layout = finalLayout;
-        desc.vsBytecode = shader.vertex.bytecode.Data();
-        desc.vsSize = shader.vertex.bytecode.Size();
-        desc.psBytecode = shader.pixel.bytecode.Data();
-        desc.psSize = shader.pixel.bytecode.Size();
-        desc.numRenderTargets = 1;
-        desc.rtvFormats[0] = RHIFormat::RG32Uint;
-        desc.dsvFormat = RHIFormat::D32Float;
-        desc.depthEnable = true;
-        desc.depthWriteMask = RHIDepthWrite::All;
-        desc.depthFunc = RHICompareOp::Always;
-        desc.cullMode = RHICullMode::None;
-        LX::Runtime::GraphicsShaderDescription description;
-        description.compile = std::move(shader.identity);
-        return resolve.Create(*context.psoManager, desc, std::move(description), error);
+        const auto create = [&](LX::Runtime::GraphicsPipeline& pipeline, const char* pixel, bool visibility) {
+            if (pipeline.IsValid())
+                return true;
+            LX::Runtime::CompiledGraphics shader;
+            if (!LX::Runtime::CompileGraphics(source, "ResolveVS", pixel, {}, options, shader, error))
+                return false;
+            RHIGraphicsPipelineDesc desc;
+            desc.layout = finalLayout;
+            desc.vsBytecode = shader.vertex.bytecode.Data();
+            desc.vsSize = shader.vertex.bytecode.Size();
+            desc.psBytecode = shader.pixel.bytecode.Data();
+            desc.psSize = shader.pixel.bytecode.Size();
+            desc.numRenderTargets = visibility ? 1 : 0;
+            if (visibility)
+                desc.rtvFormats[0] = RHIFormat::RG32Uint;
+            desc.dsvFormat = RHIFormat::D32Float;
+            desc.depthEnable = true;
+            desc.depthWriteMask = RHIDepthWrite::All;
+            desc.depthFunc = RHICompareOp::Always;
+            desc.cullMode = RHICullMode::None;
+            LX::Runtime::GraphicsShaderDescription description;
+            description.compile = std::move(shader.identity);
+            return pipeline.Create(*context.psoManager, desc, std::move(description), error);
+        };
+        return create(resolve, "ResolvePS", true) && create(resolveDepth, "ResolveDepthPS", false);
     }
 };
 // The frame prepares storage and immutable binding tables. Declaration only
 // publishes producers and exact consumers; no hidden producer on a read.
+// One owner per stage: the occluder stage consumes the first culling list and
+// resolves depth only; the final surface consumes the recovered union.
 struct SceneHybridVisibility final
 {
+    // Pass/resource prefix, e.g. METEOR.Scene.Occluder or METEOR.Scene.Visibility.
+    std::string name;
+    bool depthOnly{};
     IRenderDeviceServices* device{};
     std::shared_ptr<const SceneFrameGeometry> geometry;
     std::shared_ptr<const GpuGeometryVisibility::Frame> visible;
@@ -116,7 +129,7 @@ struct SceneHybridVisibility final
         width = context.width;
         height = context.height;
         meshlets = (geometry->nextPrimitiveAddress - 1) / 128;
-        if (!device->GetAtomicCapabilities().bufferInt64Min || !visible || !meshlets || !width || !height ||
+        if (name.empty() || !device->GetAtomicCapabilities().bufferInt64Min || !visible || !meshlets || !width || !height ||
             uint64_t(width) * height > UINT32_MAX || geometry->records.size() > 4097 ||
             records.size() != geometry->records.size())
         {
@@ -127,7 +140,7 @@ struct SceneHybridVisibility final
             return false;
         for (unsigned i = 0; i < 3; ++i)
             compute[i] = pipelines.compute[i].GetGeneration();
-        resolve = pipelines.resolve.GetGeneration();
+        resolve = (depthOnly ? pipelines.resolveDepth : pipelines.resolve).GetGeneration();
         struct Constants
         {
             math::matrix4x4 projection;
@@ -147,11 +160,13 @@ struct SceneHybridVisibility final
         RHIBufferDesc desc;
         desc.bytes = KeyBytes();
         desc.allowUnorderedAccess = true;
-        desc.debugName = L"METEOR.Scene.Visibility.Keys";
+        const std::wstring keyName(std::wstring(name.begin(), name.end()) + L".Keys");
+        const std::wstring routeName(std::wstring(name.begin(), name.end()) + L".Routes");
+        desc.debugName = keyName.c_str();
         if (!device->CreateBuffer(desc, keys, error))
             return false;
         desc.bytes = uint64_t(meshlets) * 4;
-        desc.debugName = L"METEOR.Scene.Visibility.Routes";
+        desc.debugName = routeName.c_str();
         if (!device->CreateBuffer(desc, routes, error))
             return false;
         std::vector<RHIBindingDesc> v, t;
@@ -215,14 +230,14 @@ struct SceneHybridVisibility final
             throw std::runtime_error("METEOR raster requires one explicit versioned declaration per frame.");
         graphOwner = &graph;
         graphEpoch = graph.ResourceEpoch();
-        graphKeys = graph.ImportBuffer(keys, RHIResourceState::Common, "METEOR.Scene.Visibility.Keys");
-        graphRoutes = graph.ImportBuffer(routes, RHIResourceState::Common, "METEOR.Scene.Visibility.Routes");
+        graphKeys = graph.ImportBuffer(keys, RHIResourceState::Common, (name + ".Keys").c_str());
+        graphRoutes = graph.ImportBuffer(routes, RHIResourceState::Common, (name + ".Routes").c_str());
         graph.RequireImportedFinalState(graphKeys, RHIResourceState::Common);
         graph.RequireImportedFinalState(graphRoutes, RHIResourceState::Common);
         graphKeys = graph.Write(graphKeys);
         graphRoutes = graph.Write(graphRoutes);
         graph.AddPass(
-            "METEOR.Scene.Visibility.Initialize",
+            (name + ".Initialize").c_str(),
             {{graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
              {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
             [owner](const auto& x) {
@@ -238,7 +253,7 @@ struct SceneHybridVisibility final
             {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}};
         GeometryReads(graph, uses);
         visible->AddVisibleIdsRead(graph, uses);
-        graph.AddPass("METEOR.Scene.Visibility.Classify", uses, [owner](const auto& x) {
+        graph.AddPass((name + ".Classify").c_str(), uses, [owner](const auto& x) {
             owner->Bind(*x.encoder, 1);
             DispatchGroups(*x.encoder, owner->meshlets);
         });
@@ -255,17 +270,50 @@ struct SceneHybridVisibility final
         std::vector<EnhancedRenderGraph::RGPassUsage> uses;
         AddRasterUses(graph, uses);
         GeometryReads(graph, uses);
-        graph.AddPass("METEOR.Scene.Visibility.SW", uses, [owner](const auto& x) {
+        graph.AddPass((name + ".SW").c_str(), uses, [owner](const auto& x) {
             owner->Bind(*x.encoder, 2);
             DispatchGroups(*x.encoder, owner->meshlets);
         });
     }
+    // Occluder stage: the merged atomic keys become the HZB source depth.
+    RGHandle DeclareDepthResolve(EnhancedRenderGraph& graph, RGHandle depth,
+                                 std::shared_ptr<const SceneHybridVisibility> owner) const
+    {
+        if (!depthOnly)
+            throw std::runtime_error("METEOR visibility stage resolves its visibility target too.");
+        depth = graph.Write(depth);
+        graph.AddPass((name + ".Resolve").c_str(),
+                      {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
+                       {depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
+                      [owner, depth](const auto& x) {
+                          auto& e = *x.encoder;
+                          const auto target = RHIDepthTargetDesc::Depth(x.ResolveHandle(depth), RHIFormat::D32Float);
+                          const auto targets =
+                              owner->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &target);
+                          if (!targets.IsValid())
+                              throw std::runtime_error("METEOR occluder resolve target binding failed.");
+                          owner->DrawResolve(e, targets);
+                      });
+        return depth;
+    }
+    void DrawResolve(RHIEncoder& e, const RHIRenderTargetBinding& targets) const
+    {
+        e.BindRenderTargets(targets);
+        e.SetPipeline(RHIBindPoint::Graphics, resolve->pipeline.GetHandle());
+        e.SetViewportAndScissor(width, height);
+        e.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+        e.SetConstantBuffer(RHIBindPoint::Graphics, 0, constants);
+        e.SetRootBuffer(RHIBindPoint::Graphics, 1, KeySlice());
+        e.Draw(3, 1);
+    }
     SceneSurfaceTargets::Outputs DeclareResolve(EnhancedRenderGraph& graph, SceneSurfaceTargets::Outputs outputs,
                                                 std::shared_ptr<const SceneHybridVisibility> owner) const
     {
+        if (depthOnly)
+            throw std::runtime_error("METEOR occluder stage has no visibility target.");
         outputs.visibility = graph.Write(outputs.visibility);
         outputs.depth = graph.Write(outputs.depth);
-        graph.AddPass("METEOR.Scene.Visibility.Resolve",
+        graph.AddPass((name + ".Resolve").c_str(),
                       {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
                        {outputs.visibility, RHIResourceState::RenderTarget, RGAccessMode::Write},
                        {outputs.depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
@@ -277,13 +325,7 @@ struct SceneHybridVisibility final
                           const auto targets = owner->device->CreateRenderTargets(colors, &depth);
                           if (!targets.IsValid())
                               throw std::runtime_error("METEOR visibility resolve target binding failed.");
-                          e.BindRenderTargets(targets);
-                          e.SetPipeline(RHIBindPoint::Graphics, owner->resolve->pipeline.GetHandle());
-                          e.SetViewportAndScissor(owner->width, owner->height);
-                          e.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                          e.SetConstantBuffer(RHIBindPoint::Graphics, 0, owner->constants);
-                          e.SetRootBuffer(RHIBindPoint::Graphics, 1, owner->KeySlice());
-                          e.Draw(3, 1);
+                          owner->DrawResolve(e, targets);
                       });
         return outputs;
     }

@@ -192,7 +192,7 @@ namespace material_graph
         PassLayout layout;
         PassLayout shadowLayout;
         LX::Runtime::GraphicsPipeline shadow;
-        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, visibilitySurface, depth, color, blendedColor, temporal;
+        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, visibilitySurface, color, blendedColor, temporal;
         std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> lookup, blendedLookup;
         std::array<LX::Runtime::GraphicsPipeline, 2> subsurface;
         std::array<LX::Runtime::GraphicsPipeline, 2> refraction;
@@ -235,7 +235,9 @@ namespace material_graph
         std::uint64_t recording{}, descriptors{};
         own::shared_owner<const SceneViewInput> input;
         std::shared_ptr<const SceneFrameGeometry> geometryTable;
-        std::shared_ptr<const SceneHybridVisibility> hybridVisibility;
+        // Occluder: first culling list -> HZB source depth. Final: recovered union -> surface.
+        std::shared_ptr<const SceneHybridVisibility> occluderVisibility, hybridVisibility;
+        mutable RGHandle occluderDepth;
         std::vector<Draw> draws;
         std::vector<Draw> shadowDraws;
         std::vector<std::pair<size_t, size_t>> inputRanges;
@@ -1070,14 +1072,6 @@ namespace material_graph
                         temporalDesc.rtvFormats[0] = RHIFormat::RG16Float;
                         std::fill_n(std::begin(temporalDesc.rtvFormats) + 1, 3, RHIFormat::R16Float);
                         if (!prepare(candidate->temporal[side], temporalDesc, "LXSceneTemporalVS", "LXSceneTemporalPS")) return false;
-                        auto depthDesc = desc;
-                        depthDesc.numRenderTargets = 0;
-                        depthDesc.psBytecode = compiled->depth.bytecode.Data();
-                        depthDesc.psSize = compiled->depth.bytecode.Size();
-                        if (!prepare(candidate->depth[side], depthDesc, "LXSceneVS", "LXSceneDepthPS"))
-                        {
-                            return false;
-                        }
                         desc.psBytecode = color.bytecode.Data();
                         desc.psSize = color.bytecode.Size();
                         desc.depthWriteMask = RHIDepthWrite::Zero;
@@ -1183,7 +1177,6 @@ namespace material_graph
             auto& program = *preparation->program;
             std::vector<LX::Runtime::GraphicsPipeline*> requests{
                 &program.temporal[0], &program.temporal[1],
-                &program.depth[0], &program.depth[1],
                 &program.visibilitySurface[0], &program.visibilitySurface[1],
                 &program.gbuffer[0],   &program.gbuffer[1],   &program.color[0],     &program.color[1],
                 &program.lookup[0][0], &program.lookup[0][1], &program.lookup[1][0], &program.lookup[1][1]};
@@ -1279,7 +1272,7 @@ namespace material_graph
                         }
                         program.meshPipelines.emplace(indexed.id, pipeline);
                         if (request != &program.shadow && request != &program.visibilitySurface[0] &&
-                            request != &program.visibilitySurface[1] && request != &program.depth[0] && request != &program.depth[1]) {
+                            request != &program.visibilitySurface[1]) {
                             desc.msBytecode = program.reconstructShader.Data();
                             desc.msSize = program.reconstructShader.Size();
                             desc.depthEnable = false;
@@ -1929,29 +1922,42 @@ namespace material_graph
                 candidate->cameraDepthMeshlets, error, false, previousCameraHistory) ||
              !visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
                 candidate->cameraMeshlets, error, true, {}, candidate->cameraDepthMeshlets))) return false;
+        // Current-frame occlusion exists only with an occluder stage. Without
+        // camera meshlets nothing writes opaque depth, so no HZB is built.
         if (!visibility_.Prepare(context, candidate->input->ViewProjection(), visibilityCandidates, visibilityBins,
-                                 candidate->visibility, error, true))
+                                 candidate->visibility, error, bool(candidate->cameraDepthMeshlets)))
         {
             return false;
         }
         if (!geometryTable->Upload(error)) return false;
         candidate->geometryTable = std::move(geometryTable);
-        if (std::any_of(candidate->draws.begin(), candidate->draws.end(), [](const auto& draw) {
-            return draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended;
-        })) {
+        // Both stages raster the same opaque surfaces; only their GPU list differs.
+        const auto prepareHybrid = [&](const char* name, bool depthOnly,
+            const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
+            std::shared_ptr<const SceneHybridVisibility>& result) {
             auto hybrid = std::make_shared<SceneHybridVisibility>();
+            hybrid->name = name;
+            hybrid->depthOnly = depthOnly;
             hybrid->geometry = candidate->geometryTable;
-            hybrid->visible = candidate->cameraMeshlets;
+            hybrid->visible = list;
             hybrid->records.resize(candidate->geometryTable->records.size());
             for (const auto& draw : candidate->draws) {
                 if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended) continue;
                 const auto coverage = candidate->input->Draws()[draw.inputIndex].coverage.flags;
-                hybrid->records[draw.geometryRecord] = {candidate->cameraMeshlets->MeshletOutputOffset(draw.cameraMeshletBin),
+                hybrid->records[draw.geometryRecord] = {list->MeshletOutputOffset(draw.cameraMeshletBin),
                     1u | ((coverage & 2u) ? 0u : 2u) | (draw.doubleSided ? 4u : 0u), 0u, 0u};
             }
             if (!hybrid->Prepare(context, candidate->input->ViewProjection(), hybridPipelines_, error)) return false;
-            candidate->hybridVisibility = std::move(hybrid);
-        }
+            result = std::move(hybrid);
+            return true;
+        };
+        if (candidate->cameraDepthMeshlets &&
+            !prepareHybrid("METEOR.Scene.Occluder", true, candidate->cameraDepthMeshlets, candidate->occluderVisibility))
+            return false;
+        if (std::any_of(candidate->draws.begin(), candidate->draws.end(), [](const auto& draw) {
+            return draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended;
+        }) && !prepareHybrid("METEOR.Scene.Visibility", false, candidate->cameraMeshlets, candidate->hybridVisibility))
+            return false;
         candidate->inputRanges.resize(candidate->input->Draws().size());
         for (size_t i = 0; i < candidate->draws.size(); ++i)
         {
@@ -2351,13 +2357,11 @@ namespace material_graph
     }
 
     // METEOR.Scene.Cull node: every visibility decision of the frame. Shadow
-    // cascades get compute meshlet lists; the camera gets the occluder depth
-    // prepass, its current-frame pyramid and instance culling. Raster consumers
+    // cascades get compute meshlet lists; the camera gets the hybrid occluder
+    // stage, its current-frame pyramid and instance culling. Raster consumers
     // only read the declared lists.
     void SceneHost::DeclareCulling(EnhancedRenderGraph& graph) const
     {
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
         ce::profile_scope profile{ce::marker<"MaterialDeclareCulling">()};
         const auto frame = frame_;
         if (!frame)
@@ -2390,101 +2394,32 @@ namespace material_graph
         RequireGeometry(*frame, graph);
         if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
             throw std::runtime_error("METEOR Scene culling requires versioned current-depth HZB wiring.");
-        if (frame->cameraDepthMeshlets) {
-            frame->cameraDepthMeshlets->DeclareFirstStage(graph);
-        }
-        if (frame->depthCommands) frame->depthCommands->Declare(graph, frame->depthCommands);
-        RGHandle occluderDepth;
-        const bool depthPrepass = frame->visibility &&
-            graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
-        if (depthPrepass)
+        if (frame->occluderVisibility)
         {
-            // Exact current-frame coverage/pose/LOD, with no camera/HZB-filtered
-            // arguments. The pyramid reads this version before the main write.
+            // Occluder stage: first list (history HZB or frustum) -> depth commands
+            // -> HW/SW atomic keys -> resolved depth -> current HZB. Same producer
+            // contract as the final surface; no separate depth-only raster.
+            frame->cameraDepthMeshlets->DeclareFirstStage(graph);
+            frame->depthCommands->Declare(graph, frame->depthCommands);
+            const auto& occluder = frame->occluderVisibility;
+            occluder->Declare(graph, occluder);
+            DeclareHardwareVisibility(graph, frame, true);
+            occluder->DeclareSoftware(graph, occluder);
             RGTextureDesc depthDescription;
             depthDescription.width = frame->input->View().width;
             depthDescription.height = frame->input->View().height;
             depthDescription.format = RHIFormat::D32Float;
             depthDescription.allowDepthStencil = true;
-            depthDescription.name = "METEOR.Scene.OccluderDepth";
-            // Keep main depth untouched so Less and first-primitive tie ownership
-            // remain identical to the indexed baseline after HZB filtering.
-            occluderDepth = graph.Write(graph.CreateTexture(depthDescription));
-            std::vector<EnhancedRenderGraph::RGPassUsage> depthUses;
-            depthUses.push_back({occluderDepth, RHIResourceState::DepthWrite, RGAccessMode::Write});
-            for (const auto& draw : frame->draws)
-            {
-                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-                {
-                    continue;
-                }
-                depthUses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-                if (frame->UsesMeshlets(draw))
-                {
-                    depthUses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-                }
-                for (const auto& texture : draw.bindings->resources.textures)
-                {
-                    depthUses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-                }
-            }
-            if (frame->cameraDepthMeshlets) frame->cameraDepthMeshlets->AddVisibleIdsRead(graph, depthUses);
-            if (frame->depthCommands) frame->depthCommands->AddRead(graph, depthUses);
-            NormalizeSceneReads(graph, depthUses);
-            graph.AddPass("METEOR.Scene.OccluderDepth", depthUses, [frame, depthHandle = occluderDepth](const auto& execution) {
-                frame->CheckCurrent(execution.graph);
-                auto& encoder = *execution.encoder;
-                const auto depthTarget = RHIDepthTargetDesc::Depth(execution.ResolveHandle(depthHandle), RHIFormat::D32Float);
-                const auto targets = frame->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depthTarget);
-                if (!targets.IsValid())
-                {
-                    throw std::runtime_error("METEOR Scene occluder depth target binding failed.");
-                }
-                encoder.BindRenderTargets(targets);
-                encoder.ClearDepthTarget(targets, 1.f);
-                encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                for (const auto& draw : frame->RasterDrawsFor())
-                {
-                    if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-                    {
-                        continue;
-                    }
-                    encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->depth[draw.doubleSided].GetHandle()));
-                    std::string error;
-                    if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                    {
-                        throw std::runtime_error(error);
-                    }
-                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
-                    const unsigned ownerRoot = 15 + (draw.program->hasSpecial ? 2 : 0) +
-                        (draw.program->hasTransmission ? 1 : 0);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, ownerRoot, draw.visibleOwner);
-                    if (frame->UsesMeshlets(draw))
-                    {
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->meshletRoot, draw.geometry->Meshlets());
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->temporalPreviousRoot + 1,
-                            frame->cameraDepthMeshlets->VisibleIds(
-                                frame->cameraDepthMeshlets->MeshletOutputOffset(draw.cameraMeshletBin),
-                                draw.geometry->MeshletCount() + 1));
-                        frame->depthCommands->Draw(encoder, draw.materialBucket);
-                    }
-                    else
-                    {
-                        encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
-                        encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
-                    }
-                }
-            });
-        }
-        if (frame->visibility)
-        {
+            depthDescription.name = "METEOR.Scene.Occluder.Depth";
+            frame->occluderDepth = occluder->DeclareDepthResolve(graph, graph.CreateTexture(depthDescription), occluder);
             // One immutable pyramid shared by owner and meshlet culling. Its
-            // producer uses only the independent frustum list, never HZB output.
-            frame->visibility->DeclareWithOcclusion(graph, occluderDepth);
-            if (frame->cameraMeshlets)
-                frame->cameraMeshlets->DeclareWithOcclusion(graph, frame->visibility->PreparedOcclusionPyramid());
+            // producer reads only the occluder depth, never the recovery output.
+            frame->visibility->DeclareWithOcclusion(graph, frame->occluderDepth);
+            frame->cameraMeshlets->DeclareWithOcclusion(graph, frame->visibility->PreparedOcclusionPyramid());
+        }
+        else if (frame->visibility)
+        {
+            frame->visibility->Declare(graph);
         }
         for (const auto& batch : {frame->materialCommands, frame->indexedCommands, frame->temporalCommands})
             if (batch) batch->Declare(graph, batch);
@@ -2498,6 +2433,80 @@ namespace material_graph
         {
             throw std::runtime_error("METEOR Scene raster/culling requires the METEOR.Scene.Geometry declaration first.");
         }
+    }
+
+    void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const Frame>& frame,
+                                              bool occluder)
+    {
+        const auto& hybrid = occluder ? frame->occluderVisibility : frame->hybridVisibility;
+        const auto& list = occluder ? frame->cameraDepthMeshlets : frame->cameraMeshlets;
+        const auto& commands = occluder ? frame->depthCommands : frame->materialCommands;
+        if (!hybrid || !list || !commands)
+            throw std::runtime_error("METEOR HW visibility requires its stage list, commands and atomic keys.");
+        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        hybrid->AddRasterUses(graph, uses);
+        list->AddVisibleIdsRead(graph, uses);
+        commands->AddRead(graph, uses);
+        if (!occluder) frame->AddVisibilityReads(graph, uses);
+        for (const auto& draw : frame->draws)
+        {
+            if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended) continue;
+            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            for (const auto& texture : draw.bindings->resources.textures)
+                uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource,
+                                RGAccessMode::Read});
+        }
+        NormalizeSceneReads(graph, uses);
+        const auto pass = graph.AddPass((hybrid->name + ".HW").c_str(), uses, [frame, occluder](const auto& execution) {
+            frame->CheckCurrent(execution.graph);
+            const auto& hybrid = occluder ? frame->occluderVisibility : frame->hybridVisibility;
+            const auto& list = occluder ? frame->cameraDepthMeshlets : frame->cameraMeshlets;
+            const auto& commands = occluder ? frame->depthCommands : frame->materialCommands;
+            const bool audit = !occluder && frame->geometryRouteAuditEnabled;
+            if (audit) frame->recordedGeometryRoutes.clear();
+            auto& encoder = *execution.encoder;
+            if (!encoder.BeginRasterWithoutAttachments(frame->input->View().width, frame->input->View().height))
+                throw std::runtime_error("METEOR HW visibility requires UAV-only raster support.");
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            for (const auto& draw : frame->RasterDrawsFor())
+            {
+                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended) continue;
+                if (!frame->UsesMeshlets(draw))
+                    throw std::runtime_error("METEOR HW visibility requires cooked meshlets; no indexed route.");
+                const auto sourcePipeline = draw.program->visibilitySurface[draw.doubleSided].GetHandle();
+                const auto recordedPipeline = frame->RasterPipeline(draw, sourcePipeline);
+                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
+                std::string error;
+                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                    throw std::runtime_error(error);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                // The occluder rasters every first-list meshlet; the final stage
+                // keeps the GPU owner gate of the recovered union.
+                const unsigned ownerRoot = 15 + (draw.program->hasSpecial ? 2 : 0) + (draw.program->hasTransmission ? 1 : 0);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, ownerRoot,
+                    occluder ? draw.visibleOwner : frame->visibility->VisibleIds(draw.visibleIdOffset, 1));
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->meshletRoot, draw.geometry->Meshlets());
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->temporalPreviousRoot + 1,
+                    list->VisibleIds(list->MeshletOutputOffset(draw.cameraMeshletBin), draw.geometry->MeshletCount() + 1));
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->rasterRouteRoot, hybrid->RouteSlice());
+                if (!encoder.SetRootUnorderedBuffer(RHIBindPoint::Graphics, draw.program->visibilityKeyRoot, hybrid->KeySlice()))
+                    throw std::runtime_error("METEOR HW visibility key binding failed.");
+                commands->Draw(encoder, draw.materialBucket);
+                if (!audit) continue;
+                for (const auto& submitted : frame->draws)
+                {
+                    if (submitted.materialBucket != draw.materialBucket || submitted.blended) continue;
+                    const auto& source = frame->input->Draws()[submitted.inputIndex];
+                    frame->recordedGeometryRoutes.push_back({source.geometryKey, source.temporalObjectId,
+                        source.temporalInstanceId, sourcePipeline.id, recordedPipeline.id,
+                        submitted.geometry->MeshletCount(), true, frame->UsesVisibility(submitted)});
+                }
+            }
+        });
+        // Sealed frame inputs only; route observations are read after the whole graph joins.
+        graph.DeclareRecordingIndependent(pass);
     }
 
     void SceneHost::RequireCulling(const Frame& frame, const EnhancedRenderGraph& graph)
@@ -2535,6 +2544,14 @@ namespace material_graph
     std::shared_ptr<const SceneHybridVisibility> SceneHost::HybridVisibility() const
     {
         return frame_ ? frame_->hybridVisibility : nullptr;
+    }
+    std::shared_ptr<const SceneHybridVisibility> SceneHost::OccluderVisibility() const
+    {
+        return frame_ ? frame_->occluderVisibility : nullptr;
+    }
+    RGHandle SceneHost::OccluderDepth() const
+    {
+        return frame_ ? frame_->occluderDepth : RGHandle{};
     }
 
     void SceneHost::DeclareGeometry(EnhancedRenderGraph& graph) const
@@ -2877,71 +2894,7 @@ namespace material_graph
         }
         if (!inputs.visibility.IsValid()) throw std::runtime_error("METEOR surface requires a visibility target.");
         frame->hybridVisibility->Declare(graph, frame->hybridVisibility);
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-        frame->hybridVisibility->AddRasterUses(graph, uses);
-        frame->AddGeometryReads(graph, uses, false);
-        for (const auto& draw : frame->draws)
-        {
-            if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended) continue;
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-            if (frame->UsesMeshlets(draw))
-            {
-                uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto& texture : draw.bindings->resources.textures)
-            {
-                uses.push_back(
-                    {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-        NormalizeSceneReads(graph, uses);
-        const auto pass = graph.AddPass("METEOR.Scene.Visibility.HW", uses, [frame, inputs](const auto& execution) {
-            frame->CheckCurrent(execution.graph);
-            frame->recordedGeometryRoutes.clear();
-            auto& encoder = *execution.encoder;
-            if (!encoder.BeginRasterWithoutAttachments(frame->input->View().width, frame->input->View().height))
-                throw std::runtime_error("METEOR HW visibility requires UAV-only raster support.");
-            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->RasterDrawsFor())
-            {
-                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-                {
-                    continue;
-                }
-                const bool indirect = frame->UsesVisibility(draw);
-                const auto sourcePipeline = draw.program->visibilitySurface[draw.doubleSided].GetHandle();
-                const auto recordedPipeline = frame->RasterPipeline(draw, sourcePipeline);
-                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
-                std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                {
-                    throw std::runtime_error(error);
-                }
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                frame->BindGeometry(encoder, draw);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->rasterRouteRoot, frame->hybridVisibility->RouteSlice());
-                if (!encoder.SetRootUnorderedBuffer(RHIBindPoint::Graphics, draw.program->visibilityKeyRoot, frame->hybridVisibility->KeySlice()))
-                    throw std::runtime_error("METEOR HW visibility key binding failed.");
-                frame->DrawGeometry(encoder, draw);
-                if (frame->geometryRouteAuditEnabled)
-                {
-                    for (const auto& submitted : frame->draws)
-                    {
-                    if (submitted.materialBucket != draw.materialBucket || submitted.blended ||
-                        (!frame->UsesMeshlets(draw) && &submitted != &draw)) continue;
-                    const auto& draw = submitted;
-                    const auto& source = frame->input->Draws()[draw.inputIndex];
-                    const bool meshShader = frame->UsesMeshlets(draw);
-                    frame->recordedGeometryRoutes.push_back({source.geometryKey,
-                        source.temporalObjectId, source.temporalInstanceId,
-                        sourcePipeline.id, recordedPipeline.id,
-                        meshShader ? draw.geometry->MeshletCount() : 0u, meshShader, indirect});
-                    }
-                }
-            }
-        });
-        // Sealed frame inputs only; route observations are read after the whole graph joins.
-        graph.DeclareRecordingIndependent(pass);
+        DeclareHardwareVisibility(graph, frame, false);
         frame->hybridVisibility->DeclareSoftware(graph, frame->hybridVisibility);
         inputs = frame->hybridVisibility->DeclareResolve(graph, inputs, frame->hybridVisibility);
         if (frame->materialWork) frame->materialWork->Declare(graph, inputs.visibility, frame->materialWork);
