@@ -564,7 +564,7 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
                 resolved.push_back(pending);
                 continue;
             }
-            if (!entry.IsValid() || 0 == desc.structureByteStride ||
+            if (!entry.IsValid() || (0 == desc.structureByteStride && desc.kind != RHIBindingDesc::Kind::ShaderResource) ||
                 0 == desc.numElements)
             {
                 NoteUnimplemented("SetBindings(버퍼 범위 불완전)");
@@ -574,9 +574,9 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
             pending.value = PendingBinding::Value::Buffer;
             pending.buffer.buffer = entry.buffer;
             pending.buffer.offset = static_cast<VkDeviceSize>(desc.firstElement) *
-                desc.structureByteStride;
+                (desc.structureByteStride ? desc.structureByteStride : 4u);
             pending.buffer.range = static_cast<VkDeviceSize>(desc.numElements) *
-                desc.structureByteStride;
+                (desc.structureByteStride ? desc.structureByteStride : 4u);
         }
         else
         {
@@ -715,21 +715,27 @@ void VulkanEncoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
     for (const PendingBinding& binding : resolved) UpsertBinding(index, binding);
 }
 
-void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
+void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice)
+{
+    // Both SRV and UAV use a storage descriptor; shader access comes from the layout.
+    (void)SetRootUnorderedBuffer(bindPoint, slot, slice);
+}
+
+bool VulkanEncoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot,
     const RHIBufferSlice& slice)
 {
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
         nullptr == m_descriptors || VK_NULL_HANDLE == m_device)
     {
         NoteUnimplemented("SetRootBuffer(디스크립터 서비스 없음)");
-        return;
+        return false;
     }
 
     const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
     if (!entry.IsValid() || slice.offset >= entry.bytes)
     {
         NoteUnimplemented("SetRootBuffer(버퍼 범위 불완전)");
-        return;
+        return false;
     }
 
     const VkDeviceSize range = (0 != slice.size)
@@ -738,7 +744,7 @@ void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
     if (0 == range || range > entry.bytes - static_cast<VkDeviceSize>(slice.offset))
     {
         NoteUnimplemented("SetRootBuffer(버퍼 범위 초과)");
-        return;
+        return false;
     }
 
     PendingBinding pending{};
@@ -748,6 +754,7 @@ void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
     pending.buffer.offset = slice.offset;
     pending.buffer.range = range;
     UpsertBinding(static_cast<size_t>(bindPoint), pending);
+    return true;
 }
 
 void VulkanEncoder::BindRenderTargets(const RHIRenderTargetBinding& binding)

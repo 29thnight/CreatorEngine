@@ -42,4 +42,31 @@ uint LXMeshletPrimitiveId(ByteAddressBuffer data, LXMeshletDescriptor descriptor
 {
     return data.Load(descriptor.primitives + triangle * 4u);
 }
+// Shared HW/SW geometry access. IDs are cooked geometry/LOD ordinals, never
+// descriptor indices, GPU addresses or visible-list positions. The caller owns
+// the sealed topology and posed-world vertex streams through GPU completion.
+struct LXGeometryPrimitive
+{
+    uint3 corners;          // Meshlet-local indices, exact cooked winding.
+    uint3 vertices;         // Chunk-local indices into the posed vertex stream.
+    uint3 sourceVertices;   // Original vertices within this geometry LOD.
+    uint primitiveId;
+    uint clusterId;
+    uint lodIndex;
+};
+LXGeometryPrimitive LXLoadGeometryPrimitive(ByteAddressBuffer data, LXMeshletDescriptor descriptor, uint triangle)
+{
+    LXGeometryPrimitive value;
+    value.corners = LXMeshletTriangle(data, descriptor, triangle);
+    value.vertices = uint3(LXMeshletVertex(data, descriptor, value.corners.x),
+        LXMeshletVertex(data, descriptor, value.corners.y), LXMeshletVertex(data, descriptor, value.corners.z));
+    // sourceVertexRemap parallels the meshlet vertex remap, not the chunk vertices.
+    const uint source = data.Load(64) + (descriptor.vertices - data.Load(20));
+    value.sourceVertices = uint3(data.Load(source + value.corners.x * 4u),
+        data.Load(source + value.corners.y * 4u), data.Load(source + value.corners.z * 4u));
+    value.primitiveId = LXMeshletPrimitiveId(data, descriptor, triangle);
+    value.clusterId = descriptor.clusterId;
+    value.lodIndex = descriptor.lodIndex;
+    return value;
+}
 #endif

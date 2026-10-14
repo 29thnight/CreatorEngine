@@ -296,7 +296,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         }
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph(resources);
+        EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned);
         gbuffer.Declare(graph, frameContext);
 
         const RGHandle bitmask = gbuffer.GetOutputs().bitmask;
@@ -307,7 +307,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         }
 
         graph.AddPass("Skinning.Readback",
-            { { bitmask, RHIResourceState::CopySource } },
+            { { bitmask, RHIResourceState::CopySource, RGAccessMode::Read } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,
@@ -638,7 +638,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     return false;
                 }
                 // ★ 그래프는 제출 이후까지 살아 있어야 한다.
-                EnhancedRenderGraph graph(resources);
+                EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned);
                 const RGHandle shadowMap = casters.Declare(graph, shadow, frameContext);
                 const auto outputs = casters.ShadowMeshletOutputs();
                 struct Readbacks {
@@ -651,7 +651,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     const auto& geometry = output.frame->MeshletGeometry(output.bin);
                     auto& row = lists.rows.emplace_back();
                     if (!resources.CreateBufferReadback(20, row[0], error) ||
-                        !resources.CreateBufferReadback(geometry->MeshletCount() * 4, row[1], error) ||
+                        !resources.CreateBufferReadback((geometry->MeshletCount() + 1) * 4, row[1], error) ||
                         !resources.CreateBufferReadback(geometry->Count() * sizeof(material_graph::SurfacePoint), row[2], error) ||
                         !resources.CreateBufferReadback(geometry->Meshlets().size, row[3], error)) return false;
                     std::vector<EnhancedRenderGraph::RGPassUsage> uses;
@@ -664,7 +664,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     graph.AddPass("Skinning.ShadowListReadback", uses, [output, row](const auto& execution) {
                         execution.encoder->CopyBufferToReadback(row[0], output.frame->Arguments(), output.frame->ArgsOffset(output.bin));
                         execution.encoder->CopyBufferToReadback(row[1], output.frame->VisibleIds(output.frame->MeshletOutputOffset(output.bin),
-                            output.frame->MeshletGeometry(output.bin)->MeshletCount()).buffer,
+                            output.frame->MeshletGeometry(output.bin)->MeshletCount() + 1).buffer,
                             std::uint64_t(output.frame->MeshletOutputOffset(output.bin)) * sizeof(std::uint32_t));
                         execution.encoder->CopyBufferToReadback(row[2], output.frame->MeshletGeometry(output.bin)->Buffer());
                         const auto data = output.frame->MeshletGeometry(output.bin)->Meshlets();
@@ -673,7 +673,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                 }
                 // 리드백이 소비자다 — 없으면 그래프가 그림자 패스를 걷어낸다.
                 graph.AddPass("Skinning.ShadowReadback",
-                    { { shadowMap, RHIResourceState::CopySource } },
+                    { { shadowMap, RHIResourceState::CopySource, RGAccessMode::Read } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
                         for (unsigned cascade = 0; cascade < 3; ++cascade)
@@ -707,8 +707,12 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     const auto ids = images[1].Elements<std::uint32_t>();
                     const auto points = images[2].Elements<material_graph::SurfacePoint>();
                     const auto count = geometry->MeshletCount();
-                    if (images[0].ElementCount<RHIDrawIndexedIndirectArguments>() != 1 || args[0].indexCount > count || args[0].instanceCount != 1 || args[0].firstIndex != 1 ||
-                        images[1].ElementCount<std::uint32_t>() != count || images[2].ElementCount<material_graph::SurfacePoint>() != geometry->Count()) { outLog += "Invalid shadow list capacity/arguments.\n"; return false; }
+                    if (images[1].ElementCount<std::uint32_t>() != count + 1) return false;
+                    const auto survivorCount = ids[0];
+                    if (images[0].ElementCount<RHIDrawIndexedIndirectArguments>() != 1 || survivorCount > count ||
+                        args[0].indexCount != (std::min)(survivorCount, 65535u) ||
+                        args[0].instanceCount != (std::max)(1u, (survivorCount + 65534u) / 65535u) || args[0].firstIndex != 1 ||
+                        images[2].ElementCount<material_graph::SurfacePoint>() != geometry->Count()) { outLog += "Invalid shadow list capacity/arguments.\n"; return false; }
                     const auto& topology = geometry->Input()->Meshlets();
                     if (topology.descriptors.size() != count) return false;
                     const auto& sealed = *geometry->Input();
@@ -723,9 +727,9 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                         std::to_string(output.cascade) + " bytes=" + std::to_string(packed.bytes.size()) +
                         " schema=2 profile=2 identity=exact\n";
                     std::vector<bool> survivors(count);
-                    for (unsigned i = 0; i < args[0].indexCount; ++i) {
-                        if (ids[i] >= count || survivors[ids[i]]) { outLog += "Invalid/duplicate survivor ID.\n"; return false; }
-                        survivors[ids[i]] = true;
+                    for (unsigned i = 0; i < survivorCount; ++i) {
+                        if (ids[i + 1] >= count || survivors[ids[i + 1]]) { outLog += "Invalid/duplicate survivor ID.\n"; return false; }
+                        survivors[ids[i + 1]] = true;
                     }
                     const auto& matrix = shadow.GetShadowData().lightViewProjection[output.cascade];
                     unsigned required{}, missing{}, extra{};
@@ -750,7 +754,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     outLog += "SHADOW_LIST " + std::string(suite ? "case=" + caseName + " " : "") + "label=" + label +
                         " cascade=" + std::to_string(output.cascade) + " draw=" + std::to_string(outputIndex / 3) +
                         " candidates=" + std::to_string(count) + " required=" + std::to_string(required) +
-                        " survivors=" + std::to_string(args[0].indexCount) + " missing=" + std::to_string(missing) +
+                        " survivors=" + std::to_string(survivorCount) + " missing=" + std::to_string(missing) +
                         " extra=" + std::to_string(extra) + "\n";
                     if (missing) { outLog += "CPU-required meshlet missing from GPU list.\n"; return false; }
                     if (suite && caseName == "multi" && output.cascade == 0 && count > 1 &&

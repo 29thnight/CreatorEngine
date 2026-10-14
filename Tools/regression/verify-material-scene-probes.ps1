@@ -2,9 +2,9 @@
 param(
     [ValidateSet('Debug','Release')][string]$Configuration='Release',
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [Parameter(Mandatory)][ValidateSet('--shadow-decal-only','--subsurface-only','--refraction-only','--volume-only',
+    [Parameter(Mandatory)][ValidateSet('--shadow-decal-only','--subsurface-only','--refraction-only','--refraction-film-only','--volume-only',
         '--forward-blend','--rg5-mixed','--rg5-decal','--rg5-reference','--scene-only','--lx-meshlet-only',
-        '--decal-only','--forward-transport')][string[]]$Modes,
+        '--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only')][string[]]$Modes,
     [ValidateRange(60,1800)][int]$TimeoutSeconds=1200
 )
 $ErrorActionPreference='Stop'
@@ -25,16 +25,27 @@ function Snapshot {
 $before=Snapshot
 $before|ConvertTo-Json -Depth 4|Set-Content "$out/identity-before.json"
 $required=@{
-    '--shadow-decal-only'=@('CSM_CONTRACTS_OK','SHADOW_COOKED_CLUSTER_BOUNDARY_OK','LX_MATERIAL_SCENE_SHADOW_OK','LX_MATERIAL_SCENE_DECAL_OK')
+    '--hybrid-visibility-only'=@('METEOR_HYBRID_VISIBILITY_OK frames=21 cases=7 partitions=3 validation=0')
+    '--atomic-reduction-only'=@('METEOR_ATOMIC_REDUCTION_OK permutations=24 frames=6 validation=0')
+    '--visibility-reconstruction-only'=@('METEOR_VISIBILITY_RECONSTRUCTION_OK frames=32 partitions=3 footprintFrames=8 validation=0')
+    '--hw-visibility-only'=@('METEOR_HW_VISIBILITY_OK frames=24 partitions=3 validation=0')
+    '--geometry-access-only'=@('METEOR_GEOMETRY_ACCESS_OK cases=6 lods=2 partitions=3 validation=0')
+    '--layer-bucket-only'=@('LX_LAYER_BUCKET_OK mode=1 frames=24','LX_LAYER_BUCKET_OK mode=2 frames=24')
+    '--temporal-bucket-only'=@('LX_TEMPORAL_BUCKET_OK frames=12 instances=2 submissions=1')
+    '--material-bucket-only'=@('LX_MATERIAL_BUCKET_OK frames=24','[meteor.material-buckets] commands=2 buckets=1 cpuInstanceSubmissions=0')
+    '--shadow-decal-only'=@('CSM_CONTRACTS_OK','SHADOW_MATERIAL_BUCKET_OK frames=6','[meteor.shadow-buckets] cascade=0 commands=2 buckets=1 cpuInstanceSubmissions=0','SHADOW_COOKED_CLUSTER_BOUNDARY_OK','LX_MATERIAL_SCENE_SHADOW_OK','LX_MATERIAL_SCENE_DECAL_OK')
     '--subsurface-only'=@('LX_MATERIAL_SCENE_SUBSURFACE_OK')
     '--refraction-only'=@('LX_MATERIAL_SCENE_REFRACTION_OK')
+    '--refraction-film-only'=@('LX_MATERIAL_SCENE_REFRACTION_FILM_OK frames=3')
     '--volume-only'=@('LX_MATERIAL_SCENE_VOLUME_OK')
-    '--forward-blend'=@('LX_MATERIAL_FORWARD_BLEND_OK')
+    '--forward-blend'=@('LX_MATERIAL_FORWARD_BLEND_OK','LX_BLENDED_BUCKET_OK runtime=0 frames=16','LX_BLENDED_BUCKET_OK runtime=1 frames=16')
     '--rg5-mixed'=@('RG5_MIXED_GPU_OK')
     '--rg5-decal'=@('RG5_DECAL_GPU_OK')
     '--rg5-reference'=@('LX_MATERIAL_RASTER_SURFACE_OK')
     '--scene-only'=@('LX_MATERIAL_SCENE_INTEGRATION_OK')
-    '--lx-meshlet-only'=@('LX_MESHLET_CULL_LOD_HZB_OK')
+    '--meshlet-hzb-only'=@('METEOR_MESHLET_HZB_OK cases=8','METEOR_MESHLET_TEMPORAL_OK cases=8')
+    '--lx-meshlet-only'=@('METEOR_MESHLET_HZB_OK cases=8','METEOR_MESHLET_TEMPORAL_OK cases=8','LX_MESHLET_CULL_LOD_HZB_OK','METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096')
+    '--meshlet-dispatch-only'=@('METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096')
     '--decal-only'=@('LX_MATERIAL_SCENE_DECAL_OK')
     '--forward-transport'=@('LX_MATERIAL_FORWARD_TRANSPORT_OK')
 }
@@ -63,7 +74,9 @@ foreach($mode in $Modes){
     $missing=@($required[$mode]|Where-Object {$log -notmatch ('(?m)^'+[regex]::Escape($_)+'(?: |\r?$)')})
     $passed=!$timedOut -and $proc.ExitCode -eq 0 -and !$missing.Count -and
         $log -match 'GPUValidation=on' -and $log -notmatch 'PROBE_CHECK_FAIL|RASTER_SURFACE_FAIL'
-    $runs+=@{mode=$mode;passed=$passed;exitCode=$proc.ExitCode;timedOut=$timedOut;missingMarkers=$missing}
+    $coverageNotices=[regex]::Matches($log,'(?m)^DX12_GBV_COVERAGE_LIMIT id=1044 ').Count
+    $runs+=@{mode=$mode;passed=$passed;exitCode=$proc.ExitCode;timedOut=$timedOut;missingMarkers=$missing;
+        gpuValidationCoverageNotices=$coverageNotices}
     $runs|ConvertTo-Json -Depth 5|Set-Content "$out/runs.json"
     "METEOR_PROBE_RESULT $Configuration $mode passed=$passed exit=$($proc.ExitCode)"
     if(!$passed){break}

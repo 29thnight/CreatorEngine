@@ -353,7 +353,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 fixture != 6 && fixture != 10 ? textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle : RHITextureHandle{};
             Check(host.PrepareResidency(context, input, error), "Volume residency " + error);
 
-            auto graph = std::make_shared<EnhancedRenderGraph>(device);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 pool.BeginFrame(static_cast<unsigned>(context.frameId));
@@ -379,8 +379,8 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 desc.allowDepthStencil = true;
                 desc.clearDepth = 0;
                 Check(device.CreateTexture(desc, shadowTexture, error), "Volume shadow texture");
-                shadowMap = graph->ImportTexture(shadowTexture, RHIResourceState::Common, "Probe.Volume.Shadow");
-                graph->AddPass("Probe.Volume.Shadow", {{shadowMap, RHIResourceState::DepthWrite}},
+                shadowMap = graph->Write(graph->ImportTexture(shadowTexture, RHIResourceState::Common, "Probe.Volume.Shadow"));
+                graph->AddPass("Probe.Volume.Shadow", {{shadowMap, RHIResourceState::DepthWrite, RGAccessMode::Write}},
                                [shadowMap, &device](const auto& execution) {
                                    for (unsigned slice = 0; slice < 3; ++slice)
                                    {
@@ -426,17 +426,18 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                       "Exact intersection limit rejects overflow without truncation");
             }
             gbuffer.Declare(*graph, context);
-            const auto outputs = gbuffer.GetOutputs();
+            auto outputs = gbuffer.GetOutputs();
             host.DeclareGeometry(*graph);
             host.DeclareCulling(*graph);
-            host.DeclareGBuffer(*graph, outputs);
+            outputs = host.DeclareGBuffer(*graph, outputs);
+            host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 16;
             aoDesc.format = RHIFormat::RG16Float;
             aoDesc.allowRenderTarget = true;
             aoDesc.clearColor[0] = 1;
-            const auto ao = graph->CreateTexture(aoDesc);
-            graph->AddPass("Probe.Volume.AO", {{ao, RHIResourceState::RenderTarget}}, [&](const auto& execution) {
+            const auto ao = graph->Write(graph->CreateTexture(aoDesc));
+            graph->AddPass("Probe.Volume.AO", {{ao, RHIResourceState::RenderTarget, RGAccessMode::Write}}, [&](const auto& execution) {
                 const auto texture = execution.ResolveHandle(ao);
                 const auto target = device.CreateRenderTargets({&texture, 1}, nullptr);
                 const float clear[]{1, 0, 0, 0};
@@ -451,7 +452,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(16, 16, format, 1, readbacks[i], error), "Volume readback");
                 graph->AddPass(
-                    "Probe.Volume.Texture", {{handle, RHIResourceState::CopySource}},
+                    "Probe.Volume.Texture", {{handle, RHIResourceState::CopySource, RGAccessMode::Read}},
                     [readback = readbacks[i], handle](const auto& execution) {
                         execution.encoder->CopyToReadback(readback, execution.ResolveHandle(handle));
                     },
@@ -471,11 +472,11 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             {
                 const auto refracted = host.RefractionFrame();
                 copy(4, refracted->GraphBackgroundColor(*graph), RHIFormat::RGBA16Float);
-                copy(5, graph->FindImportedTexture(refracted->Inputs()[0]), RHIFormat::RGBA32Float);
-                copy(6, graph->FindImportedTexture(refracted->Inputs()[1]), RHIFormat::RGBA32Float);
+                copy(5, refracted->GraphInputs(*graph)[0], RHIFormat::RGBA32Float);
+                copy(6, refracted->GraphInputs(*graph)[1], RHIFormat::RGBA32Float);
                 Check(device.CreateBufferReadback(16 * 16 * sizeof(SceneRefractionSample), readbacks[7], error),
                       "Volume refraction samples readback");
-                graph->AddPass("Probe.Volume.RefractionSamples", {{refracted->GraphSamples(*graph), RHIResourceState::CopySource}},
+                graph->AddPass("Probe.Volume.RefractionSamples", {{refracted->GraphSamples(*graph), RHIResourceState::CopySource, RGAccessMode::Read}},
                     [readback = readbacks[7], buffer = refracted->Samples()](const auto& execution) {
                         execution.encoder->CopyBufferToReadback(readback, buffer);
                     }, true);

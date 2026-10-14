@@ -15,6 +15,8 @@ namespace material_graph
 {
 namespace
 {
+constexpr std::uint32_t MaxCompileTargets = 64;
+
 bool Fail(std::vector<LX::LXMaterialDiagnostic>& diagnostics, std::string code, std::string message,
           LX::LXMaterialSource source = {})
 {
@@ -391,17 +393,19 @@ RHIShaderReflection LayoutReflection(const BindingLayout& layout)
         reflection.resources.push_back(std::move(cb));
     }
     const auto append = [&](const auto& table, bool texture) {
-        for (const auto& logical : table)
+        if (!table.empty())
         {
             RHIShaderResourceReflection resource;
-            resource.name = Symbol(logical);
+            resource.name = texture ? "lx_texture_table" : "lx_sampler_table";
             resource.kind = texture ? RHIShaderResourceKind::Texture : RHIShaderResourceKind::Sampler;
-            resource.registerIndex = logical.slot + (texture ? TextureRegister : SamplerRegister);
+            resource.registerIndex = texture ? TextureRegister : SamplerRegister;
+            resource.arrayElements = texture ? BindlessTextureCapacity : BindlessSamplerCapacity;
             reflection.resources.push_back(std::move(resource));
         }
     };
     append(layout.textures, true);
     append(layout.samplers, false);
+    if (!layout.textures.empty() || !layout.samplers.empty()) reflection.resources.push_back(DescriptorIndexReflection());
     return reflection;
 }
 
@@ -436,7 +440,7 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
     if (budget.compiledBytes > UINT32_MAX || program.semanticKey.empty() || program.semanticKey.size() > TextLimit ||
         program.slang.empty() || program.slang.size() > TextLimit || program.parameters.size() > 128 ||
         program.resources.size() > 128 || program.sourceMap.size() > 4096 || product.targets.empty() ||
-        product.targets.size() > 32 || product.targets.size() != product.shaders.size() ||
+        product.targets.size() > MaxCompileTargets || product.targets.size() != product.shaders.size() ||
         product.selection.reason.size() > 4096)
         return invalid();
     Capabilities capabilities;
@@ -568,14 +572,28 @@ bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capab
 std::string BuildBoundSource(const LX::LXMaterialProgram& program)
 {
     std::string source = program.slang;
+    std::string prefix;
+    if (!program.resources.empty())
+        prefix = "cbuffer LXDescriptorIndices : register(b15) { uint4 lx_descriptor_indices[32]; };\n";
+    for (const bool texture : {true, false})
+        if (std::ranges::any_of(program.resources, [texture](const auto& r) {
+            return (r.kind == LX::LXMaterialResourceKind::Texture) == texture;
+        }))
+            prefix += texture
+                ? "Texture2D<float4> lx_texture_table[4096] : register(t16384);\n"
+                : "SamplerState lx_sampler_table[36] : register(s3);\n";
     for (const auto& resource : program.resources)
     {
         const bool texture = resource.kind == LX::LXMaterialResourceKind::Texture;
         const std::string kind = texture ? "t" : "s";
-        Replace(source, "register(" + kind + std::to_string(resource.slot) + ", space1)",
-                "register(" + kind + std::to_string(resource.slot + (texture ? TextureRegister : SamplerRegister)) +
-                    ")");
+        const auto symbol = Symbol(resource);
+        const auto index = resource.slot + (texture ? 0u : 64u);
+        Replace(source, std::string(texture ? "Texture2D<float4> " : "SamplerState ") + symbol +
+            " : register(" + kind + std::to_string(resource.slot) + ", space1);",
+            "\n#define " + symbol + (texture ? " lx_texture_table[" : " lx_sampler_table[") +
+            "lx_descriptor_indices[" + std::to_string(index / 4) + "][" + std::to_string(index % 4) + "]]\n");
     }
+    source = prefix + source;
     const bool numeric =
         std::ranges::any_of(program.parameters, [](const auto& parameter) { return Numeric(parameter.type); });
     const bool textures = std::ranges::any_of(program.resources, [](const auto& resource) {
@@ -620,9 +638,16 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
 {
     BindingLayout candidate;
     const RHIShaderResourceReflection* uniforms = nullptr;
+    bool descriptorIndices{};
     std::set<std::pair<RHIShaderResourceKind, std::uint32_t>> registers;
     for (const auto& resource : reflection.resources)
     {
+        if (resource.name == "LXDescriptorIndices")
+        {
+            if (descriptorIndices || resource != DescriptorIndexReflection())
+                return Fail(diagnostics, "product.bindless", "Invalid LX descriptor index ABI; recook required.");
+            descriptorIndices = true;
+        }
         if (resource.name == "LXMaterialProperties")
         {
             if (uniforms || resource.kind != RHIShaderResourceKind::ConstantBuffer ||
@@ -635,24 +660,31 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
         }
         if (resource.name.starts_with("lx_texture_") || resource.name.starts_with("lx_sampler_"))
         {
-            const auto found = std::ranges::find_if(
-                program.resources, [&](const auto& logical) { return Symbol(logical) == resource.name; });
-            if (found == program.resources.end())
+            const bool texture = resource.name == "lx_texture_table";
+            if (!texture && resource.name != "lx_sampler_table")
                 return Fail(diagnostics, "product.resource", "Unexpected reflected LX resource: " + resource.name);
-            const bool texture = found->kind == LX::LXMaterialResourceKind::Texture;
             const auto kind = texture ? RHIShaderResourceKind::Texture : RHIShaderResourceKind::Sampler;
             const auto first = texture ? TextureRegister : SamplerRegister;
-            const auto limit = texture ? (std::min)(budget.textures, 112u) : (std::min)(budget.samplers, 125u);
-            if (resource.kind != kind || resource.registerSpace != 0 || resource.registerIndex != first + found->slot ||
-                resource.arrayElements != 1 || found->slot >= limit ||
+            const auto limit = (std::min)(texture ? budget.textures : budget.samplers, 64u);
+            if (resource.kind != kind || resource.registerSpace != 0 || resource.registerIndex != first ||
+                resource.arrayElements != (texture ? BindlessTextureCapacity : BindlessSamplerCapacity) ||
                 !registers.emplace(kind, resource.registerIndex).second)
                 return Fail(diagnostics, "product.resource",
-                            "Reflected resource differs from LX table: " + resource.name, found->source);
-            (texture ? candidate.textures : candidate.samplers).push_back(*found);
+                            "Reflected resource differs from LX bindless table: " + resource.name);
+            std::set<std::uint32_t> slots;
+            for (const auto& logical : program.resources)
+            {
+                if ((logical.kind == LX::LXMaterialResourceKind::Texture) != texture) continue;
+                if (logical.slot >= limit || !slots.insert(logical.slot).second)
+                    return Fail(diagnostics, "product.resource", "Invalid bindless logical resource slot.");
+                (texture ? candidate.textures : candidate.samplers).push_back(logical);
+            }
         }
     }
     if (candidate.textures.size() + candidate.samplers.size() != program.resources.size())
         return Fail(diagnostics, "product.resource", "Reflected shader omits a generated material resource.");
+    if (descriptorIndices != !program.resources.empty())
+        return Fail(diagnostics, "product.bindless", "Missing or unexpected descriptor index ABI.");
     std::set<LX::Id> parameterIds;
     for (const auto& parameter : program.parameters)
     {
@@ -728,7 +760,7 @@ bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages
         }
         for (const auto& resource : stage->resources)
         {
-            if (resource.name != "LXMaterialProperties" && !resource.name.starts_with("lx_texture_") &&
+            if (resource.name != "LXMaterialProperties" && resource.name != "LXDescriptorIndices" && !resource.name.starts_with("lx_texture_") &&
                 !resource.name.starts_with("lx_sampler_"))
             {
                 continue;
@@ -768,7 +800,7 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
     if (!file || !source.starts_with(BuildBoundSource(program)))
         return Fail(diagnostics, "product.source",
                     "Host shader does not contain the requested bound material program.");
-    if (targets.empty() || targets.size() > 32)
+    if (targets.empty() || targets.size() > MaxCompileTargets)
         return Fail(diagnostics, "product.target", "Material compile target count is invalid.");
     std::set<std::pair<RHIShaderBinary, std::string>> unique;
     std::map<RHIShaderBinary, unsigned> stages;
@@ -901,6 +933,7 @@ bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary back
     if (product.program.semanticKey.ends_with(SceneHostIdentity))
     {
         id.options.strictMath = id.options.fineDerivatives = true;
+        id.options.quadOperations = id.options.bufferInt64Atomics = true;
         if (!id.permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error) ||
             ((product.program.features & 0x3800u) != 0 && !id.permutation.Set("LX_MATERIAL_ROUTE", "2", error)))
             return false;
@@ -938,6 +971,7 @@ bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backe
     if (product.program.semanticKey.ends_with(SceneHostIdentity))
     {
         id.options.strictMath = id.options.fineDerivatives = true;
+        id.options.quadOperations = id.options.bufferInt64Atomics = true;
         if (!id.permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error) ||
             ((product.program.features & 0x3800u) != 0 && !id.permutation.Set("LX_MATERIAL_ROUTE", "2", error)))
             return false;
@@ -1253,7 +1287,7 @@ bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget
         }
         product.layout.textureEncodings.push_back(binding);
     }
-    if (!reader.Word(count) || count == 0 || count > 32)
+    if (!reader.Word(count) || count == 0 || count > MaxCompileTargets)
     {
         return invalid();
     }

@@ -20,12 +20,15 @@ struct RHIShaderCompileOptions
 {
     // 적분·감축처럼 부동소수점 재결합이 결과 계약을 깨는 셰이더만 켠다.
     bool strictMath{};
+    bool bufferInt64Atomics{}; // SM6.6 / SPIR-V Int64Atomics; included in cache identity
     // Generated material modules can live in the runtime cache. Their common
     // modules are resolved here; Slang reports the actual dependency files.
     std::vector<std::filesystem::path> includeDirectories;
     // Fine pixel-quad derivatives require explicit SPIR-V DerivativeControl.
     // Request the capability only for hosts that use ddx_fine/ddy_fine.
     bool fineDerivatives{};
+    // Fragment quad broadcast for visibility reconstruction; explicit SPIR-V opt-in.
+    bool quadOperations{};
 };
 
 struct RHIShaderCompileRequest

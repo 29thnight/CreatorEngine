@@ -120,6 +120,9 @@ void GeometryVisibilityCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupInde
         return;
     }
     const GeometryVisibilityCandidate candidate = geometryVisibilityCandidates[index];
+    // METEOR camera mesh bins have one owner candidate. A rejected owner must
+    // never expose an uninitialized/stale ID to the compacted mesh consumer.
+    if ((candidate.flags & 4u) != 0u) geometryVisibleIds[candidate.outputOffset] = 0xffffffffu;
     const uint preservedCount = geometryVisibilityBins[candidate.bin].preservedInstanceCount;
     if (preservedCount != 0u)
     {
@@ -149,12 +152,18 @@ void GeometryVisibilityCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupInde
     geometryVisibleIds[candidate.outputOffset + slot] = candidate.sourceIndex;
 }
 
-// Dedicated shadow compaction. Arguments use the existing 20-byte allocation;
-// DispatchMeshIndirect consumes only its first 12 bytes (survivors, 1, 1).
+// Shared camera/shadow compaction. Arguments use the 20-byte allocation;
+// DispatchMeshIndirect consumes the first 12 bytes as bounded 2D dimensions.
 #include "Includes/MaterialGraphSurfacePoint.slang"
-StructuredBuffer<LXSurfacePoint> shadowMeshletVertices : register(t18);
+StructuredBuffer<LXSurfacePoint> shadowMeshletVertices[4096] : register(t18);
 #include "Includes/LxMeshletGpuContract.slang"
-ByteAddressBuffer shadowMeshletTopology : register(t19);
+ByteAddressBuffer shadowMeshletTopology[4096] : register(t4114);
+#if defined(GEOMETRY_VISIBILITY_HISTORY)
+cbuffer MeshletHistoryProjection : register(b1) { float4 meshletHistoryColumns[4]; };
+#endif
+#if defined(GEOMETRY_VISIBILITY_RECOVERY)
+StructuredBuffer<uint> meshletFirstStage : register(t8210);
+#endif
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
@@ -166,20 +175,47 @@ void ShadowMeshletResetCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     args.indexCount = 0u; args.instanceCount = 1u; args.firstIndex = 1u;
     args.baseVertex = 0; args.firstInstance = 0u;
     geometryIndirectArguments[bin] = args;
+    geometryVisibleIds[geometryVisibilityBins[bin].firstIndex] = 0u;
 }
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
-    uint meshlet;
-    if (!GeometryVisibilityIndex(group, lane, geometryVisibilityCandidateCount, meshlet)) return;
-    const LXMeshletDescriptor descriptor = LXLoadMeshlet(shadowMeshletTopology, meshlet);
+    const uint workGroup = group.y * 65535u + group.x;
+    if (workGroup >= geometryVisibilityPadding) return;
+    // Upper-bound search over one CPU-sealed range per bin, never a per-meshlet
+    // work list. Every lane in a group selects the same two buffer descriptors.
+    uint low = 0u, high = geometryVisibilityBinCount;
+    while (low + 1u < high)
+    {
+        const uint middle = low + (high - low) / 2u;
+        if (geometryVisibilityCandidates[middle].sourceIndex <= workGroup) low = middle;
+        else high = middle;
+    }
+    const uint bin = low;
+    const uint meshlet = (workGroup - geometryVisibilityCandidates[bin].sourceIndex) * 64u + lane;
+    if (meshlet >= geometryVisibilityBins[bin].indexCount) return;
+    const uint classification = geometryVisibilityBins[bin].firstIndex + 1u +
+        geometryVisibilityBins[bin].indexCount + meshlet;
+    const bool classify = (geometryVisibilityCandidates[bin].flags & 8u) != 0u;
+    if (classify) geometryVisibleIds[classification] = 0u;
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(shadowMeshletTopology[bin], meshlet);
     const uint count = descriptor.vertexCount;
     uint outside = geometryVisibilityProjectionValid != 0u ? 63u : 0u;
+#if defined(GEOMETRY_VISIBILITY_OCCLUSION)
+    float3 minimumWorld = float3(3.402823466e+38f);
+    float3 maximumWorld = -minimumWorld;
+    bool finiteBounds = count != 0u;
+#endif
     for (uint vertex = 0u; vertex < count; ++vertex)
     {
-        const float4 position = float4(shadowMeshletVertices[LXMeshletVertex(shadowMeshletTopology, descriptor, vertex)].position.xyz, 1);
+        const float4 position = float4(shadowMeshletVertices[bin][LXMeshletVertex(shadowMeshletTopology[bin], descriptor, vertex)].position.xyz, 1);
+#if defined(GEOMETRY_VISIBILITY_OCCLUSION)
+        finiteBounds = finiteBounds && all(isfinite(position));
+        minimumWorld = min(minimumWorld, position.xyz);
+        maximumWorld = max(maximumWorld, position.xyz);
+#endif
         const float4 clip = float4(dot(position, geometryVisibilityProjectionColumns[0]),
             dot(position, geometryVisibilityProjectionColumns[1]),
             dot(position, geometryVisibilityProjectionColumns[2]), dot(position, geometryVisibilityProjectionColumns[3]));
@@ -193,9 +229,36 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     }
     if (outside == 0u)
     {
+#if defined(GEOMETRY_VISIBILITY_OCCLUSION)
+        bool testOcclusion = true;
+#if defined(GEOMETRY_VISIBILITY_RECOVERY)
+        testOcclusion = meshletFirstStage[classification] == 0u;
+#endif
+        if (testOcclusion && finiteBounds && GeometryBoxOccluded(minimumWorld, maximumWorld,
+#if defined(GEOMETRY_VISIBILITY_HISTORY)
+            meshletHistoryColumns, geometryVisibilityViewSize,
+#else
+            geometryVisibilityProjectionColumns, geometryVisibilityViewSize,
+#endif
+            geometryVisibilityOcclusionLevels, geometryVisibilityProjectionValid)) return;
+#endif
+        if (classify) geometryVisibleIds[classification] = 1u;
         uint slot;
-        InterlockedAdd(geometryIndirectArguments[geometryVisibilityPadding].indexCount, 1u, slot);
+        const uint outputOffset = geometryVisibilityBins[bin].firstIndex;
+        InterlockedAdd(geometryVisibleIds[outputOffset], 1u, slot);
         // Exactly one invocation per source meshlet; capacity equals candidates.
-        geometryVisibleIds[geometryVisibilityViewSize.x + slot] = meshlet;
+        geometryVisibleIds[outputOffset + 1u + slot] = meshlet;
     }
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void MeshletFinalizeCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
+{
+    uint bin;
+    if (!GeometryVisibilityIndex(group, lane, geometryVisibilityBinCount, bin)) return;
+    const uint count = geometryVisibleIds[geometryVisibilityBins[bin].firstIndex];
+    geometryIndirectArguments[bin].indexCount = min(count, 65535u);
+    geometryIndirectArguments[bin].instanceCount = max(1u, (count + 65534u) / 65535u);
+    geometryIndirectArguments[bin].firstIndex = 1u;
 }

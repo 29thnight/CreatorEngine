@@ -18,7 +18,8 @@ namespace material_graph
 // 13: 그림자 표본을 CascadedShadow.slang 으로 모으고 디버그 보기를 더했다.
 // 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
 // 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:22";
+// 23: camera compute meshlet IDs and GPU-finalized 2D indirect dispatch ABI.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:29";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
@@ -65,9 +66,22 @@ struct Selection
 bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capabilities, const Budget& budget,
                  Selection& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
 
-inline constexpr std::uint32_t TextureRegister = 16;
+inline constexpr std::uint32_t TextureRegister = 16384;
 inline constexpr std::uint32_t SamplerRegister = 3;
 inline constexpr std::uint32_t UniformRegister = 2;
+inline constexpr std::uint32_t DescriptorIndexRegister = 15;
+inline constexpr std::uint32_t BindlessTextureCapacity = 4096;
+inline constexpr std::uint32_t BindlessSamplerCapacity = 36;
+
+inline RHIShaderResourceReflection DescriptorIndexReflection()
+{
+    RHIShaderResourceReflection result;
+    result.name = "LXDescriptorIndices";
+    result.registerIndex = DescriptorIndexRegister;
+    result.byteSize = 512;
+    result.fields.push_back({"lx_descriptor_indices", {RHIShaderScalarKind::UInt32, 1, 4, 32}, 0, 512});
+    return result;
+}
 
 // LX's logical space1 resources are projected into the current product's
 // space0 material ranges. Resource names and source-map lines stay unchanged.
@@ -204,7 +218,9 @@ struct CookedProgram
     std::string boundSource;
 };
 
-inline constexpr std::uint32_t CookedProgramVersion = 5;
+// Scene mesh shaders consume GPU-compacted meshlet IDs and 2D indirect work.
+// Previous products cannot be rebound to this host; assets must be recooked.
+inline constexpr std::uint32_t CookedProgramVersion = 7;
 bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,

@@ -51,7 +51,7 @@ LXSceneRefractionSample LXSceneRuntimeRefraction(PrincipledIblBakePoint point, P
 
 LXSceneRuntimeEffectSample LXSceneCaptureRuntimeEffects(LXSceneVertex input, bool frontFace)
 {
-    input.clip.xy += float2(lx_effectSourceX, lx_effectSourceY);
+    if (input.reconstruction == 0u) input.clip.xy += float2(lx_effectSourceX, lx_effectSourceY);
     input = LXScenePixelCenter(input);
     LXSceneRuntimeEffectSample output = (LXSceneRuntimeEffectSample)0;
     const float area = length(cross(ddx_fine(input.position), ddy_fine(input.position)));
@@ -67,12 +67,12 @@ LXSceneRuntimeEffectSample LXSceneCaptureRuntimeEffects(LXSceneVertex input, boo
     }
     const uint2 pixel = uint2(input.clip.xy);
     const uint owner = lx_owners.Load(int3(pixel, 0));
-    if (owner != lx_drawOwner)
+    if (input.reconstruction == 0u && owner != lx_drawOwner)
     {
         discard;
     }
     const uint2 local = pixel - uint2(lx_effectSourceX, lx_effectSourceY);
-    if (local.x >= lx_effectSourceWidth || local.y >= lx_effectSourceHeight)
+    if (input.reconstruction == 0u && (local.x >= lx_effectSourceWidth || local.y >= lx_effectSourceHeight))
     {
         discard;
     }
@@ -150,8 +150,7 @@ struct LXSceneRuntimeEffects1
     float4 fields[6] : SV_Target;
 };
 
-[shader("fragment")]
-LXSceneRuntimeEffects0 LXSceneRuntimeEffects0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+LXSceneRuntimeEffects0 LXSceneRuntimeEffects0PSEvaluate(LXSceneVertex input, bool frontFace)
 {
     const LXSceneRuntimeEffectSample sample = LXSceneCaptureRuntimeEffects(input, frontFace);
     LXSceneRuntimeEffects0 output;
@@ -165,9 +164,27 @@ LXSceneRuntimeEffects0 LXSceneRuntimeEffects0PS(LXSceneVertex input, bool frontF
     output.fields[7] = sample.reflection.metalEnvironment;
     return output;
 }
-
 [shader("fragment")]
-LXSceneRuntimeEffects1 LXSceneRuntimeEffects1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+LXSceneRuntimeEffects0 LXSceneRuntimeEffects0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    if (input.reconstruction == 0u) return LXSceneRuntimeEffects0PSEvaluate(input, frontFace);
+    input.clip.xy += float2(lx_effectSourceX, lx_effectSourceY);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    LXSceneRuntimeEffects0 output = (LXSceneRuntimeEffects0)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const LXSceneRuntimeEffects0 value = LXSceneRuntimeEffects0PSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
+    return output;
+}
+
+LXSceneRuntimeEffects1 LXSceneRuntimeEffects1PSEvaluate(LXSceneVertex input, bool frontFace)
 {
     const LXSceneRuntimeEffectSample sample = LXSceneCaptureRuntimeEffects(input, frontFace);
     LXSceneRuntimeEffects1 output;
@@ -177,5 +194,24 @@ LXSceneRuntimeEffects1 LXSceneRuntimeEffects1PS(LXSceneVertex input, bool frontF
     output.fields[3] = sample.refraction.glassEnvironment;
     output.fields[4] = sample.refraction.rawTransmission;
     output.fields[5] = sample.refraction.radiance;
+    return output;
+}
+[shader("fragment")]
+LXSceneRuntimeEffects1 LXSceneRuntimeEffects1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    if (input.reconstruction == 0u) return LXSceneRuntimeEffects1PSEvaluate(input, frontFace);
+    input.clip.xy += float2(lx_effectSourceX, lx_effectSourceY);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    LXSceneRuntimeEffects1 output = (LXSceneRuntimeEffects1)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const LXSceneRuntimeEffects1 value = LXSceneRuntimeEffects1PSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
     return output;
 }

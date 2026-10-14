@@ -703,15 +703,18 @@ namespace ConsoleCmd
         return Ok(); // The command system publishes only the eventual result.
     }
 
-    // CPU packet consumption only, not GPU completion or host presentation.
+    // wait observes CPU consumption. ready observes a newer completed Editor GPU
+    // view; neither promises host presentation. No fixed warmup frame counts.
     static CommandCore::CommandResult Cmd_render_live_wait(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
+        const bool requireReady = ctx.parts[0] == "render.live.ready";
+        const char* usage = requireReady ? "render.live.ready [timeout-seconds]" : "render.live.wait [timeout-seconds]";
         constexpr int kDefaultTimeoutSeconds = 120;
         constexpr int kMaxTimeoutSeconds = 600;
         int timeoutSeconds = kDefaultTimeoutSeconds;
         if (ctx.parts.size() > 2)
-            return InvalidArguments("render.live.wait [timeout-seconds]");
+            return InvalidArguments(usage);
         if (ctx.parts.size() == 2 &&
             (!ParseNumber(ctx.parts[1], timeoutSeconds) || timeoutSeconds <= 0 ||
              timeoutSeconds > kMaxTimeoutSeconds))
@@ -727,29 +730,36 @@ namespace ConsoleCmd
         const uint64_t afterFrame = start.publishedFrameId;
         const auto began = std::chrono::steady_clock::now();
         const auto deadline = began + std::chrono::seconds(timeoutSeconds);
-        ctx.system.WaitForResult([afterFrame, began, deadline]() -> std::optional<CommandResult>
+        ctx.system.WaitForResult([afterFrame, began, deadline, requireReady]() -> std::optional<CommandResult>
         {
             const EnhancedRenderThreadStats stats = EnhancedSceneRenderer::GetLiveRenderThreadStats();
             const double waitedMs = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - began).count();
+            const auto display = requireReady ? EnhancedSceneRenderer::GetLiveDisplaySnapshot() : EnhancedLiveDisplaySnapshot{};
+            const auto& view = display.Get(EnhancedLiveDisplayTarget::Editor);
+            const auto completed = requireReady ? view.completedFrameId : stats.completedFrameId;
+            const bool ready = !requireReady || (view.active && view.ready &&
+                view.completedResizeGeneration == display.resizeGeneration &&
+                view.completedCamera.editorCameraRevision == view.sourceCameraRevision);
             auto data = CommandData::Object();
             data.Set("afterFrame", CommandData::Int(static_cast<int64_t>(afterFrame)));
-            data.Set("completionKind", CommandData::String("cpu_packet_consumed"));
-            data.Set("completedFrame", CommandData::Int(static_cast<int64_t>(stats.completedFrameId)));
+            data.Set("completionKind", CommandData::String(requireReady ? "editor_gpu_frame_completed" : "cpu_packet_consumed"));
+            data.Set("completedFrame", CommandData::Int(static_cast<int64_t>(completed)));
             data.Set("publishedFrame", CommandData::Int(static_cast<int64_t>(stats.publishedFrameId)));
             data.Set("waitedMs", CommandData::Double(waitedMs));
-            if (stats.completedFrameId > afterFrame)
+            if (ready && completed > afterFrame)
             {
-                std::printf("[CLI] render.live.wait 완료 — frame %llu > %llu · %.0f ms\n",
-                    static_cast<unsigned long long>(stats.completedFrameId),
+                std::printf("[CLI] render.live.%s 완료 — frame %llu > %llu · %.0f ms\n",
+                    requireReady ? "ready" : "wait", static_cast<unsigned long long>(completed),
                     static_cast<unsigned long long>(afterFrame), waitedMs);
-                return Ok("Live RenderThread consumed a CPU frame packet published after the wait began", std::move(data));
+                return Ok(requireReady ? "Editor GPU view completed a frame published after readiness wait began" :
+                    "Live RenderThread consumed a CPU frame packet published after the wait began", std::move(data));
             }
             if (!stats.running)
                 return Fail("render.live.not_running", "Live RenderThread stopped while waiting", std::move(data));
             if (std::chrono::steady_clock::now() < deadline) return std::nullopt;
-            return CommandResult{ CommandStatus::TimedOut, "render.live.wait.timeout",
-                "Live RenderThread did not complete a newer frame", std::move(data) };
+            return CommandResult{ CommandStatus::TimedOut, requireReady ? "render.live.ready.timeout" : "render.live.wait.timeout",
+                requireReady ? "Editor GPU view did not complete a newer matching frame" : "Live RenderThread did not complete a newer frame", std::move(data) };
         });
         return Ok(); // The command system publishes only the eventual result.
     }
@@ -1193,6 +1203,7 @@ namespace ConsoleCmd
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
         reg.Result({ "render.queue.mode" }, &Cmd_render_queue_mode, SceneAccess::OwnedState);
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
+        reg.Result({ "render.live.ready" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "render.live.fence" }, &Cmd_render_live_wait, SceneAccess::OwnedState);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.ssgi.intensity" }, &Cmd_render_ssgi_intensity, SceneAccess::OwnedState);

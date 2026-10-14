@@ -1,3 +1,5 @@
+#include "RHI/RHIShaderSource.h"
+#include "RHI/RHIModelMeshletUpload.h"
 #include "material_owner_checks.h"
 #include "MaterialGraphRasterSurface.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
@@ -45,9 +47,9 @@
 #include <utility>
 #ifdef _DEBUG
 #include <crtdbg.h>
+#endif
 #include <DbgHelp.h>
 #pragma comment(lib, "dbghelp.lib")
-#endif
 
 namespace
 {
@@ -87,7 +89,6 @@ using namespace material_graph;
 using namespace LX;
 using namespace MaterialProbe::IblReference;
 std::size_t checks{}, gpuComponents{};
-#ifdef _DEBUG
 int __cdecl ReportAssertion(int, char* message, int*)
 {
     std::cerr << message << '\n';
@@ -119,7 +120,6 @@ int __cdecl ReportAssertion(int, char* message, int*)
     }
     return FALSE;
 }
-#endif
 double maxError{}, maxColorError{};
 double maxLodError{};
 
@@ -510,7 +510,7 @@ Geometry MakeGeometry(bool nearClip, bool reverse)
 CookedMeshLibrary cookedMeshes;
 
 bool SealScene(const SceneInputView& view, std::span<const EnhancedDrawItem> draws, const SceneInputBudget& budget,
-               own::shared_owner<const SceneViewInput>& result, std::string& error)
+               own::shared_owner<const SceneViewInput>& result, std::string& error, const SceneViewInput* previous = nullptr)
 {
     std::vector<EnhancedDrawItem> cooked(draws.begin(), draws.end());
     for (auto& draw : cooked)
@@ -519,8 +519,8 @@ bool SealScene(const SceneInputView& view, std::span<const EnhancedDrawItem> dra
     assets::ModelGeometryPreparationPins geometry;
     cookedMeshes.Pin(cooked, *pins, geometry);
     if (pins->meshes.empty())
-        return SceneViewInput::Seal(view, cooked, budget, result, error);
-    return SceneViewInput::Seal(view, cooked, budget, result, error, std::move(pins), {}, &geometry);
+        return SceneViewInput::Seal(view, cooked, budget, result, error, {}, {}, nullptr, previous);
+    return SceneViewInput::Seal(view, cooked, budget, result, error, std::move(pins), {}, &geometry, previous);
 }
 
 // Independent double reference: screen barycentrics -> reciprocal-W correction.
@@ -620,6 +620,9 @@ class RecordingChangeDevice : public ProbeDevice
 {
   public:
     bool flushOnUpload{};
+    bool disableAtomic64{};
+    RHIAtomicCapabilities GetAtomicCapabilities() const override
+    { return disableAtomic64 ? RHIAtomicCapabilities{} : ProbeDevice::GetAtomicCapabilities(); }
       bool forbidAllocations{}, forbidImmediate{};
       bool trackOwnedResources{};
       unsigned textureAttempt{}, bufferAttempt{}, failTextureAt{}, failBufferAt{};
@@ -1881,7 +1884,12 @@ VerifiedProduct CookedScene(const LX::LXMaterialProgram& program, const std::str
     const bool compiled = CompileSceneProduct(program, paths->ShaderSourcePath / "DefaultPassShader",
                                               paths->CacheRoot / (name + ".slang"), {}, product, error);
     Check(compiled, "Cook Scene product " + name + ": " + error);
-    return product;
+    std::vector<uint8_t> bytes;
+    CookedProgram restored;
+    Check(WriteCookedProgram(product, {}, bytes, error), "Scene product serialization " + name + ": " + error);
+    const bool reloaded = ReadCookedProgram(bytes, {}, restored, error);
+    Check(reloaded, "Scene product reload " + name + ": " + error);
+    return std::move(restored.product);
 }
 
 own::shared_owner<const Instance> SceneInstance(const own::shared_owner<const Instance>& source, VerifiedProduct product,
@@ -1921,7 +1929,14 @@ own::shared_owner<const Instance> SceneCooked(const own::shared_owner<const Inst
     const bool compiled = CookSceneProduct(source->generation->cooked.product.program, source,
                                            "scene-" + std::to_string(cooked.size()), product, error);
     Check(compiled, "Cook Scene product " + error);
-    auto scene = SceneInstance(source, std::move(product), source->generation->generation);
+    // Exercise the same strict generated-stage contract as a cooked asset load,
+    // rather than feeding the just-compiled in-memory product straight to rendering.
+    std::vector<uint8_t> bytes;
+    CookedProgram restored;
+    Check(WriteCookedProgram(product, {}, bytes, error), "Scene cooked serialization " + error);
+    const bool reloaded = ReadCookedProgram(bytes, {}, restored, error);
+    Check(reloaded, "Scene cooked reload " + error);
+    auto scene = SceneInstance(source, std::move(restored.product), source->generation->generation);
     cooked.emplace_back(source, scene);
     return scene;
 }
@@ -2007,7 +2022,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                          ProbeTextures& textures, ProbePool& pool,
                          const std::array<own::shared_owner<const Instance>, 2>& surfaceInstances,
                          own::shared_owner<const Texture> cube, const Environment& environmentColors,
-                         const SheenTable& table, unsigned expanded = 0, bool currentFrameDepth = false)
+                         const SheenTable& table, unsigned expanded = 0, bool currentFrameDepth = true, bool temporalAudit = false,
+                         bool bucketAudit = false, bool visibilityAudit = false)
 {
     const auto instances = SceneCooked(surfaceInstances);
     std::string error;
@@ -2029,8 +2045,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     context.psoManager = &pipelines;
     context.textureCache = &textures;
     context.meshCache = &meshes;
-    context.width = expanded == 2 ? 1920 : expanded == 1 ? 128 : 24;
-    context.height = expanded == 2 ? 1080 : expanded == 1 ? 96 : 24;
+    context.width = expanded == 2 ? 1920 : expanded == 1 ? 128 : visibilityAudit ? 25 : 24;
+    context.height = expanded == 2 ? 1080 : expanded == 1 ? 96 : visibilityAudit ? 19 : 24;
     const bool inspectPoint = expanded == 1 || expanded == 3 || expanded == 4 || expanded == 5;
     FrameCameraSnapshot camera;
     camera.view = camera.projection = math::matrix4x4::identity();
@@ -2212,7 +2228,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 {
                     const unsigned corner = vertex % 3;
                     const std::array<std::array<float, 2>, 3> triangle{{{-.75f, -.75f}, {.75f, -.75f}, {0, .75f}}};
-                    geometry.points[vertex].position = {triangle[corner][0] * scale + dx, triangle[corner][1] * scale,
+                    geometry.points[vertex].position = {triangle[corner][0] * scale + dx + (visibilityAudit && vertex >= 3 ? .18f : 0.f), triangle[corner][1] * scale,
                                                         z, 0};
                     geometry.points[vertex].uvLod = {.1f, .2f, 0, 0};
                     if (expanded == 3)
@@ -2284,13 +2300,26 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             std::vector<EnhancedLight> lights{light};
             context.lights = &lights;
             SceneInputView view{context.frameId, context.sceneEpoch, 71, 1, context.width, context.height, camera};
+            if (temporalAudit && step > 0) {
+                if (fixture == 1) ++view.camera.cameraCutRevision;
+                if (fixture == 2) ++view.historyRevision;
+                if (fixture == 3) ++view.viewId;
+            }
             std::array<EnhancedDrawItem, 2> graphDraws{core.draw, layered.draw};
             std::vector<EnhancedDrawItem> lxDraws(graphDraws.begin(), graphDraws.end());
             context.draws = &lxDraws;
             if (fixture == 4)
                 std::swap(graphDraws[0], graphDraws[1]);
             own::shared_owner<const SceneViewInput> input;
-            Check(SealScene(view, graphDraws, {}, input, error), "Scene composition seal " + error);
+            SceneInputBudget geometryBudget;
+            if (visibilityAudit && step % 3 != 0) {
+                experiment::MeshletBuildSettings settings; settings.maxVertices = 3;
+                for (auto& draw : graphDraws)
+                    Check(cookedMeshes.Resolve(draw.modelMeshView, draw.modelMeshView, error, settings), "Visibility fixture recook " + error);
+                if (step % 3 == 2) geometryBudget.mesh.maxChunkPoints = 3;
+            }
+            const bool sceneSealed = SealScene(view, graphDraws, geometryBudget, input, error);
+            Check(sceneSealed, "Scene composition seal " + error);
             own::shared_owner<const Instance> selectedCore;
             if (expanded == 4)
             {
@@ -2390,6 +2419,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             host.DeclareGeometry(*graph);
             host.DeclareCulling(*graph);
             const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
+            host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = context.width;
             aoDesc.height = context.height;
@@ -2415,10 +2445,10 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 
 
             lighting = SceneHost::DeclareHdrTarget(*graph, context);
-            std::array<RHIReadback, 5> readbacks;
+            std::array<RHIReadback, 6> readbacks;
             const std::array formats{RHIFormat::RGBA16Float, RHIFormat::RGBA16Float, RHIFormat::R32Uint,
-                                     RHIFormat::D32Float, RHIFormat::D32Float};
-            for (unsigned i = 0; i < 5; ++i)
+                                     RHIFormat::D32Float, RHIFormat::D32Float, RHIFormat::RG32Uint};
+            for (unsigned i = 0; i < readbacks.size(); ++i)
                 Check(device.CreateReadback(context.width, context.height, formats[i], 1, readbacks[i], error),
                       "Scene readback allocation");
             const auto copy = [&](unsigned index, RGHandle handle) {
@@ -2432,6 +2462,34 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             };
             copy(0, lighting);
             copy(3, outputs.depth);
+            copy(5, outputs.visibility);
+            const auto frameGeometry = host.FrameGeometry();
+            Check(frameGeometry && frameGeometry->records.size() == frameGeometry->geometry.size(), "Pinned frame geometry identities");
+            if (visibilityAudit) Check(frameGeometry->records.size() == (step % 3 == 2 ? 5u : 3u),
+                "Frame geometry index separates two instances and partitioned chunks");
+            const auto materialWork = host.MaterialWork();
+            Check(bool(materialWork), "GPU material tile work exists");
+            RHIReadback tileReadback, tileArguments;
+            Check(device.CreateBufferReadback(materialWork->commandBytes,tileArguments,error), "Material indirect readback");
+            graph->AddPass("Probe.Material.Arguments", {{materialWork->graphArguments,RHIResourceState::CopySource,
+                currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}}, [materialWork,tileArguments](const auto& execution) {
+                    execution.encoder->CopyBufferToReadback(tileArguments,materialWork->arguments);
+                },true);
+            Check(device.CreateBufferReadback(materialWork->workBytes, tileReadback, error), "Material tile work readback");
+            graph->AddPass("Probe.Material.Tiles", {{materialWork->graphWork, RHIResourceState::CopySource,
+                currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
+                [materialWork,tileReadback](const auto& execution) {
+                    execution.encoder->CopyBufferToReadback(tileReadback,materialWork->work);
+                },true);
+            RHIReadback geometryReadback;
+            const auto geometryBytes = frameGeometry->records.size() * sizeof(SceneFrameGeometry::Record);
+            Check(device.CreateBufferReadback(geometryBytes, geometryReadback, error), "Frame geometry table readback");
+            const auto geometryHandle = frameGeometry->GraphTable(*graph);
+            graph->AddPass("Probe.Geometry.Table.Readback", {{geometryHandle, RHIResourceState::CopySource,
+                currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
+                [frameGeometry, geometryReadback](const auto& execution) {
+                    execution.encoder->CopyBufferToReadback(geometryReadback, frameGeometry->buffer);
+                }, true);
 #ifndef LX_PROBE_VULKAN
             Microsoft::WRL::ComPtr<ID3D12QueryHeap> timer;
             RHIReadback timerReadback;
@@ -2464,29 +2522,29 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     Check(device.CreateReadback(context.width, context.height, RHIFormat::RGBA32Float, 1,
                                                 pointReadbacks[field], error),
                           "Scene lookup point readback");
-                    const auto resource = graph->FindImportedTexture(lookup->Inputs()[field]);
+                    const auto resource = lookup->GraphInputs(*graph)[field];
                     graph->AddPass(
-                        "Probe.Scene.LookupPointReadback", {{resource, RHIResourceState::CopySource}},
+                        "Probe.Scene.LookupPointReadback", {{resource, RHIResourceState::CopySource, RGAccessMode::Read}},
                         [readback = pointReadbacks[field], resource](const auto& execution) {
                             execution.encoder->CopyToReadback(readback, execution.ResolveHandle(resource));
                         },
                         true);
                     graph->AddPass(
-                        "Probe.Scene.LookupPointRestore", {{resource, RHIResourceState::ShaderResource}},
+                        "Probe.Scene.LookupPointRestore", {{resource, RHIResourceState::ShaderResource, RGAccessMode::Read}},
                         [](const auto&) {}, true);
                 }
                 Check(device.CreateBufferReadback(std::uint64_t(context.width) * context.height * sizeof(IblBakeSample),
                                                   sampleReadback, error),
                       "Scene lookup sample readback");
                 graph->AddPass(
-                    "Probe.Scene.LookupSampleReadback", {{lookup->GraphSamples(*graph), RHIResourceState::CopySource}},
+                    "Probe.Scene.LookupSampleReadback", {{lookup->GraphSamples(*graph), RHIResourceState::CopySource, RGAccessMode::Read}},
                     [sampleReadback, buffer = lookup->Samples()](const auto& execution) {
                         execution.encoder->CopyBufferToReadback(sampleReadback, buffer);
                     },
                     true);
                 graph->AddPass(
                     "Probe.Scene.LookupSampleRestore",
-                    {{lookup->GraphSamples(*graph), RHIResourceState::ShaderResource}}, [](const auto&) {}, true);
+                    {{lookup->GraphSamples(*graph), RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
             }
 #ifndef LX_PROBE_VULKAN
             if (expanded == 2)
@@ -2511,6 +2569,44 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     execution.encoder->CopyBufferToReadback(lookupReadback, buffer);
                 },
                 true);
+            struct CameraWorkReadback { std::array<RHIReadback, 6> buffers; uint32_t bin; };
+            std::vector<CameraWorkReadback> cameraWorkReadbacks;
+            const auto cameraWork = currentFrameDepth ? host.CameraDepthMeshletWork() : nullptr;
+            if (temporalAudit && cameraWork) {
+                if (step == 1 && fixture >= 1 && fixture <= 3)
+                    Check(!cameraWork->UsesHistory(), "Camera cut, history revision and view change invalidate HZB");
+                if (step == 2 || (fixture == 0 && step == 1))
+                    Check(cameraWork->UsesHistory(), "Completed accepted HZB is reused by the next stable view");
+            }
+            if (cameraWork) for (uint32_t bin = 0; bin < cameraWork->GetPreparedStats().compactedBins; ++bin)
+            {
+                const auto geometry = cameraWork->MeshletGeometry(bin);
+                const auto ids = cameraWork->VisibleIds(cameraWork->MeshletOutputOffset(bin), geometry->MeshletCount() + 1);
+                const auto topology = geometry->Meshlets();
+                const auto finalWork = host.CameraMeshletWork();
+                const auto finalIds = finalWork->VisibleIds(finalWork->MeshletOutputOffset(bin), geometry->MeshletCount() + 1);
+                CameraWorkReadback audit{{}, bin};
+                const std::array<uint64_t, 6> sizes{ids.size, sizeof(RHIDrawIndexedIndirectArguments),
+                    uint64_t(geometry->Count()) * sizeof(SurfacePoint), topology.size, finalIds.size, sizeof(RHIDrawIndexedIndirectArguments)};
+                const std::array<RHIBufferHandle, 6> buffers{ids.buffer, cameraWork->Arguments(), geometry->Buffer(), topology.buffer, finalIds.buffer, finalWork->Arguments()};
+                const std::array<uint64_t, 6> offsets{ids.offset, cameraWork->ArgsOffset(bin), 0, topology.offset, finalIds.offset, finalWork->ArgsOffset(bin)};
+                std::vector<EnhancedRenderGraph::RGPassUsage> workReads;
+                cameraWork->AddReadUsages(*graph, workReads);
+                std::vector<EnhancedRenderGraph::RGPassUsage> finalReads;
+                finalWork->AddReadUsages(*graph, finalReads);
+                const std::array<RGHandle, 6> versions{workReads[1].handle, workReads[0].handle,
+                    geometry->GraphOutput(*graph), geometry->GraphMeshlets(*graph), finalReads[1].handle, finalReads[0].handle};
+                std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                for (unsigned i = 0; i < 6; ++i) {
+                    Check(device.CreateBufferReadback(sizes[i], audit.buffers[i], error), "Camera work readback allocation");
+                    uses.push_back({versions[i], RHIResourceState::CopySource, RGAccessMode::Read});
+                }
+                graph->AddPass("Probe.CameraMeshletWork", uses, [audit, buffers, offsets, sizes](const auto& execution) {
+                    for (unsigned i = 0; i < 6; ++i)
+                        execution.encoder->CopyBufferToReadback(audit.buffers[i], buffers[i], offsets[i], sizes[i]);
+                }, true);
+                cameraWorkReadbacks.push_back(audit);
+            }
             for (bool otherGraph : {false, true})
             {
                 EnhancedRenderGraph unrelated(device);
@@ -2534,6 +2630,50 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             error.clear();
             const bool graphCompiled = graph->Compile(error);
             Check(graphCompiled, "Scene composition graph compile " + error);
+            if (visibilityAudit || expanded == 3) {
+                EnhancedRenderGraph::DiagnosticSnapshot wiring;
+                Check(graph->CaptureDiagnosticSnapshot(wiring), "Reconstruction graph diagnostic snapshot");
+                const auto find = [&](std::string_view name) -> const EnhancedRenderGraph::DiagnosticPass& {
+                    const auto found = std::ranges::find(wiring.passes, name, &EnhancedRenderGraph::DiagnosticPass::name);
+                    Check(found != wiring.passes.end(), "Required reconstruction producer/consumer " + std::string(name));
+                    return *found;
+                };
+                const auto& raster = find("METEOR.Scene.Visibility.HW");
+                const auto& countTiles = find("METEOR.Scene.Material.CountTiles");
+                const auto& ranges = find("METEOR.Scene.Material.BuildRanges");
+                const auto& scatter = find("METEOR.Scene.Material.ScatterTiles");
+                const auto& resolve = find("METEOR.Scene.Material.Resolve");
+                const auto& upload = find("METEOR.Scene.Geometry.Table.Upload");
+                const auto readsFrameTable = [&](const auto& pass) {
+                    return std::ranges::any_of(pass.usages, [&](const auto& use) {
+                        return use.resource == frameGeometry->GraphTable(*graph).index &&
+                            use.state == RHIResourceState::ShaderResource;
+                    });
+                };
+                Check(readsFrameTable(countTiles) && readsFrameTable(scatter) && !readsFrameTable(ranges) &&
+                    upload.compiledIndex < countTiles.compiledIndex,
+                    "Only address lookup stages read the explicitly uploaded frame table");
+                Check(raster.compiledIndex < countTiles.compiledIndex && countTiles.compiledIndex < ranges.compiledIndex &&
+                    ranges.compiledIndex < scatter.compiledIndex && scatter.compiledIndex < resolve.compiledIndex,
+                    "Explicit visibility -> count -> ranges -> scatter -> material consumer");
+                Check(std::ranges::none_of(wiring.passes, [](const auto& pass) {return pass.name=="METEOR.Scene.Commands.Reconstruct.Build";}),
+                    "No obsolete Cull reconstruction command producer");
+                const auto& color = find("METEOR.Scene.Color");
+                Check(std::ranges::count(raster.usages, RHIResourceState::RenderTarget, &EnhancedRenderGraph::DiagnosticUsage::state) == 0,
+                    "HW raster writes atomic keys without attachment dependencies");
+                const auto readsVisibility = [&](const auto& pass) {
+                    return std::ranges::any_of(pass.usages, [&](const auto& use) {
+                        return use.resource == outputs.visibility.index && use.state == RHIResourceState::PixelShaderResource;
+                    });
+                };
+                Check(readsVisibility(resolve) && readsVisibility(color), "Material and lighting consume hardware visibility");
+                Check(raster.compiledIndex < resolve.compiledIndex && resolve.compiledIndex < color.compiledIndex,
+                    "RenderPassGraph orders visibility, reconstruction and lighting");
+                Check(std::ranges::none_of(wiring.passes, [](const auto& pass) {
+                    return pass.name == "METEOR.Scene.GBuffer" || pass.name == "METEOR.Scene.LookupCapture";
+                }), "Opaque path contains no material geometry reraster or old lookup capture");
+            }
+
             RHICompletionPoint graphCompletion;
             RHISubmissionTicket graphTicket;
             std::unique_ptr<SceneSubmissionGate> submissionGate;
@@ -2607,6 +2747,67 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             }
             device.WaitForGpu();
             Check(GetRHISubmissionThread().Drain(&device, error), "Scene submission retirement");
+            for (const auto& audit : cameraWorkReadbacks)
+            {
+                std::array<RHIReadbackImage, 6> mapped;
+                for (unsigned i = 0; i < 6; ++i)
+                    Check(device.MapReadback(audit.buffers[i], mapped[i], error), "Camera work readback map");
+                const auto word = [](const RHIReadbackImage& data, size_t offset) {
+                    uint32_t value; std::memcpy(&value, data.data.data() + offset, 4); return value;
+                };
+                const auto count = word(mapped[0], 0);
+                const auto geometry = cameraWork->MeshletGeometry(audit.bin);
+                Check(count <= geometry->MeshletCount(), "GPU meshlet count cannot exceed capacity");
+                Check(word(mapped[1], 0) == (std::min)(count, 65535u) &&
+                    word(mapped[1], 4) == (std::max)(1u, (count + 65534u) / 65535u) &&
+                    word(mapped[1], 8) == 1u, "GPU work count produces bounded 2D indirect arguments count=" +
+                        std::to_string(count) + " args=" + std::to_string(word(mapped[1], 0)) + "," +
+                        std::to_string(word(mapped[1], 4)) + "," + std::to_string(word(mapped[1], 8)));
+                std::set<uint32_t> actual, expected;
+                for (uint32_t i = 0; i < count; ++i)
+                    Check(actual.insert(word(mapped[0], (i + 1) * 4)).second, "GPU work list contains no duplicate meshlets");
+                for (uint32_t meshlet = 0; meshlet < geometry->MeshletCount(); ++meshlet)
+                {
+                    const auto descriptor = word(mapped[3], 12) + meshlet * word(mapped[3], 16);
+                    const auto remap = word(mapped[3], 20) + word(mapped[3], descriptor) * 4u;
+                    const auto vertices = word(mapped[3], descriptor + 12);
+                    uint32_t outside = 63;
+                    for (uint32_t vertex = 0; vertex < vertices; ++vertex)
+                    {
+                        SurfacePoint point;
+                        std::memcpy(&point, mapped[2].data.data() + word(mapped[3], remap + vertex * 4u) * sizeof(point), sizeof(point));
+                        float clip[4];
+                        const auto& matrix = input->ViewProjection();
+                        for (unsigned c = 0; c < 4; ++c)
+                            clip[c] = point.position[0] * matrix.m[0][c] + point.position[1] * matrix.m[1][c] +
+                                point.position[2] * matrix.m[2][c] + matrix.m[3][c];
+                        uint32_t mask = 0;
+                        if (std::ranges::all_of(clip, [](float v) { return std::isfinite(v); })) {
+                            const auto epsilon = (std::max)({1.f, std::abs(clip[0]), std::abs(clip[1]), std::abs(clip[2]), std::abs(clip[3])}) * .00001f;
+                            mask = (clip[0] < -clip[3]-epsilon ? 1u : 0u) | (clip[0] > clip[3]+epsilon ? 2u : 0u) |
+                                (clip[1] < -clip[3]-epsilon ? 4u : 0u) | (clip[1] > clip[3]+epsilon ? 8u : 0u) |
+                                (clip[2] < -epsilon ? 16u : 0u) | (clip[2] > clip[3]+epsilon ? 32u : 0u);
+                        }
+                        outside &= mask;
+                    }
+                    if (!outside) expected.insert(meshlet);
+                }
+                Check(cameraWork->UsesHistory() ? std::ranges::all_of(actual, [&](auto id) { return expected.contains(id); }) :
+                    actual == expected, "GPU first-stage IDs respect independent posed-vertex clip replay");
+                const auto finalCount = word(mapped[4], 0);
+                Check(finalCount >= count && finalCount <= expected.size(), "Recovery retains first-stage work within frustum capacity");
+                std::set<uint32_t> finalSet;
+                for (uint32_t i = 0; i < finalCount; ++i) {
+                    const auto id = word(mapped[4], (i + 1) * 4);
+                    Check(expected.contains(id) && finalSet.insert(id).second, "HZB IDs are unique frustum survivors");
+                }
+                Check(std::ranges::all_of(actual, [&](auto id) { return finalSet.contains(id); }),
+                    "Recovery union retains every first-stage survivor");
+                Check(word(mapped[5], 0) == (std::min)(finalCount, 65535u) &&
+                    word(mapped[5], 4) == (std::max)(1u, (finalCount + 65534u) / 65535u) &&
+                    word(mapped[5], 8) == 1, "HZB GPU count drives final indirect work");
+                for (auto readback : audit.buffers) device.ReleaseReadback(readback);
+            }
 #ifdef LX_PROBE_VULKAN
             Check(pool.GetEncoderUnimplementedCount() == 0 && device.GetEncoderUnimplementedCount() == 0,
                   "Scene recording must not drop native Vulkan operations");
@@ -2644,7 +2845,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                               : expanded == 1 ? step == 1 || step == 3 || step == 6 || step == 8
                               : expanded == 3 ? step == 1 || step == 2 || step == 4 || step == 7
                                               : step > 0;
-            if (warm)
+            if (warm && !(temporalAudit && step == 1 && fixture >= 1 && fixture <= 3))
                 Check(stats.baked == 0 && stats.reused == stats.visible,
                       "Unchanged Scene pixels reuse exact IBL for all worker modes");
             if (expanded == 1 && (step == 0 || step == 2 || step == 7 || step == 9))
@@ -2683,7 +2884,25 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 ++sceneLookupMutationFrames;
             if (expanded == 3)
                 ++sceneTextureFrames;
-            std::array<RHIReadbackImage, 5> mapped;
+            RHIReadbackImage geometryImage;
+            Check(device.MapReadback(geometryReadback, geometryImage, error) &&
+                std::memcmp(geometryImage.data.data(), frameGeometry->records.data(), geometryBytes) == 0,
+                "GPU frame table exactly matches its sealed CPU geometry identities");
+            for (size_t recordIndex = 1; recordIndex < frameGeometry->records.size(); ++recordIndex) {
+                const auto& record = frameGeometry->records[recordIndex];
+                const auto sourceIndex = record.owner - 0x80000001u;
+                Check(sourceIndex < input->Draws().size(), "Geometry table owner maps to sealed input");
+                const auto& source = input->Draws()[sourceIndex];
+                Check(record.identity.geometryKey == source.geometryKey && record.identity.objectId == source.temporalObjectId &&
+                    record.identity.incarnation == source.temporalIncarnation && record.identity.instanceId == source.temporalInstanceId &&
+                    record.identity.materialSlot == source.materialSlot && record.identity.lodIndex == source.geometry->Source()->Geometry().sourceLodIndex &&
+                    record.identity.primitiveCount == source.geometry->Source()->SourcePrimitiveCount(),
+                    "Full geometry identity survives frame-local table indexing");
+                Check(record.chunkIndex < source.geometry->Chunks().size() &&
+                    frameGeometry->geometry[recordIndex]->Input() == source.geometry->Chunks()[record.chunkIndex].input,
+                    "Frame table pins exact posed chunk and cooked topology");
+            }
+            std::array<RHIReadbackImage, 6> mapped;
             std::array<RHIReadbackImage, 11> mappedPoint;
             RHIReadbackImage mappedSample;
             if (inspectPoint)
@@ -2693,10 +2912,55 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                           "Scene lookup point map");
                 Check(device.MapReadback(sampleReadback, mappedSample, error), "Scene lookup sample map");
             }
-            for (unsigned i = 0; i < 5; ++i)
+            for (unsigned i = 0; i < readbacks.size(); ++i)
                 Check(device.MapReadback(readbacks[i], mapped[i], error), "Scene readback map");
+            RHIReadbackImage tileImage;
+            Check(device.MapReadback(tileReadback,tileImage,error), "Material tile list map");
+            const auto tileWord = [&](size_t index) {
+                uint32_t value{}; Check((index+1)*4 <= tileImage.data.size(), "Material tile list bounds");
+                std::memcpy(&value,tileImage.data.data()+index*4,4); return value;
+            };
+            Check(tileWord(0)==context.width && tileWord(1)==context.height &&
+                tileWord(2)==frameGeometry->records.size(), "Material tile header matches frame");
+            std::vector<std::set<uint32_t>> expectedTiles(frameGeometry->records.size());
+            for (unsigned y=0; y<context.height; ++y) for (unsigned x=0; x<context.width; ++x) {
+                uint32_t record{};
+                std::memcpy(&record,mapped[5].data.data()+y*mapped[5].rowPitch+x*8,4);
+                record = frameGeometry->FindRecord(record);
+                Check(record<expectedTiles.size(), "Visibility tile owner is in frame");
+                if(record) expectedTiles[record].insert((y/8)*((context.width+7)/8)+x/8);
+            }
+            uint32_t prefix{};
+            const auto records = expectedTiles.size();
+            for(size_t record=0; record<records; ++record) {
+                const auto count=tileWord(4+record), offset=tileWord(4+records+record);
+                Check(count==expectedTiles[record].size() && offset==prefix && tileWord(4+2*records+record)==count,
+                    "Exact GPU material tile count, prefix and scatter cursor");
+                std::set<uint32_t> actual;
+                for(uint32_t i=0;i<count;++i) Check(actual.insert(tileWord(4+3*records+offset+i)).second,
+                    "No duplicate material tile work");
+                Check(actual==expectedTiles[record], "GPU tile list exactly matches visible pixels; no missing or extra tiles");
+                prefix+=count;
+            }
+            RHIReadbackImage argumentImage;
+            Check(device.MapReadback(tileArguments,argumentImage,error), "Material indirect argument map");
+            for(uint32_t index=0; index<materialWork->commandCount; ++index) {
+                std::array<uint32_t,4> command;
+                std::memcpy(command.data(),static_cast<const uint8_t*>(materialWork->records.cpuAddress)+index*16,16);
+                const auto count=static_cast<uint32_t>(expectedTiles.at(command[3]).size());
+                std::array<uint32_t,3> dispatch;
+                std::memcpy(dispatch.data(),argumentImage.data.data()+command[1]+command[2]*4,12);
+                Check(dispatch==std::array<uint32_t,3>{(std::min)(count,65535u),(std::max)(1u,(count+65534u)/65535u),1u},
+                    "Visible tile counts alone drive indirect mesh work");
+                Check(std::memcmp(argumentImage.data.data()+command[1],
+                    static_cast<const uint8_t*>(materialWork->templates.cpuAddress)+command[0],command[2]*4)==0,
+                    "GPU material commands retain exact geometry and material roots");
+            }
+            device.ReleaseReadback(tileArguments);
+            device.ReleaseReadback(tileReadback);
             std::array<unsigned, 2> visible{};
             unsigned backgroundPixels{};
+            std::array<unsigned, 2> primitivePixels{};
             for (unsigned y = 0; y < context.height; ++y)
             {
                 Check(std::memcmp(mapped[3].data.data() + y * mapped[3].rowPitch,
@@ -2706,6 +2970,40 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 {
                     const auto owner =
                         reinterpret_cast<const std::uint32_t*>(mapped[2].data.data() + y * mapped[2].rowPitch)[x];
+                    const auto* visibilityPixel = reinterpret_cast<const uint32_t*>(mapped[5].data.data() + y * mapped[5].rowPitch) + x * 2;
+                    if (owner == 0) Check(visibilityPixel[0] == 0 && visibilityPixel[1] == 0, "Background visibility sentinel stays clear");
+                    else {
+                        const uint32_t recordIndex = frameGeometry->FindRecord(visibilityPixel[0]);
+                        Check(recordIndex != 0, "Frame primitive address resolves without truncation");
+                        const uint32_t local = visibilityPixel[0] - frameGeometry->records[recordIndex].identity.reserved[1];
+                        const uint32_t meshletIndex = local >> 7, triangle = local & 127;
+                        uint32_t depthBits{};
+                        std::memcpy(&depthBits, mapped[3].data.data() + y * mapped[3].rowPitch + x * 4, 4);
+                        Check(visibilityPixel[1] == depthBits, "Visibility key contains the exact merged winning depth bits");
+                        Check(recordIndex > 0 && recordIndex < frameGeometry->records.size(), "Visible record index is in this frame");
+                        const auto& record = frameGeometry->records[recordIndex];
+                        Check(record.owner == owner && meshletIndex < record.meshletCount, "Visibility and depth winner select the same geometry owner");
+                        const auto& topology = frameGeometry->geometry[recordIndex]->Input()->Meshlets();
+                        const auto& descriptor = topology.descriptors[meshletIndex];
+                        Check(triangle < descriptor.triangleCount &&
+                            topology.primitiveRemap[descriptor.primitiveOffset + triangle] < record.identity.primitiveCount,
+                            "Visibility resolves to a valid cooked primitive, not compacted dispatch ordinal");
+                        if (visibilityAudit) {
+                            const auto primitive = topology.primitiveRemap[descriptor.primitiveOffset + triangle];
+                            Check(primitive < 2, "Known authored primitive namespace");
+                            ++primitivePixels[primitive];
+                            const auto& authored = record.identity.geometryKey == core.draw.geometryKey ? core : layered;
+                            const auto& a = authored.points[primitive * 3].position;
+                            const auto& b = authored.points[primitive * 3 + 1].position;
+                            const auto& c = authored.points[primitive * 3 + 2].position;
+                            const double px = (x + .5) / context.width * 2 - 1, py = 1 - (y + .5) / context.height * 2;
+                            const double det = (b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);
+                            const double wa = ((b[1]-c[1])*(px-c[0])+(c[0]-b[0])*(py-c[1]))/det;
+                            const double wb = ((c[1]-a[1])*(px-c[0])+(a[0]-c[0])*(py-c[1]))/det;
+                            Check(wa >= -.005 && wb >= -.005 && wa+wb <= 1.005,
+                                "Visibility primitive independently covers the HW pixel center");
+                        }
+                    }
                     if ((owner & 0x80000000u) == 0)
                     {
                         for (unsigned c = 0; c < 4; ++c)
@@ -2732,7 +3030,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                                                                                                                 : 1.3f)
                                       : expanded == 1 && tier == 0 && step >= 4 ? 1.7f
                                                                                 : 1.3f;
-                    auto point = ExpectedPoint(spatial, input->Surface(), ior, .5f, tier == 1);
+                    auto point = ExpectedPoint(spatial, input->Surface(), bucketAudit && tier == 1 ? 1.9f : ior,
+                        .5f, !bucketAudit && tier == 1);
                     point.metalIorLevelAo[3] = occlusion;
                     if (expanded == 3)
                     {
@@ -2880,9 +3179,11 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(visible[fixture == 4 ? 0 : 1] == 0, "Coplanar color cannot overwrite the depth winner");
             if (fixture == 5)
                 Check(visible[0] == 0, "METEOR masked alpha discards without stealing depth or color");
+            if (visibilityAudit) Check(primitivePixels[0] > 0 && primitivePixels[1] > 0, "Both authored triangles produce visible primitive addresses");
             Check(backgroundPixels > 5, "METEOR clear covers pixels outside graph surfaces");
             for (auto& readback : readbacks)
                 device.ReleaseReadback(readback);
+            device.ReleaseReadback(geometryReadback);
             graph.reset();
             ++sceneCompositionFrames;
             if (expanded == 4)
@@ -2966,6 +3267,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 #include "material_scene_volume_tests.inl"
 #include "csm_vulkan_inflight.inl"
 #include "material_scene_shadow_decal_tests.inl"
+#include "material_temporal_bucket_tests.inl"
 #include "material_scene_decal_tests.inl"
 #include "material_forward_blend_tests.inl"
 #include "material_forward_transport_tests.inl"
@@ -3266,6 +3568,73 @@ void RunIssueResourceLifetime(RecordingChangeDevice& device, ProbeRoots& roots, 
     std::cout << "ISSUE_RESOURCE_LIFETIME_OK ssgiFailurePoints=3 fogFailurePoints=2 fogCycles=6 forwardFailurePoints=2 validation=0\n";
 }
 
+void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines)
+{
+    const std::array<uint32_t, 5> counts{0, 1, 65535, 65536, 131071};
+    std::string error;
+    LX::Runtime::CompiledCompute compiled;
+    RHIShaderCompileOptions options; options.strictMath = true;
+    Check(LX::Runtime::CompileCompute(RHIShaderSource::Resolve("GeometryVisibility.slang").string(),
+        "MeshletFinalizeCS", {}, options, compiled, error), "Meshlet finalize compile " + error);
+    const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(1), RHILayout::UavBufferTable(2, 0)};
+    const auto layout = roots.GetOrCreate({params, {}}, error);
+    LX::Runtime::ComputePipeline pipeline;
+    RHIComputePipelineDesc desc; desc.layout = layout;
+    desc.csBytecode = compiled.stage.bytecode.Data(); desc.csSize = compiled.stage.bytecode.Size();
+    Check(pipeline.Create(pipelines, desc, std::move(compiled.description), error), "Meshlet finalize pipeline " + error);
+    RHIBufferHandle ids, args;
+    RHIBufferDesc buffer; buffer.allowUnorderedAccess = true; buffer.bytes = sizeof(counts);
+    Check(device.CreateBuffer(buffer, ids, error), "Meshlet boundary counts buffer");
+    buffer.bytes = counts.size() * sizeof(RHIDrawIndexedIndirectArguments); buffer.allowIndirectArguments = true;
+    Check(device.CreateBuffer(buffer, args, error), "Meshlet boundary argument buffer");
+    RHIReadback readback;
+    Check(device.CreateBufferReadback(buffer.bytes, readback, error) && device.BeginFrame(error), "Meshlet boundary frame");
+    std::array<uint32_t, 48> constants{}; constants[25] = static_cast<uint32_t>(counts.size());
+    const auto uniform = device.UploadConstants(constants.data(), sizeof(constants));
+    std::array<GpuGeometryVisibility::Bin, 5> bins{};
+    for (uint32_t i = 0; i < bins.size(); ++i) bins[i].firstIndex = i;
+    const auto upload = [&](const void* data, size_t bytes) {
+        auto slice = device.AllocateUpload({bytes, RHIUploadUsage::Raw, 256});
+        Check(slice.IsWritable(), "Meshlet boundary sealed upload"); std::memcpy(slice.cpuAddress, data, bytes); return slice;
+    };
+    const auto binUpload = upload(bins.data(), sizeof(bins));
+    const auto countUpload = upload(counts.data(), sizeof(counts));
+    const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(ids, counts.size(), 4),
+        RHIBindingDesc::UavBuffer(args, counts.size(), sizeof(RHIDrawIndexedIndirectArguments))};
+    const auto table = device.CreateBindings(outputs);
+    Check(table.IsValid() && uniform.IsValid(), "Meshlet boundary bindings");
+    auto& encoder = device.GetImmediateEncoder();
+    const RHIBufferTransition before[]{{ids, RHIResourceState::Common, RHIResourceState::CopyDest},
+        {args, RHIResourceState::Common, RHIResourceState::UnorderedAccess}};
+    encoder.ResourceBarriers({{}, before});
+    RHIBufferSlice destination; destination.buffer = ids; destination.size = sizeof(counts);
+    Check(encoder.CopyBuffer(destination, countUpload), "Meshlet boundary count copy");
+    const RHIBufferTransition ready{ids, RHIResourceState::CopyDest, RHIResourceState::UnorderedAccess};
+    encoder.ResourceBarriers({{}, {&ready, 1}});
+    encoder.SetPipeline(RHIBindPoint::Compute, pipeline.GetGeneration()->GetHandle());
+    encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform);
+    encoder.SetRootBuffer(RHIBindPoint::Compute, 1, binUpload);
+    encoder.SetBindings(RHIBindPoint::Compute, 2, table); encoder.Dispatch(1, 1, 1);
+    const RHIBufferTransition copied{args, RHIResourceState::UnorderedAccess, RHIResourceState::CopySource};
+    encoder.ResourceBarriers({{}, {&copied, 1}}); encoder.CopyBufferToReadback(readback, args);
+    Check(device.EndFrame(error), "Meshlet boundary submission"); device.WaitForGpu();
+    RHIReadbackImage mapped; Check(device.MapReadback(readback, mapped, error), "Meshlet boundary readback");
+    for (unsigned i = 0; i < counts.size(); ++i) {
+        RHIDrawIndexedIndirectArguments result; std::memcpy(&result, mapped.data.data() + i * sizeof(result), sizeof(result));
+        Check(result.indexCount == (std::min)(counts[i], 65535u) &&
+            result.instanceCount == (std::max)(1u, (counts[i] + 65534u) / 65535u) && result.firstIndex == 1,
+            "GPU 2D argument boundary includes zero and 65536 without truncation");
+    }
+    device.ReleaseBuffer(ids); device.ReleaseBuffer(args);
+    std::cout << "METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071\n";
+}
+
+#include "support/MeshletBatchDispatchProbe.inl"
+#include "support/AtomicReductionProbe.inl"
+#include "support/GeometryAccessProbe.inl"
+#include "support/HybridVisibilityProbe.inl"
+#include "support/MeshletHzbProbe.inl"
+
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
 {
     {
@@ -3401,6 +3770,19 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     if (mode == "--forward-blend")
     {
         RunForwardBlend(root, device, roots, pipelines, textures, pool, instances, cube);
+        RunForwardBlend(root, device, roots, pipelines, textures, pool, instances, cube, true);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--layer-bucket-only") {
+        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube, false, 1);
+        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube, false, 2);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--layer-shape-only") {
+        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube, false, 3);
+        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube, false, 4);
         ShutdownNative(device, roots, pipelines, textures, pool);
         return;
     }
@@ -3482,9 +3864,63 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                   << " gpuComponents=" << gpuComponents << " sceneCompiles=0 validation=0 pak=encrypted\n";
         return;
     }
+    if (mode == "--hybrid-visibility-only") { RunHybridVisibility(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--atomic-reduction-only") { RunAtomicReduction(device, roots, pipelines, root, pool); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--geometry-access-only") { RunGeometryAccess(device, roots, pipelines, root); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--meshlet-hzb-only") { RunMeshletHzb(device, roots, pipelines, root); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--meshlet-dispatch-only")
+    {
+        RunMeshletDispatchBoundaries(device, roots, pipelines);
+        RunMeshletBatchDispatch(device, roots, pipelines);
+        std::string validation;
+        const auto problems = device.DrainDebugMessages(validation);
+        Check(problems == 0, "Meshlet dispatch boundary validation " + validation);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--temporal-bucket-only") {
+        RunTemporalBuckets(device, roots, pipelines, textures, pool, root, image);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--material-bucket-only" || mode == "--hw-visibility-only" || mode == "--visibility-reconstruction-only")
+    {
+        const auto first = SceneCooked(instances[0]);
+        auto obsolete = first->generation->cooked.product;
+        obsolete.program.semanticKey.replace(obsolete.program.semanticKey.size() - SceneHostIdentity.size(),
+            SceneHostIdentity.size(), "|lx-scene-host:28");
+        SceneShaderSet rejected; std::string rejection;
+        Check(!LoadSceneShaders(obsolete, RHIShaderBinary::Dxil, rejected, rejection), "Previous visibility payload ABI must be recooked");
+        auto description = first->description;
+        std::erase_if(description.parameters, [](const auto& value) { return value.id == 900; });
+        description.parameters.push_back({900, 1.9});
+        own::shared_owner<const Instance> second;
+        std::string error;
+        Check(BuildInstance(first->generation, description,
+            [&](const experiment::AssetId& id, LXColorSpace space, std::string&) {
+                const auto found = std::ranges::find_if(first->textures, [&](const auto& t) {
+                    return t.assetId == id && t.colorSpace == space;
+                });
+                return found == first->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
+            }, second, error), "Two distinct instances share one cooked shader: " + error);
+        RunSceneComposition(device, roots, pipelines, textures, pool, {first, second}, cube,
+            environmentColors, table, 0, true, true, true, mode != "--material-bucket-only");
+        if (mode == "--visibility-reconstruction-only")
+            RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors, table, 3);
+        std::string validation;
+        Check(device.DrainDebugMessages(validation) == 0, "Material bucket validation " + validation);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        if (mode == "--visibility-reconstruction-only") std::cout << "METEOR_VISIBILITY_RECONSTRUCTION_OK frames=" << sceneCompositionFrames << " partitions=3 footprintFrames=8 validation=0\n";
+        if (mode == "--hw-visibility-only") std::cout << "METEOR_HW_VISIBILITY_OK frames=" << sceneCompositionFrames << " partitions=3 validation=0\n";
+        std::cout << "LX_MATERIAL_BUCKET_OK frames=" << sceneCompositionFrames << " validation=0\n";
+        return;
+    }
     if (mode == "--lx-meshlet-only")
     {
-        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 0, true);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 0, true, true);
+        RunMeshletHzb(device, roots, pipelines, root);
+        RunMeshletDispatchBoundaries(device, roots, pipelines);
+        RunMeshletBatchDispatch(device, roots, pipelines);
         std::string validation;
         Check(device.DrainDebugMessages(validation) == 0, "METEOR meshlet/depth/HZB validation " + validation);
         ShutdownNative(device, roots, pipelines, textures, pool);
@@ -3513,9 +3949,10 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     }
     if (!mode.empty() && mode != "--rg5-reference")
     {
-        if (mode == "--refraction-only")
+        if (mode == "--refraction-only" || mode == "--refraction-film-only")
         {
-            RunSceneRefraction(device, roots, pipelines, textures, pool, root, image, cube, instances[0]);
+            RunSceneRefraction(device, roots, pipelines, textures, pool, root, image, cube, instances[0],
+                               mode == "--refraction-film-only");
         }
         else if (mode == "--volume-only")
         {
@@ -3989,6 +4426,8 @@ int main(int argc, char** argv)
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
     _CrtSetReportHook(ReportAssertion);
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
+    std::cout << std::unitbuf;
     SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* exception) -> LONG {
         std::cerr << "Native exception code=" << std::hex << exception->ExceptionRecord->ExceptionCode
                   << " address=" << exception->ExceptionRecord->ExceptionAddress << std::dec << '\n';
@@ -3996,7 +4435,6 @@ int main(int argc, char** argv)
         ReportAssertion(0, message, nullptr);
         return EXCEPTION_EXECUTE_HANDLER;
     });
-#endif
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
     try
     {
@@ -4015,11 +4453,11 @@ int main(int argc, char** argv)
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
                    (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
-                    std::string_view(argv[2]) == "--lx-meshlet-only" ||
+                    std::string_view(argv[2]) == "--layer-shape-only" || std::string_view(argv[2]) == "--layer-bucket-only" || std::string_view(argv[2]) == "--temporal-bucket-only" || std::string_view(argv[2]) == "--visibility-reconstruction-only" || std::string_view(argv[2]) == "--hw-visibility-only" || std::string_view(argv[2]) == "--material-bucket-only" || std::string_view(argv[2]) == "--lx-meshlet-only" || std::string_view(argv[2]) == "--geometry-access-only" || std::string_view(argv[2]) == "--meshlet-dispatch-only" || std::string_view(argv[2]) == "--hybrid-visibility-only" || std::string_view(argv[2]) == "--atomic-reduction-only" || std::string_view(argv[2]) == "--meshlet-hzb-only" ||
                     std::string_view(argv[2]) == "--issue-resource-lifetime" ||
                     std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
-                    std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
+                    std::string_view(argv[2]) == "--refraction-film-only" || std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),
               "Expected repository root");
         Run(std::filesystem::absolute(argv[1]), argc >= 3 ? std::string_view(argv[2]) : std::string_view{},

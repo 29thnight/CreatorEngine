@@ -44,11 +44,11 @@ float GeometryOcclusionLoad(uint level, uint2 pixel)
     }
 }
 
-bool GeometrySphereOccluded(float4 sphere, bool skipOcclusion, float4 projectionColumns[4],
+bool GeometryBoxOccluded(float3 minimumWorld, float3 maximumWorld, float4 projectionColumns[4],
     uint2 viewSize, uint occlusionLevels, uint projectionValid)
 {
-    if (skipOcclusion || !all(isfinite(sphere)) || sphere.w <= 0.0f ||
-        projectionValid == 0u || occlusionLevels == 0u)
+    if (!all(isfinite(minimumWorld)) || !all(isfinite(maximumWorld)) || any(minimumWorld > maximumWorld) ||
+        any(viewSize == 0u) || projectionValid == 0u || occlusionLevels == 0u)
     {
         return false;
     }
@@ -62,13 +62,12 @@ bool GeometrySphereOccluded(float4 sphere, bool skipOcclusion, float4 projection
     [unroll]
     for (uint corner = 0u; corner < 8u; ++corner)
     {
-        const float3 direction = float3((corner & 1u) != 0u ? 1.0f : -1.0f,
-                                        (corner & 2u) != 0u ? 1.0f : -1.0f,
-                                        (corner & 4u) != 0u ? 1.0f : -1.0f);
-        const float4 position = float4(sphere.xyz + direction * sphere.w, 1.0f);
+        const float4 position = float4((corner & 1u) != 0u ? maximumWorld.x : minimumWorld.x,
+            (corner & 2u) != 0u ? maximumWorld.y : minimumWorld.y,
+            (corner & 4u) != 0u ? maximumWorld.z : minimumWorld.z, 1.0f);
         // Includes corner construction and dot-product cancellation error. An
         // ill-conditioned large-world projection therefore remains visible.
-        const float4 magnitude = float4(abs(sphere.xyz) + sphere.w, 1.0f);
+        const float4 magnitude = float4(max(abs(minimumWorld), abs(maximumWorld)), 1.0f);
         float4 clip, error;
         [unroll]
         for (uint component = 0u; component < 4u; ++component)
@@ -136,6 +135,14 @@ bool GeometrySphereOccluded(float4 sphere, bool skipOcclusion, float4 projection
         }
     }
     return true;
+}
+
+bool GeometrySphereOccluded(float4 sphere, bool skipOcclusion, float4 projectionColumns[4],
+    uint2 viewSize, uint occlusionLevels, uint projectionValid)
+{
+    if (skipOcclusion || !all(isfinite(sphere)) || sphere.w <= 0.0f) return false;
+    return GeometryBoxOccluded(sphere.xyz - sphere.w, sphere.xyz + sphere.w,
+        projectionColumns, viewSize, occlusionLevels, projectionValid);
 }
 
 #endif

@@ -182,10 +182,6 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
             std::span<const RHIShaderReflection> reflections, ShaderMetaBindingLayout& result, std::string& error)
         {
             ShaderMetaBindingLayout candidate;
-            if (!ShaderMetaReflection::Resolve(meta, reflections, candidate, error))
-            {
-                return false;
-            }
             std::vector<const RHIShaderReflection*> stages;
             for (const auto& reflection : reflections)
             {
@@ -203,6 +199,34 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
                 error = diagnostics.empty() ? "Invalid generated internal binding layout." : diagnostics.front().message;
                 return false;
             }
+            // Authoring properties describe logical texture slots. Validate the
+            // physical bindless ABI above before projecting those slots for the
+            // property packer; this projection is never a runtime root layout.
+            auto logicalReflections = std::vector<RHIShaderReflection>(reflections.begin(), reflections.end());
+            for (auto& reflection : logicalReflections)
+            {
+                std::erase_if(reflection.resources, [](const auto& resource) {
+                    return resource.name == "lx_texture_table" || resource.name == "lx_sampler_table" ||
+                        resource.name == "LXDescriptorIndices";
+                });
+                for (const auto& logical : bindings.textures)
+                {
+                    RHIShaderResourceReflection resource;
+                    resource.name = "lx_texture_" + std::to_string(logical.slot);
+                    resource.kind = RHIShaderResourceKind::Texture;
+                    resource.registerIndex = TextureRegister + logical.slot;
+                    reflection.resources.push_back(std::move(resource));
+                }
+                for (const auto& logical : bindings.samplers)
+                {
+                    RHIShaderResourceReflection resource;
+                    resource.name = "lx_sampler_" + std::to_string(logical.slot);
+                    resource.kind = RHIShaderResourceKind::Sampler;
+                    resource.registerIndex = SamplerRegister + logical.slot;
+                    reflection.resources.push_back(std::move(resource));
+                }
+            }
+            if (!ShaderMetaReflection::Resolve(meta, logicalReflections, candidate, error)) return false;
             // Encoding uniforms are private runtime fields. A texture-only graph still
             // needs the common packer to allocate the entire validated constant buffer.
             if (bindings.uniformBytes != 0)
@@ -425,6 +449,10 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
                     for (const auto backend : carried)
                     {
                         declared.emplace(backend, meshEntry, "ms_");
+                        if (pass.vertex->entry == "LXSceneVS") {
+                            declared.emplace(backend, "LXSceneReconstructMS", "ms_");
+                            declared.emplace(backend, "LXSceneVisibilityMS", "ms_");
+                        }
                     }
                 }
             }
@@ -463,22 +491,25 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
         {
             reflection.resources.push_back(std::move(uniforms));
         }
-        for (const auto& resource : product.layout.textures)
+        if (!product.layout.textures.empty())
         {
             RHIShaderResourceReflection texture;
-            texture.name = "lx_texture_" + std::to_string(resource.slot);
+            texture.name = "lx_texture_table";
             texture.kind = RHIShaderResourceKind::Texture;
-            texture.registerIndex = TextureRegister + resource.slot;
+            texture.registerIndex = TextureRegister;
+            texture.arrayElements = BindlessTextureCapacity;
             reflection.resources.push_back(std::move(texture));
         }
-        for (const auto& resource : product.layout.samplers)
+        if (!product.layout.samplers.empty())
         {
             RHIShaderResourceReflection sampler;
-            sampler.name = "lx_sampler_" + std::to_string(resource.slot);
+            sampler.name = "lx_sampler_table";
             sampler.kind = RHIShaderResourceKind::Sampler;
-            sampler.registerIndex = SamplerRegister + resource.slot;
+            sampler.registerIndex = SamplerRegister;
+            sampler.arrayElements = BindlessSamplerCapacity;
             reflection.resources.push_back(std::move(sampler));
         }
+        if (!program.resources.empty()) reflection.resources.push_back(DescriptorIndexReflection());
         if (!ResolveGeneratedBindings(program, candidate.meta, std::span(&reflection, 1), candidate.layout, error))
         {
             return false;

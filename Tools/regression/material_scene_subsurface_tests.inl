@@ -205,7 +205,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "SSS residency " + error);
 
-            auto graph = std::make_shared<EnhancedRenderGraph>(device);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 RHIRecordedBatchDesc desc;
@@ -226,17 +226,18 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                       host.SubsurfaceFrame() == accepted,
                   "SSS budget failure preserves accepted frame");
             gbuffer.Declare(*graph, context);
-            const auto outputs = gbuffer.GetOutputs();
+            auto outputs = gbuffer.GetOutputs();
             host.DeclareGeometry(*graph);
             host.DeclareCulling(*graph);
-            host.DeclareGBuffer(*graph, outputs);
+            outputs = host.DeclareGBuffer(*graph, outputs);
+            host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
             aoDesc.format = RHIFormat::RG16Float;
             aoDesc.allowRenderTarget = true;
             aoDesc.clearColor[0] = .25f;
-            const auto ao = graph->CreateTexture(aoDesc);
-            graph->AddPass("Probe.SSS.AOClear", {{ao, RHIResourceState::RenderTarget}}, [&](const auto& execution) {
+            const auto ao = graph->Write(graph->CreateTexture(aoDesc));
+            graph->AddPass("Probe.SSS.AOClear", {{ao, RHIResourceState::RenderTarget, RGAccessMode::Write}}, [&](const auto& execution) {
                 const auto handle = execution.ResolveHandle(ao);
                 const auto target = device.CreateRenderTargets({&handle, 1}, nullptr);
                 const float clear[]{.25f, 0, 0, 0};
@@ -250,7 +251,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const auto copyTexture = [&](unsigned index, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(24, 24, format, 1, readbacks[index], error), "SSS texture readback");
                 graph->AddPass(
-                    "Probe.SSS.TextureReadback", {{handle, RHIResourceState::CopySource}},
+                    "Probe.SSS.TextureReadback", {{handle, RHIResourceState::CopySource, RGAccessMode::Read}},
                     [readback = readbacks[index], handle](const auto& execution) {
                         execution.encoder->CopyToReadback(readback, execution.ResolveHandle(handle));
                     },
@@ -264,12 +265,12 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             copyTexture(4, outputs.bitmask, RHIFormat::R32Uint);
             for (unsigned field = 0; field < 7; ++field)
             {
-                copyTexture(5 + field, graph->FindImportedTexture(accepted->Inputs()[field]), RHIFormat::RGBA32Float);
+                copyTexture(5 + field, accepted->GraphInputs(*graph)[field], RHIFormat::RGBA32Float);
             }
-            copyTexture(12, graph->FindImportedTexture(host.LookupFrame()->Inputs()[0]), RHIFormat::RGBA32Float);
+            copyTexture(12, host.LookupFrame()->GraphInputs(*graph)[0], RHIFormat::RGBA32Float);
             Check(device.CreateBufferReadback(24 * 24 * 16, readbacks[13], error), "SSS irradiance readback");
             graph->AddPass(
-                "Probe.SSS.IrradianceReadback", {{accepted->GraphIrradiance(*graph), RHIResourceState::CopySource}},
+                "Probe.SSS.IrradianceReadback", {{accepted->GraphIrradiance(*graph), RHIResourceState::CopySource, RGAccessMode::Read}},
                 [readback = readbacks[13], buffer = accepted->Irradiance()](const auto& execution) {
                     execution.encoder->CopyBufferToReadback(readback, buffer);
                 },

@@ -36,6 +36,7 @@ namespace DX12Translate
             return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
         case RHIDescriptorType::Sampler:         return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         case RHIDescriptorType::ShaderResource:
+        case RHIDescriptorType::ShaderResourceBuffer:
         default:                                 return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         }
     }

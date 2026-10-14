@@ -19,6 +19,8 @@
 #include "../RHISubmissionThread.h"
 #include <memory>
 #include <vector>
+#include <map>
+#include <mutex>
 
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
@@ -248,6 +250,22 @@ public:
     TemporalResult GetTemporalBootstrapResult() const { return m_temporalBootstrapResult; }
     bool HasTemporalSharedDevice() const { return static_cast<bool>(m_temporalDevice); }
     ID3D12Device* GetDevice() const {  return m_device.Get(); }
+    bool EncodeIndirectBuffer(const RHIBufferSlice& slice, uint64_t& payload) const override
+    {
+        const auto entry = DescribeBuffer(slice.buffer);
+        if (!entry.IsValid() || slice.offset >= entry.bytes || slice.size > entry.bytes - slice.offset) return false;
+        payload = entry.resource->GetGPUVirtualAddress() + slice.offset;
+        return payload != 0;
+    }
+    bool EncodeIndirectIndexBuffer(const RHIBufferSlice& slice, RHIFormat format,
+        std::array<uint32_t, 4>& payload) const override
+    {
+        uint64_t address{};
+        if (format != RHIFormat::R32Uint || !slice.size || slice.size > UINT32_MAX ||
+            slice.size % 4 || !EncodeIndirectBuffer(slice, address) || address % 4) return false;
+        payload = {uint32_t(address), uint32_t(address >> 32), uint32_t(slice.size), uint32_t(DXGI_FORMAT_R32_UINT)};
+        return true;
+    }
     IDXGIAdapter1* GetAdapter() const { return m_adapter.Get(); }
     RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator()
     {
@@ -468,6 +486,8 @@ public:
         return { available, available || nullptr != m_drawIndirectSignature.Get(),
             nullptr != m_drawIndirectSignature.Get() };
     }
+    RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
+    bool IsAtomicMin64Buffer(RHIBufferHandle buffer) const override;
     RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override
     {
         return m_meshShaderCapabilities;
@@ -476,6 +496,7 @@ public:
     {
         return m_dispatchMeshIndirectSignature.Get();
     }
+    ID3D12CommandSignature* GetMaterialBatchSignature(ID3D12RootSignature*, std::span<const uint32_t>, bool indexed);
     ID3D12CommandSignature* GetDrawIndirectSignature() const
     {
         return m_drawIndirectSignature.Get();
@@ -574,6 +595,9 @@ private:
     ComPtr<ID3D12CommandSignature>     m_drawIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_dispatchMeshIndirectSignature;
+    std::mutex m_meshBatchSignatureMutex;
+    std::map<std::pair<ID3D12RootSignature*, std::vector<uint32_t>>, ComPtr<ID3D12CommandSignature>> m_meshBatchSignatures;
+    RHIAtomicCapabilities             m_atomicCapabilities;
     RHIMeshShaderCapabilities          m_meshShaderCapabilities;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이

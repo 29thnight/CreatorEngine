@@ -8,6 +8,7 @@
 #include "RHI/RHIEncoder.h"
 
 #include <optional>
+#include <mutex>
 
 namespace material_graph
 {
@@ -19,6 +20,7 @@ namespace material_graph
         std::optional<std::uint32_t> uniformSlot;
         std::optional<std::uint32_t> textureSlot;
         std::optional<std::uint32_t> samplerSlot;
+        std::optional<std::uint32_t> descriptorIndexSlot;
         bool operator==(const PassLayout&) const = default;
     };
 
@@ -28,6 +30,14 @@ namespace material_graph
                           std::span<const RHIPipelineLayoutParam> hostParameters,
                           std::span<const RHIStaticSamplerDesc> hostSamplers, bool inputAssembler, PassLayout& result,
                           std::string& error);
+
+    struct BindlessMaterialFrame
+    {
+        std::mutex mutex;
+        std::vector<RHIBindingDesc> descriptions;
+        RHIBindingTable textures;
+        std::size_t publishedSize{};
+    };
 
     struct RenderBindings
     {
@@ -39,6 +49,8 @@ namespace material_graph
         RHIBufferSlice uniforms;
         RHIBindingTable textures;
         RHISamplerTable samplers;
+        std::shared_ptr<BindlessMaterialFrame> bindless;
+        RHIBufferSlice descriptorIndices;
         const IRenderDeviceServices* device{};
         std::uint64_t recordingId{};
         std::uint64_t descriptorVersion{};
@@ -71,12 +83,13 @@ namespace material_graph
         // Clear after device idle, before device recreation. Sampler registrations
         // are device-owned; the RHI has no per-table release operation.
         void Clear();
-        std::size_t SamplerTableCount() const { return samplers_.size(); }
+        std::size_t SamplerTableCount() const { return bindlessSamplers_.IsValid() ? 1 : 0; }
 
       private:
         IRenderDeviceServices* device_{};
-        std::map<std::vector<std::string>, RHISamplerTable> samplers_;
         std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
         std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
+        std::shared_ptr<BindlessMaterialFrame> bindless_;
+        RHISamplerTable bindlessSamplers_;
     };
 } // namespace material_graph

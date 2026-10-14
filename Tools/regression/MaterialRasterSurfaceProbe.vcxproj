@@ -86,7 +86,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="material_raster_surface_probe.cpp" />
+    <ClCompile Include="material_raster_surface_probe.cpp"><AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="support\MaterialGraphScenePacket.cpp" />
 
   </ItemGroup>

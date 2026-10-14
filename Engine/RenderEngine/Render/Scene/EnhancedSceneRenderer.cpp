@@ -554,6 +554,7 @@ namespace
         outputs.emissive   = blackboard.Get(LiveSlots::kGBufferEmissive);
         outputs.bitmask    = blackboard.Get(LiveSlots::kGBufferBitmask);
         outputs.depth      = blackboard.Get(LiveSlots::kGBufferDepth);
+        outputs.visibility = blackboard.Get(LiveSlots::kVisibility);
         return outputs;
     }
 
@@ -3630,7 +3631,7 @@ namespace
                 node.writes = {
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
-                    LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth,
+                    LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
                 };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
@@ -3653,6 +3654,18 @@ namespace
                     bb.Set(LiveSlots::kGBufferEmissive,   outputs.emissive);
                     bb.Set(LiveSlots::kGBufferBitmask,    outputs.bitmask);
                     bb.Set(LiveSlots::kGBufferDepth,      outputs.depth);
+                    bb.Set(LiveSlots::kVisibility, outputs.visibility);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.History";
+                node.reads = {LiveSlots::kGBufferDepth};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&) {
+                    p.graphMaterials.DeclareHistory(graph, bb.Get(LiveSlots::kGBufferDepth));
                 };
                 p.desc.AddNode(std::move(node));
             }

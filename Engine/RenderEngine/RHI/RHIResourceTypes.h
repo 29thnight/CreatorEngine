@@ -266,6 +266,15 @@ struct RHIBindingDesc
         d.firstElement = firstElement;
         return d;
     }
+
+    // A zero stride denotes a raw byte-address view (elements are 32-bit words).
+    static RHIBindingDesc SrvBuffer(RHIBufferHandle resource, uint32_t numElements,
+        uint32_t structureByteStride, uint32_t firstElement = 0)
+    {
+        auto d = UavBuffer(resource, numElements, structureByteStride, firstElement);
+        d.kind = Kind::ShaderResource;
+        return d;
+    }
 };
 
 /// 잘라 둔 연속 테이블. 수명은 발급한 recording의 completion까지다.
@@ -704,6 +713,12 @@ static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) == sizeof
 
 /// 실제 생성·활성화한 기능만 보고한다. 기본값이면 CPU DrawIndexed를 쓴다.
 /// 단건만 보장하며 count buffer·multi-draw·mesh shader·DXR은 전제하지 않는다.
+struct RHIAtomicCapabilities
+{
+    bool bufferInt64Min{false}; // root raw/structured UAV; aligned 8-byte elements
+    bool typedInt64Min{false};  // DX12 uint64 UAV uses RG32Uint, not two uint32 atomics
+};
+
 struct RHIIndirectDrawCapabilities
 {
     bool indexedDraw{ false };

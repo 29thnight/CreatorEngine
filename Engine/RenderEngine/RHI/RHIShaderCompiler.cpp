@@ -1017,8 +1017,11 @@ namespace
                 VulkanBindingModel::kUnorderedAccessShift, VulkanBindingModel::kSamplerShift};
             hash.Add(shifts.data(), sizeof(shifts));
         }
+        hash.Add(&request.options.bufferInt64Atomics, sizeof(request.options.bufferInt64Atomics));
         hash.Add(&request.options.strictMath, sizeof(request.options.strictMath));
         hash.Add(&request.options.fineDerivatives, sizeof(request.options.fineDerivatives));
+        if (request.output == RHIShaderBinary::SpirV && request.options.quadOperations)
+            hash.Add("spvGroupNonUniformQuad");
         for (const auto& directory : request.options.includeDirectories)
             hash.Add(PathUtf8(directory));
         for (const SourceUnit& unit : units)
@@ -1578,8 +1581,12 @@ namespace
             addArgument("-profile");
             const bool meshStage = stage == SLANG_STAGE_MESH;
             addArgument(RHIShaderBinary::Dxil == request.output
-                ? (meshStage ? "sm_6_5" : "sm_6_0")
+                ? (request.options.bufferInt64Atomics ? "sm_6_6" : meshStage ? "sm_6_5" : "sm_6_0")
                 : (meshStage ? "spirv_1_5" : "spirv_1_3"));
+            if (request.options.bufferInt64Atomics && request.output == RHIShaderBinary::SpirV)
+            {
+                addArgument("-capability"); addArgument("spvInt64Atomics");
+            }
             if (meshStage && request.output == RHIShaderBinary::SpirV)
             {
                 addArgument("-capability");
@@ -1589,6 +1596,11 @@ namespace
             {
                 addArgument("-capability");
                 addArgument("spvDerivativeControl");
+            }
+            if (request.output == RHIShaderBinary::SpirV && request.options.quadOperations)
+            {
+                addArgument("-capability");
+                addArgument("spvGroupNonUniformQuad");
             }
             // 소스 언어는 확장자가 정한다. Slang은 HLSL의 상위집합이라 둘을
             // 한 세션 설정으로 묶고 싶어지지만, front-end 규칙이 갈린다 —

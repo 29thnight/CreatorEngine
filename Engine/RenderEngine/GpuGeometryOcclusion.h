@@ -7,6 +7,7 @@
 #include <mathematics/matrix4x4.hpp>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -14,9 +15,8 @@
 
 struct EnhancedFrameContext;
 
-// One current-frame, standard-Z depth pyramid shared by any number of indexed
-// and meshlet bins. Its textures belong to the existing graph; no temporal
-// resources, history promotion, or hidden submission lifetime are introduced.
+// Standard-Z pyramids. Persistent history is immutable and explicitly retained
+// by submitted frames; importing it creates a new recording-local view.
 class GpuGeometryOcclusion final
 {
 public:
@@ -31,6 +31,16 @@ public:
         bool operator==(const ViewKey&) const = default;
     };
 
+    struct History
+    {
+        ~History();
+        IRenderDeviceServices* device{};
+        ViewKey source;
+        std::uint64_t viewId{}, revision{}, completion{};
+        std::vector<RHITextureHandle> textures;
+        std::atomic<bool> recorded{};
+    };
+
     class Pyramid
     {
     public:
@@ -43,6 +53,8 @@ public:
             std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
         RHIBindingTable Bindings(const EnhancedRenderGraph::ExecuteContext& execution) const;
         std::uint32_t LevelCount() const { return m_levelCount; }
+        const std::shared_ptr<History>& HistoryOwner() const { return m_history; }
+        void ImportHistory(EnhancedRenderGraph& graph) const;
 
     private:
         friend class GpuGeometryOcclusion;
@@ -56,12 +68,19 @@ public:
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_depth;
         mutable std::vector<RGHandle> m_levels;
+        std::shared_ptr<History> m_history;
+        bool m_historyReader{};
     };
 
     static ViewKey CaptureView(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection);
     static std::uint32_t LevelCount(std::uint32_t width, std::uint32_t height);
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
         std::shared_ptr<const Pyramid>& result, std::string& error);
+    bool PrepareHistory(const EnhancedFrameContext& context, const math::matrix4x4& projection,
+        std::uint64_t viewId, std::uint64_t revision,
+        std::shared_ptr<const Pyramid>& result, std::string& error);
+    static std::shared_ptr<const Pyramid> ReadHistory(const EnhancedFrameContext& context,
+        const math::matrix4x4& projection, const std::shared_ptr<History>& history);
     void ShutdownAfterIdle();
 
 private:

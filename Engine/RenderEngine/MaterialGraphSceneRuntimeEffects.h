@@ -82,6 +82,9 @@ namespace material_graph
         {
             preparationDeferred_ = false;
         }
+        // An owner unwound without ShutdownAfterIdle must not leave a dangling
+        // upload listener on the device.
+        ~SceneRuntimeEffectsResources();
         void ShutdownAfterIdle();
 
       private:

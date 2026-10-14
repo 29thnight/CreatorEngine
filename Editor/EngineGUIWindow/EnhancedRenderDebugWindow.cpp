@@ -552,6 +552,7 @@ namespace EnhancedRenderDebugUi
         case RGAccessMode::Read: return "Read";
         case RGAccessMode::Write: return "Write";
         case RGAccessMode::ReadWrite: return "Modify";
+        case RGAccessMode::AtomicMin64: return "AtomicMin64";
         default: return "LegacyState";
         }
     }

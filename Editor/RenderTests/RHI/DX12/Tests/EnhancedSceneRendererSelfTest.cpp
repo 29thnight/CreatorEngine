@@ -2300,7 +2300,7 @@ passes:
                 }
                 const auto output = gbuffer.GetOutputs();
                 const RGHandle handles[] = {output.diffuse, output.metalRough, output.normal,        output.emissive,
-                                            output.bitmask, output.depth,      shadow.GetShadowMap()};
+                                            output.bitmask, output.depth, output.visibility, shadow.GetShadowMap()};
                 std::vector<EnhancedRenderGraph::RGPassUsage> reads;
                 for (const auto handle : handles)
                 {
@@ -2321,7 +2321,7 @@ passes:
                 {
                     return false;
                 }
-                if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 2} || snapshot.resources.size() != 7 ||
+                if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 2} || snapshot.resources.size() != std::size(handles) ||
                     graph.GetStats().passesExecuted != 3)
                 {
                     error = "RG5 product producer/consumer plan mismatch";
@@ -2341,7 +2341,7 @@ passes:
                         }
                     }
                 }
-                if (mode == RGSchedulingMode::ExplicitVersioned && snapshot.versionEdges.size() != 7)
+                if (mode == RGSchedulingMode::ExplicitVersioned && snapshot.versionEdges.size() != std::size(handles))
                 {
                     error = "RG5 product output RAW edges missing";
                     return false;

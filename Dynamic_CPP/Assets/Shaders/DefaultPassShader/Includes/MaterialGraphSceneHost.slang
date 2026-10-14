@@ -200,7 +200,19 @@ struct LXSceneVertex
     float3 bitangent : TEXCOORD3;
     float2 uv : TEXCOORD4;
     nointerpolation uint owner : TEXCOORD5;
+    nointerpolation uint reconstruction : TEXCOORD15;
 };
+
+LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFace);
+#include "MeteorVisibilityContract.slang"
+Texture2D<uint2> lx_visibility : register(t159);
+uint2 LXSceneLoadVisibility(uint2 pixel)
+{
+    const uint address = lx_visibility.Load(int3(pixel, 0)).x;
+    const uint begin = lx_geometryIdentityPadding.y, end = lx_geometryIdentityPadding.z;
+    if (address < begin || address >= end || begin == 0u) return uint2(0u);
+    return uint2(lx_geometryIdentityPadding.x, address - begin);
+}
 
 LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection)
 {
@@ -213,6 +225,7 @@ LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection)
     output.bitangent = source.bitangent.xyz;
     output.uv = source.uvLod.xy;
     output.owner = owner;
+    output.reconstruction = 0u;
     return output;
 }
 
@@ -226,53 +239,30 @@ LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceI
 // Scene preparation pins this immutable stream through submission completion.
 #include "LxMeshletGpuContract.slang"
 ByteAddressBuffer lx_meshlets : register(t155);
+StructuredBuffer<uint> lx_shadowMeshletIds : register(t157);
 
-groupshared uint lx_meshletOutside;
+// Per-primitive identity is emitted by the mesh shader, never inferred from
+// compacted dispatch order or shared vertex interpolation.
+struct LXScenePrimitive { uint address : SV_PrimitiveID; };
 
-// Intersect the outside-plane masks of the actual posed vertices. A common
-// plane proves the entire convex hull is outside; crossings/unknowns survive.
-bool LXSceneMeshletVisible(LXMeshletDescriptor descriptor, uint lane, float4x4 projection)
-{
-    if (lane == 0u)
-    {
-        lx_meshletOutside = 63u;
-    }
-    GroupMemoryBarrierWithGroupSync();
-    if (lane < descriptor.vertexCount)
-    {
-        const float4 clip = mul(float4(lx_vertices[LXMeshletVertex(lx_meshlets, descriptor, lane)].position.xyz, 1), projection);
-        const float epsilon = max(1.0, max(abs(clip.w), max(abs(clip.x), max(abs(clip.y), abs(clip.z))))) * 0.00001;
-        uint mask = 0u;
-        if (all(isfinite(clip)))
-        {
-            mask = (clip.x < -clip.w - epsilon ? 1u : 0u) |
-                (clip.x > clip.w + epsilon ? 2u : 0u) |
-                (clip.y < -clip.w - epsilon ? 4u : 0u) |
-                (clip.y > clip.w + epsilon ? 8u : 0u) |
-                (clip.z < -epsilon ? 16u : 0u) |
-                (clip.z > clip.w + epsilon ? 32u : 0u);
-        }
-        InterlockedAnd(lx_meshletOutside, mask);
-    }
-    GroupMemoryBarrierWithGroupSync();
-    return lx_meshletOutside == 0u;
-}
+StructuredBuffer<uint> lx_rasterRoutes : register(t161);
+RWStructuredBuffer<uint64_t> lx_visibilityKeys : register(u1);
 
 [shader("mesh")]
 [numthreads(64, 1, 1)]
 [outputtopology("triangle")]
 void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
-    out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
+    out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126],
+    out primitives LXScenePrimitive primitives[126])
 {
-    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, group.x);
-    const uint vertexCount = descriptor.vertexCount;
-    const uint triangleCount = descriptor.triangleCount;
-    const bool visible = LXSceneMeshletVisible(descriptor, lane, lx_viewProjection);
-    SetMeshOutputCounts(visible ? vertexCount : 0u, visible ? triangleCount : 0u);
-    if (!visible)
-    {
-        return;
-    }
+    const uint work = group.y * 65535u + group.x;
+    const bool validWork = work < lx_shadowMeshletIds[0];
+    const uint meshlet = lx_shadowMeshletIds[1u + (validWork ? work : 0u)];
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, meshlet);
+    const uint enabled = uint(validWork) & uint(lx_visibleOwners[0] == lx_drawOwner);
+    const uint vertexCount = descriptor.vertexCount * enabled;
+    const uint triangleCount = descriptor.triangleCount * enabled;
+    SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
         LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection);
@@ -280,7 +270,37 @@ void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
-        triangles[triangle] = LXMeshletTriangle(lx_meshlets, descriptor, triangle);
+        triangles[triangle] = LXLoadGeometryPrimitive(lx_meshlets, descriptor, triangle).corners;
+        primitives[triangle].address = (meshlet << 7u) | triangle;
+    }
+}
+
+[shader("mesh")]
+[numthreads(64, 1, 1)]
+[outputtopology("triangle")]
+void LXSceneVisibilityMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
+    out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126],
+    out primitives LXScenePrimitive primitives[126])
+{
+    const uint work = group.y * 65535u + group.x;
+    const bool validWork = work < lx_shadowMeshletIds[0];
+    const uint meshlet = lx_shadowMeshletIds[1u + (validWork ? work : 0u)];
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, meshlet);
+    const uint enabled = uint(validWork) & uint(lx_visibleOwners[0] == lx_drawOwner) &
+        uint(lx_rasterRoutes[(lx_geometryIdentityPadding.y - 1u) / 128u + meshlet] == 1u);
+    const uint vertexCount = descriptor.vertexCount * enabled;
+    const uint triangleCount = descriptor.triangleCount * enabled;
+    // A single straight-line output count avoids DXC duplicating the mesh intrinsic.
+    SetMeshOutputCounts(vertexCount, triangleCount);
+    if (lane < vertexCount)
+    {
+        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection);
+        vertices[lane] = vertex;
+    }
+    for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
+    {
+        triangles[triangle] = LXLoadGeometryPrimitive(lx_meshlets, descriptor, triangle).corners;
+        primitives[triangle].address = (meshlet << 7u) | triangle;
     }
 }
 
@@ -291,6 +311,7 @@ void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
 // Coverage/depth remain owned by the rasterizer. Derivatives precede guards.
 LXSceneVertex LXScenePixelCenter(LXSceneVertex input)
 {
+    if (input.reconstruction != 0u) return input;
     const float3 px=ddx_fine(input.position), py=ddy_fine(input.position);
     const float3 nx=ddx_fine(input.normal), ny=ddy_fine(input.normal);
     const float3 tx=ddx_fine(input.tangent), ty=ddy_fine(input.tangent);
@@ -335,7 +356,6 @@ cbuffer LXSceneShadowConstants : register(b4)
     uint3 lx_shadowGeometryIdentityPadding;
 };
 
-StructuredBuffer<uint> lx_shadowMeshletIds : register(t157);
 
 [shader("vertex")]
 LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
@@ -349,23 +369,21 @@ LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
 void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
 {
-    const uint meshlet = lx_shadowMeshletIds[group.x];
+    const uint work = group.y * 65535u + group.x;
+    const bool validWork = work < lx_shadowMeshletIds[0];
+    const uint meshlet = lx_shadowMeshletIds[1u + (validWork ? work : 0u)];
     const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, meshlet);
-    const uint vertexCount = descriptor.vertexCount;
-    const uint triangleCount = descriptor.triangleCount;
-    const bool visible = LXSceneMeshletVisible(descriptor, lane, lx_shadowViewProjection);
-    SetMeshOutputCounts(visible ? vertexCount : 0u, visible ? triangleCount : 0u);
-    if (!visible)
-    {
-        return;
-    }
+    const uint enabled = uint(validWork);
+    const uint vertexCount = descriptor.vertexCount * enabled;
+    const uint triangleCount = descriptor.triangleCount * enabled;
+    SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
         vertices[lane] = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), 0u, lx_shadowViewProjection);
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
-        triangles[triangle] = LXMeshletTriangle(lx_meshlets, descriptor, triangle);
+        triangles[triangle] = LXLoadGeometryPrimitive(lx_meshlets, descriptor, triangle).corners;
     }
 }
 
@@ -420,7 +438,7 @@ PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
     // Preserve authored IOR/level and the unrotated tangent. The compute baker
     // applies material evaluation once, exactly as the evaluated-point path.
     PrincipledIblBakePoint point;
-    point.baseAlpha = float4(raw.baseColor, ApplyPbrCoverage(saturate(raw.alpha), lx_cutoff, lx_coverage, frontFace));
+    point.baseAlpha = float4(raw.baseColor, input.reconstruction != 0u ? 1.0 : ApplyPbrCoverage(saturate(raw.alpha), lx_cutoff, lx_coverage, frontFace));
     point.normalRoughness = float4(OrientPbrNormal(normal, lx_coverage, frontFace), raw.roughness);
     point.metalIorLevelAo = float4(raw.metallic, raw.ior, raw.specularIorLevel, raw.occlusion);
     point.tintAnisotropy = float4(raw.specularTint, raw.anisotropy);
@@ -439,7 +457,7 @@ PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
     // Principled core graphs use the same GGX closures with film/coat disabled.
     // This lookup tag describes the evaluation model, not the authoring tier.
     // Fine UV derivatives and graph evaluation precede this divergent owner test.
-    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
         discard;
     return point;
 }
@@ -472,8 +490,7 @@ struct LXSceneLookup1
     float4 fields[3] : SV_Target;
 };
 
-[shader("fragment")]
-LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+LXSceneLookup0 LXSceneLookup0PSEvaluate(LXSceneVertex input, bool frontFace)
 {
     input=LXScenePixelCenter(input);
     const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
@@ -488,9 +505,26 @@ LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFront
     output.fields[7] = point.coatNormalSheenWeight;
     return output;
 }
-
 [shader("fragment")]
-LXSceneLookup1 LXSceneLookup1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    if (input.reconstruction == 0u) return LXSceneLookup0PSEvaluate(input, frontFace);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    LXSceneLookup0 output = (LXSceneLookup0)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const LXSceneLookup0 value = LXSceneLookup0PSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
+    return output;
+}
+
+LXSceneLookup1 LXSceneLookup1PSEvaluate(LXSceneVertex input, bool frontFace)
 {
     input=LXScenePixelCenter(input);
     const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
@@ -498,6 +532,24 @@ LXSceneLookup1 LXSceneLookup1PS(LXSceneVertex input, bool frontFace : SV_IsFront
     output.fields[0] = point.sheenTintRoughness;
     output.fields[1] = point.tangentRotation;
     output.fields[2] = point.viewTier;
+    return output;
+}
+[shader("fragment")]
+LXSceneLookup1 LXSceneLookup1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    if (input.reconstruction == 0u) return LXSceneLookup1PSEvaluate(input, frontFace);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    LXSceneLookup1 output = (LXSceneLookup1)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const LXSceneLookup1 value = LXSceneLookup1PSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
     return output;
 }
 
@@ -514,10 +566,10 @@ LXMaterialContext LXSceneContext(LXSceneVertex input)
     return context;
 }
 
-PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMaterialContext context, bool frontFace)
+PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMaterialContext context, bool frontFace, bool reconstructed)
 {
     PrincipledSurface surface = LXEvaluateGeneratedSurface(generated, context);
-    surface.alpha = ApplyPbrCoverage(surface.alpha, lx_cutoff, lx_coverage, frontFace);
+    surface.alpha = reconstructed ? 1.0 : ApplyPbrCoverage(surface.alpha, lx_cutoff, lx_coverage, frontFace);
     surface.normal = OrientPbrNormal(surface.normal, lx_coverage, frontFace);
     surface.coatNormal = OrientPbrNormal(surface.coatNormal, lx_coverage, frontFace);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
@@ -537,7 +589,7 @@ PrincipledSurface LXSceneUndecaledMaterial(LXSceneVertex input, bool frontFace)
 {
     const LXMaterialContext context = LXSceneContext(input);
     const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
-    return LXSceneEvaluateMaterial(generated, context, frontFace);
+    return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u);
 }
 
 PrincipledSurface LXSceneMaterial(LXSceneVertex input, bool frontFace)
@@ -545,7 +597,7 @@ PrincipledSurface LXSceneMaterial(LXSceneVertex input, bool frontFace)
     const LXMaterialContext context = LXSceneContext(input);
     LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
     generated.surfaceInputs = LXSceneDecalInputs(generated.surfaceInputs, input, frontFace);
-    return LXSceneEvaluateMaterial(generated, context, frontFace);
+    return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u);
 }
 
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
@@ -560,7 +612,7 @@ LXSceneRefractionCapture LXSceneRefractionPS(LXSceneVertex input, bool frontFace
 {
     input=LXScenePixelCenter(input);
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
-    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
     {
         discard;
     }
@@ -580,8 +632,7 @@ struct LXSceneGBuffer
     uint owner : SV_Target4;
 };
 
-[shader("fragment")]
-LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+LXSceneGBuffer LXSceneEvaluateSurface(LXSceneVertex input, bool frontFace)
 {
     input=LXScenePixelCenter(input);
     const PrincipledSurface surface = LXSceneUndecaledMaterial(input, frontFace);
@@ -593,6 +644,112 @@ LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFront
     output.emissive = float4(surface.emission, 1);
     output.owner = input.owner;
     return output;
+}
+
+LXSceneGBuffer LXSceneGBufferPSEvaluate(LXSceneVertex input, bool frontFace)
+{
+    return LXSceneEvaluateSurface(input, frontFace);
+}
+[shader("fragment")]
+LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    if (input.reconstruction == 0u) return LXSceneGBufferPSEvaluate(input, frontFace);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    LXSceneGBuffer output = (LXSceneGBuffer)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const LXSceneGBuffer value = LXSceneGBufferPSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
+    return output;
+}
+
+StructuredBuffer<LXFrameGeometryRecord> lx_frameGeometry : register(t158);
+
+
+// Opaque coverage/depth is decided only here. Material attributes are evaluated
+// by the reconstruction consumer, not written as additional raster MRTs.
+[shader("fragment")]
+void LXSceneVisibilityPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace,
+    uint primitiveAddress : SV_PrimitiveID)
+{
+    input = LXScenePixelCenter(input);
+    const LXMaterialContext context = LXSceneContext(input);
+    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_cutoff, lx_coverage, frontFace);
+    if (input.clip.z >= 0.0 && input.clip.z < 1.0) {
+        const uint2 pixel = uint2(input.clip.xy);
+        uint64_t ignored;
+        InterlockedMin(lx_visibilityKeys[pixel.y * lx_width + pixel.x],
+            MeteorVisibilityKey(input.clip.z, lx_geometryIdentityPadding.y + primitiveAddress), ignored);
+    }
+}
+
+// One mesh group covers one compacted material tile, never a full viewport.
+StructuredBuffer<uint> lx_materialWork : register(t160);
+[shader("mesh")]
+[numthreads(32, 1, 1)]
+[outputtopology("triangle")]
+void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
+    out vertices LXSceneVertex vertices[4], out indices uint3 triangles[2])
+{
+    const uint record = lx_geometryIdentityPadding.x;
+    const uint recordCount = lx_materialWork[2];
+    const uint index = group.x + group.y * 65535u;
+    const uint count = lx_materialWork[4 + record];
+    const bool valid = index < count;
+    SetMeshOutputCounts(4u * uint(valid), 2u * uint(valid));
+    if (!valid) return;
+    const uint offset = lx_materialWork[4 + recordCount + record];
+    const uint tile = lx_materialWork[4 + 3 * recordCount + offset + index];
+    const uint grid = (lx_width + 7u) / 8u;
+    const uint2 origin = uint2(tile % grid, tile / grid) * 8u;
+    if (lane < 4u) {
+        LXSceneVertex v = (LXSceneVertex)0;
+        const float2 pixel = min(origin + uint2(lane & 1u, lane >> 1u) * 8u, uint2(lx_width,lx_height));
+        v.clip = float4(pixel / float2(lx_width,lx_height) * float2(2,-2) + float2(-1,1),0,1);
+        v.reconstruction = 1u;
+        vertices[lane] = v;
+    }
+    if (lane == 0u) { triangles[0] = uint3(0,1,2); triangles[1] = uint3(2,1,3); }
+}
+
+LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFace)
+{
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, identity.y >> 7u);
+    const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, identity.y & 127u);
+    const LXSurfacePoint a = lx_vertices[primitive.vertices.x];
+    const LXSurfacePoint b = lx_vertices[primitive.vertices.y];
+    const LXSurfacePoint c = lx_vertices[primitive.vertices.z];
+    const float4 ca = mul(float4(a.position.xyz, 1), lx_viewProjection);
+    const float4 cb = mul(float4(b.position.xyz, 1), lx_viewProjection);
+    const float4 cc = mul(float4(c.position.xyz, 1), lx_viewProjection);
+    // Homogeneous solve also handles a triangle crossing the near plane. Do not
+    // divide vertices by w: clipped vertices can have zero/negative w.
+    const float2 ndc = pixel.xy / float2(lx_width, lx_height) * float2(2, -2) + float2(-1, 1);
+    const float2 x = cb.xy - ca.xy - ndc * (cb.w - ca.w);
+    const float2 y = cc.xy - ca.xy - ndc * (cc.w - ca.w);
+    const float2 delta = ndc * ca.w - ca.xy;
+    const float determinant = x.x * y.y - x.y * y.x;
+    const float2 weights = float2(delta.x * y.y - delta.y * y.x,
+        x.x * delta.y - x.y * delta.x) / determinant;
+    const float3 w = float3(1.0 - weights.x - weights.y, weights);
+    LXSceneVertex v = (LXSceneVertex)0;
+    v.clip = pixel;
+    v.position = a.position.xyz * w.x + b.position.xyz * w.y + c.position.xyz * w.z;
+    v.normal = a.normal.xyz * w.x + b.normal.xyz * w.y + c.normal.xyz * w.z;
+    v.tangent = a.tangent.xyz * w.x + b.tangent.xyz * w.y + c.tangent.xyz * w.z;
+    v.bitangent = a.bitangent.xyz * w.x + b.bitangent.xyz * w.y + c.bitangent.xyz * w.z;
+    v.uv = a.uvLod.xy * w.x + b.uvLod.xy * w.y + c.uvLod.xy * w.z;
+    v.owner = lx_frameGeometry[identity.x].owner;
+    v.reconstruction = 1u;
+    frontFace = determinant < 0.0;
+    return v;
 }
 
 // Paired transformed streams use the same current topology. Previous skin and
@@ -821,8 +978,7 @@ struct LXSceneSubsurfaceCapture
     float4 fields[7] : SV_Target;
 };
 
-[shader("fragment")]
-LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+LXSceneSubsurfaceCapture LXSceneSubsurfacePSEvaluate(LXSceneVertex input, bool frontFace)
 {
     input=LXScenePixelCenter(input);
     // Evaluate quad derivatives before alpha/face coverage can discard a lane.
@@ -830,7 +986,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
     const PrincipledIblBakeSample sample = LXSceneReadIbl(input, frontFace, index);
-    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
     {
         discard;
     }
@@ -858,6 +1014,24 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     output.fields[4] = float4(profile.virtualDepth, 0);
     output.fields[5] = float4(profile.attenuation, 0);
     output.fields[6] = float4(profile.normalization, 0);
+    return output;
+}
+[shader("fragment")]
+LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    if (input.reconstruction == 0u) return LXSceneSubsurfacePSEvaluate(input, frontFace);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    LXSceneSubsurfaceCapture output = (LXSceneSubsurfaceCapture)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const LXSceneSubsurfaceCapture value = LXSceneSubsurfacePSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
     return output;
 }
 
@@ -921,8 +1095,7 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
 }
 #endif
 
-[shader("fragment")]
-float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV_Target
+float4 LXSceneColorPSEvaluate(LXSceneVertex input, bool frontFace)
 {
     input=LXScenePixelCenter(input);
     PrincipledSurface material = LXSceneMaterial(input, frontFace);
@@ -930,7 +1103,7 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
     const PrincipledIblBakeSample sample = LXSceneReadIbl(input, frontFace, index);
     if (lx_blended == 1u && material.alpha <= 0.0) discard;
     // Fine derivatives must be evaluated before the per-pixel owner branch.
-    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
         discard;
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) == 0
@@ -1016,4 +1189,22 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
     return float4(lx_blended != 0u ? LXForwardVolume(input.clip.xy, input.position, color) : color,
                   lx_blended == 1u ? material.alpha : 1);
 #endif
+}
+[shader("fragment")]
+float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV_Target
+{
+    if (input.reconstruction == 0u) return LXSceneColorPSEvaluate(input, frontFace);
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    float4 output = (float4)0;
+    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+        const uint2 identity = QuadReadLaneAt(own, lane);
+        if (identity.x == lx_geometryIdentityPadding.x) {
+            bool face;
+            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            const float4 value = LXSceneColorPSEvaluate(restored, face);
+            if (all(own == identity)) output = value;
+        }
+    }
+    if (own.x != lx_geometryIdentityPadding.x) discard;
+    return output;
 }

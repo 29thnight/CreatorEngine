@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <map>
 #include <wrl/client.h>
 #include <d3d12.h>   // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
 #include "../RHIEncoder.h"
@@ -50,6 +51,8 @@ public:
     void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBufferSlice& slice) override;
 
+    bool SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice) override;
+
     void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) override;
     void SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format) override;
 
@@ -77,10 +80,15 @@ public:
 
     bool DispatchMesh(uint32_t x, uint32_t y, uint32_t z) override;
     bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
+    bool DispatchMeshIndirectBatch(RHIBufferHandle arguments, uint64_t byteOffset, uint32_t count,
+        std::span<const uint32_t> roots) override;
 
+    bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,
+        std::span<const uint32_t>) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
     uint64_t GetComputeDispatchCount() const override { return m_computeDispatches; }
 
+    bool BeginRasterWithoutAttachments(uint32_t width, uint32_t height) override;
     void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
     void ClearRenderTargets(const RHIRenderTargetBinding& binding,
         const float rgba[4]) override;

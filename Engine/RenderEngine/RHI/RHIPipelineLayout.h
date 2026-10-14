@@ -168,6 +168,7 @@ enum class RHIDescriptorType
     // to choose VK_DESCRIPTOR_TYPE_STORAGE_BUFFER up front.
     UnorderedAccessBuffer,
     Sampler,
+    ShaderResourceBuffer,
 };
 
 // 연속한 레지스터 한 묶음. 실측한 25곳이 전부 테이블당 범위 하나라
@@ -293,6 +294,12 @@ namespace RHILayout
     {
         return Table(RHIDescriptorType::UnorderedAccessBuffer,
             count, baseRegister, visibility);
+    }
+
+    constexpr RHIPipelineLayoutParam SrvBufferTable(uint32_t count, uint32_t baseRegister = 0,
+        RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        return Table(RHIDescriptorType::ShaderResourceBuffer, count, baseRegister, visibility);
     }
 
     constexpr RHIPipelineLayoutParam SamplerTable(uint32_t count, uint32_t baseRegister = 0,

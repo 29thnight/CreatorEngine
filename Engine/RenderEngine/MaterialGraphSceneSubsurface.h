@@ -23,6 +23,11 @@ namespace material_graph
         RHIBufferHandle Reflection() const;
         RHIBufferHandle Irradiance() const;
         const std::array<RGHandle, 7>& DeclareInputs(EnhancedRenderGraph& graph) const;
+        const std::array<RGHandle, 7>& GraphInputs(const EnhancedRenderGraph& graph) const
+        {
+            CheckCurrent(graph);
+            return graphInputs_;
+        }
         std::array<RGHandle, 7> DeclareCaptureOutputs(EnhancedRenderGraph& graph) const;
         void DeclareReflection(EnhancedRenderGraph& graph, const SceneLookupFrame& lookup, RGHandle owners) const;
         void DeclareFilter(EnhancedRenderGraph& graph, RGHandle owners) const;

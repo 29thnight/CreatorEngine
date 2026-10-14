@@ -7,6 +7,9 @@
 // itself (LX::Runtime, LX materials) and keeps its own name.
 
 #include "MaterialGraphSceneInput.h"
+#include "MaterialGraphFrameGeometry.h"
+#include "MaterialGraphWork.h"
+#include "MaterialGraphHybridVisibility.h"
 #include "MaterialGraphRenderBindings.h"
 #include "MaterialGraphSceneLookup.h"
 #include "MaterialGraphSceneRuntimeEffects.h"
@@ -83,7 +86,13 @@ namespace material_graph
         SceneProgramStats ProgramStats() const;
         // Submitted commands, not a GPU-visible draw count.
         uint32_t ShadowDrawCount() const;
-        // Successfully recorded mesh dispatches per cascade, before GPU culling.
+        uint32_t TemporalBucketSubmissionCount() const;
+        uint32_t BlendedBucketSubmissionCount() const;
+        std::array<uint32_t, 2> LayerBucketCounts() const;
+        // Actual ExecuteIndirect calls, recorded after successful bucket submission.
+        std::array<uint32_t, 3> ShadowBucketSubmissionCounts() const;
+        // Logical mesh commands per cascade, before GPU culling.
+        // A bucket can contain multiple commands in one native submission.
         std::array<uint32_t, 3> RecordedShadowMeshletDrawCounts() const;
         struct ShadowMeshletOutput {
             unsigned cascade{}, bin{};
@@ -105,6 +114,9 @@ namespace material_graph
         // CPU-prepared route categories, not GPU-visible counts. Graph raster
         // bins contain one candidate each and produce a GPU 0/1 instance count.
         GpuGeometryVisibility::PreparedStats CameraVisibilityStats() const;
+        // Diagnostic owner for submitted GPU work-list/argument readback gates.
+        std::shared_ptr<const GpuGeometryVisibility::Frame> CameraMeshletWork() const;
+        std::shared_ptr<const GpuGeometryVisibility::Frame> CameraDepthMeshletWork() const;
         std::array<GpuGeometryVisibility::PreparedStats, 3> ShadowVisibilityStats() const;
         MeshSurfaceCacheStats GeometryStats() const
         {
@@ -139,6 +151,7 @@ namespace material_graph
         void DeclareGeometry(EnhancedRenderGraph& graph) const;
         // METEOR.Scene.Cull: shadow meshlet lists, occluder depth, pyramid and camera culling.
         void DeclareCulling(EnhancedRenderGraph& graph) const;
+        void DeclareHistory(EnhancedRenderGraph& graph, RGHandle depth) const;
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
         // METEOR owns its current-frame depth prepass and pyramid.
         SceneSurfaceTargets::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
@@ -158,13 +171,16 @@ namespace material_graph
             float depth{};
         };
         std::vector<ForwardDraw> BlendedDraws() const;
-        RGHandle DeclareBlended(EnhancedRenderGraph& graph, std::size_t index, RGHandle lighting, RGHandle shadowMap,
+        RGHandle DeclareBlended(EnhancedRenderGraph& graph, const std::vector<std::size_t>& indices, RGHandle lighting, RGHandle shadowMap,
                                 const EnhancedForwardLighting& forward) const;
         // METEOR.Scene.Blended: every blended draw back to front over the composed
         // opaque scene, lit through the frame's light tiles.
         RGHandle DeclareBlendedStream(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle shadowMap,
                                       const EnhancedForwardLighting& tiles) const;
         RGHandle DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const;
+        std::shared_ptr<const SceneFrameGeometry> FrameGeometry() const;
+        std::shared_ptr<const SceneMaterialWork> MaterialWork() const;
+        std::shared_ptr<const SceneHybridVisibility> HybridVisibility() const;
         bool HasDraws() const;
         // Live callers provide the exact graph batch ticket; pending completion is
         // polled without waiting. An empty ticket requires prior successful CPU drain.
@@ -201,7 +217,18 @@ namespace material_graph
         IRenderDeviceServices* device_{};
         MeshSurfaceEvaluator geometry_;
         GpuGeometryVisibility visibility_;
+        GpuGeometryOcclusion cameraOcclusion_;
+        struct CameraHistory
+        {
+            std::shared_ptr<GpuGeometryOcclusion::History> pyramid;
+            FrameCameraSnapshot camera;
+            std::uint64_t temporalRevision{};
+        };
+        std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<CameraHistory>> cameraHistories_;
         RenderBindingCache bindings_;
+        LX::Runtime::ComputePipeline indirectCommands_;
+        HybridVisibilityPipelines hybridPipelines_;
+        std::array<LX::Runtime::ComputePipeline,4> materialWorkPipelines_;
         SceneLookupCache lookup_;
         SceneRuntimeEffectsResources runtimeEffects_;
         SceneSubsurfaceResources subsurface_;
@@ -226,7 +253,7 @@ namespace material_graph
         RGHandle DeclareShading(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
                                 RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
                                 bool transmissionStage, std::optional<std::size_t> blended = {},
-                                EnhancedForwardLighting forward = {}) const;
+                                EnhancedForwardLighting forward = {}, std::vector<std::size_t> blendedGroup = {}) const;
         RGHandle DeclareRuntimeEffects(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
                                        RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
                                        bool transmissionStage, std::optional<std::size_t> blended,

@@ -204,14 +204,16 @@ void Run(const std::filesystem::path& root)
     const RHIPipelineLayoutParam host[] = {RHILayout::Cbv(0)};
     Check(CreatePassLayout(roots, product.layout, host, {}, false, layout, error),
           "Append independent material root ranges");
-    Check(layout.uniformSlot == 1u && layout.textureSlot == 2u && layout.samplerSlot == 3u,
+    Check(layout.uniformSlot == 1u && layout.textureSlot == 2u && layout.samplerSlot == 3u && layout.descriptorIndexSlot == 4u,
           "Exact appended root slots");
     PassLayout normalLayout;
     Check(CreatePassLayout(roots, normalProduct.layout, host, {}, false, normalLayout, error),
         "Create BC5 graph pass layout");
     const auto acceptedLayout = layout.handle;
-    for (const auto conflict : {RHILayout::Cbv(2), RHILayout::Constants(2, 1), RHILayout::Srv(16),
-                                RHILayout::SrvTable(3, 15), RHILayout::SamplerTable(5, 1)})
+    for (const auto conflict : {RHILayout::Cbv(2), RHILayout::Constants(2, 1), RHILayout::Cbv(DescriptorIndexRegister), RHILayout::Srv(TextureRegister),
+                                RHILayout::SrvTable(3, TextureRegister - 1),
+                                RHILayout::Srv(TextureRegister + BindlessTextureCapacity - 1),
+                                RHILayout::SamplerTable(5, 1)})
         Check(!CreatePassLayout(roots, product.layout, {&conflict, 1}, {}, false, layout, error) &&
                   layout.handle == acceptedLayout,
               "Conflicting host range preserves accepted layout");
@@ -316,6 +318,10 @@ void Run(const std::filesystem::path& root)
         Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted),
               "Missing sampler root retains accepted render packet");
         wrongLayout = layout;
+        wrongLayout.descriptorIndexSlot.reset();
+        Check(!RenderBindingCache::ValidatePass(device, *packet, wrongLayout, error),
+              "Pass binding rejects a missing bindless descriptor-index root");
+        wrongLayout = layout;
         wrongLayout.samplerSlot = layout.uniformSlot;
         Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted),
               "Aliased root slots retain accepted render packet");
@@ -394,8 +400,9 @@ void Run(const std::filesystem::path& root)
         std::string messages;
         Check(device.DrainDebugMessages(messages) == 0, "D3D12 validation: " + messages);
     }
-    Check(textures.GetUploadFailureCount() == 1 && textures.GetStats().uploads == 1,
-          "Only the injected missing-pixels upload failed; valid texture upload was reused");
+    Check(textures.GetUploadFailureCount() == 1 && textures.GetStats().uploads == 2,
+          "Only the injected missing-pixels upload failed; SRGB and BC5 textures each upload once: failures=" +
+              std::to_string(textures.GetUploadFailureCount()) + " uploads=" + std::to_string(textures.GetStats().uploads));
     device.ReleaseReadback(readback);
     device.ReleaseTexture(target);
     packet.reset();

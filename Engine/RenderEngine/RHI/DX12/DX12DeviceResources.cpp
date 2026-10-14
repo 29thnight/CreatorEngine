@@ -263,6 +263,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     m_drawIndirectSignature.Reset();
     m_drawIndexedIndirectSignature.Reset();
     m_dispatchMeshIndirectSignature.Reset();
+    m_meshBatchSignatures.clear();
     m_meshShaderCapabilities = {};
     m_lastAdmittedFenceValue = 0;
 
@@ -464,6 +465,23 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     if (FAILED(hr)) { outError = "커맨드 리스트 생성 실패 " + HrToString(hr); return false; }
     // Mesh support is optional. Feature level alone is not sufficient: require
     // shader model, hardware tier and the interfaces used by pipeline/dispatch.
+    m_atomicCapabilities = {};
+    D3D12_FEATURE_DATA_SHADER_MODEL atomicModel{D3D_SHADER_MODEL_6_6};
+    D3D12_FEATURE_DATA_D3D12_OPTIONS1 integerOptions{};
+    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &atomicModel, sizeof(atomicModel))) &&
+        atomicModel.HighestShaderModel >= D3D_SHADER_MODEL_6_6 &&
+        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &integerOptions, sizeof(integerOptions))) &&
+        integerOptions.Int64ShaderOps)
+    {
+        m_atomicCapabilities.bufferInt64Min = true;
+        D3D12_FEATURE_DATA_D3D12_OPTIONS9 atomicOptions{};
+        D3D12_FEATURE_DATA_FORMAT_SUPPORT format{DXGI_FORMAT_R32G32_UINT};
+        m_atomicCapabilities.typedInt64Min =
+            SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS9, &atomicOptions, sizeof(atomicOptions))) &&
+            atomicOptions.AtomicInt64OnTypedResourceSupported &&
+            SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &format, sizeof(format))) &&
+            (format.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) != 0;
+    }
     D3D12_FEATURE_DATA_D3D12_OPTIONS7 meshOptions{};
     D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{ D3D_SHADER_MODEL_6_5 };
     ComPtr<ID3D12Device2> meshDevice;
@@ -536,7 +554,10 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     // shader-visible descriptor page·샘플러 힙. page는 recording 단위로
     // 제출하고 실제 peakRecordingDescriptors로 용량을 조정한다.
-    constexpr uint32_t kDescriptorsPerPage = 4096;
+    // A recording retains camera + three shadow views, each with two input
+    // tables of up to 4096 mesh bins, alongside transform/material descriptors.
+    // These tables must coexist in one immutable shader-visible heap version.
+    constexpr uint32_t kDescriptorsPerPage = 131072;
     if (!m_descriptorRecycler.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
         kDescriptorsPerPage, kFrameCount, outError))
     {
@@ -695,6 +716,7 @@ void DX12DeviceResources::Shutdown()
     m_drawIndirectSignature.Reset();
     m_drawIndexedIndirectSignature.Reset();
     m_dispatchMeshIndirectSignature.Reset();
+    m_meshBatchSignatures.clear();
     m_meshShaderCapabilities = {};
     for (auto& lists : m_retiredCommandLists) lists.clear();
     m_immediateEncoder.reset();
@@ -1527,6 +1549,16 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
         case D3D12_MESSAGE_SEVERITY_MESSAGE:    severity = "MESSAGE";    break;
         }
 
+        // ExecuteIndirect root arguments are legal, but GBV cannot precisely
+        // track their promoted COMMON resources. Preserve this coverage notice
+        // separately; never waive an ERROR or an actual resource-state error.
+        if (message->Severity == D3D12_MESSAGE_SEVERITY_WARNING &&
+            message->ID == D3D12_MESSAGE_ID_GPU_BASED_VALIDATION_RESOURCE_STATE_IMPRECISE)
+        {
+            isProblem = false;
+            severity = "VALIDATION-COVERAGE";
+            std::fprintf(stderr, "DX12_GBV_COVERAGE_LIMIT id=%u %s\n", unsigned(message->ID), message->pDescription);
+        }
         if (isProblem) ++problems;
 
         outMessages += "[";
@@ -2219,6 +2251,15 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     for (const RHIBindingDesc& desc : descs)
     {
         if (nullptr == ResolveBinding(desc) && !desc.allowNull) return {};
+        if (desc.kind == RHIBindingDesc::Kind::ShaderResource && desc.dim == RHIBindingDesc::Dim::Buffer)
+        {
+            const auto stride = desc.structureByteStride ? desc.structureByteStride : 4u;
+            auto* buffer = ResolveBinding(desc);
+            if (!desc.numElements || (desc.structureByteStride &&
+                (desc.structureByteStride % 4 || desc.structureByteStride > 2048)) ||
+                (buffer && (buffer->GetDesc().Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
+                    (uint64_t(desc.firstElement) + desc.numElements) * stride > buffer->GetDesc().Width))) return {};
+        }
     }
 
     const auto range = m_descriptorRecycler.Allocate(static_cast<uint32_t>(descs.size()));
@@ -2268,6 +2309,14 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
         srv.Format = ResolveSrvFormat(desc, resource);
         switch (desc.dim)
         {
+        case RHIBindingDesc::Dim::Buffer:
+            srv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srv.Format = desc.structureByteStride ? DXGI_FORMAT_UNKNOWN : DXGI_FORMAT_R32_TYPELESS;
+            srv.Buffer.FirstElement = desc.firstElement;
+            srv.Buffer.NumElements = desc.numElements;
+            srv.Buffer.StructureByteStride = desc.structureByteStride;
+            srv.Buffer.Flags = desc.structureByteStride ? D3D12_BUFFER_SRV_FLAG_NONE : D3D12_BUFFER_SRV_FLAG_RAW;
+            break;
         case RHIBindingDesc::Dim::Texture2DArray:
             srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
             srv.Texture2DArray.MostDetailedMip = desc.mostDetailedMip;
@@ -2542,6 +2591,15 @@ namespace
     {
         if (nullptr != resource && nullptr != name) resource->SetName(name);
     }
+}
+
+bool DX12DeviceResources::IsAtomicMin64Buffer(RHIBufferHandle buffer) const
+{
+    auto* resource = m_resourceTable.Resolve(buffer);
+    if (!m_atomicCapabilities.bufferInt64Min || !resource) return false;
+    const auto desc = resource->GetDesc();
+    return desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && desc.Width != 0 && desc.Width % 8 == 0 &&
+        (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
 }
 
 bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
@@ -3041,4 +3099,42 @@ bool DX12DeviceResources::DetachSwapChain(std::string& outError)
     m_hostSubmissionTicket = {};
     m_hostFenceValue = 0;
     return true;
+}
+
+ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(ID3D12RootSignature* rootSignature, std::span<const uint32_t> roots, bool indexed)
+{
+    std::lock_guard lock(m_meshBatchSignatureMutex);
+    const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + (indexed ? 36 : 12);
+    std::vector<uint32_t> key(roots.begin(), roots.end());
+    key.push_back(indexed ? 1u : 0u);
+    auto& signature = m_meshBatchSignatures[{rootSignature, key}];
+    if (!signature)
+    {
+        std::vector<D3D12_INDIRECT_ARGUMENT_DESC> descriptions;
+        uint64_t seen{};
+        for (const auto root : roots)
+        {
+            const auto slot = root & 0x7fffffffu;
+            // Native indirect root arguments must be strictly increasing.
+            if (slot >= 64 || (seen >> slot)) return nullptr;
+            seen |= uint64_t{1} << slot;
+            D3D12_INDIRECT_ARGUMENT_DESC desc{};
+            desc.Type = (root & 0x80000000u) ? D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW
+                : D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
+            desc.ConstantBufferView.RootParameterIndex = slot;
+            descriptions.push_back(desc);
+        }
+        D3D12_INDIRECT_ARGUMENT_DESC dispatch{};
+        if (indexed) {
+            D3D12_INDIRECT_ARGUMENT_DESC indexView{};
+            indexView.Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
+            descriptions.push_back(indexView);
+        }
+        dispatch.Type = indexed ? D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED : D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
+        descriptions.push_back(dispatch);
+        const D3D12_COMMAND_SIGNATURE_DESC desc{stride, static_cast<UINT>(descriptions.size()), descriptions.data(), 0};
+        if (FAILED(GetDevice()->CreateCommandSignature(&desc, rootSignature,
+            IID_PPV_ARGS(&signature)))) return nullptr;
+    }
+    return signature.Get();
 }

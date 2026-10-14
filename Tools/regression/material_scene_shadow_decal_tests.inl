@@ -178,7 +178,9 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
     }
     else
     {
-        Check(graph->Execute(error), "Shadow/Decal sequential " + error);
+        const bool executed = graph->Execute(error);
+        if (!executed) { std::string diagnostic; device.DrainDebugMessages(diagnostic); std::cerr << diagnostic << std::endl; }
+        Check(executed, "Shadow/Decal sequential " + error);
     }
     Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error), "Shadow/Decal submit");
     if (!workers)
@@ -239,7 +241,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     WaitSceneProgram(host, context, generation);
     WaitSceneProgram(host, context, volumeGeneration);
     unsigned frames{}, coveredPixels{};
-    for (unsigned fixture = 0; fixture < 15; ++fixture)
+    for (unsigned fixture = 0; fixture < 17; ++fixture)
     {
         for (unsigned workers : {0u, 1u, 4u})
         {
@@ -331,8 +333,20 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                       "Author smaller cooked shadow clusters " + error);
                 std::cout << "SHADOW_COOKED_CLUSTER_BOUNDARY_OK incompatibleBudgetRejected=1 recookedMaxVertices=3\n";
             }
-            const bool sealed = SealScene(shadowView,
-                {fixture == 12 ? &volume.draw : &geometry.draw, 1}, sealBudget, input, error);
+            auto bucketDraws = std::array{geometry.draw, geometry.draw};
+            if (fixture >= 15) {
+                for (auto& draw : bucketDraws) draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
+                auto& second = bucketDraws[1];
+                second.geometryKey += 1000;
+                second.worldMatrix.m[3][0] = .25f;
+                second.worldMatrix.m[3][2] = -.2f;
+                Check(BuildInstance(generation, {id, {{1200, fixture == 16 ? .25 : .75}}, {}},
+                    [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; },
+                    second.materialGraphInstance, error), "Independent shadow bucket instance " + error);
+            }
+            const auto sceneDraws = fixture >= 15 ? std::span<const std::remove_cvref_t<decltype(geometry.draw)>>(bucketDraws)
+                : std::span<const std::remove_cvref_t<decltype(geometry.draw)>>(fixture == 12 ? &volume.draw : &geometry.draw, 1);
+            const bool sealed = SealScene(shadowView, sceneDraws, sealBudget, input, error);
             Check(sealed, "Shadow seal " + error);
             if (fixture != 12)
             {
@@ -344,7 +358,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             Check(device.BeginFrame(error), "Shadow begin");
             textures.BeginFrame(context.frameId);
             Check(host.PrepareResidency(context, input, error), "Shadow residency");
-            auto graph = std::make_shared<EnhancedRenderGraph>(device);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 pool.BeginFrame(static_cast<unsigned>(context.frameId));
@@ -366,9 +380,9 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             desc.clearDepth = fixture == 8 ? .2f : 1.f;
             RHITextureHandle texture;
             Check(device.CreateTexture(desc, texture, error), "Shadow depth array");
-            const auto map = graph->ImportTexture(texture, RHIResourceState::Common, "Probe.LXShadow");
+            auto map = graph->Write(graph->ImportTexture(texture, RHIResourceState::Common, "Probe.LXShadow"));
             const float clear = fixture == 8 ? .2f : 1.f;
-            graph->AddPass("Probe.LXShadow.Clear", {{map, RHIResourceState::DepthWrite}},
+            graph->AddPass("Probe.LXShadow.Clear", {{map, RHIResourceState::DepthWrite, RGAccessMode::Write}},
                            [map, clear, &device](const auto& execution) {
                                for (unsigned cascade = 0; cascade < 3; ++cascade)
                                {
@@ -382,13 +396,13 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                            });
             host.DeclareGeometry(*graph);
             host.DeclareCulling(*graph);
-            host.DeclareShadow(*graph, map);
+            map = host.DeclareShadow(*graph, map);
             if (shadow.enabled)
             {
                 bool rejected = false;
                 try
                 {
-                    host.DeclareShadow(*graph, map);
+                    map = host.DeclareShadow(*graph, map);
                 }
                 catch (const std::runtime_error&)
                 {
@@ -410,7 +424,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             RHIReadback readback;
             Check(device.CreateReadback(16, 16, RHIFormat::D32Float, 3, readback, error), "Shadow readback");
             graph->AddPass(
-                "Probe.LXShadow.Read", {{map, RHIResourceState::CopySource}},
+                "Probe.LXShadow.Read", {{map, RHIResourceState::CopySource, RGAccessMode::Read}},
                 [map, readback](const auto& execution) {
                     for (unsigned cascade = 0; cascade < 3; ++cascade)
                     {
@@ -429,7 +443,14 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 Check(host.ShadowCasterCounts()[2] == (indirect ? 1u : 0u),
                       "Rejected cascade is a GPU candidate or excluded from the direct stream");
             }
-            const bool casts = fixture == 0 || fixture == 2 || fixture == 4 || fixture == 7 || fixture == 9 ||
+            if (fixture >= 15) {
+                Check(host.ShadowDrawCount() == 6, "Two logical commands in each shadow cascade");
+                for (auto count : host.ShadowBucketSubmissionCounts())
+                    Check(count == 1, "Two instances require exactly one native submission per cascade");
+                for (auto count : host.ShadowCasterCounts())
+                    Check(count == 2, "Both material instances retain independent cascade commands");
+            }
+            const bool casts = fixture >= 15 || fixture == 0 || fixture == 2 || fixture == 4 || fixture == 7 || fixture == 9 ||
                                fixture == 10 || fixture == 13 || fixture == 14;
             for (unsigned cascade = 0; cascade < 3; ++cascade)
             {
@@ -439,7 +460,9 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     for (unsigned x = 0; x < 16; ++x)
                     {
                         const bool covered = casts && !(fixture == 14 && cascade == 2) && x >= left && x < left + 12 && y >= 2 && y < 14;
-                        Near(mapped.At(x, y, 0, cascade), covered ? .4 : clear, "Graph alpha/cascade shadow");
+                        const bool secondCovered = fixture == 15 && x >= 4 + cascade && x < 16 + cascade && y >= 2 && y < 14;
+                        Near(mapped.At(x, y, 0, cascade), secondCovered ? .2 : covered ? .4 : clear,
+                            "Graph alpha/cascade shadow, independent bucket roots");
                         coveredPixels += covered;
                     }
                 }
@@ -451,6 +474,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
         }
     }
     host.ShutdownAfterIdle();
+    std::cout << "SHADOW_MATERIAL_BUCKET_OK frames=6 instances=2 cascades=3 workers=0,1,4\n";
     std::cout << "LX_MATERIAL_SCENE_SHADOW_OK frames=" << frames << " covered=" << coveredPixels << " checks=" << checks
               << " gpuComponents=" << gpuComponents << " validation=0\n";
 }

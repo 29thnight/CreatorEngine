@@ -148,7 +148,8 @@ public:
     // distinct content so repeated frames keep one geometry identity. Granular
     // and incomplete views pass through unchanged for the seal to judge.
     // view is a copy so resolved may alias the caller's source.
-    [[nodiscard]] bool Resolve(const RHIModelMeshView view, RHIModelMeshView& resolved, std::string& error)
+    [[nodiscard]] bool Resolve(const RHIModelMeshView view, RHIModelMeshView& resolved, std::string& error,
+                               const experiment::MeshletBuildSettings& settings = {})
     {
         resolved = view;
         if (view.handle.domain == assets::ModelMeshDomain::Granular || !view.IsComplete())
@@ -156,6 +157,10 @@ public:
         const auto* bytes = static_cast<const std::byte*>(view.vertexData);
         for (const auto& entry : m_loose)
         {
+            const auto& cookedSettings = m_meshes[entry.mesh].payload->mesh.meshlets.settings;
+            if (cookedSettings.profileVersion != settings.profileVersion || cookedSettings.builderVersion != settings.builderVersion ||
+                cookedSettings.meshoptimizerVersion != settings.meshoptimizerVersion || cookedSettings.maxVertices != settings.maxVertices ||
+                cookedSettings.maxTriangles != settings.maxTriangles || cookedSettings.coneWeight != settings.coneWeight) continue;
             if (entry.meshId == view.handle.meshId && entry.modelId == view.handle.modelId &&
                 entry.mask == view.vertexAttributeMask &&
                 std::ranges::equal(entry.vertices, std::span(bytes, static_cast<std::size_t>(view.vertexBytes))) &&
@@ -165,7 +170,7 @@ public:
                 return true;
             }
         }
-        if (!Cook(view, resolved, error))
+        if (!Cook(view, resolved, error, settings))
             return false;
         m_loose.push_back({view.handle.meshId, view.handle.modelId, view.vertexAttributeMask,
             {bytes, bytes + view.vertexBytes}, {view.indexData, view.indexData + view.indexCount},

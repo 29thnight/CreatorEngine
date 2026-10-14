@@ -95,17 +95,22 @@ Vector SceneTransmissionIntegral(const MaterialProbe::Reference::Material& glass
 void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                         own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
-                        const own::shared_owner<const Instance>& surfaceBackground)
+                        const own::shared_owner<const Instance>& surfaceBackground, bool filmOnly = false)
 {
     const auto background = SceneCooked(surfaceBackground);
-    const std::array products{RefractionProduct(root, false), RefractionProduct(root, true),
-                              RefractionProduct(root, false, true)};
+    std::array<VerifiedProduct, 3> products;
+    if (!filmOnly)
+    {
+        products[0] = RefractionProduct(root, false);
+        products[1] = RefractionProduct(root, true);
+    }
+    products[2] = RefractionProduct(root, false, true);
     GenerationStore store;
     experiment::AssetId graphId;
     Check(Uuid::TryParse("88888888-8888-4888-8888-888888888888", graphId.value), "Refraction graph identity");
     std::string error;
     std::array<own::shared_owner<const Generation>, 3> generations;
-    for (unsigned i = 0; i < generations.size(); ++i)
+    for (unsigned i = filmOnly ? 2u : 0u; i < generations.size(); ++i)
     {
         generations[i] = store.Load(
             graphId,
@@ -146,11 +151,12 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     WaitSceneProgram(host, context, background->generation);
     for (const auto& generation : generations)
     {
-        WaitSceneProgram(host, context, generation);
+        if (generation)
+            WaitSceneProgram(host, context, generation);
     }
     std::uint64_t frames{}, pixels{}, hits{}, misses{}, shifted{}, tir{}, maskedHoles{}, hybridPixels{}, failures{},
         roughChecks{}, roughMixed{};
-    for (unsigned fixture = 0; fixture < 8; ++fixture)
+    for (unsigned fixture = filmOnly ? 7u : 0u; fixture < 8; ++fixture)
     {
         for (unsigned workers : {0u, 1u, 4u})
         {
@@ -232,7 +238,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
             Check(tiles.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 pool.BeginFrame(static_cast<std::uint32_t>(context.frameId));
@@ -249,17 +255,18 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                   "Refraction budget failure preserves prior frame");
             ++failures;
             gbuffer.Declare(*graph, context);
-            const auto outputs = gbuffer.GetOutputs();
+            auto outputs = gbuffer.GetOutputs();
             host.DeclareGeometry(*graph);
             host.DeclareCulling(*graph);
-            host.DeclareGBuffer(*graph, outputs);
+            outputs = host.DeclareGBuffer(*graph, outputs);
+            host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
             aoDesc.format = RHIFormat::RG16Float;
             aoDesc.allowRenderTarget = true;
             aoDesc.clearColor[0] = .25f;
-            const auto ao = graph->CreateTexture(aoDesc);
-            graph->AddPass("Probe.Refraction.AO", {{ao, RHIResourceState::RenderTarget}}, [&](const auto& execution) {
+            const auto ao = graph->Write(graph->CreateTexture(aoDesc));
+            graph->AddPass("Probe.Refraction.AO", {{ao, RHIResourceState::RenderTarget, RGAccessMode::Write}}, [&](const auto& execution) {
                 const auto texture = execution.ResolveHandle(ao);
                 const auto target = device.CreateRenderTargets({&texture, 1}, nullptr);
                 const float clear[]{.25f, 0, 0, 0};
@@ -278,7 +285,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(24, 24, format, 1, readbacks[i], error), "Refraction readback");
                 graph->AddPass(
-                    "Probe.Refraction.Texture", {{handle, RHIResourceState::CopySource}},
+                    "Probe.Refraction.Texture", {{handle, RHIResourceState::CopySource, RGAccessMode::Read}},
                     [readback = readbacks[i], handle](const auto& execution) {
                         execution.encoder->CopyToReadback(readback, execution.ResolveHandle(handle));
                     },
@@ -290,14 +297,14 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             copy(3, surfaceOutputs.depth, RHIFormat::D32Float);
             copy(4, surfaceOutputs.bitmask, RHIFormat::R32Uint);
             copy(10, outputs.depth, RHIFormat::D32Float);
-            copy(5, graph->FindImportedTexture(accepted->Inputs()[0]), RHIFormat::RGBA32Float);
-            copy(6, graph->FindImportedTexture(accepted->Inputs()[1]), RHIFormat::RGBA32Float);
-            copy(8, graph->FindImportedTexture(host.ForwardLookupFrame()->Inputs()[1]), RHIFormat::RGBA32Float);
-            copy(9, graph->FindImportedTexture(host.ForwardLookupFrame()->Inputs()[10]), RHIFormat::RGBA32Float);
+            copy(5, accepted->GraphInputs(*graph)[0], RHIFormat::RGBA32Float);
+            copy(6, accepted->GraphInputs(*graph)[1], RHIFormat::RGBA32Float);
+            copy(8, host.ForwardLookupFrame()->GraphInputs(*graph)[1], RHIFormat::RGBA32Float);
+            copy(9, host.ForwardLookupFrame()->GraphInputs(*graph)[10], RHIFormat::RGBA32Float);
             Check(device.CreateBufferReadback(24 * 24 * sizeof(SceneRefractionSample), readbacks[7], error),
                   "Refraction samples readback");
             graph->AddPass(
-                "Probe.Refraction.Samples", {{accepted->GraphSamples(*graph), RHIResourceState::CopySource}},
+                "Probe.Refraction.Samples", {{accepted->GraphSamples(*graph), RHIResourceState::CopySource, RGAccessMode::Read}},
                 [readback = readbacks[7], buffer = accepted->Samples()](const auto& execution) {
                     execution.encoder->CopyBufferToReadback(readback, buffer);
                 },
@@ -578,9 +585,12 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             std::cout << "LX_REFRACTION_FIXTURE_OK fixture=" << fixture << " workers=" << workers << '\n';
         }
     }
-    Check(pixels && hits && misses && shifted && tir && maskedHoles && hybridPixels && failures && roughChecks &&
-              roughMixed,
-          "Refraction fixture coverage");
+    if (filmOnly)
+        Check(frames == 3 && pixels && hits + misses == pixels && failures >= frames, "Refraction film fixture coverage");
+    else
+        Check(pixels && hits && misses && shifted && tir && maskedHoles && hybridPixels && failures && roughChecks &&
+                  roughMixed,
+              "Refraction fixture coverage");
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
 
@@ -589,7 +599,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     std::string messages;
     const auto validation = device.DrainDebugMessages(messages);
     Check(validation == 0, "Refraction native GPU validation: " + messages);
-    std::cout << "LX_MATERIAL_SCENE_REFRACTION_OK frames=" << frames << " pixels=" << pixels << " hits=" << hits
+    std::cout << (filmOnly ? "LX_MATERIAL_SCENE_REFRACTION_FILM_OK frames=" : "LX_MATERIAL_SCENE_REFRACTION_OK frames=") << frames << " pixels=" << pixels << " hits=" << hits
               << " misses=" << misses << " shifted=" << shifted << " tir=" << tir << " maskedHoles=" << maskedHoles
               << " hybridPixels=" << hybridPixels << " failures=" << failures << " roughChecks=" << roughChecks
               << " roughMixed=" << roughMixed << " checks=" << checks << " gpuComponents=" << gpuComponents

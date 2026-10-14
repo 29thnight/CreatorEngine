@@ -3,14 +3,14 @@
 
 RHIFormat SceneSurfaceTargets::GetRenderTargetFormat(uint32_t index)
 {
-    return index < 4 ? RHIFormat::RGBA16Float : index == 4 ? RHIFormat::R32Uint : RHIFormat::Unknown;
+    return index < 4 ? RHIFormat::RGBA16Float : index == 4 ? RHIFormat::R32Uint : index == 5 ? RHIFormat::RG32Uint : RHIFormat::Unknown;
 }
 
 void SceneSurfaceTargets::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
     static const char* names[kRenderTargetCount] = {
         "GBuffer.Diffuse", "GBuffer.MetalRough", "GBuffer.Normal",
-        "GBuffer.Emissive", "GBuffer.Bitmask"};
+        "GBuffer.Emissive", "GBuffer.Bitmask", "METEOR.Scene.Visibility"};
     std::array<RGHandle, kRenderTargetCount> colors{};
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
     const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
@@ -42,7 +42,7 @@ void SceneSurfaceTargets::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         depth = graph.Write(depth);
     }
     usages.push_back({depth, RHIResourceState::DepthWrite, access});
-    m_outputs = {colors[0], colors[1], colors[2], colors[3], colors[4], depth};
+    m_outputs = {colors[0], colors[1], colors[2], colors[3], colors[4], depth, colors[5]};
     graph.AddPass("METEOR.Scene.Surface.Clear", usages,
         [colors, depth, &context](const EnhancedRenderGraph::ExecuteContext& execution)
         {

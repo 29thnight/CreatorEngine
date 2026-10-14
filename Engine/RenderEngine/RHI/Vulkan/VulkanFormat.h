@@ -23,6 +23,7 @@ inline VkFormat ToVulkan(RHIFormat format)
     case RHIFormat::RGBA32Float:    return VK_FORMAT_R32G32B32A32_SFLOAT;
     case RHIFormat::RG16Float:      return VK_FORMAT_R16G16_SFLOAT;
     case RHIFormat::RG32Float:      return VK_FORMAT_R32G32_SFLOAT;
+    case RHIFormat::RG32Uint:       return VK_FORMAT_R32G32_UINT;
     case RHIFormat::RGB32Float:     return VK_FORMAT_R32G32B32_SFLOAT;
     case RHIFormat::R16Float:       return VK_FORMAT_R16_SFLOAT;
     case RHIFormat::R16Unorm:       return VK_FORMAT_R16_UNORM;

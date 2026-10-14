@@ -110,11 +110,11 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                                                                  : std::vector<EnhancedDecalPass::Item>{});
                     Check(decal.PrepareFrame(context, error),
                           "Decal preparation " + error);
-                    const bool versioned = policy != 0;
+                    const bool versioned = true; // All Scene fixtures use the production RG2 wiring.
                     const auto readAccess = versioned ? RGAccessMode::Read : RGAccessMode::LegacyState;
                     const auto writeAccess = versioned ? RGAccessMode::Write : RGAccessMode::LegacyState;
                     auto graph = std::make_shared<EnhancedRenderGraph>(
-                        device, versioned ? RGSchedulingMode::ExplicitVersioned : RGSchedulingMode::DeclarationOrder,
+                        device, RGSchedulingMode::ExplicitVersioned,
                         policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
                     if (workers)
                     {
@@ -129,6 +129,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     host.DeclareGeometry(*graph);
                     host.DeclareCulling(*graph);
                     auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
+                    host.DeclareHistory(*graph, outputs.depth);
                     auto decalInputs = outputs;
                     if (fixture == 6)
                     {

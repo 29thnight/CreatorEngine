@@ -52,6 +52,7 @@ namespace LiveSlots
     constexpr const char* kGBufferEmissive   = "GBuffer.Emissive";
     constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
     constexpr const char* kGBufferDepth      = "GBuffer.Depth";
+    inline constexpr const char* kVisibility = "METEOR.Scene.Visibility";
 
     constexpr const char* kTemporalMotion = "Temporal.Motion";
     constexpr const char* kTemporalReactive = "Temporal.Reactive";
