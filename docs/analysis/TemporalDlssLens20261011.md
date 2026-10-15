@@ -20,3 +20,7 @@ FOV와 near/far 변경이 실제 projection/depth와 SDK camera 값에 반영되
 - [Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h](../../Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h)
 - [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp](../../Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp)
 - [Tools/temporal-validation/Compare-TemporalLens.py](../../Tools/temporal-validation/Compare-TemporalLens.py)
+
+## 이전 기록
+
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/TemporalDlssLens20261011.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

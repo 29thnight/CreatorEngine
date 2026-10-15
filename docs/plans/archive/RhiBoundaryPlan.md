@@ -18,7 +18,7 @@ persistent heap policy와 device memory budget coordinator는 여러 consumer의
 
 공통 헤더 존재, native include 건수, 예전 17개 pass 목록만으로 RHI 완료를 판정하지 않는다. 현재 METEOR mesh indirect·atomic/raster capability, temporal vendor API, upload/retire·resize/device-loss를 각 backend에서 확인해야 한다. 선언만 있고 호출되지 않는 표면과 실제 제품 사용을 구분한다.
 
-옛 DX11 wrapper·고정 GBuffer/Deferred 이식 목록·Vulkan 20/20 결과는 당시 전환 기록이다. 이번 문서 개정은 현재 GPU 실행을 하지 않았다. 상세 현재 메모리/queue 설계는 [RhiGpuMemoryLifetimeDesign](../../design/RhiGpuMemoryLifetimeDesign.md)와 [RhiQueueContractPlan](../RhiQueueContractPlan.md), 실제 교차 수용은 [BackendParityPlan](../BackendParityPlan.md)을 따른다.
+옛 DX11 wrapper·고정 GBuffer/Deferred 이식 목록·Vulkan 20/20 결과는 당시 전환 기록이다. 이번 문서 개정은 현재 GPU 실행을 하지 않았다. 상세 현재 메모리/queue 설계는 [RhiGpuMemoryLifetimeDesign](../../design/RhiGpuMemoryLifetimeDesign.md)와 [RhiQueueContractQ0](../../analysis/RhiQueueContractQ0_20261008.md), 실제 교차 수용은 [BackendParityPlan](../BackendParityPlan.md)을 따른다.
 
 ## 유지하는 후속 원칙
 
@@ -34,3 +34,7 @@ persistent heap policy와 device memory budget coordinator는 여러 consumer의
 - [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp](../../../Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp)
 - [Engine/RenderEngine/RHI/Vulkan/VulkanRenderServices.cpp](../../../Engine/RenderEngine/RHI/Vulkan/VulkanRenderServices.cpp)
 - [Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp](../../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp)
+
+## 이전 기록
+
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/plans/archive/RhiBoundaryPlan.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

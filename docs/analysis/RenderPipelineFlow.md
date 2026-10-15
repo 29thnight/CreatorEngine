@@ -50,3 +50,7 @@ Vulkan도 같은 파이프라인 기술과 그래프를 쓰지만 별도의 devi
 - [Engine/RenderEngine/MaterialGraphSceneStages.inl](../../Engine/RenderEngine/MaterialGraphSceneStages.inl)
 - [Editor/EngineEntry/App.cpp](../../Editor/EngineEntry/App.cpp)
 - [Player/PlayerApp.cpp](../../Player/PlayerApp.cpp)
+
+## 이전 기록
+
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/RenderPipelineFlow.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

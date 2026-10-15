@@ -2,9 +2,13 @@
 
 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
+<a id="1-실제-소비-경로와-대체-범위"></a>
+
 ## 현재 상태와 범위
 
 C# pipeline IR/build/registry 연결은 미구현 목표다. 실제 실행은 BuildPipelineDesc의 C++ 조립이며 versioned graph와 METEOR native 알고리즘은 이미 존재한다. 새 작업은 이 고정 조립의 저작 경계를 교체하고 기존 GPU 실행을 재사용하는 것이다. [목표 구조](../design/RenderPipelineTargetArchitecture.md)가 계약 정본이다.
+
+<a id="3-구현-슬라이스--2026-10-01-재산정-32인일"></a>
 
 ## 구현 순서
 
@@ -16,11 +20,19 @@ C# pipeline IR/build/registry 연결은 미구현 목표다. 실제 실행은 Bu
 - CSRP-5: 현행 기본 pipeline을 C# 저작으로 재구성하고 같은 sealed 입력에서 기존 C++ 조립과 topology·HDR·display·validation을 비교한다
 - CSRP-6: 조건·fallback·native escape·queue 선호와 reload/fence 수명을 닫는다. viewer와 실제 실행 generation을 대조한다
 
+<a id="2-공통-계약"></a>
+
+<a id="4-제외분리한-작업"></a>
+
+<a id="2026-10-01-editor-viewer--설정-착지-완료-조건"></a>
+
 ## 안전·제품 경계
 
 Build는 세대 변화 때 호출하며 Render/CommandBuild/RHI 스레드에 CLR callback을 넣지 않는다. old generation은 실제 최종 GPU 소비까지 유지한다. SceneRenderProfile은 파라미터이고 topology 저작을 대체하지 않는다. Project Graphics의 선택·설정 UI는 공통 schema를 사용해야 한다.
 
 기본 geometry·shadow·material·vendor SDK 본체는 native에 남는다. barrier·descriptor·fence를 C#에서 직접 제어하거나 외부 DLL Pass ABI를 제공하는 것은 범위가 아니다. shader-only template와 pass-domain visual graph도 별도 범위다.
+
+<a id="5-완료-판정과-공수-규칙"></a>
 
 ## 검증·산정
 

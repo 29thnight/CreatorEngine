@@ -20,3 +20,7 @@ view Begin은 실제 render/display 크기, 재구성 설정 또는 provider 변
 - [Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp](../../Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp)
 - [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp](../../Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp)
 - [Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.cpp](../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.cpp)
+
+## 이전 기록
+
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/TemporalDlssTransitions20261011.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

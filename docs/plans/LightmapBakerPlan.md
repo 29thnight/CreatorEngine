@@ -2,11 +2,17 @@
 
 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
+<a id="0-왜-이-페이즈인가--gi가-있어도-라이트맵을-쓴다"></a>
+
+<a id="1-삭제된-구현--측정-2026-08-25"></a>
+
 ## 구현된 것과 비어 있는 것
 
 LightMapping에는 lightmapIndex, 기존 철자의 ligthmapResolution, lightmapScale, offset/tiling 값이 있다. MeshRenderer에서 proxy로 값이 전달된다. 이 직렬화/프록시 표면만으로 UV 생성·bake dispatch·광선 탐색·완성 texture 저장·제품 sampling까지 구현되었다고 할 수 없다. 감사한 live pipeline에는 완성된 lightmap baker의 진입·실행 배선이 없다.
 
 현재 ProxyCommand의 갱신은 유효한 lightmapIndex와 index 변경을 조건으로 삼는다. 같은 index의 scale/offset만 변경한 경우까지 완전한 실시간 반영 계약으로 가정하지 않는다. 새 baker는 저장 값과 실제 shader 소비를 끝까지 연결해야 한다.
+
+<a id="3-설계-결정"></a>
 
 ## 자산·UV 저작
 
@@ -18,11 +24,21 @@ CPU BVH는 SAH 또는 longest-axis 분할과 nth_element를 평가하되 compara
 
 GPU dispatch는 실제 chart/rect와 유효 light 수에 한정한다. 전체 atlas를 매 batch 무조건 훑는 구현을 성능 완료로 보지 않는다. progressive indirect bounce, denoise·dilate·padding의 공간 의미를 분리하고 각 단계의 중간 결과를 재개 가능하게 보존한다.
 
+<a id="2-병렬화-설계"></a>
+
+<a id="6-리스크"></a>
+
 ## Editor 작업과 수명
 
 Editor background worker가 sealed geometry·material·lighting snapshot을 소비한다. 게임 스레드 lockstep으로 장시간 bake를 실행하지 않는다. bounded dispatch와 GPU time budget, cancel·pause/resume checkpoint를 두고 입력 변경 시 해당 작업을 invalidation한다. 전용 compute queue는 Q0 계약 소비자로 검토할 수 있지만 RG8 자동 scheduler 전체가 필수 선행은 아니다. overlap 이득은 실제 측정해야 한다.
 
 완성 결과는 texture/artifact generation과 resolver를 통해 원자 게시하고 실제 mesh/lightmap shader binding까지 검증한다. 취소·실패·새 세대 게시가 기존 정상 자산을 손상하지 않아야 한다. old snapshot·GPU 중간 자원은 마지막 사용 완료 전 회수하지 않는다.
+
+<a id="4-이행--슬라이스"></a>
+
+<a id="5-완료-기준"></a>
+
+<a id="7-다른-계획과의-관계"></a>
 
 ## 수용과 산정
 
