@@ -640,7 +640,8 @@ namespace
         Require(ck::ReadModelGeometryArtifact(bytes, restored, failure, &warnings) && warnings.empty() &&
             restored.mesh.coarseLods.geometryDigest == value.mesh.coarseLods.geometryDigest &&
             restored.mesh.coarseLods.levels.size() == value.mesh.coarseLods.levels.size() &&
-            restored.mesh.coarseLods.levels[0].indices == value.mesh.coarseLods.levels[0].indices,
+            restored.mesh.coarseLods.levels[0].indices == value.mesh.coarseLods.levels[0].indices &&
+            restored.mesh.coarseLods.groups == value.mesh.coarseLods.groups,
             "LOD geometry roundtrip");
         auto corrupt = bytes;
         const auto meshletSection = 100u + value.mesh.vertices.ByteSize() + value.mesh.indices.size() * 4u;
@@ -651,9 +652,8 @@ namespace
         }
         const auto lodSection = meshletSection + 4u + meshletBytes;
         corrupt[lodSection + 4u + 24u] ^= std::byte{ 1u };
-        Require(ck::ReadModelGeometryArtifact(corrupt, restored, failure, &warnings) && !warnings.empty() &&
-            restored.mesh.coarseLods.IsEmpty() && restored.mesh.meshlets.HasMeshlets() &&
-            restored.mesh.indices == value.mesh.indices, "optional LOD corruption lost valid LOD0");
+        Require(!ck::ReadModelGeometryArtifact(corrupt, restored, failure, &warnings),
+            "Corrupt cooked LOD hierarchy must require recook");
         ck::SkeletonArtifact skeleton;
         skeleton.skeleton.rootBone = experiment::BoneIndex(0u);
         for (std::uint32_t index = 0; index < 255u; ++index)

@@ -27,10 +27,13 @@ Assets/Models에 복사하고 identity sidecar와 cooked generation을 생성한
 
 애니메이션 재생: `verify-animation-product.ps1`.
 GPU 이미지·블렌드·상체 마스크·소켓: `verify-animation-visual.ps1`.
-cold reload·재질 참조: `verify-model-scene-consumption.ps1`.
 드롭 및 취소·undo/redo: `verify-editor-drop-animation.ps1`,
 `verify-model-async-placement.ps1`.
-PBR: `verify-pbr-wiring-baseline.ps1`, `verify-pbr-soak.ps1`.
+PBR soak: `verify-pbr-soak.ps1`(기본 모델). 이 모델이 없는 체크아웃은 `-Model Prim_Suzanne`
+처럼 저장소 모델로 나머지 축을 돌린다.
+
+`verify-model-scene-consumption.ps1`과 `verify-pbr-wiring-baseline.ps1`은 METEOR 컷오버
+(`dc8233a90`)에서 GBuffer/Forward 경로와 함께 삭제됐다.
 
 GLB는 반복·상태 전이의 엔진 저작 설정을 대신하지 않는다. Jump / Land / Hit /
 Death를 게임에 연결할 때는 Animator에서 단발 재생으로 설정하고 Death는 마지막

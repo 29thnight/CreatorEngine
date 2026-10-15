@@ -79,8 +79,8 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     // ShaderMeta describes generated entry contracts, including the installed
     // common Forward+ alpha consumer.
     graphics("LXSceneTemporal", "LXSceneTemporalVS", "LXSceneTemporalPS", ShaderPassQueue::Opaque, true);
+    graphics("METEORVisibility", "LXSceneVS", "LXSceneVisibilityPS", ShaderPassQueue::Opaque, true);
     graphics("GBuffer", "LXSceneVS", "LXSceneGBufferPS", ShaderPassQueue::Opaque, true);
-    graphics("LXSceneDepth", "LXSceneVS", "LXSceneDepthPS", ShaderPassQueue::Opaque, true);
     graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
     graphics("Forward", "LXSceneVS", "LXSceneColorPS", ShaderPassQueue::Transparent);
     passes.back().state.blendMode = ShaderBlendMode::Alpha;
@@ -117,7 +117,9 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
         targets.push_back({backend, "LXSceneTemporalVS", "vs_6_0"});
         targets.push_back({backend, "LXSceneTemporalPS", "ps_6_0"});
         targets.push_back({backend, "LXSceneMS", "ms_6_5"});
-        for (const auto entry : {"LXSceneGBufferPS", "LXSceneDepthPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
+        targets.push_back({backend, "LXSceneVisibilityMS", "ms_6_6"});
+        targets.push_back({backend, "LXSceneReconstructMS", "ms_6_5"});
+        for (const auto entry : {"LXSceneGBufferPS", "LXSceneVisibilityPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
             targets.push_back({backend, entry, "ps_6_0"});
         }
@@ -185,6 +187,8 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     RHIShaderCompileOptions options;
     options.strictMath = true;
     options.fineDerivatives = true;
+    options.quadOperations = true;
+    options.bufferInt64Atomics = true;
     options.includeDirectories.push_back(shaderDirectory / "Includes");
     Capabilities capabilities;
     capabilities.coreForward = capabilities.layeredLookup = capabilities.refraction = capabilities.subsurface =
@@ -274,12 +278,14 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         }
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
         const std::pair<std::string_view, Member> members[]{{"LXSceneVS", &SceneShaderSet::vertex},
-                                                            {"LXSceneDepthPS", &SceneShaderSet::depth},
                                                             {"LXSceneTemporalVS", &SceneShaderSet::temporalVertex},
                                                             {"LXSceneTemporalPS", &SceneShaderSet::temporal},
                                                             {"LXSceneMS", &SceneShaderSet::mesh},
+                                                            {"LXSceneVisibilityMS", &SceneShaderSet::visibilityMesh},
+                                                            {"LXSceneReconstructMS", &SceneShaderSet::reconstructMesh},
                                                             {"LXSceneShadowMS", &SceneShaderSet::shadowMesh},
                                                             {"LXSceneGBufferPS", &SceneShaderSet::gbuffer},
+                                                            {"LXSceneVisibilityPS", &SceneShaderSet::visibility},
                                                             {"LXSceneColorPS", &SceneShaderSet::color},
                                                             {"LXSceneLookup0PS", &SceneShaderSet::lookup0},
                                                             {"LXSceneLookup1PS", &SceneShaderSet::lookup1},

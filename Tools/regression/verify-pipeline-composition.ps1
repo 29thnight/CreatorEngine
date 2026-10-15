@@ -1,4 +1,4 @@
-﻿# 렌더 파이프라인 구성 (E4 착수 전 필수 게이트)
+# 렌더 파이프라인 구성 (E4 착수 전 필수 게이트)
 #
 # 왜 필요한가
 # ───────────
@@ -114,11 +114,15 @@ $appCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\App.cpp")
 if ($mainCode -notmatch 'SetCameraRig') {
     throw "EditorMain이 카메라 rig를 세션에 설치하지 않는다 — E4-5 배선이 사라졌다"
 }
-if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)') {
+# The host now reads the editor camera through its rig (CameraRig()); either accessor
+# keeps the property that the Editor host seals its own camera into the view request.
+if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)|CameraRig\(\)') {
     throw "Editor Host(App.cpp)가 뷰 요청으로 밀봉하지 않는다 — E4-5 배선이 사라졌다"
 }
 $facadeCode = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.h")
-if ($liveCode -match 'editorCamera' -or $facadeCode -match 'GetEditorCamera') {
+# Word boundary: FrameCameraSnapshot::editorCameraRevision is camera data the
+# renderer reads, not an owned editor camera.
+if ($liveCode -match '\beditorCamera\b' -or $facadeCode -match 'GetEditorCamera') {
     throw "Core(RenderCore)가 에디터 카메라를 소유/노출한다 — E4-5 소유권 회귀"
 }
 foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
@@ -196,7 +200,8 @@ try {
     $declaredCount = [int]$data.count
     $valid = [int]$data.valid; $ready = [int]$data.ready
     $nodes = @($data.nodes | ForEach-Object {
-        [pscustomobject]@{ Name = $_.name; State = if (-not $_.conditional) { 'always' } elseif ($_.active) { 'active' } else { 'inactive' } }
+        [pscustomobject]@{ Name = $_.name; State = if (-not $_.conditional) { 'always' } elseif ($_.active) { 'active' } else { 'inactive' }
+            Reads = @($_.reads); Writes = @($_.writes) }
     })
 
     # ── 무의미성 방지 1: 측정이 실제로 나왔는가 ──
@@ -215,11 +220,73 @@ try {
     # ── 판정 A: 알려진 런타임 패스가 전부 있다 ──
     # 이것이 양성 대조다. 이게 없으면 "Editor 패스가 없다"가 파이프라인이 통째로
     # 비어서 참이 되는 경우와 구분되지 않는다.
-    $requiredRuntime = @('Shadow','GBuffer','Deferred','Forward+','PostChain','UI','live_present')
+    # METEOR scene wiring (2026-10-12): Shadow/GBuffer/Deferred/Forward+ became the
+    # METEOR.Scene geometry, cull, shadow, surface, color, light tile and blended nodes.
+    # 2026-10-14: Cull was split into Cull.First, Occluder and Cull.Final.
+    $requiredRuntime = @('METEOR.Scene.Geometry','METEOR.Scene.Cull.First','METEOR.Scene.Occluder',
+        'METEOR.Scene.Cull.Final','METEOR.Scene.Shadow',
+        'METEOR.Scene.Surface','METEOR.Scene.Color','METEOR.Scene.LightTiles','METEOR.Scene.Blended',
+        'PostChain','UI','live_present')
     foreach ($name in $requiredRuntime) {
         if (-not ($nodes | Where-Object { $_.Name -eq $name })) {
             throw "런타임 패스 '$name'이 파이프라인에 없다 — 구성이 무너졌다"
         }
+    }
+
+    # ── 판정 A2: METEOR 단계 계약은 블랙보드 슬롯이다 ──
+    # 노드 사이 의존이 선언 순서가 아니라 reads/writes로 드러나야 덤프만으로
+    # 배선을 그릴 수 있다. 숨은 결합(슬롯 없는 METEOR 노드)이 돌아오면 여기서 잡힌다.
+    $meteorContract = @(
+        @{ Node = 'METEOR.Scene.Geometry';   Reads = @();                                                            Writes = @('METEOR.Scene.Geometry.Table') }
+        @{ Node = 'METEOR.Scene.Cull.First'; Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('METEOR.Scene.Cull.FirstList') }
+        @{ Node = 'METEOR.Scene.Occluder';   Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Cull.FirstList'); Writes = @('METEOR.Scene.Occluder.Depth') }
+        @{ Node = 'METEOR.Scene.Cull.Final'; Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Occluder.Depth'); Writes = @('METEOR.Scene.Cull.FinalList','METEOR.Scene.Cull.BlendedList') }
+        @{ Node = 'METEOR.Scene.Shadow';     Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('Shadow.Map') }
+    )
+    foreach ($row in $meteorContract) {
+        $node = $nodes | Where-Object { $_.Name -eq $row.Node }
+        if ((@($node.Reads) -join ',') -ne ($row.Reads -join ',') -or (@($node.Writes) -join ',') -ne ($row.Writes -join ',')) {
+            throw "METEOR 단계 계약 불일치: $($row.Node) reads=[$(@($node.Reads) -join ',')] writes=[$(@($node.Writes) -join ',')]"
+        }
+    }
+    foreach ($cull in @($nodes | Where-Object { $_.Name -like 'METEOR.Scene.Cull.*' })) {
+        if (@($cull.Reads + $cull.Writes | Where-Object { $_ -like 'METEOR.Scene.Commands.*' }).Count) {
+            throw "Culling must publish lists only: $($cull.Name)"
+        }
+    }
+    # Cross-node commands and material work must be named graph-resource slots.
+    $commandContracts = @(
+        @{Node='METEOR.Scene.LayerWork'; Reads=@('METEOR.Scene.Cull.BlendedList'); Writes=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended')}
+        @{ Node='METEOR.Scene.Surface'; Reads=@('METEOR.Scene.Cull.FinalList'); Writes=@('METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments') }
+        @{ Node='METEOR.Scene.Color'; Reads=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments'); Writes=@() }
+        @{ Node='METEOR.Scene.Blended'; Reads=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended'); Writes=@() }
+    )
+    $commandContracts += @(
+        @{Node='Temporal.Inputs'; Reads=@('METEOR.Scene.Visibility','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments','METEOR.Scene.Cull.BlendedList'); Writes=@()}
+        @{Node='METEOR.Scene.Surface'; Reads=@(); Writes=@('METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal')}
+        @{Node='METEOR.Scene.Color'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Scene.Visibility','METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal'); Writes=@()}
+    )
+    foreach ($row in $commandContracts) {
+        $node = $nodes | Where-Object { $_.Name -eq $row.Node }
+        foreach ($slot in $row.Reads) {
+            if (@($node.Reads) -notcontains $slot) { throw "$($row.Node) missing command consumer slot: $slot" }
+        }
+        foreach ($slot in $row.Writes) {
+            if (@($node.Writes) -notcontains $slot) { throw "$($row.Node) missing command producer slot: $slot" }
+        }
+    }
+    $volume = $nodes | Where-Object { $_.Name -eq 'METEOR.Scene.Volume' }
+    if (@($volume.Reads | Where-Object { $_ -like 'METEOR.Scene.Commands.*' }).Count) {
+        throw 'METEOR.Scene.Volume must not consume raster command slots'
+    }
+    $color = $nodes | Where-Object { $_.Name -eq 'METEOR.Scene.Color' }
+    if (@($color.Reads) -contains 'METEOR.Scene.Commands.Surface') {
+        throw 'METEOR.Scene.Color reconstructs opaque work and must not consume surface raster commands'
+    }
+    $meteorNodes = @($nodes | Where-Object { $_.Name -like 'METEOR.Scene.*' })
+    $silent = @($meteorNodes | Where-Object { -not $_.Reads.Count -and -not $_.Writes.Count })
+    if ($silent.Count) {
+        throw "슬롯 없는 METEOR 노드: $(@($silent.Name) -join ', ') — 숨은 선언 순서 결합"
     }
 
     # ── 판정 B: Editor 패스의 현재 상태를 못 박는다 ──

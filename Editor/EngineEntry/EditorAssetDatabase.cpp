@@ -1,5 +1,6 @@
 #include <optional>
 #include <atomic>
+#include <charconv>
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ProjectLayerSettingsCodec.h"
@@ -768,6 +769,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		}
 
 		ScanAndCleanupInvalidMeta();
+		PruneUnusableTextureGenerations();
 		ScanAndRegisterMeta();
 
 		m_watcher = std::make_unique<efsw::FileWatcher>();
@@ -1765,6 +1767,166 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         }
     }
 
+    // One immutable cooked texture generation on disk, named by its content key.
+    struct TextureGenerationRecord
+    {
+        experiment::AssetId textureAssetId{};
+        std::string artifactPath;
+        std::uint64_t byteSize{};
+        Hash::Sha256Digest contentSha256{};
+        std::uint32_t formatVersion{};
+    };
+    static constexpr std::string_view kTextureGenerationRecord = "generation.record";
+    static constexpr std::string_view kTextureGenerationMagic = "ce.texture.generation.v1";
+
+    // Key: texture identity, source bytes, import recipe and artifact format. The
+    // sidecar timestamp is not part of it, so a checkout or touch reuses the cook.
+    bool TextureGenerationKey(const file::path& source, std::string& key, std::string& failure)
+    {
+        namespace cooked = experiment::cooked;
+        const file::path sidecar = source.string() + ".meta";
+        std::ifstream metaStream(sidecar, std::ios::binary);
+        const std::string metaText{ std::istreambuf_iterator<char>(metaStream), {} };
+        const FileGuid guid = LoadGuidFromMeta(sidecar);
+        cooked::TextureImportSettings settings;
+        if (!metaStream || guid == FileGuid{} || !cooked::ParseTextureImportSettings(metaText, settings, failure))
+        {
+            if (failure.empty()) failure = "Texture sidecar is missing or has no identity";
+            return false;
+        }
+        std::ifstream sourceStream(source, std::ios::binary);
+        if (!sourceStream)
+        {
+            failure = "Texture source cannot be read";
+            return false;
+        }
+        Hash::Sha256 hash;
+        const auto add = [&](std::string_view text)
+        {
+            const std::uint64_t size = text.size();
+            hash.Update(&size, sizeof(size));
+            hash.Update(text.data(), text.size());
+        };
+        add(kTextureGenerationMagic);
+        add(guid.ToString());
+        add(cooked::TextureImportRecipe(settings));
+        add(std::to_string(cooked::kTextureArtifactVersion) + "/" +
+            std::to_string(cooked::kCookedTextureRepresentationVersion));
+        std::array<char, 65536> chunk;
+        while (sourceStream)
+        {
+            sourceStream.read(chunk.data(), chunk.size());
+            hash.Update(chunk.data(), static_cast<std::size_t>(sourceStream.gcount()));
+        }
+        if (!sourceStream.eof())
+        {
+            failure = "Texture source read failed";
+            return false;
+        }
+        // Half the digest keeps the generation path short (Windows path limits).
+        key = Hash::ToHex(hash.Finish()).substr(0, 32);
+        return true;
+    }
+
+    static bool WriteTextureGenerationRecord(const file::path& generation, const TextureGenerationRecord& record)
+    {
+        std::ofstream output(generation / kTextureGenerationRecord, std::ios::binary | std::ios::trunc);
+        output << kTextureGenerationMagic << '\n'
+               << FileGuid(record.textureAssetId.value).ToString() << '\n'
+               << record.artifactPath << '\n'
+               << record.byteSize << '\n'
+               << Hash::ToHex(record.contentSha256) << '\n'
+               << record.formatVersion << '\n';
+        output.close();
+        return !output.fail();
+    }
+
+    // A record is accepted only if its artifact exists with the recorded size and
+    // content hash; anything else is cooked again.
+    static bool ReadTextureGenerationRecord(const file::path& generation, TextureGenerationRecord& record)
+    {
+        std::ifstream input(generation / kTextureGenerationRecord, std::ios::binary);
+        std::string magic, guid, path, size, digest, format;
+        if (!input || !std::getline(input, magic) || magic != kTextureGenerationMagic
+            || !std::getline(input, guid) || !std::getline(input, path) || !std::getline(input, size)
+            || !std::getline(input, digest) || !std::getline(input, format) || path.empty())
+        {
+            return false;
+        }
+        TextureGenerationRecord candidate;
+        FileGuid parsed;
+        if (!Uuid::TryParse(guid, parsed.m_guid))
+        {
+            return false;
+        }
+        candidate.textureAssetId.value = parsed.m_guid;
+        candidate.artifactPath = path;
+        const auto parseNumber = [](const std::string& text, auto& value)
+        {
+            const auto end = text.data() + text.size();
+            return std::from_chars(text.data(), end, value).ptr == end && !text.empty();
+        };
+        if (!parseNumber(size, candidate.byteSize) || !parseNumber(format, candidate.formatVersion))
+        {
+            return false;
+        }
+        std::ifstream artifact(generation / path, std::ios::binary);
+        if (!artifact)
+        {
+            return false;
+        }
+        Hash::Sha256 hash;
+        std::uint64_t read = 0;
+        std::array<char, 65536> chunk;
+        while (artifact)
+        {
+            artifact.read(chunk.data(), chunk.size());
+            const auto count = static_cast<std::size_t>(artifact.gcount());
+            hash.Update(chunk.data(), count);
+            read += count;
+        }
+        candidate.contentSha256 = hash.Finish();
+        if (!artifact.eof() || read != candidate.byteSize || Hash::ToHex(candidate.contentSha256) != digest)
+        {
+            return false;
+        }
+        record = std::move(candidate);
+        return true;
+    }
+
+    // Before this process publishes anything: random-GUID generations from the
+    // previous per-start cooking and abandoned staging trees can never be reused.
+    void PruneUnusableTextureGenerations()
+    {
+        const auto generations = m_root.parent_path() / "Library" / "TextureAssetGenerations";
+        std::error_code error;
+        if (!file::is_directory(generations, error))
+        {
+            return;
+        }
+        std::size_t removed = 0;
+        for (const auto& entry : file::directory_iterator(generations, error))
+        {
+            const std::string name = entry.path().filename().string();
+            FileGuid legacy;
+            const bool legacyName = name.size() == 36 && Uuid::TryParse(name, legacy.m_guid);
+            if (!legacyName && !name.starts_with("stage-"))
+            {
+                continue;
+            }
+            std::error_code ignored;
+            if (file::remove_all(entry.path(), ignored) > 0 && !ignored)
+            {
+                ++removed;
+            }
+        }
+        if (removed)
+        {
+            Debug::PrintLog(spdlog::level::info, "Removed " + std::to_string(removed)
+                + " unusable texture generation directories");
+        }
+    }
+
     void CookTextureGeneration(const file::path& source,
         const std::array<ModelSourceStamp, 2>& stamps, std::uint64_t revision)
     {
@@ -1777,68 +1939,133 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 return;
             }
         }
-        auto result = cooked::BuildTextureCookProduct({ source, m_root });
         std::string failure;
         ScopedPathCleanup generationCleanup;
         own::shared_owner<RuntimeTexturePublication> publication;
-        file::path generation;
-        if (result.Succeeded())
+        experiment::AssetId textureAssetId{};
+        // Content-addressed generations: identical source bytes, import recipe and
+        // artifact format reuse one immutable directory instead of decoding and
+        // writing a new random generation on every Editor start.
+        const auto generations = m_root.parent_path() / "Library" / "TextureAssetGenerations";
+        std::string key;
+        TextureGenerationRecord record;
+        if (const auto keyed = TextureGenerationKey(source, key, failure); keyed)
         {
-            const auto& product = *result.product;
-            generation = m_root.parent_path() / "Library" / "TextureAssetGenerations"
-                / FileGuid::CreateRandomV4().ToString();
-            // artifactPath already contains the texture GUID. A unique generation
-            // root preserves immutable ownership without repeating that GUID in
-            // the host path (which can otherwise exceed Windows path limits).
-            generationCleanup.target = generation;
-            // This directory is unique and never overwritten after publication.
-            // Failed/stale generations are removed before any locator escapes.
-            if (!WriteBinaryFileLocked(generation / product.artifactPath, product.artifactBytes))
+            if (!ReadTextureGenerationRecord(generations / key, record))
             {
-                failure = "Could not write the immutable texture artifact";
-            }
-            else
-            {
-                publication = own::make_shared<RuntimeTexturePublication>();
-                auto& manifest = publication->manifest;
-                manifest.assetSetId = product.textureAssetId;
-                manifest.revision = revision;
-                manifest.targetPlatform = "win-x64";
-                manifest.targetAbi = CreatorContentAbi::Token;
-                const cooked::TypedAssetReference reference{ { product.textureAssetId, {} }, cooked::CookedAssetKind::Texture };
-                manifest.entries.push_back({ reference, 0u, {} });
-                manifest.roots.push_back(reference);
-                cooked::AssetBlobRecord blob;
-                blob.contentSha256 = product.manifestEntry.contentSha256;
-                blob.byteSize = product.artifactBytes.size();
-                blob.kind = cooked::CookedAssetKind::Texture;
-                blob.representation = cooked::kCookedTextureRepresentationVersion;
-                blob.schemaVersion = product.manifestEntry.formatVersion;
-                blob.targetPlatform = manifest.targetPlatform;
-                blob.targetAbi = manifest.targetAbi;
-                blob.artifactPath = product.artifactPath;
-                manifest.blobs.push_back(std::move(blob));
-                auto written = cooked::WriteAssetSetManifest(manifest);
-                if (!written.Succeeded())
+                auto result = cooked::BuildTextureCookProduct({ source, m_root });
+                if (!result.Succeeded())
                 {
-                    failure = "Texture generation manifest validation failed";
+                    for (const auto& issue : result.issues)
+                    {
+                        failure += (failure.empty() ? "" : "; ") + issue.context + ": " + issue.message;
+                    }
                 }
                 else
                 {
-                    publication->manifestBytes = std::move(written.bytes);
-                    publication->byteSource = own::make_shared<const cooked::LooseArtifactByteSource>(generation);
-                    if (!cooked::CaptureArtifactSource(publication->byteSource, product.artifactPath, failure))
+                    const auto& product = *result.product;
+                    record = { product.textureAssetId, product.artifactPath, product.artifactBytes.size(),
+                        product.manifestEntry.contentSha256, product.manifestEntry.formatVersion };
+                    // Write a private staging tree, then publish it under the key in
+                    // one rename. A concurrent identical cook that wins keeps its tree.
+                    // A short name: artifactPath already repeats the texture GUID and
+                    // a 36-character generation name was the previous length budget.
+                    const auto staging = generations /
+                        ("stage-" + FileGuid::CreateRandomV4().ToString().substr(0, 8));
+                    generationCleanup.target = staging;
+                    std::error_code renameError;
+                    if (!WriteBinaryFileLocked(staging / product.artifactPath, product.artifactBytes)
+                        || !WriteTextureGenerationRecord(staging, record))
                     {
-                        publication.reset();
+                        failure = "Could not write the immutable texture artifact";
+                    }
+                    else
+                    {
+                        // Serialize publication and recovery between this Editor's
+                        // cooks. Never remove a valid generation that won the race.
+                        static std::mutex publicationMutex;
+                        std::lock_guard publicationLock(publicationMutex);
+                        file::rename(staging, generations / key, renameError);
+                        if (!renameError)
+                        {
+                            generationCleanup.Release();
+                        }
+                        else if (!ReadTextureGenerationRecord(generations / key, record))
+                        {
+                            // A corrupt existing directory cannot be overwritten by
+                            // rename. Move it aside only after the replacement is
+                            // complete, and restore it if publication fails.
+                            const auto damaged = generations /
+                                ("stage-" + FileGuid::CreateRandomV4().ToString().substr(0, 8));
+                            std::error_code repairError;
+                            file::rename(generations / key, damaged, repairError);
+                            if (!repairError)
+                            {
+                                file::rename(staging, generations / key, repairError);
+                                if (!repairError)
+                                {
+                                    generationCleanup.Release();
+                                    ScopedPathCleanup damagedCleanup;
+                                    damagedCleanup.target = damaged;
+                                }
+                                else
+                                {
+                                    std::error_code restoreError;
+                                    file::rename(damaged, generations / key, restoreError);
+                                    failure = "Could not replace the damaged texture generation: "
+                                        + repairError.message();
+                                    if (restoreError)
+                                        failure += "; damaged generation retained at " + damaged.string()
+                                            + ": " + restoreError.message();
+                                }
+                            }
+                            else
+                            {
+                                failure = "Could not quarantine the damaged texture generation: "
+                                    + repairError.message();
+                            }
+                        }
                     }
                 }
             }
         }
-        else
+        if (failure.empty())
         {
-            for (const auto& issue : result.issues)
+            const auto generation = generations / key;
+            textureAssetId = record.textureAssetId;
+            publication = own::make_shared<RuntimeTexturePublication>();
+            auto& manifest = publication->manifest;
+            manifest.assetSetId = record.textureAssetId;
+            manifest.revision = revision;
+            manifest.targetPlatform = "win-x64";
+            manifest.targetAbi = CreatorContentAbi::Token;
+            const cooked::TypedAssetReference reference{ { record.textureAssetId, {} }, cooked::CookedAssetKind::Texture };
+            manifest.entries.push_back({ reference, 0u, {} });
+            manifest.roots.push_back(reference);
+            cooked::AssetBlobRecord blob;
+            blob.contentSha256 = record.contentSha256;
+            blob.byteSize = record.byteSize;
+            blob.kind = cooked::CookedAssetKind::Texture;
+            blob.representation = cooked::kCookedTextureRepresentationVersion;
+            blob.schemaVersion = record.formatVersion;
+            blob.targetPlatform = manifest.targetPlatform;
+            blob.targetAbi = manifest.targetAbi;
+            blob.artifactPath = record.artifactPath;
+            manifest.blobs.push_back(std::move(blob));
+            auto written = cooked::WriteAssetSetManifest(manifest);
+            if (!written.Succeeded())
             {
-                failure += (failure.empty() ? "" : "; ") + issue.context + ": " + issue.message;
+                failure = "Texture generation manifest validation failed";
+                publication.reset();
+            }
+            else
+            {
+                publication->manifestBytes = std::move(written.bytes);
+                publication->byteSource = own::make_shared<const cooked::LooseArtifactByteSource>(generation);
+                if (!cooked::CaptureArtifactSource(publication->byteSource, record.artifactPath, failure))
+                {
+                    publication.reset();
+                }
             }
         }
         const std::array after{ ReadModelSourceStamp(source),
@@ -1853,7 +2080,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 publication->latestRevision = work.latestRevision;
                 publication->revision = revision;
                 DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
-                    RuntimeAssetType::Texture, FileGuid(result.product->textureAssetId.value), source, publication });
+                    RuntimeAssetType::Texture, FileGuid(textureAssetId.value), source, publication });
                 generationCleanup.Release();
                 work.publication = publication;
                 work.refreshRequest = {};
@@ -3385,8 +3612,11 @@ private:
 
 		const file::path metaPath = targetFile.string() + ".meta";
 		Authoring::WriteDocument document;
+		std::optional<std::string> existingMeta;
 		if (file::exists(metaPath))
 		{
+			std::ifstream existing(metaPath, std::ios::binary);
+			existingMeta.emplace(std::istreambuf_iterator<char>(existing), std::istreambuf_iterator<char>());
 			std::string parseError;
 			std::optional<Authoring::WriteDocument> parsed =
 				Authoring::WriteDocument::ParseFile(metaPath, &parseError);
@@ -3465,10 +3695,16 @@ private:
 		const Authoring::WriteNode importSettings = root.Child("importSettings");
 		importSettings.Child("extension").SetScalar(
 			targetFile.extension().string());
-		std::error_code timestampError;
-		const auto timestamp = file::last_write_time(targetFile, timestampError);
-		importSettings.Child("timestamp").SetScalar(timestampError
-			? 0 : timestamp.time_since_epoch().count());
+		// The timestamp records when the sidecar was first created; nothing reads it
+		// back. Refreshing it from the source's write time rewrote every sidecar on
+		// each checkout and startup, so an existing value is kept.
+		if (!importSettings.Read().HasChild("timestamp"))
+		{
+			std::error_code timestampError;
+			const auto timestamp = file::last_write_time(targetFile, timestampError);
+			importSettings.Child("timestamp").SetScalar(timestampError
+				? 0 : timestamp.time_since_epoch().count());
+		}
 
 		if (audioSource)
 		{
@@ -3501,13 +3737,19 @@ private:
 			}
 		}
 		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
-		std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
-		if (!output.is_open()) return {};
-		output << document.Dump();
-		output.flush();
-		if (!output.good()) return {};
-		output.close();
-		if (output.fail()) return {};
+		// An unchanged sidecar is not rewritten: the rewrite itself is a watcher
+		// event and an import trigger.
+		const std::string dumped = document.Dump();
+		if (!existingMeta || *existingMeta != dumped)
+		{
+			std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
+			if (!output.is_open()) return {};
+			output << dumped;
+			output.flush();
+			if (!output.good()) return {};
+			output.close();
+			if (output.fail()) return {};
+		}
 
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
 			RuntimeAssetType::Auto, guid, targetFile });

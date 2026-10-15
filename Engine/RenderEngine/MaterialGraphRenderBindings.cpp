@@ -67,7 +67,9 @@ namespace material_graph
             std::uint32_t next = layout.hostParameterCount;
             for (const auto& [slot, used] : {std::pair{layout.uniformSlot, layout.material.uniformBytes != 0},
                                              std::pair{layout.textureSlot, !layout.material.textures.empty()},
-                                             std::pair{layout.samplerSlot, !layout.material.samplers.empty()}})
+                                             std::pair{layout.samplerSlot, !layout.material.samplers.empty()},
+                                             std::pair{layout.descriptorIndexSlot,
+                                                 !layout.material.textures.empty() || !layout.material.samplers.empty()}})
             {
                 if (slot.has_value() != used || (used && *slot != next++))
                 {
@@ -91,7 +93,8 @@ namespace material_graph
             return Fail(error, "Invalid material uniform size or texture/sampler slots.");
         }
         const auto constantConflict = [&](const RHIPipelineLayoutParam& parameter) {
-            return material.uniformBytes && parameter.shaderRegister == UniformRegister &&
+            return ((material.uniformBytes && parameter.shaderRegister == UniformRegister) ||
+                    ((textures || samplers) && parameter.shaderRegister == DescriptorIndexRegister)) &&
                    (parameter.kind == RHILayoutParamKind::ConstantBuffer ||
                     parameter.kind == RHILayoutParamKind::Constants);
         };
@@ -102,7 +105,7 @@ namespace material_graph
                 return Fail(error, "Host constant binding overlaps LX material b2.");
             }
             if (parameter.kind == RHILayoutParamKind::ShaderResourceBuffer &&
-                Overlaps(TextureRegister, textures, parameter.shaderRegister, 1))
+                Overlaps(TextureRegister, textures ? BindlessTextureCapacity : 0, parameter.shaderRegister, 1))
             {
                 return Fail(error, "Host SRV buffer overlaps LX material textures.");
             }
@@ -112,16 +115,16 @@ namespace material_graph
             }
             const auto& table = parameter.table;
             if ((table.type == RHIDescriptorType::ShaderResource && textures &&
-                 Overlaps(TextureRegister, textures, table.baseRegister, table.count)) ||
+                 Overlaps(TextureRegister, BindlessTextureCapacity, table.baseRegister, table.count)) ||
                 (table.type == RHIDescriptorType::Sampler && samplers &&
-                 Overlaps(SamplerRegister, samplers, table.baseRegister, table.count)))
+                 Overlaps(SamplerRegister, BindlessSamplerCapacity, table.baseRegister, table.count)))
             {
                 return Fail(error, "Host descriptor table overlaps LX material resources.");
             }
         }
         for (const auto& sampler : hostSamplers)
         {
-            if (samplers && Overlaps(SamplerRegister, samplers, sampler.shaderRegister, 1))
+            if (samplers && Overlaps(SamplerRegister, BindlessSamplerCapacity, sampler.shaderRegister, 1))
             {
                 return Fail(error, "Host static sampler overlaps LX material samplers.");
             }
@@ -139,12 +142,17 @@ namespace material_graph
         if (textures)
         {
             candidate.textureSlot = static_cast<std::uint32_t>(parameters.size());
-            parameters.push_back(RHILayout::SrvTable(textures, TextureRegister));
+            parameters.push_back(RHILayout::SrvTable(BindlessTextureCapacity, TextureRegister));
         }
         if (samplers)
         {
             candidate.samplerSlot = static_cast<std::uint32_t>(parameters.size());
-            parameters.push_back(RHILayout::SamplerTable(samplers, SamplerRegister));
+            parameters.push_back(RHILayout::SamplerTable(BindlessSamplerCapacity, SamplerRegister));
+        }
+        if (textures || samplers)
+        {
+            candidate.descriptorIndexSlot = static_cast<std::uint32_t>(parameters.size());
+            parameters.push_back(RHILayout::Cbv(DescriptorIndexRegister));
         }
         RHIPipelineLayoutDesc description;
         description.params = parameters;
@@ -187,6 +195,7 @@ namespace material_graph
             prepared_.clear();
             preparedRecording_ = recording;
             preparedDescriptorVersion_ = descriptorVersion;
+            bindless_ = std::make_shared<BindlessMaterialFrame>();
         }
         const auto identity = InstanceFramePins::Identity(*instance);
         // Both objects remain pinned during the address check. Keep forged or
@@ -255,35 +264,67 @@ namespace material_graph
         // A binding packet borrows that closure through its frame table rather
         // than duplicating texture strong references for every draw/pass.
         candidate->resources.owners.clear();
+        std::array<std::uint32_t, 128> descriptorIndices{};
         if (layout.samplerSlot)
         {
-            std::vector<std::string> key(candidate->resources.samplers.size(), "nearest-clamp");
+            // The cooker accepts exactly these 36 filter/address combinations.
+            // Stable indices are independent of instance order and frame lifetime.
+            const std::array modes{RHIAddressMode::Wrap, RHIAddressMode::Clamp, RHIAddressMode::Mirror};
+            if (!bindlessSamplers_.IsValid())
+            {
+                std::array<RHISamplerDesc, BindlessSamplerCapacity> descriptions;
+                for (unsigned filter = 0; filter < 2; ++filter)
+                    for (unsigned mip = 0; mip < 2; ++mip)
+                        for (unsigned u = 0; u < 3; ++u)
+                            for (unsigned v = 0; v < 3; ++v)
+                            {
+                                auto& desc = descriptions[((filter * 2 + mip) * 3 + u) * 3 + v];
+                                desc.minMag = filter ? RHIFilterMode::Linear : RHIFilterMode::Point;
+                                desc.mip = mip ? RHIFilterMode::Linear : RHIFilterMode::Point;
+                                desc.addressU = desc.addressW = modes[u];
+                                desc.addressV = modes[v];
+                            }
+                bindlessSamplers_ = device.CreateSamplers(descriptions);
+                if (!bindlessSamplers_.IsValid())
+                {
+                    return Fail(error, "LX bindless sampler table allocation failed.");
+                }
+                device_ = &device;
+            }
+            candidate->samplers = bindlessSamplers_;
             for (const auto& resource : layout.material.samplers)
             {
-                key[resource.slot] = resource.reference;
-            }
-            if (const auto found = samplers_.find(key); found != samplers_.end())
-            {
-                candidate->samplers = found->second;
-            }
-            else
-            {
-                candidate->samplers = device.CreateSamplers(candidate->resources.samplers);
-                if (!candidate->samplers.IsValid())
-                {
-                    return Fail(error, "LX material sampler table allocation failed.");
-                }
-                samplers_.emplace(std::move(key), candidate->samplers);
-                device_ = &device;
+                const auto& sampler = candidate->resources.samplers[resource.slot];
+                const auto u = std::ranges::find(modes, sampler.addressU) - modes.begin();
+                const auto v = std::ranges::find(modes, sampler.addressV) - modes.begin();
+                if (u == modes.size() || v == modes.size()) return Fail(error, "Invalid LX bindless sampler.");
+                descriptorIndices[64 + resource.slot] = static_cast<std::uint32_t>(
+                    (((sampler.minMag == RHIFilterMode::Linear ? 1 : 0) * 2 +
+                      (sampler.mip == RHIFilterMode::Linear ? 1 : 0)) * 3 + u) * 3 + v);
             }
         }
         if (layout.textureSlot)
         {
-            candidate->textures = device.CreateBindings(candidate->resources.textures);
-            if (!candidate->textures.IsValid())
+            candidate->bindless = bindless_;
+            std::lock_guard lock(bindless_->mutex);
+            for (const auto& resource : layout.material.textures)
             {
-                return Fail(error, "LX material texture descriptor allocation failed.");
+                const auto& desc = candidate->resources.textures[resource.slot];
+                const auto found = std::ranges::find_if(bindless_->descriptions, [&](const auto& existing) {
+                    return existing.resource == desc.resource && existing.format == desc.format &&
+                        existing.mostDetailedMip == desc.mostDetailedMip && existing.mipLevels == desc.mipLevels;
+                });
+                const auto index = found - bindless_->descriptions.begin();
+                if (index == BindlessTextureCapacity)
+                    return Fail(error, "LX frame exceeds bindless texture capacity; no per-material fallback.");
+                if (found == bindless_->descriptions.end()) bindless_->descriptions.push_back(desc);
+                descriptorIndices[resource.slot] = static_cast<std::uint32_t>(index);
             }
+        }
+        if (layout.descriptorIndexSlot)
+        {
+            candidate->descriptorIndices = device.UploadConstants(descriptorIndices.data(), sizeof(descriptorIndices));
+            if (!candidate->descriptorIndices.IsValid()) return Fail(error, "LX descriptor index upload failed.");
         }
         if (layout.uniformSlot)
         {
@@ -328,12 +369,24 @@ namespace material_graph
         }
         if (layout.textureSlot)
         {
-            encoder.SetBindings(point, *layout.textureSlot, source.textures);
+            std::lock_guard lock(source.bindless->mutex);
+            auto& frame = *source.bindless;
+            if (frame.publishedSize != frame.descriptions.size())
+            {
+                auto descriptions = frame.descriptions;
+                descriptions.resize(BindlessTextureCapacity, RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
+                frame.textures = device.CreateBindings(descriptions);
+                if (!frame.textures.IsValid()) return Fail(error, "LX bindless texture table allocation failed.");
+                frame.publishedSize = frame.descriptions.size();
+            }
+            encoder.SetBindings(point, *layout.textureSlot, frame.textures);
         }
         if (layout.samplerSlot)
         {
             encoder.SetSamplers(point, *layout.samplerSlot, source.samplers);
         }
+        if (layout.descriptorIndexSlot)
+            encoder.SetConstantBuffer(point, *layout.descriptorIndexSlot, source.descriptorIndices);
         return true;
     }
 
@@ -349,8 +402,9 @@ namespace material_graph
             return Fail(error, "Material render bindings belong to a different frame recording.");
         }
         const auto& layout = bindings.layout;
-        if ((layout.uniformSlot && !bindings.uniforms.IsValid()) || (layout.textureSlot && !bindings.textures.IsValid()) ||
-            (layout.samplerSlot && !bindings.samplers.IsValid()))
+        if ((layout.uniformSlot && !bindings.uniforms.IsValid()) || (layout.textureSlot && !bindings.bindless) ||
+            (layout.samplerSlot && !bindings.samplers.IsValid()) ||
+            (layout.descriptorIndexSlot && !bindings.descriptorIndices.IsValid()))
         {
             return Fail(error, "Material render bindings contain an invalid upload or descriptor table.");
         }
@@ -360,30 +414,14 @@ namespace material_graph
     bool RenderBindingCache::Bind(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
                                   const RenderBindings& bindings, std::string& error)
     {
-        if (!Validate(device, bindings, error))
-        {
-            return false;
-        }
-        const auto& layout = bindings.layout;
-        if (layout.uniformSlot)
-        {
-            encoder.SetConstantBuffer(point, *layout.uniformSlot, bindings.uniforms);
-        }
-        if (layout.textureSlot)
-        {
-            encoder.SetBindings(point, *layout.textureSlot, bindings.textures);
-        }
-        if (layout.samplerSlot)
-        {
-            encoder.SetSamplers(point, *layout.samplerSlot, bindings.samplers);
-        }
-        return true;
+        return BindPass(device, encoder, point, bindings, bindings.layout, error);
     }
 
     void RenderBindingCache::Clear()
     {
-        samplers_.clear();
         prepared_.clear();
+        bindless_.reset();
+        bindlessSamplers_ = {};
         preparedRecording_ = preparedDescriptorVersion_ = 0;
         device_ = nullptr;
     }

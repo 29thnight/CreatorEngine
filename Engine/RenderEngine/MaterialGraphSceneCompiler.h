@@ -10,8 +10,8 @@ namespace material_graph
 struct SceneShaderSet
 {
     BindingLayout layout;
-    RHIShaderCompiler::VerifiedShader vertex, gbuffer, depth, color, lookup0, lookup1, temporalVertex, temporal;
-    RHIShaderCompiler::VerifiedShader mesh, shadowMesh;
+    RHIShaderCompiler::VerifiedShader vertex, gbuffer, visibility, color, lookup0, lookup1, temporalVertex, temporal;
+    RHIShaderCompiler::VerifiedShader mesh, visibilityMesh, reconstructMesh, shadowMesh;
     RHIShaderCompiler::VerifiedShader shadowVertex, shadow, subsurface, refraction, volume, runtimeEffects0, runtimeEffects1;
 };
 

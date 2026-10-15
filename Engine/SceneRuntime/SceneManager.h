@@ -262,6 +262,7 @@ private:
     struct PendingSceneLoad;
     std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate,
         std::uint64_t* requestId = nullptr);
+    static void SubmitScenePreparation(const own::shared_owner<PendingSceneLoad>& load);
     void RecordSceneLoadResult(PendingSceneLoad& load, SceneLoadRequestState state, std::string message = {});
     void CompleteSceneLoads(bool wait);
     Scene* BuildPreparedScene(const PendingSceneLoad& load);

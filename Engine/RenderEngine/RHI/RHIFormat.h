@@ -95,6 +95,7 @@ enum class RHIFormat : uint16_t
     BC5Unorm,
     BC7Unorm,
     BC7UnormSrgb,
+    RG32Uint,       // frame primitive address + standard-Z float bits (visibility buffer)
 };
 
 /// 픽셀 하나의 바이트 수. 0이면 이 포맷을 모르는 것이다.
@@ -111,7 +112,8 @@ constexpr uint32_t RHIFormatBytes(RHIFormat format)
     {
     case RHIFormat::RGBA32Float:    return 16;
     case RHIFormat::RGBA16Float:
-    case RHIFormat::RG32Float:      return 8;
+    case RHIFormat::RG32Float:
+    case RHIFormat::RG32Uint:       return 8;
     case RHIFormat::RGB32Float:     return 12;
     case RHIFormat::RGBA8Unorm:
     case RHIFormat::RGBA8UnormSrgb:
@@ -158,7 +160,8 @@ constexpr uint32_t RHIFormatChannels(RHIFormat format)
     case RHIFormat::RGBA32Float:    return 4;
     case RHIFormat::RGB32Float:     return 3;
     case RHIFormat::RG16Float:
-    case RHIFormat::RG32Float:      return 2;
+    case RHIFormat::RG32Float:
+    case RHIFormat::RG32Uint:       return 2;
     case RHIFormat::R16Float:
     case RHIFormat::R16Unorm:
     case RHIFormat::R32Float:

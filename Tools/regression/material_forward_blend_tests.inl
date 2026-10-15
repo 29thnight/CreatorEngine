@@ -1,7 +1,8 @@
 // Pixel-level alpha composition of the cooked blended stream (light tiles + SceneHost).
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
-                     std::array<own::shared_owner<const Instance>, 2> instances, own::shared_owner<const Texture> cube)
+                     std::array<own::shared_owner<const Instance>, 2> instances, own::shared_owner<const Texture> cube,
+                     bool runtime = false)
 {
     std::string error;
     for (unsigned tier = 0; tier < 2; ++tier)
@@ -74,12 +75,12 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     unsigned pixels{}, frames{}, expectedPublications{};
     // Four isolated colors, mixed sequential and parallel, reverse collection,
     // reverse camera sorting, opaque occlusion, and >64-light overflow/reference.
-    for (unsigned fixture = 0; fixture < 12; ++fixture)
+    for (unsigned fixture = 0; fixture < 16; ++fixture)
     {
         std::cerr << "LX_FORWARD_FIXTURE " << fixture << "\n";
         Drain drain{device};
         context.frameId = 12000 + fixture;
-        lights.assign(fixture >= 10 ? 65 : 1, light);
+        lights.assign(fixture == 10 || fixture == 11 ? 65 : 1, light);
         camera.forward = math::vector3(0, 0, fixture == 7 ? 1.f : -1.f);
         std::vector<EnhancedDrawItem> graphDraws;
         for (unsigned i = 0; i < 4; ++i)
@@ -88,10 +89,11 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             auto draw = geometry.draw;
             draw.geometryKey = 8500 + i;
             draw.worldMatrix[3, 2] = depths[i];
+            if (fixture == 15) draw.worldMatrix[3, 0] = 4.f;
             const float a = fixture < 4 ? 1 : fixture == 9 ? 0 : alpha[i];
             draw.coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended;
             // Two cooked tiers, each used by two draws with independent alpha overrides.
-            const auto& tierInstance = instances[i % 2];
+            const auto& tierInstance = instances[fixture >= 12 ? 0 : i % 2];
             auto description = tierInstance->description;
             description.parameters.push_back({902, double(a)});
             Check(BuildInstance(tierInstance->generation, description,
@@ -101,7 +103,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             draw.materialGraphSlot = 700 + i;
             graphDraws.push_back(std::move(draw));
         }
-        if (fixture == 6) std::reverse(graphDraws.begin(), graphDraws.end());
+        if (fixture == 6 || fixture == 13) std::reverse(graphDraws.begin(), graphDraws.end());
         const std::vector<EnhancedDrawItem> empty;
         context.draws = &empty;
         SceneInputView view{context.frameId, context.sceneEpoch, 99, 1, 16, 16, camera};
@@ -117,14 +119,18 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(environment.IsValid(), "Alpha environment upload");
         Check(tiles.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error), "Mixed preparation " + error);
-        auto graph = std::make_shared<EnhancedRenderGraph>(device);
-        const unsigned workers = fixture == 5 || fixture == 6 || fixture == 11 ? 4 : 0;
+        auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+        const unsigned workers = fixture == 14 ? 1 : fixture == 5 || fixture == 6 || fixture == 11 || fixture == 13 ? 4 : 0;
         if (workers)
         {
             pool.BeginFrame(static_cast<std::uint32_t>(context.frameId));
             Check(graph->PrepareParallel(pool, error), "Mixed parallel prefix " + error);
         }
-        Check(host.Prepare(context, input, environment.handle, {}, {}, {}, {}, error, 1), "Alpha host " + error);
+        SceneHostBudget budget;
+        budget.lookupRuntimeEvaluation = runtime;
+        budget.lookupApproximate = runtime;
+        const bool prepared = host.Prepare(context, input, environment.handle, {}, {}, {}, budget, error, 1);
+        Check(prepared, "Alpha host " + error);
         gbuffer.Declare(*graph, context);
         auto outputs = gbuffer.GetOutputs();
         RHITextureHandle opaqueDepth;
@@ -136,30 +142,34 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             depthDesc.allowDepthStencil = true;
             depthDesc.clearDepth = .1f;
             Check(device.CreateTexture(depthDesc, opaqueDepth, error), "Opaque test depth");
-            outputs.depth = graph->ImportTexture(opaqueDepth, RHIResourceState::Common, "Probe.OpaqueDepth");
+            outputs.depth = graph->Write(graph->ImportTexture(opaqueDepth, RHIResourceState::Common, "Probe.OpaqueDepth"));
         }
         if (fixture == 8)
-            graph->AddPass("Probe.OpaqueDepth", {{outputs.depth, RHIResourceState::DepthWrite}},
+            graph->AddPass("Probe.OpaqueDepth", {{outputs.depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
                 [depth = outputs.depth, &device](const auto& execution) {
                     const auto d = RHIDepthTargetDesc::Depth(execution.ResolveHandle(depth), RHIFormat::D32Float);
                     const auto target = device.CreateRenderTargets(std::span<const RHITextureHandle>{}, &d);
                     execution.encoder->BindRenderTargets(target);
                     execution.encoder->ClearDepthTarget(target, .1f);
                 });
-        host.DeclareGeometry(*graph);
-        host.DeclareCulling(*graph);
-        host.DeclareGBuffer(*graph, outputs);
+        const auto meteorGeometry = host.DeclareGeometry(*graph);
+        const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+        const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+        const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
+        outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
+        host.DeclareHistory(*graph, outputs.depth);
         RGTextureDesc colorDesc;
         colorDesc.width = colorDesc.height = 16;
         colorDesc.format = RHIFormat::RGBA16Float;
         colorDesc.allowRenderTarget = true;
         std::copy(background.begin(), background.end(), colorDesc.clearColor);
-        const auto color = graph->CreateTexture(colorDesc);
+        const auto color = graph->Write(graph->CreateTexture(colorDesc));
         RGTextureDesc aoDesc = colorDesc;
         aoDesc.format = RHIFormat::RG16Float;
         std::fill(std::begin(aoDesc.clearColor), std::end(aoDesc.clearColor), 1.f);
-        const auto ao = graph->CreateTexture(aoDesc);
-        graph->AddPass("Probe.Background", {{color, RHIResourceState::RenderTarget}, {ao, RHIResourceState::RenderTarget}},
+        const auto ao = graph->Write(graph->CreateTexture(aoDesc));
+        graph->AddPass("Probe.Background", {{color, RHIResourceState::RenderTarget, RGAccessMode::Write}, {ao, RHIResourceState::RenderTarget, RGAccessMode::Write}},
             [color, ao, background, &device](const auto& execution) {
                 for (const auto h : {color, ao})
                 {
@@ -170,18 +180,54 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->ClearRenderTargets(target, h.index == color.index ? background.data() : white);
                 }
             });
-        const auto opaque = host.DeclareColor(*graph, outputs, color, ao, {});
+        const auto opaque = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
+        if (fixture == 0) {
+            bool rejected = false;
+            try { host.DeclareColor(*graph, outputs, {meteorLayerWork.layer,
+                host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, opaque, ao, {}); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Effect color output rejects duplicate shading before declaring resources");
+        }
         tiles.SetUseReferencePath(fixture == 11);
         tiles.SetDepth(outputs.depth);
         tiles.Declare(*graph, context);
-        const auto blended = host.DeclareBlendedStream(*graph, opaque, {}, tiles.GetLighting());
+        if (!meteorLayerWork.blended.empty()) {
+            auto wrong = meteorLayerWork;
+            wrong.blended.pop_back();
+            bool rejected = false;
+            try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended rejects incomplete command-list slot before declaring layers");
+            wrong = meteorLayerWork;
+            ++wrong.blended.front().epoch;
+            rejected = false;
+            try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended rejects command inputs from another graph epoch");
+        }
+        if (fixture == 0) {
+            const auto selected = host.BlendedDraws();
+            Check(!selected.empty(), "Blended prepared stage contains a layer");
+            bool rejected = false;
+            try { host.DeclareBlended(*graph, {selected.front().index, selected.front().index},
+                meteorLayerWork, opaque, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended duplicate indices rejected without publishing partial layer output");
+        }
+        const auto blended = host.DeclareBlendedStream(*graph, meteorLayerWork, opaque, {}, tiles.GetLighting());
+        if (fixture == 0) {
+            bool rejected = false;
+            try { host.DeclareBlendedStream(*graph, meteorLayerWork, blended, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended output ownership rejects a second stream declaration");
+        }
         std::array<RHIReadback, 3> readbacks;
         const std::array handles{blended, outputs.depth, outputs.bitmask};
         const std::array formats{RHIFormat::RGBA16Float, RHIFormat::D32Float, RHIFormat::R32Uint};
         for (unsigned i = 0; i < 3; ++i)
         {
             Check(device.CreateReadback(16, 16, formats[i], 1, readbacks[i], error), "Mixed readback");
-            graph->AddPass("Probe.MixedReadback", {{handles[i], RHIResourceState::CopySource}},
+            graph->AddPass("Probe.MixedReadback", {{handles[i], RHIResourceState::CopySource, RGAccessMode::Read}},
                 [h = handles[i], r = readbacks[i]](const auto& execution) {
                     execution.encoder->CopyToReadback(r, execution.ResolveHandle(h));
                 }, true);
@@ -208,6 +254,8 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Mixed submission drain");
         Check(host.PublishSubmittedCache(context.frameId, completion, error, ticket), "Alpha publication " + error);
         device.WaitForGpu();
+        Check(host.BlendedBucketSubmissionCount() == (fixture < 4 || (runtime && fixture >= 12) ? 1u : 4u),
+            "Sorted alpha submits one native command range per consecutive shader bucket");
         std::array<RHIReadbackImage, 3> mapped;
         for (unsigned i = 0; i < 3; ++i) Check(device.MapReadback(readbacks[i], mapped[i], error), "Mixed map");
         std::vector<float> actual;
@@ -222,17 +270,17 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     const auto value = mapped[0].At(x, y, c);
                     Check(std::isfinite(value), "Finite mixed HDR");
                     actual.push_back(value);
-                    if (fixture >= 4 && fixture < 10)
+                    if (fixture >= 4 && (fixture < 10 || fixture >= 12))
                     {
                         double expected = background[c];
-                        if (fixture != 8 && fixture != 9)
+                        if (fixture != 8 && fixture != 9 && fixture != 15)
                         {
                             const bool covered = std::abs(solo[0][(y * 16 + x) * 3 + c] - background[c]) > .0001;
                             if (covered)
                                 for (unsigned j = 0; j < 4; ++j)
                                 {
                                     const auto i = fixture == 7 ? 3 - j : j;
-                                    expected = solo[i][(y * 16 + x) * 3 + c] * alpha[i] + expected * (1 - alpha[i]);
+                                    expected = solo[fixture >= 12 ? 0 : i][(y * 16 + x) * 3 + c] * alpha[i] + expected * (1 - alpha[i]);
                                 }
                         }
                         Check(std::abs(value - expected) <= .003 + .003 * std::abs(expected), "Independent alpha recurrence");
@@ -253,7 +301,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         ++frames;
     }
     const auto finalStats = host.ProgramStats();
-    Check(expectedPublications == 36 && finalStats.compileSubmissions == 0 &&
+    Check(expectedPublications == 52 && finalStats.compileSubmissions == 0 &&
               finalStats.publications == expectedPublications,
           "Cooked Graph Blend publishes every submitted draw without source compilation: actual=" +
               std::to_string(finalStats.publications) + " expected=" + std::to_string(expectedPublications));
@@ -262,6 +310,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     gbuffer.Shutdown();
     meshes.Shutdown();
     InternalPath::GetInstance()->AssetAuthoringEnabled = true;
+    std::cout << "LX_BLENDED_BUCKET_OK runtime=" << runtime << " frames=" << frames << " sameShaderInstances=4 workers=0,1,4\n";
     std::cout << "LX_MATERIAL_FORWARD_BLEND_OK frames=" << frames << " pixels=" << pixels
               << " checks=" << checks << " graphCompiles=0 stream=true parallel=true overflowLights=65 validation=0\n";
 }

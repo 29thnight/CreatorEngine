@@ -357,6 +357,11 @@ public:
     };
     [[nodiscard]] SceneAssetHandoff BeginSceneAssetHandoff(
         const own::shared_owner<SceneAssetPreparation>& preparation, AssetDepot::AssetRequestStatus& status);
+    // True when an asset change or mount after this preparation began made it
+    // outdated (not an owner cancellation). The same scene request may prepare
+    // again against the current assets.
+    [[nodiscard]] bool IsSceneAssetPreparationOutdated(
+        const own::shared_owner<SceneAssetPreparation>& preparation) const;
 
     struct AssetPreparationProgress
     {

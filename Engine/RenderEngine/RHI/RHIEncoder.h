@@ -174,6 +174,10 @@ public:
     virtual void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBufferSlice& slice) = 0;
 
+    // Explicit root UAV, distinct from the read-only SetRootBuffer contract.
+    // Unsupported encoders report failure; callers must not silently continue.
+    virtual bool SetRootUnorderedBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&) { return false; }
+
     // ── 드로우 · 디스패치 ──
 
     /// 정점·인덱스 버퍼 (A-5a). 링 조각과 보폭·포맷만 받는다 — 뷰 구조체를
@@ -221,6 +225,16 @@ public:
     /// producer owns dimension/output bounds; no CPU readback is performed.
     virtual bool DispatchMeshIndirect(RHIBufferHandle, uint64_t = 0) { return false; }
 
+    // Each command contains ordered 64-bit root buffer addresses followed by
+    // RHIDispatchMeshIndirectArguments. PSO and descriptor tables are inherited
+    // once per shader bucket. Bit 31 marks a CBV; other entries are SRVs.
+    virtual bool DispatchMeshIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,
+        std::span<const uint32_t>) { return false; }
+
+    // Ordered 64-bit root descriptors, native index view, then 5 indexed draw words.
+    // No direct-draw fallback on unsupported backends.
+    virtual bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,
+        std::span<const uint32_t>) { return false; }
     virtual void Dispatch(uint32_t x, uint32_t y, uint32_t z) = 0;
     // Native command recording count; unavailable encoders explicitly return the sentinel.
     virtual uint64_t GetComputeDispatchCount() const { return UINT64_MAX; }
@@ -250,6 +264,8 @@ public:
     //   방법이 없으니 빠뜨릴 방법도 없다 — 인코더 수명을 패스로 좁힌 것,
     //   그래프의 서비스를 생성자 인자로 만든 것과 같은 수다.
 
+    // Explicit UAV-only raster scope. Unsupported backends fail, never retain old attachments.
+    virtual bool BeginRasterWithoutAttachments(uint32_t width, uint32_t height) { return false; }
     virtual void BindRenderTargets(const RHIRenderTargetBinding& binding) = 0;
     virtual void ClearRenderTargets(const RHIRenderTargetBinding& binding,
         const float rgba[4]) = 0;

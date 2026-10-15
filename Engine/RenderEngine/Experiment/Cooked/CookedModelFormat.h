@@ -80,7 +80,7 @@ namespace experiment::cooked
     //   재임포트해야 채워진다.
     // 10: optional generation-owned meshlets.
     // 11: optional coarse-LOD chains. 이전 판은 읽지 않는다 — 재임포트한다.
-    inline constexpr std::uint32_t kFormatVersion = 13u;
+    inline constexpr std::uint32_t kFormatVersion = 15u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.

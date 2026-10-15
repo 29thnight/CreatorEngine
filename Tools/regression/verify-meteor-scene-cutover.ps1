@@ -7,6 +7,7 @@ param(
     [switch]$OnlyLive,
     [switch]$DeferRetention,
     [string]$Python='python',
+    [ValidateRange(1,600)][int]$FrameTimeoutSeconds=120,
     [ValidateRange(60,2400)][int]$TimeoutSeconds=1200
 )
 $ErrorActionPreference='Stop'
@@ -26,7 +27,7 @@ New-Item -ItemType Directory -Force (Split-Path $shaderTarget)|Out-Null
 Copy-Item -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders/DefaultPassShader" -Destination $shaderTarget -Recurse
 $exe="$repo/Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 function Snapshot {
-    $paths=@(Get-ChildItem "$repo/Engine","$repo/Editor","$repo/Dynamic_CPP/Assets/Shaders" -Recurse -File|Where-Object {$_.Extension -in '.cpp','.h','.slang','.vcxproj','.filters'}|Sort-Object FullName|ForEach-Object FullName)
+    $paths=@(Get-ChildItem "$repo/Engine","$repo/Editor","$repo/Dynamic_CPP/Assets/Shaders" -Recurse -File|Where-Object {$_.Extension -in '.cpp','.h','.inl','.slang','.vcxproj','.filters'}|Sort-Object FullName|ForEach-Object FullName)
     $paths+=@($exe,"$repo/Bin/x64-$Configuration/Editor/CreatorEditor.runtime.dll",$PSCommandPath,"$PSScriptRoot/verify-meteor-scene-capture.py")
     @($paths|ForEach-Object {@{path=[IO.Path]::GetRelativePath($repo,$_);sha256=(Get-FileHash -LiteralPath $_).Hash}})
 }
@@ -37,14 +38,14 @@ if($OnlyLive){$tests=@()}
 $commands=$tests+@('scene.new MeteorCutover','object.create ProbeCamera','component.add ProbeCamera CameraComponent',
     'object.transform ProbeCamera 0 3 -8 12 0 0','object.create ProbeLight Light','object.transform ProbeLight 0 20 0 50 -30 0')
 # Exercise the production METEOR first writer before any material or geometry exists.
-$commands+=@(1..64|ForEach-Object {'render.live.wait'})
+$commands+=@("render.live.ready $FrameTimeoutSeconds")
 $commands+=@("render.live.capture $($out.Replace('\','/'))/live-empty editor",
     "assets.model.reimport $($project.Replace('\','/'))/Assets/Models/Prim_Suzanne.glb",
     "model.loadcached $($project.Replace('\','/'))/Assets/Models/Prim_Suzanne.glb",'model.place Prim_Suzanne',
     'camera.editor match')
-# Each wait advances actual product packets while bounded native PSO preparation
-# completes. These CPU waits are warmup only; acceptance requires the GPU capture.
-$commands+=@(1..64|ForEach-Object {'render.live.wait'})
+# Wait for a newer matching completed GPU view, not a fixed number of consumed
+# CPU packets: material preparation can defer rendering while packets keep flowing.
+$commands+=@("render.live.ready $FrameTimeoutSeconds")
 $commands+=@('dx12.live status',"render.live.capture $($out.Replace('\','/'))/live editor",'dx12.validation','quit')
 [IO.File]::WriteAllText("$out/commands.txt",($commands -join "`n")+"`n",[Text.UTF8Encoding]::new($false))
 $start=[Diagnostics.ProcessStartInfo]::new($exe)
@@ -77,8 +78,13 @@ $expected=if($OnlyLive){0}elseif($ExtendedCases){144}else{12}
 $lists=$listLines.Count -eq $expected
 foreach($line in $listLines){if($line -notmatch ' missing=0 extra=\d+$'){$lists=$false}}
 $payloadLines=if($skin.Count){@($skin[0].data.log -split "`n"|Where-Object {$_ -match '^MESHLET_GPU_PAYLOAD '})}else{@()}
-$payloads=$payloadLines.Count -eq $expected -and @($payloadLines|Where-Object {$_ -notmatch ' schema=2 profile=2 identity=exact$'}).Count -eq 0
-$passed=$proc.ExitCode -eq 0 -and $stable -and $rows.Count -eq $commands.Count -and
+$payloads=$payloadLines.Count -eq $expected -and @($payloadLines|Where-Object {$_ -notmatch ' schema=4 profile=2 identity=exact$'}).Count -eq 0
+$ready=@($rows|Where-Object command -eq 'render.live.ready')
+$readiness=$ready.Count -eq 2 -and @($ready|Where-Object {
+    $_.status -ne 'succeeded' -or $_.data.completionKind -ne 'editor_gpu_frame_completed' -or
+    $_.data.completedFrame -le $_.data.afterFrame
+}).Count -eq 0
+$passed=$readiness -and $proc.ExitCode -eq 0 -and $stable -and $rows.Count -eq $commands.Count -and
     @($rows|Where-Object status -ne 'succeeded').Count -eq 0 -and
     @($rows|Where-Object {$_.command -in $tests -and $_.data.passed -ne $true}).Count -eq 0 -and $lists -and $payloads -and
     $validation.Count -eq 1 -and $validation[0].data.layerEnabled -and $validation[0].data.mode -eq 'gpu' -and
@@ -91,10 +97,10 @@ if($passed){
     & $Python "$PSScriptRoot/verify-meteor-scene-capture.py" "$out/live"
     $passed=$LASTEXITCODE -eq 0
 }
-$verdict=@{passed=$passed;configuration=$Configuration;sourceStable=$stable;exitCode=$proc.ExitCode;
+$verdict=@{passed=$passed;gpuReadiness=$readiness;configuration=$Configuration;sourceStable=$stable;exitCode=$proc.ExitCode;
     normalQuit=@($rows|Where-Object {$_.command -eq 'quit' -and $_.status -eq 'succeeded'}).Count -eq 1;
     gpuPayloadChecks=$payloadLines.Count;gpuListChecks=$listLines.Count;expectedGpuListChecks=$expected;extendedCases=[bool]$ExtendedCases;
-    scope='LX-only surface, shadow, skinning, graph and live display; no old/new route comparison';tests=$rows}
+    frameTimeoutSeconds=$FrameTimeoutSeconds;scope='LX-only surface, shadow, skinning, graph and live display; no old/new route comparison';tests=$rows}
 $verdict|ConvertTo-Json -Depth 12|Set-Content "$out/verdict.json"
 if(!$passed){throw "LX-only cutover verification failed: $out"}
 if(!$DeferRetention){Complete-ArtifactRetention $out "lx-scene-cutover-$Configuration"}

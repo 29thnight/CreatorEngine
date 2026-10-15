@@ -227,6 +227,22 @@ void DX12Encoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
         m_commandList->SetGraphicsRootShaderResourceView(slot, address);
 }
 
+bool DX12Encoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice)
+{
+    const auto address = ResolveSlice(slice);
+    if (!m_commandList || !address || !m_resources || !slice.size || slice.offset % 4 != 0) return false;
+    auto* resource = m_resources->Resolve(slice.buffer);
+    if (!resource) return false;
+    const auto desc = resource->GetDesc();
+    if (!(desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) ||
+        slice.offset >= desc.Width || slice.size > desc.Width - slice.offset) return false;
+    if (bindPoint == RHIBindPoint::Compute)
+        m_commandList->SetComputeRootUnorderedAccessView(slot, address);
+    else
+        m_commandList->SetGraphicsRootUnorderedAccessView(slot, address);
+    return true;
+}
+
 void DX12Encoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
@@ -388,6 +404,36 @@ bool DX12Encoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteO
     return true;
 }
 
+bool DX12Encoder::DispatchMeshIndirectBatch(RHIBufferHandle arguments, uint64_t byteOffset, uint32_t count,
+    std::span<const uint32_t> roots)
+{
+    if (!m_meshCommandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, true) ||
+        !count || roots.empty() || roots.size() > 16 || byteOffset % 4) return false;
+    const auto entry = m_resources->DescribeBuffer(arguments);
+    const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + 12;
+    if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        uint64_t(stride) * count > entry.bytes - byteOffset) return false;
+    auto* signature = m_resources->GetMaterialBatchSignature(m_boundRootSignature[0], roots, false);
+    if (!signature) return false;
+    m_meshCommandList->ExecuteIndirect(signature, count, entry.resource, byteOffset, nullptr, 0);
+    return true;
+}
+
+bool DX12Encoder::DrawIndexedIndirectBatch(RHIBufferHandle arguments, uint64_t byteOffset, uint32_t count,
+    std::span<const uint32_t> roots)
+{
+    if (!m_commandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, false) ||
+        !count || roots.empty() || roots.size() > 16 || byteOffset % 4) return false;
+    const auto entry = m_resources->DescribeBuffer(arguments);
+    const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + 36;
+    if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        uint64_t(stride) * count > entry.bytes - byteOffset) return false;
+    auto* signature = m_resources->GetMaterialBatchSignature(m_boundRootSignature[0], roots, true);
+    if (!signature) return false;
+    m_commandList->ExecuteIndirect(signature, count, entry.resource, byteOffset, nullptr, 0);
+    return true;
+}
+
 void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
     if (nullptr == m_commandList)
@@ -417,6 +463,14 @@ void DX12Encoder::EnsureDescriptorHeaps()
 
     m_resources->BindDescriptorHeaps(m_commandList, true);
     m_heapsBound = true;
+}
+
+bool DX12Encoder::BeginRasterWithoutAttachments(uint32_t width, uint32_t height)
+{
+    if (!m_commandList || !width || !height) return false;
+    m_commandList->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+    SetViewportAndScissor(width, height);
+    return true;
 }
 
 void DX12Encoder::BindRenderTargets(const RHIRenderTargetBinding& binding)

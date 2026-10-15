@@ -363,19 +363,22 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
                                            hdr ? hdri.GetSourceMap() : RHITextureHandle{});
         CheckWith(prepared, "Matched prepare ", error);
         const auto prepareMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-prepareStart).count();
-        auto graph = std::make_shared<EnhancedRenderGraph>(device);
+        auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         gbuffer.Declare(*graph, context);
-        const auto outputs = gbuffer.GetOutputs();
-        host.DeclareGeometry(*graph);
-        host.DeclareCulling(*graph);
-        host.DeclareGBuffer(*graph, outputs);
+        const auto meteorGeometry = host.DeclareGeometry(*graph);
+        const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+        const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+        const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
+        const auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
+        host.DeclareHistory(*graph, outputs.depth);
         RGTextureDesc aoDesc;
         aoDesc.width = aoDesc.height = 64;
         aoDesc.format = RHIFormat::RG16Float;
         aoDesc.allowRenderTarget = true;
         aoDesc.clearColor[0] = 1;
-        const auto ao = graph->CreateTexture(aoDesc);
-        graph->AddPass("MAT9.NeutralAO", {{ao, RHIResourceState::RenderTarget}},
+        const auto ao = graph->Write(graph->CreateTexture(aoDesc));
+        graph->AddPass("MAT9.NeutralAO", {{ao, RHIResourceState::RenderTarget, RGAccessMode::Write}},
                        [&device,ao](const auto& execution) {
                            const auto handle = execution.ResolveHandle(ao);
                            const auto target = device.CreateRenderTargets({&handle,1}, nullptr);
@@ -387,17 +390,17 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
 
 
         lighting = SceneHost::DeclareHdrTarget(*graph, context);
-        const auto lit = host.DeclareColor(*graph, outputs, lighting, ao, {});
+        const auto lit = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
         // Same order as the product renderer: the medium composes once over the
         // opaque scene, then the blended stream draws every Blended/transmission
         // draw (glass). Publication rejects a stream that omits a blended draw.
         const auto composed = host.DeclareVolume(*graph, lit, outputs.depth, {});
         tiles.SetDepth(outputs.depth);
         tiles.Declare(*graph, context);
-        const auto color = host.DeclareBlendedStream(*graph, composed, {}, tiles.GetLighting());
+        const auto color = host.DeclareBlendedStream(*graph, meteorLayerWork, composed, {}, tiles.GetLighting());
         RHIReadback readback;
         CheckWith(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback ", error);
-        graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource}},
+        graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource, RGAccessMode::Read}},
                        [readback,color](const auto& execution) {
                            execution.encoder->CopyToReadback(readback, execution.ResolveHandle(color));
                        }, true);
@@ -410,12 +413,12 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             {
                 Check(device.CreateReadback(64,64,RHIFormat::RGBA32Float,1,diagnostics[i],error),
                       "Matched geometry diagnostic readback");
-                const auto resource = graph->FindImportedTexture(lookup->Inputs()[fields[i]]);
-                graph->AddPass("MAT9.GeometryReadback", {{resource,RHIResourceState::CopySource}},
+                const auto resource = lookup->GraphInputs(*graph)[fields[i]];
+                graph->AddPass("MAT9.GeometryReadback", {{resource,RHIResourceState::CopySource,RGAccessMode::Read}},
                                [readback=diagnostics[i],resource](const auto& execution) {
                                    execution.encoder->CopyToReadback(readback,execution.ResolveHandle(resource));
                                },true);
-                graph->AddPass("MAT9.GeometryRestore", {{resource,RHIResourceState::ShaderResource}},
+                graph->AddPass("MAT9.GeometryRestore", {{resource,RHIResourceState::ShaderResource,RGAccessMode::Read}},
                                [](const auto&) {},true);
             }
         }

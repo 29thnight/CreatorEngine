@@ -85,12 +85,12 @@ namespace
     bool Writes(const EnhancedRenderGraph::RGPassUsage& usage)
     {
         return usage.access == RGAccessMode::LegacyState ? IsWriteState(usage.state)
-            : usage.access == RGAccessMode::Write || usage.access == RGAccessMode::ReadWrite;
+            : usage.access == RGAccessMode::Write || usage.access == RGAccessMode::ReadWrite || usage.access == RGAccessMode::AtomicMin64;
     }
     bool Reads(const EnhancedRenderGraph::RGPassUsage& usage)
     {
         return usage.access == RGAccessMode::LegacyState ? !IsWriteState(usage.state)
-            : usage.access == RGAccessMode::Read || usage.access == RGAccessMode::ReadWrite;
+            : usage.access == RGAccessMode::Read || usage.access == RGAccessMode::ReadWrite || usage.access == RGAccessMode::AtomicMin64;
     }
 }
 
@@ -443,8 +443,27 @@ RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
     return VersionHandle(previous.index, version);
 }
 
+bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, const std::string& producer) const
+{
+    if (!ValidVersionHandle(resource)) return false;
+    for (const auto& pass : m_passes) if (pass.name == producer)
+        for (const auto& use : pass.usages)
+            if (use.handle.index == resource.index && use.handle.kind == resource.kind &&
+                use.handle.epoch == resource.epoch &&
+                (use.access == RGAccessMode::Write || use.access == RGAccessMode::ReadWrite))
+                return true;
+    return false;
+}
+
 RGHandle EnhancedRenderGraph::Write(RGHandle previous) { return AdvanceVersion(previous, false); }
 RGHandle EnhancedRenderGraph::Modify(RGHandle previous) { return AdvanceVersion(previous, true); }
+RGHandle EnhancedRenderGraph::AtomicMin64(RGHandle previous)
+{
+    if (!ValidVersionHandle(previous) || previous.kind != RGResourceKind::Buffer) return {};
+    const auto result = AdvanceVersion(previous, true);
+    if (result.IsValid()) m_resources[result.index].versions[result.version].atomicMin64 = true;
+    return result;
+}
 
 void EnhancedRenderGraph::RequireImportedFinalState(RGHandle handle, RHIResourceState state)
 {
@@ -534,7 +553,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         std::unordered_set<uint32_t> importedTextures, importedBuffers;
         importedTextures.reserve(m_resources.size());
         importedBuffers.reserve(m_resources.size());
-        std::vector<std::vector<int32_t>> producers(m_resources.size());
+        std::vector<std::vector<std::vector<uint16_t>>> producers(m_resources.size());
         std::vector<std::vector<std::vector<uint16_t>>> consumers(m_resources.size());
         const auto fail = [&](const std::string& why, size_t r, uint16_t v) {
             outError = "RG2 " + why + ": " + m_resources[r].name + " v" + std::to_string(v); return false;
@@ -552,7 +571,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                     return fail("duplicate physical import; reuse its handle",r,0);
                 }
             }
-            producers[r].assign(resource.versions.size(), -1);
+            producers[r].resize(resource.versions.size());
             consumers[r].resize(resource.versions.size());
             for (size_t v=resource.imported ? 1 : 0; v<resource.versions.size(); ++v)
             {
@@ -578,7 +597,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 const auto r=u.handle.index, v=u.handle.version;
                 if (std::find(seen.begin(),seen.end(),r)!=seen.end()) return bad("duplicate resource access; use Modify: "+m_resources[r].name);
                 seen.push_back(r);
-                if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite)
+                if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite && u.access!=RGAccessMode::AtomicMin64)
                     return bad("explicit access required");
                 if (u.state<RHIResourceState::Common || u.state>RHIResourceState::VertexAndShaderResource ||
                     ((u.state==RHIResourceState::IndirectArgument || u.state==RHIResourceState::VertexAndShaderResource) &&
@@ -592,9 +611,14 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 {
                     if (m_resources[r].imported && v==0) return fail("cannot overwrite imported v0; call Write/Modify",r,v);
                     const auto& declaration=m_resources[r].versions[v];
-                    if (declaration.modify!=(u.access==RGAccessMode::ReadWrite)) return fail("Write/Modify access mismatch",r,v);
-                    if (producers[r][v]>=0) return fail("multiple version producers",r,v);
-                    producers[r][v]=static_cast<int32_t>(p);
+                    if (declaration.atomicMin64 != (u.access == RGAccessMode::AtomicMin64) ||
+                        declaration.modify != (u.access == RGAccessMode::ReadWrite || u.access == RGAccessMode::AtomicMin64))
+                        return fail("Write/Modify/AtomicMin64 access mismatch",r,v);
+                    if (declaration.atomicMin64 && (!m_resources[r].IsBuffer() ||
+                        u.state != RHIResourceState::UnorderedAccess))
+                        return fail("AtomicMin64 requires a buffer UAV",r,v);
+                    if (!declaration.atomicMin64 && !producers[r][v].empty()) return fail("multiple version producers",r,v);
+                    producers[r][v].push_back(static_cast<uint16_t>(p));
                     if (declaration.modify) consumers[r][declaration.parent].push_back(static_cast<uint16_t>(p));
                 }
                 else consumers[r][v].push_back(static_cast<uint16_t>(p));
@@ -602,7 +626,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         }
         for(size_t r=0; r<m_resources.size(); ++r)
             for(size_t v=0; v<producers[r].size(); ++v)
-                if(producers[r][v]<0 && !(m_resources[r].imported && v==0))
+                if(producers[r][v].empty() && !(m_resources[r].imported && v==0))
                     return fail("missing version producer",r,static_cast<uint16_t>(v));
         // Only data dependencies retain work. WAR/WAW constrain surviving
         // accesses; they must not keep discarded versions or dead readers alive.
@@ -612,7 +636,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         for(size_t p=0; p<count; ++p) if(m_passes[p].hasSideEffect) retain(static_cast<uint16_t>(p));
         for(size_t r=0; r<m_resources.size(); ++r)
             if(m_resources[r].imported && producers[r].size()>1)
-                retain(static_cast<uint16_t>(producers[r].back()));
+                for (const auto producer : producers[r].back()) retain(producer);
         while(!roots.empty())
         {
             const auto p=roots.back(); roots.pop_back();
@@ -620,9 +644,8 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             {
                 if(!Reads(u)) continue;
                 const auto r=u.handle.index;
-                const auto v=u.access==RGAccessMode::ReadWrite ? m_resources[r].versions[u.handle.version].parent : u.handle.version;
-                const auto producer=producers[r][v];
-                if(producer>=0) retain(static_cast<uint16_t>(producer));
+                const auto v=(u.access==RGAccessMode::ReadWrite || u.access==RGAccessMode::AtomicMin64) ? m_resources[r].versions[u.handle.version].parent : u.handle.version;
+                for (const auto producer : producers[r][v]) retain(producer);
             }
         }
         for(size_t p=0; p<count; ++p) m_passes[p].culled=!alive[p];
@@ -635,23 +658,32 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         };
         for (size_t r=0; r<m_resources.size(); ++r)
         {
-            int32_t previousWriter=-1;
+            std::vector<uint16_t> previousWriters;
             uint16_t previousVersion=0;
             std::vector<std::pair<uint16_t,uint16_t>> pendingReaders;
             for (size_t v=0; v<producers[r].size(); ++v)
             {
-                const auto producer=producers[r][v];
-                if (producer<0 && !(m_resources[r].imported && v==0)) return fail("missing version producer",r,static_cast<uint16_t>(v));
-                if(producer>=0 && alive[producer])
+                std::vector<uint16_t> current;
+                for (const auto producer : producers[r][v]) if (alive[producer]) current.push_back(producer);
+                if (!current.empty())
                 {
-                    edge(previousWriter,static_cast<uint16_t>(producer),static_cast<uint16_t>(r),previousVersion,Reason::WAW);
-                    for(const auto& [reader,readVersion]:pendingReaders)
-                        edge(reader,static_cast<uint16_t>(producer),static_cast<uint16_t>(r),readVersion,Reason::WAR);
-                    pendingReaders.clear(); previousWriter=producer; previousVersion=static_cast<uint16_t>(v);
+                    for (const auto producer : current)
+                    {
+                        for (const auto previous : previousWriters)
+                            edge(previous,producer,static_cast<uint16_t>(r),previousVersion,Reason::WAW);
+                        for (const auto& [reader,readVersion] : pendingReaders)
+                        {
+                            // Atomic writers consume initialization, not sibling results.
+                            if (std::find(current.begin(),current.end(),reader)==current.end())
+                                edge(reader,producer,static_cast<uint16_t>(r),readVersion,Reason::WAR);
+                        }
+                    }
+                    pendingReaders.clear(); previousWriters=current; previousVersion=static_cast<uint16_t>(v);
                 }
-                for(const auto reader:consumers[r][v]) if(alive[reader])
+                for (const auto reader : consumers[r][v]) if (alive[reader])
                 {
-                    edge(producer,reader,static_cast<uint16_t>(r),static_cast<uint16_t>(v),Reason::RAW);
+                    for (const auto producer : current)
+                        edge(producer,reader,static_cast<uint16_t>(r),static_cast<uint16_t>(v),Reason::RAW);
                     pendingReaders.push_back({reader,static_cast<uint16_t>(v)});
                 }
             }
@@ -1658,6 +1690,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
     m_stats.barriersEmitted = 0;
     m_stats.barrierBatches = 0;
     std::vector<bool> previousWrite(m_resources.size(),true);
+    std::vector<uint16_t> previousAtomicVersion(m_resources.size(), RGHandle::kInvalid);
     std::vector<RHIResourceState> finalStates;
     const auto retainsState = [&](size_t index)
     {
@@ -1771,6 +1804,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
         if (pass.repeated)
         {
             PlanRepeatedBarriers(pass, previousWrite);
+            std::fill(previousAtomicVersion.begin(), previousAtomicVersion.end(), RGHandle::kInvalid);
         }
         else
         {
@@ -1781,6 +1815,10 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
                     continue;
                 }
                 Resource& resource = m_resources[usage.handle.index];
+                const bool siblingAtomic = usage.access == RGAccessMode::AtomicMin64 &&
+                    previousAtomicVersion[usage.handle.index] == usage.handle.version;
+                previousAtomicVersion[usage.handle.index] = usage.access == RGAccessMode::AtomicMin64
+                    ? usage.handle.version : RGHandle::kInvalid;
 
                 // ★ 핸들이 유효한가만 본다 (G-2). 예전에는 여기서 `Resolve` 로
                 //   포인터를 풀어 배리어 구조체에 박았는데, 그 한 줄 때문에
@@ -1795,7 +1833,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
                 {
                     // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
                     // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
-                    if (RHIResourceState::UnorderedAccess == usage.state &&
+                    if (RHIResourceState::UnorderedAccess == usage.state && !siblingAtomic &&
                         (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite[usage.handle.index] || Writes(usage)))
                     {
                         if (resource.IsBuffer())
@@ -2125,6 +2163,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         {
             mix(version.parent);
             mix(version.modify);
+            mix(version.atomicMin64);
         }
     }
     mix(output.passes.size());
@@ -2268,6 +2307,19 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
         return false;
     }
 
+    // Device/storage validity is not structural: validate even when reusing a DAG.
+    for (const auto& resource : m_resources)
+    {
+        if (!std::any_of(resource.versions.begin(), resource.versions.end(),
+            [](const Resource::Version& v) { return v.atomicMin64; })) continue;
+        if (!m_deviceServices->GetAtomicCapabilities().bufferInt64Min || !resource.IsBuffer() ||
+            (resource.imported ? !m_deviceServices->IsAtomicMin64Buffer(resource.buffer) :
+                (!resource.bufferDesc.allowUnorderedAccess || resource.bufferDesc.bytes == 0 || resource.bufferDesc.bytes % 8 != 0)))
+        {
+            outError = "AtomicMin64 requires supported, valid 8-byte aligned UAV buffer storage: " + resource.name;
+            return false;
+        }
+    }
     if (!ValidateRepeatedPasses(outError)) return false;
     // Normalize the previous compilation's reachability before constructing the
     // authored-contract key. Exact byte comparison avoids hash collision reuse.
@@ -2434,6 +2486,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
         {
             number(version.parent);
             number(version.modify);
+            number(version.atomicMin64);
         }
     }
     number(m_passes.size());
@@ -2495,10 +2548,14 @@ bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
     {
         return false;
     }
-    const auto compatible = [](const std::vector<RGPassUsage>& usages)
+    const auto compatible = [this](const std::vector<RGPassUsage>& usages)
     {
         for (const auto& usage : usages)
         {
+            // Reduction storage stays on graphics until cross-queue simultaneous UAV ownership is supported.
+            if (usage.handle.index < m_resources.size() &&
+                std::any_of(m_resources[usage.handle.index].versions.begin(), m_resources[usage.handle.index].versions.end(),
+                    [](const Resource::Version& v) { return v.atomicMin64; })) return false;
             // This is the RHI compute encoder's supported legacy-state subset.
             // ShaderResource is narrowed to NON_PIXEL only after a COMMON handoff.
             switch (usage.state)
@@ -2545,6 +2602,7 @@ struct EnhancedRenderGraph::QueuePlanningScratch
         RHIResourceState state{RHIResourceState::Common};
         RHIQueueKind queue{RHIQueueKind::Graphics};
         bool immutableRead{false};
+        uint16_t atomicVersion{RGHandle::kInvalid};
     };
     std::vector<ReadEpoch> resources;
     std::vector<uint32_t> position, remaining;
@@ -2586,6 +2644,7 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
         epoch.state = RHIResourceState::Common;
         epoch.queue = RHIQueueKind::Graphics;
         epoch.immutableRead = false;
+        epoch.atomicVersion = RGHandle::kInvalid;
     }
     for (const auto pass : std::span{m_executeOrder.data(), m_executeOrder.size()})
     {
@@ -2604,7 +2663,9 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
             // to NON_PIXEL. Equal RHI enums do not prove cross-queue compatibility.
             // Same-queue readers share one immutable state epoch: that queue owns
             // preparation and batch-boundary COMMON transitions in submission order.
-            const bool compatible = immutableRead && epoch.immutableRead &&
+            const bool atomicSibling = usage.access == RGAccessMode::AtomicMin64 &&
+                usage.handle.version == epoch.atomicVersion;
+            const bool compatible = ((immutableRead && epoch.immutableRead) || atomicSibling) &&
                 usage.state == epoch.state && queues[pass] == epoch.queue;
             if (!compatible)
             {
@@ -2619,6 +2680,7 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
             epoch.state = usage.state;
             epoch.queue = queues[pass];
             epoch.immutableRead = immutableRead;
+            epoch.atomicVersion = usage.access == RGAccessMode::AtomicMin64 ? usage.handle.version : RGHandle::kInvalid;
         }
     }
     for (auto* lists : {&predecessors, &successors})

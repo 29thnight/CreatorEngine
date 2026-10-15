@@ -85,7 +85,7 @@ public:
     RGHandle DeclareBlended(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle shadowMap,
         const EnhancedForwardLighting& tiles) const
     {
-        return m_host.DeclareBlendedStream(graph, lighting, shadowMap, tiles);
+        return m_host.DeclareBlendedStream(graph, m_layerWork, lighting, shadowMap, tiles);
     }
     const SceneSurfaceTargets::Outputs& GetOutputs() const { return m_surfaceOutputs; }
     uint32_t GetLastDrawCount() const { return static_cast<uint32_t>(m_surfaceDraws.size()); }
@@ -111,6 +111,8 @@ private:
     EnhancedFrameContext m_cameraContext{};
     std::vector<EnhancedDrawItem> m_surfaceDraws;
     SceneSurfaceTargets::Outputs m_surfaceOutputs{};
+    material_graph::SceneLayerWork m_layerWork{};
+    material_graph::SceneColorInputs m_colorInputs{};
     own::shared_owner<const material_graph::Generation> m_generation;
     own::shared_owner<const material_graph::Instance> m_instance;
     std::uint32_t AddView(const RHIModelMeshView& source);

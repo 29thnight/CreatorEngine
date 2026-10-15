@@ -69,7 +69,7 @@ struct RGPassId
     bool IsValid() const { return kInvalid != index; }
 };
 
-enum class RGAccessMode { LegacyState, Read, Write, ReadWrite };
+enum class RGAccessMode { LegacyState, Read, Write, ReadWrite, AtomicMin64 };
 enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };
 // Access/version declarations and execution ordering are independent contracts.
 enum class RGOrderPolicy { DependencyOrder, PreserveDeclarationOrder };
@@ -426,6 +426,9 @@ public:
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
     RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
     RGHandle FindImportedTexture(RHITextureHandle texture) const;
+    // Declaration-time validation against real pass usages, not a second stage registry.
+    // Any version of this physical graph resource written by this producer matches.
+    bool HasDeclaredWriter(RGHandle resource, const std::string& producer) const;
 
     // Flush the immediate upload prefix before preparing recording-scoped pass
     // packets. RecordParallel reuses this exact recording instead of flushing it
@@ -454,6 +457,10 @@ public:
     // their producer usages and rejects forks; old versions remain readable.
     RGHandle Write(RGHandle previous);
     RGHandle Modify(RGHandle previous);
+    // A single initialized buffer version reduced by one or more unordered
+    // uint64 atomic-min writers. Writers must not consume intermediate values.
+    // Every reader of the result waits for ALL writers; no sibling WAW edges.
+    RGHandle AtomicMin64(RGHandle previous);
 
     // 캐시처럼 그래프 밖에서 상태를 고정한 소유자에게 마지막 소비 뒤 돌려준다.
     // 유효성·서로 다른 최종 상태 요구는 Compile에서 진단한다.
@@ -838,7 +845,7 @@ private:
         uint32_t aliasMember{UINT32_MAX};
         uint64_t allocationBytes{0};
         std::string name;
-        struct Version { uint16_t parent; bool modify; };
+        struct Version { uint16_t parent; bool modify; bool atomicMin64{false}; };
         std::vector<Version> versions;
     };
 

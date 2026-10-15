@@ -26,6 +26,11 @@ namespace material_graph
             return samples_;
         }
         const std::array<RGHandle, 2>& DeclareInputs(EnhancedRenderGraph& graph) const;
+        const std::array<RGHandle, 2>& GraphInputs(const EnhancedRenderGraph& graph) const
+        {
+            CheckCurrent(graph);
+            return graphInputs_;
+        }
         std::array<RGHandle, 2> DeclareCaptureOutputs(EnhancedRenderGraph& graph) const;
         void DeclareBackground(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth) const;
         void DeclareBake(EnhancedRenderGraph& graph, const SceneLookupFrame& lookup, RGHandle owners,

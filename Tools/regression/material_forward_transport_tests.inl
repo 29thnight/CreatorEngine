@@ -86,7 +86,7 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
 void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                          ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
                          own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
-                         bool versionedAcceptance = false)
+                         bool versionedAcceptance = false, unsigned layerMode = 0)
 {
     std::string error;
     std::array<own::shared_owner<const Generation>, 4> generations;
@@ -141,7 +141,33 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             normal.data(), 12);
     }
     const std::array<std::array<float, 2>, 1> ranges{{{.2f, .6f}}};
+    std::vector<uint32_t> expandedIndices;
+    if (layerMode >= 3) {
+        const auto stride = geometry.draw.modelMeshView.vertexStride;
+        const std::vector<std::byte> vertex(geometry.vertices.begin(), geometry.vertices.begin() + stride);
+        geometry.vertices.resize(72 * stride);
+        expandedIndices.resize(72);
+        for (unsigned i = 0; i < 72; ++i) {
+            // Keep the reversed quad winding; SSS and refraction read SV_IsFrontFace.
+            expandedIndices[i] = i < 6 ? geometry.indices[i] : i;
+            if (i < 6) continue;
+            auto* destination = geometry.vertices.data() + i * stride;
+            std::memcpy(destination, vertex.data(), stride);
+            const float position[]{4.f + float(i % 3), float((i / 3) % 3), 0.f};
+            std::memcpy(destination, position, sizeof(position));
+        }
+        geometry.draw.modelMeshView.vertexData = geometry.vertices.data();
+        geometry.draw.modelMeshView.vertexBytes = geometry.vertices.size();
+        geometry.draw.modelMeshView.indexData = expandedIndices.data();
+        geometry.draw.modelMeshView.indexCount = expandedIndices.size();
+    }
     auto boundary = VolumeBoxes(ranges, 9999, false);
+    if (layerMode) {
+        experiment::MeshletBuildSettings settings;
+        if (layerMode < 3) settings.maxVertices = 3;
+        Check(cookedMeshes.Cook(geometry.draw.modelMeshView, geometry.draw.modelMeshView, error, settings), "Layer surface cooking " + error);
+        Check(cookedMeshes.Cook(boundary.draw.modelMeshView, boundary.draw.modelMeshView, error, settings), "Layer volume cooking " + error);
+    }
     std::array<std::vector<float>, 3> solo;
     std::vector<float> mixed, refracted, fullTransport;
     const std::array<float, 3> alphas{.3f, .45f, .6f};
@@ -253,7 +279,9 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             const std::vector<EnhancedDrawItem> empty;
             context.draws = &empty;
             own::shared_owner<const SceneViewInput> input;
-            Check(SealScene({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, {},
+            SceneInputBudget inputBudget;
+            if (layerMode) inputBudget.mesh.maxChunkPoints = layerMode == 3 ? 128 : layerMode == 4 ? 64 : 3;
+            Check(SealScene({context.frameId, context.sceneEpoch, 901, 1, 16, 16, camera}, graphDraws, inputBudget,
                                        input, error) &&
                       host.SelectReadyInput(context, input, input, error) && input->Draws().size() == graphDraws.size(),
                   "All transport draws accepted");
@@ -264,11 +292,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             Check(tiles.PrepareFrame(context, error) &&
                       host.PrepareResidency(context, input, error),
                   "Transport preparation");
-            const bool versioned = policy != 0;
+            const bool versioned = true; // All Scene fixtures use the production RG2 wiring.
             const auto accessRead = versioned ? RGAccessMode::Read : RGAccessMode::LegacyState;
             const auto accessWrite = versioned ? RGAccessMode::Write : RGAccessMode::LegacyState;
             auto graph = std::make_shared<EnhancedRenderGraph>(
-                device, versioned ? RGSchedulingMode::ExplicitVersioned : RGSchedulingMode::DeclarationOrder,
+                device, RGSchedulingMode::ExplicitVersioned,
                 policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
             const bool parallel = fixture == 4 || fixture == 10 || fixture == 20 || fixture == 22;
             if (parallel)
@@ -276,7 +304,9 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                 pool.BeginFrame(static_cast<std::uint32_t>(context.frameId));
                 Check(graph->PrepareParallel(pool, error), "Transport parallel prefix");
             }
-            const bool prepared = host.Prepare(context, input, environment.handle, {}, {}, {}, {}, error, 1);
+            SceneHostBudget hostBudget;
+            hostBudget.lookupRuntimeEvaluation = hostBudget.lookupApproximate = layerMode == 2;
+            const bool prepared = host.Prepare(context, input, environment.handle, {}, {}, {}, hostBudget, error, 1);
             Check(prepared, "Transport host " + error);
             gbuffer.Declare(*graph, context);
             auto outputs = gbuffer.GetOutputs();
@@ -301,9 +331,13 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                execution.encoder->BindRenderTargets(target);
                                execution.encoder->ClearDepthTarget(target, fixture == 6 ? .1f : .9f);
                            });
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            outputs = host.DeclareGBuffer(*graph, outputs);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
+            outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
+            host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc desc;
             desc.width = desc.height = 16;
             desc.format = RHIFormat::RGBA16Float;
@@ -332,11 +366,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                        target, h.index == color.index ? background.data() : white);
                                }
                            });
-            color = host.DeclareColor(*graph, outputs, color, ao, {});
+            color = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
             const auto composed = host.DeclareVolume(*graph, color, outputs.depth, {});
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);
-            const auto final = host.DeclareBlendedStream(*graph, composed, {}, tiles.GetLighting());
+            const auto final = host.DeclareBlendedStream(*graph, meteorLayerWork, composed, {}, tiles.GetLighting());
             Check(final.IsValid(), "Transport shared output");
             std::array<RHIReadback, 3> readbacks;
             const std::array handles{final, outputs.depth, outputs.bitmask};
@@ -412,6 +446,12 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             Check(host.PublishSubmittedCache(context.frameId, completion, error, ticket),
                   "Transport publication " + error);
             device.WaitForGpu();
+            if (layerMode) {
+                const auto counts = host.LayerBucketCounts();
+                Check(counts[1] == counts[0] * (layerMode == 3 ? 1 : 2), "Effect layer native range covers every chunk");
+                if (fixture == 0 || fixture == 9 || fixture == 10)
+                    Check(counts[0] > 0, "SSS/refraction executes the layer command range");
+            }
             std::array<RHIReadbackImage, 3> mapped;
             for (unsigned i = 0; i < 3; ++i)
             {
@@ -550,6 +590,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
     }
     else
     {
+        if (layerMode) std::cout << "LX_LAYER_BUCKET_OK mode=" << layerMode << " frames=" << frames << " chunksPerSubmission=" << (layerMode == 3 ? 1 : 2) << "\n";
         std::cout << "LX_MATERIAL_FORWARD_TRANSPORT_OK frames=" << frames << " components=" << components
                   << " checks=" << checks << " graphCompiles=0 validation=0\n";
     }

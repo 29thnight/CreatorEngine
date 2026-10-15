@@ -28,7 +28,7 @@ W1 의 판정은 "노멀맵이 있는 draw 와 없는 draw 가 서로 다르게 
 디스크에만 있다. 그것만 쓰는 게이트는 clean checkout 에서 조용히 비어 버린다
 (`Tools/regression/fixtures/imgui-ini` · `gltf-multifile` 이 같은 이유로 생겼다).
 
-현재 `verify-pbr-wiring-baseline.ps1`의 스킨드·다중 재질 축은
+`verify-pbr-wiring-baseline.ps1`(METEOR 컷오버 `dc8233a90`에서 삭제)의 스킨드·다중 재질 축은
 CreatorRobot으로 교체했다. 이 모델도 로컬 준비본이며 없으면 skipped로 기록한다.
 [CreatorRobot fixture 안내](../creator-robot/README.md)를 따른다. 이 대조쌍은
 계속 clean checkout에서 노멀맵 유무만 독립적으로 검증한다.

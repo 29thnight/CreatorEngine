@@ -5,6 +5,7 @@
 #include "Assets/ModelSkeletonPayload.h"
 #include "Experiment/Cooked/CookedModelSubAssetCodec.h"
 #include "Experiment/Import/MeshletBuilder.h"
+#include "Experiment/Import/MeshLodBuilder.h"
 #include "RHI/IRenderDeviceServices.h"
 
 #include <algorithm>
@@ -27,7 +28,8 @@ struct CookedMeshFixture
 };
 
 [[nodiscard]] inline bool CookMeshFixture(const RHIModelMeshView& source, CookedMeshFixture& result, std::string& error,
-                                        const experiment::MeshletBuildSettings& settings = {})
+                                        const experiment::MeshletBuildSettings& settings = {},
+                                        const experiment::MeshLodBuildSettings* lodSettings = nullptr)
 {
     struct FixtureBytes final : experiment::cooked::ArtifactByteSource
     {
@@ -57,6 +59,7 @@ struct CookedMeshFixture
         error = "Fixture meshlet cooking failed: " + error;
         return false;
     }
+    if (lodSettings && !experiment::importer::BuildMeshLods(authored, authored.coarseLods, error, *lodSettings, settings)) return false;
     auto payload = own::make_shared<assets::ModelGeometryPayload>();
     auto& mesh = payload->mesh;
     mesh.vertexAttributeMask = source.vertexAttributeMask;
@@ -65,6 +68,7 @@ struct CookedMeshFixture
     mesh.vertexBytes.assign(authored.vertices.Bytes().begin(), authored.vertices.Bytes().end());
     mesh.indices = std::move(authored.indices);
     mesh.meshlets = std::move(authored.meshlets);
+    mesh.coarseLods = std::move(authored.coarseLods);
     auto& summary = payload->meshletSummary;
     summary.settings = mesh.meshlets.settings;
     summary.geometryDigest = mesh.meshlets.geometryDigest;
@@ -83,6 +87,18 @@ struct CookedMeshFixture
     descriptor.vertexCount = static_cast<uint32_t>(mesh.vertexBytes.size() / mesh.vertexStride);
     descriptor.indexCount = static_cast<uint32_t>(mesh.indices.size());
     descriptor.meshlets = summary;
+    descriptor.lodSettings = mesh.coarseLods.settings;
+    descriptor.lodGeometryDigest = mesh.coarseLods.geometryDigest;
+    descriptor.coarseLodCount = static_cast<uint32_t>(mesh.coarseLods.levels.size());
+    for (uint32_t i=0;i<descriptor.coarseLodCount;++i) {
+        const auto& lod=mesh.coarseLods.levels[i]; auto& target=payload->lodSummaries[i];
+        target.geometricError=lod.geometricError; target.indexCount=static_cast<uint32_t>(lod.indices.size());
+        const auto& p=lod.meshlets;auto& m=target.meshlets;
+        m.settings=p.settings;m.geometryDigest=p.geometryDigest;m.descriptorCount=static_cast<uint32_t>(p.descriptors.size());
+        m.vertexRemapCount=static_cast<uint32_t>(p.vertexRemap.size());m.triangleIndexCount=static_cast<uint32_t>(p.triangleIndices.size());
+        m.primitiveRemapCount=static_cast<uint32_t>(p.primitiveRemap.size());m.lod0=p.lod0;
+        descriptor.coarseLods[i]=target;
+    }
     descriptor.skinned = assets::Has(mesh.vertexAttributeMask, assets::VertexAttribute::BoneIndices);
     if (descriptor.skinned)
     {
@@ -132,10 +148,11 @@ class CookedMeshLibrary
 {
 public:
     [[nodiscard]] bool Cook(const RHIModelMeshView& loose, RHIModelMeshView& cooked, std::string& error,
-                            const experiment::MeshletBuildSettings& settings = {})
+                            const experiment::MeshletBuildSettings& settings = {},
+                            const experiment::MeshLodBuildSettings* lodSettings = nullptr)
     {
         auto& mesh = m_meshes.emplace_back();
-        if (!CookMeshFixture(loose, mesh, error, settings))
+        if (!CookMeshFixture(loose, mesh, error, settings, lodSettings))
         {
             m_meshes.pop_back();
             return false;
@@ -148,7 +165,8 @@ public:
     // distinct content so repeated frames keep one geometry identity. Granular
     // and incomplete views pass through unchanged for the seal to judge.
     // view is a copy so resolved may alias the caller's source.
-    [[nodiscard]] bool Resolve(const RHIModelMeshView view, RHIModelMeshView& resolved, std::string& error)
+    [[nodiscard]] bool Resolve(const RHIModelMeshView view, RHIModelMeshView& resolved, std::string& error,
+                               const experiment::MeshletBuildSettings& settings = {})
     {
         resolved = view;
         if (view.handle.domain == assets::ModelMeshDomain::Granular || !view.IsComplete())
@@ -156,6 +174,10 @@ public:
         const auto* bytes = static_cast<const std::byte*>(view.vertexData);
         for (const auto& entry : m_loose)
         {
+            const auto& cookedSettings = m_meshes[entry.mesh].payload->mesh.meshlets.settings;
+            if (cookedSettings.profileVersion != settings.profileVersion || cookedSettings.builderVersion != settings.builderVersion ||
+                cookedSettings.meshoptimizerVersion != settings.meshoptimizerVersion || cookedSettings.maxVertices != settings.maxVertices ||
+                cookedSettings.maxTriangles != settings.maxTriangles || cookedSettings.coneWeight != settings.coneWeight) continue;
             if (entry.meshId == view.handle.meshId && entry.modelId == view.handle.modelId &&
                 entry.mask == view.vertexAttributeMask &&
                 std::ranges::equal(entry.vertices, std::span(bytes, static_cast<std::size_t>(view.vertexBytes))) &&
@@ -165,7 +187,7 @@ public:
                 return true;
             }
         }
-        if (!Cook(view, resolved, error))
+        if (!Cook(view, resolved, error, settings))
             return false;
         m_loose.push_back({view.handle.meshId, view.handle.modelId, view.vertexAttributeMask,
             {bytes, bytes + view.vertexBytes}, {view.indexData, view.indexData + view.indexCount},

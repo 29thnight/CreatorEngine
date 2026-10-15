@@ -3,6 +3,7 @@
 #include "IRenderDeviceServices.h"
 
 #include <cstring>
+#include <cmath>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -21,7 +22,8 @@ struct RHIModelMeshletUpload
 inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked,
     uint64_t vertexCount, uint32_t vertexStride, uint32_t vertexAttributeMask,
     uint32_t sourceLodIndex, uint32_t sourcePrimitiveCount, uint32_t sourceVertexCount,
-    std::span<const uint32_t> sourceVertices, RHIModelMeshletUpload& result, std::string& error)
+    std::span<const uint32_t> sourceVertices, RHIModelMeshletUpload& result, std::string& error,
+    const experiment::MeshClusterHierarchy* hierarchy = nullptr)
 {
     result = {};
     const auto* payload = &cooked;
@@ -32,6 +34,37 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
     {
         error = "METEOR requires current cooked meshlets; force reimport/recook.";
         return false;
+    }
+    if (hierarchy && !hierarchy->groupCount && (!hierarchy->groups.empty() || hierarchy->rootGroup!=UINT32_MAX)) {
+        error="METEOR empty spatial DAG has stale metadata."; return false;
+    }
+    if (hierarchy && hierarchy->groupCount) {
+        if (hierarchy->groupCount != hierarchy->groups.size() || hierarchy->groupCount > experiment::kMeshClusterMaxGroups ||
+            hierarchy->rootGroup + 1 != hierarchy->groupCount) {
+            error = "METEOR GPU spatial DAG has invalid count/root."; return false;
+        }
+        for (uint32_t i=0;i<hierarchy->groupCount;++i) {
+            const auto& g=hierarchy->groups[i];
+            if (!g.meshletCount || !std::isfinite(g.geometricError) || g.geometricError<0 ||
+                !std::isfinite(g.sphere[0]) || !std::isfinite(g.sphere[1]) || !std::isfinite(g.sphere[2]) ||
+                !std::isfinite(g.sphere[3]) || g.sphere[3]<0 || g.lodIndex>experiment::kMeshLodMaxLevels ||
+                (i==hierarchy->rootGroup ? g.parentGroup!=UINT32_MAX : (g.parentGroup<=i || g.parentGroup>=hierarchy->groupCount)) ||
+                (g.childGroup!=UINT32_MAX && (g.childGroup>=i || g.secondChild>=i || g.childGroup==g.secondChild))) {
+                error = "METEOR GPU spatial DAG edges/bounds/errors are invalid."; return false;
+            }
+            if (g.childGroup==UINT32_MAX ? (g.secondChild!=UINT32_MAX || g.lodIndex!=0 || g.geometricError!=0) :
+                (hierarchy->groups[g.childGroup].parentGroup!=i || hierarchy->groups[g.secondChild].parentGroup!=i ||
+                 g.geometricError<hierarchy->groups[g.childGroup].geometricError || g.geometricError<hierarchy->groups[g.secondChild].geometricError)) {
+                error="METEOR GPU spatial DAG ownership/error is invalid."; return false;
+            }
+        }
+        for (const auto& d:payload->descriptors) {
+            if (d.reserved>=hierarchy->groupCount) { error="METEOR cluster has no spatial group."; return false; }
+            const auto& g=hierarchy->groups[d.reserved];
+            if (d.clusterId<g.firstMeshlet || uint64_t(d.clusterId)>=uint64_t(g.firstMeshlet)+g.meshletCount) {
+                error="METEOR cluster belongs to another spatial group."; return false;
+            }
+        }
     }
     uint64_t vertexEnd{}, triangleEnd{}, primitiveEnd{};
     uint32_t cluster = payload->descriptors.front().clusterId;
@@ -105,6 +138,7 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
         !section(header.triangleByteCount, sizeof(uint8_t), header.triangleOffset) ||
         !section(header.primitiveRemapCount, sizeof(uint32_t), header.primitiveRemapOffset) ||
         !section(header.sourceVertexRemapCount, sizeof(uint32_t), header.sourceVertexRemapOffset) ||
+        (hierarchy && hierarchy->groupCount && !section(hierarchy->GpuBytes(), 1, header.hierarchyOffset)) ||
         bytes > maximum - 15u)
     {
         error = "Meshlet GPU buffer size overflows 32-bit offsets.";
@@ -125,6 +159,11 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
                 std::memcpy(candidate.bytes.data() + offset, source, size);
             }
         };
+        if (header.hierarchyOffset) {
+            const uint32_t dagHeader[4]{hierarchy->groupCount,hierarchy->rootGroup,0,0};
+            copy(header.hierarchyOffset,dagHeader,sizeof(dagHeader));
+            copy(header.hierarchyOffset+16,hierarchy->groups.data(),hierarchy->groups.size()*sizeof(experiment::MeshClusterGroup));
+        }
         copy(header.descriptorOffset, payload->descriptors.data(),
             payload->descriptors.size() * sizeof(experiment::MeshletDescriptor));
         copy(header.vertexRemapOffset, payload->vertexRemap.data(), payload->vertexRemap.size() * sizeof(uint32_t));

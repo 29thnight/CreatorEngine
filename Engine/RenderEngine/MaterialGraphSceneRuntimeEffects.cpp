@@ -736,6 +736,14 @@ namespace material_graph
         pool_->Rejected(recording, completion);
     }
 
+    SceneRuntimeEffectsResources::~SceneRuntimeEffectsResources()
+    {
+        if (device_)
+        {
+            device_->UnregisterUploadTransactionListener(this);
+        }
+    }
+
     void SceneRuntimeEffectsResources::ShutdownAfterIdle()
     {
         if (device_)

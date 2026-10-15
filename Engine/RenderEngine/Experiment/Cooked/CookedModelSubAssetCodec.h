@@ -5,10 +5,10 @@
 
 namespace experiment::cooked
 {
-    // Independent CEMF3 payloads. These do not change the CEMC v11 contract.
+    // Independent CEMF3 payloads. Spatial DAG geometry requires artifact v4 / CEMC v15.
     inline constexpr std::uint32_t kModelDescriptorRepresentation = 2u;
     inline constexpr std::uint32_t kModelGeometryRepresentation = 1u;
-    inline constexpr std::uint32_t kModelGeometryArtifactVersion = 2u;
+    inline constexpr std::uint32_t kModelGeometryArtifactVersion = 4u;
     inline constexpr std::uint32_t kSkeletonRepresentation = 1u;
     inline constexpr std::uint32_t kAnimationClipRepresentation = 1u;
     // Version 5 requires the canonical LX profile-2 geometry contract.

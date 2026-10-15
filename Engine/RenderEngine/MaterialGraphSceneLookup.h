@@ -51,6 +51,12 @@ namespace material_graph
                                   std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const;
         void BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) const;
         const std::array<RGHandle, 11>& DeclareInputs(EnhancedRenderGraph& graph) const;
+        bool InputsDeclared(const EnhancedRenderGraph& graph) const
+        {
+            if (!graph_) return false;
+            CheckCurrent(graph);
+            return true;
+        }
         const std::array<RGHandle, 11>& GraphInputs(const EnhancedRenderGraph& graph) const;
         std::array<RGHandle, 11> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first,
                                                        unsigned count) const;
@@ -116,6 +122,9 @@ namespace material_graph
                               std::string& error);
         // 큐 접수의 수명 증거를 먼저 보관한다. native 성공과 cache 게시는 별도다.
         bool TrackAcceptedSubmission(const SceneLookupFrame& frame, RHICompletionPoint completion, std::string& error);
+        // An owner unwound without ShutdownAfterIdle must not leave a dangling
+        // upload listener on the device.
+        ~SceneLookupCache();
         void ShutdownAfterIdle();
 
       private:

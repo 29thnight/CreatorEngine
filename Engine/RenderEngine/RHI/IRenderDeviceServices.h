@@ -256,6 +256,12 @@ public:
     /// texture owners do. The resource table does not wait on a fence.
     virtual void ReleaseBuffer(RHIBufferHandle handle) = 0;
 
+    // Opaque root descriptor payload for an indirect command, valid only while
+    // the supplied buffer is retained. Unsupported backends reject preparation.
+    virtual bool EncodeIndirectBuffer(const RHIBufferSlice&, uint64_t&) const { return false; }
+    // Native 16-byte index-buffer view used only inside an indirect command.
+    virtual bool EncodeIndirectIndexBuffer(const RHIBufferSlice&, RHIFormat, std::array<uint32_t, 4>&) const { return false; }
+
     /// 그래프 밖에서 상태를 바꾼다. 지금 열려 있는 커맨드 리스트에 기록한다.
     ///
     /// ★ 그래프 안에서는 부르면 안 된다 — 거기서는 usage 선언이 배리어를
@@ -300,6 +306,10 @@ public:
     {
         return {};
     }
+
+    virtual RHIAtomicCapabilities GetAtomicCapabilities() const { return {}; }
+    // Validate imported storage, including stale handles, UAV flags and 8-byte extent.
+    virtual bool IsAtomicMin64Buffer(RHIBufferHandle) const { return false; }
 
     virtual RHIMeshShaderCapabilities GetMeshShaderCapabilities() const
     {
@@ -653,8 +663,9 @@ struct RHIModelMeshView
     return outView.IsComplete();
 }
 
-/// Derive a per-LOD upload view from the same validated aggregate or payload.
-/// coarseIndex is zero-based (LOD1). This is not a separate mesh cache identity.
+/// Derive a topology-bucket upload view from the validated cooked payload.
+/// coarseIndex is zero-based depth; spatial buckets need not cover the whole mesh.
+/// Scene rendering uses the complete DAG and never submits one of these buckets alone.
 [[nodiscard]] inline bool BuildRHIModelMeshLodView(const RHIModelMeshView& base,
     uint32_t coarseIndex, RHIModelMeshView& result)
 {

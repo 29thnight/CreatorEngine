@@ -16,8 +16,11 @@ def main(work):
     for result in results:
         if result["command"] == "animation.visual.probe":
             latest = result["data"]
-        if result["command"] == "render.pbr.capture":
-            reports[Path(result["data"]["directory"]).name] = latest
+        if result["command"] == "render.pbr.capture" and result.get("data"):
+            name = Path(result["data"]["directory"]).name
+            # Warm-up captures only prove METEOR program readiness; they are not poses.
+            if not name.startswith("warmup-"):
+                reports[name] = latest
     captures, checks, failures = {}, {}, []
 
     def check(name, value):

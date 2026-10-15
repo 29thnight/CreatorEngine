@@ -119,6 +119,71 @@ void GpuGeometryOcclusion::Pyramid::CheckCurrent(const EnhancedRenderGraph* grap
     }
 }
 
+GpuGeometryOcclusion::History::~History()
+{
+    if (device) for (auto texture : textures) device->ReleaseTexture(texture);
+}
+
+bool GpuGeometryOcclusion::PrepareHistory(const EnhancedFrameContext& context,
+    const math::matrix4x4& projection, std::uint64_t viewId, std::uint64_t revision,
+    std::shared_ptr<const Pyramid>& result, std::string& error)
+{
+    if (!Prepare(context, projection, result, error)) return false;
+    auto pyramid = std::const_pointer_cast<Pyramid>(result);
+    auto history = std::make_shared<History>();
+    history->device = context.resources;
+    history->source = pyramid->m_view;
+    history->viewId = viewId;
+    history->revision = revision;
+    auto width = context.width, height = context.height;
+    for (unsigned level = 0; level < pyramid->m_levelCount; ++level)
+    {
+        width = (width + 1u) / 2u; height = (height + 1u) / 2u;
+        RHITextureDesc desc;
+        desc.width = width; desc.height = height; desc.format = RHIFormat::R32Float;
+        desc.allowUnorderedAccess = true;
+        desc.debugName = L"METEOR.Camera.HistoryHZB";
+        RHITextureHandle texture;
+        if (!context.resources->CreateTexture(desc, texture, error)) { result.reset(); return false; }
+        history->textures.push_back(texture);
+    }
+    pyramid->m_history = std::move(history);
+    return true;
+}
+
+std::shared_ptr<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadHistory(
+    const EnhancedFrameContext& context, const math::matrix4x4& projection,
+    const std::shared_ptr<History>& history)
+{
+    if (!history || !history->recorded.load() || !history->completion || history->device != context.resources ||
+        history->source.width != context.width || history->source.height != context.height ||
+        history->source.sceneEpoch != context.sceneEpoch || history->source.frameId >= context.frameId)
+        throw std::runtime_error("History HZB does not match the current device, extent, scene or frame order.");
+    auto pyramid = std::make_shared<Pyramid>();
+    pyramid->m_view = CaptureView(context, projection);
+    pyramid->m_levelCount = static_cast<std::uint32_t>(history->textures.size());
+    pyramid->m_history = history;
+    pyramid->m_historyReader = true;
+    pyramid->m_self = pyramid;
+    return pyramid;
+}
+
+void GpuGeometryOcclusion::Pyramid::ImportHistory(EnhancedRenderGraph& graph) const
+{
+    CheckCurrent();
+    if (!m_historyReader || !m_history || graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned ||
+        &graph.DeviceServices() != m_view.device)
+        throw std::runtime_error("History HZB import requires its recording-local RG2 reader.");
+    if (m_graph) { CheckCurrent(&graph); return; }
+    m_graph = &graph; m_graphEpoch = graph.ResourceEpoch();
+    for (auto texture : m_history->textures)
+    {
+        auto handle = graph.ImportTexture(texture, RHIResourceState::ShaderResource, "METEOR.Camera.PreviousHZB");
+        graph.RequireImportedFinalState(handle, RHIResourceState::ShaderResource);
+        m_levels.push_back(handle);
+    }
+}
+
 void GpuGeometryOcclusion::Pyramid::RequireView(const ViewKey& view) const
 {
     CheckCurrent();
@@ -131,6 +196,7 @@ void GpuGeometryOcclusion::Pyramid::RequireView(const ViewKey& view) const
 void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle depth) const
 {
     CheckCurrent();
+    if (m_historyReader) throw std::runtime_error("An immutable history HZB cannot be overwritten.");
     if (m_graph)
     {
         CheckCurrent(&graph);
@@ -165,7 +231,10 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
         description.format = RHIFormat::R32Float;
         description.allowUnorderedAccess = true;
         description.name = "Geometry.Occlusion." + std::to_string(level);
-        const auto target = graph.Write(graph.CreateTexture(description));
+        const auto resource = m_history ? graph.ImportTexture(m_history->textures.at(level),
+            RHIResourceState::Common, "METEOR.Camera.NextHZB." + std::to_string(level)) : graph.CreateTexture(description);
+        if (m_history) graph.RequireImportedFinalState(resource, RHIResourceState::ShaderResource);
+        const auto target = graph.Write(resource);
         m_levels.push_back(target);
         const auto buildPass = graph.AddPass(description.name,
             {{source, RHIResourceState::ShaderResource, RGAccessMode::Read},
@@ -197,7 +266,8 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
                 encoder.SetBindings(RHIBindPoint::Compute, 1, inputs);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, outputs);
                 encoder.Dispatch((constants.targetWidth + 7u) / 8u, (constants.targetHeight + 7u) / 8u, 1u);
-            });
+                if (owner->m_history && level + 1u == owner->m_levelCount) owner->m_history->recorded.store(true);
+            }, m_history && level + 1u == m_levelCount);
         // The prepared view is immutable during recording; the callback only
         // binds declared SRV/UAV resources and dispatches through its encoder.
         graph.DeclareComputeCompatible(buildPass);

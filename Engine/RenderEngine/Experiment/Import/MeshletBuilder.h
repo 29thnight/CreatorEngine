@@ -12,9 +12,8 @@ namespace experiment::importer
     [[nodiscard]] bool BuildMeshlets(const Mesh& mesh, MeshletPayload& outPayload,
         std::string& diagnostic, const MeshletBuildSettings& settings = {});
 
-    // A completely absent legacy payload is valid, but is not a meshlet route.
-    // Any malformed/stale nonempty payload returns false with a diagnostic.
-    // Readers may discard ONLY the derived payload and retain indexed geometry.
+    // Empty authoring geometry can have no clusters. Scene admission requires
+    // current cooked meshlets. Malformed/stale payloads require reimport/recook.
     [[nodiscard]] bool ValidateMeshlets(const Mesh& mesh, const MeshletPayload& payload,
         std::string& diagnostic, const MeshletBuildSettings& expectedSettings = {});
 

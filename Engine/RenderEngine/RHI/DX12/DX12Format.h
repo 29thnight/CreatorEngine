@@ -23,6 +23,7 @@ inline DXGI_FORMAT ToDXGI(RHIFormat format)
     case RHIFormat::RGBA32Float:    return DXGI_FORMAT_R32G32B32A32_FLOAT;
     case RHIFormat::RG16Float:      return DXGI_FORMAT_R16G16_FLOAT;
     case RHIFormat::RG32Float:      return DXGI_FORMAT_R32G32_FLOAT;
+    case RHIFormat::RG32Uint:       return DXGI_FORMAT_R32G32_UINT;
     case RHIFormat::RGB32Float:     return DXGI_FORMAT_R32G32B32_FLOAT;
     case RHIFormat::R16Float:       return DXGI_FORMAT_R16_FLOAT;
     case RHIFormat::R16Unorm:       return DXGI_FORMAT_R16_UNORM;

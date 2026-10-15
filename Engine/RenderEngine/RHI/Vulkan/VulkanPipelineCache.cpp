@@ -521,6 +521,10 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
                 shift = VulkanBindingModel::kUnorderedAccessShift;
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
+            case RHIDescriptorType::ShaderResourceBuffer:
+                shift = VulkanBindingModel::kShaderResourceShift;
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                break;
             case RHIDescriptorType::Sampler:
                 shift = VulkanBindingModel::kSamplerShift;
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;

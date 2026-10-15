@@ -136,6 +136,7 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         cameraForward.x, cameraForward.y, cameraForward.z, static_cast<float>(packedOptions) };
     m_shadowData.lightDirection = math::vector4{ m_lightDirection.x, m_lightDirection.y,
         m_lightDirection.z, 0.f };
+    m_shadowData.mapResolution = kShadowMapSize;
     m_shadowData.enabled = true;
 }
 

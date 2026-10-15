@@ -511,6 +511,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         m_outputs.normal = graph.Modify(incoming.normal);
         m_outputs.metalRough = graph.Modify(incoming.metalRough);
     }
+    m_outputs.decalBaseline = baseline;
     const auto outputs = m_outputs;
 
     // ── 덧칠 ──

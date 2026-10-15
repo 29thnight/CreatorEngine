@@ -52,6 +52,22 @@ namespace LiveSlots
     constexpr const char* kGBufferEmissive   = "GBuffer.Emissive";
     constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
     constexpr const char* kGBufferDepth      = "GBuffer.Depth";
+    inline constexpr const char* kDecalBaseDiffuse = "METEOR.Scene.Decal.BaseDiffuse";
+    inline constexpr const char* kDecalBaseOrm = "METEOR.Scene.Decal.BaseOrm";
+    inline constexpr const char* kDecalBaseNormal = "METEOR.Scene.Decal.BaseNormal";
+    inline constexpr const char* kVisibility = "METEOR.Scene.Visibility";
+
+    /// METEOR 단계 계약. 각 단계가 발행한 그래프 핸들을 다음 단계가 그대로 받는다.
+    /// 그리기 없는 프레임은 무효 핸들을 발행한다.
+    inline constexpr const char* kMeteorGeometry = "METEOR.Scene.Geometry.Table";
+    inline constexpr const char* kMeteorFirstList = "METEOR.Scene.Cull.FirstList";
+    inline constexpr const char* kMeteorOccluderDepth = "METEOR.Scene.Occluder.Depth";
+    inline constexpr const char* kMeteorLayerCommands = "METEOR.Scene.Commands.Layer";
+    inline constexpr const char* kMeteorMaterialTiles = "METEOR.Scene.Material.Tiles";
+    inline constexpr const char* kMeteorMaterialArguments = "METEOR.Scene.Material.Arguments";
+    inline constexpr const char* kMeteorBlendedCommands = "METEOR.Scene.Commands.Blended";
+    inline constexpr const char* kMeteorBlendedList = "METEOR.Scene.Cull.BlendedList";
+    inline constexpr const char* kMeteorFinalList = "METEOR.Scene.Cull.FinalList";
 
     constexpr const char* kTemporalMotion = "Temporal.Motion";
     constexpr const char* kTemporalReactive = "Temporal.Reactive";
@@ -99,18 +115,29 @@ public:
     /// 발행·수정 공용. 수정이 별도 함수가 아닌 이유는 값이 갈리지 않아서다 —
     /// 무엇이 발행이고 무엇이 수정인지는 노드의 writes/modifies가 말하고,
     /// Validate가 그것으로 판정한다.
-    void Set(const std::string& slot, RGHandle handle) { m_slots[slot] = handle; }
+    void Set(const std::string& slot, RGHandle handle) { m_slots[slot] = {handle}; }
 
     /// 없으면 무효 핸들. 슬롯 이름 오타는 여기서 조용히 무효가 되지만,
     /// Validate가 파이프라인을 세울 때 이미 잡았어야 하는 종류다.
     RGHandle Get(const std::string& slot) const
     {
         const auto found = m_slots.find(slot);
-        return (m_slots.end() == found) ? RGHandle{} : found->second;
+        if (found == m_slots.end() || found->second.empty()) return {};
+        if (found->second.size() != 1) throw std::runtime_error("A resource-list slot requires GetList.");
+        return found->second.front();
+    }
+
+    // One slot may publish several independently versioned command buffers.
+    // They remain real resource handles, never a dummy join token or hidden producer.
+    void SetList(const std::string& slot, std::vector<RGHandle> handles) { m_slots[slot] = std::move(handles); }
+    std::vector<RGHandle> GetList(const std::string& slot) const
+    {
+        const auto found = m_slots.find(slot);
+        return found == m_slots.end() ? std::vector<RGHandle>{} : found->second;
     }
 
 private:
-    std::unordered_map<std::string, RGHandle> m_slots;
+    std::unordered_map<std::string, std::vector<RGHandle>> m_slots;
 };
 
 /// 프레임마다 달라지는 값. 노드 정의는 정적이어야 하므로 이런 것은 캡처가

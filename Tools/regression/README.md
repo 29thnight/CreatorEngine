@@ -13,7 +13,7 @@ Player는 패키징이 `build.render.backend`에서 투영한 런타임 설정�
 DX12·Vulkan 및 공용 Vulkan RHI는 계속 지원한다.
 
 `verify-editor-theme.ps1`, `verify-editor-rendering-surfaces.ps1`,
-`verify-pbr-wiring-baseline.ps1`, `verify-pbr-soak.ps1`, `verify-render-base0.ps1`은
+`verify-pbr-soak.ps1`, `verify-render-base0.ps1`은
 Vulkan Editor 인자를 산출물 생성·설정 변경 전에 거절한다. DX12 실행을 Vulkan PASS로
 표시하지 않으며 Editor 백엔드를 바꾸려고 설정 파일을 다시 쓰지 않는다.
 theme 기본값도 DX12 하나다. `verify-render-base0.ps1 -Phase49`의

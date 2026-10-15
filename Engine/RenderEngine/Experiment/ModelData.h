@@ -383,9 +383,10 @@ namespace experiment
 		VertexBuffer vertices{};
 		std::vector<std::uint32_t> indices{};
 		math::aabb bounds{};
-		// Derived from this mesh's finalized indexed geometry; optional for legacy data.
+		// Mandatory cooked METEOR topology over finalized indexed geometry.
 		MeshletPayload meshlets{};
-		// Optional coarse topology; LOD0 stays in indices/meshlets for all legacy consumers.
+		// Authored coarse topology plus complete cluster replacement hierarchy.
+        // Empty means intentionally disabled/non-reducible, never a decoder fallback.
 		MeshLodChain coarseLods{};
 	};
 

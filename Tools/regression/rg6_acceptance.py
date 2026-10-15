@@ -87,8 +87,10 @@ def compare(reference, product, output):
     expected_resources['GizmoIcon.Texture'] = 2
     # Authored LX-only geometry has no preceding traditional occluder depth.
     if before_passes['METEOR.Scene.GBuffer'] and not before_passes['GBuffer']:
-        expected_passes['METEOR.Scene.OccluderDepth'] = 1
-        expected_resources['METEOR.Scene.OccluderDepth'] = 1
+        for stage in ('Initialize', 'Classify', 'HW', 'SW', 'Resolve'):
+            expected_passes['METEOR.Scene.Occluder.' + stage] = 1
+        for resource in ('Keys', 'Routes', 'Depth'):
+            expected_resources['METEOR.Scene.Occluder.' + resource] = 1
     expected_removed = Counter({'Geometry.Visibility.Cull': 1})
     # EnhancedPbrCapture::DeclareStage shares only proven identical versioned
     # handles. Named images remain present and still undergo pixel comparison.

@@ -3,6 +3,8 @@
 #include "Render/Graph/ShadowMath.h"
 #include "MaterialGraphSceneAccess.h"
 #include "MaterialGraphSceneCompiler.h"
+#include "MaterialGraphIndirectBatch.h"
+#include "MaterialGraphWork.h"
 
 
 #include "PathFinder.h"
@@ -13,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <set>
+#include <ranges>
 #include <atomic>
 #include <bit>
 #include <chrono>
@@ -44,8 +47,8 @@ namespace material_graph
             std::uint64_t draws{}, visibleDraws{}, meshlets{}, rejected{}, triangles{}, rejectedTriangles{};
         };
 
-        // One static (unskinned) meshlet caster against one cascade. The instance
-        // test mirrors GPU visibility's sphere/clip rejection before dispatch.
+        // Candidate-only static geometry diagnostic over every cooked LOD.
+        // It does not select GPU LOD or measure final GPU survivors.
         void AuditShadowMeshlets(const MeshSurfaceInput& input, const math::matrix4x4& lightViewProjection,
                                  ShadowMeshletAudit& audit)
         {
@@ -162,8 +165,10 @@ namespace material_graph
             math::matrix4x4 temporalCurrentProjection, temporalPreviousProjection;
             std::uint32_t temporalHistoryValid{}, temporalPadding[3]{};
             SceneGeometryIdentity geometryIdentity;
+            // Object-space vertex streams: current and previous chunk object-to-world.
+            math::matrix4x4 world, previousWorld;
         };
-        static_assert(sizeof(SceneConstants) == 4672);
+        static_assert(sizeof(SceneConstants) == 4800);
         static_assert(offsetof(SceneConstants, lights) == 368);
 
         struct SceneShadowConstants
@@ -173,12 +178,42 @@ namespace material_graph
             float cutoff{};
             std::uint32_t padding0{}, padding1{};
             SceneGeometryIdentity geometryIdentity;
+            math::matrix4x4 world;
         };
-        static_assert(sizeof(SceneShadowConstants) == 144);
+        static_assert(sizeof(SceneShadowConstants) == 208);
 
         std::array<RGHandle, 5> Colors(const SceneSurfaceTargets::Outputs& outputs)
         {
             return {outputs.diffuse, outputs.metalRough, outputs.normal, outputs.emissive, outputs.bitmask};
+        }
+
+        // Stage contracts travel as blackboard handles. A consumer must receive
+        // exactly the version its producer published (both invalid for an empty stage).
+        void RequireStage(RGHandle actual, RGHandle expected, const char* message)
+        {
+            const bool same = actual.IsValid() == expected.IsValid() &&
+                (!actual.IsValid() || (actual.index == expected.index && actual.version == expected.version &&
+                                       actual.kind == expected.kind && actual.epoch == expected.epoch));
+            if (!same) throw std::runtime_error(message);
+        }
+        // METEOR declares versioned producers only. Every public stage entry checks
+        // this once, so stage code carries no other scheduling-mode branches.
+        EnhancedRenderGraph& RequireVersionedGraph(EnhancedRenderGraph& graph)
+        {
+            if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+                throw std::runtime_error("METEOR Scene requires an ExplicitVersioned render graph.");
+            return graph;
+        }
+        RGHandle BlendedCommandInput(const EnhancedRenderGraph& graph, const IndirectMaterialBatch& batch,
+                                     const SceneLayerWork& commands)
+        {
+            const auto expected = batch.GraphOutput(graph);
+            const auto found = std::ranges::find_if(commands.blended, [&](RGHandle input) {
+                return input.index == expected.index && input.version == expected.version &&
+                       input.kind == expected.kind && input.epoch == expected.epoch;
+            });
+            if (found == commands.blended.end()) throw std::runtime_error("METEOR blended consumer has no command input.");
+            return *found;
         }
     } // namespace
 
@@ -189,22 +224,38 @@ namespace material_graph
         PassLayout layout;
         PassLayout shadowLayout;
         LX::Runtime::GraphicsPipeline shadow;
-        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, depth, color, blendedColor, temporal;
+        std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, visibilitySurface, color, blendedColor, temporal;
         std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> lookup, blendedLookup;
         std::array<LX::Runtime::GraphicsPipeline, 2> subsurface;
         std::array<LX::Runtime::GraphicsPipeline, 2> refraction;
         std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> runtimeEffects;
         PassLayout volumeLayout;
         LX::Runtime::ComputePipeline volume;
-        RHIShaderBlob meshShader, shadowMeshShader;
+        RHIShaderBlob meshShader, visibilityMeshShader, reconstructShader, shadowMeshShader;
+        std::unordered_map<uint32_t, RHIPipelineHandle> reconstructionPipelines;
         std::map<uint64_t, RHIPipelineHandle> meshPipelines;
-        uint32_t meshletRoot{}, temporalPreviousRoot{}, shadowMeshletRoot{2};
+        uint32_t rasterRouteRoot{}, visibilityKeyRoot{}, meshletRoot{}, temporalPreviousRoot{}, geometryTableRoot{}, visibilityRoot{}, materialWorkRoot{}, shadowMeshletRoot{2};
+        // Host slots recorded while building the root layout below; never recomputed from flags.
+        uint32_t decalRoot{}, forwardLightsRoot{}, visibleOwnerRoot{}, specialEffectsRoot{};
         bool meshEnabled{};
         bool hasSurface{}, hasVolume{};
         bool hasSubsurface{}, hasTransmission{}, hasSpecial{};
     };
 
-    struct SceneHost::Frame
+    #include "MaterialGraphSceneStages.inl"
+
+    struct SceneHost::RasterResources
+    {
+        std::shared_ptr<const SceneFrameGeometry> geometry;
+        std::shared_ptr<const GpuGeometryVisibility::Frame> first, opaque, layers;
+        std::shared_ptr<const IndirectMaterialBatch> layerCommands;
+        std::shared_ptr<const SceneMaterialWork> material;
+    };
+
+    // Sealed draw/device inputs and immutable GPU binding references.
+    // Base-owner conversion retains the derived Frame, including stage receivers.
+    // Only recording identity and execution observations mutate in this shared input.
+    struct SceneHost::FrameInput
     {
         struct Draw
         {
@@ -212,9 +263,13 @@ namespace material_graph
             own::shared_owner<const RenderBindings> bindings;
             bool shadowEnabled{};
             std::shared_ptr<const MeshSurfaceBatch> geometry, previousGeometry;
-            RHIBufferSlice indices, constants, referenceConstants;
+            RHIBufferSlice constants, referenceConstants;
             RHIBufferSlice visibleOwner;
-            std::uint32_t visibilityBin{UINT32_MAX}, visibleIdOffset{};
+            // Bin in the camera list (opaque) or the ordered blended list.
+            std::uint32_t cameraMeshletBin{UINT32_MAX};
+            std::uint32_t materialBucket{UINT32_MAX}, materialTileBucket{UINT32_MAX}, geometryRecord{};
+            std::uint32_t indexedBucket{UINT32_MAX};
+            bool bucketRepresentative{true};
 
             std::array<RHIBufferSlice, 3> shadowConstants;
             std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 3> shadowMeshlets;
@@ -223,9 +278,11 @@ namespace material_graph
             bool doubleSided{}, blended{};
             std::size_t inputIndex{};
         };
+        std::shared_ptr<const RasterResources> raster;
         IRenderDeviceServices* device{};
         std::uint64_t recording{}, descriptors{};
         own::shared_owner<const SceneViewInput> input;
+        // Occluder: first culling list -> HZB source depth. Final: recovered union -> surface.
         std::vector<Draw> draws;
         std::vector<Draw> shadowDraws;
         std::vector<std::pair<size_t, size_t>> inputRanges;
@@ -242,170 +299,35 @@ namespace material_graph
             const auto [first, count] = inputRanges[*inputIndex];
             return std::span<const Draw>(draws).subspan(first, count);
         }
-        std::shared_ptr<const GpuGeometryVisibility::Frame> visibility;
+        // All passes reference the canonical draw storage. Representatives are a
+        // view, never a second owning list with a separately maintained input map.
+        auto RasterDrawsFor(std::optional<size_t> inputIndex = {}, bool allCommands = false) const
+        {
+            return DrawsFor(inputIndex) | std::views::filter([allCommands](const Draw& draw) {
+                return allCommands || draw.bucketRepresentative;
+            });
+        }
+        mutable std::atomic<uint32_t> indexedBucketSubmissions{}, indexedLogicalCommands{};
+        mutable std::atomic<uint32_t> temporalBucketSubmissions{};
+        mutable std::atomic<uint32_t> blendedBucketSubmissions{};
 
+        RHIBindingTable emptyVisibility;
         RHITextureHandle environment;
         bool shadow{};
         mutable std::atomic<uint32_t> shadowDrawCount{};
-        mutable std::array<std::atomic<uint32_t>, 3> shadowMeshletDrawCounts{};
-        // One writer: METEOR.Scene.GBuffer recording. Consumers read after the
+        mutable std::array<std::atomic<uint32_t>, 3> shadowMeshletDrawCounts{}, shadowBucketSubmissions{};
+        // One writer: final METEOR.Scene.Visibility.HW recording. Consumers read after the
         // graph's recording join and native submission, never while recording.
         mutable std::vector<SceneGeometryRouteAudit::Draw> recordedGeometryRoutes;
         mutable bool geometryRouteAuditEnabled{};
-        std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
-        std::shared_ptr<const SceneRuntimeEffectsFrame> runtimeEffects;
-        mutable bool alphaInputsDeclared{};
-        mutable std::set<std::size_t> alphaDeclared;
-        std::shared_ptr<const SceneSubsurfaceFrame> subsurface;
-        std::shared_ptr<const SceneRefractionFrame> refraction;
-        std::shared_ptr<const SceneVolumeFrame> volume;
-        std::vector<SceneVolumeBinding> volumeBindings;
-        RHIBufferSlice emptyVolumeConstants, emptyVolumeBuffer;
-        RHIBindingTable emptyVolumeBindings;
-        RHIBindingTable emptyRuntimeInputs, emptyRuntimeBackground;
         mutable const EnhancedRenderGraph* graph{};
         mutable std::uint64_t graphEpoch{};
-        mutable SceneSurfaceTargets::Outputs gbuffer;
-        mutable SceneSurfaceTargets::Outputs forwardGbuffer;
-        mutable bool colorDeclared{};
-        mutable bool volumeDeclared{};
-        mutable bool gbufferDeclared{}, shadowDeclared{}, cullDeclared{};
-        mutable bool decalDeclared{};
-        mutable std::array<RGHandle, 3> decalBaseline;
-        std::array<RHIBufferSlice, 2> decalConstants;
-        struct RuntimeBindings
-        {
-            RHIRenderTargetBinding color;
-            RHIBindingTable common, decal, volume;
-        };
-        mutable std::mutex runtimeBindingMutex;
-        mutable std::map<std::array<std::uint64_t, 7>, RuntimeBindings> runtimeBindings;
-        mutable std::mutex forwardTargetMutex;
-        mutable RHIRenderTargetBinding forwardTargets;
 
-        RuntimeBindings RuntimeTables(const EnhancedRenderGraph::ExecuteContext& execution,
-                                      const SceneSurfaceTargets::Outputs& inputs, RGHandle lighting,
-                                      RGHandle ambientOcclusion, RGHandle shadowMap, bool blended,
-                                      bool transmissionStage) const
-        {
-            const auto color = execution.ResolveHandle(lighting);
-            const auto depth = execution.ResolveHandle(inputs.depth);
-            const auto owners = execution.ResolveHandle(inputs.bitmask);
-            const auto ao = blended ? RHITextureHandle{} : execution.ResolveHandle(ambientOcclusion);
-            const auto shadowTexture = shadow ? execution.ResolveHandle(shadowMap) : RHITextureHandle{};
-            const std::array<std::uint64_t, 7> key{color.id, depth.id, owners.id, ao.id, shadowTexture.id,
-                                                   transmissionStage || blended, blended && bool(volume)};
-            std::lock_guard lock(runtimeBindingMutex);
-            auto& result = runtimeBindings[key];
-            if (!result.color.IsValid())
-            {
-                const auto depthView = RHIDepthTargetDesc::DepthReadOnly(depth, RHIFormat::D32Float);
-                result.color = device->CreateRenderTargets({&color, 1}, &depthView);
-                const RHIBindingDesc descriptions[]{
-                    RHIBindingDesc::SrvCube(environment, environment.IsValid() ? device->DescribeTexture(environment).format
-                                                                            : RHIFormat::RGBA16Float, 1).OrNull(),
-                    RHIBindingDesc::Srv2D(owners, RHIFormat::R32Uint),
-                    RHIBindingDesc::Srv2D(ao, RHIFormat::RG16Float).OrNull(),
-                    RHIBindingDesc::SrvArray(shadowTexture, RHIFormat::R32Float, 3).OrNull()};
-                result.common = device->CreateBindings(descriptions);
-                result.decal = DecalTable(execution, transmissionStage || blended);
-                if (volume && blended)
-                {
-                    result.volume = device->CreateBindings(volume->LightingBindings(shadowTexture));
-                }
-            }
-            if (!result.color.IsValid() || !result.common.IsValid() || !result.decal.IsValid() ||
-                (volume && blended && !result.volume.IsValid()))
-            {
-                throw std::runtime_error("Runtime special immutable stream bindings could not be allocated.");
-            }
-            return result;
-        }
-
-        void AddDecalUses(std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool transmissionStage,
-                          RGAccessMode readAccess = RGAccessMode::LegacyState) const
-        {
-            if (!decalDeclared || transmissionStage)
-            {
-                return;
-            }
-            for (const auto handle : {gbuffer.diffuse, gbuffer.metalRough, gbuffer.normal})
-            {
-                uses.push_back({handle, RHIResourceState::PixelShaderResource, readAccess});
-            }
-            for (const auto handle : decalBaseline)
-            {
-                uses.push_back({handle, RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-
-        RHIBindingTable DecalTable(const EnhancedRenderGraph::ExecuteContext& execution, bool transmissionStage) const
-        {
-            const bool enabled = decalDeclared && !transmissionStage;
-            const std::array<RGHandle, 6> handles{gbuffer.diffuse,  gbuffer.metalRough, gbuffer.normal,
-                                                  decalBaseline[0], decalBaseline[1],   decalBaseline[2]};
-            std::array<RHIBindingDesc, 6> descriptions;
-            for (unsigned i = 0; i < handles.size(); ++i)
-            {
-                descriptions[i] =
-                    RHIBindingDesc::Srv2D(enabled ? execution.ResolveHandle(handles[i]) : RHITextureHandle{},
-                                          RHIFormat::RGBA16Float)
-                        .OrNull();
-            }
-            const auto table = device->CreateBindings(descriptions);
-            if (!table.IsValid())
-            {
-                throw std::runtime_error("METEOR Scene Decal binding failed.");
-            }
-            return table;
-        }
-
-        void BindDecal(RHIEncoder& encoder, const Draw& draw, RHIBindingTable table, bool transmissionStage) const
-        {
-            const unsigned index = 4 + (draw.program->hasSpecial ? 2 : 0) + (draw.program->hasTransmission ? 1 : 0);
-            encoder.SetBindings(RHIBindPoint::Graphics, index, table);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, index + 1,
-                                      decalConstants[decalDeclared && !transmissionStage]);
-        }
-
-        void BindForward(RHIEncoder& encoder, const Draw& draw, const EnhancedForwardLighting& forward) const
-        {
-            const unsigned index = 6 + (draw.program->hasSpecial ? 2 : 0) + (draw.program->hasTransmission ? 1 : 0);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, index,
-                                  forward.lights.IsValid() ? forward.lights : draw.constants);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 1,
-                                  forward.counts.IsValid() ? RHIBufferSlice::Whole(forward.counts) : draw.constants);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 2,
-                                  forward.indices.IsValid() ? RHIBufferSlice::Whole(forward.indices) : draw.constants);
-            const bool medium = draw.blended && bool(volume);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, index + 3,
-                                      medium ? volume->TransportConstants() : emptyVolumeConstants);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 4, medium ? volume->Triangles() : emptyVolumeBuffer);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 5,
-                                  medium ? RHIBufferSlice::Whole(volume->Coefficients()) : emptyVolumeBuffer);
-            const auto table =
-                medium && forward.volumeTable.IsValid() ? forward.volumeTable : emptyVolumeBindings;
-            if (!table.IsValid())
-            {
-                throw std::runtime_error("Forward medium binding failed.");
-            }
-            encoder.SetBindings(RHIBindPoint::Graphics, index + 6, table);
-            const auto& sceneLookup = draw.blended ? alphaLookup : lookup;
-            sceneLookup->BindRuntime(encoder, index + 7);
-            if (draw.program->hasSpecial && !runtimeEffects)
-            {
-                // Offline 분기는 tile을 읽지 않지만 공유 PSO의 root는 모두
-                // 유효하게 둔다. 전체 화면 bake 레코드 계약은 그대로 유지한다.
-                const unsigned effectIndex = index + 10;
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, effectIndex, emptyVolumeConstants);
-                encoder.SetBindings(RHIBindPoint::Graphics, effectIndex + 1, emptyRuntimeInputs);
-                encoder.SetBindings(RHIBindPoint::Graphics, effectIndex + 2, emptyRuntimeBackground);
-            }
-        }
 
         bool UsesMeshlets(const Draw& draw) const
         {
-            return draw.program->meshEnabled && !draw.blended && draw.geometry->MeshletCount() > 0 &&
+            return (draw.program->hasSurface || draw.program->hasSpecial) &&
+                draw.program->meshEnabled && draw.geometry->MeshletCount() > 0 &&
                 device->GetMeshShaderCapabilities().SupportsDispatch(draw.geometry->MeshletCount(), 1, 1);
         }
 
@@ -423,67 +345,72 @@ namespace material_graph
             return found->second;
         }
 
-        bool UsesVisibility(const Draw& draw) const
-        {
-            if (!visibility || draw.visibilityBin == UINT32_MAX)
-                throw std::runtime_error("METEOR Scene raster requires its GPU visibility bin.");
-            return true;
-        }
 
-        void AddVisibilityReads(EnhancedRenderGraph& graph,
-                                std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+        // Geometry replay is exclusively for ordered layers. Opaque work is
+        // restored from visibility/material tiles; its HW commands stay in Surface.
+        template<class Predicate>
+        void AddLayerReads(EnhancedRenderGraph& graph,
+                           std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+                           const Predicate& selected, RGHandle commands) const
         {
-            if (visibility)
-            {
-                visibility->AddReadUsages(graph, uses);
+            bool any = false;
+            for (const auto& draw : draws) if (selected(draw)) {
+                if (!draw.blended || !UsesMeshlets(draw))
+                    throw std::runtime_error("METEOR layer replay requires ordered cooked meshlets.");
+                any = true;
+            }
+            if (any) {
+                raster->layers->AddVisibleIdsRead(graph, uses);
+                raster->layerCommands->AddRead(graph, uses, commands);
             }
         }
 
-        void BindGeometry(RHIEncoder& encoder, const Draw& draw) const
+        void AddReconstructionReads(EnhancedRenderGraph& graph,
+            std::vector<EnhancedRenderGraph::RGPassUsage>& uses, RGHandle visibilityTarget, const std::array<RGHandle,2>& materialInputs) const
         {
+            uses.push_back({visibilityTarget, RHIResourceState::PixelShaderResource, RGAccessMode::Read});
+            uses.push_back({raster->geometry->GraphTable(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read});
+            if (raster->material) raster->material->AddRead(graph, uses, materialInputs);
+        }
+        void BindReconstruction(const EnhancedRenderGraph::ExecuteContext& execution, const Draw& draw,
+            RGHandle visibilityTarget, RHIPipelineHandle source) const
+        {
+            auto& encoder = *execution.encoder;
+            encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->reconstructionPipelines.at(source.id));
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->geometryTableRoot, RHIBufferSlice::Whole(raster->geometry->buffer));
+            const auto desc = RHIBindingDesc::Srv2D(execution.ResolveHandle(visibilityTarget), RHIFormat::RG32Uint);
+            const auto table = device->CreateBindings({&desc, 1});
+            if (!table.IsValid()) throw std::runtime_error("METEOR reconstruction visibility target binding failed.");
+            encoder.SetBindings(RHIBindPoint::Graphics, draw.program->visibilityRoot, table);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->materialWorkRoot, RHIBufferSlice::Whole(raster->material->work));
+        }
+        void DrawReconstruction(RHIEncoder& encoder, const Draw& draw) const
+        {
+            if (!raster->material) throw std::runtime_error("METEOR material tile producer is missing.");
+            raster->material->Draw(encoder, draw.materialTileBucket);
+        }
+
+        void BindLayerGeometry(RHIEncoder& encoder, const Draw& draw) const
+        {
+            if (!draw.blended) throw std::runtime_error("METEOR opaque geometry must use visibility restoration.");
+            encoder.SetBindings(RHIBindPoint::Graphics, draw.program->visibilityRoot, emptyVisibility);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->geometryTableRoot, RHIBufferSlice::Whole(raster->geometry->buffer));
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
-            // Runtime IBL owns the preceding two slots; material bindings follow
-            // this final host slot and are resolved by the reflected PassLayout.
-            const unsigned index = 15 + (draw.program->hasSpecial ? 2 : 0) +
-                                   (draw.program->hasTransmission ? 1 : 0);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, index,
-                visibility->VisibleIds(draw.visibleIdOffset, 1));
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->visibleOwnerRoot, draw.visibleOwner);
+            const auto& list = raster->layers;
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->temporalPreviousRoot + 1,
+                list->VisibleIds(list->MeshletOutputOffset(draw.cameraMeshletBin), draw.geometry->MeshletCount() + 1));
         }
 
-        void DrawGeometry(RHIEncoder& encoder, const Draw& draw) const
+        void DrawLayerGeometry(RHIEncoder& encoder, const Draw& draw) const
         {
-            if (UsesMeshlets(draw))
-            {
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->meshletRoot, draw.geometry->Meshlets());
-                const bool submitted = encoder.DispatchMeshIndirect(visibility->Arguments(), visibility->ArgsOffset(draw.visibilityBin));
-                if (!submitted)
-                {
-                    throw std::runtime_error("METEOR Scene meshlet dispatch failed.");
-                }
-                static std::atomic<bool> reported{};
-                if (!reported.exchange(true))
-                {
-                    std::printf("[meteor.meshlets] surface dispatch groups=%u indirect=%u\n", draw.geometry->MeshletCount(), unsigned(UsesVisibility(draw)));
-                }
-                return;
-            }
-            encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
-            if (UsesVisibility(draw))
-            {
-                // Each bin has exactly one owner. GPU rejection changes only its
-                // instanceCount (0/1), never the CPU's globally merged draw order.
-                if (!encoder.DrawIndexedIndirect(visibility->Arguments(), visibility->ArgsOffset(draw.visibilityBin)))
-                {
-                    throw std::runtime_error("METEOR Scene indexed indirect submission failed.");
-                }
-            }
-            else
-            {
-                // Compatibility devices without indexed indirect retain the same
-                // material/effect pipelines and per-draw identity owner binding.
-                encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
-            }
+            if (!draw.blended || !UsesMeshlets(draw) || !raster->layerCommands || draw.indexedBucket == UINT32_MAX)
+                throw std::runtime_error("METEOR layer replay requires its ordered meshlet command bucket.");
+            raster->layerCommands->Draw(encoder, draw.indexedBucket);
+            indexedBucketSubmissions.fetch_add(1, std::memory_order_relaxed);
+            indexedLogicalCommands.fetch_add(raster->layerCommands->buckets[draw.indexedBucket].count, std::memory_order_relaxed);
         }
+
 
         void CheckCurrent(const EnhancedRenderGraph* currentGraph = nullptr) const
         {
@@ -498,6 +425,31 @@ namespace material_graph
             }
         }
     };
+
+    struct SceneHost::Frame : FrameInput
+    {
+        GeometryStage geometryStage;
+        FirstCullStage firstCullStage;
+        OccluderStage occluderStage;
+        FinalCullStage finalCullStage;
+        ShadowStage shadowStage;
+        TemporalStage temporalStage;
+        SurfaceStage surfaceStage;
+        HistoryStage historyStage;
+        EffectStage effectStage;
+    };
+
+    #include "MaterialGraphSceneGeometryStage.inl"
+    #include "MaterialGraphSceneFirstCullStage.inl"
+    #include "MaterialGraphSceneOccluderStage.inl"
+    #include "MaterialGraphSceneFinalCullStage.inl"
+    #include "MaterialGraphSceneShadowStage.inl"
+    #include "MaterialGraphSceneTemporalStage.inl"
+    #include "MaterialGraphSceneSurfaceStage.inl"
+    #include "MaterialGraphSceneHistoryStage.inl"
+    #include "MaterialGraphSceneLayerStage.inl"
+    #include "MaterialGraphSceneVolumeStage.inl"
+    #include "MaterialGraphSceneEffectStage.inl"
 
     struct SceneHost::Preparation
     {
@@ -731,6 +683,8 @@ namespace material_graph
                         caps.maxThreadsPerGroup >= 64 && caps.maxThreadGroupSizeX >= 64 &&
                         caps.maxOutputMemoryBytes >= 8192;
                     candidate->meshShader = compiled->mesh.bytecode;
+                    candidate->visibilityMeshShader = compiled->visibilityMesh.bytecode;
+                    candidate->reconstructShader = compiled->reconstructMesh.bytecode;
                     candidate->shadowMeshShader = compiled->shadowMesh.bytecode;
                     const auto& product =
                         compiled->verified ? *compiled->verified : candidate->generation->cooked.product;
@@ -760,8 +714,10 @@ namespace material_graph
                     {
                         host.push_back(RHILayout::Srv(8, RHIShaderVisibility::Pixel));
                     }
+                    candidate->decalRoot = static_cast<uint32_t>(host.size());
                     host.push_back(RHILayout::SrvTable(6, 9, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::Cbv(3, RHIShaderVisibility::Pixel));
+                    candidate->forwardLightsRoot = static_cast<uint32_t>(host.size());
                     host.push_back(RHILayout::Srv(128, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::Srv(129, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::Srv(130, RHIShaderVisibility::Pixel));
@@ -771,9 +727,11 @@ namespace material_graph
                     host.push_back(RHILayout::SrvTable(2, 133, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::SrvTable(3, 135, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::Cbv(6, RHIShaderVisibility::Pixel));
+                    candidate->visibleOwnerRoot = static_cast<uint32_t>(host.size());
                     host.push_back(RHILayout::Srv(138, RHIShaderVisibility::All));
                     if (candidate->hasSpecial)
                     {
+                        candidate->specialEffectsRoot = static_cast<uint32_t>(host.size());
                         host.push_back(RHILayout::Cbv(7, RHIShaderVisibility::Pixel));
                         host.push_back(RHILayout::SrvTable(14, 139, RHIShaderVisibility::Pixel));
                         host.push_back(RHILayout::SrvTable(2, 153, RHIShaderVisibility::Pixel));
@@ -782,6 +740,17 @@ namespace material_graph
                     host.push_back(RHILayout::Srv(155));
                     candidate->temporalPreviousRoot = static_cast<uint32_t>(host.size());
                     host.push_back(RHILayout::Srv(156, RHIShaderVisibility::All));
+                    host.push_back(RHILayout::Srv(157));
+                    candidate->geometryTableRoot = static_cast<uint32_t>(host.size());
+                    host.push_back(RHILayout::Srv(158, RHIShaderVisibility::Pixel));
+                    candidate->visibilityRoot = static_cast<uint32_t>(host.size());
+                    host.push_back(RHILayout::SrvTable(1, 159, RHIShaderVisibility::Pixel));
+                    candidate->materialWorkRoot = static_cast<uint32_t>(host.size());
+                    host.push_back(RHILayout::Srv(160));
+                    candidate->rasterRouteRoot = static_cast<uint32_t>(host.size());
+                    host.push_back(RHILayout::Srv(161));
+                    candidate->visibilityKeyRoot = static_cast<uint32_t>(host.size());
+                    host.push_back(RHILayout::Uav(1, RHIShaderVisibility::Pixel));
                     const RHIStaticSamplerDesc samplers[]{
                         {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
                         {RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
@@ -860,6 +829,15 @@ namespace material_graph
                         {
                             return false;
                         }
+                        auto visibilityDesc = desc;
+                        visibilityDesc.psBytecode = compiled->visibility.bytecode.Data();
+                        visibilityDesc.psSize = compiled->visibility.bytecode.Size();
+                        visibilityDesc.numRenderTargets = 0;
+                        visibilityDesc.depthEnable = false;
+                        visibilityDesc.depthWriteMask = RHIDepthWrite::Zero;
+                        visibilityDesc.dsvFormat = RHIFormat::Unknown;
+                        std::fill(std::begin(visibilityDesc.rtvFormats), std::end(visibilityDesc.rtvFormats), RHIFormat::Unknown);
+                        if (!prepare(candidate->visibilitySurface[side], visibilityDesc, "LXSceneVS", "LXSceneVisibilityPS")) return false;
                         auto temporalDesc = desc;
                         temporalDesc.vsBytecode = compiled->temporalVertex.bytecode.Data();
                         temporalDesc.vsSize = compiled->temporalVertex.bytecode.Size();
@@ -871,14 +849,6 @@ namespace material_graph
                         temporalDesc.rtvFormats[0] = RHIFormat::RG16Float;
                         std::fill_n(std::begin(temporalDesc.rtvFormats) + 1, 3, RHIFormat::R16Float);
                         if (!prepare(candidate->temporal[side], temporalDesc, "LXSceneTemporalVS", "LXSceneTemporalPS")) return false;
-                        auto depthDesc = desc;
-                        depthDesc.numRenderTargets = 0;
-                        depthDesc.psBytecode = compiled->depth.bytecode.Data();
-                        depthDesc.psSize = compiled->depth.bytecode.Size();
-                        if (!prepare(candidate->depth[side], depthDesc, "LXSceneVS", "LXSceneDepthPS"))
-                        {
-                            return false;
-                        }
                         desc.psBytecode = color.bytecode.Data();
                         desc.psSize = color.bytecode.Size();
                         desc.depthWriteMask = RHIDepthWrite::Zero;
@@ -984,7 +954,7 @@ namespace material_graph
             auto& program = *preparation->program;
             std::vector<LX::Runtime::GraphicsPipeline*> requests{
                 &program.temporal[0], &program.temporal[1],
-                &program.depth[0], &program.depth[1],
+                &program.visibilitySurface[0], &program.visibilitySurface[1],
                 &program.gbuffer[0],   &program.gbuffer[1],   &program.color[0],     &program.color[1],
                 &program.lookup[0][0], &program.lookup[0][1], &program.lookup[1][0], &program.lookup[1][1]};
             if (program.hasSurface)
@@ -1041,14 +1011,15 @@ namespace material_graph
                 {
                     for (const auto* request : requests)
                     {
-                        if (request == &program.temporal[0] || request == &program.temporal[1]) continue;
+                        const bool temporal = request == &program.temporal[0] || request == &program.temporal[1];
                         const auto indexed = request->GetHandle();
-                        if (program.meshPipelines.contains(indexed.id))
+                        if (program.meshPipelines.contains(indexed.id) && (!temporal || program.reconstructionPipelines.contains(indexed.id)))
                         {
                             continue;
                         }
                         const auto& raster = request->GetDesc();
-                        const auto& shader = request == &program.shadow ? program.shadowMeshShader : program.meshShader;
+                        const auto& shader = request == &program.shadow ? program.shadowMeshShader :
+                            (request == &program.visibilitySurface[0] || request == &program.visibilitySurface[1]) ? program.visibilityMeshShader : program.meshShader;
                         RHIMeshPipelineDesc desc;
                         desc.msBytecode = shader.Data();
                         desc.msSize = shader.Size();
@@ -1077,11 +1048,23 @@ namespace material_graph
                             break;
                         }
                         program.meshPipelines.emplace(indexed.id, pipeline);
+                        if (request != &program.shadow && request != &program.visibilitySurface[0] &&
+                            request != &program.visibilitySurface[1]) {
+                            desc.msBytecode = program.reconstructShader.Data();
+                            desc.msSize = program.reconstructShader.Size();
+                            desc.depthEnable = temporal ? raster.depthEnable : false;
+                            desc.depthWriteMask = temporal ? raster.depthWriteMask : RHIDepthWrite::Zero;
+                            if (temporal) desc.depthFunc = RHICompareOp::Always;
+                            desc.cullMode = RHICullMode::None;
+                            const auto reconstructed = context.psoManager->GetOrCreateMesh(desc, error);
+                            if (!reconstructed.IsValid()) { reject("METEOR reconstruction PSO failed: " + error); break; }
+                            program.reconstructionPipelines.emplace(indexed.id, reconstructed);
+                        }
                         // Budget synchronous mesh PSO creation across preparation ticks.
                         break;
                     }
                     if (!preparation->program || !std::ranges::all_of(requests, [&](const auto* request)
-                        { return request == &program.temporal[0] || request == &program.temporal[1] || program.meshPipelines.contains(request->GetHandle().id); }))
+                        { return (request == &program.temporal[0] || request == &program.temporal[1]) ? program.reconstructionPipelines.contains(request->GetHandle().id) : program.meshPipelines.contains(request->GetHandle().id); }))
                     {
                         continue;
                     }
@@ -1332,19 +1315,22 @@ namespace material_graph
         candidate->descriptors = device_->GetDescriptorVersionToken();
         candidate->input = std::move(input);
         candidate->environment = environment;
+        const auto emptyVisibility = RHIBindingDesc::Srv2D({}, RHIFormat::RG32Uint).OrNull();
+        candidate->emptyVisibility = device_->CreateBindings({&emptyVisibility, 1});
+        if (!candidate->emptyVisibility.IsValid()) return Fail(error, "METEOR empty layer visibility binding failed.");
         candidate->shadow = shadow.enabled;
         const std::array<std::byte, SceneVolumeConstantsBytes> emptyMedium{};
-        candidate->emptyVolumeConstants = device_->UploadConstants(emptyMedium.data(), emptyMedium.size());
-        candidate->emptyVolumeBuffer = device_->AllocateUpload({48, RHIUploadUsage::Raw, 16});
-        if (!candidate->emptyVolumeConstants.IsValid() || !candidate->emptyVolumeBuffer.IsWritable())
+        candidate->effectStage.volume.constants = device_->UploadConstants(emptyMedium.data(), emptyMedium.size());
+        candidate->effectStage.volume.buffer = device_->AllocateUpload({48, RHIUploadUsage::Raw, 16});
+        if (!candidate->effectStage.volume.constants.IsValid() || !candidate->effectStage.volume.buffer.IsWritable())
         {
             return Fail(error, "METEOR Scene empty medium allocation failed.");
         }
-        std::memset(candidate->emptyVolumeBuffer.cpuAddress, 0, 48);
+        std::memset(candidate->effectStage.volume.buffer.cpuAddress, 0, 48);
         const RHIBindingDesc emptyVolumeBindings[]{RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull(),
                                                    RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull()};
-        candidate->emptyVolumeBindings = device_->CreateBindings(emptyVolumeBindings);
-        if (!candidate->emptyVolumeBindings.IsValid())
+        candidate->effectStage.volume.table = device_->CreateBindings(emptyVolumeBindings);
+        if (!candidate->effectStage.volume.table.IsValid())
         {
             return Fail(error, "METEOR Scene empty medium bindings could not be allocated.");
         }
@@ -1353,14 +1339,14 @@ namespace material_graph
             return p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0);
         });
         if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
-                             environmentGeneration, budget.lookupBytes, candidate->lookup, error, importance, source,
+                             environmentGeneration, budget.lookupBytes, candidate->effectStage.lookup.opaque, error, importance, source,
                              false, budget.lookupApproximate, false, budget.lookupRuntimeEvaluation))
         {
             return false;
         }
         if (hasAlpha && !lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
                                          environmentGeneration, budget.lookupBytes,
-                                         candidate->alphaLookup, error, importance, source, true,
+                                         candidate->effectStage.lookup.layered, error, importance, source, true,
                                          budget.lookupApproximate, false, budget.lookupRuntimeEvaluation))
         {
             return false;
@@ -1375,17 +1361,17 @@ namespace material_graph
             {
                 input = RHIBindingDesc::Srv2D({}, RHIFormat::RGBA32Float).OrNull();
             }
-            candidate->emptyRuntimeInputs = device_->CreateBindings(inputs);
+            candidate->effectStage.runtime.emptyInputs = device_->CreateBindings(inputs);
             const RHIBindingDesc background[]{RHIBindingDesc::Srv2D({}, RHIFormat::RGBA16Float).OrNull(),
                                                RHIBindingDesc::Srv2D({}, RHIFormat::R32Float).OrNull()};
-            candidate->emptyRuntimeBackground = device_->CreateBindings(background);
-            if (!candidate->emptyRuntimeInputs.IsValid() || !candidate->emptyRuntimeBackground.IsValid())
+            candidate->effectStage.runtime.emptyBackground = device_->CreateBindings(background);
+            if (!candidate->effectStage.runtime.emptyInputs.IsValid() || !candidate->effectStage.runtime.emptyBackground.IsValid())
             {
                 return Fail(error, "Offline special surface root bindings could not be allocated.");
             }
         }
         if (hasSpecial && !budget.lookupRuntimeEvaluation &&
-            !subsurface_.Prepare(context, environment, budget.subsurfaceBytes, candidate->subsurface, error))
+            !subsurface_.Prepare(context, environment, budget.subsurfaceBytes, candidate->effectStage.subsurface, error))
         {
             return false;
         }
@@ -1396,37 +1382,37 @@ namespace material_graph
             return draw.material->generation->cooked.product.program.volume;
         });
         if (hasVolume && !volume_.Prepare(context, *candidate->input, environment, shadow, budget.volumeBytes,
-                                          candidate->volume, error))
+                                          candidate->effectStage.volume.frame, error))
         {
             return false;
         }
         if (hasTransmission && !budget.lookupRuntimeEvaluation &&
             !refraction_.Prepare(context, candidate->input->ViewProjection(), environment, budget.refractionBytes,
-                                 candidate->refraction, error, candidate->volume))
+                                 candidate->effectStage.refraction, error, candidate->effectStage.volume.frame))
         {
             return false;
         }
         if (hasSpecial && budget.lookupRuntimeEvaluation &&
             !runtimeEffects_.Prepare(context, candidate->input->ViewProjection(), hasTransmission,
-                                     bool(candidate->volume), budget.subsurfaceBytes, budget.refractionBytes,
-                                     candidate->runtimeEffects, error))
+                                     bool(candidate->effectStage.volume.frame), budget.subsurfaceBytes, budget.refractionBytes,
+                                     candidate->effectStage.runtime.frame, error))
         {
             return false;
         }
-        for (unsigned enabled = 0; enabled < candidate->decalConstants.size(); ++enabled)
+        for (unsigned enabled = 0; enabled < candidate->effectStage.decal.constants.size(); ++enabled)
         {
             const std::array<std::uint32_t, 4> constants{enabled, 0, 0, 0};
-            candidate->decalConstants[enabled] = device_->UploadConstants(constants.data(), sizeof(constants));
-            if (!candidate->decalConstants[enabled].IsValid())
+            candidate->effectStage.decal.constants[enabled] = device_->UploadConstants(constants.data(), sizeof(constants));
+            if (!candidate->effectStage.decal.constants[enabled].IsValid())
             {
                 return Fail(error, "METEOR Scene Decal constants allocation failed.");
             }
         }
         std::uint32_t owner = 0x80000000u;
-        std::vector<GpuGeometryVisibility::Candidate> visibilityCandidates;
-        std::vector<GpuGeometryVisibility::Bin> visibilityBins;
-        const bool indexedIndirect = device_->GetIndirectDrawCapabilities().indexedDraw;
-        if (!indexedIndirect) return Fail(error, "METEOR Scene requires GPU indirect work; no CPU/direct surface route.");
+        auto geometryTable = std::make_shared<SceneFrameGeometry>();
+        geometryTable->device = device_;
+
+        if (!device_->GetMeshShaderCapabilities().meshIndirect) return Fail(error, "METEOR Scene requires GPU indirect work; no CPU/direct surface route.");
         for (const auto& draw : candidate->input->Draws())
         {
             own::shared_owner<const Program> program;
@@ -1449,13 +1435,13 @@ namespace material_graph
                     return false;
                 }
                 const std::array<std::uint32_t, 4> constants{
-                    static_cast<std::uint32_t>(candidate->volumeBindings.size()), 0, 0, 0};
+                    static_cast<std::uint32_t>(candidate->effectStage.volume.bindings.size()), 0, 0, 0};
                 volume.constants = device_->UploadConstants(constants.data(), sizeof(constants));
                 if (!volume.constants.IsValid())
                 {
                     return Fail(error, "METEOR Scene Volume coefficient constants allocation failed.");
                 }
-                candidate->volumeBindings.push_back(std::move(volume));
+                candidate->effectStage.volume.bindings.push_back(std::move(volume));
             }
             SceneConstants constants{};
             constants.viewProjection = math::transpose(candidate->input->ViewProjection());
@@ -1463,7 +1449,7 @@ namespace material_graph
             constants.eye = math::vector4(eye[0], eye[1], eye[2], 1);
             constants.owner = ++owner;
             constants.geometryIdentity = {draw.geometryKey, draw.temporalObjectId, draw.temporalIncarnation,
-                draw.temporalInstanceId, draw.materialSlot, draw.geometry->Source()->Geometry().sourceLodIndex,
+                draw.temporalInstanceId, draw.materialSlot, draw.geometry->Source()->Hierarchy().groupCount ? UINT32_MAX : draw.geometry->Source()->Geometry().sourceLodIndex,
                 draw.geometry->Source()->SourcePrimitiveCount()};
             constants.width = context.width;
             constants.height = context.height;
@@ -1499,29 +1485,12 @@ namespace material_graph
                 constants.lightCount = static_cast<std::uint32_t>(ordered ? context.lights->size() : stored);
                 std::copy_n(context.lights->begin(), stored, constants.lights);
             }
-            const auto uploaded = device_->UploadConstants(&constants, sizeof(constants));
-            if (!uploaded.IsValid())
-            {
-                return Fail(error, "METEOR Scene constants allocation failed.");
-            }
             const auto visibleOwner = device_->AllocateUpload({sizeof(constants.owner), RHIUploadUsage::BufferCopy, 256});
             if (!visibleOwner.IsValid() || !visibleOwner.IsWritable())
             {
                 return Fail(error, "METEOR Scene visible owner allocation failed.");
             }
             std::memcpy(visibleOwner.cpuAddress, &constants.owner, sizeof(constants.owner));
-            const auto reference = [&] {
-                if (!ordered)
-                {
-                    return RHIBufferSlice{};
-                }
-                constants.padding[0] = 2;
-                return device_->UploadConstants(&constants, sizeof(constants));
-            }();
-            if (ordered && !reference.IsValid())
-            {
-                return Fail(error, "METEOR reference constants allocation failed.");
-            }
             bool shadowEnabled{};
             std::array<RHIBufferSlice, 3> shadowConstants;
             std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 3> shadowMeshlets;
@@ -1535,18 +1504,14 @@ namespace material_graph
                 shadowEnabled = true;
                 for (unsigned cascade = 0; cascade < shadowConstants.size(); ++cascade)
                 {
-                    if (!indexedIndirect &&
-                        !shadow_math::IntersectsClip({draw.shadowCenter, draw.shadowRadius},
-                                                    shadow.lightViewProjection[cascade]))
-                    {
-                        continue;
-                    }
                     SceneShadowConstants shadowValues;
                     shadowValues.viewProjection = math::transpose(shadow.lightViewProjection[cascade]);
                     shadowValues.coverage = draw.coverage.flags;
                     shadowValues.cutoff = draw.coverage.cutoff;
                     shadowValues.geometryIdentity = {draw.geometryKey, draw.temporalObjectId, draw.temporalIncarnation,
-                        draw.temporalInstanceId, draw.materialSlot, 0, draw.shadowGeometry->Source()->SourcePrimitiveCount()};
+                        draw.temporalInstanceId, draw.materialSlot, draw.geometry->Source()->Hierarchy().groupCount ? UINT32_MAX : 0, draw.geometry->Source()->SourcePrimitiveCount()};
+                    // Camera and each light select LOD independently from the same sealed hierarchy.
+                    shadowValues.world = math::transpose(draw.geometry->Source()->World());
                     shadowConstants[cascade] = device_->UploadConstants(&shadowValues, sizeof(shadowValues));
                     if (!shadowConstants[cascade].IsValid())
                     {
@@ -1563,11 +1528,11 @@ namespace material_graph
                 item.bindings = bindings;
                 item.shadowEnabled = shadowEnabled;
                 item.shadowConstants = shadowConstants;
-                item.constants = uploaded;
+
                 item.visibleOwner = visibleOwner;
-                item.referenceConstants = reference;
+
                 item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
-                if (!geometry_.Prepare(*device_, chunk.input, item.geometry, error, true, candidate->input->View().temporalFrame.realFrameId ? candidate->input->View().temporalFrame.realFrameId : candidate->input->View().frameId, candidate->input->View().viewId))
+                if (!geometry_.Prepare(*device_, chunk.input, item.geometry, error, true, candidate->input->View().temporalFrame.realFrameId ? candidate->input->View().temporalFrame.realFrameId : candidate->input->View().frameId, candidate->input->View().viewId, true))
                 {
                     return false;
                 }
@@ -1575,94 +1540,118 @@ namespace material_graph
                 if (draw.previousGeometry && draw.previousGeometry != draw.geometry && chunkIndex < draw.previousGeometry->Chunks().size())
                 {
                     if (!geometry_.Prepare(*device_, draw.previousGeometry->Chunks()[chunkIndex].input,
-                        item.previousGeometry, error, true, candidate->input->View().temporalFrame.realFrameId ? candidate->input->View().temporalFrame.realFrameId : candidate->input->View().frameId, candidate->input->View().viewId)) return false;
+                        item.previousGeometry, error, true, candidate->input->View().temporalFrame.realFrameId ? candidate->input->View().temporalFrame.realFrameId : candidate->input->View().frameId, candidate->input->View().viewId, true)) return false;
                 }
                 else item.previousGeometry = item.geometry;
-                const auto& source = chunk.input->Geometry();
-                // Per-draw transformed geometry and material constants still
-                // define CPU bins for every surface, including ordered/special
-                // and skinned materials. One candidate per bin prevents atomic
-                // compaction from reordering the merged Code/Graph forward stream.
-                // SceneViewInput sealed the pose/bounds; transformed geometry
-                // remains a dependency of every raster consumer.
+                if (geometryTable->records.size() >= UINT32_MAX || item.geometry->MeshletCount() > (UINT32_MAX >> 7))
+                    return Fail(error, "METEOR visibility address exceeds its frame geometry contract.");
+                SceneFrameGeometry::Record record;
+                record.identity = constants.geometryIdentity;
+                record.chunkIndex = static_cast<uint32_t>(chunkIndex);
+                record.owner = constants.owner;
+                record.meshletCount = item.geometry->MeshletCount();
+                record.vertexCount = static_cast<uint32_t>(chunk.input->Count());
+                record.SetWorld(item.geometry->ObjectToWorld());
+                constants.world = math::transpose(item.geometry->ObjectToWorld());
+                constants.previousWorld = math::transpose(item.previousGeometry->ObjectToWorld());
+                constants.geometryIdentity.reserved[0] = static_cast<uint32_t>(geometryTable->records.size());
+                item.geometryRecord = constants.geometryIdentity.reserved[0];
+                if (!SceneVisibilityContract::Reserve(record.meshletCount, geometryTable->nextPrimitiveAddress,
+                    constants.geometryIdentity.reserved[1], constants.geometryIdentity.reserved[2]))
+                    return Fail(error, "METEOR frame primitive address capacity exceeded; no truncated visibility IDs.");
+                record.identity.reserved[1] = constants.geometryIdentity.reserved[1];
+                record.identity.reserved[2] = constants.geometryIdentity.reserved[2];
+                constants.padding[0] = ordered ? 1u : 0u;
+                item.constants = device_->UploadConstants(&constants, sizeof(constants));
+                if (ordered) {
+                    constants.padding[0] = 2;
+                    item.referenceConstants = device_->UploadConstants(&constants, sizeof(constants));
+                }
+                if (!item.constants.IsValid() || (ordered && !item.referenceConstants.IsValid()))
+                    return Fail(error, "METEOR per-chunk geometry constants allocation failed.");
+                record.identity.reserved[0] = 0;
+                geometryTable->records.push_back(record);
+                geometryTable->geometry.push_back(item.geometry);
+                // CPU seals geometry/material command ranges; compute selects
+                // cooked replacement groups and compacts meshlets. Ordered lists
+                // preserve the source primitive and layer order.
                 // The compiler accepts Surface and/or Volume closures; emission
                 // belongs to Surface, not a separate color-only raster program.
                 // Surface color/lookup passes require hasSurface. Special
                 // capture entry points key on their feature bits instead, so
-                // cover those entries too. Volume-only programs emit no indexed
+                // cover those entries too. Volume-only programs emit no mesh
                 // raster work and keep their existing compute/composite route.
                 const bool rasterGeometry = program->hasSurface || program->hasSpecial;
-                if (rasterGeometry && !ordered && !candidate->UsesMeshlets(item))
-                    return Fail(error, "METEOR opaque surface requires supported cooked meshlets; reimport the asset.");
-                if (indexedIndirect && rasterGeometry)
-                {
-                    item.visibilityBin = static_cast<std::uint32_t>(visibilityBins.size());
-                    item.visibleIdOffset = item.visibilityBin * GpuGeometryVisibility::kOutputAlignment;
-                    visibilityBins.push_back(candidate->UsesMeshlets(item)
-                        ? GpuGeometryVisibility::MeshDispatchBin(item.geometry->MeshletCount())
-                        : GpuGeometryVisibility::Bin{source.indexCount, 0, 0, 0});
-                    visibilityCandidates.push_back({
-                        math::vector4{draw.shadowCenter.x, draw.shadowCenter.y, draw.shadowCenter.z, draw.shadowRadius},
-                        item.visibilityBin, constants.owner, item.visibleIdOffset,
-                        ordered ? GpuGeometryVisibility::kNoOcclusion : 0u});
-                }
+                // Opaque and blended surfaces are culled per meshlet; the owner gate is
+                // the sealed visibleOwner. No instance-level culling route exists.
+                if (rasterGeometry && !candidate->UsesMeshlets(item))
+                    return Fail(error, ordered
+                        ? "METEOR blended surface requires supported cooked meshlets; reimport the asset."
+                        : "METEOR opaque surface requires supported cooked meshlets; reimport the asset.");
 
-                const auto bytes = std::size_t(source.indexCount) * sizeof(std::uint32_t);
-                item.indices = item.geometry->Indices();
-                if (!item.indices.IsValid())
-                {
-                    item.indices = device_->AllocateUpload({bytes, RHIUploadUsage::IndexData, alignof(std::uint32_t)});
-                    if (!item.indices.IsValid() || !item.indices.cpuAddress)
-                    {
-                        return Fail(error, "METEOR Scene index upload failed.");
-                    }
-                    std::memcpy(item.indices.cpuAddress, source.indexData, bytes);
-                }
-                if (shadowEnabled && !draw.geometryLod)
+                if (shadowEnabled)
                 {
                     candidate->shadowDraws.push_back(item);
                 }
                 candidate->draws.push_back(std::move(item));
             }
-            if (shadowEnabled && draw.geometryLod)
-            {
-                for (const auto& chunk : draw.shadowGeometry->Chunks())
-                {
-                    Frame::Draw item;
-                    item.program = program;
-                    item.bindings = bindings;
-                    item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
-                    item.blended = ordered;
-                    item.shadowEnabled = true;
-                    item.shadowConstants = shadowConstants;
-                    if (!geometry_.Prepare(*device_, chunk.input, item.geometry, error, true, candidate->input->View().temporalFrame.realFrameId ? candidate->input->View().temporalFrame.realFrameId : candidate->input->View().frameId, candidate->input->View().viewId))
-                    {
-                        return false;
-                    }
-                    // Shadow-only LOD0 geometry is never consumed by the motion
-                    // pass and does not share the visible LOD's chunk indexing.
-                    const auto& source = chunk.input->Geometry();
-
-                    item.indices = item.geometry->Indices();
-                    if (!item.indices.IsValid())
-                    {
-                        const auto bytes = size_t(source.indexCount) * sizeof(uint32_t);
-                        item.indices = device_->AllocateUpload({bytes, RHIUploadUsage::IndexData, alignof(uint32_t)});
-                        if (!item.indices.IsWritable())
-                        {
-                            return Fail(error, "METEOR Scene shadow LOD0 index upload failed.");
-                        }
-                        std::memcpy(item.indices.cpuAddress, source.indexData, bytes);
-                    }
-                    candidate->shadowDraws.push_back(std::move(item));
-                }
+        }
+        std::vector<std::shared_ptr<const MeshSurfaceBatch>> cameraGeometry, blendedGeometry;
+        for (auto& draw : candidate->draws)
+            if (candidate->UsesMeshlets(draw)) {
+                auto& list = draw.blended ? blendedGeometry : cameraGeometry;
+                draw.cameraMeshletBin = static_cast<uint32_t>(list.size());
+                list.push_back(draw.geometry);
             }
-        }
-        if (!visibility_.Prepare(context, candidate->input->ViewProjection(), visibilityCandidates, visibilityBins,
-                                 candidate->visibility, error, true))
+        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previousCameraHistory;
+        if (!cameraGeometry.empty())
         {
-            return false;
+            const auto& view = candidate->input->View();
+            auto historyCamera = view.camera;
+            if (view.temporalFrame.camera.valid)
+                std::memcpy(&historyCamera.projection, view.temporalFrame.camera.projectionMatrix.data(), sizeof(historyCamera.projection));
+            std::uint64_t completed;
+            { std::lock_guard lock(recordingMutex_); completed = completed_; }
+            // Only completed, accepted history can enter another recording.
+            // Keep the newest completed view plus its still-submitted successors.
+            std::erase_if(cameraHistories_, [&](const auto& entry) { return entry.first.first != view.sceneEpoch; });
+            auto& histories = cameraHistories_[{view.sceneEpoch, view.viewId}];
+            std::uint64_t newest{};
+            for (const auto& item : histories)
+                if (item.pyramid->completion <= completed) newest = (std::max)(newest, item.pyramid->source.frameId);
+            std::erase_if(histories, [&](const auto& item) {
+                return item.pyramid->completion <= completed && item.pyramid->source.frameId < newest;
+            });
+            for (const auto& item : histories)
+            {
+                const auto& h = *item.pyramid;
+                if (h.source.frameId == newest && h.source.frameId < view.frameId && h.completion <= completed &&
+                    h.source.width == view.width && h.source.height == view.height &&
+                    h.revision == view.historyRevision && historyCamera.HasSameTemporalHistory(item.camera) &&
+                    item.temporalRevision == view.temporalFrame.historyRevision &&
+                    (!view.temporalFrame.realFrameId || !view.temporalFrame.reset))
+                    previousCameraHistory = GpuGeometryOcclusion::ReadHistory(context,
+                        candidate->input->ViewProjection(), item.pyramid);
+            }
+            if (!cameraOcclusion_.PrepareHistory(context, candidate->input->ViewProjection(),
+                view.viewId, view.historyRevision, candidate->historyStage.nextCameraHistory, error)) return false;
+            // The same builder produces the current pyramid from the occluder depth.
+            if (!cameraOcclusion_.Prepare(context, candidate->input->ViewProjection(),
+                candidate->finalCullStage.currentPyramid, error)) return false;
         }
+        if (!cameraGeometry.empty() &&
+            (!visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
+                candidate->firstCullStage.cameraDepthMeshlets, error, false, previousCameraHistory, {}, false, candidate->input->GeometryMaxPixelError()) ||
+             !visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
+                candidate->finalCullStage.cameraMeshlets, error, true, {}, candidate->firstCullStage.cameraDepthMeshlets, false, candidate->input->GeometryMaxPixelError()))) return false;
+        // Blended surfaces were never depth-occlusion culled: frustum only, and
+        // survivors keep source meshlet order so blending stays deterministic.
+        if (!blendedGeometry.empty() &&
+            !visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), blendedGeometry,
+                candidate->finalCullStage.blendedMeshlets, error, false, {}, {}, true, candidate->input->GeometryMaxPixelError())) return false;
+        if (!candidate->geometryStage.Prepare(std::move(geometryTable), error) ||
+            !candidate->occluderStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable, candidate->firstCullStage.cameraDepthMeshlets, hybridPipelines_, error) ||
+            !candidate->surfaceStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable, candidate->finalCullStage.cameraMeshlets, hybridPipelines_, error)) return false;
         candidate->inputRanges.resize(candidate->input->Draws().size());
         for (size_t i = 0; i < candidate->draws.size(); ++i)
         {
@@ -1683,7 +1672,8 @@ namespace material_graph
         if (!shadowMeshletGeometry.empty()) for (unsigned cascade = 0; cascade < 3; ++cascade) {
             std::shared_ptr<const GpuGeometryVisibility::Frame> culling;
             if (!visibility_.PrepareMeshlets(context, shadow.lightViewProjection[cascade], shadowMeshletGeometry,
-                culling, error)) return false;
+                culling, error, false, {}, {}, false, shadow.mapResolution ? candidate->input->GeometryMaxPixelError() : 0.f,
+                shadow.mapResolution, shadow.mapResolution)) return false;
             if (!culling) return Fail(error, "Shadow meshlet compaction was not prepared.");
             for (auto& draw : candidate->shadowDraws) {
                 if (draw.shadowMeshletBin == UINT32_MAX) continue;
@@ -1694,6 +1684,286 @@ namespace material_graph
                 draw.shadowConstants[cascade] = device_->UploadConstants(&constants, sizeof(constants));
                 if (!draw.shadowConstants[cascade].IsValid()) return Fail(error, "Shadow compacted constants allocation failed.");
             }
+        }
+        if (!cameraGeometry.empty() || !shadowMeshletGeometry.empty() ||
+            std::ranges::any_of(candidate->draws, [](const auto& draw) { return draw.program->hasSurface; }))
+        {
+            if (!indirectCommands_.GetGeneration())
+            {
+                const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0),
+                    RHILayout::Srv(1), RHILayout::Srv(2), RHILayout::UavBufferTable(1, 0)};
+                const auto layout = context.rootSignatures->GetOrCreate({params, {}}, error);
+                LX::Runtime::CompiledCompute compiled;
+                RHIShaderCompileOptions options; options.strictMath = true;
+                if (!layout.IsValid() || !LX::Runtime::CompileCompute(
+                    RHIShaderSource::Resolve("MaterialGraphIndirect.slang").string(),
+                    "LXBuildIndirectCommands", {}, options, compiled, error)) return false;
+                RHIComputePipelineDesc desc; desc.layout = layout;
+                desc.csBytecode = compiled.stage.bytecode.Data(); desc.csSize = compiled.stage.bytecode.Size();
+                if (!indirectCommands_.Create(*context.psoManager, desc, std::move(compiled.description), error)) return false;
+            }
+            // GBuffer bytecode can be identical while the color/lookup shader
+            // differs. A bucket must share the complete cooked program identity.
+            std::map<std::pair<std::string, bool>, std::vector<std::size_t>> groups;
+            for (std::size_t index = 0; index < candidate->draws.size(); ++index)
+            {
+                const auto& draw = candidate->draws[index];
+                // Blended meshlets have their own ordered layer/range commands.
+                if (candidate->UsesMeshlets(draw) && !draw.blended)
+                    groups[{draw.program->generation->cooked.product.program.semanticKey, draw.doubleSided}].push_back(index);
+            }
+            const auto prepare = [&](bool depth, std::shared_ptr<const IndirectMaterialBatch>& result,
+                std::optional<unsigned> cascade = {}) {
+                auto batch = std::make_shared<IndirectMaterialBatch>();
+                batch->name = cascade ? "METEOR.Scene.Commands.Shadow." + std::to_string(*cascade)
+                    : depth ? "METEOR.Scene.Commands.Depth" : "METEOR.Scene.Commands.Surface";
+                batch->device = device_;
+                batch->pipeline = indirectCommands_.GetGeneration();
+                auto& draws = cascade ? candidate->shadowDraws : candidate->draws;
+                batch->visibility = cascade ? draws[groups.begin()->second.front()].shadowMeshlets[*cascade]
+                    : depth ? candidate->firstCullStage.cameraDepthMeshlets : candidate->finalCullStage.cameraMeshlets;
+                std::vector<std::uint32_t> words;
+                std::vector<std::array<std::uint32_t, 4>> records;
+                std::uint32_t outputBytes{};
+                for (const auto& [key, indices] : groups)
+                {
+                    IndirectMaterialBatch::Bucket bucket;
+                    bucket.representative = indices.front(); bucket.offset = outputBytes;
+                    bucket.count = static_cast<std::uint32_t>(indices.size());
+                    for (const auto index : indices)
+                    {
+                        auto& draw = draws[index];
+                        draw.materialBucket = static_cast<std::uint32_t>(batch->buckets.size());
+                        draw.bucketRepresentative = index == indices.front();
+                        const auto& layout = cascade ? draw.program->shadowLayout : draw.program->layout;
+                        std::vector<std::uint32_t> roots;
+                        const auto first = static_cast<std::uint32_t>(words.size() * 4);
+                        const auto append = [&](std::uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
+                            std::uint64_t value{};
+                            if (!device_->EncodeIndirectBuffer(slice, value) || (cbv && value % 256)) return false;
+                            roots.push_back(slot | (cbv ? 0x80000000u : 0));
+                            words.push_back(static_cast<std::uint32_t>(value));
+                            words.push_back(static_cast<std::uint32_t>(value >> 32));
+                            return true;
+                        };
+                        const unsigned ownerRoot = draw.program->visibleOwnerRoot;
+                        const auto bin = cascade ? draw.shadowMeshletBin : draw.cameraMeshletBin;
+                        const bool geometryRoots = cascade
+                            ? append(0, draw.shadowConstants[*cascade], true) &&
+                                append(1, RHIBufferSlice::Whole(draw.geometry->Buffer())) &&
+                                append(draw.program->shadowMeshletRoot, draw.geometry->Meshlets()) &&
+                                append(3, batch->visibility->VisibleIds(
+                                    batch->visibility->MeshletOutputOffset(bin), draw.geometry->MeshletCount() + 1))
+                            : append(0, draw.constants, true) &&
+                                append(1, RHIBufferSlice::Whole(draw.geometry->Buffer())) &&
+                                append(ownerRoot, draw.visibleOwner) &&
+                                append(draw.program->meshletRoot, draw.geometry->Meshlets()) &&
+                                append(draw.program->temporalPreviousRoot + 1, batch->visibility->VisibleIds(
+                                    batch->visibility->MeshletOutputOffset(bin), draw.geometry->MeshletCount() + 1));
+                        if (!geometryRoots ||
+                            (layout.uniformSlot && !append(*layout.uniformSlot, draw.bindings->uniforms, true)) ||
+                            (layout.descriptorIndexSlot && !append(*layout.descriptorIndexSlot, draw.bindings->descriptorIndices, true)))
+                            return Fail(error, "LX indirect root descriptor preparation failed; no CPU submission fallback.");
+                        if (bucket.roots.empty()) bucket.roots = roots;
+                        if (bucket.roots != roots) return Fail(error, "LX shader bucket root ABI differs between instances.");
+                        records.push_back({first, outputBytes, static_cast<std::uint32_t>(roots.size() * 2),
+                            static_cast<std::uint32_t>(batch->visibility->ArgsOffset(bin))});
+                        outputBytes += static_cast<std::uint32_t>(roots.size() * 8 + 12);
+                    }
+                    batch->buckets.push_back(std::move(bucket));
+                }
+                if (!batch->Upload(words, records, outputBytes, error)) return false;
+                result = std::move(batch);
+                return true;
+            };
+            if (!groups.empty()) {
+                if (!prepare(false, candidate->surfaceStage.materialCommands) || !prepare(true, candidate->occluderStage.depthCommands)) return false;
+                std::printf("[meteor.material-buckets] commands=%u buckets=%zu cpuInstanceSubmissions=0\n",
+                    candidate->surfaceStage.materialCommands->commandCount, candidate->surfaceStage.materialCommands->buckets.size());
+            }
+            const auto needsMaterialTiles = [&](const auto& group) {
+                const auto& draw = candidate->draws[group.second.front()];
+                return draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended;
+            };
+            if (std::ranges::any_of(groups, needsMaterialTiles)) {
+                const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::SrvTable(1,0),
+                    RHILayout::Srv(1), RHILayout::Srv(2), RHILayout::UavBufferTable(2,0), RHILayout::Srv(3)};
+                const auto layout = context.rootSignatures->GetOrCreate({params,{}},error);
+                constexpr const char* entries[]{"ResetMaterialWork","CountMaterialTiles","BuildMaterialRanges","ScatterMaterialTiles"};
+                auto work = std::make_shared<SceneMaterialWork>();
+                work->device = device_; work->width = context.width; work->height = context.height;
+                work->recordCount = static_cast<uint32_t>(candidate->geometryStage.geometryTable->records.size());
+                work->geometry = candidate->geometryStage.geometryTable;
+                for (unsigned stage = 0; stage < 4; ++stage) {
+                    if (!materialWorkPipelines_[stage].GetGeneration()) {
+                        LX::Runtime::CompiledCompute compiled;
+                        RHIShaderCompileOptions options; options.strictMath = true;
+                        if (!layout.IsValid() || !LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphWork.slang").string(),
+                            entries[stage], {}, options, compiled, error)) return false;
+                        RHIComputePipelineDesc desc; desc.layout = layout;
+                        desc.csBytecode = compiled.stage.bytecode.Data(); desc.csSize = compiled.stage.bytecode.Size();
+                        if (!materialWorkPipelines_[stage].Create(*context.psoManager, desc, std::move(compiled.description), error)) return false;
+                    }
+                    work->pipelines[stage] = materialWorkPipelines_[stage].GetGeneration();
+                }
+                std::vector<uint32_t> words;
+                std::vector<std::array<uint32_t,4>> records;
+                uint32_t bytes{};
+                for (const auto& group : groups) {
+                    if (!needsMaterialTiles(group)) continue;
+                    const auto& indices = group.second;
+                    SceneMaterialWork::Bucket bucket;
+                    bucket.representative = indices.front(); bucket.offset = bytes;
+                    bucket.count = static_cast<uint32_t>(indices.size());
+                    for (const auto index : indices) {
+                        auto& draw = candidate->draws[index];
+                        draw.materialTileBucket = static_cast<uint32_t>(work->buckets.size());
+                        const auto first = static_cast<uint32_t>(words.size() * 4);
+                        std::vector<uint32_t> roots;
+                        const auto append = [&](uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
+                            uint64_t address{};
+                            if (!device_->EncodeIndirectBuffer(slice,address) || (cbv && address % 256)) return false;
+                            roots.push_back(slot | (cbv ? 0x80000000u : 0));
+                            words.push_back(static_cast<uint32_t>(address)); words.push_back(static_cast<uint32_t>(address >> 32));
+                            return true;
+                        };
+                        const auto& bindings = draw.program->layout;
+                        if (!append(0,draw.constants,true) || !append(1,RHIBufferSlice::Whole(draw.geometry->Buffer())) ||
+                            !append(draw.program->meshletRoot,draw.geometry->Meshlets()) ||
+                            !append(draw.program->temporalPreviousRoot,RHIBufferSlice::Whole(draw.previousGeometry->Buffer())) ||
+                            (bindings.uniformSlot && !append(*bindings.uniformSlot,draw.bindings->uniforms,true)) ||
+                            (bindings.descriptorIndexSlot && !append(*bindings.descriptorIndexSlot,draw.bindings->descriptorIndices,true)))
+                            return Fail(error,"METEOR material tile root template failed.");
+                        if (bucket.roots.empty()) bucket.roots = roots;
+                        if (bucket.roots != roots) return Fail(error,"METEOR material tile bucket ABI mismatch.");
+                        records.push_back({first,bytes,static_cast<uint32_t>(roots.size()*2),draw.geometryRecord});
+                        bytes += static_cast<uint32_t>(roots.size()*8 + 12);
+                    }
+                    work->buckets.push_back(std::move(bucket));
+                }
+                if (!work->Upload(words,records,bytes,error)) return false;
+                candidate->surfaceStage.materialWork = std::move(work);
+            }
+            groups.clear();
+            for (std::size_t index = 0; index < candidate->shadowDraws.size(); ++index) {
+                const auto& draw = candidate->shadowDraws[index];
+                if (draw.shadowEnabled)
+                    groups[{draw.program->generation->cooked.product.program.semanticKey, draw.doubleSided}].push_back(index);
+            }
+            if (!groups.empty()) for (unsigned cascade = 0; cascade < 3; ++cascade) {
+                if (!prepare(false, candidate->shadowStage.shadowCommands[cascade], cascade)) return false;
+                std::printf("[meteor.shadow-buckets] cascade=%u commands=%u buckets=%zu cpuInstanceSubmissions=0\n",
+                    cascade, candidate->shadowStage.shadowCommands[cascade]->commandCount, candidate->shadowStage.shadowCommands[cascade]->buckets.size());
+            }
+            // Only transmitting/blended surfaces replay geometry. Opaque Temporal
+            // consumes final visibility and the existing GPU material tile packets.
+            auto replay = std::make_shared<IndirectMaterialBatch>();
+            replay->name = "METEOR.Scene.Commands.Temporal.Layers";
+            replay->visibility = candidate->finalCullStage.blendedMeshlets;
+            replay->device = device_;
+            replay->pipeline = indirectCommands_.GetGeneration();
+            std::vector<uint32_t> replayWords;
+            std::vector<std::array<uint32_t, 4>> replayRecords;
+            RHIPipelineHandle previousPipeline{};
+            uint32_t replayBytes{};
+            for (std::size_t index = 0; index < candidate->draws.size(); ++index) {
+                const auto& draw = candidate->draws[index];
+                if (!draw.program->hasSurface || !draw.blended) continue;
+                const auto pipeline = draw.program->temporal[draw.doubleSided].GetHandle();
+                if (replay->buckets.empty() || pipeline != previousPipeline) {
+                    IndirectMaterialBatch::Bucket bucket;
+                    bucket.representative = index;
+                    bucket.offset = replayBytes;
+                    replay->buckets.push_back(std::move(bucket));
+                    previousPipeline = pipeline;
+                }
+                auto& bucket = replay->buckets.back();
+                const auto first = static_cast<uint32_t>(replayWords.size() * 4);
+                std::vector<uint32_t> roots;
+                const auto append = [&](uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
+                    uint64_t address{};
+                    if (!device_->EncodeIndirectBuffer(slice, address) || (cbv && address % 256)) return false;
+                    roots.push_back(slot | (cbv ? 0x80000000u : 0));
+                    replayWords.push_back(uint32_t(address)); replayWords.push_back(uint32_t(address >> 32));
+                    return true;
+                };
+                const auto& layout = draw.program->layout;
+                const unsigned ownerRoot = draw.program->visibleOwnerRoot;
+                if (!append(0, draw.constants, true) || !append(1, RHIBufferSlice::Whole(draw.geometry->Buffer())) ||
+                    !append(ownerRoot, draw.visibleOwner) ||
+                    !append(draw.program->meshletRoot, draw.geometry->Meshlets()) ||
+                    !append(draw.program->temporalPreviousRoot, RHIBufferSlice::Whole(draw.previousGeometry->Buffer())) ||
+                    !append(draw.program->temporalPreviousRoot + 1, replay->visibility->VisibleIds(
+                        replay->visibility->MeshletOutputOffset(draw.cameraMeshletBin), draw.geometry->MeshletCount() + 1)) ||
+                    (layout.uniformSlot && !append(*layout.uniformSlot, draw.bindings->uniforms, true)) ||
+                    (layout.descriptorIndexSlot && !append(*layout.descriptorIndexSlot, draw.bindings->descriptorIndices, true)))
+                    return Fail(error, "LX temporal indirect root preparation failed.");
+                if (bucket.roots.empty()) bucket.roots = roots;
+                if (bucket.roots != roots) return Fail(error, "LX temporal bucket root ABI mismatch.");
+                replayRecords.push_back({first, replayBytes,
+                    uint32_t(roots.size() * 2), uint32_t(replay->visibility->ArgsOffset(draw.cameraMeshletBin))});
+                replayBytes += uint32_t(roots.size() * 8 + 12);
+                ++bucket.count;
+            }
+            if (!replayRecords.empty()) {
+                if (!replay->Upload(replayWords, replayRecords, replayBytes, error)) return false;
+                candidate->temporalStage.temporalCommands = std::move(replay);
+            }
+        }
+
+        // Captures and tiled effects preserve each sorted layer boundary. Within
+        // a layer, every geometry chunk shares material/scene constants and PSO;
+        // only geometry, owner and its ordered meshlet list vary per mesh dispatch.
+        auto indexed = std::make_shared<IndirectMaterialBatch>();
+        indexed->name = "METEOR.Scene.Commands.Layer";
+        indexed->device = device_;
+        indexed->pipeline = indirectCommands_.GetGeneration();
+        indexed->visibility = candidate->finalCullStage.blendedMeshlets;
+        std::vector<uint32_t> indexedWords;
+        std::vector<std::array<uint32_t, 4>> indexedRecords;
+        std::uint32_t indexedOutputBytes{};
+        for (const auto [first, count] : candidate->inputRanges)
+        {
+            uint32_t bucketIndex = UINT32_MAX;
+            for (size_t index = first; index < first + count; ++index)
+            {
+                auto& draw = candidate->draws[index];
+                if (draw.blended && draw.program->hasSurface &&
+                    (draw.program->hasSpecial || candidate->effectStage.lookup.layered->RequiresCapture()))
+                {
+                    const auto& list = candidate->finalCullStage.blendedMeshlets;
+                    if (!list || !candidate->UsesMeshlets(draw))
+                        return Fail(error, "METEOR layer requires its ordered blended meshlet list.");
+                    if (bucketIndex == UINT32_MAX) {
+                        bucketIndex = static_cast<uint32_t>(indexed->buckets.size());
+                        IndirectMaterialBatch::Bucket bucket;
+                        bucket.representative = index;
+                        bucket.offset = indexedOutputBytes;
+                        bucket.roots = {1u, draw.program->visibleOwnerRoot, draw.program->meshletRoot,
+                            draw.program->temporalPreviousRoot + 1};
+                        indexed->buckets.push_back(std::move(bucket));
+                    }
+                    auto& bucket = indexed->buckets[bucketIndex];
+                    const auto first = static_cast<uint32_t>(indexedWords.size() * 4);
+                    for (const auto slice : {RHIBufferSlice::Whole(draw.geometry->Buffer()), draw.visibleOwner,
+                        draw.geometry->Meshlets(), list->VisibleIds(list->MeshletOutputOffset(draw.cameraMeshletBin),
+                            draw.geometry->MeshletCount() + 1)}) {
+                        uint64_t address{};
+                        if (!device_->EncodeIndirectBuffer(slice, address))
+                            return Fail(error, "METEOR layer indirect root preparation failed.");
+                        indexedWords.push_back(uint32_t(address)); indexedWords.push_back(uint32_t(address >> 32));
+                    }
+                    indexedRecords.push_back({first, indexedOutputBytes, uint32_t(bucket.roots.size() * 2),
+                        static_cast<uint32_t>(list->ArgsOffset(draw.cameraMeshletBin))});
+                    indexedOutputBytes += static_cast<uint32_t>(bucket.roots.size() * 8 + 12);
+                    draw.indexedBucket = bucketIndex;
+                    draw.bucketRepresentative = bucket.count++ == 0;
+                }
+            }
+        }
+        if (!indexedRecords.empty()) {
+            if (!indexed->Upload(indexedWords, indexedRecords, indexedOutputBytes, error)) return false;
+            candidate->effectStage.layers.indexedCommands = std::move(indexed);
         }
         // The replay walks every caster vertex for three cascades. Sample at most
         // one prepared frame every two seconds so it cannot stall the render thread.
@@ -1732,7 +2002,7 @@ namespace material_graph
             {
                 const auto& audit = audits[cascade];
                 std::printf("[meteor.meshlets.audit] frame=%llu cascade=%u draws=%llu visibleDraws=%llu meshlets=%llu "
-                            "rejected=%llu triangles=%llu rejectedTriangles=%llu indexed=%u skinned=%u\n",
+                            "rejected=%llu triangles=%llu rejectedTriangles=%llu indexed=%u skinned=%u scope=allLodsBeforeGpuSelection\n",
                             static_cast<unsigned long long>(context.frameId), cascade,
                             static_cast<unsigned long long>(audit.draws), static_cast<unsigned long long>(audit.visibleDraws),
                             static_cast<unsigned long long>(audit.meshlets), static_cast<unsigned long long>(audit.rejected),
@@ -1741,8 +2011,13 @@ namespace material_graph
             }
             std::fflush(stdout);
         }
+        candidate->raster = std::make_shared<const RasterResources>(RasterResources{
+            candidate->geometryStage.geometryTable, candidate->firstCullStage.cameraDepthMeshlets,
+            candidate->finalCullStage.cameraMeshlets, candidate->finalCullStage.blendedMeshlets,
+            candidate->effectStage.layers.indexedCommands, candidate->surfaceStage.materialWork});
         try
         {
+            if (!candidate->effectStage.layers.PrepareBlended(*candidate, candidate->effectStage.lookup.layered, bool(candidate->effectStage.runtime.frame), indirectCommands_.GetGeneration(), error)) return false;
             candidate->CheckCurrent();
         }
         catch (const std::exception& exception)
@@ -1781,208 +2056,135 @@ namespace material_graph
         return true;
     }
 
-    // METEOR.Scene.Cull node: every visibility decision of the frame. Shadow
-    // cascades get compute meshlet lists; the camera gets the occluder depth
-    // prepass, its current-frame pyramid and instance culling. Raster consumers
-    // only read the declared lists.
-    void SceneHost::DeclareCulling(EnhancedRenderGraph& graph) const
+    // METEOR.Scene.Cull.First: the first camera list (completed history HZB or
+    // frustum) and the depth commands the occluder stage consumes.
+    SceneLayerWork SceneHost::DeclareLayerWork(EnhancedRenderGraph& graph, RGHandle layerList) const
     {
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        ce::profile_scope profile{ce::marker<"MaterialDeclareCulling">()};
-        const auto frame = frame_;
-        if (!frame)
-        {
-            return;
-        }
-        frame->CheckCurrent();
-        if (frame->cullDeclared)
-        {
-            throw std::runtime_error("METEOR Scene culling requires one declaration per prepared frame.");
-        }
-        frame->cullDeclared = true;
-        if (frame->draws.empty())
-        {
-            return;
-        }
-        RequireGeometry(*frame, graph);
-        if (frame->shadow)
-        {
-            for (unsigned cascade = 0; cascade < 3; ++cascade)
-            {
-                std::vector<std::shared_ptr<const GpuGeometryVisibility::Frame>> meshlets;
-                for (const auto& draw : frame->shadowDraws)
-                {
-                    if (draw.shadowMeshlets[cascade]) meshlets.push_back(draw.shadowMeshlets[cascade]);
-                }
-                GpuGeometryVisibility::Frame::DeclareMeshletBatch(graph, meshlets);
-            }
-        }
-        RGHandle occluderDepth;
-        const bool depthPrepass = frame->visibility &&
-            graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
-        if (depthPrepass)
-        {
-            // Exact current-frame coverage/pose/LOD, with no camera/HZB-filtered
-            // arguments. The pyramid reads this version before the main write.
-            RGTextureDesc depthDescription;
-            depthDescription.width = frame->input->View().width;
-            depthDescription.height = frame->input->View().height;
-            depthDescription.format = RHIFormat::D32Float;
-            depthDescription.allowDepthStencil = true;
-            depthDescription.name = "METEOR.Scene.OccluderDepth";
-            // Keep main depth untouched so Less and first-primitive tie ownership
-            // remain identical to the indexed baseline after HZB filtering.
-            occluderDepth = graph.Write(graph.CreateTexture(depthDescription));
-            std::vector<EnhancedRenderGraph::RGPassUsage> depthUses;
-            depthUses.push_back({occluderDepth, RHIResourceState::DepthWrite, RGAccessMode::Write});
-            for (const auto& draw : frame->draws)
-            {
-                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-                {
-                    continue;
-                }
-                depthUses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-                if (frame->UsesMeshlets(draw))
-                {
-                    depthUses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-                }
-                for (const auto& texture : draw.bindings->resources.textures)
-                {
-                    depthUses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-                }
-            }
-            NormalizeSceneReads(graph, depthUses);
-            graph.AddPass("METEOR.Scene.OccluderDepth", depthUses, [frame, depthHandle = occluderDepth](const auto& execution) {
-                frame->CheckCurrent(execution.graph);
-                auto& encoder = *execution.encoder;
-                const auto depthTarget = RHIDepthTargetDesc::Depth(execution.ResolveHandle(depthHandle), RHIFormat::D32Float);
-                const auto targets = frame->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depthTarget);
-                if (!targets.IsValid())
-                {
-                    throw std::runtime_error("METEOR Scene occluder depth target binding failed.");
-                }
-                encoder.BindRenderTargets(targets);
-                encoder.ClearDepthTarget(targets, 1.f);
-                encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                for (const auto& draw : frame->draws)
-                {
-                    if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-                    {
-                        continue;
-                    }
-                    encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->depth[draw.doubleSided].GetHandle()));
-                    std::string error;
-                    if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                    {
-                        throw std::runtime_error(error);
-                    }
-                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
-                    const unsigned ownerRoot = 15 + (draw.program->hasSpecial ? 2 : 0) +
-                        (draw.program->hasTransmission ? 1 : 0);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, ownerRoot, draw.visibleOwner);
-                    if (frame->UsesMeshlets(draw))
-                    {
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->meshletRoot, draw.geometry->Meshlets());
-                        if (!encoder.DispatchMesh(draw.geometry->MeshletCount(), 1, 1))
-                        {
-                            throw std::runtime_error("METEOR Scene occluder mesh dispatch failed.");
-                        }
-                    }
-                    else
-                    {
-                        encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
-                        encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
-                    }
-                }
-            });
-        }
-        if (frame->visibility)
-        {
-            if (depthPrepass &&
-                graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
-            {
-                // Cull against the separate occluder depth; never LX's own main depth.
-                frame->visibility->DeclareWithOcclusion(graph, occluderDepth);
-            }
-            else
-            {
-                frame->visibility->Declare(graph);
-            }
-        }
+        const LayerStage empty;
+        return (frame_ ? frame_->effectStage.layers : empty).Declare(frame_, RequireVersionedGraph(graph), layerList);
     }
 
-    void SceneHost::RequireGeometry(const Frame& frame, const EnhancedRenderGraph& graph)
+    SceneFirstCullOutputs SceneHost::DeclareFirstCull(EnhancedRenderGraph& graph, RGHandle geometry) const
     {
-        if (frame.graph != &graph || frame.graphEpoch != graph.ResourceEpoch())
-        {
-            throw std::runtime_error("METEOR Scene raster/culling requires the METEOR.Scene.Geometry declaration first.");
-        }
+        const FirstCullStage empty;
+        const auto& stage = frame_ ? frame_->firstCullStage : empty;
+        return stage.DeclareFirstCull(frame_, RequireVersionedGraph(graph), geometry);
     }
 
-    void SceneHost::RequireCulling(const Frame& frame, const EnhancedRenderGraph& graph)
+    // METEOR.Scene.Occluder: first list -> HW/SW atomic keys -> depth-only
+    // resolve. Same producer contract as the final surface; no depth-only raster.
+    RGHandle SceneHost::DeclareOccluder(EnhancedRenderGraph& graph, RGHandle geometry, const SceneFirstCullOutputs& first) const
     {
-        if (!frame.cullDeclared)
-        {
-            throw std::runtime_error("METEOR Scene raster requires the METEOR.Scene.Cull declaration first.");
-        }
-        if (!frame.draws.empty())
-        {
-            RequireGeometry(frame, graph);
-        }
+        const OccluderStage empty;
+        const auto& stage = frame_ ? frame_->occluderStage : empty;
+        return stage.DeclareOccluder(frame_, RequireVersionedGraph(graph), geometry, first);
     }
 
-    void SceneHost::DeclareGeometry(EnhancedRenderGraph& graph) const
+    // METEOR.Scene.Cull.Final: current HZB from the occluder depth, instance
+    // and recovery culling, then every command producer whose input is now final.
+    SceneFinalCullOutputs SceneHost::DeclareFinalCull(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle occluderDepth) const
     {
-        ce::profile_scope profile{ce::marker<"MaterialDeclareGeometry">()};
-        const auto frame = frame_;
-        if (!frame || frame->draws.empty())
-        {
-            return;
-        }
-        frame->CheckCurrent();
-        if (frame->graph)
-        {
-            frame->CheckCurrent(&graph);
-            return;
-        }
-        // Every world transform of the frame goes into one batched declaration.
-        std::set<const MeshSurfaceBatch*> declaredGeometry;
-        std::vector<const MeshSurfaceBatch*> geometry;
+        const FinalCullStage empty;
+        const auto& stage = frame_ ? frame_->finalCullStage : empty;
+        return stage.DeclareFinalCull(frame_, RequireVersionedGraph(graph), geometry, occluderDepth, frame_ ? frame_->occluderStage.occluderVisibility : nullptr);
+    }
+
+    void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const FrameInput>& frame,
+                                              const std::shared_ptr<const SceneHybridVisibility>& hybrid,
+                                              const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
+                                              const std::shared_ptr<const IndirectMaterialBatch>& commands, bool occluder, RGHandle commandInput)
+    {
+        if (!hybrid || !list || !commands)
+            throw std::runtime_error("METEOR HW visibility requires its stage list, commands and atomic keys.");
+        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        hybrid->AddRasterUses(graph, uses);
+        list->AddVisibleIdsRead(graph, uses);
+        commands->AddRead(graph, uses, commandInput);
+
         for (const auto& draw : frame->draws)
         {
-            declaredGeometry.insert(draw.geometry.get());
-            geometry.push_back(draw.geometry.get());
-            if (draw.previousGeometry && declaredGeometry.insert(draw.previousGeometry.get()).second)
-            {
-                geometry.push_back(draw.previousGeometry.get());
-            }
+            if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended) continue;
+            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
             for (const auto& texture : draw.bindings->resources.textures)
+                uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource,
+                                RGAccessMode::Read});
+        }
+        NormalizeSceneReads(graph, uses);
+        const auto pass = graph.AddPass((hybrid->name + ".HW").c_str(), uses, [frame, hybrid, list, commands, occluder](const auto& execution) {
+            frame->CheckCurrent(execution.graph);
+            const bool audit = !occluder && frame->geometryRouteAuditEnabled;
+            if (audit) frame->recordedGeometryRoutes.clear();
+            auto& encoder = *execution.encoder;
+            if (!encoder.BeginRasterWithoutAttachments(frame->input->View().width, frame->input->View().height))
+                throw std::runtime_error("METEOR HW visibility requires UAV-only raster support.");
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            for (const auto& draw : frame->RasterDrawsFor())
             {
-                auto handle = graph.FindImportedTexture(texture.resource);
-                if (!handle.IsValid())
+                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended) continue;
+                if (!frame->UsesMeshlets(draw))
+                    throw std::runtime_error("METEOR HW visibility requires cooked meshlets; no indexed route.");
+                const auto sourcePipeline = draw.program->visibilitySurface[draw.doubleSided].GetHandle();
+                const auto recordedPipeline = frame->RasterPipeline(draw, sourcePipeline);
+                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
+                std::string error;
+                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                    throw std::runtime_error(error);
+                // Constants, geometry, visible owner, meshlets and the meshlet list are
+                // per-command roots of the bucket. Only the hybrid outputs are bound here.
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->rasterRouteRoot, hybrid->RouteSlice());
+                if (!encoder.SetRootUnorderedBuffer(RHIBindPoint::Graphics, draw.program->visibilityKeyRoot, hybrid->KeySlice()))
+                    throw std::runtime_error("METEOR HW visibility key binding failed.");
+                commands->Draw(encoder, draw.materialBucket);
+                if (!audit) continue;
+                for (const auto& submitted : frame->draws)
                 {
-                    handle =
-                        graph.ImportTexture(texture.resource, RHIResourceState::PixelShaderResource, "METEOR.Scene.Image");
+                    if (submitted.materialBucket != draw.materialBucket || submitted.blended) continue;
+                    const auto& source = frame->input->Draws()[submitted.inputIndex];
+                    frame->recordedGeometryRoutes.push_back({source.geometryKey, source.temporalObjectId,
+                        source.temporalInstanceId, sourcePipeline.id, recordedPipeline.id,
+                        submitted.geometry->MeshletCount(), true, true});
                 }
             }
-        }
-        for (const auto& draw : frame->shadowDraws)
-        {
-            if (declaredGeometry.insert(draw.geometry.get()).second)
-            {
-                geometry.push_back(draw.geometry.get());
-            }
-        }
-        std::string error;
-        if (!MeshSurfaceBatch::DeclareBatch(graph, geometry, error))
-        {
-            throw std::runtime_error(error);
-        }
-        frame->graph = &graph;
-        frame->graphEpoch = graph.ResourceEpoch();
+        });
+        // Sealed frame inputs only; route observations are read after the whole graph joins.
+        graph.DeclareRecordingIndependent(pass);
+    }
+
+    std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::CameraMeshletWork() const
+    {
+        return frame_ ? frame_->finalCullStage.cameraMeshlets : nullptr;
+    }
+
+    std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::CameraDepthMeshletWork() const
+    {
+        return frame_ ? frame_->firstCullStage.cameraDepthMeshlets : nullptr;
+    }
+
+    std::shared_ptr<const SceneMaterialWork> SceneHost::MaterialWork() const
+    {
+        return frame_ ? frame_->surfaceStage.materialWork : nullptr;
+    }
+
+    std::shared_ptr<const SceneFrameGeometry> SceneHost::FrameGeometry() const
+    {
+        return frame_ ? frame_->geometryStage.geometryTable : nullptr;
+    }
+
+    std::shared_ptr<const SceneHybridVisibility> SceneHost::HybridVisibility() const
+    {
+        return frame_ ? frame_->surfaceStage.hybridVisibility : nullptr;
+    }
+    std::shared_ptr<const SceneHybridVisibility> SceneHost::OccluderVisibility() const
+    {
+        return frame_ ? frame_->occluderStage.occluderVisibility : nullptr;
+    }
+
+    RGHandle SceneHost::DeclareGeometry(EnhancedRenderGraph& graph) const
+    {
+        const GeometryStage empty;
+        const auto& stage = frame_ ? frame_->geometryStage : empty;
+        return stage.DeclareGeometry(frame_, RequireVersionedGraph(graph));
     }
 
     uint32_t SceneHost::PreparedMeshletDrawCount() const
@@ -2016,6 +2218,30 @@ namespace material_graph
         return result;
     }
 
+    std::array<uint32_t, 3> SceneHost::ShadowBucketSubmissionCounts() const
+    {
+        std::array<uint32_t, 3> result{};
+        if (frame_) for (unsigned cascade = 0; cascade < 3; ++cascade)
+            result[cascade] = frame_->shadowBucketSubmissions[cascade].load(std::memory_order_relaxed);
+        return result;
+    }
+
+    uint32_t SceneHost::TemporalBucketSubmissionCount() const
+    {
+        return frame_ ? frame_->temporalBucketSubmissions.load(std::memory_order_relaxed) : 0;
+    }
+
+    uint32_t SceneHost::BlendedBucketSubmissionCount() const
+    {
+        return frame_ ? frame_->blendedBucketSubmissions.load(std::memory_order_relaxed) : 0;
+    }
+
+    std::array<uint32_t, 2> SceneHost::LayerBucketCounts() const
+    {
+        return frame_ ? std::array{frame_->indexedBucketSubmissions.load(std::memory_order_relaxed),
+            frame_->indexedLogicalCommands.load(std::memory_order_relaxed)} : std::array<uint32_t, 2>{};
+    }
+
     uint32_t SceneHost::ShadowDrawCount() const
     {
         return frame_ ? frame_->shadowDrawCount.load(std::memory_order_relaxed) : 0;
@@ -2041,8 +2267,16 @@ namespace material_graph
 
     GpuGeometryVisibility::PreparedStats SceneHost::CameraVisibilityStats() const
     {
-        return frame_ && frame_->visibility ? frame_->visibility->GetPreparedStats()
-                                            : GpuGeometryVisibility::PreparedStats{};
+        GpuGeometryVisibility::PreparedStats total{};
+        if (frame_) for (const auto& list : {frame_->finalCullStage.cameraMeshlets, frame_->finalCullStage.blendedMeshlets})
+            if (list) {
+                const auto stats = list->GetPreparedStats();
+                total.candidateCount += stats.candidateCount;
+                total.compactedBins += stats.compactedBins;
+                total.preservedBins += stats.preservedBins;
+                total.conservativeCandidates += stats.conservativeCandidates;
+            }
+        return total;
     }
 
     std::array<GpuGeometryVisibility::PreparedStats, 3> SceneHost::ShadowVisibilityStats() const
@@ -2075,297 +2309,34 @@ namespace material_graph
         return counts;
     }
 
-    RGHandle SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const
+    RGHandle SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const
     {
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto modifyAccess = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-
-        ce::profile_scope profile{ce::marker<"MaterialDeclareShadow">()};
-        const auto frame = frame_;
-        if (!frame || !frame->shadow)
-        {
-            return shadowMap;
-        }
-        frame->CheckCurrent();
-        if (frame->shadowDeclared)
-        {
-            throw std::runtime_error("METEOR Scene shadow requires one declaration per prepared frame.");
-        }
-        RequireCulling(*frame, graph);
-        // One pass per cascade: identical commands, but each cascade's GPU time
-        // is attributed separately by the graph profiler.
-        static constexpr const char* kCascadePassNames[]{"METEOR.Scene.Shadow.C0", "METEOR.Scene.Shadow.C1",
-                                                         "METEOR.Scene.Shadow.C2"};
-        for (unsigned cascade = 0; cascade < 3; ++cascade)
-        {
-            if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
-            {
-                shadowMap = graph.Modify(shadowMap);
-            }
-            std::vector<EnhancedRenderGraph::RGPassUsage> uses{{shadowMap, RHIResourceState::DepthWrite, modifyAccess}};
-
-            for (const auto& draw : frame->shadowDraws)
-            {
-                if (!draw.shadowEnabled)
-                {
-                    continue;
-                }
-                if (draw.shadowMeshlets[cascade]) draw.shadowMeshlets[cascade]->AddReadUsages(graph, uses);
-                uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-                if (frame->UsesMeshlets(draw))
-                {
-                    uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-                }
-                for (const auto& texture : draw.bindings->resources.textures)
-                {
-                    uses.push_back(
-                        {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-                }
-            }
-            NormalizeSceneReads(graph, uses);
-            graph.AddPass(kCascadePassNames[cascade], uses, [frame, shadowMap, cascade](const auto& execution) {
-                frame->CheckCurrent(execution.graph);
-                auto& encoder = *execution.encoder;
-                const auto map = execution.ResolveHandle(shadowMap);
-                const auto description = frame->device->DescribeTexture(map);
-                if (description.depthOrArraySize != 3 || description.format != RHIFormat::D32Float)
-                {
-                    throw std::runtime_error("METEOR Scene shadow needs its three D32 cascades.");
-                }
-                encoder.SetViewportAndScissor(description.width, description.height);
-                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                const auto depth = RHIDepthTargetDesc::DepthSlice(map, RHIFormat::D32Float, cascade);
-                const auto targets = frame->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depth);
-                if (!targets.IsValid())
-                {
-                    throw std::runtime_error("METEOR Scene cascade target binding failed.");
-                }
-                encoder.BindRenderTargets(targets);
-                RHIPipelineHandle boundPipeline{};
-                // Address identity is local to this pass. The captured frame pins
-                // every compared binding for the entire callback.
-                const RenderBindings* boundBindings = nullptr;
-                for (const auto& draw : frame->shadowDraws)
-                {
-
-                    if (!draw.shadowEnabled)
-                    {
-                        continue;
-                    }
-                    const auto pipeline = frame->RasterPipeline(draw, draw.program->shadow.GetHandle());
-                    if (pipeline != boundPipeline)
-                    {
-                        encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);
-                        boundPipeline = pipeline;
-                        boundBindings = nullptr;
-                    }
-                    std::string error;
-                    if (boundBindings != std::addressof(*draw.bindings) &&
-                        !RenderBindingCache::BindPass(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
-                                                  draw.program->shadowLayout,
-                                                  error))
-                    {
-                        throw std::runtime_error(error);
-                    }
-                    boundBindings = std::addressof(*draw.bindings);
-                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.shadowConstants[cascade]);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
-                    encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
-                    const auto& compacted = draw.shadowMeshlets[cascade];
-                    if (!compacted) throw std::runtime_error("METEOR shadow has no prepared compute list.");
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->shadowMeshletRoot, draw.geometry->Meshlets());
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 3,
-                        compacted->VisibleIds(compacted->MeshletOutputOffset(draw.shadowMeshletBin), draw.geometry->MeshletCount()));
-                    if (!encoder.DispatchMeshIndirect(compacted->Arguments(), compacted->ArgsOffset(draw.shadowMeshletBin)))
-                        throw std::runtime_error("METEOR shadow compute-list indirect dispatch failed.");
-                    frame->shadowMeshletDrawCounts[cascade].fetch_add(1, std::memory_order_relaxed);
-                    frame->shadowDrawCount.fetch_add(1, std::memory_order_relaxed);
-                }
-            });
-        }
-        frame->shadowDeclared = true;
-        return shadowMap;
+        const ShadowStage empty;
+        const auto& stage = frame_ ? frame_->shadowStage : empty;
+        return stage.DeclareShadow(frame_, RequireVersionedGraph(graph), geometry, shadowMap);
     }
 
-    std::array<RGHandle, 5> SceneHost::DeclareTemporal(EnhancedRenderGraph& graph,
+    std::array<RGHandle, 5> SceneHost::DeclareTemporal(EnhancedRenderGraph& graph, RGHandle visibility, const std::array<RGHandle, 2>& material, RGHandle layerList,
         std::array<RGHandle, 5> targets) const
     {
-        const auto frame = frame_;
-        if (!frame || frame->draws.empty()) return targets;
-        RequireGeometry(*frame, graph);
-        const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-        for (unsigned i = 0; i < targets.size(); ++i)
-        {
-            if (versioned) targets[i] = graph.Modify(targets[i]);
-            uses.push_back({targets[i], i == 4 ? RHIResourceState::DepthWrite : RHIResourceState::RenderTarget, modify});
-        }
-        for (const auto& draw : frame->draws)
-        {
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, read});
-            if (draw.previousGeometry != draw.geometry)
-                uses.push_back({draw.previousGeometry->GraphOutput(graph), RHIResourceState::ShaderResource, read});
-            for (const auto& texture : draw.bindings->resources.textures)
-                uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, read});
-        }
-        NormalizeSceneReads(graph, uses);
-        const auto pass = graph.AddPass("Temporal.ObjectMotion", uses, [frame, targets](const auto& execution) {
-            frame->CheckCurrent(execution.graph);
-            auto& encoder = *execution.encoder;
-            std::array<RHITextureHandle, 4> colors;
-            for (unsigned i = 0; i < colors.size(); ++i) colors[i] = execution.ResolveHandle(targets[i]);
-            const auto depth = RHIDepthTargetDesc::Depth(execution.ResolveHandle(targets[4]), RHIFormat::D32Float);
-            const auto bindings = frame->device->CreateRenderTargets(colors, &depth);
-            if (!bindings.IsValid()) throw std::runtime_error("Temporal motion render targets unavailable.");
-            encoder.BindRenderTargets(bindings);
-            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->draws)
-            {
-                if (!draw.program->hasSurface) continue;
-                encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->temporal[draw.doubleSided].GetHandle());
-                std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                    throw std::runtime_error(error);
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->temporalPreviousRoot,
-                    RHIBufferSlice::Whole(draw.previousGeometry->Buffer()));
-                const unsigned ownerRoot = 15 + (draw.program->hasSpecial ? 2 : 0) + (draw.program->hasTransmission ? 1 : 0);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, ownerRoot, draw.visibleOwner);
-                encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
-                // Dedicated indexed replay keeps vertex correspondence independent
-                // of meshlet/indirect compaction and preserves every alpha surface.
-                encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
-            }
-        }, true);
-        // Sealed frame inputs only; route observations are read after the whole graph joins.
-        graph.DeclareRecordingIndependent(pass);
-        return targets;
+        const TemporalStage empty;
+        const auto& stage = frame_ ? frame_->temporalStage : empty;
+        return stage.DeclareTemporal(frame_, RequireVersionedGraph(graph), frame_ ? frame_->surfaceStage.gbuffer.visibility : RGHandle{}, visibility, material, layerList, targets);
     }
 
-    SceneSurfaceTargets::Outputs SceneHost::DeclareGBuffer(EnhancedRenderGraph& graph,
+    SceneSurfaceTargets::Outputs SceneHost::DeclareGBuffer(EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,
                                                            const SceneSurfaceTargets::Outputs& incoming) const
     {
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto modifyAccess = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-
-        ce::profile_scope profile{ce::marker<"MaterialDeclareGBuffer">()};
-        const auto frame = frame_;
-        if (!frame || frame->draws.empty())
-        {
-            return incoming;
-        }
-        frame->CheckCurrent();
-        if (frame->gbufferDeclared)
-        {
-            throw std::runtime_error("METEOR Scene GBuffer requires one declaration per prepared frame.");
-        }
-        RequireCulling(*frame, graph);
-        const auto inputs = AdvanceSceneSurface(graph, incoming, RGAccessMode::ReadWrite);
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-        frame->AddVisibilityReads(graph, uses);
-        for (const auto& draw : frame->draws)
-        {
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-            if (frame->UsesMeshlets(draw))
-            {
-                uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto& texture : draw.bindings->resources.textures)
-            {
-                uses.push_back(
-                    {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-        for (const auto target : Colors(inputs))
-        {
-            uses.push_back({target, RHIResourceState::RenderTarget, modifyAccess});
-        }
-        uses.push_back({inputs.depth, RHIResourceState::DepthWrite, modifyAccess});
-        NormalizeSceneReads(graph, uses);
-        const auto pass = graph.AddPass("METEOR.Scene.GBuffer", uses, [frame, inputs](const auto& execution) {
-            frame->CheckCurrent(execution.graph);
-            frame->recordedGeometryRoutes.clear();
-            auto& encoder = *execution.encoder;
-            std::array<RHITextureHandle, 5> colors;
-            const auto handles = Colors(inputs);
-            for (unsigned i = 0; i < 5; ++i)
-            {
-                colors[i] = execution.ResolveHandle(handles[i]);
-            }
-            const auto depth = RHIDepthTargetDesc::Depth(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-            const auto targets = frame->device->CreateRenderTargets(colors, &depth);
-            if (!targets.IsValid())
-            {
-                throw std::runtime_error("METEOR Scene shared GBuffer target binding failed.");
-            }
-            encoder.BindRenderTargets(targets);
-            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->draws)
-            {
-                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-                {
-                    continue;
-                }
-                const bool indirect = frame->UsesVisibility(draw);
-                const auto sourcePipeline = draw.program->gbuffer[draw.doubleSided].GetHandle();
-                const auto recordedPipeline = frame->RasterPipeline(draw, sourcePipeline);
-                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
-                std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                {
-                    throw std::runtime_error(error);
-                }
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                frame->BindGeometry(encoder, draw);
-                frame->DrawGeometry(encoder, draw);
-                if (frame->geometryRouteAuditEnabled)
-                {
-                    const auto& source = frame->input->Draws()[draw.inputIndex];
-                    const bool meshShader = frame->UsesMeshlets(draw);
-                    frame->recordedGeometryRoutes.push_back({source.geometryKey,
-                        source.temporalObjectId, source.temporalInstanceId,
-                        sourcePipeline.id, recordedPipeline.id,
-                        meshShader ? draw.geometry->MeshletCount() : 0u, meshShader, indirect});
-                }
-            }
-        });
-        // Sealed frame inputs only; route observations are read after the whole graph joins.
-        graph.DeclareRecordingIndependent(pass);
-        frame->gbufferDeclared = true;
-        frame->gbuffer = inputs;
-        return inputs;
+        const SurfaceStage empty;
+        const auto& stage = frame_ ? frame_->surfaceStage : empty;
+        return stage.DeclareGBuffer(frame_, RequireVersionedGraph(graph), cull, incoming);
     }
 
-    void SceneHost::DeclareDecalInputs(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                       const std::array<RGHandle, 3>& baseline) const
+    void SceneHost::DeclareHistory(EnhancedRenderGraph& graph, RGHandle depth) const
     {
-        const auto frame = frame_;
-        if (!frame || frame->draws.empty())
-        {
-            return;
-        }
-        frame->CheckCurrent(&graph);
-        const auto expected = Colors(frame->gbuffer), actual = Colors(inputs);
-        if (!frame->gbufferDeclared || frame->colorDeclared || frame->decalDeclared ||
-            !std::equal(expected.begin(), expected.end(), actual.begin(),
-                        [](RGHandle a, RGHandle b) { return a.index == b.index; }) ||
-            frame->gbuffer.depth.index != inputs.depth.index ||
-            std::ranges::any_of(baseline, [](RGHandle handle) { return !handle.IsValid(); }))
-        {
-            throw std::runtime_error(
-                "METEOR Scene Decal requires its GBuffer, a valid snapshot and one declaration before Color.");
-        }
-        frame->decalBaseline = baseline;
-        frame->gbuffer = inputs;
-        frame->decalDeclared = true;
+        const HistoryStage empty;
+        const auto& stage = frame_ ? frame_->historyStage : empty;
+        stage.DeclareHistory(frame_, RequireVersionedGraph(graph), frame_ ? frame_->surfaceStage.gbuffer.depth : RGHandle{}, depth);
     }
 
     RGHandle SceneHost::DeclareHdrTarget(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
@@ -2380,14 +2351,8 @@ namespace material_graph
         description.format = RHIFormat::RGBA16Float;
         description.allowRenderTarget = true;
         description.name = "METEOR.Scene.HdrColor";
-        auto output = graph.CreateTexture(description);
-        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
-        {
-            output = graph.Write(output);
-        }
-        const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
-            ? RGAccessMode::LegacyState : RGAccessMode::Write;
-        graph.AddPass("METEOR.Scene.HdrClear", {{output, RHIResourceState::RenderTarget, access}},
+        const auto output = RequireVersionedGraph(graph).Write(graph.CreateTexture(description));
+        graph.AddPass("METEOR.Scene.HdrClear", {{output, RHIResourceState::RenderTarget, RGAccessMode::Write}},
             [device = context.resources, output](const auto& execution) {
                 const RHITextureHandle color = execution.ResolveHandle(output);
                 const auto targets = device->CreateRenderTargets({&color, 1});
@@ -2402,955 +2367,44 @@ namespace material_graph
         return output;
     }
 
-    RGHandle SceneHost::DeclareColor(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
+    RGHandle SceneHost::DeclareColor(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneColorInputs& commands,
                                      RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap) const
     {
-
-        const auto frame = frame_;
-        if (!frame || frame->draws.empty())
-        {
-            return lighting;
-        }
-        frame->CheckCurrent();
-        const auto expected = Colors(frame->gbuffer), actual = Colors(inputs);
-        const bool sameTargets = std::equal(expected.begin(), expected.end(), actual.begin(),
-                                            [](RGHandle a, RGHandle b) { return a.index == b.index; });
-        if (!frame->gbufferDeclared || frame->graph != &graph || frame->graphEpoch != graph.ResourceEpoch() ||
-            frame->colorDeclared || !sameTargets || frame->gbuffer.depth.index != inputs.depth.index)
-        {
-            throw std::runtime_error("METEOR Scene color requires its own GBuffer producer and one declaration.");
-        }
-        frame->lookup->DeclareInputs(graph);
-        if (frame->runtimeEffects)
-        {
-            frame->runtimeEffects->DeclareInputs(graph);
-        }
-        if (frame->volume)
-        {
-            frame->volume->DeclareCoefficients(graph, frame->volumeBindings);
-        }
-        if (frame->subsurface)
-        {
-            frame->subsurface->DeclareInputs(graph);
-        }
-        lighting = DeclareShading(graph, inputs, lighting, ambientOcclusion, shadowMap, false);
-        if (frame->refraction)
-        {
-            frame->refraction->DeclareInputs(graph);
-        }
-        frame->colorDeclared = true;
-        frame->lookup->DeclareReady(graph);
-        return lighting;
+        const EffectStage empty;
+        const auto& stage = frame_ ? frame_->effectStage : empty;
+        return stage.DeclareColor(frame_, RequireVersionedGraph(graph), frame_ ? frame_->surfaceStage.gbuffer : SceneSurfaceTargets::Outputs{}, inputs, commands, lighting, ambientOcclusion, shadowMap);
     }
 
     std::vector<SceneHost::ForwardDraw> SceneHost::BlendedDraws() const
     {
-        std::vector<ForwardDraw> result;
-        if (!frame_)
-        {
-            return result;
-        }
-        for (std::size_t i = 0; i < frame_->input->Draws().size(); ++i)
-        {
-            const auto& draw = frame_->input->Draws()[i];
-            const auto& p = draw.material->generation->cooked.product.program;
-            if (p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0))
-            {
-                result.push_back({i, draw.geometryKey, draw.viewDepth});
-            }
-        }
-        return result;
+        const EffectStage empty;
+        const auto& stage = frame_ ? frame_->effectStage : empty;
+        return stage.BlendedDraws(frame_);
     }
 
-    RGHandle SceneHost::DeclareBlended(EnhancedRenderGraph& graph, std::size_t index, RGHandle lighting,
+    RGHandle SceneHost::DeclareBlended(EnhancedRenderGraph& graph, const std::vector<std::size_t>& indices, const SceneLayerWork& commands, RGHandle lighting,
                                        RGHandle shadowMap, const EnhancedForwardLighting& forward) const
     {
-
-        const auto frame = frame_;
-        if (!frame || !frame->colorDeclared || !frame->alphaLookup || !lighting.IsValid() ||
-            index >= frame->input->Draws().size() || !forward.lights.IsValid() || !forward.counts.IsValid() ||
-            !forward.indices.IsValid() || !forward.graphCounts.IsValid() || !forward.graphIndices.IsValid())
-        {
-            throw std::runtime_error("Graph Blend needs its exact prepared frame and light-tile resources.");
-        }
-        frame->CheckCurrent(&graph);
-        if (!frame->alphaDeclared.insert(index).second)
-        {
-            throw std::runtime_error("Graph Blend draw declared twice.");
-        }
-        if (!frame->alphaInputsDeclared)
-        {
-            frame->alphaLookup->DeclareInputs(graph);
-            frame->alphaInputsDeclared = true;
-        }
-        const auto& p = frame->input->Draws()[index].material->generation->cooked.product.program;
-        const bool needsSurfaceBuffer = (p.features & 0x1800u) != 0;
-        if (needsSurfaceBuffer)
-        {
-            DeclareForwardGBuffer(graph, frame->gbuffer, index);
-        }
-        if ((p.features & 0x0800u) != 0)
-        {
-            if (frame->runtimeEffects)
-            {
-                frame->runtimeEffects->DeclareBackground(graph, lighting, frame->gbuffer.depth);
-            }
-            else
-            {
-                frame->refraction->DeclareBackground(graph, lighting, frame->gbuffer.depth);
-            }
-        }
-        lighting = DeclareShading(graph, needsSurfaceBuffer ? frame->forwardGbuffer : frame->gbuffer, lighting, {},
-                                  shadowMap, (p.features & 0x0800u) != 0, index, forward);
-        frame->alphaLookup->DeclareReady(graph);
-        return lighting;
+        const EffectStage empty;
+        const auto& stage = frame_ ? frame_->effectStage : empty;
+        return stage.DeclareBlended(frame_, RequireVersionedGraph(graph), frame_ ? frame_->surfaceStage.gbuffer : SceneSurfaceTargets::Outputs{}, indices, commands, lighting, shadowMap, forward);
     }
 
-    RGHandle SceneHost::DeclareBlendedStream(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle shadowMap,
+    RGHandle SceneHost::DeclareBlendedStream(EnhancedRenderGraph& graph, const SceneLayerWork& commands, RGHandle lighting, RGHandle shadowMap,
                                              const EnhancedForwardLighting& tiles) const
     {
-        const auto draws = BlendedDraws();
-        if (draws.empty())
-        {
-            return lighting;
-        }
-        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitSingleWriter)
-        {
-            throw std::runtime_error("METEOR blended stream requires ExplicitVersioned resource declarations.");
-        }
-        ce::profile_scope profile{ce::marker<"MaterialDeclareBlended">()};
-        // Media inside blended shading use the frame's volume coefficients. The
-        // composite itself is METEOR.Scene.Volume, declared once before this stream.
-        EnhancedForwardLighting shared = tiles;
-        if (const auto volume = VolumeFrame())
-        {
-            shared.volumeConstants = volume->TransportConstants();
-            shared.volumeTriangles = volume->Triangles();
-            shared.volumeCoefficients = RHIBufferSlice::Whole(volume->Coefficients());
-            shared.graphVolumeCoefficients = volume->GraphCoefficients(graph);
-            shared.volumeEnvironment = volume->LightingBindings({})[1].resource;
-        }
-        else
-        {
-            const std::array<std::byte, SceneVolumeConstantsBytes> empty{};
-            shared.volumeConstants = device_->UploadConstants(empty.data(), empty.size());
-            shared.volumeTriangles = device_->AllocateUpload({48, RHIUploadUsage::Raw, 16});
-            if (!shared.volumeConstants.IsValid() || !shared.volumeTriangles.IsWritable())
-            {
-                throw std::runtime_error("METEOR blended empty medium allocation failed.");
-            }
-            std::memset(shared.volumeTriangles.cpuAddress, 0, 48);
-            shared.volumeCoefficients = shared.volumeTriangles;
-        }
-        // Back to front. Equal depths keep a stable geometry/draw order.
-        auto order = draws;
-        std::stable_sort(order.begin(), order.end(), [](const ForwardDraw& a, const ForwardDraw& b) {
-            if (a.depth != b.depth) return a.depth > b.depth;
-            if (a.geometryKey != b.geometryKey) return a.geometryKey < b.geometryKey;
-            return a.index < b.index;
-        });
-        for (const auto& draw : order)
-        {
-            if (!std::isfinite(draw.depth))
-            {
-                throw std::runtime_error("METEOR blended sorting depth is non-finite.");
-            }
-            lighting = DeclareBlended(graph, draw.index, lighting, shadowMap, shared);
-        }
-        return lighting;
+        const EffectStage empty;
+        const auto& stage = frame_ ? frame_->effectStage : empty;
+        return stage.DeclareBlendedStream(frame_, RequireVersionedGraph(graph), frame_ ? frame_->surfaceStage.gbuffer : SceneSurfaceTargets::Outputs{}, commands, lighting, shadowMap, tiles);
     }
 
-    RGHandle SceneHost::DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth,
-                                      RGHandle shadowMap) const
+    RGHandle SceneHost::DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const
     {
-        const auto frame = frame_;
-        if (!frame || !frame->volume || frame->volumeDeclared)
-        {
-            return lighting;
-        }
-        frame->CheckCurrent(&graph);
-        if (!frame->colorDeclared)
-        {
-            throw std::runtime_error("METEOR Scene Volume requires completed surface shading.");
-        }
-        const auto result = frame->volume->DeclareComposite(graph, lighting, depth, shadowMap);
-        frame->volumeDeclared = true;
-        return result;
-    }
-    void SceneHost::DeclareForwardGBuffer(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque,
-                                          std::size_t index) const
-    {
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto modifyAccess = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-
-        const auto frame = frame_;
-        if (!frame->forwardGbuffer.depth.IsValid())
-        {
-            RGTextureDesc desc;
-            desc.width = frame->input->View().width;
-            desc.height = frame->input->View().height;
-            desc.allowRenderTarget = true;
-            auto targets = std::array{&frame->forwardGbuffer.diffuse, &frame->forwardGbuffer.metalRough,
-                                      &frame->forwardGbuffer.normal, &frame->forwardGbuffer.emissive,
-                                      &frame->forwardGbuffer.bitmask};
-            for (unsigned i = 0; i < targets.size(); ++i)
-            {
-                desc.format = SceneSurfaceTargets::GetRenderTargetFormat(i);
-                desc.name = "METEOR.Blended.Surface";
-                *targets[i] = graph.CreateTexture(desc);
-            }
-            desc.format = RHIFormat::D32Float;
-            desc.allowRenderTarget = false;
-            desc.allowDepthStencil = true;
-            desc.name = "METEOR.Blended.Depth";
-            frame->forwardGbuffer.depth = graph.CreateTexture(desc);
-        }
-        const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
-        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
-        {
-            frame->forwardGbuffer.depth = graph.Write(frame->forwardGbuffer.depth);
-        }
-        const auto copiedDepth = frame->forwardGbuffer.depth;
-        graph.AddPass("METEOR.Blended.DepthCopy",
-                      {{opaque.depth, RHIResourceState::CopySource, readAccess},
-                       {copiedDepth, RHIResourceState::CopyDest, writeAccess}},
-                      [frame, opaque, copiedDepth](const auto& execution) {
-                          frame->CheckCurrent(execution.graph);
-                          execution.encoder->CopyResource(execution.ResolveHandle(copiedDepth),
-                                                          execution.ResolveHandle(opaque.depth));
-                      });
-        frame->forwardGbuffer = AdvanceSceneSurface(graph, frame->forwardGbuffer, RGAccessMode::Write);
-        const auto inputs = frame->forwardGbuffer;
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{{inputs.depth, RHIResourceState::DepthWrite, modifyAccess}};
-        for (const auto target : Colors(inputs))
-        {
-            uses.push_back({target, RHIResourceState::RenderTarget, writeAccess});
-        }
-        for (const auto& draw : frame->draws)
-        {
-            if (draw.inputIndex != index || !draw.program->hasSurface)
-            {
-                continue;
-            }
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-            if (frame->UsesMeshlets(draw))
-            {
-                uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto& texture : draw.bindings->resources.textures)
-            {
-                uses.push_back(
-                    {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-        frame->AddVisibilityReads(graph, uses);
-        NormalizeSceneReads(graph, uses);
-        graph.AddPass("METEOR.Blended.Surface", uses, [frame, inputs, index](const auto& execution) {
-            frame->CheckCurrent(execution.graph);
-            std::array<RHITextureHandle, 5> colors;
-            const auto handles = Colors(inputs);
-            for (unsigned i = 0; i < colors.size(); ++i)
-            {
-                colors[i] = execution.ResolveHandle(handles[i]);
-            }
-            RHIRenderTargetBinding targets;
-            {
-                std::lock_guard lock(frame->forwardTargetMutex);
-                if (!frame->forwardTargets.IsValid())
-                {
-                    const auto depth = RHIDepthTargetDesc::Depth(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-                    frame->forwardTargets = frame->device->CreateRenderTargets(colors, &depth);
-                }
-                targets = frame->forwardTargets;
-            }
-            if (!targets.IsValid())
-            {
-                throw std::runtime_error("METEOR Scene transmission GBuffer binding failed.");
-            }
-            auto& encoder = *execution.encoder;
-            encoder.BindRenderTargets(targets);
-            const float clear[]{0, 0, 0, 0};
-            encoder.ClearRenderTargets(targets, clear);
-            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->draws)
-            {
-                if (draw.inputIndex != index || !draw.program->hasSurface)
-                {
-                    continue;
-                }
-                encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->gbuffer[draw.doubleSided].GetHandle()));
-                std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                {
-                    throw std::runtime_error(error);
-                }
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                frame->BindGeometry(encoder, draw);
-                frame->DrawGeometry(encoder, draw);
-            }
-        });
+        const VolumeStage empty;
+        return (frame_ ? frame_->effectStage.volume : empty).Declare(frame_, RequireVersionedGraph(graph),
+            frame_ ? frame_->effectStage.colorOutput : RGHandle{}, lighting, depth, shadowMap);
     }
 
-    void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                             std::optional<std::size_t> index) const
-    {
-        const auto frame = frame_;
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
-        const auto targets = frame->refraction->DeclareCaptureOutputs(graph);
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {inputs.depth, RHIResourceState::DepthRead, readAccess},
-            {inputs.bitmask, RHIResourceState::ShaderResource, readAccess}};
-        for (const auto input : targets)
-        {
-            uses.push_back({input, RHIResourceState::RenderTarget, writeAccess});
-        }
-        for (const auto& draw : frame->draws)
-        {
-            if (!draw.program->hasTransmission || (index && draw.inputIndex != *index))
-            {
-                continue;
-            }
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-            if (frame->UsesMeshlets(draw))
-            {
-                uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto& texture : draw.bindings->resources.textures)
-            {
-                uses.push_back(
-                    {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-        frame->AddVisibilityReads(graph, uses);
-        NormalizeSceneReads(graph, uses);
-        graph.AddPass("METEOR.Scene.RefractionCapture", uses, [frame, inputs, index](const auto& execution) {
-            frame->CheckCurrent(execution.graph);
-            const auto depth =
-                RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-            const auto targets = frame->device->CreateRenderTargets(frame->refraction->Inputs(), &depth);
-            const RHIBindingDesc descriptions[]{
-                RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull(),
-                RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
-                RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
-                RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull()};
-            const auto table = frame->device->CreateBindings(descriptions);
-            const auto decalTable = frame->DecalTable(execution, true);
-            if (!targets.IsValid() || !table.IsValid())
-            {
-                throw std::runtime_error("METEOR Scene refraction capture binding failed.");
-            }
-            auto& encoder = *execution.encoder;
-            encoder.BindRenderTargets(targets);
-            const float clear[]{0, 0, 0, 0};
-            encoder.ClearRenderTargets(targets, clear);
-            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->draws)
-            {
-                if (!draw.program->hasTransmission || (index && draw.inputIndex != *index))
-                {
-                    continue;
-                }
-                encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->refraction[draw.doubleSided].GetHandle()));
-                std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                {
-                    throw std::runtime_error(error);
-                }
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                frame->BindGeometry(encoder, draw);
-                encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                frame->BindDecal(encoder, draw, decalTable, true);
-                frame->DrawGeometry(encoder, draw);
-            }
-        });
-    }
-
-    RGHandle SceneHost::DeclareShading(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                       RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
-                                       bool transmissionStage, std::optional<std::size_t> blended,
-                                       EnhancedForwardLighting forward) const
-    {
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto modifyAccess = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-
-        const auto frame = frame_;
-        const auto lookup = blended ? frame->alphaLookup : frame->lookup;
-        const auto selected = [blended](const Frame::Draw& draw) {
-            return blended ? draw.blended && draw.inputIndex == *blended : !draw.blended;
-        };
-        const bool ordinary = !frame->runtimeEffects || std::ranges::any_of(frame->DrawsFor(blended), [&](const auto& draw) {
-            return selected(draw) && draw.program->hasSurface && !draw.program->hasSpecial &&
-                   draw.program->hasTransmission == transmissionStage;
-        });
-        if (ordinary)
-        {
-            lighting = AdvanceSceneColor(graph, lighting);
-        }
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {lighting, RHIResourceState::RenderTarget, modifyAccess},
-            {inputs.depth, RHIResourceState::DepthRead, readAccess},
-            {inputs.bitmask, RHIResourceState::ShaderResource, readAccess},
-            {ambientOcclusion, RHIResourceState::ShaderResource, readAccess}};
-        if (blended)
-        {
-            uses.pop_back();
-        }
-        frame->AddDecalUses(uses, transmissionStage || blended.has_value(), readAccess);
-        lookup->DeclareShadingInputs(graph, uses);
-        if (blended)
-        {
-            uses.push_back({forward.graphCounts, RHIResourceState::ShaderResource, readAccess});
-            uses.push_back({forward.graphIndices, RHIResourceState::ShaderResource, readAccess});
-            if (frame->volume)
-            {
-                uses.push_back(
-                    {frame->volume->GraphCoefficients(graph), RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-        if (frame->environment.IsValid())
-        {
-            auto environment = graph.FindImportedTexture(frame->environment);
-            if (!environment.IsValid())
-            {
-                environment =
-                    graph.ImportTexture(frame->environment, RHIResourceState::PixelShaderResource, "METEOR.Scene.HDR");
-            }
-            uses.push_back({environment, RHIResourceState::PixelShaderResource, readAccess});
-        }
-        if (frame->shadow)
-        {
-            uses.push_back({shadowMap, RHIResourceState::ShaderResource, readAccess});
-        }
-        for (const auto& draw : frame->DrawsFor(blended))
-        {
-            if (!selected(draw))
-            {
-                continue;
-            }
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-            if (frame->UsesMeshlets(draw))
-            {
-                uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto& texture : draw.bindings->resources.textures)
-            {
-                uses.push_back(
-                    {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
-            }
-        }
-        const bool explicitLookup = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto lookupRead = explicitLookup ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto lookupWrite = explicitLookup ? RGAccessMode::Write : RGAccessMode::LegacyState;
-        for (unsigned part = 0; part < (lookup->RequiresCapture() ? 2u : 0u); ++part)
-        {
-            std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{
-                {inputs.depth, RHIResourceState::DepthRead, lookupRead},
-                {inputs.bitmask, RHIResourceState::ShaderResource, lookupRead}};
-            frame->AddDecalUses(captureUses, transmissionStage || blended.has_value(), lookupRead);
-            const unsigned first = part ? 8 : 0, count = part ? 3 : 8;
-            const auto lookupInputs = lookup->DeclareCaptureOutputs(graph, first, count);
-            for (unsigned i = first; i < first + count; ++i)
-            {
-                captureUses.push_back({lookupInputs[i], RHIResourceState::RenderTarget, lookupWrite});
-            }
-            for (const auto& draw : frame->DrawsFor(blended))
-            {
-                if (!selected(draw))
-                {
-                    continue;
-                }
-                captureUses.push_back(
-                    {draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, lookupRead});
-                if (frame->UsesMeshlets(draw))
-                {
-                    captureUses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, lookupRead});
-                }
-                for (const auto& texture : draw.bindings->resources.textures)
-                {
-                    captureUses.push_back({graph.FindImportedTexture(texture.resource),
-                                           RHIResourceState::PixelShaderResource, lookupRead});
-                }
-            }
-            frame->AddVisibilityReads(graph, captureUses);
-            NormalizeSceneReads(graph, captureUses);
-            graph.AddPass(
-                "METEOR.Scene.LookupCapture", captureUses,
-                [frame, inputs, first, count, part, transmissionStage, blended, lookup, selected,
-                 forward](const auto& execution) {
-                    frame->CheckCurrent(execution.graph);
-                    auto& encoder = *execution.encoder;
-                    const auto handles = lookup->Inputs().subspan(first, count);
-                    const auto depth =
-                        RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-                    const auto targets = frame->device->CreateRenderTargets(handles, &depth);
-                    const RHIBindingDesc descriptions[]{
-                        RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull(),
-                        RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
-                        RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
-                        RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull()};
-                    const auto table = frame->device->CreateBindings(descriptions);
-                    const auto decalTable = frame->DecalTable(execution, transmissionStage || blended.has_value());
-                    frame->CheckCurrent();
-                    if (!targets.IsValid() || !table.IsValid())
-                    {
-                        throw std::runtime_error("METEOR Scene lookup capture binding failed.");
-                    }
-                    encoder.BindRenderTargets(targets);
-                    const float clear[]{0, 0, 0, 0};
-                    encoder.ClearRenderTargets(targets, clear);
-                    encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-                    encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                    for (const auto& draw : frame->DrawsFor(blended))
-                    {
-                        if (!draw.program->hasSurface || !selected(draw))
-                        {
-                            continue;
-                        }
-                        encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, (blended ? draw.program->blendedLookup : draw.program->lookup)[part][draw.doubleSided]
-                                .GetHandle()));
-                        std::string error;
-                        if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
-                                                      error))
-                        {
-                            throw std::runtime_error(error);
-                        }
-                        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
-                                                  blended && forward.reference ? draw.referenceConstants
-                                                                               : draw.constants);
-                        frame->BindGeometry(encoder, draw);
-                        encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                        frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
-                        frame->BindForward(encoder, draw, forward);
-                        frame->DrawGeometry(encoder, draw);
-                    }
-                });
-        }
-        lookup->DeclareBake(graph, inputs.bitmask);
-        uses.push_back({lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess});
-        if (transmissionStage && !frame->runtimeEffects)
-        {
-            DeclareRefractionCapture(graph, inputs, blended);
-            frame->refraction->DeclareBake(graph, *lookup, inputs.bitmask, shadowMap);
-            uses.push_back({frame->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess});
-        }
-        const bool special = std::ranges::any_of(frame->DrawsFor(blended), [&](const auto& draw) {
-            return selected(draw) && draw.program->hasSpecial && draw.program->hasTransmission == transmissionStage;
-        });
-        if (frame->subsurface && special)
-        {
-            const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-            const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-            const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
-            const auto targets = frame->subsurface->DeclareCaptureOutputs(graph);
-            frame->subsurface->DeclareReflection(graph, *lookup, inputs.bitmask);
-            std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{
-                {inputs.depth, RHIResourceState::DepthRead, readAccess},
-                {inputs.bitmask, RHIResourceState::ShaderResource, readAccess},
-                {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess},
-                {frame->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource, readAccess}};
-            frame->AddDecalUses(captureUses, transmissionStage || blended.has_value(), readAccess);
-            lookup->DeclareShadingInputs(graph, captureUses);
-            if (blended)
-            {
-                captureUses.push_back({forward.graphCounts, RHIResourceState::ShaderResource, readAccess});
-                captureUses.push_back({forward.graphIndices, RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto target : targets)
-            {
-                captureUses.push_back({target, RHIResourceState::RenderTarget, writeAccess});
-            }
-            if (frame->shadow)
-            {
-                captureUses.push_back({shadowMap, RHIResourceState::ShaderResource, readAccess});
-            }
-            for (const auto& draw : frame->DrawsFor(blended))
-            {
-                if (!draw.program->hasSubsurface)
-                {
-                    continue;
-                }
-                captureUses.push_back(
-                    {draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-                if (frame->UsesMeshlets(draw))
-                {
-                    captureUses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, readAccess});
-                }
-                for (const auto& texture : draw.bindings->resources.textures)
-                {
-                    captureUses.push_back({graph.FindImportedTexture(texture.resource),
-                                           RHIResourceState::PixelShaderResource, readAccess});
-                }
-            }
-            if (transmissionStage)
-            {
-                captureUses.push_back(
-                    {frame->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess});
-            }
-            frame->AddVisibilityReads(graph, captureUses);
-            NormalizeSceneReads(graph, captureUses);
-            graph.AddPass(
-                "METEOR.Scene.SubsurfaceCapture", captureUses,
-                [frame, inputs, shadowMap, transmissionStage, blended, lookup, selected,
-                 forward](const auto& execution) {
-                    frame->CheckCurrent(execution.graph);
-                    auto& encoder = *execution.encoder;
-                    const auto depth =
-                        RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-                    const auto targets = frame->device->CreateRenderTargets(frame->subsurface->Inputs(), &depth);
-                    const RHIBindingDesc descriptions[]{
-                        RHIBindingDesc::SrvCube(lookup->UsesRuntimeEvaluation() ? frame->environment : RHITextureHandle{},
-                                                frame->environment.IsValid()
-                                                    ? frame->device->DescribeTexture(frame->environment).format
-                                                    : RHIFormat::RGBA16Float, 1).OrNull(),
-                        RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
-                        RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
-                        RHIBindingDesc::SrvArray(frame->shadow ? execution.ResolveHandle(shadowMap)
-                                                               : RHITextureHandle{},
-                                                 RHIFormat::R32Float, 3)
-                            .OrNull()};
-                    const auto table = frame->device->CreateBindings(descriptions);
-                    const auto decalTable = frame->DecalTable(execution, transmissionStage || blended.has_value());
-                    if (!targets.IsValid() || !table.IsValid())
-                    {
-                        throw std::runtime_error("METEOR Scene SSS capture target binding failed.");
-                    }
-                    encoder.BindRenderTargets(targets);
-                    const float clear[]{0, 0, 0, 0};
-                    encoder.ClearRenderTargets(targets, clear);
-                    encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-                    encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                    for (const auto& draw : frame->DrawsFor(blended))
-                    {
-                        if (!selected(draw) || !draw.program->hasSubsurface ||
-                            (draw.program->hasTransmission && !transmissionStage))
-                        {
-                            continue;
-                        }
-                        encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->subsurface[draw.doubleSided].GetHandle()));
-                        std::string error;
-                        if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
-                                                      error))
-                        {
-                            throw std::runtime_error(error);
-                        }
-                        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
-                                                  blended && forward.reference ? draw.referenceConstants
-                                                                               : draw.constants);
-                        frame->BindGeometry(encoder, draw);
-                        encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                        frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
-                        frame->BindForward(encoder, draw, forward);
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(lookup->Samples()));
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
-                                              RHIBufferSlice::Whole(frame->subsurface->Reflection()));
-                        if (draw.program->hasTransmission)
-                        {
-                            encoder.SetRootBuffer(RHIBindPoint::Graphics, 6,
-                                                  RHIBufferSlice::Whole(frame->refraction->Samples()));
-                        }
-                        frame->DrawGeometry(encoder, draw);
-                    }
-                });
-            frame->subsurface->DeclareFilter(graph, inputs.bitmask);
-            uses.push_back(
-                {frame->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource, readAccess});
-            uses.push_back(
-                {frame->subsurface->GraphIrradiance(graph), RHIResourceState::PixelShaderResource, readAccess});
-        }
-        if (ordinary)
-        {
-            frame->AddVisibilityReads(graph, uses);
-            NormalizeSceneReads(graph, uses);
-            const auto colorPass = graph.AddPass(
-                blended             ? "METEOR.Blended.Color"
-                : transmissionStage ? "METEOR.Scene.TransmissionColor"
-                                    : "METEOR.Scene.Color",
-                uses,
-                [frame, inputs, lighting, ambientOcclusion, shadowMap, transmissionStage, blended, lookup, selected,
-                 forward](const auto& execution) mutable {
-                    frame->CheckCurrent(execution.graph);
-                    auto& encoder = *execution.encoder;
-                    const auto color = execution.ResolveHandle(lighting);
-                    const auto depth =
-                        RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-                    const auto target = frame->device->CreateRenderTargets({&color, 1}, &depth);
-                    std::array<RHIBindingDesc, 4> descriptions{
-                        RHIBindingDesc::SrvCube(frame->environment,
-                                                frame->environment.IsValid()
-                                                    ? frame->device->DescribeTexture(frame->environment).format
-                                                    : RHIFormat::RGBA16Float,
-                                                1)
-                            .OrNull(),
-                        RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
-                        RHIBindingDesc::Srv2D(blended ? RHITextureHandle{} : execution.ResolveHandle(ambientOcclusion),
-                                              RHIFormat::RG16Float)
-                            .OrNull(),
-                        RHIBindingDesc::SrvArray(frame->shadow ? execution.ResolveHandle(shadowMap) : RHITextureHandle{},
-                                                 RHIFormat::R32Float, 3)
-                            .OrNull()};
-                    const auto table = frame->device->CreateBindings(descriptions);
-                    const auto decalTable = frame->DecalTable(execution, transmissionStage || blended.has_value());
-                    if (frame->volume && blended)
-                    {
-                        forward.volumeTable = frame->device->CreateBindings(frame->volume->LightingBindings(
-                            frame->shadow ? execution.ResolveHandle(shadowMap) : RHITextureHandle{}));
-                        if (!forward.volumeTable.IsValid())
-                        {
-                            throw std::runtime_error("Graph medium lighting binding failed.");
-                        }
-                    }
-                    frame->CheckCurrent();
-                    if (!target.IsValid() || !table.IsValid())
-                    {
-                        throw std::runtime_error("METEOR Scene color/depth/AO/environment binding failed.");
-                    }
-                    encoder.BindRenderTargets(target);
-                    encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-                    encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                    for (const auto& draw : frame->DrawsFor(blended))
-                    {
-                        if (!selected(draw) || !draw.program->hasSurface ||
-                            draw.program->hasTransmission != transmissionStage ||
-                            (frame->runtimeEffects && draw.program->hasSpecial))
-                        {
-                            continue;
-                        }
-                        encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, (blended ? draw.program->blendedColor : draw.program->color)[draw.doubleSided].GetHandle()));
-                        std::string error;
-                        if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
-                                                      error))
-                        {
-                            throw std::runtime_error(error);
-                        }
-                        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
-                                                  blended && forward.reference ? draw.referenceConstants : draw.constants);
-                        frame->BindGeometry(encoder, draw);
-                        encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                        frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
-                        frame->BindForward(encoder, draw, forward);
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(lookup->Samples()));
-                        if (draw.program->hasSpecial)
-                        {
-                            encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
-                                                  RHIBufferSlice::Whole(frame->subsurface->Reflection()));
-                            encoder.SetRootBuffer(RHIBindPoint::Graphics, 5,
-                                                  RHIBufferSlice::Whole(frame->subsurface->Irradiance()));
-                        }
-                        if (draw.program->hasTransmission)
-                        {
-                            encoder.SetRootBuffer(RHIBindPoint::Graphics, 6,
-                                                  RHIBufferSlice::Whole(frame->refraction->Samples()));
-                        }
-                        frame->DrawGeometry(encoder, draw);
-                    }
-                });
-            if (!blended && !transmissionStage)
-            {
-                // Prepared opaque shading does not consume another callback CPU output.
-                graph.DeclareRecordingIndependent(colorPass);
-            }
-        }
-        if (frame->runtimeEffects && special)
-        {
-            lighting = DeclareRuntimeEffects(graph, inputs, lighting, ambientOcclusion, shadowMap,
-                                             transmissionStage, blended, forward);
-        }
-        return lighting;
-    }
-
-    RGHandle SceneHost::DeclareRuntimeEffects(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                              RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
-                                              bool transmissionStage, std::optional<std::size_t> blended,
-                                              EnhancedForwardLighting forward) const
-    {
-        const auto frame = frame_;
-        const auto effects = frame->runtimeEffects;
-        const auto lookup = blended ? frame->alphaLookup : frame->lookup;
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
-        const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-        const auto selected = [blended, transmissionStage](const Frame::Draw& draw) {
-            return draw.program->hasSurface && draw.program->hasSpecial &&
-                   draw.program->hasTransmission == transmissionStage &&
-                   (blended ? draw.blended && draw.inputIndex == *blended : !draw.blended);
-        };
-        const auto commonUses = [&] {
-            std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-                {inputs.bitmask, RHIResourceState::ShaderResource, read},
-                {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, read}};
-            if (!blended)
-            {
-                uses.push_back({ambientOcclusion, RHIResourceState::ShaderResource, read});
-            }
-            frame->AddDecalUses(uses, transmissionStage || blended.has_value(), read);
-            lookup->DeclareShadingInputs(graph, uses);
-            if (blended)
-            {
-                uses.push_back({forward.graphCounts, RHIResourceState::ShaderResource, read});
-                uses.push_back({forward.graphIndices, RHIResourceState::ShaderResource, read});
-                if (frame->volume)
-                {
-                    uses.push_back({frame->volume->GraphCoefficients(graph), RHIResourceState::PixelShaderResource, read});
-                }
-            }
-            if (frame->shadow)
-            {
-                uses.push_back({shadowMap, RHIResourceState::ShaderResource, read});
-            }
-            for (const auto& draw : frame->DrawsFor(blended))
-            {
-                if (!selected(draw))
-                {
-                    continue;
-                }
-                uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, read});
-                if (frame->UsesMeshlets(draw))
-                {
-                    uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, read});
-                }
-                for (const auto& texture : draw.bindings->resources.textures)
-                {
-                    uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, read});
-                }
-            }
-            frame->AddVisibilityReads(graph, uses);
-            return uses;
-        };
-        const auto raster = [frame, effects, lookup, inputs, ambientOcclusion, shadowMap, transmissionStage,
-                             blended, selected](const EnhancedRenderGraph::ExecuteContext& execution,
-                                                std::size_t tileIndex, int part, RGHandle lighting,
-                                                EnhancedForwardLighting forward) {
-            frame->CheckCurrent(execution.graph);
-            effects->CheckCurrent(*execution.graph);
-            const auto& tile = effects->Tiles()[tileIndex];
-            const bool capture = part >= 0;
-            auto& encoder = *execution.encoder;
-            const auto bindings = frame->RuntimeTables(execution, inputs, lighting, ambientOcclusion, shadowMap,
-                                                       blended.has_value(), transmissionStage);
-            const auto targets = capture ? effects->CaptureTargets(static_cast<unsigned>(part)) : bindings.color;
-            forward.volumeTable = bindings.volume;
-            encoder.BindRenderTargets(targets);
-            if (capture)
-            {
-                const float clear[]{0, 0, 0, 0};
-                encoder.ClearRenderTargets(targets, clear);
-                if (!encoder.SetViewport(-static_cast<float>(tile.sourceX), -static_cast<float>(tile.sourceY),
-                                         frame->input->View().width, frame->input->View().height) ||
-                    !encoder.SetScissor(0, 0, tile.sourceWidth, tile.sourceHeight))
-                {
-                    throw std::runtime_error("Runtime special MRT tile needs a supported offset viewport.");
-                }
-            }
-            else
-            {
-                encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-                if (!encoder.SetScissor(tile.x, tile.y, tile.width, tile.height))
-                {
-                    throw std::runtime_error("Runtime special tile needs a supported bounded scissor.");
-                }
-            }
-            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->DrawsFor(blended))
-            {
-                if (!selected(draw))
-                {
-                    continue;
-                }
-                const auto pipeline = capture ? draw.program->runtimeEffects[part][draw.doubleSided].GetHandle()
-                    : (blended ? draw.program->blendedColor : draw.program->color)[draw.doubleSided].GetHandle();
-                encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, pipeline));
-                std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
-                {
-                    throw std::runtime_error(error);
-                }
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
-                                          blended && forward.reference ? draw.referenceConstants : draw.constants);
-                frame->BindGeometry(encoder, draw);
-                encoder.SetBindings(RHIBindPoint::Graphics, 2, bindings.common);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(lookup->Samples()));
-                frame->BindDecal(encoder, draw, bindings.decal, transmissionStage || blended.has_value());
-                frame->BindForward(encoder, draw, forward);
-                const unsigned firstRoot = 16 + 2 + (draw.program->hasTransmission ? 1 : 0);
-                effects->Bind(encoder, firstRoot, tileIndex);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, RHIBufferSlice::Whole(lookup->Samples()));
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 5, RHIBufferSlice::Whole(lookup->Samples()));
-                if (draw.program->hasTransmission)
-                {
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 6, RHIBufferSlice::Whole(lookup->Samples()));
-                }
-                frame->DrawGeometry(encoder, draw);
-            }
-            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-        };
-        if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
-        {
-            throw std::runtime_error("Runtime special tiling requires graph-owned repeated phase scheduling.");
-        }
-        const auto tileDepth = effects->DeclareDepthOutput(graph);
-        const auto firstTargets = effects->DeclareCaptureOutputs(graph, 0);
-        const auto targets = effects->DeclareCaptureOutputs(graph, 1);
-        lighting = AdvanceSceneColor(graph, lighting);
-        auto external = commonUses();
-        external.push_back({inputs.depth, RHIResourceState::PixelShaderResource, RGAccessMode::Read});
-        external.push_back({tileDepth, RHIResourceState::DepthWrite, RGAccessMode::Write});
-        for (unsigned i = 0; i < targets.size(); ++i)
-        {
-            external.push_back({i < 8 ? firstTargets[i] : targets[i], RHIResourceState::RenderTarget, RGAccessMode::Write});
-        }
-        external.push_back({lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite});
-        effects->DeclareShadingInputs(graph, external, false, transmissionStage);
-        // Tile depth is already the external Write. Its local Read belongs to the
-        // capture phases, not a duplicate access on the outer version.
-        std::erase_if(external, [&](const auto& use) {
-            return use.handle.index == tileDepth.index && use.access == RGAccessMode::Read;
-        });
-        NormalizeSceneReads(graph, external);
-        std::vector<EnhancedRenderGraph::RepeatedPhase> phases;
-        phases.push_back({"METEOR.Scene.RuntimeTileDepth",
-                          {{inputs.depth, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
-                           {tileDepth, RHIResourceState::DepthWrite, RGAccessMode::Write}}});
-        for (unsigned part = 0; part < 2; ++part)
-        {
-            auto captureUses = commonUses();
-            effects->DeclareShadingInputs(graph, captureUses, false, transmissionStage);
-            const unsigned first = part ? 8 : 0, count = part ? 6 : 8;
-            for (unsigned i = first; i < first + count; ++i)
-            {
-                captureUses.push_back({i < 8 ? firstTargets[i] : targets[i], RHIResourceState::RenderTarget,
-                                       RGAccessMode::Write});
-            }
-            NormalizeSceneReads(graph, captureUses);
-            phases.push_back({part ? "METEOR.Scene.RuntimeEffectCapture1" : "METEOR.Scene.RuntimeEffectCapture0",
-                              std::move(captureUses)});
-        }
-        auto colorUses = commonUses();
-        colorUses.push_back({inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read});
-        colorUses.push_back({lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite});
-        effects->DeclareShadingInputs(graph, colorUses);
-        NormalizeSceneReads(graph, colorUses);
-        phases.push_back({"METEOR.Scene.RuntimeEffectColor", std::move(colorUses)});
-        graph.AddRepeatedPass("METEOR.Scene.RuntimeEffects", external, phases,
-            static_cast<std::uint32_t>(effects->Tiles().size()),
-            [effects, raster, inputs, lighting, forward](const auto& execution, std::uint32_t iteration,
-                                                         std::uint32_t phase) {
-                if (phase == 0)
-                {
-                    effects->RecordDepth(execution, inputs.depth, iteration);
-                }
-                else
-                {
-                    raster(execution, iteration, phase == 3 ? -1 : static_cast<int>(phase - 1), lighting, forward);
-                }
-            });
-        return lighting;
-    }
 
     bool SceneHost::PublishSubmittedCache(std::uint64_t frameId, RHICompletionPoint completion, std::string& error,
                                           RHISubmissionTicket ticket)
@@ -3405,16 +2459,16 @@ namespace material_graph
         {
             draw.geometry->MarkSubmitted(completion);
         }
-        if (frame_->runtimeEffects)
+        if (frame_->effectStage.runtime.frame)
         {
-            frame_->runtimeEffects->MarkSubmitted(completion);
+            frame_->effectStage.runtime.frame->MarkSubmitted(completion);
         }
         std::string firstError;
-        bool tracked = lookup_.TrackAcceptedSubmission(*frame_->lookup, completion, firstError);
-        if (frame_->alphaLookup)
+        bool tracked = lookup_.TrackAcceptedSubmission(*frame_->effectStage.lookup.opaque, completion, firstError);
+        if (frame_->effectStage.lookup.layered)
         {
             std::string alphaError;
-            if (!lookup_.TrackAcceptedSubmission(*frame_->alphaLookup, completion, alphaError))
+            if (!lookup_.TrackAcceptedSubmission(*frame_->effectStage.lookup.layered, completion, alphaError))
             {
                 if (firstError.empty())
                 {
@@ -3447,28 +2501,41 @@ namespace material_graph
     bool SceneHost::CommitSubmittedFrame(const own::shared_owner<const Frame>& frame, RHICompletionPoint completion,
                                          std::string& error)
     {
-        if (frame->runtimeEffects)
+        if (frame->effectStage.runtime.frame)
         {
-            frame->runtimeEffects->ConfirmSubmitted(completion);
+            frame->effectStage.runtime.frame->ConfirmSubmitted(completion);
         }
         const auto forwardCount = std::ranges::count_if(frame->input->Draws(), [](const auto& draw) {
             const auto& p = draw.material->generation->cooked.product.program;
             return p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0);
         });
-        if (frame->alphaLookup && frame->alphaDeclared.size() != static_cast<std::size_t>(forwardCount))
+        if (frame->effectStage.lookup.layered && frame->effectStage.layers.blendedOutputs.size() != static_cast<std::size_t>(forwardCount))
         {
             return Fail(error, "METEOR alpha cache publication requires the complete blended stream.");
         }
-        if (frame->alphaLookup &&
-            !lookup_.PublishSubmitted(*frame->alphaLookup, frame->input->View().frameId, completion, error))
+        if (frame->effectStage.lookup.layered &&
+            !lookup_.PublishSubmitted(*frame->effectStage.lookup.layered, frame->input->View().frameId, completion, error))
         {
             return false;
         }
-        if (!lookup_.PublishSubmitted(*frame->lookup, frame->input->View().frameId, completion, error))
+        if (!lookup_.PublishSubmitted(*frame->effectStage.lookup.opaque, frame->input->View().frameId, completion, error))
         {
             return false;
         }
         const auto& view = frame->input->View();
+        if (frame->historyStage.nextCameraHistory && frame->historyStage.nextCameraHistory->HistoryOwner()->recorded.load())
+        {
+            auto history = frame->historyStage.nextCameraHistory->HistoryOwner();
+            history->completion = completion.value;
+            auto& histories = cameraHistories_[{view.sceneEpoch, view.viewId}];
+            if (std::ranges::none_of(histories, [&](const auto& item) { return item.pyramid == history; }))
+            {
+                auto historyCamera = view.camera;
+                if (view.temporalFrame.camera.valid)
+                    std::memcpy(&historyCamera.projection, view.temporalFrame.camera.projectionMatrix.data(), sizeof(historyCamera.projection));
+                histories.push_back({std::move(history), historyCamera, view.temporalFrame.historyRevision});
+            }
+        }
         for (const auto& draw : frame->input->Draws())
         {
             if (!draw.selectionRevision)
@@ -3554,42 +2621,42 @@ namespace material_graph
 
     RHIBufferHandle SceneHost::LookupStatistics() const
     {
-        return HasDraws() ? frame_->lookup->Statistics() : RHIBufferHandle{};
+        return HasDraws() ? frame_->effectStage.lookup.opaque->Statistics() : RHIBufferHandle{};
     }
 
     RGHandle SceneHost::GraphLookupStatistics(const EnhancedRenderGraph& graph) const
     {
-        return HasDraws() ? frame_->lookup->GraphStatistics(graph) : RGHandle{};
+        return HasDraws() ? frame_->effectStage.lookup.opaque->GraphStatistics(graph) : RGHandle{};
     }
 
     std::shared_ptr<const SceneLookupFrame> SceneHost::LookupFrame() const
     {
-        return HasDraws() ? frame_->lookup : nullptr;
+        return HasDraws() ? frame_->effectStage.lookup.opaque : nullptr;
     }
 
     std::shared_ptr<const SceneLookupFrame> SceneHost::ForwardLookupFrame() const
     {
-        return HasDraws() ? frame_->alphaLookup : nullptr;
+        return HasDraws() ? frame_->effectStage.lookup.layered : nullptr;
     }
 
     SceneSurfaceTargets::Outputs SceneHost::ForwardSurfaceOutputs() const
     {
-        return HasDraws() ? frame_->forwardGbuffer : SceneSurfaceTargets::Outputs{};
+        return HasDraws() ? frame_->effectStage.layers.forwardGbuffer : SceneSurfaceTargets::Outputs{};
     }
 
     std::shared_ptr<const SceneSubsurfaceFrame> SceneHost::SubsurfaceFrame() const
     {
-        return HasDraws() ? frame_->subsurface : nullptr;
+        return HasDraws() ? frame_->effectStage.subsurface : nullptr;
     }
 
     std::shared_ptr<const SceneRefractionFrame> SceneHost::RefractionFrame() const
     {
-        return HasDraws() ? frame_->refraction : nullptr;
+        return HasDraws() ? frame_->effectStage.refraction : nullptr;
     }
 
     std::shared_ptr<const SceneVolumeFrame> SceneHost::VolumeFrame() const
     {
-        return HasDraws() ? frame_->volume : nullptr;
+        return HasDraws() ? frame_->effectStage.volume.frame : nullptr;
     }
     bool SceneHost::HasDraws() const
     {
@@ -3603,6 +2670,8 @@ namespace material_graph
             device_->UnregisterUploadTransactionListener(this);
         }
         frame_.reset();
+        cameraHistories_.clear();
+        cameraOcclusion_.ShutdownAfterIdle();
         visibility_.ShutdownAfterIdle();
         lookup_.ShutdownAfterIdle();
         runtimeEffects_.ShutdownAfterIdle();
@@ -3611,6 +2680,9 @@ namespace material_graph
         volume_.ShutdownAfterIdle();
         programs_.clear();
         bindings_.Clear();
+        indirectCommands_ = {};
+        hybridPipelines_ = {};
+        materialWorkPipelines_ = {};
         geometry_ = {};
         device_ = nullptr;
         programDevice_ = nullptr;

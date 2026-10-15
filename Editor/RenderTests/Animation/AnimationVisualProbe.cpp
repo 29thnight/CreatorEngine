@@ -2,6 +2,7 @@
 #include "AnimationScheduler.h"
 #include "Animator.h"
 #include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelMaterialGraph.h"
 #include "DataSystem.h"
 #include "Material.h"
 #include "MeshRenderer.h"
@@ -57,13 +58,34 @@ namespace RenderTest
             socket->m_offset = math::translation_matrix(math::vector3{0.f, 0.f, 0.22f});
             socket->AttachObject(marker);
             marker->Transform_().SetScale({0.12f, 0.12f, 0.12f});
+            // METEOR draws the material graph instance, so legacy setters on the
+            // cube's textured model material no longer change what renders. The
+            // marker gets its own untextured default graph authored green.
+            auto source = assets::BuildDefaultMaterialGraph(error);
+            if (!source) return false;
+            const auto author = [&](const char* socket, LX::LXSocketValue value)
+            {
+                for (const auto& node : source->graph.Nodes())
+                    for (const auto& pin : node.pins)
+                        if (pin.Identifier() == socket && pin.direction == LX::Direction::Input)
+                        {
+                            source->graph.SetSocketValue(pin.id, value);
+                            return true;
+                        }
+                return false;
+            };
+            if (!author("Base Color", std::array<double, 4>{0.01, 1.0, 0.03, 1.0}) ||
+                !author("Metallic", 0.0) || !author("Roughness", 0.6))
+            { error = "Default material graph lacks a Principled base color socket"; return false; }
+            material_graph::InstanceDescription description;
+            // Fixed test identity, never a product asset.
+            if (!Uuid::TryParse("5e1f0c2a-6b7d-4c9e-8a31-2d4f6b8c0e17", description.graphId.value))
+            { error = "Marker graph identity"; return false; }
+            Material markerMaterial;
+            if (!DataSystems->ConfigureMaterialGraphAuthoring(markerMaterial, *source, description, error))
+                return false;
             auto* mesh = marker->GetComponent<MeshRenderer>();
-            auto material = own::make_shared<Material>(*mesh->m_Material);
-            material->UseBaseColorMap(nullptr);
-            material->SetBaseColor(0.01f, 1.f, 0.03f);
-            material->SetMetallic(0.f);
-            material->SetRoughness(0.6f);
-            mesh->SetMaterial(std::move(material));
+            mesh->SetMaterial(own::make_shared<Material>(std::move(markerMaterial)));
             mesh->SetEnabled(true);
         }
         if (!actor) { error = "Run setup first"; return false; }

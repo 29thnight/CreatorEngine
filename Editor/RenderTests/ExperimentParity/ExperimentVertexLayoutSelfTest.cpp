@@ -246,7 +246,7 @@ namespace RenderTest
                     geometry.vertexAttributeMask, 3, geometry.indexCount / 3, static_cast<uint32_t>(vertices.size()), {}, upload, error), "LX canonical GPU packing");
                 RHIMeshletBufferHeader header{};
                 if (upload.bytes.size() >= sizeof(header)) std::memcpy(&header, upload.bytes.data(), sizeof(header));
-                check.Check(header.schemaVersion == 2 && header.sourceLodIndex == 3 && header.meshletCount == cooked.descriptors.size()
+                check.Check(header.schemaVersion == 4 && header.hierarchyOffset == 0 && header.sourceLodIndex == 3 && header.meshletCount == cooked.descriptors.size()
                     && header.descriptorStride == sizeof(experiment::MeshletDescriptor) && header.sourcePrimitiveCount == indices.size() / 3,
                     "METEOR GPU header has explicit cluster/LOD/primitive contract");
                 experiment::cooked::ModelGeometryArtifact artifact;
@@ -259,7 +259,7 @@ namespace RenderTest
                 const bool decodedOk = experiment::cooked::ReadModelGeometryArtifact(encoded, decoded, error);
                 check.Check(decodedOk, "METEOR cooked geometry round trip: " + error);
                 auto old = encoded;
-                if (old.size() > 7) { const uint32_t version = 1; std::memcpy(old.data() + 4, &version, sizeof(version)); }
+                if (old.size() > 7) { const uint32_t version = 2; std::memcpy(old.data() + 4, &version, sizeof(version)); }
                 check.Check(!experiment::cooked::ReadModelGeometryArtifact(old, decoded, error), "METEOR rejects prior cooked geometry version");
                 artifact.mesh.meshlets = {};
                 check.Check(!experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error), "METEOR cooker rejects indexed-only geometry");

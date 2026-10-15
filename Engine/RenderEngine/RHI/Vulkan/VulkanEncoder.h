@@ -261,6 +261,7 @@ public:
         const RHIBindingTable& table) override;
     void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         const RHISamplerTable& table) override;
+    bool SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice) override;
     void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBufferSlice& slice) override;
 

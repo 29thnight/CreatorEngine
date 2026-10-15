@@ -7,9 +7,14 @@
 class SceneSurfaceTargets final
 {
 public:
-    static constexpr uint32_t kRenderTargetCount = 5;
+    static constexpr uint32_t kRenderTargetCount = 6;
     static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
-    struct Outputs { RGHandle diffuse, metalRough, normal, emissive, bitmask, depth; };
+    struct Outputs {
+        RGHandle diffuse, metalRough, normal, emissive, bitmask, depth, visibility;
+        // Optional immutable pre-Decal versions, ordered diffuse/ORM/normal.
+        // Carried with the post-Decal surface; never registered in SceneHost state.
+        std::array<RGHandle,3> decalBaseline{};
+    };
     static RHIFormat GetRenderTargetFormat(uint32_t index);
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
     const Outputs& GetOutputs() const { return m_outputs; }

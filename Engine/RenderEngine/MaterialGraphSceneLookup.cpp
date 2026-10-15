@@ -960,6 +960,14 @@ namespace material_graph
         return true;
     }
 
+    SceneLookupCache::~SceneLookupCache()
+    {
+        if (device_)
+        {
+            device_->UnregisterUploadTransactionListener(this);
+        }
+    }
+
     void SceneLookupCache::ShutdownAfterIdle()
     {
         if (device_)
