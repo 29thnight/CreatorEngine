@@ -12,7 +12,11 @@ ByteAddressBuffer topology[4096] : register(t4112);
 RWStructuredBuffer<uint> routes : register(u0);
 RWStructuredBuffer<uint64_t> keys : register(u1);
 uint GroupIndex(uint3 group) { return group.y * 65535u + group.x; }
-float4 Clip(uint record, uint vertex) { return mul(float4(vertices[record-1u][vertex].position.xyz,1),projection); }
+// Vertex streams are object space; the frame record carries object-to-world.
+float4 Clip(uint record, uint vertex) {
+    const float3 world=MeteorRecordWorldPosition(geometryTable[record],vertices[record-1u][vertex].position.xyz);
+    return mul(float4(world,1),projection);
+}
 float2 Screen(float4 clip) { return (clip.xy/clip.w*float2(.5,-.5)+.5)*float2(width,height); }
 [numthreads(64,1,1)]
 void Initialize(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)

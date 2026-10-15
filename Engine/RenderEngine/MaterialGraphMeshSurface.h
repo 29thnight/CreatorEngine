@@ -43,6 +43,8 @@ class MeshSurfaceInput
     std::span<const uint32_t> SourceVertexIds() const { return staticOwner_ ? staticOwner_->SourceVertexIds() : std::span<const uint32_t>(sourceVertexIds_); }
     uint32_t SourceVertexCount() const { return staticOwner_ ? staticOwner_->SourceVertexCount() : sourceVertexCount_; }
     uint32_t SourcePrimitiveCount() const { return staticOwner_ ? staticOwner_->SourcePrimitiveCount() : sourcePrimitiveCount_; }
+    const experiment::MeshClusterHierarchy& Hierarchy() const { return staticOwner_ ? staticOwner_->Hierarchy() : hierarchy_; }
+    uint32_t OriginalIndexCount() const { return staticOwner_ ? staticOwner_->OriginalIndexCount() : originalIndexCount_; }
     bool Matches(const MeshSurfaceInput& other) const;
 
   private:
@@ -51,13 +53,15 @@ class MeshSurfaceInput
     MeshSurfaceInput() = default;
     static bool SealImpl(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
                          std::uint32_t maxVertices, std::shared_ptr<const MeshSurfaceInput>& result,
-                         std::string& error);
+                         std::string& error, bool includeHierarchy = false);
     RHIModelMeshView geometry_;
     math::matrix4x4 world_;
     SurfaceView view_;
     std::vector<std::byte> vertices_;
     std::vector<std::uint32_t> indices_;
     experiment::MeshletPayload meshlets_;
+    experiment::MeshClusterHierarchy hierarchy_{};
+    uint32_t originalIndexCount_{};
     std::vector<std::uint32_t> sourceVertexIds_;
     uint32_t sourcePrimitiveCount_{}, sourceVertexCount_{};
     std::vector<PackedBoneMatrix> bones_;
@@ -124,7 +128,7 @@ class MeshSurfacePlan
     static bool BuildPartitioned(const EnhancedDrawItem& draw, const SurfaceView& view,
                                  std::span<const float> lods, const MeshSurfacePlanBudget& budget,
                                  std::uint32_t chunkCeiling,
-                                 std::shared_ptr<const MeshSurfacePlan>& result, std::string& error);
+                                 std::shared_ptr<const MeshSurfacePlan>& result, std::string& error, bool includeHierarchy = false);
     static bool BuildSceneZeroLod(const EnhancedDrawItem& draw, const SurfaceView& view,
                                  std::span<const float> lods, const MeshSurfacePlanBudget& budget,
                                  std::shared_ptr<const MeshSurfacePlan>& result, std::string& error);
@@ -167,10 +171,17 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     bool IsSampled() const { return !samples_.empty(); }
     std::uint64_t RecordingId() const override { return recordingId_; }
     bool IsValidated() const override { return validated_; }
-    bool IsReadyForEvaluation() const override { return recordedStages_.load() == 3; }
+    bool IsReadyForEvaluation() const override {
+        return declarationOwner_ ? declared_.load() && declarationOwner_->IsReadyForEvaluation()
+                                 : recordedStages_.load() == 3;
+    }
     bool IsPreparedForGraph() const override;
     RGHandle GraphOutput(const EnhancedRenderGraph& graph) const override;
     bool HasGraphDeclaration() const { return graph_ != nullptr; }
+    // Scene instances prepared together with identical geometry/pose/pipeline
+    // share posed object-space output; consumers apply their own ObjectToWorld.
+    bool IsObjectSpace() const { return objectSpace_; }
+    const math::matrix4x4& ObjectToWorld() const;
     RHIBufferSlice Indices() const;
     RHIBufferSlice Meshlets() const;
     uint32_t MeshletCount() const;
@@ -180,7 +191,11 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     // set, so graph and profiler pass counts do not grow with the mesh count.
     static bool DeclareBatch(EnhancedRenderGraph& graph, std::span<const MeshSurfaceBatch* const> batches,
                              std::string& error);
-    void MarkSubmitted(RHICompletionPoint completion) const { completion_ = completion; }
+    void MarkSubmitted(RHICompletionPoint completion) const {
+        completion_ = completion;
+        if (declarationOwner_) declarationOwner_->MarkSubmitted(completion);
+        else if (transformedOwner_) transformedOwner_->MarkSubmitted(completion);
+    }
     bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;
 
   private:
@@ -199,9 +214,11 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     RHIBufferHandle buffer_;
     std::shared_ptr<MeshSurfaceBufferPool> bufferPool_;
     std::shared_ptr<MeshSurfaceStaticBuffers> staticBuffers_;
-    // Reuse only immutable, completed outputs. Recording/descriptors stay local.
+    // Buffer lifetime belongs to the cached producer. A recording has exactly
+    // one declaration owner; instance wrappers retain their own input/world.
     std::shared_ptr<const MeshSurfaceBatch> transformedOwner_;
-    mutable std::uint64_t lastReuseRecording_{};
+    std::shared_ptr<const MeshSurfaceBatch> declarationOwner_;
+    mutable std::weak_ptr<const MeshSurfaceBatch> reuseDeclaration_;
     mutable std::uint64_t lastUsedGeneration_{};
     mutable RHICompletionPoint completion_{};
     mutable RHIResourceState bufferState_{RHIResourceState::Common};
@@ -222,6 +239,7 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     mutable std::uint64_t graphEpoch_{};
     mutable RGHandle graphOutput_;
     mutable bool validated_{};
+    bool objectSpace_{};
 };
 
 class MeshSurfaceEvaluator
@@ -242,7 +260,7 @@ class MeshSurfaceEvaluator
     // This records the current pose inside the same graph without an earlier submit.
     bool Prepare(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
                  std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error, bool cacheStatic = false,
-                 std::uint64_t auditRealFrame = 0, std::uint64_t auditView = 0);
+                 std::uint64_t auditRealFrame = 0, std::uint64_t auditView = 0, bool objectSpace = false);
     void NotifyCompleted(std::uint64_t completed) const;
     // Advance once per upload recording, including empty scene frames. Active
     // outputs have scene lifetime; only unused, completed owners are retired.

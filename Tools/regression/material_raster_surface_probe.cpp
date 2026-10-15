@@ -7,8 +7,8 @@
 #include "support/MaterialGraphScenePacket.h"
 #include "support/CookedMeshFixture.h"
 #include "MaterialGraphSceneInput.h"
-#include "MaterialGraphSceneLod.h"
 #include "MaterialGraphSceneHost.h"
+#include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphSceneCompiler.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/PakAudioClipByteSource.h"
@@ -2420,6 +2420,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
             const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
             const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
             const auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
@@ -2513,7 +2514,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     true);
             }
 #endif
-            const auto sceneLighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+            const auto sceneLighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
             std::array<RHIReadback, 11> pointReadbacks;
             RHIReadback sampleReadback;
             if (inspectPoint)
@@ -2615,7 +2616,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 bool rejected = false;
                 try
                 {
-                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(otherGraph ? unrelated : *graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(otherGraph ? unrelated : *graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
                 }
                 catch (const std::runtime_error&)
                 {
@@ -3696,44 +3697,12 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
 #include "support/AtomicReductionProbe.inl"
 #include "support/GeometryAccessProbe.inl"
 #include "support/HybridVisibilityProbe.inl"
+#include "support/ObjectSpaceInstanceProbe.inl"
+#include "support/ClusterLodProbe.inl"
 #include "support/MeshletHzbProbe.inl"
 
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
 {
-    {
-        SceneInputView view;
-        view.width = view.height = 100;
-        view.camera.view = view.camera.projection = math::matrix4x4::identity();
-        const auto world = math::matrix4x4::identity();
-        const shadow_math::Sphere sphere{{0, 0, 10}, 1};
-        std::array<experiment::MeshLodLevel, 2> levels;
-        levels[0].indices = {0, 1, 2};
-        levels[0].geometricError = 0.001f;
-        levels[1].indices = {0, 2, 3};
-        levels[1].geometricError = 0.01f;
-        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 1,
-            "Orthographic projected error chooses actual authored LOD1");
-        view.width = view.height = 10;
-        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 2,
-            "Smaller screen footprint chooses LOD2");
-        view.width = view.height = 1000;
-        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 0,
-            "High screen error retains original geometry");
-        Check(SelectSceneGeometryLod(levels, world, {{0, 0, 0}, 1}, view, 1) == 0,
-            "Near-plane crossing retains original geometry");
-        view.camera.projection.m[2][3] = 1;
-        view.width = view.height = 100;
-        const auto close = SelectSceneGeometryLod(levels, world, {{0, 0, 2}, 1}, view, 1);
-        const auto distantLod = SelectSceneGeometryLod(levels, world, {{0, 0, 100}, 1}, view, 1);
-        Check(distantLod == 2 && close < distantLod, "Perspective distance reduces submitted geometry detail");
-        auto scaled = world;
-        scaled.m[0][0] = 100;
-        Check(SelectSceneGeometryLod(levels, scaled, sphere, view, 1) < 2,
-            "Nonuniform world scale preserves the projected-error budget");
-        levels[1].geometricError = std::numeric_limits<float>::quiet_NaN();
-        Check(SelectSceneGeometryLod(levels, world, sphere, view, 1) == 0,
-            "Invalid authored error retains original geometry");
-    }
 #ifdef LX_PROBE_VULKAN
     RHIShaderCompiler::ScopedOutput nativeOutput(RHIShaderBinary::SpirV);
 #endif
@@ -3927,6 +3896,9 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                   << " gpuComponents=" << gpuComponents << " sceneCompiles=0 validation=0 pak=encrypted\n";
         return;
     }
+    if (mode == "--temporal-transmission-only") { RunTemporalBuckets(device, roots, pipelines, textures, pool, root, image, true); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--cluster-lod-only") { RunClusterLod(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--object-space-only") { RunObjectSpaceInstances(device, roots, pipelines, textures, pool); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--hybrid-visibility-only") { RunHybridVisibility(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--atomic-reduction-only") { RunAtomicReduction(device, roots, pipelines, root, pool); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--geometry-access-only") { RunGeometryAccess(device, roots, pipelines, root); ShutdownNative(device, roots, pipelines, textures, pool); return; }
@@ -3951,7 +3923,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         const auto first = SceneCooked(instances[0]);
         auto obsolete = first->generation->cooked.product;
         obsolete.program.semanticKey.replace(obsolete.program.semanticKey.size() - SceneHostIdentity.size(),
-            SceneHostIdentity.size(), "|lx-scene-host:29");
+            SceneHostIdentity.size(), "|lx-scene-host:30");
         SceneShaderSet rejected; std::string rejection;
         Check(!LoadSceneShaders(obsolete, RHIShaderBinary::Dxil, rejected, rejection), "Previous visibility payload ABI must be recooked");
         auto description = first->description;
@@ -4516,7 +4488,7 @@ int main(int argc, char** argv)
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
                    (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
-                    std::string_view(argv[2]) == "--layer-shape-only" || std::string_view(argv[2]) == "--layer-bucket-only" || std::string_view(argv[2]) == "--temporal-bucket-only" || std::string_view(argv[2]) == "--visibility-reconstruction-only" || std::string_view(argv[2]) == "--hw-visibility-only" || std::string_view(argv[2]) == "--material-bucket-only" || std::string_view(argv[2]) == "--lx-meshlet-only" || std::string_view(argv[2]) == "--geometry-access-only" || std::string_view(argv[2]) == "--meshlet-dispatch-only" || std::string_view(argv[2]) == "--hybrid-visibility-only" || std::string_view(argv[2]) == "--atomic-reduction-only" || std::string_view(argv[2]) == "--meshlet-hzb-only" ||
+                    std::string_view(argv[2]) == "--layer-shape-only" || std::string_view(argv[2]) == "--layer-bucket-only" || std::string_view(argv[2]) == "--temporal-bucket-only" || std::string_view(argv[2]) == "--visibility-reconstruction-only" || std::string_view(argv[2]) == "--hw-visibility-only" || std::string_view(argv[2]) == "--material-bucket-only" || std::string_view(argv[2]) == "--lx-meshlet-only" || std::string_view(argv[2]) == "--geometry-access-only" || std::string_view(argv[2]) == "--meshlet-dispatch-only" || std::string_view(argv[2]) == "--temporal-transmission-only" || std::string_view(argv[2]) == "--cluster-lod-only" || std::string_view(argv[2]) == "--object-space-only" || std::string_view(argv[2]) == "--hybrid-visibility-only" || std::string_view(argv[2]) == "--atomic-reduction-only" || std::string_view(argv[2]) == "--meshlet-hzb-only" ||
                     std::string_view(argv[2]) == "--issue-resource-lifetime" ||
                     std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||

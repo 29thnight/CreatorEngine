@@ -38,7 +38,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 
     struct Candidate
     {
-        // World-space center/radius; a nonpositive or nonfinite radius is unknown.
+        // Instance bins: world center/radius (nonpositive means unknown).
+        // Meshlet range bins (flags 8): {LOD width, height, 0, maxPixelError}.
         math::vector4 sphere{};
         std::uint32_t bin{}, sourceIndex{}, outputOffset{}, flags{};
     };
@@ -136,6 +137,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::shared_ptr<const Frame> m_firstStage;
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_historyPyramid;
         bool m_ordered{};
+        RHIBufferSlice m_meshletWorlds;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletFinalize;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_occlusionCull;
         GpuGeometryOcclusion::ViewKey m_occlusionView;
@@ -177,7 +179,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
         std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion = false,
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history = {},
-        std::shared_ptr<const Frame> firstStage = {}, bool ordered = false);
+        std::shared_ptr<const Frame> firstStage = {}, bool ordered = false, float maxPixelError = 1.f,
+        uint32_t lodWidth = 0, uint32_t lodHeight = 0);
 
     // Direct draws use the same vertex-ID indirection with an identity mapping.
     static RHIBufferSlice UploadIdentity(const EnhancedFrameContext& context, std::uint32_t count,

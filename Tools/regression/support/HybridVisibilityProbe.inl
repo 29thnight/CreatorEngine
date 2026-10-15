@@ -50,7 +50,24 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     Check(!LoadSceneShaders(old, RHIShaderBinary::Dxil, rejected, error),
           "Hybrid ABI rejects old HW-only cooked stages");
     unsigned frames{}, hwPixels{}, swPixels{}, occluderPixels{}, historyFrames{};
-    for (unsigned fixture = 0; fixture < 7; ++fixture)
+    // Fixture 7 repeats fixture 0 with object-space vertices: each draw carries a
+    // non-uniform scale, rotation and translation, and its stream holds W^-1 * world.
+    // HW, SW, culling and resolve must all apply W to reproduce the same oracle.
+    math::matrix4x4 objectToWorld = math::matrix4x4::identity();
+    {
+        const float c = std::cos(.6f), s = std::sin(.6f);
+        const float row0[4]{1.25f * c, 1.25f * s, 0, 0}, row1[4]{-.8f * s, .8f * c, 0, 0},
+            row2[4]{0, 0, 1.5f, 0}, row3[4]{.2f, -.1f, .05f, 1};
+        for (unsigned column = 0; column < 4; ++column)
+        {
+            objectToWorld.m[0][column] = row0[column];
+            objectToWorld.m[1][column] = row1[column];
+            objectToWorld.m[2][column] = row2[column];
+            objectToWorld.m[3][column] = row3[column];
+        }
+    }
+    const auto worldToObject = math::inverse(objectToWorld);
+    for (unsigned fixture = 0; fixture < 8; ++fixture)
         for (unsigned workers : {0u, 1u, 4u})
         {
             std::cerr << "METEOR_HYBRID_FRAME fixture=" << fixture << " workers=" << workers << '\n';
@@ -110,9 +127,17 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     g.points[v].position = {positions[v][0] / context.width * 2 - 1,
                                             1 - positions[v][1] / context.height * 2,
                                             r.z + r.slope * (positions[v][0] - r.x0), 0};
-                    std::memcpy(g.vertices.data() + v * g.draw.modelMeshView.vertexStride, g.points[v].position.data(),
-                                12);
+                    std::array<float, 3> stored{g.points[v].position[0], g.points[v].position[1], g.points[v].position[2]};
+                    if (fixture == 7)
+                    {
+                        const auto world = stored;
+                        for (unsigned axis = 0; axis < 3; ++axis)
+                            stored[axis] = world[0] * worldToObject.m[0][axis] + world[1] * worldToObject.m[1][axis] +
+                                world[2] * worldToObject.m[2][axis] + worldToObject.m[3][axis];
+                    }
+                    std::memcpy(g.vertices.data() + v * g.draw.modelMeshView.vertexStride, stored.data(), 12);
                 }
+                if (fixture == 7) g.draw.worldMatrix = objectToWorld;
                 if (r.reverse)
                 {
                     std::swap(g.indices[1], g.indices[2]);
@@ -157,27 +182,33 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                   "Final culling rejects a missing occluder stage");
             Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, {}); }),
                   "Occluder rejects an unpublished first list");
-            auto wrongDepthCommands = meteorFirstList;
-            wrongDepthCommands.depthCommands = {};
-            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, wrongDepthCommands); }),
-                  "Occluder rejects missing command input before declaring raster");
-            wrongDepthCommands.depthCommands = meteorFirstList.depthCommands;
-            ++wrongDepthCommands.depthCommands.version;
-            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, wrongDepthCommands); }),
-                  "Occluder rejects a different command buffer version");
+            auto wrongFirstList = meteorFirstList;
+            wrongFirstList.list = {};
+            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, wrongFirstList); }),
+                  "Occluder rejects a missing first list before declaring commands");
+            wrongFirstList.list = meteorFirstList.list;
+            ++wrongFirstList.list.version;
+            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, wrongFirstList); }),
+                  "Occluder rejects a different first-list version");
             const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
             Check(rejected([&] { host.DeclareFinalCull(*graph, meteorGeometry, meteorFirstList.list); }),
                   "Final culling rejects a handle other than the occluder depth");
             const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
-            Check(rejected([&] { host.DeclareGBuffer(*graph, {meteorFirstList.list, meteorFinalList.commands}, targets.GetOutputs()); }),
+            auto wrongLayerList = meteorFinalList.blendedList;
+            if (!wrongLayerList.IsValid()) wrongLayerList = meteorFirstList.list;
+            ++wrongLayerList.version;
+            Check(rejected([&] { host.DeclareLayerWork(*graph, wrongLayerList); }),
+                "Layer work rejects a foreign list before producing commands");
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
+            Check(rejected([&] { host.DeclareGBuffer(*graph, {meteorFirstList.list, {}}, targets.GetOutputs()); }),
                   "Surface rejects a list other than the final culling list");
-            auto wrongSurfaceCommands = meteorFinalList;
-            wrongSurfaceCommands.commands.surface = meteorFirstList.depthCommands;
-            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongSurfaceCommands, targets.GetOutputs()); }),
-                  "Surface rejects depth commands substituted for surface commands");
-            wrongSurfaceCommands.commands.surface = {};
-            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongSurfaceCommands, targets.GetOutputs()); }),
-                  "Surface rejects missing commands before declaring visibility");
+            auto wrongFinalList = meteorFinalList;
+            ++wrongFinalList.list.version;
+            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongFinalList, targets.GetOutputs()); }),
+                  "Surface rejects a first-stage list substituted for final visibility");
+            wrongFinalList.list = {};
+            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongFinalList, targets.GetOutputs()); }),
+                  "Surface rejects missing final visibility before declaring passes");
             const auto output = host.DeclareGBuffer(*graph, meteorFinalList, targets.GetOutputs());
             host.DeclareHistory(*graph, output.depth);
             const auto hybrid = host.HybridVisibility();
@@ -256,6 +287,10 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                       prefix + " sibling atomic writers have no false ordering edge");
                 return resolve.compiledIndex;
             };
+            Check(find("METEOR.Scene.Commands.Depth.Build").authoredIndex < find("METEOR.Scene.Occluder.HW").authoredIndex &&
+                find("METEOR.Scene.Commands.Surface.Build").authoredIndex > find("Geometry.Occlusion.0").authoredIndex &&
+                find("METEOR.Scene.Commands.Surface.Build").authoredIndex < find("METEOR.Scene.Visibility.HW").authoredIndex,
+                "Depth/surface command producers stay with their consumer raster stages");
             const auto occluderResolve = stage("METEOR.Scene.Occluder", *occluder);
             const auto finalResolve = stage("METEOR.Scene.Visibility", *hybrid);
             Check(occluderResolve < find("Geometry.Occlusion.0").compiledIndex &&
@@ -375,6 +410,6 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     host.ShutdownAfterIdle();
     meshes.Shutdown();
     std::cout << "METEOR_HYBRID_VISIBILITY_OK frames=" << frames
-              << " cases=7 partitions=3 validation=0 hwPixels=" << hwPixels << " swPixels=" << swPixels
+              << " cases=8 partitions=3 validation=0 hwPixels=" << hwPixels << " swPixels=" << swPixels
               << " occluderPixels=" << occluderPixels << " historyFrames=" << historyFrames << '\n';
 }

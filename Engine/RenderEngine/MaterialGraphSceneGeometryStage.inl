@@ -1,5 +1,5 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-    RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph) const
+    RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph) const
     {
         ce::profile_scope profile{ce::marker<"MaterialDeclareGeometry">()};
         const auto frame = prepared;
@@ -11,9 +11,9 @@
         if (frame->graph)
         {
             frame->CheckCurrent(&graph);
-            return frame->geometryStage.geometryTable->GraphTable(graph);
+            return this->geometryTable->GraphTable(graph);
         }
-        // Every world transform of the frame goes into one batched declaration.
+        // Declare unique pose producers once; instance views retain their own worlds.
         std::set<const MeshSurfaceBatch*> declaredGeometry;
         std::vector<const MeshSurfaceBatch*> geometry;
         for (const auto& draw : frame->draws)
@@ -46,9 +46,9 @@
         {
             throw std::runtime_error(error);
         }
-        frame->geometryStage.geometryTable->Declare(graph, frame->geometryStage.geometryTable);
+        this->geometryTable->Declare(graph, this->geometryTable);
         frame->graph = &graph;
         frame->graphEpoch = graph.ResourceEpoch();
-        return frame->geometryStage.geometryTable->GraphTable(graph);
+        return this->geometryTable->GraphTable(graph);
     }
 

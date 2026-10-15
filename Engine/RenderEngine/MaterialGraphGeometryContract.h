@@ -12,6 +12,7 @@ namespace material_graph
     struct alignas(16) SceneGeometryIdentity final
     {
         uint64_t geometryKey{}, objectId{}, incarnation{}, instanceId{}, materialSlot{};
+        // UINT32_MAX denotes a replacement hierarchy; actual LOD is carried by each cooked descriptor.
         uint32_t lodIndex{}, primitiveCount{}, version{1}, reserved[3]{};
     };
     static_assert(std::is_trivially_copyable_v<SceneGeometryIdentity>);

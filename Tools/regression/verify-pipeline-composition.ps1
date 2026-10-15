@@ -238,9 +238,9 @@ try {
     # 배선을 그릴 수 있다. 숨은 결합(슬롯 없는 METEOR 노드)이 돌아오면 여기서 잡힌다.
     $meteorContract = @(
         @{ Node = 'METEOR.Scene.Geometry';   Reads = @();                                                            Writes = @('METEOR.Scene.Geometry.Table') }
-        @{ Node = 'METEOR.Scene.Cull.First'; Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('METEOR.Scene.Cull.FirstList','METEOR.Scene.Commands.Depth') }
-        @{ Node = 'METEOR.Scene.Occluder';   Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Cull.FirstList','METEOR.Scene.Commands.Depth'); Writes = @('METEOR.Scene.Occluder.Depth') }
-        @{ Node = 'METEOR.Scene.Cull.Final'; Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Occluder.Depth'); Writes = @('METEOR.Scene.Cull.FinalList','METEOR.Scene.Commands.Surface','METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended') }
+        @{ Node = 'METEOR.Scene.Cull.First'; Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('METEOR.Scene.Cull.FirstList') }
+        @{ Node = 'METEOR.Scene.Occluder';   Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Cull.FirstList'); Writes = @('METEOR.Scene.Occluder.Depth') }
+        @{ Node = 'METEOR.Scene.Cull.Final'; Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Occluder.Depth'); Writes = @('METEOR.Scene.Cull.FinalList','METEOR.Scene.Cull.BlendedList') }
         @{ Node = 'METEOR.Scene.Shadow';     Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('Shadow.Map') }
     )
     foreach ($row in $meteorContract) {
@@ -249,11 +249,22 @@ try {
             throw "METEOR 단계 계약 불일치: $($row.Node) reads=[$(@($node.Reads) -join ',')] writes=[$(@($node.Writes) -join ',')]"
         }
     }
+    foreach ($cull in @($nodes | Where-Object { $_.Name -like 'METEOR.Scene.Cull.*' })) {
+        if (@($cull.Reads + $cull.Writes | Where-Object { $_ -like 'METEOR.Scene.Commands.*' }).Count) {
+            throw "Culling must publish lists only: $($cull.Name)"
+        }
+    }
     # Cross-node commands and material work must be named graph-resource slots.
     $commandContracts = @(
-        @{ Node='METEOR.Scene.Surface'; Reads=@('METEOR.Scene.Cull.FinalList','METEOR.Scene.Commands.Surface'); Writes=@('METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments') }
+        @{Node='METEOR.Scene.LayerWork'; Reads=@('METEOR.Scene.Cull.BlendedList'); Writes=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended')}
+        @{ Node='METEOR.Scene.Surface'; Reads=@('METEOR.Scene.Cull.FinalList'); Writes=@('METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments') }
         @{ Node='METEOR.Scene.Color'; Reads=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments'); Writes=@() }
         @{ Node='METEOR.Scene.Blended'; Reads=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended'); Writes=@() }
+    )
+    $commandContracts += @(
+        @{Node='Temporal.Inputs'; Reads=@('METEOR.Scene.Visibility','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments','METEOR.Scene.Cull.BlendedList'); Writes=@()}
+        @{Node='METEOR.Scene.Surface'; Reads=@(); Writes=@('METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal')}
+        @{Node='METEOR.Scene.Color'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Scene.Visibility','METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal'); Writes=@()}
     )
     foreach ($row in $commandContracts) {
         $node = $nodes | Where-Object { $_.Name -eq $row.Node }

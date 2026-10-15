@@ -534,6 +534,14 @@ namespace experiment::cooked
                 GeometryArray(wire, level.indices);
                 GeometryMeshlets(wire, level.meshlets);
             }
+            wire.Integer(static_cast<uint32_t>(value.groups.size()));
+            for (const auto& group : value.groups) {
+                wire.Integer(group.firstMeshlet); wire.Integer(group.meshletCount);
+                wire.Integer(group.childGroup); wire.Integer(group.secondChild);
+                wire.Integer(group.parentGroup); wire.Integer(group.lodIndex); wire.Integer(group.primitiveBase); wire.Float(group.geometricError);
+                for(auto v:group.sphere) wire.Float(v);
+                wire.Integer(group.levelFirstMeshlet); for(auto v:group.reserved) wire.Integer(v);
+            }
         }
 
         void GeometryLods(WireReader& wire, MeshLodChain& value)
@@ -555,6 +563,16 @@ namespace experiment::cooked
                 GeometryArray(wire, level.indices);
                 GeometryMeshlets(wire, level.meshlets);
                 value.levels.push_back(std::move(level));
+            }
+            const auto groups = wire.Count(kMeshClusterMaxGroups, sizeof(MeshClusterGroup));
+            for (uint32_t i = 0; i < groups; ++i) {
+                MeshClusterGroup group;
+                group.firstMeshlet = wire.Integer<uint32_t>(); group.meshletCount = wire.Integer<uint32_t>();
+                group.childGroup = wire.Integer<uint32_t>(); group.secondChild = wire.Integer<uint32_t>();
+                group.parentGroup = wire.Integer<uint32_t>(); group.lodIndex = wire.Integer<uint32_t>(); group.primitiveBase = wire.Integer<uint32_t>(); group.geometricError = wire.Float();
+                for(auto& v:group.sphere) v=wire.Float();
+                group.levelFirstMeshlet=wire.Integer<uint32_t>(); for(auto& v:group.reserved) v=wire.Integer<uint32_t>();
+                value.groups.push_back(group);
             }
         }
 

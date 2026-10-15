@@ -369,6 +369,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
         const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
         const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
         const auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
         host.DeclareHistory(*graph, outputs.depth);
         RGTextureDesc aoDesc;
@@ -389,14 +390,14 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
 
 
         lighting = SceneHost::DeclareHdrTarget(*graph, context);
-        const auto lit = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+        const auto lit = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
         // Same order as the product renderer: the medium composes once over the
         // opaque scene, then the blended stream draws every Blended/transmission
         // draw (glass). Publication rejects a stream that omits a blended draw.
         const auto composed = host.DeclareVolume(*graph, lit, outputs.depth, {});
         tiles.SetDepth(outputs.depth);
         tiles.Declare(*graph, context);
-        const auto color = host.DeclareBlendedStream(*graph, meteorFinalList.commands, composed, {}, tiles.GetLighting());
+        const auto color = host.DeclareBlendedStream(*graph, meteorLayerWork, composed, {}, tiles.GetLighting());
         RHIReadback readback;
         CheckWith(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback ", error);
         graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource, RGAccessMode::Read}},

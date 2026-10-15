@@ -509,6 +509,7 @@ namespace
         charge = AddModelCharge(charge, mesh.indices.capacity() * sizeof(std::uint32_t));
         charge = AddModelCharge(charge, MeshletDynamicCharge(mesh.meshlets));
         charge = AddModelCharge(charge, mesh.coarseLods.levels.capacity() * sizeof(experiment::MeshLodLevel));
+        charge = AddModelCharge(charge, mesh.coarseLods.groups.capacity() * sizeof(experiment::MeshClusterGroup));
         for (const auto& lod : mesh.coarseLods.levels)
         {
             charge = AddModelCharge(charge, lod.indices.capacity() * sizeof(std::uint32_t));

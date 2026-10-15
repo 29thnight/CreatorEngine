@@ -544,7 +544,7 @@ namespace
     ///
     /// 데칼과 LX가 Outputs를 통째로 받기 때문에 필요하다. 슬롯을 낱개로
     /// 두는 이유는 그것이 실제 의존 관계이기 때문이고(데칼은 셋만 수정한다),
-    /// 묶는 비용은 핸들 여섯 개 복사뿐이다.
+    /// 최종 가시성과 데칼 전후 버전도 이 명시적 입력 계약으로 전달한다.
     SceneSurfaceTargets::Outputs GatherGBufferOutputs(const LiveBlackboard& blackboard)
     {
         SceneSurfaceTargets::Outputs outputs{};
@@ -555,6 +555,13 @@ namespace
         outputs.bitmask    = blackboard.Get(LiveSlots::kGBufferBitmask);
         outputs.depth      = blackboard.Get(LiveSlots::kGBufferDepth);
         outputs.visibility = blackboard.Get(LiveSlots::kVisibility);
+        return outputs;
+    }
+
+    SceneSurfaceTargets::Outputs GatherMaterialSurface(const LiveBlackboard& blackboard)
+    {
+        auto outputs=GatherGBufferOutputs(blackboard);
+        outputs.decalBaseline={blackboard.Get(LiveSlots::kDecalBaseDiffuse),blackboard.Get(LiveSlots::kDecalBaseOrm),blackboard.Get(LiveSlots::kDecalBaseNormal)};
         return outputs;
     }
 
@@ -3586,26 +3593,25 @@ namespace
                 LivePassNode node;
                 node.name = "METEOR.Scene.Cull.First";
                 node.reads = {LiveSlots::kMeteorGeometry};
-                node.writes = {LiveSlots::kMeteorFirstList, LiveSlots::kMeteorDepthCommands};
+                node.writes = {LiveSlots::kMeteorFirstList};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
                     const auto first = p.graphMaterials.DeclareFirstCull(graph, bb.Get(LiveSlots::kMeteorGeometry));
                     bb.Set(LiveSlots::kMeteorFirstList, first.list);
-                    bb.Set(LiveSlots::kMeteorDepthCommands, first.depthCommands);
                 };
                 p.desc.AddNode(std::move(node));
             }
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Occluder";
-                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorFirstList, LiveSlots::kMeteorDepthCommands};
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorFirstList};
                 node.writes = {LiveSlots::kMeteorOccluderDepth};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
                     bb.Set(LiveSlots::kMeteorOccluderDepth, p.graphMaterials.DeclareOccluder(graph,
-                        bb.Get(LiveSlots::kMeteorGeometry), {bb.Get(LiveSlots::kMeteorFirstList), bb.Get(LiveSlots::kMeteorDepthCommands)}));
+                        bb.Get(LiveSlots::kMeteorGeometry), {bb.Get(LiveSlots::kMeteorFirstList)}));
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3613,16 +3619,30 @@ namespace
                 LivePassNode node;
                 node.name = "METEOR.Scene.Cull.Final";
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
-                node.writes = {LiveSlots::kMeteorFinalList, LiveSlots::kMeteorSurfaceCommands, LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands};
+                node.writes = {LiveSlots::kMeteorFinalList, LiveSlots::kMeteorBlendedList};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
                     const auto final = p.graphMaterials.DeclareFinalCull(graph,
                         bb.Get(LiveSlots::kMeteorGeometry), bb.Get(LiveSlots::kMeteorOccluderDepth));
                     bb.Set(LiveSlots::kMeteorFinalList, final.list);
-                    bb.Set(LiveSlots::kMeteorSurfaceCommands, final.commands.surface);
-                    bb.Set(LiveSlots::kMeteorLayerCommands, final.commands.layer);
-                    bb.SetList(LiveSlots::kMeteorBlendedCommands, final.commands.blended);
+                    bb.Set(LiveSlots::kMeteorBlendedList, final.blendedList);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // Layer consumers share prepared capture/color work; culling publishes lists only.
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.LayerWork";
+                node.reads = {LiveSlots::kMeteorBlendedList};
+                node.writes = {LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    const auto work = p.graphMaterials.DeclareLayerWork(graph, bb.Get(LiveSlots::kMeteorBlendedList));
+                    bb.Set(LiveSlots::kMeteorLayerCommands, work.layer);
+                    bb.SetList(LiveSlots::kMeteorBlendedCommands, work.blended);
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3667,18 +3687,19 @@ namespace
                     p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
                     return p.decal.PrepareFrame(ctx, err);
                 };
-                node.reads = { LiveSlots::kMeteorFinalList, LiveSlots::kMeteorSurfaceCommands };
+                node.reads = { LiveSlots::kMeteorFinalList };
                 node.writes = {
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
                     LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
                     LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments,
+                    LiveSlots::kDecalBaseDiffuse, LiveSlots::kDecalBaseOrm, LiveSlots::kDecalBaseNormal,
                 };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.gbuffer.Declare(graph, ctx);
-                    auto outputs = p.graphMaterials.DeclareGBuffer(graph, {bb.Get(LiveSlots::kMeteorFinalList), {bb.Get(LiveSlots::kMeteorSurfaceCommands), {}, {}}},
+                    auto outputs = p.graphMaterials.DeclareGBuffer(graph, {bb.Get(LiveSlots::kMeteorFinalList), {}},
                         p.gbuffer.GetOutputs());
                     const auto material = p.graphMaterials.MaterialWork();
                     const auto workInputs = material ? material->GraphInputs(graph) : std::array<RGHandle,2>{};
@@ -3690,10 +3711,9 @@ namespace
                     outputs.diffuse = decalOutputs.diffuse;
                     outputs.normal = decalOutputs.normal;
                     outputs.metalRough = decalOutputs.metalRough;
-                    if (p.decal.HasPreparedDecals())
-                    {
-                        p.graphMaterials.DeclareDecalInputs(graph, decalOutputs, p.decal.GetBaseline());
-                    }
+                    bb.Set(LiveSlots::kDecalBaseDiffuse, decalOutputs.decalBaseline[0]);
+                    bb.Set(LiveSlots::kDecalBaseOrm, decalOutputs.decalBaseline[1]);
+                    bb.Set(LiveSlots::kDecalBaseNormal, decalOutputs.decalBaseline[2]);
                     bb.Set(LiveSlots::kGBufferDiffuse,    outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
                     bb.Set(LiveSlots::kGBufferNormal,     outputs.normal);
@@ -3720,7 +3740,8 @@ namespace
             {
                 LivePassNode node; node.name="Temporal.Inputs";
                 node.instance=[&p](uint32_t)->EnhancedRenderPass* {return &p.temporalInputs;};
-                node.reads={LiveSlots::kGBufferDepth,LiveSlots::kMeteorGeometry};
+                node.reads={LiveSlots::kGBufferDepth,LiveSlots::kMeteorGeometry,LiveSlots::kVisibility,
+                    LiveSlots::kMeteorMaterialTiles,LiveSlots::kMeteorMaterialArguments,LiveSlots::kMeteorBlendedList};
                 node.writes={LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                     LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
                 node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding& binding) {
@@ -3730,7 +3751,9 @@ namespace
                         p.desc.HasConsumer(LiveSlots::kTemporalMotion, ctx, binding);
                     if (!required) return; // Reset blackboard contains no temporal handles for this view.
                     p.temporalInputs.SetDepth(bb.Get(LiveSlots::kGBufferDepth));p.temporalInputs.Declare(graph,ctx);
-                    auto targets=p.graphMaterials.DeclareTemporal(graph,bb.Get(LiveSlots::kMeteorGeometry),p.temporalInputs.Outputs());
+                    auto targets=p.graphMaterials.DeclareTemporal(graph,bb.Get(LiveSlots::kVisibility),
+                        {bb.Get(LiveSlots::kMeteorMaterialTiles),bb.Get(LiveSlots::kMeteorMaterialArguments)},
+                        bb.Get(LiveSlots::kMeteorBlendedList),p.temporalInputs.Outputs());
                     targets=p.decal.DeclareTemporal(graph,ctx,targets);
                     const char* names[]{LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                         LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
@@ -3768,9 +3791,11 @@ namespace
                 LivePassNode node;
                 node.name = "METEOR.Scene.Color";
                 node.reads = {
+                    LiveSlots::kMeteorGeometry, LiveSlots::kVisibility,
                     LiveSlots::kMeteorLayerCommands,
                     LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments,
                     LiveSlots::kAmbientOcclusion, LiveSlots::kShadowMap,
+                    LiveSlots::kDecalBaseDiffuse, LiveSlots::kDecalBaseOrm, LiveSlots::kDecalBaseNormal,
                 };
                 // Refraction completes the opaque HDR first, then installs the
                 // closest transmitting surface in the shared GBuffer and depth.
@@ -3784,8 +3809,8 @@ namespace
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);
-                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareColor(graph, GatherGBufferOutputs(bb),
-                        {{}, bb.Get(LiveSlots::kMeteorLayerCommands), {},
+                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareColor(graph, GatherMaterialSurface(bb),
+                        {bb.Get(LiveSlots::kMeteorLayerCommands),
                          {bb.Get(LiveSlots::kMeteorMaterialTiles), bb.Get(LiveSlots::kMeteorMaterialArguments)}}, hdr, bb.Get(LiveSlots::kAmbientOcclusion),
                         bb.Get(LiveSlots::kShadowMap)));
                 };
@@ -3975,7 +4000,7 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareBlendedStream(graph, { {}, bb.Get(LiveSlots::kMeteorLayerCommands), bb.GetList(LiveSlots::kMeteorBlendedCommands) },
+                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareBlendedStream(graph, { bb.Get(LiveSlots::kMeteorLayerCommands), bb.GetList(LiveSlots::kMeteorBlendedCommands) },
                         bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kShadowMap), p.lightTiles.GetLighting()));
                 };
                 p.desc.AddNode(std::move(node));

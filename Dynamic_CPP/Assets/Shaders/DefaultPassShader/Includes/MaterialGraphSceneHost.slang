@@ -1,6 +1,7 @@
 #pragma once
 #define LX_SCENE_VOLUME_TRANSPORT 1
 #include "MaterialGraphSurfacePoint.slang"
+#include "MaterialEvaluation.slang"
 #include "PrincipledIblLookup.slang"
 #include "PbrCoverage.slang"
 #include "CascadedShadow.slang"
@@ -57,6 +58,9 @@ cbuffer LXSceneConstants : register(b0)
     uint lx_geometryPrimitiveCount;
     uint lx_geometryIdentityVersion;
     uint3 lx_geometryIdentityPadding;
+    // lx_vertices is object space; these map the current/previous chunk to world.
+    float4x4 lx_world;
+    float4x4 lx_previousWorld;
 };
 
 StructuredBuffer<LXSurfacePoint> lx_vertices : register(t0);
@@ -201,6 +205,7 @@ struct LXSceneVertex
     float2 uv : TEXCOORD4;
     nointerpolation uint owner : TEXCOORD5;
     nointerpolation uint reconstruction : TEXCOORD15;
+    float4 previousClip : TEXCOORD6;
 };
 
 LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFace);
@@ -214,10 +219,23 @@ uint2 LXSceneLoadVisibility(uint2 pixel)
     return uint2(lx_geometryIdentityPadding.x, address - begin);
 }
 
-LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection)
+// Object-space stream point -> world space (position and PBR frame).
+LXSurfacePoint LXSceneWorldPoint(LXSurfacePoint source, float4x4 world)
 {
-    const LXSurfacePoint source = lx_vertices[index];
-    LXSceneVertex output;
+    LXSurfacePoint result = source;
+    result.position = float4(mul(float4(source.position.xyz, 1), world).xyz, 0);
+    float3 n, t, b;
+    TransformPbrFrame(source.normal.xyz, source.tangent.xyz, source.bitangent.xyz, (float3x3)world, n, t, b);
+    result.normal = float4(n, 0);
+    result.tangent = float4(t, 0);
+    result.bitangent = float4(b, 0);
+    return result;
+}
+
+LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection, float4x4 world)
+{
+    const LXSurfacePoint source = LXSceneWorldPoint(lx_vertices[index], world);
+    LXSceneVertex output = (LXSceneVertex)0;
     output.clip = mul(float4(source.position.xyz, 1), viewProjection);
     output.position = source.position.xyz;
     output.normal = source.normal.xyz;
@@ -232,7 +250,7 @@ LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection)
 [shader("vertex")]
 LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-    return LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection);
+    return LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection, lx_world);
 }
 
 // Chunk-local topology over the same transformed vertices used by LXSceneVS.
@@ -265,7 +283,7 @@ void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
-        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection);
+        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection, lx_world);
         vertices[lane] = vertex;
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
@@ -294,7 +312,7 @@ void LXSceneVisibilityMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
-        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection);
+        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection, lx_world);
         vertices[lane] = vertex;
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
@@ -354,13 +372,14 @@ cbuffer LXSceneShadowConstants : register(b4)
     uint lx_shadowGeometryPrimitiveCount;
     uint lx_shadowGeometryIdentityVersion;
     uint3 lx_shadowGeometryIdentityPadding;
+    float4x4 lx_shadowWorld;
 };
 
 
 [shader("vertex")]
 LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
 {
-    return LXSceneVertexAt(index, 0u, lx_shadowViewProjection);
+    return LXSceneVertexAt(index, 0u, lx_shadowViewProjection, lx_shadowWorld);
 }
 
 [shader("mesh")]
@@ -379,7 +398,7 @@ void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
-        vertices[lane] = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), 0u, lx_shadowViewProjection);
+        vertices[lane] = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), 0u, lx_shadowViewProjection, lx_shadowWorld);
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
@@ -687,7 +706,8 @@ StructuredBuffer<uint> lx_materialWork : register(t160);
 [numthreads(32, 1, 1)]
 [outputtopology("triangle")]
 void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
-    out vertices LXSceneVertex vertices[4], out indices uint3 triangles[2])
+    out vertices LXSceneVertex vertices[4], out indices uint3 triangles[2],
+    out primitives LXScenePrimitive primitives[2])
 {
     const uint record = lx_geometryIdentityPadding.x;
     const uint recordCount = lx_materialWork[2];
@@ -707,16 +727,17 @@ void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
         v.reconstruction = 1u;
         vertices[lane] = v;
     }
-    if (lane == 0u) { triangles[0] = uint3(0,1,2); triangles[1] = uint3(2,1,3); }
+    if (lane == 0u) { triangles[0] = uint3(0,1,2); triangles[1] = uint3(2,1,3); primitives[0].address=0; primitives[1].address=0; }
 }
 
 LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFace)
 {
     const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, identity.y >> 7u);
     const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, identity.y & 127u);
-    const LXSurfacePoint a = lx_vertices[primitive.vertices.x];
-    const LXSurfacePoint b = lx_vertices[primitive.vertices.y];
-    const LXSurfacePoint c = lx_vertices[primitive.vertices.z];
+    // Reconstruction runs per record with that record's constants and world.
+    const LXSurfacePoint a = LXSceneWorldPoint(lx_vertices[primitive.vertices.x], lx_world);
+    const LXSurfacePoint b = LXSceneWorldPoint(lx_vertices[primitive.vertices.y], lx_world);
+    const LXSurfacePoint c = LXSceneWorldPoint(lx_vertices[primitive.vertices.z], lx_world);
     const float4 ca = mul(float4(a.position.xyz, 1), lx_viewProjection);
     const float4 cb = mul(float4(b.position.xyz, 1), lx_viewProjection);
     const float4 cc = mul(float4(c.position.xyz, 1), lx_viewProjection);
@@ -743,22 +764,14 @@ LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFac
     return v;
 }
 
-// Paired transformed streams use the same current topology. Previous skin and
-// object transforms are evaluated by the existing surface-geometry compute stage.
+// Current/previous posed streams share topology; worlds remain instance inputs.
 StructuredBuffer<LXSurfacePoint> lx_previousVertices : register(t156);
-struct LXTemporalVertex
-{
-    LXSceneVertex surface;
-    float4 currentClip : TEXCOORD6;
-    float4 previousClip : TEXCOORD7;
-};
 [shader("vertex")]
-LXTemporalVertex LXSceneTemporalVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
+LXSceneVertex LXSceneTemporalVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-    LXTemporalVertex output;
-    output.surface = LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection);
-    output.currentClip = mul(float4(lx_vertices[index].position.xyz, 1), lx_temporalCurrentProjection);
-    output.previousClip = mul(float4(lx_previousVertices[index].position.xyz, 1), lx_temporalPreviousProjection);
+    LXSceneVertex output = LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection, lx_world);
+    const float3 previous = mul(float4(lx_previousVertices[index].position.xyz, 1), lx_previousWorld).xyz;
+    output.previousClip = mul(float4(previous, 1), lx_temporalPreviousProjection);
     return output;
 }
 struct LXTemporalOutput
@@ -767,38 +780,54 @@ struct LXTemporalOutput
     float reactive : SV_Target1;
     float transparency : SV_Target2;
     float responsive : SV_Target3;
+    float depth : SV_Depth;
 };
 [shader("fragment")]
-LXTemporalOutput LXSceneTemporalPS(LXTemporalVertex input, bool frontFace : SV_IsFrontFace)
+LXTemporalOutput LXSceneTemporalPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace, uint primitiveAddress : SV_PrimitiveID)
 {
-    // Match the material host's true-pixel-center correction in BOTH time samples.
-    // Derivatives precede material coverage/discard, including alpha/SDF edges.
-    const float3 dx=ddx_fine(input.surface.position), dy=ddy_fine(input.surface.position);
-    const float4 previousDx=ddx_fine(input.previousClip), previousDy=ddy_fine(input.previousClip);
-    const LXSceneVertex centered=LXScenePixelCenter(input.surface);
-    const float3 delta=centered.position-input.surface.position;
-    const float xx=dot(dx,dx), xy=dot(dx,dy), yy=dot(dy,dy), determinant=xx*yy-xy*xy;
-    if (isfinite(determinant) && abs(determinant)>1e-20)
-    {
-        const float2 step=float2(dot(delta,dx)*yy-dot(delta,dy)*xy,
-            dot(delta,dy)*xx-dot(delta,dx)*xy)/determinant;
-        if(all(isfinite(step)))input.previousClip+=previousDx*step.x+previousDy*step.y;
-    }
-    input.currentClip=mul(float4(centered.position,1),lx_temporalCurrentProjection);
-    const PrincipledSurface surface = LXSceneUndecaledMaterial(centered, frontFace);
-    if (lx_blended == 1u && surface.alpha <= 0.01) discard;
+    const bool reconstructed = input.reconstruction != 0u;
+    LXSceneVertex centered;
+    uint address = primitiveAddress;
+    if (reconstructed) {
+        const uint2 identity = LXSceneLoadVisibility(uint2(input.clip.xy));
+        if (identity.x == 0u) discard;
+        centered = LXSceneReconstruct(input.clip, identity, frontFace);
+        address = identity.y;
+    } else centered = LXScenePixelCenter(input);
+    // The selected current topology also indexes the retained previous pose.
+    // A LOD transition never reads the previous frame's different topology.
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, address >> 7u);
+    const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, address & 127u);
+    const float3 a = LXSceneWorldPoint(lx_vertices[primitive.vertices.x], lx_world).position.xyz;
+    const float3 b = LXSceneWorldPoint(lx_vertices[primitive.vertices.y], lx_world).position.xyz;
+    const float3 c = LXSceneWorldPoint(lx_vertices[primitive.vertices.z], lx_world).position.xyz;
+    const float3 x=b-a, y=c-a, delta=centered.position-a;
+    const float xx=dot(x,x), xy=dot(x,y), yy=dot(y,y), determinant=xx*yy-xy*xy;
+    const float2 uv=float2(dot(delta,x)*yy-dot(delta,y)*xy,dot(delta,y)*xx-dot(delta,x)*xy)/determinant;
+    const float3 weights=float3(1-uv.x-uv.y,uv);
+    const float3 previous=lx_previousVertices[primitive.vertices.x].position.xyz*weights.x +
+        lx_previousVertices[primitive.vertices.y].position.xyz*weights.y +
+        lx_previousVertices[primitive.vertices.z].position.xyz*weights.z;
+    const float4 previousClip=mul(mul(float4(previous,1),lx_previousWorld),lx_temporalPreviousProjection);
+    const float4 currentClip=mul(float4(centered.position,1),lx_temporalCurrentProjection);
+    // Opaque coverage is already fixed by final visibility; only replay evaluates alpha.
+    float alpha=1;
+    if(!reconstructed) alpha=LXSceneUndecaledMaterial(centered, frontFace).alpha;
+    if (lx_blended == 1u && alpha <= 0.01) discard;
     LXTemporalOutput output;
-    const bool valid = lx_temporalHistoryValid != 0u && input.currentClip.w > 0.000001 &&
-        input.previousClip.w > 0.000001 && all(isfinite(input.previousClip));
-    output.motion = valid ? (input.previousClip.xy / input.previousClip.w -
-        input.currentClip.xy / input.currentClip.w) * float2(0.5 * lx_width, -0.5 * lx_height) : float2(0);
-    output.transparency = lx_blended != 0u ? saturate(surface.alpha) : 0;
+    const bool valid = lx_temporalHistoryValid != 0u && currentClip.w > 0.000001 &&
+        previousClip.w > 0.000001 && all(isfinite(previousClip));
+    output.motion = valid ? (previousClip.xy / previousClip.w -
+        currentClip.xy / currentClip.w) * float2(0.5 * lx_width, -0.5 * lx_height) : float2(0);
+    output.transparency = lx_blended != 0u ? saturate(alpha) : 0;
     output.reactive = lx_blended != 0u ? 1 : 0;
     output.responsive = valid ? 0 : 1;
+    const float4 rasterClip=mul(float4(centered.position,1),lx_viewProjection);
+    output.depth=rasterClip.z/rasterClip.w;
     return output;
 }
 
-// Deferred·Forward 와 같은 식(CascadedShadow.slang)을 쓴다.
+// Shared cascaded-shadow evaluation for METEOR material packets and layer shading.
 CascadedShadowView LXSceneShadowView()
 {
     CascadedShadowView view;

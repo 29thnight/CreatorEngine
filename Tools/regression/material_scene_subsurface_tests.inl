@@ -231,6 +231,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
             const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
             const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
             outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
@@ -261,7 +262,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             };
             copyTexture(0, lighting, RHIFormat::RGBA16Float);
             copyTexture(1, outputs.depth, RHIFormat::D32Float);
-            lighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
             copyTexture(2, lighting, RHIFormat::RGBA16Float);
             copyTexture(3, outputs.depth, RHIFormat::D32Float);
             copyTexture(4, outputs.bitmask, RHIFormat::R32Uint);

@@ -775,10 +775,11 @@
     <ClInclude Include="MaterialGraphRasterSurface.h" />
     <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
-    <ClInclude Include="MaterialGraphSceneLod.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
     <ClInclude Include="MaterialGraphSceneStages.inl" />
     <ClInclude Include="MaterialGraphSceneEffectStage.inl" />
+    <ClInclude Include="MaterialGraphSceneLayerStage.inl" />
+    <ClInclude Include="MaterialGraphSceneVolumeStage.inl" />
     <ClInclude Include="MaterialGraphSceneFinalCullStage.inl" />
     <ClInclude Include="MaterialGraphSceneFirstCullStage.inl" />
     <ClInclude Include="MaterialGraphSceneGeometryStage.inl" />

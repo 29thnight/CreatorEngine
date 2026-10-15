@@ -1,13 +1,20 @@
 #ifndef METEOR_VISIBILITY_CONTRACT
 #define METEOR_VISIBILITY_CONTRACT
-// SceneFrameGeometry::Record, 80 bytes. reserved.yz is the half-open range.
+// SceneFrameGeometry::Record, 128 bytes. reserved.yz is the half-open range.
+// worldColumns map the object-space vertex stream to world space.
 struct LXFrameGeometryRecord
 {
     uint2 geometryKey, objectId, incarnation, instanceId, materialSlot;
     uint lodIndex, primitiveCount, version;
     uint3 reserved;
     uint chunkIndex, owner, meshletCount, vertexCount;
+    float4 worldColumns[3];
 };
+float3 MeteorRecordWorldPosition(LXFrameGeometryRecord record, float3 position)
+{
+    const float4 p = float4(position, 1);
+    return float3(dot(p, record.worldColumns[0]), dot(p, record.worldColumns[1]), dot(p, record.worldColumns[2]));
+}
 uint MeteorVisibilityRecord(StructuredBuffer<LXFrameGeometryRecord> table, uint count, uint address)
 {
     if (address == 0u || address == 0xffffffffu) return 0u;

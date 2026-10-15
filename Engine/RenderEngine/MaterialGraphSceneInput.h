@@ -62,11 +62,7 @@ namespace material_graph
         EnhancedMaterialCoverage coverage;
         SceneCoverage queue{};
         float viewDepth{};
-        math::vector3 shadowCenter{};
-        float shadowRadius{};
-        std::uint32_t geometryLod{};
         std::shared_ptr<const MeshSurfacePlan> geometry;
-        std::shared_ptr<const MeshSurfacePlan> shadowGeometry;
         std::shared_ptr<const MeshSurfacePlan> previousGeometry;
     };
 
@@ -88,7 +84,7 @@ namespace material_graph
         explicit SceneViewInput(ConstructionKey) {}
         SceneViewInput(ConstructionKey, const SceneViewInput& source)
             : view_(source.view_), surface_(source.surface_), viewProjection_(source.viewProjection_),
-              draws_(source.draws_), cost_(source.cost_), modelPins_(source.modelPins_),
+              draws_(source.draws_), cost_(source.cost_), geometryMaxPixelError_(source.geometryMaxPixelError_), modelPins_(source.modelPins_),
               materialPins_(source.materialPins_) {}
         static bool Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,
                          const SceneInputBudget& budget, own::shared_owner<const SceneViewInput>& result, std::string& error,
@@ -101,6 +97,7 @@ namespace material_graph
         const math::matrix4x4& ViewProjection() const { return viewProjection_; }
         std::span<const SceneDrawInput> Draws() const { return draws_; }
         const SceneInputCost& Cost() const { return cost_; }
+        float GeometryMaxPixelError() const { return geometryMaxPixelError_; }
         own::shared_owner<const Instance> MaterialOwner(const SceneDrawInput& draw) const
         {
             return materialPins_->Owner(draw.materialPinIndex);
@@ -114,6 +111,7 @@ namespace material_graph
         math::matrix4x4 viewProjection_;
         std::vector<SceneDrawInput> draws_;
         SceneInputCost cost_;
+        float geometryMaxPixelError_{1.f};
         own::shared_owner<const assets::ModelAssetGenerationPins> modelPins_;
         own::shared_owner<InstanceFramePins> materialPins_;
     };

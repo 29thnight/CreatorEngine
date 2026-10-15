@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][ValidateSet('--shadow-decal-only','--subsurface-only','--refraction-only','--refraction-film-only','--volume-only',
         '--forward-blend','--rg5-mixed','--rg5-decal','--rg5-reference','--scene-only','--lx-meshlet-only',
-        '--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only')][string[]]$Modes,
+        '--temporal-transmission-only','--cluster-lod-only','--object-space-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only')][string[]]$Modes,
     [ValidateRange(60,1800)][int]$TimeoutSeconds=1200
 )
 $ErrorActionPreference='Stop'
@@ -25,13 +25,16 @@ function Snapshot {
 $before=Snapshot
 $before|ConvertTo-Json -Depth 4|Set-Content "$out/identity-before.json"
 $required=@{
-    '--hybrid-visibility-only'=@('METEOR_HYBRID_VISIBILITY_OK frames=21 cases=7 partitions=3 validation=0')
+    '--temporal-transmission-only'=@('METEOR_TEMPORAL_TRANSMISSION_OK frames=6 instances=2 validation=0')
+    '--cluster-lod-only'=@('METEOR_CLUSTER_LOD_OK frames=16 partitions=2 malformed=9')
+    '--object-space-only'=@('METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3')
+    '--hybrid-visibility-only'=@('METEOR_HYBRID_VISIBILITY_OK frames=24 cases=8 partitions=3 validation=0')
     '--atomic-reduction-only'=@('METEOR_ATOMIC_REDUCTION_OK permutations=24 frames=6 validation=0')
     '--visibility-reconstruction-only'=@('METEOR_VISIBILITY_RECONSTRUCTION_OK frames=32 partitions=3 footprintFrames=8 validation=0')
     '--hw-visibility-only'=@('METEOR_HW_VISIBILITY_OK frames=24 partitions=3 validation=0')
     '--geometry-access-only'=@('METEOR_GEOMETRY_ACCESS_OK cases=6 lods=2 partitions=3 validation=0')
     '--layer-bucket-only'=@('LX_LAYER_BUCKET_OK mode=1 frames=24','LX_LAYER_BUCKET_OK mode=2 frames=24')
-    '--temporal-bucket-only'=@('LX_TEMPORAL_BUCKET_OK frames=12 instances=2 submissions=1')
+    '--temporal-bucket-only'=@('LX_TEMPORAL_BUCKET_OK frames=12 instances=2 opaquePackets=12 layerReplays=3')
     '--material-bucket-only'=@('LX_MATERIAL_BUCKET_OK frames=24','[meteor.material-buckets] commands=2 buckets=1 cpuInstanceSubmissions=0')
     '--shadow-decal-only'=@('CSM_CONTRACTS_OK','SHADOW_MATERIAL_BUCKET_OK frames=6','[meteor.shadow-buckets] cascade=0 commands=2 buckets=1 cpuInstanceSubmissions=0','SHADOW_COOKED_CLUSTER_BOUNDARY_OK','LX_MATERIAL_SCENE_SHADOW_OK','LX_MATERIAL_SCENE_DECAL_OK')
     '--subsurface-only'=@('LX_MATERIAL_SCENE_SUBSURFACE_OK')

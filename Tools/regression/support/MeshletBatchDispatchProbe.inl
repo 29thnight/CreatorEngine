@@ -5,7 +5,8 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
 {
     std::string error;
     const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),
-        RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18), RHILayout::SrvBufferTable(4096, 4114)};
+        RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18), RHILayout::SrvBufferTable(4096, 4114),
+        RHILayout::Srv(8211)};
     const auto layout = roots.GetOrCreate({params, {}}, error);
     Check(layout.IsValid(), "Batch meshlet layout " + error);
     std::array<LX::Runtime::ComputePipeline, 3> kernels;
@@ -99,6 +100,11 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             RHIBindingDesc::UavBuffer(args, binCount, sizeof(RHIDrawIndexedIndirectArguments))};
         const auto outputTable = device.CreateBindings(out);
         const auto vertexTable = device.CreateBindings(vertices), topologyTable = device.CreateBindings(topologies);
+        // World-space fixture streams: identity object-to-world per bin.
+        std::vector<math::vector4> worlds;
+        for (uint32_t bin = 0; bin < binCount; ++bin)
+            worlds.insert(worlds.end(), {math::vector4(1, 0, 0, 0), math::vector4(0, 1, 0, 0), math::vector4(0, 0, 1, 0)});
+        const auto worldUpload = upload(worlds.data(), worlds.size() * sizeof(math::vector4));
         Check(uniform.IsValid() && outputTable.IsValid() && vertexTable.IsValid() && topologyTable.IsValid(),
             "Batch tables stay in the active recording");
         const RHIBufferTransition before[]{{ids, RHIResourceState::Common, RHIResourceState::UnorderedAccess},
@@ -112,6 +118,7 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             encoder.SetBindings(RHIBindPoint::Compute, 3, outputTable);
             encoder.SetBindings(RHIBindPoint::Compute, 4, vertexTable);
             encoder.SetBindings(RHIBindPoint::Compute, 5, topologyTable);
+            encoder.SetRootBuffer(RHIBindPoint::Compute, 6, worldUpload);
             const auto groups = stage == 1 ? groupCount : (binCount + 63) / 64;
             encoder.Dispatch((std::min)(groups, 65535u), (groups + 65534) / 65535, 1);
             const RHIBufferHandle barriers[]{ids, args}; encoder.ResourceBarriers({{}, {}, {}, barriers});

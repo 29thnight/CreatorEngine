@@ -1,5 +1,5 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-    RGHandle SceneHost::ShadowStage::DeclareShadow(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const
+    RGHandle SceneHost::ShadowStage::DeclareShadow(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const
     {
         ce::profile_scope profile{ce::marker<"MaterialDeclareShadow">()};
         const auto frame = prepared;
@@ -9,7 +9,7 @@
         }
         frame->CheckCurrent();
         if (!frame->draws.empty()) frame->CheckCurrent(&graph);
-        RequireStage(geometry, frame->geometryStage.geometryTable->GraphTable(graph), "METEOR.Scene.Shadow requires the METEOR.Scene.Geometry table.");
+        RequireStage(geometry, frame->raster->geometry->GraphTable(graph), "METEOR.Scene.Shadow requires the METEOR.Scene.Geometry table.");
         static constexpr const char* kCascadePassNames[]{"METEOR.Scene.Shadow.C0", "METEOR.Scene.Shadow.C1",
                                                          "METEOR.Scene.Shadow.C2"};
         if (graph.HasDeclaredWriter(shadowMap, kCascadePassNames[0]))
@@ -24,7 +24,7 @@
                 if (draw.shadowMeshlets[cascade]) meshlets.push_back(draw.shadowMeshlets[cascade]);
             }
             GpuGeometryVisibility::Frame::DeclareMeshletBatch(graph, meshlets);
-            if (frame->shadowStage.shadowCommands[cascade]) frame->shadowStage.shadowCommands[cascade]->Declare(graph, frame->shadowStage.shadowCommands[cascade]);
+            if (this->shadowCommands[cascade]) this->shadowCommands[cascade]->Declare(graph, this->shadowCommands[cascade]);
         }
         // One pass per cascade: identical commands, but each cascade's GPU time
         // is attributed separately by the graph profiler.
@@ -51,10 +51,10 @@
                         {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, RGAccessMode::Read});
                 }
             }
-            if (frame->shadowStage.shadowCommands[cascade])
-                frame->shadowStage.shadowCommands[cascade]->AddRead(graph, uses, frame->shadowStage.shadowCommands[cascade]->GraphOutput(graph));
+            if (this->shadowCommands[cascade])
+                this->shadowCommands[cascade]->AddRead(graph, uses, this->shadowCommands[cascade]->GraphOutput(graph));
             NormalizeSceneReads(graph, uses);
-            graph.AddPass(kCascadePassNames[cascade], uses, [frame, shadowMap, cascade](const auto& execution) {
+            graph.AddPass(kCascadePassNames[cascade], uses, [this, frame, shadowMap, cascade](const auto& execution) {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
                 const auto map = execution.ResolveHandle(shadowMap);
@@ -72,7 +72,7 @@
                     throw std::runtime_error("METEOR Scene cascade target binding failed.");
                 }
                 encoder.BindRenderTargets(targets);
-                const auto& batch = frame->shadowStage.shadowCommands[cascade];
+                const auto& batch = this->shadowCommands[cascade];
                 if (!batch) return; // No admitted shadow casters in this sealed frame.
                 for (std::size_t bucket = 0; bucket < batch->buckets.size(); ++bucket)
                 {

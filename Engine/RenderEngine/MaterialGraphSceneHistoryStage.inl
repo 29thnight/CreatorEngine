@@ -1,10 +1,10 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-    void SceneHost::HistoryStage::DeclareHistory(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle depth) const
+    void SceneHost::HistoryStage::DeclareHistory(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle expectedDepth, RGHandle depth) const
     {
-        if (!prepared || !prepared->historyStage.nextCameraHistory) return;
+        if (!prepared || !this->nextCameraHistory) return;
         prepared->CheckCurrent(&graph);
-        if (!prepared->surfaceStage.gbuffer.depth.IsValid() || depth.index != prepared->surfaceStage.gbuffer.depth.index)
+        if (!expectedDepth.IsValid() || depth.index != expectedDepth.index)
             throw std::runtime_error("METEOR history requires its final surface depth.");
-        prepared->historyStage.nextCameraHistory->Declare(graph, depth);
+        this->nextCameraHistory->Declare(graph, depth);
     }
 

@@ -335,6 +335,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
             const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
             const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
             outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc desc;
@@ -365,11 +366,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                        target, h.index == color.index ? background.data() : white);
                                }
                            });
-            color = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
+            color = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
             const auto composed = host.DeclareVolume(*graph, color, outputs.depth, {});
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);
-            const auto final = host.DeclareBlendedStream(*graph, meteorFinalList.commands, composed, {}, tiles.GetLighting());
+            const auto final = host.DeclareBlendedStream(*graph, meteorLayerWork, composed, {}, tiles.GetLighting());
             Check(final.IsValid(), "Transport shared output");
             std::array<RHIReadback, 3> readbacks;
             const std::array handles{final, outputs.depth, outputs.bitmask};

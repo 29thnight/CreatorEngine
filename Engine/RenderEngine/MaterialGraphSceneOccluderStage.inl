@@ -1,5 +1,5 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-    RGHandle SceneHost::OccluderStage::DeclareOccluder(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, const SceneFirstCullOutputs& first) const
+    RGHandle SceneHost::OccluderStage::DeclareOccluder(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, const SceneFirstCullOutputs& first) const
     {
         ce::profile_scope profile{ce::marker<"MaterialDeclareOccluder">()};
         const auto frame = prepared;
@@ -9,13 +9,14 @@
             return {};
         }
         frame->CheckCurrent(&graph);
-        RequireStage(geometry, frame->geometryStage.geometryTable->GraphTable(graph), "METEOR.Scene.Occluder requires the METEOR.Scene.Geometry table.");
-        if (!frame->occluderStage.occluderVisibility) { RequireStage(first.list, {}, "METEOR occluder has no first list."); RequireStage(first.depthCommands, {}, "METEOR occluder has no commands."); return {}; }
-        RequireStage(first.list, frame->firstCullStage.cameraDepthMeshlets->GraphVisibleIds(graph), "METEOR.Scene.Occluder requires the METEOR.Scene.Cull.First list.");
-        frame->firstCullStage.depthCommands->ValidateInput(graph, first.depthCommands);
-        const auto& occluder = frame->occluderStage.occluderVisibility;
+        RequireStage(geometry, frame->raster->geometry->GraphTable(graph), "METEOR.Scene.Occluder requires the METEOR.Scene.Geometry table.");
+        if (!this->occluderVisibility) { RequireStage(first.list, {}, "METEOR occluder has no first list."); return {}; }
+        RequireStage(first.list, frame->raster->first->GraphVisibleIds(graph), "METEOR.Scene.Occluder requires the METEOR.Scene.Cull.First list.");
+        depthCommands->Declare(graph, depthCommands);
+        const auto command = depthCommands->GraphOutput(graph);
+        const auto& occluder = this->occluderVisibility;
         occluder->Declare(graph, occluder);
-        DeclareHardwareVisibility(graph, frame, true, first.depthCommands);
+        DeclareHardwareVisibility(graph, frame, occluder, frame->raster->first, depthCommands, true, command);
         occluder->DeclareSoftware(graph, occluder);
         RGTextureDesc depthDescription;
         depthDescription.width = frame->input->View().width;
@@ -27,10 +28,11 @@
     }
 
 
-    bool SceneHost::OccluderStage::Prepare(const Frame& frame, const EnhancedFrameContext& context,
+    bool SceneHost::OccluderStage::Prepare(const FrameInput& frame, const EnhancedFrameContext& context,
+    const std::shared_ptr<const SceneFrameGeometry>& geometry, const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
     HybridVisibilityPipelines& pipelines, std::string& error)
 {
-    if (!frame.firstCullStage.cameraDepthMeshlets) return true;
-    return SurfaceStage::PrepareVisibility(frame, context, pipelines, "METEOR.Scene.Occluder", true,
-        frame.firstCullStage.cameraDepthMeshlets, occluderVisibility, error);
+    if (!list) return true;
+    return SurfaceStage::PrepareVisibility(frame, context, geometry, pipelines, "METEOR.Scene.Occluder", true,
+        list, occluderVisibility, error);
 }

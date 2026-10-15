@@ -1,3 +1,6 @@
+    // Internal evaluator inputs. Public consumers receive purpose-specific contracts.
+    struct SceneShadingInputs { SceneLayerWork layers; std::array<RGHandle, 2> material; };
+
     // Each stage owns its prepared resources and the code that declares their graph passes.
     struct SceneHost::GeometryStage
     {
@@ -8,125 +11,146 @@
             geometryTable = std::move(table);
             return true;
         }
-        RGHandle DeclareGeometry(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph) const;
+        RGHandle DeclareGeometry(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph) const;
     };
 
     struct SceneHost::FirstCullStage
     {
         std::shared_ptr<const GpuGeometryVisibility::Frame> cameraDepthMeshlets;
-        std::shared_ptr<const IndirectMaterialBatch> depthCommands;
-        SceneFirstCullOutputs DeclareFirstCull(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry) const;
+        SceneFirstCullOutputs DeclareFirstCull(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry) const;
     };
 
     struct SceneHost::OccluderStage
     {
+        std::shared_ptr<const IndirectMaterialBatch> depthCommands;
         std::shared_ptr<const SceneHybridVisibility> occluderVisibility;
-        bool Prepare(const Frame& frame, const EnhancedFrameContext& context,
+        bool Prepare(const FrameInput& frame, const EnhancedFrameContext& context,
+            const std::shared_ptr<const SceneFrameGeometry>& geometry, const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
                      HybridVisibilityPipelines& pipelines, std::string& error);
-        RGHandle DeclareOccluder(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, const SceneFirstCullOutputs& first) const;
+        RGHandle DeclareOccluder(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, const SceneFirstCullOutputs& first) const;
     };
 
     struct SceneHost::FinalCullStage
     {
         // Opaque recovery union, and the frustum-culled blended list in source meshlet order.
         std::shared_ptr<const GpuGeometryVisibility::Frame> cameraMeshlets, blendedMeshlets;
-        // Surface: opaque mesh dispatch buckets. Layer: blended mesh dispatch per input range.
-        std::shared_ptr<const IndirectMaterialBatch> materialCommands, indexedCommands;
         // Built from the occluder depth; read by opaque meshlet recovery.
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> currentPyramid;
-        SceneFinalCullOutputs DeclareFinalCull(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, RGHandle occluderDepth) const;
+        SceneFinalCullOutputs DeclareFinalCull(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, RGHandle occluderDepth, const std::shared_ptr<const SceneHybridVisibility>& occluder) const;
     };
 
     struct SceneHost::ShadowStage
     {
         std::array<std::shared_ptr<const IndirectMaterialBatch>, 3> shadowCommands;
-        RGHandle DeclareShadow(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const;
+        RGHandle DeclareShadow(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const;
     };
 
     struct SceneHost::TemporalStage
     {
         std::shared_ptr<const IndirectMaterialBatch> temporalCommands;
-        std::array<RGHandle, 5> DeclareTemporal(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry,
+        std::array<RGHandle, 5> DeclareTemporal(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle expectedVisibility, RGHandle visibility, const std::array<RGHandle, 2>& material, RGHandle layerList,
         std::array<RGHandle, 5> targets) const;
     };
 
     struct SceneHost::SurfaceStage
     {
+        std::shared_ptr<const IndirectMaterialBatch> materialCommands;
         std::shared_ptr<const SceneHybridVisibility> hybridVisibility;
-        static bool PrepareVisibility(const Frame& frame, const EnhancedFrameContext& context,
+        static bool PrepareVisibility(const FrameInput& frame, const EnhancedFrameContext& context,
+            const std::shared_ptr<const SceneFrameGeometry>& geometry,
             HybridVisibilityPipelines& pipelines, const char* name, bool depthOnly,
             const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
             std::shared_ptr<const SceneHybridVisibility>& result, std::string& error);
-        bool Prepare(const Frame& frame, const EnhancedFrameContext& context,
+        bool Prepare(const FrameInput& frame, const EnhancedFrameContext& context,
+            const std::shared_ptr<const SceneFrameGeometry>& geometry, const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
                      HybridVisibilityPipelines& pipelines, std::string& error);
         std::shared_ptr<const SceneMaterialWork> materialWork;
         mutable SceneSurfaceTargets::Outputs gbuffer;
-        SceneSurfaceTargets::Outputs DeclareGBuffer(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,
+        SceneSurfaceTargets::Outputs DeclareGBuffer(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,
                                                            const SceneSurfaceTargets::Outputs& incoming) const;
     };
 
     struct SceneHost::HistoryStage
     {
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> nextCameraHistory;
-        void DeclareHistory(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle depth) const;
+        void DeclareHistory(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle expectedDepth, RGHandle depth) const;
     };
 
-    struct SceneHost::EffectStage
+    struct SceneHost::VolumeStage
     {
-        std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
-        std::shared_ptr<const SceneRuntimeEffectsFrame> runtimeEffects;
-        std::shared_ptr<const SceneSubsurfaceFrame> subsurface;
-        std::shared_ptr<const SceneRefractionFrame> refraction;
-        std::shared_ptr<const SceneVolumeFrame> volume;
-        std::vector<SceneVolumeBinding> volumeBindings;
-        RHIBufferSlice emptyVolumeConstants, emptyVolumeBuffer;
-        RHIBindingTable emptyVolumeBindings, emptyRuntimeInputs, emptyRuntimeBackground;
+        std::shared_ptr<const SceneVolumeFrame> frame;
+        std::vector<SceneVolumeBinding> bindings;
+        RHIBufferSlice constants, buffer;
+        RHIBindingTable table;
+        mutable RGHandle output;
+        RGHandle Declare(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph,
+            RGHandle shaded, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const;
+        template<class DrawType>
+        void BindForward(RHIEncoder& encoder, const DrawType& draw, const EnhancedForwardLighting& forward) const;
+    };
+
+    struct SceneHost::LayerStage
+    {
+        std::shared_ptr<const IndirectMaterialBatch> indexedCommands;
         mutable SceneSurfaceTargets::Outputs forwardGbuffer;
-        mutable RGHandle colorOutput, volumeOutput;
         mutable std::map<std::size_t, RGHandle> blendedOutputs;
-        mutable std::array<RGHandle, 3> decalBaseline;
-        std::array<RHIBufferSlice, 2> decalConstants;
-        struct RuntimeBindings { RHIRenderTargetBinding color; RHIBindingTable common, decal, volume; };
-        mutable std::mutex runtimeBindingMutex;
-        mutable std::map<std::array<std::uint64_t, 7>, RuntimeBindings> runtimeBindings;
         mutable std::mutex forwardTargetMutex;
         mutable RHIRenderTargetBinding forwardTargets;
         struct BlendedRange { std::vector<size_t> inputs; std::array<std::shared_ptr<const IndirectMaterialBatch>, 2> commands; };
         std::vector<BlendedRange> blendedRanges;
-        RHIBufferSlice emptyMediumConstants, emptyMediumTriangles;
-        bool PrepareBlended(Frame& frame, const std::shared_ptr<const LX::Runtime::ComputeGeneration>& generation, std::string& error);
-        mutable SceneSurfaceTargets::Outputs decalInputs;
-        const SceneSurfaceTargets::Outputs& SurfaceInputs(const Frame& frame) const;
-        RuntimeBindings RuntimeTables(const Frame& frame, const EnhancedRenderGraph::ExecuteContext& execution,
+        bool PrepareBlended(const FrameInput& frame, const std::shared_ptr<const SceneLookupFrame>& alphaLookup, bool hasRuntimeEffects, const std::shared_ptr<const LX::Runtime::ComputeGeneration>& generation, std::string& error);
+        void DeclareForwardGBuffer(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque, const SceneShadingInputs& commands,
+                                          std::size_t index) const;
+        SceneLayerWork Declare(const own::shared_owner<const FrameInput>& frame, EnhancedRenderGraph& graph, RGHandle list) const;
+    };
+
+    struct SceneHost::EffectStage
+    {
+        LayerStage layers;
+        struct LookupState { std::shared_ptr<const SceneLookupFrame> opaque, layered; } lookup;
+
+        std::shared_ptr<const SceneSubsurfaceFrame> subsurface;
+        std::shared_ptr<const SceneRefractionFrame> refraction;
+
+        mutable RGHandle colorOutput;
+        VolumeStage volume;
+        struct DecalState
+        {
+            std::array<RHIBufferSlice, 2> constants;
+            void AddUses(const SceneSurfaceTargets::Outputs& inputs, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool transmission) const;
+            RHIBindingTable Table(const FrameInput& frame, const EnhancedRenderGraph::ExecuteContext& execution, const SceneSurfaceTargets::Outputs& inputs, bool transmission) const;
+            template<class DrawType> void Bind(RHIEncoder& encoder, const DrawType& draw, RHIBindingTable table, bool enabled) const;
+        } decal;
+        struct RuntimeBindings { RHIRenderTargetBinding color; RHIBindingTable common, decal, volume; };
+        struct RuntimeState
+        {
+            std::shared_ptr<const SceneRuntimeEffectsFrame> frame;
+            RHIBindingTable emptyInputs, emptyBackground;
+            mutable std::mutex mutex;
+            mutable std::map<std::array<std::uint64_t, 13>, RuntimeBindings> bindings;
+        RuntimeBindings Tables(const FrameInput& frame, const EnhancedRenderGraph::ExecuteContext& execution,
                                       const SceneSurfaceTargets::Outputs& inputs, RGHandle lighting,
                                       RGHandle ambientOcclusion, RGHandle shadowMap, bool blended,
-                                      bool transmissionStage) const;
-        void AddDecalUses(const Frame& frame, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool transmissionStage) const;
-        RHIBindingTable DecalTable(const Frame& frame, const EnhancedRenderGraph::ExecuteContext& execution, bool transmissionStage) const;
-        template<class DrawType>
-        void BindDecal(RHIEncoder& encoder, const DrawType& draw, RHIBindingTable table, bool transmissionStage) const;
+                                      bool transmissionStage, const VolumeStage& volume, const DecalState& decal) const;
+        } runtime;
         template<class DrawType>
         void BindForward(RHIEncoder& encoder, const DrawType& draw, const EnhancedForwardLighting& forward) const;
-        void DeclareDecalInputs(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                       const std::array<RGHandle, 3>& baseline) const;
-        RGHandle DeclareColor(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneCommandInputs& commands,
+
+        RGHandle DeclareColor(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& expected, const SceneSurfaceTargets::Outputs& inputs, const SceneColorInputs& inputWork,
                                      RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap) const;
-        std::vector<ForwardDraw> BlendedDraws(const own::shared_owner<const Frame>& prepared) const;
-        RGHandle DeclareBlended(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const std::vector<std::size_t>& indices, const SceneCommandInputs& commands, RGHandle lighting,
+        std::vector<ForwardDraw> BlendedDraws(const own::shared_owner<const FrameInput>& prepared) const;
+        RGHandle DeclareBlended(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque, const std::vector<std::size_t>& indices, const SceneLayerWork& commands, RGHandle lighting,
                                        RGHandle shadowMap, const EnhancedForwardLighting& forward) const;
-        RGHandle DeclareBlendedStream(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneCommandInputs& commands, RGHandle lighting, RGHandle shadowMap,
+        RGHandle DeclareBlendedStream(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque, const SceneLayerWork& commands, RGHandle lighting, RGHandle shadowMap,
                                              const EnhancedForwardLighting& tiles) const;
-        RGHandle DeclareVolume(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth,
-                                      RGHandle shadowMap) const;
-        void DeclareForwardGBuffer(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque, const SceneCommandInputs& commands,
-                                          std::size_t index) const;
-        void DeclareRefractionCapture(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneCommandInputs& commands,
+
+        void DeclareRefractionCapture(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneShadingInputs& commands,
                                              std::optional<std::size_t> index) const;
-        RGHandle DeclareShading(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneCommandInputs& commands,
+        RGHandle DeclareShading(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneShadingInputs& commands,
                                        RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
                                        bool transmissionStage, std::optional<std::size_t> blended = {},
                                        EnhancedForwardLighting forward = {}, std::vector<std::size_t> blendedGroup = {}) const;
-        RGHandle DeclareRuntimeEffects(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneCommandInputs& commands,
+        RGHandle DeclareRuntimeEffects(const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneShadingInputs& commands,
                                               RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
                                               bool transmissionStage, std::optional<std::size_t> blended,
                                               EnhancedForwardLighting forward) const;

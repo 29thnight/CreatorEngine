@@ -1,6 +1,6 @@
 #ifndef LX_MESHLET_GPU_CONTRACT
 #define LX_MESHLET_GPU_CONTRACT
-// RHIMeshletBufferHeader schema 2 (80 bytes), MeshletDescriptor profile 2.
+// RHIMeshletBufferHeader schema 4 (80 bytes, optional spatial replacement DAG section), MeshletDescriptor profile 2.
 // Addresses are bytes. Cooked triangle corners remain packed uint8.
 struct LXMeshletDescriptor
 {
@@ -11,6 +11,8 @@ struct LXMeshletDescriptor
     uint triangleCount;
     uint clusterId;
     uint lodIndex;
+    uint groupId;
+    uint primitiveBase;
 };
 LXMeshletDescriptor LXLoadMeshlet(ByteAddressBuffer data, uint index)
 {
@@ -22,7 +24,10 @@ LXMeshletDescriptor LXLoadMeshlet(ByteAddressBuffer data, uint index)
     value.vertexCount = data.Load(descriptor + 12u);
     value.triangleCount = data.Load(descriptor + 16u);
     value.clusterId = data.Load(descriptor + 24u);
-    value.lodIndex = data.Load(56);
+    value.primitiveBase = data.Load(76) != 0u ? data.Load(descriptor + 60u) : 0u;
+    const uint hierarchy=data.Load(76);
+    value.groupId=hierarchy!=0u ? data.Load(descriptor+28u) : 0u;
+    value.lodIndex=hierarchy!=0u ? data.Load(hierarchy+16u+value.groupId*64u+20u) : data.Load(56);
     return value;
 }
 uint LXMeshletVertex(ByteAddressBuffer data, LXMeshletDescriptor descriptor, uint vertex)
@@ -40,7 +45,7 @@ uint3 LXMeshletTriangle(ByteAddressBuffer data, LXMeshletDescriptor descriptor, 
 }
 uint LXMeshletPrimitiveId(ByteAddressBuffer data, LXMeshletDescriptor descriptor, uint triangle)
 {
-    return data.Load(descriptor.primitives + triangle * 4u);
+    return data.Load(descriptor.primitives + triangle * 4u) - descriptor.primitiveBase;
 }
 // Shared HW/SW geometry access. IDs are cooked geometry/LOD ordinals, never
 // descriptor indices, GPU addresses or visible-list positions. The caller owns
@@ -53,6 +58,7 @@ struct LXGeometryPrimitive
     uint primitiveId;
     uint clusterId;
     uint lodIndex;
+    uint primitiveBase;
 };
 LXGeometryPrimitive LXLoadGeometryPrimitive(ByteAddressBuffer data, LXMeshletDescriptor descriptor, uint triangle)
 {
@@ -65,7 +71,9 @@ LXGeometryPrimitive LXLoadGeometryPrimitive(ByteAddressBuffer data, LXMeshletDes
     value.sourceVertices = uint3(data.Load(source + value.corners.x * 4u),
         data.Load(source + value.corners.y * 4u), data.Load(source + value.corners.z * 4u));
     value.primitiveId = LXMeshletPrimitiveId(data, descriptor, triangle);
-    value.clusterId = descriptor.clusterId;
+    const uint hierarchy = data.Load(76);
+    const uint groupFirst = hierarchy != 0u ? data.Load(hierarchy + 16u + descriptor.groupId * 64u + 48u) : 0u;
+    value.clusterId = descriptor.clusterId - groupFirst;
     value.lodIndex = descriptor.lodIndex;
     return value;
 }

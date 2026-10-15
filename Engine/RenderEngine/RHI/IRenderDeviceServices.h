@@ -663,8 +663,9 @@ struct RHIModelMeshView
     return outView.IsComplete();
 }
 
-/// Derive a per-LOD upload view from the same validated aggregate or payload.
-/// coarseIndex is zero-based (LOD1). This is not a separate mesh cache identity.
+/// Derive a topology-bucket upload view from the validated cooked payload.
+/// coarseIndex is zero-based depth; spatial buckets need not cover the whole mesh.
+/// Scene rendering uses the complete DAG and never submits one of these buckets alone.
 [[nodiscard]] inline bool BuildRHIModelMeshLodView(const RHIModelMeshView& base,
     uint32_t coarseIndex, RHIModelMeshView& result)
 {

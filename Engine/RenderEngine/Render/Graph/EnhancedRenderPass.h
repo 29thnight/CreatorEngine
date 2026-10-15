@@ -404,6 +404,7 @@ struct EnhancedShadowData
     // 값을 얻지만, 캐스터 컬링을 밖에서 검증하려면 이쪽이 필요하다.
     math::vector4 lightDirection{};
 
+    uint32_t mapResolution{}; // Actual per-cascade raster extent, also used by GPU LOD.
     bool enabled{ false };
 };
 

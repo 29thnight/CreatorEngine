@@ -27,13 +27,22 @@ struct IndirectMaterialBatch
     mutable std::uint64_t graphEpoch{};
     std::uint32_t commandCount{};
     std::string name{"METEOR.Scene.Commands"};
-    bool indexedReplay{};
 
     ~IndirectMaterialBatch() { if (device && output.IsValid()) device->ReleaseBuffer(output); }
 
     bool Upload(std::span<const std::uint32_t> words, std::span<const std::array<std::uint32_t, 4>> records,
         std::uint32_t outputBytes, std::string& error)
     {
+        // The native indirect signature consumes ascending, unique root slots.
+        // Reject malformed templates in Prepare, before any graph work is recorded.
+        for (const auto& bucket : buckets) {
+            uint32_t previous{}; bool first=true;
+            for (const auto root : bucket.roots) {
+                const auto slot=root & 0x7fffffffu;
+                if (!first && slot<=previous) { error="METEOR indirect roots must be strictly increasing."; return false; }
+                previous=slot; first=false;
+            }
+        }
         commandCount = static_cast<std::uint32_t>(records.size());
         if (!commandCount) return true;
         const auto upload = [&](const void* data, std::size_t bytes) {
@@ -43,7 +52,7 @@ struct IndirectMaterialBatch
         };
         templates = upload(words.data(), words.size_bytes());
         commands = upload(records.data(), records.size_bytes());
-        const std::array<std::uint32_t, 4> values{commandCount, indexedReplay ? 1u : 0u, 0, 0};
+        const std::array<std::uint32_t, 4> values{commandCount, 0u, 0, 0};
         constants = device->UploadConstants(values.data(), sizeof(values));
         RHIBufferDesc desc;
         desc.bytes = outputBytes; desc.allowUnorderedAccess = true; desc.allowIndirectArguments = true;
@@ -102,8 +111,7 @@ struct IndirectMaterialBatch
     void Draw(RHIEncoder& encoder, std::size_t bucket) const
     {
         const auto& range = buckets.at(bucket);
-        if (!(indexedReplay ? encoder.DrawIndexedIndirectBatch(output, range.offset, range.count, range.roots)
-            : encoder.DispatchMeshIndirectBatch(output, range.offset, range.count, range.roots)))
+        if (!encoder.DispatchMeshIndirectBatch(output, range.offset, range.count, range.roots))
             throw std::runtime_error("METEOR material bucket indirect submission failed.");
     }
 };

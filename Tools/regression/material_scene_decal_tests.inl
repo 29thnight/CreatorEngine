@@ -130,6 +130,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
                     const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
                     const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
                     auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
                     host.DeclareHistory(*graph, outputs.depth);
                     auto decalInputs = outputs;
@@ -160,32 +161,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     outputs.diffuse = decal.GetOutputs().diffuse;
                     outputs.normal = decal.GetOutputs().normal;
                     outputs.metalRough = decal.GetOutputs().metalRough;
-                    if (decal.HasPreparedDecals())
-                    {
-                        bool rejected = false;
-                        try
-                        {
-                            host.DeclareDecalInputs(*graph, outputs, {});
-                        }
-                        catch (const std::runtime_error&)
-                        {
-                            rejected = true;
-                        }
-                        Check(rejected, "Invalid Decal snapshot preserves frame");
-                        ++failures;
-                        host.DeclareDecalInputs(*graph, outputs, decal.GetBaseline());
-                        rejected = false;
-                        try
-                        {
-                            host.DeclareDecalInputs(*graph, outputs, decal.GetBaseline());
-                        }
-                        catch (const std::runtime_error&)
-                        {
-                            rejected = true;
-                        }
-                        Check(rejected, "Duplicate Decal declaration rejected");
-                        ++failures;
-                    }
+                    outputs.decalBaseline = decal.GetOutputs().decalBaseline;
                     RGTextureDesc aoDesc;
                     aoDesc.width = aoDesc.height = 16;
                     aoDesc.format = RHIFormat::RG16Float;
@@ -207,7 +183,16 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
 
 
                     lighting = SceneHost::DeclareHdrTarget(*graph, context);
-                    const auto color = lighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ambient, {});
+                    const SceneColorInputs packetCommands{meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}};
+                    if(decal.HasPreparedDecals())for(unsigned fault=0;fault<2;++fault) {
+                        auto bad=outputs;
+                        if(fault==0)bad.decalBaseline[1]={};
+                        else bad.decalBaseline[0]=outputs.diffuse;
+                        bool rejected=false;
+                        try{host.DeclareColor(*graph,bad,packetCommands,lighting,ambient,{});}catch(const std::runtime_error&){rejected=true;}
+                        Check(rejected,"Incomplete or aliased Decal packet rejected before Color declaration");++failures;
+                    }
+                    const auto color = lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ambient, {});
                     std::array<RHIReadback, 9> readbacks;
                     const auto copyTexture = [&](unsigned index, RGHandle texture, RHIFormat format) {
                         Check(device.CreateReadback(16, 16, format, 1, readbacks[index], error),

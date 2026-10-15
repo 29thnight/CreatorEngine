@@ -60,12 +60,71 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 <body>
 <main>
 <header class="hero">
-  <div class="kicker">docs/analysis · 2026-10-14 · METEOR 단계 객체·효과 상태 정리 · 범위별 오류 검증 통과</div>
+  <div class="kicker">docs/analysis · 2026-10-16 · 단계 책임·명령 계약 정리 / DX12 오류 검증 통과</div>
   <h1>METEOR 라이브 배선 현황과 RE 엔진까지 남은 작업</h1>
-  <p class="meta"><b>METEOR</b>는 LX 머티리얼을 그리는 장면 렌더러다(정식 명칭은 <code>MaterialGraphSceneHost.h</code> 머리 주석 한 곳에 둔다). <b>LX</b>(Lattice eXperiment)는 노드 언어 자체(<code>LX::Runtime</code>, LX 머티리얼)를 가리키며 이후 비주얼 스크립트·BT에도 쓰인다. 대상은 DX12 라이브 경로이며 PR #169·#172 병합 이후의 <code>master</code>를 기반으로 한 <code>meteor-cleanup</code> 작업본이다. 배선 서술은 현재 소스 구조다. 이번 HW/SW 변경의 검증은 상단 카드에, 04장의 2026-10-12 결과는 이전 단계 이력으로 구분한다.</p>
+  <p class="meta"><b>METEOR</b>는 LX 머티리얼을 그리는 장면 렌더러다(정식 명칭은 <code>MaterialGraphSceneHost.h</code> 머리 주석 한 곳에 둔다). <b>LX</b>(Lattice eXperiment)는 노드 언어 자체(<code>LX::Runtime</code>, LX 머티리얼)를 가리키며 이후 비주얼 스크립트·BT에도 쓰인다. 대상은 DX12 라이브 경로이며 PR #169·#172 병합 이후의 <code>master</code>를 기반으로 한 <code>meteor-cleanup</code> 작업본이다. 배선 서술은 현재 소스 구조다. 최신 공유·오브젝트 공간 변경의 검증은 상단 카드에, 04장의 2026-10-12 결과는 이전 단계 이력으로 구분한다.</p>
 </header>
 
-<div class="card" id="blended-meshlets"><h3>현재 구현: 반투명·레이어 메시렛 전환, 인스턴스 가시성 제거 (2026-10-15)</h3>
+<div class="card" id="stage-boundary-cleanup"><h3>2026-10-15–16 · 소비 단계 책임과 입력 계약 정리</h3>
+<p>이 카드와 02·03장이 현재 코드다. 아래 이전 카드의 30노드·Cull 명령 발행 계약은 당시 검증 이력이다. 현재는 <b>31노드</b>이며, 공유 레이어 작업을 명시한 <code>METEOR.Scene.LayerWork</code>가 추가됐다. 노드 수 감소가 아니라 실제 소유 책임과 교차 계약의 분리가 이번 변경의 목적이다.</p>
+<ul><li>Cull.First/Cull.Final은 가시성 목록만 발행한다. 깊이·Surface 명령은 각각 Occluder/Surface에서 선언한다. 레이어 캡처·정렬 Color 명령은 LayerWork가 같은 정렬 목록으로 만들고 Color/Blended에 명시적 슬롯으로 전달한다.</li>
+<li>공용 <code>SceneCommandInputs</code>는 제거했다. Color는 캡처 명령 하나+머티리얼 타일/인자, Blended는 관련 레이어 작업만 받는다. 실행 전 내부 평가기 입력도 공개 단계 계약과 구분한다.</li>
+<li>단계 Declare는 전체 Frame을 받지 않는다. 봉인된 <code>FrameInput</code>과 준비된 불변 GPU 바인딩을 공유하고, Surface/History/Temporal이 확인할 생산자 값은 Host 조립부가 명시적으로 전달한다. FrameInput에는 다른 단계 객체·효과 캐시·단계 결과 핸들이 없다. 공용 입력의 Surface/Depth 명령 참조와 미사용 불투명 재래스터 분기도 제거했다. 기하 재실행 헬퍼는 정렬된 메시렛 레이어만 허용한다. 그래프 epoch/업로드 수명 및 실행 통계는 기록 소유권용 공유 상태다.</li>
+<li>LayerStage가 명령·레이어 타깃·래스터와 레이어 출력 상태를, VolumeStage가 계수·합성 출력·매질 바인딩을 소유한다. Lookup, Runtime 바인딩 캐시와 Decal 바인딩도 목적별 상태로 분리했다. 사용하지 않던 레이어의 빈 매질 버퍼 두 개와 전달 필드를 제거했고, 실제 매질 바인딩과 빈 매질 바인딩은 VolumeStage가 전담한다. Layer Prepare의 volume 유무 의존성도 제거했다. 굴절/SSS의 준비된 자원은 기존 전용 Frame 객체가 계속 소유하고 EffectStage는 효과 평가 순서를 조립한다.</li></ul>
+<details id="stage-boundary-slots"><summary>현재 pipeline.nodes에서 생성한 31노드 계약</summary><p>근거: <code>Build/Verification/MeteorWiringBoundaries20261015/Pipeline-Final/results.jsonl</code>. 구성 검사 PASS.</p><table><thead><tr><th>노드</th><th>reads</th><th>writes</th><th>modifies</th></tr></thead><tbody><tr><td>METEOR.Scene.Geometry</td><td>—</td><td><code>METEOR.Scene.Geometry.Table</code></td><td>—</td></tr><tr><td>METEOR.Scene.Cull.First</td><td><code>METEOR.Scene.Geometry.Table</code></td><td><code>METEOR.Scene.Cull.FirstList</code></td><td>—</td></tr><tr><td>METEOR.Scene.Occluder</td><td><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Cull.FirstList</code></td><td><code>METEOR.Scene.Occluder.Depth</code></td><td>—</td></tr><tr><td>METEOR.Scene.Cull.Final</td><td><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Occluder.Depth</code></td><td><code>METEOR.Scene.Cull.FinalList</code><br><code>METEOR.Scene.Cull.BlendedList</code></td><td>—</td></tr><tr><td>METEOR.Scene.LayerWork</td><td><code>METEOR.Scene.Cull.BlendedList</code></td><td><code>METEOR.Scene.Commands.Layer</code><br><code>METEOR.Scene.Commands.Blended</code></td><td>—</td></tr><tr><td>METEOR.Scene.Shadow</td><td><code>METEOR.Scene.Geometry.Table</code></td><td><code>Shadow.Map</code></td><td>—</td></tr><tr><td>METEOR.Scene.Surface</td><td><code>METEOR.Scene.Cull.FinalList</code></td><td><code>GBuffer.Diffuse</code><br><code>GBuffer.MetalRough</code><br><code>GBuffer.Normal</code><br><code>GBuffer.Emissive</code><br><code>GBuffer.Bitmask</code><br><code>GBuffer.Depth</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code><br><code>METEOR.Scene.Decal.BaseDiffuse</code><br><code>METEOR.Scene.Decal.BaseOrm</code><br><code>METEOR.Scene.Decal.BaseNormal</code></td><td>—</td></tr><tr><td>METEOR.Scene.History</td><td><code>GBuffer.Depth</code></td><td>—</td><td>—</td></tr><tr><td>Temporal.Inputs</td><td><code>GBuffer.Depth</code><br><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code><br><code>METEOR.Scene.Cull.BlendedList</code></td><td><code>Temporal.Motion</code><br><code>Temporal.Reactive</code><br><code>Temporal.Transparency</code><br><code>Temporal.Responsive</code><br><code>Temporal.Depth</code></td><td>—</td></tr><tr><td>SSAO</td><td><code>GBuffer.Depth</code><br><code>GBuffer.Normal</code></td><td><code>Scene.AmbientOcclusion</code></td><td>—</td></tr><tr><td>METEOR.Scene.Color</td><td><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Commands.Layer</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code><br><code>Scene.AmbientOcclusion</code><br><code>Shadow.Map</code><br><code>METEOR.Scene.Decal.BaseDiffuse</code><br><code>METEOR.Scene.Decal.BaseOrm</code><br><code>METEOR.Scene.Decal.BaseNormal</code></td><td><code>Scene.LitColor</code></td><td><code>GBuffer.Depth</code><br><code>GBuffer.Bitmask</code><br><code>GBuffer.Diffuse</code><br><code>GBuffer.MetalRough</code><br><code>GBuffer.Normal</code><br><code>GBuffer.Emissive</code></td></tr><tr><td>SkyBox</td><td><code>GBuffer.Depth</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>SSGI</td><td><code>GBuffer.Depth</code><br><code>GBuffer.Normal</code><br><code>GBuffer.Diffuse</code><br><code>GBuffer.MetalRough</code><br><code>Scene.AmbientOcclusion</code><br><code>Temporal.Motion</code><br><code>Temporal.Responsive</code><br><code>Temporal.Reactive</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>SSS</td><td><code>GBuffer.Depth</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>SSR</td><td><code>GBuffer.Depth</code><br><code>GBuffer.MetalRough</code><br><code>GBuffer.Normal</code><br><code>GBuffer.Bitmask</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>METEOR.Scene.Volume</td><td><code>GBuffer.Depth</code><br><code>Shadow.Map</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>METEOR.Scene.LightTiles</td><td><code>GBuffer.Depth</code></td><td>—</td><td>—</td></tr><tr><td>METEOR.Scene.Blended</td><td><code>GBuffer.Depth</code><br><code>Shadow.Map</code><br><code>METEOR.Scene.Commands.Layer</code><br><code>METEOR.Scene.Commands.Blended</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>Sprite</td><td><code>GBuffer.Depth</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>VolumetricFog</td><td><code>GBuffer.Depth</code><br><code>Shadow.Map</code><br><code>METEOR.Scene.Commands.Layer</code><br><code>METEOR.Scene.Commands.Blended</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>Temporal.SpriteMotion</td><td><code>Scene.LitColor</code><br><code>GBuffer.Depth</code></td><td>—</td><td><code>Temporal.Motion</code><br><code>Temporal.Reactive</code><br><code>Temporal.Transparency</code><br><code>Temporal.Responsive</code><br><code>Temporal.Depth</code></td></tr><tr><td>Temporal.Upscale</td><td><code>Temporal.Motion</code><br><code>Temporal.Depth</code><br><code>Temporal.Reactive</code><br><code>Temporal.Transparency</code><br><code>Temporal.Responsive</code></td><td>—</td><td><code>Scene.LitColor</code></td></tr><tr><td>PostChain</td><td><code>Scene.LitColor</code></td><td><code>Display.LDR</code></td><td>—</td></tr><tr><td>SpatialPost</td><td>—</td><td>—</td><td><code>Display.LDR</code></td></tr><tr><td>Temporal.DisplayInputs</td><td><code>Display.LDR</code></td><td><code>Display.Hudless</code><br><code>Display.UI</code></td><td>—</td></tr><tr><td>UI</td><td>—</td><td>—</td><td><code>Display.LDR</code></td></tr><tr><td>Grid</td><td><code>GBuffer.Depth</code></td><td><code>Gizmo.Depth</code></td><td><code>Display.LDR</code></td></tr><tr><td>WireFrame</td><td>—</td><td>—</td><td><code>Display.LDR</code><br><code>Gizmo.Depth</code></td></tr><tr><td>GizmoIcon</td><td>—</td><td>—</td><td><code>Display.LDR</code></td></tr><tr><td>GizmoLine</td><td>—</td><td>—</td><td><code>Display.LDR</code></td></tr><tr><td>live_present</td><td><code>Display.LDR</code><br><code>Display.Hudless</code><br><code>Display.UI</code><br><code>Temporal.Depth</code><br><code>Temporal.Motion</code></td><td>—</td><td>—</td></tr></tbody></table></details><p id="stage-boundary-validation">1차 소스로 Release 10모드와 Release Editor 전체 게이트가 정상 종료·sourceStable=true로 통과했다. 이후 미사용 불투명 재실행과 중복 매질 상태를 정리한 변경은 네 소스 파일이며 다른 1,160개 소스·셰이더 해시는 같다(<code>layer-only-scope.json</code>). 최종 소스로 Release 반투명·볼륨 2모드, Debug 혼합 래스터·Temporal 3모드, Release Editor 실제 장면(OnlyLive)이 모두 정상 종료·sourceStable=true로 통과했다. Editor 빈 장면 피복 0, 실제 피복·조명 252픽셀, validation 0. 실제 pipeline.nodes 31노드 구성 검사도 통과했고 최종 정리 전후 슬롯 계약이 같다. 최종 게이트 이후 코드 변경은 EOF 공백 제거뿐이다. 최종 Editor 원본 픽셀은 보존하며, 이전 Editor 원본은 보존 정책에 따라 정리했고 로그·판정·해시·보존 장부는 남겼다. MaterialMatchedImageProbe는 빌드만 확인했으며 실행 비교는 하지 않았다. <a href="../../Build/Verification/MeteorWiringBoundaries20261015/scope-verdict.json">최종 검증 근거</a>. RenderPassGraph·LX 단일 경로 유지; 성능·Vulkan 제외. HTML 구조 검사는 통과했으며 시각 미리보기는 수행하지 않았다.</p></div>
+<div class="card" id="a2-spatial-dag"><h3>현재 구현: 공간별 독립 교체 DAG (2026-10-15)</h3>
+<p>원본 메시렛 범위를 공간 패치의 잎으로 삼고, 가장 긴 중심축의 중앙 분할로 자식을 묶는다. 각 부모는 원본 자식 영역의 기하 경계를 고정해 단순화한 별도 토폴로지를 가진다. 같은 위치의 경계 정점 사본을 모두 잠그며, 경계는 위치를 정규화한 선분으로 검증한다. 쿠킹된 자식 둘·부모·범위·깊이·패치 구체·단조 오차로 교체 DAG를 발행한다. 현재 쿠커는 단일 부모의 이진 트리를 생성한다(비순환 DAG의 제한된 형태). 다중 부모 공유·스트리밍은 구현하지 않는다.</p>
+<p>GPU는 자기 패치의 투영 오차와 모든 조상 선택을 검사한다. 부모를 선택하면 두 자식 영역을 함께 대체하고, 그렇지 않으면 자식들이 독립 선택된다. 같은 메시·같은 프레임에서 서로 다른 상세도의 패치를 함께 출력할 수 있다. 모든 청크가 같은 DAG·뷰·월드를 읽어 일관된 cut을 고르며, 카메라 첫/복구·각 그림자 목록은 기존 RenderPassGraph 생산자에서 생성한다. 새 CPU 제출·호환 배선·추가 래스터 노드는 없다.</p>
+<pre class="mermaid">flowchart LR
+  CK["쿠커: 원본 패치 경계 고정 · 공간 교체 DAG"] --> GEO["Scene.Geometry: 전체 토폴로지 · DAG 업로드"]
+  GEO --> FIRST["Cull.First: 공간별 cut + 이전 HZB"]
+  FIRST --> OCC["Scene.Occluder: HW/SW"]
+  OCC --> FINAL["Cull.Final: 같은 cut + HZB 복구"]
+  GEO --> SH["Scene.Shadow: 캐스케이드별 cut"]
+  FINAL --> SURF["Scene.Surface: HW/SW 가시성 → 머티리얼 타일"]
+  SURF --> TEMP["Temporal: 선택된 패치 토폴로지 · 이전 포즈"]
+</pre>
+<p>형식 변경: LOD builder v3 · geometry artifact v4 · model container v15 · GPU meshlet schema v4 · Scene host ABI 34 / material v12. 구형 전체 메시 계층은 거부하고 재임포트·재쿠킹한다. 변형 오차 없는 스키닝 coarse LOD는 계속 제외한다. 성능 측정·개선 및 Vulkan 런타임은 이번 범위 밖이다.</p>
+<p id="a2-dag-validation"><b>현재 오류 검증:</b> Release 7모드·Debug 4모드 전체 회귀가 정상 종료·sourceStable=true로 통과했다. 이후 DAG/header 예산을 메시렛별 과대 계상에서 청크별 1회로 바로잡고 CPU 소유 DAG 복사 비용도 청크별로 반영했다. 정확한 GPU 한도 수락·1바이트 부족 거부 검사를 추가한 최종 소스로 Release·Debug 각각 공간 DAG·불투명/반투명 Temporal·투과 Temporal 3모드를 다시 통과했다. 이 예산 수정 시 변경 범위는 렌더러 예산 계산과 DAG 검사 파일뿐이었다(<code>budget-fix-scope.json</code>). 실제 Suzanne 재임포트에서 같은 위치의 이음새 인덱스를 서로 다른 경계로 세던 검증 오류를 발견해 수정했다. 경계는 위치 정규화로 비교하고 모든 경계 위치의 정점 사본을 잠근다. 분리 인덱스 이음새 쿠킹 검사를 추가한 최종 소스로 두 구성의 동일 3모드를 다시 통과했다(<code>boundary-fix-scope.json</code>). 두 수정의 합계는 렌더러 예산·쿠커·DAG 검사 3파일이며 다른 소스 해시는 같다(<code>post-matrix-scope.json</code>). 최초 Editor 실패와 이음새 검사 초기 구성 실패 기록도 보존했다. 공간 DAG 전용 모드는 구성별 16프레임·두 청크 분할, 혼합 상세도 4프레임, 직교·원근 투영, 월드 스케일·반사, 근평면/프러스텀, 카메라/캐스케이드별 cut과 HZB 복구를 검사했다. authored 토폴로지의 독립 CPU 원근 보간과 깊이·Temporal 모션을 비교했다(3,606픽셀·전환 3,182건). 순환·범위·음수 오차·부모 누락·중복 자식·잘못된 구체·깊이/primitive base 등 손상 8종과 이전 artifact v3를 거부했다. 객체 공간 공유·스키닝·불투명/반투명/투과 Temporal·그림자/데칼·forward blend·기하 ID 접근 회귀도 통과했다. GPU validation 오류 0; GBV 1044의 간접 명령 추적 제한 알림은 원본 로그에 보존한다. Editor도 정상 종료·sourceStable=true, 빈 장면 피복 0, 실제 장면 피복 252·조명 252픽셀, validation 문제 0으로 통과했다. pipeline.nodes는 기존 노드 30개와 명시적 슬롯 계약을 유지한다. 성능·Vulkan은 검증하지 않았다. 근거: <code>Build/Verification/MeteorA2SpatialDag20261015/scope-verdict.json</code> 및 구성별 verdict/원본 로그. 최신 성공 Editor-Accepted 원본 캡처를 유지한다. 정리된 이전 성공 실행은 판정·로그·해시·retention ledger를 보존하지만 삭제된 픽셀은 재생할 수 없다. 실패 실행은 정리하지 않았다. HTML 태그·ID 검사는 통과했고 브라우저 시각 미리보기는 수행하지 않았다.</p><details id="a2-slot-contracts"><summary>A2 당시 노드 계약 (당시 pipeline.nodes 덤프에서 생성)</summary><p>근거: <code>Build/Verification/MeteorA2SpatialDag20261015/Pipeline-Seams/results.jsonl</code> · 노드 30개 · composition PASS.</p><table><thead><tr><th>노드</th><th>reads</th><th>writes</th></tr></thead><tbody><tr><td>METEOR.Scene.Geometry</td><td></td><td><code>METEOR.Scene.Geometry.Table</code></td></tr><tr><td>METEOR.Scene.Cull.First</td><td><code>METEOR.Scene.Geometry.Table</code></td><td><code>METEOR.Scene.Cull.FirstList</code><br><code>METEOR.Scene.Commands.Depth</code></td></tr><tr><td>METEOR.Scene.Cull.Final</td><td><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Occluder.Depth</code></td><td><code>METEOR.Scene.Cull.FinalList</code><br><code>METEOR.Scene.Cull.BlendedList</code><br><code>METEOR.Scene.Commands.Surface</code><br><code>METEOR.Scene.Commands.Layer</code><br><code>METEOR.Scene.Commands.Blended</code></td></tr><tr><td>METEOR.Scene.Shadow</td><td><code>METEOR.Scene.Geometry.Table</code></td><td><code>Shadow.Map</code></td></tr><tr><td>Temporal.Inputs</td><td><code>GBuffer.Depth</code><br><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code><br><code>METEOR.Scene.Cull.BlendedList</code></td><td><code>Temporal.Motion</code><br><code>Temporal.Reactive</code><br><code>Temporal.Transparency</code><br><code>Temporal.Responsive</code><br><code>Temporal.Depth</code></td></tr></tbody></table></details></div>
+<div class="card" id="a2-cluster-lod"><h3>이전 단계: A2 전체 메시 교체 계층 쿠킹 + GPU LOD (2026-10-15)</h3>
+<p>모든 쿠킹 LOD의 메시렛을 같은 봉인된 기하·포즈·프레임 조회 테이블에 담는다. CPU 카메라 LOD 선택기와 그림자 전용 LOD0 준비를 제거했다. GPU 컬링이 투영 오차·월드 스케일·교체 계층을 읽어 한 LOD의 메시렛만 최종 목록에 발행한다. 카메라 첫 목록과 복구 목록은 같은 선택 계약을 사용하며, 그림자는 실제 캐스케이드 해상도와 light projection으로 독립 선택한다. 해상도를 제공하지 않은 검사 입력은 오차 예산 0(원본 상세도)을 명시한다.</p>
+<p><b>당시 계층의 범위:</b> 이전 단순화기는 각 레벨을 원본에서 독립적으로 생성하므로 메시 전체가 하나의 교체 영역이다. 레벨별 클러스터 범위·하위 교체 그룹·단조 오차를 쿠킹하고 GPU가 root부터 세부 그룹으로 내려간다. 공간별 그룹을 독립 단순화·선택하는 DAG, 클러스터 스트리밍, 변형 오차가 없는 스키닝 coarse LOD는 구현하지 않았다. 스키닝은 신규 메시렛 배선에서 단일 원본 레벨을 사용한다.</p>
+<p>Temporal 투과·반투명의 indexed 재생도 제거했다. 투과·반투명은 공통 정렬 메시렛 목록·인자로 간접 실행하고, 현재 선택 토폴로지의 정점을 이전 포즈에 대응시킨다. 신규 <code>Cull.BlendedList</code>를 Temporal.Inputs의 명시적 슬롯 입력으로 전달한다. 불투명 Temporal은 가시성·타일 패킷만 읽으며 최종 메시렛 목록을 다시 읽지 않는다. 준비는 Prepare, 생산자 선언과 소비 의존은 RenderPassGraph에 남긴다.</p>
+<p>강제 재임포트·재쿠킹: model geometry artifact v3, model container v14, LOD builder v2, GPU meshlet schema v3, Scene host ABI 33 / material v11. 이전 형식·손상된 교체 계층을 거부한다. 성능 개선·측정과 Vulkan 런타임은 범위 밖이다.</p>
+<p id="a2-validation"><b>이전 단계 오류 검증:</b> 당시 소스로 Debug 투과 Temporal 6프레임, 불투명·반투명 Temporal 12프레임, A2 12프레임, object-space 9프레임이 모두 정상 종료·sourceStable=true로 통과했다. A2는 두 청크 분할·월드 스케일·반사·카메라/캐스케이드별 선택·근평면/프러스텀·HZB 이력 복구·깊이/LOD 전환 모션을 검사했다(픽셀 2,640개·전환 검사 2,128개). 손상된 교체 계층 3종과 구형 artifact, 비정상 오차 예산, 다른 목록 버전을 거부했다. 잘못 정렬된 간접 루트는 Prepare에서 할당·기록 전에 거부했다. GPU validation 오류 0, 기존 GBV 1044 간접 명령 추적 제한 알림은 로그에 보존했다. Release 7모드·Debug 4모드 전체 회귀가 통과했다. 이후 소비자가 사라진 SceneHost의 인덱스 필드·업로드와 오래된 CPU bin 주석만 제거했다. 다른 소스 1,161개는 같은 해시이며(<code>index-cleanup-scope.json</code>), 그 최종 소스로 Release·Debug 각각 A2/투과 Temporal/반투명 Temporal 3모드를 다시 통과했다(모두 정상 종료·sourceStable=true). Editor도 정상 종료·sourceStable=true로 통과했고 빈 장면 0픽셀, 실제 장면 피복 252픽셀·조명 252픽셀, GPU validation 문제 0을 확인했다. 마지막 변경은 Editor 검사·진단의 구형 schema 기대값 교정이며 렌더러·셰이더·네이티브 프로브 바이너리는 동일하다(<code>editor-selftest-update-scope.json</code>). 근거: <code>Build/Verification/MeteorA2ClusterLod20261015/scope-verdict.json</code> 및 같은 폴더의 구성별 판정·원본 로그.</p><p id="a2-failures"><b>실패 이력:</b> 초기 전용 프로브의 부정확한 authored bounds·기하 식별자/피복 누락·색상 캐시 선언 누락을 수정했다. 기존 Temporal 회귀에서 발견한 반투명 간접 루트 순서 오류는 루트를 오름차순으로 구성하고 공통 Prepare 검증을 추가해 해결했다. 투과·반투명은 기존 엔진에서 공통 정렬 목록이므로 명령 생산자도 하나로 합쳤다. Editor 첫 검사에서는 구형 GPU schema=2 기대값 하나가 실패했다. 당시 schema=3으로 교정하고 스키닝 진단도 GPU readback의 실제 schema/profile을 출력하게 고친 후 전체 Editor 게이트를 다시 통과했다. 최초 실패 판정과 로그는 동일 검증 루트에 보존했으며 성공으로 바꾸지 않았다.</p></div>
+<div class="card" id="c4-packets"><h3>이전 단계 구현: C4 Temporal·데칼의 명시적 머티리얼 패킷 계약 (2026-10-15)</h3>
+<p>불투명 Temporal은 최종 Visibility와 기존 Material.Tiles/Arguments를 읽고 현재/이전 포즈·월드로 모션·마스크·깊이를 복원한다. 불투명 indexed 재생 명령은 만들지 않는다. 투과·반투명 표면만 순서·알파·깊이 계약을 유지하는 별도 Layers 경로를 사용한다. Temporal.Inputs 노드에 가시성·타일 슬롯 읽기를 명시한다.</p>
+<p>데칼 합성의 pre-Decal 스냅샷은 표면 출력과 Surface → Color 블랙보드 슬롯으로 전달한다. SceneHost의 DeclareDecalInputs 등록 API와 EffectStage의 decalInputs/decalBaseline 상태는 제거한다. 실제 Decal.Snapshot 생산자, 완전한 세 채널, 최종 표면과 구별되는 스냅샷을 검사한다. 물리 합성에 필요한 Snapshot·Decal 패스와 반투명 경계는 유지한다.</p>
+<p>Scene host ABI 32 · cooked program/artifact v10으로 강제 재쿠킹한다. RenderPassGraph 유지·호환 경로 없음. 오류 검증: Release object-space 9프레임·3,192 픽셀, Temporal 12프레임(불투명 패킷 12/순서 레이어 3), 데칼·hybrid 통과. Debug object-space·Temporal·데칼도 통과. Release·Debug 데칼은 각각 114프레임·258,642 GPU 성분과 72건의 의도적 잘못된 입력 거부를 확인했다. Release Editor도 실제 장면 피복/조명 각 252픽셀·validation 문제 0으로 통과했다. Release 회귀 7모드와 Debug 3모드는 모두 정상 종료·sourceStable=true로 통과했다. 이어 Color의 Geometry.Table/Visibility 읽기 메타데이터와 주석을 보강했다. 출력 생성 코드·셰이더·프로브 바이너리는 그대로이며 최종 30노드·슬롯 계약과 Editor 재검증도 통과했다. 최종 Editor는 빈 장면 0픽셀, 실제 모델 피복/조명 각 252픽셀, validation 문제 0, 정상 종료·sourceStable=true다. GPU validation은 켰으며 기존 GBV id=1044 간접 명령 추적 한계 알림은 보존한다. 완전한 GPU 메모리 추적의 증명으로 확대하지 않는다. 근거: <code>Build/Verification/MeteorC4Packets20261015/{Release-Final,Debug,Pipeline-Final,Editor-Final}</code> 및 <code>scope-verdict.json</code>. 성능·Vulkan은 범위 밖이다.</p></div>
+<p><b>C4 실패 이력:</b> 첫 전용 검사(<code>Release-Initial</code>)에서 object-space는 통과했으나 Temporal fixture에 컬링 단계 호출을 중복 추가해 선언 거부가 발생했다. 테스트의 중복 선언을 제거한 뒤 위 최종 행렬이 통과했다. 실패 로그와 소스 해시는 보존했다. 마지막 노드 슬롯·주석 보강은 GPU 회귀 이후 별도로 기록했고(<code>post-matrix-scope.json</code>), 출력 생성 코드/셰이더/프로브 바이너리의 동일성과 주석 외 C++ 본문 동일성을 대조했다. 해당 최종 노드 배선은 새 Editor 빌드·덤프·실제 장면 게이트로 검증했다.</p>
+<details id="c4-slot-contracts"><summary>최종 pipeline.nodes에서 생성한 C4 슬롯 계약</summary><p>근거: <code>Build/Verification/MeteorC4Packets20261015/Pipeline-Final/results.jsonl</code>. 실제 노드 덤프에서 추출한 계약이며, 프레임별 선택 패스와 리소스 버전·배리어는 RenderPassGraph가 결정한다.</p><table><thead><tr><th>노드</th><th>reads</th><th>writes</th><th>modifies</th></tr></thead><tbody><tr><td>METEOR.Scene.Surface</td><td><code>METEOR.Scene.Cull.FinalList</code><br><code>METEOR.Scene.Commands.Surface</code></td><td><code>GBuffer.Diffuse</code><br><code>GBuffer.MetalRough</code><br><code>GBuffer.Normal</code><br><code>GBuffer.Emissive</code><br><code>GBuffer.Bitmask</code><br><code>GBuffer.Depth</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code><br><code>METEOR.Scene.Decal.BaseDiffuse</code><br><code>METEOR.Scene.Decal.BaseOrm</code><br><code>METEOR.Scene.Decal.BaseNormal</code></td><td>—</td></tr><tr><td>Temporal.Inputs</td><td><code>GBuffer.Depth</code><br><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code></td><td><code>Temporal.Motion</code><br><code>Temporal.Reactive</code><br><code>Temporal.Transparency</code><br><code>Temporal.Responsive</code><br><code>Temporal.Depth</code></td><td>—</td></tr><tr><td>METEOR.Scene.Color</td><td><code>METEOR.Scene.Geometry.Table</code><br><code>METEOR.Scene.Visibility</code><br><code>METEOR.Scene.Commands.Layer</code><br><code>METEOR.Scene.Material.Tiles</code><br><code>METEOR.Scene.Material.Arguments</code><br><code>Scene.AmbientOcclusion</code><br><code>Shadow.Map</code><br><code>METEOR.Scene.Decal.BaseDiffuse</code><br><code>METEOR.Scene.Decal.BaseOrm</code><br><code>METEOR.Scene.Decal.BaseNormal</code></td><td><code>Scene.LitColor</code></td><td><code>GBuffer.Depth</code><br><code>GBuffer.Bitmask</code><br><code>GBuffer.Diffuse</code><br><code>GBuffer.MetalRough</code><br><code>GBuffer.Normal</code><br><code>GBuffer.Emissive</code></td></tr></tbody></table></details>
+<div class="card" id="instance-sharing"><h3>직전 구현: 같은 프레임 인스턴스의 포즈 출력 공유 (2026-10-15)</h3>
+<p>동일한 기하·포즈·변환 파이프라인으로 함께 준비한 인스턴스는 선언·실행 전부터 하나의 출력 버퍼를 공유한다. 각 인스턴스의 입력·현재/이전 월드는 별도로 보존한다. 완료된 이전 출력도 해당 녹화의 첫 재사용 뷰 하나가 선언을 소유하고 다른 뷰는 같은 그래프 버전을 받는다.</p>
+<p>DeclareBatch는 실제 생산자를 중복 제거하여 한 번만 import/write한다. 공유 뷰는 생산자의 정확한 RGHandle(index/version/epoch/kind)을 사용한다. 추가 인스턴스마다 생산자·준비·join 패스를 만들지 않는다. 출력의 실제 추적된 상태로 import하고, 다음 읽기에 필요한 상태 전환과 배리어는 그래프가 계산한다. 고정 최종 상태를 강제하지 않는다. Prepare에는 그래프 신원이 없으므로 이미 선언된 미실행 생산자를 새 준비에 재사용하지 않아 별도 그래프 사이에 핸들을 넘기지 않는다. 제출 완료점은 선언 소유자를 거쳐 물리 버퍼 소유자까지 전달한다. RenderPassGraph의 자원 의존성과 수명·배리어 관리, LX 단일 배선은 유지한다.</p>
+<p id="instance-sharing-validation"><b>최종 오류 검증:</b> 그래프 경계·완료점 전파 수정 후 Release의 <code>--object-space-only / --hybrid-visibility-only / --temporal-bucket-only</code>, Debug의 앞 두 모드가 모두 정상 종료·sourceStable=true로 통과했다. 새 object-space 검사는 각 구성에서 9프레임·3,192 내부 픽셀을 비교한다. 비균등·음수 스케일/회전/이동 월드 4개, 가중치 .25/.75의 두 본, 같은 포즈 3인스턴스와 다른 포즈 1인스턴스를 사용한다. CPU 투영·역전치/접선 프레임·현재/이전 정점 대응으로 피복·깊이·노멀맵·Temporal 모션을 확인하고, 버퍼·정확한 그래프 버전 공유, 독립적인 컬링, 월드만 변경한 프레임의 완료 출력 재사용과 변환 패스 0개를 검사한다. worker 0/1/4 × 최초/월드 변경/포즈 변경의 9프레임이다. 두 본의 가중치는 모든 정점에서 동일하며 임의의 스켈레톤 전체 검증으로 확대하지 않는다. 실제 30노드 배선 계약도 재통과했다. Release Editor 최종 게이트도 통과했다: 기존 그래프 자가검사·메시렛 계약·스키닝, GPU 목록/페이로드 각 12건, 빈 장면 0픽셀, 실제 모델 피복/조명 각 252픽셀, GPU validation 문제 0, normalQuit/sourceStable=true. 추가 근거: <code>Editor-Final/verdict.json</code>. 근거: <code>Build/Verification/MeteorInstanceSharing20261015/{Release-Final,Debug-Final,Pipeline-Final}</code>. GPU validation 켬·오류 0; 기존 GBV id=1044 간접 명령 추적 한계 알림은 보존한다. 성능·Vulkan 실행은 범위 밖이다.</p>
+<p id="instance-sharing-attempts"><b>보존한 검증 이력:</b> 그래프 경계 수정 전 Release 5개 모드(공유·hybrid·Temporal·forward-blend·shadow-decal)도 통과했다(<code>Release-Verified</code>). 이를 최종 수정본의 추가 실행으로 계산하지 않는다. 첫 Editor 실행은 별도 그래프에 이미 선언된 미실행 생산자를 재선택해 그래프 자가검사에서 실패했다(<code>Editor</code>). 초기 프로브의 중복 Compile, 제출 캐시 미발행, AO clear 값 불일치도 수정했고 실패 로그를 보존했다. 미지원 imported-final 상태를 강제했던 시도는 제거했으며 RenderPassGraph 계약을 확장하거나 validation을 억제하지 않았다.</p>
+</div>
+<div class="card" id="object-space"><h3>직전 구현: A3 오브젝트 공간 정점 스트림 (2026-10-15)</h3>
+<p>METEOR 장면의 변환 compute(<code>LXTransformMesh</code>)는 이제 월드 행렬을 곱하지 않는다. 스키닝까지만 적용한 오브젝트 공간 <code>LXSurfacePoint</code>를 만들고, 월드 행렬은 소비하는 쪽이 곱한다. <code>MeshSurfaceEvaluator::Prepare(..., objectSpace)</code>로 SceneHost만 이 모드를 쓰며, 정적 캐시 키에서 월드 행렬을 뺐다. 그래서 움직이는 강체도 포즈가 같으면 이전 변환 결과를 재사용한다. 머티리얼 프로브 등 다른 사용자는 기존 월드 공간 출력을 그대로 쓴다.</p>
+<p><b>월드 행렬 전달.</b></p>
+<ul>
+<li>장면 상수에 <code>lx_world</code>·<code>lx_previousWorld</code>, 그림자 상수에 <code>lx_shadowWorld</code>를 붙였다. 청크마다 그 청크 기하의 행렬로 채운다.</li>
+<li>호스트 셰이더의 <code>LXSceneWorldPoint</code>가 위치와 PBR 프레임(<code>TransformPbrFrame</code>)을 월드로 바꾼다. 카메라·그림자 메시/버텍스 셰이더, 가시성 재구성, Temporal 현재/이전 위치가 이 함수를 쓴다.</li>
+<li>프레임 기하 레코드에 오브젝트→월드 열 3개를 추가했다(80→128바이트). SW 래스터와 분류는 레코드 행렬을 쓴다.</li>
+<li>메시렛 컬링은 bin별 월드 열 버퍼(루트 6, <code>t8211</code>)를 받는다. 오클루전 테이블은 루트 7, 이력/복구 입력은 루트 8로 밀렸다.</li>
+</ul>
+<p>Scene host ABI <b>31</b>, cooked program/artifact <b>v9</b>: 이전 쿠킹 결과는 거부되고 재쿠킹해야 한다.</p>
+<p><b>직전 한계의 해소:</b> 녹화당 1회 재사용 제한과 실행 완료 전 공유 제한은 위 포즈 출력 공유 구현으로 제거했다. 인스턴스마다 월드는 보존하며 같은 기하·포즈의 생산자 버퍼와 그래프 버전만 공유한다. 정점 양자화(A1)는 별도다.</p>
+<div id="object-space-validation"><p><b>직전 구현 당시의 오류 검증 이력</b>(GPU validation 켬, 성능 측정 없음; 최신 보강 결과는 위 공유 카드 참조):</p>
+<ul>
+<li>Release 프로브 17개 모드 통과(<code>Release/verdict.json</code>). 단, 기존 프로브 장면은 모두 단위 월드 행렬이라 이 결과만으로는 월드 행렬 경로가 검증되지 않는다.</li>
+<li>그래서 hybrid 프로브에 fixture 7을 추가했다. 각 draw에 비균등 스케일·Z 회전·이동 월드를 주고 정점에는 <code>W⁻¹</code>을 곱해 넣는다. HW·SW 래스터, 메시렛 컬링, resolve, occluder 깊이가 fixture 0과 같은 독립 피복·깊이 정답(2e-6)을 재현해야 한다. 통과: <code>Release-Hybrid-3/verdict.json</code>(frames=24, cases=8). 필수 마커를 <code>frames=24 cases=8</code>로 올렸다.</li>
+<li>첫 두 실행(<code>Release-Hybrid</code>, <code>Release-Hybrid-2</code>)은 테스트 버그로 실패했다. 역변환 루프가 제자리에서 좌표를 덮어썼고, 두 번째 실행은 수정이 적용되지 않은 채 돌았다. 순수 이동/순수 회전 분리 실행으로 원인을 찾았으며, HW와 SW가 같은 잘못된 입력에 같은 결과를 내 엔진 경로 간 일치도 확인했다. 실패 기록은 보존한다.</li>
+<li>당시에는 노멀·탄젠트 월드 변환을 이미지 정답으로 검사하지 않았다. 위 후속 검사에서 두 본 가중 스키닝·비균등/음수 스케일과 비평탄 노멀맵을 함께 사용해 CPU 역전치·접선 프레임 정답과 비교했다. 임의의 스켈레톤·포즈 전체에 대한 증명으로 확대하지 않는다.</li>
+<li id="object-space-editor">Release Editor: 자가검사 5종(스키닝 GBuffer·그림자 포함) 통과, GPU 목록·페이로드 각 12건, 빈 장면 0픽셀, 실제 모델 피복/조명 252픽셀, hybrid 배선 확인, validationProblems=0, normalQuit/sourceStable=true(<code>Editor-Release/verdict.json</code>). Editor 장면의 모델도 원점·단위 월드다. Debug 프로브 hybrid(월드 fixture 포함)·메시렛·반투명 3개 모드 통과(<code>Debug/verdict.json</code>). 근거 루트: <code>Build/Verification/MeteorObjectSpace20261015/</code>.</li>
+</ul></div>
+</div>
+<div class="card" id="blended-meshlets"><h3>직전 구현: 반투명·레이어 메시렛 전환, 인스턴스 가시성 제거 (2026-10-15)</h3>
 <p>METEOR 장면에서 인스턴스 가시성(<code>Geometry.Visibility.*</code>, indexed 간접 draw)을 없앴다. 반투명(Blended 큐·transmission) draw도 메시렛 경로를 쓴다. 메시렛이 없는 반투명 에셋은 불투명과 같이 준비 단계에서 재임포트를 요구하며 indexed 대체 경로는 없다. <code>finalCullStage.visibility</code>, <code>visibilityBin</code>/<code>visibleIdOffset</code>, <code>AddVisibilityReads</code>, 간접 빌드 셰이더의 indexed visibility 모드(2)를 제거했다. Decal·Sprite 패스의 인스턴스 가시성은 METEOR 밖이라 유지한다.</p>
 <p><b>반투명 메시렛 목록.</b> Cull.Final이 <code>finalCullStage.blendedMeshlets</code>를 선언한다(<code>METEOR.BlendedMeshlet.Reset → Cull → Finalize</code>). 이전 인스턴스 경로와 같이 프러스텀만 검사하고 깊이 오클루전은 하지 않는다. 블렌딩 결과가 프레임마다 같도록 생존 메시렛은 원본 메시렛 순서를 유지한다. Cull은 메시렛별 분류(0/1)만 쓰고 atomic 슬롯을 쓰지 않으며, Finalize가 bin마다 분류 배열을 원본 순서로 압축한다(<code>kOrderedMeshlets</code>). 엔진 런타임 컴퓨트 셰이더만 바뀌어 쿠킹 ABI는 그대로다. 한 객체 안 삼각형 순서는 이전 인덱스 순서가 아니라 쿠킹된 메시렛 순서다.</p>
 <p><b>명령.</b> 반투명 범위 명령(<code>Commands.Blended.*</code>)과 캡처용 레이어 명령(<code>Commands.Layer</code>)은 indexed draw 대신 메시 dispatch 명령이다. 루트는 geometry·<code>visibleOwner</code>·meshlets·정렬 목록이며, 인자는 반투명 목록의 bin에서 온다. 블랙보드 슬롯과 노드 계약은 바뀌지 않았다. 레이어 버킷 카운터 계약(제출 1회가 입력의 모든 청크를 덮음)은 유지된다. 진단용 <code>CameraVisibilityStats</code>는 카메라 합집합과 반투명 목록의 준비 통계를 합산한다.</p>
@@ -192,8 +251,8 @@ flowchart LR
 <div class="verdict">
   <strong>요약</strong>
   <ul>
-    <li>노드 <b>24개(+에디터 기여 4개)</b>를 5단계(기하 → 래스터 → 불투명 조명 → 반투명·매질 → 시간·표시)로 정리했다. 그래프를 빌드하는 구조는 그대로다. 노드 순서는 슬롯 버전과 동순위 tie-break만 정하고, 실행 순서는 그래프가 리소스 의존성으로 컴파일한다.</li>
-    <li>변환·컬링은 <code>METEOR.Scene.Geometry</code>·<code>METEOR.Scene.Cull</code> 노드가 맡는다. 이제 소비자의 부수 효과가 아니다. SceneHost가 Geometry → Cull → Shadow/Surface 선언 순서를 강제한다.</li>
+    <li>노드 <b>31개(에디터 기여 포함)</b>를 5단계(기하 → 래스터 → 불투명 조명 → 반투명·매질 → 시간·표시)로 정리했다. 그래프를 빌드하는 구조는 그대로다. 노드 순서는 슬롯 버전과 동순위 tie-break만 정하고, 실행 순서는 그래프가 리소스 의존성으로 컴파일한다.</li>
+    <li>변환은 Geometry, 컬링은 Cull.First/Final, 래스터는 Occluder/Surface가 맡는다. 블랙보드 슬롯과 리소스 버전이 노드 사이 의존을 명시한다.</li>
     <li>구 <code>EnhancedForwardPass</code>를 삭제했다. 타일 광원 컬링은 <code>EnhancedLightTilePass</code>, 반투명 정렬·셰이딩은 <code>SceneHost::DeclareBlendedStream</code>이 맡는다.</li>
     <li>볼륨 합성은 반투명 앞 한 곳(<code>METEOR.Scene.Volume</code>)에서만 일어난다. SSS·SSR은 반투명 앞으로 옮겼다. 반투명면은 더 이상 SSS·SSR을 받지 않으며, 이는 의도된 화면 변화다.</li>
     <li>Temporal 하드코딩을 없앴다. 소비자 목록 대신 각 노드가 <code>consumes</code>로 자기 조건을 밝히고, 캡처의 이름 비교 대신 <code>displayResolutionOutput</code>을 쓴다.</li>
@@ -347,40 +406,43 @@ flowchart TB
 </pre></div>
 
 <h2><span class="num">02</span>노드 배선</h2>
-<p>둥근 상자는 노드 사이 블랙보드 슬롯, 실선은 발행, 점선은 읽기다. Depth/Surface/Layer/Blended 명령과 Surface의 타일 작업·간접 인자는 실제 버퍼 핸들을 전달한다. 블랙보드 reads/writes는 노드 계약이고, 실행 순서·버전·배리어·수명은 RenderPassGraph가 실제 패스의 리소스 접근으로 결정한다. 아래 그림은 주요 METEOR 계약을 펼쳐 그린 요약이며 모든 내부 자원 간선을 표시하지 않는다. <code>verify-pipeline-composition.ps1</code>은 실제 pipeline.nodes 덤프에서 이 슬롯 생산·소비 계약을 검사한다.</p>
+<p>둥근 상자는 노드 사이 블랙보드 슬롯, 실선은 발행, 점선은 읽기다. Depth/Surface 명령은 소비 노드 내부 자원이다. 공유 Layer/Blended 명령과 Surface의 타일 작업·간접 인자만 노드 사이 실제 버퍼 핸들로 전달한다. 블랙보드 reads/writes는 노드 계약이고, 실행 순서·버전·배리어·수명은 RenderPassGraph가 실제 패스의 리소스 접근으로 결정한다. 아래 그림은 주요 METEOR 계약을 펼쳐 그린 요약이며 모든 내부 자원 간선을 표시하지 않는다. <code>verify-pipeline-composition.ps1</code>은 실제 pipeline.nodes 덤프에서 이 슬롯 생산·소비 계약을 검사한다.</p>
 <div class="card"><pre class="mermaid">
 flowchart TB
-  GEO["METEOR.Scene.Geometry<br/>변환 · 프레임 기하 테이블"] --> GT(["METEOR.Scene.Geometry.Table"])
-  GT -.-> CF["METEOR.Scene.Cull.First<br/>이전 HZB 또는 프러스텀 1차 목록 · Commands.Depth"]
+  GEO["METEOR.Scene.Geometry<br/>공유 포즈 · all-LOD 토폴로지 · 프레임 기하 테이블"] --> GT(["METEOR.Scene.Geometry.Table"])
+  GT -.-> CF["METEOR.Scene.Cull.First<br/>공간 DAG cut · 이전 HZB 또는 프러스텀 1차 목록"]
   CF --> FL(["METEOR.Scene.Cull.FirstList"])
-  CF --> DC(["Commands.Depth"])
-  DC -.-> OC
-  GT -.-> OC["METEOR.Scene.Occluder<br/>Classify → HW · SW(AtomicMin64) → 깊이 Resolve"]
+  GT -.-> OC["METEOR.Scene.Occluder<br/>Depth 명령 → Classify → HW · SW(AtomicMin64) → 깊이 Resolve"]
   FL -.-> OC
   OC --> OD(["METEOR.Scene.Occluder.Depth"])
-  GT -.-> CL["METEOR.Scene.Cull.Final<br/>현재 HZB · 인스턴스/복구 컬링<br/>Commands.Surface · Layer · Blended"]
+  GT -.-> CL["METEOR.Scene.Cull.Final<br/>공간 DAG cut · 현재 HZB · 메시렛 복구 컬링"]
   OD -.-> CL
   CL --> FN(["METEOR.Scene.Cull.FinalList"])
-  CL --> SC(["Commands.Surface"])
-  CL --> IC(["Commands.Layer"])
-  CL --> BC(["Commands.Blended · RGHandle 목록"])
-  SC -.-> SU
+  CL --> BLI(["METEOR.Scene.Cull.BlendedList"])
+  BLI -.-> LW["METEOR.Scene.LayerWork<br/>캡처·정렬 Color 명령 생성"]
+  LW --> IC(["Commands.Layer"])
+  LW --> BC(["Commands.Blended · RGHandle 목록"])
   IC -.-> CO
   IC -.-> BL
   BC -.-> BL
-  GT -.-> SH["METEOR.Scene.Shadow<br/>그림자 메시렛 목록 · Commands.Shadow · C0/C1/C2"]
+  GT -.-> SH["METEOR.Scene.Shadow<br/>light-space 공간 DAG cut · 메시렛 목록 · Commands.Shadow · C0/C1/C2"]
   SH --> SM(["Shadow.Map"])
-  FN -.-> SU["METEOR.Scene.Surface<br/>Visibility.Classify → HW · SW → Resolve<br/>Material tiles → Material.Resolve · Decal"]
+  FN -.-> SU["METEOR.Scene.Surface<br/>Surface 명령 → Visibility.Classify → HW · SW → Resolve<br/>Material tiles → Material.Resolve · Decal"]
   SU --> GB(["GBuffer.* · Depth · METEOR.Scene.Visibility"])
   SU --> MW(["Material.Tiles · Material.Arguments"])
   MW -.-> CO
+  MW -.-> TI
+  SU --> DB(["Decal.BaseDiffuse / BaseOrm / BaseNormal · 있을 때"])
+  DB -.-> CO
   GB -.-> HI["METEOR.Scene.History<br/>최종 깊이 HZB"]
   HI -. "제출 승인·GPU 완료 후 다음 프레임" .-> CF
-  GB -.-> TI["Temporal.Inputs<br/>Commands.Temporal(컬링 입력 없음)"]
+  GB -.-> TI["Temporal.Inputs<br/>가시성·타일 Resolve + GPU 선택 레이어"]
+  BLI --> TI
   GT -.-> TI
   TI --> TM(["Temporal.*"])
   GB -.-> AO["SSAO"] --> AOS(["Scene.AmbientOcclusion"])
   GB -.-> CO["METEOR.Scene.Color · HDR"]
+  GT -.-> CO
   SM -.-> CO
   AOS -.-> CO
   CO --> LC(["Scene.LitColor"])
@@ -397,29 +459,41 @@ flowchart TB
 <thead><tr><th>#</th><th>노드</th><th>reads</th><th>writes / modifies</th><th>그래프에 넣는 패스</th></tr></thead>
 <tbody>
 <tr><td>1</td><td>METEOR.Scene.Geometry</td><td>—</td><td>W METEOR.Scene.Geometry.Table</td><td><code>METEOR.TransformMeshWorld</code>(native dispatch 1) · <code>METEOR.MeshWorldReady</code> · <code>METEOR.MeshWorldReuse</code> · <code>METEOR.Scene.Geometry.Table.Upload</code> · 필요 시 <code>METEOR.MeshInputUpload</code></td></tr>
-<tr><td>2</td><td>METEOR.Scene.Cull.First</td><td>Geometry.Table</td><td>W Cull.FirstList · Commands.Depth</td><td><code>METEOR.CameraMeshlet.First</code>(이력 없을 때) 또는 이력 HZB 컬링 · <code>METEOR.Scene.Commands.Depth.Build</code></td></tr>
-<tr><td>3</td><td>METEOR.Scene.Occluder</td><td>Geometry.Table · Cull.FirstList · Commands.Depth</td><td>W METEOR.Scene.Occluder.Depth</td><td><code>METEOR.Scene.Occluder.{Initialize,Classify,HW,SW,Resolve}</code></td></tr>
-<tr><td>4</td><td>METEOR.Scene.Cull.Final</td><td>Geometry.Table · Occluder.Depth</td><td>W Cull.FinalList · Commands.Surface/Layer/Blended</td><td><code>Geometry.Occlusion.N</code> · <code>METEOR.BlendedMeshlet.Reset/Cull/Finalize</code>(반투명 프러스텀 컬링·원본 순서 압축, 있을 때만) · <code>METEOR.CameraMeshlet.Recovery</code> · <code>METEOR.Scene.Commands.{Surface,Layer,Blended.*}.Build</code></td></tr>
-<tr><td>5</td><td>METEOR.Scene.Shadow</td><td>Geometry.Table</td><td>W Shadow.Map</td><td><code>METEOR.ShadowMeshlet.Reset/Cull/Finalize</code> x3 · <code>METEOR.Scene.Commands.Shadow.*.Build</code> · <code>Shadow.Clear</code> · <code>METEOR.Scene.Shadow.C0/C1/C2</code></td></tr>
-<tr><td>6</td><td>METEOR.Scene.Surface</td><td>Cull.FinalList · Commands.Surface</td><td>W 표면 5장 + Depth + Visibility · Material.Tiles/Arguments</td><td>타깃 초기화 → <code>Visibility.Initialize/Classify</code> → <code>Visibility.HW + SW</code>(AtomicMin64) → <code>Visibility.Resolve</code> → <code>Material.Reset/CountTiles/BuildRanges/ScatterTiles</code> → <code>METEOR.Scene.Material.Resolve</code> → 데칼</td></tr>
-<tr><td>7</td><td>METEOR.Scene.History</td><td>Depth</td><td>다음 프레임 HZB 이력</td><td>최종 깊이 피라미드. 제출 승인·완료 후 이력 발행</td></tr>
-<tr><td>8</td><td>Temporal.Inputs</td><td>Depth · Geometry.Table</td><td>W Temporal 5장</td><td><code>HasConsumer</code>가 참이거나 진단 캡처일 때만. <code>METEOR.Scene.Commands.Temporal.Build</code>도 여기서 선언(소비자가 없으면 생산자도 없음)</td></tr>
-<tr><td>9</td><td>SSAO</td><td>Depth·Normal</td><td>W AO</td><td>SSAO</td></tr>
-<tr><td>10</td><td>METEOR.Scene.Color</td><td>AO·Shadow · Commands.Layer · Material.Tiles/Arguments</td><td>W LitColor · M GBuffer</td><td><code>METEOR.Scene.HdrClear</code> → 조건부 Lookup·Subsurface·RuntimeEffects → <code>METEOR.Scene.Color</code> → 굴절</td></tr>
-<tr><td>11–14</td><td>SkyBox · SSGI · SSS · SSR</td><td>Depth (+GBuffer·Temporal)</td><td>M LitColor</td><td>불투명 후처리. SSGI는 강도 &gt; 0일 때만 Temporal 소비</td></tr>
-<tr><td>15</td><td>METEOR.Scene.Volume</td><td>Depth·Shadow</td><td>M LitColor</td><td>볼륨 합성(프레임당 한 번, 반투명 앞)</td></tr>
-<tr><td>16</td><td>METEOR.Scene.LightTiles</td><td>Depth</td><td>—</td><td>반투명 드로우가 있을 때만 <code>METEOR.Scene.LightTiles</code></td></tr>
-<tr><td>17</td><td>METEOR.Scene.Blended</td><td>Depth·Shadow · Commands.Layer/Blended</td><td>M LitColor</td><td>드로우마다 <code>METEOR.Blended.DepthCopy/Surface</code>(필요 시) · <code>METEOR.Blended.Color</code></td></tr>
-<tr><td>18–19</td><td>Sprite · VolumetricFog</td><td>Depth (+Shadow)</td><td>M LitColor</td><td>Fog는 <code>active</code> 조건부</td></tr>
-<tr><td>20–21</td><td>Temporal.SpriteMotion · Temporal.Upscale</td><td>Temporal 5장</td><td>M Temporal · M LitColor</td><td>Upscale은 <code>displayResolutionOutput</code>로 캡처 해상도를 알린다</td></tr>
-<tr><td>22–25</td><td>PostChain · SpatialPost · Temporal.DisplayInputs · UI</td><td>LitColor / DisplayLdr</td><td>W/M DisplayLdr · W Hudless/UiLayer</td><td>톤맵·블룸·FXAA · 공간 후처리 · UI</td></tr>
+<tr><td>2</td><td>METEOR.Scene.Cull.First</td><td>Geometry.Table</td><td>W Cull.FirstList</td><td><code>METEOR.CameraMeshlet.First</code>(이력 없을 때) 또는 이력 HZB 컬링</td></tr>
+<tr><td>3</td><td>METEOR.Scene.Occluder</td><td>Geometry.Table · Cull.FirstList</td><td>W METEOR.Scene.Occluder.Depth</td><td><code>Commands.Depth.Build</code> → <code>METEOR.Scene.Occluder.{Initialize,Classify,HW,SW,Resolve}</code></td></tr>
+<tr><td>4</td><td>METEOR.Scene.Cull.Final</td><td>Geometry.Table · Occluder.Depth</td><td>W Cull.FinalList · Cull.BlendedList</td><td><code>Geometry.Occlusion.N</code> · <code>METEOR.BlendedMeshlet.Reset/Cull/Finalize</code>(반투명 프러스텀 컬링·원본 순서 압축, 있을 때만) · <code>METEOR.CameraMeshlet.Recovery</code></td></tr>
+<tr><td>5</td><td>METEOR.Scene.LayerWork</td><td>Cull.BlendedList</td><td>W Commands.Layer/Blended</td><td><code>METEOR.Scene.Commands.{Layer,Blended.*}.Build</code> · 관련 레이어 작업만 생성</td></tr>
+<tr><td>6</td><td>METEOR.Scene.Shadow</td><td>Geometry.Table</td><td>W Shadow.Map</td><td><code>METEOR.ShadowMeshlet.Reset/Cull/Finalize</code> x3 · <code>METEOR.Scene.Commands.Shadow.*.Build</code> · <code>Shadow.Clear</code> · <code>METEOR.Scene.Shadow.C0/C1/C2</code></td></tr>
+<tr><td>7</td><td>METEOR.Scene.Surface</td><td>Cull.FinalList</td><td>W 표면 5장 + Depth + Visibility · Material.Tiles/Arguments · Decal.Base*</td><td>타깃 초기화 → <code>Commands.Surface.Build</code> → <code>Visibility.Initialize/Classify</code> → <code>Visibility.HW + SW</code>(AtomicMin64) → <code>Visibility.Resolve</code> → <code>Material.Reset/CountTiles/BuildRanges/ScatterTiles</code> → <code>METEOR.Scene.Material.Resolve</code> → 데칼</td></tr>
+<tr><td>8</td><td>METEOR.Scene.History</td><td>Depth</td><td>다음 프레임 HZB 이력</td><td>최종 깊이 피라미드. 제출 승인·완료 후 이력 발행</td></tr>
+<tr><td>9</td><td>Temporal.Inputs</td><td>Geometry.Table · Depth · Visibility · Material.Tiles/Arguments · Cull.BlendedList</td><td>W Temporal.*</td><td>DepthCopy/입력 초기화 → METEOR.Scene.Temporal.Resolve(불투명) → Commands.Temporal.Layers.Build → Raster(공통 정렬 GPU 목록·인자) → Decal 반응 마스크. 실제 소비자 또는 진단이 있는 프레임만 선언</td></tr>
+<tr><td>10</td><td>SSAO</td><td>Depth·Normal</td><td>W AO</td><td>SSAO</td></tr>
+<tr><td>11</td><td>METEOR.Scene.Color</td><td>Geometry.Table · Visibility · AO·Shadow · Commands.Layer · Material.Tiles/Arguments · Decal.Base*</td><td>W LitColor · M GBuffer</td><td><code>METEOR.Scene.HdrClear</code> → 조건부 Lookup·Subsurface·RuntimeEffects → <code>METEOR.Scene.Color</code> → 굴절</td></tr>
+<tr><td>12–15</td><td>SkyBox · SSGI · SSS · SSR</td><td>Depth (+GBuffer·Temporal)</td><td>M LitColor</td><td>불투명 후처리. SSGI는 강도 &gt; 0일 때만 Temporal 소비</td></tr>
+<tr><td>16</td><td>METEOR.Scene.Volume</td><td>Depth·Shadow</td><td>M LitColor</td><td>볼륨 합성(프레임당 한 번, 반투명 앞)</td></tr>
+<tr><td>17</td><td>METEOR.Scene.LightTiles</td><td>Depth</td><td>—</td><td>반투명 드로우가 있을 때만 <code>METEOR.Scene.LightTiles</code></td></tr>
+<tr><td>18</td><td>METEOR.Scene.Blended</td><td>Depth·Shadow · Commands.Layer/Blended</td><td>M LitColor</td><td>드로우마다 <code>METEOR.Blended.DepthCopy/Surface</code>(필요 시) · <code>METEOR.Blended.Color</code></td></tr>
+<tr><td>19–20</td><td>Sprite · VolumetricFog</td><td>Depth (+Shadow)</td><td>M LitColor</td><td>Fog는 <code>active</code> 조건부</td></tr>
+<tr><td>21–22</td><td>Temporal.SpriteMotion · Temporal.Upscale</td><td>Temporal 5장</td><td>M Temporal · M LitColor</td><td>Upscale은 <code>displayResolutionOutput</code>로 캡처 해상도를 알린다</td></tr>
+<tr><td>23–26</td><td>PostChain · SpatialPost · Temporal.DisplayInputs · UI</td><td>LitColor / DisplayLdr</td><td>W/M DisplayLdr · W Hudless/UiLayer</td><td>톤맵·블룸·FXAA · 공간 후처리 · UI</td></tr>
 <tr><td>+</td><td>에디터 기여</td><td>—</td><td>M DisplayLdr</td><td>Grid · WireFrame · GizmoIcon · GizmoLine</td></tr>
-<tr><td>26</td><td>live_present</td><td>DisplayLdr·Hudless·UiLayer·Temporal</td><td>—</td><td>Temporal 깊이·모션은 FG 대상이 묶였을 때만 소비</td></tr>
+<tr><td>27</td><td>live_present</td><td>DisplayLdr·Hudless·UiLayer·Temporal</td><td>—</td><td>Temporal 깊이·모션은 FG 대상이 묶였을 때만 소비</td></tr>
 </tbody></table></div>
 
 <h2><span class="num">03</span>METEOR 단계 객체와 실제 내부 패스</h2>
-<p>아래 각 단계의 Declare는 해당 객체가 수행한다. Geometry/FirstCull/Occluder/FinalCull/Shadow/Temporal/Surface/History는 독립된 자원 소유자이며 Color·Volume·Blended는 EffectStage가 효과 자원과 결과를 소유한다. 객체 분리로 노드·패스 간선을 생략하지 않았다.</p>
-<table><thead><tr><th>실제 객체</th><th>소유 책임</th><th>출력·소비 계약</th></tr></thead><tbody><tr><td><code>GeometryStage</code></td><td>변환 선언·프레임 기하 테이블 업로드</td><td>Geometry.Table</td></tr><tr><td><code>FirstCullStage</code></td><td>첫 카메라 목록·깊이 명령</td><td>FirstList / Commands.Depth</td></tr><tr><td><code>OccluderStage</code></td><td>혼합 래스터 준비·깊이 Resolve</td><td>Occluder.Depth</td></tr><tr><td><code>FinalCullStage</code></td><td>현재 HZB·복구 목록·Surface/Layer/Blended 명령</td><td>FinalList / Commands.*</td></tr><tr><td><code>ShadowStage</code></td><td>그림자 목록·명령·cascade 래스터</td><td>Shadow.Map</td></tr><tr><td><code>TemporalStage</code></td><td>재생 명령·Temporal 출력</td><td>Temporal.*</td></tr><tr><td><code>SurfaceStage</code></td><td>최종 혼합 래스터·타일 작업·속성 복원</td><td>GBuffer.* / Material.Tiles / Material.Arguments</td></tr><tr><td><code>HistoryStage</code></td><td>최종 깊이의 다음 프레임 이력</td><td>완료된 HZB 이력</td></tr><tr><td><code>EffectStage</code></td><td>데칼 결과·셰이딩·캡처·미디어·반투명 범위·바인딩 캐시</td><td>Color/Volume HDR 및 레이어별 출력 버전</td></tr></tbody></table>
+<p>각 단계 Declare는 봉인된 FrameInput과 명시된 생산자 값을 받는다. 다른 단계 객체를 통해 결과를 조회하지 않는다. LayerStage가 레이어 명령·타깃·래스터, VolumeStage가 볼륨 합성과 매질 바인딩을 수행한다. EffectStage는 Color와 효과의 의미상 순서를 조립하며 Runtime/Decal/Lookup 상태를 분리해 소유한다. 실제 리소스 의존성은 RenderPassGraph에 남는다.</p>
+<div class="card" id="pose-sharing-wiring"><b>Geometry 내부의 버퍼 소유권과 인스턴스 입력</b><p>아래는 추가 노드가 아닌 기존 GeometryStage 내부의 자원 관계다. 동일 기하·포즈·파이프라인의 인스턴스는 생산자 하나의 버퍼와 동일한 그래프 버전을 읽는다. 다른 포즈는 별도 출력을 갖는다. 인스턴스별 frame record와 현재/이전 월드 상수는 합치지 않는다. 완료 출력 재사용 프레임에는 첫 뷰가 import를 소유하며 나머지 뷰가 그 버전을 공유한다.</p><pre class="mermaid">
+flowchart LR
+  P["Prepare · 같은 기하 + 포즈"] --> O["고유 포즈 생산자 · 한 출력 버퍼"]
+  O --> V["GeometryStage · 한 번 선언한 RGHandle"]
+  V --> I0["인스턴스 A · World A / Previous A"]
+  V --> I1["인스턴스 B · World B / Previous B"]
+  V --> I2["인스턴스 C · World C / Previous C"]
+  I0 --> C["기존 Cull · HW/SW · 속성 복원 · Temporal 소비"]
+  I1 --> C
+  I2 --> C
+</pre><p>Temporal의 이전 포즈는 별도 봉인 입력으로 유지한다. 같은 포즈 출력의 공유로 현재/이전 월드나 이전 포즈를 덮어쓰지 않는다. 변환 dispatch는 고유한 새 포즈 출력만 포함하고, 완료 출력 재사용은 기존 묶음 읽기 패스를 사용한다.</p></div>
+<table><thead><tr><th>실제 객체</th><th>소유 책임</th><th>출력·소비 계약</th></tr></thead><tbody><tr><td><code>GeometryStage</code></td><td>변환 선언·프레임 기하 테이블 업로드</td><td>Geometry.Table</td></tr><tr><td><code>FirstCullStage</code></td><td>첫 카메라 목록</td><td>FirstList</td></tr><tr><td><code>OccluderStage</code></td><td>깊이 명령·혼합 래스터 준비·깊이 Resolve</td><td>Occluder.Depth</td></tr><tr><td><code>FinalCullStage</code></td><td>현재 HZB·복구 목록·정렬 레이어 목록</td><td>FinalList / BlendedList</td></tr><tr><td><code>ShadowStage</code></td><td>그림자 목록·명령·cascade 래스터</td><td>Shadow.Map</td></tr><tr><td><code>TemporalStage</code></td><td>최종 가시성·GPU 타일 복원, 정렬 목록의 투과·반투명 간접 실행·Temporal 출력</td><td>Temporal.*</td></tr><tr><td><code>SurfaceStage</code></td><td>Surface 명령·최종 혼합 래스터·타일 작업·속성 복원</td><td>GBuffer.* / Material.Tiles / Material.Arguments</td></tr><tr><td><code>HistoryStage</code></td><td>최종 깊이의 다음 프레임 이력</td><td>완료된 HZB 이력</td></tr><tr><td><code>LayerStage</code></td><td>레이어 명령·순서·타깃·래스터·출력</td><td>Commands.Layer/Blended · 레이어 Surface</td></tr><tr><td><code>VolumeStage</code></td><td>계수·매질 바인딩·합성</td><td>Volume HDR</td></tr><tr><td><code>EffectStage</code></td><td>Color·효과 평가 순서 조립, 목적별 Lookup/Runtime/Decal 상태</td><td>Color HDR</td></tr></tbody></table>
 <div class="card"><pre class="mermaid">
 flowchart TB
   PREP["Prepare · 봉인 입력 · PSO · 버퍼/템플릿 Upload"] --> GEO["GeometryStage · 변환 + 테이블"]
@@ -427,7 +501,10 @@ flowchart TB
   FIRST --> OCC["OccluderStage · HW/SW atomic → 깊이 Resolve"]
   OCC --> FINAL["FinalCullStage · 현재 HZB · 복구 + 명령 생산"]
   GEO --> SH["Shadow · 목록 + 명령 + 래스터"]
-  GEO --> TEMP["Temporal.Inputs · 재생 명령 + 소비"]
+  GEO --> TEMP["Temporal.Inputs · 현재/이전 포즈 입력"]
+  SURF --> TEMP
+  FINAL -. "정렬 LOD 목록" .-> TEMP
+  TEMP --> TMOUT["Temporal.Resolve · 기존 타일 패킷<br/>Layers 명령은 투과·반투명만"]
   FINAL --> SURF["Surface · 명령 입력 → 가시성 → 타일 작업 → 복원"]
   SURF --> COLOR["Color · 타일/간접 인자 + Layer 명령 입력"]
   FINAL --> COLOR
@@ -497,19 +574,19 @@ flowchart TB
 <tbody>
 <tr><td colspan="4"><b>A. 기하·데이터</b></td></tr>
 <tr><td>A1</td><td>정점 속성 양자화</td><td><span class="tag gap">없음</span></td><td>쿠커·MS 디코드, 강제 재쿠킹</td></tr>
-<tr><td>A2</td><td>GPU LOD 선택</td><td><span class="tag ext">부분</span> CPU 선택, 그림자 LOD0</td><td>클러스터 계층 쿠킹</td></tr>
-<tr><td>A3</td><td>정적 메시 월드 변환 제거</td><td><span class="tag ext">부분</span> 결과 캐시 256개·32MiB</td><td><code>METEOR.Scene.Geometry</code> 노드 안에서 교체</td></tr>
+<tr><td>A2</td><td>클러스터 계층 쿠킹 · GPU LOD</td><td><span class="tag ext">부분 구현 · DX12 검증</span> 공간별 교체 DAG / GPU 독립 선택 · DX12 검증</td><td>단일 부모의 공간 트리 DAG. 다중 부모 공유는 없음. 스키닝 coarse 오차·스트리밍 제외. 최신 검증은 상단 A2 카드.</td></tr>
+<tr><td>A3</td><td>정적 메시 월드 변환 제거</td><td><span class="tag ext">구현 · 오류 검증</span> 오브젝트 공간 정점 스트림 + 소비자 월드 행렬</td><td>월드 변경은 재변환을 일으키지 않는다. 같은 녹화의 인스턴스 뷰가 포즈 생산자의 버퍼·그래프 버전을 공유 · 상단 검증 카드</td></tr>
 <tr><td>A4</td><td>클러스터 스트리밍</td><td><span class="tag gap">없음</span></td><td>A2와 계층 공유</td></tr>
 <tr><td colspan="4"><b>B. 컬링 (<code>METEOR.Scene.Cull.First</code> · <code>Occluder</code> · <code>Cull.Final</code> 노드)</b></td></tr>
 <tr><td>B1</td><td>카메라 메시렛 compute 컬링</td><td><span class="tag ok">구현·오류 검증</span> posed 정점 프러스텀 + 메시렛별 HZB</td><td>B2에서 1차 이력 목록·현재 HZB 복구로 확장. 표면은 GPU 목록·간접 인자만 소비한다. 현재 HZB는 이력 HZB와 같은 생성기로 만들고 메시렛 복구만 읽는다. DX12 Debug/Release 검증 통과, 성능 측정 보류. <a href="MeteorCameraMeshletCulling20261013.md">근거</a></td></tr>
 <tr><td>B2</td><td>2단계 오클루전</td><td><span class="tag ok">구현·오류 검증</span> 완료된 제출의 이전 HZB → 현재 posed bounds 재투영 → 1차 깊이 → 현재 HZB → 제외 후보 복구. 첫 목록과 복구 목록의 합집합을 최종 표면이 소비</td><td>최종 불투명 깊이로 다음 이력 생성. 장면·view·extent·카메라 컷·렌즈·history revision 변경 시 무효화. DX12 Debug/Release 프로브·Release Editor 통과. 최종 표면과 1차 occluder 깊이 모두 C2 혼합 가시성(HW/SW atomic key → resolve)으로 전환. 성능·Vulkan은 보류</td></tr>
-<tr><td>B3</td><td>GPU 작업 분배</td><td><span class="tag ext">부분</span> GPU 열거·압축·2D 간접 인자</td><td>각 뷰의 컬링 단계마다 bin 전체를 단일 native cull dispatch로 처리(최대 4096 bin). 카메라는 이전 HZB 1차·현재 HZB 복구 두 단계이며 이력이 없으면 1차는 프러스텀만 검사. 카메라 불투명 메시렛은 GPU root 명령 생성 + 셰이더 버킷당 간접 실행으로 전환·오류 검증 완료. CPU는 셰이더 종류별 PSO를 유지하며 메시·인스턴스별 제출을 제거. 그림자도 캐스케이드·셰이더 버킷별 간접 실행으로 전환하고 Release/Debug 오류 검증 완료. Temporal replay는 순서를 보존하는 연속 PSO 구간별 간접 실행으로 전환하고 Release/Debug 오류 검증 완료. 정렬 반투명 색상과 레이어 캡처도 순서 보존 반투명 메시렛 목록의 mesh dispatch 간접 실행으로 전환했고, METEOR의 인스턴스 가시성은 제거했다(상단 카드). 굴절·SSS 캡처/runtime effect도 레이어 내부 청크를 간접 범위로 통합(아래 검증 카드 참조). 레이어 간 배경·캡처 의존성에 따른 CPU 스케줄 경계는 남음. 하드웨어 한도 초과는 준비 실패</td></tr>
+<tr><td>B3</td><td>GPU 작업 분배</td><td><span class="tag ext">부분</span> GPU 열거·압축·2D 간접 인자</td><td>각 뷰의 컬링 단계마다 bin 전체를 단일 native cull dispatch로 처리(최대 4096 bin). 카메라는 이전 HZB 1차·현재 HZB 복구 두 단계이며 이력이 없으면 1차는 프러스텀만 검사. 카메라 불투명 메시렛은 GPU root 명령 생성 + 셰이더 버킷당 간접 실행으로 전환·오류 검증 완료. CPU는 셰이더 종류별 PSO를 유지하며 메시·인스턴스별 제출을 제거. 그림자도 캐스케이드·셰이더 버킷별 간접 실행으로 전환하고 Release/Debug 오류 검증 완료. 불투명 Temporal은 최종 가시성·GPU 머티리얼 타일 패킷을 소비하고, 투과·반투명만 순서를 보존하는 연속 PSO 구간별 재생 명령을 만든다(C4 보강 검증은 상단 참조). 정렬 반투명 색상과 레이어 캡처도 순서 보존 반투명 메시렛 목록의 mesh dispatch 간접 실행으로 전환했고, METEOR의 인스턴스 가시성은 제거했다(상단 카드). 굴절·SSS 캡처/runtime effect도 레이어 내부 청크를 간접 범위로 통합(아래 검증 카드 참조). 레이어 간 배경·캡처 의존성에 따른 CPU 스케줄 경계는 남음. 하드웨어 한도 초과는 준비 실패</td></tr>
 <tr><td>B4</td><td>그림자 고도화</td><td><span class="tag ext">부분</span></td><td>광원별 2단계·정적 캐시·비동기 compute</td></tr>
 <tr><td colspan="4"><b>C. 래스터·셰이딩</b></td></tr>
 <tr><td>C1</td><td>RHI 64-bit atomic·포맷</td><td><span class="tag ok">DX12 buffer 구현 · 오류 검증</span></td><td>SM6.6 buffer uint64 min, typed 포맷 기능 별도 조회. C2 혼합 래스터가 사용하는 계약. Vulkan 런타임 Phase 4.9</td></tr>
 <tr><td>C2</td><td>가시성 버퍼 + SW 래스터</td><td><span class="tag ok">1차 occluder · 최종 표면 구현 · 오류 검증</span> 두 단계가 같은 GPU 분류·HW/SW atomic key 생산·resolve 계약을 쓴다. 1차는 depth만, 최종은 depth/visibility를 resolve</td><td>가시성 기반 속성/머티리얼 복원과 GPU 타일 작업 분배 연결. 깊이 전용 HW 래스터(<code>LXSceneDepthPS</code>)와 그 PSO는 제거. 현재 검증 결과는 상단 카드 참조</td></tr>
-<tr><td>C3</td><td>바인드리스 머티리얼</td><td><span class="tag done">DX12 구현 · 오류 검증</span></td><td>DX12 LX 공유 텍스처 테이블(4096), 공통 샘플러(36), b15 descriptor 인덱스. Scene host ABI 30 · cooked material v8 (occluder도 HW/SW 생산자 계약, 깊이 전용 진입점 제거): 이전 쿠킹 결과는 거부하고 재쿠킹. Vulkan 런타임 동등성은 Phase 4.9.</td></tr>
-<tr><td>C4</td><td>머티리얼 패킷 셰이딩</td><td><span class="tag ext">부분</span> GPU 타일 작업 분배·가시성 기반 복원 구현</td><td>현재 CountTiles → BuildRanges → ScatterTiles → 간접 Material.Resolve/Color. Temporal 입력·데칼은 별도 패스로 남아 있으며, 머티리얼 패킷으로 통합하는 후속 작업이 필요</td></tr>
+<tr><td>C3</td><td>바인드리스 머티리얼</td><td><span class="tag done">DX12 구현 · 오류 검증</span></td><td>DX12 LX 공유 텍스처 테이블(4096), 공통 샘플러(36), b15 descriptor 인덱스. Scene host ABI 34 · cooked material v12 (GPU LOD 토폴로지 기반 Temporal 포함): 이전 쿠킹 결과는 거부하고 재쿠킹. Vulkan 런타임 동등성은 Phase 4.9.</td></tr>
+<tr><td>C4</td><td>머티리얼 패킷 셰이딩</td><td><span class="tag ok">구현 · 오류 검증</span> 공유 타일 패킷의 Surface/Color/Temporal 소비 · 명시적 데칼 입력</td><td>CountTiles → BuildRanges → ScatterTiles → 간접 Material.Resolve/Color/Temporal.Resolve. 데칼 전후 표면 버전은 명시적 패킷 입력·블랙보드 슬롯으로 전달한다. 불투명 Temporal 재생은 제거했다. 합성 Snapshot/Decal·데칼 반응 마스크와 투과·반투명 Layers는 실제 의존성을 유지한다. C4 오류 검증 통과 · 상단 근거 참조</td></tr>
 <tr><td>C5</td><td>그래프 commutative writer</td><td><span class="tag ok">단일 큐 AtomicMin64 · 오류 검증</span></td><td>초기화 → 다중 생산자 → 전체 join. 그룹 내부 불필요 간선·배리어 제거. 단일 큐 계약</td></tr>
 <tr><td colspan="4"><b>D. 검증·인프라</b></td></tr>
 <tr><td>D1</td><td>성능 측정·개선</td><td><span class="tag ext">구현 완료 후</span></td><td>사용자 지시(2026-10-13): 구현 중에는 빌드·GPU validation·출력 정확성·회귀 오류만 검증. 모든 구조 구현 뒤 성능 측정·개선</td></tr>
@@ -540,7 +617,10 @@ flowchart TB
 <tr><td>C1·C5 GPU 프로브</td><td><code>Tools/regression/support/AtomicReductionProbe.inl/.slang</code> · <code>--atomic-reduction-only</code></td></tr>
 <tr><td>노드 목록</td><td><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp</code> · <code>BuildPipelineDesc</code></td></tr>
 <tr><td>노드 계약·소비자 질의</td><td><code>Render/Core/EnhancedLivePipelineDesc.h/.cpp</code> · <code>consumes</code>, <code>HasConsumer</code>, <code>displayResolutionOutput</code></td></tr>
-<tr><td>METEOR SceneHost</td><td><code>MaterialGraphSceneHost.h/.cpp</code> + <code>MaterialGraphScene*Stage.inl</code> · <code>DeclareGeometry/FirstCull/Occluder/FinalCull/Shadow/GBuffer/Color/Volume/BlendedStream</code></td></tr>
+<tr><td>A2 계층·GPU LOD</td><td><code>Experiment/MeshLodData.h</code> · <code>Experiment/Import/MeshLodBuilder.cpp</code> · <code>Experiment/Cooked/CookedModelSubAssetCodec.cpp</code> · <code>MaterialGraphMeshSurface.cpp</code> · <code>GpuGeometryVisibility.cpp</code> · <code>GeometryVisibility.slang</code> · <code>support/ClusterLodProbe.inl</code></td></tr>
+<tr><td>C4 Temporal 패킷·순서 표면</td><td><code>MaterialGraphSceneTemporalStage.inl</code> · <code>Includes/MaterialGraphSceneHost.slang</code> · <code>material_temporal_bucket_tests.inl</code> · <code>ObjectSpaceInstanceProbe.inl</code></td></tr>
+<tr><td>C4 데칼 입력 계약</td><td><code>Render/Passes/Geometry/SceneSurfaceTargets.h</code> · <code>Render/Passes/Geometry/EnhancedDecalPass.h/.cpp</code> · <code>MaterialGraphSceneEffectStage.inl</code> · <code>Render/Core/EnhancedLivePipelineDesc.h</code></td></tr>
+<tr><td>METEOR SceneHost</td><td><code>MaterialGraphSceneHost.h/.cpp</code> + <code>MaterialGraphScene*Stage.inl</code> · <code>DeclareGeometry/FirstCull/Occluder/FinalCull/Shadow/GBuffer/Temporal/Color/Volume/BlendedStream</code></td></tr>
 <tr><td>타일 광원 컬링</td><td><code>Render/Passes/Lighting/EnhancedLightTilePass.h/.cpp</code></td></tr>
 <tr><td>메시 변환</td><td><code>MaterialGraphMeshSurface.cpp</code> · <code>DeclareBatch</code>, <code>PrepareDispatch</code></td></tr>
 <tr><td>검증</td><td><code>Tools/regression/verify-meteor-scene-cutover.ps1</code> · <code>Editor/RenderTests/.../Geometry/EnhancedBlendedStreamTest.cpp</code>(<code>dx12.blended</code>)</td></tr>

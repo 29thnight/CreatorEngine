@@ -1,6 +1,4 @@
 #include "MaterialGraphSceneInput.h"
-#include "MaterialGraphSceneLod.h"
-#include "Render/Graph/ShadowCasterBounds.h"
 #include "Render/Graph/EnhancedDrawIdentity.h"
 #include "Material.h"
 #include "Assets/ModelGeometryPayload.h"
@@ -96,7 +94,8 @@ namespace material_graph
         ce::profile_scope profile{ce::marker<"MaterialSceneInputSeal">()};
         const auto& camera = view.camera;
         const std::array eye{camera.eyePosition.x, camera.eyePosition.y, camera.eyePosition.z, 0.f};
-        if (!view.frameId || !view.sceneEpoch || !view.viewId || !view.width || !view.height ||
+        if (!std::isfinite(budget.geometryMaxPixelError) || budget.geometryMaxPixelError < 0 ||
+            !view.frameId || !view.sceneEpoch || !view.viewId || !view.width || !view.height ||
             std::uint64_t(view.width) * view.height > UINT32_MAX || !budget.draws || draws.size() > budget.draws ||
             !budget.chunks || !Finite(eye) || !Finite(std::bit_cast<std::array<float, 16>>(camera.view)) ||
             !Finite(std::bit_cast<std::array<float, 16>>(camera.projection)) || !math::try_inverse(camera.view) ||
@@ -138,6 +137,7 @@ namespace material_graph
             : own::make_shared<InstanceFramePins>();
         candidate->materialPins_ = materialPins ? std::move(materialPins) : collectedPins;
         candidate->view_ = view;
+        candidate->geometryMaxPixelError_ = budget.geometryMaxPixelError;
         candidate->viewProjection_ = camera.view * camera.projection;
         if (!Finite(std::bit_cast<std::array<float, 16>>(candidate->viewProjection_)))
         {
@@ -236,16 +236,8 @@ namespace material_graph
             }
             // Raster computes the texture footprint from perspective UV derivatives.
             // Zero vertex LOD is transport initialization, not a material footprint.
-            auto selectedDraw = draw;
-            input.geometryLod = SelectSceneGeometryLod(draw, view, budget.geometryMaxPixelError);
-            if (input.geometryLod)
-            {
-                const auto& indices = geometry.SourceMesh()->coarseLods.levels[input.geometryLod - 1].indices;
-                selectedDraw.modelMeshView.sourceLodIndex = input.geometryLod;
-                selectedDraw.modelMeshView.indexData = indices.data();
-                selectedDraw.modelMeshView.indexCount = static_cast<uint32_t>(indices.size());
-            }
-            if (!MeshSurfacePlan::BuildForScene(selectedDraw, candidate->surface_, budget.mesh, input.geometry, error))
+            // All cooked LODs; GPU selects replacement groups.
+            if (!MeshSurfacePlan::BuildForScene(draw, candidate->surface_, budget.mesh, input.geometry, error))
             {
                 error = "Scene graph geometry " + std::to_string(draw.geometryKey) + ": " + error;
                 return false;
@@ -272,7 +264,7 @@ namespace material_graph
                     }
                     else
                     {
-                        auto previousDraw = selectedDraw;
+                        auto previousDraw = draw;
                         previousDraw.worldMatrix = old->geometry->Source()->World();
                         std::vector<math::matrix4x4> bones;
                         for (const auto& packed : old->geometry->Source()->Bones())
@@ -288,18 +280,6 @@ namespace material_graph
                     input.temporalHistoryValid = true;
                 }
             }
-            // Camera screen error must not lower the detail of a nearby light's
-            // casters. Until a light-space error budget is supplied, shadows keep LOD0.
-            input.shadowGeometry = input.geometry;
-            if (input.geometryLod &&
-                !MeshSurfacePlan::BuildForScene(draw, candidate->surface_, budget.mesh, input.shadowGeometry, error))
-            {
-                return false;
-            }
-            // Bounds consume source bytes and palette only after their full validation.
-            const auto shadowBounds = shadow_math::WorldBounds(draw);
-            input.shadowCenter = shadowBounds.center;
-            input.shadowRadius = shadowBounds.radius;
             const auto& cost = input.geometry->Cost();
             auto& total = candidate->cost_;
             const auto chunks = input.geometry->Chunks().size();
@@ -314,20 +294,6 @@ namespace material_graph
             total.chunks += chunks;
             total.cpuPayloadBytes += cost.cpuPayloadBytes;
             total.gpuPayloadBytes += cost.gpuPayloadBytes;
-            if (input.shadowGeometry != input.geometry)
-            {
-                const auto& shadowCost = input.shadowGeometry->Cost();
-                const auto shadowChunks = input.shadowGeometry->Chunks().size();
-                if (shadowChunks > budget.chunks - total.chunks ||
-                    shadowCost.cpuPayloadBytes > budget.cpuPayloadBytes - total.cpuPayloadBytes ||
-                    shadowCost.gpuPayloadBytes > budget.gpuPayloadBytes - total.gpuPayloadBytes)
-                {
-                    return Fail(error, "Scene shadow LOD0 exceeds the aggregate payload budget.");
-                }
-                total.chunks += shadowChunks;
-                total.cpuPayloadBytes += shadowCost.cpuPayloadBytes;
-                total.gpuPayloadBytes += shadowCost.gpuPayloadBytes;
-            }
             if (input.previousGeometry != input.geometry)
             {
                 const auto& oldCost = input.previousGeometry->Cost();

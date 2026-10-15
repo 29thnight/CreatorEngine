@@ -158,6 +158,8 @@ void GeometryVisibilityCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupInde
 StructuredBuffer<LXSurfacePoint> shadowMeshletVertices[4096] : register(t18);
 #include "Includes/LxMeshletGpuContract.slang"
 ByteAddressBuffer shadowMeshletTopology[4096] : register(t4114);
+// Per-bin object-to-world columns (3 x float4): vertex streams are object space.
+StructuredBuffer<float4> meshletWorldColumns : register(t8211);
 #if defined(GEOMETRY_VISIBILITY_HISTORY)
 cbuffer MeshletHistoryProjection : register(b1) { float4 meshletHistoryColumns[4]; };
 #endif
@@ -176,6 +178,52 @@ void ShadowMeshletResetCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     args.baseVertex = 0; args.firstInstance = 0u;
     geometryIndirectArguments[bin] = args;
     geometryVisibleIds[geometryVisibilityBins[bin].firstIndex] = 0u;
+}
+
+// Each spatial group tests its own conservative original-patch sphere/error.
+// Ancestor suppression selects a disjoint covering cut, identical across chunks.
+bool GeometryAcceptClusterGroup(uint bin, uint base, uint group)
+{
+    const uint node=base+16u+group*64u;
+    if (shadowMeshletTopology[bin].Load(node+8u)==0xffffffffu) return true;
+    const float4 sphere=asfloat(shadowMeshletTopology[bin].Load4(node+32u));
+    const float error=asfloat(shadowMeshletTopology[bin].Load(node+28u));
+    const float4 metric=geometryVisibilityCandidates[bin].sphere;
+    if (!all(isfinite(metric)) || metric.x<=0 || metric.y<=0 || metric.w<=0) return false;
+    const float4 object = float4(sphere.xyz, 1);
+    const float4 c0 = meshletWorldColumns[bin * 3u], c1 = meshletWorldColumns[bin * 3u + 1u], c2 = meshletWorldColumns[bin * 3u + 2u];
+    const float scale = sqrt(dot(c0.xyz,c0.xyz)+dot(c1.xyz,c1.xyz)+dot(c2.xyz,c2.xyz)) * 1.00002;
+    const float4 centerWorld = float4(dot(object,c0),dot(object,c1),dot(object,c2),1);
+    const float radiusWorld = sphere.w * scale;
+    float4 center, norm, rounding;
+    [unroll] for (uint col=0u;col<4u;++col) {
+        const float4 column = geometryVisibilityProjectionColumns[col];
+        center[col] = dot(centerWorld,column);
+        norm[col] = length(column.xyz) * 1.00002;
+        rounding[col] = max(0.00001, dot(abs(centerWorld)+float4(radiusWorld,radiusWorld,radiusWorld,0),abs(column))*0.00002);
+    }
+    const float4 radius = radiusWorld * norm;
+    const float lowW = center.w-radius.w-rounding.w;
+    if (!all(isfinite(center+radius+rounding)) || lowW <= 0.00001 || center.z-radius.z-rounding.z <= 0) return false;
+    const float maximumW = abs(center.w)+radius.w+rounding.w;
+    const float2 derivative = (norm.xy*maximumW+norm.w*(abs(center.xy)+radius.xy+rounding.xy)) / (lowW*lowW) * metric.xy*0.5;
+    const float pixels = length(derivative)*scale*1.00004;
+    if (!isfinite(pixels) || pixels <= 0) return false;
+    return error*pixels<=metric.w;
+}
+bool GeometryClusterSelected(uint bin, uint group)
+{
+    const uint base=shadowMeshletTopology[bin].Load(76);
+    if (base==0u) return true; // Single original level has no replacement edges.
+    const uint count=shadowMeshletTopology[bin].Load(base);
+    if (group>=count || !GeometryAcceptClusterGroup(bin,base,group)) return false;
+    uint parent=shadowMeshletTopology[bin].Load(base+16u+group*64u+16u);
+    [loop] for(uint depth=0u;depth<8u;++depth) {
+        if(parent==0xffffffffu)return true;
+        if(parent>=count || GeometryAcceptClusterGroup(bin,base,parent))return false;
+        parent=shadowMeshletTopology[bin].Load(base+16u+parent*64u+16u);
+    }
+    return false; // Cooker rejects excessive depth/cycles before GPU upload.
 }
 
 [shader("compute")]
@@ -201,6 +249,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     const bool classify = (geometryVisibilityCandidates[bin].flags & 8u) != 0u;
     if (classify) geometryVisibleIds[classification] = 0u;
     const LXMeshletDescriptor descriptor = LXLoadMeshlet(shadowMeshletTopology[bin], meshlet);
+    if (!GeometryClusterSelected(bin, descriptor.groupId)) return;
     const uint count = descriptor.vertexCount;
     uint outside = geometryVisibilityProjectionValid != 0u ? 63u : 0u;
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
@@ -210,7 +259,9 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 #endif
     for (uint vertex = 0u; vertex < count; ++vertex)
     {
-        const float4 position = float4(shadowMeshletVertices[bin][LXMeshletVertex(shadowMeshletTopology[bin], descriptor, vertex)].position.xyz, 1);
+        const float4 object = float4(shadowMeshletVertices[bin][LXMeshletVertex(shadowMeshletTopology[bin], descriptor, vertex)].position.xyz, 1);
+        const float4 position = float4(dot(object, meshletWorldColumns[bin * 3u]),
+            dot(object, meshletWorldColumns[bin * 3u + 1u]), dot(object, meshletWorldColumns[bin * 3u + 2u]), 1);
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
         finiteBounds = finiteBounds && all(isfinite(position));
         minimumWorld = min(minimumWorld, position.xyz);

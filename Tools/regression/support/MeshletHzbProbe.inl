@@ -6,8 +6,8 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     std::string error;
     const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),
         RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18),
-        RHILayout::SrvBufferTable(4096, 4114), RHILayout::SrvTable(16, 2)};
-    const auto baseLayout = roots.GetOrCreate({std::span(params, 6), {}}, error);
+        RHILayout::SrvBufferTable(4096, 4114), RHILayout::Srv(8211), RHILayout::SrvTable(16, 2)};
+    const auto baseLayout = roots.GetOrCreate({std::span(params, 7), {}}, error);
     const auto hzbLayout = roots.GetOrCreate({params, {}}, error);
     Check(baseLayout.IsValid() && hzbLayout.IsValid(), "HZB meshlet layouts " + error);
     std::array<LX::Runtime::ComputePipeline, 3> kernels;
@@ -144,6 +144,9 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         const GpuGeometryVisibility::Candidate range{{}, 0, 0, 0, temporal ? 8u : 0u};
         const GpuGeometryVisibility::Bin bin{7, 0, 0, 0};
         const auto rangeUpload = upload(&range, sizeof(range)), binUpload = upload(&bin, sizeof(bin));
+        // World-space fixture stream: identity object-to-world for the single bin.
+        const std::array<math::vector4, 3> world{math::vector4(1, 0, 0, 0), math::vector4(0, 1, 0, 0), math::vector4(0, 0, 1, 0)};
+        const auto worldUpload = upload(world.data(), sizeof(world));
         std::array<uint32_t, 48> constants{};
         constants[24] = constants[25] = constants[27] = 1;
         // Shader constants store columns, while matrix.m is row-major.
@@ -226,8 +229,9 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, rangeUpload); encoder.SetRootBuffer(RHIBindPoint::Compute, 2, binUpload);
                     encoder.SetBindings(RHIBindPoint::Compute, 3, firstTable); encoder.SetBindings(RHIBindPoint::Compute, 4, vertexTable);
                     encoder.SetBindings(RHIBindPoint::Compute, 5, topologyTable);
-                    if (stage == 1 && history) { encoder.SetBindings(RHIBindPoint::Compute, 6, history->Bindings(execution));
-                        encoder.SetConstantBuffer(RHIBindPoint::Compute, 7, historyUniform); }
+                    encoder.SetRootBuffer(RHIBindPoint::Compute, 6, worldUpload);
+                    if (stage == 1 && history) { encoder.SetBindings(RHIBindPoint::Compute, 7, history->Bindings(execution));
+                        encoder.SetConstantBuffer(RHIBindPoint::Compute, 8, historyUniform); }
                     encoder.Dispatch(1,1,1);
                     const RHIBufferHandle barriers[]{firstIds, firstArgs}; encoder.ResourceBarriers({{}, {}, {}, barriers});
                 }
@@ -251,9 +255,10 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                 encoder.SetBindings(RHIBindPoint::Compute, 3, outputTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 4, vertexTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 5, topologyTable);
-                if (stage == 1) encoder.SetBindings(RHIBindPoint::Compute, 6, depthTable);
+                encoder.SetRootBuffer(RHIBindPoint::Compute, 6, worldUpload);
+                if (stage == 1) encoder.SetBindings(RHIBindPoint::Compute, 7, depthTable);
                 if (stage == 1 && temporal) { RHIBufferSlice slice; slice.buffer = firstIds; slice.size = 64 * 4;
-                    encoder.SetRootBuffer(RHIBindPoint::Compute, 7, slice); }
+                    encoder.SetRootBuffer(RHIBindPoint::Compute, 8, slice); }
                 encoder.Dispatch(1, 1, 1);
                 const RHIBufferHandle barriers[]{ids, args}; encoder.ResourceBarriers({{}, {}, {}, barriers});
             }

@@ -156,6 +156,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
         const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
         const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
         outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
         host.DeclareHistory(*graph, outputs.depth);
         RGTextureDesc colorDesc;
@@ -179,10 +180,10 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->ClearRenderTargets(target, h.index == color.index ? background.data() : white);
                 }
             });
-        const auto opaque = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
+        const auto opaque = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
         if (fixture == 0) {
             bool rejected = false;
-            try { host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {},
+            try { host.DeclareColor(*graph, outputs, {meteorLayerWork.layer,
                 host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, opaque, ao, {}); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Effect color output rejects duplicate shading before declaring resources");
@@ -190,14 +191,14 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         tiles.SetUseReferencePath(fixture == 11);
         tiles.SetDepth(outputs.depth);
         tiles.Declare(*graph, context);
-        if (!meteorFinalList.commands.blended.empty()) {
-            auto wrong = meteorFinalList.commands;
+        if (!meteorLayerWork.blended.empty()) {
+            auto wrong = meteorLayerWork;
             wrong.blended.pop_back();
             bool rejected = false;
             try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Blended rejects incomplete command-list slot before declaring layers");
-            wrong = meteorFinalList.commands;
+            wrong = meteorLayerWork;
             ++wrong.blended.front().epoch;
             rejected = false;
             try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
@@ -209,14 +210,14 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             Check(!selected.empty(), "Blended prepared stage contains a layer");
             bool rejected = false;
             try { host.DeclareBlended(*graph, {selected.front().index, selected.front().index},
-                meteorFinalList.commands, opaque, {}, tiles.GetLighting()); }
+                meteorLayerWork, opaque, {}, tiles.GetLighting()); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Blended duplicate indices rejected without publishing partial layer output");
         }
-        const auto blended = host.DeclareBlendedStream(*graph, meteorFinalList.commands, opaque, {}, tiles.GetLighting());
+        const auto blended = host.DeclareBlendedStream(*graph, meteorLayerWork, opaque, {}, tiles.GetLighting());
         if (fixture == 0) {
             bool rejected = false;
-            try { host.DeclareBlendedStream(*graph, meteorFinalList.commands, blended, {}, tiles.GetLighting()); }
+            try { host.DeclareBlendedStream(*graph, meteorLayerWork, blended, {}, tiles.GetLighting()); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Blended output ownership rejects a second stream declaration");
         }

@@ -17,8 +17,14 @@ struct SceneFrameGeometry final
     struct alignas(16) Record {
         SceneGeometryIdentity identity;
         uint32_t chunkIndex{}, owner{}, meshletCount{}, vertexCount{};
+        // Object-to-world columns of the row-vector transform: world = dot(float4(p,1), column).
+        math::vector4 worldColumns[3];
+        void SetWorld(const math::matrix4x4& world) {
+            for (unsigned column = 0; column < 3; ++column)
+                worldColumns[column] = math::vector4(world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]);
+        }
     };
-    static_assert(sizeof(Record) == 80);
+    static_assert(sizeof(Record) == 128);
     static_assert(offsetof(Record, owner) == 68);
     IRenderDeviceServices* device{};
     std::vector<Record> records{Record{}};

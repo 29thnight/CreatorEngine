@@ -405,6 +405,8 @@ namespace experiment::cooked
             const MeshLodChain& chain = mesh.coarseLods;
             coarseLods.Pod(CookedLodMesh{chain.settings, chain.geometryDigest,
                 static_cast<std::uint32_t>(chain.levels.size())});
+            coarseLods.Pod(static_cast<uint32_t>(chain.groups.size()));
+            coarseLods.PodArray(chain.groups);
             for (const MeshLodLevel& level : chain.levels)
             {
                 const MeshletPayload& payload = level.meshlets;
@@ -1038,11 +1040,14 @@ namespace experiment::cooked
                     chain.settings = header.settings;
                     chain.geometryDigest = header.geometryDigest;
                     chain.levels.resize(header.levelCount);
+                    const auto groupCount = cursor.Pod<uint32_t>();
+                    valid = cursor.Ok() && groupCount <= kMeshClusterMaxGroups && cursor.Array(groupCount, chain.groups);
+                    if (!valid) break;
                     for (MeshLodLevel& level : chain.levels)
                     {
                         const auto record = cursor.Pod<CookedLodLevel>();
                         valid = cursor.Ok() && record.indexCount != 0u && record.indexCount % 3u == 0u
-                            && record.indexCount < mesh.indices.size()
+                            && record.indexCount <= mesh.indices.size()
                             && record.descriptorCount != 0u && record.descriptorCount <= record.indexCount / 3u
                             && record.vertexCount <= record.indexCount
                             && record.triangleCount == record.indexCount
@@ -1078,7 +1083,7 @@ namespace experiment::cooked
                 {
                     mesh.coarseLods = {};
                 }
-                Reject(issues, "lods", failure + "; retaining LOD0 geometry.");
+                Reject(issues, "lods", failure + "; force reimport/recook required.");
             }
         }
 

@@ -20,6 +20,8 @@ namespace
     constexpr std::uint32_t kVisibilityThreads = 64;
     constexpr std::uint32_t kVisibilityDispatchWidth = 65535;
     constexpr std::uint32_t kMeshletBinCapacity = 4096;
+    // Root 6 of every meshlet layout: per-bin object-to-world columns.
+    constexpr std::uint32_t kMeshletWorldRegister = 8211;
 
     std::uint32_t VisibilityGroups(std::uint32_t elements)
     {
@@ -240,7 +242,7 @@ bool GpuGeometryVisibility::InitializeMeshlets(const EnhancedFrameContext& conte
     const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(0), RHILayout::Srv(0),
         RHILayout::Srv(1), RHILayout::UavBufferTable(2, 0),
         RHILayout::SrvBufferTable(kMeshletBinCapacity, 18),
-        RHILayout::SrvBufferTable(kMeshletBinCapacity, 18 + kMeshletBinCapacity)};
+        RHILayout::SrvBufferTable(kMeshletBinCapacity, 18 + kMeshletBinCapacity), RHILayout::Srv(kMeshletWorldRegister)};
     const auto layout = context.rootSignatures->GetOrCreate({parameters, {}}, error);
     if (!layout.IsValid()) return false;
     LX::Runtime::ComputePipeline reset, cull;
@@ -263,7 +265,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(const EnhancedFrameContext& context,
     const math::matrix4x4& projection,
     std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
     std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage, bool ordered)
+    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage, bool ordered, float maxPixelError, uint32_t lodWidth, uint32_t lodHeight)
 {
     std::vector<Candidate> candidates;
     std::vector<Bin> bins;
@@ -293,7 +295,8 @@ bool GpuGeometryVisibility::PrepareMeshlets(const EnhancedFrameContext& context,
         // the source meshlets; no CPU-sized list of individual work items exists.
         // sourceIndex is the first 64-thread group of this range. Padding each
         // range to a group keeps descriptor selection uniform across a wave.
-        candidates.push_back({{}, bin, static_cast<uint32_t>(groups), static_cast<uint32_t>(offset),
+        // Meshlet ranges use the otherwise unused sphere words as {LOD width, height, 0, pixel error}.
+        candidates.push_back({{float(lodWidth ? lodWidth : context.width), float(lodHeight ? lodHeight : context.height), 0, maxPixelError}, bin, static_cast<uint32_t>(groups), static_cast<uint32_t>(offset),
             8u | (ordered ? kOrderedMeshlets : 0u)});
         groups += (uint64_t(count) + kVisibilityThreads - 1) / kVisibilityThreads;
         bins.push_back({count, static_cast<uint32_t>(offset), 0, 0}); offset += uint64_t(count) * 2 + 1;
@@ -305,6 +308,18 @@ bool GpuGeometryVisibility::PrepareMeshlets(const EnhancedFrameContext& context,
     if (!result) return true;
     auto frame = std::const_pointer_cast<Frame>(result);
     frame->m_ordered = ordered;
+    // Vertex streams may be object space; culling tests world positions.
+    std::vector<math::vector4> worlds;
+    worlds.reserve(geometries.size() * 3);
+    for (const auto& geometry : geometries)
+    {
+        const auto& world = geometry->ObjectToWorld();
+        for (unsigned column = 0; column < 3; ++column)
+            worlds.emplace_back(world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]);
+    }
+    frame->m_meshletWorlds = m_device->AllocateUpload({worlds.size() * sizeof(math::vector4), RHIUploadUsage::Raw, 16});
+    if (!frame->m_meshletWorlds.IsWritable()) return VisibilityFail(error, "Meshlet world transform upload failed.");
+    std::memcpy(frame->m_meshletWorlds.cpuAddress, worlds.data(), worlds.size() * sizeof(math::vector4));
     if (history)
     {
         history->RequireView(frame->m_occlusionView);
@@ -337,7 +352,8 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
     const auto compile = [&](LX::Runtime::ComputePipeline& pipeline, const char* stage) {
     std::vector<RHIPipelineLayoutParam> parameters{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),
         RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(kMeshletBinCapacity, 18),
-        RHILayout::SrvBufferTable(kMeshletBinCapacity, 18 + kMeshletBinCapacity), RHILayout::SrvTable(kOcclusionLevels, 2)};
+        RHILayout::SrvBufferTable(kMeshletBinCapacity, 18 + kMeshletBinCapacity), RHILayout::Srv(kMeshletWorldRegister),
+        RHILayout::SrvTable(kOcclusionLevels, 2)};
     if (stage) parameters.push_back(std::string_view(stage) == "GEOMETRY_VISIBILITY_HISTORY" ? RHILayout::Cbv(1) : RHILayout::Srv(8210));
     const auto layout = context.rootSignatures->GetOrCreate({parameters, {}}, error);
     if (!layout.IsValid()) return false;
@@ -717,10 +733,11 @@ void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset, RHI
     if (!m_meshletGeometries.empty()) {
         encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
         encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
+        encoder.SetRootBuffer(RHIBindPoint::Compute, 6, m_meshletWorlds);
         if (reset) { DispatchGroups(encoder, VisibilityGroups(m_binCount)); return; }
-        if (depth.IsValid()) encoder.SetBindings(RHIBindPoint::Compute, 6, depth);
-        if (m_historyProjection.IsValid()) encoder.SetConstantBuffer(RHIBindPoint::Compute, 7, m_historyProjection);
-        if (m_firstStage) encoder.SetRootBuffer(RHIBindPoint::Compute, 7,
+        if (depth.IsValid()) encoder.SetBindings(RHIBindPoint::Compute, 7, depth);
+        if (m_historyProjection.IsValid()) encoder.SetConstantBuffer(RHIBindPoint::Compute, 8, m_historyProjection);
+        if (m_firstStage) encoder.SetRootBuffer(RHIBindPoint::Compute, 8,
             m_firstStage->VisibleIds(0, m_firstStage->m_outputCount));
         DispatchGroups(encoder, m_meshletGroups);
         return;
@@ -739,6 +756,7 @@ void GpuGeometryVisibility::Frame::DispatchMeshletFinalize(RHIEncoder& encoder) 
     encoder.SetBindings(RHIBindPoint::Compute, 3, m_outputs);
     encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
     encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
+    encoder.SetRootBuffer(RHIBindPoint::Compute, 6, m_meshletWorlds);
     DispatchGroups(encoder, VisibilityGroups(m_binCount));
 }
 

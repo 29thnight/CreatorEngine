@@ -160,7 +160,8 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
                        unsigned workers, bool publish)
 {
     std::string error;
-    Check(graph->Compile(error), "Shadow/Decal graph compile " + error);
+    const bool compiled = graph->Compile(error);
+    Check(compiled, "Shadow/Decal graph compile " + error);
     RHISubmissionTicket ticket;
     RHICompletionPoint completion;
     if (workers)
@@ -189,7 +190,8 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
     }
     if (publish)
     {
-        Check(host.PublishSubmittedCache(frameId, completion, error, ticket), "Shadow/Decal publication " + error);
+        const bool published=host.PublishSubmittedCache(frameId, completion, error, ticket);
+        Check(published, "Shadow/Decal publication " + error);
     }
     device.WaitForGpu();
     Check(GetRHISubmissionThread().Drain(&device, error), "Shadow/Decal retirement");
@@ -398,6 +400,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
             const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
             [[maybe_unused]] const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
             map = host.DeclareShadow(*graph, meteorGeometry, map);
             if (shadow.enabled)
             {

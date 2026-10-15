@@ -78,7 +78,7 @@ $expected=if($OnlyLive){0}elseif($ExtendedCases){144}else{12}
 $lists=$listLines.Count -eq $expected
 foreach($line in $listLines){if($line -notmatch ' missing=0 extra=\d+$'){$lists=$false}}
 $payloadLines=if($skin.Count){@($skin[0].data.log -split "`n"|Where-Object {$_ -match '^MESHLET_GPU_PAYLOAD '})}else{@()}
-$payloads=$payloadLines.Count -eq $expected -and @($payloadLines|Where-Object {$_ -notmatch ' schema=2 profile=2 identity=exact$'}).Count -eq 0
+$payloads=$payloadLines.Count -eq $expected -and @($payloadLines|Where-Object {$_ -notmatch ' schema=4 profile=2 identity=exact$'}).Count -eq 0
 $ready=@($rows|Where-Object command -eq 'render.live.ready')
 $readiness=$ready.Count -eq 2 -and @($ready|Where-Object {
     $_.status -ne 'succeeded' -or $_.data.completionKind -ne 'editor_gpu_frame_completed' -or

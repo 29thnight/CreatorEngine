@@ -719,13 +719,17 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     RHIModelMeshletUpload packed;
                     if (!PackMeteorMeshletGpuPayload(topology, sealed.Count(), sealed.Geometry().vertexStride,
                         sealed.Geometry().vertexAttributeMask, sealed.Geometry().sourceLodIndex,
-                        sealed.SourcePrimitiveCount(), sealed.SourceVertexCount(), sealed.SourceVertexIds(), packed, error)) return false;
+                        sealed.SourcePrimitiveCount(), sealed.SourceVertexCount(), sealed.SourceVertexIds(), packed, error, &sealed.Hierarchy())) return false;
                     if (images[3].data.size() != packed.bytes.size() ||
                         std::memcmp(images[3].data.data(), packed.bytes.data(), packed.bytes.size()) != 0)
                     { outLog += "METEOR GPU cooked meshlet payload identity mismatch.\n"; return false; }
+                    RHIMeshletBufferHeader actualHeader;
+                    std::memcpy(&actualHeader, images[3].data.data(), sizeof(actualHeader));
+                    if (actualHeader.schemaVersion != 4 || actualHeader.profileVersion != experiment::kMeshletProfileVersion)
+                    { outLog += "METEOR GPU meshlet payload schema/profile mismatch.\n"; return false; }
                     outLog += "MESHLET_GPU_PAYLOAD case=" + caseName + " label=" + label + " cascade=" +
                         std::to_string(output.cascade) + " bytes=" + std::to_string(packed.bytes.size()) +
-                        " schema=2 profile=2 identity=exact\n";
+                        " schema=" + std::to_string(actualHeader.schemaVersion) + " profile=" + std::to_string(actualHeader.profileVersion) + " identity=exact\n";
                     std::vector<bool> survivors(count);
                     for (unsigned i = 0; i < survivorCount; ++i) {
                         if (ids[i + 1] >= count || survivors[ids[i + 1]]) { outLog += "Invalid/duplicate survivor ID.\n"; return false; }

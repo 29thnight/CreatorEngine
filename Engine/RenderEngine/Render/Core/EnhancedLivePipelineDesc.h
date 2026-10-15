@@ -52,6 +52,9 @@ namespace LiveSlots
     constexpr const char* kGBufferEmissive   = "GBuffer.Emissive";
     constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
     constexpr const char* kGBufferDepth      = "GBuffer.Depth";
+    inline constexpr const char* kDecalBaseDiffuse = "METEOR.Scene.Decal.BaseDiffuse";
+    inline constexpr const char* kDecalBaseOrm = "METEOR.Scene.Decal.BaseOrm";
+    inline constexpr const char* kDecalBaseNormal = "METEOR.Scene.Decal.BaseNormal";
     inline constexpr const char* kVisibility = "METEOR.Scene.Visibility";
 
     /// METEOR 단계 계약. 각 단계가 발행한 그래프 핸들을 다음 단계가 그대로 받는다.
@@ -59,12 +62,11 @@ namespace LiveSlots
     inline constexpr const char* kMeteorGeometry = "METEOR.Scene.Geometry.Table";
     inline constexpr const char* kMeteorFirstList = "METEOR.Scene.Cull.FirstList";
     inline constexpr const char* kMeteorOccluderDepth = "METEOR.Scene.Occluder.Depth";
-    inline constexpr const char* kMeteorDepthCommands = "METEOR.Scene.Commands.Depth";
-    inline constexpr const char* kMeteorSurfaceCommands = "METEOR.Scene.Commands.Surface";
     inline constexpr const char* kMeteorLayerCommands = "METEOR.Scene.Commands.Layer";
     inline constexpr const char* kMeteorMaterialTiles = "METEOR.Scene.Material.Tiles";
     inline constexpr const char* kMeteorMaterialArguments = "METEOR.Scene.Material.Arguments";
     inline constexpr const char* kMeteorBlendedCommands = "METEOR.Scene.Commands.Blended";
+    inline constexpr const char* kMeteorBlendedList = "METEOR.Scene.Cull.BlendedList";
     inline constexpr const char* kMeteorFinalList = "METEOR.Scene.Cull.FinalList";
 
     constexpr const char* kTemporalMotion = "Temporal.Motion";

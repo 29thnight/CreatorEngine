@@ -131,7 +131,7 @@ public:
         return { m_copiedDiffuse, m_copiedOrm, m_copiedNormal };
     }
 
-    /// 이 패스를 컬링 뿌리로 표시할지. 소비자(Deferred)가 붙기 전에는 켜 둔다.
+    /// 명시적 소비자가 없는 진단 실행에서 이 패스를 보존할지.
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
 
     /// 그린 데칼 수와 실제 발행한 드로우 수.

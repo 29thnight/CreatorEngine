@@ -20,7 +20,10 @@ namespace material_graph
 // 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
 // 23: camera compute meshlet IDs and GPU-finalized 2D indirect dispatch ABI.
 // 30: occluder depth uses the HW/SW visibility producer; LXSceneDepthPS removed.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:30";
+// 32: visibility-packet Temporal shader interface (forced recook).
+// 34: spatial replacement DAG addressing and group-based GPU LOD (forced recook).
+// 31: object-space vertex streams; lx_world/lx_previousWorld/lx_shadowWorld constants.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:34";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
@@ -221,7 +224,7 @@ struct CookedProgram
 
 // Scene mesh shaders consume GPU-compacted meshlet IDs and 2D indirect work.
 // Previous products cannot be rebound to this host; assets must be recooked.
-inline constexpr std::uint32_t CookedProgramVersion = 8;
+inline constexpr std::uint32_t CookedProgramVersion = 12;
 bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,
