@@ -1,96 +1,24 @@
-# RG8 PR168: Release product measurement
+# 제품 큐 성능 측정의 재현 조건
 
-Source: `d5a6a26a78da93686b8168429183ee7e0d50a8de`, Windows, VS 2026 v18,
-RTX 4070 Ti / driver 595.97. TestShadow, DX12, 1496 x 692.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-**Performance acceptance failed.** The product scheduler usually has no usable
-pass costs. This collection does not establish async speedup or close RG8.
+## 이 문서의 역할
 
-Follow-up: the history rejection below was traced to SSGI physical ping-pong
-declaration order and fixed. See [history fix and remeasurement](RenderRg8HistoryFix20261009.md).
-The historical measurements on this page remain unchanged.
+제품 큐 성능 측정의 재현 조건에 관한 과거 단계별 기록을 현행 계약으로 다시 정리한다. 공통 용어·수명·실행 모델은 [RenderGraph 정본](../plans/RenderGraphDependencySchedulingPlan.md)을 따른다. 날짜가 붙은 파일명은 링크 호환을 위해 유지한다.
 
-## Build and native correctness
+## 현재 구현과 호출 경로
 
-The initial Release build failed the command registry's sorted-name assertion:
-PR168 inserted `render.queue.mode` before `render.live.fence`. Moving the new
-entry after `render.pbr.uv` fixes the ordering without changing its behavior.
-The subsequent VS2026 Release build passed. Existing Utility_Framework PDB
-LNK4020 and managed trimming warnings remain.
+현재 planner는 유효한 전체 pass 비용이 없으면 missing-measurement로 graphics fallback한다. 과거 특정 TestShadow 실행의 missing signature 원인·수치가 현행 바이너리에서도 같다고 가정할 수 없다. 구조 신원과 실제 normal-domain 비용 채택 여부를 먼저 확인해야 한다.
 
-This was a dirty-worktree build, including the preserved GCCE/local test edits
-and the earlier optimized-clear-value fixture correction. It is not a pristine
-PR checkout result. The original patch/status and binary hashes are retained.
+## 변경·검증 기준
 
-Release `verify-rg8-queue-execution.ps1 -FullRegression` passed: 428 execution
-checks, 111 schedule checks, full RenderGraph regression and native GPU validation.
-The wrapper did not require measured overlap. These native results do not prove
-product performance or product GPU-validation acceptance.
+현재 소스·shader·runtime·장치·드라이버와 viewport 크기를 봉인한다. compile/prepare/schedule/record/submit 및 GPU span을 나누고 느린 정상 표본을 임의 제거하지 않는다. correctness가 통과해도 성능 채택은 별도 판정이다.
 
-## Normal-frame collection
+과거 로컬 Build/Artifacts 경로의 수치와 완료·기성 표시는 이번 소스 감사에서 재검증하지 않았으므로 현재 통과 결과로 옮기지 않는다. 제품 기본값, 특정 fixture 성공, 여러 backend의 제품 수용은 각각 판정한다.
 
-Two Editor processes ran the forward 0/1/2 and reverse 2/1/0 sequences. Within
-each process, `render.queue.mode` switched at render-owner frame boundaries.
-Each segment warmed 16 ordinary frames and collected 64 chronological candidate
-snapshots. GPU validation and image capture were disabled during timing. GPU
-clocks were not locked; sparse clock/power observations are retained, not a
-continuous frequency-control proof. Mode 0 is the existing executor; mode 1 is
-primary-graphics queue execution; mode 2 requests overlap placement.
+## 소스 근거
 
-The original wrapper aborted after the first insufficient segment. The retained
-initial run is under `normal`. The wrapper was then changed to collect all mode
-diagnostics before failing. It still requires 32 eligible samples per segment,
-returns failure when any segment lacks them, and leaves acceptance false. The
-complete diagnostic attempt is under `normal-complete-diagnostics`.
-
-All 384 candidate identities and calibrated intervals were independently checked
-with `audit-rg8-adoption.py`'s timing verifier. The following distributions include
-all 64 candidates per segment, including missing-cost fallback. They are
-**diagnostic observations, not accepted warmed async-performance distributions**.
-
-| Order / mode | GPU span median / p95 ms | Full-view CPU median / p95 ms | Record-submit CPU median ms | Eligible samples |
-|---|---:|---:|---:|---:|
-| Forward 0 | 2.9082 / 3.6342 | 7.3035 / 11.2548 | 1.0730 | 32 / 32 |
-| Forward 1 | 3.1206 / 3.2614 | 7.1030 / 10.8199 | 1.4424 | 0 / 32 |
-| Forward 2 | 2.5175 / 3.9588 | 7.8681 / 13.5453 | 1.7648 | 4 / 32 |
-| Reverse 2 | 3.2809 / 3.5953 | 7.5824 / 9.8074 | 1.5270 | 0 / 32 |
-| Reverse 1 | 2.6578 / 3.5062 | 7.1947 / 10.5457 | 1.5904 | 2 / 32 |
-| Reverse 0 | 2.2159 / 3.5799 | 6.2903 / 8.9849 | 0.9152 | 32 / 32 |
-
-Of 128 mode-2 candidates, 124 fell back with `missing-measurement`; only four
-submitted compute. All 128 candidate overlaps were zero, including those four.
-The initial attempt's full log did contain a small nonzero overlap (maximum
-0.0226 ms), outside this complete candidate matrix. That observation must not be
-substituted for sustained overlap or net speedup.
-
-In the initial log, missing-cost schedules reported all 68 pass measurements
-missing, rather than one unsupported pass. This points to a history admission,
-freshness or graph-signature problem; the exact rejection path has not yet been
-instrumented and the root cause is **not established**. More repetitions of the
-same benchmark will not resolve that defect.
-
-Full-view CPU includes preparation, graph construction/compile, recording,
-scheduling, submission and retirement enqueue; it excludes main-thread scene
-generation, presentation and GPU-completion waits. Opt-in evidence serialization
-is included. Record-submit is a narrower scope and must not be confused with it.
-
-## Decision and next correction
-
-Separate correctness captures completed in six normally exited processes (four
-captures per mode/order). The 16 mode-0 versus mode-1/2 comparisons passed with
-all 112 standard attachments at `maxAbs=0`, no nonfinite values, and matched
-controlled scene inputs. These captures ran with GPU validation disabled and
-are excluded from the normal timing distributions. Both normal-timing processes
-also exited zero; it is the evidence acceptance wrapper that failed.
-
-Keep RG8 default OFF. Native correctness passes, but product performance does
-not meet the existing acceptance contract. Diagnose exactly why stored normal
-costs are rejected at `FindFresh` / signature matching before changing thresholds
-or increasing sample counts. Then rerun this same matrix and separately establish
-a sustained-overlap workload and a fully measured negative fallback workload.
-
-Evidence root: `Build/Verification/Phase43/RG8Pr168Perf20261009/`. It contains
-source/binary identities, native results, both timing attempts, the independent
-`summarize.py` and `diagnostic-performance-summary.json`, and separate image
-captures/comparisons. Build logs: `Build/rg8-pr168-release.log` and
-`Build/rg8-pr168-release-fixed.log`.
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp](../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp)
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp)
+- [Tools/regression/measure-rg8-adoption.ps1](../../Tools/regression/measure-rg8-adoption.ps1)
+- [Tools/regression/audit-rg8-adoption.py](../../Tools/regression/audit-rg8-adoption.py)
