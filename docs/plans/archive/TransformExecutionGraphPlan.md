@@ -1,43 +1,26 @@
-# (통합됨) Sparse Compiled Transform Execution Graph 제안
+# Transform 실행 그래프 이전 안내
 
-> **보관 · 통합됨 (정리: 2026-09-06).** 2026-08-25 TransformUpdatePlan으로 통합된 제안과 절 매핑.
-> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 호출부. 이 문서는 현재 구현을 설명하며, 이번 문서 갱신에서 빌드·테스트·제품 실행을 수행하지 않았다.
 
-**이 문서의 내용은 2026-08-25에 [`TransformUpdatePlan.md`](TransformUpdatePlan.md)로
-통합됐다.** 여기서 유지하지 않는다.
+## 통합 위치
 
-`TransformUpdatePlan.md`가 PHASE 8.75의 단일 정본이며, 이 제안이 담고 있던 것은
-다음 자리로 갔다.
+이전 Sparse Compiled Transform Execution Graph 제안은 [Transform 갱신 계약](TransformUpdatePlan.md)에 통합했다. 현재 Scene에는 CompileExecutionGraphs, sparse resolver, EnsureResolved, local/world batch publication이 존재한다. 이 문서를 별도의 미착수 executor 설계로 해석하지 않는다.
 
-| 원래 절 | 통합 후 |
-|---|---|
-| §0 판정 요약 | §0 판정 요약 — 권장 구조와 복잡도 표 |
-| §1 측정·구조 전제 교정 | **§3** 측정·구조 전제 교정 (§3.1~§3.7). 소스 확인 표시와 §3.8·§3.9 신규 실측 추가 |
-| §2 목표와 비목표 | §5 |
-| §3 목표 소유 구조 | §6 (다이어그램 재작성) |
-| §4 쓰기 계약 | §7 |
-| §5 resolve 알고리즘 | §8 (프레임 플로우·SyncDerivedState·sparse resolve 다이어그램 신설) |
-| §6 render publication | §9 |
-| §7 데이터 표현 | §10 |
-| §8 계층 mutation 계약 | §11 |
-| §9 실행 슬라이스 X0~X9 | §12 (의존 다이어그램 신설, X0에 topology 변경 빈도 추가) |
-| §10 성능·회귀 매트릭스 | §13 (스폰/파괴 시나리오 추가) |
-| §11 위험과 롤백 경계 | §14 |
-| §12 기존 계획과의 관계 | **부록 A** — 폐기된 T0~T5와 판정 |
-| §13 최종 권고 | §12 슬라이스 의존 다이어그램이 대체 |
+## 실행 graph가 나타내는 것
 
-통합 과정에서 더해진 것:
+HierarchyStore의 canonical 관계를 topology version에 맞춰 spatial/UI 실행 투영으로 바꾼다. node의 실행 위치와 EntityHandle은 별개다. reparent는 cycle·cross-scene을 검증하고 compiler도 손상을 다시 검사한다. topology가 변하지 않은 frame은 기존 projection을 재사용할 수 있다.
 
-- **§3.8 X1 비용 실측** — `Transform` 한정 TRS 직접 쓰기 **12곳, 전부 에디터**
-  (`InspectorWindow.cpp` 9 · `ImGuiDrawHelperRectTransformComponent.cpp` 3).
-  느슨한 상한 104건은 대부분 다른 타입이다. X1은 대공사가 아니다.
-- **§3.9 topology 변경 빈도 (미측정, X0-④ 신설)** — §8.5가 허용하는 "topology 변경 시
-  O(N) 전체 compile"의 재개 조건이 *reparent*로만 잡혀 있었는데, **엔티티 생성·파괴도
-  topology 변경**이다. 매 프레임 스폰하는 씬이면 O(N)/frame이 되어 지금보다 나빠질 수
-  있다. X0에서 재고, 크면 incremental compile이 X9 선택지가 아니라 X4의 전제가 된다.
-- **§6.3 소유자 명시** — WorldSpace Canvas처럼 두 projection에 모두 들어가는 Entity의
-  `worldMatrix` 소유자는 Spatial graph 하나다.
-- **§8.4 동등 비교의 한계 명시** — `nextWorld != worldMatrix[i]`는 64B float 완전 일치라
-  FP 지터에 무력하고, range 순회 자체를 줄이지 않고 write·publish만 줄인다.
-- **X5 완료 기준 단서** — skeleton 시나리오는 X7(bulk upload) 이후에 다시 잰다.
-  X5 시점의 나쁜 수치를 설계 실패로 오독하지 않기 위해서다.
+dirty root와 epoch는 sparse resolve의 입력이다. parent world 변경은 child에 전파되고 EnsureResolved가 chain을 먼저 계산한 뒤에도 worldChanged가 남아 다른 branch의 변경을 잃지 않는다. 단순 preorder 배열만 만드는 것과 이 mutation/invalidaton 계약을 구현하는 것은 다르다.
+
+## 사용자가 변경할 때의 경계
+
+새 writer는 local setter/PublishLocalWrite 또는 owner의 ApplyWorldWriteBatch에 합류해야 한다. 새로운 Scene traversal을 subsystem마다 추가하지 않는다. UI screen resize는 별도 dirty domain이고 animation worker는 scene storage를 직접 갱신하지 않는다.
+
+성능 확장인 depth-band 병렬화나 static partition은 현재 source 구조만으로 효과를 보장할 수 없다. topology churn과 sparse/full movement를 같은 fixture에서 재측정한 뒤 결정한다. 이번 문서화에서는 실행 그래프 테스트·벤치마크를 수행하지 않았다.
+
+## 구현 근거
+
+- [Engine/SceneRuntime/Scene.cpp](../../../Engine/SceneRuntime/Scene.cpp)
+- [Engine/SceneRuntime/Scene.h](../../../Engine/SceneRuntime/Scene.h)
+- [Engine/SceneRuntime/HierarchyStore.h](../../../Engine/SceneRuntime/HierarchyStore.h)
+- [Engine/SceneRuntime/TransformStore.h](../../../Engine/SceneRuntime/TransformStore.h)
