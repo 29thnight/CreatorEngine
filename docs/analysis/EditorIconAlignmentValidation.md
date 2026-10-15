@@ -1,36 +1,24 @@
-# 아이콘·본문 수직 정렬 보정
+# 아이콘 baseline 정렬과 fallback 계약
 
-2026-09-12. PHASE 21 W1 후속 수정. 사용자 표시 위치는 Scene/Game 탭과 Perspective 버튼이다.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
 
-## 원인과 수정
+## 정렬 알고리즘
 
-- 기존 라벨은 같은 문자열 또는 같은 `CalcTextSize` 높이로 배치됐지만,
-  Inter와 Material Symbols의 실제 글리프 기준선·상하 여백은 달랐다.
-  `GlyphOffset.y=0` 병합 때문에 아이콘 가시 영역이 글자보다 위에 놓였다.
-- 폰트 병합의 공통 경로에 `merge_aligned_icons`를 적용했다.
-  실제 적재한 본문의 H와 Material Symbols의 대칭 Menu 글리프를 128px로 측정하고,
-  기준선에 대한 가시 영역 중심 차이를 각 폰트의 기준 크기로 환산한다.
-  계산한 `GlyphOffset.y`가 ImGui의 사용자 배율·DPI 확대에 함께 적용된다.
-- Scene/Game 도킹 탭, 툴바, Hierarchy/Inspector 및 작은 글씨에 병합된 아이콘이 같은 보정을 받는다.
-  개별 아이콘의 고유 비율·글자의 descender를 보존하며, 모든 모양의 아래 끝을 강제로 맞추지는 않는다.
-- 기본 폰트 fallback에도 기준 크기를 명시해 비영점 보정을 허용한다.
-  외부의 암묵 크기 폰트 병합은 ImGui가 허용하는 영점 보정 경로를 유지한다.
-- 폰트 파일·글리프 모양·가로 advance·본문 글꼴·저장된 창 ID는 수정하지 않는다.
+`editor::fonts::merge_aligned_icons`는 이미 atlas에 있는 destination text font에 icon font를 merge한다. CalcTextSize의 line box만으로는 visible glyph bearing 차이를 알 수 없으므로 sample size 128에서 본문 H와 semantic Menu glyph의 Y0/Y1 중심 및 ascent를 비교한다. destination text size와 icon size를 적용해 GlyphOffset.y를 구하고 opticalOffset을 더한다.
 
-## 검증
+destination이 implicit reference size이면 ImGui가 nonzero offset merge를 허용하지 않으므로 zero-offset 경로를 유지한다. destination이 없거나 source font를 읽지 못하면 null을 반환한다. 임시 metrics bake는 merge 때 폐기되고 실제 offset은 reference pixels로 남아 user scale/DPI에 따라 확대된다.
 
-- `verify-editor-icon-alignment.ps1`: 289개 검사, 실패 0.
-  실제 ImGui rasterizer와 제품의 병합 함수를 사용했다.
-- Inter/Verdana/맑은 고딕/ImGui 기본 폰트, 기준 크기 10/12/16px,
-  배율 1/1.25/1.5/2/2.25/3, Scene/Game/Menu/Lit의 가시 중심을 검사했다.
-  glyph raster rounding을 포함한 최대 중심 차이는 1.5 물리 px다.
-- DX12 Debug 빌드 성공. 실제 Scene/Game 탭·Perspective/Lit 버튼·Hierarchy·Inspector의 정렬을 확인했다.
-  [적용 화면](../../Artifacts/phase21-icon-alignment/editor-aligned.png).
-- `editor.theme`: clean/geometryMatches/themeMappingMatches=true, 63개 아이콘 역할 누락 0.
-  `editor.selftest`: 640개 검사, 실패 0. 시작 assertion 없이 프레임이 진행됐고 stderr는 비어 있다.
-- DX12 시작 사용자 배율 100→150→100%의 3회 재기동, 64개 테마 회귀 검사 통과.
-  실제 OS DPI는 150%였고 모니터 이동 검사는 아니다. 각 실행의 640개 selftest도 통과했다.
-- 프로젝트 설정과 imgui.ini를 작업 전 원본 바이트로 복원했다.
+## 소비와 회귀
 
-작업 증거는 `Artifacts/phase21-icon-alignment/`에 둔다.
-이 수정으로 W2/W4/W5의 별도 완료 범위를 확장하지 않는다.
+EditorFontResources는 본문 fallback을 고른 뒤 이 merge helper를 사용한다. 따라서 특정 개발자 PC의 Inter 한 폰트에서 보기 좋은 상수를 모든 fallback에 하드코딩하지 않는다. private-use exclusion과 icon merge가 함께 지켜져야 올바른 glyph가 선택된다.
+
+`editor_icon_alignment_probe.cpp`와 `verify-editor-icon-alignment.ps1`이 실제 glyph metric을 비교하는 재현 경로다. glyph 중심 계산의 단정과 최종 행의 optical balance는 다르다. toolbar/tab/header/menu의 작은 크기, 여러 user scale/DPI, system font 또는 default fallback을 실제 화면에서도 확인해야 한다.
+
+과거 `Artifacts/phase21-icon-alignment/editor-aligned.png`는 당시 캡처다. 본 개정은 원본 이미지나 TTF를 변경하지 않았고 최신 실행 화면을 만들지 않았다. semantic role 또는 글꼴 source를 바꾸면 probe와 시각 수용을 다시 수행한다.
+
+## 구현 근거
+
+- [Editor/ImGuiHelper/EditorIconAlignment.h](../../Editor/ImGuiHelper/EditorIconAlignment.h)
+- [Editor/EngineGUIWindow/EditorFontResources.cpp](../../Editor/EngineGUIWindow/EditorFontResources.cpp)
+- [Tools/regression/editor_icon_alignment_probe.cpp](../../Tools/regression/editor_icon_alignment_probe.cpp)
+- [Tools/regression/verify-editor-icon-alignment.ps1](../../Tools/regression/verify-editor-icon-alignment.ps1)
