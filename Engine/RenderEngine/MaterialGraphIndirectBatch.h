@@ -28,7 +28,6 @@ struct IndirectMaterialBatch
     std::uint32_t commandCount{};
     std::string name{"METEOR.Scene.Commands"};
     bool indexedReplay{};
-    bool indexedVisibility{};
 
     ~IndirectMaterialBatch() { if (device && output.IsValid()) device->ReleaseBuffer(output); }
 
@@ -44,7 +43,7 @@ struct IndirectMaterialBatch
         };
         templates = upload(words.data(), words.size_bytes());
         commands = upload(records.data(), records.size_bytes());
-        const std::array<std::uint32_t, 4> values{commandCount, indexedVisibility ? 2u : indexedReplay ? 1u : 0u, 0, 0};
+        const std::array<std::uint32_t, 4> values{commandCount, indexedReplay ? 1u : 0u, 0, 0};
         constants = device->UploadConstants(values.data(), sizeof(values));
         RHIBufferDesc desc;
         desc.bytes = outputBytes; desc.allowUnorderedAccess = true; desc.allowIndirectArguments = true;
@@ -80,11 +79,25 @@ struct IndirectMaterialBatch
             encoder.Dispatch((owner->commandCount + 63) / 64, 1, 1);
         });
     }
-    void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+    RGHandle GraphOutput(const EnhancedRenderGraph& graph) const
     {
-        if (commandCount && (graphOwner != &graph || graphEpoch != graph.ResourceEpoch()))
-            throw std::runtime_error("METEOR command consumer requires an explicitly declared producer.");
-        if (commandCount) uses.push_back({graphOutput, RHIResourceState::IndirectArgument, RGAccessMode::Read});
+        if (!commandCount) return {};
+        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
+            throw std::runtime_error("METEOR commands require their explicit producer on this graph.");
+        return graphOutput;
+    }
+    void ValidateInput(const EnhancedRenderGraph& graph, RGHandle input) const
+    {
+        const auto expected = GraphOutput(graph);
+        if (input.IsValid() != expected.IsValid() || (input.IsValid() &&
+            (input.index != expected.index || input.version != expected.version ||
+             input.kind != expected.kind || input.epoch != expected.epoch)))
+            throw std::runtime_error("METEOR command input is not the published buffer version.");
+    }
+    void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, RGHandle input) const
+    {
+        ValidateInput(graph, input);
+        if (input.IsValid()) uses.push_back({input, RHIResourceState::IndirectArgument, RGAccessMode::Read});
     }
     void Draw(RHIEncoder& encoder, std::size_t bucket) const
     {

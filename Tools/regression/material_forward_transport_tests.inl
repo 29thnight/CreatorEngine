@@ -331,9 +331,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                execution.encoder->BindRenderTargets(target);
                                execution.encoder->ClearDepthTarget(target, fixture == 6 ? .1f : .9f);
                            });
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            outputs = host.DeclareGBuffer(*graph, outputs);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc desc;
             desc.width = desc.height = 16;
@@ -363,11 +365,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                        target, h.index == color.index ? background.data() : white);
                                }
                            });
-            color = host.DeclareColor(*graph, outputs, color, ao, {});
+            color = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
             const auto composed = host.DeclareVolume(*graph, color, outputs.depth, {});
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);
-            const auto final = host.DeclareBlendedStream(*graph, composed, {}, tiles.GetLighting());
+            const auto final = host.DeclareBlendedStream(*graph, meteorFinalList.commands, composed, {}, tiles.GetLighting());
             Check(final.IsValid(), "Transport shared output");
             std::array<RHIReadback, 3> readbacks;
             const std::array handles{final, outputs.depth, outputs.bitmask};

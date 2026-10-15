@@ -126,9 +126,11 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     Check(host.Prepare(context, input, environment, {}, {}, {}, {}, error, 1),
                           "Decal host prepare " + error);
                     gbuffer.Declare(*graph, context);
-                    host.DeclareGeometry(*graph);
-                    host.DeclareCulling(*graph);
-                    auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
+                    const auto meteorGeometry = host.DeclareGeometry(*graph);
+                    const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+                    const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+                    const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+                    auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
                     host.DeclareHistory(*graph, outputs.depth);
                     auto decalInputs = outputs;
                     if (fixture == 6)
@@ -205,7 +207,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
 
 
                     lighting = SceneHost::DeclareHdrTarget(*graph, context);
-                    const auto color = lighting = host.DeclareColor(*graph, outputs, lighting, ambient, {});
+                    const auto color = lighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ambient, {});
                     std::array<RHIReadback, 9> readbacks;
                     const auto copyTexture = [&](unsigned index, RGHandle texture, RHIFormat format) {
                         Check(device.CreateReadback(16, 16, format, 1, readbacks[index], error),

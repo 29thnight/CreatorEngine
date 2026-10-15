@@ -143,13 +143,46 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(prepared, "Hybrid prepare " + error);
             SceneSurfaceTargets targets;
             targets.Declare(*graph, context);
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            const auto output = host.DeclareGBuffer(*graph, targets.GetOutputs());
+            // Stage contract: a consumer rejects a missing stage or a handle that is
+            // not exactly the one its producer published, before declaring anything.
+            const auto rejected = [](auto&& declare) {
+                try { declare(); } catch (const std::runtime_error&) { return true; }
+                return false;
+            };
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, {}); }),
+                  "Occluder rejects a missing first culling stage");
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            Check(rejected([&] { host.DeclareFinalCull(*graph, meteorGeometry, {}); }),
+                  "Final culling rejects a missing occluder stage");
+            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, {}); }),
+                  "Occluder rejects an unpublished first list");
+            auto wrongDepthCommands = meteorFirstList;
+            wrongDepthCommands.depthCommands = {};
+            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, wrongDepthCommands); }),
+                  "Occluder rejects missing command input before declaring raster");
+            wrongDepthCommands.depthCommands = meteorFirstList.depthCommands;
+            ++wrongDepthCommands.depthCommands.version;
+            Check(rejected([&] { host.DeclareOccluder(*graph, meteorGeometry, wrongDepthCommands); }),
+                  "Occluder rejects a different command buffer version");
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            Check(rejected([&] { host.DeclareFinalCull(*graph, meteorGeometry, meteorFirstList.list); }),
+                  "Final culling rejects a handle other than the occluder depth");
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            Check(rejected([&] { host.DeclareGBuffer(*graph, {meteorFirstList.list, meteorFinalList.commands}, targets.GetOutputs()); }),
+                  "Surface rejects a list other than the final culling list");
+            auto wrongSurfaceCommands = meteorFinalList;
+            wrongSurfaceCommands.commands.surface = meteorFirstList.depthCommands;
+            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongSurfaceCommands, targets.GetOutputs()); }),
+                  "Surface rejects depth commands substituted for surface commands");
+            wrongSurfaceCommands.commands.surface = {};
+            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongSurfaceCommands, targets.GetOutputs()); }),
+                  "Surface rejects missing commands before declaring visibility");
+            const auto output = host.DeclareGBuffer(*graph, meteorFinalList, targets.GetOutputs());
             host.DeclareHistory(*graph, output.depth);
             const auto hybrid = host.HybridVisibility();
             const auto occluder = host.OccluderVisibility();
-            const auto occluderDepth = host.OccluderDepth();
+            const auto occluderDepth = meteorOccluderDepth;
             const auto table = host.FrameGeometry();
             Check(bool(hybrid), "Hybrid prepared owner");
             Check(occluder && occluder->depthOnly && occluderDepth.IsValid() && occluder->visible != hybrid->visible,

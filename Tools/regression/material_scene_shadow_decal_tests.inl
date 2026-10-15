@@ -394,15 +394,17 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                                    execution.encoder->ClearDepthTarget(target, clear);
                                }
                            });
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            map = host.DeclareShadow(*graph, map);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            [[maybe_unused]] const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            map = host.DeclareShadow(*graph, meteorGeometry, map);
             if (shadow.enabled)
             {
                 bool rejected = false;
                 try
                 {
-                    map = host.DeclareShadow(*graph, map);
+                    map = host.DeclareShadow(*graph, meteorGeometry, map);
                 }
                 catch (const std::runtime_error&)
                 {
@@ -413,7 +415,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 rejected = false;
                 try
                 {
-                    host.DeclareShadow(other, map);
+                    host.DeclareShadow(other, meteorGeometry, map);
                 }
                 catch (const std::runtime_error&)
                 {

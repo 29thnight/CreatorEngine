@@ -69,6 +69,16 @@ namespace material_graph
         std::vector<Draw> draws;
     };
 
+    // Graph values published by culling. No stage state or ownership is copied.
+    struct SceneFirstCullOutputs { RGHandle list, depthCommands; };
+    struct SceneCommandInputs
+    {
+        RGHandle surface, layer;
+        std::vector<RGHandle> blended;
+        std::array<RGHandle,2> material; // Surface publishes tile work + indirect arguments.
+    };
+    struct SceneFinalCullOutputs { RGHandle list; SceneCommandInputs commands; };
+
     class SceneHost final : private IRHIUploadTransactionListener
     {
       public:
@@ -111,8 +121,8 @@ namespace material_graph
         // GPU candidates per cascade (direct compatibility uses CPU-visible
         // casters). No GPU visibility counter is read back here.
         std::array<uint32_t, 3> ShadowCasterCounts() const;
-        // CPU-prepared route categories, not GPU-visible counts. Graph raster
-        // bins contain one candidate each and produce a GPU 0/1 instance count.
+        // CPU-prepared camera meshlet work (opaque union + ordered blended list),
+        // not GPU-visible counts.
         GpuGeometryVisibility::PreparedStats CameraVisibilityStats() const;
         // Diagnostic owner for submitted GPU work-list/argument readback gates.
         std::shared_ptr<const GpuGeometryVisibility::Frame> CameraMeshletWork() const;
@@ -143,18 +153,26 @@ namespace material_graph
         {
             return selectionDeferred_;
         }
-        std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph,
+        // Temporal.Inputs: owns its replay command producer (no culling input).
+        std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph, RGHandle geometry,
             std::array<RGHandle, 5> targets) const;
-        // Live node order: Geometry -> Cull -> Shadow/GBuffer. Each consumer
-        // rejects a frame whose earlier stage was not declared on this graph.
-        // METEOR.Scene.Geometry: one world-transform declaration for camera and shadow draws.
-        void DeclareGeometry(EnhancedRenderGraph& graph) const;
-        // METEOR.Scene.Cull: shadow meshlet lists, hybrid occluder depth, pyramid and camera culling.
-        void DeclareCulling(EnhancedRenderGraph& graph) const;
+        // Stage contract: each stage returns the handle it publishes and each
+        // consumer takes that exact handle (live blackboard slots). Empty frames
+        // publish invalid handles. A wrong or missing handle throws.
+        // METEOR.Scene.Geometry: one world-transform declaration -> frame geometry table.
+        RGHandle DeclareGeometry(EnhancedRenderGraph& graph) const;
+        // METEOR.Scene.Cull.First: first camera list + depth commands.
+        SceneFirstCullOutputs DeclareFirstCull(EnhancedRenderGraph& graph, RGHandle geometry) const;
+        // METEOR.Scene.Occluder: hybrid HW/SW raster of the first list -> occluder depth.
+        RGHandle DeclareOccluder(EnhancedRenderGraph& graph, RGHandle geometry, const SceneFirstCullOutputs& first) const;
+        // METEOR.Scene.Cull.Final: current HZB, instance/recovery culling and the
+        // surface, layer and blended command producers -> final list.
+        SceneFinalCullOutputs DeclareFinalCull(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle occluderDepth) const;
         void DeclareHistory(EnhancedRenderGraph& graph, RGHandle depth) const;
-        RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
-        // Final hybrid visibility, then material reconstruction into the GBuffer.
-        SceneSurfaceTargets::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
+        // METEOR.Scene.Shadow: shadow meshlet lists, shadow commands and cascades.
+        RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const;
+        // METEOR.Scene.Surface: final hybrid visibility, then material reconstruction into the GBuffer.
+        SceneSurfaceTargets::Outputs DeclareGBuffer(EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,
                                                     const SceneSurfaceTargets::Outputs& inputs) const;
         // Baseline is the existing Decal pass snapshot, ordered diffuse, ORM, normal.
         // Register after Decal.Declare and before Color; unchanged channels retain
@@ -163,7 +181,7 @@ namespace material_graph
                                 const std::array<RGHandle, 3>& baseline) const;
         // METEOR owns the first HDR writer, including empty/pending material frames.
         static RGHandle DeclareHdrTarget(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
-        RGHandle DeclareColor(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, RGHandle lighting,
+        RGHandle DeclareColor(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs, const SceneCommandInputs& commands, RGHandle lighting,
                               RGHandle ambientOcclusion, RGHandle shadowMap) const;
         struct ForwardDraw
         {
@@ -171,19 +189,17 @@ namespace material_graph
             float depth{};
         };
         std::vector<ForwardDraw> BlendedDraws() const;
-        RGHandle DeclareBlended(EnhancedRenderGraph& graph, const std::vector<std::size_t>& indices, RGHandle lighting, RGHandle shadowMap,
+        RGHandle DeclareBlended(EnhancedRenderGraph& graph, const std::vector<std::size_t>& indices, const SceneCommandInputs& commands, RGHandle lighting, RGHandle shadowMap,
                                 const EnhancedForwardLighting& forward) const;
         // METEOR.Scene.Blended: every blended draw back to front over the composed
         // opaque scene, lit through the frame's light tiles.
-        RGHandle DeclareBlendedStream(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle shadowMap,
+        RGHandle DeclareBlendedStream(EnhancedRenderGraph& graph, const SceneCommandInputs& commands, RGHandle lighting, RGHandle shadowMap,
                                       const EnhancedForwardLighting& tiles) const;
         RGHandle DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const;
         std::shared_ptr<const SceneFrameGeometry> FrameGeometry() const;
         std::shared_ptr<const SceneMaterialWork> MaterialWork() const;
         std::shared_ptr<const SceneHybridVisibility> HybridVisibility() const;
         std::shared_ptr<const SceneHybridVisibility> OccluderVisibility() const;
-        // Resolved occluder depth (HZB source) of the current graph declaration.
-        RGHandle OccluderDepth() const;
         bool HasDraws() const;
         // Live callers provide the exact graph batch ticket; pending completion is
         // polled without waiting. An empty ticket requires prior successful CPU drain.
@@ -203,6 +219,16 @@ namespace material_graph
       private:
         struct Program;
         struct Frame;
+        struct GeometryStage;
+        struct FirstCullStage;
+        struct OccluderStage;
+        struct FinalCullStage;
+        struct ShadowStage;
+        struct TemporalStage;
+        struct SurfaceStage;
+        struct HistoryStage;
+        struct EffectStage;
+
         struct Preparation;
         struct Slot;
         using SlotKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t>;
@@ -251,24 +277,10 @@ namespace material_graph
         bool CommitSubmittedFrame(const own::shared_owner<const Frame>& frame, RHICompletionPoint completion,
                                   std::string& error);
         void PollSubmittedFrames();
-        static void RequireGeometry(const Frame& frame, const EnhancedRenderGraph& graph);
         // One HW producer per hybrid stage: occluder (first list, depth commands)
         // or final surface (recovered union, surface commands).
         static void DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const Frame>& frame,
-                                              bool occluder);
-        static void RequireCulling(const Frame& frame, const EnhancedRenderGraph& graph);
-        RGHandle DeclareShading(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
-                                bool transmissionStage, std::optional<std::size_t> blended = {},
-                                EnhancedForwardLighting forward = {}, std::vector<std::size_t> blendedGroup = {}) const;
-        RGHandle DeclareRuntimeEffects(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                       RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
-                                       bool transmissionStage, std::optional<std::size_t> blended,
-                                       EnhancedForwardLighting forward) const;
-        void DeclareForwardGBuffer(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                   std::size_t index) const;
-        void DeclareRefractionCapture(EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
-                                      std::optional<std::size_t> index = {}) const;
+                                              bool occluder, RGHandle commands);
         void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;
         void OnUploadAccepted(std::uint64_t recording, RHICompletionPoint completion) override;
         void OnUploadCompleted(std::uint64_t completed) override;

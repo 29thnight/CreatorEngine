@@ -427,9 +427,11 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             }
             gbuffer.Declare(*graph, context);
             auto outputs = gbuffer.GetOutputs();
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            outputs = host.DeclareGBuffer(*graph, outputs);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 16;
@@ -447,7 +449,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
 
 
             lighting = SceneHost::DeclareHdrTarget(*graph, context);
-            lighting = host.DeclareColor(*graph, outputs, lighting, ao, shadowMap);
+            lighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, shadowMap);
             std::array<RHIReadback, 8> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(16, 16, format, 1, readbacks[i], error), "Volume readback");
@@ -464,7 +466,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const auto composed = host.DeclareVolume(*graph, lighting, outputs.depth, shadowMap);
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);
-            const auto final = host.DeclareBlendedStream(*graph, composed, shadowMap, tiles.GetLighting());
+            const auto final = host.DeclareBlendedStream(*graph, meteorFinalList.commands, composed, shadowMap, tiles.GetLighting());
             copy(1, final, RHIFormat::RGBA16Float);
             copy(2, outputs.depth, RHIFormat::D32Float);
             copy(3, outputs.bitmask, RHIFormat::R32Uint);

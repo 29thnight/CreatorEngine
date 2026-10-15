@@ -1,4 +1,4 @@
-﻿#include "GpuGeometryVisibility.h"
+#include "GpuGeometryVisibility.h"
 #include "MaterialGraphMeshSurface.h"
 
 #include "RHI/RHIShaderSource.h"
@@ -20,6 +20,16 @@ namespace
     constexpr std::uint32_t kVisibilityThreads = 64;
     constexpr std::uint32_t kVisibilityDispatchWidth = 65535;
     constexpr std::uint32_t kMeshletBinCapacity = 4096;
+
+    std::uint32_t VisibilityGroups(std::uint32_t elements)
+    {
+        return static_cast<std::uint32_t>((std::uint64_t(elements) + kVisibilityThreads - 1) / kVisibilityThreads);
+    }
+    void DispatchGroups(RHIEncoder& encoder, std::uint32_t groups)
+    {
+        encoder.Dispatch((std::min)(groups, kVisibilityDispatchWidth),
+            (groups + kVisibilityDispatchWidth - 1) / kVisibilityDispatchWidth, 1);
+    }
 
     struct GeometryVisibilityConstants
     {
@@ -253,7 +263,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(const EnhancedFrameContext& context,
     const math::matrix4x4& projection,
     std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
     std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage)
+    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage, bool ordered)
 {
     std::vector<Candidate> candidates;
     std::vector<Bin> bins;
@@ -283,15 +293,18 @@ bool GpuGeometryVisibility::PrepareMeshlets(const EnhancedFrameContext& context,
         // the source meshlets; no CPU-sized list of individual work items exists.
         // sourceIndex is the first 64-thread group of this range. Padding each
         // range to a group keeps descriptor selection uniform across a wave.
-        candidates.push_back({{}, bin, static_cast<uint32_t>(groups), static_cast<uint32_t>(offset), 8});
+        candidates.push_back({{}, bin, static_cast<uint32_t>(groups), static_cast<uint32_t>(offset),
+            8u | (ordered ? kOrderedMeshlets : 0u)});
         groups += (uint64_t(count) + kVisibilityThreads - 1) / kVisibilityThreads;
         bins.push_back({count, static_cast<uint32_t>(offset), 0, 0}); offset += uint64_t(count) * 2 + 1;
     }
     if (history && firstStage) return VisibilityFail(error, "Meshlet stage cannot both read history and recover.");
+    if (ordered && (history || firstStage)) return VisibilityFail(error, "Ordered meshlet lists are single-stage.");
     if (!PrepareInternal(context, projection, candidates, bins, result, error,
         currentFrameOcclusion || bool(history) || bool(firstStage), geometries)) return false;
     if (!result) return true;
     auto frame = std::const_pointer_cast<Frame>(result);
+    frame->m_ordered = ordered;
     if (history)
     {
         history->RequireView(frame->m_occlusionView);
@@ -643,10 +656,7 @@ bool GpuGeometryVisibility::PrepareInternal(const EnhancedFrameContext& context,
     }
     frame->m_descriptors = m_device->GetDescriptorVersionToken();
     frame->m_occlusionView = GpuGeometryOcclusion::CaptureView(context, viewProjection);
-    if (currentFrameOcclusion && geometries.empty() && !m_depthPyramid.Prepare(context, viewProjection, frame->m_preparedPyramid, error))
-    {
-        return false;
-    }
+
     frame->m_self = frame;
     {
         std::lock_guard lock(m_recordingMutex);
@@ -704,48 +714,34 @@ void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset, RHI
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, m_candidates);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 2, m_bins);
     encoder.SetBindings(RHIBindPoint::Compute, 3, m_outputs);
-    const auto dispatch = [&](std::uint32_t elements) {
-        const auto groups = static_cast<std::uint32_t>((std::uint64_t(elements) + kVisibilityThreads - 1) / kVisibilityThreads);
-        encoder.Dispatch((std::min)(groups, kVisibilityDispatchWidth),
-            (groups + kVisibilityDispatchWidth - 1) / kVisibilityDispatchWidth, 1);
-    };
     if (!m_meshletGeometries.empty()) {
         encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
         encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
-        if (reset) { dispatch(m_binCount); return; }
+        if (reset) { DispatchGroups(encoder, VisibilityGroups(m_binCount)); return; }
         if (depth.IsValid()) encoder.SetBindings(RHIBindPoint::Compute, 6, depth);
         if (m_historyProjection.IsValid()) encoder.SetConstantBuffer(RHIBindPoint::Compute, 7, m_historyProjection);
         if (m_firstStage) encoder.SetRootBuffer(RHIBindPoint::Compute, 7,
             m_firstStage->VisibleIds(0, m_firstStage->m_outputCount));
-        encoder.Dispatch((std::min)(m_meshletGroups, kVisibilityDispatchWidth),
-            (m_meshletGroups + kVisibilityDispatchWidth - 1) / kVisibilityDispatchWidth, 1);
-        const RHIBufferHandle barrier[]{m_visibleIds, m_arguments};
-        encoder.ResourceBarriers({{}, {}, {}, barrier});
-        encoder.SetPipeline(RHIBindPoint::Compute, m_meshletFinalize->GetHandle());
-        // The occlusion PSO has an extra table, so switching back changes the
-        // root layout. Rebind every finalize input after that switch.
-        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, m_constants);
-        encoder.SetRootBuffer(RHIBindPoint::Compute, 1, m_candidates);
-        encoder.SetRootBuffer(RHIBindPoint::Compute, 2, m_bins);
-        encoder.SetBindings(RHIBindPoint::Compute, 3, m_outputs);
-        encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
-        encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
-        dispatch(m_binCount);
+        DispatchGroups(encoder, m_meshletGroups);
         return;
     }
     if (!reset && depth.IsValid()) encoder.SetBindings(RHIBindPoint::Compute, 4, depth);
-    dispatch(count);
+    DispatchGroups(encoder, VisibilityGroups(count));
 }
 
-void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& graph, RGHandle occluderDepth) const
+void GpuGeometryVisibility::Frame::DispatchMeshletFinalize(RHIEncoder& encoder) const
 {
-    if (!m_preparedPyramid)
-    {
-        throw std::runtime_error("GPU visibility was not prepared for current-depth occlusion.");
-    }
-    m_preparedPyramid->Declare(graph, occluderDepth);
-    DeclareWithOcclusion(graph, m_preparedPyramid);
+    if (!m_candidateCount) return;
+    encoder.SetPipeline(RHIBindPoint::Compute, m_meshletFinalize->GetHandle());
+    encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, m_constants);
+    encoder.SetRootBuffer(RHIBindPoint::Compute, 1, m_candidates);
+    encoder.SetRootBuffer(RHIBindPoint::Compute, 2, m_bins);
+    encoder.SetBindings(RHIBindPoint::Compute, 3, m_outputs);
+    encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
+    encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
+    DispatchGroups(encoder, VisibilityGroups(m_binCount));
 }
+
 
 void GpuGeometryVisibility::Frame::DeclareFirstStage(EnhancedRenderGraph& graph) const
 {
@@ -779,13 +775,20 @@ void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& gra
 void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& graph,
     std::span<const std::shared_ptr<const Frame>> frames, const char* passPrefix)
 {
+    if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+        throw std::runtime_error("METEOR meshlet visibility requires an ExplicitVersioned graph.");
     std::vector<std::shared_ptr<const Frame>> owners;
-    const auto mode = graph.GetSchedulingMode();
-    const bool versioned = mode == RGSchedulingMode::ExplicitVersioned;
-    const auto read = mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
-    const auto write = mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Write;
-    std::vector<EnhancedRenderGraph::RGPassUsage> resetUses, cullUses;
+    std::vector<EnhancedRenderGraph::RGPassUsage> resetUses, cullUses, finalizeUses;
     std::set<std::pair<std::uint32_t, std::uint32_t>> geometryReads;
+    // Reset -> Cull -> Finalize are separate passes over the same UAV lists.
+    // Each step advances both versions, so the graph owns the UAV barriers between them.
+    const auto advance = [&graph](const Frame& frame, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool first) {
+        frame.m_graphArguments = first ? graph.Write(frame.m_graphArguments) : graph.Modify(frame.m_graphArguments);
+        frame.m_graphVisibleIds = first ? graph.Write(frame.m_graphVisibleIds) : graph.Modify(frame.m_graphVisibleIds);
+        const auto access = first ? RGAccessMode::Write : RGAccessMode::ReadWrite;
+        uses.push_back({frame.m_graphArguments, RHIResourceState::UnorderedAccess, access});
+        uses.push_back({frame.m_graphVisibleIds, RHIResourceState::UnorderedAccess, access});
+    };
     for (const auto& frame : frames) {
         if (!frame || frame->m_meshletGeometries.empty()) throw std::runtime_error("Invalid shadow meshlet batch member.");
         frame->CheckCurrent();
@@ -797,46 +800,22 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         frame->m_graphArguments = graph.ImportBuffer(frame->m_arguments, RHIResourceState::Common, "METEOR.ShadowMeshlet.Arguments");
         graph.RequireImportedFinalState(frame->m_graphVisibleIds, RHIResourceState::Common);
         graph.RequireImportedFinalState(frame->m_graphArguments, RHIResourceState::Common);
-        if (versioned) {
-            frame->m_graphArguments = graph.Write(frame->m_graphArguments);
-            frame->m_graphVisibleIds = graph.Write(frame->m_graphVisibleIds);
-        }
-        resetUses.push_back({frame->m_graphArguments, RHIResourceState::UnorderedAccess, write});
-        resetUses.push_back({frame->m_graphVisibleIds, RHIResourceState::UnorderedAccess, write});
-        if (versioned) {
-            frame->m_graphArguments = graph.Modify(frame->m_graphArguments);
-            frame->m_graphVisibleIds = graph.Modify(frame->m_graphVisibleIds);
-        }
-        cullUses.push_back({frame->m_graphArguments, RHIResourceState::UnorderedAccess,
-            versioned ? RGAccessMode::ReadWrite : write});
-        cullUses.push_back({frame->m_graphVisibleIds, RHIResourceState::UnorderedAccess,
-            versioned ? RGAccessMode::ReadWrite : write});
+        advance(*frame, resetUses, true);
+        advance(*frame, cullUses, false);
         for (const auto& geometry : frame->m_meshletGeometries)
             for (auto handle : {geometry->GraphOutput(graph), geometry->GraphMeshlets(graph)})
                 if (geometryReads.emplace(handle.index, handle.version).second)
-                    cullUses.push_back({handle, RHIResourceState::ShaderResource, read});
+                    cullUses.push_back({handle, RHIResourceState::ShaderResource, RGAccessMode::Read});
         if (frame->m_pyramid) frame->m_pyramid->AddReadUsages(graph, cullUses);
         if (frame->m_firstStage)
         {
             frame->m_firstStage->CheckCurrent(&graph);
-            cullUses.push_back({frame->m_firstStage->m_graphVisibleIds, RHIResourceState::ShaderResource, read});
+            cullUses.push_back({frame->m_firstStage->m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
         }
+        advance(*frame, finalizeUses, false);
         owners.push_back(frame);
     }
     if (owners.empty()) return;
-    if (mode == RGSchedulingMode::ExplicitSingleWriter) {
-        graph.AddPass(std::string(passPrefix) + ".Cull", cullUses, [owners](const auto& execution) {
-            std::vector<RHIBufferHandle> barriers;
-            for (const auto& owner : owners) {
-                owner->CheckCurrent(execution.graph); owner->Dispatch(*execution.encoder, true);
-                barriers.push_back(owner->m_arguments);
-            }
-            for (const auto& owner : owners) barriers.push_back(owner->m_visibleIds);
-            execution.encoder->ResourceBarriers({{}, {}, {}, barriers});
-            for (const auto& owner : owners) owner->Dispatch(*execution.encoder, false);
-        });
-        return;
-    }
     const auto reset = graph.AddPass(std::string(passPrefix) + ".Reset", resetUses, [owners](const auto& execution) {
         for (const auto& owner : owners) { owner->CheckCurrent(execution.graph); owner->Dispatch(*execution.encoder, true); }
     });
@@ -846,8 +825,14 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             owner->Dispatch(*execution.encoder, false, owner->m_pyramid ? owner->m_pyramid->Bindings(execution) : RHIBindingTable{});
         }
     });
-    graph.DeclareComputeCompatible(reset); graph.DeclareRecordingIndependent(reset);
-    graph.DeclareComputeCompatible(cull); graph.DeclareRecordingIndependent(cull);
+    const auto finalize = graph.AddPass(std::string(passPrefix) + ".Finalize", finalizeUses, [owners](const auto& execution) {
+        for (const auto& owner : owners) { owner->CheckCurrent(execution.graph); owner->DispatchMeshletFinalize(*execution.encoder); }
+    });
+    for (const auto pass : {reset, cull, finalize})
+    {
+        graph.DeclareComputeCompatible(pass);
+        graph.DeclareRecordingIndependent(pass);
+    }
 }
 
 void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
@@ -865,8 +850,14 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     }
     if (!m_meshletGeometries.empty()) {
         const std::shared_ptr<const Frame> frames[]{owner};
-        DeclareMeshletBatch(graph, frames, m_firstStage ? "METEOR.CameraMeshlet.Recovery" :
+        DeclareMeshletBatch(graph, frames, m_ordered ? "METEOR.BlendedMeshlet" : m_firstStage ? "METEOR.CameraMeshlet.Recovery" :
             m_historyPyramid ? "METEOR.CameraMeshlet.History" : m_pyramid ? "METEOR.CameraMeshlet.HZB" : "METEOR.ShadowMeshlet"); return;
+    }
+    // Reset and cull write the same arguments twice. RG1 cannot express that,
+    // and no caller declares visibility on an ExplicitSingleWriter graph.
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitSingleWriter)
+    {
+        throw std::runtime_error("GPU visibility requires a DeclarationOrder or ExplicitVersioned graph.");
     }
     m_graph = &graph;
     m_graphEpoch = graph.ResourceEpoch();
@@ -877,24 +868,6 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     // final transitions after its last readers, on both backends.
     graph.RequireImportedFinalState(m_graphVisibleIds, RHIResourceState::Common);
     graph.RequireImportedFinalState(m_graphArguments, RHIResourceState::Common);
-
-    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitSingleWriter)
-    {
-        // RG1 cannot express two writes to one resource. Keep that compatibility
-        // mode as one producer; the product RG2 path below declares both versions.
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {m_graphArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
-            {m_graphVisibleIds, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
-        graph.AddPass("Geometry.Visibility", uses,
-                      [owner](const auto& execution) {
-                          owner->CheckCurrent(execution.graph);
-                          owner->Dispatch(*execution.encoder, true);
-                          const RHIBufferHandle barrier[]{owner->m_arguments};
-                          execution.encoder->ResourceBarriers({{}, {}, {}, barrier});
-                          owner->Dispatch(*execution.encoder, false);
-                      });
-        return;
-    }
 
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     if (versioned)
@@ -984,6 +957,13 @@ void GpuGeometryVisibility::Frame::AddVisibleIdsRead(EnhancedRenderGraph& graph,
     usages.push_back({m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
 }
 
+RGHandle GpuGeometryVisibility::Frame::GraphVisibleIds(const EnhancedRenderGraph& graph) const
+{
+    if (m_graph != &graph || m_graphEpoch != graph.ResourceEpoch() || !m_graphVisibleIds.IsValid())
+        throw std::runtime_error("METEOR visibility list was not declared on this graph.");
+    return m_graphVisibleIds;
+}
+
 RHIBufferSlice GpuGeometryVisibility::Frame::VisibleIds(std::uint32_t outputOffset, std::uint32_t count) const
 {
     if (!count || outputOffset % kOutputAlignment != 0 ||
@@ -1028,7 +1008,7 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
     m_reset = {};
     m_cull = {};
     m_occlusionCull = {};
-    m_depthPyramid.ShutdownAfterIdle();
+
     m_device = nullptr;
     m_bufferPool.reset();
 }

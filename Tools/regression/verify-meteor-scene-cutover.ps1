@@ -27,7 +27,7 @@ New-Item -ItemType Directory -Force (Split-Path $shaderTarget)|Out-Null
 Copy-Item -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders/DefaultPassShader" -Destination $shaderTarget -Recurse
 $exe="$repo/Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 function Snapshot {
-    $paths=@(Get-ChildItem "$repo/Engine","$repo/Editor","$repo/Dynamic_CPP/Assets/Shaders" -Recurse -File|Where-Object {$_.Extension -in '.cpp','.h','.slang','.vcxproj','.filters'}|Sort-Object FullName|ForEach-Object FullName)
+    $paths=@(Get-ChildItem "$repo/Engine","$repo/Editor","$repo/Dynamic_CPP/Assets/Shaders" -Recurse -File|Where-Object {$_.Extension -in '.cpp','.h','.inl','.slang','.vcxproj','.filters'}|Sort-Object FullName|ForEach-Object FullName)
     $paths+=@($exe,"$repo/Bin/x64-$Configuration/Editor/CreatorEditor.runtime.dll",$PSCommandPath,"$PSScriptRoot/verify-meteor-scene-capture.py")
     @($paths|ForEach-Object {@{path=[IO.Path]::GetRelativePath($repo,$_);sha256=(Get-FileHash -LiteralPath $_).Hash}})
 }

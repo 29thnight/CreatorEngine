@@ -152,9 +152,11 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->BindRenderTargets(target);
                     execution.encoder->ClearDepthTarget(target, .1f);
                 });
-        host.DeclareGeometry(*graph);
-        host.DeclareCulling(*graph);
-        outputs = host.DeclareGBuffer(*graph, outputs);
+        const auto meteorGeometry = host.DeclareGeometry(*graph);
+        const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+        const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+        const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+        outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
         host.DeclareHistory(*graph, outputs.depth);
         RGTextureDesc colorDesc;
         colorDesc.width = colorDesc.height = 16;
@@ -177,11 +179,47 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->ClearRenderTargets(target, h.index == color.index ? background.data() : white);
                 }
             });
-        const auto opaque = host.DeclareColor(*graph, outputs, color, ao, {});
+        const auto opaque = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
+        if (fixture == 0) {
+            bool rejected = false;
+            try { host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {},
+                host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, opaque, ao, {}); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Effect color output rejects duplicate shading before declaring resources");
+        }
         tiles.SetUseReferencePath(fixture == 11);
         tiles.SetDepth(outputs.depth);
         tiles.Declare(*graph, context);
-        const auto blended = host.DeclareBlendedStream(*graph, opaque, {}, tiles.GetLighting());
+        if (!meteorFinalList.commands.blended.empty()) {
+            auto wrong = meteorFinalList.commands;
+            wrong.blended.pop_back();
+            bool rejected = false;
+            try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended rejects incomplete command-list slot before declaring layers");
+            wrong = meteorFinalList.commands;
+            ++wrong.blended.front().epoch;
+            rejected = false;
+            try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended rejects command inputs from another graph epoch");
+        }
+        if (fixture == 0) {
+            const auto selected = host.BlendedDraws();
+            Check(!selected.empty(), "Blended prepared stage contains a layer");
+            bool rejected = false;
+            try { host.DeclareBlended(*graph, {selected.front().index, selected.front().index},
+                meteorFinalList.commands, opaque, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended duplicate indices rejected without publishing partial layer output");
+        }
+        const auto blended = host.DeclareBlendedStream(*graph, meteorFinalList.commands, opaque, {}, tiles.GetLighting());
+        if (fixture == 0) {
+            bool rejected = false;
+            try { host.DeclareBlendedStream(*graph, meteorFinalList.commands, blended, {}, tiles.GetLighting()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            Check(rejected, "Blended output ownership rejects a second stream declaration");
+        }
         std::array<RHIReadback, 3> readbacks;
         const std::array handles{blended, outputs.depth, outputs.bitmask};
         const std::array formats{RHIFormat::RGBA16Float, RHIFormat::D32Float, RHIFormat::R32Uint};

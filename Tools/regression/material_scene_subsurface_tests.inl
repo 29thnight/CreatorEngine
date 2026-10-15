@@ -227,9 +227,11 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                   "SSS budget failure preserves accepted frame");
             gbuffer.Declare(*graph, context);
             auto outputs = gbuffer.GetOutputs();
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            outputs = host.DeclareGBuffer(*graph, outputs);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
@@ -259,7 +261,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             };
             copyTexture(0, lighting, RHIFormat::RGBA16Float);
             copyTexture(1, outputs.depth, RHIFormat::D32Float);
-            lighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
+            lighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
             copyTexture(2, lighting, RHIFormat::RGBA16Float);
             copyTexture(3, outputs.depth, RHIFormat::D32Float);
             copyTexture(4, outputs.bitmask, RHIFormat::R32Uint);

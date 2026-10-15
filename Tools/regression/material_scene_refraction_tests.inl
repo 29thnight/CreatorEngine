@@ -256,9 +256,11 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             ++failures;
             gbuffer.Declare(*graph, context);
             auto outputs = gbuffer.GetOutputs();
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            outputs = host.DeclareGBuffer(*graph, outputs);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            outputs = host.DeclareGBuffer(*graph, meteorFinalList, outputs);
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = aoDesc.height = 24;
@@ -276,10 +278,10 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
 
 
             lighting = SceneHost::DeclareHdrTarget(*graph, context);
-            lighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
+            lighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);
-            const auto blended = host.DeclareBlendedStream(*graph, lighting, {}, tiles.GetLighting());
+            const auto blended = host.DeclareBlendedStream(*graph, meteorFinalList.commands, lighting, {}, tiles.GetLighting());
             const auto surfaceOutputs = host.ForwardSurfaceOutputs();
             std::array<RHIReadback, 11> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
@@ -310,6 +312,22 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                 },
                 true);
             Check(graph->Compile(error), "Refraction graph compile " + error);
+            EnhancedRenderGraph::DiagnosticSnapshot commandWiring;
+            Check(graph->CaptureDiagnosticSnapshot(commandWiring), "Refraction command wiring snapshot");
+            unsigned commandCaptures = 0;
+            for (const auto& pass : commandWiring.passes) if (pass.name == "METEOR.Scene.RefractionCapture") {
+                ++commandCaptures;
+                const auto layer = meteorFinalList.commands.layer;
+                Check(layer.IsValid() && std::ranges::any_of(pass.usages, [&](const auto& use) {
+                    return use.resource == layer.index && use.version == layer.version &&
+                           use.state == RHIResourceState::IndirectArgument && use.access == RGAccessMode::Read;
+                }), "Refraction capture declares the layer command version it executes");
+                const auto surface = meteorFinalList.commands.surface;
+                Check(!surface.IsValid() || std::ranges::none_of(pass.usages, [&](const auto& use) {
+                    return use.resource == surface.index && use.state == RHIResourceState::IndirectArgument;
+                }), "Refraction capture has no unused opaque command dependency");
+            }
+            Check(commandCaptures != 0, "Refraction command producer/consumer gate is not empty");
             RHICompletionPoint completion;
             RHISubmissionTicket ticket;
             if (workers)

@@ -365,9 +365,11 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         const auto prepareMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-prepareStart).count();
         auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         gbuffer.Declare(*graph, context);
-        host.DeclareGeometry(*graph);
-        host.DeclareCulling(*graph);
-        const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
+        const auto meteorGeometry = host.DeclareGeometry(*graph);
+        const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+        const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+        const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+        const auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
         host.DeclareHistory(*graph, outputs.depth);
         RGTextureDesc aoDesc;
         aoDesc.width = aoDesc.height = 64;
@@ -387,14 +389,14 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
 
 
         lighting = SceneHost::DeclareHdrTarget(*graph, context);
-        const auto lit = host.DeclareColor(*graph, outputs, lighting, ao, {});
+        const auto lit = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
         // Same order as the product renderer: the medium composes once over the
         // opaque scene, then the blended stream draws every Blended/transmission
         // draw (glass). Publication rejects a stream that omits a blended draw.
         const auto composed = host.DeclareVolume(*graph, lit, outputs.depth, {});
         tiles.SetDepth(outputs.depth);
         tiles.Declare(*graph, context);
-        const auto color = host.DeclareBlendedStream(*graph, composed, {}, tiles.GetLighting());
+        const auto color = host.DeclareBlendedStream(*graph, meteorFinalList.commands, composed, {}, tiles.GetLighting());
         RHIReadback readback;
         CheckWith(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback ", error);
         graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource, RGAccessMode::Read}},

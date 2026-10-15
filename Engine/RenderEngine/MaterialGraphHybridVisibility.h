@@ -96,7 +96,7 @@ struct SceneHybridVisibility final
     RHIBufferHandle keys, routes;
     RHIBindingTable vertices, topologies;
     uint32_t width{}, height{}, meshlets{};
-    mutable RGHandle graphKeys, graphRoutes;
+    mutable RGHandle graphKeys, graphRoutes, graphDepth;
     mutable const EnhancedRenderGraph* graphOwner{};
     mutable uint64_t graphEpoch{};
     ~SceneHybridVisibility()
@@ -282,6 +282,7 @@ struct SceneHybridVisibility final
         if (!depthOnly)
             throw std::runtime_error("METEOR visibility stage resolves its visibility target too.");
         depth = graph.Write(depth);
+        graphDepth = depth;
         graph.AddPass((name + ".Resolve").c_str(),
                       {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
                        {depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
@@ -295,6 +296,12 @@ struct SceneHybridVisibility final
                           owner->DrawResolve(e, targets);
                       });
         return depth;
+    }
+    RGHandle ResolvedDepth(const EnhancedRenderGraph& graph) const
+    {
+        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch() || !graphDepth.IsValid())
+            throw std::runtime_error("METEOR depth requires its explicit resolve producer.");
+        return graphDepth;
     }
     void DrawResolve(RHIEncoder& e, const RHIRenderTargetBinding& targets) const
     {
@@ -313,6 +320,7 @@ struct SceneHybridVisibility final
             throw std::runtime_error("METEOR occluder stage has no visibility target.");
         outputs.visibility = graph.Write(outputs.visibility);
         outputs.depth = graph.Write(outputs.depth);
+        graphDepth = outputs.depth;
         graph.AddPass((name + ".Resolve").c_str(),
                       {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
                        {outputs.visibility, RHIResourceState::RenderTarget, RGAccessMode::Write},

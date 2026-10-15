@@ -29,7 +29,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
   public:
     static constexpr std::uint32_t kConservative = 1;
     static constexpr std::uint32_t kNoOcclusion = 2;
-    static constexpr std::uint32_t kMeshletOwner = 4;
+    // Meshlet bins: survivors keep source meshlet order (blended primitives).
+    static constexpr std::uint32_t kOrderedMeshlets = 16;
     // Root storage-buffer offsets must satisfy both backends' alignment limits.
     // Units are uint32 IDs, so each bin starts at a 256-byte boundary.
     static constexpr std::uint32_t kOutputAlignment = 64;
@@ -81,13 +82,11 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         static void DeclareMeshletBatch(EnhancedRenderGraph& graph,
             std::span<const std::shared_ptr<const Frame>> frames,
             const char* passPrefix = "METEOR.ShadowMeshlet");
-        // Optional second geometry stage: depth must be an earlier RG2 version
-        // from this exact view/recording, standard-Z (clear 1, Less/LessEqual).
-        // It must not be the version written by this frame's geometry consumer.
-        // Tested draws must use these bounds/projection without custom pixel
-        // depth or depth bias. The METEOR GBuffer caller supplies this contract.
-        // No history is kept or reprojected. Call before AddReadUsages/Declare.
-        void DeclareWithOcclusion(EnhancedRenderGraph& graph, RGHandle occluderDepth) const;
+        // Optional second geometry stage: the pyramid is already declared from an
+        // earlier same-view standard-Z depth (clear 1, Less/LessEqual) that this
+        // frame's geometry consumer does not write. Tested draws must use these
+        // bounds/projection without custom pixel depth or depth bias. The caller
+        // owns and declares the pyramid. Call before AddReadUsages/Declare.
         void DeclareWithOcclusion(EnhancedRenderGraph& graph,
             std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid) const;
         void DeclareFirstStage(EnhancedRenderGraph& graph) const;
@@ -100,9 +99,11 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
             std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
         RHIBufferSlice VisibleIds(std::uint32_t outputOffset, std::uint32_t count) const;
         RHIBufferHandle VisibleIdBuffer() const { return m_visibleIds; }
+        // Published list version on this graph (the METEOR stage contract handle).
+        RGHandle GraphVisibleIds(const EnhancedRenderGraph& graph) const;
         RHIBufferHandle Arguments() const { return m_arguments; }
         bool UsesHistory() const { return bool(m_historyPyramid); }
-        const std::shared_ptr<const GpuGeometryOcclusion::Pyramid>& PreparedOcclusionPyramid() const { return m_preparedPyramid; }
+
         const std::shared_ptr<const material_graph::MeshSurfaceBatch>& MeshletGeometry(std::uint32_t bin) const { return m_meshletGeometries.at(bin); }
         std::uint32_t MeshletOutputOffset(std::uint32_t bin) const { return m_meshletOffsets.at(bin); }
         PreparedStats GetPreparedStats() const { return m_preparedStats; }
@@ -113,6 +114,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         Frame() = default;
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
         void Dispatch(RHIEncoder& encoder, bool reset, RHIBindingTable depth = {}) const;
+        // Meshlet lists only: turns culled per-bin counts into draw arguments.
+        void DispatchMeshletFinalize(RHIEncoder& encoder) const;
 
         std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
         std::vector<std::uint32_t> m_meshletOffsets;
@@ -132,10 +135,11 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         RHIBufferSlice m_historyProjection;
         std::shared_ptr<const Frame> m_firstStage;
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_historyPyramid;
+        bool m_ordered{};
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletFinalize;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_occlusionCull;
         GpuGeometryOcclusion::ViewKey m_occlusionView;
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_preparedPyramid;
+
         mutable std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_pyramid;
         std::weak_ptr<const Frame> m_self;
         mutable const EnhancedRenderGraph* m_graph{};
@@ -173,7 +177,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
         std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion = false,
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history = {},
-        std::shared_ptr<const Frame> firstStage = {});
+        std::shared_ptr<const Frame> firstStage = {}, bool ordered = false);
 
     // Direct draws use the same vertex-ID indirection with an identity mapping.
     static RHIBufferSlice UploadIdentity(const EnhancedFrameContext& context, std::uint32_t count,
@@ -209,7 +213,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     LX::Runtime::ComputePipeline m_meshletOcclusionCull;
     LX::Runtime::ComputePipeline m_meshletHistoryCull, m_meshletRecoveryCull;
     LX::Runtime::ComputePipeline m_occlusionCull;
-    GpuGeometryOcclusion m_depthPyramid;
+
     std::mutex m_recordingMutex;
     std::map<std::uint64_t, Recording> m_recordings;
     std::uint64_t m_completed{};

@@ -243,6 +243,8 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
             geometryVisibilityOcclusionLevels, geometryVisibilityProjectionValid)) return;
 #endif
         if (classify) geometryVisibleIds[classification] = 1u;
+        // Ordered lists keep source meshlet order; MeshletFinalizeCS compacts them.
+        if ((geometryVisibilityCandidates[bin].flags & 16u) != 0u) return;
         uint slot;
         const uint outputOffset = geometryVisibilityBins[bin].firstIndex;
         InterlockedAdd(geometryVisibleIds[outputOffset], 1u, slot);
@@ -257,7 +259,19 @@ void MeshletFinalizeCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
     uint bin;
     if (!GeometryVisibilityIndex(group, lane, geometryVisibilityBinCount, bin)) return;
-    const uint count = geometryVisibleIds[geometryVisibilityBins[bin].firstIndex];
+    const uint first = geometryVisibilityBins[bin].firstIndex;
+    if ((geometryVisibilityCandidates[bin].flags & 16u) != 0u)
+    {
+        // Blended primitives must keep one deterministic order: compact the
+        // per-meshlet classification in source order instead of atomic slots.
+        const uint total = geometryVisibilityBins[bin].indexCount;
+        uint visible = 0u;
+        for (uint meshlet = 0u; meshlet < total; ++meshlet)
+            if (geometryVisibleIds[first + 1u + total + meshlet] != 0u)
+                geometryVisibleIds[first + 1u + visible++] = meshlet;
+        geometryVisibleIds[first] = visible;
+    }
+    const uint count = geometryVisibleIds[first];
     geometryIndirectArguments[bin].indexCount = min(count, 65535u);
     geometryIndirectArguments[bin].instanceCount = max(1u, (count + 65534u) / 65535u);
     geometryIndirectArguments[bin].firstIndex = 1u;

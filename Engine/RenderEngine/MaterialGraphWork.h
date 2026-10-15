@@ -57,29 +57,29 @@ struct SceneMaterialWork final
     void Declare(EnhancedRenderGraph& graph, RGHandle visibility, std::shared_ptr<const SceneMaterialWork> owner) const {
         if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch()) return;
         if (graphOwner) throw std::runtime_error("METEOR material work cannot cross frame graphs.");
+        if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+            throw std::runtime_error("METEOR material work requires an ExplicitVersioned graph.");
         graphOwner = &graph; graphEpoch = graph.ResourceEpoch();
         graphWork = graph.ImportBuffer(work, RHIResourceState::Common, "METEOR.Scene.Material.Tiles");
         graphArguments = graph.ImportBuffer(arguments, RHIResourceState::Common, "METEOR.Scene.Material.Arguments");
         graph.RequireImportedFinalState(graphWork, RHIResourceState::Common);
         graph.RequireImportedFinalState(graphArguments, RHIResourceState::Common);
-        const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         constexpr const char* names[]{"METEOR.Scene.Material.Reset", "METEOR.Scene.Material.CountTiles",
             "METEOR.Scene.Material.BuildRanges", "METEOR.Scene.Material.ScatterTiles"};
         for (unsigned stage = 0; stage < 4; ++stage) {
-            if (versioned) graphWork = stage == 0 ? graph.Write(graphWork) : graph.Modify(graphWork);
+            graphWork = stage == 0 ? graph.Write(graphWork) : graph.Modify(graphWork);
             std::vector<EnhancedRenderGraph::RGPassUsage> uses{{graphWork, RHIResourceState::UnorderedAccess,
-                !explicitAccess ? RGAccessMode::LegacyState : stage == 0 ? RGAccessMode::Write : RGAccessMode::ReadWrite}};
+                stage == 0 ? RGAccessMode::Write : RGAccessMode::ReadWrite}};
             if (stage == 1 || stage == 3) {
                 uses.push_back({visibility, RHIResourceState::ShaderResource,
-                    explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState});
+                    RGAccessMode::Read});
                 uses.push_back({geometry->GraphTable(graph), RHIResourceState::ShaderResource,
-                    explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState});
+                    RGAccessMode::Read});
             }
             if (stage == 2) {
-                if (versioned) graphArguments = graph.Write(graphArguments);
+                graphArguments = graph.Write(graphArguments);
                 uses.push_back({graphArguments, RHIResourceState::UnorderedAccess,
-                    explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState});
+                    RGAccessMode::Write});
             }
             graph.AddPass(names[stage], uses, [owner,visibility,stage](const auto& execution) {
                 auto& encoder = *execution.encoder;
@@ -101,12 +101,23 @@ struct SceneMaterialWork final
             });
         }
     }
-    void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const {
+    std::array<RGHandle,2> GraphInputs(const EnhancedRenderGraph& graph) const {
         if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
             throw std::runtime_error("METEOR material consumer requires explicit tile work producer.");
-        const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
-        uses.push_back({graphWork, RHIResourceState::ShaderResource, read});
-        uses.push_back({graphArguments, RHIResourceState::IndirectArgument, read});
+        return {graphWork, graphArguments};
+    }
+    void ValidateInputs(const EnhancedRenderGraph& graph, const std::array<RGHandle,2>& inputs) const {
+        const auto expected = GraphInputs(graph);
+        for (size_t i=0; i<inputs.size(); ++i)
+            if (inputs[i].index != expected[i].index || inputs[i].version != expected[i].version ||
+                inputs[i].kind != expected[i].kind || inputs[i].epoch != expected[i].epoch)
+                throw std::runtime_error("METEOR material work input is not its published resource version.");
+    }
+    void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+                 const std::array<RGHandle,2>& inputs) const {
+        ValidateInputs(graph, inputs);
+        uses.push_back({inputs[0], RHIResourceState::ShaderResource, RGAccessMode::Read});
+        uses.push_back({inputs[1], RHIResourceState::IndirectArgument, RGAccessMode::Read});
     }
     void Draw(RHIEncoder& encoder, size_t bucket) const {
         const auto& range = buckets.at(bucket);

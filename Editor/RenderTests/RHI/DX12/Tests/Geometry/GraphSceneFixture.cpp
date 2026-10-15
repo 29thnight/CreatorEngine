@@ -327,20 +327,22 @@ RGHandle GraphSceneFixture::Declare(EnhancedRenderGraph& graph, EnhancedShadowPa
     const EnhancedFrameContext& context)
 {
     // Product node order: geometry, culling, then shadow and surface raster.
-    m_host.DeclareGeometry(graph);
-    m_host.DeclareCulling(graph);
+    const auto meteorGeometry = m_host.DeclareGeometry(graph);
+    const auto meteorFirstList = m_host.DeclareFirstCull(graph, meteorGeometry);
+    const auto meteorOccluderDepth = m_host.DeclareOccluder(graph, meteorGeometry, meteorFirstList);
+    const auto meteorFinalList = m_host.DeclareFinalCull(graph, meteorGeometry, meteorOccluderDepth);
     shadow.DeclareGraphTargets(graph, context);
-    const RGHandle shadowMap = m_host.DeclareShadow(graph, shadow.GetShadowMap());
+    const RGHandle shadowMap = m_host.DeclareShadow(graph, meteorGeometry, shadow.GetShadowMap());
 
     // The host's camera route records the lighting lookup that publication and
     // GPU memory retirement require. It lands in private targets only.
     m_cameraTargets.Declare(graph, m_cameraContext);
-    const auto outputs = m_host.DeclareGBuffer(graph, m_cameraTargets.GetOutputs());
+    const auto outputs = m_host.DeclareGBuffer(graph, meteorFinalList, m_cameraTargets.GetOutputs());
     auto& resources = *m_cameraContext.resources;
     const RGHandle lighting = material_graph::SceneHost::DeclareHdrTarget(graph, m_cameraContext);
     const RGHandle ambientOcclusion = DeclareClearedInput(graph, resources, m_cameraContext,
         RHIFormat::RG16Float, 1.f, "GraphShadowFixture.AO");
-    const RGHandle color = m_host.DeclareColor(graph, outputs, lighting, ambientOcclusion, shadowMap);
+    const RGHandle color = m_host.DeclareColor(graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, m_host.MaterialWork() ? m_host.MaterialWork()->GraphInputs(graph) : std::array<RGHandle,2>{}}, lighting, ambientOcclusion, shadowMap);
     // Sink: without a consumer the graph would cull the camera route.
     const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
         ? RGAccessMode::LegacyState : RGAccessMode::Read;
@@ -415,10 +417,14 @@ bool GraphSceneFixture::PrepareFrame(EnhancedFrameContext& context, std::string&
 
 void GraphSceneFixture::DeclareSurface(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
-    m_host.DeclareGeometry(graph);
-    m_host.DeclareCulling(graph);
+    const auto meteorGeometry = m_host.DeclareGeometry(graph);
+    const auto meteorFirstList = m_host.DeclareFirstCull(graph, meteorGeometry);
+    const auto meteorOccluderDepth = m_host.DeclareOccluder(graph, meteorGeometry, meteorFirstList);
+    const auto meteorFinalList = m_host.DeclareFinalCull(graph, meteorGeometry, meteorOccluderDepth);
     m_cameraTargets.Declare(graph, context);
-    m_surfaceOutputs = m_host.DeclareGBuffer(graph, m_cameraTargets.GetOutputs());
+    m_surfaceOutputs = m_host.DeclareGBuffer(graph, meteorFinalList, m_cameraTargets.GetOutputs());
+    m_surfaceCommands = meteorFinalList.commands;
+    m_surfaceCommands.material = m_host.MaterialWork() ? m_host.MaterialWork()->GraphInputs(graph) : std::array<RGHandle,2>{};
 }
 
 RGHandle GraphSceneFixture::DeclareColor(EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
@@ -426,7 +432,7 @@ RGHandle GraphSceneFixture::DeclareColor(EnhancedRenderGraph& graph, const Enhan
 {
     const auto ao = DeclareClearedInput(graph, *context.resources, context,
         RHIFormat::RG16Float, 1.f, "METEOR.SurfaceFixture.AO");
-    return m_host.DeclareColor(graph, m_surfaceOutputs, lighting, ao, shadowMap);
+    return m_host.DeclareColor(graph, m_surfaceOutputs, m_surfaceCommands, lighting, ao, shadowMap);
 }
 
 void GraphSceneFixture::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)

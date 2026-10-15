@@ -2416,9 +2416,11 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 ++sceneCompositionFailures;
             }
             gbuffer.Declare(*graph, context);
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
-            const auto outputs = host.DeclareGBuffer(*graph, gbuffer.GetOutputs());
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
+            const auto outputs = host.DeclareGBuffer(*graph, meteorFinalList, gbuffer.GetOutputs());
             host.DeclareHistory(*graph, outputs.depth);
             RGTextureDesc aoDesc;
             aoDesc.width = context.width;
@@ -2511,7 +2513,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     true);
             }
 #endif
-            const auto sceneLighting = host.DeclareColor(*graph, outputs, lighting, ao, {});
+            const auto sceneLighting = host.DeclareColor(*graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
             std::array<RHIReadback, 11> pointReadbacks;
             RHIReadback sampleReadback;
             if (inspectPoint)
@@ -2613,7 +2615,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 bool rejected = false;
                 try
                 {
-                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, lighting, ao, {});
+                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, {meteorFinalList.commands.surface, meteorFinalList.commands.layer, {}, host.MaterialWork() ? host.MaterialWork()->GraphInputs(otherGraph ? unrelated : *graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
                 }
                 catch (const std::runtime_error&)
                 {
@@ -3576,7 +3578,7 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
     RHIShaderCompileOptions options; options.strictMath = true;
     Check(LX::Runtime::CompileCompute(RHIShaderSource::Resolve("GeometryVisibility.slang").string(),
         "MeshletFinalizeCS", {}, options, compiled, error), "Meshlet finalize compile " + error);
-    const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(1), RHILayout::UavBufferTable(2, 0)};
+    const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1), RHILayout::UavBufferTable(2, 0)};
     const auto layout = roots.GetOrCreate({params, {}}, error);
     LX::Runtime::ComputePipeline pipeline;
     RHIComputePipelineDesc desc; desc.layout = layout;
@@ -3598,6 +3600,9 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
         Check(slice.IsWritable(), "Meshlet boundary sealed upload"); std::memcpy(slice.cpuAddress, data, bytes); return slice;
     };
     const auto binUpload = upload(bins.data(), sizeof(bins));
+    // Unordered bins: finalize reads only the candidate flags.
+    const std::array<GpuGeometryVisibility::Candidate, 5> candidates{};
+    const auto candidateUpload = upload(candidates.data(), sizeof(candidates));
     const auto countUpload = upload(counts.data(), sizeof(counts));
     const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(ids, counts.size(), 4),
         RHIBindingDesc::UavBuffer(args, counts.size(), sizeof(RHIDrawIndexedIndirectArguments))};
@@ -3613,8 +3618,9 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
     encoder.ResourceBarriers({{}, {&ready, 1}});
     encoder.SetPipeline(RHIBindPoint::Compute, pipeline.GetGeneration()->GetHandle());
     encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform);
-    encoder.SetRootBuffer(RHIBindPoint::Compute, 1, binUpload);
-    encoder.SetBindings(RHIBindPoint::Compute, 2, table); encoder.Dispatch(1, 1, 1);
+    encoder.SetRootBuffer(RHIBindPoint::Compute, 1, candidateUpload);
+    encoder.SetRootBuffer(RHIBindPoint::Compute, 2, binUpload);
+    encoder.SetBindings(RHIBindPoint::Compute, 3, table); encoder.Dispatch(1, 1, 1);
     const RHIBufferTransition copied{args, RHIResourceState::UnorderedAccess, RHIResourceState::CopySource};
     encoder.ResourceBarriers({{}, {&copied, 1}}); encoder.CopyBufferToReadback(readback, args);
     Check(device.EndFrame(error), "Meshlet boundary submission"); device.WaitForGpu();
@@ -3626,7 +3632,64 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
             "GPU 2D argument boundary includes zero and 65536 without truncation");
     }
     device.ReleaseBuffer(ids); device.ReleaseBuffer(args);
-    std::cout << "METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071\n";
+
+    // Ordered bin: finalize rebuilds the list from the per-meshlet classification in
+    // source order. Stale atomic-slot contents (9) must not survive.
+    constexpr uint32_t total = 6;
+    const std::array<uint32_t, 1 + 2 * total> source{0xffffffffu, 9, 9, 9, 9, 9, 9, 1, 0, 1, 1, 0, 1};
+    std::array<GpuGeometryVisibility::Bin, 1> orderedBins{};
+    orderedBins[0].indexCount = total;
+    std::array<GpuGeometryVisibility::Candidate, 1> orderedCandidates{};
+    orderedCandidates[0].flags = GpuGeometryVisibility::kOrderedMeshlets;
+    RHIBufferHandle orderedIds, orderedArgs;
+    RHIBufferDesc orderedBuffer; orderedBuffer.allowUnorderedAccess = true; orderedBuffer.bytes = sizeof(source);
+    Check(device.CreateBuffer(orderedBuffer, orderedIds, error), "Ordered meshlet list buffer");
+    orderedBuffer.bytes = sizeof(RHIDrawIndexedIndirectArguments); orderedBuffer.allowIndirectArguments = true;
+    Check(device.CreateBuffer(orderedBuffer, orderedArgs, error), "Ordered meshlet argument buffer");
+    RHIReadback orderedListReadback, orderedArgsReadback;
+    Check(device.CreateBufferReadback(sizeof(source), orderedListReadback, error) &&
+        device.CreateBufferReadback(sizeof(RHIDrawIndexedIndirectArguments), orderedArgsReadback, error) &&
+        device.BeginFrame(error), "Ordered meshlet frame");
+    constants[25] = 1;
+    const auto orderedUniform = device.UploadConstants(constants.data(), sizeof(constants));
+    const auto orderedSource = upload(source.data(), sizeof(source));
+    const auto orderedBinUpload = upload(orderedBins.data(), sizeof(orderedBins));
+    const auto orderedCandidateUpload = upload(orderedCandidates.data(), sizeof(orderedCandidates));
+    const RHIBindingDesc orderedOutputs[]{RHIBindingDesc::UavBuffer(orderedIds, source.size(), 4),
+        RHIBindingDesc::UavBuffer(orderedArgs, 1, sizeof(RHIDrawIndexedIndirectArguments))};
+    const auto orderedTable = device.CreateBindings(orderedOutputs);
+    Check(orderedTable.IsValid() && orderedUniform.IsValid(), "Ordered meshlet bindings");
+    auto& orderedEncoder = device.GetImmediateEncoder();
+    const RHIBufferTransition orderedBefore[]{{orderedIds, RHIResourceState::Common, RHIResourceState::CopyDest},
+        {orderedArgs, RHIResourceState::Common, RHIResourceState::UnorderedAccess}};
+    orderedEncoder.ResourceBarriers({{}, orderedBefore});
+    RHIBufferSlice orderedDestination; orderedDestination.buffer = orderedIds; orderedDestination.size = sizeof(source);
+    Check(orderedEncoder.CopyBuffer(orderedDestination, orderedSource), "Ordered meshlet source copy");
+    const RHIBufferTransition orderedReady{orderedIds, RHIResourceState::CopyDest, RHIResourceState::UnorderedAccess};
+    orderedEncoder.ResourceBarriers({{}, {&orderedReady, 1}});
+    orderedEncoder.SetPipeline(RHIBindPoint::Compute, pipeline.GetGeneration()->GetHandle());
+    orderedEncoder.SetConstantBuffer(RHIBindPoint::Compute, 0, orderedUniform);
+    orderedEncoder.SetRootBuffer(RHIBindPoint::Compute, 1, orderedCandidateUpload);
+    orderedEncoder.SetRootBuffer(RHIBindPoint::Compute, 2, orderedBinUpload);
+    orderedEncoder.SetBindings(RHIBindPoint::Compute, 3, orderedTable); orderedEncoder.Dispatch(1, 1, 1);
+    const RHIBufferTransition orderedCopied[]{{orderedIds, RHIResourceState::UnorderedAccess, RHIResourceState::CopySource},
+        {orderedArgs, RHIResourceState::UnorderedAccess, RHIResourceState::CopySource}};
+    orderedEncoder.ResourceBarriers({{}, orderedCopied});
+    orderedEncoder.CopyBufferToReadback(orderedListReadback, orderedIds);
+    orderedEncoder.CopyBufferToReadback(orderedArgsReadback, orderedArgs);
+    Check(device.EndFrame(error), "Ordered meshlet submission"); device.WaitForGpu();
+    RHIReadbackImage orderedList, orderedArguments;
+    Check(device.MapReadback(orderedListReadback, orderedList, error) &&
+        device.MapReadback(orderedArgsReadback, orderedArguments, error), "Ordered meshlet readback");
+    std::array<uint32_t, 5> list{};
+    std::memcpy(list.data(), orderedList.data.data(), sizeof(list));
+    RHIDrawIndexedIndirectArguments orderedResult;
+    std::memcpy(&orderedResult, orderedArguments.data.data(), sizeof(orderedResult));
+    Check(list == std::array<uint32_t, 5>{4, 0, 2, 3, 5} && orderedResult.indexCount == 4 &&
+        orderedResult.instanceCount == 1 && orderedResult.firstIndex == 1,
+        "Ordered meshlet finalize compacts survivors in source order");
+    device.ReleaseBuffer(orderedIds); device.ReleaseBuffer(orderedArgs);
+    std::cout << "METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1\n";
 }
 
 #include "support/MeshletBatchDispatchProbe.inl"

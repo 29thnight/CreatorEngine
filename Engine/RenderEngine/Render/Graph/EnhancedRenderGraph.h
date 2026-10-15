@@ -426,6 +426,9 @@ public:
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
     RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
     RGHandle FindImportedTexture(RHITextureHandle texture) const;
+    // Declaration-time validation against real pass usages, not a second stage registry.
+    // Any version of this physical graph resource written by this producer matches.
+    bool HasDeclaredWriter(RGHandle resource, const std::string& producer) const;
 
     // Flush the immediate upload prefix before preparing recording-scoped pass
     // packets. RecordParallel reuses this exact recording instead of flushing it

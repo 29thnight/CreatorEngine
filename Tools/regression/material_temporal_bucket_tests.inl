@@ -51,8 +51,10 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers) { pool.BeginFrame(unsigned(context.frameId)); Check(graph->PrepareParallel(pool, error), "Temporal parallel prepare"); }
             Check(host.Prepare(context, input, {}, {}, {}, {}, {}, error, 0), "Temporal prepare " + error);
-            host.DeclareGeometry(*graph);
-            host.DeclareCulling(*graph);
+            const auto meteorGeometry = host.DeclareGeometry(*graph);
+            const auto meteorFirstList = host.DeclareFirstCull(*graph, meteorGeometry);
+            const auto meteorOccluderDepth = host.DeclareOccluder(*graph, meteorGeometry, meteorFirstList);
+            [[maybe_unused]] const auto meteorFinalList = host.DeclareFinalCull(*graph, meteorGeometry, meteorOccluderDepth);
             std::array<RGHandle, 5> targets;
             std::array<RHIReadback, 5> readbacks;
             const std::array formats{RHIFormat::RG16Float, RHIFormat::R16Float, RHIFormat::R16Float, RHIFormat::R16Float, RHIFormat::D32Float};
@@ -72,7 +74,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                 const float zero[4]{}; execution.encoder->BindRenderTargets(binding);
                 execution.encoder->ClearRenderTargets(binding,zero); execution.encoder->ClearDepthTarget(binding,1.f);
             });
-            targets=host.DeclareTemporal(*graph,targets);
+            targets=host.DeclareTemporal(*graph,meteorGeometry,targets);
             for(unsigned i=0;i<5;++i) graph->AddPass("Probe.Temporal.Read",{{targets[i],RHIResourceState::CopySource,RGAccessMode::Read}},
                 [target=targets[i],readback=readbacks[i]](const auto& execution){execution.encoder->CopyToReadback(readback,execution.ResolveHandle(target));},true);
             SubmitShadowDecal(device,pool,graph,host,context.frameId,workers,false);

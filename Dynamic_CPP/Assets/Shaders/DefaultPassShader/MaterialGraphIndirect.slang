@@ -15,12 +15,6 @@ void LXBuildIndirectCommands(uint3 id : SV_DispatchThreadID)
         lx_indirect_commands[command.y / 4 + word] = lx_templates.Load(command.x + word * 4);
     // Temporal replays all sealed indices; the template includes IBV and draw args.
     if (lx_indexed_replay == 1) return;
-    if (lx_indexed_replay == 2) {
-        // Sorted alpha preserves command order; visibility supplies indexed work.
-        for (uint word = 0; word < 5; ++word)
-            lx_indirect_commands[command.y / 4 + command.z - 5 + word] = lx_visible_arguments.Load(command.w + word * 4);
-        return;
-    }
     uint3 groups = lx_visible_arguments.Load3(command.w);
     for (uint axis = 0; axis < 3; ++axis) lx_indirect_commands[command.y / 4 + command.z + axis] = groups[axis];
 }

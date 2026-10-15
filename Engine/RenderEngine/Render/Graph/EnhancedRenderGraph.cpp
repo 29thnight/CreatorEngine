@@ -443,6 +443,18 @@ RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
     return VersionHandle(previous.index, version);
 }
 
+bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, const std::string& producer) const
+{
+    if (!ValidVersionHandle(resource)) return false;
+    for (const auto& pass : m_passes) if (pass.name == producer)
+        for (const auto& use : pass.usages)
+            if (use.handle.index == resource.index && use.handle.kind == resource.kind &&
+                use.handle.epoch == resource.epoch &&
+                (use.access == RGAccessMode::Write || use.access == RGAccessMode::ReadWrite))
+                return true;
+    return false;
+}
+
 RGHandle EnhancedRenderGraph::Write(RGHandle previous) { return AdvanceVersion(previous, false); }
 RGHandle EnhancedRenderGraph::Modify(RGHandle previous) { return AdvanceVersion(previous, true); }
 RGHandle EnhancedRenderGraph::AtomicMin64(RGHandle previous)

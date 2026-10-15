@@ -3565,27 +3565,64 @@ namespace
 
             // ── 1 · 기하: 월드 변환과 가시성 결정 ──
             //
-            // 변환·컬링은 소비자의 부수 효과가 아니라 자기 노드다. SceneHost가
-            // Geometry → Cull → Shadow/Surface 선언 순서를 강제하므로 노드를
-            // 옮기면 그림을 보기 전에 예외로 드러난다. 의존성은 그래프 리소스가
-            // 표현하므로 블랙보드 슬롯은 쓰지 않는다.
+            // 변환·컬링은 소비자의 부수 효과가 아니라 자기 노드다. 단계 사이의
+            // 계약은 블랙보드 슬롯이다: 각 단계가 발행한 그래프 핸들을 다음 단계가
+            // 그대로 받고, SceneHost는 다른 핸들이나 누락을 예외로 거부한다.
+            //   Geometry → Cull.First → Occluder → Cull.Final → Surface
+            //   Geometry → Shadow (그림자 컬링·명령은 그림자 노드가 소유)
+            // 래스터는 Cull 노드에 두지 않는다. 명령 생성기는 입력이 확정되는 노드에 둔다.
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Geometry";
-                node.declare = [&p](LiveBlackboard&, EnhancedRenderGraph& graph,
+                node.writes = {LiveSlots::kMeteorGeometry};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    p.graphMaterials.DeclareGeometry(graph);
+                    bb.Set(LiveSlots::kMeteorGeometry, p.graphMaterials.DeclareGeometry(graph));
                 };
                 p.desc.AddNode(std::move(node));
             }
             {
                 LivePassNode node;
-                node.name = "METEOR.Scene.Cull";
-                node.declare = [&p](LiveBlackboard&, EnhancedRenderGraph& graph,
+                node.name = "METEOR.Scene.Cull.First";
+                node.reads = {LiveSlots::kMeteorGeometry};
+                node.writes = {LiveSlots::kMeteorFirstList, LiveSlots::kMeteorDepthCommands};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    p.graphMaterials.DeclareCulling(graph);
+                    const auto first = p.graphMaterials.DeclareFirstCull(graph, bb.Get(LiveSlots::kMeteorGeometry));
+                    bb.Set(LiveSlots::kMeteorFirstList, first.list);
+                    bb.Set(LiveSlots::kMeteorDepthCommands, first.depthCommands);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.Occluder";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorFirstList, LiveSlots::kMeteorDepthCommands};
+                node.writes = {LiveSlots::kMeteorOccluderDepth};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    bb.Set(LiveSlots::kMeteorOccluderDepth, p.graphMaterials.DeclareOccluder(graph,
+                        bb.Get(LiveSlots::kMeteorGeometry), {bb.Get(LiveSlots::kMeteorFirstList), bb.Get(LiveSlots::kMeteorDepthCommands)}));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.Cull.Final";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
+                node.writes = {LiveSlots::kMeteorFinalList, LiveSlots::kMeteorSurfaceCommands, LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    const auto final = p.graphMaterials.DeclareFinalCull(graph,
+                        bb.Get(LiveSlots::kMeteorGeometry), bb.Get(LiveSlots::kMeteorOccluderDepth));
+                    bb.Set(LiveSlots::kMeteorFinalList, final.list);
+                    bb.Set(LiveSlots::kMeteorSurfaceCommands, final.commands.surface);
+                    bb.Set(LiveSlots::kMeteorLayerCommands, final.commands.layer);
+                    bb.SetList(LiveSlots::kMeteorBlendedCommands, final.commands.blended);
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3600,12 +3637,14 @@ namespace
                 {
                     return p.shadow.PrepareGraphFrame(ctx, error);
                 };
+                node.reads = { LiveSlots::kMeteorGeometry };
                 node.writes = { LiveSlots::kShadowMap };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.shadow.DeclareGraphTargets(graph, ctx);
-                    bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadow(graph, p.shadow.GetShadowMap()));
+                    bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadow(graph,
+                        bb.Get(LiveSlots::kMeteorGeometry), p.shadow.GetShadowMap()));
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -3628,16 +3667,23 @@ namespace
                     p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
                     return p.decal.PrepareFrame(ctx, err);
                 };
+                node.reads = { LiveSlots::kMeteorFinalList, LiveSlots::kMeteorSurfaceCommands };
                 node.writes = {
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
                     LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
+                    LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments,
                 };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.gbuffer.Declare(graph, ctx);
-                    auto outputs = p.graphMaterials.DeclareGBuffer(graph, p.gbuffer.GetOutputs());
+                    auto outputs = p.graphMaterials.DeclareGBuffer(graph, {bb.Get(LiveSlots::kMeteorFinalList), {bb.Get(LiveSlots::kMeteorSurfaceCommands), {}, {}}},
+                        p.gbuffer.GetOutputs());
+                    const auto material = p.graphMaterials.MaterialWork();
+                    const auto workInputs = material ? material->GraphInputs(graph) : std::array<RGHandle,2>{};
+                    bb.Set(LiveSlots::kMeteorMaterialTiles, workInputs[0]);
+                    bb.Set(LiveSlots::kMeteorMaterialArguments, workInputs[1]);
                     p.decal.SetInputs(outputs);
                     p.decal.Declare(graph, ctx);
                     const auto decalOutputs = p.decal.GetOutputs();
@@ -3674,7 +3720,7 @@ namespace
             {
                 LivePassNode node; node.name="Temporal.Inputs";
                 node.instance=[&p](uint32_t)->EnhancedRenderPass* {return &p.temporalInputs;};
-                node.reads={LiveSlots::kGBufferDepth};
+                node.reads={LiveSlots::kGBufferDepth,LiveSlots::kMeteorGeometry};
                 node.writes={LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                     LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
                 node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding& binding) {
@@ -3684,7 +3730,7 @@ namespace
                         p.desc.HasConsumer(LiveSlots::kTemporalMotion, ctx, binding);
                     if (!required) return; // Reset blackboard contains no temporal handles for this view.
                     p.temporalInputs.SetDepth(bb.Get(LiveSlots::kGBufferDepth));p.temporalInputs.Declare(graph,ctx);
-                    auto targets=p.graphMaterials.DeclareTemporal(graph,p.temporalInputs.Outputs());
+                    auto targets=p.graphMaterials.DeclareTemporal(graph,bb.Get(LiveSlots::kMeteorGeometry),p.temporalInputs.Outputs());
                     targets=p.decal.DeclareTemporal(graph,ctx,targets);
                     const char* names[]{LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                         LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
@@ -3722,6 +3768,8 @@ namespace
                 LivePassNode node;
                 node.name = "METEOR.Scene.Color";
                 node.reads = {
+                    LiveSlots::kMeteorLayerCommands,
+                    LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments,
                     LiveSlots::kAmbientOcclusion, LiveSlots::kShadowMap,
                 };
                 // Refraction completes the opaque HDR first, then installs the
@@ -3737,7 +3785,8 @@ namespace
                 {
                     const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);
                     bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareColor(graph, GatherGBufferOutputs(bb),
-                        hdr, bb.Get(LiveSlots::kAmbientOcclusion),
+                        {{}, bb.Get(LiveSlots::kMeteorLayerCommands), {},
+                         {bb.Get(LiveSlots::kMeteorMaterialTiles), bb.Get(LiveSlots::kMeteorMaterialArguments)}}, hdr, bb.Get(LiveSlots::kAmbientOcclusion),
                         bb.Get(LiveSlots::kShadowMap)));
                 };
                 p.desc.AddNode(std::move(node));
@@ -3921,12 +3970,12 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Blended";
-                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
+                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap, LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareBlendedStream(graph,
+                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareBlendedStream(graph, { {}, bb.Get(LiveSlots::kMeteorLayerCommands), bb.GetList(LiveSlots::kMeteorBlendedCommands) },
                         bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kShadowMap), p.lightTiles.GetLighting()));
                 };
                 p.desc.AddNode(std::move(node));
@@ -4018,7 +4067,7 @@ namespace
                     }
                 };
 
-                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
+                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap, LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands };
                 node.modifies = { LiveSlots::kLitColor };
                 node.active = [this, &p, supportsFog]()
                 {

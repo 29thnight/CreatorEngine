@@ -57,10 +57,11 @@ struct SceneFrameGeometry final
         if (graphOwner) throw std::runtime_error("METEOR geometry table cannot cross frame graphs.");
         graphOwner = &graph; graphEpoch = graph.ResourceEpoch();
         graphTable = graph.ImportBuffer(buffer, RHIResourceState::Common, "METEOR.Scene.Geometry.Table");
-        const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
-        if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned) graphTable = graph.Write(graphTable);
+        if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+            throw std::runtime_error("METEOR geometry table requires an ExplicitVersioned graph.");
+        graphTable = graph.Write(graphTable);
         graph.AddPass("METEOR.Scene.Geometry.Table.Upload",
-            {{graphTable, RHIResourceState::CopyDest, explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState}},
+            {{graphTable, RHIResourceState::CopyDest, RGAccessMode::Write}},
             [owner](const auto& execution) {
                 auto destination = RHIBufferSlice::Whole(owner->buffer);
                 destination.size = owner->staging.size;

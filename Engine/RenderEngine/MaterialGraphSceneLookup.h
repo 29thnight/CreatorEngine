@@ -51,6 +51,12 @@ namespace material_graph
                                   std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const;
         void BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) const;
         const std::array<RGHandle, 11>& DeclareInputs(EnhancedRenderGraph& graph) const;
+        bool InputsDeclared(const EnhancedRenderGraph& graph) const
+        {
+            if (!graph_) return false;
+            CheckCurrent(graph);
+            return true;
+        }
         const std::array<RGHandle, 11>& GraphInputs(const EnhancedRenderGraph& graph) const;
         std::array<RGHandle, 11> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first,
                                                        unsigned count) const;

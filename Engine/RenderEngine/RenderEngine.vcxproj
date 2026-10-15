@@ -777,6 +777,16 @@
     <ClInclude Include="MaterialGraphSceneInput.h" />
     <ClInclude Include="MaterialGraphSceneLod.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
+    <ClInclude Include="MaterialGraphSceneStages.inl" />
+    <ClInclude Include="MaterialGraphSceneEffectStage.inl" />
+    <ClInclude Include="MaterialGraphSceneFinalCullStage.inl" />
+    <ClInclude Include="MaterialGraphSceneFirstCullStage.inl" />
+    <ClInclude Include="MaterialGraphSceneGeometryStage.inl" />
+    <ClInclude Include="MaterialGraphSceneHistoryStage.inl" />
+    <ClInclude Include="MaterialGraphSceneOccluderStage.inl" />
+    <ClInclude Include="MaterialGraphSceneShadowStage.inl" />
+    <ClInclude Include="MaterialGraphSceneSurfaceStage.inl" />
+    <ClInclude Include="MaterialGraphSceneTemporalStage.inl" />
     <ClInclude Include="GpuGeometryVisibility.h" />
     <ClInclude Include="MaterialGraphSceneCompiler.h" />
     <ClInclude Include="MaterialGraphShaderMeta.h" />
