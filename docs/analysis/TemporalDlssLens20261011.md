@@ -1,28 +1,22 @@
-# DLSS perspective lens 변경과 history reset
+# 카메라 렌즈와 시간축 history
 
-2026-10-11. 실행 정본: `Artifacts/PR169/dlss-lens-20261011/checkpoint.json`.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-## 구현
+## 현행 계약
 
-라이브 개발용 raw fixture `camera.lens.probe <target> [vertical-fov near far]`를 추가했다. 같은 CameraComponent가 소유한 perspective 렌즈를 바꾸지만 camera cut 또는 명시적 temporal reset을 요청하지 않는다. 따라서 제출된 투영의 변경 감지가 실제 reset을 만드는지를 검사한다. 읽기 응답과 변경 응답에 이전/현재 FOV·near·far 및 cut revision을 남긴다. 이 명령은 Undo/일반 저작 동등성 검사가 아닌 진단용이다. 직교 카메라와 비유한 값, 범위 밖 FOV, 잘못된 클리핑 평면은 거부한다.
+FrameCameraSnapshot::HasSameTemporalHistory는 cameraCutRevision, jitter 없는 projection, orthographic 여부, FOV, near/far를 마지막 제출 카메라와 비교한다. view state는 이 비교 실패를 reset 조건에 넣는다. 단순 camera transform 이동은 motion으로 처리되며 렌즈 변경과 구분한다.
 
-새 `Verify-TemporalLens.ps1`/`Compare-TemporalLens.py` 및 기존 launcher의 `-Scenario lens`를 연결했다. 기존 전환 시나리오가 기본값이다. 첫 초기 실행에서 명령을 commandlet 테이블로 잘못 분류해 unknown을 반환했고, 라이브 테이블 등록으로 수정했다. 해당 실행은 GPU 캡처 없이 정상 종료했으며 로그를 보존했다. 렌더러의 reset 알고리즘이나 DLSS preset은 이번에 변경하지 않았다.
+## 재현·수용 조건
 
-## 실행 결과
+FOV와 near/far 변경이 실제 projection/depth와 SDK camera 값에 반영되는지 검사한다. 같은 값을 다시 설정한 no-op은 불필요한 reset을 만들지 않아야 한다. camera cut 없이 렌즈만 바뀌는 사례도 포함한다.
 
-SDK 활성 Debug/Release 재빌드 후 Native AA/Quality/Balanced/Performance/Ultra Performance 10실행, **180캡처·90비교**를 통과했다. 각 실행은 FOV 60°/near .1/far 500을 기준으로 FOV 45°·90°, near .25, far 100을 개별 변경한다. 첫 번째와 여덟 번째 승인 reset 프레임을 동일한 최종 렌즈의 camera-cut reference와 비교하고, 마지막 baseline 복원도 비교한다.
+## 기록의 범위
 
-- depth/baseColor/SSGI/HDR/display 최대 차이 전부 0. 비교 대상과 reference의 D/R 픽셀 해시 동일.
-- 카메라 위치 불변, 요청 렌즈의 투영 계수/표시 aspect 일치, cut revision 불변, 별도 설정/reset 세대와 해상도 불변 확인.
-- 모든 렌즈 변경에서 baseline 대비 depth 변화 확인. 명령 성공만으로 렌더 반영을 인정하지 않았다.
-- 동일 렌즈 재설정 **80건**에서 16프레임 넘게 진행한 뒤 history 유지·DLSS 활성·폴백 없음 확인.
-- 잘못된 입력 **60건**을 카메라 변경 없이 거부. 실제 대표 캡처 기반 receipt/신원/투영 변이 **20종** 거부.
-- 각 구성/품질 실행의 history 계약 506단정 통과. GPU validation 메시지/문제/누락 0, 정상 종료 코드 0.
+[시간축 재구성 정본](../plans/TemporalReconstructionPlan.md)과 함께 읽는다. 이 파일명은 이전 검사 주제로 연결되는 경로를 유지한다. 과거 특정 GPU·해상도·바이너리의 성공 표본, 삭제된 원본 픽셀과 보존 manifest를 현재 전체 제품 수용으로 확대하지 않는다. 이번 개정에서는 새 실행·측정 결과를 만들지 않았다.
 
-Quality Debug pilot 이후 검증기에 no-op 품질과 입력 거부 요약을 강화했다. pilot의 보존된 no-op/거부 metadata도 최종 집계에서 같은 조건으로 다시 확인했다. 원본 픽셀을 복제하거나 손상시키지 않았다.
+## 소스 근거
 
-## 저장과 범위
-
-구성/품질별 성공은 첫 FOV reset 대표만 보존했다. 중복 raw 삭제 ledger 기준 실제 6.109GiB 회수, 여유 81.78GiB다. 로그·판정·manifest·해시는 유지하지만 제거한 전체 raw 시퀀스는 다시 재생할 수 없다.
-
-범위는 DX12 RTX 2080 Ti, Editor Game 뷰, 정적 cube/floor, 고정 SDK 시간, 위 네 perspective 렌즈 변화다. 연속 zoom, 직교 전환, 임의 비대칭 투영, 다른 해상도/GPU, 멀티카메라와 뷰 재생성, 가변 시간, 실제 자산 화질·성능, FG 및 외부 지연은 별도 수용이 필요하다. TR2/TR3/TU3 progress, PHASE 4.5 기성 12/71 유지. 다음 우선 항목은 멀티카메라 전환/뷰 수명과 history 격리다.
+- [Engine/RenderEngine/FrameCameraSnapshot.h](../../Engine/RenderEngine/FrameCameraSnapshot.h)
+- [Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h](../../Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h)
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp](../../Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp)
+- [Tools/temporal-validation/Compare-TemporalLens.py](../../Tools/temporal-validation/Compare-TemporalLens.py)

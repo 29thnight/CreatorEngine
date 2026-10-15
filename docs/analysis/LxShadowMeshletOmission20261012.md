@@ -1,65 +1,21 @@
-# LX 보이는 그림자 메시렛 누락 변이 (2026-10-12)
+# 보이는 그림자 메시렛 누락 변이
 
-후속 목록 4번의 변이는 실제 GPU 그림자 셰이더에서 비스킨드 사각형의 첫 메시렛을 제외한다. 깊이 파일을 사후 편집하는 검사가 아니다. 저장소의 원본 셰이더·C++ 소스·실행 파일을 유지하고, 실행마다 복사한 격리 프로젝트의 `Includes/MaterialGraphSceneHost.slang`만 변경한다. SceneHost는 그 프로젝트의 셰이더를 실제 컴파일한다.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-```slang
-const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowViewProjection)
-    && !(group.x == 0u && vertexCount == 4u);
-```
+## 현재 구현
 
-변경 대상은 `LXSceneShadowMS` 안의 유일한 판정이다. 네 정점 사각형의 메시렛은 생략하지만 스킨드 스트립·indexed 경로·카메라 셰이더·캐스케이드 행렬은 그대로 유지한다. 각 캐스케이드에서 일부 깊이만 누락되고 남은 스킨드 그림자는 계속 존재해야 예상 거부로 인정한다.
+shadow 목록은 source meshlet ID를 유지해 indirect shader 소비와 연결한다. prepared candidate 수는 실제 선택·coverage를 증명하지 않으므로, 보이는 중간 meshlet을 의도적으로 누락시킨 결과를 oracle이 거부하는 검사가 유용하다.
 
-## 판정
+## 확인해야 할 경계
 
-**후속 목록 4번 완료.** Debug/Release 변이를 모두 의도한 깊이 누락으로 거부했다. 새 격리 프로젝트에서 실행한 두 정상 대조군은 6개 깊이·행렬 비교 모두 비트 동치로 통과했다. 네 실행 모두 GPU validation 활성·문제 0·누락 메시지 0, quit 성공, 실행 전후 소스·binary·격리 셰이더 해시 일치를 확인했다. 변이는 종료 코드 4, 정상은 0이다.
+여러 meshlet이 반드시 필요한 topology와 실제 shadow에 기여하는 ID를 선택한다. GPU 목록·depth 차이·최종 shadow 차이를 함께 확인하고 변이 입력을 정상 성능 표본에서 제외한다. 이번 감사에서 변이 실행은 하지 않았다.
 
-| 포즈 | 캐스케이드 | 참조 깊이 텍셀 | 누락 = 불일치 | 추가 | 최대 절대 오차 |
-|---|---|---:|---:|---:|---:|
-| 바인드 | C0 | 45,878 | 15,292 | 0 | 0.438993335 |
-| 바인드 | C1 | 8,381 | 2,797 | 0 | 0.535633683 |
-| 바인드 | C2 | 449 | 143 | 0 | 0.563969493 |
-| 본 이동 | C0 | 45,856 | 15,292 | 0 | 0.438993335 |
-| 본 이동 | C1 | 8,379 | 2,797 | 0 | 0.535633683 |
-| 본 이동 | C2 | 439 | 143 | 0 | 0.563969493 |
+## 정본과 이전 기록
 
-6개 비교 모두 행렬 비트 동치다. 각 meshlet 프레임의 캐스케이드별 제출 횟수는 2, indexed는 0이다. 제출은 성공했지만 셰이더가 실제 깊이 일부를 생략했다. 기존 첫 캐스케이드 포즈 변화는 여전히 40,762 텍셀이므로, 포즈 변화 검사만으로는 이 누락을 잡지 못한다. 새 3장 동치 oracle이 `dx12.skinning`을 실패시킨다.
+전체 geometry 계약은 [GPU 메시렛 배선](../design/GpuDrivenMeshletDxrWiring.md), 라이브 연결은 [파이프라인 흐름](RenderPipelineFlow.md)을 따른다. 이 날짜 문서는 주제와 경로를 보존한 호환 안내다. 과거 선택 스위치·형식 버전·로컬 실행 수치는 현행 제품 계약으로 재사용하지 않는다. 이번 개정의 확인 범위는 소스와 호출 경로이며 GPU 실행·성능 수용은 미실행이다.
 
-변이의 commandlet 종료 코드 4는 의도한 `CommandStatus::Failed`다. `quit`은 성공하고 GPU validation 활성·문제 0·누락 메시지 0이어야 한다. 단순 실행 실패나 검증 레이어 오류는 예상 거부로 인정하지 않는다. 스크립트의 `verdict.passed=true`는 **예상 거부 검사 성공**이며, 렌더 테스트 자체의 `passed=false` 및 `equivalencePassed=false`와 구별한다.
+## 소스 근거
 
-## 재현·증거
-
-현재 Editor Debug/Release 빌드를 준비한 뒤 실행한다. C++·기본 셰이더는 이전 [3장 동치 검증](LxShadowEquivalence20261012.md)의 빌드와 같고, 이번 변경은 검증 스크립트에 있다.
-
-```powershell
-& Tools/regression/verify-lx-shadow-baseline.ps1 `
-    -Configuration Debug `
-    -FixtureProject Build/Obj/LxShadowP0/Fixture `
-    -OutputDirectory Build/Verification/ShadowOmission-New/Mutant-Debug `
-    -ExpectedVisibleMeshletRejection
-```
-
-Release는 구성·출력 디렉터리를 바꾼다. 정상 대조군은 변이 스위치 대신 `-ShadowEquivalenceOnly`로 새로운 격리 프로젝트에서 실행한다. 변이 플래그는 동치 모드를 자동 활성화하고 backOff 변이 모드와 동시 사용을 거부한다.
-
-- [스크립트](../../Tools/regression/verify-lx-shadow-baseline.ps1)
-- [Debug 변이 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/verdict.json), [비교 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/equivalence.json), [변이 원본·규칙·해시](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/mutation.json), [명령별 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/results.jsonl)
-- [Release 변이 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/verdict.json), [비교 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/equivalence.json), [변이 원본·규칙·해시](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/mutation.json), [명령별 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/results.jsonl)
-- [Debug 정상 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Debug/verdict.json), [동치 상세](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Debug/equivalence.json)
-- [Release 정상 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Release/verdict.json), [동치 상세](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Release/equivalence.json)
-- [전체 판정·원본 대조](../../Build/Verification/ShadowMeshletOmission-20261012/overall.json)
-- [문서 구조·링크·스크립트 검사](../../Build/Verification/ShadowMeshletOmission-20261012/document-verification.json)
-
-각 실행의 `identity-before.json`·`identity-after.json`은 저장소 소스, exe/runtime, 실제 사용한 격리 셰이더와 실행 스크립트 해시를 기록한다. `fixture-inputs.json`은 복사·변이 적용 후 입력을 기록한다. `capture-manifest.json`은 삭제 전 깊이·행렬 파일의 크기·해시다.
-
-AGENTS.md에 따라 예상 거부를 확인한 직후 각 변이 실행의 `.f32` 파일 12개를 삭제했다. 로그·판정·행렬·해시·변이 셰이더는 보존하고, `pixel-retention-*.json`과 `.result.json`에 삭제 목록 및 실제 회수 공간을 남겼다. 변이의 역사적 판정은 보존되지만 삭제한 픽셀은 재생할 수 없다. 이전 정상 원본에는 변경·삭제를 적용하지 않았다.
-
-변이의 indexed 깊이 6장 및 행렬 12개는 이전 3장 동치 검사의 동일 구성 정상 원본과 SHA256이 같다. meshlet 깊이 6장은 모두 다르다. 새 정상 재실행의 깊이·행렬 24개도 이전 원본과 모두 같다. 이 대조 후 새 정상의 중복 `.f32` 12개씩도 삭제 기록을 남겼다. 정상 픽셀 재생은 이전 검사의 `Debug/captures`·`Release-Final/captures`에서 가능하며, 각 새 정상의 retention 기록에 대표 원본 경로를 명시했다. 네 번의 정리마다 실제 디스크 회수량은 약 0.19GiB로 기록되었다. 이는 파일 길이의 합이 아닌 삭제 전후 가용 공간 차이다.
-
-이전 검사 이후 저장소 C++·셰이더·Debug/Release exe/runtime 해시는 바뀌지 않았다. 검증 스크립트만 확장했으므로 C++ 재빌드를 반복하지 않았다. 격리된 변이 셰이더를 읽고 컴파일하는 경로는 `GraphShadowCasterFixture::Initialize` → `PathFinder::RelativeToShader` → `DataSystem::CompileMaterialGraphAuthoring`이며, 실제 누락 깊이와 정상 재실행이 변경 적용·제거를 확인한다.
-
-## 범위
-
-DX12의 두 합성 메시·두 포즈에서 비스킨드 사각형 메시렛 하나의 누락을 검증기가 거부하는 증거다. mesh dispatch 전체 실패·맵 전체 소실로 대체하지 않는다. 복잡한 메시의 중간 메시렛, 알파 마스크·면 판정·변환·캐스케이드 경계는 후속 5번의 확대 장면 범위다. compute 사전 컬링의 생존 목록 검증이나 성능 수용은 아니다. Vulkan은 PHASE 4.9에 남긴다.
-
-네 실행의 GPU validation 메시지 1건은 레이어 활성 안내다. 기존 profiler 종료 진단은 이번 범위에서 해결하지 않는다. 검증 레이어를 켠 실행 시간은 성능 수용에 사용하지 않는다.
-
-문서 갱신 중 이전 단계의 두 분석 HTML에서 문자 단위 치환 오류를 발견해 복구했다. 대화 실행 기록의 손상 전 원본과 대조하여 CSS 일치와 승인된 설명 변경만 남은 것을 확인했다. 세 HTML의 시작·종료 루트, 실제 태그 중첩, 로컬 링크 및 스크립트 구문·diff 검사를 다시 통과했다. GPU 테스트 소스·셰이더 원본·실행 결과에는 이 문서 오류가 적용되지 않았다.
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp](../../Engine/RenderEngine/GpuGeometryVisibility.cpp)
+- [Engine/RenderEngine/MaterialGraphSceneShadowStage.inl](../../Engine/RenderEngine/MaterialGraphSceneShadowStage.inl)
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang](../../Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang)
