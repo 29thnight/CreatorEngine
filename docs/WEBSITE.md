@@ -8,6 +8,7 @@
 
 - 소개 화면은 역사 Editor 캡처 세 장, 엔진 구성 안내와 API 링크를 표시한다
 - API 화면은 현재 디렉터리의 `reference.json`을 HTTP fetch한다. 파일을 읽지 못하면 오류 화면이 나오며, 개별 페이지를 로드하는 서버 API로 우회하지 않는다
+- 이전 section/member hash가 새 선별 문서에서 사라졌으면 `legacyAnchors`가 현재 계약 절로 연결하고 이전 링크 안내를 표시한다. 제거된 시그니처를 지원 API처럼 복원하지 않는다
 - 페이지 신원은 `#guide/overview`, `#script/Component` 같은 hash다. `~members` 또는 `~member-...` 부분이 문서 내부 anchor를 가리킨다
 - 검색은 로드한 페이지의 제목·요약·멤버·절 내용을 브라우저에서 필터한다. 저장소 전체 코드/문서 검색 기능은 아니다
 - 알 수 없는 페이지 신원은 찾을 수 없음 안내를 표시한다. 빈 hash는 `guide/overview`다

@@ -56,3 +56,7 @@ Editor는 DX12 renderer와 ImGui host presentation을 연결한다. Player는 `R
 ## 갱신할 때
 
 문서를 바꿀 때는 public 선언, 구현 본문, 호출자, 프로젝트/호스트 편입을 함께 확인한다. 지원 조건·실패·취소·교체·종료 경로를 생략하지 않는다. 실행 결과가 필요하면 정확한 commit과 명령, 환경, 결과 파일을 남긴다. 기존 기록의 통과 표시를 새로운 검증으로 복사하지 않는다.
+
+## 감사 범위와 재검사
+
+[재작성 감사 보고](DocumentationAudit.md)는 기준 파일 전체의 처리 결과와 검증 범위를 설명한다. [파일별 근거 목록](DocumentationCoverage.json)은 문서별 확인한 행동·소스·한계와 원본/결과 blob을 기록한다. 정적 무결성 검사는 `python docs/check_documentation.py`로 실행한다. 이 검사는 링크·anchor·hash를 확인하며 문서 의미의 정확성이나 엔진 실행 성공을 자동으로 증명하지 않는다.
