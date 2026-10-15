@@ -4,9 +4,9 @@
 
 ## 등록 표면
 
-게임 스크립트는 `OnBeginSimulation`에서 `Physics.ObserveContacts(owner, selfRole, otherRole, phases, capacity, grouping)`를 호출한다. 현재 실행 중인 subscriber는 `ScriptRegistry`가 이 훅을 호출하는 동안 설정한 `ContactRouter.Current`에서 얻는다. 임의 프레임이나 background Task에서 구독하면 `InvalidOperationException`이다.
+게임 스크립트는 `OnBeginSimulation`에서 `Physics.ObserveContacts(owner, selfRole, otherRole, phases, capacity, grouping)`를 호출한다. 현재 실행 중인 subscriber는 `ScriptRegistry`가 이 훅을 호출하는 동안 설정한 `ContactRouter.Current`에서 얻는다. 이 훅 밖에서 Current가 없으면 `InvalidOperationException`이다. 이 static 문맥은 worker-thread 사용 허가가 아니므로 background Task에서 등록하지 않는다.
 
-기본 phase는 Begin, capacity는 256, grouping은 ShapePairs다. owner가 유효해야 하고 self/other role은 빈 GUID가 아니어야 한다. phase는 Begin/Persist/End의 nonzero 조합, capacity는 1~65536, grouping은 정의된 enum이어야 한다. 구독은 subscriber의 `SimulationScope`에 묶이며 scope 취소 시 Dispose된다.
+기본 phase는 Begin, capacity는 256, grouping은 ShapePairs다. 등록 검사는 owner 핸들의 generation이 0이 아닌지 확인하며 네이티브 생존을 조회하지 않는다. 호출자가 살아 있는 owner를 확보해야 하고 self/other role은 빈 GUID가 아니어야 한다. phase는 Begin/Persist/End의 nonzero 조합, capacity는 1~65536, grouping은 정의된 enum이어야 한다. 구독은 subscriber의 `SimulationScope`에 묶이며 scope 취소 시 Dispose된다.
 
 저장 role이 없는 shape만 `Physics.BindContactRole(body, shapeId, role)`로 임시 역할을 부여할 수 있다. 이 호출도 OnBeginSimulation 전용이며 shape가 실제 body에 있어야 한다. 저장된 role은 스크립트 binding보다 우선하며 이미 저작된 역할을 덮어쓰려 하면 거부한다. 역할 binding은 충돌 레이어를 바꾸지 않는다.
 

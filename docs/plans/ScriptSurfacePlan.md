@@ -24,11 +24,11 @@ RuntimeFrame은 initialization/input→PrePhysics→physics→native GameLogic�
 
 ## OnSimulate·Scope·예외
 
-OnBeginSimulation 성공 뒤 OnSimulate Task가 한 번 시작된다. Scope.Delay는 engine dt로 진행하고 생성 프레임에는 시간을 소비하지 않으며 최소 다음 프레임까지 기다린다. NaN은 ArgumentException, 0 이하 값은 다음 프레임, positive infinity는 scope cancellation까지 대기한다.
+OnBeginSimulation 성공 뒤에도 활성·생존 상태가 유지될 때 OnSimulate Task가 한 번 시작된다. Scope.Delay는 engine dt로 진행하고 생성 프레임에는 시간을 소비하지 않으며 최소 다음 프레임까지 기다린다. NaN은 ArgumentException, 0 이하 값은 다음 프레임, positive infinity는 scope cancellation까지 대기한다.
 
 PrePhysicsTick은 membership flush→모든 live scope Tick→GameThreadSynchronizationContext Drain→enabled PrePhysics 순이다. disabled script의 scope time은 계속 진행한다. Scope.Cancel은 cleanup 예외를 기록하면서 나머지 정리를 계속하고 pending delay와 cancellation registration을 해제한다. 정상 종료 순서는 scope 취소 후 OnEndSimulation이다.
 
-일반 await는 설치된 context에 continuation을 게시하며 game-thread drain에서 재개한다. ConfigureAwait(false), 직접 background 접근, 긴 동기 루프는 안전을 자동 보장하지 않는다. 취소는 협조적이다. context.Send는 worker에서 거부하며 engine native 진입은 game-thread guard를 따른다. 훅/비동기 오류는 ScriptRegistry의 인스턴스 격리와 로그로 드러난다.
+일반 await는 설치된 context에 continuation을 게시하며 game-thread drain에서 재개한다. ConfigureAwait(false), 직접 background 접근, 긴 동기 루프는 안전을 자동 보장하지 않는다. 취소는 협조적이다. context.Send는 worker에서 거부하며 engine native 진입은 game-thread guard를 따른다. 일반 훅과 게임 스레드로 돌아온 OnSimulate 오류는 ScriptRegistry가 기록하고 인스턴스를 비활성화한다. 컨텍스트를 우회해 worker에서 도착한 OnSimulate 오류는 엔진 상태를 바꾸지 않고 진단만 남기므로 같은 격리 보장을 가정하지 않는다.
 
 ## 현재 지원 표면과 미러 한계
 
