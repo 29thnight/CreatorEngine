@@ -1,105 +1,35 @@
-# Local artifact backing leases
+# Artifact backing lease와 물리 회수
 
-This implementation is a bounded physical-exclusion slice of the approved
-AssetDepot ownership contract. It does not implement a garbage collector, select
-obsolete releases, delete files, repack archives, or infer GPU completion.
+> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
 
-## Existing storage roles
+## 보호하는 대상
 
-- `LooseArtifactByteSource` opens one shared OS guard when constructed. Catalog
-  snapshots, requests, and unselected lazy-child origins already retain that
-  source, so they protect the immutable release without opening every artifact
-- A narrowed `SingleArtifactSource` retains its selected native file and shares
-  the release guard. It does not retain the mount source, sibling file handles,
-  or decoded payload bytes. Physical collection is conservatively release-wide
-- `Pak::Archive` holds its own guard before opening the pak. This covers archives
-  that outlive an individual `PakAudioClipByteSource`; existing native FILE RAII
-  and chunk-range reads are unchanged
-- A guard is native OS RAII. Engine lifetime sharing uses the existing public
-  `own::make_shared` and `own::shared_owner` APIs. There is no new manager,
-  distributed lease service, or public per-asset lease wrapper
+`ArtifactStoreGuard`는 로컬 파일시스템의 immutable release 디렉터리 하나 또는 PAK 하나를 보호한다. 개별 decoded object의 reference count나 GPU fence를 대신하지 않는다. sibling `.asset-store.guard`는 영구 protocol metadata이며 backing cleanup과 함께 이동·교체·삭제하지 않는다.
 
-## Publication and identity
+상태는 Acquired, Unmanaged, Busy, Invalid로 구분된다. guard가 없는 legacy backing은 읽을 수 있으나 collection 자격이 생기지 않는다. 오래된 파일이거나 mount 목록에서 빠졌다는 이유만으로 삭제 가능 판정을 내릴 수 없다.
 
-`ArtifactStoreGuard::BeginPublication` reserves a new backing path and holds its
-exclusive sibling guard. The producer creates/validates a candidate, atomically
-publishes it, then calls `CommitPublication` before reporting success. The
-persistent guard record binds the normalized backing path to its volume/device,
-file identity, directory/file kind, and backing incarnation stamp (Windows
-creation time; POSIX ctime seconds and nanoseconds). The guard file's own ctime
-is deliberately excluded from its identity because publication writes it.
-Existing backing cannot be retroactively
-enrolled, because legacy readers may lack the protocol.
+## 발행 → 읽기 → 회수
 
-`BuildAssetSet` performs these publication steps for new immutable loose outputs.
-The guard is a sibling named `<backing>.asset-store.guard`, outside the release
-and its payload list. It is machine-local coordination metadata, not a portable
-artifact or input to deterministic build keys. Moving/copying a release requires
-fresh publication at a new path; copied guard records do not authorize GC of a
-new file identity. Safe deployment reserves the absent destination with
-`BeginPublication`, copies into a private candidate, renames it to the destination,
-calls `CommitPublication`, then releases the exclusive publication guard before
-mounting. Already-extracted final roots remain unmanaged/noncollectible; there is
-no retrofit enrollment operation. Existing `AssetPacker` replace-in-place outputs are not silently
-converted. Immutable pak producers can use the same new-path publication API.
+1. 생산자는 새 backing 경로에 `BeginPublication`으로 exclusive guard를 획득한다. 이미 존재하는 backing을 사후 등록하지 않는다
+2. candidate를 atomic rename한 뒤 `CommitPublication`으로 backing의 file identity와 incarnation을 guard에 기록·flush한다. 이 단계가 실패하면 정상 등록된 발행으로 보고하지 않는다
+3. source/archive 생성 시 `OpenShared`를 호출하고 owner가 guard를 유지한다. alias·reparse·hardlink 및 guard/backing identity 변조를 검사한다
+4. collector는 모든 active release/manifest 참조를 먼저 retire한 뒤 `TryAcquireCollection`으로 exclusive capability를 얻는다. 물리 mutation 직전에 `RevalidateCollection`을 호출하고 작업이 끝날 때까지 guard를 유지한다
 
-Never delete, move, truncate, or replace a persistent guard as part of collection.
-It must remain in a stable parent directory. Abandoned publication records are
-not evidence of a live owner; a new publication may acquire the existing OS guard
-only when the target path is still absent. An incomplete record fails closed for
-readers and collection, and cannot be repaired by inferring process age.
+`TryAcquireCollection`은 잠깐 관측한 bool이 아니라 들고 있어야 하는 권한 객체다. Busy와 Invalid를 무시하고 별도 delete를 실행하면 계약을 깨뜨린다.
 
-Paths crossing symlinks/reparse points and multiply-linked file backing/guards
-are rejected. Windows canonical naming also resolves short-name aliases before
-choosing a sidecar. Shared acquisition validates the recorded backing identity;
-source reads that would reopen a loose path validate the root again. Pak open
-also compares its native FILE identity with the acquired guard. On POSIX,
-changing an enrolled immutable root's metadata invalidates its captured incarnation even when
-the inode is unchanged. Publish a new immutable root rather than touching an
-existing enrolled root. Unmanaged legacy roots still validate directory/file
-identity, but do not enforce the managed incarnation contract for unrelated
-metadata changes. These checks harden ordinary replacement/inode reuse;
-they do not claim to defeat adversarial timestamp restoration.
+## bytes 수명과 경계
 
-## Physical cleanup eligibility
+`ArtifactByteSource` owner는 backing을 pin한다. loose artifact는 capture로 열린 파일을 좁혀 보유할 수 있으며, immutable PAK/memory source는 빈 narrowed 결과와 기존 owner 유지로 계약을 만족할 수 있다. capture 실패 시 원래 pathname으로 fallback해서는 안 된다. capture 성공 자체는 typed SHA/schema 검증이 아니고 이후 reader가 이를 수행한다.
 
-1. Separately establish that an exact release/pak is obsolete under publication
-   policy. This API does not decide whether a release will be needed in future
-2. Call `TryAcquireCollection(backing, capability, failure)` in a storage worker
-3. `Busy` means a mount, old snapshot, descriptor, payload origin, job, archive,
-   another producer, or another collector still owns an OS guard. `Unmanaged`
-   means no enrollment exists and expressly does not allow collection. `Invalid`
-   includes incomplete/corrupt metadata, aliases, and changed backing identity
-4. Only `Acquired` returns a held exclusive capability. Keep it alive throughout
-   eventual physical work, use its exact `BackingPath`, and call
-   `RevalidateCollection` immediately before mutation. Revalidation refuses a
-   replaced root/pak/guard. Never turn the result into a cached Boolean
-5. There is deliberately no destructive API in this slice. A future collector
-   must use this protocol for the whole backing and leave the sibling guard
-   intact. Ancestor-directory cleanup must first cover every descendant store;
-   taking an unrelated ancestor's guard is not permission to remove descendants
+PAK은 실제 FILE을 연 뒤 `ValidateOpenedFile`로 guard와 파일 open 사이 identity 변경을 검사한다. 외부 프로그램의 비협조적 삭제·교체를 모든 OS에서 막는 보장은 없으며 변조 감지와 fail-closed가 목적이다. network/distributed storage는 범위 밖이다.
 
-Windows uses `LockFileEx`; POSIX uses `flock` on separate close-on-exec descriptors.
-Locks are nonblocking and cover separate opens in the same process as well as
-independent cooperating processes. OS process termination releases locks, so no
-PID expiry file, `use_count()`, GPU token, timeout, or stale-file heuristic decides
-whether owners exist. This protocol is for a supported local filesystem; it does
-not claim distributed/network-filesystem lease semantics. Uncooperative external
-mutation can still cause explicit identity/I/O errors and is not made safe by an
-OS advisory protocol.
+## 구현 수준
 
-Shared acquisition is metadata I/O at source/archive construction. It must not
-be added to `TryAcquire`, resident cache-hit paths, or GT/RT uploads. Logical
-unmount only drops the new resolver's source references; it does not release
-references held by old snapshots, descriptors, or jobs.
+AssetSet 생산자는 새 output 발행에 guard를 사용하고 output blob은 cache의 독립 복사본으로 만든다. cache GC가 발행된 release를 깨지 않도록 hardlink 공유를 전제하지 않는다. 이 protocol이 존재한다고 자동 TTL/LRU disk collector, quota UI 또는 복구 daemon이 구현된 것은 아니다. 별도 collector가 추가될 때에도 active manifest retirement와 exclusive guard를 둘 다 만족해야 한다.
 
-## Verification status
+## 구현 근거
 
-`Tools/regression/artifact_store_lease_probe.cpp` is added but has not been built
-or run. It covers mounted/retired snapshots, never-read lazy origins, narrowed
-file captures without sibling descriptors, same-process and independent-process
-exclusion, OS release after child termination, missing/corrupt enrollment,
-replacement identity and same-inode incarnation rejection, and Windows pak archive lifetime. Linux checks
-native descriptor counts. Existing catalog/source regressions remain relevant.
-No deletion, repack, build, binary, shader compilation, or test was executed as
-part of this implementation task. Static source review is not a runtime pass.
+- [Engine/Utility_Framework/ArtifactStoreGuard.h](../../Engine/Utility_Framework/ArtifactStoreGuard.h)
+- [Engine/RenderEngine/Experiment/Cooked/ArtifactByteSource.h](../../Engine/RenderEngine/Experiment/Cooked/ArtifactByteSource.h)
+- [Engine/Utility_Framework/Paklib.hpp](../../Engine/Utility_Framework/Paklib.hpp)
+- [Tools/AssetCooker/AssetSetBuild.cpp](../../Tools/AssetCooker/AssetSetBuild.cpp)
