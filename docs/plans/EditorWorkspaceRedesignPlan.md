@@ -31,7 +31,7 @@ ViewportHost는 닫을 수 없는 중앙 창이며 Scene/Game tab을 그린다. 
 
 현재 gameTarget은 Host Game 또는 Game Preview가 실제 그려졌을 때 켜진다. editorTarget은 항상 true로 남아 있으므로 “숨은 Scene과 Game을 대칭으로 모두 끈다”는 설명은 틀리다. 수요 억제와 카메라 부재로 view를 만들지 못한 경우는 계수를 구분한다.
 
-Host는 content region×DisplayFramebufferScale로 canvas 크기를 측정한다. 그 프레임에 host가 그려지지 않았다고 0 extent를 게시하지 않고 마지막 유효값을 보존한다. render scale은 dpi_auto(1/DPI), off(1.0), fixed 정책이다. 낮은 render scale에서 표시 영역 자체가 줄어들면 안 된다.
+Host는 content region×DisplayFramebufferScale로 canvas 크기를 측정한다. 그 프레임에 host가 그려지지 않았다고 0 extent를 게시하지 않고 마지막 유효값을 보존한다. render scale은 dpi_auto(1/DPI), off(1.0), fixed 정책이며 적용 범위는 0.25~1이다. 낮은 render scale에서 표시 영역 자체가 줄어들면 안 된다.
 
 `ViewportCanvas`가 content/image/clip/UV를 한 번 계산한다. Scene은 extent에 맞는 타깃을 fill하고 Game은 종횡비를 유지하는 letterbox를 사용한다. picking은 SourceUV, gizmo는 같은 image rect를 사용한다. overlay는 화면에 보이는 content를 기준으로 놓고 입력 소유를 먼저 판단한다. 오래된 crop 설계는 [호환 설명](../analysis/EditorSceneCropValidation.md)에 남긴다.
 
@@ -41,7 +41,7 @@ Host는 content region×DisplayFramebufferScale로 canvas 크기를 측정한다
 
 현재 schema는 3, 읽을 수 있는 가장 오래된 schema는 1, 파일 상한은 4MiB다. v1에는 preset이 없고 v3 이전에는 monitors가 없다. 화면 구성 fingerprint를 모르면 저장된 외부 viewport 좌표를 신뢰하지 않는다. `ViewportPos`/`ViewportId`를 제거해 화면 밖 창을 복구하면서 도킹 정보는 보존한다. 창 display label은 legacy alias를 통해 stable ID로 이주한다.
 
-Save/Load/Reset/Open/Close/ApplyPreset 및 named workspace SaveAs/Load/Rename/Delete는 단일 pending action mailbox를 거친다. 이미 요청이 있으면 추가 요청을 거부한다. 파일 쓰기는 atomic publication과 backup 경로를 사용한다. 이름은 64자 이하의 안전한 파일명이며 active, Windows 장치명, 경로 구분자·예약 문자 등을 거부한다. 삭제는 현재 화면 배치를 없애는 동작과 다르다.
+Save/Load/Reset/Open/Close/ApplyPreset 및 named workspace SaveAs/Load/Rename/Delete는 단일 pending action mailbox를 거친다. 이미 요청이 있으면 추가 요청을 거부한다. 파일 쓰기는 atomic publication과 backup 경로를 사용한다. 이름은 UTF-8 문자열의 64바이트 이하인 안전한 파일명이며 active, Windows 장치명, 경로 구분자·예약 문자 등을 거부한다. 삭제는 현재 화면 배치를 없애는 동작과 다르다.
 
 preset은 sbox_compact, level_editing, ui_editing, rendering_debug, legacy_unity 다섯 개다. central 창은 preset으로 닫을 수 없고 transient는 dock하지 않는다. Rendering & Debug preset이 외부 ProfilerViewer 프로세스를 자동 실행하지 않으며 명시적인 Profiler 열기만 viewer launch를 요청한다.
 
@@ -64,7 +64,7 @@ Output Log는 bounded LogStore의 delta를 UI 모델이 받아 필터·Collapse 
 
 정적 선언 검사, 순수 레이아웃 검사, commandlet/HTTP 제품 상태, 실제 Windows 입력 및 screenshot, CPU/GPU 성능 측정은 각각 다른 증거다. W0 과거 숫자를 현재 baseline으로 쓰지 않는다. source·binary hash와 장비·DPI·창 크기·scene·warmup/측정 구간을 함께 남긴다.
 
-미구현 요구는 Cmd 실행/완성/이력의 실제 명령 서비스 연결, Revision Control 통합, Quality preset 저장·패키징·Player 소비, frame capture debugger다. Preferences는 현재 EngineSettings.asset에 저장되는 항목이 있으므로 완전한 사용자 전역/프로젝트 독립 저장소 설계를 완료했다고 보지 않는다. 다중 모니터 복구, narrow/DPI, stale async 완료, 작은 worker pool, 종료 및 장시간 회귀는 최신 binary로 다시 실행해야 한다. 렌더 준비 완료와 GPU fence 완료는 계속 구분한다.
+미구현 요구는 Cmd 실행/완성/이력의 실제 명령 서비스 연결, Revision Control 통합, Quality preset 저장·패키징·Player 소비, frame capture debugger다. 패널을 메인 창 밖의 별도 native 창으로 분리하는 multi-viewport도 현재 비활성이다. 재개하려면 창 생성·파괴와 메시지 펌프의 소유 스레드, DPI 및 GPU 수명을 함께 검증해야 한다. Preferences는 현재 EngineSettings.asset에 저장되는 항목이 있으므로 완전한 사용자 전역/프로젝트 독립 저장소 설계를 완료했다고 보지 않는다. 다중 모니터 복구, narrow/DPI, stale async 완료, 작은 worker pool, 종료 및 장시간 회귀는 최신 binary로 다시 실행해야 한다. 렌더 준비 완료와 GPU fence 완료는 계속 구분한다.
 
 ## 구현 근거
 

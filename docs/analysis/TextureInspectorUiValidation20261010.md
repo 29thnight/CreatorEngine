@@ -4,7 +4,7 @@
 
 ## 이전 UI와 현재 UI의 관계
 
-이 경로는 2026-10-10 초기의 Save and Reimport 및 Reload Saved Scene UI 검증 문서를 찾는 독자를 위한 호환 요약이다. 그 버튼 순서를 현재 사용 절차로 안내하지 않는다. 현재 `DrawTextureImportSettingsEditor`는 유효한 편집을 자동 저장 대기열에 넣고 `Retry Import`, 충돌 시 `Reload Disk Settings`를 제공한다. “Scene references update without reloading the scene” 안내가 현재 본문에 있다.
+이 경로는 2026-10-10 초기의 Save and Reimport 및 Reload Saved Scene UI 검증 문서를 찾는 독자를 위한 호환 요약이다. 그 버튼 순서를 현재 사용 절차로 안내하지 않는다. 현재 `DrawTextureImportEditor`는 유효한 편집을 자동 저장 대기열에 넣고 `Retry Import`, 충돌 시 `Reload Disk Settings`를 제공한다. “Scene references update without reloading the scene” 안내가 현재 본문에 있다.
 
 일부 status fallback 문자열에 Save and Reimport라는 옛 표현이 남아 있어도 실제 버튼의 존재를 뜻하지 않는다. UI를 기술할 때는 그리는 함수와 입력 handler를 함께 읽어야 한다.
 

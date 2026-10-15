@@ -1,231 +1,48 @@
-# PHASE 21 W0 기준선 — 창 목록 · 스타일 지점 · 성능 · 셸 캡처
+# W0 역사 기준선과 현재 비교 절차
 
-2026-09-11. 계획서 `docs/plans/EditorWorkspaceRedesignPlan.md`의 W0 후반 산출물이다.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
 
-W7·W8의 성능 판정과 W1의 토큰 이주가 전부 **"W0 기준선과 비교"**를 전제한다. 그 기준선이
-없으면 판정문이 추정치가 된다. 여기 적힌 수는 전부 실측이고, 재지 못한 것은 재지 못했다고
-적었다.
+## 보존된 기준선의 정체
 
-측정 대상은 `Bin/x64-Release/Editor/CreatorEditor.exe`(2026-09-11 13:00 빌드), 커밋
-`031cf238` 직후 상태다.
+W0는 2026-09-11, `031cf238` 직후 Release Editor와 당시 초기 도킹 배치를 기록한 기준선이다. 당시 창 선언 25개·본문 22개, 기본 배치의 ImGui 정점 1,688/인덱스 3,858/draw command 12, UI CPU 중앙값 0.38ms가 기록되었다. 이 수는 현재 registry 개수·최소 비용·통과 기준이 아니다. current ViewportHost, theme, workspace 저장소와 추가 창이 생긴 뒤 같은 숫자를 강제하면 정상 변화를 회귀로 판정한다.
 
----
+당시 UI 시간은 BeginRender~EndRender이며 GPU 제출/Present를 포함하지 않았다. 옛 ini를 그대로 사용한 실행과 ini 없는 초기 배치 실행은 열린 창이 달라 비교 모수가 달랐다. baseline의 핵심은 낮은 수치 자체가 아니라 측정 대상의 배치를 재현하는 조건이다. 현재 `EditorPanelCost`의 shell/present 장부와 당시 단일 UI CPU 값을 합치거나 같은 범위라고 가정하지 않는다.
 
-## 1. 선언된 창 스물다섯
+## 그대로 남기는 이미지
 
-`editor.windows`가 낸 표다. `declared=25 bound_bodies=22 orphan_bodies=0 bodyless_windows=0
-duplicate_ids=0 empty_dock_slots=0 audit=clean`.
+다음 네 파일은 W1 테마 및 고정 중앙 ViewportHost 도입 전의 역사 이미지다. 이번 작업에서 바꾸지 않았다.
 
-| 선언자 | 창 | 역할 | 도크 자리 | 닫힘 | 기본 열림 |
-|---|---|---|---|---|---|
-| `editor_panel_windows` | Hierarchy | panel | right_upper | 아니오 | 예 |
-| | Inspector | panel | right_lower | 아니오 | 예 |
-| | AssetBundle | panel | bottom | 아니오 | 예 |
-| | Content Browser | panel | bottom | 아니오 | 예 |
-| | Resource Counter | panel | bottom | 예 | 아니오 |
-| `editor_tool_windows` | RenderPass · LightMap · CollisionMatrixPopup · TextureType Selector · SelectMaterial | panel | floating | 예 | 아니오 |
-| `editor_viewport_windows` | Scene · Game | central | center | 아니오 | 예 |
-| `editor_authoring_windows` | Behavior Tree Editor · BlackBoard Editor | panel | center | 예 | 아니오 |
-| | InputActionMaps | panel | floating | 예 | 아니오 |
-| `editor_diagnostic_windows` | FrameProfiler | panel | floating | 예 | 아니오 |
-| | Log · RenderPass Debug | panel | floating | 예 | 아니오 |
-| `editor_dialog_windows` | About Creator Engine · Build Scene Setting · Grid Settings | panel | floating | 예 | 아니오 |
-| | Model loading | **transient** | floating | 아니오 | 예 |
-| `editor_animator_windows` | Event · Animation Controllers · AvatarMask | panel | floating | 예 | 아니오 |
+- [1920 요청·user scale 0.8](images/w0-shell/shell-fresh-1920x1080-scale0.8.png)
+- [1920 요청·user scale 1.2](images/w0-shell/shell-fresh-1920x1080-scale1.2.png)
+- [2560 요청·user scale 0.8](images/w0-shell/shell-fresh-2560x1440-scale0.8.png)
+- [2560 요청·user scale 1.2](images/w0-shell/shell-fresh-2560x1440-scale1.2.png)
 
-읽을 것 셋.
+원래 기록의 actual client는 각각 1920×1111 또는 2560×1471이며 OS 150%에서 user scale을 바꾼 캡처다. 실제 OS DPI 왕복 검사가 아니고, 당시 큰 창의 검은 viewport도 포함한다. 현재 chrome의 visual golden으로 승격시키거나 이미지의 검은 영역을 최신 resize 실패 증거로 제시하지 않는다.
 
-- **기본으로 열리는 창은 일곱**이다(Hierarchy · Inspector · AssetBundle · Content Browser ·
-  Scene · Game · Model loading). 나머지 열여덟은 닫힌 채 뜨고, 그래서 `FindWindowByName`이
-  널을 돌려준다 — 감사가 그것을 결함으로 읽지 않는 이유다.
-- **`Model loading`만 `transient`**다. 유일하게 상태를 저장하지 않는(`persist=0`) 창이다.
-- 도크 자리를 가진 창은 아홉이고 나머지 열여섯은 떠 있다. 떠 있는 창은 감사에서
-  `dock_exempt`로 빠진다.
+legacy ini 자료는 [fixture 안내](../../Tools/regression/fixtures/imgui-ini/README.md)에 있다. 손상/과거 경로 fixture는 이주·복구 입력이며 정상 default workspace의 정본은 아니다.
 
-메뉴 표면은 `editor_core_menus` 한 선언자에서 항목 열하나가 나온다(top 3 · popup 6 ·
-top_selection 2). `editor.menu`가 정본이다.
+## 현재 측정의 출발점
 
----
+창 목록은 `RegisterEditorWindowManual.h`와 stable ID registry, 실제 결속은 host/audit로 확인한다. default preset 또는 named workspace를 명시하고 `editor.windows`, `editor.dock`, `editor.state`, `editor.panelcost`, `editor.viewport`를 같은 실행에서 수집한다. 창 open 상태와 실제 그려진 본문은 다르므로 숨겨진 탭·tool occlusion도 기록한다.
 
-## 2. `PushStyleColor` / `PushStyleVar` 지점 **쉰일곱**
+현재 저장은 RuntimeData의 Editor/Workspaces를 사용한다. 테스트는 `CREATOR_EDITOR_WORKSPACE_DIR` 및 legacy ini override로 사용자 배치와 격리한다. 예전처럼 사용자 ini를 삭제하는 방법을 새 기본 절차로 요구하지 않는다. preset, viewport 모드, named/active workspace, monitor fingerprint와 actual client/DPI/user scale을 함께 기록해야 초기 배치 비교가 의미가 있다.
 
-W1의 입력이다. 계획서 본문은 **91건**이라고 적고 있는데 그것은 M3 이전의 수다 — M3가 메뉴
-행을 표로 옮기며 창별 예외가 줄었다. 다시 셌다.
+성능은 [패널 비용 계약](EditorPanelCostBaselineW7.md)의 최근 표본/누계/중첩 범위를 따른다. GPU는 현재 제공되는 live timing의 view/frame/extent provenance를 확인한다. W0 당시 “타깃별 GPU 관측 수단 없음”이라는 조사 결과를 지금도 없는 기능이라고 재사용하지 않는다. 반대로 GPU pass sum을 전체 프레임 시간으로 바꾸어 쓰지 않는다.
 
-`PushStyleColor` 31 + `PushStyleVar` 26 = **57**. (`Editor/ImGuiHelper/`는 제외했다. 그쪽은
-위젯 구현이라 W2의 대상이지 토큰 이주의 대상이 아니다.)
+## golden과 새 수용
 
-**(2026-09-11 W1 착수 시 재계수 — 살아 있는 것은 51이다.)** 위 57은 `wc -l`로 센 수라
-**주석 처리된 줄 여섯을 함께 셌다**(`ImGuiDrawHelperRectTransformComponent.cpp` 3 ·
-`MenuBarWindow.cpp` 3). 주석을 걷고 호출마다 세면 `PushStyleColor` 26 + `PushStyleVar` 25 =
-**51**이고, `MenuBarWindow.cpp`의 몫은 20이 아니라 **17**이다.
+현재 저장소의 [chrome 환경](../../Tools/regression/golden-editor-chrome/environment.json), [성능 golden](../../Tools/regression/editor-chrome-perf.golden.json), base/nested/revealed 이미지는 기존 측정 증거다. `verify-editor-chrome-golden.ps1`과 `verify-editor-chrome-perf.ps1`의 실제 비교 범위를 읽고 환경을 맞춘다. golden 갱신은 코드 변경의 이유와 새 실행 증거를 검토하는 별도 작업이며 문서 최신화 과정에서 숫자·이미지를 덮어쓰지 않는다.
 
-같은 계수에서 하나 더 갈라야 할 것이 나왔다. `MenuBarWindow.cpp`에는
-`ed::PushStyleColor`/`ed::PushStyleVar`가 **15건** 있는데 이것은 imgui-node-editor의
-**별도 스타일 스택**(`ed::StyleColor_*` / `ed::StyleVar_*`)이다. ImGui의 스타일과 같은 이름을
-쓸 뿐 같은 것이 아니므로 토큰 이주의 대상이 아니다. 기준선의 `ImGui::` 접두어 요구가 이것들을
-이미 걸러 내고 있었고, 그 요구는 옳았다 — 재계수도 같은 기준을 지킨다.
+아직 필요한 비교 축은 스크롤된 Hierarchy, 검색/캐시 무효화 spike, 여러 DPI 및 좁은 창, 실제 UI 입력과 workspace 복구다. W0 화면 하나 또는 현재 소스의 clipper 존재가 이 모든 수용을 완료하지 않는다. 이번 개정은 역사 자료의 역할과 현재 재현 경로만 정리했으며 새 기준선 측정은 없다.
 
-| 파일 | Color | Var | 합 |
-|---|---:|---:|---:|
-| `EngineGUIWindow/MenuBarWindow.cpp` | 13 | 7 | **20** |
-| `EngineGUIWindow/SceneViewWindow.cpp` | 6 | 4 | 10 |
-| `EngineGUIWindow/InspectorWindow.cpp` | 4 | 4 | 8 |
-| `EngineGUIWindow/HierarchyWindow.cpp` | 3 | 2 | 5 |
-| `EngineGUIWindow/ContentsBrowserWindow.cpp` | 1 | 3 | 4 |
-| `EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp` | 2 | 1 | 3 |
-| `EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp` | 0 | 2 | 2 |
-| `EngineEntry/EditorAssetPresentation.cpp` | 1 | 1 | 2 |
-| `EditorWindow/EditorWindowHost.cpp` | 1 | 1 | 2 |
-| `EngineGUIWindow/EditorRenderer.cpp` | 0 | 1 | 1 |
+## 구현 근거
 
-계획서가 "48건이 `MenuBarWindow.cpp`에 몰려 있으므로 그 파일을 먼저 친다"고 적은 것도 낡았다.
-지금 그 파일의 몫은 **20**이고 여전히 가장 크지만 전체의 35%다. 재계수 명령은 이렇다.
-
-```bash
-grep -rn 'ImGui::PushStyleColor\|ImGui::PushStyleVar' --include='*.cpp' --include='*.h' \
-  Editor/ --exclude-dir=ImGuiHelper | wc -l
-```
-
----
-
-## 3. 성능 기준선 (Release)
-
-`editor.dock`을 20프레임 간격으로 열두 번 불러 표본을 떴다. Debug로 재지 않은 이유는
-저장소 규약이다 — Debug는 방향까지 뒤집는다.
-
-**★ 띄우기 전에 `imgui.ini`를 지웠다.** 이것을 빠뜨리면 재는 대상이 달라진다. `EditorRenderer.cpp:296`이
-`resetRequested || !file::exists(iniPath)`라 **ini가 있으면 도크 빌더가 돌지 않고** 배치를 그
-파일이 정하기 때문이다. 처음 잰 값은 디스크에 있던 개발자의 옛 ini(창 13 · 노드 11) 위에서 나온
-것이라 틀렸다. 정정 폭이 작지 않다.
-
-| | 옛 ini 위 (틀림) | 선언이 세운 배치 (정본) |
-|---|---:|---:|
-| 정점 | 2,978 | **1,688** |
-| 인덱스 | 7,071 | **3,858** |
-| draw command | 13 | **12** |
-| UI CPU 중앙값 | 1.90 ms | **0.38 ms** |
-
-옛 ini 쪽이 다섯 배 비쌌던 것은 그 파일이 Log·FrameProfiler·Behavior Tree Editor 같은 창을
-열어 둔 상태였기 때문이다. 아래는 전부 **정본** 값이다.
-
-**기하는 완전히 결정적이었다.** 열두 표본 전부 같은 값이다.
-
-| 값 | 측정 |
-|---|---:|
-| ImGui 정점 | 1,688 |
-| ImGui 인덱스 | 3,858 |
-| ImGui draw command | 12 |
-
-**UI CPU는 흔들린다.** `BeginRender`부터 `EndRender`까지이고 GPU 제출과 Present는 빠진다.
-
-| 통계 | ms |
-|---|---:|
-| 최솟값 | 0.26 |
-| 중앙값 | 0.38 |
-| 평균 | 0.37 |
-| 최댓값 | 0.46 |
-
-**★ 이 수가 어떤 배치에서 나온 값인지가 수 자체만큼 중요하다.** 축이 어긋나면 나중에
-"회귀"로 오독된다. 측정 상태는 **ini 없이 띄워 `BuildInitialDockLayout`이 세운 배치**이고,
-도크 노드 7 · 리프 4 · 도킹된 창 6 · 중앙 노드 0 · `imguiScale` 0.8 · 창 1920×1111이다.
-창을 더 열거나 사용자 ini로 뜨면 셋 다 정당하게 바뀐다 — 위 표가 그 폭을 보여 준다.
-
-밖에서 읽는 방법은 이렇다.
-
-```bash
-editor.dock
-```
-
-`[AUDIT] uiCpuMs=... imguiVertices=... imguiIndices=... imguiDrawCommands=...` 줄이 나오고,
-같은 값이 결과 JSON의 `uiCpuMs` · `imguiVertices` · `imguiIndices` · `imguiDrawCommands`에도
-실린다.
-
-### 재지 못한 것 — 타깃별 GPU ms
-
-계획서 §11이 함께 요구했지만 **잴 수단이 저장소에 없다.** GPU 타임스탬프 질의 표면이 0이고
-(`GpuTimer`·`TimestampQuery` 류의 심볼이 `Engine/RenderEngine/`과 `Editor/` 전체에 없다),
-`profile.stats`가 내는 것은 CPU 프로파일러의 **건강 상태**이지 구간 시간이 아니다.
-
-추정치로 채우지 않는다. 이 수를 실제로 필요로 하는 것은 W4의 view demand 판정
-("Game Preview가 닫힌 single-view 상태에서 불필요 target 생산 여부가 계측된다")이므로 그
-슬라이스가 계측 표면을 함께 세워야 한다. `editor.viewport`를 W5로 넘긴 것과 같은 판단이다.
-
----
-
-## 4. 셸 캡처 넷
-
-`docs/analysis/images/w0-shell/`에 있다. 해상도 둘 × user scale 둘.
-
-**넷 다 `imgui.ini`를 지우고 띄웠다** — `fresh` 접두어가 그 뜻이다. 성능 기준선과 같은 이유이고,
-빠뜨리면 선언이 세운 배치가 아니라 그 기계에 남아 있던 배치를 찍게 된다.
-
-| 파일 | 요청 | 캡처된 클라이언트 rect | `imguiScale` |
-|---|---|---|---:|
-| `shell-fresh-1920x1080-scale0.8.png` | 기본(리사이즈 없음) | 1920×1111 | 0.8 |
-| `shell-fresh-1920x1080-scale1.2.png` | 기본(리사이즈 없음) | 1920×1111 | 1.2 |
-| `shell-fresh-2560x1440-scale0.8.png` | 2560×1440 | 2560×1471 | 0.8 |
-| `shell-fresh-2560x1440-scale1.2.png` | 2560×1440 | 2560×1471 | 1.2 |
-
-**★ 이 넷은 아직 유니티식 2×3 배치다.** S&Box식 **고정 중앙 `ViewportHost` + 주변 자유 도킹**은
-W4가 세운다(§4.2). 지금 `BuildInitialDockLayout`은 `DockBuilderAddNode`를 `DockSpace` 플래그
-없이 부르고 중앙을 아무도 지정하지 않아, 감사가 `central=0`을 찍는다. 그러니까 이 캡처는
-**목표 배치가 아니라 목표 이전의 모습**이고, 그것이 기준선의 정의다.
-
-**이것은 user scale 캡처이지 DPI 캡처가 아니다.** 계획서 §3.2가 요구한 구분이다. 찍은
-기계의 주 모니터는 2560×1440이고 OS 배율이 **150%**인데, 프로세스가 매니페스트로
-`permonitorv2`를 선언하므로 OS 가상화가 없다 — 에디터는 보정 없이 물리 픽셀 1:1로 그린다.
-즉 이 넷은 전부 "DPI 보정 0" 상태의 그림이고, 진짜 DPI 왕복 캡처는 W1이 `FontScaleDpi`
-경로를 채택한 뒤에야 의미가 생긴다.
-
-`imguiScale` 기본값이 0.8이라 "100%"를 0.8로, "150%"를 1.2로 잡았다. 배율을 바꾸는 CLI가
-없어서 `Dynamic_CPP/ProjectSetting/EngineSettings.asset`의 `imguiScale` 한 줄을 띄우기 전에
-고쳤다(캡처 뒤 되돌린다).
-
-### 캡처가 드러낸 것 둘
-
-**① 에디터는 시작 창 크기를 고를 수 없다.** `App.cpp:100-101`이 클라이언트 1920×1080을
-**하드코딩**한다. 설정 파일에 `lastWindowSize`가 저장돼 있지만 **읽는 코드가 없다** —
-`Tools/build.ps1:1138`이 템플릿에 그 키가 있는지 검사할 뿐이고, 설정 로더가 읽는 키는
-`projectName` · `build` · `startupSceneName` · `imguiScale` 넷뿐이다. 죽은 키다.
-
-그래서 2560×1440 캡처는 "그 크기로 뜬 셸"이 아니라 **1920으로 뜬 뒤 런타임에 리사이즈한
-셸**이다. `window.resize`가 유일한 경로이기 때문이다.
-
-**② 그 리사이즈가 뷰포트를 검게 만든다.** 2560 캡처에서 Scene·Game 영역이 통째로 검다.
-이미 올라와 있는 미결 건("창 크기 변경 뒤 씬 뷰포트가 검게 남는 문제")과 같은 증상이고, 이
-캡처가 그 증거다. 배치 자체는 무너지지 않는다 — 오른쪽 열과 아래 열의 비율이 유지된다.
-
-**★ 여기서 한 번 틀렸다가 실측으로 고쳤다.** 처음에는 "리사이즈가 배치를 재배열한다"고
-적었다. 그때 캡처에서 Content Browser가 가운데 세로 기둥이 되고 Inspector가 오른쪽 끝으로
-밀렸기 때문이다. 그런데 그 캡처는 **ini를 지우지 않고 찍은 것**이었고, 열이 갈린 것은
-리사이즈가 아니라 그 기계에 남아 있던 옛 배치 탓이었다. ini를 지우고 같은 리사이즈를 태우니
-배치는 그대로였고 검은 뷰포트만 남았다. **한 캡처에 원인 둘이 섞여 있으면 눈으로는 갈리지
-않는다 — 변인을 하나씩 지워야 한다.**
-
-**따라서 이 넷을 visual golden으로 쓰지 마라.** W8이 "viewport를 제외한 chrome crop visual
-golden"을 만들 때 시작 크기 문제와 검은 뷰포트가 먼저 닫혀 있어야 한다. 지금 이 넷의
-용도는 **W1·W4 전의 모습을 남기는 것**뿐이다.
-
----
-
-## 5. `imgui.ini` fixture
-
-`Tools/regression/fixtures/imgui-ini/`로 옮겼다. 출처와 표는 그 폴더의 `README.md`에 있고,
-게이트가 여섯 벌을 태운 기준선은 커밋 `031cf238`의 메시지에 있다.
-
-한 줄만 옮겨 적는다 — **실물 넷이 전부 git 추적 밖이었다.** 막고 있던 것은 `Bin/`을 막는
-`.gitignore:94`가 아니라 그 아래의 전면 `*.ini`(:511)였다.
-
----
-
-## 6. 뒤 슬라이스로 넘긴 것
-
-| 항목 | 넘긴 곳 | 이유 |
-|---|---|---|
-| 타깃별 GPU ms | W4 | 계측 표면이 저장소에 0이다. 그 수를 실제로 쓰는 판정이 W4에 있다 |
-| 진짜 DPI 왕복 캡처 | W1 이후 | 보정 경로가 서기 전에는 재도 같은 그림이다 |
-| chrome crop visual golden | W8 | 시작 크기와 리사이즈가 먼저 닫혀야 한다 |
-| `undocked`/`ghost`를 legacy ini에서 0으로 | W3 | 이주가 없으면 낡은 파일이 배치를 정한다 |
-| 손상 ini 복구 | W3 | `damaged-halfwritten.ini`가 `undocked=4`를 낸다 |
-| 시작 창 크기 설정 | 미배정 | `lastWindowSize`가 죽은 키다. 어느 슬라이스도 이것을 적지 않았다 |
+- [Editor/EditorWindow/RegisterEditorWindowManual.h](../../Editor/EditorWindow/RegisterEditorWindowManual.h)
+- [Editor/EditorWindow/EditorWindowRegistry.cpp](../../Editor/EditorWindow/EditorWindowRegistry.cpp)
+- [Editor/EditorWindow/EditorWindowHost.cpp](../../Editor/EditorWindow/EditorWindowHost.cpp)
+- [Editor/EngineGUIWindow/EditorPanelCost.cpp](../../Editor/EngineGUIWindow/EditorPanelCost.cpp)
+- [Editor/EngineGUIWindow/EditorWorkspaceStore.cpp](../../Editor/EngineGUIWindow/EditorWorkspaceStore.cpp)
+- [Tools/regression/verify-editor-workspace.ps1](../../Tools/regression/verify-editor-workspace.ps1)
+- [Tools/regression/verify-editor-chrome-golden.ps1](../../Tools/regression/verify-editor-chrome-golden.ps1)
+- [Tools/regression/verify-editor-chrome-perf.ps1](../../Tools/regression/verify-editor-chrome-perf.ps1)
+- [Tools/regression/fixtures/imgui-ini/README.md](../../Tools/regression/fixtures/imgui-ini/README.md)

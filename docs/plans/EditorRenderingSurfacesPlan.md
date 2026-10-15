@@ -10,7 +10,7 @@
 
 현재 `MaterialGraphWindow::Draw`는 자산 picker를 제공하고 Scene 객체나 MeshRenderer 선택 없이 material 자산을 만들고 열 수 있다. source material/document ID/revision에 맞는 준비 결과만 적용하며 stable revision이 0.6초 유지되고 preview가 유효하면 자동 Apply→Save를 시도한다. 선택 MeshRenderer에 assign하는 것은 자산 저작과 구별되는 동작이고 씬 참조를 유지하려면 씬 저장이 필요하다.
 
-Scene 변경 시 session을 reconcile하고 preview 대상을 정리한다. session 데이터와 준비 job을 UI 창이 열려 있는 동안에만 처리하는 구조가 아니며 shutdown에서 최종 준비와 저장을 시도한다. 과거 “현재 Scene의 MeshRenderer만 편집” 설명은 현재 기능 범위를 제한하지 않는다. 저장 실패/디스크 충돌·draft 복구의 상세 정책은 material 문서 및 해당 session 구현을 기준으로 읽는다.
+Scene 변경 시 asset-owned draft는 유지하고 inspector preview와 이전 Scene assignment target을 정리한다. session 데이터와 준비 job을 UI 창이 열려 있는 동안에만 처리하는 구조가 아니며 shutdown에서 최종 준비와 저장을 시도한다. 과거 “현재 Scene의 MeshRenderer만 편집” 설명은 현재 기능 범위를 제한하지 않는다. 저장 실패/디스크 충돌·draft 복구의 상세 정책은 material 문서 및 해당 session 구현을 기준으로 읽는다.
 
 ## Scene Show와 화면 진단
 

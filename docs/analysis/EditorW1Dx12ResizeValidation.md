@@ -1,91 +1,42 @@
-# PHASE 21 W1 — DX12 DPI/resize 수정 검증
+# DX12 resize 수용: 자원 전환과 표시 증거
 
-2026-09-12, HEAD `3efbb23f` 위의 W1 작업 트리. 사용자 요청에 따라 DX12를 먼저 수정했다.
-[이전 원인 분석](EditorW1DpiResizeRootCauseAndFixPlan.md) ·
-[정본 W1](../plans/EditorWorkspaceRedesignPlan.md).
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
 
-## 원인과 수정
+## 현재 코드에서 확인한 수정 경계
 
-DX12는 창 크기가 바뀔 때 완료된 표시 결과를 무효화한 뒤 `LivePipeline`을 해체하고
-모든 패스를 다시 초기화했다. 화면 크기와 무관한 셰이더 준비, ShaderMeta 적용과 IBL 생성도 반복됐다.
-캐시를 유지해도 셰이더 컴파일 경로는 캐시 조회 전에 Slang 세션과 소스 모듈을 준비하므로
-패스 재초기화 자체가 무료가 아니다. 표시 수명 잠금을 잡은 구축 구간과 새 결과 대기가 겹쳐
-Scene에 오랫동안 준비 배경이 남았다.
+`EnhancedSceneRenderer::ResizePipeline`은 GPU drain 뒤 크기에 의존하는 display slot, graph/transient 자원, SSGI history를 교체한다. PSO·ShaderMeta variant·IBL·고정 fog volume은 보존한다. render target은 이제 창 전체 대신 ViewportHost canvas와 render scale을 통해 정해지므로 2026-09-12의 고정 창 크기 시험과 입력 조건이 다르다. 구조와 남은 진단 요구는 [원인 분리 문서](EditorW1DpiResizeRootCauseAndFixPlan.md)에 둔다.
 
-크기 snapshot 동기화만 적용한 진단 실행에서도 DPI 150→100% 뒤 `result_pending`이
-**8,578.926ms** 지속됐다. IBL만 유지한 후보에서도 **14,649ms**로 재현됐다.
-후자는 Release 빌드와 동시에 실행해 시간의 직접 성능 비교에는 쓰지 않는다.
-따라서 데이터 경쟁이나 IBL 생성 하나를 단독 원인으로 판정하지 않았다.
+완료 결과와 UI texture 조회는 scene epoch와 resize generation을 확인한다. pipeline이 ready이고 framesRendered가 늘어도 UI에 올바른 새 texture가 보인다는 보장은 없다. `lastTextureAvailable`, completed frame/generation, 실제 texture generation 및 unavailable/recovered 로그를 함께 본다. 새 pipeline 준비, GPU 완료, UI 소비는 다른 사건이다.
 
-최종 수정은 다음과 같다.
+ImGui host swapchain도 별도로 drain 후 ResizeBuffers한다. inactive/0/동일 크기는 shell에서 건너뛰고 성공 때만 shell의 cached extent를 바꾼다. 실패 시 살아 있는 resources와 frame 상태를 확인해야 하며 단순히 다음 resize 요청이 성공할 것이라고 가정하지 않는다.
 
-- `ScreenResizeBus`: width/height/generation을 잠금 아래 한 번에 읽고 쓰며 동일 크기는 generation을 올리지 않는다.
-  프레임 패킷·카메라 크기·진단의 width/height 소비자는 같은 snapshot을 사용한다.
-- `LiveState::ResizePipeline`: GPU 완료를 기다린 뒤 표시 슬롯, 완료 그래프의 transient 풀,
-  뷰별 SSGI 히스토리를 해제하고 새 크기의 표시 슬롯을 만든다. 패스 인스턴스·PSO·ShaderMeta·IBL은 유지한다.
-  각 패스는 기존 `PrepareFrame`/`Declare` 경로에서 새 크기를 반영한다.
-- `EnhancedSSGIPass::ReleaseHistory`: 옛 해상도의 히스토리 핸들을 실제로 해제하고 시간축 누적을 초기화한다.
-  GPU 완료 뒤에만 호출하며 다음 준비에서 새 크기의 히스토리를 만든다.
-- `dx12.live`: GPU 완료 generation과 UI가 실제 조회한 generation/frame, 텍스처 미준비 횟수·시간,
-  IBL 생성 횟수를 함께 관측한다. `[LiveResize]`는 크기 자원 교체 시간을 기록한다.
+## 현재 실행 시나리오
 
-최종 경로에서는 리사이즈가 ShaderMeta 재적용이나 IBL 재생성을 유발하지 않았다.
-패스 전체 재구축 제거 전후의 소스 경로와 표시 지연 변화를 해결 근거로 삼는다.
-개별 셰이더 함수의 비용을 따로 측정한 결과는 아니다.
+`verify-editor-viewport-extent.ps1`은 isolated workspace/legacy ini 환경변수를 사용하고 기존 Editor 실행 파일에 명령 script를 준다. scale off, auto, fixed 0.5를 적용한 뒤 각 상태를 여러 번 polling해 `dx12.live` extent가 canvas×scale에 수렴하는지 본다. 1600×900, 2200×1200, 1280×800, 2560×1440 요청을 이어 보내고 generation 진행·최신 texture·렌더 frame 증가·정상 종료를 확인한다. 별도 입력으로 scale 2.0/0.1 거부를 검사한다.
 
-## 최종 검증
+창 크기는 요청값이 아니라 `window.resize` 결과의 실제 client 값을 사용한다. OS가 화면 경계/DPI 조건에 맞춰 제한할 수 있기 때문이다. 유한 polling 안에서 어느 표본에 수렴했는지도 기록한다. 이는 자동 검사 timeout이며 제품의 무조건적인 최대 지연 보장은 아니다. game-thread `wait`만으로 Presentation frame 완료를 단정하지 않는다.
 
-VS18/v145, `Editor/CreatorEditor.vcxproj`, x64 Debug/Release 빌드가 모두 통과했다.
-Release에는 기존 `LNK4229 /DELAYLOAD:vulkan-1.dll` 경고가 남는다.
-최종 실행은 빌드 완료 후 각 구성의 새 실행 파일로 수행했다.
+## 역사 측정의 의미
 
-| 검사 | Debug | Release |
-|---|---:|---:|
-| 연속 창 크기 변경 | 10/10 통과 | 10/10 통과 |
-| 해당 변경의 Scene 텍스처 공백 최대 | 73.920ms | 39.447ms |
-| 실제 OS DPI 100→150% 공백 | 118.401ms | 95.969ms |
-| 실제 OS DPI 150→100% 공백 | 118.492ms | 62.719ms |
-| 리사이즈 후 IBL 생성 누적 | 1회 유지 | 1회 유지 |
-| GBuffer/Forward ShaderMeta 적용 누적 | 각각 1회 유지 | 각각 1회 유지 |
+이전 2026-09-12 기록은 수정 전 Scene 공백 8,578.926ms, IBL만 유지한 후보 14,649ms와 size-resource 수정 후의 실제 OS DPI 왕복을 보고했다. 당시 150→100% 공백은 Debug 118.492ms, Release 62.719ms로 기록되어 있다. 이 숫자는 당시 실행 파일·GPU·작업공간에서 관측한 공백이고 현재 성능 목표나 재측정 결과가 아니다.
 
-Release 종료 전 원래 150%로 복원하는 추가 100→150% 전환도 통과했으며 공백은 124.179ms였다.
+그 기록이 언급한 `verified-*-resize.json`, `verified-*-dpi*.json/png`, `restore-proof.json` 등은 외부 실행 산출물 이름이다. 현재 checkout에 첨부된 최신 결과인 것처럼 링크하거나 현재 통과 횟수로 인용하지 않는다. 원래 역사 자료를 확보했다면 configuration, 당시 commit, OS scale, actual extent와 원복 증거까지 함께 해석해야 한다.
 
-Scene을 계속 표시한 상태에서 1440×900, 1100×700, 1600×900, 1000×640, 1280×800을
-두 차례 요청했다. 실제 client 크기는 명령 응답과 display snapshot에 기록했다.
-각 단계에서 새 generation의 GPU 완료 결과와 UI 텍스처 조회를 확인했다.
-명령 호출부터 확인 응답까지의 시간과 표의 텍스처 공백은 서로 다른 지표다.
+## 아직 별도로 확인할 것
 
-사용자 배율은 1.5로 유지했다. OS 100/150%에서 본문은 24/36px이며
-`editor.theme` clean, Material Symbols 59역할·누락 0을 확인했다.
-Scene의 하늘·그리드·기즈모와 Game의 하늘 표시를 화면으로 확인했다.
-정상 종료까지의 로그에서 device loss, D3D12 error, assertion, 렌더 프레임 실패를 찾지 못했고 stderr는 0바이트다.
+- 같은 DPI에서 연속 resize와 실제 OS DPI 전환을 분리한다. user scale은 세 번째 독립 변수다
+- Scene/GamePreview 양쪽의 active/ready와 새 generation을 확인한다. 숨겨진 Game target 수요 억제는 resize 성공과 다른 계약이다
+- 최소화의 0 extent, 복원, 창 가림, GPU 지연 및 종료 중 전환을 시험한다
+- 준비 배경 허용 구간과 장시간 공백의 기준을 별도로 정하고 최초 실패 로그를 보존한다
+- UI 배치·font 건강과 GPU 표시 건강을 둘 다 판단한다
 
-추가로 `verify-screen-resize-snapshot.ps1 -Configuration All`이 통과했다.
-각 구성에서 두 writer의 40만 쓰기와 세 reader의 60만 읽기로 크기 쌍·generation 일관성을 확인하고,
-중복 크기·콜백 재진입·높이 0의 종횡비도 검사했다.
+현재 Editor의 공식 표시 host는 DX12다. 이 문서의 DX12 수용을 Vulkan Editor 지원이나 Player Vulkan swapchain 검증으로 확장하지 않는다. 이번 개정에서는 실행 파일을 만들거나 runner를 실행하지 않았다.
 
-## 증거와 범위
+## 구현 근거
 
-실행 산출물은 `Artifacts/phase21-w1-dx12-fix/`에 보관한다.
-
-- `build-verified-debug.*`, `build-verified-release.*`: 최종 빌드 기록.
-- `verified-debug-resize.json`, `verified-release-resize.json`: 단계별 크기·generation·표시 확인.
-- `verified-*-dpi150.json`, `verified-*-dpi100-return.json`: 실제 DPI 전환의 표시 관측.
-- `verified-*-theme*.json`, `verified-*-dpi*.png`, `verified-*-game*`: 폰트·Scene/Game 화면 증거.
-- `verified-debug.out/.err`, `verified-release.out/.err`: 실행과 종료 로그.
-- `restore-proof.json`: 설정 파일과 두 구성의 imgui.ini를 원래 바이트로 복원한 결과.
-- `diagnostic-dpi100-recovered.json`, `fixed-debug-dpi100-display-late.json`: 해결 전과 IBL 단독 후보의 실패 증거.
-
-`lastMissingTextureMs`는 UI 텍스처 조회 사이의 공백이다. GPU present 시간이나 픽셀 단위 무검정 보장은 아니다.
-숨겨진 탭은 조회가 중단되므로 시작 generation의 최대 공백을 resize 결과에 포함하지 않았다.
-검증 씬은 기본 SampleScene이며 무거운 모델·모든 후처리 조합·장시간 실행의 성능 보장은 범위 밖이다.
-최초 기동의 셰이더/IBL 준비 지연은 이번 크기 변경 수정과 별개다.
-
-Windows 1번 모니터 배율은 원래 150%로 복원했고 2번 모니터 설정은 변경하지 않았다.
-`EngineSettings.asset`과 Debug/Release `imgui.ini` 3개 파일 모두 실행 전 바이트와 일치한다.
-검증용 Editor·설정·제어판 창은 종료했다.
-
-DX12의 장시간 Scene 표시 지연은 이 재현 조건에서 해결됐다.
-**후속 사용자 결정(2026-09-12): Vulkan 대응은 우선 보류하고 W1을 DX12 기준 `done`으로 판정한다.**
-Vulkan 모니터 경계 resize 후 device loss는 미수정·미재검증으로 별도 보류한다.
-이번 상태 변경은 완료 범위의 조정이며 Vulkan 오류 해결이나 새 검증 결과를 뜻하지 않는다.
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp)
+- [Engine/RenderEngine/RHI/ScreenSizedResource.h](../../Engine/RenderEngine/RHI/ScreenSizedResource.h)
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp](../../Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp)
+- [Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp](../../Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp)
+- [Editor/EngineGUIWindow/ViewportHostWindow.cpp](../../Editor/EngineGUIWindow/ViewportHostWindow.cpp)
+- [Tools/regression/verify-editor-viewport-extent.ps1](../../Tools/regression/verify-editor-viewport-extent.ps1)

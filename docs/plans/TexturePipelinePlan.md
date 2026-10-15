@@ -20,7 +20,7 @@
 
 ## 2. Editor 편집과 저장
 
-Content Browser에서 자산을 선택하면 Inspector가 메타데이터를 읽고 `DrawTextureImportSettingsEditor`가 typed 설정을 그린다. 유효한 값이 바뀌면 `QueueAutomaticTextureSettings`로 저장을 예약한다. 정상 경로는 별도 Save 버튼을 기다리지 않는다. Inspector를 닫거나 선택을 바꿔도 EditorAssetDatabase가 대기열을 소유한다.
+Content Browser에서 자산을 선택하면 Inspector가 메타데이터를 읽고 `DrawTextureImportEditor`가 typed 설정을 그린다. 유효한 값이 바뀌면 `QueueAutomaticTextureSettings`로 저장을 예약한다. 정상 경로는 별도 Save 버튼을 기다리지 않는다. Inspector를 닫거나 선택을 바꿔도 EditorAssetDatabase가 대기열을 소유한다.
 
 같은 sidecar의 연속 편집은 마지막 writer와 시각을 갱신하며 최초 디스크 바이트를 기준으로 잡는다. 400ms 동안 편집이 안정되면 저장한다. 배출 직전 디스크가 기준과 다르면 쓰기를 거부하고 오류를 유지한다. `Reload Disk Settings`는 디스크 값을 draft에 다시 읽고 오류를 지우지만 새 쓰기를 예약하지 않는다. `Retry Import`는 현재 유효한 draft로 typed 재임포트를 다시 요청한다. 사용자는 외부 변경을 보존할지 자신의 값을 다시 적용할지 구별할 수 있어야 한다.
 

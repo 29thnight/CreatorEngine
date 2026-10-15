@@ -10,7 +10,7 @@
 
 ## UI 복구 경로
 
-`DrawTextureImportSettingsEditor`는 AutomaticSaveError를 매번 조회한다. 충돌 시 `Reload Disk Settings`로 sidecar를 다시 파싱하고 settings/observed/baseline을 맞춘 뒤 오류를 지운다. 이 동작은 새 자동 저장을 예약하지 않으므로 다른 프로세스의 값을 읽은 직후 다시 덮어쓰지 않는다. 읽기·파싱이 실패하면 saveError를 표시한다.
+`DrawTextureImportEditor`는 AutomaticSaveError를 매번 조회한다. 충돌 시 `Reload Disk Settings`로 sidecar를 다시 파싱하고 settings/observed/baseline을 맞춘 뒤 오류를 지운다. 이 동작은 새 자동 저장을 예약하지 않으므로 다른 프로세스의 값을 읽은 직후 다시 덮어쓰지 않는다. 읽기·파싱이 실패하면 saveError를 표시한다.
 
 사용자가 이후 값을 새로 편집하면 그 시점의 디스크를 기준으로 새 예약이 시작된다. `Retry Import`는 현재 유효한 draft를 typed save/reimport API에 전달하는 별도 의도적 경로다. draft가 남아 있다는 것과 디스크에 저장되었다는 것을 혼동하지 않아야 한다.
 

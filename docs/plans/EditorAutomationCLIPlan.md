@@ -40,7 +40,7 @@ HTTP 200은 명령의 논리 성공을 보장하지 않는다. 실패·취소·t
 
 ## 회귀 기준
 
-`verify-editor-command-surface.ps1`과 descriptor/서비스 검사는 실제 surface를 기준으로 유지한다. 음성 입력, 모드 충돌, auth 실패, queue full, stale ID, 취소와 정상 shutdown, 사용자 코드 permission, Shipping에서의 surface 부재를 각각 확인해야 한다. UI 드래그·clipboard·파일 대화상자를 command 성공으로 대체하지 않는다. 본 개정에서는 runner를 실행하거나 새 endpoint를 열지 않았다.
+`verify-editor-command-surface.ps1`과 descriptor/서비스 검사는 실제 surface를 기준으로 유지한다. 잘못된 입력, 모드 충돌, auth 실패, queue full, stale ID, 취소와 정상 shutdown, 사용자 코드 permission, Shipping에서의 surface 부재를 각각 확인해야 한다. UI 드래그·clipboard·파일 대화상자를 command 성공으로 대체하지 않는다. 본 개정에서는 runner를 실행하거나 새 endpoint를 열지 않았다.
 
 ## 구현 근거
 
