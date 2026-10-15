@@ -1,178 +1,57 @@
-# Editor 명령 / Commandlet 경계
+# Editor 자동화: 명령·서비스·Commandlet 경계
 
-## 2026-10-07 최근 병합 반영
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
 
-PR #125의 `scene.open_async`는 준비 접수 성공과 Scene 활성 완료를 구분하며 기존 동기 명령의 의미를 보존한다. PR #127의 `profile.deep.start`, `profile.deep.status`, `profile.deep.stop <session-id>`는 기존 인증/서비스 큐를 통해 엔진 소유 .cedx 세션을 제어한다. sessionId는 uint64를 보존하는 십진 문자열이며 accepted/in_progress/stopping/finalized/failed/permission_denied/unavailable을 구분한다. 새 HTTP 리스너·승격·사용자 출력 경로 입력은 없다.
+## 실행 표면과 소유권
 
-PR #117의 `profile.save`는 비동기 요청과 status 확인으로 전체 finalized spool을 저장한다. PR #129의 하단 Cmd 입력칸은 명령 실행 표면이 아니다. 남은 검증은 descriptor/golden 및 실제 접수→완료·stale ID·멱등 Stop·permission failure·Shipping 격리이며 소스 등록만으로 통과 처리하지 않는다.
+Editor의 명령 정본은 CommandRegistry descriptor와 명시적 domain registrar다. ConsoleCommandSystem이 인자를 큐에 넣고 게임 스레드 Pump에서 실제 제품 동작을 호출한다. UI thread의 mutation도 값과 generation handle을 캡처해 EnqueueEditorMutation으로 owner에 넘긴다. worker/queue가 Scene·Entity·Component raw pointer나 GC root를 임의로 보유하는 구조를 만들지 않는다.
 
-근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+GUI와 CLI가 같은 EditorObjectOperations를 쓰면 Undo와 사전조건을 공유할 수 있다. 그러나 모든 읽기/검사/저장 명령이 Undo 가능하다는 뜻은 아니다. descriptor의 class, roles, liveness, cost, userCode, undoable과 resultBearing을 확인한다. 실제 등록과 descriptor seed가 둘 다 필요하며 목록에 이름만 추가하는 것으로 handler가 생기지 않는다.
 
-> 통합 기준: 원격 `2c056012`와 로컬 `709eafe5`. `light.proxy` 제품 조회·텍스처 Commandlet과 로컬 PBR·비동기 모델 검사를 함께 보존한다. 앞선 CLI 병합 후보의 근거는 [병합 준비 기록](../analysis/Phase14_5MergePreparation.md)에 남긴다.
+## 입력 모드
 
-2026-09-06 · 저장소 동기화 통합 기준
+- `--exec`, `--script`, `--console`은 일반 배치/콘솔 입력이다
+- `--exec-args <명령> [인자]... [--]`는 이미 분리된 인자를 전달하므로 공백 경로를 문자열 결합 후 재파싱할 필요가 없다
+- `--command-service`는 local HTTP 서비스 활성화다. 기본 off이며 `--allow-user-code`는 서비스의 사용자 코드 실행을 별도로 허용한다
+- `--commandlet` 또는 `--commandlet-script`는 전용 검증 프로세스 모드다. 일반 batch/console/HTTP와 혼합하면 mode conflict로 거부한다
+- `--result-file`은 결과 JSONL을 기록한다. HTTP와 배치 봉투의 변환은 EditorCommandJson/ResultEnvelope를 공유한다
 
-## 목표
+Commandlet registry와 live registry는 분리된다. texture reimport/pending probe 같은 검증 명령을 일반 서비스에서 호출할 수 있다고 안내하지 않는다. `EditorCommandlets::Run`은 host 초기화 후 게임 스레드에서 호출되는 별도 진입점이다. 일반 배치와 stdin에는 HTTP의 allow-user-code 스위치가 동일하게 적용되는 것은 아니다.
 
-GUI와 외부 자동화는 동일한 편집 동작과 Undo 이력을 사용한다. CLI의 HTTP/JSON
-서비스는 개발자용 제품 조작·조회 창구다. 검증은 별도 프로세스의 Commandlet이며,
-이관이 끝난 일회성 하네스는 소스·등록·빌드 항목·전용 소비자를 함께 제거한다.
-기존 명령의 개수나 동작을 무조건 보존하는 것은 목표가 아니다.
+## HTTP 계약
 
-과거 LC0-LC9의 이동 계획과 실측 이력은 Git 이력에 보존된다. 이 문서는 현재
-방향과 남아 있는 제품 계약만 설명한다. 실제 명령 처분은
-[CommandSurfaceDisposition.tsv](../analysis/CommandSurfaceDisposition.tsv), 실행 증거는
-[CommandSurfaceImplementation.md](../analysis/CommandSurfaceImplementation.md)를 본다.
+CommandService는 loopback에만 bind하고 기본 port 0에서 OS가 고른 port를 쓴다. endpoint는 프로젝트 `Library/CommandService/endpoint.json`에 기록된다. 토큰은 인증 정보이므로 로그·문서·issue에 복사하지 않는다. `/health`를 포함해 Bearer 인증을 요구하고 Origin/Referer가 있는 요청은 거부한다. browser에서 localhost 호출이 가능하다는 이유로 이 검사를 없애지 않는다.
 
-## 소유권
+`GET /commands`와 `/commands/<name>`으로 descriptor를 확인한다. execute 요청에는 command와 문자열 args 배열 또는 지원되는 named parameters 객체를 사용하며 둘을 동시에 주면 거부한다. named schema의 미지 필드·형식·필수값을 검증한 후 structured arguments로 전달한다. 원문 command line으로 다시 합치지 않는다.
 
-```text
-GUI ──────────────┐
-                  ├─ EditorObjectOperations / EditorProjectOperations / editor commands ─ UndoManager ─ Scene
-CLI HTTP/JSON ────┘
-       ↑
-향후 MCP adapter
+기본 queue 상한 64, 동시 연결 16, idle 30초, 요청 전체 수신 deadline 10초가 있다. 본문 1MiB, header 8KiB/64개 제한은 HTTP parser 계약이다. userCode 금지는 queue pressure보다 먼저 판정한다. queue full은 429이며 재시도 가능성과 이미 접수된 작업의 결과 불확실성을 구별해야 한다.
 
---commandlet / --commandlet-script ─ 독립 검증 registry ─ 제품 API + 검사
-```
+## 결과와 비동기 완료
 
-- MCP는 향후 HTTP 요청과 도구 스키마를 연결하는 외부 어댑터다. 엔진 상태 변경,
-  Undo 저장, 검증 실행을 MCP 안에 다시 구현하지 않는다. 이번 작업에 MCP 서버는 없다.
-- 서비스 registry와 Commandlet registry는 서로 다른 조회 표다. HTTP discovery와
-  일반 console/batch에는 검증 이름을 등록하지 않는다.
-- `commands.selftest`는 개발자용 registry 무결성 조회다. 도메인 검사나 합성 fixture를
-  실행하는 하위 창구가 아니다. `cli.echo.args`도 입력 진단으로 유지한다.
-- `wait`는 프로세스 스크립트 문법이다. HTTP에서는 전역 프레임 정지를 거부한다.
-- 살아 있는 제품의 회귀 검사·성능 측정은 Commandlet으로 유지한다. 계획 단계가
-  끝났다는 사실만으로 현재 제품 계약을 지키는 회귀 검사를 폐기하지 않는다.
+HTTP 200은 명령의 논리 성공을 보장하지 않는다. 실패·취소·timeout도 result status로 반환할 수 있다. unknown command는 404, invalid arguments는 400, precondition은 409, internal error는 500으로 매핑한다. 큐에 들어간 뒤 클라이언트 대기 timeout이 났다고 제품 작업이 취소되었다고 가정하지 않는다.
 
-## 구현 순서와 결과물
+비동기 operation은 반환된 poll/stream 경로를 사용해 terminal 결과를 읽는다. domain 자체의 준비/완료 상태도 별도다. `scene.open_async`의 접수 뒤 `scene.load.status`를 확인하고, `profile.save`의 요청 뒤 `profile.save status`를 확인한다. `profile.deep.start/status/stop`의 session ID는 uint64를 보존하는 십진 문자열이며 정확한 session에 stop을 요청한다. CPU 준비 완료, 업로드 명령 기록, GPU fence 완료를 한 상태로 합치지 않는다.
 
-1. 전체 등록을 처분표로 대조한다. 미분류 후보를 없애고 제품 API, 검증,
-   제거, 분리가 필요한 혼합 진입점을 구분한다.
-2. 닫힌 하네스를 제거한다. `selftest`와 `SelfTestTable`, 폐기된 packer의
-   `experiment.matparity`, LC0의 `commands.dump`·`cli.probe.timing`·중복 등록/계측
-   저장소 및 전용 스크립트를 제거한다. 완료된 LC6 라이브 분류·Undo 특성화
-   하네스도 새 제품 계약 검사로 대체한다. 실패를 정상값으로 고정하는 표를 유지하지 않는다.
-3. 유지할 검증은 Commandlet registry로 분리하고 실제 소비 스크립트를 연결한다.
-   DX12 suite는 Commandlet의 런타임 목록을 읽는다. 혼합 Transform 명령의
-   `probe`/`bench`는 `*.check` Commandlet로만 실행한다.
-4. 생성/삭제 → 복제/부모 → Transform/UI → 프로퍼티/컴포넌트 → 프리팹 소환/선택을
-   공통 편집 API로 연결한다. Undo 깊이뿐 아니라 실제 상태·논리적 식별자·선택·
-   프리팹 override의 복원을 검증한다.
-5. HTTP 입력 스키마, 오류 결과, 문서와 회귀 실행 경로를 정리한다. 배포나 커밋은
-   별도 요청 범위다.
+## Editor 창 명령과 현재 UI 한계
 
-## 2026-09-06 후속 정리
+`editor.windows`, `editor.menu`는 선언/배선을 감사한다. `editor.window <stable-id> open|close|focus`는 UI mailbox로 요청한다. `editor.workspace`는 save/load/reset/preset/named 작업을 요청하고 게시 상태로 확인한다. `editor.viewport`, `editor.theme`, `editor.panelcost`는 UI가 게시한 관측값을 읽는다. 명령 결과를 바로 읽을 수 있어도 다음 UI 프레임 적용이 필요한 작업은 접수와 적용을 구분한다.
 
-제품 명령은 99개(이름 106개), Commandlet은 115개다.
-로컬의 `model.async`와 `render.pbr.*` 7개 검사는 Commandlet으로 등록한다.
-비동기 배치 대기와 프레임 캡처는 완료·실패 시점에 terminal 결과를 한 번 기록한다.
-재질 codec·seal 합성 검사는 `verify-experiment-contract.ps1`가 계속 소유한다.
-`experiment.matruntime`의 seed 텍스처도 명시적 입력으로 받으며, 코퍼스 전용
-검사는 일반 명령과 구별한다. 종료된 비교 벤치
-`dx12.bench11`, `dx12.encoderbench`, `dx12.ssaoscale`, `dx12.postscale`,
-`dx12.forwardscale`, `perf.reflect`를 제거했다. SSAO의 벤치 전용 참조 PSO와
-옛 알고리즘 셰이더도 제품에서 제거했다. Post/Forward의 참조 경로는 현재 픽셀
-동등성 검사가 사용하므로 유지한다.
+하단 Cmd는 편집 가능한 문자열 필드만 있으며 Enter는 이 명령 큐를 실행하지 않는다. 현재 shell UI에 필드가 있다는 이유로 CLI 실행 표면과 동일하게 안내하지 않는다. 실행/이력/완성의 제품 연결은 남은 요구다.
 
-`scene.hierarchycheck`와 `animator.status`는 공통 읽기 전용 진단 서비스다.
-`tag.list/has/add/remove`는 프로젝트 태그 API이며 GUI의 추가 동작도 같은
-저장/Undo 서비스를 사용한다. `experiment.animlive`와 `tag.authoring.probe`는
-별칭으로 남기지 않았다.
+## 회귀 기준
 
-정리 대상 여섯 명령의 Gunner/SU/scene.glb/Cube 텍스처 선택은 입력 인자로 옮겼다.
-`assets.generationcorpus`/`assets.scenemodel`의 코퍼스 전용 단정은 유지한다.
-실제 corpus를 사용하는 소비 스크립트는 입력 경로와 독립 pose 골든을 명시한다.
-이는 제품 자산 삭제나 corpus 검증 완료를 뜻하지 않는다.
-상세 범위와 검증은 [후속 정리 기록](../analysis/CommandletRetirementAudit.md)을 본다.
+`verify-editor-command-surface.ps1`과 descriptor/서비스 검사는 실제 surface를 기준으로 유지한다. 음성 입력, 모드 충돌, auth 실패, queue full, stale ID, 취소와 정상 shutdown, 사용자 코드 permission, Shipping에서의 surface 부재를 각각 확인해야 한다. UI 드래그·clipboard·파일 대화상자를 command 성공으로 대체하지 않는다. 본 개정에서는 runner를 실행하거나 새 endpoint를 열지 않았다.
 
-## 마무리 반영
+## 구현 근거
 
-- 제품 99개 전부 결과 반환, named JSON 입력 59개, Undo 선언 21개.
-- `assets.scenemodel`은 검증 표로 이동, 사용하지 않는 `animator.state/exit` 제거.
-- `animator.param`·`render.matmode`는 공통 GUI/Undo 작업으로 연결.
-- 미보고 상태·void 등록·legacy 직접 exit 어댑터 제거.
-- 한국어 verdict consumer 13→0, 소스 기반 명령 존재 consumer 6→0.
-- 최종 판정은 [종결 검토](../analysis/Phase14_5Closure.md)의 현재 실행 증거와 미검증 경계로 정한다.
-
-## Commandlet 사용
-
-```powershell
-& .\Bin\x64-Debug\Editor\CreatorEditor.exe --commandlet list -- --result-file C:\Temp\commandlets.jsonl
-& .\Bin\x64-Debug\Editor\CreatorEditor.exe --commandlet scene.transformpull.check probe -- --result-file C:\Temp\pull.jsonl
-& .\Bin\x64-Debug\Editor\CreatorEditor.exe --commandlet-script C:\Temp\scenario.txt --result-file C:\Temp\scenario.jsonl
-```
-
-결과 파일의 부모 폴더는 호출자가 준비한다. 시나리오는 제품 준비 명령과 검증
-명령을 함께 쓰며, 프레임당 한 줄을 실행한다. 큐가 소진되면 `quit` 없이 종료한다.
-`--commandlet`은 하나의 검사를 실행하고 종료한다. `--` 뒤에는 호스트 옵션을 둔다.
-
-Commandlet 모드와 일반 `--script`/`--exec`/stdin/HTTP를 혼합하면 실행 전에 오류로
-종료한다. 성공 exit 0, 인자 오류 2, 선행조건 실패 3, 검사 실패 4, 내부 오류 5다.
-계속 실행과 최종 실패 누적이 기본이고 `--fail-fast`도 적용한다. 그래픽·CLR이
-필요한 검사는 Editor 호스트를 사용하므로 별도 headless 실행 파일은 아니다.
-
-완료 조건이 있는 한시적 하네스는 그 조건이 충족되면 등록·소스·전용 소비자를
-함께 삭제한다. 현재 유지한 제품 회귀는 해당 제품 계약이 폐기되거나 후계 검사에
-흡수될 때 같은 절차로 제거한다. `experiment.*`라는 이름만으로 일괄 폐기하지 않는다.
-
-## 편집 HTTP 계약
-
-```json
-{"command":"object.create","parameters":{"name":"Lamp","type":"Light"},"mode":"sync"}
-{"command":"object.describe","parameters":{"target":"Lamp"},"mode":"sync"}
-{"command":"object.transform","parameters":{"target":"Lamp","position":[1,2,3]},"mode":"sync"}
-{"command":"object.property","parameters":{"target":"Lamp","component":"LightComponent","field":"m_intencity","value":4.5},"mode":"sync"}
-{"command":"undo","mode":"sync"}
-```
-
-`GET /commands/<name>`의 입력 스키마와 실제 변환기는 같은 descriptor를 사용한다.
-추가/누락 필드, 잘못된 타입, NUL, 유효하지 않은 숫자·벡터를 실행 전에 거부한다.
-`parameters`와 `args`를 동시에 보낼 수 없다. 기존 positional `args`도 같은 공통
-편집 API로 들어간다. 이름에 공백이 있으면 스크립트에서 따옴표로 묶는다.
-
-- 대상은 이름 또는 `object.describe`가 반환하는 `@scene:index:generation`이다.
-  중복 이름은 거부하고 ID를 요구한다. 지워지거나 씬이 교체된 슬롯 ID를 재활용하지 않는다.
-- Undo 내부는 scene ID와 객체의 논리적 instance ID를 사용한다. 삭제·생성·복제
-  재실행으로 슬롯이 바뀌어도 이전 편집 이력이 복원된 객체를 찾는다. 외부 슬롯 ID는
-  복원 후 다시 조회해야 한다.
-- `object.describe`는 부모·자식 ID, Transform, 컴포넌트 ID/타입을 소유 값으로 반환한다.
-  `object.properties`는 반사 필드의 타입과 현재 값을 반환한다. 동일 타입 컴포넌트는
-  `#instanceId`로 구분한다.
-- 생성 타입 Light/Camera/Mesh/Canvas는 해당 기본 컴포넌트까지 만든다. 공간 타입만
-  바꾸고 필요한 컴포넌트를 빠뜨리던 이전 CLI 동작은 보존하지 않는다.
-- 삭제 취소는 서브트리, 컴포넌트 값/식별자, 부모/root 참조, 프리팹 등록과 선택을
-  복원한다. 이미 있는 컴포넌트 추가는 no-op이다. 필수 공간 컴포넌트는 제거할 수 없다.
-- UI 위치/앵커/크기와 기즈모 편집도 같은 프로퍼티 트랜잭션을 사용한다.
-  여러 객체를 한 번에 바꾼 GUI 동작은 Undo 한 항목으로 묶는다.
-- 새 편집은 Redo를 비운다. 무변경과 잘못된 입력은 Undo 항목을 추가하지 않는다.
-  실패한 Undo/Redo의 항목은 원래 스택에 남긴다.
-- 프레임 종료 시 생명주기 정리가 필요한 명령 뒤에는 HTTP drain을 다음 프레임으로
-  넘긴다. 명령 핸들러가 프레임 중간에 파괴 큐를 강제로 비우지 않는다.
-- 프리팹 정의 저장/갱신과 씬 저장은 영속 자산 서비스다. 씬 편집 Undo와 별개이며
-  `undoable:false`로 설명한다. 프리팹 **소환**은 씬 편집으로서 Undo를 지원한다.
-
-## 검증 기준
-
-`Tools/regression/verify-editor-command-surface.ps1`는 Commandlet 격리·종료와 HTTP
-실제 상태 복원을 검사한다. `run-all.ps1`에 연결한다. 이름 변경 한 건이나 빌드
-성공을 전체 GUI 기능의 수동 검증으로 확대하지 않는다. Debug/Release 실행 결과,
-회귀 범위와 미실행 항목은 구현 기록에 명시한다.
-
-### 종결 조건 (2026-09-15 재정의)
-
-이 페이즈는 둘을 만족하면 닫는다 — ① 14.5 소유 게이트 13칸(`CLI *(LC0~LC9)`·`CLI 제품 표면 변경 검증`·
-`Commandlet 격리 및 공통 편집 API`·`Player Shipping 격리`·`Player 명령 서비스`)이 **현재 HEAD에서** 초록,
-② LC6 공통 편집 API의 Undo 선언에 대한 GUI 수동 조작 확인 —
-대상과 절차는 [체크리스트](../analysis/Phase14_5ManualGuiChecklist.md)에 있다(2026-09-15 기준 **24개**,
-경로 확인 18 · 미확인 6). 위 "마무리 반영"의 21개는 09-06 당시 값이며 PHASE 21이 셋을 더했다.
-
-**①은 2026-09-15에 닫았다** — HEAD `575ab79b`에서 초록 11 · 붉음 2이고, 붉은 둘(LC5 drain · LC8 Player 서비스)은
-제품 응답이 아니라 게이트 자신의 가정에서 나온 것임을 각각 확정했다. 사유와 실행 표는
-[종결 검토](../analysis/Phase14_5Closure.md)에 있다. 게이트 둘의 수정은 별도 과제이며, 붉음을 통과로 바꾸지 않았다.
-**남은 조건은 ② 하나다.**
-
-전체 `run-all.ps1` 완주와 canonical 성능 예산은 이 페이즈의 종결 조건이 아니다. 전자는 HEAD부터 초록
-기준선이 없어 한 페이즈가 남의 선행 실패를 떠안게 되고, 후자는 게이트와 기준 archive가 PHASE 3.75
-소유였으며 그 계획이 닫히면서 함께 삭제됐다. 근거와 옮긴 자리는 [종결 검토](../analysis/Phase14_5Closure.md)에 있다.
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp](../../Editor/EngineEntry/ConsoleCommandSystem.cpp)
+- [Editor/EngineEntry/ConsoleCommandSystem.h](../../Editor/EngineEntry/ConsoleCommandSystem.h)
+- [Editor/EngineEntry/EditorCommandServiceHost.cpp](../../Editor/EngineEntry/EditorCommandServiceHost.cpp)
+- [Editor/EngineEntry/Commands/CommandRegistrar.h](../../Editor/EngineEntry/Commands/CommandRegistrar.h)
+- [Editor/EngineEntry/Commandlets/EditorCommandlets.h](../../Editor/EngineEntry/Commandlets/EditorCommandlets.h)
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp](../../Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp)
+- [Engine/CommandService/CommandService.h](../../Engine/CommandService/CommandService.h)
+- [Engine/CommandService/CommandService.cpp](../../Engine/CommandService/CommandService.cpp)
+- [Editor/EngineEntry/Commands/SceneObjectCommands.cpp](../../Editor/EngineEntry/Commands/SceneObjectCommands.cpp)
+- [Editor/EngineEntry/Commands/DiagnosticsCommands.cpp](../../Editor/EngineEntry/Commands/DiagnosticsCommands.cpp)
+- [Tools/regression/verify-editor-command-surface.ps1](../../Tools/regression/verify-editor-command-surface.ps1)
