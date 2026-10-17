@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/RenderPipelineTargetArchitecture.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Render Pipeline 목표 구조 — C# 저작과 네이티브 실행</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#책임-경계">책임 경계</a></li><li><a href="#무엇을-대체하는가">무엇을 대체하는가</a></li><li><a href="#리소스-의미와-순서">리소스 의미와 순서</a></li><li><a href="#passschema와-c-표면">PassSchema와 C# 표면</a></li><li><a href="#단계와-완료-증거">단계와 완료 증거</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="RenderPipelineTargetArchitecture.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Render Pipeline 목표 구조 — C# 저작과 네이티브 실행</h1>
+<div class="meta"><p><strong>결정 2026-09-23.</strong> 사용자가 제공한 <code>CreatorEngine_RenderPipeline_Target_Architecture.md</code>를
+현행 소스와 계획에 대조해 채택한 설계 정본이다. 작업 순서와 공수는
+<a href="../plans/RenderPhaseRoadmap.html"><code>RenderPhaseRoadmap.md</code></a>, 실행 슬라이스는
+<a href="../plans/RenderGraphDependencySchedulingPlan.html"><code>RenderGraphDependencySchedulingPlan.md</code></a>와
+<a href="../plans/CSharpRenderPipelinePlan.html"><code>CSharpRenderPipelinePlan.md</code></a>가 소유한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#책임-경계"><span class="ve-label">§00</span><span class="map-name">책임 경계</span><span class="map-bar"><i style="width:56.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#무엇을-대체하는가"><span class="ve-label">§01</span><span class="map-name">무엇을 대체하는가</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#리소스-의미와-순서"><span class="ve-label">§02</span><span class="map-name">리소스 의미와 순서</span><span class="map-bar"><i style="width:49.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#passschema와-c-표면"><span class="ve-label">§03</span><span class="map-name">PassSchema와 C# 표면</span><span class="map-bar"><i style="width:46.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#단계와-완료-증거"><span class="ve-label">§04</span><span class="map-name">단계와 완료 증거</span><span class="map-bar"><i style="width:44.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「무엇을 대체하는가」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-책임-경계">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="책임-경계">책임 경계</h2></div>
+<div class="prose"><pre><code class="language-text">C# RenderPipeline.Build()       저작 시점에 구성·연결·조건·설정 선언
+        ↓
+typed PassSchema + ShaderMeta   입출력·파라미터·키워드 계약 검증
+        ↓
+immutable Pipeline IR          안정 Pass ID·버전 핸들·값·root·제약
+        ↓  Game-thread/저작 경계에서 세대 단위 게시
+LivePipelineDesc               native Pass 수명·per-view·Host 기여·진단
+        ↓
+EnhancedRenderPass             PrepareFrame·Declare·실제 알고리즘
+        ↓
+EnhancedRenderGraph            리소스 DAG·컬링·수명·배리어·기록 스케줄
+        ↓
+RHIEncoder → DX12/Vulkan        백엔드 명령 인코딩과 제출</code></pre>
+<p><code>EnhancedSceneRenderer</code>는 multi-view, frame-in-flight, fence 완료, 표시 승격과 graph
+lifetime을 계속 소유한다. <code>EnhancedLiveFramePacket</code>은 불변 입력을 게시한다. C# <code>Build()</code>는
+GPU 명령을 실행하지 않고 <strong>파이프라인 세대가 만들어지거나 교체될 때</strong> 호출한다. Render,
+CommandBuild, RHI 제출 스레드는 관리 코드를 호출하지 않는다. 실패한 새 IR은 게시하지
+않으며 마지막 정상 세대를 유지한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-무엇을-대체하는가">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="무엇을-대체하는가">무엇을 대체하는가</h2></div>
+<div class="prose"><p>현재 <a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp"><code>EnhancedSceneRenderer.cpp</code></a>의
+<code>BuildPipelineDesc</code>는 C++ 람다와 구체 <code>EnhancedRenderPass</code> 멤버로 Pass 목록을 만든다.
+C# 저작 + native IR compiler는 이 <strong>고정 조립부</strong>를 대체할 수 있다. GBuffer의 재질
+generation 검증·배치/업로드, Shadow의 cascade·masked draw, GPU-driven·DXR 같은 특수
+기능의 C++ 본체는 그대로 native Pass다. 일반 효과에 필요한 Fullscreen/Compute
+template는 별도 수직 슬라이스에서 열 수 있지만 C# 저작의 성립 조건은 아니다.</p>
+<p>Meshlet/Mesh Shader raster와 DXR의 공통 geometry·별도 visibility·BLAS/TLAS·동기화·
+fallback·수명 계약은 <a href="GpuDrivenMeshletDxrWiring.html">GpuDrivenMeshletDxrWiring.md</a>가 소유한다.
+EnhancedSceneRenderer가 같은 frame/graph를 조율하고 Mesh Shader의 출력이 자동으로
+DXR geometry가 된다고 가정하지 않는다. 이 상세 설계는 제품 구현 완료의 증거가 아니다.</p>
+<p>기존 <a href="../../Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h"><code>LivePipelineDesc</code></a>는
+<code>std::function</code>/인스턴스 포인터를 갖는 native runtime 기술이다. 직렬화 IR로 직접
+노출하지 않는다. C#과 향후 시각 편집기·preset·C++ builder는 <strong>같은 immutable IR</strong>로
+내려간다. 별도의 제품 실행 그래프를 만들지 않는다.</p>
+<h3 id="이전-srp-계획과의-비교">이전 SRP 계획과의 비교</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>경계</th><th>이전 Asset-first 계획</th><th>현재 결정</th></tr></thead>
+<tbody><tr><td>저작 정본</td><td>Pipeline Asset Inspector의 Pass Stack</td><td>C# <code>RenderPipeline.Build(builder)</code>가 typed IR 생성</td></tr>
+<tr><td>C# 역할</td><td>Game-thread 값·variant 제어에 한정</td><td>구성·Pass 선택·리소스 연결·조건·설정 저작</td></tr>
+<tr><td><span class="chip ok">native Pass</span></td><td>Asset이 선택하는 template/소스 Pass</td><td>기존 <code>EnhancedRenderPass</code>를 안정 ID registry로 연결·계속 실행</td></tr>
+<tr><td>graph 순서</td><td>Asset authored stack과 향후 version DAG</td><td>RG1 단일 writer DAG를 먼저 구현, RG2 version/Modify로 확장</td></tr>
+<tr><td>생성·검증</td><td>Asset schema/Inspector 우선</td><td>PassSchema·ShaderMeta를 Roslyn typed 표면과 native 검증에 공유</td></tr></tbody></table></div>
+<p>이전 계획의 구현되지 않은 <code>SRP-0~6</code>을 완료로 간주하거나 새 슬라이스로 이름만
+바꾸지 않는다. <code>4-1</code>의 2일 설계 완료도 새 C# 계약의 증거가 아니며, 과거 공수는
+<a href="../plans/ScriptableRenderPipelinePlan.html"><code>ScriptableRenderPipelinePlan.md</code></a>에 보존한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-리소스-의미와-순서">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="리소스-의미와-순서">리소스 의미와 순서</h2></div>
+<div class="prose"><p><code>RGPassUsage</code>는 접근 의미 <code>Read/Write/ReadWrite</code>와 요구 <code>RHIResourceState</code>를 분리한다.
+<strong>첫 구현은 단일 writer 리소스와 명시적 ordering token에 한정한 stable DAG 정렬</strong>이다.
+접근 의미만 먼저 명시하고 같은 리소스의 다중 writer/<code>ReadWrite</code> 연쇄는 모호한 채
+추정하지 않고 compile 오류로 거부한다. 다음 슬라이스에서 <code>Write</code>/<code>Modify</code>의 논리
+버전 핸들을 도입해 다중 writer와 <code>Scene.LitColor</code> 연쇄를 DAG에 편입한다. 이 순서는
+사용자 결정인 <strong>DAG 정렬 우선</strong>을 따르되, 아직 정의하지 않은 선후를 실행하지 않는다.</p>
+<p>실행 순서는 resource version edge가 결정하고, 독립 Pass만 authored index로 안정적으로
+묶는다. 명시적 present/export root와 side effect·semantic ordering token은 필요할 때
+edge로 선언한다. <code>RenderPhase</code>/before-after는 표현할 수 없는 실제 순서 제약이 있을 때만
+사용하며, 숨은 전역 phase 순서로 resource edge를 대체하지 않는다. <code>LivePipelineDesc</code>의
+목록은 저작·수명·진단 순서로 남고 GPU 실행 순서는 compiled graph가 소유한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-passschema와-c-표면">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="passschema와-c-표면">PassSchema와 C# 표면</h2></div>
+<div class="prose"><ul>
+<li>native <code>PassTypeId</code>/설정 schema가 Pass의 실행 계약이다. C# typed wrapper는 같은
+schema에서 생성하며 native 구현을 대신하지 않는다.</li>
+<li><code>ShaderMeta</code>가 shader entry, property·binding, keyword/permutation의 단일 정본이다.
+PassSchema는 이를 참조·합성하고 keyword 축을 중복 선언하지 않는다.</li>
+<li>Roslyn generator는 typed handle/builder·interop layout·Editor metadata를 생성한다.
+analyzer는 누락 입력·의미 불일치·잘못된 keyword·범위·queue hint를 잡는다. 생성기
+출력과 native schema의 ID·layout 일치를 빌드 게이트로 검사한다.</li>
+<li>C#은 read/write/modify, 조건, 값, 지원 기능, queue <strong>선호</strong>를 기술한다. raw RHI,
+command list, descriptor heap, barrier/fence 삽입 API는 공개하지 않는다.</li>
+<li>특수 동기화·외부 API는 native escape hatch로 두되 input/output/side effect/ownership/
+queue 제약을 graph에 게시한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-단계와-완료-증거">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="단계와-완료-증거">단계와 완료 증거</h2></div>
+<div class="prose"><p>PHASE 4.3은 <code>BASE-0 → RG1</code> 명시적 접근·단일 writer DAG → <code>RG2</code> 리소스 버전과
+다중 writer DAG → <code>RG3~RG6</code> 제품 전환을 닫는다.
+<code>Q0</code> queue/fence와 <code>RG7~RG9</code> aliasing·multi-queue·subresource는 별도 후속이다.
+PHASE 4.6은 native IR/C++ fixture → C# 저작·managed 경계 → schema/Roslyn →
+기본 19 node A/B cutover 순서로 닫는다. PHASE 4.7 라이트맵, PHASE 4.75 renderer 품질,
+PHASE 4.8 GPU 설계는 C# 저작 구현 완료를 일괄 선행으로 받지 않는다.</p>
+<p>완료 증거는 잘못된 producer/version/semantic/queue/keyword 변이가 빌드 또는 graph
+compile에서 실패하는 것, sealed frame 기준 19 node dump와 DX12 픽셀·validation,
+관리 호출이 렌더 스레드에서 0건인 것, reload 실패 시 마지막 정상 세대와 GPU 자원이
+fence 완료까지 유지되는 것이다. 이 문서는 설계 결정이며 구현·런타임 완료 증거가 아니다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderPipelineTargetArchitecture.md"><code>docs/design/RenderPipelineTargetArchitecture.md</code></a> · 마지막 커밋 2026-10-03 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

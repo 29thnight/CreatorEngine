@@ -1,35 +1,84 @@
-# reflgen 통합 증거와 현재 저장 경계
+# reflgen와 PHASE 4.25 통합 검증
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 호출부. 이 문서는 현재 구현을 설명하며, 이번 문서 갱신에서 빌드·테스트·제품 실행을 수행하지 않았다.
+2026-09-30. [PR #114](https://github.com/29thnight/CreatorEngine/pull/114)의 reflgen 도입을
+master에 병합하고, 기존 PHASE 4.25 변경과 다른 세션의 편집기 성능 개선을 함께 통합한다.
+MAT-9 렌더 결과 대조의 잔여 작업은 이 통합 검증과 별도로 유지한다.
 
-## 이력과 현재 구현을 구분한다
+## 설치와 병합
 
-이 문서는 reflgen과 당시 PHASE 4.25 통합 보고서의 진입점을 유지한다. 당시 설치·빌드·회귀 집계는 [원자료 JSON](ReflgenPhase425Integration.json)에 남아 있으며 이번 개정에서 변경하지 않았다. 그 자료를 현재 master의 새 실행 결과로 재표시하지 않는다.
+- VS **18 Community** 인스턴스 `55b1962e`에 공식 **Reflgen.VisualStudio 1.0.1** VSIX를 설치했다.
+  설치 종료 코드 0과 설치된 `extension.vsixmanifest`의 identity
+  `Reflgen.VisualStudio.29thnight`·버전 1.0.1을 확인했다.
+- [확장 릴리스](https://github.com/29thnight/reflgen_cpp/releases/tag/v1.0.1)의 VSIX SHA-256:
+  `44E7F76741BA890CFEC3CBC051823FEEEAFCF0646A8DA479E5176E7EFFF8994D`.
+  확장의 IDE 자동완성 기능을 직접 조작한 검증은 하지 않았다.
+- 엔진 manifest/overlay port의 생성기·런타임은 **reflgen 1.0.0**이다.
+  확장 1.0.1은 VSIX 패키징 변경이며 생성기 버전 변경과 구분한다.
+- PR head `1ff657a6ea5b9aa4cbae63128221ebd4be2f2ced`를 확인해 병합했다.
+  GitHub master 병합 커밋은 `090aba0afe16e1495fec06738d928fb581617595`다.
+- 로컬 4.25 변경은 먼저 `0268e4b5cc6bfeed5258b426a3ce5f3bbed7f886`에 보존했다.
+  이 커밋과 PR 병합 커밋을 합쳐 충돌을 해결했다.
 
-현재 generator dependency는 overlay port의 reflgen v1.0.0이다. VSIX 설치 여부나 버전은 이 checkout만으로 현재 사용자의 Visual Studio 상태를 알 수 없으며 엔진 generator와 별도다. 이전 보고서의 특정 PC·설치 인스턴스가 지금도 유효하다고 가정하지 않는다.
+## 4.25와 맞춘 내용
 
-## 통합에서 유지해야 할 계약
+- MeshRenderer Inspector의 그래프 저작·미리보기 기능을 유지하고 legacy 재질의
+  Rendering Mode 편집만 reflgen `field_info`·enum 서술자를 사용하도록 바꿨다.
+- `SceneRenderProfile`·`SceneRenderProfileComponent` 이름을 유지하면서
+  `[[reflgen::reflect]]` 서술로 옮겼다. 구 `VolumeProfile`·`VolumeComponent` 이름은 복원하지 않는다.
+- Material의 그래프 인스턴스, Foliage의 그래프 소스 및 프로파일 컴포넌트의
+  런타임 설정·캐시는 `[[reflgen::ignore]]`로 저장에서 제외했다.
+- RenderEngine 프로젝트는 MaterialGraph 헤더와 `ReflgenRegistration.h`를 함께 포함한다.
+- 생성된 서술자의 저장 필드 순서를 확인했다: Material 14개, FoliageType 3개,
+  SceneRenderProfile 1개, SceneRenderProfileComponent 자체 필드 2개.
+  병합 전 저장 계약과 일치하고 런타임 포인터·캐시는 포함되지 않는다.
+- 다른 세션 「프로파일링으로 프레임 급감 원인 찾기」의 캔버스 계산 캐시,
+  노드 선택 정보, Inspector 재질 선택·구체/격자 미리보기 변경을 포함했다.
+  해당 측정 기록은 [MAT9NodeEditorPerformance](MAT9NodeEditorPerformance.md)에 정리했다.
+  병합 전 성능 수치를 병합 후 실측으로 표시하지 않는다.
+- README·문서 색인·LX 계획서의 현재 상태를 Material Editor 제품 연결에 맞춰 정리했다.
+  MAT-0~8 완료 **32/34일**, MAT-9 및 LX-3/3H 진행 상태를 유지한다.
 
-RenderEngine/SceneRuntime descriptor를 생성한 등록 TU는 ReflgenRegistration.h를 통해 엔진 serializer와 field 정의를 함께 보아야 한다. registration function을 호출하는 것만으로 field serializer 가시성 문제가 사라지지 않으므로 VerifyReflectRegistration을 유지한다.
+## 검증
 
-Material의 graph runtime instance, Foliage의 runtime graph source, SceneRenderProfileComponent의 runtime cache는 저작 필드와 구별해야 한다. 이름만 옛 Volume 계열로 되돌리거나 runtime pointer를 저장하려 해서는 안 된다. 정확한 저장 대상은 현재 선언의 reflect/ignore와 생성 결과로 검토한다. 과거 “필드 N개”는 새 field 변경의 합격 기준이 아니다.
+VS 18 x64 MSBuild·MSVC v145, `UseDynamicDebugging=false`, `LinkIncremental=false`로
+`CreatorEngine.sln` 전체를 빌드했다. Editor·Player·AssetCooker 및 솔루션의
+공용 모듈·도구 빌드를 포함한다.
 
-현재 GC 통합에서는 ComponentFactory가 explicit domain으로 managed component를 만든다. reflector allocation patch와 `Meta::Create` 제한도 함께 확인한다. 생성기 교체가 authoring field를 유지하더라도 수명 모델까지 자동으로 유지되는 것은 아니다.
+| 검증 | 결과 |
+|---|---|
+| 전체 솔루션 Debug | 성공, 종료 0, 빌드 오류 0, 12분 48초 |
+| 전체 솔루션 Release | 성공, 종료 0, 빌드 오류 0, 16분 31초 |
+| reflgen 속성 배치 | 자기 검사 및 헤더 52개·속성 블록 295개 통과 |
+| 컨테이너 분류 | Debug/Release 모두 통과 |
+| 컨테이너 값·저장 형상 왕복 | Debug 28축, 실패 0 |
+| 생성된 저장 계약 | Debug/Release 각각 4타입·20필드 일치, 런타임 필드 제외 |
+| Material Node Editor 제품 회귀 Debug | 1,344검사·최종 capture 5회·소스 1,139개 drift 0·정상 종료 |
+| Material Node Editor 제품 회귀 Release | 1,344검사·최종 capture 5회·소스 1,139개 drift 0·정상 종료 |
+| 대시보드 | 전체 JS 파싱, 435항목·산수 검사·유한한 진행률 통과 |
 
-## 다시 확인할 순서
+제품 회귀는 격리된 검증 프로젝트를 실제 Editor에서 열고 HTTP 명령으로
+동일한 LXDocument를 편집했다. 문서 ID/revision 충돌 거부, 값·연결·접힘,
+Undo/Redo·Save/Reload, Apply 실패 시 마지막 정상 generation 유지,
+Scene 저장·새 프로세스 재개방 및 Scene/구체 미리보기 픽셀 변화를 확인한다.
+Debug/Release GPU validation 문제·누락 메시지는 각각 0이다. 기동 시 엔진의
+`VerifyReflectRegistration()`도 통과했다. 성능 재측정을 목적으로 한 실행은 아니다.
 
-1. vcpkg port·patch와 imported targets identity를 기록한다
-2. 생성 입력과 registration TU의 serializer 가시성을 확인한다
-3. Debug/Release compile·부팅 검증을 각각 수행한다
-4. 저장→재로드, property change, post-load, Editor Undo/Apply를 수행한다
-5. 재질 화면·GPU 결과·성능은 해당 렌더 검증에서 별도로 판정한다
+빌드 로그에는 MSVC 변환·링커(`LNK4075`, `LNK4229`)와 .NET trimming 경고가 있다.
+생성기는 반영 선언 밖의 clang 진단 2건을 `RG0101` 안내로 보고했다
+(`AuthoringRymlErrorPolicy.h` 주석 위치). 생성된 저장 계약 검사와 MSVC 컴파일,
+실제 Editor 기동·직렬화 회귀 결과를 각각 확인한다.
 
-이번 작업은 1~2의 소스 연결을 읽은 문서 재작성이다. 기존 JSON의 build 성공이나 Editor 검사를 이번 실행으로 주장하지 않는다. 자세한 사용 계약은 [ReflectionDesign](../design/ReflectionDesign.md)을 따른다.
+설치·빌드·회귀 집계와 소스 identity는
+[ReflgenPhase425Integration.json](ReflgenPhase425Integration.json)에 보존한다.
+원시 빌드/회귀 로그는 로컬 `Build/Obj/ReflgenIntegration/`에 있다.
 
-## 구현 근거
+첫 manifest 빌드는 reflgen 설치를 완료한 뒤 MSBuild targets를 다시 읽도록
+재빌드를 안내했다. 새 의존성을 설치한 첫 실행의 결과이며, 실제 컴파일 검증은
+그 다음 빌드 결과를 사용한다.
 
-- [ports/reflgen/portfile.cmake](../../ports/reflgen/portfile.cmake)
-- [Directory.Build.targets](../../Directory.Build.targets)
-- [Engine/RenderEngine/ReflgenRegistration.h](../../Engine/RenderEngine/ReflgenRegistration.h)
-- [Engine/SceneRuntime/RegisterReflectManual.h](../../Engine/SceneRuntime/RegisterReflectManual.h)
-- [Engine/SceneRuntime/ComponentFactory.cpp](../../Engine/SceneRuntime/ComponentFactory.cpp)
+## 남는 범위
+
+이번 작업은 reflgen 통합과 빌드·편집/저장 회귀 확인이다. MAT-9의 박막 이미지 차이,
+Special·텍스처/조명 입력 및 경로별 대조·최종 성능 수용은 남아 있다.
+최초 ImGui scale 0.8 원인 분석도 사용자가 미룬 후속 항목으로 유지한다.
+원시 `Dynamic_CPP/2026-09-30-1135.ceprof`는 로컬에 보존하고 소스 커밋에 넣지 않는다.

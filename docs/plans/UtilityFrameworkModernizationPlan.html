@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/UtilityFrameworkModernizationPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>유틸리티 프레임워크 현대화 — 표준 회귀와 죽은 코드 정리 (PHASE 15)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-전략-요약">0. 전략 요약</a></li><li><a href="#1-실측--2026-08-14-전수-조사">1. 실측 — 2026-08-14 전수 조사</a></li><li><a href="#2-트랙-구조">2. 트랙 구조</a></li><li><a href="#3-단계별">3. 단계별</a></li><li><a href="#4-게이트-관례">4. 게이트 관례</a></li><li><a href="#5-이-계획이-다루지-않는-것">5. 이 계획이 다루지 않는 것</a></li><li><a href="#6-진행-상태">6. 진행 상태</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="UtilityFrameworkModernizationPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>유틸리티 프레임워크 현대화 — 표준 회귀와 죽은 코드 정리 (PHASE 15)</h1>
+<div class="meta"><p>작성: 2026-08-14 · 계기: <code>Core.Assert.hpp</code> 제거 논의. &quot;사용하는 곳이 없는데 없애도
+되지 않을까&quot;에서 출발해 전수 조사로 확대했고, 같은 성격의 것이 더 있다는 것이 실측으로
+확인됐다. 이어서 <code>HashingString</code> 분석 결과를 <strong>트랙 H</strong>로 편입했다.</p>
+<p>2026-08-17 추가: &quot;<code>Mathf</code>가 SimpleMath/DirectXMath 별칭에 가까운데 자체 라이브러리로
+전환할 값이 있는가&quot;라는 질문에서 출발해 별칭 계층을 실측했다. 당시 자체 구현 전환은
+기각(M5)했지만 계층 자체의 결함 6종이 드러나 <strong>트랙 M</strong>을 신설했다. §5가 트랙 C로
+미뤄 두었던 <code>Core.Mathf.h</code>의 assimp 의존이 실은 소비자 0인 죽은 코드였다는 것이
+이 조사의 가장 값싼 수확이다.</p>
+<p>2026-08-25 갱신: M5의 &quot;새 수학 라이브러리를 여기서 다시 구현한다&quot;는 기각 근거는
+유효하지만, 별도 저장소 <a href="https://github.com/29thnight/Mathematics"><code>29thnight/Mathematics</code></a>가
+DirectXMath parity·packed value type·SSE2/AVX2/NEON·scalar fallback을 구현하면서 전제가
+바뀌었다. 외부 정본으로의 단계 이주는 <a href="MathematicsMigrationPlan.html">MathematicsMigrationPlan.md</a>가
+승계한다. M0~M4는 그 이주의 선행 cleanup으로 유지한다.</p>
+<p>관련 문서: <code>Phase5CouplingPlan.md</code>(간선 절단 — 우산 헤더 문제를 공유),
+<code>SceneGraphRedesignPlan.md</code>(트랙 H의 §6 항목이 그쪽 트랙 E의 <code>GetGameObject</code> 60곳과 겹친다),
+<code>BuildPipelinePlan.md</code>(트랙 구조·게이트 관례를 승계).</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#0-전략-요약"><span class="ve-label">§0</span><span class="map-name">전략 요약</span><span class="map-bar"><i style="width:4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-실측--2026-08-14-전수-조사"><span class="ve-label">§1</span><span class="map-name">실측 — 2026-08-14 전수 조사</span><span class="map-bar"><i style="width:72.8%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#2-트랙-구조"><span class="ve-label">§2</span><span class="map-name">트랙 구조</span><span class="map-bar"><i style="width:6.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-단계별"><span class="ve-label">§3</span><span class="map-name">단계별</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-게이트-관례"><span class="ve-label">§4</span><span class="map-name">게이트 관례</span><span class="map-bar"><i style="width:1.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-이-계획이-다루지-않는-것"><span class="ve-label">§5</span><span class="map-name">이 계획이 다루지 않는 것</span><span class="map-bar"><i style="width:4.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-진행-상태"><span class="ve-label">§6</span><span class="map-name">진행 상태</span><span class="map-bar"><i style="width:5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「3. 단계별」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><hr>
+</section>
+<section class="doc-sec" id="sec-0-전략-요약">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-전략-요약">0. 전략 요약</h2></div>
+<div class="prose"><p><strong>세 갈래를 구분한다.</strong> &quot;정리&quot;라는 한 단어로 뭉뚱그리면 위험도가 전혀 다른 작업이 섞인다.</p>
+<ul>
+<li><strong>죽은 코드</strong> — 소비자가 실제로 0인 것. 지우면 끝이고 회귀 위험이 거의 없다.</li>
+<li><strong>표준으로 회귀</strong> — C++23 표준이 제공하는데 직접 구현해 둔 것. 프로젝트 공통
+기본값은 <code>stdcpp23</code>이다(<code>Directory.Build.props</code>). 자작 구현이 표준보다 나은 근거가
+없다면 표준이 옳다. <strong>단, 동작이 같음을 확인한 뒤에만 옮긴다.</strong></li>
+<li><strong>결함 수정</strong> — 살아 있는데 잘못 만들어진 것. HashingString과 <code>Core.Runtime.h</code>가 여기다.
+이건 정리가 아니라 수리이고, 우선순위가 가장 높다.</li>
+</ul>
+<p><strong>순서의 원칙: 지우는 것이 먼저, 옮기는 것이 나중.</strong> 죽은 코드를 먼저 걷어내야 표준
+대체 작업의 표면이 줄어든다. 반대로 하면 곧 지울 것을 이식하는 데 시간을 쓰게 된다.</p>
+<p><strong>단, §1.1의 UB 한 건은 이 순서 밖이다.</strong> 표준 라이브러리의 계약을 깨는 코드가
+거의 전 코드베이스에 퍼져 있고, 이건 정리가 아니라 지혈이다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-실측--2026-08-14-전수-조사">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-실측--2026-08-14-전수-조사">1. 실측 — 2026-08-14 전수 조사</h2></div>
+<div class="prose"><p>방법: 프로젝트 소스 1,185개(vcpkg·빌드 산출물 제외)에서 <code>#include</code> 그래프를 만들고,
+각 유틸리티의 주요 타입명을 <strong>선언 파일 자신을 제외한</strong> 나머지 전체에서 역추적했다.
+include 수만 세면 <code>Core.Minimal.h</code>가 전이로 끌어오는 것들이 전부 &quot;미사용&quot;으로 잘못
+잡히기 때문에, 심볼 소비자를 기준으로 판정했다.</p>
+<p>Utility_Framework: <strong>73개 파일</strong>.</p>
+<h3 id="11-표준-라이브러리-네임스페이스-침범--최우선">1.1 표준 라이브러리 네임스페이스 침범 — 최우선</h3>
+<p><code>Core.Runtime.h</code> 전문이 이것이다:</p>
+<pre><code class="language-cpp">namespace std
+{
+    class null_exception : public std::exception { ... };
+}</code></pre>
+<p><code>namespace std</code>에 사용자 선언을 추가하는 것은 <strong>정의된 동작이 아니다</strong>([namespace.std]).
+표준이 허용하는 것은 사용자 타입에 대한 일부 템플릿 특수화뿐이고, 새 클래스 추가는
+여기에 해당하지 않는다. 구현체가 같은 이름을 도입하면 그 자리에서 깨지고, 그때
+에러 메시지는 원인 지점을 가리키지 않는다.</p>
+<p>여파가 넓다 — <code>Core.Runtime.h</code>는 <code>Core.Minimal.h:4</code>에 들어 있고, <code>Core.Minimal.h</code>는
+사실상 전 코드베이스의 진입 헤더다. 즉 <strong>이 UB가 거의 모든 번역 단위에 있다.</strong></p>
+<p>실사용은 좁다(같은 날 실측): <code>Component.cpp:12</code>·<code>:20</code> 두 곳뿐이고, <code>Component.inl:9</code>·<code>:25</code>는
+주석 처리되어 있다. <strong>표면이 2줄이라 S0의 실제 작업량은 매우 작다</strong> — 위험도가 낮은데
+여파가 큰, 먼저 처리해야 할 전형적인 항목이다.</p>
+<h3 id="12-소비자가-실제로-0인-것">1.2 소비자가 실제로 0인 것</h3>
+<p>선언 파일을 제외한 전체 소스에서 참조 0건:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>파일</th><th>크기</th><th>비고</th></tr></thead>
+<tbody><tr><td><code>FileReader</code> / <code>FileWriter</code></td><td><code>FileIO.h</code></td><td class="num">2.3KB</td><td>파일 전체가 죽었다 — 2026-08-24 삭제 완료</td></tr>
+<tr><td><code>Fence</code></td><td><code>Core.Fence.h</code></td><td class="num">2.8KB</td><td>include 소비자 0 — 2026-08-24 삭제 완료</td></tr>
+<tr><td><code>Aes256Ctr</code> · <code>LZ4Codec</code></td><td><code>Paklib.hpp</code> 내부</td><td>—</td><td>§1.5 참조</td></tr>
+<tr><td><code>RenderCommandFence</code> · <code>RHICommandFence</code></td><td>옛 <code>EngineSetting.h:129-130</code></td><td>—</td><td>2026-08-24 재검사 시 선언도 이미 없음</td></tr></tbody></table></div>
+<p><code>Paklib.hpp</code> 자체는 살아 있다 — <code>PakHelper.h:155·465</code>가 <code>Pak::Builder</code>/<code>Pak::Archive</code>를
+쓴다. 죽은 것은 그 안의 암호화·압축 코덱이다.</p>
+<p><code>DirectXHelper.h</code>는 삭제 대상이 아니다. <code>ComException</code>을 외부에서 직접 부르는 곳은
+없지만 <code>Texture.cpp</code>가 <code>Win32::ThrowIfFailed</code>를 15곳에서 호출하고, 그 함수가
+<code>ComException</code>을 구성한다. 선언 파일 밖의 타입 이름 횟수만으로 헤더 전체를 죽었다고
+판정했던 이전 기록을 2026-08-24 소스 재검사에서 바로잡았다.</p>
+<h3 id="13-소비자가-1곳뿐인-것-표준-대체-후보">1.3 소비자가 1곳뿐인 것 (표준 대체 후보)</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>유틸</th><th>유일한 소비자</th><th>C++20 표준 대응</th></tr></thead>
+<tbody><tr><td><code>Core.CountingSemaphore.h</code></td><td><code>Core.ThreadPool.h</code></td><td><code>std::counting_semaphore</code></td></tr>
+<tr><td><code>MemoryPool.h</code> / <code>.inl</code> (6.7KB)</td><td><code>Core.Memory.hpp</code></td><td>— (표준 없음, 존치 판단)</td></tr>
+<tr><td><code>RingBuffer.h</code></td><td><code>LogSink.h</code></td><td>— (표준 없음, 존치 판단)</td></tr>
+<tr><td><code>MetaStateCommand.h</code></td><td><code>ReflectionFunction.h</code></td><td>—</td></tr>
+<tr><td><code>CoroutineHelper.h</code> (<code>YieldInstruction</code>)</td><td><code>Core.Coroutine.h</code></td><td>—</td></tr>
+<tr><td><code>LinkedListLib.hpp</code></td><td><code>Core.Coroutine</code> 2곳</td><td><code>std::list</code> 검토</td></tr></tbody></table></div>
+<p>소비자 1곳은 &quot;죽었다&quot;가 아니라 **&quot;추상화가 값을 못 하고 있다&quot;**는 신호다. 재사용을
+전제로 만든 일반 유틸리티인데 쓰는 곳이 하나면, 그 하나에 인라인하는 편이 나을 수
+있다. 개별 판정이 필요하다.</p>
+<h3 id="14-살아-있는-것--표준-대체-검토-대상">1.4 살아 있는 것 — 표준 대체 검토 대상</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>유틸</th><th>외부 소비자</th><th>표준 대응</th><th>판정</th></tr></thead>
+<tbody><tr><td><code>Core.Barrier.h</code> (<code>Barrier</code>)</td><td>0 — 3-2G에서 삭제</td><td>—</td><td><span class="chip ok"><strong>은퇴 완료</strong> — 아래</span></td></tr>
+<tr><td><code>Core.Thread.h</code> (<code>Thread</code>)</td><td>9파일</td><td><code>std::jthread</code> + <code>std::stop_token</code></td><td>유력</td></tr>
+<tr><td><code>Core.ThreadPool.h</code></td><td>7파일</td><td>—</td><td>존치</td></tr>
+<tr><td><code>WorkerPool.h</code></td><td>3파일</td><td>—</td><td>존치</td></tr>
+<tr><td><code>SpinLock.h</code></td><td>55회 / 5파일</td><td>—</td><td>존치</td></tr>
+<tr><td><code>Singleton</code> (<code>ClassProperty.h</code>)</td><td>56회 / 24파일</td><td>—</td><td>존치</td></tr></tbody></table></div>
+<p><code>Barrier</code>는 당시 역할·페이즈·<code>Finalize()</code> 의미 때문에 <code>std::barrier</code>로 1:1 교체할
+수 없었다. 3-2G에서 프레임 스냅샷 producer/consumer 전환이 완료되자 교체할 필요
+자체가 사라졌다. 빈 CommandBuild 스레드와 Game/CB/CE 랑데뷰, syncstats CLI,
+프로젝트 항목을 함께 제거하고 GT→Presentation 단방향 latest-wins 통지로 바꿨다.</p>
+<p><code>Core.Thread.h</code>는 <code>Start</code>/<code>Stop</code>/<code>RequestStop</code>/<code>Join</code> + <code>std::atomic&lt;bool&gt;</code> 정지 플래그로,
+<code>std::jthread</code>의 <code>stop_token</code>과 의미가 거의 같다. 여기가 가장 이식하기 쉽다.</p>
+<h3 id="15-문서와-구현의-불일치">1.5 문서와 구현의 불일치</h3>
+<p><code>README.md:70</code>은 이렇게 적고 있다:</p>
+<blockquote>
+<p>팩 파일 시스템: <code>Paklib</code> 헤더는 LZ4 압축 훅, AES-256-CTR 암호화, SHA-256 무결성
+검사를 갖춘 패키징 런타임을 제공합니다.</p>
+</blockquote>
+<p>그런데 <code>Paklib.hpp:7</code>은 이렇게 적고 있다:</p>
+<blockquote>
+<p>LZ4 사용: 프로젝트에 LZ4를 추가하고, 아래 Pak::Compression::LZ4Codec 구현의
+TODO 표시된 부분을 채우세요.</p>
+</blockquote>
+<p><code>vcpkg.json:43</code>에 lz4 의존성은 이미 있는데 코덱은 TODO 상태이고, 소비자도 0이다.
+<code>EngineStructureAnalysis.html:292</code>와 <code>:650</code>도 README와 같은 주장을 반복한다.
+<strong>빌드된 pak이 압축·암호화되지 않는다는 뜻이며</strong>, 배포 산출물의 성질에 관한
+문제이므로 <code>EnginePackagingPlan.md</code>와 교차 확인이 필요하다.</p>
+<h3 id="16-껍데기-헤더">1.6 껍데기 헤더</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>파일</th><th>내용</th></tr></thead>
+<tbody><tr><td><code>Core.Thread.hpp</code> (42B)</td><td><code>#include &quot;Core.ThreadPool.h&quot;</code> 한 줄</td></tr>
+<tr><td><code>Reflection.hpp</code> (42B)</td><td><code>#include &quot;ReflectionMecro.h&quot;</code> 한 줄</td></tr></tbody></table></div>
+<p>이름이 가리키는 것과 내용이 다르다 — <code>Core.Thread.hpp</code>를 열면 스레드가 아니라
+스레드 풀이 나오고, <code>Core.Thread.h</code>(다른 파일)와 확장자 하나로 갈린다.
+<code>ReflectionMecro.h</code>는 철자도 틀려 있다(Mecro → Macro).</p>
+<h3 id="17-우산-헤더">1.7 우산 헤더</h3>
+<p><code>Core.Minimal.h</code>는 8개 헤더를 끌어온다 — <code>Core.Definition.h</code>, <code>Core.Mathf.h</code>,
+<code>Core.Runtime.h</code>, <code>Core.Memory.hpp</code>, <code>Core.Coroutine.h</code>, <code>PathFinder.h</code>,
+<code>LogSystem.h</code>, <code>Delegate.h</code>. (<code>Reflection.hpp</code>는 PHASE 18 CT3에서 빠졌다 —
+<code>Core.Minimal.h:9</code>의 주석이 그 이력이다. <strong>U1의 &quot;<code>Core.Minimal.h:9</code>가 쓰므로&quot;
+서술은 그 시점에 낡았다.</strong>)</p>
+<p><code>Core.Mathf.h</code>(21KB)는 그 안에서 다시 assimp 3종과 nlohmann/json을 끌어온다. 즉
+<code>Core.Minimal.h</code> 한 줄이 assimp와 json 전체를 모든 TU에 넣는다. 유니티 빌드에서는
+이 비용이 한 번으로 상쇄되지만, <strong>전이 include가 의존성을 감추는 문제</strong>는 그대로다.
+이건 <code>Phase5CouplingPlan.md</code>의 간선 절단과 같은 성격이라 그쪽 래칫 게이트와
+함께 다뤄야 한다.</p>
+<p><strong>단 이 둘의 성질이 다르다</strong> — §1.10에서 실측했다. assimp를 끄는 것은 <code>Core.Mathf.h</code>
+<strong>하나뿐</strong>이라 그 안의 소비자 0 헬퍼를 지우면 간선이 사라진다(→ M0). json은
+<code>Core.Definition.h:72</code> → <code>TypeDefinition.h:7</code>이 <strong>따로</strong> 열고 있어, <code>Core.Mathf.h</code>에서
+빼도 307 TU 도달은 그대로다. 즉 json은 중복 간선 제거이지 도달 축소가 아니다.</p>
+<h3 id="18-hashingstring-2026-08-14-분석">1.8 HashingString (2026-08-14 분석)</h3>
+<p><code>Object::m_name</code> / <code>GameObject::m_tag</code> / <code>GameObject::m_layer</code> / <code>Scene::m_sceneName</code>의
+타입이라 오브젝트 모델 전반에 걸려 있다. 외부 참조 21회 / 9파일.</p>
+<p>설계 의도(문자열 비교 O(n) → 해시 비교 O(1))는 타당하고 해시 1회 계산도 의도대로
+동작하지만, <strong>이득을 회수하는 지점이 전부 값 복사로 막혀 있다.</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>결함</th><th>근거</th><th>여파</th></tr></thead>
+<tbody><tr><td>H-a</td><td>인스펙터 이름 편집이 3중으로 깨짐</td><td><code>ReflectionImGuiHelper.h:538-540</code></td><td>아래 상술</td></tr>
+<tr><td>H-b</td><td><code>string_view::data()</code>를 <code>const char*</code>로 전달</td><td><code>Scene.cpp:411</code>, <code>GameObject.h:44</code></td><td>널 종료 미보장 → UB, 길이 정보 소실</td></tr>
+<tr><td>H-c</td><td><code>==</code>는 해시만, <code>&lt;=&gt;</code>는 해시+문자열</td><td><code>:72</code> vs <code>:65</code></td><td>표준 알고리즘의 ==/&lt; 일관성 위반</td></tr>
+<tr><td>H-d</td><td><code>GetHashedName()</code>·<code>ToString()</code> 값 반환</td><td><code>Object.h:40</code> 외 3곳</td><td>충돌 콜백 경로에서 할당 2회</td></tr>
+<tr><td>H-e</td><td><code>std::hash&lt;HashingString&gt;</code> 특수화 없음</td><td>—</td><td>해시 컨테이너 키로 못 씀</td></tr>
+<tr><td>H-f</td><td><code>Scene::GetGameObject</code>가 O(n) + 요소마다 복사</td><td><code>Scene.cpp:409-420</code></td><td><code>std::string</code> 선형 탐색보다 느릴 수 있음</td></tr>
+<tr><td>H-g</td><td><code>data()</code>/<code>size()</code>가 non-const</td><td><code>:97-98</code></td><td><code>const&amp;</code>로는 <code>size()</code>조차 못 부름</td></tr>
+<tr><td>H-h</td><td>빈 문자열 정책 4갈래</td><td>생성자·대입·기본생성·<code>SetString</code></td><td>즉사 / 통과 / 합법이 경로마다 다름</td></tr></tbody></table></div>
+<p><strong>H-a 상술</strong> — <code>ReflectionImGuiHelper.h:538</code>:</p>
+<pre><code class="language-cpp">HashingString value = std::any_cast&lt;HashingString&gt;(prop.getter(instance));  // 복사본
+if (ImGui::InputText(prop.name, value.data(), value.size() + 1))</code></pre>
+<ol>
+<li>복사본을 편집하고 <code>prop.setter</code>를 부르지 않는다 → <strong>편집이 반영되지 않는다.</strong></li>
+<li><code>data()</code>가 <code>char*</code>를 노출해 ImGui가 내부 버퍼에 직접 쓴다 → <strong><code>m_hash</code>가 갱신되지
+않아 문자열과 해시가 어긋난다.</strong> 이 상태의 <code>==</code> 결과는 전부 신뢰할 수 없다.</li>
+<li>버퍼 크기로 <code>size() + 1</code>(= 현재 길이)을 넘긴다 → <strong>이름을 늘릴 수 없고</strong>,
+<code>capacity()</code>를 넘는 경우 범위 밖 쓰기가 된다.</li>
+</ol>
+<p>근본 원인은 해시를 캐시하는 타입이 내부 버퍼의 쓰기 권한을 외부에 준 것이다.</p>
+<p><strong>H-f 상술</strong> — <code>Scene.cpp:411</code>:</p>
+<pre><code class="language-cpp">HashingString hashedName(name.data());
+for (auto&amp; obj : m_SceneObjects)
+    if (obj &amp;&amp; obj-&gt;GetHashedName() == hashedName)   // 요소마다 문자열 복사</code></pre>
+<p><code>GetHashedName()</code>이 값 반환이라 <strong>순회하는 오브젝트 수만큼 힙 할당</strong>이 일어난다.
+해시 하나를 비교하려고 문자열을 통째로 복사한다 — 이 클래스를 쓰는 목적과 정반대다.
+<code>ConsoleCommandSystem.cpp</code>에서만 이 오버로드를 14곳 호출한다.</p>
+<h3 id="19-plf_colonyh--배치가-잘못됐다-2026-08-14-추가-실측">1.9 <code>plf_colony.h</code> — 배치가 잘못됐다 (2026-08-14 추가 실측)</h3>
+<p>214KB 단일 헤더가 <code>Core.Definition.h:78</code>에 들어 있다. <code>Core.Definition.h</code>는
+<code>Core.Minimal.h:2</code>이므로, <strong>이 헤더가 소스 1,185개 대부분에 파싱된다.</strong></p>
+<p>그런데 실제 소비자는 <strong><code>AIManager.h:69-70</code> 두 멤버, 단 한 파일</strong>이다.</p>
+<p><strong>존폐 문제가 아니라 배치 문제다.</strong> <code>Core.Definition.h</code>에서 빼고 <code>AIManager.h</code>가
+직접 include하면 끝난다. 소비자가 하나뿐이라 위험도가 매우 낮다 → U4.</p>
+<p>컨테이너 선택 자체는 두 사용처의 판정이 갈린다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>멤버</th><th>요건</th><th>판정</th></tr></thead>
+<tbody><tr><td><code>plf::colony&lt;BlackBoard&gt; m_blackBoards</code></td><td><code>m_blackBoardFind</code>가 <code>BlackBoard*</code>를 보관(<code>:68</code>) → <strong>포인터 안정성 필수</strong></td><td><strong>적합</strong></td></tr>
+<tr><td><code>plf::colony&lt;pair&lt;weak_ptr&lt;GameObject&gt;, IAIComponent*&gt;&gt; m_aiComponentMap</code></td><td>조회 0회, 전부 선형 순회</td><td><strong>부적합</strong></td></tr></tbody></table></div>
+<p><strong><code>m_blackBoards</code>는 올바른 선택이다.</strong> <code>AIManager.cpp:16-18</code>이 <code>&amp;(*it)</code>로 주소를 꺼내
+맵에 넣으므로 <code>vector</code>(재할당)도 <code>deque</code>(중간 삭제)도 쓸 수 없다. colony가 정확히
+이 용도다. 다만 이점을 절반만 쓴다 — <code>AIManager.cpp:28</code>이 하나를 지우려고 전체를
+순회한다. <code>m_blackBoardFind</code>가 포인터 대신 <code>colony::iterator</code>를 들면 O(1)이 된다.</p>
+<p><strong><code>m_aiComponentMap</code>은 되돌리는 편이 낫다.</strong> 주석이 이력을 남기고 있다 —
+<code>AIManager.cpp:89</code>·<code>:99-103</code>에 <code>unordered_map</code> 시절의 <code>find</code>/<code>erase(it)</code>가 주석으로
+있다. colony로 바꾸면서 O(1) 조회를 잃고 O(n) <code>erase_if</code>(<code>:105</code>)를 얻었는데,
+<strong>여기서 포인터 안정성은 요건이 아니다</strong>(pair를 가리키는 외부 포인터가 없다).
+순회가 주 작업이면 <code>vector</code>가 colony보다 빠르다 — colony는 삭제 슬롯을 건너뛰려
+skipfield를 읽어 순회에 분기가 붙는다.</p>
+<h3 id="110-coremathfh--별칭-계층-평가-2026-08-17-추가-실측">1.10 <code>Core.Mathf.h</code> — 별칭 계층 평가 (2026-08-17 추가 실측)</h3>
+<p>계기: &quot;<code>Mathf</code>는 DirectXTK SimpleMath / DirectXMath의 별칭에 가까운데, 자체 라이브러리로
+전환할 값이 있는가.&quot; 2026-08-17 당시 엔진 안에서 새로 구현하는 안은 기각했다(M5).
+그 판단을 위해 표면을 재는 과정에서 별칭 계층 자체의 결함이 드러났고, 이 결함 정리는
+외부 Mathematics 이주 결정 뒤에도 그대로 선행 조건이다.</p>
+<p>사용 규모:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>수치</th></tr></thead>
+<tbody><tr><td><code>Mathf::*</code> 타입 사용</td><td>1,706회 / 243파일</td></tr>
+<tr><td>raw DirectXMath (<code>XMVECTOR</code>·<code>XMMatrix*</code>·<code>XMLoad*</code>…)</td><td>992회 / 104파일</td></tr>
+<tr><td><code>DirectX::SimpleMath::</code> <strong>직접</strong> 참조 (별칭 우회)</td><td>448회 / 57파일 — Physics 모듈 전체</td></tr>
+<tr><td>실사용 API 표면</td><td>정적 35종 + 인스턴스 13종 ≈ 50개</td></tr>
+<tr><td><code>Core.Minimal.h</code> 경유 도달 TU</td><td class="num">307개</td></tr></tbody></table></div>
+<p><strong>구조를 먼저 확정해 둔다.</strong> <code>SimpleMath::Vector3</code>는 <code>XMFLOAT3</code>을 <strong>상속</strong>하고
+<code>operator XMVECTOR()</code>를 가진다(<code>SimpleMath.h:228</code>·<code>:244</code>, Vector2/4·Quaternion·Color도 동형).
+즉 <code>Mathf</code>는 이름 별칭이 아니라 <strong>암시적 변환 브리지</strong>이고, raw DirectXMath 호출
+992곳이 그 브리지에 얹혀 있다 — 예: <code>Core.Mathf.h:223</code>이 <code>Quaternion</code>을
+<code>XMMatrixRotationQuaternion</code>의 <code>XMVECTOR</code> 파라미터에 그대로 넘긴다. 이 성질은
+Mathematics 이주에서 alias swap을 금지하고 명시적 수직 슬라이스를 요구하는 1차 근거다.</p>
+<p>결함 — 전부 전환 여부와 무관하게 성립한다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>결함</th><th>근거</th><th>여파</th></tr></thead>
+<tbody><tr><td>M-a</td><td>assimp 3헤더 + nlohmann/json을 307 TU에 주입</td><td><code>Core.Mathf.h:3-7</code></td><td>그 소비자는 <strong>0개</strong> — 아래</td></tr>
+<tr><td>M-b</td><td>헤더 최상단 <code>using namespace DirectX;</code></td><td><code>:9</code></td><td>307 TU 전역 오염 (§1.1과 같은 부류)</td></tr>
+<tr><td>M-c</td><td>헤더의 <code>static</code> 전역 8개</td><td><code>:28-35</code></td><td>TU마다 사본 + 동적 초기화 — 아래</td></tr>
+<tr><td>M-d</td><td>Lerp 정본 3중 · Distance/Normalize/Clamp 중복</td><td><code>:44</code>·<code>:75</code>·<code>:80</code>·<code>:261</code>·<code>:266</code>·<code>:576</code></td><td>아래</td></tr>
+<tr><td>M-e</td><td>수학이 아닌 것 동거 — <code>Easing</code>·<code>Tweener</code>·<code>ITween</code>·<code>Tween</code></td><td><code>:283-681</code> (파일의 59%)</td><td><code>Easing</code> 21파일·<code>Tweener</code> 10파일이 수학 헤더에 묶임</td></tr>
+<tr><td>M-f</td><td><code>constexpr float halfPi = 1.5707963267948966…;</code></td><td><code>:13</code> (<code>pi</code>·<code>pi2</code> 동일)</td><td>double 리터럴 → float 축소 대입</td></tr></tbody></table></div>
+<p><strong>M-a 상술 — assimp/json 헬퍼의 소비자가 0이다.</strong> 선언 파일을 제외한 전체 소스에서
+참조 0건을 확인했다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>헬퍼</th><th>끌고 오는 의존</th></tr></thead>
+<tbody><tr><td><code>aiToXMMATRIX</code> · <code>aiToFloat3</code> · <code>aiToFloat2</code> · <code>CreateBoneIndex</code> · <code>CreateBoneWeight</code></td><td>assimp 3헤더</td></tr>
+<tr><td><code>jsonToVector2</code> · <code>jsonToVector3</code> · <code>jsonToColor4</code></td><td>nlohmann/json</td></tr></tbody></table></div>
+<p>즉 §1.7이 &quot;트랙 C의 일부&quot;로 미뤄 둔 문제가 <strong>실은 트랙 U 성격이었다.</strong> 죽은 헬퍼
+8개를 지우면 assimp include 3줄이 근거를 잃는다. assimp를 여는 프로젝트 헤더는
+<code>Core.Mathf.h</code> 외에 <code>Mesh.h</code>·<code>Model.cpp</code>·<code>ModelLoader.cpp</code> 셋뿐이므로, 실제 assimp
+소비자 8파일(<code>AnimationLoader</code>·<code>SkeletonLoader</code>·<code>ModelLoader</code> 계열) 중 전이에
+기대던 곳만 직접 include로 고치면 끝난다. <strong>json은 §1.7 단서대로 도달이 줄지 않는다.</strong></p>
+<p>같은 조사에서 소비자 0인 것이 더 나왔다 — <code>ConvertToDistance</code>, <code>EularToQuaternion</code>,
+<code>Mathf::lerp</code>(소문자), <code>Mathf::Wrap</code>, <code>ClampedIncrementOrDecrement</code>, <code>Mathf::Slerp</code>,
+<code>Mathf::ToDegrees</code>, <code>xVColor4</code>, 그리고 <code>xVectorUp</code>·<code>Down</code>·<code>Right</code>·<code>Left</code>·<code>Forward</code> 5개.</p>
+<p><strong>M-c 상술.</strong> <code>XMMatrixIdentity()</code>·<code>XMVectorSet()</code>은 <code>constexpr</code>가 아니다(내부 전역
+<code>g_XM*</code> 상수를 참조한다). 헤더의 <code>static</code>은 내부 링키지이므로 <strong>307 TU × 8개의
+사본과 동적 초기화</strong>가 된다. 그런데 살아 있는 소비자는 3줄뿐이다 —
+<code>FoliageComponent.cpp:359</code>(<code>xMatrixIdentity</code>), <code>Transform.cpp:451-453</code>
+(<code>xVectorZero</code> ×2, <code>xVectorOne</code>). 나머지 5개는 위 목록대로 죽었다.</p>
+<p><strong>M-d 상술.</strong> <code>Mathf::Distance</code>(<code>:261</code>)는 <code>powf</code> 3회 + <code>sqrtf</code>로
+<code>Vector3::Distance</code>를 느리게 재구현한 것이다. 실사용은 <code>EntityAsis.cpp</code> 한 파일뿐이고,
+<code>Vector3::Distance</code> 쪽이 15회로 실질 정본이다. <code>Mathf::Normalize</code>(<code>:266</code>)도 같은
+파일 하나가 유일한 소비자다. Lerp는 <code>lerp</code>(<code>:44</code>, 소비자 0) · <code>Lerp</code>(<code>:75</code>·<code>:80</code>·<code>:85</code>,
+16파일) · <code>LerpHelper</code>(<code>:576</code>, <code>Tweener</code> 전용)로 셋이 공존한다.</p>
+<p><strong>2026-08-17 당시 존치 판정</strong> — <code>Mathf::Rect</code>(38회, SimpleMath에 없다),
+<code>Mathf::xMatrix</code>(37파일) · <code>xVector</code>(22파일)를 지우지 않는다고 판단했다. 2026-08-25
+Mathematics 이주에서는 이 중 Rect는 UI 도메인 타입으로 분리하고, xMatrix/xVector는
+저장 타입과 레지스터 타입을 구분해 제거한다. 상세 순서는 MathematicsMigrationPlan을 따른다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-트랙-구조">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-트랙-구조">2. 트랙 구조</h2></div>
+<div class="prose"><p>네 트랙은 <strong>서로 독립적으로 가치가 있고</strong>, 어디서 멈춰도 그 시점의 개선이 남는다.
+다만 S0만은 순서 밖에서 먼저 처리한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>트랙</th><th>내용</th><th>위험도</th><th>선행</th></tr></thead>
+<tbody><tr><td><strong>S</strong> (Standard)</td><td>표준 회귀 — UB 제거, C++20 프리미티브</td><td>S0 낮음 / S1~ 중간</td><td>S0은 즉시</td></tr>
+<tr><td><strong>U</strong> (Unused)</td><td>죽은 코드·껍데기·문서 불일치 정리</td><td>낮음</td><td>없음</td></tr>
+<tr><td><strong>H</strong> (HashingString)</td><td>결함 수정 + 성능 회수</td><td>H0<del>H2 낮음 / H3</del> 중간</td><td>없음</td></tr>
+<tr><td><strong>M</strong> (Mathf)</td><td>별칭 계층 정리 — 죽은 의존 축출·전역 오염·정본 통일</td><td>M0<del>M2 낮음 / M3</del>M4 중간</td><td>없음</td></tr>
+<tr><td><strong>C</strong> (Coupling)</td><td>우산 헤더 해체</td><td>높음</td><td>Phase4 래칫과 협조</td></tr>
+<tr><td><strong>K</strong> (Container)</td><td>자체 컨테이너 — <code>ce::dynamic_array</code></td><td>중간</td><td>리플렉션 특수화 선행</td></tr></tbody></table></div>
+<p><strong>권장 진행 순서: S0 → U0 → M0 → H0<del>H2 → U1 → M1</del>M2 → H3<del>H4 → M3</del>M4 → S1 → S2 → C.</strong>
+앞쪽 넷은 서로 겹치지 않아 병행 가능하다.</p>
+<p>M0을 U0 직후에 두는 이유는 이득/위험 비가 가장 좋기 때문이다 — 소비자 0인 헬퍼를
+지우는 것만으로 307 TU에서 assimp가 빠진다. 반대로 M3(Easing/Tween 분리)은 소비자
+21파일이라 뒤로 미룬다.</p>
+<p>★ <strong>트랙 K는 별도 문서로 분리했다</strong> — <a href="../design/ContainerLibraryDesign.html">ContainerLibraryDesign.md</a>.
+슬라이스(C0~C4)·기각 근거(realloc/<code>mi_expand</code>·SBO·할당자 매개변수화)·첫 소비자
+선정이 거기 있다. 트랙 H(HashingString)와 접점이 있다 — 둘 다 &quot;자체 제작물이
+표준이 공짜로 주는 것(정렬·등가 일관성)을 빠뜨렸다&quot;는 같은 사인이고, K의 설계가
+그 목록을 계약으로 박는다. 진입 조건은 <strong>리플렉션 특수화 선행</strong>이며 그 전에
+착수하면 <code>[[Property]]</code> 필드가 조용히 유실된다(설계안 §3).</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-단계별">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-단계별">3. 단계별</h2></div>
+<div class="prose"><h3 id="트랙-s--표준-회귀">트랙 S — 표준 회귀</h3>
+<h4 id="s0-namespace-std-침범-제거--순서-밖-최우선">S0. <code>namespace std</code> 침범 제거 · 순서 밖 최우선</h4>
+<p><code>Core.Runtime.h</code>의 <code>std::null_exception</code>을 프로젝트 네임스페이스로 옮긴다.</p>
+<ul>
+<li><code>Core::NullException</code>으로 옮기고 호출부 2곳(<code>Component.cpp:12</code>·<code>:20</code>)을 고친다.</li>
+<li><code>Component.inl:9</code>·<code>:25</code>의 주석도 함께 정리한다 (같은 이름이 되살아나지 않게).</li>
+<li>이때 예외 타입이 옳은지도 함께 본다 — &quot;소유자 미설정&quot;과 &quot;컴포넌트 없음&quot;에
+같은 예외를 쓰고 있고, 후자는 예외가 아니라 <code>nullptr</code> 반환이 맞을 수 있다.
+<strong>다만 이 판단은 S0의 범위 밖이다.</strong> 우선 네임스페이스만 옮긴다.</li>
+</ul>
+<p><strong>게이트</strong>: <code>namespace std</code> 안의 사용자 선언이 프로젝트 전체에서 0건. 빌드 통과.</p>
+<h4 id="s1-thread--stdjthread">S1. <code>Thread</code> → <code>std::jthread</code></h4>
+<p><code>Core.Thread.h</code>의 <code>Thread</code>(소비자 9파일)를 <code>std::jthread</code> + <code>std::stop_token</code>으로.
+정지 플래그(<code>m_stopRequested</code>)와 <code>RequestStop</code>/<code>Join</code>이 <code>stop_token</code>과 의미가 같다.</p>
+<p><strong>이때 함께 고칠 것</strong> — 현재 <code>Start()</code>는 어설션 뒤에 복구가 없다. 릴리스에서는
+어설션이 사라지므로 이미 실행 중인 스레드의 핸들을 덮어써 <strong>핸들 누수 + 원래 스레드
+미조인</strong>이 된다. <code>jthread</code> 이식이 이 문제를 구조적으로 없앤다.</p>
+<p><strong>게이트</strong>: 소비자 9파일 빌드 통과. 종료 경로에서 스레드 누수 0
+(<code>Tools/regression</code>의 셧다운 검사 통과).</p>
+<h4 id="s2-countingsemaphore--stdcounting_semaphore">S2. <code>CountingSemaphore</code> → <code>std::counting_semaphore</code></h4>
+<p>소비자가 <code>Core.ThreadPool.h</code> 하나뿐이라 표면이 작다. S1 이후에 한다.</p>
+<p><code>Barrier</code>는 3-2G에서 소비자와 함께 은퇴했다. <code>Fence</code>는 §1.2대로 <strong>사용처가 0</strong>이므로
+트랙 U에서 멤버 선언과 함께 지운다.</p>
+<h3 id="트랙-u--죽은-코드-정리">트랙 U — 죽은 코드 정리</h3>
+<h4 id="u0-소비자-0인-것-제거">U0. 소비자 0인 것 제거</h4>
+<ul>
+<li>✅ <code>FileIO.h</code> 삭제, 잔존 include 2곳 제거</li>
+<li>✅ <code>RenderCommandFence</code>·<code>RHICommandFence</code> 선언은 이미 없음을 확인하고,
+include 소비자 0인 <code>Core.Fence.h</code> 삭제</li>
+<li><code>DirectXHelper.h</code> 삭제는 취소 — <code>Texture.cpp</code>의 <code>Win32::ThrowIfFailed</code> 15곳이 소비한다</li>
+<li>✅ <code>.vcxproj</code> / <code>.filters</code> 항목과 <code>Core.Memory\SyncAPI</code> 빈 필터 정리.
+삭제한 두 헤더는 <code>Doc/Docs_Index.md</code> 목차에 없었고, 살아 있는 <code>DirectXHelper</code> 행은 유지</li>
+</ul>
+<p><code>Core.Assert.hpp</code> 제거(2026-08-14 완료)와 같은 절차다. 그때 확인된 함정을 반복하지
+않는다 — <strong>유니티 빌드에서는 헤더를 빼도 전이 include로 우연히 컴파일된다.</strong>
+파일을 지운 뒤 반드시 정식 빌드로 확인한다.</p>
+<p><strong>게이트</strong>: 삭제 대상 심볼의 전체 참조 0건. 전체 솔루션 빌드 통과.</p>
+<p>2026-08-24 검증: 삭제 심볼의 코드·프로젝트 참조 0, Debug x64 전체 솔루션 빌드
+오류 0. <code>Utility_Framework</code>·<code>SceneRuntime</code>·<code>RenderEngine</code> Debug x64 비유니티 전수
+컴파일도 오류 0(기존 <code>Terrain.cpp</code> C4244 경고 1)으로 통과했다.</p>
+<h4 id="u1-껍데기명명-정리">U1. 껍데기·명명 정리</h4>
+<ul>
+<li><code>Core.Thread.hpp</code> — 이름이 내용과 어긋난다(스레드가 아니라 스레드 풀). 소비자를
+<code>Core.ThreadPool.h</code> 직접 include로 바꾸고 삭제</li>
+<li><code>Reflection.hpp</code> — 같은 성격. 단 <code>Core.Minimal.h:9</code>가 쓰므로 U1은 트랙 C와 겹친다.
+C 이전에는 그대로 둔다</li>
+<li><code>ReflectionMecro.h</code> → <code>ReflectionMacro.h</code> 철자 수정 (소비자 1)</li>
+</ul>
+<h4 id="u2-문서-구현-불일치-해소">U2. 문서-구현 불일치 해소</h4>
+<p>§1.5의 pak 압축·암호화. <strong>셋 중 하나를 골라야 한다:</strong></p>
+<ol>
+<li>코덱을 구현한다 (lz4는 이미 vcpkg에 있다)</li>
+<li>README·EngineStructureAnalysis에서 해당 주장을 내린다</li>
+<li>미구현임을 명시한다</li>
+</ol>
+<p>배포 산출물의 성질이 걸린 문제이므로 <code>EnginePackagingPlan.md</code>와 함께 판단한다.
+<strong>이 항목은 결정이 필요하며, 코드 작업이 아니다.</strong></p>
+<h4 id="u4-plf_colonyh-배치-이동">U4. <code>plf_colony.h</code> 배치 이동</h4>
+<p><code>Core.Definition.h:78</code>의 include를 빼고 <code>AIManager.h</code>가 직접 include한다.
+214KB 헤더가 전 TU에 파싱되던 것이 1개 TU로 줄어든다.</p>
+<p><strong>주의</strong>: 유니티 빌드에서는 다른 파일이 <code>Core.Definition.h</code> 경유로 이 헤더를
+암묵 의존하고 있어도 드러나지 않는다. U0과 같은 함정이므로 이동 후 정식 빌드로
+확인한다. <code>EngineStructureAnalysis.html:649</code>의 &quot;메모리: … plf::colony&quot; 서술도
+실태(AI 전용)에 맞게 손본다.</p>
+<p><strong>게이트</strong>: <code>Core.Definition.h</code>에서 제거 후 전체 솔루션 빌드 통과.</p>
+<h4 id="u3-소비자-1곳-유틸-개별-판정">U3. 소비자 1곳 유틸 개별 판정</h4>
+<p>§1.3의 6건. 각각 &quot;인라인할 것 / 존치할 것&quot;을 판정한다. 일괄 처리하지 않는다 —
+<code>MemoryPool</code>(6.7KB)과 <code>RingBuffer</code>(1.4KB)는 성격이 다르다.</p>
+<h3 id="트랙-h--hashingstring">트랙 H — HashingString</h3>
+<h4 id="진행-상태-2026-09-05">진행 상태 (2026-09-05)</h4>
+<p>H0~H4를 착지시켰다. 게이트는 <code>Tools/regression/verify-hashing-string.ps1</code> +
+<code>hashing_string_contract_probe.cpp</code>이고 회귀 세트에 배선돼 있다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>상태</th><th>비고</th></tr></thead>
+<tbody><tr><td>H-a 인스펙터 3중 파손</td><td><strong>닫힘</strong></td><td><code>ReflectionTypedDraw.h</code>의 HashingString 브랜치를 바로 위 <code>std::string</code> 브랜치와 같은 모양(버퍼 + 리사이즈 콜백 + setter 커밋)으로 맞췄다. 게이트는 정적 래칫으로만 본다 — ImGui 컨텍스트가 필요해 프로브가 태우지 못한다</td></tr>
+<tr><td>H-b <code>.data()</code> UB</td><td><strong>이미 닫혀 있었다</strong></td><td><code>Scene::GetEntity</code>가 <code>string_view</code> 오버로드를 타고 있다. 프로브의 부분 뷰 축이 되돌림을 잡는다</td></tr>
+<tr><td>H-c <code>==</code>/<code>&lt;=&gt;</code> 불일치</td><td><strong>닫힘</strong></td><td><code>==</code>가 해시 → 문자열 순으로 본다. 손으로 쓰던 <code>!=</code>는 지웠다(컴파일러 합성)</td></tr>
+<tr><td>H-d 값 반환</td><td><strong>닫힘</strong></td><td><code>GetHashedName()</code>은 이미 <code>const&amp;</code>였고, <code>ToString()</code>을 <code>const&amp;</code>로 바꿨다</td></tr>
+<tr><td>H-e <code>std::hash</code> 특수화</td><td><strong>닫힘</strong></td><td><code>GetHash()</code> + 특수화. <code>unordered_map</code>/<code>unordered_set</code> 키 계약을 프로브가 512키로 잰다</td></tr>
+<tr><td>H-f <code>GetGameObject</code> O(n)</td><td><strong>이 트랙 밖</strong></td><td>아래 H4 단서대로 <code>SceneGraphRedesignPlan</code> 트랙 E 소관</td></tr>
+<tr><td>H-g <code>data()</code>/<code>size()</code> non-const</td><td><strong>닫힘</strong></td><td><code>const char* data() const</code> / <code>size() const</code>. 내부 버퍼의 쓰기 권한을 닫은 것이 H-a의 근본 원인 제거다</td></tr>
+<tr><td>H-h 빈 문자열 정책 4갈래</td><td><strong>닫힘</strong></td><td>H5를 &quot;합법&quot;으로 결정했다(아래 §H5). 어설션 4종 제거, 기본 생성자가 <code>&quot;&quot;</code>의 해시를 갖게, <code>SetString</code>은 대입에 위임 → 갈래가 하나다</td></tr></tbody></table></div>
+<p>전체 솔루션 Debug 빌드 통과(exit 0). 헤더 밖 <code>HashingString</code> 참조가 23곳뿐이라
+<code>data()</code> 봉인의 파급이 인스펙터 한 곳으로 끝났다.</p>
+<h4 id="h0-인스펙터-편집-복구-기능-파손">H0. 인스펙터 편집 복구 (기능 파손)</h4>
+<p><code>ReflectionImGuiHelper.h:538-540</code>. 고정 버퍼로 받아 편집하고, 변경 시 <code>prop.setter</code>를
+호출하는 형태로 바꾼다. 다른 타입 브랜치가 이미 쓰는 패턴을 따른다.</p>
+<p><strong>게이트</strong>: 인스펙터에서 오브젝트 이름을 현재보다 길게 변경 → 저장 → 재로드 후 유지.</p>
+<h4 id="h1-data-ub-제거">H1. <code>.data()</code> UB 제거</h4>
+<p><code>Scene.cpp:411</code>, <code>GameObject.h:44</code>에서 <code>.data()</code>를 뺀다. <code>string_view</code> 오버로드가
+이미 있으므로 그쪽이 선택되게 하는 것으로 충분하다.</p>
+<p><strong>게이트</strong>: 부분 뷰(<code>sv.substr(0, n)</code>)를 넘겨도 잘린 이름이 저장되는지 확인.</p>
+<p>★ <strong>지목한 두 곳 말고 두 곳이 더 있었다</strong>(2026-09-05). <code>Scene.h</code>의
+<code>CreateNewScene</code>·<code>LoadScene</code>이 <code>m_sceneName = sceneName.data();</code>로 같은 결함을
+갖고 있었다 — 계획서가 세어 둔 목록이 전수가 아니었다. 둘 다 닫았고, 게이트에
+<code>m_sceneName = *.data()</code> 정적 래칫을 넣었다.</p>
+<h4 id="h2--일관성--data-봉인">H2. <code>==</code>/<code>&lt;=&gt;</code> 일관성 + <code>data()</code> 봉인</h4>
+<ul>
+<li><code>operator==</code>가 <code>&lt;=&gt;</code>와 같은 기준(해시 → 문자열 tie-break)을 쓰게 한다. 해시가
+먼저 걸러주므로 비용은 사실상 그대로다</li>
+<li><code>data()</code>의 <code>char*</code> 반환을 없앤다 (H0이 선행되어야 한다)</li>
+<li><code>data()</code>/<code>size()</code>에 <code>const</code> 부여, 무의미한 <code>constexpr</code> 제거</li>
+</ul>
+<h4 id="h3-값-반환-제거-성능-회수">H3. 값 반환 제거 (성능 회수)</h4>
+<p><code>GetHashedName()</code> 3곳과 <code>ToString()</code>을 <code>const&amp;</code> 반환으로. 호출부 대부분은 수정 없이
+그대로 동작한다.</p>
+<p><strong>게이트</strong>: <code>GetHashedName().ToString()</code> 관용구에서 할당 0회.
+충돌 콜백 경로(<code>EntityEnemy.cpp:76·117</code>)에서 프레임당 할당 감소를 프로파일러로 확인.</p>
+<h4 id="h4-stdhash-특수화--조회-경로">H4. <code>std::hash</code> 특수화 + 조회 경로</h4>
+<ul>
+<li><code>GetHash()</code> 접근자 + <code>std::hash&lt;HashingString&gt;</code> 특수화 추가 (신규라 안전)</li>
+<li><code>Scene.h:367</code>의 <code>CanvasMap</code> 키를 <code>std::string</code> → <code>HashingString</code>으로 전환 검토</li>
+</ul>
+<p><strong><code>Scene::GetGameObject</code>의 O(n) 선형 탐색은 이 트랙에서 다루지 않는다.</strong>
+<code>SceneGraphRedesignPlan.md</code> 트랙 E(E1·E3)가 <code>GetGameObject</code> 호출 60곳/14파일을 이미
+마이그레이션 표면으로 잡고 있어, 여기서 따로 손대면 충돌한다. <strong>H4는 그쪽이
+쓸 수 있는 재료(해시 특수화)를 준비하는 데까지만 한다.</strong></p>
+<h4 id="h5-빈-문자열-정책-통일--결정-합법-2026-09-05">H5. 빈 문자열 정책 통일 — <strong>결정: 합법</strong> (2026-09-05)</h4>
+<p><strong>결정 이전에 결함이 하나 섞여 있었다.</strong> 기본 생성자가 <code>= default</code>라 <code>m_hash</code>가
+0으로 남는데 <code>&quot;&quot;</code>의 해시는 FNV offset basis(14695981039346656037)다. 그래서
+<code>HashingString()</code>과 <code>HashingString(&quot;&quot;)</code>이 <strong>같은 내용인데 다르다고 판정</strong>됐다 —
+빈 상태가 둘이었다. 정책과 무관한 결함이므로 어느 쪽으로 정하든 고쳐야 했다.</p>
+<p>실측:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>값</th></tr></thead>
+<tbody><tr><td>기본 생성을 쓰는 멤버</td><td><strong>1곳</strong> — <code>Scene::m_sceneName</code>. 나머지는 전부 기본값 문자열을 갖는다(<code>m_name{&quot;Object&quot;}</code>·<code>m_tag{&quot;Untagged&quot;}</code>·<code>m_layer{&quot;Default&quot;}</code>·<code>textureFilePath{&quot;None&quot;}</code>)</td></tr>
+<tr><td>저작 코퍼스의 HashingString 빈 값</td><td><strong>0건</strong>. 14개 씬의 <code>name: &quot;&quot;</code>은 전부 <code>AssetBundle::name</code>이고 그것은 <code>std::string</code>이다</td></tr>
+<tr><td>현 &quot;금지&quot;의 강제력</td><td><strong>0</strong>. <code>assert</code>는 Release에서 사라지고, <code>const char*</code> 경로는 빈 문자열에 검사가 없으며, <code>SetString</code>은 무검사였다</td></tr></tbody></table></div>
+<p><strong>합법으로 정한 이유</strong>는 강제 수단이 없어서가 아니라 강제할 자리가 여기가 아니기
+때문이다. 이름·태그는 저작 UI와 역직렬화가 매 입력마다 만드는 값이고, 빈 값은
+잘못된 프로그램이 아니라 &quot;사용자가 지웠다&quot;는 정상 입력이다. 값 타입이 던지면
+호출부마다 방어가 붙는다 — 실제로 인스펙터에 가드를 하나 넣어야 했다.
+&quot;이름 없는 엔티티를 만들지 마라&quot;는 상위 정책이고 그 층이 이미 막고 있다.</p>
+<p>착지한 것:</p>
+<ul>
+<li>빈 문자열 어설션 4종 제거, <code>&lt;cassert&gt;</code> 소비자 0이 되어 함께 제거</li>
+<li>기본 생성자가 <code>&quot;&quot;</code>의 해시를 계산한다 → 빈 상태가 하나</li>
+<li><code>SetString</code>은 <code>operator=(string_view)</code>에 위임한다 → <strong>네 번째 갈래 소멸</strong></li>
+<li>널 포인터는 여전히 던지되 기준을 정밀화했다: <code>data() == nullptr &amp;&amp; size() != 0</code>.
+빈 뷰(<code>std::string_view{}</code>)는 읽을 것이 없으므로 정상 입력이다</li>
+<li>저작 UI의 빈 이름 커밋 가드는 <strong>UX 판단으로 유지</strong>한다(이름이 비면 하이어라키에서
+그 오브젝트를 다시 고를 수 없다). 타입 정책과 별개라고 주석에 적었다</li>
+</ul>
+<p>게이트: 프로브의 빈 문자열 축이 <strong>Debug에서도 돈다는 사실 자체가 강제 수단</strong>이다 —
+어설션이 되살아나면 Debug 실행이 죽어 빨개진다(변이로 확인). 정적 래칫은
+<code>assert(...empty())</code> 재도입과 <code>= default</code> 복귀를 함께 막는다.</p>
+<p><strong>사각지대</strong>: <code>data()==nullptr &amp;&amp; size()!=0</code> 가드는 런타임으로 잴 수 없다. 그런
+뷰를 만드는 것 자체가 UB라 MSVC 디버그 STL이 <code>string_view</code> 생성자에서 먼저
+죽는다(시도했다가 게이트가 STATUS_BREAKPOINT로 죽었다).</p>
+<h3 id="트랙-m--mathf-별칭-계층">트랙 M — Mathf 별칭 계층</h3>
+<p>§1.10이 근거다. M0~M4는 전부 <strong>수학 라이브러리 전환 여부와 독립적으로</strong> 가치가 있고,
+Mathematics 이주의 선행 cleanup이다. M5는 2026-08-17 당시 자체 구현 기각 기록이며,
+2026-08-25 이후의 실제 이주 순서는 MathematicsMigrationPlan이 정본이다.</p>
+<h4 id="m0-소비자-0-헬퍼-삭제--assimp-의존-소멸--구현-완료-전체-솔루션-게이트-전-2026-08-25">M0. 소비자 0 헬퍼 삭제 → assimp 의존 소멸 — 구현 완료, 전체 솔루션 게이트 전 (2026-08-25)</h4>
+<p>소비자 0을 §1.10에서 확인한 것들을 지운다.</p>
+<ul>
+<li>assimp 헬퍼 5개(<code>aiToXMMATRIX</code>·<code>aiToFloat3</code>·<code>aiToFloat2</code>·<code>CreateBoneIndex</code>·
+<code>CreateBoneWeight</code>) → <code>Core.Mathf.h:5-7</code>의 assimp include 3줄 삭제</li>
+<li>json 헬퍼 3개(<code>jsonToVector2</code>·<code>jsonToVector3</code>·<code>jsonToColor4</code>) → <code>:3</code> 삭제
+(도달은 줄지 않는다. §1.7 단서 — <code>TypeDefinition.h:7</code>이 따로 연다)</li>
+<li>그 외 죽은 심볼: <code>ConvertToDistance</code>·<code>EularToQuaternion</code>·<code>lerp</code>·<code>Wrap</code>·
+<code>ClampedIncrementOrDecrement</code>·<code>Slerp</code>·<code>ToDegrees</code>·<code>xVColor4</code>·
+<code>xVectorUp</code>/<code>Down</code>/<code>Right</code>/<code>Left</code>/<code>Forward</code></li>
+</ul>
+<p><strong>주의 — U0·U4와 같은 함정이다.</strong> 유니티 빌드에서는 assimp를 전이로 받던 TU가
+드러나지 않는다. 삭제 후 <strong>정식 빌드</strong>로 확인하고, 드러난 곳은 직접 include로
+고친다 — 그게 이 슬라이스의 목적이다. 후보는 <code>AnimationLoader.{h,cpp}</code> ·
+<code>SkeletonLoader.{h,cpp}</code> · <code>ModelLoader.h</code>(assimp를 쓰지만 직접 include하지 않는다).</p>
+<p><strong>게이트</strong>: <code>Core.Mathf.h</code>에 assimp include 0. 전체 솔루션 빌드 통과.
+<code>Tools/regression</code> 통과(<code>pwsh</code>로 실행).</p>
+<p>2026-08-25 적용: 대상 helper와 dead symbol 참조 0을 재확인하고 삭제했다.
+비유니티 빌드가 드러낸 <code>AnimationLoader</code>·<code>Mesh</code>·<code>SkeletonLoader</code>·<code>ModelLoader</code>의
+Assimp 선언과 <code>DataSystem</code>의 <code>unordered_set</code>은 소유 헤더에 직접 include했다.
+Debug non-unity/Release unity 엔진 라이브러리 4개는 통과했지만 전체 솔루션과
+전체 regression 묶음은 아직 실행하지 않았다. 현재 라이브러리를 relink한 Debug
+<code>CreatorEditor</code> 통합 빌드와 reflection golden 77타입 diff 0은 통과했다.</p>
+<h4 id="m1-using-namespace-directx-제거--구현-및-빌드-완료-2026-08-25">M1. <code>using namespace DirectX;</code> 제거 — 구현 및 빌드 완료 (2026-08-25)</h4>
+<p><code>Core.Mathf.h:9</code>. 307 TU 전역 오염이다 — §1.1(<code>namespace std</code> 침범)과 같은 부류이고,
+차이는 UB가 아니라 이름 충돌 위험이라는 점뿐이다.</p>
+<p><code>namespace Mathf</code> 내부 완충 <code>using</code>도 두지 않고, 별칭과 소비자에서 필요한
+DirectX 식별자를 <code>DirectX::</code>로 명시 수식한다.</p>
+<p><strong>주의</strong>: 이 <code>using</code>에 기대어 <code>XMMatrixTranspose(...)</code>를 <strong>비수식(unqualified)</strong> 으로
+쓰는 곳이 992회 중 상당수다. 제거하면 그 전부가 드러난다 → <strong>M1은 표면이 크다.</strong>
+compile probe로 드러나는 raw <code>XMVECTOR</code> 연산자는 <code>XMVectorAdd/Scale/Subtract</code> 형태로
+바꿔 연산자 namespace import에도 기대지 않는다.</p>
+<p><strong>게이트</strong>: 전역 스코프에서 <code>DirectX</code> 심볼이 비수식으로 보이지 않음. 빌드 통과.</p>
+<p>2026-08-25 적용: 초기 compile probe에서 드러난 <code>Camera</code>의 XMVECTOR 연산자,
+<code>Mesh.h</code>의 XMFLOAT/bounds, render proxy 초기값과 Engine/Editor 소비자를 명시
+수식했다. <code>verify-directx-namespace-hygiene.ps1</code>는 723개 소스에서 전이 비수식
+DirectX 식별자 0을 확인했다. Debug non-unity/Release unity 엔진 라이브러리 4개,
+Debug <code>CreatorEditor</code>/<code>RenderTests</code>, reflection golden 77타입 diff 0이 통과했다.
+Player/UI runtime과 전체 Release 솔루션은 이 검증에 포함하지 않았다.</p>
+<h4 id="m2-static-전역-8개-정리--구현-및-엔진-빌드-완료-2026-08-25">M2. <code>static</code> 전역 8개 정리 — 구현 및 엔진 빌드 완료 (2026-08-25)</h4>
+<p><code>Core.Mathf.h:28-35</code>. 살아 있는 소비자 3줄만 남기고 처리한다.</p>
+<ul>
+<li>죽은 5개(<code>xVectorUp</code>·<code>Down</code>·<code>Right</code>·<code>Left</code>·<code>Forward</code>)는 M0에서 함께 삭제</li>
+<li>남는 3개(<code>xMatrixIdentity</code>·<code>xVectorZero</code>·<code>xVectorOne</code>)는 <code>static</code> 변수를 버리고
+<code>inline</code> 함수 또는 호출부 직접 표현으로 바꾼다. 소비자는
+<code>FoliageComponent.cpp:359</code>, <code>Transform.cpp:451-453</code> 두 파일뿐이다</li>
+<li><code>Transform.cpp:451-453</code>은 <code>Mathf::Vector3</code>에 <code>xVectorZero</code>를 중괄호 초기화로 넣고
+있다 — <code>Vector3::Zero</code>/<code>Vector3::One</code>이 정본이므로 그쪽으로 바꾸는 편이 낫다</li>
+</ul>
+<p><strong>게이트</strong>: <code>Core.Mathf.h</code>에 <code>static</code> 전역 0개. 빌드 통과.</p>
+<p>2026-08-25 적용: <code>FoliageComponent</code>는 <code>Matrix::Identity</code>, <code>TransformReset</code>은
+명시적인 <code>Vector4</code> 0/1 값으로 바꿨다. Debug non-unity/Release unity 엔진
+라이브러리 4개가 통과했다.</p>
+<h4 id="m3-easing--tween-분리--구현-완료-runtime-gate-전-2026-08-25">M3. <code>Easing</code> · <code>Tween</code> 분리 — 구현 완료, runtime gate 전 (2026-08-25)</h4>
+<p><code>Core.Mathf.h:283-681</code> — 파일의 59%가 수학이 아니다. <code>Core.Easing.h</code>(또는
+<code>Tween/</code> 모듈)로 옮긴다.</p>
+<ul>
+<li><code>Easing</code> 소비자 21파일, <code>Tweener</code>/<code>Tween</code> 10파일, <code>DynamicEasing</code> 3파일</li>
+<li><code>LerpHelper</code>(<code>:576</code>)는 <code>Tweener</code> 전용이므로 함께 나간다 → M4의 Lerp 정본 정리가
+이 이동에 의존한다</li>
+<li><code>Core.Mathf.h</code>에 남는 코드가 21KB → 약 8KB로 줄어든다</li>
+</ul>
+<p><strong>주의</strong>: 소비자 21파일이 지금은 <code>Core.Minimal.h</code> 전이로 <code>Easing</code>을 받고 있다.
+이동 후 정식 빌드로 드러난 곳에 직접 include를 넣는다.</p>
+<p><strong>게이트</strong>: 전체 솔루션 빌드 통과. 트윈이 걸린 UI 회귀 검사 통과.</p>
+<p>2026-08-25 적용: live 소비자는 과거 집계와 달리 CharacterController 계열 두 헤더뿐이었다.
+두 헤더가 <code>Core.Easing.h</code>를 직접 include하며 Debug non-unity/Release unity 엔진
+라이브러리 및 Debug <code>CreatorEditor</code> 통합 빌드는 통과했다. UI runtime 회귀는 아직
+실행하지 않았다.</p>
+<h4 id="m4-정본-통일--dead-wrapper-정리-완료-전체-솔루션-게이트-전-2026-08-25">M4. 정본 통일 — dead wrapper 정리 완료, 전체 솔루션 게이트 전 (2026-08-25)</h4>
+<p>M3 이후에 한다(<code>LerpHelper</code>가 먼저 나가야 한다).</p>
+<ul>
+<li><code>Mathf::Distance</code>(<code>:261</code>) 삭제 → <code>Vector3::Distance</code>로. 소비자는 <code>EntityAsis.cpp</code> 하나</li>
+<li><code>Mathf::Normalize</code>(<code>:266</code>) 삭제 → <code>Vector3::Normalize</code>로. 소비자 동일
+단 <strong>의미가 다르다</strong> — <code>Mathf::Normalize</code>는 길이 0에서 <code>Zero</code>를 반환하고
+<code>Vector3::Normalize</code>는 그렇지 않다. 호출부가 0 길이에 도달할 수 있는지 확인한 뒤
+옮긴다. 필요하면 <code>SafeNormalize</code>로 이름을 바꿔 존치한다</li>
+<li><code>Mathf::Clamp</code>(값 반환·참조 변경 2종) → 소비자 1파일. <code>std::clamp</code>로</li>
+<li><code>Mathf::pi</code>·<code>halfPi</code>·<code>pi2</code>의 double 리터럴에 <code>f</code> 접미를 붙인다(M-f)</li>
+</ul>
+<p><strong>게이트</strong>: 각 함수의 참조 0건 확인 후 삭제. 빌드 통과.
+<code>EntityAsis.cpp</code> 동작 확인(0 길이 정규화 경로).</p>
+<p>2026-08-25 재정찰에서는 문서에 적힌 <code>EntityAsis.cpp</code> 소비가 현재 트리에 없었다.
+<code>Distance</code>·<code>Normalize</code>·<code>Clamp</code>·<code>Lerp</code>·<code>Slerp</code>·<code>Wrap</code> 참조 0을 확인해 dead wrapper를
+삭제했고 상수 리터럴에는 <code>f</code>를 붙였다. 엔진 라이브러리 빌드는 통과했지만 전체
+솔루션과 별도 runtime 경로는 아직 검증하지 않았다.</p>
+<h4 id="m5-엔진-내부-자체-구현--기각-기록-2026-08-17-2026-08-25-외부-정본-이주로-승계">M5. 엔진 내부 자체 구현 — <strong>기각 기록</strong> (2026-08-17, 2026-08-25 외부 정본 이주로 승계)</h4>
+<blockquote>
+<p>이 절은 &quot;CreatorEngine 안에서 SimpleMath 호환 라이브러리를 새로 만든다&quot;는 안의
+당시 기각 근거다. 2026-08-25에는 별도 구현·검증된 Mathematics를 고정 의존으로
+채택할 계획이 생겼으므로, 실행 계획은
+<a href="MathematicsMigrationPlan.html">MathematicsMigrationPlan.md</a>를 따른다. 아래 비용 표는
+사라진 것이 아니라 새 계획의 슬라이스와 게이트를 결정하는 입력으로 재사용한다.</p>
+</blockquote>
+<p><code>ce::dynamic_array</code>(트랙 K)와 같은 논리를 수학 타입에 적용하는 안을 검토했고,
+<strong>기각한다.</strong> 근거를 남긴다 — 재평가할 날에 같은 조사를 되풀이하지 않기 위해서다.</p>
+<p><strong>전환 논거 3종의 검증:</strong></p>
+<ol>
+<li><strong>&quot;SIMD 성능&quot;</strong> — 성립하지 않는다. 저장 타입은 어차피 12/16/64B POD여야 한다
+(GPU 상수버퍼 memcpy · YAML 직렬화 · PhysX 필드 변환). 자체 구현도 같은 제약을
+받으므로 연산당 load/store는 그대로다. 그리고 <strong>핫패스는 이미 레지스터 타입으로
+내려가 있다</strong> — <code>AnimationJob.cpp</code> 35회, <code>EnhancedSceneRendererLive.cpp</code> 74회가
+raw <code>XMVECTOR</code>/<code>XMMATRIX</code>이고, <code>Mathf::xVector</code>(22파일)·<code>xMatrix</code>(37파일)가 그
+경로의 별칭이다. 탈출구가 있고 실제로 쓰인다.
+성능이 목표라면 답은 라이브러리 교체가 아니라 <strong>SoA 배치 전환</strong>이며, 그건
+<code>Vector3</code>를 무엇으로 만들든 무관한 별개 작업이다(<code>AnimationSchedulerPlan.md</code> 소관).</li>
+<li><strong>&quot;이식성&quot;</strong> — 현재 근거 없음. 문서 전수에서 비윈도우 목표가 없고 Vulkan
+백엔드도 윈도우에서 돈다. DirectXMath는 Windows SDK 동봉 + vcpkg 포트 +
+ARM64 NEON 지원, MIT. 그리고 <code>directxtk</code>는 SpriteBatch·SpriteFont로도 쓰이므로
+(<code>vcpkg.json</code>의 <code>$why</code>, <code>Core.Definition.h:30</code>) <strong>&quot;의존 하나 걷기&quot; 논거도 성립하지 않는다.</strong></li>
+<li><strong>&quot;API 통제·일관성&quot;</strong> — 유일하게 진짜인 논거인데 방향이 반대다. 실사용 표면이
+50개뿐이라는 것은 &quot;자체 구현이 가능하다&quot;는 뜻이자 **&quot;지금 불편이 작다&quot;**는 뜻이다.
+실제 불일치는 SimpleMath가 아니라 <code>Mathf</code>가 만들고 있고(M-d), 그건 M4가 고친다.</li>
+</ol>
+<p><strong>비용 — 족쇄 4개:</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>족쇄</th><th>규모</th></tr></thead>
+<tbody><tr><td class="num">1</td><td>암시적 변환 브리지(§1.10). 자체 타입이 <code>XMFLOATn</code> 상속 + <code>operator XMVECTOR</code>를 재현하면 사실상 SimpleMath 재작성이고, 재현하지 않으면 호출부를 전부 고쳐야 한다</td><td>992회 / 104파일</td></tr>
+<tr><td class="num">2</td><td>Physics가 별칭을 쓰지 않는다. <code>PhysicsHelper.h</code>는 <code>Core.Minimal.h</code>를 주석 처리하고 <code>&lt;directxtk/SimpleMath.h&gt;</code>를 직접 연다 — <code>using</code> 교체로 끝나지 않는 독립 작업</td><td>448회 / 57파일</td></tr>
+<tr><td class="num">3</td><td>직렬화 정본 7종 하드코딩(<code>ReflectionTypedYml.h</code>의 Vector2/3/4·Color4·Quaternion·Rect·xMatrix emit/read). 씬·프리팹 포맷이 불변이어야 한다 — 골든 diff 0 체계가 있어 검증은 가능하다</td><td>7종 × emit/read</td></tr>
+<tr><td class="num">4</td><td>관리 측은 이미 독립. <code>ScriptCore/Quaternion.cs</code>·<code>Float3</code>이 <code>LayoutKind.Sequential</code>로 자체 구현돼 있다 — 네이티브를 바꿔도 C# 이득이 0이고 두 정본이 어긋날 위험만 늘어난다</td><td>—</td></tr></tbody></table></div>
+<p><strong>재평가 트리거</strong> — 아래 중 하나가 성립하면 이 기각을 다시 연다:</p>
+<ul>
+<li>비윈도우·콘솔 이식이 <strong>실제</strong> 목표가 된다</li>
+<li><code>ProfilingCapturePlan.md</code>의 캡처가 스칼라 load/store를 상위 비용으로 지목한다</li>
+<li>SoA 배치가 필요해진다 → 이 경우에도 필요한 것은 애니메이션 샘플링용 <strong>별도 배치
+타입</strong>이지 <code>Vector3</code> 대체가 아니다</li>
+</ul>
+<p><strong>그래도 전환한다면 최소 요건</strong>: 레이아웃 동일(12/16/64B POD) · <code>operator XMVECTOR</code>
+브리지 존치(족쇄 1 무력화) · 직렬화 골든 diff 0 · PhysX 경계는 필드 변환 유지 ·
+<code>using</code> 별칭만 갈아끼우는 swap-in 단계 진행. 즉 <strong>&quot;SimpleMath와 구별되지 않는 자체
+타입&quot;</strong> 을 만드는 일이 되는데, 그것이 곧 이득이 없다는 근거다.</p>
+<p>2026-08-25 Mathematics 계획은 이 마지막 가정까지 재사용하지 않는다. upstream이
+암시적 DirectX 변환을 의도적으로 제공하지 않으므로, <code>operator XMVECTOR</code> 호환 타입을
+재현하지 않고 producer-boundary-consumer를 함께 옮기는 수직 슬라이스와 명시적 임시
+interop을 사용한다.</p>
+<h3 id="트랙-c--우산-헤더-해체">트랙 C — 우산 헤더 해체</h3>
+<p><code>Core.Minimal.h</code>의 9개 전이를 해체한다. 위험도가 가장 높고 표면이 가장 넓다.
+<code>Phase5CouplingPlan.md</code>의 간선 래칫 게이트와 <strong>반드시 협조해야 한다</strong> — 독립 진행하면
+그쪽 카운트가 흔들린다. 앞의 세 트랙이 끝난 뒤 착수한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-게이트-관례">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-게이트-관례">4. 게이트 관례</h2></div>
+<div class="prose"><p><code>BuildPipelinePlan.md</code>의 관례를 승계한다.</p>
+<ul>
+<li>각 단계는 <strong>전체 솔루션 빌드 통과</strong>를 최소 게이트로 한다. 유니티 빌드라
+부분 빌드로는 헤더 삭제의 영향이 드러나지 않는다.</li>
+<li>삭제 작업은 <strong>삭제 → 참조 0건 재확인 → 빌드</strong> 순서를 지킨다.</li>
+<li>회귀 세트는 <code>pwsh</code>로 실행한다 (5.1은 한글 주석 인코딩이 깨져 거짓 실패가 난다).</li>
+<li>커밋 전 <code>HEAD</code>를 재확인한다 — 같은 워크트리에서 동시 커밋이 일어난 전례가 있다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-이-계획이-다루지-않는-것">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-이-계획이-다루지-않는-것">5. 이 계획이 다루지 않는 것</h2></div>
+<div class="prose"><ul>
+<li><strong><code>plf_colony.h</code>의 존폐</strong> — 컨테이너 자체는 정당하다(§1.9). U4는 배치만 옮긴다.</li>
+<li><strong><code>m_aiComponentMap</code>의 컨테이너 교체</strong> — §1.9의 판정은 AI 시스템 소관이며,
+유틸리티 정리 계획이 단독으로 결정할 사안이 아니다. 근거만 남긴다.</li>
+<li><del><strong><code>Core.Mathf.h</code>의 assimp/json 의존</strong></del> — <strong>트랙 M으로 편입했다</strong>(2026-08-17).
+§1.10 실측으로 이것이 트랙 C가 아니라 트랙 U 성격임이 드러났다 — 해당 헬퍼의
+소비자가 0이므로 <code>Core.Definition.h</code> 정리를 기다릴 이유가 없다 → M0.</li>
+<li><strong>SoA 배치 전환</strong> — M5의 재평가 트리거 중 하나지만 유틸리티 정리의 범위가 아니다.
+애니메이션 샘플링 배치는 <code>AnimationSchedulerPlan.md</code> 소관이다.</li>
+<li><strong><code>Scene::GetGameObject</code>의 자료구조 교체</strong> — <code>SceneGraphRedesignPlan.md</code> 트랙 E 소관.</li>
+<li><strong><code>Singleton</code>·<code>SpinLock</code>의 설계 평가</strong> — 둘 다 광범위하게 살아 있고(56회/24파일,
+55회/5파일) 표준 대응물이 없다. 별도 판단이 필요하며 &quot;정리&quot;의 범위가 아니다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-진행-상태">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-진행-상태">6. 진행 상태</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>단계</th><th>상태</th><th>비고</th></tr></thead>
+<tbody><tr><td>—</td><td>✅</td><td><code>Core.Assert.hpp</code> 제거 (2026-08-14). 표준 <code>assert</code> 통일, 잔여 참조 0. <strong>빌드 미검증</strong></td></tr>
+<tr><td>S0</td><td>⬜</td><td><code>namespace std</code> 침범</td></tr>
+<tr><td>S1</td><td>⬜</td><td><code>Thread</code> → <code>jthread</code></td></tr>
+<tr><td>S2</td><td>⬜</td><td><code>CountingSemaphore</code></td></tr>
+<tr><td>U0</td><td>✅</td><td><code>FileIO.h</code>·<code>Core.Fence.h</code> 제거. <code>DirectXHelper.h</code>는 실제 소비자 15곳으로 생존 재분류</td></tr>
+<tr><td>U1</td><td>⬜</td><td>껍데기 헤더</td></tr>
+<tr><td>U2</td><td>⬜</td><td>pak 문서 불일치 — <strong>결정 필요</strong></td></tr>
+<tr><td>U3</td><td>⬜</td><td>소비자 1곳 6건 개별 판정</td></tr>
+<tr><td>U4</td><td>⬜</td><td><code>plf_colony.h</code> 배치 이동 (214KB, 전 TU → 1 TU)</td></tr>
+<tr><td>H0</td><td>⬜</td><td>인스펙터 편집 복구</td></tr>
+<tr><td>H1</td><td>⬜</td><td><code>.data()</code> UB</td></tr>
+<tr><td>H2</td><td>⬜</td><td><code>==</code>/<code>&lt;=&gt;</code> + <code>data()</code> 봉인</td></tr>
+<tr><td>H3</td><td>⬜</td><td>값 반환 제거</td></tr>
+<tr><td>H4</td><td>⬜</td><td><code>std::hash</code> 특수화</td></tr>
+<tr><td>H5</td><td>⬜</td><td>빈 문자열 정책 — <strong>결정 필요</strong></td></tr>
+<tr><td>M0</td><td>⬜</td><td>죽은 헬퍼 삭제 → assimp 의존 소멸 (307 TU)</td></tr>
+<tr><td>M1</td><td>⬜</td><td><code>using namespace DirectX;</code> — 표면 큼, 1단 완충 우선</td></tr>
+<tr><td>M2</td><td>⬜</td><td><code>static</code> 전역 8개 (소비자 3줄)</td></tr>
+<tr><td>M3</td><td>⬜</td><td><code>Easing</code>·<code>Tween</code> 분리 (파일의 59%)</td></tr>
+<tr><td>M4</td><td>⬜</td><td>정본 통일 — M3 선행</td></tr>
+<tr><td>M5</td><td>↗</td><td>엔진 내부 자체 구현은 <strong>기각 기록</strong>(2026-08-17). 외부 Mathematics 단계 이주는 별도 계획으로 승계(2026-08-25)</td></tr>
+<tr><td>C</td><td>⬜</td><td>우산 헤더 — Phase4 협조</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="UtilityFrameworkModernizationPlan.md"><code>docs/plans/UtilityFrameworkModernizationPlan.md</code></a> · 마지막 커밋 2026-09-05 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

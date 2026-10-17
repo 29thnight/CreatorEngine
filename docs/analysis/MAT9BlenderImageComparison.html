@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/MAT9BlenderImageComparison.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAT-9 Blender / native image comparison</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#shared-inputs-and-capture">Shared inputs and capture</a></li><li><a href="#comparison-setup-corrections">Comparison setup corrections</a></li><li><a href="#measured-results">Measured results</a></li><li><a href="#reproduction-and-evidence">Reproduction and evidence</a></li><li><a href="#film-sweep-follow-up--2026-10-01">Film sweep follow-up — 2026-10-01</a></li><li><a href="#next-required-work">Next required work</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="MAT9BlenderImageComparison.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>MAT-9 Blender / native image comparison</h1>
+<div class="meta"><p>2026-09-30. Matched <strong>Core / Layered constant-input</strong> image measurement, updated
+after the visible-spectrum thin-film implementation.
+MAT-9 remains in progress; these results do not close Special transport, the
+textured area-light/HDRI grid, route parity or performance acceptance.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#shared-inputs-and-capture"><span class="ve-label">§00</span><span class="map-name">Shared inputs and capture</span><span class="map-bar"><i style="width:55.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#comparison-setup-corrections"><span class="ve-label">§01</span><span class="map-name">Comparison setup corrections</span><span class="map-bar"><i style="width:27.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#measured-results"><span class="ve-label">§02</span><span class="map-name">Measured results</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#reproduction-and-evidence"><span class="ve-label">§03</span><span class="map-name">Reproduction and evidence</span><span class="map-bar"><i style="width:73.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#film-sweep-follow-up--2026-10-01"><span class="ve-label">§04</span><span class="map-name">Film sweep follow-up — 2026-10-01</span><span class="map-bar"><i style="width:26.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#next-required-work"><span class="ve-label">§05</span><span class="map-name">Next required work</span><span class="map-bar"><i style="width:66.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「Measured results」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-shared-inputs-and-capture">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="shared-inputs-and-capture">Shared inputs and capture</h2></div>
+<div class="prose"><ul>
+<li>Blender <strong>5.1.1 Cycles</strong> (build <code>b70da489d7f4</code>), 64×64 perspective view, eye (0,0,3), 45° FOV,
+no denoising, exposure zero, Raw view, 1,024 samples.</li>
+<li>One shared imported sphere: Blender exports the exact triangle corner positions,
+normals, active UV tangents and UVs consumed by native raster.</li>
+<li>Twelve cases under a unit-irradiance directional light with no environment, then
+under a unit-radiance white environment with no direct lights: <strong>24 images</strong>.</li>
+<li>Ten MAT-0 Core/Layered authored constant-value cases plus an emission-only control
+and a diffuse white / IOR=1 control. The <code>core_normal</code> case uses the default
+geometry normal here; the MAT-0 normal texture is excluded from this measurement.</li>
+<li>Native DX12 Release uses actual graph generation, complete Scene compilation,
+immutable material instance, geometry sealing, SceneHost GBuffer/lookup/color and
+shared depth. AO is neutral white; shadows, decals and post effects are excluded.</li>
+<li>Native half-float lighting is read back and converted to bottom-up RGBA32F for
+comparison with Blender scene-linear EXR pixels. No display transform is used
+for metrics. The contact sheet applies the same sRGB display transform to both.</li>
+<li>A common emission-control mask is eroded by two pixels. Every material uses this
+same interior mask; highlight pixels are retained. Nonfinite values and changed
+input/reference identities are rejected before error measurement.</li>
+</ul>
+<p>The original <code>material-reference-5.1.1</code> area-light/HDRI fixture is preserved.
+The supplemental frozen reference is <code>Tools/blender/fixtures/material-matched-5.1.1</code>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-comparison-setup-corrections">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="comparison-setup-corrections">Comparison setup corrections</h2></div>
+<div class="prose"><p>Two apparent rendering errors came from differing inputs:</p>
+<ol>
+<li>Blender BOX reconstruction ignores its RNA width and always uses a one-pixel
+box. Native raster evaluates pixel centers. A 0.01-width Gaussian reference
+isolates point shading; it does not verify anti-aliasing equivalence.</li>
+<li>Blender&#39;s unconnected anisotropy tangent is not the engine&#39;s imported UV tangent.
+The matched reference explicitly links the active UV tangent. Generated/default
+Blender tangent semantics are outside this particular comparison.</li>
+</ol>
+<p>Source checks used the pinned Blender
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/blender/sync.cpp">film synchronization</a>,
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/scene/shader_nodes.cpp">shader nodes</a>
+and <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/svm/closure.h">closure setup</a>.
+The geometry diagnostic additionally captures normal/view fields from the native
+lookup and emits Blender geometry normal/incoming fields independently.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-measured-results">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="measured-results">Measured results</h2></div>
+<div class="prose"><p>Relative RMS is <code>sqrt(sum((native-reference)^2) / sum(reference^2))</code> over the common
+interior RGB samples. It is not a frame-rate metric. Final results use
+345 interior pixels per image. Native DX12 <strong>Debug and Release each</strong> completed
+24 captures, 400,495 checks, zero GPU validation messages and normal shutdown.
+All 393,216 RGBA components of the 24 images are byte-identical across configurations.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Case</th><th style="text-align:right">Directional relative RMS</th><th style="text-align:right">Furnace relative RMS</th></tr></thead>
+<tbody><tr><td>Core base</td><td class="num" style="text-align:right">0.697%</td><td class="num" style="text-align:right">0.284%</td></tr>
+<tr><td>Core metal</td><td class="num" style="text-align:right">0.269%</td><td class="num" style="text-align:right">0.365%</td></tr>
+<tr><td>Core rough</td><td class="num" style="text-align:right">1.941%</td><td class="num" style="text-align:right">0.136%</td></tr>
+<tr><td>Core geometry normal</td><td class="num" style="text-align:right">0.760%</td><td class="num" style="text-align:right">0.119%</td></tr>
+<tr><td>Core emission</td><td class="num" style="text-align:right">0.045%</td><td class="num" style="text-align:right">0.104%</td></tr>
+<tr><td>Coat</td><td class="num" style="text-align:right">0.182%</td><td class="num" style="text-align:right">0.147%</td></tr>
+<tr><td>Sheen</td><td class="num" style="text-align:right">0.090%</td><td class="num" style="text-align:right">0.176%</td></tr>
+<tr><td>Anisotropy, explicit UV tangent</td><td class="num" style="text-align:right">0.937%</td><td class="num" style="text-align:right">1.019%</td></tr>
+<tr><td>Thin film, current Fourier LUT / F82</td><td class="num" style="text-align:right"><strong>2.835%</strong></td><td class="num" style="text-align:right"><strong>1.352%</strong></td></tr>
+<tr><td>Mixed layers</td><td class="num" style="text-align:right">0.071%</td><td class="num" style="text-align:right">0.120%</td></tr>
+<tr><td>Emission-only control</td><td class="num" style="text-align:right"><strong>0.000%</strong></td><td class="num" style="text-align:right"><strong>0.000%</strong></td></tr>
+<tr><td>Diffuse white control</td><td class="num" style="text-align:right">0.045%</td><td class="num" style="text-align:right">0.066%</td></tr></tbody></table></div>
+<p>Small differences include the native BRDF/integration approximations, Monte Carlo
+noise and half-float lighting quantization. They must not all be attributed to one
+of those terms without an additional isolation test.</p>
+<p>The historical RGB 650/550/450nm film baseline was <strong>18.348% / 15.646%</strong>.
+The current LUT, dielectric diffuse weighting and substrate Fss corrections reduce
+that difference to the table above. Non-film cases retain their previous values.
+See <a href="MAT9ThinFilmAndEnvironment.html">thin-film implementation, dense spectral reference and GPU cost</a>
+for the separately measured contributions and approximation limits.</p>
+<h3 id="reference-noise-isolation">Reference noise isolation</h3>
+<p>A second complete Blender render used seed <strong>11</strong> instead of <strong>0</strong>, retaining the
+same mesh, inputs, 1,024 samples and render settings. Over the same comparison mask:</p>
+<ul>
+<li>Directional maximum seed-to-seed relative RMS: <strong>0.05802%</strong> (Core metal).</li>
+<li>Furnace maximum seed-to-seed relative RMS: <strong>0.22359%</strong> (thin film).</li>
+<li>Thin film seed-to-seed: <strong>0.00636%</strong> directional / <strong>0.22359%</strong> furnace, compared
+with current native/reference differences of 2.835% / 1.352% (historically
+18.348% / 15.646% for RGB 3 wavelengths).</li>
+<li>Core rough directional seed-to-seed: <strong>0.00132%</strong>, compared with 1.941% native
+difference. That remaining direct-light difference cannot be explained by the
+measured reference noise alone. Its BRDF/energy approximation needs separate judgment.</li>
+</ul>
+<p>This is one independent seed pair, not a statistical confidence interval or a
+universal convergence bound. It identifies the measured film difference as much
+larger than this reference&#39;s sampling variation.</p>
+<p>The current engine uses visible-spectrum Fourier sensitivity, three Airy orders
+and an F82 model at the film/metal interface. The residual difference remains above
+the measured seed variation. This is <strong>not accepted rendered parity</strong>; spectral
+order truncation, RGB optical reconstruction and the remaining BRDF approximations
+need material-specific acceptance bounds.
+See the pinned <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_util.h">Cycles Fresnel implementation</a>
+and <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_microfacet.h">microfacet Fresnel</a>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-reproduction-and-evidence">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="reproduction-and-evidence">Reproduction and evidence</h2></div>
+<div class="prose"><pre><code class="language-powershell">&amp; 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup `
+  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/Mat9NewReference
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label comparison
+# Independent reference noise measurement:
+&amp; 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup `
+  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/Mat9Repeat --seed 11
+&amp; 'C:\Python313\python.exe' Tools/regression/compare-material-blender-images.py `
+  Tools/blender/fixtures/material-matched-5.1.1 Build/Obj/Mat9Images-Release-comparison/Native `
+  Build/Obj/Mat9Images-Release-comparison/comparison-with-noise.json --reference-repeat Build/Obj/Mat9Repeat</code></pre>
+<p>The script reports <strong>measurement completion</strong>, leaving material acceptance pending.
+It rejects existing output directories, uses the native GPU validation layer,
+restores its environment and never launches or modifies the user&#39;s live Editor.
+Reference and captured native triangle bytes and parsed graph values are checked
+against the manifest before comparison, in addition to the reference image hashes.</p>
+<p>Local evidence:</p>
+<ul>
+<li><code>Tools/blender/fixtures/material-matched-5.1.1</code>: frozen Blender source images and setup.</li>
+<li><code>Build/Obj/Mat9Images-Release-frozen-final</code> and <code>Mat9Images-Debug-frozen-final</code>:
+historical RGB-3 native captures, inputs/geometry, build and validation logs.</li>
+<li><code>Build/Obj/Mat9Images-Release-film-spectral-v4</code> and
+<code>Mat9Images-Debug-film-spectral-final</code>: current LUT captures and regression evidence.</li>
+<li><code>Build/Obj/Mat9MatchedReference-repeat-11</code>: independent seed-11 reference.</li>
+<li><code>Build/Obj/mat9-blender-comparison-frozen-final.json</code> and <code>.png</code>: metrics, reference
+noise measurements and contact sheet.</li>
+<li>Identity rejection checks: modified input value, triangle bytes, reference pixels
+and an added case were all rejected; frozen input files were preserved.</li>
+<li>Dashboard full parse: 435 entries, no malformed rows, all progress values finite.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-film-sweep-follow-up--2026-10-01">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="film-sweep-follow-up--2026-10-01">Film sweep follow-up — 2026-10-01</h2></div>
+<div class="prose"><p>The <a href="MAT9ThinFilmAcceptance.html">fixed eight-pair film sweep</a> adds 36 captures and an
+independent seed repeat. Only 4 of 16 film conditions meet the declared image target.
+The subnanometer double blend and 0.1nm cutoff have been corrected; the original
+550nm measurements above are unchanged. Mixed-metal film-off controls also show
+large residuals. Common metal/dielectric attenuation and GGX compensation must be
+resolved before rendered acceptance; increasing a tolerance is not a fix.</p>
+<p>The subsequent <a href="MAT9GgxClosureComparison.html">GGX closure comparison</a> resolves those
+common terms and the Scene Core fallback. The same fixed film/off inputs now pass
+16/16 film and 16/16 off conditions under the unchanged targets. The values above
+remain the earlier measurement, not the current shader result.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-next-required-work">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="next-required-work">Next required work</h2></div>
+<div class="prose"><p>The historical <a href="MAT9HdriImageComparison.html">HDRI follow-up</a> did not accept parity.
+The subsequent <a href="MAT9HdriConvergence.html">full HDRI convergence</a> passes the fixed
+forest/autumn constant-material 26 conditions under the unchanged image/noise targets.
+This does not close the original textured grid or the unimplemented area-light consumer.</p>
+<p>The <a href="MAT9SpecialTransportComparison.html">Special follow-up</a> accepts eight fixed
+homogeneous single-scattering Volume conditions after matching the reference transport
+and capturing the final product Volume composite. Transmission/SSS remain unaccepted;
+the initial 24-condition reference is diagnostic, and Scene alpha blending is rejected.</p>
+<p>The subsequent <a href="MAT9SpecialProfileCorrection.html">Special Surface correction</a> fixes
+Scene artist-radius units and grazing-angle residency rejection. Two 131072-sample
+references converge under the existing noise bound; the final product passes only
+7/18 fixed Surface conditions. Directional SSS RMS improves from 6.2598% to 4.1009%,
+while mixed directional SSS slightly worsens and furnace SSS is unchanged. Full-image
+zero-scale/off controls pass after removing the edge error colors. Transmission and
+SSS spatial-response acceptance remain pending.</p>
+<ol>
+<li>Correct transmission boundary and SSS spatial-response differences, converge their
+independent references and recheck the same image/noise targets. Verify a real
+blended-composition path for the existing alpha/transmission criterion.</li>
+<li>Measure texture-only, factor-times-texture and normal-map reference scenes with
+shared supported geometry/background/transport conditions and explicit approximation limits.</li>
+<li>Continue Deferred/Forward parity and moving-camera/tier/cold-warm performance
+acceptance, including the increased environment integration cost on actual models.</li>
+<li>Implement and measure the original area-light ABI/consumer and grid. Fixed constant
+film/off, HDRI and bounded Volume results do not establish parity at every scene/angle.</li>
+</ol>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MAT9BlenderImageComparison.md"><code>docs/analysis/MAT9BlenderImageComparison.md</code></a> · 마지막 커밋 2026-10-01 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

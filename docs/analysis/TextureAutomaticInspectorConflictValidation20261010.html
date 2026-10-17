@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/TextureAutomaticInspectorConflictValidation20261010.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자동 Inspector 저장 대기 중 디스크 충돌 검증</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="TextureAutomaticInspectorConflictValidation20261010.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>자동 Inspector 저장 대기 중 디스크 충돌 검증</h1>
+<div class="meta"><p>2026-10-10, PHASE 12의 다음 잔여 범위인 저장 대기 중 외부 설정 변경을 검증했다.
+검증 대상은 실제 Release Inspector 입력으로 생성한 400ms 저장 대기와 기존
+자동 저장 서비스다. T0/T1a/T2 진행 중 및 earnedDays 0, T1b 대기, T3 중단은 유지한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 3개의 분량 막대">
+<a class="map-row" href="#확인한-문제와-수정"><span class="ve-label">§00</span><span class="map-name">확인한 문제와 수정</span><span class="map-bar"><i style="width:61.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#최종-release-실행-결과"><span class="ve-label">§01</span><span class="map-name">최종 Release 실행 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">1</span> <span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#수용-경계"><span class="ve-label">§02</span><span class="map-name">수용 경계</span><span class="map-bar"><i style="width:20.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 3개 가운데 「최종 Release 실행 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-확인한-문제와-수정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="확인한-문제와-수정">확인한 문제와 수정</h2></div>
+<div class="prose"><p>첫 Release 실행에서 실제 값 2 붙여넣기가 저장 대기열에 들어온 age 0ms에 외부
+설정 1을 주입했다. 기존 저장 직전 디스크 비교는 정상적으로 외부 설정을 보존하고
+대기 편집을 거부했다. 그러나 포커스를 해제해도 Inspector는 편집 값 2를 표시하며
+충돌 설명을 표시하지 않았다. 정상 저장으로 오해할 수 있는 UI 결함이다.
+<a href="../../Build/TAUI-Release-conflict-cde28d7e/conflict-before-ui-fix.png">수정 전 화면</a>과
+<a href="../../Build/TAUI-Release-conflict-cde28d7e/editor.out">로그</a>에 재현 근거를 남겼다.
+이 실행은 최종 수정 UI의 수용 증거로 사용하지 않는다.</p>
+<p>EditorAssetDatabase는 자산 경로별 자동 저장 실패를 mutex로 보호하는 snapshot으로
+보관한다. 새 편집을 대기열에 넣으면 이전 오류를 해제한다. Inspector는 오류와
+<code>Reload Disk Settings</code>를 표시한다. 이 버튼은 유효한 디스크 설정을 draft에 읽고
+오류를 해제하며 디스크 쓰기나 저장 대기 요청을 만들지 않는다. 읽기/파싱 실패 시
+기존 draft를 유지하고 실패를 표시한다. 정상 Retry Import 성공도 이전 오류를 해제한다.
+기존 400ms 대기와 저장 직전 디스크 비교를 변경하지 않았다.</p>
+<p>관련 소스는 <a href="../../Editor/EngineEntry/EditorAssetDatabase.cpp">자동 저장 서비스</a>,
+<a href="../../Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp">Inspector 설정 UI</a>,
+<a href="../../Tools/regression/texture_auto_ui_pending_probe.inl">격리 관찰 명령</a>이다.
+관찰 명령의 conflict/conflictshutdown 모드는 실제 UI 입력을 기다린 뒤 외부 설정만
+주입한다. local UI 편집이나 대기 저장을 생성하지 않는다. 일반 conflict는 저장
+대기가 제거된 뒤 750ms 동안 주입한 bytes가 그대로인지 검사한다. conflictshutdown은
+주입 직후 정상 RequestQuit을 요청하여 Finalize의 대기 저장 경로를 검사한다.
+<code>[AUTOSAVE_CONFLICT]</code> 로그는 비교 거부 시점의 실행 증거다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-최종-release-실행-결과">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="최종-release-실행-결과">최종 Release 실행 결과</h2></div>
+<div class="prose"><p>HEAD <code>b2f918c196d02c648eef5ef064e11ae4f8d7846b</code>의 로컬 수정 소스로 빌드한
+<code>Bin/x64-Release/Editor/CreatorEditor.exe</code>를 사용했다. 최종 runtime DLL SHA-256은
+<code>43B76B0069FD9EF23B6FA5A523B1A5F5225B4837ED7B9E27D5DED474702888BF</code>다.
+<a href="../../Build/phase12-conflict-ui-editor-final-build.log">Editor 빌드</a>와
+<a href="../../Build/phase12-conflict-ui-host-build.log">host 빌드</a>는 성공했다.
+Utility_Framework.pdb의 기존 LNK4020 경고는 남았으며 해당 디버그 형식 정보의
+완전성 수용은 아니다. texture Editor source 정적 검사 5개를 통과했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>결과</th><th>근거</th></tr></thead>
+<tbody><tr><td><span class="chip dim">일반 저장 대기 중 외부 변경</span></td><td>실제 숫자 2 입력 후 age 8ms에 외부 값 1 주입; 저장 거부 및 외부 bytes 보존</td><td><a href="../../Build/TAUI-Release-conflict-64d24b9d/commands.jsonl">receipt</a>, <a href="../../Build/TAUI-Release-conflict-64d24b9d/editor.out">로그</a></td></tr>
+<tr><td>충돌 오류 표시</td><td>Inspector에 저장 거부 설명과 Reload Disk Settings 표시</td><td><a href="../../Build/TAUI-Release-conflict-64d24b9d/conflict-visible.png">화면</a></td></tr>
+<tr><td>실제 Reload Disk Settings 클릭</td><td>Inspector 1 복원, 디스크 hash 불변, 오류 해제</td><td><a href="../../Build/TAUI-Release-conflict-64d24b9d/disk-reloaded.png">화면</a>, <a href="../../Build/TAUI-Release-conflict-64d24b9d/reload-receipt.json">hash receipt</a></td></tr>
+<tr><td>충돌 해소 후 실제 숫자 2 입력</td><td>추가 저장 버튼/씬 재로드 없이 최종 metadata 2, 오류 재발 없음</td><td><a href="../../Build/TAUI-Release-conflict-64d24b9d/edit-after-conflict.png">화면</a></td></tr>
+<tr><td><span class="chip ok">정상 종료 시 외부 충돌</span></td><td>age 8ms에 외부 값 1 주입 후 RequestQuit; Finalize age 32ms flush에서 저장 거부, 최종 metadata 1</td><td><a href="../../Build/TAUI-Release-conflictshutdown-3daac159/commands.jsonl">receipt</a>, <a href="../../Build/TAUI-Release-conflictshutdown-3daac159/editor.out">로그</a></td></tr></tbody></table></div>
+<p>일반 fixture는 native 창 닫기로 종료했다. 종료 충돌 fixture는 제어된 RequestQuit을
+사용했다. 둘 다 원본 PNG·GUID 및 저장 씬을 보존했고 Finalize 완료와 DX12
+pending task/batch/retirement 0/0/0을 확인했다. 일반 실행은 미저장 엔티티를 유지했다.
+Output Log의 오류 건수 1은 이전 충돌 기록이며 복구 후 새 충돌이 발생했다는 의미가 아니다.
+<code>wait 36000</code> 명령은 화면 관찰을 위한 유지 요청이고 장시간 완료 증거가 아니다.</p>
+<p><a href="../../Build/TextureAutomaticConflictUi/result.json">통합 결과와 소스 manifest</a> 및
+<a href="../../Build/collect-texture-conflict-ui.ps1">수집 스크립트</a>에 디스크·로그 단정을 기록했다.
+Build 아래 fixture·화면·로그는 로컬 실행 증거다. 이번 검사로 일반 대기/종료 flush의
+제어된 유효 외부 설정 충돌, 오류 표시와 디스크 재읽기/재편집을 수용한다.
+실패한 디스크 재읽기와 정상 Retry Import의 오류 해제는 소스 구현 확인이며 이번
+UI 실행에서 직접 클릭한 수용으로 확대하지 않는다.</p>
+<p>동일 최종 Release runtime의 소비자 회귀도 282단정을 통과했다. 자동 4→2 연결,
+미저장 씬·Undo 보존, cook/reload 실패 보존과 복구 및 프리팹 자동 Apply/Undo/Redo를
+ImageComponent/SpriteRenderer에서 확인했다.
+<a href="../../Build/TRS-Release-dffb9166/results.jsonl">회귀 receipt</a>와
+<a href="../../Build/TextureReimportScene/result.json">통합 결과</a>의 sourceDrift는 0이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용-경계">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="수용-경계">수용 경계</h2></div>
+<div class="prose"><p>각 모드의 단일 제어된 외부 쓰기 수용이며 모든 디스크 충돌 수용은 아니다.
+최종 디스크 비교와 실제 쓰기 사이에 다른 쓰기가 끼어드는 경합, 파일 잠금/삭제/
+손상된 외부 설정, 반복·장시간·다중 창·배율 및 Debug 실행은 별도 잔여다.
+일반 conflict의 bytes 보존과 종료 시 최종 설정 보존은 서로 다른 단정이다.
+화면은 Inspector/씬 관찰이며 독립 GPU pixel oracle이나 전체 소비자 계측을 대신하지 않는다.
+미저장 엔티티는 열린 씬 유지 검사이고 저장 씬 파일은 변경하지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="TextureAutomaticInspectorConflictValidation20261010.md"><code>docs/analysis/TextureAutomaticInspectorConflictValidation20261010.md</code></a> · 마지막 커밋 2026-10-10 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

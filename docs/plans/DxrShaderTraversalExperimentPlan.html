@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/DxrShaderTraversalExperimentPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>셰이더 교차 탐색의 DXR 전환 가설·채택 실험</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-08-제품-페이즈-연결">2026-10-08 제품 페이즈 연결</a></li><li><a href="#1-현재-근거와-검증-가능한-가설">1. 현재 근거와 검증 가능한 가설</a></li><li><a href="#2-실행-순서선행산출물">2. 실행 순서·선행·산출물</a></li><li><a href="#3-비교-조건과-크기-sweep">3. 비교 조건과 크기 sweep</a></li><li><a href="#4-정확도-계약">4. 정확도 계약</a></li><li><a href="#5-비용-판정과-설계-반영">5. 비용 판정과 설계 반영</a></li><li><a href="#연결-문서">연결 문서</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="DxrShaderTraversalExperimentPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>셰이더 교차 탐색의 DXR 전환 가설·채택 실험</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">9<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="차단·중단 1, 대기·미검증 8"><i class="risk" style="flex:1"></i><i class="dim" style="flex:8"></i></div>
+<span class="legend"><span class="chip risk">차단·중단 1</span><span class="chip dim">대기·미검증 8</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#2026-10-08-제품-페이즈-연결"><span class="ve-label">§00</span><span class="map-name">2026-10-08 제품 페이즈 연결</span><span class="map-bar"><i style="width:63.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-현재-근거와-검증-가능한-가설"><span class="ve-label">§1</span><span class="map-name">현재 근거와 검증 가능한 가설</span><span class="map-bar"><i style="width:81.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-실행-순서선행산출물"><span class="ve-label">§2</span><span class="map-name">실행 순서·선행·산출물</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">8</span></span></a>
+<a class="map-row" href="#3-비교-조건과-크기-sweep"><span class="ve-label">§3</span><span class="map-name">비교 조건과 크기 sweep</span><span class="map-bar"><i style="width:91.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-정확도-계약"><span class="ve-label">§4</span><span class="map-name">정확도 계약</span><span class="map-bar"><i style="width:94.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-비용-판정과-설계-반영"><span class="ve-label">§5</span><span class="map-name">비용 판정과 설계 반영</span><span class="map-bar"><i style="width:89%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#연결-문서"><span class="ve-label">§06</span><span class="map-name">연결 문서</span><span class="map-bar"><i style="width:9.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「2. 실행 순서·선행·산출물」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-2026-10-08-제품-페이즈-연결">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="2026-10-08-제품-페이즈-연결">2026-10-08 제품 페이즈 연결</h2></div>
+<div class="prose"><p>전체 제품 목표는 <a href="PathTracingHybridPipelinePlan.html">PHASE 4.85 Path Tracing·Hybrid RT</a>다. 이 문서는 Hybrid RTP-5의 효과별 탐색·품질·비용 판정 입력이며 기본 PT나 ReSTIR PT Enhanced, tetrahedral cages의 전체 계획을 대신하지 않는다. RT 공통 기반은 RTP-1/2를 소비하고 재구현/중복 산정하지 않는다. EXP-2V 우선은 이 실험 가지에 적용하며 Hybrid hard shadow와 기본 PT 착수를 막지 않는다. EXP-4 결과는 RTP-5/13과 GPU-3/9에 함께 반환한다.</p>
+<p>2026-10-08 공수 산정: EXP-0/1 효과 baseline은 RTP-0/5, EXP-2/3 효과 prototype·AS 비용은 RTP-5, EXP-4 판정은 RTP-5/13에 포함한다. 공통 기반 RTP-1/2와 제품 수명 RTP-12를 재계상하지 않는다. 전체 RTP 208인일 중 효과 확장 RTP-5는 28인일이며 EXP 별도 공수를 추가하지 않는다. 아래 10월 1일의 null 표기는 당시 미산정 이력이다.</p>
+<p><strong>2026-10-01 · 계획만 작성 · 실험 미착수 · 공수 미산정(<code>days: null</code>).</strong>
+GPU-3의 효과 선정 근거와 GPU-9의 설계 채택 판정을 위한 실험 계획이다.
+DXR 전환은 아직 확정하지 않는다. 기존 상세 배선의 첫 기능인 directional hard shadow는
+유지하며, 아래 후보는 결과가 나온 뒤 별도 변경 결정으로 반영한다.
+현재 GPU 설계 4행 9일에 prototype/실측 공수를 포함하지 않는다. 5.5일은 이전 산정이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-현재-근거와-검증-가능한-가설">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-현재-근거와-검증-가능한-가설">1. 현재 근거와 검증 가능한 가설</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>ID</th><th>현재 코드/방식</th><th>가설</th><th>반증 조건</th></tr></thead>
+<tbody><tr><td>H-V</td><td><code>Includes/MaterialGraphSceneVolume.slang</code>의 LXVolumeEvents: 최대 128 triangle 전수 교차·이벤트 삽입 정렬, 16 object</td><td>triangle AS를 통한 경계 탐색은 geometry/ray 수 증가 시 탐색 비용을 줄일 수 있다</td><td>AS build/update·반복 trace·event 처리 포함 전체 시간이 줄지 않거나 매질 의미가 달라짐</td></tr>
+<tr><td>H-R</td><td><code>MaterialGraphSceneRefractionBake.slang</code>: background 탐색 뒤 medium 처리</td><td>geometry 기반 hit로 화면 공간 굴절의 가림·화면 밖 hit 정확도를 개선할 수 있다</td><td>배경 radiance 평가/출구 경계 없이 교차만 바꿔 오차 증가, 전체 예산 초과</td></tr>
+<tr><td>H-S</td><td><code>Ssr.slang</code> Raytrace와 <code>SsgiTrace.slang</code> TraceHiZ</td><td>RT는 화면 밖/가려진 geometry에서 화면 공간의 miss를 줄일 수 있다</td><td>hit 재질/조명·denoise까지 포함한 비용 대비 품질 이점 미수용</td></tr>
+<tr><td>H-F</td><td><code>FogAccumulate.slang</code>의 깊이 slice 적분</td><td>fog 광원 visibility만 RT로 바꾸면 가림 품질이 개선될 수 있다</td><td>적분 비용이 지배적이거나 RT visibility 비용·노이즈가 이점을 상쇄</td></tr></tbody></table></div>
+<p>H-V는 현재 구현이 software BVH라는 가정이 아니다. H-R의 화면 공간/매질 경로와
+SSR/SSGI/Fog의 실제 제품 호출·활성 설정은 EXP-0에서 다시 추적한다. 테스트 전 source를
+바꾼 경우 최신 hash·실행 binary 포함 여부를 확인한 뒤 다시 baseline을 잡는다.
+DXR이 triangle 교차/AS traversal을 담당해도 event 정렬, BRDF, radiance, 볼륨 적분은 남는다.
+SDF/procedural AABB의 내부 marching은 사용자 intersection shader에 남으므로 별도 가설로
+추가하지 않는 한 이 실험의 성공으로 대체 완료를 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-실행-순서선행산출물">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-실행-순서선행산출물">2. 실행 순서·선행·산출물</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>ID</th><th>작업</th><th>선행</th><th>산출물</th><th>공수/상태</th></tr></thead>
+<tbody><tr><td>EXP-0</td><td>현재 소비 경로·지원 probe·측정 환경·수용 예산 봉인</td><td>해당 소스/제품 route 접근</td><td>call-path 목록, scene manifest, budget/tolerance, device capability</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-1</td><td>기존 compute/raster baseline과 단계별 GPU 시간</td><td>EXP-0</td><td>raw captures·CPU oracle·픽셀/교차/VRAM 결과</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-2V</td><td>H-V 독립 offscreen triangle-AS prototype</td><td>EXP-1, 필요한 GD0 RT 계약</td><td>DXR boundary events와 동일 medium evaluator 비교</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-2R</td><td>H-R 단일 경계 hit + 후속 폐곡면 출구 실험</td><td>EXP-1, GD0, 경계 의미가 겹치면 EXP-2V</td><td>hit/radiance/transport 분리 결과</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-2S</td><td>SSR 먼저, SSGI는 별도 비용/품질 실험</td><td>EXP-1, GD0, sealed material hit 평가</td><td>screen-space/RT/hybrid 비교</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-2F</td><td>fog visibility만 교체, 적분 유지</td><td>EXP-1, GD0, light/medium oracle</td><td>visibility 품질·전체 fog 비용 비교</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-3</td><td>같은 프레임의 AS 공유·변경·두 view/in-flight 스트레스</td><td>통과한 EXP-2 후보, 제품 통합은 RG6</td><td>공유/독립 AS 비용, abort/retirement·통합 frame 결과</td><td><span class="chip dim">null / todo</span></td></tr>
+<tr><td>EXP-4</td><td>효과별 채택/조건부/보류/기각 판정</td><td>해당 후보 EXP-2/3 결과</td><td>decision record와 GPU-3/GPU-9 상세 설계 변경</td><td><span class="chip dim">null / todo</span></td></tr></tbody></table></div>
+<p>먼저 EXP-0/1 → EXP-2V를 진행한다. 탐색이 실제 병목이 아니거나 정확도 gate를 통과하지
+못하면 그 원인을 기록하고 후보 확장을 자동으로 계속하지 않는다. 다른 효과는 독립 근거로
+선정한다. prototype은 독립 offscreen으로 시작할 수 있으며 RG6 전체를 일괄 선행으로 받지
+않는다. 기존 제품 renderer에 설치하는 EXP-3는 RG6·관련 version/수명 계약을 소비한다.
+GPU-2/C# 전체 완료는 실험의 선행이 아니다. Vulkan 지원/fallback·native 실행 비교는
+<a href="BackendParityPlan.html">PHASE 4.9</a>로 이관하며 DX12 실험 완료를 막지 않는다. DX12 결과를 Vulkan 성능 증거로 이월하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-비교-조건과-크기-sweep">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-비교-조건과-크기-sweep">3. 비교 조건과 크기 sweep</h2></div>
+<div class="prose"><p>같은 source commit+dirty diff hash, shader hash, cooker/asset generation, binary hash,
+driver/device, Debug/Release, resolution, camera/light/material, ray/sample budget를 manifest에
+고정한다. source 최신 binary 확인 후 캡처한다. Debug는 correctness/validation,
+Release는 성능 판정의 주 근거다. GPU validation 켠 결과와 꺼진 성능 결과를 분리한다.</p>
+<p>최소 1280×720/1920×1080, 정적·transform 이동·geometry 변형 scene, 1/2 view를 비교한다.
+H-V는 triangle 12/32/64/128 및 object 1/4/16을 먼저 측정한다. 현재 상한 밖의
+512/2048/8192 triangle은 독립 reference fixture에서만 비교하고 현행 shader의 clamp 결과를
+정답으로 사용하지 않는다. extended sweep은 CPU oracle 또는 동등 의미의 bounded software
+reference를 마련한 뒤 진행한다. active pixel/ray 수를 함께 sweep해 crossover를 찾는다.</p>
+<p>AS cold build, warm static reuse, transform-only TLAS 갱신, geometry BLAS rebuild/update를
+분리한다. update는 해당 capability와 build 조건을 검증한 경우만 측정한다. 공통 shadow AS를
+이미 가진 경우의 incremental 비용과 이 효과 때문에 AS를 만드는 standalone 비용을 모두
+보고한다. AS 공유를 무료로 가정하거나 cold 비용을 전체 평균에 숨기지 않는다.</p>
+<p>각 조합 warmup 10초 이상, 측정 30초 이상을 기본으로 5회 교차 순서(A/B, B/A) 실행한다.
+thermal/clock 상태가 불안정하면 안정화 후 반복한다. 외부 앱/진단 부하·캡처 오버헤드를
+기록하고 CPU/GPU 작업을 같은 조건으로 맞춘다. p50/p95와 run간 분산 및 paired delta를
+보고한다. 차이가 측정 변동 범위 안이면 성능 우위로 판정하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-정확도-계약">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-정확도-계약">4. 정확도 계약</h2></div>
+<div class="prose"><p>H-V는 모든 필요한 positive crossing, camera-inside winding, entry/exit beyond far plane,
+겹치는 매질·shared edge·tangent·mirrored transform·같은 거리 events를 검증한다.
+DXR any-hit 방문 순서는 정렬된 hit 순서가 아니다. 이벤트 수집 후 정렬/병합 또는 반복
+nearest-hit 알고리즘 중 하나를 prototype에서 명시하고 ray epsilon으로 얇은 층을 건너뛰는
+오류와 event overflow를 검증한다. unmatched/overflow는 명시적 실패/fallback이며 누락 성공이
+아니다. RT scene geometry와 기존 software boundary의 winding·sidedness·object ID를 맞춘다.
+삼각형 count 확장 자체를 품질 향상이라고 판정하지 않는다.</p>
+<p>H-R은 교차 정확도와 radiance/transport를 분리한다. offscreen geometry에 screen color를
+억지로 샘플링하지 않고 동일 hit material/light/environment evaluator로 비교한다. current
+단일 경계 근사와 폐곡면 다중 경계 모델의 차이는 별도 품질 실험으로 표시한다.
+H-S는 동일 on-screen geometry 비교와 offscreen/occluded 품질 fixture를 분리한다. ray hit
+개수만으로 GI/반사 품질 성공을 판정하지 않는다. roughness/sample count/denoise 조건을
+고정하고 경계 누락·temporal 안정성·reference radiance 오차를 보고한다.
+H-F는 적분 sample/해상도/계수를 고정하고 visibility만 교체한다.</p>
+<p>EXP-0에서 CPU double-precision triangle/event oracle과 승인된 reference 이미지의 tolerance,
+최대 ray distance, bias, material 의미, memory/CPU/GPU 예산을 baseline 파일에 고정한다.
+결과를 본 뒤 threshold를 느슨하게 바꾸지 않는다. tolerance 변경은 사유와 양쪽 재측정을
+남긴다. GPU validation 0, generation 혼합/조기 해제 0, fallback 정상 동작은 필수다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-비용-판정과-설계-반영">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-비용-판정과-설계-반영">5. 비용 판정과 설계 반영</h2></div>
+<div class="prose"><p>GPU timestamp로 upload/deform, BLAS/TLAS build, traversal/event sort, hit shading,
+medium integration, denoise/history, composite와 전체 frame critical path를 각각 측정한다.
+CPU prepare/record, peak VRAM·scratch·persistent AS/table, ray/event 수, AS 재생성 횟수도
+보고한다. 분리된 pass 시간을 단순 합산해 병렬 frame 이득으로 주장하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>판정</th><th>조건</th><th>설계 처리</th></tr></thead>
+<tbody><tr><td>채택</td><td>정확도/수명 gate 통과; EXP-0 예산 안; 개선이 반복 측정 변동보다 큼</td><td>해당 효과 DXR route·AS 공유·fallback을 상세 계약/후속 구현 슬라이스에 추가</td></tr>
+<tr><td>조건부 채택</td><td>특정 규모·정적 reuse·hardware에서만 이점, 또는 품질 개선에 비용 증가</td><td>crossover·지원/설정·비용을 명시하고 선택 모드로 추가; 기본값 전환은 별도 결정</td></tr>
+<tr><td><span class="chip risk">보류</span></td><td>정확도는 통과하나 우위 불확실, 지원 hardware/예산 측정 부족</td><td>기존 route 유지; 재실험 조건만 남김</td></tr>
+<tr><td>기각</td><td>의미 손실/안전 실패 또는 예산 초과·품질 이점 없음</td><td>제품 DXR route를 추가하지 않고 원인 기록</td></tr></tbody></table></div>
+<p>품질 향상과 성능 향상은 각각 판정한다. 품질이 좋아도 느려지면 성능 개선으로 표현하지
+않는다. 후보별 결과가 다르면 일괄 전환하지 않는다. 기존 directional hard-shadow 첫
+슬라이스를 교체하려면 EXP-4 decision에 이유·새 선행·회귀/공수 변경을 명시한다.</p>
+<p>결과는 <code>docs/analysis/DxrShaderTraversalExperiment.md</code>와 기계 판독 manifest/metrics에
+남길 계획이다. 현재 이 파일들은 생성하지 않으며 미실행 결과를 채워 넣지 않는다.
+decision에는 가설, 현재 call path, 환경/해시, oracle, raw capture 위치, 정확도·비용 결과,
+판정/지원 범위, fallback, 잔여 위험, 후속 구현 공수(null 또는 근거 있는 산정)를 포함한다.
+GPU-9는 이 판정 없이 shader traversal의 DXR 전환을 확정 설계로 승격하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-연결-문서">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="연결-문서">연결 문서</h2></div>
+<div class="prose"><ul>
+<li><a href="GpuFeaturePlanningPlan.html">GPU 기능 설계 계획</a></li>
+<li><a href="../design/GpuDrivenMeshletDxrWiring.html">Meshlet·DXR 상세 배선</a></li>
+<li><a href="https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html">Microsoft DXR 사양</a></li>
+</ul>
+<p>이 문서는 실험 실행 계획이며 새 source/build/runtime/performance 완료 증거가 아니다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="DxrShaderTraversalExperimentPlan.md"><code>docs/plans/DxrShaderTraversalExperimentPlan.md</code></a> · 마지막 커밋 2026-10-08 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

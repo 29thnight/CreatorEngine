@@ -1,2 +1,256 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>메시렛 파이프라인 비교를 위한 현재 구현 기준</title><style>body{margin:0;background:#f4f6f9;color:#172435;font:17px/1.8 system-ui,sans-serif}main{max-width:1040px;margin:auto;padding:36px 24px}h1{font-size:2.2rem;line-height:1.25}h2{font-size:1.45rem;color:#174c70}section{background:white;padding:22px 28px;margin:20px 0;border-radius:8px;border:1px solid #dce3eb}nav{display:flex;flex-wrap:wrap;gap:10px 20px}a{color:#155e89;overflow-wrap:anywhere}code{background:#eef2f6;padding:2px 5px;overflow-wrap:anywhere}.notice{border-left:4px solid #bd772b;padding:12px 18px;background:#fff4df}li{margin:6px 0}@media(max-width:600px){main{padding:20px 14px}section{padding:16px}h1{font-size:1.8rem}}</style></head><body><main><section id="master-integration"><h2>2026-10-17 master 통합 기록</h2><p>다음은 master b767a3c67e0f8474792a0a141a4580c5eac15712에서 가져온 후속 구현·검증 기록이다. 이번 충돌 해결에서 실행 검증을 재수행한 결과는 아니다. 이전 본문의 2026-10-15 기준보다 이 기록과 최신 라이브 배선을 우선한다.</p><section class="summary" id="shared-pool-update"><strong>2026-10-17 공유 물리 풀·전역 페이지 정책·packing·증분 전송</strong><p>자산별 고정 가상 주소와 장치별 공유 64 MiB 물리 heap을 연결했다. 완료·비참조 캐시의 선택 페이지부터 전역 우선순위/최근 사용 순서로 퇴거하며 활성 페이지는 보호한다. 패킷은 16바이트 정렬로 packing하고 유지된 패킷을 건너뛰며 메타데이터 변경 구간·신규/재매핑 패킷만 전송한다. Debug/Release 5모드·Editor 통합·39노드 배선 검증을 통과했다. 최종 결과와 잔여 범위는 <a href="LiveRenderWiring20261012.html#validation-current">현재 검증</a>을 따른다. 성능 측정은 하지 않았다. 아래 기존 비교와 수용 기록은 각 작성 시점의 이력이다.</p></section><section class="summary" id="current-wave-update"><details><summary>이전 기록: 2026-10-16 CEGE9 저장·소비자 전환</summary><strong>2026-10-16 현재 구현 · SceneHost 39 / CEGE9</strong><p>아래 본문은 10월 11일의 역사적 비교다. 현재는 GPU ring·JOB_COUNT·준비된 뷰 공유, 그림자 2단계 컬링·정적 캐시, 속성별 양자화·GPU 직접 복원, Reserved Resource 풀·GPU 요구·장치 VRAM 성장 예산·메타데이터 콜드 로드와 Editor 소비자 전환을 연결했다. 후속 5·6단계는 CEGE의 원본 본문과 Editor generation의 model.cemc를 제거하고 구형 CEGE/generation 리더·비활성 collider 작업 연결을 정리한다. CEGE9는 메타데이터와 QMC2 페이지만 저장하며 정확한 충돌 위치·인덱스는 별도 CECP로 지연 소비한다. schema 2 generation은 기하 배열 없는 metadata.cemc를 읽는다. shader 39 / GPU schema 6은 유지한다. 최신 빌드·정확성 결과는 <a href="LiveRenderWiring20261012.html#validation-current">현재 검증</a>과 <a href="LiveRenderWiring20261012.html#geometry-consumers">소비자 정책</a>을 따른다. 자산 간 물리 타일 재분배·대규모 스트레스·RE 비공개 인코딩 동일성·Vulkan·성능 수용은 별도다. 성능 측정은 하지 않았다.</p></details></section></section><h1>메시렛 파이프라인 비교를 위한 현재 구현 기준</h1><p class="notice">기준: master 493536e300e274cbf59989cdd62b20310c8ae64f의 소스 정적 조사. 이번 재작성에서 빌드·실행·성능 측정은 하지 않았다.</p><nav><a href="#scope">비교 자료의 범위</a><a href="#pipeline">현재 제품 파이프라인</a><a href="#occlusion">current depth와 history의 구분</a><a href="#ownership">비교해야 할 비용과 자원</a><a href="#limits">미검증과 후속</a></nav><section id="scope"><h2>비교 자료의 범위</h2><p>이 경로는 2026-10-11 RE ENGINE 비교 보고의 후계다. 외부 엔진의 비공개 구현이나 최신 게임 상태를 확인하지 않았으므로 RE ENGINE의 세부 동작·우열을 현재 사실로 단정하지 않는다. 여기서는 비교에 필요한 CreatorEngine의 실제 producer/consumer와 수명 기준을 고정한다.</p><p>외부 발표와 비교할 때는 발표 버전·장면·하드웨어·render path를 별도 출처로 붙여야 한다. 이름이 같은 meshlet이나 HZB가 같은 알고리즘·성능을 뜻하지 않는다.</p></section><section id="pipeline"><h2>현재 제품 파이프라인</h2><p>EnhancedSceneRenderer는 METEOR Geometry → Cull.First → Occluder → Cull.Final → Surface를 배선한다. Shadow는 Geometry를 독립 소비한다. current/previous/shadow pose는 geometry owner가 준비하고 object-space 출력은 world transform이 다른 instance에서 공유한다.</p><p>SceneHost는 meshIndirect와 cooked meshlet을 요구한다. general visibility helper의 nullable 결과는 여기에서 CPU/direct route를 제공한다는 뜻이 아니다. 옛 “모든 group을 mesh shader에서만 거절”이라는 단계 설명을 최신 전체 경로로 읽지 않는다.</p></section><section id="occlusion"><h2>current depth와 history의 구분</h2><p>current-frame HZB는 앞서 선언된 같은 view의 standard-Z depth에서 만든다. 소비자가 다시 쓰는 depth로 자신의 visibility를 판단하는 feedback은 피한다. history는 device·view·revision·completion을 보존하고 현재 graph에 recording-local read로 가져온다.</p><p>카메라 가시성으로 shadow 가시성을 대체하지 않는다. 불확실한 bound나 projection은 conservative하게 다뤄야 하며 custom pixel depth/depth bias는 helper의 명시된 HZB 입력 가정 밖이다.</p></section><section id="ownership"><h2>비교해야 할 비용과 자원</h2><p>visibility Frame은 candidate·visible IDs·indirect args를 recording별로 소유하고 submitted GPU 작업이 끝날 때까지 유지한다. 서로 다른 view/frame이 같은 buffer를 덮어써 절약한 것처럼 보이는 구현과 비용을 비교하면 안 된다.</p><p>DispatchMeshIndirect 전용 bin과 DrawIndexedIndirect bin은 혼용할 수 없다. ordered meshlets와 preserved instance stream은 투명 순서를 유지하는 별도 계약이다. 성능 비교는 같은 visible work·quality·history validity와 실패 정책을 고정해야 한다.</p></section><section id="limits"><h2>미검증과 후속</h2><p>이 문서는 새로운 capture나 GPU timing을 만들지 않았다. 과거 측정 이미지는 당시 evidence로 유지한다. 현재 제품 품질·backend parity·LOD 전환·occlusion false-negative·device-loss는 별도 gate다. 최신 계약은 <a href="../design/GpuDrivenMeshletDxrWiring.md">GPU 기하 배선</a>과 <a href="ReEngineMeshletGraphFeasibility20261011.html">graph 수용 경계</a>에서 이어진다.</p></section><section id="sources"><h2>구현 근거</h2><ul><li><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp</a></li><li><a href="../../Engine/RenderEngine/MaterialGraphSceneHost.cpp">Engine/RenderEngine/MaterialGraphSceneHost.cpp</a></li><li><a href="../../Engine/RenderEngine/MaterialGraphSceneGeometryStage.inl">Engine/RenderEngine/MaterialGraphSceneGeometryStage.inl</a></li><li><a href="../../Engine/RenderEngine/GpuGeometryVisibility.h">Engine/RenderEngine/GpuGeometryVisibility.h</a></li><li><a href="../../Engine/RenderEngine/GpuGeometryOcclusion.h">Engine/RenderEngine/GpuGeometryOcclusion.h</a></li></ul></section></main></body></html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>RE ENGINE 메시렛 비교</title>
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  :root { --ink: var(--text); --ink-2: var(--text); --muted: var(--text-dim); --dim: var(--text-dim); --line: var(--border); --line-2: var(--border-bright); --sheet-line: var(--border); --good: var(--ok); --green: var(--ok); --accent-2: var(--ok); --bad: var(--risk); --danger: var(--risk); --err: var(--risk); --crit: var(--risk); --purple: var(--info); --target: var(--info); --target-bg: color-mix(in srgb, var(--info) 14%, transparent); --cost: var(--accent); --cost-bg: var(--accent-dim); --surface-2: color-mix(in srgb, var(--text) 5%, var(--surface)); --surface2: color-mix(in srgb, var(--text) 5%, var(--surface)); --chip: color-mix(in srgb, var(--text) 6%, var(--surface)); --code: color-mix(in srgb, var(--text) 6%, var(--surface)); --code-bg: color-mix(in srgb, var(--text) 6%, var(--surface)); --sheet: var(--surface); --shadow: none; --radius: var(--r-2); --f-sans: var(--font-body); --f-mono: var(--font-mono); }
+
+
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.7 var(--font-body);
+}
+main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 80px; }
+header.hero { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
+.kicker { font: 600 12px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; margin: 10px 0 12px; }
+h2 { font-size: 22px; margin: 48px 0 12px; display: flex; gap: 12px; align-items: baseline; }
+h2 .num { font: 600 13px var(--font-mono); color: var(--accent); }
+h3 { font-size: 16px; margin: 24px 0 8px; }
+p, li { color: var(--ink); }
+.meta { color: var(--muted); font-size: 13px; }
+code { font: 13px var(--font-mono); background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.summary {
+  background: var(--surface); border-left: 4px solid var(--accent); border-radius: var(--radius);
+  padding: 18px 22px; box-shadow: var(--shadow);
+}
+.summary ul { margin: 8px 0 0; padding-left: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+.card h3 { margin-top: 0; }
+.mermaid { min-width: 0; }
+.mermaid svg { max-width: 100%; height: auto; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); position: sticky; top: 0; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.tag { display: inline-block; font: 600 11px/1.6 var(--font-mono); padding: 0 8px; border-radius: 999px; white-space: nowrap; }
+.tag.missing { color: var(--bad); border: 1px solid var(--bad); }
+.tag.diff { color: var(--warn); border: 1px solid var(--warn); }
+.tag.ok { color: var(--good); border: 1px solid var(--good); }
+.pros { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 820px) { .pros { grid-template-columns: 1fr; } }
+.pros div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.pros strong { display: block; margin-bottom: 4px; }
+ol.priority { list-style: none; padding: 0; margin: 0; counter-reset: p; }
+ol.priority li { counter-increment: p; display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+ol.priority li::before { content: counter(p); font: 700 22px var(--font-mono); color: var(--accent); }
+ol.priority li:last-child { border-bottom: 0; }
+.note { color: var(--muted); font-size: 13px; }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ve-crumbs { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1.5rem 0; font: 500 .75rem var(--font-mono); color: var(--text-dim); display: flex; gap: 1rem; }
+  .ve-crumbs a { color: var(--text-dim); }
+  .ve-crumbs a:hover { color: var(--accent); }
+  @media print { body::before, .ve-crumbs { display: none; } }
+</style>
+</head>
+<body>
+<nav class="ve-crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span></nav>
+
+
+<main>
+<section class="summary" id="shared-pool-update"><strong>2026-10-17 공유 물리 풀·전역 페이지 정책·packing·증분 전송</strong><p>자산별 고정 가상 주소와 장치별 공유 64 MiB 물리 heap을 연결했다. 완료·비참조 캐시의 선택 페이지부터 전역 우선순위/최근 사용 순서로 퇴거하며 활성 페이지는 보호한다. 패킷은 16바이트 정렬로 packing하고 유지된 패킷을 건너뛰며 메타데이터 변경 구간·신규/재매핑 패킷만 전송한다. Debug/Release 5모드·Editor 통합·39노드 배선 검증을 통과했다. 최종 결과와 잔여 범위는 <a href="LiveRenderWiring20261012.html#validation-current">현재 검증</a>을 따른다. 성능 측정은 하지 않았다. 아래 기존 비교와 수용 기록은 각 작성 시점의 이력이다.</p></section>
+
+<header class="hero">
+  <div class="kicker">Analysis · 2026-10-11</div>
+  <h1>RE ENGINE 메시렛 파이프라인과 CreatorEngine 지오메트리 경로 비교</h1>
+  <p class="meta">출처: REAC 2025 RE ENGINE 메시렛 렌더링 파이프라인 발표 번역본(Dragon's Dogma 2, Monster Hunter Wilds).
+  비교 대상: <code>GpuMeshletVisibility</code>, <code>GpuGeometryOcclusion</code>, <code>GpuGeometryVisibility</code>,
+  <code>EnhancedGBufferPass</code>, <code>EnhancedShadowPass</code>, <code>MaterialGraphSceneHost</code>, <code>Experiment/MeshletData.h</code>, <code>Experiment/MeshLodData.h</code>.</p>
+</header>
+<section class="summary" id="current-wave-update"><details><summary>이전 기록: 2026-10-16 CEGE9 저장·소비자 전환</summary><strong>2026-10-16 현재 구현 · SceneHost 39 / CEGE9</strong><p>아래 본문은 10월 11일의 역사적 비교다. 현재는 GPU ring·JOB_COUNT·준비된 뷰 공유, 그림자 2단계 컬링·정적 캐시, 속성별 양자화·GPU 직접 복원, Reserved Resource 풀·GPU 요구·장치 VRAM 성장 예산·메타데이터 콜드 로드와 Editor 소비자 전환을 연결했다. 후속 5·6단계는 CEGE의 원본 본문과 Editor generation의 model.cemc를 제거하고 구형 CEGE/generation 리더·비활성 collider 작업 연결을 정리한다. CEGE9는 메타데이터와 QMC2 페이지만 저장하며 정확한 충돌 위치·인덱스는 별도 CECP로 지연 소비한다. schema 2 generation은 기하 배열 없는 metadata.cemc를 읽는다. shader 39 / GPU schema 6은 유지한다. 최신 빌드·정확성 결과는 <a href="LiveRenderWiring20261012.html#validation-current">현재 검증</a>과 <a href="LiveRenderWiring20261012.html#geometry-consumers">소비자 정책</a>을 따른다. 자산 간 물리 타일 재분배·대규모 스트레스·RE 비공개 인코딩 동일성·Vulkan·성능 수용은 별도다. 성능 측정은 하지 않았다.</p></details></section>
+
+
+<section class="summary">
+  <strong>요약</strong>
+  <ul>
+    <li>현재 표면·그림자는 LX 단일 배선이다. 일반 GBuffer 표면 구현과 전용 GPU 메시렛/LOD 컬링 모듈은 삭제했다.</li>
+    <li>LX 카메라 오클루전은 현재 프레임 깊이 선행 방식이다. RE의 이전 HiZ 기반 2단계 재검사는 후속이다.</li>
+    <li>가시성 버퍼, 소프트웨어 래스터라이저, 바인드리스 머티리얼이 없다.</li>
+    <li>그림자 캐스터는 LX 경로로 통일했다. 2026-10-12 사용자 지시로 DX12 compute 메시렛 생존 목록과 indirect 소비를 구현했다. 정확도·변이·성능 검증 범위는 <a href="LxShadowComputeCulling20261012.md">현재 실행 기록</a>을 따른다. Vulkan은 PHASE 4.9에서 검증한다.</li>
+  </ul>
+</section>
+
+<h2><span class="num">01</span>파이프라인 비교</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>RE ENGINE (Monster Hunter Wilds 기준)</h3>
+<pre class="mermaid">
+flowchart TB
+  subgraph P1["1단계 · 이전 프레임 HiZ"]
+    IC1["인스턴스 컬링<br/>AABB·절두체·HiZ"] --> CC1["클러스터 컬링<br/>링버퍼 웨이브 분배"]
+    CC1 --> SW1["SW 래스터<br/>작은 메시렛"]
+    CC1 --> HW1["HW 가시성 래스터"]
+  end
+  SW1 --> VB[("가시성 버퍼<br/>64-bit atomic")]
+  HW1 --> VB
+  VB --> HZ["현재 HiZ 생성"]
+  HZ --> P2
+  subgraph P2["2단계 · 가려졌던 것만 재검사"]
+    IC2["인스턴스 컬링"] --> CC2["클러스터 컬링"]
+    CC2 --> R2["SW / HW 래스터"]
+  end
+  R2 --> VB
+  VB --> SORT["셰이더 ID 버킷 정렬<br/>IndirectArgs"]
+  SORT --> VTX["정점 변환 사전 계산<br/>CS · 비동기"]
+  VTX --> GB["GBuffer 셰이딩<br/>바인드리스 · 약 50~60 draw"]
+  SORT --> SPR["특수 래스터라이저<br/>데칼 · 알파테스트"]
+</pre>
+  </div>
+  <div class="card">
+    <h3>CreatorEngine · 현재 LX 단일 배선 (2026-10-12)</h3>
+<pre class="mermaid">
+flowchart TB
+  CPU["장면 · 쿠킹된 LX 재질 · geometry"] --> SEAL["SceneViewInput 밀봉"]
+  SEAL --> GEO["LX 정점 변환 · 스키닝"]
+  SEAL --> VIS["카메라 GPU 가시성 · 현재 프레임 HiZ"]
+  CLEAR["SceneSurfaceTargets · MRT와 깊이 생성/클리어"] --> GB["LX Scene GBuffer 직접 기록"]
+  GEO --> GB
+  VIS --> GB
+  GB --> LIGHT["Deferred · LX Color"]
+  CAS["광원 · cascade 3개 행렬"] --> CS["Shadow reset/cull"]
+  GEO --> CS
+  CS --> IDS["원래 meshlet ID 생존 목록 · indirect 인자"]
+  IDS --> MS["LX Shadow MS"]
+  MS --> DEPTH["그림자 깊이 3장"]
+  DEPTH --> LIGHT
+</pre>
+  </div>
+</div>
+
+<h2><span class="num">02</span>항목별 차이 · 2026-10-11 소스 스냅샷</h2>
+<p class="meta">아래 표와 오클루더 방식 비교는 일반 GBuffer 삭제 전 분석이다. 현재 경로는 위 LX 단일 배선과 <a href="LxSceneBigBangCutover20261012.md">빅뱅 전환 기록</a>을 따른다. 일반 GBuffer의 80B descriptor·쌍 펼치기·GPU LOD를 현재 LX 기능으로 해석하지 않는다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>영역</th><th>RE ENGINE</th><th>CreatorEngine</th><th>판정</th></tr></thead>
+  <tbody>
+    <tr><td>메시렛 크기</td><td>정점·삼각형 각각 최대 128</td><td>정점 64 / 삼각형 126 (meshoptimizer)</td><td><span class="tag diff">다름</span> RE는 작게 잡을수록 컬링 비용이 급증한다고 보고</td></tr>
+    <tr><td>메시렛 저장</td><td>메시 1개 = ByteAddressBuffer 1개, 256B 헤더, 정점을 클러스터 안에 직접 저장</td><td>80B descriptor + <code>vertexRemap</code> + 8-bit 삼각형 인덱스, 정점은 원본 VB 참조</td><td><span class="tag diff">다름</span></td></tr>
+    <tr><td>속성 압축</td><td>16/10/8-bit 양자화, 동일 값 속성은 1개만 저장</td><td>없음</td><td><span class="tag missing">없음</span></td></tr>
+    <tr><td>클러스터 바운드</td><td>AABB</td><td>구 + 법선 cone</td><td><span class="tag ok">보유</span> cone 백페이스 컬링은 우리만 있음</td></tr>
+    <tr><td>LOD</td><td>GPU가 LOD 계수로 선택, 스트리밍을 위해 저→고 순서로 저장</td><td>거친 LOD 최대 7단계(LOD0 정점 공유), GPU가 화면 오차로 메시 단위 선택</td><td><span class="tag diff">다름</span> 클러스터 단위 LOD·스트리밍 없음. 자동 LOD는 RE도 미구현</td></tr>
+    <tr><td>적용 대상</td><td>배경 정적 메시에서 시작해 알파테스트·정점 변환·SpeedTree까지 확장</td><td>정적·비스킨(<code>boneCount==0</code>)·LOD0 소스만</td><td><span class="tag diff">초기 단계</span></td></tr>
+    <tr><td>오클루전</td><td>2단계: 이전 프레임 HiZ → 가려진 것만 현재 HiZ로 재검사</td><td>현재 프레임 오클루더 선행 후 재검사, history 없음</td><td><span class="tag diff">방식 다름</span> 03절 참고</td></tr>
+    <tr><td>컬링 작업 분배</td><td>인스턴스를 16 웨이브로 분할하다가 AtomicMin/CAS 링버퍼로 웨이브 간 분배</td><td>{인스턴스, 메시렛} 쌍당 스레드 1개, CPU가 쌍을 펼침, 배치당 65535 상한</td><td><span class="tag diff">취약</span> 대형 HLOD에서 상한·CPU 비용</td></tr>
+    <tr><td>래스터화</td><td>HW 메시/정점 셰이더 + SW 래스터(작은 메시렛, DX 래스터화 규칙 준수)</td><td>HW 메시 셰이더 또는 indexed VS</td><td><span class="tag missing">SW 래스터 없음</span></td></tr>
+    <tr><td>셰이딩</td><td>가시성 버퍼 → 셰이더 ID 버킷 정렬 → 영역 draw, 바인드리스 머티리얼</td><td>GBuffer 직접 기록, CPU가 머티리얼별 PSO 배치</td><td><span class="tag missing">없음</span> 바인드리스 흔적은 FSR 백엔드뿐</td></tr>
+    <tr><td>셰이더 미분</td><td>셰이더 그래프가 UV 미분을 자동 처리, 트라이플래너·하이트맵은 SampleLevel</td><td>래스터 경로라 하드웨어 미분 사용, <code>MaterialGraphMeshletTopology</code>가 primitive 순서 보존</td><td><span class="tag diff">해당 없음</span> 가시성 버퍼 도입 시 과제</td></tr>
+    <tr><td>정점 변환 사전 계산</td><td>GBuffer 전에 CS로 HPOS·이전 HPOS·법선 계산, 정점당 16B, 앨리어싱 메모리</td><td>해당 없음</td><td><span class="tag missing">없음</span> 가시성 버퍼 전제</td></tr>
+    <tr><td>그림자</td><td>메시렛 캐스터, 깊이 재투영 오클루더(64×64), 방향광 2단계 컬링, 3 캐스케이드 비동기 컴퓨트, RT 히트 위치 주입</td><td>3 캐스케이드. <code>EnhancedShadowPass</code>는 계산·맵 선언/클리어만 담당. LX는 캐스케이드 클립 볼륨의 인스턴스 GPU 컬링 후 메시렛 전체를 dispatch하고 MS에서 거부. <code>PrepareShadow</code>는 호출자 없음</td><td><span class="tag missing">격차 최대</span></td></tr>
+    <tr><td>토글</td><td>메시별·시스템 플래그</td><td>전제 조건 불충족 시 indexed 자동 폴백, 사유 기록(<code>m_lastMeshletFallback</code>)</td><td><span class="tag ok">보유</span> 진단성은 우리가 나음</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="num">03</span>오클루전 방식 차이</h2>
+<div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant H as HiZ
+  participant C as 컬링
+  participant R as 래스터
+  Note over H,R: RE ENGINE · 2단계
+  H->>C: 이전 프레임 HiZ
+  C->>R: 보이는 것 그리기
+  R->>H: 현재 HiZ 생성
+  C->>C: 1단계에서 가려졌던 것만 재검사
+  C->>R: 새로 드러난 것 추가로 그리기
+  Note over H,R: CreatorEngine · 오클루더 선행
+  C->>R: 오클루더 배치만 먼저 그리기
+  R->>H: 현재 프레임 피라미드
+  H->>C: 전체 후보 재검사
+  C->>R: 메인 GBuffer 그리기
+</pre>
+</div>
+<div class="pros">
+  <div><strong>우리 방식의 장점</strong>history가 없어서 카메라 컷이나 disocclusion 직후에도 틀리지 않는다. temporal 검증 체계와도 잘 맞는다.</div>
+  <div><strong>우리 방식의 약점</strong>오클루더로 지정된 배치만 가리는 쪽에 참여한다. RE가 아티스트 오클루더 방식을 떠난 이유가 이 한계다. 오클루더를 두 번 그리는 비용도 있다.</div>
+</div>
+
+<h2><span class="num">04</span>도입 우선순위 제안</h2>
+<div class="card">
+<ol class="priority">
+  <li><div><strong>그림자 패스에 메시렛 단위 GPU 컬링</strong><br>사용자 지시로 DX12 compute 사전 컬링을 구현하고 기준선·3장 동치·누락 변이·반복 성능을 재검증한다. Vulkan 실행·교차 비교는 PHASE 4.9에 이관한다. 계획: <a href="../plans/ShadowMeshletGpuCullingPlan.html">ShadowMeshletGpuCullingPlan</a>.</div></li>
+  <li><div><strong>2단계 오클루전 (이전 프레임 HiZ + 재검사)</strong><br>오클루더 지정 의존을 없앤다. 기존 <code>PrepareOcclusionRecheck</code>를 2단계 쪽으로 확장할 수 있다.</div></li>
+  <li><div><strong>컬링 작업 분배 개선</strong><br>CPU의 쌍 펼치기를 GPU 측 확장으로 옮겨 65535 상한과 CPU 비용을 없앤다. 대형 HLOD 대비.</div></li>
+  <li><div><strong>속성 양자화·압축</strong><br>메모리와 대역폭 절감. 쿠커(<code>CookedModelCodec</code>)만 바꾸면 되는 독립 작업이다.</div></li>
+  <li><div><strong>가시성 버퍼 + 바인드리스 + SW 래스터</strong><br>효과는 가장 크지만 머티리얼 그래프, 미분, 데칼까지 재설계하는 장기 과제다. RE도 두 타이틀에 걸쳐 단계적으로 도입했다.</div></li>
+</ol>
+</div>
+
+<h2><span class="num">05</span>한계</h2>
+<ul>
+  <li>원문 PDF의 성능 표 수치(CPU/GPU 시간, 메모리)는 텍스트 추출 과정에서 빠져 비교하지 못했다.</li>
+  <li>본 비교는 소스 구조 검토다. 그림자 계획에는 합성 장면의 제한된 Release 역사적 측정이 추가되었으나, 현재 빌드의 성능·전체 픽셀 정확성 수용은 아니다. 2026-10-11 DX12 Debug/Release의 5개 회귀와 backOff 제거 변이 거부는 <a href="LxShadowBaseline20261011.md">현재 기준선</a>에서 확인했다. <a href="LxShadowEquivalence20261012.md">두 합성 메시·두 포즈의 그림자 맵 3장 비트 동치</a>와 <a href="LxShadowMeshletOmission20261012.md">보이는 사각형 메시렛 누락 변이 거부·정상 대조군</a>도 당시 D/R에서 확인했다. <a href="LxShadowCases20261012.md">12개 합성 장면의 알파 임계값·면 정책·변환·경계·먼 캐스터·다중 메시렛</a>도 해당 보고서의 D/R에서 동치·변이 거부를 통과했다. 텍스처 알파 패턴 등 일반 수용은 남아 있다. 오클루더 선행 패스 비용은 실측하지 않았다.</li>
+  <li><a href="LxShadowRepeatedPerformance20261012.md">2026-10-12 후속 반복 측정</a>: 4096 계측 슬롯으로 큰 장면의 1710개 구간 누락을 해결하고, 현재 Release 3개 합성 장면·총 24회 기록을 검증했다. GPU 비용 비교는 변동성 기준을 통과하지 못해 성능 이득과 compute 착수는 수용하지 않는다. 위 동치·변이 결과는 각 보고서의 당시 binary 증거이며 새 계측 빌드의 재실행 결과와 구분한다.</li>
+  <li>DX12/Vulkan 그림자 실행·리소스·픽셀 비교는 <a href="../plans/BackendParityPlan.md">PHASE 4.9</a>에서 수행한다. 현재 LX 작업의 완료 조건에 포함하지 않는다.</li>
+</ul>
+
+<p class="meta">2026-10-12 사용자 지시로 DX12 compute 생존 목록을 구현했다. 최종 D/R 선택 정확도·변이·회귀는 통과했으며 Release 3장면·24회 compute 포함 성능 이득은 미수용이다. PHASE 4.9 Vulkan 이관은 유지한다. <a href="LxShadowComputeCulling20261012.md">구현과 현재 검증 기록</a>.</p>
+<p class="meta">2026-10-12 현재 구조 갱신: 일반 GBuffer 표면 구현·구경로 테스트·비교 토글을 삭제하고 LX 단일 배선으로 전환했다. Scene ABI 21의 강제 리임포트·재쿠킹 계약을 적용한다. 이전 동치·성능 판정은 당시 바이너리 기록이다. <a href="LxSceneBigBangCutover20261012.md">실제 삭제 목록·현재 배선·검증</a>.</p>
+<p class="meta">메시렛 계약 후속: 현재 LX는 쿠커의 단일 클러스터·원본 삼각형 ID를 사용하며 런타임 재클러스터링을 삭제했다. Scene ABI 22 · CEMC 13 · geometry artifact 2 · meshlet profile/builder 2로 갱신했다. 이전 산출물은 강제 리임포트·재쿠킹 대상이다. <a href="LxMeshletGeometryContract20261012.md">현재 데이터 계약과 검증</a>.</p>
+<footer>CreatorEngine docs/analysis · 작성 2026-10-11 · 브랜치 <code>codex/pr169-build-fixes</code> 기준</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function () {
+  var dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+    (document.documentElement.getAttribute('data-theme') !== 'light' &&
+     window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: (() => { const c = getComputedStyle(document.documentElement), v = n => c.getPropertyValue(n).trim();
+      return { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'), lineColor: v('--text-dim'),
+        secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') }; })(), securityLevel: 'strict',
+      fontFamily: '"IBM Plex Sans KR", system-ui, sans-serif', flowchart: { htmlLabels: true, curve: 'basis' } });
+  }
+})();
+</script>
+</body>
+</html>

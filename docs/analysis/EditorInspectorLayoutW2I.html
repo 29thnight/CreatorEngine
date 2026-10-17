@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorInspectorLayoutW2I.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2-I0 — 인스펙터 배치 실측과 공통 계약</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-인스펙터-렌더-경로-전수">1. 인스펙터 렌더 경로 전수</a></li><li><a href="#2-transform-이-두-번-그려진다">2. Transform 이 두 번 그려진다</a></li><li><a href="#3-개별-활성제거-진입점-재계수">3. 개별 활성·제거 진입점 재계수</a></li><li><a href="#4-폭-계산과-전환-조건--정본-계약">4. 폭 계산과 전환 조건 — 정본 계약</a></li><li><a href="#46-배치만으로는-리플렉션-경로가-전용-드로어를-대신하지-못한다">4.6 배치만으로는 리플렉션 경로가 전용 드로어를 대신하지 못한다</a></li><li><a href="#5-공수-재계수">5. 공수 재계수</a></li><li><a href="#6-착수-순서와-걸림돌">6. 착수 순서와 걸림돌</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorInspectorLayoutW2I.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>W2-I0 — 인스펙터 배치 실측과 공통 계약</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#1-인스펙터-렌더-경로-전수"><span class="ve-label">§1</span><span class="map-name">인스펙터 렌더 경로 전수</span><span class="map-bar"><i style="width:72.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-transform-이-두-번-그려진다"><span class="ve-label">§2</span><span class="map-name">Transform 이 두 번 그려진다</span><span class="map-bar"><i style="width:54.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-개별-활성제거-진입점-재계수"><span class="ve-label">§3</span><span class="map-name">개별 활성·제거 진입점 재계수</span><span class="map-bar"><i style="width:39%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-폭-계산과-전환-조건--정본-계약"><span class="ve-label">§4</span><span class="map-name">폭 계산과 전환 조건 — 정본 계약</span><span class="map-bar"><i style="width:80.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#46-배치만으로는-리플렉션-경로가-전용-드로어를-대신하지-못한다"><span class="ve-label">§4.6</span><span class="map-name">배치만으로는 리플렉션 경로가 전용 드로어를 대신하지 못한다</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-공수-재계수"><span class="ve-label">§5</span><span class="map-name">공수 재계수</span><span class="map-bar"><i style="width:38%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-착수-순서와-걸림돌"><span class="ve-label">§6</span><span class="map-name">착수 순서와 걸림돌</span><span class="map-bar"><i style="width:10.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「4.6 배치만으로는 리플렉션 경로가 전용 드로어를 대신하지 못한다」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><ul>
+<li>작성: 2026-09-12</li>
+<li>2026-09-13 상태 정정: I0는 완료. 아래는 착수 당시 실측과 추가 범위 제안이며 §5의 9일안은 현재 채택 견적이 아니다. 정본은 <a href="../plans/EditorWorkspaceRedesignPlan.html#phase21-current-status">최신 완료·잔여</a>의 W2-I 6일·I0 완료 공수 0.5일을 따른다. 현재 외관은 사용자 승인으로 고정했다.</li>
+<li>대상: <code>docs/plans/EditorWorkspaceRedesignPlan.md</code> 의 <a href="../plans/EditorWorkspaceRedesignPlan.html#w2-inspector-layout">W2-I</a></li>
+<li>범위: W2-I0 이 요구한 &quot;content 폭·공통 열·줄 전환과 표시 정책 정의&quot;, 그리고 계획서가
+I0 으로 미룬 <strong>전용 드로어 전수 이관량</strong>과 <strong>개별 활성 변경 진입점</strong>의 재계수</li>
+</ul>
+<p>계획서는 W2-I 의 근거를 &quot;현재 소스 분석&quot; 이라고 적고, 실제 폭별 캡처·빌드·런타임 결과로
+표기하지 말라고 못 박았다. 이 글은 그 경계를 지킨다 — 아래 계수는 소스에서 센 것이고,
+Transform 중복과 라벨 배치 두 양식은 <strong>실제 에디터 화면으로도</strong> 확인했다. 어느 쪽인지 항목마다
+적었다. 폭별·배율별 검증은 W2-I5 의 일이며 여기서 하지 않았다.</p>
+<hr>
+</section>
+<section class="doc-sec" id="sec-1-인스펙터-렌더-경로-전수">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-인스펙터-렌더-경로-전수">1. 인스펙터 렌더 경로 전수</h2></div>
+<div class="prose"><p><code>InspectorWindow::RenderImGui</code> 가 선택된 엔티티를 그리는 경로는 셋이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th>자리</th><th>라벨 배치</th></tr></thead>
+<tbody><tr><td>기본 렌더</td><td><code>InspectorWindow.cpp:1718-1726</code> — 기본 정보 + 공간 컴포넌트</td><td>라벨 <strong>왼쪽</strong> (<code>Text</code> + <code>SameLine</code>)</td></tr>
+<tr><td>전용 드로어</td><td>컴포넌트 순회의 <code>type_guid</code> 분기 11개</td><td>드로어마다 제각각</td></tr>
+<tr><td>일반 리플렉션</td><td><code>Meta::DrawObject</code> → <code>ReflectionTypedDraw.h</code></td><td>라벨 <strong>오른쪽</strong> (ImGui 기본)</td></tr></tbody></table></div>
+<p><strong>라벨이 두 방향으로 갈린다는 것은 화면으로 확인했다.</strong> 같은 인스펙터 안에서 전용 드로어의
+<code>Position</code>·<code>Rotation</code>·<code>Scale</code> 은 라벨이 왼쪽에 서고, 그 아래 일반 리플렉션의 <code>m_name</code>·<code>position</code>·
+<code>rotation</code>·<code>scale</code>·<code>m_parentID</code>·<code>m_nearPlane</code> 은 라벨이 오른쪽에 선다. 값 열도 맞지 않는다.</p>
+<h3 id="11-전용-드로어의-실제-분량">1.1 전용 드로어의 실제 분량</h3>
+<p>계획서가 &quot;전용 드로어 전수 이관량은 I0 에서 재계수한다&quot; 고 한 항목이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>드로어</th><th style="text-align:right">줄</th></tr></thead>
+<tbody><tr><td><code>ImGuiDrawHelperSoundComponent</code></td><td class="num" style="text-align:right">836</td></tr>
+<tr><td><code>ImGuiDrawHelperGameObjectBaseInfo</code></td><td class="num" style="text-align:right">206</td></tr>
+<tr><td><code>ImGuiDrawHelperVolume</code></td><td class="num" style="text-align:right">201</td></tr>
+<tr><td><code>DrawManagedScripts</code></td><td class="num" style="text-align:right">169</td></tr>
+<tr><td><code>ImGuiDrawHelperTransformComponent</code></td><td class="num" style="text-align:right">162</td></tr>
+<tr><td><code>ImGuiDrawHelperImageComponent</code></td><td class="num" style="text-align:right">152</td></tr>
+<tr><td><code>ImGuiDrawHelperDecal</code></td><td class="num" style="text-align:right">87</td></tr>
+<tr><td><code>ImGuiDrawHelperBT</code></td><td class="num" style="text-align:right">65</td></tr>
+<tr><td><code>ImGuiDrawHelperSpriteRenderer</code></td><td class="num" style="text-align:right">28</td></tr>
+<tr><td><code>ImGuiDrawHelperFSM</code></td><td class="num" style="text-align:right">22</td></tr>
+<tr><td><code>ImGuiDrawHelperCanvas</code></td><td class="num" style="text-align:right">13</td></tr>
+<tr><td><strong><code>InspectorWindow.cpp</code> 안 소계</strong></td><td class="num" style="text-align:right"><strong>1,941</strong></td></tr>
+<tr><td><code>ImGuiDrawHelperMeshRenderer.cpp</code></td><td class="num" style="text-align:right">477</td></tr>
+<tr><td><code>ImGuiDrawHelperTerrainComponent.cpp</code></td><td class="num" style="text-align:right">371</td></tr>
+<tr><td><code>ImGuiDrawHelperRectTransformComponent.cpp</code></td><td class="num" style="text-align:right">328</td></tr>
+<tr><td><code>ImGuiDrawHelperAnimator.cpp</code></td><td class="num" style="text-align:right">88</td></tr>
+<tr><td><code>ImGuiDrawHelperPlayerInput.cpp</code></td><td class="num" style="text-align:right">39</td></tr>
+<tr><td><strong>바깥 파일 소계</strong></td><td class="num" style="text-align:right"><strong>1,303</strong></td></tr>
+<tr><td><code>DrawYamlNodeEditor.cpp</code> (자산 Import Settings)</td><td class="num" style="text-align:right">143</td></tr>
+<tr><td><code>ReflectionTypedDraw.h</code> (일반 경로 정본)</td><td class="num" style="text-align:right">499</td></tr>
+<tr><td><code>ReflectionImGuiHelper.h</code></td><td class="num" style="text-align:right">232</td></tr></tbody></table></div>
+<p><strong>한 드로어가 전체의 4분의 1이다.</strong> <code>SoundComponent</code> 836줄이 전용 드로어 3,244줄 중 26%이고,
+계획서가 &quot;Sound 의 Bus/Params·Spatial 같은 허용된 하위 묶음&quot; 을 따로 언급한 이유가 이 분량이다.
+W2-I4 의 초기 추정 1.5일은 이 한 드로어를 상수로 보고 세운 값이 아니다 — §5 에서 다시 잰다.</p>
+<h3 id="12-죽어-있는-분기-하나">1.2 죽어 있는 분기 하나</h3>
+<p><code>InspectorWindow.cpp:1908</code> 이 <code>dynamic_cast&lt;ICustomEditor*&gt;</code> 로 사용자 정의 인스펙터를 찾고
+<code>OnInspectorGUI()</code> 를 부른다. <strong>그 인터페이스를 구현하는 클래스가 저장소에 0 개다.</strong>
+<code>ICustomEditor</code> 라는 이름이 나오는 파일은 인터페이스 정의(<code>ICustomEditor.h</code>, 9줄), 이 호출부,
+프로젝트 파일 둘, 계획 문서 둘뿐이다. 상속하는 타입이 없으므로 <code>dynamic_cast</code> 는 언제나
+<code>nullptr</code> 이고 실행은 늘 <code>else</code> 의 <code>Meta::DrawObject</code> 로 간다.</p>
+<p>이관 계획에서 이 분기를 &quot;전용 드로어 경로 하나&quot; 로 세면 안 된다. 지금은 이관할 소비자가 없다.
+W2-I3 에서 이 분기의 처리(유지·제거·실제 소비자 도입)를 명시적으로 정한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-transform-이-두-번-그려진다">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-transform-이-두-번-그려진다">2. Transform 이 두 번 그려진다</h2></div>
+<div class="prose"><p>계획서가 &quot;Transform 이 다시 일반 리플렉션으로 내려갈 수 있다&quot; 고 적은 항목이다. <strong>가능성이
+아니라 현재 동작이다.</strong> 소스와 화면 양쪽으로 확인했다.</p>
+<h3 id="21-소스">2.1 소스</h3>
+<ul>
+<li><code>Entity</code> 의 <code>Transform</code> 은 값 멤버가 아니라 <strong><code>m_components</code> 안에 있다.</strong> S1-b 에서 저장소가
+옮겨졌고 <code>m_pTransformComponent</code> 는 그 슬롯을 가리키는 캐시다(<code>Entity.h:197-199</code>).</li>
+<li>기본 렌더는 RectTransform 이 있으면 RectTransform 드로어를, 없으면 Transform 드로어를
+부른다(<code>InspectorWindow.cpp:1719-1726</code>).</li>
+<li>그 뒤 컴포넌트 순회는 <strong><code>RectTransformComponent</code> 만</strong> 건너뛴다(<code>InspectorWindow.cpp:1756</code>).</li>
+<li><code>Transform</code> 은 리플렉션 등록 목록에 있다(<code>RegisterReflectManual.h</code> 의 <code>X(Transform)</code>).
+따라서 <code>Meta::Find</code> 가 성공하고 <code>Meta::DrawObject</code> 가 돈다.</li>
+</ul>
+<h3 id="22-화면">2.2 화면</h3>
+<p>일반 엔티티(Main Camera)를 선택하면 <code>Transform</code> 헤더가 <strong>두 개</strong> 나온다. 위는 전용 드로어라
+체크박스가 없고 축 badge 가 붙은 Position·Rotation·Scale 을 그린다. 아래는 일반 리플렉션이라
+체크박스가 있고 <code>m_name</code>·<code>position</code>(4값)·<code>rotation</code>(4값 quaternion)·<code>scale</code>(4값)·<code>m_parentID</code> 를
+그린다. 즉 <strong>회전이 quaternion 원시값으로 한 번 더 편집 가능하다.</strong></p>
+<h3 id="23-엔티티-종류별-현재-동작">2.3 엔티티 종류별 현재 동작</h3>
+<p>공간 컴포넌트 조합은 <code>Entity::AttachSpatialComponent</code>(<code>Entity.cpp:60-77</code>)가 정한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>종류</th><th>Transform</th><th>RectTransform</th><th>지금 인스펙터가 하는 일</th></tr></thead>
+<tbody><tr><td>일반 · Empty</td><td>있음</td><td>없음</td><td>Transform 드로어 1 + 일반 리플렉션 1 → <strong>헤더 2개</strong></td></tr>
+<tr><td>UI</td><td><strong>없음</strong></td><td>있음</td><td>RectTransform 드로어 1, 순회에서 제외 → 1개 (정상)</td></tr>
+<tr><td>Canvas</td><td>있음</td><td>있음</td><td>RectTransform 드로어 1 + Transform 일반 리플렉션 1 → <strong>Transform 의 전용 편집이 없다</strong></td></tr></tbody></table></div>
+<p>Canvas 가 둘 다 갖는 것은 의도된 예외다. rect 는 자식 레이아웃의 기준이고 Transform 은 월드
+공간 배치용이며, <code>CanvasRenderMode::WorldSpace</code> 경로가 그 월드 행렬을 읽는다(<code>Entity.cpp</code> 의
+<code>AttachSpatialComponent</code> 주석). 그런데 지금 인스펙터는 <code>else</code> 분기 때문에 Canvas 에서 Transform
+드로어를 <strong>부르지 않는다.</strong> 계획서의 &quot;Canvas 에서는 각각 한 번 표시한다&quot; 는 이 자리를 고치라는
+뜻이다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-개별-활성제거-진입점-재계수">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-개별-활성제거-진입점-재계수">3. 개별 활성·제거 진입점 재계수</h2></div>
+<div class="prose"><p>계획서: &quot;개별 조작과 엔티티 전이를 구분해 UI·개별 활성 변경 진입점에 같은 정책을 적용한다.&quot;
+그 진입점을 셌다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>진입점</th><th>자리</th><th>대상</th><th>판정</th></tr></thead>
+<tbody><tr><td>인스펙터 컴포넌트 체크박스</td><td><code>InspectorWindow.cpp:1791</code></td><td><strong>임의 컴포넌트</strong></td><td>공간 컴포넌트 정책이 필요한 <strong>유일한 개별 조작 진입점</strong></td></tr>
+<tr><td>엔티티 활성 전이</td><td><code>Entity.cpp:554</code> (<code>Entity::SetEnabled</code> → 각 컴포넌트)</td><td>모든 컴포넌트·자식</td><td><strong>막으면 안 된다</strong> — 계획서가 명시적으로 금지</td></tr>
+<tr><td>C# 스크립트 활성</td><td><code>ClrHost.cpp:458</code> (<code>Api_Script_SetEnabled</code>)</td><td><code>ScriptComponent</code> 한정</td><td>대상이 고정이라 무관</td></tr>
+<tr><td>C# 엔티티 활성</td><td><code>ClrHost.cpp:429</code> (<code>Api_Entity_SetEnabled</code>)</td><td>엔티티 전체</td><td>엔티티 전이라 무관</td></tr>
+<tr><td>CLI</td><td><code>ConsoleCommandSystem.cpp:2262·3612·3618</code></td><td>MeshRenderer·Animator 한정</td><td>대상이 고정이라 무관</td></tr>
+<tr><td>역직렬화·생성 시 강제 활성</td><td><code>CameraComponent.h:18</code> · <code>LightComponent.h:38</code> · <code>MeshRenderer.cpp:516</code> · <code>FoliageComponent.cpp:428</code> · <code>ModelSceneInstantiation.cpp</code> 3곳</td><td>각자 고정</td><td>공간 컴포넌트를 건드리지 않음</td></tr></tbody></table></div>
+<p><strong>정책을 적용할 자리는 하나다.</strong> 나머지는 대상 타입이 이미 고정돼 있어 공간 컴포넌트에 닿지
+않는다. 계획서가 경고한 &quot;공용 <code>SetEnabled(false)</code> 를 무조건 거부하는 구현&quot;은 <code>Entity.cpp:554</code>
+를 막는 구현이고, 그 줄은 엔티티 전이의 전파 경로다.</p>
+<p><strong>제거 쪽은 이미 서 있다.</strong> <code>EditorObjectOperations.cpp:497</code> 이
+<code>dynamic_cast&lt;::Transform*&gt; || dynamic_cast&lt;RectTransformComponent*&gt;</code> 로 공간 컴포넌트 제거를
+거부한다. W2-I1 은 이 거부를 재구현하지 않고 그대로 쓴다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-폭-계산과-전환-조건--정본-계약">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-폭-계산과-전환-조건--정본-계약">4. 폭 계산과 전환 조건 — 정본 계약</h2></div>
+<div class="prose"><p>I0 의 완료 기준은 &quot;폭 계산·정책이 한 정본을 소비하고 전환 조건이 고정됨&quot; 이다. 아래가 그
+고정이다. 구현은 <code>EditorPropertyRow</code> 의 배치 책임을 넓혀 담고, 새 입력 체계나 매크로 선언을
+만들지 않는다(계획서 계약 1).</p>
+<h3 id="41-폭의-출처는-하나다">4.1 폭의 출처는 하나다</h3>
+<p>가용 폭은 <strong><code>ImGui::GetContentRegionAvail().x</code></strong> 하나만 읽는다. 지금 <code>InspectorWindow.cpp</code> 는
+<code>GetWindowSize()</code> 를 한 번, <code>GetContentRegionAvail()</code> 을 두 번 쓴다. 둘은 스크롤바 폭만큼 다르고,
+<code>Add Component</code> 버튼이 <code>GetWindowSize().x</code> 로 중앙을 잡아 스크롤바가 선 폭에서 오른쪽으로 밀린다.
+화면에서 그 버튼의 라벨이 잘리는 것으로 보인다.</p>
+<p>창 전체 폭이나 GPU 타깃 크기를 배치 기준으로 쓰지 않는다.</p>
+<h3 id="42-열-구성">4.2 열 구성</h3>
+<pre><code>[ 라벨 열 ][ gap ][ 값 열 ..................... ][ gap ][ 보조 버튼 예약 ]</code></pre>
+<div class="table-scroll"><table>
+<thead><tr><th>양</th><th>정의</th></tr></thead>
+<tbody><tr><td><code>label_max</code></td><td><code>ThemePixels(160)</code> — 라벨 열의 <strong>상한</strong>. 남는 폭은 값 열이 가져간다</td></tr>
+<tr><td><code>label_ratio</code></td><td>가용 폭의 <code>0.40</code> — 상한에 닿기 전까지의 비율</td></tr>
+<tr><td><code>label_min</code></td><td><code>CalcTextSize(&quot;MMMMM...&quot;).x</code> — 말줄임 뒤 최소 판독 폭</td></tr>
+<tr><td><code>value_min</code></td><td><code>CalcTextSize(&quot;-0000.000&quot;).x + FramePadding.x * 2</code> — 대표 최악 문자열</td></tr>
+<tr><td><code>aux_reserve</code></td><td>보조 버튼이 있는 줄만 <code>GetFrameHeight()</code> × 버튼 수</td></tr>
+<tr><td><code>gap</code></td><td><code>ThemePixels(EditorThemeTokens::ItemGapX)</code></td></tr></tbody></table></div>
+<p><code>value_min</code> 을 <strong>현재 값이 아니라 고정 대표 문자열</strong>로 재는 것이 핵심이다. 계획서가 &quot;현재 숫자
+값이나 매 프레임 라벨 최대값 변화로 열과 모드가 흔들리지 않게 한다&quot; 고 한 자리다. 같은 이유로
+<code>label_max</code> 도 실제 라벨 길이의 최대값을 매 프레임 다시 재어 정하지 않는다.</p>
+<p>치수는 전부 W1 의 <code>ThemePixels</code> 를 <strong>한 번만</strong> 통과한다. 폰트에서 재는 값(<code>CalcTextSize</code>)은
+이미 배율이 반영돼 있으므로 다시 곱하지 않는다.</p>
+<h3 id="43-전환-조건">4.3 전환 조건</h3>
+<p>세 모드를 둔다. 조건은 가용 폭 <code>W</code> 에 대해 판정한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>모드</th><th>조건</th><th>배치</th></tr></thead>
+<tbody><tr><td><code>Inline</code></td><td><code>W - label_col - gap - aux ≥ value_min</code></td><td>라벨 왼쪽, 값 오른쪽 (기본)</td></tr>
+<tr><td><code>Stacked</code></td><td>위가 거짓</td><td>라벨 한 줄, 값 다음 줄</td></tr>
+<tr><td>축 <code>AxisStacked</code></td><td>축 슬롯 하나가 <code>badge_w + value_min</code> 미만</td><td>X·Y·Z 를 세로로</td></tr></tbody></table></div>
+<p>축 판정은 값 열을 셋으로 나눈 뒤에 한다. 축 슬롯 = <code>(value_col - gap × 2) / 3</code>.</p>
+<p><strong>완충 폭을 둔다.</strong> 전환한 모드에서 되돌아오려면 임계값보다 <code>ThemePixels(ItemGapX)</code> 만큼 더
+넓어져야 한다. 경계에서 한 픽셀 왕복이 모드를 진동시키면 열 위치가 매 프레임 바뀐다.</p>
+<p><strong>편집 중에는 전환을 보류한다.</strong> <code>ImGui::IsAnyItemActive()</code> 가 참인 동안 직전 모드를 유지하고,
+편집이 끝난 프레임에 다시 판정한다. 드래그 중에 값 칸이 다른 줄로 이동하면 드래그가 끊긴다.</p>
+<h3 id="44-id-는-배치를-모른다">4.4 ID 는 배치를 모른다</h3>
+<p>ID 씨앗은 엔티티·컴포넌트 인스턴스·필드·축의 안정 신원이다. 열 위치, 표시 라벨, 모드
+(<code>Inline</code>/<code>Stacked</code>/<code>AxisStacked</code>)는 ID 에 들어가지 않는다. 이미 선 규약이 둘 있다 —
+<code>EditorPropertyRow</code> 의 필드 ID 는 열 인덱스로 고정한 표이고 <code>EditorAxisField3</code> 의 것은 축마다
+고정이다. 모드 전환으로 이 값이 달라지지 않는다.</p>
+<h3 id="45-넘침-처리">4.5 넘침 처리</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>종류</th><th>처리</th></tr></thead>
+<tbody><tr><td>긴 라벨</td><td>말줄임 + 전체 이름 tooltip. 지금은 <code>m_nearPlane</code> 이 그냥 잘린다</td></tr>
+<tr><td>설명·읽기 전용 경로</td><td>줄바꿈</td></tr>
+<tr><td>편집 문자열</td><td>표준 입력칸의 탐색·스크롤 유지. 보조 버튼이 밖으로 밀리지 않게 폭을 먼저 예약</td></tr>
+<tr><td>세로</td><td>스크롤. 높이가 남아도 행 간격을 늘려 채우지 않는다</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-46-배치만으로는-리플렉션-경로가-전용-드로어를-대신하지-못한다">
+<div class="sec-head"><p class="ve-label">§4.6</p><h2 id="46-배치만으로는-리플렉션-경로가-전용-드로어를-대신하지-못한다">4.6 배치만으로는 리플렉션 경로가 전용 드로어를 대신하지 못한다</h2></div>
+<div class="prose"><p><strong>이 절은 첫 판 이후에 더했다.</strong> §4 가 폭과 열 전환만 정해 두었는데, 그것만으로는
+&quot;리플렉션이 그리는 컴포넌트를 볼 만하게 만들려면 결국 컴포넌트마다 전용 창구를 하나씩
+만들어야 하지 않느냐&quot; 는 물음에 답이 되지 않는다. 실제로 저장소가 걸어온 길이 그쪽이고,
+그래서 전용 드로어가 3,244줄 쌓였다. 아래가 그 물음에 대한 답이다.</p>
+<h3 id="461-갈리는-것은-테마가-아니다">4.6.1 갈리는 것은 테마가 아니다</h3>
+<p>색과 치수는 <code>ImGuiStyle</code> 이 전역으로 입힌다. 리플렉션 경로도 이미 같은 테마를 쓰고 있고,
+화면에서 두 경로의 색·프레임 모양은 같다. 전용 드로어가 생겨난 이유는 테마가 아니라 셋이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>축</th><th>지금 상태</th><th>전용 드로어 없이 풀 수 있나</th></tr></thead>
+<tbody><tr><td><strong>배치</strong> — 라벨 방향, 열 정렬, 폭</td><td>기본 렌더는 라벨 왼쪽, 리플렉션은 오른쪽</td><td>풀 수 있다. §4 의 공통 계층을 리플렉션 경로가 소비하면 된다</td></tr>
+<tr><td><strong>의미</strong> — 표시 이름, 범위, 숨김</td><td>아래 실측대로 <strong>거의 비어 있다</strong></td><td>풀 수 있다. 단 §4 의 범위 밖이라 이 절에서 정한다</td></tr>
+<tr><td><strong>편집 의미</strong> — 쿼터니언↔오일러, 앵커 프리셋, 에셋 참조 선택</td><td>전용 드로어가 든다</td><td><strong>풀 수 없다.</strong> 여기는 전용으로 남는다</td></tr></tbody></table></div>
+<h3 id="462-의미-축의-실측">4.6.2 의미 축의 실측</h3>
+<p><code>MetaSchema.h</code> 에 멤버 속성 셋이 있다 — <code>display_name_attr</code>, <code>range_attr&lt;V&gt;</code>, <code>units_attr</code>.
+<code>ReflectionTypedDraw.h:170-180</code> 이 앞의 둘을 소비한다. 그런데 선언 쪽이 비어 있다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>속성</th><th style="text-align:right">선언</th><th>소비</th><th>판정</th></tr></thead>
+<tbody><tr><td><code>display_name_attr</code></td><td class="num" style="text-align:right"><strong>0</strong></td><td>있음</td><td>소비만 있고 생산이 0. 라벨은 언제나 원시 필드명이다</td></tr>
+<tr><td><code>range_attr&lt;float&gt;</code></td><td class="num" style="text-align:right">3</td><td>있음</td><td>셋 다 <code>BoxColliderComponent.h</code> 한 파일</td></tr>
+<tr><td><code>units_attr</code></td><td class="num" style="text-align:right"><strong>0</strong></td><td><strong>없음</strong></td><td>양쪽 다 0. 죽은 속성</td></tr></tbody></table></div>
+<p>숨김·읽기 전용 속성은 <strong>아예 없다.</strong> 인스펙터에서 필드를 거르는 규칙은
+<code>ReflectionTypedDraw.h:159</code> 의 <code>std::strcmp(name, &quot;m_isEnabled&quot;) == 0</code> 하나뿐이고 문자열
+비교다. 그래서 <code>m_name</code>·<code>m_parentID</code> 같은 내부 필드가 그대로 화면에 나온다 — 실제로 나온다.</p>
+<p>전체 규모는 <strong>필드 416개 · 타입 77개</strong>이고 그중 <strong>181개가 <code>m_</code> 접두</strong>다.</p>
+<h3 id="463-그래서-이렇게-푼다">4.6.3 그래서 이렇게 푼다</h3>
+<p><strong>컴포넌트마다 전용 창구를 만들지 않는다.</strong> 그 길은 컴포넌트를 하나 더할 때마다 드로어를
+하나 더하게 만들고, 이미 그렇게 쌓인 것이 §1.1 의 3,244줄이다. 대신 축마다 다르게 푼다.</p>
+<p><strong>① 배치는 공통 계층이 든다.</strong> 계획서 계약 1 의 &quot;배치와 값 편집을 분리한다&quot; 가 이것이다.
+<code>ReflectionTypedDraw.h</code> 의 각 타입 분기는 값 편집만 남기고, 라벨 열·값 열·줄 전환은 §4 의
+계층에서 받는다. 이 하나로 리플렉션이 그리는 <strong>모든</strong> 컴포넌트가 기본 렌더와 같은 열에 선다.
+전용 드로어를 하나도 더 만들지 않고 얻는다.</p>
+<p><strong>② 이름은 규칙으로 유도하고 속성은 예외에만 붙인다.</strong> 416개 필드에 손으로 <code>displayName</code> 을
+붙이는 길은 택하지 않는다. 분량도 분량이지만 붙이지 않은 필드가 조용히 원시 이름으로 나오는
+것을 막을 수단이 없다 — 지금 선언이 0건인 이유가 그것이다. 드로어가 식별자에서 표시 이름을
+유도한다.</p>
+<pre><code>m_nearPlane  → &quot;Near Plane&quot;
+m_isPrimary  → &quot;Is Primary&quot;
+position     → &quot;Position&quot;</code></pre>
+<p>규칙은 <code>display_label(identifier)</code> 한 자리에 두고, <code>m_</code> 접두 제거 · camelCase 분리 ·
+첫 글자 대문자 · 연속 대문자 보존(<code>m_fov</code> → &quot;FOV&quot; 는 예외 표로)만 한다. 유도가 틀리는 자리에
+<code>meta::displayName</code> 을 붙인다 — 그때는 속성이 <strong>예외 표기</strong>라 안 붙은 필드가 기본값으로 잘
+나온다. 규칙 자체는 검사가 대표 입력 몇 개로 단정한다.</p>
+<p><strong>③ 숨김 속성을 더한다.</strong> <code>m_isEnabled</code> 문자열 비교를 속성으로 옮기고, 내부 전용 필드에 붙인다.
+<strong>기본은 &quot;보임&quot; 이다.</strong> 반대로 두면 새 필드가 인스펙터에서 조용히 사라지고, 그 사라짐은 빌드도
+검사도 붉게 만들지 않는다. 이 저장소가 이미 겪은 실패 양식이다.</p>
+<p><strong>④ 전용 드로어는 편집 의미가 진짜 다른 것만 남긴다.</strong> 쿼터니언을 오일러로 보여 주는 것,
+앵커 프리셋 팝업, 에셋 참조 선택이 그것이다. 이들도 헤더와 배치는 공통 계층이 들고 본문만
+그린다(계획서 W2-I1 의 &quot;공통 헤더 / 전용 본문 분리&quot;). 이름이 읽히고 배치가 맞는다고 해서
+쿼터니언 4칸이 좋은 편집기가 되지는 않으므로, 이 축은 줄이는 것이 목표가 아니다.</p>
+<h3 id="464-이-절이-계획서를-넘는-부분">4.6.4 이 절이 계획서를 넘는 부분</h3>
+<p>계획서 W2-I 의 여섯 계약은 <strong>배치</strong> 축만 다룬다. 의미 축(표시 이름·숨김·범위)은 계획서에
+없고, 그것이 비어 있다는 사실도 적혀 있지 않다. W2-I3 의 &quot;일반 리플렉션·중첩 필드·공유
+드로어 이관 1일&quot; 은 배치 이관만 센 값이다.</p>
+<p>의미 축을 같은 슬라이스에 넣으면 I3 은 1일이 아니다. §5 에서 다시 잰다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-공수-재계수">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-공수-재계수">5. 공수 재계수</h2></div>
+<div class="prose"><p>계획서는 I0 에서 재계수하고 &quot;초기 추정이 달라지면 본문과 대시보드의 공수를 함께 갱신한다&quot; 고
+정했다. 계수 결과 <strong>둘을 조정하고 넷은 유지한다.</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>단계</th><th style="text-align:right">계획서</th><th style="text-align:right">재계수</th><th>근거</th></tr></thead>
+<tbody><tr><td>W2-I0</td><td class="num" style="text-align:right">0.5일</td><td style="text-align:right">0.5일 (소진)</td><td>이 문서</td></tr>
+<tr><td>W2-I1</td><td class="num" style="text-align:right">1일</td><td class="num" style="text-align:right">1일</td><td>중복은 한 자리(<code>:1756</code> 의 제외 조건)에서 갈린다. 제거 거부는 이미 서 있다</td></tr>
+<tr><td>W2-I2</td><td class="num" style="text-align:right">1일</td><td class="num" style="text-align:right">1일</td><td>대상 셋, 그중 RectTransform 의 표는 이미 <code>EditorPropertyRow</code> 위에 있다</td></tr>
+<tr><td>W2-I3</td><td class="num" style="text-align:right">1일</td><td class="num" style="text-align:right"><strong>2.5일</strong></td><td>배치 이관은 한 파일(499줄)이라 1일이다. §4.6 의 의미 축(표시 이름 유도·숨김 속성·죽은 <code>units_attr</code> 처리)이 416필드·77타입에 걸쳐 +1.5일</td></tr>
+<tr><td>W2-I4</td><td class="num" style="text-align:right">1.5일</td><td class="num" style="text-align:right"><strong>2.5일</strong></td><td>전용 드로어 3,244줄 중 <code>SoundComponent</code> 한 드로어가 836줄이고 고정 폭·중첩 묶음이 가장 많다</td></tr>
+<tr><td>W2-I5</td><td class="num" style="text-align:right">1일</td><td class="num" style="text-align:right"><strong>1.5일</strong></td><td>검증 행렬이 폭 4단 × 배율 4단 × 엔티티 4종이고, 변이 주입 항목이 넷이다</td></tr>
+<tr><td><strong>합</strong></td><td class="num" style="text-align:right"><strong>6일</strong></td><td class="num" style="text-align:right"><strong>9일</strong></td><td></td></tr></tbody></table></div>
+<p>I4 의 증가분이 대부분 <code>SoundComponent</code> 한 드로어다. 이 드로어만 별도 슬라이스로 떼는 선택지도
+있으나, 계획서가 &quot;일반 리플렉션만 바꾸고 전용 드로어를 남겨 두면 전체 이관 완료로 세지
+않는다&quot; 고 했으므로 I4 안에 둔다.</p>
+<p>I3 의 증가분은 성질이 다르다 — 계획서에 <strong>없던 축</strong>이다(§4.6.4). 배치만 이관하고 의미 축을
+남기면 리플렉션이 그리는 컴포넌트는 열은 맞되 이름이 <code>m_nearPlane</code> 인 채로 남는다. 그 상태를
+&quot;공통 규칙을 사용한다&quot; 로 판정하면, 남은 차이를 메우려고 컴포넌트마다 전용 드로어를 만드는
+길이 다시 열린다. 그래서 같은 슬라이스에 둔다.</p>
+<p><strong>의미 축을 W2-I 밖의 별도 슬라이스로 빼는 선택지도 있다.</strong> 그 경우 W2-I 는 6일 + I4·I5 조정분
+으로 7.5일이 되고, 의미 축 1.5일이 별도로 선다. 어느 쪽이든 총량은 같다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-착수-순서와-걸림돌">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-착수-순서와-걸림돌">6. 착수 순서와 걸림돌</h2></div>
+<div class="prose"><p>I1 부터는 <code>InspectorWindow.cpp</code>·<code>ReflectionTypedDraw.h</code>·<code>ImGuiDrawHelper*.cpp</code> 를 고쳐야 한다.
+이 글을 쓰는 시점에 <strong>다른 세션이 그 파일들을 미커밋으로 들고 있다</strong>(아이콘을 Material Symbols
+로 바꾸는 작업, 작업 트리에 64개 파일). 같은 파일을 두 세션이 동시에 고치면 한쪽이 사라진다.
+I0 은 새 파일 하나라 충돌하지 않지만, I1 착수는 그 세션이 커밋한 뒤로 미룬다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="EditorInspectorLayoutW2I.md"><code>docs/analysis/EditorInspectorLayoutW2I.md</code></a> · 마지막 커밋 2026-09-13 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

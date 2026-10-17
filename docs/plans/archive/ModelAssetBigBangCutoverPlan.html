@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/archive/ModelAssetBigBangCutoverPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>모델 자산 빅뱅 전환 계획 (PHASE 3.75)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-결정과-정본-경계">0. 결정과 정본 경계</a></li><li><a href="#1-왜-새-페이즈가-필요한가">1. 왜 새 페이즈가 필요한가</a></li><li><a href="#2-ceuuidv8sha256v1-신원-프로필">2. ce.uuidv8.sha256.v1 신원 프로필</a></li><li><a href="#3-sidecar-schema-v2와-원자-writer">3. sidecar schema v2와 원자 writer</a></li><li><a href="#4-런타임-정본-modelassetgeneration">4. 런타임 정본: ModelAssetGeneration</a></li><li><a href="#5-직접-소비와-제거-경계">5. 직접 소비와 제거 경계</a></li><li><a href="#6-두-긴급-자산의-폐쇄-조건">6. 두 긴급 자산의 폐쇄 조건</a></li><li><a href="#7-실행-슬라이스와-공수">7. 실행 슬라이스와 공수</a></li><li><a href="#8-게이트">8. 게이트</a></li><li><a href="#9-완료-정의와-되돌리지-않는-선">9. 완료 정의와 되돌리지 않는 선</a></li><li><a href="#10-변경-이력">10. 변경 이력</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/archive/</span><a href="ModelAssetBigBangCutoverPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">보관 계획</p>
+<h1>모델 자산 빅뱅 전환 계획 (PHASE 3.75)</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">체크 항목 완료</span><span class="val">100<span class="unit">%</span></span>
+<div class="stack" role="img" aria-label="24개 중 24개 완료"><i class="ok" style="flex:24"></i><i class="dim" style="flex:0"></i></div>
+<span class="ve-label">24 / 24</span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 11개의 분량 막대">
+<a class="map-row" href="#0-결정과-정본-경계"><span class="ve-label">§0</span><span class="map-name">결정과 정본 경계</span><span class="map-bar"><i style="width:8.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-왜-새-페이즈가-필요한가"><span class="ve-label">§1</span><span class="map-name">왜 새 페이즈가 필요한가</span><span class="map-bar"><i style="width:6.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-ceuuidv8sha256v1-신원-프로필"><span class="ve-label">§2</span><span class="map-name">ce.uuidv8.sha256.v1 신원 프로필</span><span class="map-bar"><i style="width:23.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-sidecar-schema-v2와-원자-writer"><span class="ve-label">§3</span><span class="map-name">sidecar schema v2와 원자 writer</span><span class="map-bar"><i style="width:50.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-런타임-정본-modelassetgeneration"><span class="ve-label">§4</span><span class="map-name">런타임 정본: ModelAssetGeneration</span><span class="map-bar"><i style="width:59.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-직접-소비와-제거-경계"><span class="ve-label">§5</span><span class="map-name">직접 소비와 제거 경계</span><span class="map-bar"><i style="width:11.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-두-긴급-자산의-폐쇄-조건"><span class="ve-label">§6</span><span class="map-name">두 긴급 자산의 폐쇄 조건</span><span class="map-bar"><i style="width:7.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-실행-슬라이스와-공수"><span class="ve-label">§7</span><span class="map-name">실행 슬라이스와 공수</span><span class="map-bar"><i style="width:38.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-게이트"><span class="ve-label">§8</span><span class="map-name">게이트</span><span class="map-bar"><i style="width:36.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-완료-정의와-되돌리지-않는-선"><span class="ve-label">§9</span><span class="map-name">완료 정의와 되돌리지 않는 선</span><span class="map-bar"><i style="width:6.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#10-변경-이력"><span class="ve-label">§10</span><span class="map-name">변경 이력</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 11개 가운데 「10. 변경 이력」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>보관 · 완료 (정리: 2026-09-06).</strong> 2026-09-04 MBC11 cutover·PHASE 3.75 종료 기록. 임베디드 텍스처 디코드는 PHASE 12 T1a/T2로 이관했고 비회귀 기준은 유지한다.
+<a href="README.html">보관 색인</a> · <a href="../../RefactoringPlanDashboard.html#doc-index">활성 계획과 대시보드</a></p>
+</blockquote>
+<p><strong>신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 완료 — MBC0~MBC11 종료·cutover(60/60일, 2026-09-04)</strong></p>
+<p>이 계획은 기존 <code>experiment</code> 배선을 완성하거나 legacy 경로와 대조 운용하는 계획이 아니다.
+모델 자산의 신원·저장·로딩·런타임 소비를 새 계약으로 한 번에 교체하고, 전환 완료 뒤
+legacy <code>Model</code> 계층·Assimp 폴백·역브리지·A/B 스위치를 제품에서 제거하는 <strong>단방향
+cutover</strong> 계획이다.</p>
+<p>PHASE 4는 이 계획의 완료 산출물만 입력으로 받는다. 구
+<a href="ModelImportPipelinePlan.html"><code>ModelImportPipelinePlan.md</code></a>의 I/V 트랙은 구현 이력과 실패
+증거로만 보존하며, 더 이상 PHASE 4의 활성 범위·공수·진행률에 포함하지 않는다.</p>
+<hr>
+</section>
+<section class="doc-sec" id="sec-0-결정과-정본-경계">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-결정과-정본-경계">0. 결정과 정본 경계</h2></div>
+<div class="prose"><h3 id="01-확정-결정">0.1 확정 결정</h3>
+<ol>
+<li><strong>기존 GUID를 제품 신원으로 보존·매핑·재활용하지 않는다.</strong> 전체 모델 자산 corpus에
+새 identity epoch를 적용하고 모델·메시·재질·임베디드 텍스처·스켈레톤·애니메이션
+신원을 다시 발급한다.</li>
+<li><strong>UUIDv8 + SHA-256 프로필을 정식 채택한다.</strong> UUIDv4 또는 UUIDv5를 최종 모델 자산
+신원 규약으로 사용하지 않는다.</li>
+<li><strong>기존 sidecar를 부분 수정하지 않는다.</strong> schema v2 sidecar와 모든 subasset 신원을
+하나의 writer가 완성한 뒤 원자 게시한다.</li>
+<li><strong>A/B 런타임·silent fallback을 제거한다.</strong> 새 경로 실패는 legacy 로더로 우회하지 않고
+해당 generation 게시를 거부한다.</li>
+<li><strong><code>experiment</code>에서 legacy 객체를 재생성하지 않는다.</strong> renderer·scene·animation·editor가
+새 모델 aggregate를 직접 소비한다.</li>
+<li><strong>제품 cutover는 한 번이다.</strong> 구현은 빌드 가능한 내부 슬라이스로 나누되, 제품에 두
+모델 체계를 장기 공존시키거나 중간 슬라이스를 부분 공개하지 않는다.</li>
+</ol>
+<h3 id="02-정본">0.2 정본</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>범위</th><th>정본</th></tr></thead>
+<tbody><tr><td>PHASE 3.75 순서·공수·완료 기준</td><td>이 문서</td></tr>
+<tr><td>UUIDv8 byte-level identity profile</td><td>이 문서 §2</td></tr>
+<tr><td>sidecar schema v2·writer transaction</td><td>이 문서 §3</td></tr>
+<tr><td>런타임 aggregate·소비자 cutover</td><td>이 문서 §4~§6</td></tr>
+<tr><td>MBC0 기준선(동결 표면·corpus/참조 분류·Release 성능·예산 B1~B6)</td><td><a href="ModelAssetBigBangCutoverBaseline.html"><code>ModelAssetBigBangCutoverBaseline.md</code></a> — 다시 뜨지 않는 archive</td></tr>
+<tr><td>대시보드 표시</td><td><code>RefactoringPlanDashboard.html</code> PHASE 3.75 — 이 문서의 파생 표시</td></tr>
+<tr><td>구 I/V 구현·측정 이력</td><td><code>ModelImportPipelinePlan.md</code> — <strong>역사 자료이며 활성 계획이 아님</strong></td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-왜-새-페이즈가-필요한가">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-왜-새-페이즈가-필요한가">1. 왜 새 페이즈가 필요한가</h2></div>
+<div class="prose"><p>현재 결함은 두 개의 파일에 국한되지 않는다.</p>
+<ul>
+<li><code>SU_Mythic.glb</code>가 그려지지 않는 현상은 메시가 가진 실제 속성 조합과 PSO/셰이더
+변형 키가 한 계약에서 나오지 않는 문제다. COLOR와 SKIN이 함께 있는 stride 84 경로를
+<code>core|color|skin</code>으로 구분하지 못하면 입력 레이아웃 또는 <code>VSIn</code>이 다른 바이트를 읽는다.</li>
+<li><code>Gunner_F_Mythic.glb</code>의 재질이 비는 현상은 모델이 완전히 검증되기 전에 임베디드
+텍스처를 전역 등록하고, 역직렬화 순서로 등록부를 미리 데우는 부분 게시 문제다.</li>
+<li>Prim 8개 sidecar에서 최상위 GUID와 <code>subAssets</code>가 분리 변경된 것은 모델 신원 발급과
+subasset refresh가 서로 다른 writer라는 증거다.</li>
+<li>experiment 실패 뒤 legacy <code>Model::LoadModel*</code>로 돌아가는 동안 animation tick만 먼저
+제거하면 메시만 보이고 애니메이션이 멈춘 혼합 상태가 정상처럼 게시된다.</li>
+<li><code>BuildLegacyModelFromExperiment</code>, legacy cache, <code>m_hashingMesh</code> 기반 binding은 새
+파이프라인을 정본이 아니라 legacy 객체 생산기로 만든다.</li>
+</ul>
+<p>따라서 sidecar 8개를 옛 GUID로 되돌리거나 fallback을 한 겹 더 붙이는 것은 목표가 아니다.
+필요한 것은 <strong>새 신원 epoch, 원자적 authoring transaction, 원자적 runtime generation,
+직접 소비자, legacy 0건 게이트</strong>를 한 경계로 묶는 것이다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-ceuuidv8sha256v1-신원-프로필">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-ceuuidv8sha256v1-신원-프로필">2. <code>ce.uuidv8.sha256.v1</code> 신원 프로필</h2></div>
+<div class="prose"><h3 id="21-출력-형식">2.1 출력 형식</h3>
+<ul>
+<li>외부 표현: RFC UUID canonical text, 소문자 36자.</li>
+<li>내부 표현: 16-byte network order.</li>
+<li>해시: SHA-256.</li>
+<li>UUID version: 8.</li>
+<li>UUID variant: RFC 4122/9562 variant <code>10xx</code>.</li>
+<li>유효 digest bit: version·variant 고정 뒤 122bit.</li>
+</ul>
+<p>UUIDv8은 해시 알고리즘을 지정하지 않는다. 그러므로 아래 프로필 전체가 식별자의 계약이며
+<code>UUIDv8</code>이라는 이름만으로 호환된다고 판정하지 않는다.</p>
+<h3 id="22-입력-byte-계약">2.2 입력 byte 계약</h3>
+<pre><code>IdentityInput :=
+  Bytes(&quot;ce.uuidv8.sha256.v1&quot;) || 0x00 ||
+  U32BE(len(domain))    || UTF8_NFC(domain) ||
+  U32BE(len(namespace)) || namespaceBytes  ||
+  U32BE(len(kind))      || UTF8_NFC(kind)   ||
+  U32BE(len(stableKey)) || UTF8_NFC(stableKey)
+
+digest := SHA256(IdentityInput)
+uuidBytes := digest[0..15]
+uuidBytes[6] := (uuidBytes[6] &amp; 0x0f) | 0x80
+uuidBytes[8] := (uuidBytes[8] &amp; 0x3f) | 0x80</code></pre>
+<p>규칙:</p>
+<ul>
+<li>문자열은 UTF-8 NFC이며 NUL 종단자를 포함하지 않는다.</li>
+<li>길이는 변환 후 byte 수를 unsigned 32-bit big-endian으로 기록한다.</li>
+<li>경로가 stable key의 일부일 때만 프로젝트 상대 경로, <code>/</code> separator, <code>.</code>·<code>..</code> 제거,
+asset database가 확정한 대소문자를 사용한다. 임의 lower-case는 금지한다.</li>
+<li>UUID namespace를 넣을 때는 문자열이 아니라 16-byte network-order 값을 넣는다.</li>
+<li>epoch seed를 넣을 때는 sidecar header에 저장된 32-byte 값을 그대로 넣는다.</li>
+<li>프로필·정규화·truncation·bit setting 중 하나라도 달라지면 다른 identity profile이다.</li>
+</ul>
+<h3 id="23-계층-신원">2.3 계층 신원</h3>
+<p>프로젝트는 cutover 시 CSPRNG로 새 256-bit <code>identityEpochSeed</code>를 한 번 발급한다. 이것은
+legacy GUID가 아니며 제품 AssetId로 노출하지 않는다.</p>
+<pre><code>ModelId     = V8(domain=&quot;model&quot;, namespace=identityEpochSeed,
+                 kind=&quot;model&quot;, stableKey=modelAuthoringKey)
+MeshId      = V8(domain=&quot;subasset&quot;, namespace=ModelId,
+                 kind=&quot;mesh&quot;, stableKey=meshStableKey)
+MaterialId  = V8(domain=&quot;subasset&quot;, namespace=ModelId,
+                 kind=&quot;material&quot;, stableKey=materialStableKey)
+TextureId   = V8(domain=&quot;subasset&quot;, namespace=ModelId,
+                 kind=&quot;texture&quot;, stableKey=textureStableKey)
+SkeletonId  = V8(domain=&quot;subasset&quot;, namespace=ModelId,
+                 kind=&quot;skeleton&quot;, stableKey=skeletonStableKey)
+AnimationId = V8(domain=&quot;subasset&quot;, namespace=ModelId,
+                 kind=&quot;animation&quot;, stableKey=animationStableKey)</code></pre>
+<p><code>modelAuthoringKey</code>는 migration 시 새로 만드는 256-bit 불변 authoring key 또는 exporter가
+제공한 검증 가능한 persistent ID다. 기존 GUID를 key나 namespace로 사용하지 않는다.</p>
+<p>subasset stable key 우선순위:</p>
+<ol>
+<li><code>extras.creatorEngineId</code>처럼 exporter가 보존하는 명시적 persistent ID.</li>
+<li>원본 DCC/exporter persistent object ID.</li>
+<li>타입·계층·명시 이름으로 만든 검증 가능한 semantic key.</li>
+<li>schema v2에 한 번 기록한 새 immutable authoring key.</li>
+</ol>
+<p>배열 ordinal만 쓴 <code>gltf/material/0</code>, 표시 이름만 쓴 key, 파일명 기반 추측은 금지한다.
+동일 kind 안에서 key가 중복되거나 안정성을 증명할 수 없으면 import를 실패시킨다.</p>
+<h3 id="24-충돌과-재현성-게이트">2.4 충돌과 재현성 게이트</h3>
+<ul>
+<li><code>(profile, epoch, modelAuthoringKey, kind, stableKey) ↔ UUID</code>는 전 corpus에서 bijection이어야 한다.</li>
+<li>writer는 UUID 충돌뿐 아니라 canonical tuple 중복도 검사한다.</li>
+<li>같은 입력은 Windows 개발기·AssetCooker·Player staging에서 같은 UUID를 만들어야 한다.</li>
+<li>SHA-256이 충돌 불가능하다고 가정하지 않는다. 충돌은 게시 거부와 진단 artifact 대상이다.</li>
+<li>기존 pseudo UUIDv5 구현처럼 SHA-1 결과에 v4 nibble을 쓰는 코드는 0건이어야 한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-sidecar-schema-v2와-원자-writer">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-sidecar-schema-v2와-원자-writer">3. sidecar schema v2와 원자 writer</h2></div>
+<div class="prose"><h3 id="31-최소-schema">3.1 최소 schema</h3>
+<pre><code class="language-yaml">schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: &lt;epoch name&gt;
+authoringKey: &lt;new immutable key&gt;
+assetId: &lt;uuidv8&gt;
+generation: &lt;monotonic integer&gt;
+sourceFingerprint: &lt;sha256&gt;
+subAssets:
+  - kind: material
+    stableKey: &lt;typed stable key&gt;
+    assetId: &lt;uuidv8&gt;</code></pre>
+<p>epoch seed는 <code>ProjectSetting/AssetIdentity.asset</code>에만 저장하며 sidecar는 <code>identityEpoch</code>로
+그 header를 참조한다. <code>identityProfile</code>, <code>identityEpoch</code>, <code>authoringKey</code>, <code>assetId</code>,
+<code>generation</code>, 완전한 <code>subAssets</code> closure는 반드시 재구성 가능해야 한다.</p>
+<p><strong>MBC2에서 확정(2026-09-02).</strong></p>
+<ul>
+<li>epoch header는 <code>ProjectSetting/AssetIdentity.asset</code> 하나(schemaVersion 1, identityProfile,
+identityEpoch, identityEpochSeed 64hex, createdAt). ProjectSetting은 pak에 들어가므로 Player가
+§4 load 1단계를 같은 파일로 검증한다. sidecar는 seed를 복제하지 않고 <code>identityEpoch</code> 이름만
+들어 header와 대조한다.</li>
+<li>sidecar v2는 최상위 <code>schemaVersion: 2</code> 아래 <code>identityProfile</code>·<code>identityEpoch</code>·<code>authoringKey</code>·
+<code>assetId</code>·<code>generation</code>·<code>sourceFingerprint(sha256:&lt;64hex&gt;)</code>·<code>subAssets[]{kind, stableKey, assetId, binding, name, fingerprint}</code>. legacy 최상위 <code>guid:</code>는 없다(있으면 reader가 거부).
+v1(<code>subAssets.schemaVersion: 1</code>)은 <code>LegacySchema</code>로 거부 — MBC4 offline migrator의 입력이다.
+<code>importSettings</code>·<code>ModelImporter</code> 등 다른 최상위 키는 writer가 보존한다.</li>
+<li>stable key 문법: <code>exporter:&lt;id&gt;</code> | <code>name:&lt;NFC 이름&gt;</code> | <code>authoring:&lt;64hex&gt;</code>. ordinal
+(<code>gltf/material/0</code>)·빈 값·비NFC·대문자 접두는 파서가 거부한다. 모델 <code>authoringKey</code>는
+<code>exporter:</code>·<code>authoring:</code>만(이름 없음).</li>
+<li>authoring key 재결합 규칙: 요소의 콘텐츠 지문(SHA-256 — 재질=속성+슬롯 텍스처 지문,
+텍스처=바이트, 메시=위치+인덱스, 스켈레톤=joint 이름+inverse bind, 애니메이션=타깃 이름+키)
+으로 prior key를 되찾는다. 같은 지문이 여럿이면 binding 순으로 짝짓는다(바이트 동일 요소는
+교환 불가시). prior에 없는 지문 → 새 key, 현재에 없는 prior → 은퇴(경고), <strong>둘이 동시</strong> →
+<code>AuthoringRebindAmbiguous</code> 오류로 import 실패(§2.3 마지막 문장의 구현).</li>
+<li>MBC2 당시 실측은 corpus 14 모델 309 subasset이었다. MBC5 cold-load가 animation-only
+<code>Cha_Mon_5.fbx</code>의 유도 skeleton 1건이 inventory에서 빠진 것을 검출해 writer를 보완했으며,
+현재 정본은 310 subasset이다. scene.glb(무명 재질 25·텍스처 69·메시 103)만 authoring,
+나머지 기존 112건은 semantic이었다. 당시 exporter persistent ID는 0건이었다.
+MBC3에서 glTF <code>extras.creatorEngineId</code> 콜백을 열고 mesh/material/image/skin/animation의
+<code>StableKeyElement::persistentId</code>로 전달한다. ID가 없는 기존 corpus의 배정은 바뀌지 않는다.</li>
+</ul>
+<p><strong>PHASE 17 병합 재검증(2026-09-02).</strong> PHASE 17은 yaml-cpp를 source·manifest·runtime에서
+0으로 만든다. 병합 전 MBC2의 <code>AssetIdentityEpoch</code>·<code>ModelSidecarV2</code>가 yaml-cpp를 직접
+사용해 의미 충돌이 있었으므로 둘을 <code>Authoring::ParsedDocument</code>·<code>WriteDocument</code>로 이식했다.
+UUIDv8 byte profile과 schema v2 출력 계약은 유지되고, <code>verify-yaml-cpp-retirement</code> 0건,
+<code>verify-asset-identity</code> 184/184, <code>verify-asset-sidecar-v2</code> 85/85·corpus 14/14·subasset
+310·registry 충돌 0으로 다시 닫았다. PHASE 17 D2의 UUIDv4 설계·수치는 전환 전 역사와
+MBC4 입력 기준선일 뿐 최종 identity authority가 아니다.</p>
+<h3 id="32-단일-authoring-transaction">3.2 단일 authoring transaction</h3>
+<p><code>ModelAssetAuthoringTransaction</code> 하나가 다음 순서를 소유한다.</p>
+<ol>
+<li>source를 임시 draft로 decode한다. 전역 catalog/cache는 변경하지 않는다.</li>
+<li>stable key 전부를 만들고 중복·누락을 검사한다.</li>
+<li>UUIDv8 closure를 계산하고 corpus registry와 충돌 검사한다.</li>
+<li>geometry·material·texture·skeleton·animation 참조 closure를 검증한다.</li>
+<li>schema v2 sidecar와 cooked artifact를 같은 temporary generation에 쓴다.</li>
+<li>임시 산출물을 다시 읽어 UUID 재계산·closure·source fingerprint를 검증한다.</li>
+<li>sidecar, cooked artifact, catalog record를 원자 rename/publish한다.</li>
+<li>파일 watcher에는 최종 generation 하나만 보인다.</li>
+</ol>
+<p>실패 시 임시 generation만 폐기한다. 최상위 GUID만 바뀌거나 <code>subAssets</code>가 사라진 sidecar,
+모델 게시 전에 전역 texture registry만 데워진 상태는 존재할 수 없어야 한다.</p>
+<h3 id="33-writer-단일화">3.3 writer 단일화</h3>
+<ul>
+<li><code>ModelIdentityRefresher</code>의 모델 신원 발급 책임을 제거한다.</li>
+<li><code>CreateMetaLocked</code>, importer refresh, watcher refresh, AssetCooker가 별도 규칙으로 sidecar를
+쓰지 못하게 한다.</li>
+<li>source import·reimport·cook·rename은 같은 transaction API를 호출한다.</li>
+<li>writer 외부에서 model sidecar의 <code>assetId</code>·<code>subAssets</code>를 수정하는 호출은 정적 게이트로 막는다.</li>
+</ul>
+<p><strong>MBC3 완료(2026-09-02).</strong> <code>Engine/RenderEngine/Assets/ModelAssetAuthoringTransaction</code>이
+프로젝트 단위 cross-process mutex 아래 decode → stable key/NFC → UUIDv8 closure·corpus 충돌
+검사 → CEMC/embedded texture/generation record·schema v2 sidecar staging → 전부 재판독 → generation
+rename → canonical sidecar commit을 소유한다. <code>EditorAssetDatabase</code>의 생성·수정·이동·import와
+<code>AssetCooker --author-model-asset</code>은 이 API만 호출한다. legacy <code>ModelIdentityRefresher</code>와
+pseudo-v5-as-v4 구현은 삭제했고, UUIDv4 repair/apply 도구는 model 및 model sidecar를 거부한다.
+<code>verify-model-authoring-transaction</code>은 Prim_Cube 복제본에서 generation 1→2 동안 model/subasset
+UUIDv8 4개가 유지됨, 주입 실패 5단계의 sidecar/generation delta 0, corpus collision 게시 거부,
+temporary 누수 0을 확인했다. Debug/Release x64 AssetCooker·CreatorEditor 빌드와 MBC1/MBC2
+게이트(184/184, 85/85, corpus 14/14·subasset 310·충돌 0)를 통과했다. 실제 corpus 발급과 저장
+참조 rewrite, project epoch header의 정식 생성은 MBC4 범위라 이 단계에서 원본 sidecar를 바꾸지 않았다.
+따라서 MBC3 종료 시점의 legacy <code>verify-experiment-model-cook-all</code>은
+<code>Models/scene.glb.meta</code>의 불완전한 v1 <code>subAssets</code>에서 RED였다. 이는 writer의 fixture 원자성
+실패가 아니라 MBC4가 전 corpus를 schema v2로 발급하기 전에 닫아야 했던 진입 차단점이었다.</p>
+<p><strong>MBC4 완료(2026-09-02).</strong> <code>Tools/migration/Invoke-ModelAssetV8Cutover.ps1</code>이 MBC0
+baseline의 legacy GUID를 입력 위치 확인에만 읽고, 임시 프로젝트에서 정식 AssetCooker로 새
+epoch header를 CSPRNG 발급한 뒤 모델 14개를 전부 MBC3 writer에 통과시킨다. 새 sidecar와
+generation, 저장 참조 rewrite를 전부 검증한 뒤 generation → sidecar → document → epoch header
+순서로 게시하며 실패하면 원본 sidecar/document와 generation을 되돌린다. old GUID→new UUIDv8
+표는 프로세스 메모리 밖으로 게시하지 않는다.</p>
+<p>MBC4 최초 적용 결과는 model 14, subasset 309, UUIDv8 identity 323, 최초 generation 14였다.
+MBC5가 animation-only 유도 skeleton 누락을 닫아 현재 정본은 subasset 310, identity 324이며
+모델별 canonical current generation 수는 14다.
+legacy model/subasset identity 68개 중 저장 참조가 있던 <code>FT_Primitives.creator</code>의 model 참조
+8개만 새 ModelId로 치환됐고, old identity 저장 참조는 0이다. baseline의 subasset 참조는
+실자산 0건이므로 material/texture 치환은 합성 fixture 1건으로 검증했다. 이미 고아였던
+<code>Test1</code>/<code>Test2</code>의 미해석 GUID 11개는 모델 신원으로 오인해 바꾸지 않았다. <code>scene.glb</code>를 포함한
+기존 v1/불완전 sidecar 14개는 모두 schema v2가 됐고, <code>Gunner_F_Mythic</code>의 material 2·embedded
+texture 6도 같은 closure에 포함됐다.</p>
+<p>게이트는 corpus 실패 주입 뒤 snapshot 복구, 기존 epoch overwrite 거부, source SHA-256 불변,
+generation/canonical sidecar 일치, old 참조 0을 확인한다. PHASE 17 Strict는 이제 비모델 UUIDv4
+212개와 model UUIDv8 14개/subasset UUIDv8 310개를 함께 검사해 <code>identityReady=true</code>다. 구
+<code>verify-experiment-model-cook-all</code> 진입점은 CI 호출 호환만 유지하고 legacy v1 cook 대신 MBC4
+corpus generation 폐포와 MBC3 원자 authoring을 검증한다. <code>Dynamic_CPP/Library</code> generation은
+재생성 가능한 로컬 산출물이고, <code>ProjectSetting/AssetIdentity.asset</code>만 epoch 정본으로 추적한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-런타임-정본-modelassetgeneration">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-런타임-정본-modelassetgeneration">4. 런타임 정본: <code>ModelAssetGeneration</code></h2></div>
+<div class="prose"><p>런타임에는 다음 immutable aggregate 하나만 게시한다.</p>
+<pre><code>ModelAssetGeneration
+ ├─ identity { ModelId, generation, sourceFingerprint }
+ ├─ meshes[] { MeshId, vertexLayout, vertex/index storage, bounds }
+ ├─ materials[] { MaterialId, property block, texture handles }
+ ├─ textures[] { TextureId, decoded/upload descriptor }
+ ├─ skeleton { SkeletonId, hierarchy, inverse bind }
+ ├─ animations[] { AnimationId, tracks, events }
+ └─ gpuDescriptors { backend-neutral immutable requests }</code></pre>
+<p>load 순서:</p>
+<ol>
+<li>sidecar/cooked header의 profile·epoch·fingerprint를 검증한다.</li>
+<li>CPU draft와 모든 내부 handle을 pending generation에 만든다.</li>
+<li>embedded texture와 material 연결을 포함한 closure를 검증한다.</li>
+<li>GPU upload request를 준비하고 양 backend 요구를 검증한다.</li>
+<li>generation 전체를 한 번에 cache/catalog에 게시한다.</li>
+</ol>
+<p>동일 AssetId reimport는 <code>try_emplace</code>로 옛 객체를 남기지 않고 generation을 교체한다. cache
+key는 <code>{AssetId, generation}</code>이며 mesh binding은 <code>{ModelId, MeshId, generation}</code>이다.
+legacy <code>Mesh::m_hashingMesh</code>를 신원으로 사용하지 않는다. retire는 모델·subasset·GPU
+descriptor generation 전체를 함께 처리한다.</p>
+<p><strong>MBC5 완료(2026-09-02).</strong> <code>Assets/ModelAssetGeneration</code>이 schema v2 canonical sidecar,
+generation record, CEMC와 embedded texture의 SHA-256을 모두 검증한 뒤 node·mesh·material·
+decoded texture·skeleton·animation·animator·backend-neutral upload descriptor를 immutable
+snapshot 하나로 만든다. <code>ModelAssetGenerationCache</code>는 <code>{ModelId,generation}</code>을 주소로 쓰고
+asset별 current generation을 원자 교체하며 stale/same-generation collision을 거부한다.
+<code>{ModelId,MeshId,generation}</code> typed handle, read-only 통계, aggregate retire와 외부 <code>shared_ptr</code>
+snapshot 수명도 함께 닫았다. <code>DataSystem</code> startup catalog는 schema v2 <code>assetId</code>를 읽고 UUIDv8
+모델 load/reload/remove/finalize에서 publish/retire한다. 다만 제품 소비자의 남은 legacy adapter는
+MBC7~MBC9 범위이므로 이 단계의 완료가 legacy 제거 완료를 뜻하지 않는다.</p>
+<p>실자산 cold-load에서 <code>Cha_Mon_5.fbx</code>의 animation-only CEMC에는 유도 skeleton과 clip 2개가
+있지만 sidecar inventory에는 skeleton이 없던 기존 부분 게시가 검출됐다. writer가 애니메이션
+target node 조상 폐포를 SHA-256 지문화해 신규 skeleton UUIDv8을 한 번 발급하도록 수정하고,
+sidecar↔ModelDraft 수 검산을 게시 전 필수 조건으로 추가했다. 현재 corpus는 model 14/14,
+mesh 130, material 52, embedded texture 96, skeleton 4, animation 28, upload descriptor 356이며
+subasset 310/identity 324다. <code>verify-model-asset-generation</code>은 generation 1→2 교체, model·sidecar·
+record·texture 변조 4종의 게시 전 거부, 실패 뒤 current 불변, retire 2회를 Debug/Release에서
+통과했다. identity/sidecar/MBC3/MBC4/freeze 게이트와 Debug/Release x64 AssetCooker·
+CreatorEditor 빌드도 통과했다.</p>
+<p><strong>MBC6 완료(2026-09-02).</strong> <code>Assets/ModelVertexLayout</code>을 제품 정본으로 승격하고
+<code>core</code>, <code>core|color</code>, <code>core|skin</code>, <code>core|color|skin</code> 네 조합을 전체
+<code>vertexAttributeMask</code> PSO/permutation key로 분리했다. <code>ModelVertexInput</code>은 같은 표에서
+DX12/Vulkan input element와 shader axis를 만들며, pass가 읽는 속성 집합은 전체 buffer layout과
+별도로 받되 모든 오프셋은 원본 mask에서 계산한다. 따라서 depth-only Shadow도 COLOR가 사이에 낀
+SU skin 오프셋을 잃지 않으면서 Vulkan unused-input 경고를 만들지 않는다.</p>
+<p><code>RHIModelMeshView</code>는 <code>{ModelId,MeshId,generation}</code>과 immutable vertex/index descriptor를 검증해
+양 backend cache의 정확한 typed key로 올린다. GBuffer·Forward·Shadow는 이 view를 최우선으로
+소비하고, Forward는 t12 bone palette와 instance별 bone offset까지 연결해 투명 skin pose를 더는
+무시하지 않는다. SU closure는 mask 247, stride 84, bone indices 64, bone weights 68이며 COLOR를
+제거하거나 legacy vertex upload로 우회하지 않았다. <code>verify-model-render-wiring</code>은 CPU layout/PSO
+4종과 corpus 14/14를 검사한 뒤 GBuffer가 DX12/Vulkan typed generation upload를 각각 정확히
+1회 수행했는지, DX12 skinning 및 Vulkan Shadow·GBuffer·Forward가 실제 실행되는지, validation이
+0건인지를 요구하며 Debug/Release에서 통과했다. Scene/MeshRenderer가 typed view를
+직접 채우는 전환은 MBC7, 남은 legacy upload arm의 물리 삭제는 MBC9 범위다.</p>
+<p><strong>MBC7 완료(2026-09-03).</strong> <code>MeshRenderer</code>가 모델 <code>ModelAssetGeneration</code>을 붙들고
+(<code>m_modelGeneration</code>·<code>m_modelMeshIndex</code>, 영속 <code>m_meshAssetId</code> = UUIDv8 MeshId) 프록시
+→ drawPool이 <code>BuildRHIModelMeshView</code>로 typed 뷰를 채운다. 그래서 MBC6이 비워 둔
+<code>EnhancedDrawItem::modelMeshView</code>가 실씬에서 처음 채워졌고, 지오메트리 키는
+<code>{ModelId, MeshId, generation}</code> 해시다. <code>Model::LoadModelToScene</code>은 generation 직행
+인스턴스화(<code>GenerateSceneObjectHierarchyFromGeneration</code>)가 정본이고 experiment → legacy
+재귀는 폴백이다. 재질은 generation의 immutable material에서 시공하며, embedded texture
+owner는 <code>DataSystem::ResolveModelGenerationTexture</code>({TextureId, generation} 캐시,
+generation 단위 retire)가 closure에서 만든다 — 전역 임베디드 등록부·이름 폴백·로드
+순서·hot cache에 기대지 않는다. 저작 sealing(<code>BuildSealSourceFromAuthored</code>)과 M2
+resolver도 같은 closure 훅(<code>resolveEmbeddedTexture</code>)을 첫 축으로 쓴다.</p>
+<p>실측이 고친 결함 셋. ① 저장 시 <code>SynchronizeLegacyMaterialProperties</code>가 런타임 텍스처
+<strong>이름</strong>으로 <code>Materials\*.png</code>(legacy Assimp 추출물)의 v4 GUID를 되살려 closure의 UUIDv8
+신원을 덮어썼다 — UUIDv8은 이름에 지지 않는다. ② 재질 저작 코덕의 reader가 UUIDv4만
+받아 writer가 이미 적던 UUIDv8 재질 assetId·texture GUID를 통째로 거부했다(저장 씬의
+모델 재질이 typed 기본값으로 비었다) — 혼합 계약(PHASE 17 Strict)대로 v8을 받는다.
+③ experiment 소스 로드의 v1 sidecar 리더가 schema v2를 거부해 legacy 재질이 embedded
+GUID를 잃고 있었다 — v2 subAssets(binding = sourceKey)로 같은 표를 채운다(MBC9까지의
+전환기 보강). 가시 결과: <code>verify-model-scene-consumption</code>이 FT_Primitives+Gunner 씬에서
+renderer 10/10 typed, Gunner embedded 6/6 closure(등록부 출처 0), 콜드 프로세스 재로드
+동일, reimport 뒤 이전 texture generation 재사용 0(retire 6), 실GPU 업로드 10/10 typed를
+Debug에서 통과했다. <code>[mesh.resolve]</code>·<code>[model.instantiate]</code>에 <code>generation</code> 축이 생겨
+<code>verify-experiment-vertex-live</code>·<code>verify-editor-drop-animation</code>은 typed 축을 받아들이도록
+갱신했고(legacy 0은 그대로), dx12.scene 업로드 요약에 <code>generation</code> 계수를 더했다.
+MBC3~MBC6 게이트 4종과 함께 run-all에 편입했다. Animator·Foliage·Collider·Editor의 typed
+전환은 MBC8, legacy <code>m_Mesh</code>·experiment 병행 핸들·등록부의 물리 삭제는 MBC9 범위다.</p>
+<p><strong>MBC8 완료(2026-09-03).</strong> Animator가 <code>m_Motion</code>(ModelId)으로 <code>ModelAssetGeneration</code>을
+붙들고(<code>m_modelGeneration</code>) 재생 틱·본 해석·신원·클립 열거·AvatarMask 생성·루프 판정이
+typed skeleton/animation을 첫 축으로 쓴다(<code>AnimatorDataPath</code> = Generation → Experiment →
+Legacy). 재생 산술은 <code>Assets/ModelAnimationSampler</code>(typed 트랙 샘플러·유니크 키 시각 계량)에
+있고, <code>AnimationJob</code>의 틱 본문은 데이터 뷰 템플릿 하나(<code>GenerationPoseSource</code> /
+<code>ExperimentPoseSource</code>)로 합쳐 두 판이 갈릴 자리를 없앴다 — typed 샘플러는 experiment 골든
+<code>poseDigest=8042DC1C</code>를 <strong>비트 동일</strong>하게 재현했고, A/B 스위치를 끈 프로세스에서도 같은
+값을 낸다(재생의 스위치 의존 은퇴). skeleton 신원은 {ModelId, SkeletonId, generation}
+해시라 legacy m_serial·experiment Generation 번호 공간과 겹치지 않는다. Foliage는
+<code>FoliageType::m_modelGeneration</code>을 이름 → ModelId → generation으로 잇고 DrawSource →
+drawPool이 typed 뷰를 채우며 재질 embedded texture를 같은 closure에서 푼다. 에디터
+인스펙터는 typed generation read-only 블록(ModelId·MeshId·generation·epoch·정점/인덱스)을
+보인다. cook의 씬 참조 스캔·재질 texture GUID 파서는 혼합 신원 계약(v4 비모델 + v8
+모델/subasset)을 받는다 — MBC7 저장 씬이 <code>scene.reference</code>에서 거부되던 자리다.</p>
+<p>실측 두 가지. ① Collider는 지오메트리를 소비하지 않는다 — <code>PhysicsManager::AddCollider(Mesh)</code>가
+<code>HasComponent&lt;MeshRenderer&gt;</code>만 보고 convex cook은 정점 nullptr(PHASE 19 소관, 살아 있는
+호출자 0). typed CPU view는 필요할 때 만든다(YAGNI). ② CLR 재질 API는 entity 핸들 + 이름
+문자열만 넘기고 모델/메시 신원 표면이 없다 — typed bind 뒤 <code>m_Material</code>·<code>MaterialInstance</code>가
+유효한 것으로 계약이 닫힌다(MBC7 게이트가 이미 잰다). 진단(<code>boneresolve</code>·<code>animmask</code>·
+<code>editorsurface</code>·<code>animtick</code>·<code>animlive</code>·<code>foliage verify</code>)에 <code>generation</code> 축을 더하고 후보 선별을
+legacy Skeleton 존재가 아니라 창구(<code>GetSkeletonSerial</code>)로 바꿨다. 신설 게이트
+<code>verify-model-typed-consumers</code>는 스위치 off 프로세스에서 typed 전량(재생 골든·본 해석 N/N·
+마스크 구조·클립 열거·Foliage 뷰 N/N)을 요구하고, vertex-live의 8/8b/9/9b/11b·off
+4k/4m/4m2/4n을 typed 축으로 갱신했다. 남는 것: legacy <code>m_Skeleton</code> 대입(bridge·
+OnDeserialized)·experiment 병행 핸들·<code>m_hashingMesh</code> Foliage 조회·<code>BuildLegacySkeleton</code>은
+MBC9가 걷고, ModelCookProducer의 v1 sidecar 리더(cooked-catalog RED)는 MBC11 몫이다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-직접-소비와-제거-경계">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-직접-소비와-제거-경계">5. 직접 소비와 제거 경계</h2></div>
+<div class="prose"><h3 id="51-직접-소비자로-전환할-표면">5.1 직접 소비자로 전환할 표면</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>소비자</th><th>최종 입력</th></tr></thead>
+<tbody><tr><td>GBuffer·Forward·Shadow·Depth·Wireframe</td><td><code>MeshId</code> + vertex attribute mask + immutable material snapshot</td></tr>
+<tr><td><code>MeshRenderer</code>·scene bridge</td><td><code>ModelId</code>/<code>MeshId</code>/<code>MaterialId</code> generation handle</td></tr>
+<tr><td>Animator·animation job</td><td>skeleton/animation handle와 pose output</td></tr>
+<tr><td>Foliage·Collider·proxy</td><td>mesh bounds/storage handle, 필요한 경우 명시적 CPU view</td></tr>
+<tr><td>Editor Inspector·preview</td><td>read-only generation snapshot과 authoring transaction command</td></tr>
+<tr><td>Serialization·CLR</td><td>UUIDv8 AssetId와 typed subasset handle</td></tr>
+<tr><td>AssetCooker·Player package</td><td>schema v2 + verified cooked generation</td></tr></tbody></table></div>
+<p>최종 namespace는 <code>experiment</code>가 아니다. cutover 전용 내부 이름을 거쳐도 제품 게시 전에
+<code>RenderEngine::Assets</code> 계층의 정식 타입으로 승격한다.</p>
+<h3 id="52-제품에서-제거할-것">5.2 제품에서 제거할 것</h3>
+<ul>
+<li><code>BuildLegacyModelFromExperiment</code>와 legacy <code>Model/ModelNode/Mesh/Material/Skeleton/Bone/ NodeAnimation</code> 복제.</li>
+<li>legacy <code>Models</code>·<code>Materials</code> cache와 <code>m_experimentMeshBindings</code> 병행 상태.</li>
+<li><code>ModelSceneBridge</code>·<code>GetOrUpload</code>·Animator의 legacy fallback.</li>
+<li>Assimp 제품 importer와 vcpkg 제품 의존.</li>
+<li><code>CREATOR_EXPERIMENT_VERTEX</code>, experiment on/off, parity/skip-success 분기.</li>
+<li>legacy <code>.asset</code> runtime reader와 제품 migration alias.</li>
+<li>정상 제품 경로의 <code>[material.finalize]</code>, <code>[mesh.resolve]</code>, <code>[model.instantiate]</code>,
+<code>[anim.tick]</code> 무조건 출력.</li>
+<li>상태를 바꾸는 <code>experiment.animlive</code>류 제품 진단 명령.</li>
+</ul>
+<p>과거 포맷을 읽는 도구가 꼭 필요하면 제품 밖 일회성 offline migrator로만 둔다. migrator는
+기존 GUID를 <strong>입력 위치 찾기</strong>에 일시 사용할 수 있지만 새 AssetId 계산·runtime alias에는
+사용할 수 없다. migration 완료 게이트는 저장소 전체 old GUID 참조 0건이다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-두-긴급-자산의-폐쇄-조건">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-두-긴급-자산의-폐쇄-조건">6. 두 긴급 자산의 폐쇄 조건</h2></div>
+<div class="prose"><h3 id="61-su_mythicglb">6.1 <code>SU_Mythic.glb</code></h3>
+<ul>
+<li>PSO/permutation key에 전체 <code>vertexAttributeMask</code>를 넣는다.</li>
+<li>최소 조합 <code>core</code>, <code>core|color</code>, <code>core|skin</code>, <code>core|color|skin</code>을 구별한다.</li>
+<li><code>core|color|skin</code> stride 84, bone indices offset 64, bone weights offset 68을 layout table에서
+유도하며 하드코딩하지 않는다.</li>
+<li>GBuffer와 Shadow, DX12와 Vulkan 모두 같은 mask에서 input layout과 <code>VSIn</code>을 만든다.</li>
+<li>COLOR_0을 제거해 통과시키거나 skin을 legacy layout으로 우회하지 않는다.</li>
+<li>source load·cold cooked load·reimport 뒤 대표 프레임에서 geometry, color, skin pose가 모두
+유효해야 한다.</li>
+</ul>
+<h3 id="62-gunner_f_mythicglb">6.2 <code>Gunner_F_Mythic.glb</code></h3>
+<ul>
+<li>새 epoch에서 model 1, material 2, embedded texture 6의 UUIDv8 closure를 sidecar에 기록한다.</li>
+<li>cold load에서 임베디드 texture decode → material property 연결 → model generation 게시가 한
+transaction이다.</li>
+<li><code>MeshRenderer::OnDeserialized</code>가 재질 노드에서 model GUID를 미리 찾아 registry를 데우는
+순서 해킹을 제거한다.</li>
+<li>이름 fallback, 이전 전역 registry 잔존, hot cache가 없어도 두 material의 texture property가
+완전해야 한다.</li>
+<li>reimport generation 교체 뒤 이전 texture generation이 재사용되지 않아야 한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-실행-슬라이스와-공수">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-실행-슬라이스와-공수">7. 실행 슬라이스와 공수</h2></div>
+<div class="prose"><p>공수는 1인 전담 엔지니어 개발일이다. 제품 공개는 <code>MBC11</code>에서 한 번만 하지만, 각
+슬라이스는 cutover branch에서 독립적으로 빌드·검증 가능해야 한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>ID</th><th>내용</th><th>선행</th><th style="text-align:right">공수</th><th>상태</th></tr></thead>
+<tbody><tr><td><code>MBC0</code></td><td>cutover 계약·변경 동결·corpus/참조/성능 기준선</td><td>—</td><td class="num" style="text-align:right">2</td><td><strong>완료 2026-09-02</strong> — <code>verify-mbc-cutover-freeze</code>(래칫 15 표면·하드 계약 3), <code>mbc0_corpus_baseline.json</code>, <a href="ModelAssetBigBangCutoverBaseline.html">기준선 문서</a></td></tr>
+<tr><td><code>MBC1</code></td><td><code>ce.uuidv8.sha256.v1</code> 구현·test vector·collision registry</td><td>MBC0</td><td class="num" style="text-align:right">3</td><td><strong>완료 2026-09-02</strong> — <code>Engine/RenderEngine/Assets/AssetIdentityProfile·Registry</code>, <code>Utility_Framework/Sha256.h</code>, <code>assets.identity</code>(단정 184), <code>verify-asset-identity</code>(C++·Python·.NET 3중 유도, 벡터 15)</td></tr>
+<tr><td><code>MBC2</code></td><td>schema v2·stable key·epoch header</td><td>MBC1</td><td class="num" style="text-align:right">4</td><td><strong>완료 2026-09-02, PHASE 17 병합 후 재검증</strong> — <code>Assets/AssetIdentityEpoch</code>·<code>ModelStableKeys</code>·<code>ModelSidecarV2</code>를 ryml 저작 문서 경계에 접합, <code>assets.sidecar</code>(단정 85, corpus 14/14·subasset 310·충돌 0), <code>verify-asset-sidecar-v2</code>, yaml-cpp 은퇴 0건</td></tr>
+<tr><td><code>MBC3</code></td><td>원자 authoring writer·watcher/AssetCooker 단일화</td><td>MBC2</td><td class="num" style="text-align:right">5</td><td><strong>완료 2026-09-02</strong> — project mutex 기반 <code>ModelAssetAuthoringTransaction</code>, Editor create/modify/move/import·<code>AssetCooker --author-model-asset</code> 단일 진입, glTF exporter ID 수집, legacy refresher 삭제, 실패 주입 5단계·collision 1건 원자성 게이트, Debug/Release 빌드</td></tr>
+<tr><td><code>MBC4</code></td><td>전 corpus 새 신원 발급·scene/prefab/material 참조 일회성 rewrite</td><td>MBC3</td><td class="num" style="text-align:right">6</td><td><strong>완료 2026-09-02</strong> — epoch header CSPRNG 발급, model 14/subasset 310/identity 324(MBC5 animation-derived skeleton 보정 포함), current generation 14, 저장 참조 8 rewrite, old 참조 0, rollback·subasset 합성 gate</td></tr>
+<tr><td><code>MBC5</code></td><td><code>ModelAssetGeneration</code>·generation cache·원자 publish/retire</td><td>MBC2</td><td class="num" style="text-align:right">7</td><td><strong>완료 2026-09-02</strong> — immutable aggregate·typed generation handle, SHA-256 closure load, replace/stale/collision/retire cache, DataSystem publish/retire, 변조 4종 fail-closed, corpus 14/14·mesh 130/material 52/texture 96/skeleton 4/animation 28/descriptor 356, Debug/Release gate</td></tr>
+<tr><td><code>MBC6</code></td><td>RHI/GBuffer/Forward/Shadow 직접 소비 + SU 전체 mask 조합</td><td>MBC5</td><td class="num" style="text-align:right">5</td><td><strong>완료 2026-09-02</strong> — canonical 4-mask layout/PSO, typed <code>{ModelId,MeshId,generation}</code> DX12/Vulkan cache와 실제 upload 1/1, Forward skin palette, SU mask 247·84B·64/68, Debug/Release 실GPU gate·Vulkan validation 0</td></tr>
+<tr><td><code>MBC7</code></td><td>Scene/MeshRenderer/material 직접 소비 + Gunner cold-load closure</td><td>MBC3, MBC5</td><td class="num" style="text-align:right">5</td><td><strong>완료 2026-09-03</strong> — MeshRenderer generation handle·영속 MeshId, 프록시→drawPool typed 뷰, generation 직행 인스턴스화, <code>ResolveModelGenerationTexture</code> closure 캐시(generation retire), 코덕 UUIDv8 수용·이름 역해석 차단, <code>verify-model-scene-consumption</code>(10/10 typed·Gunner 6/6·reimport 재사용 0·실GPU 10/10)</td></tr>
+<tr><td><code>MBC8</code></td><td>Animator/Foliage/Collider/Editor/Serialization/CLR 직접 소비</td><td>MBC5</td><td class="num" style="text-align:right">6</td><td><strong>완료 2026-09-03</strong> — Animator <code>m_modelGeneration</code>·<code>AnimatorDataPath</code>, <code>Assets/ModelAnimationSampler</code>(골든 8042DC1C 비트 동일), 틱 뷰 템플릿 단일화, Foliage typed 뷰, 인스펙터 read-only 블록, cook 참조 스캔 v8 수용, <code>verify-model-typed-consumers</code>(스위치 off typed 전량)</td></tr>
+<tr><td><code>MBC9</code></td><td>A/B·Assimp fallback·역브리지·legacy 타입/cache 제거</td><td>MBC6~MBC8</td><td class="num" style="text-align:right">5</td><td><strong>완료 2026-09-03</strong> — legacy <code>Model/ModelLoader/Skeleton/AnimatorData/Animation/ModelAssetFormat</code>·<code>ExperimentModelMigration</code>(역브리지·<code>LoadModelViaExperiment</code>·A/B 스위치)·<code>ModelSceneBridge</code>·Assimp include/vcpkg port 물리 삭제, <code>RHIExperimentVertexView</code>/<code>GetOrUploadExperiment</code>/experiment 계수·컴포넌트 병행 핸들(<code>m_experimentModel</code>·<code>m_Mesh</code>·<code>m_Skeleton</code>)·전역 임베디드 등록부·<code>Models</code> cache 제거, <code>ModelSceneInstantiation</code>(generation 직행)·<code>LoadModelAssetGenerationByPath</code>/<code>FindModelAssetGenerationByStem</code>/<code>ReadModelCreateMeshCollider</code>·<code>BoneRegion.h</code>(MAX_BONES) 신설, dx12/vulkan selftest·에디터 드롭·진단·transformbulk 프로브 typed 전환, 동결 래칫 제거 표면 0 재기준, <code>verify-experiment-vertex-live</code>·<code>phase17-local-model-corpus</code> 은퇴</td></tr>
+<tr><td><code>MBC10</code></td><td>진단 read-only화·정적/변이/실자산 gate 완결</td><td>MBC1, MBC9</td><td class="num" style="text-align:right">5</td><td><strong>완료 2026-09-03</strong> — 제품 경로의 무조건 stdout 토큰(<code>[mesh.resolve]</code>·<code>[model.instantiate]</code>·<code>[anim.tick]</code>) 제거 → <code>ModelConsumptionDiagnostics</code> 원자 계수 + 읽기 전용 <code>assets.modeldiag</code>, <code>experiment.animlive</code>는 publish를 부르지 않고 제품 barrier의 마지막 메트릭 스냅샷(<code>Scene::TryGetLastAnimatorPoseMetrics</code>)을 읽음, 동결 게이트에 §5.2/§8.2 하드 계약(제거 표면 하드 0·<code>m_hashingMesh</code> 절차 지오메트리 허용목록·제품 소비자 experiment 객체 0·generation 게시 진입점 DataSystem 하나·animlive 읽기 전용) 추가, 게이트 5종을 스냅샷 파싱으로 전환</td></tr>
+<tr><td><code>MBC11</code></td><td>전체 build/runtime/performance 검증·단일 제품 cutover</td><td>MBC4, MBC9, MBC10</td><td class="num" style="text-align:right">7</td><td><strong>완료·cutover 2026-09-04</strong> — 최종 판정은 §10의 2026-09-04 종료 기록을 따른다. 아래는 2026-09-03 검증·보류 당시 기록이다: cook 경로 단일화(<code>ModelGenerationExportProducer</code>가 게시된 generation을 검증해 <code>Derived/Models/&lt;xx&gt;/&lt;id&gt;/&lt;gen&gt;/</code>로 내보내고 재질·텍스처·메시 subasset을 manifest에 등록, <code>ModelCookProducer</code> 삭제, <code>DataSystem::LoadModelAssetGeneration</code>이 cooked catalog → Library 순으로 해석·계수), 계측 공백 폐쇄(<code>assets.modelbench</code> author/cooked + <code>phases</code> 단계 분해 + peak WS/VRAM, <code>assets.modeldiag</code>의 generation 출처 계수), <code>verify-model-cutover-budget</code>(Release, run-all 배선). §8.4 실측: B3·B4·B5·B6 통과/기록, <strong>B1 10/14·B2 12/14 초과</strong>(원인: cooked 텍스처 재디코드·저작 트랜잭션 고정 비용) — <a href="ModelAssetBigBangCutoverBaseline.html">기준선 §4.5</a>. §8.4 규칙대로 cutover는 보류한다</td></tr>
+<tr><td><strong>합계</strong></td><td></td><td></td><td class="num" style="text-align:right"><strong>60일</strong></td><td></td></tr></tbody></table></div>
+<p>병렬 가능 범위는 <code>MBC3</code>과 <code>MBC5</code>, <code>MBC6</code><del><code>MBC8</code>이다. 한 명이 순차 수행하면 60
+개발일, 약 12 work-week다. 2명이 writer/runtime 축과 consumer 축을 나누되 동일 gate owner를
+두면 8</del>10주가 현실적이다. 공식 일정은 <strong>10주 목표 + 2주 여유</strong>로 둔다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-게이트">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-게이트">8. 게이트</h2></div>
+<div class="prose"><h3 id="81-정적-identitysidecar">8.1 정적 identity·sidecar</h3>
+<ul>
+<li class="task"><input type="checkbox" disabled checked> 모든 model sidecar <code>schemaVersion=2</code>, profile=<code>ce.uuidv8.sha256.v1</code>.</li>
+<li class="task"><input type="checkbox" disabled checked> UUID 재계산 불일치 0, canonical tuple 중복 0, UUID 충돌 0.</li>
+<li class="task"><input type="checkbox" disabled checked> <code>subAssets</code> closure 누락 0; 모델별 source decode 결과와 kind별 개수가 일치.</li>
+<li class="task"><input type="checkbox" disabled checked> legacy GUID 참조 0; legacy GUID→new GUID runtime map/alias 0.</li>
+<li class="task"><input type="checkbox" disabled checked> pseudo UUIDv5-as-v4 구현·호출 0.</li>
+<li class="task"><input type="checkbox" disabled checked> model sidecar writer가 <code>ModelAssetAuthoringTransaction</code> 한 곳뿐.</li>
+</ul>
+<h3 id="82-구조--verify-mbc-cutover-freeze-하드-계약mbc10">8.2 구조 — <code>verify-mbc-cutover-freeze</code> 하드 계약(MBC10)</h3>
+<ul>
+<li class="task"><input type="checkbox" disabled checked> Assimp 제품 호출·include·package 의존 0 (<code>assimp.include</code>·vcpkg port 하드 0).</li>
+<li class="task"><input type="checkbox" disabled checked> experiment/legacy 선택 플래그·off arm·fallback 0 (<code>CREATOR_EXPERIMENT_VERTEX</code>·<code>LoadModelViaExperiment</code> 하드 0).</li>
+<li class="task"><input type="checkbox" disabled checked> <code>BuildLegacyModelFromExperiment</code>와 legacy 모델 객체 복제 0 (하드 0, 타입 파일 부재 — typed-consumers 정적).</li>
+<li class="task"><input type="checkbox" disabled checked> <code>m_hashingMesh</code>·legacy <code>Models/Materials</code> cache 기반 binding 0 — 모델 경로 0. <code>m_hashingMesh</code>는 절차 지오메트리(스프라이트 쿼드·지형·기즈모) 캐시 키로만 허용목록 10파일에 남고 밖에 나타나면 실패.</li>
+<li class="task"><input type="checkbox" disabled checked> 모델·임베디드 텍스처·재질 부분 게시 가능 경로 0 — generation 게시 진입점 <code>m_modelAssetGenerations.Publish</code>는 DataSystem 하나(정적), 게시 전 검증 실패는 전역 delta 0(<code>verify-model-asset-generation</code> 변조 4종).</li>
+<li class="task"><input type="checkbox" disabled checked> 제품 소비자는 <code>ModelAssetGeneration</code> handle만 사용 — SceneRuntime/Render/PrimitiveRenderProxy/EngineGUIWindow에서 <code>experiment::Model</code>·<code>TryGetMesh</code> 0(정적).</li>
+<li class="task"><input type="checkbox" disabled checked> 정상 제품 경로의 무조건 진단 출력 0·상태 변경 진단 명령 0 — <code>[material.finalize]</code>/<code>[mesh.resolve]</code>/<code>[model.instantiate]</code>/<code>[anim.tick]</code> 하드 0, <code>experiment.animlive</code>는 <code>PublishAnimatorPose</code>를 부르지 않는다(정적). 관측은 <code>assets.modeldiag</code>(원자 계수 스냅샷)·<code>Scene::TryGetLastAnimatorPoseMetrics</code>.</li>
+</ul>
+<h3 id="83-buildruntime">8.3 build·runtime</h3>
+<ul>
+<li class="task"><input type="checkbox" disabled checked> AssetCooker, RenderTests, CreatorEditor Debug/Release 빌드.</li>
+<li class="task"><input type="checkbox" disabled checked> DX12와 Vulkan validation error 0 (<code>verify-model-render-wiring</code> — Vulkan validation 0건 단정).</li>
+<li class="task"><input type="checkbox" disabled checked> 전체 모델 corpus source load·cold cooked load 통과 (<code>verify-model-asset-generation</code> corpus 14/14 cold-load closure); reimport는 Gunner(<code>assets.scenemodel reload</code>)로 대표 — 전 corpus reimport 시간 예산은 MBC11 §8.4.</li>
+<li class="task"><input type="checkbox" disabled checked> <code>SU_Mythic.glb</code> geometry/color/skin pose가 GBuffer·Shadow 양 backend에서 통과 (<code>verify-model-render-wiring</code>).</li>
+<li class="task"><input type="checkbox" disabled checked> <code>Gunner_F_Mythic.glb</code> material 2/2, embedded texture 6/6이 cold load·reimport에서 통과 (<code>verify-model-scene-consumption</code>).</li>
+<li class="task"><input type="checkbox" disabled checked> 실패 주입 단계별 catalog/cache/scene/render delta 0 — generation 변조 4종 게시 전 거부·cache 무변화(<code>verify-model-asset-generation</code>); scene/render delta는 게시가 거부되면 소비자가 붙들 handle이 없어 구조적으로 0(<code>unbound=0</code> 단정과 함께).</li>
+<li class="task"><input type="checkbox" disabled checked> scene save/reload·prefab·CLR round-trip 후 AssetId와 subasset handle 일치 (<code>verify-model-scene-consumption</code> 저장 씬 UUIDv8 <code>m_meshAssetId</code>·콜드 재해석, <code>verify-scene/prefab-authoring-corpus</code>; CLR은 이름 API뿐이라 handle 이관 대상 없음 — MBC8 실측).</li>
+</ul>
+<h3 id="84-성능">8.4 성능</h3>
+<p>legacy runtime과 live A/B 스위치를 두지 않는다. cutover 전에 고정한 archived baseline과 새
+단일 경로를 별도 실행으로 비교하고, 제품에는 새 경로만 남긴다.</p>
+<p>★ <strong>2026-09-04 축 재유도(사용자 결정).</strong> B1·B2의 기준값이 잰 일과 새 경로가 재는 일이
+달랐다 — B1 기준은 프로토타입의 <strong>디코드</strong>였고, B2 기준인 legacy <code>.asset</code> 읽기는
+<strong>텍스처도 신원 검증도 해시 검증도 하지 않았다</strong>. 그래서 같은 일끼리만 비교 예산으로
+판정하고, legacy에 대응물이 없는 칸은 archive 대비 비회귀로 본다. 임베디드 텍스처
+디코드 칸은 <strong>PHASE 12 T1a/T2로 이관</strong>한다 — cook artifact를 디코드 완료 형식으로
+바꾸면 사라지는 비용이고, 그 artifact 포맷은 그 페이즈의 소유다. 판정 규칙과 그것이
+지키는 선은 <a href="ModelAssetBigBangCutoverBaseline.html">기준선 §4.4a</a>에 있고, 게이트
+<code>verify-model-cutover-budget</code>의 상수 블록이 같은 표를 들고 있다. 이관한 칸도 모델별
+값으로 archive에 남아 회귀하면 붉어진다 — 예산에서 빼는 것이 아니라 판정 주체를 옮긴다.</p>
+<ul>
+<li class="task"><input type="checkbox" disabled checked> Release cold load·warm load·reimport 시간 예산 충족 — <strong>B1a 14/14·B2a 14/14 통과(2026-09-04, <a href="ModelAssetBigBangCutoverBaseline.html">기준선 §4.6</a>)</strong>. 소스 디코드는 처음부터 14/14 예산 안이었고(Gunner 52.8 vs 158, scene 482 vs 859), CEMC 읽기·디코드·조립도 예산 안이다. 판정 전에 3.75가 소유한 낭비 둘을 걷었다 — 저작마다 asset root를 전수 재순회하며 sidecar를 재파싱하던 corpus collision 검사(파싱 캐시 — 평균 6.93 → 3.92 ms, 남은 것은 파싱이 아니라 순회다)와 게시 직전 source 전체를 다시 읽어 SHA-256을 다시 계산하던 race 검사(14모델 합계 302.6 → 48.1 ms, scene 212.9 → 2.8). B1b(저작 트랜잭션)·B2b(신원·해시 검증)·B2c(임베디드 텍스처 디코드 — PHASE 12)는 archive 비회귀 축이다. B3 씬 로드·B4 부팅도 통과. 전 corpus reimport는 14/14 합계 3.1 s(2026-09-03 실측).</li>
+<li class="task"><input type="checkbox" disabled checked> model CPU resident·vertex/index·texture staging·peak VRAM 예산 충족 — B5 peak working set 832.8 MB ≤ 1,351 통과, peak VRAM 1,145 MB를 B6 archive에 기록(비회귀 ×1.10).</li>
+<li class="task"><input type="checkbox" disabled checked> frame CPU record와 GPU pass timing 비회귀 — <strong>기준선 기록 2026-09-03, 비회귀 판정 개시 2026-09-04</strong>: corpus 재임포트(CEMC v4→v5, 14/14) 뒤 <code>dx12.scene</code>(FT_Primitives + Gunner)에서 메시 업로드 10개·1,075 KB가 전량 generation 경로, 커버리지 49,684, VRAM 1,145 MB를 <code>mbc11_perf_archive.json</code>에 기록했다. 이후 실행은 ×1.10 안이어야 한다. archive는 축 재유도와 함께 B1b·B2b·B2c의 <strong>모델별</strong> 시간(<code>authoringOverheadMs</code>·<code>identityVerifyMs</code>·<code>textureDecodeMs</code>)을 함께 들고, 시간 축은 흔들림 때문에 ×1.25(또는 +2 ms) 여유로 본다. 게이트는 <strong>어느 칸이라도 붉은 실행</strong>을 archive로 굳히지 않는다(회귀가 새 정답이 되는 것을 막는다).</li>
+<li class="task"><input type="checkbox" disabled checked> cache hit/miss·generation retire 수가 읽기 전용 snapshot으로 관측됨.</li>
+</ul>
+<p>예산 수치는 <code>MBC0</code>에서 같은 장비·같은 asset corpus·같은 해상도로 고정한다. 기준을 못
+맞추면 cutover를 연기하되 legacy fallback을 제품에 되살리지 않는다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-완료-정의와-되돌리지-않는-선">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-완료-정의와-되돌리지-않는-선">9. 완료 정의와 되돌리지 않는 선</h2></div>
+<div class="prose"><p>PHASE 3.75 완료는 새 타입이 추가된 상태가 아니다. 아래가 모두 참이어야 한다.</p>
+<ol>
+<li>전체 corpus와 저장된 모든 scene/prefab/material 참조가 새 UUIDv8 epoch만 사용한다.</li>
+<li>sidecar/cooked/catalog가 generation 단위로 원자 게시된다.</li>
+<li>모든 제품 소비자가 새 aggregate를 직접 사용한다.</li>
+<li>SU와 Gunner 긴급 자산이 cold load·reimport·양 backend에서 통과한다.</li>
+<li>Assimp, legacy 모델 타입/cache, 역브리지, A/B switch, silent fallback이 제품에서 0건이다.</li>
+<li>정적 검사, 빌드, runtime, 성능 검증을 각각 통과하고 결과 artifact를 보존한다.
+성능 검증은 §8.4 개정판을 뜻한다 — 비교 예산(B1a·B2a·B3·B4·B5)은 통과해야 하고,
+legacy에 대응물이 없는 칸(B1b·B2b·B6)은 archive 대비 비회귀로만 판정하며,
+임베디드 텍스처 디코드(B2c)는 <strong>PHASE 12 T1a/T2</strong>가 완료선을 소유한다.
+이관은 면제가 아니다 — 모델별 값이 archive에 남아 회귀하면 이 게이트가 붉어진다.</li>
+</ol>
+<p><code>MBC11</code> cutover가 승인된 뒤에는 legacy GUID 복원, runtime mapping, Assimp fallback, experiment
+on/off를 복구 경로로 사용하지 않는다. rollback은 이전 release 전체로 되돌리는 배포 결정이며,
+새 release 안에서 두 자산 체계를 다시 병행시키는 코드 경로가 아니다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-10-변경-이력">
+<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-변경-이력">10. 변경 이력</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>날짜</th><th>변경</th></tr></thead>
+<tbody><tr><td>2026-09-04</td><td><strong>MBC11 완료 — cutover. PHASE 3.75 종료.</strong> 2026-09-03에 붉었던 B1·B2의 원인이 성능 회귀가 아니라 <strong>축 불일치</strong>였다는 것을 단계 분해가 보였고, 사용자 결정으로 §8.4의 축을 재유도했다(기준선 §4.4a). 비교 예산은 같은 일끼리만 판정하고(B1a 소스 디코드 · B2a CEMC 읽기/디코드/조립 — <strong>각각 14/14 통과</strong>), legacy에 대응물이 없는 칸은 archive 비회귀로 보고(B1b 저작 트랜잭션 · B2b 신원·epoch·SHA 검증 · B6 frame/VRAM), 임베디드 텍스처 디코드(B2c)는 <strong>PHASE 12 T1a/T2로 이관</strong>했다 — cook artifact가 디코드 완료 형식이 되면 사라지는 비용이고 그 포맷은 그 페이즈의 소유라 여기서 만들면 T1a가 다시 정의할 포맷이 하나 더 생긴다. 이관은 면제가 아니다: 모델별 값이 <code>mbc11_perf_archive.json</code>에 남아 회귀하면 게이트가 붉어진다. 판정 전에 3.75가 소유한 낭비를 걷었다 — ① corpus collision 검사의 sidecar 파싱을 <code>(크기, mtime)</code> 지문으로 캐시(순회와 epoch 폐포 재검증은 남긴다), ② 게시 직전 source 전량 재해시를 <code>(크기, mtime)</code> 대조 우선으로(다르면 옛 방식대로 재해시). <code>corpus-collision-scan</code> 평균 6.93 → 3.92 ms, <code>publish</code> 14모델 합계 302.6 → 48.1 ms(scene 212.9 → 2.8). ①의 착수 가정은 절반 틀렸다 — 남은 4 ms는 파싱이 아니라 asset root 전체 순회이고, 순회를 캐시하면 새 sidecar를 놓쳐 충돌 검사가 눈멀므로 남겼다. 로드 경로에서는 <code>cemc-read</code>와 <code>cemc-sha</code>를 갈라 &quot;읽기는 비교 대상이고 해시는 아니다&quot;를 수치로 보이게 했다. 후보 ④(SHA 가속)는 이 기준선 장비에서 답이 아니다 — <strong>Xeon W-2223(Cascade Lake-W)에 SHA-NI가 없다</strong>(기준선 §4.4a). 게이트는 어느 칸이라도 붉은 실행을 archive로 굳히지 않는다. 재측정 전량과 before/after는 <a href="ModelAssetBigBangCutoverBaseline.html">기준선 §4.6</a>. 모델·cook 게이트 11종(authoring-transaction·asset-identity·corpus-v8·corpus-v8-cutover·asset-generation·cutover-freeze·scene-consumption·typed-consumers·experiment-asset-cooker·experiment-cooked-catalog·experiment-model-cook-all) 전부 초록 — <strong>Debug/Release AssetCooker와 Debug/Release Editor를 다시 빌드한 뒤</strong>의 값이다. 처음 초록은 2026-09-03자 AssetCooker를 재고 있었다(모델 게이트 6종의 기준 바이너리가 <code>Bin/x64-Debug/Tools/AssetCooker</code>다). 그 재실행에서 <code>verify-experiment-asset-cooker</code>가 붉었는데 이 페이즈와 무관한 선행 결함이었다 — <code>GBuffer.shadermeta</code>의 <code>source:</code>가 <code>.hlsl</code>에서 <code>.slang</code>으로 옮겨간 커밋(<code>5ac55b17</code>) 뒤로 fixture가 옛 이름을 하드코딩해 복사하고 있었다. 이름을 문서의 <code>source:</code> 줄에서 유도하도록 고쳐 초록 복귀</td></tr>
+<tr><td>2026-09-03</td><td><strong>MBC11 검증 완료 — cutover 보류.</strong> cook 경로를 하나로 만들었다: <code>ModelGenerationExportProducer</code>(namespace <code>experiment::cooked</code>)가 v2 sidecar → 게시된 generation을 런타임 리더로 검증한 뒤 generation 디렉터리 전체를 <code>Derived/Models/&lt;xx&gt;/&lt;ModelId&gt;/&lt;gen&gt;/</code>로 내보내고 kind Model(record, formatVersion 1)·Material·Texture(<code>textures/&lt;id&gt;.png</code>)·Mesh(record 경로) manifest 항목을 낸다. AssetCooker는 <code>--generation-root</code>(기본 <code>&lt;asset-root&gt;/../Library/ModelAssetGenerations</code>)·identity header를 받고, 폐포 sweep이 Model 레코드 디렉터리 안 파일을 폐포로 세며, 260자 경계는 <code>LongPath</code>로, WIC는 <code>CoInitializeEx</code>로 연다. manifest·source identity가 UUIDv8을 받는다(<code>IsCookedAssetId</code>). <code>ModelCookProducer</code>·v1 sidecar 리더 삭제. <code>DataSystem::LoadModelAssetGeneration</code>은 cooked catalog(<code>ResolveCookedArtifact</code> → generation.asset) → Library 순으로 해석하고 출처 계수(<code>generationFromCatalog/FromLibrary/LoadFailed</code>)를 <code>assets.modeldiag</code>에 낸다. <code>verify-experiment-cooked-catalog</code>(mounted 8/0·stale·unmounted 0/8)·<code>verify-experiment-asset-cooker</code>(UUIDv8·relocation) GREEN 복귀. 계측 공백을 닫았다: `assets.modelbench <dir> N [cooked</td></tr>
+<tr><td>2026-09-03</td><td><strong>MBC10 완료.</strong> 제품 경로의 무조건 stdout 진단(<code>[mesh.resolve]</code>·<code>[model.instantiate]</code>·<code>[anim.tick]</code>)을 걷고 <code>Engine/SceneRuntime/ModelConsumptionDiagnostics</code>(원자 계수, 리셋 없음)로 대체했다 — 읽기 전용 <code>assets.modeldiag</code>가 <code>meshResolveGeneration/meshResolveFailed/instantiateGeneration/instantiateRejected/tickGeneration/tickNone/lastInstantiated</code>를 낸다. <code>experiment.animlive</code>는 더 이상 <code>Scene::PublishAnimatorPose</code>를 부르지 않고(상태 변경) 제품 barrier(AnimationJob)가 남긴 마지막 메트릭 스냅샷 <code>Scene::TryGetLastAnimatorPoseMetrics</code>를 읽는다(<code>source=product</code>). <code>verify-mbc-cutover-freeze</code>에 §5.2/§8.2 하드 계약을 더했다: 제거 표면 12종 하드 0·vcpkg assimp 0, <code>m_hashingMesh</code> 절차 지오메트리 허용목록 10파일 밖 0, 제품 소비자(SceneRuntime·Render·PrimitiveRenderProxy·EngineGUIWindow)의 <code>experiment::Model</code>/<code>TryGetMesh</code> 0, generation 게시 진입점 DataSystem 하나, animlive 읽기 전용·<code>assets.modeldiag</code> 존재. typed-consumers·scene-consumption·drop-animation·skin-pose-visual이 스냅샷 파싱으로 전환됐고 제품 stdout 토큰 재유입을 단정한다. §8.2 전항·§8.3 전항을 게이트 근거와 함께 체크했다(§8.4 성능 예산은 MBC11)</td></tr>
+<tr><td>2026-09-03</td><td><strong>MBC9 완료.</strong> legacy 모델 타입·로더(<code>Model</code>·<code>ModelLoader</code>·<code>SkeletonLoader</code>·<code>AnimationLoader</code>·<code>Skeleton</code>·<code>Animation</code>·<code>AnimatorData</code>·<code>ModelAssetFormat</code>)와 역브리지 TU(<code>ExperimentModelMigration.cpp</code> — <code>BuildLegacyModelFromExperiment</code>·<code>LoadModelViaExperiment</code>·<code>CREATOR_EXPERIMENT_VERTEX</code>·병행 바인딩 맵)·<code>ModelSceneBridge.cpp</code>·Assimp include 10건/vcpkg port를 물리 삭제했다. cooked catalog 함수는 <code>DataSystem.cpp</code>로 이주. RHI는 <code>GetOrUploadModel</code>(typed)과 절차 지오메트리용 <code>GetOrUpload(Mesh*)</code> 둘만 남고 <code>RHIExperimentVertexView</code>·<code>GetOrUploadExperiment</code>·lookup 주입·experiment 계수가 사라졌다(<code>EnhancedDrawItem::experimentView</code>·<code>experimentSource</code>·와이어프레임 배치 키 → <code>geometryKey</code>). 컴포넌트는 <code>MeshRenderer::m_Mesh</code>(리플렉션 골든 갱신)·<code>m_experimentModel</code>·<code>EnsureExperimentBinding</code>, <code>Animator::m_Skeleton</code>·<code>m_experimentModel</code>·<code>EnsureExperimentAnimationBinding</code>(→ <code>EnsureAnimationBinding</code>), <code>FoliageType::m_mesh</code>·<code>m_experimentModel</code>(→ 이름 → generation 바인딩), <code>AvatarMask::MakeBoneMask(Bone*)</code>가 은퇴했고 <code>AnimatorDataPath</code>는 <code>{None, Generation}</code>이다. 씬 인스턴스화는 <code>ModelSceneInstantiation::Instantiate(scene, generation, options)</code>(sidecar <code>ModelImporter.CreateMeshCollider</code> → <code>DataSystem::ReadModelCreateMeshCollider</code>)로, 에디터 드롭/undo 커맨드·<code>model.load/loadcached/place</code>·<code>App</code> 드롭·에셋 번들 창(<code>SnapshotCurrentModelAssetGenerations</code>)·리소스 카운터가 여기에 붙었다. <code>BoneRegion.h</code>가 <code>BoneRegion</code>·<code>ToLower</code>·<code>MAX_BONES</code>를 승계한다. 진단은 legacy/experiment 축을 걷고 typed 단일 축으로 재단(boneresolve/animmask/editorsurface/foliage/skinbounds — packed 정점을 <code>ModelVertexLayout</code> 표로 디코드/animevent/animlive/animtick), <code>experiment.model/modelbridge/anim/phase17model/import/gltf/fbx/embedded/bench/meshbounds</code>와 parity selftest 6쌍이 죽었다. dx12/vulkan <code>scene.glb</code> 16MiB 슬라이스와 기즈모 하네스는 <code>LoadModelAssetGenerationByPath</code>+<code>RHIModelMeshView</code>로, <code>scene.transformbulk</code> 프로브는 합성 Skeleton 대신 Gunner/SU generation rebind로 전환. 게이트: 동결 래칫 제거 표면 전부 0 재기준(<code>m_hashingMesh</code> 10은 비모델 절차 지오메트리 키), <code>verify-legacy-skeleton-retirement</code> 0-래칫(잔존 2 = 구 씬 YAML 키 문자열), <code>verify-model-typed-consumers</code>(스위치 없음·legacy 파일 부재·Assimp 0)·<code>verify-model-scene-consumption</code>(<code>unbound=0</code>·업로드 총계==generation)·<code>verify-editor-drop-animation</code> 갱신, <code>verify-experiment-vertex-live</code>·<code>verify-phase17-local-model-corpus</code> 은퇴</td></tr>
+<tr><td>2026-09-03</td><td><strong>MBC8 완료.</strong> Animator가 <code>ModelAssetGeneration</code>을 붙들고 재생·본 해석·신원·클립·마스크가 typed 첫 축(Generation → Experiment → Legacy). <code>Assets/ModelAnimationSampler</code> typed 샘플러 + <code>AnimationJob</code> 틱 뷰 템플릿 단일화 — experiment 골든 <code>poseDigest=8042DC1C</code> 비트 동일, 스위치 off에서도 동일(재생의 스위치 의존 은퇴). Foliage <code>m_modelGeneration</code> typed 뷰·closure 텍스처, 인스펙터 typed read-only 블록, cook 씬 참조 스캔·재질 texture GUID 파서 v8 수용(MBC7 저장 씬이 <code>scene.reference</code>에서 거부되던 자리). Collider는 지오메트리 미소비(PHASE 19)·CLR은 이름 API뿐이라 이관 대상 없음을 실측으로 확정. 진단 6종에 <code>generation</code> 축, 신설 <code>verify-model-typed-consumers</code>, vertex-live·drop-animation typed 축 갱신</td></tr>
+<tr><td>2026-09-03</td><td><strong>MBC7 완료.</strong> <code>MeshRenderer</code>가 <code>ModelAssetGeneration</code> handle과 영속 <code>m_meshAssetId</code>(UUIDv8 MeshId)를 붙들고 프록시→drawPool이 <code>RHIModelMeshView</code>를 채운다(MBC6이 비워 둔 자리). 씬 배치는 generation 직행이 정본, 재질은 generation material에서 시공, embedded texture owner는 <code>ResolveModelGenerationTexture</code> closure 캐시({TextureId, generation}, generation 단위 retire)에서 온다 — 등록부·이름 폴백·로드 순서 의존 제거(§6.2). 실측 결함 셋을 고쳤다: 이름 역해석이 v8 신원을 v4 PNG GUID로 덮던 저장 경로, 재질 코덕 reader의 v4 전용 파서(writer는 v8을 적고 있었다), v1 sidecar 리더의 v2 거부로 legacy 재질이 embedded GUID를 잃던 경로. 게이트 <code>verify-model-scene-consumption</code>: FT_Primitives+Gunner renderer 10/10 typed, Gunner 6/6 closure(등록부 0), 콜드 재로드 동일, reimport 재사용 0/retire 6, 실GPU 업로드 10/10 typed. vertex-live·drop-animation은 typed 축 수용으로 갱신, MBC3~MBC7 게이트 6종 run-all 편입, reflect 골든은 <code>m_meshAssetId</code> 한 줄만 달라 재생성</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC6 완료.</strong> <code>ModelVertexLayout</code>을 Assets 정본으로 승격하고 core/color/skin/color+skin 네 전체 mask를 input layout·shader permutation·PSO key에 그대로 사용한다. <code>RHIModelMeshView</code>가 <code>{ModelId,MeshId,generation}</code>과 generation upload descriptor를 검증하며 DX12/Vulkan mesh cache와 GBuffer/Forward/Shadow가 이를 최우선 소비한다. Shadow는 pass-consumed attribute를 전체 layout과 분리하되 bone offset을 원본 mask에서 유도하고, Forward는 t12 palette와 instance bone offset으로 실제 skin pose를 계산한다. SU는 mask 247, stride 84, bone 64/68을 만족한다. <code>verify-model-render-wiring</code>이 CPU 4-mask·corpus 14/14와 DX12/Vulkan GBuffer typed upload 1/1, DX12 skinning, Vulkan Shadow/GBuffer/Forward 실실행, Vulkan validation 0을 Debug/Release에서 통과했다. Scene/MeshRenderer typed view 공급은 MBC7, legacy upload arm 삭제는 MBC9로 남는다</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC5 완료.</strong> <code>ModelAssetGeneration</code> immutable aggregate와 <code>{ModelId,generation}</code> cache, <code>{ModelId,MeshId,generation}</code> handle, atomic publish/replace/retire 및 read-only snapshot을 추가하고 <code>DataSystem</code> schema v2 catalog와 load/reload/remove/finalize에 연결했다. canonical sidecar·generation record·CEMC·embedded texture SHA-256과 subasset closure를 게시 전에 검증한다. 실 corpus cold-load가 <code>Cha_Mon_5.fbx</code>의 animation-only derived skeleton inventory 누락을 잡아 writer에 신규 UUIDv8 skeleton 발급과 sidecar↔ModelDraft 수 검산을 추가했다. 현재 model 14/14, subasset 310, UUIDv8 identity 324, mesh 130/material 52/texture 96/skeleton 4/animation 28/descriptor 356이다. generation 1→2·변조 4종·stale/collision·retire gate를 Debug/Release에서 통과했고 identity 184, sidecar 85, MBC3/MBC4/freeze, Debug/Release AssetCooker·CreatorEditor도 통과했다. legacy adapter/소비자 제거는 MBC6~MBC9 범위로 남는다</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC4 완료.</strong> <code>Invoke-ModelAssetV8Cutover</code> one-shot offline transaction과 <code>AssetCooker --issue-model-identity-epoch</code>을 추가했다. 실제 corpus에 <code>2026-09-model-bigbang</code> epoch를 발급하고 model 14/subasset 309/UUIDv8 identity 323/cooked generation 14를 게시했으며 <code>FT_Primitives.creator</code>의 legacy model 참조 8건을 새 ModelId로 rewrite했다. old model/subasset identity 68개는 migration 메모리에서만 사용하고 게시 mapping/alias는 만들지 않았다. 결과는 old 저장 참조 0, source 변조 0, UUID 충돌 0이다. 실패 주입은 generation·sidecar를 게시한 뒤에도 전체 원본 snapshot을 복구했고, 합성 material/texture 참조와 epoch overwrite 거부를 함께 검증했다. PHASE 17 Strict는 비모델 v4 212/model v8 14/subasset v8 309 혼합 계약으로 갱신했고 구 experiment 전수 cook 진입점은 v2 generation gate로 전환했다. Debug/Release AssetCooker·CreatorEditor 빌드와 identity/sidecar/MBC3/MBC4/freeze 게이트를 통과했다</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC3 완료.</strong> <code>ModelAssetAuthoringTransaction</code>을 정식 Assets 계층에 추가해 프로젝트 단위 writer lock, source/import·stable-key·UUIDv8 corpus 검사, schema v2+CEMC+embedded texture+generation record staging/재판독, generation 우선 rename·canonical sidecar 최종 commit/rollback을 구현했다. Editor create/modify/move/import와 AssetCooker를 단일 API에 연결하고 <code>ModelIdentityRefresher</code> pseudo-v5-as-v4를 삭제했다. glTF <code>extras.creatorEngineId</code>를 mesh/material/image/skin/animation stable key 입력으로 전달한다. Prim_Cube 복제본 generation 1→2, UUIDv8 4개 유지, 실패 주입 5단계 delta 0, collision 거부, Debug/Release AssetCooker·CreatorEditor와 identity 184·sidecar 84 단정을 통과했다. 실제 corpus와 참조 rewrite는 MBC4로 남겼고, legacy 전수 cook 게이트의 <code>scene.glb.meta</code> v1 closure RED도 MBC4 진입 차단점으로 기록했다</td></tr>
+<tr><td>2026-09-02</td><td>신설. 구 PHASE 4 I/V experiment 배선을 PHASE 3.75 단방향 cutover로 대체. 기존 GUID 비승계, UUIDv8+SHA-256 profile, schema v2 원자 writer, <code>ModelAssetGeneration</code>, SU/Gunner 폐쇄 조건, legacy/A-B/Assimp 제거, 60일 공수와 게이트를 확정</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC0 완료.</strong> 동결 래칫 게이트(표면 15·하드 계약 3), corpus 14/참조 28 분류(모델 참조 8·subasset 참조 <strong>0</strong>·고아 11), Prim sidecar 8개 손상의 원인 경로(워처 Delete 오독 → <code>CreateMetaLocked</code> 재발급) 실측, Release 기준선·예산 B1~B6 고정. 미커밋 폴백 덧대기(MeshRenderer 순서 해킹·<code>[material.finalize]</code>)와 손상 sidecar는 stash로 걷어냈다. <strong>계측 공백</strong>: 새 경로 cooked 읽기·frame CPU/GPU·peak VRAM은 CLI가 없어 MBC11 전에 세워야 한다</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC2 완료.</strong> epoch header(<code>ProjectSetting/AssetIdentity.asset</code>, CSPRNG 256-bit), stable key 문법·규칙 엔진(semantic/authoring, 지문 재결합, 모호성=고아 prior+새 지문 동시), sidecar v2 코덱(왕복·다른 키 보존·legacy guid 제거·v1/ordinal 거부)·폐포 검증(재유도·registry bijection). 실자산 14 모델 임포트→배정→v2→폐포 통과, 전 corpus registry 309 충돌 0, 같은 입력 재배정 동일 신원. 첫 규칙은 scene.glb의 동일 지오메트리 무명 메시에서 변경 없는 재임포트를 거부했다 — 지문 그룹 안 binding 순 짝짓기로 정련. 디스크 쓰기 없음(원본 해시 전후 동일 게이트). §3.1에 확정 사항 기록</td></tr>
+<tr><td>2026-09-02</td><td><strong>MBC1 완료.</strong> §2 바이트 계약을 <code>assets::DeriveIdentity</code>로 구현(헤더 온리 SHA-256, UTF-8 well-formed·NFC fail-closed, 길이 접두 U32BE, v8/variant bit), 계층 <code>DeriveModelId</code>/<code>DeriveSubAssetId</code>(legacy v4 namespace는 값에서 거부), <code>IdentityRegistry</code>(DuplicateTuple/UuidCollision/RecomputeMismatch, canonical tuple = 입력 바이트열). test vector 15건은 Python 독립 유도로 생성하고 .NET이 3차 검산. <strong>변이 검증</strong>: 길이 접두를 LE로 바꾼 제품 빌드에서 게이트 RED(단정 86 실패), 되돌리면 GREEN. pseudo-v5-as-v4 접촉 2+1은 MBC3에서 0으로 내려 래칫을 갱신했다</td></tr>
+<tr><td>2026-09-02</td><td><strong>PHASE 17 동기화 충돌 해소.</strong> 코드 충돌 2곳(Console 명령 등록, SerializationPlan)을 병합하고, yaml-cpp 은퇴와 충돌한 MBC2 epoch/sidecar 코덱을 ryml 저작 문서 경계로 이식했다. PHASE 17 D2의 UUIDv4 방향은 역사·MBC4 입력 기준선으로 강등하고 최종 identity authority를 이 문서의 UUIDv8로 단일화했다. 현재 디스크 sidecar 226개는 여전히 UUIDv4이므로 실제 corpus cutover는 MBC3~MBC4 미완료로 유지</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ModelAssetBigBangCutoverPlan.md"><code>docs/plans/archive/ModelAssetBigBangCutoverPlan.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/archive/MaterialPipelinePlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>머테리얼 · 셰이더 파이프라인 재설계 (PHASE 3.5)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0--이-문서가-하루도-못-가-낡았다-2026-08-11-정정">0. ★ 이 문서가 하루도 못 가 낡았다 (2026-08-11 정정)</a></li><li><a href="#1-지금-무엇이-있는가--측정">1. 지금 무엇이 있는가 — 측정</a></li><li><a href="#2-무엇을-하려는가">2. 무엇을 하려는가</a></li><li><a href="#3-설계">3. 설계</a></li><li><a href="#4-이행--슬라이스">4. 이행 — 슬라이스</a></li><li><a href="#5-완료-기준">5. 완료 기준</a></li><li><a href="#6-리스크">6. 리스크</a></li><li><a href="#7-다른-계획과의-관계">7. 다른 계획과의 관계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/archive/</span><a href="MaterialPipelinePlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">보관 계획</p>
+<h1>머테리얼 · 셰이더 파이프라인 재설계 (PHASE 3.5)</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">5<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 2, 진행·부분 2, 차단·중단 1"><i class="ok" style="flex:2"></i><i class="info" style="flex:2"></i><i class="risk" style="flex:1"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 2</span><span class="chip info">진행·부분 2</span><span class="chip risk">차단·중단 1</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 8개의 분량 막대">
+<a class="map-row" href="#0--이-문서가-하루도-못-가-낡았다-2026-08-11-정정"><span class="ve-label">§0</span><span class="map-name">★ 이 문서가 하루도 못 가 낡았다 (2026-08-11 정정)</span><span class="map-bar"><i style="width:15.4%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">2</span> <span class="chip info" title="진행·부분">2</span> <span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#1-지금-무엇이-있는가--측정"><span class="ve-label">§1</span><span class="map-name">지금 무엇이 있는가 — 측정</span><span class="map-bar"><i style="width:7.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-무엇을-하려는가"><span class="ve-label">§2</span><span class="map-name">무엇을 하려는가</span><span class="map-bar"><i style="width:2.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-설계"><span class="ve-label">§3</span><span class="map-name">설계</span><span class="map-bar"><i style="width:12.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-이행--슬라이스"><span class="ve-label">§4</span><span class="map-name">이행 — 슬라이스</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-완료-기준"><span class="ve-label">§5</span><span class="map-name">완료 기준</span><span class="map-bar"><i style="width:2.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-리스크"><span class="ve-label">§6</span><span class="map-name">리스크</span><span class="map-bar"><i style="width:1.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-다른-계획과의-관계"><span class="ve-label">§7</span><span class="map-name">다른 계획과의 관계</span><span class="map-bar"><i style="width:2.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 8개 가운데 「4. 이행 — 슬라이스」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>보관 · 완료 (정리: 2026-09-06).</strong> PHASE 3.5 M0~M7 종료. 현재 PBR 배선 수정은 PHASE 4, Material Graph는 PHASE 4.25에서 진행한다.
+<a href="README.html">보관 색인</a> · <a href="../../RefactoringPlanDashboard.html#doc-index">활성 계획과 대시보드</a></p>
+</blockquote>
+<p>2026-08-11 작성, 2026-08-27 모델 임포트 교차 배선 재감사. Vulkan 골격
+(vk.selftest)이 선 직후 작성. RhiBoundaryPlan §7.2가 다음
+슬라이스로 V5(셰이더 컴파일 93건)·V6(파이프라인 상태 기술 107건)를 지목하는데,
+그 둘에 착수하기 전에 <strong>그 인터페이스를 섬길 소비자 — 머테리얼·셰이더 애셋
+파이프라인 — 의 모양을 먼저 정한다.</strong> 구 RHI가 죽은 이유가 &quot;소비자 없는
+추상&quot;이었고(RhiBoundaryPlan §1.1), V5를 지금 모양의 셰이더 시스템에 맞춰 자르면
+같은 실수를 반복한다. 목표 사슬:</p>
+<pre><code>Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
+        → 셰이더 퍼뮤테이션 → HLSL 소스 → Slang 컴파일러 → DXIL | SPIR-V</code></pre>
+<hr>
+</section>
+<section class="doc-sec" id="sec-0--이-문서가-하루도-못-가-낡았다-2026-08-11-정정">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0--이-문서가-하루도-못-가-낡았다-2026-08-11-정정">0. ★ 이 문서가 하루도 못 가 낡았다 (2026-08-11 정정)</h2></div>
+<div class="prose"><p>작성 직후 확인해 보니 <strong>§1의 전제 절반이 이미 사실이 아니었다.</strong> 계획을 쓰는
+동안 같은 트리에서 두 커밋이 나갔고, 그것이 M0와 M4의 대부분을 실행했다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>커밋</th><th>한 일</th><th>이 문서에 미친 것</th></tr></thead>
+<tbody><tr><td><code>cc12ba4f</code> 02:56</td><td>패스 24곳의 인라인 HLSL 45블록(3,792줄)을 파일로. <code>RHIShaderSource</code>(중립 읽기) / <code>DX12ShaderCompiler</code>(백엔드 컴파일) 분리</td><td><strong>M4 후반 완료 · M1 골격 완료</strong></td></tr>
+<tr><td><code>24e784ce</code> 02:56</td><td>옛 셰이더 시스템 폐기 — 소스 17파일 · 자산 136파일 · 약 14,800줄</td><td><span class="chip ok"><strong>M0 완료(범위 초과)</strong></span></td></tr>
+<tr><td><code>1ab3d12b</code> 07:42</td><td>V5 범위 재측정 93 → 66, 성격 변경</td><td>§1.4 · §4 M1 수치 무효</td></tr>
+<tr><td><code>a253a22d</code> 07:49</td><td>자가 검증 기준선 33종 → 35종</td><td>§4 판정 문구 무효</td></tr>
+<tr><td>2026-08-16 M1A 수직 슬라이스</td><td><code>IRHIShaderCompiler</code> + 단일 DXC DXIL/SPIR-V 구현 + transitive include 콘텐츠 캐시. 구 DX12/Vulkan 컴파일러 제거</td><td><span class="chip ok"><strong>중립 서비스 기준선 완료</strong></span></td></tr>
+<tr><td>2026-08-24 Slang 전환 평가</td><td>현재 HLSL 52파일은 런타임 define 반영 시 Slang 프런트엔드 52/52 통과. GBuffer·Forward Cull·SSAO·SSGI·Shadow·IBL 대표 8변형은 DXIL/SPIR-V 16/16 코드 생성</td><td><strong>M1B로 컴파일러 백엔드 전환. 전면 언어 재작성은 하지 않음</strong></td></tr></tbody></table></div>
+<p><strong>가장 크게 틀린 것은 §1.1의 골자다 — &quot;컴파일 시스템이 둘&quot;은 이제 거짓이고,
+하나다.</strong> 애셋 경로(<code>ShaderSystem</code>·<code>ShaderPSO</code>·<code>ShaderDSL</code>·<code>VisualShader*</code>·
+<code>HLSLCompiler</code>·<code>Shader.h</code>·<code>PSO</code>·<code>ShaderSelectionWindow</code> + <code>.hlsl</code> 113 ·
+<code>.hlsli</code> 11 · <code>.shader</code> 12)가 통째로 사라졌다. 폐기 근거는 이 문서 §1.1이
+적은 것과 같다(그림에 닿지 않는다). 즉 <strong>결론은 맞았고 그 결론에 따른 실행이
+계획보다 먼저 도착했다.</strong></p>
+<p>아래 §1은 정정하되 원문의 판단은 남긴다 — 무엇을 보고 이 페이즈를 세웠는지가
+근거이기 때문이다. 갱신된 현재 위치는 §1.0에 따로 적는다.</p>
+<h3 id="10-지금-실제-위치-2026-08-24-재실측">1.0 지금 실제 위치 (2026-08-24 재실측)</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>값</th><th>판정</th></tr></thead>
+<tbody><tr><td>셰이더 컴파일 시스템</td><td><strong>1개</strong>(<code>RHIShaderCompiler</code>)</td><td><code>IRHIShaderCompiler</code> 뒤 단일 Slang 구현</td></tr>
+<tr><td>목표 컴파일러</td><td><strong>Slang 2026.14, 이관 완료</strong></td><td>M1B가 인터페이스·패스 호출부를 유지한 채 구현·배포를 교체</td></tr>
+<tr><td><code>D3DCompile</code> 호출 지점</td><td><strong>0곳</strong></td><td>FXC 은퇴 · 구 DX12/Vulkan 컴파일러 소스 제거</td></tr>
+<tr><td>패스의 <code>D3DCompile</code></td><td><span class="chip info"><strong>0건</strong> (착수 전 19)</span></td><td>〃</td></tr>
+<tr><td>컴파일 헬퍼</td><td><span class="chip info"><strong>1개</strong> (착수 전 22)</span></td><td>오류에 파일·엔트리·타깃이 항상 붙는다</td></tr>
+<tr><td>HLSL 소스</td><td><code>Assets/Shaders/DefaultPassShader/</code> 루트 <strong>38</strong> + <code>SelfTest/</code> <strong>11</strong> = <strong>49</strong></td><td>파일이다(문자열 아님), <code>#include</code> 가능</td></tr>
+<tr><td><code>D3DReflect</code></td><td class="num"><strong>0건</strong></td><td><span class="chip risk">리플렉션 몫은 폐기와 함께 소멸</span></td></tr>
+<tr><td>컴파일 결과의 <code>ID3DBlob</code></td><td class="num"><strong>0</strong></td><td><code>RHIShaderBlob</code> 소유 바이트로 이관 완료</td></tr>
+<tr><td><code>D3D_SHADER_MACRO</code> · <code>RHIShaderDefine</code></td><td><strong>0 · 0</strong></td><td>M2A가 4패스의 손 배열 6그룹을 소유형 <code>RHIShaderPermutation</code>으로 대체</td></tr>
+<tr><td>코드 기반 퍼뮤테이션</td><td><strong>4패스 · 6그룹</strong></td><td>Shadow 1 · Forward 2 · SSAO 2 · SSGI 1, 정렬된 name/value와 128-bit key가 컴파일·캐시 정체성</td></tr>
+<tr><td><code>.shadermeta</code></td><td><strong>schema v1 · strict YAML loader</strong></td><td>property·keyword·pass/stage·RHI state·queue를 소유, catalog GUID를 재사용하고 별도 전역 registry는 없음</td></tr>
+<tr><td><code>.cso</code> · 읽는 코드</td><td><strong>0 · 0</strong></td><td>정리됨</td></tr>
+<tr><td><code>.meta</code> 고아</td><td class="num">129</td><td><strong>손댈 것 없음</strong> — git 미추적(<code>.gitignore:465</code>)이고 <code>DataSystem</code> 초기화의 <code>ScanAndCleanupInvalidMeta</code>가 다음 실행에서 지운다(호출자 확인: <code>DataSystem.cpp:96,98</code>)</td></tr>
+<tr><td><code>Material::TrySetValue</code> 계열</td><td><strong>M5-A에서 재가동</strong></td><td><code>ConfigureShaderProperties</code>가 M7 소유 layout을 붙인 뒤 타입 검증된 논리 값과 CB byte view를 함께 갱신한다. 미구성 legacy material은 계속 fail-closed다</td></tr></tbody></table></div>
+<h3 id="101-slang-전환-결정-2026-08-24">1.0.1 Slang 전환 결정 (2026-08-24)</h3>
+<ul>
+<li><strong>1차 목표는 언어 이사가 아니라 컴파일러 백엔드 교체다.</strong> <code>.hlsl</code>·명시적
+<code>register(...)</code>·현재 Vulkan <code>b/t/u/s</code> 시프트를 그대로 두고, <code>IRHIShaderCompiler</code>
+구현만 Slang API로 옮긴다. <code>.slang</code> 일괄 개명·모듈화·자동 바인딩은
+동일 슬라이스에서 하지 않는다.</li>
+<li><strong>검증용 이중 컴파일은 한시적 도구일 뿐이다.</strong> DXC와 Slang을 영구히 런타임
+선택지로 남기지 않는다. 전수 산출·바인딩·픽셀 동등성이 닫히면 제품
+경로는 Slang 하나로 전환한다.</li>
+<li><strong><code>.shadermeta</code>가 저작 스키마의 정본이다.</strong> 프로퍼티 기본값·에디터 라벨·키워드
+축·패스·렌더 상태는 Slang reflection으로 유출하지 않는다. reflection은
+스키마와 실제 cbuffer·리소스 바인딩을 대조하는 컴파일 산출물이다.</li>
+<li><strong>배포는 설치된 Vulkan SDK에 기대지 않는다.</strong> 선택한 Slang 릴리스의
+헤더·<code>slang-compiler.dll</code>·라이선스·DXIL 산출에 필요한 구성을 하나의
+<code>ThirdParty/Slang</code> 번들로 고정한다. 캐시 identity에는 그 정확한 버전을 넣는다.</li>
+<li>위 52/52·16/16은 <strong>소스 호환성 프로브</strong>다. 전체 엔진 빌드·DX12/Vulkan 실행·
+reflection 동등성·픽셀 회귀를 통과한 구현 완료 증거로 쓰지 않는다.</li>
+</ul>
+<p>★ <strong>M0에서 &quot;죽은 사슬을 지우지 않는다&quot;고 한 판단은 유지됐으나 내가 적은
+이유는 틀렸다.</strong> 나는 &quot;<code>.shader</code> 애셋 로드가 아직 그 위에 있다&quot;고 했는데 그
+<code>.shader</code>가 함께 폐기됐다. 실제 이유는 <code>24e784ce</code>가 적은 것이다 — 게임
+스크립트와 C# 인터롭이 부르고, <strong>이것이 다음 셰이더 저작 언어가 다시 물릴
+자리</strong>다. 폐기 범위를 &quot;ShaderPSO 의존&quot;으로 긋고 &quot;이음매&quot;까지 넓히지 않았고,
+넓혔으면 게임 스크립트 프로젝트가 깨졌다. M5-A는 이 API 표면은 보존하되 늘
+널이던 <code>m_cbMeta</code>와 임시 <code>MaterialParameters.h</code>를 제거하고 M7의
+<code>ShaderMetaBindingLayout</code> 소유 복사본에 직접 연결했다.</p>
+<p>★ <strong>소스 파일화가 V5보다 먼저 와야 했다는 것을 놓쳤다.</strong> 이 문서는 M1(컴파일러)
+→ M4(애셋화) 순으로 잡았는데 <code>cc12ba4f</code>가 반대로 갔고 그쪽이 옳다. 문자열은
+런타임 컴파일이 전제인데 Vulkan은 OS가 주는 컴파일러가 없어서, 문자열인 채로
+V5를 하면 <strong>Vulkan에서 성립하지 않는 계약을 중립화하게 된다.</strong></p>
+<h3 id="102-실제-소비modelimport-교차-상태-2026-08-29-재감사">1.0.2 실제 소비·ModelImport 교차 상태 (2026-08-29 재감사)</h3>
+<p>M5의 저장·reflection 구조와 M7의 양 backend 대조 위에 M6-P0의 격리된 숫자 property
+프로브, M6-P1a의 제품 GBuffer 숫자 property 소비, M6-P1b1의 texture generation 소유,
+M6-P1b2a의 texture GUID/register 배선, M6-P1b2b1의 material keyword permutation
+PSO와 M6-P1b2b2의 multi ShaderMeta generation PSO까지 섰다. <code>BuildDrawPool</code>은 최종 draw item에
+<code>Material*</code>를 남기지 않고 ShaderMeta generation·복사된 binding layout·keyword·property bytes와
+네 texture의 property 이름·논리 GUID·reflection register/space·<code>shared_ptr</code> owner를 immutable
+snapshot으로 밀봉한다. GBuffer는 그 전체 내용을 batch key로 삼아 batch별 <code>b2</code>와 texture를
+올린다. Material은 texture generation을 이름 기반 owner vector로 직접 소유하며 P2d-e에서
+public raw view를 제거했다. GT frame packet은 primary와 Host required packet이 참조하는 복수 ShaderMeta generation/value를
+소유하고, 제품 GBuffer는 material별 meta+keyword PSO를 batch 직전에 고른다. M6-P2a는 제품
+Forward draw의 숫자 값과 네 texture generation도 별도 immutable packet으로 밀봉해 raw
+texture 수명 경계를 닫았다. M6-P2b는 별도 <code>forwardShaderMetas</code> frame owner, Standard 48B
+<code>b2</code>, reflection <code>t4..t7</code>, material keyword별 일반/Reference PSO pair를 제품 Forward에 연결하고,
+기존 back-to-front 순서를 보존한 채 인접 호환 draw만 batch한다. M6-P2c는 실제
+<code>ForwardWater</code>·<code>ForwardWind</code> Material의 non-nil <code>m_shaderMetaGuid</code>가 별도 ShaderMeta를 고르게 하고,
+Standard 48B prefix 뒤 대표 custom float 4개를 붙인 64B <code>b2</code>와 기존 <code>t4..t7</code> 계약을 양
+backend에서 관통했다. 당시 Scene/proxy 소유 non-cache Material도 대표 generation을 얻도록
+Water/Wind seed를 frame에 싣던 bridge는 M6-P2d-d의 Host required-asset packet으로 교체됐다.
+M6-P2d-a는 그 대표 재질의 실제 소비자인
+<code>FoliageRenderProxy</code>를 타입별 owning draw source로 펼치고, 한 카메라에서 파생된
+<code>m_isCulled</code> 대신 mesh world bounds를 제품 view별 절두체 판정에 연결했다.
+M6-P2d-b는 <code>Material::m_flowInfo</code> 32B와 producer frame total/delta를 별도 immutable
+flow snapshot으로 밀봉하고 Forward instance upload·Water/Wind 셰이더 소비까지 연결했다.
+M6-P2d-c는 <code>Material</code>의 runtime texture owner와 GBuffer/Forward draw snapshot을 임의
+ShaderMeta property 이름의 vector로 바꾸고 reflection register로 기존 4-slot pass 범위에
+투영한다. M6-P2d-d는 Editor/Player Host가 활성 Scene의 Mesh/Foliage Material owner에서 pass별
+ShaderMeta GUID를 수집해 임의 required-asset packet으로 밀봉하고 고정 Water/Wind seed를 제거했다.
+M6-P2d-e는 제품 frame의 material-cache 전수 스캔 2곳과 draw pool의 legacy field 중복 쓰기를
+제거하고, 외부 호출자 0인 raw <code>Texture*</code> setter 6개·Material raw texture alias 5개·읽는 곳 0인
+<code>m_dirtyCBs</code>를 은퇴했다. <code>ApplyShaderParams</code>도 실행 코드 0건임을 다시 확인했다. 따라서 M6는
+<strong>P0·P1a·P1b1·P1b2a·P1b2b1·P1b2b2·P2a·P2b·P2c·P2d-a·P2d-b·P2d-c·P2d-d·P2d-e 완료,
+제품 배선 완료</strong>다.</p>
+<p>여기서 제품 배선 완료는 <strong>기존 <code>::Material</code>이 제공하던 렌더 계약의 완결</strong>을 뜻한다.
+타입 자체의 장기 존치나 <code>experiment::Material</code> 직접 소비 완료를 뜻하지 않는다.
+새 저작 정본·runtime instance·resolver는 ModelImportPipelinePlan I5-M에서
+<code>experiment::Material</code> 위에 세우고, 기존 <code>::Material</code>에는 전환에 필요한 수정 외의
+새 책임을 추가하지 않는다. I5-M parity 뒤 I6가 legacy <code>::Model</code>/<code>::Material</code>,
+Assimp와 변환 bridge를 함께 퇴역시킨다. 따라서 PHASE 3.5의 완료 상태는 유지하되
+legacy 타입 퇴역 완료로 확대 해석하지 않는다.</p>
+<p>동시에 <code>experiment::Material</code>은 목표 구조를 거의 갖췄지만 변환기의 기본 property
+이름이 M5 정본과 달랐다. 2026-08-27 <code>StandardMaterialProperty.h</code>를 이름 정본으로
+추가해 <code>DataSystem</code>의 legacy GUID 이행과 <code>SceneToModelDraft</code> 기본 매핑을 합쳤다.
+glTF/FBX 게이트는 표준 숫자 property 6개와 underscore 별칭 0건을 검사한다.
+재질별 <code>assetId</code>·<code>shaderAssetId</code>·texture ID가 없으면 cooked 게시를 거부하는 D5-a 계약과,
+모델 sidecar의 저장된 material/embedded texture UUIDv4·재질별 ShaderMeta resolver·CEMF v1
+  GUID manifest를 정의한 D5-b1과 별도 AssetCooker의 단일 <code>Prim_Cube</code> CEMC/CEMF 원자 게시
+  D5-b2a는 완료됐다. D5-b2b1은 model 14개에서 material 52·embedded texture 96 identity를
+  전수 UUIDv4로 재발급하고 CEMC 14 + CEMF 1/entry 66을 결정적으로 cook했다. D5-b2b2는 이를
+  package-base snapshot에서 생성해 <code>AssetPacker</code>/pak에 게시했다. texture/ShaderMeta 등 나머지
+  Derived producer D5-b2c와 experiment 재질의 실제
+  draw 소비는 남아 있다.
+모델 레이아웃 선행 레인은 V2(68B)에 이어 V3(mesh별 packed mask/stride)까지 완료됐다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-지금-무엇이-있는가--측정">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-지금-무엇이-있는가--측정">1. 지금 무엇이 있는가 — 측정</h2></div>
+<div class="prose"><p>★ 아래는 <strong>착수 시점(2026-08-11 오전) 측정이고 §0에서 절반이 갱신됐다.</strong>
+이 페이즈를 세운 근거로 남긴다.</p>
+<h3 id="11-셰이더-컴파일-시스템이-둘이고-화면에-나오는-쪽은-애셋-파이프라인이-아니다">1.1 셰이더 컴파일 시스템이 둘이고, 화면에 나오는 쪽은 애셋 파이프라인이 아니다</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th>소스</th><th>컴파일</th><th>퍼뮤테이션</th><th>화면 도달</th></tr></thead>
+<tbody><tr><td>(a) 애셋</td><td><code>Dynamic_CPP/Assets/Shaders/</code> — <code>.hlsl</code> 114(vs 22 · ps 65 · cs 25 · gs 1) + <code>.hlsli</code> 11 + <code>.shader</code> DSL 12</td><td><code>HLSLCompiler</code>: <code>D3DCompileFromFile</code>, <strong>SM5.0 고정 · 매크로 인자 NULL</strong> (<code>HLSLCompiler.cpp:57-67</code>)</td><td>없음</td><td><strong>못 한다</strong></td></tr>
+<tr><td>(b) 패스 내장</td><td><code>Enhanced*Pass.cpp</code> 안 <strong>C++ 문자열 리터럴</strong> HLSL</td><td><code>D3DCompile</code> 직접 호출 93건 (24파일)</td><td>손 매크로 배열</td><td>이것만 그린다</td></tr></tbody></table></div>
+<p>★ <strong><code>Material::GetShaderPSO()</code>의 렌더 경로 소비자가 0이다</strong> (grep 재확인:
+<code>Material.cpp</code>·<code>ShaderSystem.cpp</code> 자기 참조뿐). 애셋 경로는 데이터가 끝까지
+흐르지만 — DSL 파싱 → <code>ShaderPSO</code> 조립 → cbuffer 리플렉션 → <code>Material</code>이
+값 저장 — <strong>GPU에 올리는 소비자가 없다.</strong> <code>Material.cpp:447-460</code>의 주석도
+&quot;GPU에 올리는 쪽이 없는 상태&quot;라고 자인한다.</p>
+<p>실제 소비 경로는 이것뿐이다:</p>
+<ol>
+<li><code>MeshRenderProxy::m_Material</code> → <code>RenderPassData::PushRenderQueue</code>가
+<strong><code>m_renderingMode</code> 하나만 읽어</strong> deferred/forward 분류 (<code>RenderPassData.cpp:112-133</code>)</li>
+<li><code>EnhancedSceneRenderer::copyQueue</code>가 <strong>텍스처 4장 + PBR 스칼라 4개만</strong> 뽑아
+<code>EnhancedDrawItem</code>으로 축약 (<code>EnhancedSceneRenderer.cpp:2018-2028</code>)</li>
+<li><code>EnhancedGBufferPass</code>/<code>EnhancedForwardPass</code>가 <strong>자기 안에 박힌 고정 HLSL</strong>로
+그린다 (<code>kGBufferShader</code>, 텍스처 슬롯 t0~t3 고정)</li>
+</ol>
+<p>따라서 <code>.shader</code> 애셋 12종(물·바람·플래시 등 게임 커스텀 셰이더)은 구조상
+반영될 수 없다 — 전부 고정 셰이더 폴백으로 그려진다. <strong>커스텀 머테리얼
+셰이더라는 기능 자체가 DX12 전환에서 계승되지 않았고, 이 페이즈가 그것을
+새 구조로 부활시키는 자리다.</strong></p>
+<h3 id="12-퍼뮤테이션은-개념이-없다--필요한-곳마다-손으로">1.2 퍼뮤테이션은 개념이 없다 — 필요한 곳마다 손으로</h3>
+<ul>
+<li>DSL의 <code>Keywords = [...]</code>는 <strong>파싱만 되고 읽는 곳이 0이다</strong> (<code>ShaderDSL.cpp:99</code>
+대입뿐, 소비 grep 0).</li>
+<li>진짜 필요한 곳은 패스마다 재구현한다: <code>SHADOW_SKINNING</code> 두 벌
+(<code>EnhancedShadowPass.cpp:97-107</code>) · <code>REFERENCE_PATH</code> <code>variants[]</code> 루프
+(<code>EnhancedForwardPass.cpp:855-880</code>) · SSAO·SSGI의 <code>D3D_SHADER_MACRO</code> 손 배열.
+variant가 늘수록 패스 코드의 <code>D3DCompile</code> 호출을 하나씩 늘리는 구조다.</li>
+</ul>
+<h3 id="13-렌더스테이트는-애셋-어디에도-없다">1.3 렌더스테이트는 애셋 어디에도 없다</h3>
+<p><code>PSO.h:6-22</code>가 블렌드/래스터/뎁스스텐실 상태 객체를 &quot;호출자 0&quot;으로 걷어냈고,
+지금 유일한 정의처는 **패스 C++ 코드가 채우는 <code>DX12GraphicsPipelineDesc</code>**다
+(D3D12 원시 타입, <code>DX12PSOManager.h:28-183</code>). Material이 가진 상태 어휘는
+<code>MaterialRenderingMode{Opaque, Transparent}</code> 둘뿐 (<code>Material.h:15-20</code>) —
+아티스트가 블렌드·컬·뎁스를 데이터로 바꿀 자리가 없다.</p>
+<h3 id="14-컴파일러가-목적지에-못-간다">1.4 컴파일러가 목적지에 못 간다</h3>
+<ul>
+<li>FXC(<code>D3DCompileFromFile</code>) SM5.0 고정. DXIL도 SPIR-V도 못 낸다.</li>
+<li>include 의존 추적이 없어 <code>.hlsli</code> 하나 바뀌면 <strong><code>.cso</code> 전체를 삭제</strong>한다
+(<code>ShaderSystem.cpp:199-221</code>).</li>
+<li><code>_DEBUG</code> PDB 추출은 <code>pdbPath == csoPath</code>라 PDB가 저장된 적이 없다
+(<code>HLSLCompiler.cpp:78,97</code>).</li>
+<li>Vulkan은 OS가 컴파일러를 주지 않아 SPIR-V 사전 컴파일이 필수이고, <strong>Windows
+SDK의 dxc는 SPIR-V 출력이 꺼져 있다</strong> — DXC 벤더링이 필요하다
+(RhiBoundaryPlan §7.2.2 실측). 이는 착수 시점 판단으로 남기되, 최종 배포
+방향은 §1.0.1의 Slang 번들 결정이 대체한다.</li>
+</ul>
+<h3 id="15-그-밖의-실측--재설계가-밟게-될-자리">1.5 그 밖의 실측 — 재설계가 밟게 될 자리</h3>
+<ul>
+<li><strong>M5 착수 전 직렬화 3계열 공존</strong>: <code>.asset</code> YAML(<code>DataSystem::LoadMaterial</code> /
+<code>EditorAssetDatabase::SaveMaterial</code>) · 씬 임베디드 수동 파싱
+(<code>MeshRenderer::OnDeserialized</code>) · 모델 바이너리(<code>ModelLoader</code>의
+<code>SerializeMaterials</code>/<code>LoadMaterial</code>)였다. M5-B1에서 앞의 둘을 typed reflection +
+<code>DataSystem</code> codec/finalize 경계로 합쳤고, M5-B2에서 모델 바이너리도 같은 payload의
+versioned envelope로 옮겼다. 현재 새 필드의 저장 수정 지점은 <code>Material::reflect()</code>와
+<code>DataSystem</code> codec이며, 무버전 모델 material record는 read-only 호환 경로다.</li>
+<li><strong>텍스처 슬롯 5개 고정 필드</strong> — 이름 문자열+포인터 쌍이 클래스에 박혀 있다
+(<code>Material.h:119-135</code>). 임의 슬롯 추가는 클래스 수정이다.</li>
+<li><strong>M5 착수 전에는 핫리로드 세대 핸들이 없었다</strong>: 당시
+<code>DataSystem::RetireCachedAsset</code>은 legacy raw 소비자를 위해 Model·Material·Texture의
+이전 <code>shared_ptr</code> 세대를 종료까지 전역 retired 목록에 붙들었고,
+<code>FoliageType::m_material</code>도 Model에서 얻은 raw pointer였다. M5-C2/C3가 ShaderMeta·PSO
+generation을 세웠고 C4가 장기 Model/Mesh/Material 소비자를 소유 참조로 바꿨다.
+현재 전역 보존은 raw texture alias가 남은 Texture·UITexture·SpriteSheet 계열에만
+한정한다.</li>
+<li><strong>죽은 코드</strong>: <code>VisualShaderAssets</code> 맵은 대입하는 코드가 0이고, 비주얼 셰이더는
+파서·자료구조만 있고 HLSL codegen이 없다. <code>SpriteRenderProxy::m_customPSO</code>는
+대입만 되고 읽는 그리기 코드가 0.</li>
+<li>RHI 계약(<code>IRHIDeviceResources</code>)에는 셰이더·PSO 개념이 없다 — 디바이스·프레임
+생명주기뿐. PSO 캐시는 DX12 전용 구체 타입으로 노출돼 있다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-무엇을-하려는가">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-무엇을-하려는가">2. 무엇을 하려는가</h2></div>
+<div class="prose"><p><strong>목표</strong>: 머테리얼이 셰이더를 고르고, 셰이더가 자기 패스·상태·키워드를
+선언하고, 퍼뮤테이션이 요청식으로 컴파일되어 DXIL과 SPIR-V 어느 쪽으로든
+나가는 <strong>단일 파이프라인</strong>을 세운다. 지금의 두 시스템((a) 죽은 애셋 경로,
+(b) 재사용 불가 인라인 경로)을 이것 하나로 수렴시킨다.</p>
+<p><strong>왜 지금(3.5)인가</strong> — 셋:</p>
+<ol>
+<li><strong>V5·V6의 인터페이스를 소비자가 정하게 한다.</strong> 컴파일러 호출만
+옮겨 적으면 퍼뮤테이션·캐시·리플렉션 요구가
+나중에 인터페이스를 다시 찢는다.</li>
+<li><strong>PHASE 12.5(빌드 파이프라인)의 셰이더 스텝이 이 파이프라인의 오프라인
+모드다.</strong> 게임 빌드가 셰이더를 미리 굽는 단계는 여기서 정의된 퍼뮤테이션
+전수 컴파일 그 자체다.</li>
+<li><strong>PHASE 10(파티클)·11(지형)이 이 위에 선다.</strong> 그쪽에서 셰이더 경로를 또
+만들면 세 번째 시스템이 생긴다.</li>
+</ol>
+<p><strong>하지 않을 것</strong>:</p>
+<ul>
+<li><strong>비주얼 셰이더 codegen 없음.</strong> 노드 그래프→HLSL 생성은 별건이고, 지금 있는
+스텁(파서만)은 M0에서 은퇴했다. 1차 이관의 소스는 현재 텍스트 HLSL이다.</li>
+<li><strong>파티클·지형·스프라이트 셰이더 없음</strong> — PHASE 10·11의 몫. 이 페이즈의 배선
+대상은 메시 재질 경로(GBuffer·Forward)다.</li>
+<li><strong>HLSL 문법 현대화 강박 없음.</strong> 현재 파일은 Slang HLSL 모드로 산출되는 한
+그대로 둔다. 새 모듈·generic·specialization은 컴파일러 전환 후 가치가
+입증된 축에만 별도 슬라이스로 도입한다.</li>
+<li><strong>M1B에서 <code>ParameterBlock</code>·자동 바인딩을 도입하지 않음.</strong> 기존 명시적
+<code>register(...)</code>와 Vulkan 시프트를 유지해 컴파일러 동등성과 바인딩 재설계를
+한 슬라이스에 섞지 않는다.</li>
+<li><strong>머테리얼 에디터 UI 재설계 없음.</strong> 인스펙터는 새 프로퍼티 모델을 읽는 최소
+배선만 한다. 본격 UI와 편집 경험은 별도 UI/에디터 재설계 계획에서 다룬다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-설계">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-설계">3. 설계</h2></div>
+<div class="prose"><h3 id="31-계층">3.1 계층</h3>
+<pre><code>Material (.asset, YAML)          프로퍼티 값 · 키워드 선택 · ShaderMeta 참조(GUID)
+  ↓
+ShaderMeta (.shadermeta, YAML)   프로퍼티 선언 · 키워드 축 · 패스 목록
+  │                              └ 패스마다: 스테이지 엔트리 · 렌더스테이트 · 큐
+  ↓
+PermutationKey                   (meta, pass, 정규화된 키워드 집합)의 해시
+  ↓
+IRHIShaderCompiler (V5 승계)     HLSL + permutation inputs → Slang → DXIL | SPIR-V
+  │                                   └ target layout → 중립 RHIShaderReflection
+  ↓
+파이프라인 캐시 (V6 승계)         (blob들 + RHIGraphicsPipelineDesc + RT 포맷) → PSO</code></pre>
+<h3 id="32-shadermeta--정규식-dsl의-후계">3.2 ShaderMeta — 정규식 DSL의 후계</h3>
+<p><code>.shader</code> 정규식 DSL은 은퇴하고 YAML로 간다. 근거: 엔진 직렬화 자산이 이미
+YAML(<code>Meta::Serialize</code>)이라 파서를 하나 더 유지할 이유가 없고, 지금 DSL은
+파싱 결과의 절반(<code>Keywords</code>·<code>tag</code>)이 어디에도 전달되지 않는 반쪽이다.</p>
+<pre><code class="language-yaml"># ForwardWater.shadermeta — 개념 예시(P2c 제품 자산의 정확한 복사본 아님)
+schema: 1
+name: ForwardWater
+source: ForwardWater.hlsl          # 엔트리는 패스가 지정, 소스는 하나
+properties:                        # Material 프로퍼티의 선언처 — cbuffer와 리플렉션으로 대조
+  - { name: baseColor,  type: float4,    default: [1,1,1,1] }
+  - { name: waveSpeed,  type: float,     default: 0.5 }
+  - { name: baseMap,    type: texture2d }
+keywords:                          # 퍼뮤테이션 축 — 선언한 것만 존재한다
+  - { axis: SKINNING,   values: [off, on] }
+  - { axis: ALPHA_TEST, values: [off, on] }
+passes:
+  - name: Forward
+    vs: { entry: VSMain }
+    ps: { entry: PSMain }
+    state: { blend: alpha, cull: none, depthWrite: false, depthTest: lessEqual }
+    queue: transparent
+  - name: Shadow
+    vs: { entry: ShadowVS }
+    state: { blend: off, cull: front, depthWrite: true, depthTest: less }
+    queue: shadow</code></pre>
+<p>P2c 제품 fixture는 기존 Forward 표준 texture 이름 <code>baseColorMap</code>·<code>normalMap</code>·<code>ormMap</code>·
+<code>emissiveMap</code>과 <code>t4..t7</code>을 유지했다. P2d-c에서 Wind의 <code>t4</code> 이름을 <code>windMap</code>으로 바꾸고
+Material/DataSystem/snapshot owner를 이름 기반 vector로 일반화해 위 <code>baseMap</code> 같은 generic
+texture authoring 이름을 실제 제품 reflection/register 경로에서 허용한다. 현재 대표 pass의
+물리 범위는 GBuffer <code>t0..t3</code>, Forward <code>t4..t7</code>, 모두 <code>space0</code>으로 유지한다.</p>
+<ul>
+<li><strong>프로퍼티 선언이 곧 Material의 스키마다.</strong> 컴파일 후 리플렉션과 대조해
+선언·실제 cbuffer 불일치를 로드 시점에 잡는다(지금은 수동 동기화라 조용히
+틀린다 — <code>MaterialInfomation</code> 주석의 &quot;HLSL cbuffer와 이름을 맞춰&quot;가 그 표시).</li>
+<li><strong><code>state</code> 블록의 어휘 = V6의 <code>RHIGraphicsPipelineDesc</code> 어휘.</strong> 메타 파서가
+중립 desc를 직접 채우므로 어휘가 두 벌 생기지 않는다.</li>
+<li>큐 분류는 패스의 <code>queue</code>에서 유도한다. <code>m_renderingMode</code>는 호환 필드로
+남기되 진실은 메타다.</li>
+<li>v1 property type은 <code>float|float2|float3|float4|int|bool|float4x4|texture2d</code>,
+state 어휘는 <code>fill(solid|wireframe)</code>·<code>cull(none|back|front)</code>·
+<code>blend(off|alpha|additive)</code>·<code>depthWrite</code>·<code>depthTest(off|less|lessEqual)</code>·
+<code>topology(triangle|line|point)</code>다. 알 수 없는 field는 오타로 보고 거부한다.</li>
+<li>source는 같은 meta 디렉터리 기준 상대 <code>.hlsl|.slang</code>만 허용하고 <code>..</code>·절대 경로를
+거부한다. 그래픽은 VS 필수, compute는 CS 단독 + <code>queue: compute</code>로 고정한다.</li>
+</ul>
+<h3 id="33-퍼뮤테이션-모델">3.3 퍼뮤테이션 모델</h3>
+<ul>
+<li><strong>키 = (metaGuid, passIndex, 키워드 비트셋).</strong> 축은 메타가 선언한 것만
+존재하고, 집합은 정렬·정규화 뒤 해시한다.</li>
+<li><strong>M2A의 코드 기반 이행 키</strong>는 메타가 아직 없는 엔진 패스를 위해 정렬된
+<code>(name, value)</code> 집합을 소유한다. 같은 집합은 삽입 순서와 무관하게 같은 128-bit
+key를 만들고, 중복 축·잘못된 식별자·빈 값은 요청 전에 거부한다. 이 키와
+충돌 대조용 정규화 entry 전부가 캐시 정체성에 들어간다.</li>
+<li><strong>에디터: 요청식 컴파일 + 캐시.</strong> 처음 쓰는 조합만 컴파일하고 콘텐츠 해시
+캐시에 남긴다. <strong>게임 빌드: 전수 사전 컴파일</strong> — PHASE 12.5의 셰이더 스텝이
+이 모드를 부른다.</li>
+<li><strong>폭발 억제</strong>: 축 선언 강제(자유 <code>#define</code> 주입 금지) + 메타당 퍼뮤테이션
+수를 로드 시점에 로깅 + 게임 빌드 전수 컴파일에 상한 게이트.</li>
+<li><strong>정본은 엔진의 <code>PermutationKey</code>다.</strong> M2 첫 이관은 키워드 비트셋을 현재와
+동일한 전처리 define으로 내린다. Slang specialization은 캐시·코드크기·성능
+이득을 별도로 증명한 축에만 대체 표현으로 쓴다. specialization identity도
+같은 <code>PermutationKey</code>에 포함한다.</li>
+<li>첫 이관 대상은 엔진의 손 퍼뮤테이션 4곳(1.2)이다. SKINNING이 축이 되면
+Shadow·GBuffer·WireFrame의 스키닝 이본이 데이터로 내려간다.</li>
+</ul>
+<h3 id="34-컴파일러-서비스--v5의-실물">3.4 컴파일러 서비스 — V5의 실물</h3>
+<pre><code class="language-cpp">enum class RHIShaderTarget : uint8_t { DXIL, SPIRV };
+
+struct RHIShaderCompileRequest {
+    std::filesystem::path source;      // 또는 메모리 소스(엔진 내장 셰이더 이행기)
+    std::string entry;
+    RHIShaderStage stage;
+    RHIShaderTarget target;
+    const RHIShaderPermutation* permutation;   // 정규화된 key + 소유 name/value
+    bool debug;
+};
+
+struct RHIShaderBlob {
+    std::vector&lt;uint8_t&gt; bytes;        // DXIL 또는 SPIR-V
+};
+
+class IRHIShaderCompiler {
+public:
+    virtual std::expected&lt;RHIShaderBlob, RHIShaderError&gt;
+        Compile(const RHIShaderCompileRequest&amp;) = 0;
+    virtual std::expected&lt;RHIShaderReflection, RHIShaderError&gt;
+        Reflect(const RHIShaderCompileRequest&amp;) = 0;
+};</code></pre>
+<ul>
+<li><strong>목표 구현은 고정 버전 Slang 벤더링</strong>(<code>ThirdParty/Slang/</code>)이다. 엔진은
+<code>slang-compiler.dll</code>을 직접 적재하고 compile session·module·entry point·target component를
+조립한다. Vulkan SDK·PATH·registry fallback은 Editor 편의 경로에도 두지 않아
+빌드 머신과 개발자 SDK 버전이 산출물을 바꾸지 못하게 한다.</li>
+<li><strong>캐시 키 = hash(소스 콘텐츠 + include closure 콘텐츠 + permutation key/entries + target +
+컴파일러 버전).</strong> 파일명·타임스탬프가 아니라 콘텐츠다. 이것으로 <code>.hlsli</code>
+무차별 무효화가 은퇴하고, &quot;두 번째 실행 컴파일 0건&quot;이 퍼뮤테이션 세계에서도
+유지된다. include closure는 Slang이 실제로 열어 본 파일을 엔진 파일 시스템
+어댑터에서 수집한다. 별도 HLSL include 그래프 파서는 만들지 않는다.</li>
+<li><strong>리플렉션 정규화</strong>: Slang program layout을 타깃별로 읽어 cbuffer
+레이아웃·리소스 종류·원래 register/space를 <code>RHIShaderReflection</code>으로
+정규화한다. Vulkan의 shift가 적용된 raw binding 번호와 DXIL 오프셋을 그대로
+비교하지 않고, 엔진의 논리 register/space 계약으로 되돌린 뒤 대조한다.</li>
+<li><strong>Slang reflection은 <code>.shadermeta</code>를 대체하지 않는다.</strong> 셰이더에 없는
+기본값·라벨·큐·렌더 상태는 메타에 남고, reflection은 선언과 바인딩을
+검증하고 런타임 업로드 레이아웃을 생성한다. 이 통합은 M7에서 닫혔다.</li>
+</ul>
+<h3 id="35-파이프라인-기술--v6의-실물">3.5 파이프라인 기술 — V6의 실물</h3>
+<p><code>RHIGraphicsPipelineDesc</code>(래스터·블렌드·뎁스·토폴로지·RT 포맷 — 전부 V1의
+<code>RHIFormat</code>과 새 상태 열거로)를 세우고 <code>DX12PSOManager</code>를 그 구현으로 내린다.
+PSO 요청 = (퍼뮤테이션 blob들, desc, RT 포맷). 메타의 <code>state</code> 블록과 엔진
+패스의 코드 지정이 <strong>같은 구조체를 채운다</strong> — 재질 구동 패스는 데이터에서,
+엔진 전용 패스(SSAO·포그 등)는 코드에서. 후자를 데이터로 강제하지 않는다 —
+그 상태는 아티스트의 것이 아니라 알고리즘의 일부다.</p>
+<h3 id="36-material-데이터-모델">3.6 Material 데이터 모델</h3>
+<ul>
+<li><strong>ShaderMeta 참조(GUID) + 프로퍼티 값 맵 + 키워드 선택</strong>이 전부다. 텍스처
+슬롯 5개 고정 필드는 프로퍼티 선언 기반으로 대체하고, 기존 필드·API는
+호환층으로 남겨 표준 텍스처 프로퍼티(baseColorMap·normalMap·ormMap·aoMap·
+emissiveMap)로 리매핑한다. <code>baseColor</code>는 이미 float4 값 이름이므로 texture GUID와
+공유하지 않는다.</li>
+<li><strong>직렬화 단일화</strong>: <code>DataSystem</code> 경로 하나로. <code>ComponentFactory</code>의 중복 수동
+파서와 <code>ModelLoader</code>의 바이너리 필드는 그 경로 호출로 대체한다 — 필드 추가
+시 수정 지점이 한 곳이 된다.</li>
+<li><strong>핫리로드 핸들화</strong>: 셰이더·PSO 식별을 map 엔트리 주소가 아니라 세대
+핸들로. 리로드 = 캐시 무효화 + 다음 사용 시 재요청. PHASE 2의 핸들 원칙과
+같다 — 주소 안정성 불변식(1.5)은 핸들이 서면 소멸한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-이행--슬라이스">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-이행--슬라이스">4. 이행 — 슬라이스</h2></div>
+<div class="prose"><p>원칙 둘. <strong>슬라이스마다 소비자가 먼저 있다</strong> — 추상을 세우는 슬라이스는 같은
+슬라이스 안에서 기존 코드를 그 위로 옮겨 소비자를 확보한다(구 RHI의 사인 재발
+방지). <strong>판정은 수치다</strong> — 공통 판정: 자가 검증 스윕 판정 착수 전과 동일 +
+<code>pipeline.nodes</code> 구성/상태 판정 일치. 슬라이스별 기준은 각 항목에.</p>
+<p><strong>M0 — 진실 확정과 죽은 표면 정리 (1일) — ✅ 완료 (<code>24e784ce</code>, 2026-08-11)</strong>
+계획보다 넓게 실행됐다: <code>ShaderSystem</code>·<code>ShaderPSO</code>·<code>VisualShaderPSO</code>·
+<code>ShaderDSL</code>·<code>VisualShaderDSL</code>·<code>Shader.h</code>·<code>PSO</code>·<code>HLSLCompiler</code>·
+<code>ShaderSelectionWindow</code> 소스 17파일 + 자산 136파일(<code>.hlsl</code> 113·<code>.hlsli</code> 11·
+<code>.shader</code> 12), 약 14,800줄. 폐기 근거는 이 문서 §1.1과 같다(그림에 닿지
+않는다) — 실측으로 확정한 소비자 0 목록이 커밋에 있다.
+<code>.cso</code>·읽는 코드 0. <code>.meta</code> 고아 129는 손댈 것이 없다(§1.0).
+Material 이음매는 남겼고, 그 이유는 내가 적은 것이 아니라 §0의 것이 맞다.</p>
+<p><strong>M1 — 중립 컴파일러 서비스와 Slang 백엔드 (V5 승계)</strong></p>
+<p><strong>M1A — 중립 서비스 기준선 (2.5일) — ✅ 완료 (2026-08-16).</strong>
+<code>cc12ba4f</code>의 <code>RHIShaderSource</code> 경계를 실제 서비스로 완성했다.
+<code>IRHIShaderCompiler</code> 뒤의 DXC 구현 하나가 같은 요청에서 DXIL 또는 SPIR-V를 만들고,
+패스·DX12/Vulkan 검사는 모두 <code>RHIShaderCompiler</code>만 호출한다. 구
+<code>DX12ShaderCompiler</code>·<code>VulkanShaderCompiler</code> 네 파일과 <code>D3DCompile</code> 호출은 제거했다.
+결과는 <code>RHIShaderBlob</code>, define은 <code>RHIShaderDefine</code>이라 컴파일 경계의 D3D 타입은 0이다.</p>
+<p>콘텐츠 캐시 키는 compiler identity + output + profile + entry + defines + compile options +
+루트 HLSL 및 재귀 include closure의 경로·내용을 포함한다. 메모리 캐시와
+<code>%LOCALAPPDATA%/CreatorEngine/ShaderCache/v1</code> 디스크 캐시를 쓰며, 손상된 blob은
+내용 해시로 거부한다. <code>dx12.selftest</code>는 메모리 표를 비운 재요청이 디스크 히트이고
+컴파일 수가 늘지 않음을 단정한다. 실제 두 번째 프로세스는 <strong>컴파일 0 · 디스크
+히트 5</strong>였다. <code>PostChainCommon.hlsli</code>만 바꾼 프로브에서는 캐시 파일이 정확히
+의존 엔트리 수인 <strong>6개만 증가</strong>했고 <code>dx12.post</code> 픽셀 판정도 통과했다.</p>
+<p>★ M1A의 DXC SM6 게이트는 HLSL <strong>49개</strong>(루트 38 + SelfTest 11), 실제 엔트리 67개를
+런타임 define과 같은 값으로 컴파일해 <strong>49/49 · 67/67 통과</strong>했다. 파손이 20파일을
+넘지 않았으므로 이중 FXC/DXC 기간은 두지 않는다. DXC 기본 fast math에서 IBL BRDF
+LUT 극점이 A=0.413으로 변한 회귀는 판정값을 낮추지 않고 요청별 <code>strictMath</code>를
+추가해 <code>IblBrdf</code> 한 곳에만 <code>-Gis</code>를 적용했다(A=1.000 복구). 일반 패스는 <code>-O3</code>다.</p>
+<p>검증: VS18/v145 Debug x64 전체 솔루션·Player·Academy 링크, DX12 35종 스윕은
+기준선과 같은 <strong>통과 28 · 완료 4 · 실패 2 · 무판정 1</strong>, <code>vk.selftest</code>는 검증 레이어
+클린 통과. 비유니티 전수 컴파일은 새 <code>RHIShaderCompiler.cpp</code>까지 독립 컴파일된 뒤
+기존 include 자급성 부채(<code>FrameCameraSnapshot.h</code> 등)에서 실패했다 — M1 신규 파일
+오류는 아니다.</p>
+<p>★ <strong>M1A는 완료된 역사적 기준선이지 최종 컴파일러 선택이 아니다.</strong>
+공식 DXC 바이너리 벤더링을 따로 닫지 않고 M1B가 배포 소유권을 Slang
+번들로 교체한다. M1B 전까지 현재 DXC 경로는 구현 현황으로 유지한다.
+<strong>M1B — Slang 백엔드 전환 (3일) — ✅ 구현·런타임 게이트 완료
+(2026-08-24).</strong></p>
+<ul>
+<li><code>IRHIShaderCompiler</code>·요청·패스 호출부를 유지하고 구현을 Slang 2026.14 API로
+교체했다. 제품 경로는 <code>.hlsl</code>에서 <code>DXIL | SPIR-V</code>를 내는 Slang 하나이며,
+엔진의 직접 <code>dxcapi</code>/<code>DxcCreateInstance</code>와 Vulkan SDK·PATH compiler fallback은 0이다.
+DXIL은 Slang이 downstream으로 호출하는 고정 DXC v1.9.2607을 사용한다.</li>
+<li><code>ThirdParty/Slang</code>은 Slang 헤더·<code>slang-compiler.dll</code>·DXC의
+<code>dxcompiler.dll</code>/<code>dxil.dll</code>·양쪽 라이선스를 공식 archive digest와 함께 고정한다.
+authoring은 저장소 번들, 패키지는 실행 파일 옆 정확한 세 DLL만 허용한다.
+compiler identity는 build tag와 세 DLL의 전체 콘텐츠 hash다.</li>
+<li>column-major·<code>register(...)</code>·<code>__spirv__</code>·Vulkan
+<code>b/t/u/s = 0/100/200/300</code>·<code>-fvk-use-entrypoint-name</code>을 보존했다.
+Slang 2026.14 parser가 <code>VulkanBindShift</code>를 session/target 양쪽에 넣어 종류 코드가
+binding으로 굽히는 문제는 session의 shift 중복본만 제거해 해결했다. 산출
+decoration과 동일 버전 <code>slangc</code>를 대조했다. 최종 cache schema의 SPIR-V
+94개·binding decoration 354개에는 비정상 상위 binding(1000 이상)이 0개다.
+Vulkan 장치는 Slang SPIR-V가 선언하는 <code>shaderDrawParameters</code>를 선택·생성
+계약에 포함한다.</li>
+<li><code>strictMath</code>는 <code>-fp-mode precise</code>, 일반 패스는 <code>-O3</code>, 모든 컴파일은
+<code>-warnings-as-errors all</code>이다. Slang이 지적한 Fog/Gizmo/SSGI/SSR 네 파일을
+수정했고 DXIL/SPIR-V 경고 예외는 0이다. DX12 <code>dx12.ibl</code>·<code>iblshade</code>와
+픽셀 스윕이 기존 기준선을 유지했다.</li>
+<li>실제 Slang dependency 목록을 정렬·내용 hash해 기존 디스크 캐시 계약을
+유지했다. <code>FogCommon.hlsli</code> 변경 프로브는 의존한 엔트리만 <strong>3개</strong> 새로 만들었고,
+새 프로세스 <code>dx12.selftest</code>는 <strong>컴파일 0 · 디스크 히트 5</strong>였다.</li>
+<li>Debug x64 전체 솔루션은 경고/오류 0으로 링크됐다(Player·CreatorEditor 포함;
+과거 <code>Academy_4Q</code> 별도 프로젝트는 현재 솔루션에 없고 CreatorEditor로 수렴).
+DX12 35종은 기준선과 같은 <strong>통과 28 · 완료 4 · 실패 2 · 무판정 1</strong>,
+판정 줄 차이 0. <code>vk.selftest</code>와 DX12/Vulkan <code>render.livecheck</code>는 pipeline 19노드,
+두 view ready, validation 0, 미구현 0으로 통과했다.</li>
+<li>Vulkan SDK/DXC PATH를 제거한 <code>InputMode Workspace</code> 격리 stage에서 DX12·Vulkan
+패키지가 각각 HLSL source를 포함한 172 entries를 싣고 Player smoke를 통과했다. 세 compiler DLL도
+정확한 bundle hash로 stage됐다. <strong>커밋된 스냅샷을 요구하는 <code>InputMode Tracked</code>
+clean-checkout 재현은 아직 실행하지 않았다</strong> — 현재 변경을 커밋한 뒤 돌릴
+배포 재현 게이트이며, M1B 구현 완료를 B3 shader cook 완료로 확대하지 않는다.</li>
+</ul>
+<p><strong>M2 — 퍼뮤테이션 프레임워크 (2.5일) — ✅ M2A·M2B 완료.</strong></p>
+<p><strong>M2A — 코드 기반 퍼뮤테이션 정본 (1.5일) — ✅ 구현·런타임 게이트 완료
+(2026-08-24).</strong> <code>RHIShaderPermutation</code>이 name/value를 소유하고 이름순으로
+정규화하며, 순서 독립 128-bit <code>RHIShaderPermutationKey</code>를 만든다. 컴파일 요청과
+Slang <code>-D</code> 생성, 디스크 캐시가 이 객체만 소비한다. 키뿐 아니라 정규화 entry도
+캐시에 넣어 hash 충돌이 곧 잘못된 재사용으로 이어지지 않게 했다. 중복·잘못된
+축·빈/개행 값과 64축 초과는 요청 시 거부한다.</p>
+<p>손 퍼뮤테이션은 4패스의 <strong>6 define 그룹</strong>이었다: Shadow <code>SHADOW_SKINNING</code>,
+Forward 기본 상수 + <code>REFERENCE_PATH</code>, SSAO kernel + filter, SSGI trace. 전부
+이관해 <code>RHIShaderDefine</code>·널 종료 배열·<code>CompileFile(..., nullptr, ...)</code> 계약은 0이다.
+첫 이관은 Slang에도 같은 전처리 define를 내리며 specialization은 별도 성능
+증명 뒤로 남긴다. 자가 검증은 삽입 순서 독립·값 구분·중복/잘못된 축 거부를
+단정한다. Debug x64 RenderEngine·CreatorEditor·Player 빌드, <code>dx12.selftest</code>의
+<strong>컴파일 0 · 디스크 히트 5</strong>, Shadow/Forward/SSAO/SSGI 표적 4종, DX12 35종
+기준선 판정 차이 0, <code>vk.selftest</code>, Vulkan 240프레임 <code>render.livecheck</code>가 통과했다.</p>
+<p><strong>M2B — 메타 기반 축·전수 열거·폭발 상한 (1일) — ✅ 구현·자가 검증 완료
+(2026-08-24).</strong> <code>ShaderPermutationDomain</code>이 M4의 <code>ShaderMeta</code>와 M2A의
+<code>RHIShaderPermutation</code>을 직접 잇는다. 최종 lookup digest는
+<code>metaGuid + passIndex + 축 이름순 선택(axis, value, ordinal)</code>으로 만들며,
+hash 충돌을 잘못된 재사용으로 확대하지 않도록 GUID/pass/선택값 전체도 소유한다.
+2~16값 축이므로 옛 계획의 literal keyword bitset은 <strong>다중값 선택 vector</strong>로
+일반화했다. 메타의 축 작성 순서를 바꿔도 같은 선택은 같은 key/define을 만들고,
+값 목록 순서를 바꿔 ordinal define가 달라지면 key도 달라진다.</p>
+<p><code>Resolve</code>는 Editor가 요청한 한 조합만 만들며 모든 축을 Slang 전처리 define
+<code>AXIS=0..N-1</code>로 내린다. <code>EnumerateForBuild</code>는 같은 경계에서 pass-major·축 이름순
+mixed-radix 전수 열거를 하고, 기본 <strong>4,096 compile requests</strong>를 넘으면 일부를
+조용히 자르지 않고 실패한다. <code>DataSystem::LoadShaderMetaGUID</code>는 catalog GUID로
+소유값을 읽고 variants/pass와 전체 request 수를 기록하며, 상한 초과는 Editor
+로드 실패가 아니라 Build 경고로 남긴다. 별도 Shader 전역 registry/cache는
+추가하지 않았다(M5 몫).</p>
+<p>selftest fixture는 1 pass × <code>QUALITY={low,high}</code> = <strong>2 requests</strong>, ordinal define,
+축 순서 독립, 값/pass 민감 key, cap=1 거부를 단정했다. Debug x64
+RenderEngine·CreatorEditor·Player 빌드와 <code>dx12.selftest</code>가 exit 0·stderr 0,
+PNG 생성, shader compile 0·disk hit 5로 통과했다. B3가 이 열거 결과를 소비해야
+한다는 계약은 닫혔지만, 실제 DXIL/SPIR-V cook artifact·manifest·source-free Stage는
+아직 B3 미구현이다. 이번 CPU identity/열거 슬라이스에서 DX12 35종·Vulkan·package
+스윕은 다시 돌리지 않았다.</p>
+<p><strong>M3 — 파이프라인 기술 중립화 (V6 승계, 3일) — ✅ 실행 코드 기준 완료.</strong>
+2026-08-24 재실측에서 패스의 생성 계약은 <code>RHIGraphicsPipelineDesc</code>·
+<code>RHIComputePipelineDesc</code>·중립 샘플러/상태 어휘로 수렴했고, 패스의
+<code>DX12GraphicsPipelineDesc</code>·<code>D3D12_</code> 직접 조립은 남지 않았다. <code>D3D12_</code> 문자열 1건은
+<code>EnhancedSSGIPass.cpp:275</code>의 구 상태를 설명하는 역사 주석이며 실행 참조가 아니다.
+이 슬라이스의 실행 코드 판정은 닫힌다. 재질 메타의 <code>state</code>가 같은 desc를
+채우는 state 어휘·변환은 M4가 닫았다. 실제 Material/PSO 소비 배선은 M6의
+몫이므로 M3·M4 완료를 그 배선 완료로 확대 해석하지 않는다.</p>
+<p><strong>M4 — ShaderMeta 스키마 (3일 → 2일) — ✅ 구현·자가 검증 완료
+(2026-08-24).</strong></p>
+<p>✅ 이미 된 것(<code>cc12ba4f</code>): 패스 24곳 인라인 HLSL 45블록(3,792줄)이 파일로.
+<code>Assets/Shaders/DefaultPassShader/</code>는 M4 시점 루트 38 + <code>SelfTest/</code> 11이었고,
+M7 reflection fixture 추가 뒤 현재 <code>SelfTest/</code> 12다. 나는 &quot;재질 구동 패스
+둘만 꺼내고 나머지는 강제로 옮기지 않는다&quot;고 적었는데 전부 옮겼고, 그쪽이
+옳다 — 문자열이 막고 있던 것이 편집기·<code>#include</code>·컴파일 시점 셋이었고 그중
+셋째가 Vulkan 전제와 직결된다(§0). 부수로 문자열 이어붙이기 셋이 진짜
+<code>#include</code>가 됐다.
+<code>ShaderMeta</code>/<code>ShaderMetaLoader</code>가 schema v1의 프로퍼티 선언·기본값·라벨,
+키워드 축, 패스별 VS/PS/CS 엔트리, 중립 렌더 상태와 큐를 소유한다. 모든 map은
+unknown field를 거부하고 이름/값 중복, 잘못된 stage/queue 조합, 타입 불일치,
+nil GUID, 1MiB/개수 상한, source 절대·상위 경로와 source 부재를 로드 시점에
+실패시킨다. state는 기존 RHI 열거를 저장하고 <code>RHIGraphicsPipelineDesc</code>에 직접
+적용하므로 두 번째 상태 어휘가 없다.</p>
+<p>별도 Shader 전역 registry는 만들지 않았다. 기존 <code>AssetMetaRegistry</code>가 해석한
+sidecar GUID와 경로를 loader 입력으로 받고 <code>ShaderMeta</code>는 소유 값으로 반환한다.
+M2B의 <code>DataSystem::LoadShaderMetaGUID</code>가 이 경계를 제품 load API로 올리고 조합 수를
+기록하지만 owning value 계약은 그대로다.
+핸들·세대 cache는 M5 몫이다. 에디터 asset database/presentation/content browser는
+<code>.shadermeta</code>를 셰이더 자산으로 등록한다. <code>Assets/</code> 아래 selftest fixture는 기존
+파일명 기반 UUID 규약을 쓰고, 전역 <code>*.meta</code> ignore에서 <code>.shadermeta.meta</code>만 좁게
+추적 예외로 열어 clean checkout에도 GUID 정본이 남는다. catalog GUID→파일 load,
+property 3·keyword 1·pass/state,
+중복/unknown-field/path 탈출 거부를 <code>dx12.selftest</code>에서 검증했다. Debug x64
+  RenderEngine·CreatorEditor·Player 빌드와 selftest(stderr 0, shader compile 0 ·
+  disk hit 5)가 통과했다. 실제 HLSL 선언과 property/resource layout 대조는 뒤이은
+  M7에서 닫혔으며 M4 단독 완료 증거로 소급하지 않는다.</p>
+<p><strong>M5 — Material 재설계 (3일)</strong>
+프로퍼티 블록·키워드 선택·메타 참조·직렬화 단일화·핸들화(3.6, 3.7). 기존
+<code>.asset</code> 로드 호환: 구 5필드 → 표준 프로퍼티 리매핑. 판정: 기존 씬·머테리얼
+전부 로드 왕복(저장→로드→재저장 diff 0) + 회귀 세트 통과.</p>
+<p><strong>M5-A — 소유 프로퍼티 블록과 기존 API 연결 — ✅ 구현·표적 자가 검증 완료
+(2026-08-24).</strong> <code>Material</code>의 저장 정본에 <code>m_shaderMetaGuid</code>, 이름 기반
+<code>MaterialPropertyValue</code> vector, 다중값 keyword selection을 추가했다. 값 구조체와
+vector는 C++20 <code>reflect()</code>만 사용해 typed YAML 경로로 왕복하며 새 매크로나 전역
+registry는 없다. Slang reflection의 <code>ShaderMetaBindingLayout</code>은 저장하지 않고
+<code>Material::RuntimeSchema</code>가 불변 소유 복사본으로 공유한다. 따라서 Material copy는
+schema 수명에는 안전하고 property/CB 값은 서로 독립이다.</p>
+<p><code>ConfigureShaderProperties</code>가 ShaderMeta 기본값을 논리 값에 채우고 M7 offset으로
+단일 CB byte view를 재생성한다. 기존 <code>TrySet/TryGet</code>과 C#의 <code>TrySetValue</code> 이음매는
+이 layout을 실제 소비하며, property type·CB 이름·범위를 fail-closed로 검사한다.
+texture GUID와 keyword axis/value API도 같은 정본을 갱신한다. 늘 널이던 raw
+<code>m_cbMeta</code>와 소비자 0인 <code>MaterialParameters.h</code>는 제거했다.</p>
+<p>Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드가 성공했다. 기존
+<code>ShaderMetaFixture</code>를 사용한 <code>dx12.selftest</code>는 exit 0·stderr 0으로, GUID + property
+3 + keyword 1, <code>MaterialProperties</code> 32B repack, 잘못된 type/name/value 거부,
+저장→load→재저장 YAML diff 0, copy 독립을 단정했다. 공식 validation wrapper는
+현재 로컬 vcpkg HEAD가 저장소 baseline과 달라 preflight에서 멈췄으므로, 동일한
+<code>Invoke-Dx12Suite.ps1 -Only dx12.selftest</code> 실행 결과만 이 절편의 실행 증거다.
+리플렉션 골든은 새 기본 키 3개만 기준선에 반영한 뒤 타입 77·직렬화 77·실패 0·
+diff 0으로 통과했다.</p>
+<p>★ <strong>M5-A 잔여 부채 — packing 정본의 배치 오류 (2026-08-29 확인).</strong> 이 절편이 만든
+<code>ApplyDefault</code>·<code>ValidateLogicalValue</code>·<code>PackProperty</code>(+ <code>NumericElementCount</code>·<code>LogicalByteSize</code>·
+<code>FindBinding</code>)는 <code>Material</code> 상태를 한 글자도 읽지 않는다 — <strong>Material 클래스의 알고리즘이 아니라
+ShaderMeta 계약의 알고리즘</strong>이다. 그런데 <code>Material.cpp</code> 익명 namespace(internal linkage)에 두어
+다른 TU 에서 이름조차 보이지 않는다. 결과로 (1) legacy 안에 같은 루프가 두 벌이 됐고
+(<code>ConfigureShaderProperties</code> / <code>adc026b4</code>가 더한 <code>BuildShaderPropertyBlock</code>), (2) 두 번째 소비자인
+<code>experiment::Material</code>이 이 정본에 붙을 방법이 없다.</p>
+<p>이 정본은 I6에서 <code>Material.cpp</code>가 삭제된 뒤에도 살아남아야 하므로, 분리는 experiment 와 무관하게
+필요하다. <strong>선행 작업 <code>MaterialPropertyPacker</code> 분리</strong>로 상환한다 — 자유 함수 6종을 ShaderMeta
+계약 쪽으로 이동하고 legacy 두 호출부가 정본을 부른다(<code>MaterialInfo</code> 폴백은 legacy 호환 입력이므로
+<code>Material.cpp</code>에 존치). 상세는 ModelImportPipelinePlan §I5-M &quot;선행 작업&quot;.</p>
+<p><strong>M5-B1 — standalone YAML codec + scene-owned runtime 복원 — ✅ 구현·표적 검증
+완료 (2026-08-24).</strong> <code>DataSystem::SerializeMaterialPayload</code> /
+<code>DeserializeMaterialPayload</code>가 Editor 저장과 standalone <code>.asset</code> 로드의 typed YAML,
+legacy <code>constant_buffers</code>, IOR·5 texture runtime 복원을 한 경계로 모았다. CB sequence는
+이름순으로 기록해 unordered map 순서가 저장 diff에 새지 않으며 malformed/duplicate
+entry는 거부한다. <code>LoadMaterial</code>은 파일 stem을 cache key와 material name의 정본으로
+맞춘다.</p>
+<p>씬 임베디드는 typed deserializer가 만든 renderer 소유 <code>shared_ptr&lt;Material&gt;</code>을 유지한
+채 같은 <code>FinalizeMaterialRuntime</code>만 호출한다. 이전처럼 이름 기반 cache material에
+scene snapshot을 다시 deserialize해 다른 renderer의 공유 상태를 바꾸지 않는다.
+Debug x64 RenderEngine·SceneRuntime·CreatorEditor·Player가 성공했고, codec을 직접
+통과하는 <code>dx12.selftest</code>는 <code>MaterialProperties</code> 32B legacy CB 복원과 DataSystem YAML
+diff 0을 단정했다. reflection golden은 타입 77·직렬화 77·실패 0·diff 0이었다.
+embedded material 8개가 있는 <code>FT_Primitives.creator</code>도 scene switch·11개 object 활성화·
+렌더 캡처(942,079 bytes)까지 통과했다. PhysX GPU DLL 부재로 software fallback 경고는
+있었으나 scene load/activate와 DX12 렌더 판정에는 실패가 없었다.</p>
+<p><strong>M5-B2 — versioned model material payload + legacy texture GUID 이행 — ✅ 구현·
+표적 검증 완료 (2026-08-24).</strong> <code>ModelLoader</code>의 <code>MaterialInfomation</code> raw dump, enum/GUID
+native layout, 5개 texture 문자열 수동 write를 제거했다. 새 writer는 M5-B1의
+<code>DataSystem</code> YAML payload를 <code>CEMT</code> magic + little-endian version/encoding/length의 v1
+record로 감싸며 payload는 4 MiB로 제한한다. loader는 첫 record를 probe해 v1은 같은
+codec으로 복원하고, 기존 무버전 record는 bounds-checked read-only 호환 경로로 읽는다.
+unknown version과 잘린 payload는 fail-closed다.</p>
+<p><code>FinalizeMaterialRuntime</code>은 legacy 5개 texture 이름을 catalog GUID로 해석해
+<code>baseColorMap</code>·<code>normalMap</code>·<code>ormMap</code>·<code>aoMap</code>·<code>emissiveMap</code>에 채우고 이후 load는 GUID를
+우선한다. 새 key는 숫자 <code>baseColor</code>와 타입 충돌하지 않는다. <code>ModelLoader</code>는 codec이
+복원한 texture를 다시 <code>shared_ptr</code>로 보유해 <code>UnloadUnusedAssets</code> 뒤 raw pointer 수명도
+기존 계약대로 유지한다.</p>
+<p>Debug x64 RenderEngine·SceneRuntime·RenderTests·CreatorEditor·Player가 성공했다.
+<code>dx12.selftest</code>는 YAML diff 0에 더해 binary v1 왕복, unknown/truncated 거부, legacy
+texture GUID 5개 이행을 stderr 0으로 단정했다. 기존 무버전 primitive cache 8종은
+<code>FT_Primitives.creator</code> scene switch·11개 object 활성화·DX12 렌더 캡처까지 통과했다.
+<code>verify-asset-authoring-ownership.ps1</code>은 임시 GLB의 Editor import가 1,756-byte cache에
+실제 <code>CEMT</code> marker를 썼고 재기동 cache load와 same-session generation reload가 모두
+통과했음을 확인한 뒤 임시 자산을 정리했다. reflection golden도 타입 77·직렬화 77·
+실패 0·diff 0이다.</p>
+<p><strong>M5-C1 — 현재 수명·캐시 감사 — ✅ 소스 감사 완료 (2026-08-24).</strong> 감사 시점의
+<code>ShaderMeta</code>는 <code>DataSystem::LoadShaderMetaGUID</code>가 매번 소유값으로 읽었고 별도 cache나
+generation은 없었다. 호출자는 자가 검증 둘뿐이었고, <code>Material</code>은
+<code>ConfigureShaderProperties</code>에서 reflection layout과 keyword schema를 소유 복사하므로
+메타 주소 자체에는 기대지 않았다. Slang binary cache는 source와 include content를
+identity에 넣어 재요청만 들어오면 stale blob을 피한다.</p>
+<p><code>m_retiredAssetGenerations</code>의 실제 보존 대상은 Model·Material·Texture였으며 ShaderMeta는
+들어 있지 않았다. watcher는 <code>Modified</code>를 버리고 authoring 변경 생산자는 Model·Texture만
+<code>ContentReload</code>를 냈다. DX12의 <code>OnShaderReloaded</code>는 PSO <code>ComPtr</code> cache를 비우지만
+resource-table handle slot은 해제하지 않았고 제품 호출자는 없었다. Vulkan pipeline
+handle은 generation 0/app lifetime이었다. <code>FoliageType</code>의 raw <code>Mesh*</code>/<code>Material*</code>도
+남아 있었다. 따라서 C를 C2 CPU ShaderMeta handle, C3 watcher·render-thread 재요청과
+PSO handle 완결, C4 raw 소비자·retired generation 축소 순으로 나눴다.</p>
+<p><strong>M5-C2 — DataSystem ShaderMeta generation handle — ✅ 구현·표적 검증 완료
+(2026-08-24).</strong> <code>ShaderMetaHandle {slot, generation}</code>과 DataSystem 소유 GUID→slot cache를
+추가했다. 같은 GUID 반복 요청은 같은 immutable <code>shared_ptr&lt;const ShaderMeta&gt;</code> snapshot과
+handle을 돌려주며, 게시된 <code>.shadermeta</code> <code>ContentReload</code>는 slot을 유지하고 generation을
+전진시킨다. 이전 snapshot을 가진 호출자는 안전하게 마칠 수 있지만 이전 handle resolve는
+즉시 실패한다. remove는 map에서 slot을 떼고 generation을 올린 뒤 재사용 목록으로 보낸다.
+load·resolve·invalidate는 하나의 cache mutex 아래 직렬화해 현재 CPU 경계의 thread 계약을
+명시했다.</p>
+<p><code>Material</code>은 적용한 handle을 runtime-only 값으로 기록하고 copy/move에서 보존한다.
+디스크 정본과 reflection schema에는 여전히 GUID만 들어가므로 serialization ABI는 바뀌지
+않는다. invalid handle로 schema를 적용하는 호출은 거부하고, 디스크/scene payload를 복원할
+때는 이전 적용 handle과 runtime schema를 지워 새 세대 재구성을 강제한다.
+<code>RuntimeAssetType::ShaderMeta</code>와 <code>.shadermeta</code> 분류를 <code>ApplyAssetChange</code>에 연결했으며, C3가
+이 invalidation seam에 watcher와 render-thread next-use 재요청을 붙인다.</p>
+<p>Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드와 <code>dx12.selftest</code>가 통과했다.
+자가 검증은 동일 요청의 handle/snapshot 재사용, reload 뒤 stale handle 거부, 같은 slot의
+generation 전진, 새 snapshot으로 Material 재구성을 단정했고 stderr는 0이었다. reflection
+golden도 타입 77·직렬화 77·실패 0·diff 0이다. 다만 현재 작업트리의 별도 미완성
+<code>Experiment/Model*.cpp</code> 두 파일은 자기 include 실패로 전체 빌드를 먼저 막았으므로, 이
+두 파일만 MSBuild 검증 import에서 제외해 C2와 기존 제품 대상을 링크했다. 그 병행 변경까지
+포함한 clean-tree 빌드 성공으로 확대 해석하지 않는다.</p>
+<p><strong>M5-C3a — watcher <code>Modified</code> → GT CPU invalidation queue — ✅ 구현·표적 검증 완료
+(2026-08-28).</strong> Editor의 efsw callback이 버리던 <code>.shadermeta</code> <code>Modified</code>를
+<code>DataSystem::QueueAssetChange</code>에 게시하고, 게임 스레드가 프레임 시작에만
+<code>DrainQueuedAssetChanges</code>를 적용한다. 한 번의 저장에서 같은 경로·종류로 중복 발생한
+알림은 마지막 한 건으로 합치므로 watcher 알림 조각 수만큼 generation이 뛰지 않는다.
+큐에 넣기만 한 시점에는 현재 handle/snapshot이 그대로 유효하고, drain 뒤에만 C2 slot의
+generation이 전진해 stale handle resolve가 실패한다. HLSL include dependency와 Model·Texture
+수명 정책은 이 절편에 추측으로 넓히지 않았다.</p>
+<p>VS18 MSBuild·v145·Debug x64에서 RenderEngine·RenderTests·CreatorEditor가 성공했다.
+<code>dx12.selftest</code>는 중복 queue 2건→drain 1건, drain 전 같은 snapshot, drain 뒤 stale handle
+거부와 같은 slot 새 generation 재구성을 실행 단정했고 exit 0·stderr 0이었다. 실제 외부
+편집기의 저장 이벤트 timing은 아직 별도 live probe로 판정하지 않았으므로, 이 결과를
+render-thread PSO reload 완료로 확대하지 않는다.</p>
+<p><strong>M5-C3b1 — backend PSO cache handle generation — ✅ 구현·양 backend 표적 검증 완료
+(2026-08-28).</strong> <code>IRenderPipelineCache::InvalidatePipelines</code>를 render owner의 submission
+경계 계약으로 추가했다. DX12는 cache entry를 resource table에서 release해 slot generation을
+전진시키고, Vulkan은 pipeline slot/free-list에 generation을 두어 이전 handle resolve를
+거부한다. 같은 desc를 next-use에 요청하면 두 backend 모두 새 generation handle을 게시한다.</p>
+<p>무효화 시점에 GPU가 아직 참조할 수 있는 native pipeline은 즉시 파괴하지 않는다. C3b1
+시점의 DX12 <code>ComPtr</code>와 Vulkan <code>VkPipeline</code>은 cache shutdown까지 retired 목록에 보존했다. 이는
+use-after-free를 막는 안전한 과보존 절편이며 fence 완료값 기반의 bounded collection까지
+완료됐다는 뜻은 아니다. DX12 회귀는 cache 3개 무효화, old handle 거부, 같은 desc의 새
+generation 재생성을 단정했다. Vulkan 회귀는 command submit 직후 <code>WaitForGpu</code> 전에
+무효화하여 old handle 거부·새 generation·retired 1개와 validation layer clean을 함께
+단정했다. VS18 MSBuild·v145·Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player,
+재링크 뒤 <code>dx12.psocache</code>·<code>dx12.selftest</code>·<code>vk.selftest</code>가 모두 통과했고 세 실행의
+stderr는 0이었다.</p>
+<p>이 절편은 제품 ShaderMeta watcher를 PSO cache에 일괄 연결하지 않았다. 현재 정적 pass
+20여 곳은 PSO handle만 보유하고 재생성 desc/request record를 보유하지 않아, 전역 clear를
+먼저 걸면 stale handle을 next-use에 복구하지 못한 채 draw가 조용히 빠진다. C3b2를
+completion retirement(C3b2a)와 ShaderMeta/request record(C3b2b)로 나눠 진행한다.</p>
+<p><strong>M5-C3b2a — completion-point PSO retirement — ✅ 구현·양 backend 표적 검증 완료
+(2026-08-28).</strong> <code>InvalidatePipelines</code>가 render owner가 마지막으로 제출한
+<code>RHICompletionPoint</code>를 받으며, <code>CollectRetiredPipelines</code>가 완료값을 넘은 native PSO만
+논블로킹 파괴한다. completion 0은 제출 완료를 증명하지 못한 quarantine으로 취급해
+아무리 큰 completed 값으로도 회수하지 않고 device/cache shutdown drain에서만 파괴한다.
+공통 <code>RHICompletionRetireQueue</code>를 재사용해 texture/mesh graveyard와 같은 완료 규약을 쓴다.</p>
+<p>DX12 live runner는 매 프레임 asset-cache maintenance의 completed fence로 PSO queue도
+회수하고, Vulkan은 <code>BeginFrame</code>에서 timeline 완료값으로 회수한다. DX12 <code>dx12.psocache</code>는
+completion 6에서 3개 보존→7에서 3개 회수와 completion 0 quarantine 1개를 단정했다.
+Vulkan <code>vk.selftest</code>는 실제 command submit 직후 무효화하고 <code>WaitForGpu</code> 뒤 1개 회수,
+old handle 거부·새 generation·validation layer clean을 함께 단정했다. VS18 MSBuild·v145·
+Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player가 성공했고 두 회귀의 stderr는
+0이었다.</p>
+<p>C3b2a는 제품 cache invalidation을 켜지 않았다. 현재 ShaderMeta의 production PSO 소비자는
+0이고 정적 pass 20여 곳은 deep-owned bytecode/desc request record가 없기 때문이다.
+C3b2b에서 먼저 owning request record와 targeted invalidation을 세우고, ShaderMeta generation을
+frame packet으로 render owner에 전달해 한 수직 경로의 next-use 재생성을 닫는다.</p>
+<p><strong>M5-C3b2b1 — deep-owned graphics request + targeted PSO invalidation — ✅ 구현·양 backend
+표적 검증 완료 (2026-08-28).</strong> <code>RHIGraphicsPipelineRequest</code>가 VS/PS bytecode, input element
+배열, 각 input semantic 문자열을 함께 소유하고 move 뒤 <code>RHIGraphicsPipelineDesc</code>의 빌린
+포인터를 다시 묶는다. <code>Replace</code>는 후보 PSO를 먼저 <code>GetOrCreate</code>한 뒤 성공한 경우에만 옛
+handle 하나를 <code>IRenderPipelineCache::InvalidatePipeline</code>으로 retire한다. 후보와 옛 handle이
+같으면 무효화하지 않으며, 옛 handle이 이미 global invalidation으로 stale이어도 유효한 후보로
+요청을 복구한다. compile 실패가 현재 draw PSO를 먼저 끊는 순서는 허용하지 않는다.</p>
+<p>같은 desc의 cache handle은 여러 draw/material이 공유할 수 있으므로 이 request를 material마다
+복제하지 않는다. <code>InvalidatePipeline</code>은 같은 handle의 CPU holder를 모두 stale로 만들며
+completion point는 GPU 수명만 보호한다. 따라서 C3b2b2의 RenderThread owner가 desc/key별
+unique request record와 그 handle을 참조하는 packet 집합을 소유하고, 한 프레임 경계에서
+전부 새 handle로 교체한다고 증명할 때만 targeted invalidation을 호출한다.</p>
+<p>DX12 <code>dx12.psocache</code>는 bytecode 포인터의 deep copy, targeted stale 1개와 나머지 cache handle
+보존, completion 6 보존→7 회수 1개를 단정했다. 이어 전체 invalidation 3개, 옛 desc의 같은
+slot 새 generation, completion 8 보존→9 회수 3개와 completion 0 shutdown quarantine 1개도
+그대로 통과했다. Vulkan <code>vk.selftest</code>는 실제 submit 뒤 새 cull variant를 먼저 생성하고 옛
+handle만 retire한 뒤, bytecode/input/semantic deep copy, 옛 desc의 새 generation, <code>WaitForGpu</code>
+뒤 targeted 1개 회수와 idle 경계 global 2개 회수를 단정했으며 validation layer가 clean이었다.
+VS18 MSBuild·v145·Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드와
+<code>dx12.psocache</code>·<code>dx12.selftest</code>·<code>vk.selftest</code>가 exit 0·stderr 0으로 통과했다. Player의 PhysX
+PDB 누락과 <code>/DELAYLOAD:vulkan-1.dll</code> LNK4229는 기존 경고이며 새 컴파일/링크 오류는 없다.</p>
+<p>이 절편은 <strong>그래픽 요청의 안전한 소유·교체 primitive</strong>까지만 닫았다. compute owning request는
+실제 장기 보관 소비자가 생길 때 추가한다. C3b2b1 시점에는 ShaderMeta generation을 frame
+packet에 싣거나 Material/pass 제품 owner가 <code>RHIGraphicsPipelineRequest</code>를 보유하지 않았고,
+production invalidation caller도 0이었다. 이어지는 C3b2b2가 대표 GBuffer 경로에서 이 경계를
+닫는다.</p>
+<p><strong>M5-C3b2b2 — ShaderMeta frame packet → GBuffer unique render request — ✅ 구현·양 backend
+제품/표적 검증 완료 (2026-08-28).</strong> <code>GBuffer.shadermeta</code>를 제품 자산으로 추가하고, GT가
+프레임 시작의 <code>DrainQueuedAssetChanges</code> 뒤 exact path로 GUID/handle과 immutable
+<code>ShaderMeta</code> snapshot을 해석해 <code>EnhancedLiveFramePacket::gbufferShaderMeta</code>에 싣는다.
+RenderThread는 <code>DataSystem</code>이나 파일을 다시 읽지 않고 packet snapshot만 소비한다.
+<code>EnhancedGBufferPass</code> 하나가 <code>RHIGraphicsPipelineRequest</code>와 적용한 <code>ShaderMetaHandle</code>을
+유일하게 소유하므로 공유 cache handle의 다른 CPU holder를 남기지 않는다.</p>
+<p>같은 generation은 no-op이고 새 generation은 pass 이름 <code>GBuffer</code>, opaque VS+PS와 compile
+target을 먼저 검증·컴파일한다. 성공한 후보 PSO를 먼저 만든 뒤 직전 제출의 completion point로
+옛 handle 하나만 targeted retire하고, 그 다음에만 request와 적용 generation을 교체한다.
+첫 제품 generation을 만들지 못하면 draw를 fail-closed로 막지만, 이후 잘못된 generation은
+거부하고 현재 PSO/generation을 보존한다. DX12는 DXIL, Vulkan은 SPIR-V를 같은 packet 계약에서
+선택하며 compiler output도 호출 범위에 한정한다.</p>
+<p>VS18 MSBuild·v145·Debug x64에서 RenderEngine·RenderTests·CreatorEditor·Player가 성공했다.
+최종 <code>vk.gbuffer</code>는 DX12/Vulkan 양쪽에서 ShaderMeta 1→2, old handle stale, new handle next draw,
+잘못된 generation 3 거부/current generation 2 보존을 단정했다. center diffuse/normal/bitmask/depth,
+coverage 2304/2304와 최대 채널 편차 0도 유지했고 Vulkan validation·미구현은 0건이었다.
+실제 Editor watcher probe는 자산의 <code>depthTest</code>를 <code>less</code>→<code>lessEqual</code>로 저장했을 때
+<code>handle 1:1 → 1:2</code>, apply 1→2, targeted replace 0→1, failure 0을 같은 프로세스에서 확인한 뒤
+원본을 복구했으며 exit 0·stderr 0이었다. <code>dx12.psocache</code>·<code>dx12.selftest</code>·<code>vk.selftest</code>도
+최종 코드에서 다시 exit 0·stderr 0으로 통과했다.</p>
+<p>이 완료 범위는 <strong>대표 pass의 source/entry/render-state generation 전환</strong>이다. 제품 Material의
+property/keyword/texture/CB를 item별 PSO와 draw에 전달하지 않았고, live watcher probe의 빈 씬은
+draw 0이므로 Material 시각 배선 증거로 세지 않는다. HLSL include dependency 추적과
+GBuffer/Forward 전체의 item별 Material 소비도 각각 후속 계약이다. 아래 M6-P0가 숫자 CB의
+격리 관통을, P1a가 제품 GBuffer 숫자 property packet/batch를, P1b2a가 ShaderMeta texture
+GUID/register 배선을 닫았지만 include dependency, multi-meta/permutation·Forward 경계는 남는다.</p>
+<p><strong>M5-C4 — raw Mesh/Material 소비 제거 + retired generation 축소 — ✅ 구현·전체
+게이트 완료 (2026-08-28).</strong> <code>FoliageType</code>의 runtime <code>Mesh*</code>/<code>Material*</code>를
+<code>shared_ptr</code>로 바꾸고 Model cache의 소유 로드와 <code>GetMeshShared</code>/<code>GetMaterialShared</code>를
+연결했다. Foliage proxy/packet 복사는 이제 실제 자산 세대를 소유한다. 추가 수명 감사에서
+Editor Undo/Redo의 <code>LoadModelToSceneObjCommand</code>가 장기 <code>Model*</code>를 보관하던 경로도 찾아
+<code>shared_ptr&lt;Model&gt;</code>로 바꿨다. 새 <code>LoadCachedModelShared</code>가 소유 경계이고, 오탈자 legacy
+<code>LoadCashedModel</code>은 즉시 호출 호환 wrapper로만 남아 외부 호출자는 0이다.</p>
+<p>disk reflection은 <code>modelName</code>과 shadow 필드만 계속 저장하고 runtime Mesh/Material owner는
+직렬화하지 않는다. selftest는 synthetic owner와 Foliage copy가 원본 owner reset 뒤에도
+Mesh/Material을 살리고 마지막 owner 해제 뒤 소멸함을 단정했다. Meta YAML 왕복 뒤 runtime
+owner가 비어 있음도 함께 검사했다. 실제 Material cache generation을 Foliage가 소유한 채
+<code>ContentReload</code>하면 cache entry는 즉시 분리되지만 이전 Material은 Foliage가 있는 동안만
+살고 마지막 consumer 해제 뒤 만료된다.</p>
+<p><code>DataSystem::RequiresLegacyRetiredGeneration</code>은 Model·Material에는 false,
+Texture·UITexture·SpriteSheet에는 true를 반환한다. 따라서 Model/Material 이전 세대는 실제
+외부 shared consumer만 보존하며 전역 retired 목록에 쌓이지 않는다. 반면
+<code>TerrainLayer::diffuseTexture</code>와 UI/Sprite 계열 raw texture alias는 아직 실소비 중이므로
+texture 계열의 <code>m_retiredTextureGenerations</code>는 의도적으로 유지했다. 이후 M6-P1b1이 제품
+Material/GBuffer의 texture 세대 소유만 닫았으며, 그 전역 보존을 제거할 근거로 확대하지 않는다.</p>
+<p>VS18 MSBuild·v145·Debug x64에서 RenderEngine·SceneRuntime·RenderTests·CreatorEditor·Player가
+성공했다. 최종 <code>dx12.selftest</code>·<code>vk.selftest</code>·<code>dx12.psocache</code>·<code>vk.gbuffer</code>는 모두 exit 0·
+stderr 0이었고 Vulkan validation·미구현은 0건이었다. DX12 35종 전수는 모든 stderr 0과
+기준선 그대로 <strong>통과 28 · 완료 4 · 실패 2 · 무판정 1</strong>이었다. pipeline composition은
+nodes 19와 Editor pass 상태를 단정했고, reflection golden은 타입 77·직렬화 77·실패 0·
+diff 0, asset authoring ownership은 model envelope v2·material payload v1·runtime reload·
+terrain/foliage/blackboard transaction·collision/tag/input/animator를 모두 통과했다.</p>
+<p><strong>M5-D — 표준 PBR property 이름 정본 — ✅ 구현·표적 검증 완료 (2026-08-27).</strong>
+<code>StandardMaterialProperty.h</code>가 숫자 7개와 texture 5개의 논리 이름을 소유하고 중복을
+컴파일 타임에 거부한다. M5-B2의 <code>DataSystem</code> texture GUID 이행과 ModelImport의
+<code>SceneToModelDraft</code> 기본 매핑이 이 정본을 함께 소비한다. <code>_BaseColorFactor</code>·
+<code>_MetallicRoughnessMap</code>처럼 M5에 존재하지 않던 기본 별칭은 더 이상 게시하지 않는다.
+이 슬라이스는 이름만 단일화하며 property 타입·offset·register의 정본은 계속
+ShaderMeta reflection이다. Debug x64 <code>RenderEngine</code>·<code>RenderTests</code>·<code>CreatorEditor</code> 빌드가
+성공했다. 실물 <code>ImporterModelDecoder</code>를 탄 <code>experiment.gltf</code>(Gunner, 재질 2개)와
+<code>experiment.fbx</code>(Ani_Mon, 재질 6개)는 표준 숫자 property 6개·underscore 별칭 0을
+단정했고, 두 검사 모두 구조/보간/탄젠트/Material 계약 실패 0으로 통과했다.</p>
+<p><strong>M5 — ✅ 완료 (2026-08-28).</strong> A/B1/B2가 소유 property와 단일 codec을, C2/C3가
+ShaderMeta·PSO generation/reload를, C4가 장기 Model/Mesh/Material raw 소비와 전역 retired
+의존을, D가 표준 property 이름을 닫았다. Texture 계열 raw alias와 제한된 retired 보존은
+별도 수명 작업으로 명시적으로 남겼다. item별 Material property/texture/CB/PSO draw 소비는
+M5 완료 범위가 아니라 M6가 소유한다.</p>
+<p><strong>M6 — 소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우 (4일) — ✅ 완료
+(2026-08-29).</strong>
+<code>copyQueue</code>의 축약 복사를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장하고,
+GBuffer/Forward가 아이템별 PSO로 그린다(PSO 키 정렬로 배칭 유지). M0에서
+폐기된 <code>.shader</code> 파일을 복구하지 않고, 물·바람 대표 재질을 새
+<code>.shadermeta</code> + HLSL 계약으로 작성해 픽셀 판정한다.
+★ <strong>최대 위험 슬라이스다 — &quot;배선만 이으면 그림이 더 나빠진다&quot;</strong>(Forward+
+전례: 소비자 없는 출력을 이었더니 화면이 퇴보했다). 검증 씬과 셰이더
+프로브(출력 단색 치환으로 원인 층 가르기)를 먼저 세우고 배선한다. 완료 시
+Material의 값 사슬이 처음으로 GPU에 도달한다 — <code>ApplyShaderParams</code> 구 사슬은
+여기서 은퇴.</p>
+<p><strong>착수 게이트와 순서:</strong> 선행 <code>M5-C3 → M5-C4</code>는 완료됐다. M6 안에서는 먼저 표준 PBR
+<code>.shadermeta</code> + 단색 프로브로 <code>Material → layout → CB → PSO</code> 한 재질을 수직 관통하고(P0),
+제품 GBuffer 숫자 property packet/batch를 닫은 뒤(P1a), texture generation owner(P1b1),
+ShaderMeta texture GUID/register(P1b2a), material keyword permutation PSO(P1b2b1),
+  multi ShaderMeta generation PSO(P1b2b2),
+  Forward owner packet(P2a, 완료) → ShaderMeta/PSO(P2b) → 물·바람(P2c) → 전체 재질(P2d)로
+  넓힌다. ModelImport의 V2·V3와 D5-a fail-closed cooked ID 게시 계약은 완료됐다.
+  D5-b1의 sidecar/manifest 계약, D5-b2a 단일 model producer, D5-b2b1 model 전수 Cook과
+  D5-b2b2 제품 pak 공급은 완료됐지만 D5-b2c 나머지 producer까지 닫히기 전에는
+  I5 직접 소비로 합류하지 않는다.</p>
+<p><strong>M6-P0 — Standard Material 숫자 b2 단색 프로브 — ✅ 구현·전체 게이트 완료
+(2026-08-28).</strong> 실제 catalog GUID의 <code>StandardMaterialProbe.shadermeta</code>와 HLSL을 추가하고,
+표준 숫자 property 7개를 <code>Material</code>에 설정한 뒤 DXIL/SPIR-V reflection에서 같은
+<code>MaterialProperties b2/space0/48B</code>와 field offset을 단정했다. <code>EnhancedGBufferPass</code>에는
+선택적 material constant bytes를 받는 pixel <code>b2</code> root parameter를 추가했다. 프로브는
+실제 <code>Material → ShaderMeta binding layout → 48B CB → 교체된 PSO → 5 MRT</code>를 양 backend에서
+같은 픽셀로 관통한다. 중첩된 <code>.shadermeta</code>의 source가 shader root가 아니라 meta 파일
+위치 기준임을 보존하도록 immutable snapshot에 runtime-only <code>originPath</code>도 넣었다.</p>
+<p>VS18 MSBuild/v145 Debug x64에서 RenderTests·CreatorEditor·Player를 빌드했고,
+<code>vk.gbuffer</code>는 DX12/Vulkan 모두 coverage 2304/2304·최대 채널 편차 0·Vulkan validation 0으로
+통과했다. <code>dx12.selftest</code>·<code>vk.selftest</code>, pipeline composition 19 nodes, reflection 77종/diff 0,
+asset authoring 회귀도 통과했다. DX12 35종은 기존 기준선과 같은 통과 28·완료 4·실패 2·
+무판정 1이며 전 항목 stderr 0을 유지했다.</p>
+<p>P0의 완료는 <strong>격리된 한 재질의 숫자 CB 프로브</strong>까지만 뜻했으며, 제품 배선 증거는 아래
+P1a에서 별도로 닫았다. 그러므로 P0 자체를 M6 전체 완료로 확대 해석하지 않는다.</p>
+<p><strong>M6-P1a — immutable per-material draw packet + 제품 GBuffer 숫자 property batch —
+✅ 구현·전체 게이트 완료 (2026-08-28).</strong> <code>BuildDrawPool</code> 동안만 <code>shared_ptr&lt;const Material&gt;</code>을
+임시 소유하고, 활성 제품 GBuffer ShaderMeta가 적용된 뒤 generation handle·복사된
+<code>ShaderMetaBindingLayout</code>·keyword 선택·property bytes·네 texture 참조를
+<code>EnhancedMaterialDrawSnapshot</code>으로 밀봉한다. 최종 <code>EnhancedDrawItem</code>에는 <code>Material*</code>가 없으며,
+<code>Material::BuildShaderPropertyBlock</code>은 논리 property를 const 경로로 reflection layout에 pack한다.</p>
+<p><code>EnhancedGBufferPass::ApplyShaderMeta</code>는 후보 VS/PS reflection에서 property layout을 만들고
+<code>b2/space0</code> 계약과 PSO 교체가 모두 성공한 뒤에만 현재 generation/layout을 설치한다.
+<code>PrepareFrame</code>은 다른 generation·다른 ShaderMeta·keyword 선택을 fail-closed로 거부하며 기존
+PSO를 보존한다. material batch key는 ShaderMeta handle·keyword·property bytes·texture 전체를
+비교하고, 같은 mesh/texture라도 property bytes가 다르면 batch를 나눠 각 batch의 48B <code>b2</code>를
+업로드한다.</p>
+<p>제품 <code>GBuffer.shadermeta</code>와 HLSL은 <code>baseColor</code>·<code>metallic</code>·<code>roughness</code>·<code>normalScale</code>·
+<code>occlusionStrength</code>·<code>emissive</code>·<code>alphaCutoff</code>의 표준 숫자 7개를 소비한다. <code>vk.gbuffer</code>는 같은
+mesh/texture에 property만 다른 두 draw를 넣어 draw/mesh/material/batch <code>2/1/2/2</code>, 양 backend
+coverage <code>3072/3072</code>, 좌·우 픽셀 최대 채널 편차 0을 확인했다. 잘못된 material generation은
+다음 prepare에서 거부되고 현재 PSO/meta는 보존됐다.</p>
+<p>VS18 MSBuild/v145 Debug x64의 RenderEngine·SceneRuntime·RenderTests·CreatorEditor·Player 빌드,
+<code>vk.gbuffer</code>, <code>dx12.gbuffer</code>·<code>dx12.skinning</code>·양 backend selftest, pipeline composition 19 nodes,
+reflection 77종/diff 0, asset authoring 회귀가 통과했다. DX12 35종은 기존 기준선과 같은 통과
+28·완료 4·실패 2·무판정 1이며 전 항목 stderr 0이다.</p>
+<p><strong>P1a에서 의도적으로 남겼던 경계:</strong> 당시 texture 네 칸은 raw alias였고 제품 GBuffer는
+하나의 활성 ShaderMeta와 빈 keyword만 받았다. 아래 P1b1은 texture CPU generation 수명을,
+P1b2a는 ShaderMeta texture GUID/register binding을, P1b2b1은 같은 active ShaderMeta 안의
+material keyword permutation PSO를, P1b2b2는 material별 복수 ShaderMeta generation PSO를
+닫았다. Forward 및 전체 재질 전환은 아직 완료가 아니다. 그러므로 M6 전체와 페이즈 완료 공수는
+완료로 세지 않는다.</p>
+<p><strong>M6-P1b1 — Material/draw packet texture generation ownership — ✅ 구현·전체 게이트 완료
+(2026-08-28).</strong> <code>Material</code>에 baseColor·normal/bump·ORM·AO·emissive 다섯 texture의
+<code>shared_ptr</code> owner를 두었다. 당시 public raw view/setter는 P2d-e 전까지 호환 경계로 유지했고,
+제품 sealing은 owner가 없는 raw 조합을 fail-closed로 거부했다. P2d-e에서 호출자 재측정 뒤
+그 raw 표면을 제거했다. <code>DataSystem::FinalizeMaterialRuntime</code>은 저장 정본인 property GUID를 먼저 해석해
+<code>LoadSharedMaterialTexture</code> generation을 설치하고, legacy name은 GUID가 없을 때의 fallback이다.
+Assimp <code>ModelLoader</code>와 MeshRenderer Inspector의 texture 선택/삭제도 같은 shared setter를 탄다.</p>
+<p><code>EnhancedMaterialDrawSnapshot</code>은 GBuffer가 쓰는 baseColor·normal·ORM·emissive 네 owner를
+복사해 GPU cache upload/record가 끝날 때까지 CPU texture generation을 직접 살린다. GBuffer
+batch key와 binding은 그 owner의 raw view만 순간적으로 사용한다. synthetic 1×1 baseColor
+texture를 두 Material이 공유하는 fixture에서 Material/local owner를 먼저 해제해도 두 draw
+packet이 generation을 유지했고, packet 해제 뒤 <code>weak_ptr</code>가 만료됐다. 같은 owned texture와
+다른 property의 두 draw는 양 backend draw/mesh/material/batch <code>2/1/2/2</code>, coverage
+<code>3072/3072</code>, 첫/둘째 픽셀 최대 편차 <code>0</code>, Vulkan validation·texture failure <code>0</code>으로 통과했다.</p>
+<p>VS18 MSBuild/v145 Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player 빌드와
+<code>vk.gbuffer</code>, <code>dx12.gbuffer</code>·<code>dx12.skinning</code>·양 backend selftest, pipeline composition 19 nodes,
+reflection 77종/diff 0, asset authoring 회귀가 통과했다. DX12 35종은 M6-P1 기준선과 항목별
+차이 0인 통과 28·완료 4·실패 2·무판정 1이며 전 항목 stderr 0이다.</p>
+<p>이 완료는 <code>m_retiredTextureGenerations</code> 전체 제거가 아니다. Terrain/UI/Sprite 등 다른 raw
+texture 소비자가 남아 전역 보존은 유지한다.</p>
+<p><strong>M6-P1b2a — ShaderMeta texture GUID/register binding — ✅ 구현·전체 게이트 완료
+(2026-08-28).</strong> 제품 <code>GBuffer.shadermeta</code>를 숫자 7개와 <code>baseColorMap</code>·<code>normalMap</code>·<code>ormMap</code>·
+<code>emissiveMap</code> texture 4개로 확장하고 HLSL resource 이름도 같은 정본으로 맞췄다. VS/PS
+reflection은 이 네 property가 순서대로 <code>t0..t3/space0</code>임을 만들며, GBuffer 후보는 정확히 이
+layout일 때만 PSO/current meta를 교체한다. draw snapshot은 각 texture의 property 이름·논리
+GUID·register/space·generation owner를 밀봉하고, prepare 시 활성 reflection layout과 완전히
+같은지 다시 검사한다.</p>
+<p><code>vk.gbuffer</code>는 <code>baseColorMap</code> 한 property에 서로 다른 non-nil GUID와 서로 다른 owned texture를
+넣어 draw/mesh/material/batch <code>2/1/2/2</code>, coverage <code>3072/3072</code>, 양 backend 첫/둘째 픽셀 최대
+편차 <code>0</code>, Vulkan validation·texture failure <code>0</code>을 통과했다. snapshot의 <code>baseColorMap</code> register를
+<code>t0</code>에서 <code>t1</code>로 변조한 음성 대조는 prepare에서 거부됐고 현재 pipeline/meta는 보존됐다.
+Material/local owner 해제 뒤 packet 유지와 packet 해제 뒤 반환도 그대로 통과했다.</p>
+<p>VS18 MSBuild/v145 Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player 빌드와
+reflection 77종/diff 0, asset authoring, pipeline composition 19 nodes, Vulkan selftest가
+통과했다. DX12 35종은 P1b1 기준선과 항목별 차이 0인 통과 28·완료 4·실패 2·무판정 1이며
+전 항목 stderr 0이다. nil texture GUID의 legacy/default fallback은 허용하며, 실제
+  <code>experiment::Material</code>의 실제 catalog/manifest asset/shader identity와 draw 소비는
+  Serialization D5-b와 I5에서 별도로 닫는다.</p>
+<p><strong>M6-P1b2b1 — material keyword permutation PSO — ✅ 구현·전체 게이트 완료
+(2026-08-28).</strong> 제품 <code>GBuffer.shadermeta</code>에 <code>SHADING_QUALITY=[full,reduced]</code> 축을 추가했다.
+<code>full=0</code>은 기존 출력 정본이고 <code>reduced=1</code>은 normal-map 결과를 vertex normal 쪽으로 완화한다.
+draw snapshot은 authored selection과 정규화된 <code>ShaderMetaPermutation::key</code>를 함께 밀봉한다.
+GBuffer는 default variant를 candidate-first로 교체하고 추가 variant를 generation+permutation
+key로 준비한 뒤, pass 전역 PSO가 아니라 material batch 직전에 해당 handle을 건다. reflection
+layout은 각 define 조합에서 다시 해석해 b2/texture 계약이 같을 때만 variant를 게시한다.</p>
+<p><code>vk.gbuffer</code>는 첫 두 draw의 서로 다른 baseColor texture/GUID 계약을 보존하면서, 둘째와 셋째
+draw는 texture·property를 완전히 공유하고 <code>full/reduced</code> selection만 다르게 했다. 양 backend
+draw/mesh/material/batch <code>3/1/3/3</code>, coverage <code>3072/3072</code>, 첫/둘째/셋째 최대 채널 편차 <code>0</code>,
+Vulkan validation·texture failure <code>0</code>으로 통과했고 normal 픽셀이 두 permutation에서 분리됐다.
+변조 permutation key는 prepare에서 거부되어 현재 default/alternate PSO가 보존됐으며, 다음
+ShaderMeta generation 적용 뒤 옛 alternate handle은 targeted retire되고 variant 수는 2→1이 됐다.</p>
+<p>VS18 MSBuild/v145 Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐다.
+reflection 77종/diff 0, asset authoring, pipeline composition 19 nodes, Vulkan selftest가 통과했고,
+DX12 35종은 P1b2a 기준선과 판정 차이 0인 통과 28·완료 4·실패 2·무판정 1, 전 항목 stderr
+0이다.</p>
+<p><strong>M6-P1b2b2 — multi ShaderMeta generation PSO — ✅ 구현·전체 게이트 완료
+(2026-08-28).</strong> GT는 기본 <code>GBuffer.shadermeta</code>와 <code>DataSystem::SnapshotMaterials()</code>가 참조하는
+ShaderMeta GUID 집합을 현재 handle+<code>shared_ptr&lt;const ShaderMeta&gt;</code>로 frame packet에 밀봉한다.
+RT sealing은 material GUID로 그 집합만 조회하며 DataSystem/file을 다시 읽지 않는다. GBuffer는
+primary default request를 frame root-layout 정본으로 유지하고, 같은 pipeline-layout 계약인
+secondary meta+permutation만 candidate-first로 variant map에 게시한다. primary 교체는 같은 catalog
+slot의 옛 variant만, frame commit은 이번 packet에서 빠진 meta key만 retire한다. 서로 다른 meta key가
+같은 PSO cache handle을 공유하면 마지막 holder가 사라질 때까지 invalidation을 미룬다.</p>
+<p><code>vk.gbuffer</code>는 기존 동일-meta <code>SHADING_QUALITY=full/reduced</code>와 texture/GUID 계약을 보존한 채 네 번째
+draw에 별도 ShaderMeta handle/state를 사용했다. 양 backend draw/mesh/material/batch <code>4/1/4/4</code>, coverage
+<code>3072/3072</code>, 네 픽셀 영역 최대 편차 <code>0</code>, Vulkan validation·texture failure <code>0</code>으로 통과했다. primary
+reload가 secondary를 보존하고, secondary invalid candidate가 current를 보존하며, secondary generation
+교체와 다음 frame 제외가 각각 정확한 key만 retire함을 확인했다. primary/secondary meta 원본 owner를
+놓은 뒤 frame packet이 두 generation을 유지하고 packet 해제 뒤 반환하는 수명 게이트도 통과했다.</p>
+<p>VS18 MSBuild/v145 Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐다. reflection
+77종/diff 0, pipeline composition 19 nodes, asset authoring, Vulkan selftest가 통과했다. DX12 35종 최종
+스윕은 P1b2b1 기준선과 판정 줄 차이 0인 통과 28·완료 4·실패 2·무판정 1, 전 항목 stderr 0이다.</p>
+<p><strong>M6-P2 — Forward + 전체 제품 재질 전환 — ✅ 완료 (2026-08-29).</strong> 최대 위험 범위를 다음처럼
+빌드 가능한 조각으로 고정한다.</p>
+<ol>
+<li><p><strong>P2a Forward immutable value/texture-owner packet — ✅ 구현·표적 게이트 완료
+(2026-08-29).</strong> <code>BuildDrawPool</code>이 잠시 소유한 transparent <code>Material</code>에서 baseColor,
+metallic, roughness, normal 사용 값과 baseColor/normal/ORM/emissive texture generation을
+<code>EnhancedForwardMaterialDrawSnapshot</code>으로 복사한다. 고정 Forward 계약의 논리 property,
+GUID, <code>t4..t7/space0</code>, <code>shared_ptr&lt;Texture&gt;</code> owner를 함께 밀봉한 뒤 Material owner를 놓는다.
+<code>EnhancedForwardPass</code>는 packet이 있으면 <code>EnhancedDrawItem</code>의 legacy factor/raw texture를
+읽지 않으며 property/register 순서가 다르면 mesh/texture upload 전에 fail-closed한다.</p>
+</li>
+<li><p><strong>P2b Forward ShaderMeta + material별 PSO/binding — ✅ 구현·표적/회귀 게이트 완료
+(2026-08-29).</strong> <code>Forward.shadermeta</code>가 Standard 숫자 7개·texture 4개·
+<code>SHADING_QUALITY</code>와 transparent render state를 소유한다. GT frame packet은 GBuffer와 별도인
+Forward generation/value를 소유하고, <code>SealForwardMaterials</code>가 reflection-packed <code>b2/48B</code>,
+<code>t4..t7/space0</code>, keyword/permutation과 texture owner를 draw packet에 밀봉한다. pass는 각
+<code>(ShaderMeta generation, permutation, keyword selections)</code>마다 일반/Reference owning PSO pair를
+둘 다 후보 생성한 뒤 한 번에 게시한다. <code>CaptureFromView</code>의 back-to-front 배열은 재정렬하지
+않고 같은 mesh/material/pair가 바로 이어질 때만 instancing한다. reload candidate가 실패하면
+마지막 accepted ShaderMeta value owner로 material block을 계속 밀봉하고, half-pair 실패에서
+cache handle을 invalidate하지 않아 다른 owner를 stale시키지 않은 채 retry가 같은 entry를
+재사용한다. snapshot/legacy 선택은 <code>ShadeInstance.materialFlags</code>의 명시적 bit로 운반해 합법적인
+음수 <code>alphaCutoff</code>와 충돌하지 않으며, legacy per-instance 값도 유지한다.</p>
+</li>
+<li><p><strong>P2c 물·바람 대표 재질 — ✅ 구현·표적/회귀 게이트 완료 (2026-08-29).</strong> 새
+<code>ForwardWater</code>·<code>ForwardWind</code> <code>.shadermeta + HLSL</code>과 Material asset을 추가했다. 실제
+<code>m_shaderMetaGuid</code>가 각 generation을 선택하며, Standard 숫자 7개의 48B prefix 뒤
+Water의 <code>waveSpeed</code>·<code>waveAmplitude</code>·<code>waveFrequency</code>·<code>waterTint</code> 또는 Wind의
+<code>windSpeed</code>·<code>windStrength</code>·<code>windFrequency</code>·<code>windTint</code> 네 float를 붙인 64B <code>b2</code>를
+reflection layout으로 pack한다. 표준 texture 이름과 <code>t4..t7/space0</code>, material별
+일반/Reference PSO pair, 기존 back-to-front 인접-only batch는 그대로 유지한다.</p>
+<p>canonical Water/Wind seed는 Scene/proxy가 소유하는 non-cache 대표 Material도 frame에서
+generation을 resolve하도록 catalog의 두 대표 Meta를 항상 싣던 임시 bridge였다. RT는 catalog나
+<code>DataSystem</code>을 다시 읽지 않았고, 이 고정 seed 목록은 P2d-d의 arbitrary required-asset packet으로
+일반화한 뒤 제거됐다. <code>windTint</code> 변경은 다음 frame packet에서 다시 밀봉돼 양 backend
+픽셀에 반영되고 invalid meta/generation/register는 마지막 accepted variant를 보존한 채
+fail-closed한다.</p>
+</li>
+<li><p><strong>P2d 전체 제품 재질/legacy 정리 — ✅ 완료 (2026-08-29).</strong> 남은 material 소비자를 모두 새 packet/PSO
+계약으로 옮긴다.</p>
+<ul>
+<li><p><strong>P2d-a Foliage 소비 — ✅ 완료 (2026-08-29).</strong> <code>FoliageRenderProxy</code>가 type별 mesh/material
+<code>shared_ptr</code>, instance world matrix와 transformed AABB를 <code>DrawSource</code>로 밀봉한다. 제품
+<code>BuildDrawPool</code>이 이를 opaque/transparent draw로 펼치며, view별 <code>CaptureFromView</code>가 AABB를
+절두체로 판정한다. 단일 카메라에서 만든 <code>m_isCulled</code>는 multi-view 제품 판정에 쓰지 않는다.</p>
+</li>
+<li><p><strong>P2d-b dynamic flow — ✅ 완료 (2026-08-29).</strong> <code>Material::m_flowInfo</code>의 wind vector/UV
+scroll과 <code>BuildLiveFramePacket</code>의 total/delta seconds를 32B
+<code>EnhancedForwardMaterialFlowSnapshot</code>으로 복사한다. 이는 authored ShaderMeta <code>b2</code>와 섞지
+않고 128B Forward <code>ShadeInstance</code>에 실리며, Water/Wind가 UV scroll·wind phase·frame time을
+소비한다. 값은 batch key에도 포함하고 NaN/Inf는 snapshot에서 fail-closed한다.</p>
+</li>
+<li><p><strong>P2d-c generic texture — ✅ 완료 (2026-08-29).</strong> <code>Material</code>의 Standard별 고정 owner
+5개를 <code>(propertyName, shared_ptr&lt;Texture&gt;)</code> runtime vector로 통합하고 DataSystem이 임의
+texture GUID도 복원한다. GBuffer/Forward snapshot은 ShaderMeta authoring 순서의 가변
+owner vector를 보존하고 pass는 이름이 아니라 reflection register로 기존 4-slot 물리 범위에
+투영한다. Wind fixture의 <code>baseColorMap@t4</code>를 <code>windMap@t4</code>로 바꾸고 실제 1x1 owner/GUID를
+원본 해제 뒤 양 backend가 소비하며 packet 해제 뒤 반환되는 데까지 닫았다.</p>
+</li>
+<li><p><strong>P2d-d required assets — ✅ 완료 (2026-08-29).</strong> Editor/Player Host가 활성 Scene의
+MeshRenderer/Foliage Material <code>shared_ptr</code>를 snapshot하고 rendering mode에 따라 GBuffer/Forward
+ShaderMeta GUID를 <code>EnhancedRequiredAssetPacket</code>에 선언한다. packet은 nil/중복을 제거하고
+<code>(domain, GUID)</code> 순으로 정규화되며 <code>BuildLiveFramePacket</code>이 generation/value owner로 resolve한다.
+cache 로드 전 Water/Wind 임의 GUID 2개가 양 backend frame에 들어오는 것을 판정했고 제품 코드의
+<code>ForwardWater.shadermeta</code>/<code>ForwardWind.shadermeta</code> 고정 seed 목록은 제거했다.</p>
+</li>
+<li><p><strong>P2d-e legacy 호출자 재측정/은퇴 — ✅ 완료 (2026-08-29).</strong> 제품
+<code>BuildLiveFramePacket</code>의 <code>SnapshotMaterials()</code> 전수 스캔 2곳을 제거해 Host required packet만
+secondary ShaderMeta generation을 선언하게 했다. 제품 <code>BuildDrawPool</code>의 legacy material
+field 중복 쓰기도 0건으로 만들었다. Material의 public raw texture alias 5개와 외부 호출자 0인
+raw <code>Texture*</code> setter 6개를 제거하고 Editor/DataSystem/selftest를 owning getter로 옮겼다.
+<code>m_dirtyCBs</code>는 읽는 곳 0이라 제거했다. 실행 코드의 <code>ApplyShaderParams</code>는 0건이다.</p>
+<p>남긴 경계도 분리했다. <code>SnapshotMaterials()</code>의 실제 호출자 2곳은 Editor asset 목록/번들
+표시라 frame generation 소유와 무관하다. <code>TrySetValue</code>는 C# <code>Mesh_SetMaterialFloat/Int</code>가
+실제 호출하므로 유지한다. snapshot 없는 <code>EnhancedDrawItem</code> 값은 ShaderMeta/Material/cache를
+읽지 않는 격리 geometry selftest 입력으로만 남고 제품 draw pool writer는 0이다.</p>
+</li>
+</ul>
+</li>
+</ol>
+<p>P2a의 <code>vk.forward</code>는 같은 mesh를 좌/우 두 transparent draw로 그리되 legacy 값은 같고
+owning packet의 서로 다른 1x1 baseColor texture만 다르게 했다. 원 texture owner를 렌더 전에
+놓아도 DX12/Vulkan 양쪽에서 두 영역이 분리되고, 변조 <code>t4</code> packet은 fail-closed하며, draw packet
+해제 뒤 두 owner가 반환되어야 통과한다. 실측은 coverage <code>3072/3072</code>, 양 backend 좌/우 최대
+채널 편차 <code>0</code>, 두 material 분리 <code>0.26724</code>, outside <code>0</code>, Vulkan validation·미구현 <code>0</code>이다.
+<code>vk.forward</code>·<code>vk.gbuffer</code>·<code>vk.selftest</code>, DX12
+<code>forward</code>·<code>forwardshade</code>·<code>forwardscale</code>가 stderr 0으로 통과/완료했다. VS18 MSBuild/v145 Debug
+x64의 RenderEngine·RenderTests·CreatorEditor·Player도 빌드됐다. DX12 35종 전수 스윕은 P1b2b2
+기준선과 판정 줄 차이 0인 통과 28·완료 4·실패 2·무판정 1이며 전 항목 stderr 0이다.
+P2a는 수명/입력 선행 조각이며
+그 자체로 Forward ShaderMeta/PSO나 M6 완료 증거가 아니었다. P2b의 새 <code>vk.forward</code>는 alpha
+primary A와 additive secondary B를 겹치는 A/B/A 순서로 넣고, 6 draw가 전역 PSO 정렬 없이
+인접 3 batch로 남는지 픽셀로 판정한다. DX12/Vulkan overlap RGB는
+<code>0.25/0.50/0.50</code>으로 기대식과 일치했고 backend 최대 편차 <code>0</code>, coverage <code>1134/1134</code>,
+outside <code>0</code>, ShaderMeta owner 2개·material packet 3개·variant 2개, invalid meta/generation/register
+fail-closed, Vulkan validation·미구현 <code>0</code>이 통과했다. 두 번째 PSO 생성 실패 주입은 shared cache
+invalidation <code>0</code>, 재시도 성공, 임시 variant frame retirement를 판정했고, 제품 <code>alphaCutoff=-1</code>과
+legacy 비백색 tint도 각각 snapshot/instance 경로를 유지했다. <code>vk.gbuffer</code>·<code>vk.selftest</code>,
+DX12 <code>forward</code>·<code>forwardshade</code>도 재통과했고 <code>forwardscale</code>는 완료했다. VS18 MSBuild/v145 Debug
+x64의 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐다. 이 시점에는 물·바람과 전체
+제품 재질/legacy 정리가 P2c/P2d에 남았으므로 P2b만으로 M6 완료를 선언하지 않았다.</p>
+<p>P2c의 <code>vk.forward</code>는 primary/water/wind PSO A/B/A/C의 7 draw를 입력 순서 그대로 인접 4
+batch로 유지하고 frame ShaderMeta owner 3개와 48/64B material packet 5개를 판정했다.
+DX12/Vulkan overlap RGB는 각각 <code>0.125/0.25/0.5</code>, wind G는 <code>0→0.325</code>, coverage는
+<code>1134/1134</code>로 같았다. backend 최대 편차와 기대식 편차는 <code>0</code>, custom은 <code>0.00005</code>, outside는
+<code>0</code>, Vulkan validation·미구현은 <code>0</code>이다. VS18 MSBuild/v145 Debug x64의 RenderEngine·
+RenderTests·CreatorEditor가 빌드됐고, <code>vk.gbuffer</code>·<code>vk.selftest</code>, DX12 <code>forward</code>·<code>forwardshade</code>가
+재통과했으며 <code>forwardscale</code>는 완료했다. pipeline composition도 19 nodes를 유지했다. 이
+완료는 일반 transparent Material 제품 경로의 대표 Water/Wind bridge까지다.</p>
+<p>P2d-a의 <code>vk.forward</code>는 synthetic <code>FoliageRenderProxy</code>의 type 1개와 instance 3개를 입력으로
+유효 type의 draw source 2개만 생성하고, 한 instance의 기존 <code>m_isCulled=true</code>도 view별 AABB
+판정 입력으로 보존하는지 검사했다. 원 proxy/type Material owner 해제 뒤 draw source가 수명을
+유지하고 source 해제 뒤 반환되는 것도 통과했다. 기존 Water/Wind 7 draw/4 batch/3 meta와
+coverage <code>1134/1134</code>, wind G <code>0→0.325</code>, backend 편차·validation·미구현 <code>0</code>을 유지했다.
+VS18 MSBuild/v145 Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐고,
+<code>vk.gbuffer</code>·<code>vk.selftest</code>, DX12 <code>forward</code>·<code>forwardshade</code>가 재통과했다.</p>
+<p>P2d-b의 <code>vk.forward</code>는 producer frame delta <code>0.125→0.25</code>와 누적 total 증가를 먼저 판정하고,
+<code>m_flowInfo</code> 32B+frame total/delta를 immutable draw snapshot과 128B Forward instance로 밀봉했다.
+Wind의 authored property와 flow phase/time을 다음 packet에서 함께 바꾼 결과 DX12/Vulkan G는
+각각 <code>0→0.2598</code>, overlap RGB는 <code>0.125/0.25/0.5</code>, coverage는 <code>1134/1134</code>였다. backend 최대
+편차와 기대식 편차는 <code>0</code>, custom 편차는 <code>0.00023</code>, outside·Vulkan validation·미구현은 <code>0</code>이며
+NaN time snapshot도 fail-closed했다. VS18 MSBuild/v145 Debug x64의 RenderEngine·RenderTests·
+CreatorEditor·Player가 빌드됐고, <code>vk.gbuffer</code>·<code>vk.selftest</code>, DX12 <code>forward</code>·<code>forwardshade</code>가
+재통과했다.</p>
+<p>P2d-c의 <code>vk.forward</code>는 Wind ShaderMeta/HLSL의 첫 texture를 <code>windMap@t4</code>로 authoring하고,
+generic 1x1 texture GUID/owner를 Material vector→immutable Forward packet으로 밀봉했다. 원
+Material/owner 해제 뒤 DX12/Vulkan 모두 같은 픽셀을 유지하고 packet 해제 뒤 owner가 반환됐다.
+기존 draw/batch/meta <code>7/4/3</code>, overlap RGB <code>0.125/0.25/0.5</code>, Wind G <code>0→0.2598</code>, coverage
+<code>1134/1134</code>, backend·기대식 편차 <code>0</code>, custom <code>0.00023</code>, validation·미구현 <code>0</code>을 유지했다.
+<code>vk.selftest</code>는 legacy texture 5개와 generic <code>baseMap</code>까지 owner vector 6개를 GUID로 복원하고
+copy 공동 소유를 판정했다. <code>vk.gbuffer</code>, DX12 <code>forward</code>·<code>forwardshade</code>도 재통과했고 VS18
+MSBuild/v145 Debug x64 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐다.</p>
+<p>P2d-d의 <code>vk.forward</code>는 material cache 로드 전에 순서가 뒤섞인 Water/Wind GUID와 중복·nil 입력을
+required packet에 넣고 canonical 2개로 정규화되는지, 두 generation owner가 frame에 실리는지
+판정했다. 제품 코드의 고정 seed 이름은 0건이며 draw/batch/meta <code>7/4/3</code>, overlap RGB
+<code>0.125/0.25/0.5</code>, Wind G <code>0→0.2598</code>, coverage <code>1134/1134</code>, backend·기대식 편차 <code>0</code>,
+custom <code>0.00023</code>, validation·미구현 <code>0</code>을 유지했다. <code>vk.gbuffer</code>·<code>vk.selftest</code>, DX12
+<code>forward</code>·<code>forwardshade</code>가 재통과했고 VS18 MSBuild/v145 Debug x64 RenderEngine·SceneRuntime·
+RenderTests·CreatorEditor·Player가 빌드됐다.</p>
+<p>P2d-e의 <code>vk.forward</code>는 Water/Wind Material이 cache에 들어온 뒤에도 빈 required packet에서
+GBuffer/Forward ShaderMeta가 각각 primary 1개만 남는지 음성 판정했다. 명시 packet에서는 정확히
+Forward primary+Water+Wind 3개이며 cache의 다른 재질은 frame 수명으로 새지 않는다. raw Material
+texture alias/setter·<code>m_dirtyCBs</code>·<code>ApplyShaderParams</code>는 실행 코드 0건이고 제품 draw pool의 legacy
+field writer도 0건이다. draw/batch/meta <code>7/4/3</code>, overlap RGB <code>0.125/0.25/0.5</code>, Wind G
+<code>0→0.2598</code>, coverage <code>1134/1134</code>, backend·기대식 편차 <code>0</code>, custom <code>0.00023</code>, Vulkan
+validation·미구현 <code>0</code>을 유지했다. <code>vk.gbuffer</code>·<code>vk.selftest</code>, DX12 <code>forward</code>·<code>forwardshade</code>가
+같은 실행에서 통과했고 VS18 MSBuild/v145 Debug x64 RenderEngine·SceneRuntime·RenderTests·
+CreatorEditor·Player가 빌드됐다.</p>
+<h3 id="m6-이후-phase-4-계열-인계">M6 이후 PHASE 4 계열 인계</h3>
+<p>이 문서는 M0~M7의 <strong>기반과 완료 기록</strong>만 소유한다. 이후 작업을 더 이상 단일 PBR 직선
+레인으로 정의하지 않는다. 2026-09-03 소스 재감사에서 배선 결함, Blender형 재질
+모델, renderer/post 기능이 서로 다른 실패 축임을 확인해 다음으로 분리했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>후속</th><th>이 문서가 제공하는 입력</th><th>후속 정본</th></tr></thead>
+<tbody><tr><td>PHASE 4</td><td>ShaderMeta, immutable material snapshot, Slang compiler/reflection, DXIL/SPIR-V</td><td><a href="../PBRWiringStabilizationPlan.html"><code>PBRWiringStabilizationPlan.md</code></a></td></tr>
+<tr><td>PHASE 4.25</td><td>property/texture override와 generation 수명</td><td><a href="../BlenderMaterialGraphPlan.html"><code>BlenderMaterialGraphPlan.md</code></a></td></tr>
+<tr><td>PHASE 4.75</td><td>Pipeline/Shader Asset와 native pass 기반</td><td><a href="../ScriptableRenderPipelinePlan.html"><code>ScriptableRenderPipelinePlan.md</code></a></td></tr></tbody></table></div>
+<p>현재 PBR 제품 결함의 목록과 완료 판정은 PHASE 4가 다시 실측한 소스를 정본으로 한다.
+이 완료 문서의 과거 HLSL 줄 수나 당시 selftest 초록을 현재 제품 동작의 증거로 재사용하지
+않는다. Blender Principled, Material Graph, shadow/probe/post도 M6/M7 완료 범위가 아니다.</p>
+<p><strong>M7 — Slang reflection과 DXIL/SPIR-V 타깃 동등성 (2일) — ✅ 구현·양 백엔드
+자가 검증 완료 (2026-08-24).</strong></p>
+<p><code>IRHIShaderCompiler::Reflect</code>/<code>RHIShaderCompiler::ReflectFile</code>이 컴파일 캐시와 분리된
+같은 Slang linked program에서 타깃 program layout을 읽는다. <code>RHIShaderReflection</code>은
+소유 값으로 stage, resource kind, 논리 register/space, 배열 수, cbuffer byte size,
+field scalar·row/column·offset/size를 보존한다. <code>slang.h</code> 편의 메서드가 import library
+의존을 만들지 않도록 필요한 reflection C export도 기존 <code>slang-compiler.dll</code> 동적
+로딩 경계에서 명시적으로 해석한다. <code>spirv-reflect</code>나 새 전역 registry는 추가하지 않았다.</p>
+<p>Vulkan의 t/u/s 100/200/300 shift는 추출 경계에서 HLSL 논리 register로 되돌린다.
+상수 버퍼의 실제 GPU offset도 DXIL과 같게 하기 위해 SPIR-V 타깃에
+<code>-fvk-use-dx-layout</code>을 고정했고, 옛 SPIR-V 디스크 캐시가 섞이지 않도록 compiler cache
+계약을 v11로 올렸다. <code>ShaderMetaReflection::Resolve</code>는 M4 property 선언을 실제 stage
+reflection과 대조해 하나의 material cbuffer와 texture binding을 소유
+<code>ShaderMetaBindingLayout</code>으로 만든다. property type 불일치, stage 간 binding 불일치,
+선언 부재와 둘 이상의 material cbuffer는 fail-closed다.</p>
+<p>catalog GUID로 읽는 <code>ShaderMetaFixture.shadermeta</code>의 <code>QUALITY=high</code> 조합을 VS/PS 각각
+DXIL·SPIR-V로 반사했다. <code>dx12.selftest</code>와 <code>vk.selftest</code> 모두 2 stages 동등,
+<code>MaterialProperties b2/space0/32B</code>, <code>tint@0+16</code>, <code>roughness@16+4</code>, <code>albedoMap@t3</code>와
+음성 대조를 단정했다. DX12 PNG와 Vulkan PNG가 생성됐고 Vulkan 검증 레이어는
+클린이었다. Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐고,
+240-frame warmup의 DX12 35종 전수 판정도 기준선과 같은 <strong>통과 28 · 완료 4 ·
+실패 2 · 무판정 1</strong>이었다. M7 완료 자체는 M6 소비 증거가 아니며, 이후 M6-P1a가 실제
+draw item의 숫자 property CB와 제품 GBuffer batch를 별도 판정했고 M6-P1b1이 texture
+generation owner를, M6-P1b2a가 ShaderMeta GUID/register texture binding을, M6-P1b2b1이
+material keyword permutation PSO를, M6-P1b2b2가 multi-meta generation PSO를 닫았다.
+Forward의 owning value/texture packet은 M6-P2a가 닫았고 P2b가 별도 frame generation owner,
+reflection <code>b2/t4..t7</code>, material별 일반/Reference PSO pair와 인접-only transparent batching을 닫았다.</p>
+<p>합계 <strong>23일</strong>(M0 1 · M1A 2.5 · M1B 3 · M2A 1.5 · M2B 1 · M3 3 · M4 2 ·
+M5 3 · M6 4 · M7 2). M0·M1A·M1B·M2A·M2B·M3·M4·M5·M6·M7의 실행 코드 기준
+<strong>23일 완료, 남은 추정 0일</strong>이다. PHASE 4/4.25/4.75 후속 작업은 이 23일 합계에
+넣지 않는다.
+M2B·M3·M4·M5·M7 선행은 모두 닫혔다. native Slang source/module/import 기반만 격리된
+fixture로 확인할 수 있으나 제품 PBR 배선은 PHASE 4, material specialization은 PHASE 4.25,
+generic Custom Pass Slang Code mode는 PHASE 4.75의 서로 다른 완료선이다.</p>
+<p>★ <strong>판정 문구 정정</strong>: &quot;자가 검증 33종&quot;은 낡았다 — 기준선이 35종으로 갱신됐고
+(<code>a253a22d</code>), 셰이더 작업 두 커밋은 <strong>32종 통과</strong>로 판정했다. 각 슬라이스는
+착수 시점의 스윕 결과를 기준선으로 삼고 그 수를 노트에 적는다.</p>
+<p>★ <strong>판정 줄의 의미가 넓어진 것을 이어받는다</strong>(<code>cc12ba4f</code>): 소스가 파일이 되면서
+&quot;셰이더 컴파일 통과&quot;가 &quot;파일을 찾았고 컴파일된다&quot;가 됐다 — 배포에서 셰이더가
+빠지면 여기서 잡힌다. M7의 SPIR-V 산출도 같은 성질을 갖는다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-완료-기준">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-완료-기준">5. 완료 기준</h2></div>
+<div class="prose"><ol>
+<li><strong>컴파일 진입점 하나</strong> — ✅ <code>RHIShaderCompiler</code> + 고정
+<code>ThirdParty/Slang</code> 하나다. <code>D3DCompile</code>·FXC·구 DX12/Vulkan 컴파일러·엔진의
+직접 DXC loader·Vulkan SDK/PATH fallback·런타임 컴파일러 선택 분기는 0이다.</li>
+<li><strong>손 퍼뮤테이션 0건</strong> — <code>RHIShaderDefine</code> 배열이 패스 코드에 없다
+(<code>D3D_SHADER_MACRO</code>는 이미 0).</li>
+<li><strong>패스 17종 실행 코드에 <code>D3D12_</code> 직접 참조 0건</strong> (V6 몫 —
+역사 설명 주석 1건은 제외) + 재질 구동 패스의 렌더스테이트가
+메타 데이터에 있다.</li>
+<li><strong>머테리얼 커스텀 셰이더가 화면에 나온다.</strong><ul>
+<li>✅ P2c 대표 Water/Wind Material GUID 선택, 양 backend 픽셀 판정과 다음-frame
+<code>windTint</code> 변경 반영.</li>
+<li>✅ P2d-a <code>FoliageRenderProxy</code> type/instance owning draw source와 view별 AABB culling 입력.</li>
+<li>✅ P2d-b <code>m_flowInfo</code>+frame total/delta immutable snapshot과 양 backend dynamic flow 픽셀.</li>
+<li>✅ P2d-c generic texture schema/owner vector와 <code>windMap@t4</code> 양 backend owner 수명·픽셀.</li>
+<li>✅ P2d-d arbitrary required-asset packet과 canonical Water/Wind seed 제거.</li>
+<li>✅ P2d-e 전체 legacy 호출자 재측정 및 구 사슬 은퇴 판정.</li>
+</ul>
+</li>
+<li><strong>같은 메타·같은 소스에서 Slang DXIL과 SPIR-V가 나온다</strong> —
+<code>VkShaderModule</code> 로드, DX12 PSO 생성, 두 타깃의 중립 <code>RHIShaderReflection</code>
+바인딩·cbuffer 레이아웃 일치 단정, <code>.shadermeta</code> 선언 대조를 모두 통과.</li>
+<li><strong>두 번째 실행 컴파일 0건</strong> + <code>.hlsli</code> 수정 시 영향받은 셰이더만 재컴파일
+(전체 <code>.cso</code> 삭제 경로 은퇴).</li>
+<li><strong>자가 검증 스윕 판정 착수 전과 동일</strong> + <code>pipeline.nodes</code> 구성/상태 일치 +
+회귀 세트(Tools/regression) 통과.</li>
+<li><strong>직렬화 경로 하나</strong> — 머테리얼 필드 추가 시 수정 지점이 한 곳.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-리스크">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-리스크">6. 리스크</h2></div>
+<div class="prose"><ul>
+<li><strong>DXC→Slang 런타임 동등성</strong> — 52/52 프런트엔드·16/16 대표 산출은
+착수 근거였고, Slang이 진단한 4파일 경고·실제 양 backend 파이프라인·픽셀·
+package를 M1B에서 닫았다. 이후 버전 변경은 같은 전체 게이트를 다시 요구한다.</li>
+<li><strong>Slang ABI·버전 표류</strong> — 설치된 Vulkan SDK 버전을 자동 소비하지 않고
+헤더·DLL·라이선스·DXIL 지원 구성을 하나의 고정 번들로 배치한다. 버전이
+바뀌면 캐시 identity와 DX12/Vulkan 전체 게이트를 다시 통과한다.</li>
+<li><strong>바인딩 재설계 혼입</strong> — M1B/M7에서는 명시적 register·현재 Vulkan shift를
+보존한다. <code>ParameterBlock</code>·자동 바인딩을 같이 넣은 패치는 타깃 동등성을
+증명할 대조군을 없애므로 수용하지 않는다.</li>
+<li><strong>정밀 부동소수점 드리프트</strong> — DXC <code>-Gis</code>와 Slang <code>precise</code>를 문구로
+동일시하지 않는다. IBL BRDF 극점·픽셀 판정이 모두 같아야 이관 완료다.</li>
+<li><strong>M6 배선</strong> — 소비자 없는 출력을 이었을 때 그림이 나빠진 전례가 실측으로
+있다. 프로브·검증 씬 선행이 그 대응이고, 픽셀 판정 없이는 배선을 완료로
+치지 않는다.</li>
+<li><strong>퍼뮤테이션 폭발</strong> — 축 선언 강제 + 수 로깅 + 빌드 상한 게이트(3.3).</li>
+<li><strong>핫리로드 불변식 해제 실수</strong> — M5-C4가 Model/Mesh/Material 장기 소비를 소유 참조로
+바꾼 뒤에만 해당 전역 보존을 제거했다. Texture·UITexture·SpriteSheet는 raw alias가
+남아 있으므로 제한된 <code>m_retiredTextureGenerations</code> 보존을 계속 유지한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-다른-계획과의-관계">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-다른-계획과의-관계">7. 다른 계획과의 관계</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>계획</th><th>관계</th></tr></thead>
+<tbody><tr><td>RhiBoundaryPlan §7.2</td><td><strong>V5·V6를 이 페이즈가 승계한다</strong> — M1=V5, M3=V6. V8(Vulkan 백엔드)은 M1A의 SPIR-V 산출을 이미 소비한다. 2026-08-16 DXC 기준선은 M1A의 완료 기록으로 남겨 두고, 2026-08-24 최종 컴파일러 계획은 M1B Slang 전환·M7 Slang reflection을 따른다. M3의 RHI-neutral desc 실행 코드 기준은 완료됐지만 메타 소비 배선은 M4·M6 몫으로 남는다</td></tr>
+<tr><td>BuildPipelinePlan (PHASE 12.5)</td><td>게임 빌드의 셰이더 스텝 = 이 파이프라인의 전수 사전 컴파일 모드(3.3)</td></tr>
+<tr><td>PHASE 10 파티클 · PHASE 11 지형</td><td>이 시스템 위에 선다 — 그쪽에서 셰이더 경로를 따로 만들지 않는다</td></tr>
+<tr><td>AssetResidencyPlan</td><td>텍스처 상주는 그쪽 몫, 여기는 프로퍼티가 참조만 든다</td></tr>
+<tr><td>SceneGraphRedesignPlan</td><td>직렬화 단일화(M5)가 트랙 P의 프리팹 왕복 회귀를 그대로 판정에 쓴다</td></tr>
+<tr><td>ModelAssetBigBangCutoverPlan (PHASE 3.75)</td><td>UUIDv8 typed model/material/texture generation과 vertex schema를 제공한다. 이 문서는 그 identity를 재해석하거나 legacy 모델 bridge를 소유하지 않는다</td></tr>
+<tr><td>PBRWiringStabilizationPlan (PHASE 4)</td><td>M6/M7 기반 위에서 현 제품 Slang/Material/Renderer 배선 결함과 runtime gate를 닫는다</td></tr>
+<tr><td>BlenderMaterialGraphPlan (PHASE 4.25)</td><td><code>PrincipledSurface</code>·Material Graph·artist 비용 tier를 소유한다. M6 완료를 Blender 호환 완료로 승계하지 않는다</td></tr>
+<tr><td>ScriptableRenderPipelinePlan (PHASE 4.75)</td><td>Pipeline Asset, generic Pass Graph, Slang Code mode와 Custom Pass를 소유하며 Material Graph 의미는 재정의하지 않는다</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MaterialPipelinePlan.md"><code>docs/plans/archive/MaterialPipelinePlan.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

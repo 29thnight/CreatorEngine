@@ -3,39 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>METEOR 라이브 배선</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>METEOR 라이브 배선</title>
 <style>
-:root {
-  --bg: #f6f4ef; --surface: #ffffff; --ink: #1c1f24; --muted: #5d6470; --line: #ddd8cc;
-  --accent: #b2451f; --good: #2f7a4d; --warn: #a66a00; --bad: #b23a3a; --chip: #efe9dc; --code: #f1ede4;
-  --shadow: 0 1px 2px rgba(28, 31, 36, .06), 0 8px 24px rgba(28, 31, 36, .05);
-  --radius: 10px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #15171b; --surface: #1d2026; --ink: #e8e6e1; --muted: #a2a8b3; --line: #31353d;
-    --accent: #f08a5d; --good: #6cc48f; --warn: #e2b04a; --bad: #ef7d7d; --chip: #282c33; --code: #23262c;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
   }
-}
-:root[data-theme="dark"] {
-  --bg: #15171b; --surface: #1d2026; --ink: #e8e6e1; --muted: #a2a8b3; --line: #31353d;
-  --accent: #f08a5d; --good: #6cc48f; --warn: #e2b04a; --bad: #ef7d7d; --chip: #282c33; --code: #23262c;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .3);
-}
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  :root { --ink: var(--text); --ink-2: var(--text); --muted: var(--text-dim); --dim: var(--text-dim); --line: var(--border); --line-2: var(--border-bright); --sheet-line: var(--border); --good: var(--ok); --green: var(--ok); --accent-2: var(--ok); --bad: var(--risk); --danger: var(--risk); --err: var(--risk); --crit: var(--risk); --purple: var(--info); --target: var(--info); --target-bg: color-mix(in srgb, var(--info) 14%, transparent); --cost: var(--accent); --cost-bg: var(--accent-dim); --surface-2: color-mix(in srgb, var(--text) 5%, var(--surface)); --surface2: color-mix(in srgb, var(--text) 5%, var(--surface)); --chip: color-mix(in srgb, var(--text) 6%, var(--surface)); --code: color-mix(in srgb, var(--text) 6%, var(--surface)); --code-bg: color-mix(in srgb, var(--text) 6%, var(--surface)); --sheet: var(--surface); --shadow: none; --radius: var(--r-2); --f-sans: var(--font-body); --f-mono: var(--font-mono); }
+
+
+
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 "IBM Plex Sans KR", system-ui, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 var(--font-body); }
 main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 80px; }
 header.hero { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
-.kicker { font: 600 12px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.kicker { font: 600 12px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; margin: 10px 0 12px; }
 h2 { font-size: 22px; margin: 48px 0 12px; display: flex; gap: 12px; align-items: baseline; }
-h2 .num { font: 600 13px "JetBrains Mono", monospace; color: var(--accent); }
+h2 .num { font: 600 13px var(--font-mono); color: var(--accent); }
 h3 { font-size: 16px; margin: 24px 0 8px; }
 .meta { color: var(--muted); font-size: 13px; }
-code { font: 13px "JetBrains Mono", monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+code { font: 13px var(--font-mono); background: var(--code); padding: 1px 5px; border-radius: 4px; }
 .verdict { background: var(--surface); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 18px 22px; box-shadow: var(--shadow); }
 .verdict ul { margin: 6px 0 0; padding-left: 20px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
@@ -46,7 +55,7 @@ th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom
 th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); }
 tr:last-child td { border-bottom: 0; }
 td:first-child { font-weight: 600; white-space: nowrap; }
-.tag { display: inline-block; font: 600 11px/1.6 "JetBrains Mono", monospace; padding: 0 8px; border-radius: 999px; white-space: nowrap; }
+.tag { display: inline-block; font: 600 11px/1.6 var(--font-mono); padding: 0 8px; border-radius: 999px; white-space: nowrap; }
 .tag.ok { color: var(--good); border: 1px solid var(--good); }
 .tag.ext { color: var(--warn); border: 1px solid var(--warn); }
 .tag.gap { color: var(--bad); border: 1px solid var(--bad); }
@@ -55,18 +64,39 @@ td:first-child { font-weight: 600; white-space: nowrap; }
 .caution li.bad { border-left-color: var(--bad); }
 .caution li.good { border-left-color: var(--good); }
 footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ve-crumbs { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1.5rem 0; font: 500 .75rem var(--font-mono); color: var(--text-dim); display: flex; gap: 1rem; }
+  .ve-crumbs a { color: var(--text-dim); }
+  .ve-crumbs a:hover { color: var(--accent); }
+  @media print { body::before, .ve-crumbs { display: none; } }
 </style>
 </head>
 <body>
+<nav class="ve-crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span></nav>
 <main>
 <header class="hero">
 <div class="kicker">METEOR · DX12 live pipeline · 2026-10-17</div>
 <h1>클러스터 스트리밍과 현재 렌더링 배선</h1>
 <p>공통 메시릿 컬링에 16분할·lane별 공유 ring·큐 작업 수 완료 관리를 연결했고, 방향광 그림자의 혼합 가림·복구와 캐시·제출·수명 경계 검증을 보강했다. 카메라·그림자·정렬 반투명 목록이 같은 경로를 사용한다. Surface 4노드와 그림자 6노드의 외부 슬롯 계약은 유지한다. Core 35개와 Editor 기여 4개를 합쳐 39개 상위 노드를 구성한다. 상위 노드 수와 실제 GPU 패스 수는 다르다.</p>
-<p class="meta">METEOR는 LX 머티리얼을 소비하는 장면 렌더러다. 아래는 현재 작업본의 배선과 정확성 검사 범위이며, 성능·비동기 큐 중첩의 증거는 포함하지 않는다.</p>
-<nav><a href="#validation-current">검증 결과</a> · <a href="#pipeline-overview">배선도</a> · <a href="#shadow-wiring">그림자</a> · <a href="#gpu-distribution">GPU 작업 분배</a> · <a href="#geometry-compression">기하 압축</a> · <a href="#remaining-work">남은 작업</a></nav>
+<p class="meta">METEOR는 LX 머티리얼을 소비하는 장면 렌더러다. 아래는 현재 배선과 검증 범위다. Debug CreatorRobot 플레이 성능은 현재 검증 절에 별도로 제시하며, 비동기 큐 중첩 이득은 아직 수용하지 않았다.</p>
+<nav><a href="#validation-current">현재 검증</a> · <a href="#pipeline-overview">배선도</a> · <a href="#shadow-wiring">그림자</a> · <a href="#gpu-distribution">GPU 작업 분배</a> · <a href="#geometry-compression">기하 압축</a> · <a href="#remaining-work">남은 작업</a></nav>
 </header>
-<section id="validation-current"><h2><span class="num">00</span>자산 간 공유 물리 풀 · 전역 페이지 정책 · packing·증분 전송</h2>
+<details id="performance-debug-20261017"><summary>이전 호스트의 최초 성능 측정 · 보관</summary><h2>Debug CreatorRobot 플레이 성능 · 120 FPS 미달</h2><p>2026-10-17: 1186×514 Scene+Game 두 뷰·unlimited·native·15초 기록. Game 뷰 CPU 제출 빈도 3.21회/초, 제출 중앙값 107.78ms / p95 125.87ms. GPU 계측 구간 합집합 중앙값 34.75ms. 빈 장면 Game 제출 빈도는 50.12회/초. 실제 화면 표시 FPS·단일 뷰·1080p 수용은 별도다. CPU MaterialGraphScenePrepare 58.16ms와 RenderGraphBuild 25.89ms, GPU 그림자 컬링을 우선 조사한다. 기록·모델 출력 검사와 정상 종료는 통과했다. <a href="../../Artifacts/performance-debug-20261017/report.html">측정 조건·결과·증거</a></p></details>
+<section id="validation-current"><div id="bit-storage-policy-20261017"><h2>비트셋 저장소 전환과 packed bool vector 금지</h2>
+<p>엔진·에디터·도구·테스트에서 packed bool vector 사용을 제거했다. 이전 성능 작업에서 byte로 전환했던 그래프 내부 bool 플래그도 비트 저장으로 변경했다. 고정 크기는 std::bitset&lt;N&gt;, 런타임 크기는 std::bitset&lt;64&gt; 블록을 사용하는 ce::dynamic_bitset으로 표현한다. test/set은 iterator 프록시를 만들지 않으며 동기화는 기존 소유자와 락이 담당한다.</p>
+<p>그래프·큐 배치·그림자 준비·공유 sparse pool·기하 검증·장면 슬롯의 비트 상태를 전환했다. bool 값의 저장 형식이 필요한 시퀀스는 deque&lt;bool&gt;로 유지했다. Debug Editor 빌드·그래프 126·렌더 바인딩 261·큐 계획 129·HZB/그림자/스트리밍 GPU 회귀를 통과했다. 동적 비트셋 경계 검사는 Debug/Release, 리플렉션 분류는 Debug/Release, bool 직렬화 왕복은 37항목을 통과했다.</p>
+<p><b>이 비트셋 버전의 성능은 재측정하지 않았다.</b> 아래 byte 플래그 전환의 수치는 당시 바이너리의 기록으로 보존하며 현재 비트셋 버전의 FPS 수용 근거로 사용하지 않는다. 120 FPS 수용은 여전히 남아 있다.</p>
+<p><a href="../../Artifacts/no-vector-bool-20261017/report.html">변경·검증 보고서</a> · <a href="../../Artifacts/no-vector-bool-20261017/final-audit.json">최종 감사</a> · <a href="../design/CodingConventions.md#10-bool-시퀀스와-비트-플래그">코딩 규칙</a></p></div><div id="performance-iterator-lock-20261017"><h2>Orphan·Adopt·Assign 호출 경로 및 byte 플래그 전환</h2>
+<p>직전 ETW의 _Lockit 직접 호출자와 상위 호출을 추적했다. vector&lt;bool&gt;의 _Vb_iterator/_Vb_reference는 Debug에서 원소 접근마다 iterator 등록·해제를 유발했고, 반복 패스 검증·배리어 계획에서 사용됐다. 내부 플래그를 uint8_t로 전환하고 반복 배리어 입력과 읽기 전용 usages 순회·scratch 초기화에 span을 사용했다. 전역 Debug iterator 검사와 버전·배리어·GPU 소유권 규칙은 유지한다.</p>
+<table><thead><tr><th>측정</th><th>수정 전 → 후</th></tr></thead><tbody><tr><td>ETW OFF · 기록 ON · 두 뷰 완료 합계/초</td><td>39.91 → 40.98 (+2.7%)</td></tr><tr><td>ETW OFF · 기록 OFF · 두 뷰 완료 합계/초</td><td>40.15 → 41.49 (+3.3%)</td></tr><tr><td>Game CPU 제출 p50 / p95 / 최대 ms</td><td>18.511 → 17.912 / 21.058 → 20.212 / 24.810 → 26.936</td></tr></tbody></table>
+<p>CreatorRobot 62 entities·실제 PlayingPossessed·Debug·1920×1080 offscreen·Scene+Game 각각 1186×514·native. ETW 기록 ON 60초/OFF 15초, ETW 종료 후 native 기록 ON/OFF 각 15초. 빌드·회귀·분석을 측정과 겹치지 않았다. <b>두 뷰 완료 합계는 표시 FPS가 아니며 120 FPS는 미달이다.</b> 전후 각 1회 순차 표본으로 효과의 통계적 확정은 하지 않는다.</p>
+<p>Debug 빌드·그래프 126·sampler 261·큐 계획 129·HZB/그림자/스트리밍 GPU 회귀와 동일 카메라·포즈의 6출력 비교를 수행했다. 정확한 수치와 호출 경로는 아래 보고서에 기록했다. Orphan_all의 문자열/컨테이너 소멸, 런타임 마커 맵과 profiler 맵 등은 남으며 락 전체 제거는 미수용이다. ExecuteIndirect GBV 범위 제한과 Release/Vulkan·실제 표시 FPS의 검증 경계를 유지한다.</p>
+<p><a href="../../Artifacts/iterator-lock-20261017/report.html">전후 측정·호출 경로·정확성 보고서</a> · <a href="../../Artifacts/iterator-lock-20261017/report.html#analysis-charts">타임라인·소요시간 도표</a> · <a href="../../Artifacts/iterator-lock-20261017/verdict.json">구조화 판정</a></p></div><details id="performance-graph-retirement-20261017"><summary>이전 그래프 메타데이터 재사용 · 보관</summary><p>완료·단독 소유 그래프의 Pass 저장소를 재사용하고 span 순회·빈 컨테이너 clear 축소를 적용했다. Game CPU p50 20.866→18.511ms, 두 뷰 완료 합계/초는 기록 ON 36.56→39.91이었다. 정확성 검증 통과, 120 FPS와 STL 락 전체 제거는 미수용. <a href="../../Artifacts/graph-retirement-20261017/report.html">당시 측정·검증</a></p></details><details id="performance-shadow-counter-20261017"><summary>이전 그림자 작업별 통계 전환 · 보관</summary><p>버킷당 공유 atomic 갱신을 작업별 지역 누적·전용 슬롯·기록 join 후 합산으로 변경했다. Game CPU 중앙값 21.188→20.866ms, 명령 기록 4.688→4.647ms였다. 정확성·기록 ON/OFF·ETW 검증을 통과했지만 120 FPS와 atomic 주원인 확정은 미수용이었다. <a href="../../Artifacts/shadow-counter-20261017/report.html">당시 측정·검증</a></p></details><details id="performance-final-cull-declare-20261017"><summary>이전 최종 컬링 CPU 선언 수정 · 보관</summary><p>HZB 불변 CPU 설명 캐시·배치 준비 배열·사용 목록 이동을 적용했다. 최종 컬링 중앙값 0.8501→0.6339ms였지만 전체 프레임 개선·120 FPS·과거 21.59ms 제거는 미수용이었다. VS 종료 후에도 Ready 지연 스파이크를 확인했다. <a href="../../Artifacts/final-cull-declare-20261017/report.html">당시 측정·타임라인·검증</a></p></details><details id="performance-graph-prepare-20261017"><summary>이전 그래프 선언·장면 준비·컴파일 수정 · 보관</summary><p>장면 준비 4.93→4.30ms, 노드 선언 합계 5.92→5.63ms, 컴파일 1.97→2.19ms. HZB 단계 묶음·클러스터 중복 탐색·sampler 파싱·스케줄 공유를 수정하고 정확성·ON/OFF·ETW를 확인했다. 과거 135ms의 캐시 미스 경로는 수정했으나 당시 OS 실행·대기는 미확정이었다. 이후 54.67ms 제출 안의 최종 컬링 CPU 선언 21.59ms를 최신 분석에서 별도로 추적했다. <a href="../../Artifacts/graph-prepare-20261017/report.html">당시 실행·측정 원자료</a></p></details><details id="performance-profiler-counter-20261017"><summary>이전 profiler counter 수정 · 보관</summary><p>Debug 코어 1,395 검사·소유권 변이 2종·ON/OFF·ETW 손실 0 확인. checked iterator와 반복 erase를 줄여 당시 기록 ON의 두 뷰 완료율 26.32→32.48회/초를 얻었으나 120 FPS는 미달이었다. 최대 135.03ms는 아래 최신 분석에서 캐시 미스와 구간을 재검토했다. <a href="../../Artifacts/profiler-counter-20261017/report.html">당시 실행·측정 원자료</a></p></details><details><summary>counter 수정 전 ETW 원인 분석 · 보관</summary><div id="profiling-etw-20261017"><h2>관리자 ETW · CPU 실행과 대기 분해</h2><p>관리자 WPR 수집·실행/PDB 신원 대조·손실 이벤트 0을 확인했다. 당시 Debug 실행 파일의 BeginFrame 중앙값은 0.27ms / 평균 2.44ms / p95 6.79ms다. 엔진 기록을 멈춘 ETW에서 직접 GPU 펜스 대기 스택은 0ms, CPU 명령 기록 worker 합류 대기는 2.21초였다. BeginFrame의 CPU 샘플은 완료 자원 회수·콜백이 대부분이었다. <b>120 FPS 미달.</b> 이 실행 파일은 앞선 그래프 측정과 다르다. 코드 수정·빌드는 하지 않았다. 프로파일러 자체의 counter 처리와 Debug STL 경합도 확인했다. <a href="../../Artifacts/etw-cpu-20261017/report.html">측정 조건·BeginFrame 호출 경로·실행/대기 원자료</a></p></div></details><details><summary>이전 실행 파일의 그래프·프레임 승인 최적화 · 보관</summary><div id="performance-graph-admission-20261017"><h2>그래프 구성·컴파일·프레임 승인 수정</h2><p>Debug · 1186×514 Scene+Game · 무제한 CreatorRobot 플레이 · 15초 기록. 그래프 구성 중앙값 25.47→16.61ms, 컴파일 9.59→5.00ms. Game 제출 빈도 4.40→6.22회/초, stale 폐기 267→82회. <b>120 FPS 미달.</b> 동일 카메라·포즈의 Robot 6출력 차이 0, 그래프·큐 계획·HZB·그림자 GPU 회귀를 통과했다. <a href="../../Artifacts/graph-admission-20261017/report.html">조건·전후 결과·정확성 증거</a></p></div></details><details><summary>이전 CPU 준비 재생성 최적화 · 보관</summary><div id="performance-cpu-prepare-20261017"><h2>CPU 준비 재생성 수정 · CreatorRobot 플레이 재검증</h2><p>Debug · 1186×514 Scene+Game · 무제한 플레이 · 15초 기록. ScenePrepare 중앙값 55.13→21.52ms, Game CPU 제출 108.18→72.35ms, Game 렌더 제출 빈도 3.32→4.54회/초. HZB 히스토리·피드백 readback의 완료 후 재사용을 구현했다. GPU 재검사 생략 후보는 효과 미입증으로 철회했다. 최종 HZB·그림자 GPU 검사와 동일 카메라·포즈의 Robot 깊이/머티리얼/Scene HDR 차이 0을 확인했다. <b>120 FPS 미달.</b> 그래프 구성·컴파일, 잔여 준비 및 스키닝 bounds 공유가 후속이다. <a href="../../Artifacts/cpu-prepare-20261017/report.html">측정 조건·전후 결과·검증 증거</a></p></div></details>
+<p>아래는 스트리밍 구현 당시의 검증 기록이다. 현재 실행 파일의 최종 컬링 선언과 CPU 분석은 위 최신 기록을 따르며, 이전 실행·대기 분석은 보관 절에 남긴다. 과거 성능 비교는 각 보관 기록의 실행 파일 범위를 따른다.</p><h2><span class="num">00</span>자산 간 공유 물리 풀 · 전역 페이지 정책 · packing·증분 전송</h2>
 <div class="verdict"><b>Debug/Release 5모드·Editor 통합·39노드 배선 검증 통과</b><p>자산별 Reserved Resource와 고정 가상 주소는 유지하고, 장치별 공유 64 MiB 물리 풀(1,024 × 64 KiB)을 연결했다. 전체 풀은 기존 장치 VRAM 성장 예산에 한 번 등록된다. 상위 노드 39개·shader identity 39·GPU schema 6·CEGE9는 유지한다. 성능 측정은 하지 않는다.</p></div>
 <div class="table-wrap"><table><thead><tr><th>변경</th><th>현재 계약</th></tr></thead><tbody>
 <tr><td>공유 물리 풀</td><td>서로 다른 자산의 가상 버퍼가 같은 heap과 예산 lease를 공유한다. 물리 타일은 서로 다른 가상 버퍼 사이에서 재배정하며 가상 주소는 바뀌지 않는다.</td></tr>
@@ -224,6 +254,7 @@ flowchart TB
 </pre></div>
 <p><b>카메라 1차와 그림자 1차는 같은 준비 완료 묶음의 ring과 Cull dispatch를 공유한다.</b> 먼저 선언되는 SceneHost 조립 지점이 네 뷰의 실제 GPU 생산 패스를 선언하고, 각 상위 노드는 자기 출력 핸들을 발행한다. 카메라 목록을 그림자 입력으로 복사하는 관계가 아니다. 그림자 복구 3뷰와 static cache miss 3뷰도 각각 별도 공유 묶음이다. 카메라 현재 깊이 복구는 필요한 깊이가 만들어진 뒤 독립 실행한다. 이 공유 큐는 GPU 작업 스케줄러의 UAV이며 별도 하드웨어 command queue나 비동기 중첩의 증거는 아니다.</p>
 <h3>2.3 카메라의 프레임 이력</h3>
+<p>HZB 내부는 현재 한 반복 패스의 mip별 명시 단계로 선언한다. 각 mip의 SRV/UAV 버전과 단계 배리어·dispatch 순서는 유지하며, 위 39개 상위 노드 배선은 변하지 않는다. 이름·mip 크기 설명만 CPU 템플릿으로 재사용하고 RG 핸들·기록·배리어 상태는 프레임마다 생성한다.</p>
 <p>이력은 현재 프레임의 역방향 실행 간선이 아니다. 제출 승인·GPU 완료 뒤 유효해진 HZB만 다음 프레임에서 사용한다. 이력이 없거나 무효하면 1차 컬링은 프러스텀 검사로 시작한다.</p>
 <div class="card"><pre class="mermaid">
 flowchart LR
@@ -390,7 +421,7 @@ flowchart LR
 <tr><td>그림자 검증 추가 확장</td><td>우선 보강 게이트는 D/R 선택 사례에서 통과했다. 일반 장면·스킨드 독립 정답, 강제 장치 손실·실행 시작 후 제출 실패, CPU 키/8뷰 퇴거 스트레스는 추가 확장 범위다. GPU 출력 누락 변이와 sealed 입력의 재임포트 데이터 검사는 상단 범위를 따른다.</td></tr>
 <tr><td>그림자 확장</td><td>point/spot, 증분 atlas/타일 캐시. 현재 구현은 방향광 3개 캐스케이드다.</td></tr>
 <tr><td>플랫폼·실행</td><td>이번 그림자 보강·그림자/데칼·LOD 네이티브 선택 검사는 D/R 통과. Release의 나머지 Editor 통합, Vulkan 동등성, 별도 GPU 큐 배치·동기화는 별도다.</td></tr>
-<tr><td>성능</td><td>사용자 지시에 따라 미실행. GPU/CPU 시간·FPS·큐 중첩률·회귀 성능·동적 분배 이득 판정은 이후 수행한다.</td></tr>
+<tr><td>성능</td><td>bool 상태를 bitset 기반으로 전환하고 packed bool vector 사용을 금지했다. Debug 정확성 회귀 통과. 현재 비트셋 버전 성능은 미측정이며, 직전 byte 플래그 버전의 측정은 이력으로 보존한다. 120 FPS 수용은 남아 있다.</td></tr>
 </tbody></table></div>
 <details><summary>이전 변경 이력 요약</summary>
 <p>2026-10-12에는 기존 Deferred/Forward 경로를 METEOR로 통합하고 HDR·Temporal·후처리 순서를 정리했다. 10-13~15에는 메시릿 HZB·2단계 카메라 컬링, HW/SW 가시성 키, 머티리얼 타일 패킷, 오브젝트 공간·포즈 공유, 공간별 GPU LOD와 정렬 레이어 간접 실행을 연결했다. 10-16에는 Surface 4노드와 그림자 6노드로 분리해 Debug 선택 8모드·Editor·배선을 검사했다. 이후 GPU 배치 큐·wave 소비를 도입하고, 이를 같은 dispatch의 ring 생산·소비로 교체한 뒤, 16분할 초기 배정과 lane별 일괄 슬롯 예약을 거쳐 JOB_COUNT 완료 관리와 뷰 간 공유 큐로 확장했다. 이후 그림자 혼합 가림·복구와 제출·완료·캐시 경계의 D/R 검증을 보강했다. 이번 작업본의 결과는 상단 검증 표를 따른다.</p>
@@ -420,7 +451,7 @@ flowchart LR
 <tr><td>검증</td><td><code>Tools/regression/verify-meteor-scene-cutover.ps1</code> · <code>Editor/RenderTests/.../Geometry/EnhancedBlendedStreamTest.cpp</code>(<code>dx12.blended</code>)</td></tr>
 </tbody></table></div>
 
-<footer>CreatorEngine · 2026-10-16 · 현재 작업본 / DX12 D/R 네이티브·Editor Debug 정확성 검증 · 성능 측정 미실행</footer>
+<footer>CreatorEngine · 2026-10-17 · 비트셋 저장소 전환·packed bool vector 금지 · Debug 정확성 통과 · 비트셋 버전 성능 미측정</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
@@ -428,7 +459,9 @@ flowchart LR
   var root = document.documentElement.getAttribute('data-theme');
   var dark = root === 'dark' || (root !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   if (window.mermaid) {
-    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict',
+    mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: (() => { const c = getComputedStyle(document.documentElement), v = n => c.getPropertyValue(n).trim();
+      return { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'), lineColor: v('--text-dim'),
+        secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') }; })(), securityLevel: 'strict',
       fontFamily: '"IBM Plex Sans KR", system-ui, sans-serif', flowchart: { htmlLabels: true, curve: 'basis' } });
   }
 })();

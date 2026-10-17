@@ -1,32 +1,91 @@
-# 비동기 CPU 준비와 Scene owner-thread 게시
+# CPU asset preparation and scene publication
 
-> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
+The editor Open Scene action, `scene.load`, `scene.switch` and `scene.open_async`
+queue CPU preparation and return `queued: true` plus a `requestId`. The load command
+leaves activation unchanged; switch/open request the existing frame-boundary
+activation. Query `scene.load.status <requestId>` for Pending, Ready, Failed,
+Cancelled, Stale or Superseded. Ready means scene construction completed, not GPU
+readiness or completed activation. The last 64 terminal value records are kept;
+expired IDs report an explicit unknown-request error and retain no scene owners.
 
-## 비동기 범위
+## Preparation boundary
 
-`SceneManager::BeginSceneLoad`는 owner thread에서 요청 ID와 activation epoch를 만든다. `SubmitScenePreparation`의 scheduler callback은 PendingSceneLoad만 보유하고 문서를 parse한 뒤 `DataSystem::PrepareSceneAssets`를 호출한다. callback이 SceneManager/Scene/Entity를 capture해 worker에서 scene mutation을 하는 구조가 아니다.
+`SceneManager` parses the document with the common job scheduler. `DataSystem`
+walks the current scene and referenced material/prefab documents, including
+encoded prefab overrides, inline material instances, bundle entries, named
+sprite/UI textures, and foliage model references. A first open does not require
+a previously written `ScenePreload` list.
 
-문서의 `m_requiredLoadAssetsBundle` 또는 legacy `AssetsBundle`을 hint로 읽지만, 현재 문서에서 실제 요구되는 dependency를 준비하는 주체는 DataSystem이다. callback은 추가 작업을 제출한 뒤 돌아오므로 단일 worker에서 하위 작업을 기다리는 교착을 피하는 형태다.
+1. Workers validate/decode immutable model candidates
+2. The scene owner publishes completed model generations and discovers their
+   generated material graph identities
+3. Workers prepare graph programs, validation bytes and SHA-256 digests; the
+   owner publishes those exact immutable results
+4. Workers prepare the required CPU material/texture owners, using the existing
+   material codecs and texture variant rules
+5. The scene owner constructs entities and activates the prepared scene at the
+   existing scene structure boundary
 
-## 완료와 handoff
+Scene loading and editor model placement share model preparation tickets.
+Model placement keeps its existing incremental owner-thread application budget.
+Graph preparation uses `GenerationStore::BeginPreparation`, `Prepare`, and
+`Publish`; expensive compilation/verification does not hold the store mutex.
+Requests for one asset revision share a candidate. An invalidated revision cannot
+publish over the current owner, and a failure preserves the accepted generation.
 
-owner의 `CompleteSceneLoads`가 preparation/job 상태와 CPU 자산 readiness를 poll한다. asset 변경으로 preparation이 outdated인 경우 현재 구현은 최대 8회 재준비하고, genuine failure를 무한 재시도하지 않는다. `SceneAssetHandoff`는 게시 중 asset root/revision 변경과의 경계를 담당한다.
+The explicit synchronous `PrewarmSceneMaterials` path also retains generations.
+It no longer discards a cooked program merely to populate the disk cache.
+Subsequent entity loading consumes the prepared owner without decoding that
+cache a second time. Generated compiler inputs are content-keyed and atomically
+published so overlapping requests cannot observe another writer's truncation.
 
-`BuildPreparedScene`은 owner에서 GC Scene candidate를 만들고 entity를 역직렬화한다. DDOL identity 중복 생성을 피하고 prefab/index를 재연결하며 hierarchy bulk build와 world matrix 동기화를 마친다. 준비된 texture image pin을 scene에 보관한다. 취소·종료·activation epoch 교체·asset revision 변경을 재검사한 후 `AdoptScene`으로 넘기며 실패 candidate는 retire한다.
+## Lifetime and scheduling
 
-## 수명과 오류
+Preparation uses existing `job_handle` dependency chains. Asset lanes are bounded
+by compiler capacity and leave two workers unreserved where the pool size allows.
+A normal frame pump polls completion before reading a result; only explicit
+synchronous/lifecycle APIs wait for incomplete jobs. Cancellation prevents scene
+publication and does not attempt to preempt a compiler/decoder already running.
 
-`AssetRequest` Ready는 CPU object만 준비되었다는 뜻이다. GPU upload, PSO 준비, render publication, 실제 화면 표시 완료는 뒤의 별도 경계다. consumer Cancel 이후에도 이미 수락된 work/capture는 정상 drain될 수 있다. Completion token을 받은 것이 GT/RT blocking을 허용하지 않는다.
+The request index is weak, so it does not keep another permanent copy of resident
+model/graph owners. Superseded work remains drainable until its callbacks finish.
+Asset changes invalidate request epochs; mount/root changes advance the captured
+resolver revision. Every scene phase and final handoff validates both. Typed mesh,
+image and material requests use the captured catalog. A short construction guard
+blocks root publication using the existing admission mutex, while deserializers
+and callbacks run without a held mutex. Asset-change callbacks defer their event
+until the next drain. Candidate DDOL entities stay in the candidate scene, so a
+rejected construction cannot leave them in the active scene. Once Ready handoff
+succeeds, those actual scene owners remain valid through later mount changes.
+Shutdown drains accepted work before clearing catalogs and caches.
 
-문서 parse/decode/I/O는 worker로 옮겨졌지만 entity 구성, script/lifecycle, physics handoff 및 일부 host 동기 작업은 여전히 owner에 남는다. 따라서 전체 scene load가 프레임 영향 없이 완료된다는 약속은 없다.
+Texture and Material runtime identities use one out-of-line atomic allocator.
+They are nonzero, never recycled, and fail closed at exhaustion. Persisted
+FileGuid/model identities and content fingerprints are unchanged. Material copy
+and resource move identity behavior is unchanged.
 
-## 유지할 수용 조건
+## Readiness and remaining synchronous work
 
-한 worker, 빠른 연속 scene 선택, load 중 asset import, Play/Stop/종료, malformed 문서와 dependency failure, DDOL/prefab 재연결을 실제로 검증해야 한다. source path가 유지되는 Editor authoring과 source-free Player의 cooked 문서 경로도 별도 판정한다. API 전체는 [AssetDepotImplementationPlan](../plans/AssetDepotImplementationPlan.md)에 연결된다.
+Progress counts CPU preparation items within the displayed stage, including
+instance recipes; it is not a count of unique source assets. Dependency discovery
+has no known total. Shader progress counts live compiler requests rather than
+letting one completed request hide others.
 
-## 구현 근거
+CPU preparation is distinct from GPU readiness. Texture upload, fences, resource
+retirement, PSO creation, and render-thread scene lookup initialization retain
+their existing ownership and readiness contracts. Entity construction remains on
+the scene owner and may still take a long frame. A small shared worker pool can
+also delay other jobs while non-preemptible decoding/compilation is running.
 
-- [Engine/SceneRuntime/SceneManager.cpp](../../Engine/SceneRuntime/SceneManager.cpp)
-- [Engine/SceneRuntime/SceneManager.h](../../Engine/SceneRuntime/SceneManager.h)
-- [Engine/RenderEngine/DataSystem.h](../../Engine/RenderEngine/DataSystem.h)
-- [Engine/RenderEngine/AssetDepot/AssetRequest.h](../../Engine/RenderEngine/AssetDepot/AssetRequest.h)
+Player startup and scene commands use nonblocking preparation. Explicit legacy
+C++ scene helpers, watcher hot-reload acceptance and Material Graph authoring
+apply/preview remain separate synchronous entry points. This does not claim zero
+game-thread stalls or move mixed RHI initialization onto arbitrary workers.
+
+## Verification scope
+
+The patch was reviewed statically. Added regression source covers prepared-owner
+reuse, same-revision coalescing, dirty reload retry, late completion rejection,
+unchanged-product identity, removal and shutdown. Builds, regression execution,
+engine execution, and performance measurements are still required before a
+runtime/performance claim.

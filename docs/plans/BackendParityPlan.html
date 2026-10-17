@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/BackendParityPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RenderDoc 백엔드 비교 계획 (PHASE 4.9)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-수행-순서">1. 수행 순서</a></li><li><a href="#2-작업과-공수">2. 작업과 공수</a></li><li><a href="#3-이관-목록">3. 이관 목록</a></li><li><a href="#4-수용-기준과-보존할-증거">4. 수용 기준과 보존할 증거</a></li><li><a href="#5-인계받은-관측-기록">5. 인계받은 관측 기록</a></li><li><a href="#lx-scene-단일-배선-후속--2026-10-12">LX Scene 단일 배선 후속 — 2026-10-12</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="BackendParityPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>RenderDoc 백엔드 비교 계획 (PHASE 4.9)</h1>
+<div class="meta"><p><strong>정본 2026-10-01 · BP-0~5 미착수 · 6행 22인일 · DX12/Vulkan 비교의 단독 소유자.</strong></p>
+<p>2026-09-15의 사용자 결정을 재확인한다. RHI 중립화와 backend 구현은 이미 공통 구조의 책임이다. Vulkan과의 실행·리소스·픽셀 비교를 다른 페이즈의 완료 조건으로 다시 넣지 않는다. 다른 페이즈는 DX12에서 구현 전후를 검증하고, 비교할 기능의 DX12 기준선과 캡처 입력을 이 계획에 인계한다. 4.9의 결과를 BASE-0, RG6, MAT-9, TR/TU/FG, CSRP, 라이트맵, renderer 품질 또는 GPU 설계의 착수 선행으로 역연결하지 않는다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#1-수행-순서"><span class="ve-label">§1</span><span class="map-name">수행 순서</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-작업과-공수"><span class="ve-label">§2</span><span class="map-name">작업과 공수</span><span class="map-bar"><i style="width:45.4%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#3-이관-목록"><span class="ve-label">§3</span><span class="map-name">이관 목록</span><span class="map-bar"><i style="width:82%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-수용-기준과-보존할-증거"><span class="ve-label">§4</span><span class="map-name">수용 기준과 보존할 증거</span><span class="map-bar"><i style="width:79.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-인계받은-관측-기록"><span class="ve-label">§5</span><span class="map-name">인계받은 관측 기록</span><span class="map-bar"><i style="width:22%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#lx-scene-단일-배선-후속--2026-10-12"><span class="ve-label">§05</span><span class="map-name">LX Scene 단일 배선 후속 — 2026-10-12</span><span class="map-bar"><i style="width:8.8%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「1. 수행 순서」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-수행-순서">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-수행-순서">1. 수행 순서</h2></div>
+<div class="prose"><h3 id="2026-10-07-graph-only-재질-전환-인계">2026-10-07 graph-only 재질 전환 인계</h3>
+<p>live Shadow/GBuffer/Forward의 native 재질 대체와 이전 graph instance 선택을 제거했다. DX12 D/R 장면 검사와 Release 전체 raster·shadow/decal·refraction·SSS·volume 검사는 통과했다. <a href="../analysis/GraphOnlyMaterialPasses20261007.html">변경 및 증거</a>. Release Vulkan probe는 빌드를 통과했지만 <code>--scene-only</code> 최초 재질의 <code>WaitSceneProgram</code> 준비 단계에서 <code>Scene asynchronous preparation</code>으로 exit 1, 첫 장면 fixture 실행 전에 종료했다. 이 검사의 SPIR-V 준비 제한은 600초이며 구체적인 shader/driver 오류 문자열은 비어 있다. 실행·픽셀·validation 수용은 미완료다. 실패 로그는 <code>Build/Verification/GraphOnlyMaterials20261007/scene-Vulkan-Release.log</code>에 보존한다.</p>
+<p>BP-0/1에서 같은 입력의 cold pipeline 준비 위치와 worker/PSO 단계별 시간을 분리하고 재현한다. 준비 실패/제한 초과를 구분한 뒤, 준비 완료 상태에서 새 Shadow/GBuffer clear와 exact-generation 거부·graph 재질의 실제 리소스/픽셀을 검사한다. 타임아웃 증가나 native/이전 재질 fallback 복원으로 수용하지 않는다. 이 Vulkan 잔여를 RG6의 기존 DX12 수용 선행으로 역연결하지 않는다.</p>
+<ol>
+<li>동일 입력을 밀봉한다. 정지 fixture는 BASE-0의 자산·카메라·광원·재질·샘플·히스토리 초기화 계약을 재사용한다. 움직이는 fixture는 simulation tick, delta, jitter seed, 애니메이션 pose, 이전 프레임과 history warmup 길이까지 기록한다. 재현 불가 입력은 비교 전에 거부한다.</li>
+<li><strong>RenderDoc으로 DX12와 Vulkan의 실제 제품 프레임을 각각 캡처한다.</strong> 사용한 RenderDoc 버전·GPU·driver·binary와 <code>.rdc</code>를 보존한다. 두 backend의 event 번호는 같다고 가정하지 않고 Pass 이름/역할/입출력으로 대응표를 만든다. 캡처 파일을 열어 재생할 수 있어야 한다.</li>
+<li><strong>리소스를 먼저 확인한다.</strong> 대응 event의 geometry/index/vertex 입력, constant buffer 값·layout, texture format/extent/mip/layer/색공간/초기값, SRV/UAV/RT/depth binding, sampler, PSO, blend/cull/depth, 이전 history·barrier/ownership을 추적한다. 잘못된 리소스나 입력을 이미지 허용치로 덮지 않는다.</li>
+<li><strong>확인된 대응 리소스를 추출해 픽셀별로 비교한다.</strong> GBuffer, shadow/depth, 직접광·IBL HDR, SSGI/fog/history, transparent/SSS/transmission/volume, pre-tone HDR, post/display를 단계별로 대조한다. 선형 float 원본을 보존하고 동일한 색공간·채널·depth 규약으로 명시적으로 해석한다. LDR 스크린샷만으로 수용하지 않는다.</li>
+<li>최초 불일치 Pass·리소스·픽셀 좌표를 원인과 연결하고 수정한 뒤 <strong>같은 입력으로 RenderDoc 재캡처</strong>한다. DX12 기존 기준선도 확인한다.</li>
+<li>Debug/Release·지원 장치의 독립 반복과 실패 변이를 검증하고 재현 패키지를 남긴다. 캡처 도구가 개입한 GPU 시간을 일반 성능 개선의 증거로 사용하지 않는다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-작업과-공수">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-작업과-공수">2. 작업과 공수</h2></div>
+<div class="prose"><p>1인 전담 엔지니어의 계획 추정치다. 현재 알려진 비교 표면에 대한 예산이며 실측 완료 공수가 아니다. 알려지지 않은 결함이 예산을 넘으면 원인별로 별도 산정한다. 실제 GPU 기능의 신규 구현 비용은 포함하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>ID</th><th>작업</th><th>선행</th><th style="text-align:right">인일</th><th>종료 산출물</th></tr></thead>
+<tbody><tr><td><code>BP-0</code></td><td>비교 입력·시간축·지원 행렬 고정</td><td>BASE-0 및 각 기능의 DX12 기준선</td><td class="num" style="text-align:right">3</td><td>scene/asset/material/카메라/광원/seed/노출/해상도/히스토리 프레임열과 binary·driver 신원 고정</td></tr>
+<tr><td><code>BP-1</code></td><td>RenderDoc 양 backend 실제 프레임 캡처</td><td>BP-0</td><td class="num" style="text-align:right">3</td><td>DX12/Vulkan 별도 프로세스의 .rdc와 event/Pass 대응표, 캡처 재생 성공 및 반복 캡처</td></tr>
+<tr><td><code>BP-2</code></td><td>Pass별 입력·출력 리소스와 바인딩 대조</td><td>BP-1</td><td class="num" style="text-align:right">5</td><td>format/extent/mip/layer/채널/상수/descriptor/sampler/PSO/depth·blend·cull/수명 확인, 최초 불일치 event 특정</td></tr>
+<tr><td><code>BP-3</code></td><td>선형 리소스 추출·픽셀별 수치 비교</td><td>BP-2</td><td class="num" style="text-align:right">4</td><td>GBuffer/depth/HDR/history/final의 RMSE·최대 오차·초과 좌표·차영상, NaN/Inf와 alpha 별도 검사</td></tr>
+<tr><td><code>BP-4</code></td><td>불일치 원인 수정과 RenderDoc 재캡처</td><td>BP-3</td><td class="num" style="text-align:right">5</td><td>확인된 backend/binding/state/history 결함 수정 후 같은 입력으로 재캡처, 기존 DX12 기준선 회귀 확인</td></tr>
+<tr><td><code>BP-5</code></td><td>반복·실패 변이·회귀 패키지와 수용 보고서</td><td>BP-4</td><td class="num" style="text-align:right">2</td><td>Debug/Release·지원 장치별 결과, 누락/손상/다른 입력 거부, 미지원과 미통과 분리, .rdc/리소스/비교 결과 보존</td></tr>
+<tr><td><strong>합계</strong></td><td></td><td></td><td class="num" style="text-align:right"><strong>22</strong></td><td><span class="chip ok">완료 0 / 잔여 22</span></td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-이관-목록">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-이관-목록">3. 이관 목록</h2></div>
+<div class="prose"><p>2026-10-08 신설 <a href="PathTracingHybridPipelinePlan.html">PHASE 4.85</a>의 RT/PT/Hybrid·ReSTIR PT Enhanced·tetrahedral cages는 지원 가능한 구현이 DX12 기준선·fixture·raw radiance/history/AS 신원을 확보한 뒤 비교 대상으로 인계한다. 본 문서의 기존 22인일에 신규 RT 연구/기능 구현이나 미확인 교차 비교 비용을 포함한 것으로 해석하지 않는다. 지원 행렬·캡처 도구 제약·추가 비교 범위를 BP-0에서 확인하고 필요 공수를 별도 산정한다. 4.9 완료는 4.85 DX12 착수/수용의 선행이 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>인계하는 페이즈</th><th>4.9에서 비교할 대상</th><th>원 페이즈 완료 조건</th></tr></thead>
+<tbody><tr><td>4 / 4.25</td><td>PBR, Standard/LX, GBuffer/Deferred/Forward, material routes, SSS·투과·volume, <code>vk.shadow/gbuffer/forward/deferred</code></td><td>DX12 배선·Blender/reference 의미·품질·성능. Blender 비교를 Vulkan 비교와 혼동하지 않음</td></tr>
+<tr><td>4.3 BASE-0 / RG6 / RG8</td><td>sealed frame, compiled graph, resource lifetime/barrier, history·queue·aliasing, 현재 SSGI 잔여 차이</td><td>DX12 재현·변이·제품 전후 회귀와 RHI 중립 계약</td></tr>
+<tr><td>4.5 TR/TU/FG</td><td>motion·jitter·history·upscale·FG 입력/출력, Vulkan SDK 지원·proxy present/fallback</td><td>DX12 기능·지원 하드웨어·지연/실프레임 성능</td></tr>
+<tr><td>4.6 CSRP</td><td>C# IR → native node/slot/output·reload/fence</td><td>DX12 C++/C# 조립 전후 동등성</td></tr>
+<tr><td class="num">4.7</td><td>bake 입력·UV1/geometry·직접/간접광 출력·큐</td><td>DX12 베이크 정확도·취소/재개·Editor 비차단</td></tr>
+<tr><td>4.75 / ENV</td><td>probe/AO·shadow·post/display·환경의 background/IBL 의미·package</td><td>DX12 기능별 golden·성능</td></tr>
+<tr><td>4.8 후속 구현</td><td>GPU Scene·indirect·meshlet·RT capability/fallback과 실제 출력</td><td>설계는 중립 계약과 구현 공수; 실제 기능은 별도 DX12 구현 게이트</td></tr>
+<tr><td class="num">4.85</td><td>RT scene/AS·hit material·Hybrid/PT radiance·denoise/reservoir·cage geometry·지원/fallback</td><td>두 파이프라인 DX12 수용과 연구별 판정; Vulkan 실행 비교는 본 페이즈에만 인계</td></tr>
+<tr><td>Editor/기타 렌더 소비 페이즈</td><td>viewport/UI·DPI/resize·present의 Vulkan 화면/리소스 차이</td><td>각 페이즈의 DX12 제품 게이트</td></tr></tbody></table></div>
+<p>기존 자동 비교기와 <code>vk.*</code> 검사는 보조 자료로 재사용한다. 원 페이즈의 기본 실행을 <code>dx12,vulkan</code>으로 되돌리지 않는다. <code>.f32</code> 자동 비교만으로 이 계획의 RenderDoc 리소스 확인을 통과시킬 수 없다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-수용-기준과-보존할-증거">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-수용-기준과-보존할-증거">4. 수용 기준과 보존할 증거</h2></div>
+<div class="prose"><ul>
+<li>같은 입력의 같은 backend 반복이 먼저 성립해야 한다. 지원 불가·캡처 실패·validation 오류·리소스 누락·nonfinite를 PASS나 비교 제외 픽셀로 숨기지 않는다.</li>
+<li>기존 HDR 상한 <code>0.002 + 0.005 * max(abs(a), abs(b))</code>를 유지한다. 리소스별 원래 승인 기준과 encoding을 보고서에 명시하고 실패를 통과시키기 위해 완화하지 않는다.</li>
+<li>픽셀별 절대/상대 오차·RMSE·최대값·초과 개수/좌표·차영상과 최초로 갈리는 Pass를 기록한다. history 배열 번호나 event 번호의 물리 차이는 역할 대응으로 설명하며 잘못된 바인딩을 정규화하지 않는다.</li>
+<li>모든 수용 항목에 입력 manifest, <code>.rdc</code> 두 벌, event/리소스 대응표, 원본 추출 데이터, 수치 결과, Debug/Release·장치 신원, 수정 전후 재캡처 경로를 연결한다.</li>
+<li>미지원 기능은 capability와 fallback 근거로 별도 기록한다. Vulkan에 없는 기능을 조용히 생략하고 동등하다고 판정하지 않는다.</li>
+</ul>
+<h3 id="2026-10-11-lx-그림자-메시렛-검증-이관">2026-10-11 LX 그림자 메시렛 검증 이관</h3>
+<p><a href="ShadowMeshletGpuCullingPlan.html">그림자 메시렛 GPU 컬링 계획</a>의 후속 목록 6번은 사용자 결정으로 PHASE 4.9에 이관한다. <code>vk.shadow</code> 제거와 PBR 테스트의 그림자 축 정리는 대체 검증 완료를 뜻하지 않는다. Vulkan 제품 LX 그림자의 실제 <code>DispatchMeshIndirect</code> 실행, DX12/Vulkan 캐스케이드 3장 및 알파 마스크·스키닝 리소스/픽셀 비교는 BP-0~5가 소유하며 현재 수용 증거는 미확인이다.</p>
+<p>원 작업은 DX12 Debug/Release 기준선·경로 동치·누락 변이와 성능 근거를 확보한 뒤 입력 manifest, 소스/binary 해시, 캐스케이드 깊이 원본·판정 결과를 인계한다. 4.9에서는 같은 입력의 실제 제품 프레임을 RenderDoc으로 캡처하고 event/리소스 대응·검증 레이어 결과를 확인한다. 이번 이관은 BP 완료나 기존 22인일 추정 변경이 아니며, Vulkan 실행·교차 비교를 LX DX12 작업의 선행으로 역연결하지 않는다.</p>
+<p>2026-10-12 <a href="../analysis/LxShadowRepeatedPerformance20261012.html">DX12 반복 측정</a>의 3개 합성 장면·24회 manifest/프로파일은 보존했다. 4096 슬롯으로 계측 누락을 해결했지만 변동성 때문에 성능 이득은 미수용이다. 이 결과는 Vulkan 실행 또는 BP 완료 증거가 아니다.</p>
+<p>2026-10-12 사용자 지시로 착수 성능 조건을 해제하여 <a href="../analysis/LxShadowComputeCulling20261012.html">DX12 compute 사전 컬링</a>을 구현했다. Scene host ABI는 20이며 이전 cooked Scene 제품은 재생성한다. GPU 생존 목록·indirect 인자·월드 변환 정점 리드백과 합성 깊이 맵 동치를 확인한 DX12 증거를 인계한다. SpirV에서는 새 경로를 활성화하지 않았으며 Vulkan 실행·교차 비교와 BP 완료 여부는 여전히 PHASE 4.9에서 판정한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-인계받은-관측-기록">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-인계받은-관측-기록">5. 인계받은 관측 기록</h2></div>
+<div class="prose"><p>2026-09-14~19의 sampler/시각 고정/기동 <code>gCubeMap</code>/<code>vk.*</code> 기록은 <a href="PBRWiringStabilizationPlan.html">PBR 계획</a>의 해당 날짜를 따른다. 오래된 기동 결함은 4.9 착수 시 현재 binary에서 재현 여부를 확인하고 수정 완료로 가정하지 않는다.</p>
+<p>2026-10-01에 BASE-0에서 범위를 벗어나 수행한 비교와 수정은 <a href="../analysis/RenderBase0Baseline.html">BASE-0 기록</a>에 보존한다. history guard 수정 뒤 Debug/Release 교차 잔여는 HDR 466픽셀(max 0.435546875), display 186픽셀(max 0.011764705)이며 SSGI 이후 시작한다. 이는 RenderDoc 검증 전 참고 자료다. <strong>4.9는 미착수이며 이 기록을 BP 완료 공수로 올리지 않는다. BASE-0의 실패 조건으로도 사용하지 않는다.</strong></p>
+</div>
+</section>
+<section class="doc-sec" id="sec-lx-scene-단일-배선-후속--2026-10-12">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="lx-scene-단일-배선-후속--2026-10-12">LX Scene 단일 배선 후속 — 2026-10-12</h2></div>
+<div class="prose"><p>일반 GBuffer 구현과 구경로 테스트·A/B 도구를 제거했다. Scene ABI 21과 모델 CEMC 12를 사용하며 이전 리소스는 강제 리임포트·재쿠킹한다. 현재 변경과 검증 판정은 <a href="../analysis/LxSceneBigBangCutover20261012.html">LX 전환 보고서</a>를 따른다. Vulkan 신규 배선 실행 검증은 PHASE 4.9에 남는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="BackendParityPlan.md"><code>docs/plans/BackendParityPlan.md</code></a> · 마지막 커밋 2026-10-12 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

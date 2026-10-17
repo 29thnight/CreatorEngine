@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/RhiGpuMemoryLifetimeDesign.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHI GPU 메모리·수명 관리 재설계</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-결정-요약">0. 결정 요약</a></li><li><a href="#1-현재-코드에서-확인한-문제">1. 현재 코드에서 확인한 문제</a></li><li><a href="#2-차용할-것과-차용하지-않을-것">2. 차용할 것과 차용하지 않을 것</a></li><li><a href="#3-목표-구조">3. 목표 구조</a></li><li><a href="#4-rhi-계약">4. RHI 계약</a></li><li><a href="#5-transient-upload-segment-pool">5. Transient Upload Segment Pool</a></li><li><a href="#6-제출과-abort의-단일-소유자">6. 제출과 Abort의 단일 소유자</a></li><li><a href="#7-자산-업로드-트랜잭션">7. 자산 업로드 트랜잭션</a></li><li><a href="#8-persistent-resource-heap-pool">8. Persistent Resource Heap Pool</a></li><li><a href="#9-descriptor와-sbt">9. Descriptor와 SBT</a></li><li><a href="#10-파일-배치">10. 파일 배치</a></li><li><a href="#11-구현-순서">11. 구현 순서</a></li><li><a href="#12-검증-기준">12. 검증 기준</a></li><li><a href="#13-금지-규칙">13. 금지 규칙</a></li><li><a href="#14-최종-판정">14. 최종 판정</a></li><li><a href="#15-공식-참고-자료">15. 공식 참고 자료</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="RhiGpuMemoryLifetimeDesign.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>RHI GPU 메모리·수명 관리 재설계</h1>
+<div class="meta"><p>작성: 2026-08-14</p>
+<p>상태: <strong>Slice A~D 및 Slice E-a descriptor versioned recycler 완료 / SBT는 실제 소비 경로 대기</strong></p>
+<p>대상: CreatorEngine RHI, DX12, Vulkan</p>
+<p>관련 문서: <code>RhiBoundaryPlan.md</code>, <code>AssetResidencyPlan.md</code></p>
+<p>대체 범위: 두 문서의 upload ring, frame-count 수명, 향후 placed-resource heap 부분</p>
+<p>구현 상태 (2026-08-15):</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 1, 차단·중단 2"><i class="ok" style="flex:1"></i><i class="risk" style="flex:2"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 1</span><span class="chip risk">차단·중단 2</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 16개의 분량 막대">
+<a class="map-row" href="#0-결정-요약"><span class="ve-label">§0</span><span class="map-name">결정 요약</span><span class="map-bar"><i style="width:19.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-현재-코드에서-확인한-문제"><span class="ve-label">§1</span><span class="map-name">현재 코드에서 확인한 문제</span><span class="map-bar"><i style="width:60.5%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#2-차용할-것과-차용하지-않을-것"><span class="ve-label">§2</span><span class="map-name">차용할 것과 차용하지 않을 것</span><span class="map-bar"><i style="width:25.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-목표-구조"><span class="ve-label">§3</span><span class="map-name">목표 구조</span><span class="map-bar"><i style="width:24%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-rhi-계약"><span class="ve-label">§4</span><span class="map-name">RHI 계약</span><span class="map-bar"><i style="width:58.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-transient-upload-segment-pool"><span class="ve-label">§5</span><span class="map-name">Transient Upload Segment Pool</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-제출과-abort의-단일-소유자"><span class="ve-label">§6</span><span class="map-name">제출과 Abort의 단일 소유자</span><span class="map-bar"><i style="width:35.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-자산-업로드-트랜잭션"><span class="ve-label">§7</span><span class="map-name">자산 업로드 트랜잭션</span><span class="map-bar"><i style="width:32.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-persistent-resource-heap-pool"><span class="ve-label">§8</span><span class="map-name">Persistent Resource Heap Pool</span><span class="map-bar"><i style="width:65.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-descriptor와-sbt"><span class="ve-label">§9</span><span class="map-name">Descriptor와 SBT</span><span class="map-bar"><i style="width:13.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#10-파일-배치"><span class="ve-label">§10</span><span class="map-name">파일 배치</span><span class="map-bar"><i style="width:19.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#11-구현-순서"><span class="ve-label">§11</span><span class="map-name">구현 순서</span><span class="map-bar"><i style="width:83.3%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#12-검증-기준"><span class="ve-label">§12</span><span class="map-name">검증 기준</span><span class="map-bar"><i style="width:57.4%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#13-금지-규칙"><span class="ve-label">§13</span><span class="map-name">금지 규칙</span><span class="map-bar"><i style="width:11.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#14-최종-판정"><span class="ve-label">§14</span><span class="map-name">최종 판정</span><span class="map-bar"><i style="width:11.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#15-공식-참고-자료"><span class="ve-label">§15</span><span class="map-name">공식 참고 자료</span><span class="map-bar"><i style="width:6.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 16개 가운데 「5. Transient Upload Segment Pool」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><ul>
+<li>Slice A 완료: 의미 기반 요청, all-or-none 배치, recording/completion,
+RHI <code>AbortFrame</code>, 제출 coordinator와 cache transaction listener를 배선했다.</li>
+<li>Slice B 완료: DX12/Vulkan 모두 completion-aware
+regular/large segment allocator로 전환했다. Vulkan flush는 command pool
+recycler를 사용하며 더 이상 제출 직후 CPU에서 기다리지 않는다. 일반 세그먼트는
+packed cursor CAS로 lock-free 예약하고, large/best-fit 및 생성만 allocator mutex로
+직렬화한다. 고정 용량 stable-address buffer registry와 generation 기반 free slot
+재활용을 도입해 resolve 중 slot 이동 없이 trim된 세그먼트의 handle 자리도 다시
+쓸 수 있다. worker는 slow path에서 새 네이티브 세그먼트를 만들 수 있다. worker
+allocation context는 CAS retry telemetry가 유의미할 때만 적용하는 후속 최적화다.
+양쪽 백엔드에 실제 메모리 예산 조회, soft-budget 재시도, completion 이후 trim,
+압력 히스테리시스와 정책 telemetry도 배선했다.</li>
+<li>Slice C의 중립 Vulkan mesh 경로 완료: DX12 메시 정점/인덱스는 한 배치로
+예약하고, DX12 메시·텍스처와 Vulkan 메시·텍스처는 Recording → Queued →
+Resident 및 Abort rollback을 따른다. <code>VulkanMeshCache</code>는 device-local
+vertex/index buffer를 소유하고 completion-point graveyard에서만 반환한다.
+Vulkan pipeline/encoder에도 RHI vertex input과 동적 binding stride를 연결했고,
+editor <code>TickLive</code>의 실제 scene pass와 ImGui Vulkan 표시 경로까지 배선했다.</li>
+<li>공통 completion retire queue 완료: 네이티브 payload는 각 owner가 보관하되
+완료 전/완료값 일치/quarantine/teardown 판정은 <code>RHICompletionRetireQueue</code> 하나를
+사용한다. DX12/Vulkan 메시·텍스처 캐시와 양쪽 ImGui descriptor 묘지를 이관했다.
+프레임 번호는 미사용 퇴출 정책에만 쓰며 실제 파괴는 completion point가 결정한다.</li>
+<li>Slice D persistent resource heap 완료: <code>RHIPersistentHeapPolicy</code>가 주소순 map과
+크기순 best-fit index, alignment padding 보존, 인접 block 병합, generation
+handle과 compatibility key를 백엔드 중립으로 관리한다. DX12는
+<code>ID3D12Heap</code>/<code>CreatePlacedResource</code>, Vulkan은 <code>VkDeviceMemory</code>와
+<code>vkBindBufferMemory</code>/<code>vkBindImageMemory</code>로 연결했다. 메시·텍스처 cache의
+completion graveyard가 native resource를 먼저
+파괴한 뒤에만 block을 반환하며, 빈 세그먼트는 key당 1장만 standby로
+남긴다. 32 MiB 이상, driver dedicated 요구, pool segment 생성/바인드
+실패는 committed/dedicated로 fallback한다.</li>
+<li>적용 범위는 양쪽 <code>IRenderMeshCache</code>의 vertex/index buffer와
+<code>IRenderTextureCache</code>의 sampled asset texture다. DX12는 buffer와
+<code>ALLOW_ONLY_NON_RT_DS_TEXTURES</code> heap을 분리하고, Vulkan은 memory type에
+buffer/optimal-image class를 더한 compatibility key를 사용한다. 수명 종료점을
+알려 주는 release 계약이 없는 범용 <code>CreateBuffer</code>/<code>CreateTexture</code> 소비자는
+억지로 pool로 바꾸지 않았다.</li>
+<li>persistent heap의 성장 예산은 DX12 <code>DXGI LOCAL</code>의
+<code>IDXGIAdapter3::QueryVideoMemoryInfo</code>, Vulkan memory type의 heap에 대한
+<code>VK_EXT_memory_budget</code>에서 직접 읽는다. Vulkan 확장이 없으면 heap size를
+estimated budget으로 사용한다. 90%/80% 압력 히스테리시스와 빈 segment
+강제 trim, exact-size dedicated fallback은 두 backend가 같은 공통 정책을 쓴다.</li>
+<li>device-scoped <code>RHIDeviceMemoryBudgetCoordinator</code>가 DeviceResources에서 프레임당
+한 번 갱신한 snapshot을 같은 물리 device의 모든 persistent allocator에 배포한다.
+buffer/texture allocator는 owner로 등록하고 segment 성장 전에 공통 growth ticket을
+예약·commit/cancel한다. ticket을 거치지 않는 committed/dedicated allocation도
+snapshot 이후 사용량에 합산하므로 allocator별 독립 판단에 따른 동시 과예약을 막는다.
+실제 budget만 90%/80% pressure 판정에 사용하고 heap-size estimate는 성장 한도와
+telemetry에는 쓰되 pressure 신호로 승격하지 않는다.</li>
+<li><code>RHIAssetEvictionPolicy</code>는 평상시 120프레임 미사용 은퇴를 유지한다. 실제 device
+pressure에서는 3프레임 이상 미사용한 Resident 자산을 LRU 순으로 고르고,
+80% 해제선까지 필요한 바이트와 최소 64 MiB 중 큰 값을 한 번의 texture→mesh
+공유 target으로 사용한다. 이번 프레임 사용 자산과 Recording/Queued 업로드는
+보호하며, 선택된 자산도 즉시 파괴하지 않고 completion retire queue로 보낸다.</li>
+<li>Slice E-a descriptor versioned recycler 완료: 공통 <code>RHIDescriptorVersionPolicy</code>가
+Available → Recording → Pending/Quarantined 상태와 slot+generation handle을 관리한다.
+DX12는 recording마다 shader-visible heap page 하나를, Vulkan은 descriptor pool
+version 하나를 점유한다. <code>FlushCommandList</code>의 중간 제출도 새 recording/version으로
+전환하며 제출 completion 전에는 reset하거나 덮어쓰지 않는다. 모든 version이
+pending이면 page/pool을 성장시키고, completion 도달 뒤에만 재사용한다.</li>
+<li>SBT versioned recycler는 실제 공통 RT 소비 경로가 생길 때 구현한다는 본문의
+조건을 유지한다.</li>
+<li>검증: 최종 변경을 포함한 VS18/v145 Debug x64 전체 솔루션 빌드는 오류 0으로
+성공했다. 링크 시 기존 <code>/DELAYLOAD:vulkan-1.dll</code> LNK4229가 Player/Editor에
+각각 1건 발생했으며 이번 allocator 컴파일 경고는 0건이다. <code>rhi.uploadsegments</code>는 공통 policy,
+DX12 7/7, Vulkan 4/4, Vulkan validation layer clean을 통과했다. 실제
+<code>scene.glb</code> 유효 mesh 25개의 21,626,436 B를 DX12에서 64 MiB segment
+1장, placed allocation 50개, 할당 크기 23,658,496 B로 올렸다. 완료점
+직전에는 전체 block이 보존됐고 도달 후 0 B로 병합되며 standby 1장만
+남았다. Vulkan도 segment 1장, pooled allocation 50개, 할당 21,626,944 B였고
+94,308 index draw가 green 105 / blue 3,991 pixel로 유지됐다. 양쪽의
+강제 1 B soft-budget fixture에서 committed/dedicated fallback도 통과했다.</li>
+<li>2026-08-15 추가 검증: 공통 큐의 완료값 6/7·7/7 경계와 completion 0
+quarantine을 <code>rhi.uploadsegments</code>에서 확인했다. DX12 177프레임에서는 실제
+texture 1개 128.0 MiB가 은퇴·회수되어 묘지/격리 0으로 내려왔고, Vulkan은
+130프레임 뒤 texture/mesh 묘지·격리 0, validation 0으로 정상 종료했다.</li>
+<li>texture compatibility pool 실경로 검증: 같은 프로세스에서 <code>dx12.gizmoicon</code>과
+<code>vk.gizmoicon</code>을 실행해 실제 <code>CameraGizmo.png</code>의 중심/투명/외부 픽셀이 각각
+<code>0.500/0.000/0.000</code>, 점등 1,346으로 일치했다. DX12는 texture segment 1장,
+pooled/dedicated <code>2/0</code>(흰 폴백+아이콘), Vulkan은 <code>1/0</code>을 사용했다. 두 backend
+모두 할당 0.1 MiB, 실제 device-local budget 11,228.0 MiB를 보고했고 Vulkan
+validation은 0건이었다. 전용 할당 우회나 budget 0은 이제 두 테스트가 실패시킨다.</li>
+<li>device budget 추가 검증: 공통 계약 테스트가 owner 2개의 합산 ticket 제한,
+commit/cancel, 90% 진입·80% 해제 hysteresis, estimated budget의 pressure 제외를
+통과했다. DX12/Vulkan native persistent heap 테스트도 같은 coordinator를 공유하는
+두 allocator의 segment 성장을 확인했고 <code>rhi.uploadsegments</code>는 오류 0,
+Vulkan validation clean으로 종료했다. 이후 실제 PNG 양쪽 테스트도 pooled 경로와
+동일 픽셀 결과를 유지했다.</li>
+<li>pressure eviction 추가 검증: 공통 정책 테스트가 normal 120f, pressure 3f LRU,
+recent/upload-pending 보호와 두 cache의 target 공유를 통과했다. 실제 <code>scene.glb</code>
+25개 mesh는 DX12/Vulkan 모두 3프레임 pressure 경로에서 21,626,436 B가 묘지로
+이동했고, completion 직전 보존·도달 뒤 block 병합과 empty trim을 확인했다.
+<code>dx12.gizmoicon</code>/<code>vk.gizmoicon</code> 실제 PNG 회귀도 오류 0과 동일 픽셀을 유지했다.</li>
+<li>descriptor recycler 추가 검증: <code>dx12.descriptorheap</code> 6/6이 completion 경계,
+Abort 재사용, completion 0 quarantine, generation 갱신, page 내 연속 할당,
+중간 제출 version 격리, 완료 뒤 재사용, overflow와 sampler dedupe를 통과했다.
+<code>vk.selftest</code>는 GPU 대기 없는 flush 3회로 초기 pool 3개를 모두 pending 상태로
+만든 뒤 네 번째 version을 성장시켜 실제 descriptor set draw를 완료했고,
+<code>WaitForGpu</code> 뒤 4개 version 전부가 회수됐으며 validation 오류는 0이었다.
+<code>dx12.parallel</code>은 upload 2,048건과 descriptor 1,024건에서 겹침 0건,
+순차/병렬 결과 byte 차이 0과 픽셀 차이 0/65,536을 확인했다.</li>
+</ul>
+<hr>
+</section>
+<section class="doc-sec" id="sec-0-결정-요약">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-결정-요약">0. 결정 요약</h2></div>
+<div class="prose"><p>CreatorEngine의 업로드 메모리는 더 이상 <strong>프레임 인덱스로 나눈 고정 링 버퍼</strong>를
+핵심 수명 모델로 사용하지 않는다. 다음 네 계층으로 분리한다.</p>
+<ol>
+<li><strong>Transient Upload Segment Pool</strong><ul>
+<li>CPU가 쓰고 GPU가 읽는 임시 스테이징 메모리.</li>
+<li>선형 할당하고, 제출 완료값이 지난 세그먼트를 통째로 재사용한다.</li>
+<li>일반 세그먼트와 대형 전용 세그먼트를 분리한다.</li>
+</ul>
+</li>
+<li><strong>Submission/Lifetime Coordinator</strong><ul>
+<li>모든 큐 제출에 단조 증가 완료값을 붙인다.</li>
+<li>DX12 fence와 Vulkan timeline semaphore를 같은 RHI 완료점으로 번역한다.</li>
+</ul>
+</li>
+<li><strong>Deferred Release Queue</strong><ul>
+<li>GPU가 마지막으로 사용한 완료점이 지나기 전에는 리소스, 디스크립터,
+스테이징 블록을 파괴하거나 덮어쓰지 않는다.</li>
+</ul>
+</li>
+<li><strong>Persistent Resource Heap Pool</strong><ul>
+<li>장기 상주 버퍼·텍스처는 큰 디바이스 메모리 힙 안에서 할당한다.</li>
+<li>해제 완료 후 free-list에 반환하고, 인접 빈 블록을 병합한다.</li>
+</ul>
+</li>
+</ol>
+<p>이 구조는 .NET GC의 <strong>세그먼트, 빠른 선형 할당, 대형 객체 분리, 빈 세그먼트
+standby</strong> 개념을 차용한다. 그러나 GPU 주소와 디스크립터가 인플라이트 명령에
+박혀 있으므로 <strong>이동 압축과 세대 승격은 차용하지 않는다.</strong></p>
+<p>DX12와 Vulkan은 동일한 RHI 계약과 상태 전이를 구현한다. 한 백엔드만 구현된
+상태는 이 설계의 완료가 아니다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-현재-코드에서-확인한-문제">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-현재-코드에서-확인한-문제">1. 현재 코드에서 확인한 문제</h2></div>
+<div class="prose"><h3 id="11-업로드-경로의-비대칭과-고정-상한">1.1 업로드 경로의 비대칭과 고정 상한</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>DX12 현재 상태</th><th>Vulkan 현재 상태</th><th>문제</th></tr></thead>
+<tbody><tr><td>기본 용량</td><td>프레임당 16 MiB 세그먼트</td><td>프레임당 8 MiB 단일 블록</td><td>동일 RHI 호출이 백엔드마다 다른 크기에서 실패한다</td></tr>
+<tr><td>부족 처리</td><td>실패 수요를 기록하고 다음 <code>BeginFrame</code>에 세그먼트 하나 추가</td><td>즉시 무효 슬라이스 반환</td><td>최초 요청은 실패하며 Vulkan에는 성장 경로도 없다</td></tr>
+<tr><td>대형 요청</td><td>다음 프레임에 요청 크기 세그먼트를 추가</td><td><span class="chip risk">항상 실패</span></td><td>현재 프레임의 큰 메시를 구하지 못한다</td></tr>
+<tr><td>회수 기준</td><td>프레임 슬롯 fence 대기 후 슬롯 전체 reset</td><td>프레임 슬롯 timeline 값 대기 후 offset reset</td><td>중간 제출과 실제 사용 범위를 표현하지 못한다</td></tr>
+<tr><td>동시 할당</td><td>packed cursor CAS</td><td>단순 <code>m_offset</code></td><td>Vulkan 구현은 병렬 기록에 안전하지 않다</td></tr></tbody></table></div>
+<p>근거가 되는 현재 경로:</p>
+<ul>
+<li>DX12 초기 16 MiB 값: <code>RenderEngine/RHI/DX12/DX12DeviceResources.cpp</code></li>
+<li>DX12 사후 성장: <code>RenderEngine/RHI/DX12/DX12UploadRing.cpp</code></li>
+<li>Vulkan 고정 블록: <code>RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp</code></li>
+<li>공통 표면: <code>RenderEngine/RHI/IRenderDeviceServices.h::AllocateUpload</code></li>
+</ul>
+<h3 id="12-sceneglb-대형-메시가-사라지는-직접-경로">1.2 <code>scene.glb</code> 대형 메시가 사라지는 직접 경로</h3>
+<p>현재 DX12 메시 캐시는 정점 버퍼와 인덱스 버퍼를 별도의 호출로 올린다.</p>
+<pre><code class="language-text">Upload vertex staging
+  └─ 성공 가능
+Upload index staging
+  └─ 프레임 세그먼트 부족 → 실패
+      └─ 메시 전체가 무효 binding으로 반환됨</code></pre>
+<p>한 요청이 16 MiB를 넘거나, 같은 프레임의 앞선 업로드가 공간을 소비해 합계가
+16 MiB를 넘으면 <code>DX12UploadRing::Allocate</code>가 그 프레임 요청을 거절한다. 현재
+수정안은 다음 프레임부터 세그먼트를 늘리므로 <strong>실패한 최초 프레임을 복구하지
+않는다.</strong> 같은 메시가 여러 패스에서 반복 요청되면 실패 수요도 중복 계상된다.</p>
+<p>또한 정점 업로드 성공 후 인덱스 업로드가 실패할 수 있어 목적 리소스 생성,
+복사 명령, 통계가 부분적으로 진행될 수 있다. 메시 하나는 정점·인덱스 staging을
+<strong>한 번에 예약하는 all-or-none 배치</strong>여야 한다.</p>
+<h3 id="13-제출보다-먼저-resident가-되는-캐시">1.3 제출보다 먼저 resident가 되는 캐시</h3>
+<p>DX12 메시·텍스처 캐시와 Vulkan 텍스처 캐시는 복사 명령을 기록한 뒤 실제 큐
+제출 성공을 확인하기 전에 resident map에 엔트리를 넣는다. 이후 프레임이
+Abort되거나 제출이 실패하면 캐시는 GPU에 도달하지 않은 리소스를 정상 상주
+리소스로 돌려줄 수 있다.</p>
+<p>필요한 상태는 최소 다음 넷이다.</p>
+<pre><code class="language-text">Absent → Recording → Queued(completion) → Resident
+                └──────── Abort ─────────→ Absent
+Resident → Retiring(completion) → Absent</code></pre>
+<p><code>Queued</code>는 같은 큐의 뒤 제출에서 사용할 수 있지만 아직 CPU 관점의 완료는 아니다.
+교차 큐 소비나 readback은 <code>Resident</code>, 즉 완료 확인 이후만 허용한다.</p>
+<h3 id="14-제출-추적의-구멍">1.4 제출 추적의 구멍</h3>
+<p><code>DX12DeviceResources::EndFrame</code>은 fence를 신호하지만 다음 경로는 네이티브 큐를
+직접 호출한다.</p>
+<ul>
+<li><code>EnhancedRenderGraph.cpp</code>의 병렬 command list 제출</li>
+<li><code>EnhancedApiOverheadBench.cpp</code>의 병렬 제출</li>
+<li><code>DX12DeviceResources::FlushCommandList</code>의 중간 제출</li>
+</ul>
+<p>직접 제출은 “어느 업로드 세그먼트와 어느 리소스가 어느 완료값에 속하는가”를
+한 곳에서 결정할 수 없게 한다. Vulkan <code>FlushCommandList</code>는 같은 command pool을
+재사용하려고 매번 timeline을 기다려 CPU/GPU 파이프라이닝을 끊는다.</p>
+<h3 id="15-프레임-수-기반-수명은-안전-판정이-아니다">1.5 프레임 수 기반 수명은 안전 판정이 아니다</h3>
+<p>영상에서 설명한 life-count 방식은 고정 인플라이트 수를 잘 지키면 동작할 수
+있지만, 다음 경우에는 실제 GPU 완료와 어긋난다.</p>
+<ul>
+<li>프레임 중간 제출</li>
+<li>GPU stall 또는 device scheduling 지연</li>
+<li>프레임 Abort</li>
+<li>향후 copy/compute queue 분리</li>
+<li>창 최소화 등으로 프레임 진행이 멈춘 상태</li>
+</ul>
+<p>따라서 frame count는 캐시의 “얼마나 오래 안 썼는가” 정책에는 사용할 수 있지만,
+파괴와 재사용의 안전 판정에는 사용할 수 없다. 안전 판정은 완료값만 담당한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-차용할-것과-차용하지-않을-것">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-차용할-것과-차용하지-않을-것">2. 차용할 것과 차용하지 않을 것</h2></div>
+<div class="prose"><h3 id="21-net-gc에서-차용할-것">2.1 .NET GC에서 차용할 것</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>.NET 개념</th><th>RHI 적용</th></tr></thead>
+<tbody><tr><td>관리 힙 세그먼트</td><td>큰 네이티브 메모리 블록을 만들고 그 안에서 빠르게 할당</td></tr>
+<tr><td>bump-pointer 할당</td><td>transient upload를 현재 세그먼트 cursor 증가로 할당</td></tr>
+<tr><td>SOH/LOH 분리</td><td>일반 요청과 대형 전용 세그먼트를 서로 다른 풀에서 관리</td></tr>
+<tr><td>빈 세그먼트 standby</td><td>완료된 세그먼트를 즉시 파괴하지 않고 재사용 후보로 유지</td></tr>
+<tr><td>임계치 동적 조정</td><td>peak, miss, reclaim lag를 보고 예산과 standby 목표를 조정</td></tr>
+<tr><td>allocation context</td><td>필요 시 기록 워커별 chunk를 미리 떼어 CAS 경합을 줄임</td></tr></tbody></table></div>
+<p>.NET의 85,000바이트 LOH 기준이나 실제 세그먼트 크기는 런타임 구현값이므로
+가져오지 않는다. RHI의 임계치는 GPU 업로드 패턴과 VRAM/host-visible 예산을
+측정해 결정한다.</p>
+<h3 id="22-차용하지-않을-것">2.2 차용하지 않을 것</h3>
+<ul>
+<li><strong>이동 압축:</strong> GPU 가상 주소, descriptor, SBT record, 인플라이트 command가
+기존 위치를 참조할 수 있어 투명 이동이 불가능하다.</li>
+<li><strong>도달성 추적:</strong> 엔진은 자산 ID, RHI handle, 명시적 소유권으로 수명을 안다.</li>
+<li><strong>세대 승격:</strong> 일시 데이터와 상주 데이터는 복사 시점부터 목적이 다르므로
+generation이 아니라 서로 다른 allocator를 사용한다.</li>
+<li><strong>stop-the-world:</strong> 정상 프레임에서 전체 GPU 대기나 <code>vkDeviceWaitIdle</code>로
+메모리를 회수하지 않는다.</li>
+</ul>
+<h3 id="23-영상의-관리-기법에서-차용할-것">2.3 영상의 관리 기법에서 차용할 것</h3>
+<ul>
+<li>큰 힙을 만들고 내부 free-list에서 재사용한다.</li>
+<li>해제 블록의 앞뒤가 비어 있으면 즉시 병합한다.</li>
+<li>GPU가 읽는 중인 리소스와 descriptor는 지연 해제한다.</li>
+<li>제출 뒤의 SBT/descriptor 내용을 CPU가 덮어쓰지 않고 새 버전을 만든다.</li>
+</ul>
+<p>단, 고정 life-count 대신 DX12 fence/Vulkan timeline 완료값을 사용한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-목표-구조">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-목표-구조">3. 목표 구조</h2></div>
+<div class="prose"><pre class="mermaid">flowchart TD
+    Pass[&quot;공통 패스·자산 캐시&quot;] --&gt; Service[&quot;IRenderDeviceServices&quot;]
+    Service --&gt; UploadAPI[&quot;RHI Upload API&quot;]
+    Service --&gt; ResourceAPI[&quot;RHI Resource API&quot;]
+
+    UploadAPI --&gt; UploadPolicy[&quot;Transient Segment Pool Policy&quot;]
+    ResourceAPI --&gt; HeapPolicy[&quot;Persistent Heap Pool Policy&quot;]
+
+    UploadPolicy --&gt; DXUpload[&quot;DX12 Upload Segment Adapter&quot;]
+    UploadPolicy --&gt; VKUpload[&quot;Vulkan Upload Segment Adapter&quot;]
+    HeapPolicy --&gt; DXHeap[&quot;DX12 Heap + PlacedResource&quot;]
+    HeapPolicy --&gt; VKHeap[&quot;VkDeviceMemory + Bind&quot;]
+
+    Submit[&quot;Submission Coordinator&quot;] --&gt; DXFence[&quot;ID3D12Fence value&quot;]
+    Submit --&gt; VKTimeline[&quot;Timeline semaphore value&quot;]
+    DXFence --&gt; Deferred[&quot;Deferred Release / Recycle&quot;]
+    VKTimeline --&gt; Deferred
+    Deferred --&gt; UploadPolicy
+    Deferred --&gt; HeapPolicy</pre>
+<p>공통 코드는 “언제 재사용 가능한가”, “어떤 크기 분류인가”, “어떤 블록을
+선택하는가”를 결정한다. 백엔드는 네이티브 리소스를 생성하고 요구 정렬과
+memory type/heap flag를 결정한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-rhi-계약">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-rhi-계약">4. RHI 계약</h2></div>
+<div class="prose"><h3 id="41-의미-기반-업로드-요청">4.1 의미 기반 업로드 요청</h3>
+<p>현재 <code>AllocateUpload(bytes, alignment)</code>는 DX12의 256/512 정렬 규칙을 호출부로
+노출한다. 다음 의미 기반 요청으로 바꾼다.</p>
+<pre><code class="language-cpp">enum class RHIUploadUsage : uint8_t
+{
+    Raw,
+    ConstantBuffer,
+    VertexData,
+    IndexData,
+    BufferCopy,
+    TextureCopy,
+    ShaderTable
+};
+
+struct RHIUploadRequest
+{
+    uint64_t       bytes{ 0 };
+    RHIUploadUsage usage{ RHIUploadUsage::Raw };
+    uint64_t       minimumAlignment{ 1 }; // 호출자가 아는 추가 하한
+};</code></pre>
+<p>백엔드는 다음 식으로 실제 정렬을 넓힌다.</p>
+<pre><code class="language-text">effectiveAlignment = max(request.minimumAlignment,
+                         backend.RequiredAlignment(request.usage))</code></pre>
+<p>DX12 상수/텍스처 배치 규칙과 Vulkan의 device limit은 각각의 adapter 안에 남는다.</p>
+<h3 id="42-배치-예약">4.2 배치 예약</h3>
+<pre><code class="language-cpp">class IRenderDeviceServices
+{
+public:
+    virtual bool ReserveUploadBatch(
+        std::span&lt;const RHIUploadRequest&gt; requests,
+        std::span&lt;RHIBufferSlice&gt; outSlices,
+        std::string&amp; outError) = 0;
+
+    // 이행 기간 호환 함수. 내부적으로 1개 배치를 호출한다.
+    virtual RHIBufferSlice AllocateUpload(
+        const RHIUploadRequest&amp; request) = 0;
+};</code></pre>
+<p>배치는 다음을 보장한다.</p>
+<ul>
+<li><code>outSlices.size() == requests.size()</code>가 아니면 호출 자체를 거절한다.</li>
+<li>모든 요청을 수용할 수 있을 때만 cursor를 한 번 전진시킨다.</li>
+<li>하나라도 실패하면 세그먼트 cursor와 출력은 바뀌지 않는다.</li>
+<li>정점/인덱스처럼 함께 살아야 하는 데이터는 반드시 한 배치로 요청한다.</li>
+<li>배치 내부 조각은 한 세그먼트의 연속 예약에서 <code>SubRange</code>로 만든다.</li>
+</ul>
+<p>이 규칙으로 “정점 성공, 인덱스 실패”를 구조적으로 없앤다.</p>
+<h3 id="43-완료점">4.3 완료점</h3>
+<p>현재 엔진은 graphics queue 하나에서 업로드와 렌더링을 순서대로 제출하므로
+첫 구현은 단일 단조 증가 값으로 충분하다.</p>
+<pre><code class="language-cpp">struct RHICompletionPoint
+{
+    uint64_t value{ 0 };
+    bool IsValid() const { return value != 0; }
+};</code></pre>
+<p>향후 copy/compute queue를 분리할 때는 <code>queueId + value</code> 또는 완료점 집합으로
+확장한다. 그 전까지 다른 큐에서 이 값을 완료 판정에 사용하는 것은 금지한다.</p>
+<h3 id="44-allocator-내부-계약">4.4 allocator 내부 계약</h3>
+<p>이 인터페이스는 패스에 노출하지 않고 <code>IRHIDeviceResources</code> 구현이 소유한다.</p>
+<pre><code class="language-cpp">class IRHIUploadAllocator
+{
+public:
+    virtual void Collect(uint64_t completedValue) = 0;
+    virtual void BeginRecording(uint64_t recordingId) = 0;
+
+    virtual bool ReserveBatch(
+        uint64_t recordingId,
+        std::span&lt;const RHIUploadRequest&gt; requests,
+        std::span&lt;RHIBufferSlice&gt; outSlices,
+        std::string&amp; outError) = 0;
+
+    virtual void OnSubmitted(
+        uint64_t recordingId,
+        RHICompletionPoint completion) = 0;
+
+    virtual void AbortRecording(uint64_t recordingId) = 0;
+};</code></pre>
+<p><code>recordingId</code>는 frame index가 아니다. 한 프레임 안에서 <code>FlushCommandList</code>가
+여러 번 발생하면 제출 구간마다 새 recording ID를 만든다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-transient-upload-segment-pool">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-transient-upload-segment-pool">5. Transient Upload Segment Pool</h2></div>
+<div class="prose"><h3 id="51-세그먼트-상태">5.1 세그먼트 상태</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Available
+    Available --&gt; Active: recording이 획득
+    Active --&gt; Pending: 제출 성공 + completion 부여
+    Active --&gt; Available: 제출 전 Abort
+    Pending --&gt; Available: 완료값 통과
+    Available --&gt; Released: trim 또는 shutdown
+    Pending --&gt; Quarantined: 제출은 됐으나 완료점 신호 실패
+    Quarantined --&gt; Released: device teardown</pre>
+<p>핵심 불변식은 다음과 같다.</p>
+<ol>
+<li><code>Pending</code> 세그먼트의 cursor와 바이트는 절대 수정하지 않는다.</li>
+<li>제출 시 그 recording이 사용한 모든 <code>Active</code> 세그먼트를 seal한다.</li>
+<li>중간 제출 뒤의 기록은 새 <code>Active</code> 세그먼트를 사용한다.</li>
+<li><code>completedValue</code>가 retire 값을 지난 뒤에만 <code>Available</code>로 돌아온다.</li>
+<li>frame index는 command allocator 선택에는 쓸 수 있지만 세그먼트 안전 판정에는
+쓰지 않는다.</li>
+</ol>
+<h3 id="52-크기-분류">5.2 크기 분류</h3>
+<pre><code class="language-text">packedBatchBytes &lt;= largeThreshold
+    → Regular pool
+
+packedBatchBytes &gt; largeThreshold
+    → Large pool 또는 dedicated segment</code></pre>
+<p>초기 계측용 기본값은 다음처럼 시작할 수 있지만 확정 상수는 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>설정</th><th style="text-align:right">잠정 시작값</th><th>의미</th></tr></thead>
+<tbody><tr><td><code>regularSegmentBytes</code></td><td style="text-align:right">16 MiB</td><td>일반 세그먼트 크기</td></tr>
+<tr><td><code>largeThreshold</code></td><td style="text-align:right">8 MiB</td><td>일반 풀을 오염시키지 않을 배치 기준</td></tr>
+<tr><td><code>largeGranularity</code></td><td style="text-align:right">4 MiB</td><td>대형 세그먼트 반올림 단위</td></tr>
+<tr><td><code>standbyRegularSegments</code></td><td class="num" style="text-align:right">3</td><td>생성 비용을 피하기 위해 유지할 빈 일반 세그먼트</td></tr>
+<tr><td><code>largeCacheBudgetBytes</code></td><td style="text-align:right">64 MiB</td><td>정상 상태에서 유지할 빈 대형 세그먼트의 총량</td></tr>
+<tr><td><code>trimDelayCollects</code></td><td class="num" style="text-align:right">8</td><td>정상 상태에서 재사용 기회를 주는 collect 유예 횟수</td></tr>
+<tr><td><code>softBudgetBytes</code></td><td style="text-align:right">동적, 64~512 MiB</td><td>초과 시 collect/trim 후 재시도할 기준</td></tr></tbody></table></div>
+<p>DX12와 Vulkan이 같은 숫자를 강제로 쓸 이유는 없다. 두 백엔드는 같은 동작 계약과
+테스트를 공유하되 실제 정렬, memory type, 예산은 별도 telemetry로 정한다.</p>
+<h3 id="53-할당-알고리즘">5.3 할당 알고리즘</h3>
+<ol>
+<li>요청들의 실제 정렬을 계산해 한 배치의 packed size를 구한다.</li>
+<li>대형이면 완료된 large segment 중 best-fit을 찾는다.</li>
+<li>일반이면 현재 active regular segment에서 CAS로 한 번에 예약한다.</li>
+<li>맞지 않으면 현재 세그먼트의 남은 꼬리를 기록하고 다른 available 세그먼트를
+즉시 얻는다.</li>
+<li>available 세그먼트가 없으면 <strong>현재 요청에서 바로 생성</strong>한다. 다음 프레임으로
+미루지 않는다.</li>
+<li>soft budget을 넘거나 backend pressure가 켜지면 <code>Collect</code>와 available trim을
+수행하고 생성 경로를 재시도한다.</li>
+<li>soft budget은 hard cap이 아니다. 안전하게 회수할 available 세그먼트가 없으면
+overcommit을 계측한 뒤 네이티브 생성 API가 최종 성공/OOM을 결정하게 한다.</li>
+<li>크기 합산 overflow나 네이티브 생성 실패 시 기존 cursor와 출력 slice는
+변경하지 않는다.</li>
+</ol>
+<p>느린 생성 경로는 allocator mutex로 직렬화한다. 업로드 세그먼트의 RHI handle은
+고정 용량 stable-address registry에 등록한다. registry slot 주소는 이동하지 않고,
+등록/해제만 직렬화하며 resolve는 lock-free다. trim은 handle generation을 올린 뒤
+free slot에 반환하므로 오래된 handle은 무효가 되고 다음 생성은 같은 주소의 slot을
+안전하게 재사용한다. DX12와 Vulkan 모두 buffer handle slot을 최대 handle 수로 한 번
+고정 할당해 이 조건을 만족하며, 병렬 worker의 네이티브 세그먼트 생성도 slow path
+안에서 허용한다.</p>
+<h3 id="54-병렬-기록">5.4 병렬 기록</h3>
+<p>DX12와 Vulkan의 일반 세그먼트는 같은 packed cursor CAS 정책을 사용한다. 한 번의
+CAS 성공이 배치 전체 범위를 확정하므로 all-or-none 의미를 유지한다. active
+세그먼트 교체, large best-fit 및 네이티브 생성만 slow mutex 경로로 보낸다.
+<code>ReserveBatch</code>만 같은 recording 안에서 병렬 호출한다. recording을 여닫고 제출하거나
+Abort하는 owner thread는 해당 recording의 worker를 join한 뒤 경계를 전환한다.</p>
+<p>8 worker/64 MiB fixture를 최종 코드로 두 번 실행해 64회 예약당 백엔드별 CAS
+재시도 1~6회를
+관측했다. 현재 수치로는 worker별 chunk의 내부 단편화와 수명 복잡도를 감수할
+이유가 없으므로 allocation context는 넣지 않는다. 실제 프레임 telemetry에서
+재시도가 지속적으로 증가하거나 allocator 대기 시간이 병목으로 확인될 때 다음
+단계로 .NET allocation-context 방식을 적용한다.</p>
+<pre><code class="language-text">worker context가 64~256 KiB chunk를 세그먼트에서 한 번 예약
+    └─ worker 내부 할당은 local cursor만 증가
+    └─ chunk 부족 시에만 공통 세그먼트와 동기화</code></pre>
+<p>Vulkan의 기존 단순 <code>m_offset</code>도 공통 CAS cursor로 교체했으므로 두 백엔드 모두
+병렬 allocator 계약을 만족한다.</p>
+<h3 id="55-trim">5.5 trim</h3>
+<p>매 프레임 파괴하지 않는다. 정상 상태에서는 다음 조건을 모두 만족하는 세그먼트만
+정리한다.</p>
+<ul>
+<li><code>Available</code> 상태</li>
+<li>최근 8회 collect 동안 사용되지 않음</li>
+<li>regular standby 목표보다 많거나 large cache budget을 초과함</li>
+</ul>
+<p>backend memory pressure 또는 allocator의 soft budget 초과 시에는 유예 횟수와
+standby/cache 목표를 우회해 <code>Available</code> 세그먼트를 즉시 줄인다. <code>Recording</code>과
+<code>Pending</code>은 어떤 압력에서도 trim하지 않는다. 따라서 trim은 안전성이 아니라
+성능/메모리 정책이며, 안전성은 completion 판정으로 끝난 뒤에만 실행된다.</p>
+<p>예산 입력과 압력 판정은 백엔드가 담당하고 allocator는 같은 정책으로 소비한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>DX12</th><th>Vulkan</th></tr></thead>
+<tbody><tr><td>실제 예산</td><td><code>IDXGIAdapter3::QueryVideoMemoryInfo</code>; UMA는 local, discrete는 non-local 우선</td><td>upload memory type의 heap에 <code>VK_EXT_memory_budget</code> 사용</td></tr>
+<tr><td>fallback</td><td>조회 실패 시 soft budget 256 MiB</td><td>확장 부재 시 heap size를 estimated budget으로 사용</td></tr>
+<tr><td>soft budget</td><td>현재 segment bytes + 가용 headroom의 1/8, 64~512 MiB clamp</td><td>동일</td></tr>
+<tr><td>pressure</td><td>사용량 90%에서 진입, 80% 이하에서 해제</td><td>실제 budget일 때만 동일; estimated budget은 압력 판정에 쓰지 않음</td></tr></tbody></table></div>
+<p>예산은 매 frame begin의 completed fence/timeline 값을 읽은 뒤 갱신한다. 이 순서로
+worker join, GPU completion 확인, <code>Pending → Available</code>, trim, 새 recording 시작의
+경계를 유지한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-제출과-abort의-단일-소유자">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-제출과-abort의-단일-소유자">6. 제출과 Abort의 단일 소유자</h2></div>
+<div class="prose"><h3 id="61-submission-coordinator">6.1 Submission Coordinator</h3>
+<p>모든 제출은 backend <code>DeviceResources</code>의 한 함수로 모은다.</p>
+<pre><code class="language-text">Close/End recording
+    → native queue submit
+    → completion value signal
+    → uploadAllocator.OnSubmitted(recordingId, completion)
+    → uploadTransaction.OnSubmitted(completion)
+    → 새 recordingId 시작</code></pre>
+<ul>
+<li>DX12: <code>ExecuteCommandLists</code> 뒤 같은 queue에서 <code>ID3D12Fence::Signal</code>.</li>
+<li>Vulkan: <code>vkQueueSubmit2</code>의 signal 목록에 timeline 값을 함께 넣는다.</li>
+<li>제출 수락 전 실패: 현재 recording을 즉시 Abort할 수 있다.</li>
+<li>DX12에서 실행 제출 뒤 fence signal이 실패: 안전 완료점을 증명할 수 없으므로
+관련 객체를 <code>Quarantined</code>에 두고 device teardown까지 파괴하지 않는다.</li>
+</ul>
+<p>다음 직접 호출은 제거하거나 coordinator 내부로 내려야 한다.</p>
+<ul>
+<li>render graph 병렬 제출</li>
+<li>API overhead benchmark 병렬 제출</li>
+<li>프레임 중간 flush</li>
+<li>향후 copy queue 제출</li>
+</ul>
+<h3 id="62-vulkan-중간-제출">6.2 Vulkan 중간 제출</h3>
+<p>현재 Vulkan flush는 제출 직후 timeline을 기다리고 같은 command pool을 reset한다.
+재설계 후에는 제출마다 command pool/buffer 세트를 recycler에서 하나 얻는다.</p>
+<pre><code class="language-text">RecordingPool A → submit(value 10) → Pending(10)
+RecordingPool B → 즉시 다음 기록
+completed &gt;= 10 → Pool A reset 후 Available</code></pre>
+<p>이렇게 해야 공통 <code>FlushCommandList</code>가 Vulkan에서만 CPU/GPU 동기화 지점이 되는
+비대칭을 없앨 수 있다.</p>
+<h3 id="63-abort">6.3 Abort</h3>
+<ul>
+<li>아직 제출되지 않은 current recording:<ul>
+<li>command recording 폐기</li>
+<li><code>Active</code> 업로드 세그먼트 즉시 available 반환</li>
+<li>cache의 <code>Recording</code> 엔트리 rollback</li>
+</ul>
+</li>
+<li>같은 프레임에서 앞선 flush가 이미 성공한 경우:<ul>
+<li>앞선 recording은 각 completion에 따라 pending 유지</li>
+<li>현재 미제출 recording만 rollback</li>
+</ul>
+</li>
+<li>native submit 성공 여부가 불명확한 경우:<ul>
+<li>즉시 반환 금지</li>
+<li>quarantine 후 device teardown</li>
+</ul>
+</li>
+</ul>
+<p><code>AbortFrame</code>은 DX12 전용 편의 함수가 아니라 RHI 프레임 계약에 포함되어야 한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-자산-업로드-트랜잭션">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-자산-업로드-트랜잭션">7. 자산 업로드 트랜잭션</h2></div>
+<div class="prose"><h3 id="71-캐시-상태">7.1 캐시 상태</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Absent
+    Absent --&gt; Recording: 목적 리소스 생성 + copy 기록
+    Recording --&gt; Queued: 제출 성공
+    Recording --&gt; Absent: Abort/제출 실패
+    Queued --&gt; Resident: completion 통과
+    Queued --&gt; Retiring: 사용 취소
+    Resident --&gt; Retiring: 미사용/evict
+    Retiring --&gt; Absent: last-use completion 통과</pre>
+<p><code>GetOrUpload</code>가 같은 recording 안에서 다시 호출되면 기존 <code>Recording</code> 엔트리를
+재사용할 수 있다. 다른 recording/스레드에는 제출 여부가 명확한 상태만 공개한다.</p>
+<h3 id="72-메시-배치">7.2 메시 배치</h3>
+<p>메시 하나의 staging은 다음 하나의 배치다.</p>
+<pre><code class="language-cpp">RHIUploadRequest requests[] = {
+    { vertexBytes, RHIUploadUsage::VertexData },
+    { indexBytes,  RHIUploadUsage::IndexData  }
+};
+
+RHIBufferSlice slices[2];
+services.ReserveUploadBatch(requests, slices, error);</code></pre>
+<p>실제 <code>scene.glb</code>는 20 MiB짜리 단일 메시가 아니라 유효 mesh 25개의 vertex/index
+누적 업로드가 21,626,436 B인 자산이다. 이 요청들이 같은 recording에서 regular
+segment를 즉시 확장해 모두 성공해야 한다. 단일 요청 dedicated-large 경로는 별도
+20 MiB fixture로 검증한다. 어느 경우에도 “한 프레임 실패 후 다음 프레임에 성장”은
+허용하지 않는다.</p>
+<h3 id="73-텍스처-배치">7.3 텍스처 배치</h3>
+<ul>
+<li>DX12 footprint와 Vulkan <code>VkBufferImageCopy</code>는 backend가 계산한다.</li>
+<li>여러 mip/array slice의 전체 staging을 하나의 배치로 예약한다.</li>
+<li>regular threshold를 넘으면 양쪽 모두 large segment 경로를 사용한다.</li>
+<li>DX12만 dedicated committed staging으로 우회하고 Vulkan은 실패하는 현재
+비대칭을 제거한다.</li>
+<li>non-coherent Vulkan memory type을 선택한 경우 submit 전에 쓴 범위를 atom
+크기에 맞춰 flush한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-persistent-resource-heap-pool">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-persistent-resource-heap-pool">8. Persistent Resource Heap Pool</h2></div>
+<div class="prose"><p>Transient upload 문제를 고친 뒤 buffer와 sampled asset texture를 persistent
+pool에 적용했다. render target/depth/UAV texture와 수명 종료점을 알 수 없는
+범용 생성 경로는 compatibility와 release 계약이 다르므로 적용 범위에서 제외했다.</p>
+<h3 id="81-공통-정책">8.1 공통 정책</h3>
+<pre><code class="language-text">HeapSegment
+  ├─ allocated block: resource handle + offset + size + alignment
+  ├─ free block
+  └─ free block</code></pre>
+<ul>
+<li>주소순 free map: 앞뒤 병합용</li>
+<li>크기순 index: best-fit 검색용</li>
+<li>할당 시 정렬 padding을 앞/뒤 free block으로 보존</li>
+<li>파괴 요청 시 즉시 free-list에 넣지 않고 deferred queue로 이동</li>
+<li>completion 통과 후 resource object를 파괴하고 블록을 반환·병합</li>
+<li>완전히 빈 heap segment는 standby 또는 backend memory budget에 따라 반환</li>
+</ul>
+<h3 id="82-백엔드-매핑">8.2 백엔드 매핑</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>공통 개념</th><th>DX12</th><th>Vulkan</th></tr></thead>
+<tbody><tr><td>물리 세그먼트</td><td><code>ID3D12Heap</code></td><td><code>VkDeviceMemory</code></td></tr>
+<tr><td>서브할당 리소스</td><td><code>CreatePlacedResource</code></td><td><code>vkBindBufferMemory</code> / <code>vkBindImageMemory</code></td></tr>
+<tr><td>요구 정렬</td><td><code>GetResourceAllocationInfo</code></td><td><code>vkGet*MemoryRequirements2</code></td></tr>
+<tr><td>풀 분류</td><td><code>ALLOW_ONLY_BUFFERS</code> / <code>ALLOW_ONLY_NON_RT_DS_TEXTURES</code></td><td>memory type index + buffer/optimal-image class</td></tr>
+<tr><td>dedicated 조건</td><td>정책 임계치/특수 리소스</td><td><code>requiresDedicatedAllocation</code> 우선</td></tr>
+<tr><td>해제</td><td>resource object release 후 heap block 반환</td><td>buffer/image destroy 후 memory block 반환</td></tr></tbody></table></div>
+<p>공통 allocator가 DX12 heap flag나 Vulkan memory type bit를 해석하지 않는다.
+백엔드가 불투명 <code>compatibilityKey</code>, 크기, 정렬, dedicated 요구를 만들어 공통
+free-list 정책에 전달한다.</p>
+<h3 id="83-이동과-aliasing">8.3 이동과 aliasing</h3>
+<p>첫 구현에서는 살아 있는 리소스를 이동하거나 서로 겹쳐 배치하지 않는다.
+DX12 placed-resource aliasing에는 aliasing barrier가 필요하고 Vulkan에도 메모리
+alias 규칙이 있으므로, free-list 반환이 완료된 블록만 새 리소스에 쓴다.</p>
+<p>나중의 defragmentation은 다음 명시적 이주 트랜잭션으로만 가능하다.</p>
+<pre><code class="language-text">새 블록 할당 → GPU copy → 새 descriptor/version 게시
+→ 옛 handle 마지막 사용 completion 대기 → 옛 블록 반환</code></pre>
+<h3 id="84-구현된-buffertexture-수직-슬라이스">8.4 구현된 buffer·texture 수직 슬라이스</h3>
+<ul>
+<li>공통 <code>RHIPersistentHeapPolicy</code>: 주소순/크기순 인덱스, best-fit, padding 분할,
+양쪽 병합, empty trim, slot generation, pooled/dedicated 통계.</li>
+<li>DX12 <code>DX12PersistentHeap</code>: DEFAULT buffer/샘플 텍스처 전용 heap, allocation info
+정렬, placed resource, 재사용 block의 보수적 aliasing barrier, committed fallback.</li>
+<li>Vulkan <code>VulkanPersistentHeap</code>: memory type × resource class compatibility key,
+buffer/image requirements2와 dedicated requirements, device-local segment bind,
+dedicated allocation fallback.</li>
+<li>cache 연동: 양쪽 mesh/texture cache가 allocation을 소유하고 completion queue
+payload로 이동한다. GPU 완료 후 native buffer/image/resource 파괴 →
+block 반환 → 인접 free block 병합 → key당 standby 1장 제외 trim 순서다.</li>
+<li>예산 source: DX12는 DXGI LOCAL usage/budget, Vulkan은 <code>VK_EXT_memory_budget</code>
+heap usage/budget을 사용한다. status에 buffer/texture segment와 source, 압력을
+함께 노출한다.</li>
+<li>사용 중인 resource는 move/compact하지 않는다. 메모리 압박은 LRU asset eviction,
+completion 뒤 빈 segment trim, 새 할당의 dedicated fallback으로 처리한다. 부분적으로
+빈 segment는 native budget을 즉시 낮추지 않지만 이후 할당의 성장을 막는 free block이
+되며, 실제 budget 감소는 segment가 완전히 비어 trim될 때 일어난다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-descriptor와-sbt">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-descriptor와-sbt">9. Descriptor와 SBT</h2></div>
+<div class="prose"><p>descriptor는 byte-addressable GPU heap과 네이티브 모델이 다르므로 persistent
+resource heap에 억지로 합치지 않는다. 대신 완료점 기반 재활용 정책만 공유한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>대상</th><th>DX12</th><th>Vulkan</th><th>공통 규칙</th></tr></thead>
+<tbody><tr><td>transient descriptor</td><td>shader-visible descriptor page</td><td>descriptor pool/set</td><td>제출 완료 전 reset/overwrite 금지</td></tr>
+<tr><td>persistent descriptor</td><td>CPU/GPU descriptor free-list</td><td>long-lived pool/set</td><td>last-use completion 뒤 반환</td></tr>
+<tr><td>SBT</td><td>buffer record</td><td>RT extension buffer record</td><td>제출 뒤 immutable, 새 버전으로 교체</td></tr></tbody></table></div>
+<p>현재 엔진에 RT 공통 경로가 없으므로 SBT 구현은 이번 업로드 allocator의 완료
+조건이 아니다. 다만 이후 도입 시 단일 가변 버퍼를 제자리 수정하는 설계는
+금지한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-10-파일-배치">
+<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-파일-배치">10. 파일 배치</h2></div>
+<div class="prose"><p>목표 배치는 다음과 같다. 이름은 구현 중 프로젝트 관례에 맞춰 조정할 수 있으나
+의존 방향은 바꾸지 않는다.</p>
+<pre><code class="language-text">RenderEngine/RHI/
+  RHIUploadTypes.h
+  RHIUploadSegmentPolicy.h/.cpp
+  RHISubmissionLifecycle.h/.cpp
+  RHIDeferredReleasePolicy.h/.cpp
+  RHIPersistentHeapPolicy.h/.cpp
+  RHIDescriptorVersionPolicy.h
+
+RenderEngine/RHI/DX12/
+  DX12UploadSegmentAllocator.h/.cpp
+  DX12SubmissionCoordinator.h/.cpp
+  DX12PersistentHeap.h/.cpp
+
+RenderEngine/RHI/Vulkan/
+  VulkanUploadSegmentAllocator.h/.cpp
+  VulkanSubmissionCoordinator.h/.cpp
+  VulkanCommandPoolRecycler.h/.cpp
+  VulkanPersistentHeap.h/.cpp</code></pre>
+<p>다음 구체 타입은 공통 패스와 캐시 표면에서 제거한다.</p>
+<ul>
+<li><code>DX12UploadRing</code></li>
+<li><code>VulkanUploadRing</code></li>
+<li><code>GetUploadRing()</code></li>
+<li>DX12 정렬 상수에 대한 패스 직접 참조</li>
+</ul>
+<p><code>RHIBufferSlice</code>는 ring 조각이 아니라 임의 RHI buffer의 범위를 뜻하도록 이름과
+주석을 바로잡되 타입 자체는 유지한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-11-구현-순서">
+<div class="sec-head"><p class="ve-label">§11</p><h2 id="11-구현-순서">11. 구현 순서</h2></div>
+<div class="prose"><p>각 단계는 <strong>DX12와 Vulkan을 함께 구현하고 함께 검증</strong>해야 닫힌다.</p>
+<h3 id="slice-a--공통-수명-골격">Slice A — 공통 수명 골격</h3>
+<p>구현 완료.</p>
+<ol>
+<li>의미 기반 <code>RHIUploadRequest</code>와 배치 예약 계약 추가</li>
+<li>공통 segment state/policy의 CPU 단위 검사 작성</li>
+<li>completion/recording ID 타입 추가</li>
+<li>raw queue 제출 위치를 inventory하고 coordinator 경유로 전환</li>
+<li>RHI <code>AbortFrame</code> 계약 추가</li>
+</ol>
+<h3 id="slice-b--양쪽-transient-allocator">Slice B — 양쪽 transient allocator</h3>
+<p>구현 완료. CAS fast path, stable registry slot reuse, backend budget과 trim 정책까지
+포함한다.</p>
+<ol>
+<li>DX12 adapter 구현</li>
+<li>Vulkan adapter 구현</li>
+<li>Vulkan command pool recycler 구현으로 flush 대기 제거</li>
+<li>양쪽 constant/texture upload를 새 API로 전환</li>
+<li>양쪽 기존 upload ring 제거</li>
+</ol>
+<h3 id="slice-c--자산-트랜잭션">Slice C — 자산 트랜잭션</h3>
+<p>현재 DX12 live mesh/texture와 Vulkan texture 소비 경로, 중립
+<code>VulkanMeshCache</code>, 실제 <code>scene.glb</code> indexed-draw fixture 및 editor Vulkan
+<code>TickLive</code> 연결까지 구현했다. ImGui의 DX12/Vulkan 자산 descriptor와
+<code>VulkanTextureCache</code>도 미사용 프레임을 완료점 graveyard로 옮기는 경로를 갖는다.
+기존 release 지점 전수 조사와 공통 retire queue 통합도 완료했다.</p>
+<h4 id="release-지점-전수-조사-판정">Release 지점 전수 조사 판정</h4>
+<div class="table-scroll"><table>
+<thead><tr><th>분류</th><th>대상</th><th>판정</th></tr></thead>
+<tbody><tr><td>completion 묘지</td><td>DX12/Vulkan mesh·texture cache 4곳</td><td>공통 <code>RHICompletionRetireQueue</code>로 이관</td></tr>
+<tr><td>descriptor 묘지</td><td>DX12/Vulkan ImGui shell 2곳</td><td>같은 큐로 이관, descriptor와 직접 소유 image를 함께 보관</td></tr>
+<tr><td>transient upload/descriptor</td><td>segment allocator, versioned page/pool recycler</td><td>submission completion 뒤 재사용</td></tr>
+<tr><td>render-graph transient</td><td>camera display slot의 graph</td><td>해당 slot completion 확인 뒤 <code>reset</code></td></tr>
+<tr><td><span class="chip risk">생성 실패·Abort</span></td><td>cache upload rollback</td><td>제출 전이므로 즉시 반환 유지</td></tr>
+<tr><td>pipeline/cache shutdown</td><td>pass, IBL, readback, resident cache</td><td>owner가 <code>WaitForGpu</code>한 뒤 즉시 파괴 유지</td></tr>
+<tr><td>외부 interop</td><td>DX12 shared texture/handle</td><td>GPU fence만으로 외부 소비 종료를 증명할 수 없어 <code>ExternalInteropRetired</code>로 분리, renderer teardown에서만 해제</td></tr></tbody></table></div>
+<p>큐는 owner별 인스턴스로 둔다. 중앙 큐에 backend 파괴 callback을 넣으면 cache가
+먼저 죽은 뒤 callback이 실행될 수 있으므로, <strong>정책과 상태 전이만 공통화하고
+payload 파괴는 살아 있는 owner가 수행</strong>한다.</p>
+<ol>
+<li>DX12 mesh의 vertex/index batch 예약</li>
+<li>DX12/Vulkan texture cache의 Recording/Queued/Resident 분리</li>
+<li>Vulkan <code>IRenderMeshCache</code>, vertex input/dynamic stride 및 실제 scene mesh fixture 구현</li>
+<li>Abort와 제출 실패 rollback 연결</li>
+<li>기존 frame-count graveyard를 completion 기반 공통 정책으로 이동</li>
+</ol>
+<h3 id="slice-d--persistent-heap">Slice D — persistent heap</h3>
+<ol>
+<li>✔ buffer부터 placed/bound suballocation 적용</li>
+<li>✔ texture compatibility pool 추가</li>
+<li>✔ free-list 병합/empty segment trim 검증</li>
+<li>✔ committed/dedicated fallback 및 soft-budget 정책/통계 추가</li>
+<li>✔ 실제 backend memory-budget source를 persistent heap에 연결</li>
+</ol>
+<h3 id="slice-e--descriptorsbt-확장">Slice E — descriptor/SBT 확장</h3>
+<h4 id="slice-e-a--transient-descriptor-versioned-recycler-">Slice E-a — transient descriptor versioned recycler ✔</h4>
+<ol>
+<li>공통 <code>RHIDescriptorVersionPolicy</code>의 completion/Abort/quarantine/generation 계약</li>
+<li>DX12 recording 전용 shader-visible heap page와 stale table version 차단</li>
+<li>Vulkan recording 전용 descriptor pool과 stale request epoch 차단</li>
+<li>중간 제출마다 새 version으로 전환하고 완료 뒤에만 reset·재사용</li>
+<li>page/pool 고갈 시 pending version을 건드리지 않고 새 version 성장</li>
+</ol>
+<h4 id="slice-e-b--sbt-versioned-recycler">Slice E-b — SBT versioned recycler</h4>
+<p>실제 공통 RT 소비 경로가 생길 때 같은 completion 계약으로 구현한다. 사용처가
+없는 범용 SBT allocator를 먼저 만들지는 않는다.</p>
+<h3 id="남은-구현-목록">남은 구현 목록</h3>
+<p>우선순위는 다음과 같다.</p>
+<ol>
+<li>✔ editor Vulkan <code>TickLive</code>와 <code>IRenderMeshCache</code> 실제 scene pass 연결.</li>
+<li>✔ DX12/Vulkan의 기존 frame-count graveyard와 deferred release 지점을 전수
+조사해 공통 completion-point retire queue로 이동.</li>
+<li>✔ Slice D persistent resource heap: 양쪽 백엔드의 buffer/texture
+placed/bound suballocation, compatibility 분리, free-list 병합, empty-segment
+trim, 실제 budget source, committed/dedicated fallback 및 asset cache 연동.</li>
+<li>자동 move/compact는 기본 정책으로 넣지 않는다. 재생성 가능한 자산의 명시적
+relocation 경로와 성능 근거가 생길 때 별도 단계로 검토한다.</li>
+<li>✔ transient descriptor는 실제 DX12/Vulkan 소비 경로에서 versioned recycler로
+확장했다. SBT는 실제 공통 RT 소비 경로가 생길 때 같은 정책을 적용한다.</li>
+</ol>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-12-검증-기준">
+<div class="sec-head"><p class="ve-label">§12</p><h2 id="12-검증-기준">12. 검증 기준</h2></div>
+<div class="prose"><h3 id="121-공통-allocator-contract-test">12.1 공통 allocator contract test</h3>
+<p>동일 테스트를 DX12와 Vulkan adapter에 인스턴스화한다.</p>
+<ul>
+<li>usage별 정렬 충족</li>
+<li>한 세그먼트 경계 직전/직후 배치</li>
+<li>default 크기보다 큰 첫 요청의 즉시 성공</li>
+<li>vertex/index 배치 all-or-none</li>
+<li>제출 완료 전 세그먼트 재사용 금지</li>
+<li>완료 직후 재사용</li>
+<li>제출 전 Abort 즉시 반환</li>
+<li>중간 제출 뒤 Abort 시 앞선 pending 보존</li>
+<li>regular/large pool 분리</li>
+<li>standby trim과 soft-budget 재시도</li>
+<li>trim 뒤 registry slot 재사용과 old-generation handle 무효화</li>
+<li>병렬 예약 범위 중복 0</li>
+<li>OOM에서 기존 cursor와 출력 불변</li>
+</ul>
+<h3 id="122-백엔드-검증">12.2 백엔드 검증</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>DX12</th><th>Vulkan</th></tr></thead>
+<tbody><tr><td>API 진단</td><td>debug layer + DRED</td><td>validation layer</td></tr>
+<tr><td><span class="chip ok">완료 primitive</span></td><td>fence 값</td><td>timeline semaphore 값</td></tr>
+<tr><td>large texture</td><td>128 MiB staging fixture</td><td>동일 fixture</td></tr>
+<tr><td>multi-submit</td><td>wait 없는 3회 flush</td><td>wait 없는 3회 flush</td></tr>
+<tr><td>parallel fast path</td><td>8 worker/64 MiB, 범위 중복 0, worker growth</td><td>동일 fixture와 판정</td></tr>
+<tr><td>pressure trim</td><td>강제 16 MiB soft budget, trim/retry/slot reuse/high-water/rollback</td><td>동일 fixture와 판정</td></tr>
+<tr><td>Abort</td><td>제출 전/후</td><td>제출 전/후</td></tr>
+<tr><td>기존 회귀</td><td><code>dx12.uploadring</code>을 새 <code>rhi.uploadsegments</code>로 교체 <strong>(2026-09-06 완료 — 구 명령 제거됨)</strong></td><td><code>vk.selftest</code>, <code>vk.gizmoicon</code>에 같은 검사 추가</td></tr></tbody></table></div>
+<h3 id="123-sceneglb-승인-조건">12.3 <code>scene.glb</code> 승인 조건</h3>
+<ul>
+<li>실제 자산의 유효 mesh 25개, 누적 vertex/index 21,626,436 B가 같은 recording의
+<strong>첫 업로드에서 모두 성공</strong>한다.</li>
+<li>별도 20 MiB 단일 요청도 dedicated-large segment에서 즉시 성공한다.</li>
+<li>“다음 프레임에 커져서 곧 성공” 로그가 없다.</li>
+<li>메시별 정점·인덱스 업로드가 둘 다 있거나 둘 다 없다.</li>
+<li>실패/Abort 후 resident cache에 엔트리가 남지 않는다.</li>
+<li>DX12 live scene에서 대형 메시 draw count와 픽셀 결과가 확인된다.</li>
+<li>Vulkan은 동일 CPU mesh를 <code>IRenderMeshCache</code>에 통과시키고 실제 vertex/index
+binding으로 indexed draw와 pixel을 확인한다. 이 중립 경로는 완료했지만 live
+route가 생기기 전에는 Vulkan editor scene 동등성을 완료했다고 보고하지 않는다.</li>
+<li>양쪽 validation/debug message warning 이상 0.</li>
+</ul>
+<h3 id="124-관측값">12.4 관측값</h3>
+<p><code>dx12.live status</code>와 Vulkan self-test 로그에 같은 이름으로 출력한다.</p>
+<pre><code class="language-text">upload.activeSegments / activeBytes
+upload.pendingSegments / pendingBytes
+upload.availableSegments / availableBytes
+upload.largeSegments / largeBytes
+upload.peakRecordingBytes
+upload.slowPathCreates
+upload.reuses
+upload.tailWasteBytes
+upload.batchRollbacks
+upload.oomFailures
+upload.softBudgetBytes / largeCacheBudgetBytes
+upload.trimmedSegments / trimmedBytes
+upload.budgetPressureEvents / budgetRetries / budgetOvercommits
+upload.registrySlotReuses / registryHighWater
+upload.oldestPendingValue
+upload.reclaimLag
+assetEviction.pressurePasses / pressureRetired / pressureRetiredBytes
+assetEviction.pressureProtectedRecent / pressureUploadPending</code></pre>
+<p>백엔드별 전용 수치가 필요하면 공통 수치 뒤에 별도로 붙인다. 서로 다른 의미의
+수치를 같은 이름으로 보고하지 않는다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-13-금지-규칙">
+<div class="sec-head"><p class="ve-label">§13</p><h2 id="13-금지-규칙">13. 금지 규칙</h2></div>
+<div class="prose"><p>구현과 리뷰에서 다음을 기계적으로 확인한다.</p>
+<ol>
+<li>공통 RHI 헤더에 <code>ID3D12*</code>, <code>D3D12_*</code>, <code>Vk*</code> 타입을 넣지 않는다.</li>
+<li><code>DeviceResources</code>/submission coordinator 밖에서 raw queue submit을 하지 않는다.</li>
+<li><code>lastUseCompletion &gt; completedValue</code>인 메모리나 descriptor를 재사용하지 않는다.</li>
+<li>submit acceptance 이전에 cache entry를 resident로 게시하지 않는다.</li>
+<li>제출한 upload/SBT/descriptor 내용을 CPU가 제자리 수정하지 않는다.</li>
+<li>대형 요청을 다음 프레임 성장으로 미루지 않는다.</li>
+<li>DX12만 dedicated fallback을 갖고 Vulkan은 실패하는 비대칭을 허용하지 않는다.</li>
+<li>구현 완료를 한 백엔드의 빌드 또는 테스트만으로 판정하지 않는다.</li>
+</ol>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-14-최종-판정">
+<div class="sec-head"><p class="ve-label">§14</p><h2 id="14-최종-판정">14. 최종 판정</h2></div>
+<div class="prose"><p>링 버퍼의 핵심 장점은 선형 할당 자체가 아니라 <strong>언제 앞부분을 다시 써도 되는지
+알 수 있다는 것</strong>이다. CreatorEngine은 이미 DX12 fence와 Vulkan timeline으로
+그 답을 직접 얻을 수 있다. 따라서 고정 원형 주소 공간과 프레임 슬롯 소유권은
+필수가 아니다.</p>
+<p>결론은 다음과 같다.</p>
+<ul>
+<li>transient upload에는 <strong>completion-aware segmented arena</strong>를 쓴다.</li>
+<li>persistent resource에는 <strong>free-list + coalescing heap pool</strong>을 쓴다.</li>
+<li>descriptor/SBT에는 <strong>versioned recycler</strong>를 쓴다.</li>
+<li>세 구조의 안전 판정은 모두 같은 RHI completion point를 쓴다.</li>
+<li>DX12와 Vulkan의 native 구현은 다르지만 계약, 상태, 실패 의미, 검증 기준은
+동일하게 유지한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-15-공식-참고-자료">
+<div class="sec-head"><p class="ve-label">§15</p><h2 id="15-공식-참고-자료">15. 공식 참고 자료</h2></div>
+<div class="prose"><ul>
+<li><a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals">.NET GC fundamentals</a></li>
+<li><a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap">.NET Large Object Heap</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/fence-based-resource-management">D3D12 Fence-Based Resource Management</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/memory-management-strategies">D3D12 Memory Management Strategies</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createplacedresource">ID3D12Device::CreatePlacedResource</a></li>
+<li><a href="https://docs.vulkan.org/guide/latest/memory_allocation.html">Vulkan Memory Allocation</a></li>
+<li><a href="https://docs.vulkan.org/spec/latest/chapters/memory.html">Vulkan Memory Specification</a></li>
+<li><a href="https://docs.vulkan.org/samples/latest/samples/extensions/timeline_semaphore/README.html">Vulkan Timeline Semaphores</a></li>
+<li><a href="https://youtu.be/Sew_XGPAVM4?si=LqQsSUOLymmVfqaZ">참고 영상</a></li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RhiGpuMemoryLifetimeDesign.md"><code>docs/design/RhiGpuMemoryLifetimeDesign.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict', fontFamily: v('--font-body'),
+    themeVariables: { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'),
+      lineColor: v('--text-dim'), secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') } });
+  await mermaid.run({ querySelector: 'pre.mermaid' });
+</script>
+</body>
+</html>

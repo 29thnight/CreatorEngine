@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/PrincipledMaterialAbi.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Principled Material 공용 Slang ABI — MAT-1 / MAT-3 / MAT-4 / MAT-5</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-평가와-소비">1. 평가와 소비</a></li><li><a href="#2-값의-의미">2. 값의 의미</a></li><li><a href="#3-정적-기능-마스크">3. 정적 기능 마스크</a></li><li><a href="#4-검증-결과">4. 검증 결과</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="PrincipledMaterialAbi.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Principled Material 공용 Slang ABI — MAT-1 / MAT-3 / MAT-4 / MAT-5</h1>
+<div class="meta"><p><strong>2026-09-28 · 공용 평가 경계와 core/Layered/Special Principled 의미</strong></p>
+<p>정본 코드는
+<a href="../../Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang"><code>PrincipledSurface.slang</code></a>이다.
+이 계약은 <a href="../plans/BlenderMaterialGraphPlan.html"><code>BlenderMaterialGraphPlan.md</code></a>의
+<code>MAT-1</code>에서 시작했다. <code>MAT-3</code>의 값·Fresnel·IBL 계약과 검증은
+<a href="PrincipledCoreSemantics.html">PrincipledCoreSemantics.md</a>에 기록한다.
+<code>MAT-4</code>의 coat/sheen/anisotropy/thin film 의미·비용·검증은
+<a href="PrincipledLayeredSemantics.html">PrincipledLayeredSemantics.md</a>가 소유한다.
+<code>MAT-5</code>의 transmission/subsurface/별도 Volume closure와 Forward 자원 요구 조건은
+<a href="PrincipledSpecialSemantics.html">PrincipledSpecialSemantics.md</a>가 소유한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#1-평가와-소비"><span class="ve-label">§1</span><span class="map-name">평가와 소비</span><span class="map-bar"><i style="width:93.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-값의-의미"><span class="ve-label">§2</span><span class="map-name">값의 의미</span><span class="map-bar"><i style="width:97.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-정적-기능-마스크"><span class="ve-label">§3</span><span class="map-name">정적 기능 마스크</span><span class="map-bar"><i style="width:74.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-검증-결과"><span class="ve-label">§4</span><span class="map-name">검증 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「4. 검증 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-평가와-소비">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-평가와-소비">1. 평가와 소비</h2></div>
+<div class="prose"><pre><code class="language-text">core 입력 / 이후 generated graph 값
+    → DefaultMaterialInputs → EvaluateMaterial → PrincipledSurface
+    → BuildPbrSurface / EvaluatePrincipledIbl(PrincipledIblIntegral)
+
+Layered 정적 mask의 generated 값
+    → EvaluateMaterial → PrincipledSurface + prepared PrincipledLayeredIntegral
+    → BuildPbrSurface / EvaluateLayeredIbl
+
+Special 정적 mask의 generated 값 + 별도 VolumeInputs
+    → EvaluateMaterial / EvaluateVolume
+    → BuildSpecialForwardSurface(prepared integral)
+    → 분리된 local/subsurface/transmission + prepared medium segment 합성
+
+현행 glTF texture sample × property
+    → MakeStandardMaterialInputs → EvaluateStandardMaterial → PrincipledSurface
+        ├─ GBuffer 기존 MRT → UnpackStandardSurface → Deferred
+        └─ Forward
+    → BuildPbrSurface / EvaluateStandardIbl(float2 DFG)</code></pre>
+<ul>
+<li><code>MaterialInputs</code>는 재질의 값 입력이다. 현재 <code>MakeStandardMaterialInputs</code>가
+texture×factor와 emission strength를 현행 규칙대로 합성한다.</li>
+<li><code>PrincipledSurface</code>는 평가 결과다. 직접광의 위치·시선·DFG·광원 목록은 포함하지 않는다.
+해당 조명 상태는 <code>PbrSurface</code>가 갖는다.</li>
+<li>GBuffer와 Forward가 같은 <code>EvaluateStandardMaterial</code> 호환 어댑터를 호출한다. Deferred는 기존 MRT의
+값을 <code>UnpackStandardSurface</code>로 복원하고 Forward와 같은 직접광·IBL 어댑터를 쓴다.</li>
+<li>두 형식은 셰이더 내부의 논리 값이다. C++ cbuffer나 자산 파일의 byte layout으로
+직렬화하지 않는다. 현행 b2 숫자 offset, texture register와 MRT 형식은 유지한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-값의-의미">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-값의-의미">2. 값의 의미</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>필드</th><th>현재 계약</th></tr></thead>
+<tbody><tr><td><code>baseColor</code></td><td>scene-linear RGB. Alpha와 별도</td></tr>
+<tr><td><code>alpha</code></td><td>core는 saturate된 opacity. Standard는 기존 coverage 적용 결과. Transmission과 별도</td></tr>
+<tr><td><code>normal</code></td><td>world-space 단위 normal. core의 미연결·무효 값은 geometric normal을 사용</td></tr>
+<tr><td><code>roughness</code>, <code>metallic</code></td><td>core는 saturate. Standard는 원래 texture×factor를 MRT에서 보존하고 조명 경계에서 saturate</td></tr>
+<tr><td><code>emissionColor</code>, <code>emissionStrength</code> → <code>emission</code></td><td>scene-linear HDR RGB와 scalar 입력을 곱한 평가 결과. 1.0 초과 값 보존</td></tr>
+<tr><td><code>occlusion</code></td><td>독립 AO.R과 strength로 평가한 값. Deferred의 화면 AO는 복원 후 곱함</td></tr>
+<tr><td><code>ior</code>, <code>specularIorLevel</code>, <code>specularTint</code></td><td>core는 F0·유효 IOR·금속 F82 Tint로 평가. Standard는 기존 F0=0.04와 Schlick/DFG 유지</td></tr>
+<tr><td><code>coatWeight/Roughness/Ior/Tint/Normal</code>, <code>sheenWeight/Roughness/Tint</code></td><td>MAT-4의 레이어 입력·평가 값. 별도 Normal과 에너지 감쇠</td></tr>
+<tr><td><code>anisotropy/Rotation</code>, <code>tangent</code>, <code>thinFilmThickness/Ior</code></td><td>MAT-4의 방향 프레임과 nm 단위 film. RGB 파장 근사</td></tr>
+<tr><td><code>transmissionWeight/Ior/F0/FilmIor</code></td><td>MAT-5 glass 비중과 authored IOR·tint, front/back 상대 IOR</td></tr>
+<tr><td><code>subsurfaceWeight/Radius/Scale/Ior/Anisotropy</code></td><td>MAT-5 RGB 확산 profile과 local/nonlocal 비중</td></tr>
+<tr><td><code>VolumeInputs</code> → <code>PrincipledVolume</code></td><td>별도 Output closure. scattering/absorption/emission 계수. Surface의 density 필드로 직렬화하지 않음</td></tr></tbody></table></div>
+<p><code>DefaultMaterialInputs</code>는 Blender core 기본값(base=0.8, roughness=0.5)을 사용한다.
+<code>DefaultStandardMaterialInputs</code>는 현행 glTF white/roughness=1 호환 기본값이다.
+이 구조를 Blender 전체 소켓 schema로 사용하지 않는다. 그 schema는 LX 대응표와 MAT-2가
+소유하며, layered 의미는 MAT-4, special 공용 의미는 MAT-5에서 구현했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-정적-기능-마스크">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-정적-기능-마스크">3. 정적 기능 마스크</h2></div>
+<div class="prose"><p><code>MaterialFeatureMask</code>는 <code>uint</code>이며 <code>LX_MATERIAL_FEATURE_MASK</code>의 숫자 literal에서
+셰이더 컴파일 때 고정된다. <code>PrincipledSurface</code>에 runtime mask 필드를 넣지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th style="text-align:right">bit</th><th>기능</th><th>현재 평가 모듈 지원</th></tr></thead>
+<tbody><tr><td class="num" style="text-align:right">0</td><td>Base Color</td><td>지원</td></tr>
+<tr><td class="num" style="text-align:right">1</td><td>Metallic/Roughness</td><td>지원</td></tr>
+<tr><td class="num" style="text-align:right">2</td><td>Normal</td><td>지원</td></tr>
+<tr><td class="num" style="text-align:right">3</td><td>Alpha</td><td>지원</td></tr>
+<tr><td class="num" style="text-align:right">4</td><td>Emission</td><td>지원</td></tr>
+<tr><td class="num" style="text-align:right">5</td><td>Occlusion</td><td>지원</td></tr>
+<tr><td class="num" style="text-align:right">6</td><td>Specular/IOR</td><td>MAT-3 지원, 고정 Standard pass binding은 MAT-7 후속</td></tr>
+<tr><td style="text-align:right">7~10</td><td>Coat, Sheen, Anisotropy, Iridescence</td><td>MAT-4 지원. 제품 route/binding은 MAT-7 후속</td></tr>
+<tr><td style="text-align:right">11~13</td><td>Transmission, Subsurface, Volume</td><td>MAT-5 공용 평가·Forward 요구 조건 지원. 제품 binding은 MAT-7 후속</td></tr></tbody></table></div>
+<p>공용 모듈의 알려진 마스크는 <code>0x3FFF</code>다. Layered·Transmission·Subsurface bit에는
+core Specular/IOR bit가 필요하다. Volume-only는 그 의존성이 없다.
+Special은 <code>LX_MATERIAL_ROUTE=2</code>와 별도 consumer를 요구한다.
+현행 고정 Standard 경로는 <code>0x003F</code>를 선언한다.
+<code>StandardMaterialRoute.slang</code>은 고정 pass에 bit 6~13을 요청하면 아직 없는
+MRT/IBL lookup 또는 Special Forward binding을 지목해 거부한다.
+Generic <code>PbrSurface</code>도 Special을 거부하고, 공용 모듈은 unknown bit와 잘못된
+feature 의존성을 컴파일 오류로 거부한다. 지원하지 않는 lobe를 Standard 출력으로
+조용히 바꾸지 않는다. Graph feature 추출, sample/lobe 제거와 자동 route 선택은
+<code>MAT-6/MAT-7</code>의 작업이며 이 마스크 선언만으로 구현 완료로 세지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-검증-결과">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-검증-결과">4. 검증 결과</h2></div>
+<div class="prose"><p>아래는 MAT-1의 최초 결과다. MAT-5의 현재 ABI 게이트는 기존 70개 엔트리와
+unknown 4건, 미배선 core/Layered 고정 route 30건, Special 고정 route 24건,
+총 <strong>58건 거부</strong>를 검사한다.
+core DXIL/SPIR-V·실제 GPU 의미 검사는 <a href="PrincipledCoreSemantics.html#검증">MAT-3 결과</a>를 따른다.
+Layered DXIL/SPIR-V 14개·의존 mask 거부 8개와 독립 GPU/numeric golden은 <a href="PrincipledLayeredSemantics.html#검증">MAT-4 결과</a>를 따른다.
+Special DXIL/SPIR-V CS/PS 28개·route/의존 mask 거부 22개와 GPU/numeric golden은
+<a href="PrincipledSpecialSemantics.html#검증">MAT-5 결과</a>를 따른다.</p>
+<h3 id="mat-1-최초-검증-기록">MAT-1 최초 검증 기록</h3>
+<ul>
+<li><code>Tools/regression/verify-material-abi.ps1</code>: VS18 MSVC로 독립 프로브를 빌드하고
+저장소의 <strong>Slang 2026.14·고정 DXC</strong>만 적재했다. 설치된 SDK 컴파일러를 대체 경로로 쓰지 않는다.</li>
+<li>DXIL·SPIR-V의 GBuffer, Deferred, Forward, Water/Wind, full/reduced,
+legacy/packed UV1·color·skinning과 reference 경로 <strong>70개 엔트리 컴파일 통과</strong>.
+Vulkan binding shift와 DX cbuffer layout, warnings-as-errors는 제품 설정을 따른다.</li>
+<li>MAT-1 당시 Coat <code>0x80</code>과 unknown <code>0x40000000</code>을 양 backend에서 넣은
+<strong>4개 실패 사례가 지정한 미지원 마스크 진단으로 거부</strong>됐다.</li>
+<li>기존 Debug Editor host에 <code>--development-project</code>로 이 작업 공간을 지정해
+변경한 Slang을 제품의 컴파일러·PSO·GPU readback 경로에서 검증했다.
+C++ 엔진 전체를 새로 빌드한 결과로 보고하지 않는다.</li>
+</ul>
+<div class="table-scroll"><table>
+<thead><tr><th>GPU 검사</th><th>결과</th></tr></thead>
+<tbody><tr><td><code>dx12.gbuffer</code></td><td>Diffuse=(0.2,0.4,0.6), ORM=(1,0.75,0.25), Normal=(0.5,0.5,0), Emission=(0,0,0), Bitmask=43981 기대값 통과</td></tr>
+<tr><td><code>dx12.forwardshade</code></td><td>Water/Wind b2·texture reflection·variant·실패 거부 통과. Forward+/reference 16,384 픽셀 불일치 0</td></tr>
+<tr><td><code>dx12.iblshade</code></td><td>환경 방향·매끈 금속·AO 소비 통과. 직접광 AO 변경 차이 0.0</td></tr></tbody></table></div>
+<p>이는 공용 ABI의 컴파일·현행 Standard 동작 검증이다. Blender golden과의 수치 일치,
+실제 제품 씬의 Deferred/Forward 교차 허용 오차와 성능 상한은 <code>MAT-9</code>에서 판정한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="PrincipledMaterialAbi.md"><code>docs/design/PrincipledMaterialAbi.md</code></a> · 마지막 커밋 2026-09-30 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

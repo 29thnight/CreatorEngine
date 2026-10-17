@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/TexturePipelineValidation20261009.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 12 구현 적용 및 수용 검증 — 2026-10-09</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#범위와-출처">범위와 출처</a></li><li><a href="#빌드-및-실행-중-발견한-수정">빌드 및 실행 중 발견한 수정</a></li><li><a href="#현재-확인된-결과">현재 확인된 결과</a></li><li><a href="#재현-경로">재현 경로</a></li><li><a href="#남은-수용-조건">남은 수용 조건</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="TexturePipelineValidation20261009.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 12 구현 적용 및 수용 검증 — 2026-10-09</h1>
+<div class="meta"><p>작업 시작 2026-10-09, 최종 결과 정리 2026-10-10 KST. 파일명은 시작일 기준이다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">5<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 5"><i class="ok" style="flex:5"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 5</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#범위와-출처"><span class="ve-label">§00</span><span class="map-name">범위와 출처</span><span class="map-bar"><i style="width:17.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#빌드-및-실행-중-발견한-수정"><span class="ve-label">§01</span><span class="map-name">빌드 및 실행 중 발견한 수정</span><span class="map-bar"><i style="width:49.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#현재-확인된-결과"><span class="ve-label">§02</span><span class="map-name">현재 확인된 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">5</span></span></a>
+<a class="map-row" href="#재현-경로"><span class="ve-label">§03</span><span class="map-name">재현 경로</span><span class="map-bar"><i style="width:42.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#남은-수용-조건"><span class="ve-label">§04</span><span class="map-name">남은 수용 조건</span><span class="map-bar"><i style="width:23.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「현재 확인된 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-범위와-출처">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="범위와-출처">범위와 출처</h2></div>
+<div class="prose"><ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/pull/166">PR #166</a>, 병합 커밋 <code>117b729a60acf9663dd6f41fc9b71f4ce6f60e00</code>.</li>
+<li>로컬 HEAD <code>d5a6a26a78da93686b8168429183ee7e0d50a8de</code> 위에 병합된 소스를 작업 트리로 적용했다. HEAD/index 변경이나 commit/push는 하지 않았다.</li>
+<li>현재 HEAD 이후 master의 선행 PR #119/#130 의존성을 포함한다. 기존 RG8/GCCE 수정은 유지하고 충돌 여부를 사전 확인했다. 원본 백업은 <code>C:/Users/lance/AppData/Local/Temp/creator-phase12-integration-6rxput91</code>에 있다.</li>
+<li>MSVC v145 / Visual Studio 18 / x64, Debug 및 Release. GPU 검증 장비는 NVIDIA RTX 4070 Ti.</li>
+<li>병합 여부, CPU 계약, 빌드, GPU 결과, 패키지 소비를 별도 증거로 취급한다. 전체 T0/T1a/T2 수용이나 T1b 성능 달성을 선언하지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-빌드-및-실행-중-발견한-수정">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="빌드-및-실행-중-발견한-수정">빌드 및 실행 중 발견한 수정</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>위치</th><th>문제와 수정</th></tr></thead>
+<tbody><tr><td><code>Engine/SceneRuntime/MeshRenderer.cpp</code></td><td><code>ParseText</code> 정의 헤더 누락 보완</td></tr>
+<tr><td><code>Engine/RenderEngine/Texture.cpp</code></td><td><code>AssetSetEntry</code>의 실제 GUID 필드 경로로 진단 수정</td></tr>
+<tr><td><code>Engine/RenderEngine/DataSystem.cpp</code> 및 Editor 재질 소비자</td><td>FileGuid/문자열 overload 모호성을 명시적 <code>std::string_view</code>로 해소</td></tr>
+<tr><td><code>Engine/RenderEngine/Interfaces/AssetAuthoringPort.h</code></td><td>독립 translation unit에서 찾을 수 있는 Texture 상대 include</td></tr>
+<tr><td><code>Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp</code></td><td>파일 대화상자의 wide 문자열을 filesystem path로 변환</td></tr>
+<tr><td><code>Editor/RenderTests/ExperimentParity/ExperimentSceneCookSelfTest.cpp</code></td><td>이미 ReadNode인 envelope root에서 중복 <code>Read()</code> 제거</td></tr>
+<tr><td><code>Tools/regression/verify-material-codegen.ps1</code></td><td>실제 nested vcpkg include/lib/bin 경로와 일치하는 DLL 사용</td></tr>
+<tr><td><code>Tools/regression/material_codegen_probe.cpp</code></td><td>기본값 재지정은 변경 없음(false)을 반환하므로 BC5 fixture가 실제 값 변경을 수행하도록 수정</td></tr>
+<tr><td><code>Tools/regression/verify-experiment-contract.ps1</code></td><td>구성에 맞는 vendor DLL 경로를 실행 환경 앞에 추가</td></tr>
+<tr><td><code>Tools/regression/experiment_contract_probe.cpp</code></td><td>standalone 호스트가 전체 검사 동안 COM을 유지하고 종료 직전에 WIC factory를 정리</td></tr>
+<tr><td><code>Editor/RenderTests/ExperimentParity/ExperimentMaterialInstanceSelfTest.cpp</code></td><td>CB 비교 fixture의 base가 <code>FOG=on</code>을 선택하므로 ShaderMeta에도 FOG 축 선언; unknown keyword 거부 규칙 유지</td></tr></tbody></table></div>
+<p>COM 수정의 근거: per-call <code>CoInitializeEx</code>/<code>CoUninitialize</code>만 가진 독립 재현에서 첫 PNG metadata 호출은 성공하고 두 번째 호출이 DirectXTex WIC에서 접근 위반으로 종료했다. Editor와 AssetCooker는 이미 main에서 COM을 유지한다. standalone probe도 같은 호스트 수명 계약을 갖도록 수정했다. DirectXTex의 <a href="https://github.com/microsoft/DirectXTex/wiki/WICFactory">WIC factory 문서</a>는 cached factory와 명시적 교체/정리를 설명한다. 진단용 forced include/link 옵션은 정식 검증 빌드에 사용하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-현재-확인된-결과">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="현재-확인된-결과">현재 확인된 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>검증</th><th>결과</th><th>경계</th></tr></thead>
+<tbody><tr><td>texture import Editor source</td><td><span class="chip ok">Python 5 tests 통과</span></td><td>정적 계약</td></tr>
+<tr><td>BuildTool</td><td><code>BUILD_TOOL_TESTS_OK checks=142</code></td><td>managed 단위/통합 계약</td></tr>
+<tr><td>Debug·Release Editor / Player / AssetCooker / AssetPacker / BuildTool</td><td>실제 project build 통과</td><td>런타임 수용과 별도</td></tr>
+<tr><td>Player dependency boundary</td><td><span class="chip ok">target 통과</span></td><td>source/build metadata 경계</td></tr>
+<tr><td>Release RenderEngine archive</td><td>WIC/HDR/TGA/DDS decode/save 및 mip/compress 함수 정의 0</td><td>Shipping 실제 링크 전체의 대체 증거 아님</td></tr>
+<tr><td>Debug·Release texcook</td><td>각 기존 138/138, PHASE 12 53/53 통과</td><td>GPU 없는 실제 PNG/HDR/DDS cook·손상 거부·밉 정책·BC5/BC7·Terrain byte contracts</td></tr>
+<tr><td>Debug·Release 전체 experiment contract</td><td><span class="chip ok">각 13/13 통과</span></td><td>texcook 외 font/material codec·instance·seal·sampler·normal·tangent·shaderMeta·vertex layout 등 회귀</td></tr>
+<tr><td>Debug·Release cooked Scene GPU 소비</td><td>각 24 frames, checks=57259, gpuComponents=10746, sceneCompiles=0, validation=0, encrypted PAK; 반복 cook 동일·실패 6종 accepted 출력 보존, sources=719/drift=0</td><td>native DX12 회귀 probe; 실제 Player 패키징은 별도</td></tr>
+<tr><td>material codegen</td><td>cases=22, checks=15244, compiled=101, rejected=31, gpuChecks=3960</td><td>BC5 normal reconstruction 포함; 전체 텍스처 품질 코퍼스 아님</td></tr>
+<tr><td>material metadata</td><td><span class="chip ok">JSON cases=22 통과</span></td><td>generated metadata 구조</td></tr>
+<tr><td>Debug·Release PNG 정본 왕복</td><td>각 실제 프로젝트 102/102 및 RGBA byte fixtures 통과</td><td>같은 DirectXTex decoder의 왕복; 외부 decoder 정확도 대조 아님</td></tr>
+<tr><td>Debug·Release HDR 정본 왕복</td><td>각 실제 프로젝트 19/19 float DDS 왕복 일치</td><td>float bits 보존; 시각 품질 판정 아님</td></tr>
+<tr><td>DX12/Vulkan <code>vk.texturecodec</code></td><td>각 4 textures, 95604 logical bytes, 226 rows, digest <code>948bc2173e154fae</code> 일치</td><td>BC1_SRGB·BC3·BGRA8·비압축; BC5/BC7 GPU 전체 수용 아님</td></tr>
+<tr><td>PNG/JPEG embedded model export</td><td>두 glTF fixture, CECT schema=2/representation=2, identity 및 generation fingerprint 보존</td><td>legacy schema/ambiguous references 거부; 실제 Player 모델 scene 소비는 별도</td></tr>
+<tr><td>builtin blue noise</td><td>cooker가 CECT2 BC3 128×128/8 mips/22256 bytes 생성</td><td><span class="chip ok">내장 resource cook</span></td></tr>
+<tr><td>Debug·Release 실제 Player 패키지</td><td>programs=3, materials=1; Debug gameThreadFrames=2649/displayFrame=2659, Release gameThreadFrames=2831/displayFrame=2833; 각 promotions=120, sceneCompiles=0, textParserCalls=0, payloadPreserved=true, source drift=0</td><td>모델 임베디드/독립 텍스처 산출물을 포함한 제한된 source-free DX12 fixture; 모델 모든 텍스처의 실제 sampling 및 전체 코퍼스 수용 아님</td></tr>
+<tr><td>Release / Release-Shipping Player 실제 DLL import</td><td>각 DirectXTex 및 decode/mip/compress import 0</td><td>실제 네이티브 DLL</td></tr>
+<tr><td>Release 실제 Player 패키지 runtimeEntries</td><td>DirectXTex/stb 이미지 코덱 항목 0</td><td>현재 제한된 패키지 manifest의 실제 closure</td></tr>
+<tr><td>Release-Shipping Player</td><td>실제 전체 dependency build 통과; RenderEngine codec 정의 0; 공유 런타임 22 files/codec files=0, ABI shipping=1</td><td>loader probe 통과; Shipping GPU 패키지 smoke는 별도 미실행</td></tr></tbody></table></div>
+<p>Release 링크에는 기존 라이브러리 PDB type record 관련 LNK4020 경고가 있었다. 실행 파일 빌드 성공을 디버그 심볼 완전성으로 확대하지 않는다.</p>
+<p>초기 Debug 패키징은 10/07 BuildTool 바이너리가 남아 새 <code>.cetex</code> 경로를 거부했다. 현재 source의 Debug BuildTool을 별도 빌드한 뒤 fresh candidate 재검증을 통과했다. Release의 통과 패키지도 현재 BuildTool을 사용했다.</p>
+<p>대시보드 전체 JS 파싱/렌더 및 유한 진행률 계산은 통과했다. 구조 검사기는 HEAD에서도 존재하던 PHASE 4.85 quoted-key RTP 14개를 잘못 읽어 string violations 140/shape errors 14를 보고한다. 현재 변경 후 같은 수량이며 이 별도 기존 문제를 PHASE 12 완료 근거로 쓰거나 범위 밖에서 수정하지 않았다. 변경 문서의 whitespace 검사는 통과했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현-경로">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="재현-경로">재현 경로</h2></div>
+<div class="prose"><p>검증 스크립트:</p>
+<ul>
+<li><code>Tools/regression/verify-texture-import-editor-source.py</code></li>
+<li><code>Tools/regression/verify-experiment-contract.ps1 -Configuration Release -Only texcook</code></li>
+<li><code>Tools/regression/verify-texture-canonical-roundtrip.ps1 -Configuration Release</code></li>
+<li><code>Tools/regression/verify-material-codegen.ps1</code></li>
+<li><code>Tools/regression/verify-model-texture-export.py</code> (PNG/JPEG 모델 generation을 준비한 독립 project)</li>
+<li><code>Tools/regression/verify-material-scene-cook.ps1 -SkipDependencyRestore -SkipProjectReferences</code></li>
+</ul>
+<p>현재 실행 로그는 ignored <code>Build/phase12-*.log</code>에 보존한다. 실행 파일 SHA-256은 <code>Build/phase12-binary-hashes.json</code>에 있다. PNG/JPEG 모델 project는 <code>Build/Phase12ModelFixture-ef3add4fec5745e88932308f484aaeae</code>, 정본 왕복 유지 스크립트 결과는 Release <code>Build/TextureRoundtrip-e1fe3827e02d4e3da26e9b23f2797e72/results.jsonl</code>, Debug <code>Build/TextureRoundtrip-5d364ba7681e4b5da12c557ac0f36258/results.jsonl</code>에 있다. Vulkan 업로드 대조는 <code>Build/Phase12Roundtrip-4962468abbcf4b8c87fb730fa0490e5f/results.jsonl</code>에 있다. 실제 Player 패키지는 Release <code>Build/Obj/MaterialProductProbe/ScenePkg-Release-7d009f765d664dffb93965be25a89e62</code>, Debug <code>Build/Obj/MaterialProductProbe/ScenePkg-Debug-aad0e2f7fd764d4687557fe910868ccf</code>에 보존한다. 검증용 source asset/sidecar는 격리된 fixture/project에만 작성했다. PR 자체의 source asset 변경은 앞의 구현 적용 범위에 포함한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-남은-수용-조건">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="남은-수용-조건">남은 수용 조건</h2></div>
+<div class="prose"><ol>
+<li>Shipping GPU 패키지 smoke를 추가한다. 실제 Shipping build/link/loader 및 staged codec closure는 이번 실행에서 확인했다.</li>
+<li>새 BC5/BC7, cube/HDR 등의 실제 runtime GPU 소비 범위를 넓힌다. 기존 Vulkan digest 통과만으로 이 범위를 닫지 않는다.</li>
+<li>Inspector 설정 변경·확인창 직접 조작 및 SpriteRenderer/모델 등의 소비자 수용을 확장한다. 2026-10-10 후속 자산 서비스 검증은 <a href="TextureImportLifecycleValidation20261010.html">임포트 수명 기록</a>, 씬 교체 성공/실패는 <a href="TextureSceneReloadValidation20261010.html">씬 재로드 기록</a>, 실제 한 프로세스의 ImageComponent 재임포트→재로드 수용과 빈 참조 저장 수정은 <a href="TextureReimportSceneValidation20261010.html">종단 기록</a>에서 구분한다.</li>
+<li>모델 모든 텍스처의 source-free Player 실제 sampling과 version/hash/settings 불일치 거부를 확장한다. 현재 DX12 fixture를 전체 자산·Vulkan 패키지 수용으로 확대하지 않는다.</li>
+<li>현재 코퍼스의 품질·cook 시간·메모리·디스크·recook/reload 지연을 측정한다. 과거 수치를 재사용하지 않는다.</li>
+</ol>
+<p>T0/T1a/T2는 진행 중, <code>earnedDays: 0</code>. T1b는 품질/성능 수용 대기. T3는 실제 모바일/Web 제품 타깃이 정해질 때까지 중단이다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="TexturePipelineValidation20261009.md"><code>docs/analysis/TexturePipelineValidation20261009.md</code></a> · 마지막 커밋 2026-10-10 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

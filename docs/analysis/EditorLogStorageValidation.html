@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorLogStorageValidation.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Output Log 저장 경계 정리 — 1·2·3단계</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1단계-저장-경계-정리">1단계: 저장 경계 정리</a></li><li><a href="#2단계-반복-집계">2단계: 반복 집계</a></li><li><a href="#3단계-화면-교체">3단계: 화면 교체</a></li><li><a href="#3단계-보강-카드-목록과-수준별-누적">3단계 보강: 카드 목록과 수준별 누적</a></li><li><a href="#4단계-보강-아무도-안-읽던-두-채널">4단계 보강: 아무도 안 읽던 두 채널</a></li><li><a href="#출처-축-태그를-걷고-두-경로를-합치고-읽을-채널을-냈다">출처 축: 태그를 걷고, 두 경로를 합치고, 읽을 채널을 냈다</a></li><li><a href="#출처-축-닫기-c-래퍼-셋과-outputlogtexth">출처 축 닫기: C++ 래퍼 셋과 OutputLogText.h</a></li><li><a href="#다음-단계">다음 단계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorLogStorageValidation.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>Output Log 저장 경계 정리 — 1·2·3단계</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 8개의 분량 막대">
+<a class="map-row" href="#1단계-저장-경계-정리"><span class="ve-label">§00</span><span class="map-name">1단계: 저장 경계 정리</span><span class="map-bar"><i style="width:61.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2단계-반복-집계"><span class="ve-label">§01</span><span class="map-name">2단계: 반복 집계</span><span class="map-bar"><i style="width:63.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3단계-화면-교체"><span class="ve-label">§02</span><span class="map-name">3단계: 화면 교체</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3단계-보강-카드-목록과-수준별-누적"><span class="ve-label">§03</span><span class="map-name">3단계 보강: 카드 목록과 수준별 누적</span><span class="map-bar"><i style="width:52.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4단계-보강-아무도-안-읽던-두-채널"><span class="ve-label">§04</span><span class="map-name">4단계 보강: 아무도 안 읽던 두 채널</span><span class="map-bar"><i style="width:50.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#출처-축-태그를-걷고-두-경로를-합치고-읽을-채널을-냈다"><span class="ve-label">§05</span><span class="map-name">출처 축: 태그를 걷고, 두 경로를 합치고, 읽을 채널을 냈다</span><span class="map-bar"><i style="width:67.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#출처-축-닫기-c-래퍼-셋과-outputlogtexth"><span class="ve-label">§06</span><span class="map-name">출처 축 닫기: C++ 래퍼 셋과 OutputLogText.h</span><span class="map-bar"><i style="width:51%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#다음-단계"><span class="ve-label">§07</span><span class="map-name">다음 단계</span><span class="map-bar"><i style="width:12.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 8개 가운데 「3단계: 화면 교체」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1단계-저장-경계-정리">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="1단계-저장-경계-정리">1단계: 저장 경계 정리</h2></div>
+<div class="prose"><p>날짜: 2026-09-13</p>
+<h3 id="적용-범위">적용 범위</h3>
+<p>Unity식 Output Log 개선의 첫 단계인 구조화 저장·동시 접근 경계를 구현했다.
+반복 집계, Collapse, 목록/상세 UI 전환은 후속 단계다.</p>
+<p>기존 <code>LogSink</code>는 포맷된 문자열을 <code>RingBuffer</code>에 저장했고, <code>DebugClass</code>가
+friend로 버퍼를 직접 읽거나 지웠다. 쓰기는 spdlog sink mutex로 보호되지만
+조회와 Clear는 그 mutex를 사용하지 않았다.</p>
+<p>현재 경로:</p>
+<pre><code class="language-text">producer → spdlog → LogSink → LogStore
+                 → HtmlFileSink (개별 발생 기록 유지)
+
+DebugClass → LogStore snapshot → MenuBarWindow의 로컬 사본/표시 문자열</code></pre>
+<h3 id="저장-계약">저장 계약</h3>
+<ul>
+<li><code>LogEntry</code>: 순번, 레벨, 발생 시각, 스레드 ID, 로거명, 본문 원문,
+호출 파일·함수·라인을 보관한다. spdlog의 빌린 문자열은 sink 호출 안에서 복사한다.</li>
+<li>본문의 개행·탭·연속 공백·UTF-8·NUL 바이트를 저장 단계에서 가공하지 않는다.</li>
+<li>출처를 제공하지 않은 로그는 라인 0과 빈 출처를 유지한다. 호출 위치를 추정하지 않는다.</li>
+<li><code>DebugClass</code>가 수명 동안 같은 <code>LogStore</code>를 유지하고 <code>LogSink</code>도 이를 공유 소유한다.
+UI 조회는 초기화/종료 때 교체되는 sink 포인터를 읽지 않는다.</li>
+<li><code>Append</code>, snapshot, <code>Clear</code>, 용량 초과 처리는 동일한 store mutex로 보호한다.
+snapshot은 독립적인 값이며 잠금 밖에서 포맷·렌더한다.</li>
+<li>변경이 없으면 <code>ReadSnapshotIfChanged</code>는 빈 optional을 반환한다. 로그가 변경된 경우에는
+현재 보관 목록 전체를 복사한다. 변경분만 전달하는 API는 이 단계에 없었다(2단계에서
+<code>ReadDeltaSince</code>로 착지했다).</li>
+<li>순번은 store가 기록을 받아들이는 순서다. Clear 후에도 재사용하지 않는다.
+여러 sink에 걸친 전역 기록 순서까지 보장하는 번호는 아니다.</li>
+<li><code>Clear</code>는 같은 잠금 아래 내용을 지우고 세대/revision을 갱신한다.
+Clear 뒤 들어온 기록은 유지한다. 이전 snapshot도 읽기 가능한 독립 사본으로 남는다.</li>
+<li>mutable reference를 반환하던 <code>WriteBackLogMessage</code>와 사용하지 않는 마지막 문자열 API,
+<code>get_entries</code>, <code>IsClear/toggleClear</code> 화면 신호를 제거했다.</li>
+</ul>
+<h3 id="보관-한도">보관 한도</h3>
+<p><code>LogStoreLimits</code>의 초기값은 기존 최근 500건과 문자열 내용 합계 8 MiB다.
+8 MiB는 이번 단계의 초기 메모리 보호값이며 실측에 따른 성능 목표가 아니다.
+문자열 내용 합계는 본문·로거명·파일·함수의 바이트 수다. 컨테이너/allocator 오버헤드,
+일시적인 입력 복사, UI snapshot과 표시 문자열의 메모리를 포함한 프로세스 전체 한도는 아니다.</p>
+<ul>
+<li>건수/문자열 합계가 넘으면 오래된 항목 전체를 제거한다.</li>
+<li>한 항목 자체가 문자열 예산을 넘으면 UI 저장만 거절하고 거절 횟수를 증가시킨다.
+문자열을 잘라 저장하지 않으며 다른 sink는 원본을 계속 전달받는다.</li>
+<li>제거/거절 횟수는 snapshot과 화면에 노출하며 Clear에서 초기화한다.</li>
+<li>그룹 보존과 발생 이력을 분리하는 정책은 2단계에서 적용한다. 현재는 반복 로그도
+개별 항목이므로 반복 출력이 이전 항목을 밀어내는 특성은 남아 있다.</li>
+</ul>
+<h3 id="기존-화면-연결">기존 화면 연결</h3>
+<ul>
+<li><code>OutputLogText.h</code>가 구조화 필드를 기존 spdlog 기본 표시 형식으로 변환한다.
+저장소에는 화면 표시 문자열을 넣지 않는다.</li>
+<li>화면은 revision이 변경될 때만 snapshot/표시 문자열을 교체한다.</li>
+<li>선택과 ImGui 행 ID는 배열 인덱스 대신 발생 순번을 사용한다.
+선택 항목이 제거되거나 Clear되면 선택을 해제한다.</li>
+<li>기존 <code>WordWrapText(..., 120)</code>, <code>35 * 개행 수</code>, 경로 정규식,
+Trace 필터 예외는 화면 교체 단계에 남겨 두었다. 문자열 배치 개선 완료를 의미하지 않는다.</li>
+</ul>
+<h3 id="검증">검증</h3>
+<p>회귀 진입점: <a href="../../Tools/regression/verify-log-storage.ps1">verify-log-storage.ps1</a></p>
+<pre><code class="language-powershell">./Tools/regression/verify-log-storage.ps1 -Configuration All</code></pre>
+<p>VS18 x64로 저장소·실제 sink·Editor 표시 어댑터를 포함한 독립 실행 파일을 컴파일한다.
+설치된 spdlog/fmt 헤더를 사용하며 테스트 실행 파일은 header-only 방식이다.
+<code>LogSystem.h</code>, <code>MenuBarWindow.h</code>도 포함해 변경된 공개 헤더의 컴파일을 확인한다.
+에디터 전체 링크나 <code>MenuBarWindow.cpp</code> 전체 컴파일을 대신하는 검사는 아니다.</p>
+<p>검증 항목:</p>
+<ul>
+<li>빌린 입력 문자열을 변경한 뒤에도 본문·메타데이터·출처 보존.</li>
+<li>공백·한글·NUL 원문 보존, 이전 formatter 결과와 표시 문자열 일치.</li>
+<li>독립 snapshot, 변경 없는 조회, sink 초기화 이전 DebugClass 조회/Clear.</li>
+<li>건수/바이트 한도, 메타데이터 바이트 포함, 항목 단위 거절, 제거/거절 통계.</li>
+<li>Clear 이후 단조 증가 ID와 이전 snapshot의 유효성.</li>
+<li>구성별 4개 생산자의 80,000건 기록 + snapshot 조회.</li>
+<li>구성별 추가 80,000건 기록 + snapshot 조회 + 400회의 동시 Clear.</li>
+<li>실제 spdlog logger에 UI/HTML sink를 함께 연결하여 Clear·UI 거절 이후에도
+HTML 파일에서 원래 메시지와 발생 통계 확인.</li>
+</ul>
+<p>결과: <strong>Debug·Release 모두 <code>LOG_STORAGE_OK</code> 통과</strong>. 각 구성에서 160,000건을
+기록하고 동시 Clear 400회를 수행했다. 최종 실행의 snapshot 조회 수는
+Debug 538/79회, Release 231/189회(각각 Clear 없음/있음)였다.
+조회 수는 스케줄링에 따라 달라지며 성능 측정값으로 사용하지 않는다.
+프로젝트/필터 XML과 회귀 PowerShell 구문 파싱, 변경 범위 <code>git diff --check</code>도 통과했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2단계-반복-집계">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="2단계-반복-집계">2단계: 반복 집계</h2></div>
+<div class="prose"><p>날짜: 2026-09-15</p>
+<h3 id="적용-범위-1">적용 범위</h3>
+<p>저장소를 &quot;발생 목록&quot;에서 <strong>정체성(그룹) + 발생 이력</strong>으로 바꿨다.
+Editor 트리는 한 줄도 건드리지 않았다 — <code>verify-editor-widget-clipping</code>,
+<code>verify-editor-keyboard-nav</code>, <code>verify-editor-state-matrix</code> 셋이 Editor 의
+<code>.cpp</code> 를 닫힌 집합으로 훑기 때문에, 화면 교체는 그 게이트들과 함께 움직여야
+한다(3단계). 그래서 현재 로그 창은 코드 변경 없이 그대로 돈다.</p>
+<p>신규 <a href="../../Engine/Utility_Framework/LogGroup.h">LogGroup.h</a>가 <code>LogGroup</code>과
+<code>LogOccurrence</code>를 담고 <code>LogStore</code>가 둘을 소유한다. <code>LogEntry</code>에는 store가
+채우는 <code>groupId</code>가 늘었다(생산자는 비워 둔다).</p>
+<h3 id="묶음-계약">묶음 계약</h3>
+<ul>
+<li>그룹 키는 <strong>레벨 + 로거명 + 본문 원문 + 호출 파일·함수·라인</strong> 여섯 축이다.</li>
+<li>시각·스레드·순번은 발생 정보이며 키에 넣지 않는다. 넣으면 프레임을 넘는
+반복이 합쳐지지 않는다.</li>
+<li>숫자·주소·공백을 정규화하지 않는다. <code>HP=10</code>과 <code>HP=20</code>은 다른 그룹이다.</li>
+<li>본문의 NUL 이후 바이트도 키의 일부다. 해시가 <code>std::hash&lt;std::string&gt;</code>이라
+길이를 끝까지 읽는다.</li>
+<li>해시가 같다고 같은 그룹이 아니다. 후보를 실제 키로 다시 대조한다.</li>
+<li><code>groupId</code>는 재사용하지 않는다. 퇴거된 정체성이 다시 찍히면 <strong>새 id로 시작</strong>하고
+누적 횟수도 1부터 센다. 화면의 낡은 선택이 다른 로그에 붙지 못한다.</li>
+</ul>
+<h3 id="보관-정책">보관 정책</h3>
+<p><code>LogStoreLimits</code>의 축이 셋으로 늘었다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>한도</th><th>초기값</th><th>대상</th></tr></thead>
+<tbody><tr><td><code>maxOccurrences</code></td><td class="num">500</td><td>발생 이력 건수</td></tr>
+<tr><td><code>maxGroups</code></td><td class="num">500</td><td>보관 중인 정체성 수</td></tr>
+<tr><td><code>maxTextBytes</code></td><td>8 MiB</td><td><strong>그룹</strong> 문자열 합계</td></tr></tbody></table></div>
+<ul>
+<li>이력이 넘치면 가장 오래된 발생부터 버린다. 이때 <code>totalCount</code>는 줄지 않는다 —
+100번 반복한 로그가 이력 4건만 남아도 ×100을 계속 보고한다. 1단계에 남아 있던
+&quot;반복 출력이 이전 항목을 밀어낸다&quot;는 특성이 여기서 닫힌다.</li>
+<li>그룹은 <strong>보관 이력이 0인 것만</strong> 퇴거한다. 그래서 퇴거가 이력 목록을 훑지 않고,
+&quot;보관된 발생의 그룹은 반드시 존재한다&quot;가 불변식으로 선다.</li>
+<li>그룹·문자열 예산이 모자라면 가장 오래된 발생을 버려 그룹을 놀게 만든 뒤 퇴거한다.</li>
+<li>한 항목 자체가 문자열 예산을 넘으면 저장만 거절한다(1단계와 같다).</li>
+<li>반복 본문은 그룹에 한 번만 있으므로 <code>textBytes</code>는 반복으로 늘지 않는다.</li>
+<li>초기값 8 MiB는 여전히 메모리 보호값이며 실측에 따른 성능 목표가 아니다.</li>
+</ul>
+<h3 id="변경분-조회">변경분 조회</h3>
+<p><code>ReadDeltaSince(LogCursor)</code>를 더했다. 커서는 <code>revision</code>·<code>clearGeneration</code>·
+<code>lastSequence</code> 셋이다.</p>
+<ul>
+<li>변경이 없으면 빈 optional을 반환한다.</li>
+<li>바뀐 그룹과 새 발생만 싣는다. 퇴거된 그룹은 <code>removedGroups</code>로 알리고,
+사라진 이력은 <code>oldestRetainedSequence</code>로 알린다.</li>
+<li>Clear, 상태가 없는 독자, <strong>제거 기록이 밀려난 커서</strong>는 <code>resynchronized</code>로
+표시하고 보관 전체를 싣는다. 조용히 어긋나는 대신 다시 받게 한다.</li>
+<li><code>ReadSnapshot</code>/<code>ReadSnapshotIfChanged</code>는 그대로 남아 현재 로그 창이 쓴다.
+발생 목록은 그룹의 본문으로 복원한다.</li>
+</ul>
+<h3 id="검증-1">검증</h3>
+<pre><code class="language-powershell">./Tools/regression/verify-log-storage.ps1 -Configuration All</code></pre>
+<p>결과: <strong>Debug·Release 모두 <code>LOG_STORAGE_OK</code> 통과</strong>. 기존 단정에 더해 묶음 축과
+변경분 조회 두 묶음이 늘었다.</p>
+<ul>
+<li>같은 정체성의 반복이 한 그룹으로 접히고 발생마다 순번·스레드·시각을 유지한다.</li>
+<li>키 여섯 축을 <strong>선언하고</strong>, 선언한 수만큼 그룹이 늘었는지 센다.</li>
+<li>시각·스레드를 바꾼 반복은 같은 그룹에 들어간다.</li>
+<li><code>HP=10</code>/<code>HP=20</code>과 NUL 뒤 바이트가 다른 두 본문이 각각 다른 그룹이다.</li>
+<li>이력 4건 한도에서 100번 반복 → 이력 4 · 누적 100 · 퇴거 96.</li>
+<li>그룹 2개 한도에서 셋째 정체성이 들어오면 가장 오래된 것이 나가고,
+다시 찍히면 더 큰 새 <code>groupId</code>로 누적 1부터 시작한다.</li>
+<li>변경분만 적용하는 독자를 만들어 매 회차마다 전체 snapshot과 대조한다.
+24회 동안 이력 퇴거와 그룹 퇴거를 모두 지나면서 재동기화가 1회(최초)뿐이다.</li>
+<li>Clear와 밀려난 커서는 재동기화로 표시되고, 그 뒤 독자 상태가 전체와 일치한다.</li>
+</ul>
+<p>변이 증명(Debug):</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변이</th><th>잡은 단정</th></tr></thead>
+<tbody><tr><td>그룹 조회의 본문 비교를 뒤집어 묶음을 무력화</td><td><code>repeats of one identity collapse into a single group</code></td></tr>
+<tr><td>그룹 키에 발생 시각을 추가</td><td>같은 단정</td></tr>
+<tr><td>이력 퇴거가 <code>totalCount</code>까지 줄이게 함</td><td><code>the repeat count outlives the occurrence buffer</code></td></tr>
+<tr><td>퇴거된 그룹을 변경분에서 빼먹음</td><td><code>reader tracks eviction step by step</code></td></tr>
+<tr><td>이력 퇴거가 <code>retainedOccurrences</code>를 안 줄임</td><td><code>byte budget evicts whole entry</code></td></tr></tbody></table></div>
+<p>마지막 변이는 <strong>겨냥한 단정보다 앞선 것이 먼저 울렸다.</strong> retained가 0이 되지
+않아 그룹이 영영 놀지 않고, 그 결과 바이트 예산이 아무것도 못 비운 것이라
+인과는 맞지만, &quot;retained count matches the history&quot;가 실제로 그 변이를 잡는지는
+이 회차로 증명되지 않았다.</p>
+<h3 id="아직-재지-않은-것">아직 재지 않은 것</h3>
+<ul>
+<li>Editor 전체 빌드. 다른 세션이 이 시각 MSBuild 6개로 빌드 중이라 <code>Build\Obj</code>
+충돌을 만들지 않으려고 걸지 않았다. 대신 유일한 소비자가 읽는 멤버를 소스로
+대조했다 — <code>MenuBarWindow.cpp</code>는 <code>entries</code>·<code>revision</code>·<code>evictedEntries</code>·
+<code>rejectedEntries</code>와 <code>entry.level</code>·<code>entry.sequence</code>만 읽고, <code>OutputLogText.h</code>는
+<code>LogEntry</code>의 기존 필드만 읽는다. 모두 남아 있다. 게이트가 <code>MenuBarWindow.h</code>와
+<code>LogSystem.h</code>를 <code>/W4 /WX</code>로 컴파일하지만 <code>MenuBarWindow.cpp</code> 본문은 아니다.</li>
+<li>실제 로그 창의 시각·입력. (3단계에서 화면을 교체하며 해소했다.)</li>
+<li>이 게이트는 여전히 <code>Tools/regression/run-all.ps1</code>에 <strong>등록돼 있지 않다.</strong>
+손으로 부를 때만 돈다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-3단계-화면-교체">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="3단계-화면-교체">3단계: 화면 교체</h2></div>
+<div class="prose"><p>이 단계가 원래 요청의 첫 문장에 답한다 — <em>&quot;문자열 자르는 로직이 전혀 근거없는
+눈대중으로 작성한 구 로직&quot;</em>.</p>
+<h3 id="무엇이-눈대중이었나">무엇이 눈대중이었나</h3>
+<p>옛 화면(<code>MenuBarWindow::ShowLogWindow()</code>)은 세 가지를 <strong>폭을 재지 않고</strong> 했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>옛 코드</th><th>무엇을 가정했나</th><th>왜 틀렸나</th></tr></thead>
+<tbody><tr><td><code>WordWrapText(text, 120)</code></td><td>한 줄에 120 <strong>바이트</strong></td><td>한글은 3바이트라 40자에서 접힌다. 글꼴 폭과 무관하다</td></tr>
+<tr><td><code>text.substr(0, 100) + &quot;...&quot;</code></td><td>100바이트면 한 줄</td><td>UTF-8 중간에서 잘라 깨진 바이트를 낸다</td></tr>
+<tr><td>창 폭을 안 봄</td><td>창이 늘 같은 폭</td><td>도킹·리사이즈에 따라 남거나 모자란다</td></tr></tbody></table></div>
+<p>지금은 <code>EllipsizeToWidth(text, maxWidth, measure)</code> 하나가 한다. <code>measure</code>는
+<code>ImGui::CalcTextSize</code>이고, 자를 자리는 <strong>UTF-8 글자 경계 위에서만</strong> 이진 탐색으로
+찾는다. 말줄임표를 포함한 결과가 <code>maxWidth</code> 안에 들어온다.</p>
+<h3 id="적용-범위-2">적용 범위</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>파일</th><th>하는 일</th></tr></thead>
+<tbody><tr><td><code>Editor/EngineGUIWindow/OutputLogView.h</code></td><td>상태와 판정. ImGui를 모른다</td></tr>
+<tr><td><code>Editor/EngineGUIWindow/OutputLogWindow.h/.cpp</code></td><td>그리기만 한다</td></tr>
+<tr><td><code>Editor/EngineGUIWindow/MenuBarWindow.cpp/.h</code></td><td>로그 본문 154줄과 <code>WordWrapText</code>를 뺐다(−186줄)</td></tr>
+<tr><td><code>Editor/EditorWindow/Windows/EditorToolboxWindows.h</code></td><td>창 첫 크기 선언</td></tr></tbody></table></div>
+<p>화면 상태를 <code>OutputLogView.h</code>에 따로 두는 이유는 게이트 때문이다. 판정이 ImGui
+호출에 섞여 있으면 창을 띄우지 않고는 잴 수 없고, 창을 띄우는 게이트는 프로젝트에
+하나뿐인 endpoint 파일을 독점해 다른 게이트와 같이 못 돈다. 지금은 말줄임·필터·
+검색·Collapse·선택 수명을 전부 <code>/W4 /WX</code> 단독 컴파일 프로브에서 잰다.</p>
+<h3 id="화면-계약">화면 계약</h3>
+<ul>
+<li><strong>Collapse</strong> — 같은 정체성의 반복을 한 행으로 접고 오른쪽에 누적 수를 적는다.
+배지는 <code>totalCount</code>다. <code>retainedOccurrences</code>가 아니다 — 이력 버퍼가 밀려도
+&quot;몇 번 찍혔는지&quot;는 남아야 한다.</li>
+<li><strong>수준 필터</strong> — <code>group.level &lt; minimumLevel</code>이면 거른다. 옛 화면은 Trace를 어떤
+설정에서도 흘렸다. 그 결함을 고쳤다.</li>
+<li><strong>검색</strong> — 평탄화 <strong>이전의 원문</strong>을 본다. 화면이 개행을 공백으로 바꿔 보여주는
+것은 표시 사정이고, 찾는 사람은 자기가 찍은 글자를 찾는다.</li>
+<li><strong>clipper</strong> — <code>ImGuiListClipper</code>로 보이는 행만 낸다. 행 목록은 평탄하다.</li>
+<li><strong>선택 수명</strong> — 고른 그룹이 퇴거되면 선택을 비운다. 그러지 않으면 상세 창이
+없는 그룹을 가리킨다.</li>
+<li><strong>출처</strong> — 없으면 <code>source: none (the producer did not supply a call site)</code>라고
+<strong>적는다.</strong> 지금 이 엔진의 로그는 전부 출처가 없다. 숨기면 4단계가 무엇을
+고쳐야 하는지 흐려진다.</li>
+<li><strong>파일 열기</strong> — 상세 창의 버튼으로만 연다. 옛 화면은 <strong>아무 줄이나 한 번 누르면</strong>
+본문에서 Windows 경로를 찾아 편집기를 띄웠다. 읽으려고 고른 것만으로 열렸다.</li>
+</ul>
+<h3 id="그리기-규약">그리기 규약</h3>
+<p>표준 위젯만 쓴다 — <code>AddText</code>·<code>RenderTextClipped</code>·<code>ItemAdd</code>를 직접 부르지 않는다.
+그래야 클리핑과 nav 커서를 ImGui가 맡고, W2의 custom draw 계약
+(<code>verify-editor-widget-clipping</code>·<code>verify-editor-keyboard-nav</code>)이 요구하는 신고를
+따로 들 필요가 없다. 행은 라벨이 빈 <code>Selectable(&quot;##row&quot;, ...)</code>로 깔고 본문을 그
+위에 낸다 — <code>Selectable</code>은 라벨 안의 <code>##</code>를 식별자 구분자로 읽는데, 로그 본문에
+<code>##</code>가 들어오는 일이 실제로 있다.</p>
+<h3 id="겹쳐-그리려고-setcursorpos로-돌아가면-안-된다">겹쳐 그리려고 <code>SetCursorPos</code>로 돌아가면 안 된다</h3>
+<p>첫 판은 행 위에 본문을 겹치려고 <code>SetCursorPos</code>로 행 머리로 돌아갔다가, 다음 행
+자리를 <code>SetCursorPos(rowStart.y + rowHeight)</code>로 직접 놓았다. 컴파일도 되고 그림도
+맞았지만 ImGui가 <strong>매 프레임</strong> 오류를 냈다.</p>
+<pre><code>In window ' Log###Editor.OutputLog/OutputLogRows_...':
+Code uses SetCursorPos()/SetCursorScreenPos() to extend window/parent boundaries.
+Please submit an item e.g. Dummy() afterwards in order to grow window/parent boundaries.</code></pre>
+<p><code>SetCursorPos</code>는 커서만 옮기고 창의 content 크기를 키우지 않는다. ImGui는 항목
+제출 없이 커서가 경계 밖으로 나간 채 <code>EndChild</code>에 닿으면 그것을 오류로 신고한다.</p>
+<p>고친 방식은 <code>Dummy()</code>를 덧붙이는 쪽이 아니다 — 그러면 그 항목이 다시 보폭을
+바꾼다. 행 머리로 돌아가는 일을 <code>SameLine(rowStartX)</code>가 하게 했다. <code>SameLine</code>은
+앞 줄의 높이를 그대로 물려받으므로 경계도 보폭도 건드리지 않는다. 그리고 목록
+안에서만 <code>ItemSpacing.y</code>를 0으로 눌러, <code>Selectable</code>이 차지하는 높이와 다음 행이
+시작하는 자리를 둘 다 <code>rowHeight</code>로 맞췄다 — clipper에 알려 준 보폭과 실제
+보폭이 갈리면 <strong>스크롤해야만</strong> 드러난다.</p>
+<p>측정: 같은 자극으로 띄운 에디터 stdout의 <code>[imgui-error]</code> 줄 수가 <strong>62 → 0</strong>.</p>
+<p>이것은 게이트가 못 잡았다. 게이트는 <code>OutputLogView.h</code>만 컴파일하고 ImGui를 띄우지
+않으며, 네 에디터 게이트도 이 오류를 세지 않는다. 사람이 창을 열어 본 것이 유일한
+관측 수단이었다.</p>
+<h3 id="창-첫-크기">창 첫 크기</h3>
+<p><code>initial_size</code>를 싣지 않으면 ImGui가 <strong>내용에 맞춰</strong> 접는다. 처음 뜬 로그 창이
+들고 있는 것은 툴바 한 줄과 로그 몇 줄뿐이라, 자동 크기가 1~2행짜리 창이 됐다.
+Auto Scroll이 켜져 있으면 마지막 한 줄만 보이고 나머지는 스크롤 밖으로 밀린다.
+선언에 크기를 실었다 — 형제 창들이 크기를 선언하는 그 자리다. 행 하나가 두 줄
+짜리 카드가 된 뒤 <code>1180x640</code> 이다.</p>
+<h3 id="검증-2">검증</h3>
+<pre><code class="language-powershell">./Tools/regression/verify-log-storage.ps1 -Configuration Debug</code></pre>
+<p>결과: <strong><code>LOG_STORAGE_OK</code></strong>. <code>PASS presentation: 글자 폭 말줄임, 행 평탄화, 수준 필터, 검색, Collapse, 선택 수명</code>이 늘었다.</p>
+<p>말줄임은 <strong>자 둘</strong>로 잰다. 글자 폭 자(글자당 고정 폭)와 바이트 자(바이트당 3px).
+자가 하나뿐이면 글자 경계와 바이트 경계가 같은 자리에서 갈라져, 경계를 무시하는
+구현도 같은 답을 내 통과한다(아래 P1 참조).</p>
+<p>에디터 축도 전부 통과했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>무엇</th><th>결과</th></tr></thead>
+<tbody><tr><td>Editor Release 빌드</td><td>exit 0</td></tr>
+<tr><td><code>--exec editor.selftest</code>(선언 자가 검사)</td><td>exit 0</td></tr>
+<tr><td><code>verify-editor-declaration-wiring</code></td><td>exit 0</td></tr>
+<tr><td><code>verify-editor-widget-clipping</code></td><td>exit 0</td></tr>
+<tr><td><code>verify-editor-keyboard-nav</code></td><td>exit 0</td></tr>
+<tr><td><code>verify-editor-state-matrix</code></td><td>exit 0</td></tr></tbody></table></div>
+<p>변이 증명(Debug, 여섯 전부 겨냥한 단정이 잡았다):</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변이</th><th>잡은 단정</th></tr></thead>
+<tbody><tr><td>P1 UTF-8 경계 대신 바이트 단위로 자른다</td><td><code>바이트 자 아래에서도 글자 경계까지만 담는다</code></td></tr>
+<tr><td>P2 Trace를 언제나 흘린다(옛 결함 복원)</td><td><code>고른 수준 미만은 전부 걸러진다</code></td></tr>
+<tr><td>P3 검색이 평탄화한 것을 본다</td><td><code>검색이 보는 것은 평탄화 이전의 원문이다</code></td></tr>
+<tr><td>P4 배지에 <code>totalCount</code> 대신 보관 이력을 싣는다</td><td><code>배지는 누적 20이다 — 보관 이력 3이 아니다</code></td></tr>
+<tr><td>P5 퇴거된 그룹의 선택을 안 놓는다</td><td><code>퇴거된 그룹의 선택은 비워진다</code></td></tr>
+<tr><td>P6 변경분이 들어와도 행을 무효화하지 않는다</td><td><code>필터가 같아도 변경분이 들어오면 행을 다시 센다</code></td></tr></tbody></table></div>
+<p><strong>P1과 P4는 처음에 자극조차 되지 않았다.</strong> 고친 것은 구현이 아니라 fixture다.</p>
+<ul>
+<li>P1: 글자 폭 자 하나만 있을 때는 글자 경계와 바이트 경계가 같은 자리를 가리켜
+바이트 단위 구현도 같은 답을 냈다. 둘이 실제로 갈라지는 바이트 자를 더했다
+(한글 30바이트, 폭 40 → 옳은 답 9바이트/12, 바이트 단위 10바이트/13).</li>
+<li>P4: 쓰던 저장소가 넉넉해 <code>totalCount == retainedOccurrences</code>였다. 둘이 갈라지는
+좁은 저장소(이력 3, 20회 반복)를 더해 배지가 20인지 3인지 물었다.</li>
+</ul>
+<h3 id="실제-화면-확인">실제 화면 확인</h3>
+<p>게이트는 창을 띄우지 않는다. Release 에디터를 스크립트로 띄워 캡처했다.</p>
+<pre><code>window.resize 2560 1440 ×9   (같은 본문·같은 수준의 경고를 아홉 번 만든다)
+editor.window ###Editor.OutputLog open / focus
+editor.nav pointer &lt;x&gt; &lt;y&gt; / press / release   (행 하나를 고른다)</code></pre>
+<p>관측된 것: 반복 아홉 개가 한 행으로 접히고 오른쪽 배지가 <strong>9</strong>, 수준별 아이콘과
+색(warn 노랑 · info 기본 · trace 흐림), 오른쪽 끝의 실측 폭 말줄임, 머물면 뜨는
+전문 툴팁, 고른 행의 상세 창(Copy · 수준 · logger · <code>total</code>/<code>retained</code> ·
+<code>source: none</code>).</p>
+<h3 id="아직-재지-않은-것-1">아직 재지 않은 것</h3>
+<ul>
+<li><strong>ImGui 오류를 세는 자가 없다.</strong> 위의 62 → 0은 손으로 stdout을 센 것이다.
+제품에 <code>[imgui-error]</code> 계수기가 없어 게이트로 만들지 못했다. 같은 부류의 결함이
+다시 들어와도 아무 게이트가 붉어지지 않는다.</li>
+<li>픽셀 골든 없음. 위 캡처는 사람이 본 것이지 재는 자가 아니다.</li>
+<li>이 게이트는 여전히 <code>Tools/regression/run-all.ps1</code>에 <strong>등록돼 있지 않다.</strong></li>
+<li><code>OutputLogText.h</code>는 이제 제품 소비자가 0이고 게이트만 부른다. 처분은 4단계로.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-3단계-보강-카드-목록과-수준별-누적">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="3단계-보강-카드-목록과-수준별-누적">3단계 보강: 카드 목록과 수준별 누적</h2></div>
+<div class="prose"><p>한 줄짜리 목록으로는 <strong>무엇이 얼마나 심각한지</strong>가 한눈에 안 들어왔다. 글자 색
+하나로만 가르면 수백 줄 중에서 오류가 눈에 띄지 않는다.</p>
+<h3 id="행-하나가-카드다">행 하나가 카드다</h3>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│▌⚠  [CLI] 창 크기 변경(클램프됨): 요청 2560x1440 -&gt; …   9  │
+│    Warning · multi_logger · 17:26:25.580                 │
+└──────────────────────────────────────────────────────────┘</code></pre>
+<ul>
+<li>배경은 수준 색을 옅게 깐다(info 4.5% · warn 13% · error 16%).</li>
+<li>왼쪽 3px 강조 띠. 옅은 배경만으로는 info 와 trace 가 안 갈린다.</li>
+<li>둘째 줄에 <code>수준 · 로거 · 시:분:초.밀리</code>. 전에는 어디에도 없던 값이다.</li>
+<li>선택은 강조색 배경 + 테두리.</li>
+</ul>
+<p>배경·띠·테두리는 그리기 목록(<code>AddRectFilled</code>/<code>AddRect</code>)으로 깐다. W2 의 custom
+draw 계약이 대상으로 삼는 것은 <strong>글자를 직접 그리는 자리</strong>(<code>RenderText</code>·<code>AddText</code>)
+이고 사각형은 거기 들지 않는다. 글자는 전부 표준 위젯이 낸다.</p>
+<h3 id="보폭은-여전히-imgui-가-정한다">보폭은 여전히 ImGui 가 정한다</h3>
+<p>카드가 두 줄이 되면서 <code>clipper</code> 에게 줄 보폭이 <code>lineOne + 글자높이 + 카드간격</code>
+으로 늘었다. 이 값을 직접 커서에 놓지 않는다 —</p>
+<ul>
+<li>첫 줄: <code>Selectable(높이 lineOne)</code> 이 자리를 잡고, 본문은 <code>SameLine</code> 으로 그
+줄에 겹친다.</li>
+<li>둘째 줄: 자연스러운 다음 줄. 커서를 놓는 호출이 없다.</li>
+<li>카드 사이 간격: <code>Dummy(0, gap)</code>. <strong>항목</strong>이라 ImGui 가 보폭을 세고, 뒤에
+커서를 놓는 호출이 남지 않는다.</li>
+</ul>
+<p>측정: 같은 자극에서 <code>[imgui-error]</code> <strong>0 줄</strong>(고치기 전 62 줄).</p>
+<h3 id="카드-전체가-눌린다">카드 전체가 눌린다</h3>
+<p>첫 줄만 <code>Selectable</code> 이면 메타 줄을 눌러도 아무 일이 없다. 둘째 줄에도 같은
+동작을 걸되 <code>ImGuiItemFlags_NoNav</code> 로 nav 는 끈다 — 카드 하나가 키보드 정거장
+둘이 되면 안 된다. 둘 다 <code>Header*</code> 색을 투명으로 눌러 카드 배경을 덮지 않는다.</p>
+<h3 id="툴바가-두-줄이다">툴바가 두 줄이다</h3>
+<p>첫 줄에 <code>Clear ┃ Collapse · Auto Scroll ┃ 수준 고르개 · 수준별 누적</code>, 둘째 줄에
+검색. 한 줄에 다 넣었더니 창을 좁혔을 때 검색 상자가 <strong>조용히</strong> 창 밖으로 나갔다
+— <code>SetNextItemWidth</code> 는 남은 폭이 음수여도 최소값으로 그리므로 잘못을 알리지
+않는다.</p>
+<h3 id="수준별-누적">수준별 누적</h3>
+<p><code>💬 11  ⚠ 10  ⛔ 0</code> 을 두 자리에 낸다.</p>
+<ol>
+<li>로그 창 툴바 — 누르면 그 수준을 최소 수준으로 세운다. 세는 자리와 거르는
+자리가 같아야 &quot;이 54 개를 보고 싶다&quot; 가 한 번에 끝난다.</li>
+<li>아래 상태 표시줄, <strong>디버그 모드 버튼 왼쪽</strong> — 로그 창을 열지 않아도 무엇이
+쌓였는지 보이고, 누르면 그 창이 열린다.</li>
+</ol>
+<p>두 자리가 같은 값을 읽는다. 저장소가 <code>LogStore::m_levelTotals</code> 하나를 들고,
+<code>ReadLevelTotals()</code>(상태 표시줄)와 <code>LogDelta::levelTotals</code>(창)가 그것을 물린다.
+창이 자기 목록을 세면 두 벌이 되어 한쪽만 맞는 일이 생긴다 — 값의 일치가 아니라
+<strong>출처의 동일성</strong>으로 세운다.</p>
+<p>계약:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>무엇</th><th>어떻게</th></tr></thead>
+<tbody><tr><td>버킷</td><td>trace·debug·info → 메시지, warn → 경고, err·critical → 오류</td></tr>
+<tr><td><code>off</code></td><td>어디에도 안 든다</td></tr>
+<tr><td>퇴거</td><td>누적을 <strong>줄이지 않는다.</strong> 아홉 번 찍힌 것은 둘만 남아도 아홉이다</td></tr>
+<tr><td>거절(예산 초과)</td><td>센다. 찍으려 한 것은 사실이고, 숨기면 없는 것을 찾게 된다</td></tr>
+<tr><td><code>Clear</code></td><td>0 으로 되돌린다</td></tr></tbody></table></div>
+<h3 id="검증-3">검증</h3>
+<p><code>PASS level totals: 버킷 분류, 퇴거 뒤 생존, 거절 계상, Clear</code> 가 늘었다.
+에디터 게이트 넷과 Editor Release 빌드는 그대로 exit 0.</p>
+<p>변이 증명(Debug, 여섯 전부 잡힘):</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변이</th><th>잡은 단정</th></tr></thead>
+<tbody><tr><td>T1 critical 을 메시지로 센다</td><td><code>trace·debug·info 셋이 메시지 하나로 접힌다</code></td></tr>
+<tr><td>T2 <code>off</code> 도 메시지로 센다</td><td><code>off 는 세지 않는다</code></td></tr>
+<tr><td>T3 퇴거가 누적을 줄인다</td><td><code>퇴거는 누적을 줄이지 않는다 — 아홉 번 찍힌 것은 둘만 남아도 아홉이다</code></td></tr>
+<tr><td>T4 거절된 기록을 세지 않는다</td><td><code>거절된 기록도 수준별로 센다</code></td></tr>
+<tr><td>T5 <code>Clear</code> 가 누적을 남긴다</td><td><code>Clear 는 누적을 0 으로 되돌린다</code></td></tr>
+<tr><td>T6 변경분이 누적을 안 싣는다</td><td><code>변경분이 실은 누적이 snapshot 과 같다</code></td></tr></tbody></table></div>
+<p><strong>T3 은 처음에 겨냥한 단정이 아니라 앞선 것에 걸렸다.</strong> 버킷 축과 퇴거 축이 한
+저장소(한도 4)를 같이 쓰고 있어서, 퇴거를 건드리는 변이가 버킷 단정 앞에서
+드러났다. 그러면 &quot;퇴거는 누적을 줄이지 않는다&quot; 는 <strong>증명되지 않은 채</strong> 남는다.
+버킷 축을 넉넉한 저장소(한도 64, <code>evictedEntries == 0</code> 을 전제로 단정)로 옮기고
+퇴거 축을 따로 세웠다. 그 뒤 T3 은 제 단정에 걸린다.</p>
+<p>T1 은 지금도 오류 버킷 단정이 아니라 메시지 버킷 단정에 걸린다. 한 번의 계상이
+두 버킷을 동시에 움직이므로 어느 쪽이 울려도 같은 사실을 가리킨다 — 나누지
+않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4단계-보강-아무도-안-읽던-두-채널">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="4단계-보강-아무도-안-읽던-두-채널">4단계 보강: 아무도 안 읽던 두 채널</h2></div>
+<div class="prose"><p><code>Tools/regression/verify-editor-startup-diagnostics.ps1</code> 를 새로 세웠다.
+<code>run-all.ps1</code> 에는 <strong>넣지 않았다</strong>(요청).</p>
+<h3 id="왜">왜</h3>
+<p>2026-09-16 에 결함 둘이 같은 날 들어왔고 <strong>둘 다 빌드 exit 0</strong> 이었다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th></th><th>무엇</th><th>왜 컴파일러가 못 잡나</th></tr></thead>
+<tbody><tr><td>①</td><td>일괄 치환이 문자열 리터럴 46 자리에 <code>&lt;&lt;</code> 를 박았다. 그중 둘이 <code>spReflection*_GetTypeLayout</code> 심볼 이름이라 Slang reflection 적재가 실패했다</td><td>전부 문자열</td></tr>
+<tr><td>②</td><td>네이티브가 <code>CreatorScriptApiVersion</code> 을 24→25 로 올렸는데 <code>ScriptCore/Native.cs</code> 의 <code>ExpectedVersion</code> 이 24 로 남아 CLR 초기화가 실패했다</td><td>런타임 비교</td></tr></tbody></table></div>
+<p>두 실패 메시지는 <strong>인메모리·HTML 싱크로만</strong> 가고 stdout 에는 안 나온다. 회귀
+하네스가 읽을 수단이 아예 없었다 — 사람이 로그 창을 열어 보고 찾았다.</p>
+<p>거기에 3단계가 낸 <code>[imgui-error]</code> 도 같은 처지였다. 그리기가 매 프레임 규약을
+어겼는데 그림은 맞았고 게이트 넷은 전부 초록이었다.</p>
+<h3 id="재는-것">재는 것</h3>
+<ul>
+<li>HTML 로그의 심각 행 수 → 0</li>
+<li>stdout 의 <code>[imgui-error]</code> 줄 수 → 0</li>
+</ul>
+<p>심각도 집합을 손으로 적지 않는다. <code>HtmlFileSink.h</code> 안의 뷰어 스크립트가 이미
+정하고 있으므로 거기서 뽑고, 뽑지 못하면 통과시키지 않고 던진다. 값의 일치가
+아니라 <strong>출처의 동일성</strong>이다.</p>
+<h3 id="빈-집합을-성공으로-읽지-않기">빈 집합을 성공으로 읽지 않기</h3>
+<p>&quot;오류 0&quot; 은 로그를 못 읽어도 0 이다. 그래서 자극이 실제로 일어났음을 따로
+단정한다 — 로그 창이 실제로 열렸고(결과 행의 <code>data.stableId</code>·<code>data.request</code> 로
+본다. <code>command</code> 필드에는 동사만 들어 있다), 표지 씬이 저장됐고, 이 회차가 만든
+HTML 로그가 <strong>새로</strong> 생겼고, 그 안에 이 회차의 <code>scene.save</code> 줄이 있고, 세션 종료
+줄까지 있어 로그가 잘리지 않았다.</p>
+<p>행 <strong>개수</strong>로는 재지 않는다. 처음에 <code>$totalRows -ge 20</code> 으로 적었다가 실측하니
+매 회차 정확히 16 이었다 — 눈대중이었고, 자극이 바뀌면 조용히 낡는다. 내가
+일으킨 사건이 보이는지로 바꿨다.</p>
+<h3 id="변이">변이</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>변이</th><th>결과</th><th>관측</th></tr></thead>
+<tbody><tr><td>G0 자식 창을 닫기 직전에 커서를 내용 밖으로 던진다</td><td>잡힘</td><td><code>imgui-error 444 줄</code> (고유 2 종)</td></tr>
+<tr><td>G1 행 끝의 <code>Dummy</code> 를 <code>SetCursorPos</code> 로 바꾼다</td><td><strong>못 잡음</strong></td><td><code>심각 0 · imgui-error 0</code></td></tr>
+<tr><td>G2 <code>Native.cs</code> 의 <code>ExpectedVersion</code> 을 24 로 되돌린다</td><td>잡힘</td><td><code>[CLR] 관리 초기화 실패 (result=-1) — API 표 버전이 어긋났을 수 있습니다</code></td></tr>
+<tr><td>G3 Slang 심볼 이름을 하나 망가뜨린다</td><td>잡힘</td><td><code>[EnhancedRenderer] 파이프라인 구축 실패: 노드 &#39;Shadow&#39; 초기화 실패: Slang reflection C API 진입점이 없다</code></td></tr>
+<tr><td>G4 게이트 자신이 로그 창을 안 연다</td><td>잡힘</td><td><code>로그 창을 열지 못했다</code></td></tr>
+<tr><td>대조 (변이 없음)</td><td>초록</td><td><code>행 16 · 심각 0 · imgui-error 0</code>, 9 checks</td></tr></tbody></table></div>
+<p>G2·G3 이 낸 것은 <strong>2026-09-16 에 실제로 났던 그 문장 그대로</strong>다. 이 게이트가
+지키기로 한 두 결함을 각각 제 단정으로 다시 잡았다.</p>
+<p><strong>G4 가 실패한 방식이 요점이다.</strong> 그 회차는 <code>심각 0 · imgui-error 0</code> 을 내고도
+붉었다. 0 만 봤다면 초록이었을 회차다.</p>
+<p>행 수는 회차마다 16·14·17 로 흔들렸다(G2 는 CLR 이 죽어 뒤가 줄고, G3 은 실패
+보고가 늘어난다). 처음 쓰려던 <code>$totalRows -ge 20</code> 이었다면 <strong>G2 를 행 수로 잡고
+심각 행으로는 못 잡은 것</strong>이 되어, 무엇을 재는 게이트인지가 흐려졌을 것이다.</p>
+<p><strong>G1 은 못 잡았고, 왜인지는 안다.</strong> ImGui 1.92.8 의
+<code>ErrorCheckUsingSetCursorPosToExtendParentBoundaries</code> 는 <code>End</code>·<code>EndChild</code>·
+<code>EndGroup</code> 에서 <code>IsSetPos</code> 가 <strong>선 채로</strong> 닿았고 커서가 <code>CursorMaxPos</code> 를 넘었을
+때만 운다. 행 끝의 <code>SetCursorPos</code> 는 다음 행이 내는 항목이 지우고, 마지막 행의
+것은 <code>ImGuiListClipper</code> 의 마지막 <code>Seek</code> 이 <code>CursorMaxPos</code> 를 <strong>직접 올려</strong>
+흡수한다. 그래서 이 변이는 위반이 아니다.</p>
+<p>그러면 2026-09-16 의 진짜 결함은 왜 울었나. 그때 관측한 프레임 번호가
+71·160·398 로 <strong>띄엄띄엄</strong>이었다. 수동 누산(<code>rowStart.y + rowHeight</code> 를 행마다
+더해 간다)과 clipper 의 <code>start + n*stride</code> 가 부동소수점으로 갈라져, 누산 쪽이
+한 ULP 위로 올라간 프레임에서만 울었다는 뜻이다. 즉 <strong>이 축은 결정적이지 않다</strong>
+— 한 프레임 단위로는 확률적이고, 회차가 600 프레임쯤 되기 때문에 실무에서
+잡히는 것이다. G0 는 그 확률에 기대지 않는 자리라 매번 운다.</p>
+<p><code>-AllowedErrorSubstrings</code> 는 비워 두는 것이 정상이다. 채울 때는 왜 그것이
+기대되는 오류인지 한 줄 적는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-출처-축-태그를-걷고-두-경로를-합치고-읽을-채널을-냈다">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="출처-축-태그를-걷고-두-경로를-합치고-읽을-채널을-냈다">출처 축: 태그를 걷고, 두 경로를 합치고, 읽을 채널을 냈다</h2></div>
+<div class="prose"><h3 id="논리-태그는-살아-있지도-않았다">논리 태그는 살아 있지도 않았다</h3>
+<p><code>Debug::PrintLog</code> 는 첫 인자로 논리 태그 <code>source</code> 를 받아 메시지 앞에 <code>[태그] </code> 로
+붙였다. 호출처 <strong>596 중 592 가 빈 <code>{}</code></strong> 를 넘기고 있었고, 나머지 넷은 전부 중계지
+생산자가 아니다(셋은 <code>LogSystem.h</code> 안의 전달, 하나는 CLR 브리지). 태그를 채우는
+유일한 생산자는 C# 경계인데 그쪽 호출자가 0 이라 <code>[{}] {}</code> 분기는 <strong>런타임에 죽어
+있었다.</strong> 살아 있지도 않은 축을 위해 592 자리가 <code>{}</code> 를 적고 있었다.</p>
+<p>태그는 구조 필드도 아니었다 — 문자열 연결이라 로그 창이 따로 열에 낼 수도 걸러낼
+수도 없고, 바이트 단위 묶음 키에 메시지로 섞여 들어갔다. <code>LogStore</code> 의
+<code>entry.source</code> 는 <code>file</code>/<code>line</code>/<code>function</code> 이라 <strong>이름만 같고 다른 것</strong>이다.</p>
+<p>걷어냈다. 592 자리는 바이트 단위로 고쳤다 — 패턴이 순수 ASCII 라 파일을 디코딩하지
+않았다(같은 날 일괄 치환이 CP949 파일 7 개의 한국어 주석 112 줄을 U+FFFD 로 지운
+일이 있었고, 그것은 읽기에서 인코딩을 가정했기 때문이다. 읽지 않으면 그 축이 생기지
+않는다). 그리고 <strong>옛 오버로드를 지웠다</strong> — 놓친 자리가 조용히 남는 대신 컴파일
+오류가 된다. 빌드 exit 0 이 곧 592 자리가 전부 맞다는 뜻이다.</p>
+<h3 id="stdsource_location-은-clr-경계를-못-넘는다"><code>std::source_location</code> 은 CLR 경계를 못 넘는다</h3>
+<p>C# 에는 대응 장치가 있다. <code>[CallerFilePath]</code>·<code>[CallerLineNumber]</code>·
+<code>[CallerMemberName]</code> 은 컴파일러가 호출 지점에서 채운다 —
+<code>std::source_location::current()</code> 기본 인자와 같은 성격이고 호출자는 아무것도
+적지 않는다.</p>
+<p>다만 <code>std::source_location</code> 은 <strong>값으로 만들 수 없다</strong>(표준이 <code>current()</code> 만 준다).
+경계 밖에서 온 file/line/function 을 담을 수 없으므로 <code>spdlog::source_loc</code> 을 직접
+받는 저수준 오버로드를 하나 뒀고 CLR 브리지가 그리로 들어간다. 그 오버로드가
+없으면 기본 인자가 재평가돼 모든 관리 로그가 <code>ClrHost.cpp</code> 를 자기 출처로 보고한다.
+포인터는 호출 동안만 살면 된다 — 로거가 동기라(<code>async_logger</code> 가 아니다) 포매팅이
+거기서 끝나고, 관리 측 <code>fixed</code> 핀이 그 구간을 덮는다.</p>
+<h3 id="-관리-로깅-경로가-둘이었고-고친-쪽은-안-쓰는-쪽이었다">★ 관리 로깅 경로가 둘이었고, 고친 쪽은 안 쓰는 쪽이었다</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>슬롯</th><th>관리 측 호출</th><th>출처</th></tr></thead>
+<tbody><tr><td><code>Native.Log</code> → <code>Api_Log</code></td><td><strong>44 자리</strong> (<code>Component.Log</code>·<code>BehaviorTree</code>·<code>AniBehavior</code>·<code>Bootstrap</code>·<code>BlackBoard</code>…)</td><td><code>ClrHost.cpp</code> 한 줄 — 전부</td></tr>
+<tr><td><code>Native.PrintLog</code> → <code>Api_PrintLog</code></td><td class="num"><strong>0</strong></td><td><code>[Caller*]</code> 를 얹은 쪽</td></tr></tbody></table></div>
+<p>즉 <code>[Caller*]</code> 작업이 <strong>트래픽이 흐르지 않는 경로</strong>에 들어가 있었고, 실제 관리
+로그는 여전히 브리지 자신을 가리키고 있었다. 게이트를 세우려다 알았다 — 자극할
+대상이 무엇인지 확인하지 않았으면 안 쓰는 경로에 게이트를 걸 뻔했다.</p>
+<p><code>Native.Log</code> 자체가 <code>[Caller*]</code> 기본 인자를 받아 <code>PrintLog</code> 슬롯으로 가게 합쳤다.
+<strong>호출 44 자리의 텍스트는 한 글자도 안 바뀌고</strong> 출처만 붙는다. 표에서 <code>Log</code> 슬롯과
+<code>Api_Log</code> 가 사라져 <code>CreatorScriptApiVersion</code> 이 26→27 이고 <code>ExpectedVersion</code> 을
+같은 커밋에서 올렸다.</p>
+<p>래퍼 아홉(<code>Component</code>·<code>BehaviorTree</code>·<code>AniBehavior</code> × <code>Log</code>/<code>LogWarning</code>/<code>LogError</code>)은
+자기 <code>[Caller*]</code> 를 <strong>전달</strong>하게 했다. 안 그러면 44 자리가 전부 <code>Component.cs</code> 한
+줄을 가리킨다 — 출처는 <strong>있으므로</strong> &quot;출처가 있는가&quot; 로는 안 걸리는 고장이다.</p>
+<h3 id="출처를-읽을-채널이-없었다">출처를 읽을 채널이 없었다</h3>
+<p><code>HtmlFileSink</code> 는 시각·수준·tid·메시지만 적고, <code>set_pattern</code> 은 어디에도 없고
+(spdlog 기본 패턴은 출처를 안 찍는다), CLI 는 <code>log.flush</code> 뿐이었다. 출처는
+<code>LogStore</code> 에 들어가 <strong>로그 창 상세 패널에서 눈으로만</strong> 보였다. 파일로도 안 나가고
+게이트가 읽을 길도 없었다.</p>
+<p><code>&lt;tr&gt;</code> 에 <code>data-src=&quot;파일:줄&quot;</code> 을 달았다 — 표 배치를 안 건드려 기계가 읽는다.
+사람 쪽으로는 메시지 칸 끝에 흐린 글씨를 붙인다. 경로 전체가 아니라 파일 이름만
+싣는다(절대 경로는 빌드 기계마다 달라 잡음이다).</p>
+<h3 id="변이-1">변이</h3>
+<p>기동 진단 게이트에 단정 넷을 더했다(9 → 13 checks).</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변이</th><th>결과</th><th>관측</th></tr></thead>
+<tbody><tr><td>H1 래퍼가 <code>[Caller*]</code> 를 전달 안 함</td><td>잡힘</td><td><code>관리 로그가 래퍼 자신을 출처로 싣는다: Component.cs:341</code></td></tr>
+<tr><td>H2 마샬러가 호출 지점을 버림</td><td>잡힘</td><td><code>관리 로그 출처 0 줄 · 고유 0 자리</code></td></tr>
+<tr><td>H3 싱크가 출처를 안 적음</td><td>잡힘</td><td>〃</td></tr>
+<tr><td>대조</td><td>초록</td><td><code>Bootstrap.cs:31 · 356 · ManagedLogProbe.cs:26 · 27</code>, 13 checks</td></tr></tbody></table></div>
+<p><strong>H1 이 세 번 만에 잡혔고, 그 과정이 결과보다 값지다.</strong></p>
+<ol>
+<li>첫 회차는 <strong>빌드가 실패</strong>했다. 다른 세션이 <code>EditorObjectOperations.cpp</code> 에 쓰는
+자리를 먼저 넣고 <code>#include</code> 를 뒤에 넣는 사이 컴파일이 파일을 읽어 <code>C2653</code> 이
+났다. 빌드 실패를 &quot;게이트가 못 잡았다&quot; 로 적으면 없는 구멍을 만든다 — 러너가
+&#39;재지 못함&#39; 을 따로 적게 해 뒀다.</li>
+<li>둘째 회차는 임시 명령의 따옴표 중첩이 깨져 <strong>빌드가 안 돌았고</strong>, 앞 변이가 구워진
+낡은 바이너리를 쟀다. 산출물 시각 가드를 우회한 것이 원인이다.</li>
+<li>셋째 회차에서 제대로 쟀더니 <strong>자극 자체가 그 코드를 안 지났다.</strong> 이 게이트의
+관리 로그는 <code>Bootstrap.cs</code> 둘뿐인데 그것은 <code>Native.Log</code> 를 <strong>직접</strong> 부른다 —
+<code>Component.Log</code> 래퍼를 한 번도 안 지난다.</li>
+</ol>
+<p>그래서 <code>GameScripts/ManagedLogProbe.cs</code> 를 세웠다. <code>Component.Log</code>/<code>LogWarning</code> 을
+서로 다른 줄에서 부르고, 게이트가 <code>script.invoke</code> 로 돌린다. <code>LogError</code> 는 쓰지
+않는다 — 오류 수준은 같은 게이트의 &#39;심각 행 0&#39; 에 걸려 자기 fixture 가 게이트를
+붉게 만든다.</p>
+<p><strong>그리고 단정을 자리 수로 걸면 H1 이 안 걸린다.</strong> H1 회차의 고유 자리는 <strong>여전히
+4</strong> 였다(<code>Bootstrap.cs</code> 둘 + <code>Component.cs:341</code> + <code>ManagedLogProbe.cs:27</code>). 래퍼
+파일 이름이 출처로 나오는 것 자체를 금지해야 걸린다. 그 앞에는 &quot;<code>ManagedLogProbe.cs</code>
+가 로그에 있는가&quot; 를 둬서, 래퍼를 안 지난 회차가 빈 집합으로 통과하는 것을 막는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-출처-축-닫기-c-래퍼-셋과-outputlogtexth">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="출처-축-닫기-c-래퍼-셋과-outputlogtexth">출처 축 닫기: C++ 래퍼 셋과 <code>OutputLogText.h</code></h2></div>
+<div class="prose"><h3 id="후보는-열여섯이었고-진짜는-셋이었다">후보는 열여섯이었고 진짜는 셋이었다</h3>
+<p>앞 절에서 &quot;<code>PakHelper.h</code>(39 자리)&quot; 라고 적은 것은 <strong>틀린 셈</strong>이다. 그 파일의 로그
+호출 서른아홉 중 대부분은 결함이 아니다. 직접 부르는 줄은 그 줄이 곧 진짜 호출
+지점이고, <code>WriteCensus</code>·<code>ApplyGBufferShaderMeta</code>·<code>WriteCrashReportArtifacts</code> 처럼
+메시지를 자기가 만드는 함수도 사건이 거기서 일어나므로 그 줄이 찍히는 것이 맞다.</p>
+<p>결함은 <strong>매개변수로 받은 메시지를 그대로 넘기면서 <code>where</code> 를 생략하는</strong> 함수뿐이다.
+그때만 기본 인자가 래퍼 자리에서 채워져 호출자 전부가 한 줄로 몰린다. 저장소를
+그 기준으로 훑으니 후보 열여섯 중 셋이었다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>래퍼</th><th>호출자</th><th>몰리던 자리</th></tr></thead>
+<tbody><tr><td><code>ReportSettingsError</code></td><td class="num">18</td><td><code>EditorSettingsStore.cpp:69</code></td></tr>
+<tr><td><code>RuntimeCleanupError</code></td><td class="num">13</td><td><code>PakHelper.h:33</code></td></tr>
+<tr><td><code>RuntimeCleanupInfo</code></td><td class="num">1</td><td><code>PakHelper.h:41</code></td></tr></tbody></table></div>
+<p>셋 다 <code>std::source_location where = std::source_location::current()</code> 를 받아 그대로
+넘기게 고쳤다. <code>DumpHandler.h</code>·<code>ComponentTypeUUID.h</code>·<code>ProxyCommandQueue.h</code> 는 목록에
+적혀 있었으나 이 기준으로는 래퍼가 아니었다.</p>
+<h3 id="이-축은-런타임으로-못-잡는다">이 축은 런타임으로 못 잡는다</h3>
+<p>셋 다 오류 경로거나 pak 런타임 정리 경로라 기동 한 바퀴에서 한 번도 안 돈다.
+자극할 수 없는 것을 런타임 단정으로 적으면 <strong>미자극이 초록으로 읽힌다.</strong> 그래서
+기동 진단 게이트에 소스 축 단정을 넣었다(13 → 19 checks). 게이트는 이미
+<code>HtmlFileSink.h</code> 에서 심각도 집합을 뽑고 있어 같은 자리다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변이</th><th>무엇을 한다</th><th>결과</th></tr></thead>
+<tbody><tr><td>W1</td><td>래퍼에서 <code>source_location</code> 매개변수를 뗀다</td><td>잡힘 — <code>ReportSettingsError 가 … 받지 않는다</code></td></tr>
+<tr><td>W2</td><td>래퍼 이름을 바꾼다</td><td>잡힘 — <code>래퍼 정의를 0 건 찾았다 (기대 1)</code></td></tr></tbody></table></div>
+<p><strong>W2 가 이 게이트 자신의 결함을 드러냈다.</strong> 처음 쓴 정규식은 이름 뒤의 괄호를 그냥
+찾아서 정의가 아니라 <strong>호출 자리</strong>를 잡고 있었다(<code>return ReportSettingsError(&quot;...&quot;)</code>).
+그때까지 초록이던 것은 두 파일 모두 정의가 호출보다 앞에 있었던 우연이다. 매개변수에
+<strong>타입 선언</strong>이 있는 것만 정의로 인정하게 고쳤다 — 호출은 값이나 식을 넘긴다. 그리고
+정의를 찾았는지를 먼저 단정한다. 표가 낡아 0 건이 되면 &quot;<code>source_location</code> 이 없다&quot; 가
+아니라 아무 일도 안 일어난 채 통과하기 때문이다. W2 회차에서 총 checks 가 19 → 18 로
+줄어 단정 하나가 통째로 사라진 것까지 드러난다.</p>
+<h3 id="outputlogtexth-를-걷었다"><code>OutputLogText.h</code> 를 걷었다</h3>
+<p><code>FormatOutputLogEntry</code> 는 저장한 <code>LogEntry</code> 를 <code>spdlog::details::log_msg</code> 로 되돌려
+옛 창이 내던 문자열을 다시 만드는 함수였다. 3단계에서 화면을 카드 목록으로 바꾸며
+<strong>비교 대상인 옛 화면이 없어졌고</strong>, 그 뒤로 제품 소비자가 0이다. 카드 UI 의 Copy 는
+<code>group-&gt;message</code> 원문을 쓴다 — <code>OutputLogView.h</code> 가 &quot;검색·복사·상세는 언제나 원문을
+본다&quot; 고 못 박아 둔 대로다.</p>
+<p><code>ScriptCore/Debug.cs</code> 에서 &quot;소비자 0&quot; 을 틀리게 세었던 일이 있어 이번엔 축을 나눠
+다시 셌다: 제품 호출 0, <code>Editor.vcxproj</code>·<code>.filters</code>·<code>.sln</code> 등재 0(<code>ClInclude</code> 124 건이
+전부 손표이고 와일드카드가 없다), 패키징 내보내기 0, 게이트 단정 1. <code>Debug.cs</code> 와
+결정적으로 다른 점은 이것이 <strong>밖에 내준 표면이 아니라 에디터 내부 헤더</strong>라는 것이다.</p>
+<p>남아 있던 단정 하나는 바로 위 필드 단정들에 <strong>통째로 포함된다.</strong> 기본 패턴 <code>%+</code> 가
+읽는 것과 위 단정이 재는 것을 맞대면 이렇다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th><code>%+</code> 가 읽는 것</th><th>바로 위 필드 단정</th></tr></thead>
+<tbody><tr><td>time (밀리초 절삭)</td><td><code>entry.timestamp == timestamp</code> — 절삭 없음</td></tr>
+<tr><td>logger_name</td><td><code>entry.loggerName == &quot;producer&quot;</code></td></tr>
+<tr><td>level</td><td><code>entry.level == warn</code></td></tr>
+<tr><td>source.filename (<strong>basename 만</strong>)</td><td><code>entry.source.file == originalFile</code> — 전체 경로</td></tr>
+<tr><td>source.line</td><td><code>entry.source.line == 42</code></td></tr>
+<tr><td>payload</td><td><code>entry.message == original</code></td></tr></tbody></table></div>
+<p><code>%+</code> 는 <code>thread_id</code> 와 <code>funcname</code> 을 아예 안 읽는데 그 둘도 위에서 재고 있다. 즉 이
+단정은 덮는 범위가 더 좁고 정밀도도 더 낮았다. 헤더와 단정을 같이 걷고, 쓰임이 사라진
+<code>#include &lt;spdlog/pattern_formatter.h&gt;</code> 까지 뺐다. <code>sink.set_pattern(&quot;this pattern must not become the stored payload&quot;)</code> 는 남겼다 — 싱크의 패턴이 저장 payload 로 새지 않는지는
+<code>entry.message == original</code> 이 계속 지킨다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-다음-단계">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="다음-단계">다음 단계</h2></div>
+<div class="prose"><p>목록이 비었다. 네 항목의 행선지는 이렇다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>결과</th></tr></thead>
+<tbody><tr><td>1·3 관리 로그 두 경로 합치기·읽을 채널</td><td><code>e350cabe</code></td></tr>
+<tr><td>2 C++ 래퍼 호출처</td><td><code>2240a73e</code></td></tr>
+<tr><td>4 <code>OutputLogText.h</code> 처분</td><td>이 커밋</td></tr></tbody></table></div>
+<p>기동 진단 게이트는 <code>Tools/regression/run-all.ps1</code> 에 <strong>등재하지 않는다.</strong> 사용자
+판단이고, <code>verify-log-storage.ps1</code> 과 같은 취급이다. 그러니 이 단정 열아홉은 손으로
+부를 때만 돈다 — 자동으로 도는 세트에 없다는 뜻이다.</p>
+<p><code>ScriptCore/Debug.cs</code> 는 <strong>처분 대상이 아니다.</strong> 한때 &quot;소비자 0&quot; 으로 적었는데
+틀렸다 — 저장소 안에서 호출자를 센 것이고, 게임 스크립트에 공개된 API 에 그 수는
+죽었다는 증거가 아니다. 경로도 끝까지 살아 있다.</p>
+<p>검증 범위: 저장소·화면 상태의 독립 회귀(<code>verify-log-storage</code>, Debug·Release 양쪽),
+에디터 선언·클리핑·키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트 19 checks(변이
+G0<del>G4·H1</del>H3·W1~W2), Editor Release 빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과
+Vulkan 백엔드에서의 확인은 하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="EditorLogStorageValidation.md"><code>docs/analysis/EditorLogStorageValidation.md</code></a> · 마지막 커밋 2026-09-16 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

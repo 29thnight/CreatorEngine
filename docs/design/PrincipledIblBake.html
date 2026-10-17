@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/PrincipledIblBake.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Core/Layered evaluated-point IBL bake</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-완료한-범위">1. 완료한 범위</a></li><li><a href="#2-입력과-결과">2. 입력과 결과</a></li><li><a href="#3-기록교체수명">3. 기록·교체·수명</a></li><li><a href="#4-검증과-남은-제품-작업">4. 검증과 남은 제품 작업</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="PrincipledIblBake.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Core/Layered evaluated-point IBL bake</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#1-완료한-범위"><span class="ve-label">§1</span><span class="map-name">완료한 범위</span><span class="map-bar"><i style="width:14.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-입력과-결과"><span class="ve-label">§2</span><span class="map-name">입력과 결과</span><span class="map-bar"><i style="width:71.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-기록교체수명"><span class="ve-label">§3</span><span class="map-name">기록·교체·수명</span><span class="map-bar"><i style="width:40.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-검증과-남은-제품-작업"><span class="ve-label">§4</span><span class="map-name">검증과 남은 제품 작업</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「4. 검증과 남은 제품 작업」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-완료한-범위">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-완료한-범위">1. 완료한 범위</h2></div>
+<div class="prose"><p><code>MaterialGraphIblBake.h/.cpp</code>는 엔진 중립 RHI를 사용하는 GPU compute bake다.
+<code>PrincipledIblBake.slang</code>이 Core/Layered 반사 계수와 방향별 환경 응답을 만들고,
+<code>PrincipledIblLookup.slang</code>의 소비 함수는 적분 루프 없이 그 결과를 읽는다.
+기존 Standard glTF의 2채널 DFG와 <code>EnhancedIBLGenerator</code>는 변경하지 않았다.</p>
+<p>이 결과는 <strong>평가된 지점 묶음</strong>이다. 모든 재질을 대체하는 범용 2D LUT가 아니며,
+Scene host에 설치된 lookup/renderer capability를 뜻하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-입력과-결과">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-입력과-결과">2. 입력과 결과</h2></div>
+<div class="prose"><p>입력 한 지점은 11개 float4, 176바이트다. 다음 값을 모두 포함한다.</p>
+<ul>
+<li>평가된 Base Color/Alpha, Normal/Roughness, Metallic/IOR/Specular Level/AO.</li>
+<li>Specular Tint, Anisotropy, Tangent/Rotation, Thin Film Thickness/IOR.</li>
+<li>Coat Weight/Roughness/IOR/Tint/Normal, Sheen Weight/Tint/Roughness.</li>
+<li>Emission Color/Strength, world-space view, Core/Layered tier.</li>
+</ul>
+<p>호출자는 graph/texture를 먼저 평가해 공간적으로 고정된 입력을 공급한다.
+float 값은 finite이고 절댓값이 1e6 이하여야 한다. view는 0이 아니며
+평가된 base normal과 <code>NdotV &gt;= 1e-4</code>이어야 한다. 다른 0 방향은 공용
+<code>EvaluateMaterial</code>의 fallback 규칙을 따른다. Core 입력에 Layered 항을 넣으면 거부한다.
+한 recording의 묶음은 1~4,096개 지점이다. Shader ABI의 tier 값은 Core=0, Layered=1이다.</p>
+<p>환경은 선형 HDR <code>RGBA16Float/RGBA32Float</code> 정사각형 6면 cube와 명시적인
+0이 아닌 환경 generation, owner다. 환경 mip 0을 point sampler로 읽는다.</p>
+<p>결과 한 지점은 9개 float4, 144바이트다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>결과</th><th>의미</th></tr></thead>
+<tbody><tr><td>base/coat single RGB + directional albedo, average Fresnel</td><td>Core 물리 Fresnel/F82 또는 Layered correlated Smith 적분</td></tr>
+<tr><td>base irradiance</td><td>base normal의 cosine 평균, E/PI</td></tr>
+<tr><td>base/coat prefiltered</td><td>실제 시선과 각 normal/tangent의 RGB Fresnel 가중 방향 convolution</td></tr>
+<tr><td>coat irradiance</td><td>coat normal의 별도 cosine 평균, E/PI</td></tr>
+<tr><td>sheen irradiance</td><td>view/normal/roughness의 inverse LTC cosine 표본 평균</td></tr></tbody></table></div>
+<p>반사 응답은 <code>sum(L * F * visibility) / sum(F * visibility)</code>로 채널마다
+정규화한다. 단일 Schlick scale/bias 또는 isotropic roughness mip로 대체하지 않는다.
+roughness=0은 거울 방향을 직접 읽는다. 평균 Fresnel은 64개 cosine 표본,
+각 반사/조도/sheen convolution은 1,024개 결정적 중요도 표본을 사용한다.
+Layered coat 다중산란은 coat irradiance를 소비한다. 기존 5인자 소비 함수는
+균일 환경의 이전 규약을 유지하고, 새 소비자는 별도 조도를 받는 6인자 함수를 쓴다.</p>
+<p>아주 작은 Fresnel에서 정규화된 RGB 비율은 float cancellation에 민감하다.
+해당 비율은 유한한 환경 radiance 범위 안인지 검사하고, CPU 대조는 실제
+<code>singleScatter * prefiltered</code> 반사 에너지와 최종 픽셀을 함께 판정한다.
+이를 제거하거나 임의의 기본 반사량으로 바꾸지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-기록교체수명">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-기록교체수명">3. 기록·교체·수명</h2></div>
+<div class="prose"><p><code>IblBaker::Initialize</code>는 이미 컴파일/쿠킹된 CS bytecode와 엔진의 root/PSO cache를 받는다.
+baker 내부에서 Slang compiler를 만들지 않는다. 초기화 실패는 이전 pipeline을 유지한다.</p>
+<p><code>Record</code>는 열린 recording의 immediate encoder를 사용한다. RenderGraph pass callback용
+함수가 아니다. 외부 host가 환경을 <code>ShaderResource</code>로 전이해 두고 GPU 환경 등록/owner를
+보존한다. 새 출력 buffer는 Common→UAV→ShaderResource 순서로 기록된다.
+입력·출력·upload·descriptor를 모두 준비한 뒤 dispatch하며 실패는 이전 result를 유지한다.</p>
+<p>반환은 <strong>기록 성공</strong>이다. 제출/완료 성공을 의미하지 않는다. host는 환경 cache와
+새/이전 result를 각 마지막 제출 완료까지 보존한다. CPU Texture owner만으로 GPU cache
+eviction을 막을 수 없으므로 GPU 환경 owner/cache의 보존·사용 갱신도 필요하다.
+buffer 해제는 중립 <code>IRenderDeviceServices::ReleaseBuffer</code>를 거친다. 기존 DX12/Vulkan
+해제를 같은 인터페이스로 노출했으며 fence 대기는 여전히 owning host의 책임이다.</p>
+<p><code>IblBakeResult::Matches</code>는 장치, 환경 handle/format/크기/mip/generation/owner와
+입력 전체 바이트를 비교한다. 축약 hash 충돌을 허용하지 않는다. texture evaluation,
+numeric override, normal/tangent/azimuth/view 또는 환경 세대가 달라지면 새 요청이 필요하다.
+result는 device shutdown 전에 파괴한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-검증과-남은-제품-작업">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-검증과-남은-제품-작업">4. 검증과 남은 제품 작업</h2></div>
+<div class="prose"><p>재현 명령:</p>
+<pre><code class="language-powershell">&amp; Tools/regression/verify-material-ibl-bake.ps1
+&amp; Tools/regression/verify-principled-layered.ps1</code></pre>
+<p><code>MaterialIblBakeProbe</code>는 현재 RenderEngine/Utility_Framework에 링크한다. 실제 DX12
+device/root/PSO/texture cache, upload, compute dispatch, SRV 소비 graphics draw와 readback을
+사용한다. 152개 Core/Layered 지점, 균일/면별 HDR 환경, 3프레임의 변경 후 다시 굽기를
+독립 double CPU 수식 및 pinned LTC 계수와 대조한다. DXIL/SPIR-V CS/VS/PS를 모두 컴파일한다.
+invalid input/environment/view/tier/budget/initialization, IOR/tangent/view/environment 세대
+변경 검출과 실패 result 보존, 완료 뒤 native buffer 등록 해제를 검사한다.</p>
+<p>Debug/Release 각각 <strong>19,351개 검사·18,240개 GPU 성분</strong>이 통과했다. 각 실행의
+CS/VS/PS DXIL/SPIR-V 컴파일은 6개이며 GPU validation WARNING 이상은 0건이다.
+최대 정규화 오차는 0.00000950694다. 비교 상한은 0.0001이며 weak reflection 에너지는
+0.000001 상한을 별도로 적용한다. 기존 Layered 216,776개 검사와 energy bound 5,712개,
+numeric golden 1,960행/7,840성분, 컴파일 14개·지정 거부 8개도 재실행해 통과했다.
+로그는 <code>Build/Obj/MaterialProductProbe/ibl-bake-{build-,}{Debug,Release}.log</code>,
+<code>ibl-bake-gate-final.log</code>, <code>ibl-layered-regression.log</code>에 남긴다.</p>
+<p>남은 MAT-7 작업:</p>
+<p><a href="MaterialGraphScenePacket.html">MaterialGraphScenePacket.md</a>의 render owner가 IBL 결과를
+graph instance·coverage/queue·PSO·binding과 함께 소유하며, 실제 두 in-flight 제출의 교체와
+완료 해제·abort를 검증한다. 아래 Scene pass/lookup 설치와 환경/성능 검증은 여전히 남는다.</p>
+<p><a href="MaterialGraphSurfaceBatch.html">MaterialGraphSurfaceBatch.md</a>의 GPU graph 평가 배치와
+<code>RecordGpu</code>를 추가했다. UV/LOD·world frame·eye·typed instance에서 만든 GPU point buffer를
+CPU wait/readback 없이 bake가 직접 읽는다. invalid point는 -1 진단 표식으로 적분을
+건너뛴다. Scene 게시 전 완료 readback 검증과 실제 mesh/skin sampling·보간/예산·RenderGraph
+설치는 여전히 host 후속이다. 본 문서의 CPU evaluated-point 경로도 유지한다.</p>
+<ol>
+<li>Scene host에 평가 입력·공간/시선 lookup 배치·보간/재사용 정책을 연결한다.
+texture-varying lobe와 매 view 변경을 재질별 단일 LUT로 축약하지 않는다.</li>
+<li>작은 HDR 광원까지의 환경 중요도/MIS 및 표본 수 수렴, lookup 해상도/메모리/시간 예산을
+실제 Scene에서 검증한다. 이 제한된 환경 fixture는 임의 HDR의 수렴이나 실시간 성능 증거가 아니다.</li>
+<li><code>SceneMaterialSlot</code>의 함께 게시·두 in-flight 교체/실패/abort/회수는 엔진 RHI host에서
+검사했다. 이를 제품 RenderGraph usage/draw/pass에 설치하고 actual Scene 교체와
+환경 eviction/device 재생성을 검증한다. 설치 전 capability는 계속 꺼져 있다.</li>
+<li>자동 host/compiler 쿠킹과 graph 의존성 폐포, SSS/refraction/Volume 자원 연결을 마친다.</li>
+</ol>
+<p>actual GPU runtime은 D3D12다. SPIR-V 컴파일은 Vulkan runtime 검증을 뜻하지 않는다.
+Blender rendered parity와 Standard 성능 수용은 MAT-9, Editor canvas는 LX-3이다.</p>
+<p>동일 RenderGraph의 준비/선언/순차·병렬 기록과 GPU owner retirement는 <a href="MaterialGraphPassRecording.html">MaterialGraphPassRecording.md</a>에 구현·검증했다. 위 실제 Scene 설치·환경 수렴·실시간 예산 항목은 계속 남는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="PrincipledIblBake.md"><code>docs/design/PrincipledIblBake.md</code></a> · 마지막 커밋 2026-09-30 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

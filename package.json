@@ -5,13 +5,16 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docs:render": "node Tools/docs/render-markdown-docs.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
-    "vite": "^7.1.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "vite": "^7.1.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "marked": "^16.4.2"
+  }
 }

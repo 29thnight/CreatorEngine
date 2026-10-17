@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorW1InteractiveValidation.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 21 W1 — 실제 화면·OS DPI 전환 검증</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#판정">판정</a></li><li><a href="#실행과-증거">실행과 증거</a></li><li><a href="#실제-화면-확인">실제 화면 확인</a></li><li><a href="#완료-차단-항목">완료 차단 항목</a></li><li><a href="#복원과-다음-검증">복원과 다음 검증</a></li><li><a href="#2026-09-12-dx12-후속-수정">2026-09-12 DX12 후속 수정</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorW1InteractiveValidation.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 21 W1 — 실제 화면·OS DPI 전환 검증</h1>
+<div class="meta"><p>2026-09-11, 기존 W1 Material Symbols 적용 Debug/Release 실행 파일과 현재 작업 트리 기준.
+<a href="../plans/EditorWorkspaceRedesignPlan.html">정본 계획</a> ·
+<a href="EditorMaterialSymbolsW1Validation.html">폰트 적용·자동 회귀</a> ·
+<a href="EditorW1DpiResizeRootCauseAndFixPlan.html">후속 원인 분석·해결안</a>.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#판정"><span class="ve-label">§00</span><span class="map-name">판정</span><span class="map-bar"><i style="width:28%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행과-증거"><span class="ve-label">§01</span><span class="map-name">실행과 증거</span><span class="map-bar"><i style="width:76.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-화면-확인"><span class="ve-label">§02</span><span class="map-name">실제 화면 확인</span><span class="map-bar"><i style="width:46.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#완료-차단-항목"><span class="ve-label">§03</span><span class="map-name">완료 차단 항목</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#복원과-다음-검증"><span class="ve-label">§04</span><span class="map-name">복원과 다음 검증</span><span class="map-bar"><i style="width:26.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-09-12-dx12-후속-수정"><span class="ve-label">§05</span><span class="map-name">2026-09-12 DX12 후속 수정</span><span class="map-bar"><i style="width:34.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「완료 차단 항목」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-판정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="판정">판정</h2></div>
+<div class="prose"><p><strong>W1은 <code>progress</code> 유지.</strong> 실제 화면과 OS DPI 값 검증은 수행했지만,
+DX12의 Scene 표시 복구 지연과 Vulkan의 모니터 경계/리사이즈 후 device loss를 발견했다.
+폰트·토큰 검사 성공을 렌더링 안정성 통과로 확대하지 않는다.
+이번 작업은 검증과 기록이며 제품 코드는 추가 수정하지 않았다.</p>
+<p>2026-09-12 후속 소스 분석에서는 공통 크기 전달의 데이터 경쟁, Vulkan 실제 extent 전달 및 실패 상태 처리 결함을 확인했다.
+DX12 표시 공백의 지연 단계와 Vulkan 장치 손실의 직접 원인은 당시 계측이 부족해 미확정이다.
+구체적인 수정 순서와 재검증 기준은 위 후속 해결안을 따른다. 아래 내용은 최초 재현 당시의 관측 기록이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실행과-증거">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="실행과-증거">실행과 증거</h2></div>
+<div class="prose"><p>로컬 산출물: <code>Artifacts/phase21-w1-final-visual/</code>.
+실행 중인 사용자 Editor가 없는 상태에서 검증용 프로세스만 실행했고, 로컬 제품 명령으로 값을 읽었다.
+Windows 설정 UI에서 1번 모니터의 배율을 실제로 변경했다. 합성 DPI 메시지를 사용하지 않았다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>실행</th><th>사용자 배율</th><th>실제 OS DPI</th><th>본문 크기</th><th>판정</th></tr></thead>
+<tbody><tr><td>Debug DX12</td><td class="num">100%</td><td>150→100→150%</td><td>24→16→24px</td><td>폰트·DPI 값 통과, 100% 전환 후 Scene 검은 표시 관찰</td></tr>
+<tr><td>Release Vulkan</td><td class="num">100%</td><td>150→100%</td><td>24→16px</td><td>해당 구간 화면·팝업 및 폰트·DPI 값 통과</td></tr>
+<tr><td>Release Vulkan 모니터 경계</td><td class="num">100%</td><td>100→150→100%</td><td>16→24→16px</td><td>값은 변경되나 복귀 리사이즈 직후 device loss</td></tr>
+<tr><td>Debug DX12 재실행</td><td class="num">150%</td><td>150→100→150%</td><td>36→24→36px</td><td>폰트·DPI 값 통과, 100% 전환 후 Scene 검은 표시 재현</td></tr></tbody></table></div>
+<p>모든 기록된 <code>editor.theme</code> 관측은 59개 역할 누락 0, source policy valid,
+본문/창 DPI 일치, geometry 일치를 보고했다. Vulkan 오류 발생 뒤에도 같은 명령이
+<code>clean=true</code>를 반환했으므로 이 검사는 GPU 표시 성공을 보증하지 않는다.</p>
+<p>실제 모니터 경계 검증은 다음 순서였다.</p>
+<ol>
+<li>1번 모니터 100%, 2번 모니터 150% 상태에서 Editor를 아래쪽 2번 모니터 방향으로 드래그했다.</li>
+<li>제품 관측 DPI가 1.0에서 1.5로 바뀌었다(<code>release-vulkan-monitor2-transition.json</code>).</li>
+<li>창이 모니터 경계에 걸친 상태에서 제품 명령 <code>window.resize 960 400</code>을 실행했다.
+DPI 변경과 함께 실제 client는 639×296으로 조정됐고 다시 DPI 1.0으로 관측됐다.
+복귀는 역방향 드래그가 아니라 창 면적이 1번 모니터 쪽에 속하도록 크기를 줄인 결과다.</li>
+<li>이 리사이즈 직후 Vulkan 오류가 시작됐다. 이후 150% 원복의 CPU DPI 값은 확인했지만
+해당 구간의 GPU 화면은 통과 처리하지 않았다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-화면-확인">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="실제-화면-확인">실제 화면 확인</h2></div>
+<div class="prose"><ul>
+<li>Scene/Hierarchy/Inspector/Content Browser 탭, 검색, 선택·이동·회전·스케일, 재생·일시정지의
+Material Symbols가 문자 대체나 assertion 없이 표시됐다. 큰 배율에서도 본문과 아이콘의 모양을 확인했다.</li>
+<li>모델 폴더에서 유형 아이콘과 파일명이 표시됐고, Hierarchy의 Main Camera 선택은 Inspector에 반영됐다.</li>
+<li>100% DPI에서 Camera 팝업을 클릭해 열고 150% 복귀 뒤 도구 모드를 바꿨다.
+검사한 버튼과 팝업의 클릭 위치는 표시 위치와 일치했다. 씬 picking 전체를 검증한 것은 아니다.</li>
+<li>증거: <code>debug-dx12-dpi150-start.png</code>, <code>debug-dx12-dpi100-camera-popup.png</code>,
+<code>debug-dx12-dpi150-return.png</code>, <code>release-vulkan-dpi100-camera-popup.png</code>,
+<code>debug-repeat-user150-dpi150-start.png</code>.</li>
+<li>확대 배율에서 우측 툴바와 방향 기즈모의 겹침·잘림, 고정 폭 폴더 트리의 이름 잘림도 확인했다.
+현재 정본의 <strong>W2-V / W2-B</strong>에 이미 구체적인 수정 범위가 있다. 이 검증으로 해당 작업을 완료 처리하지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-완료-차단-항목">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="완료-차단-항목">완료 차단 항목</h2></div>
+<div class="prose"><h3 id="dx12--dpi-축소-후-scene-표시-복구-지연">DX12 — DPI 축소 후 Scene 표시 복구 지연</h3>
+<p>두 독립 Debug 실행에서 OS 배율을 150%에서 100%로 낮춘 뒤 Scene 영상 대신 검은 배경이 남았다.
+본문·아이콘·도구·FPS 표시는 살아 있었으며 <code>editor.theme</code>도 정상 값이었다.
+첫 실행은 Camera 버튼을 누른 뒤 영상이 복구됐다. 재실행은 추가 UI 입력 없이 진단 조회 후의
+캡처에서 복구됐으므로 <strong>클릭이 필수 조건이거나 복구 원인이라고 단정하지 않는다</strong>.
+정확한 복구 지연 시간과 원인은 아직 계측하지 않았다.</p>
+<ul>
+<li>전/후 증거: <code>debug-dx12-dpi100-black-scene.png</code>, <code>debug-dx12-dpi100-camera-popup.png</code>,
+<code>debug-repeat-user150-dpi100-black-scene.png</code>, <code>debug-repeat-user150-dpi100-recovered.png</code>.</li>
+<li><code>debug-black-live-status.json</code>은 DX12 pipeline ready와 렌더 프레임 진행을 보고한다.
+이것만으로 Scene의 표시 텍스처가 준비됐다고 판정할 수 없다.</li>
+<li>소스상 <code>SceneViewWindow.cpp</code>는 표시 ID가 0이면 준비 배경을 그린다.
+<code>EnhancedSceneRenderer::GetLiveDisplayImTextureId</code>의 대상 ready/key와 DX12 표시 텍스처 개방 경로를
+DPI/resize generation 및 표시 프레임과 함께 관측해 원인을 분리해야 한다. 특정 분기 실패는 아직 확인하지 않았다.</li>
+</ul>
+<h3 id="vulkan--모니터-경계에서-창-크기-조정-후-device-loss">Vulkan — 모니터 경계에서 창 크기 조정 후 device loss</h3>
+<p><code>release-vulkan.out</code> 1057행의 창 크기 조정 보고 바로 다음 1058행에서
+<code>Vulkan BeginFrame 실패: 펜스 대기 실패 — VK_ERROR_DEVICE_LOST</code>가 시작됐다.
+이어 프레임이 열리지 않았다는 렌더 실패가 반복됐고 종료 시 <code>vkDeviceWaitIdle</code>도 같은 오류였다.
+<code>render-log-review.json</code>에 최초 문맥과 device-loss 로그 275,198행을 기록했다.</p>
+<p>단순 OS 배율 변경 구간과 모니터 경계의 리사이즈 구간을 구분한다.
+확인한 직접 선행 동작은 <code>window.resize 960 400</code>이며 DPI 변경만을 유일한 원인으로 확정하지 않는다.
+정확한 장치 손실 원인과 swapchain/표시 자원 동기화는 추가 분석이 필요하다.
+CPU 폰트 검사의 성공 응답이나 정상적인 종료 절차를 이 오류의 통과 근거로 쓰지 않는다.</p>
+<p>참고로 <code>render.livecheck</code>는 현재 제품 서비스에서 <code>command.unknown</code>으로 거절됐다.
+소스의 테스트 명령 선언을 실행 가능한 제품 검사로 취급하지 않았으며, 해당 시도는 통과 증거가 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-복원과-다음-검증">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="복원과-다음-검증">복원과 다음 검증</h2></div>
+<div class="prose"><ul>
+<li>Windows 1번 모니터는 원래 **150%**로 복원했다. 2번 모니터의 설정은 변경하지 않았다.</li>
+<li><code>EngineSettings.asset</code>과 Debug/Release의 <code>imgui.ini</code>는 실행 전 바이트로 복원했다.
+<code>restore-proof.json</code>의 세 경로 해시/일치 결과로 확인했다. 원래 사용자 배율 1.5, backend DX12다.</li>
+<li>검증용 Editor·Windows 설정·제어판 창은 종료했다. 다른 창과 별도 작업 트리 변경은 보존했다.</li>
+<li>다음 완료 조건은 위 두 표시 오류의 원인 분리·수정 후 실제 DPI/resize 경로 재검증이다.
+폰트 값뿐 아니라 표시 프레임 진행, 장치 손실/프레임 실패 로그까지 함께 판정해야 한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-2026-09-12-dx12-후속-수정">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="2026-09-12-dx12-후속-수정">2026-09-12 DX12 후속 수정</h2></div>
+<div class="prose"><p>사용자 요청에 따라 DX12 크기 변경 경로를 먼저 수정했다. 패스·셰이더·IBL은 유지하고
+표시 슬롯·transient 풀·SSGI 히스토리만 GPU 완료 뒤 교체한다.
+최종 Debug/Release 빌드, 각 10회 resize와 실제 OS DPI 왕복이 통과했다.
+DPI 150→100%의 Scene 텍스처 공백은 기존 8,578.926ms에서 Debug 118.492ms,
+Release 62.719ms로 줄었다. Scene·Game이 새 generation을 표시하는 것과 폰트 정상 여부를 함께 확인했다.
+상세와 범위는 <a href="EditorW1Dx12ResizeValidation.html">EditorW1Dx12ResizeValidation.md</a>에 둔다.
+이전 Vulkan device loss는 이번에 수정·재검증하지 않았다.
+이후 사용자가 Vulkan 대응을 우선 보류하기로 결정해 현재 W1은 **DX12 기준 <code>done</code>**이다.
+Vulkan 오류는 별도 보류하며 해결된 것으로 세지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="EditorW1InteractiveValidation.md"><code>docs/analysis/EditorW1InteractiveValidation.md</code></a> · 마지막 커밋 2026-09-13 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

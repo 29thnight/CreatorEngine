@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/MaterialAssetAuthoring.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset-centered material authoring</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#ownership-and-workflow">Ownership and workflow</a></li><li><a href="#publication-and-lifetime-contracts">Publication and lifetime contracts</a></li><li><a href="#boundaries">Boundaries</a></li><li><a href="#validation">Validation</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="MaterialAssetAuthoring.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Asset-centered material authoring</h1>
+<div class="meta"><p>The Material Node Editor edits existing material assets independently of Scene selection. It does not introduce a second asset system.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#ownership-and-workflow"><span class="ve-label">§00</span><span class="map-name">Ownership and workflow</span><span class="map-bar"><i style="width:96.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#publication-and-lifetime-contracts"><span class="ve-label">§01</span><span class="map-name">Publication and lifetime contracts</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#boundaries"><span class="ve-label">§02</span><span class="map-name">Boundaries</span><span class="map-bar"><i style="width:24.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#validation"><span class="ve-label">§03</span><span class="map-name">Validation</span><span class="map-bar"><i style="width:79.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「Publication and lifetime contracts」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-ownership-and-workflow">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="ownership-and-workflow">Ownership and workflow</h2></div>
+<div class="prose"><ul>
+<li><code>.shadergraph</code> owns nodes, links, graph parameter declarations, and connected Surface Settings</li>
+<li><code>.asset</code> owns its graph GUID, default parameter values, texture references, and material flags</li>
+<li><code>MeshRenderer</code> owns the material asset reference and optional instance overrides</li>
+<li>An open editor session owns its draft graph/defaults, private compiled candidate, and last valid preview</li>
+</ul>
+<p>Open the Material Node Editor from the window menu without selecting an object. Use <strong>New Material Asset</strong> or <strong>Open Material Asset</strong>. The Inspector&#39;s <strong>Open Node Editor</strong> opens the referenced base asset, not a mesh&#39;s instance overrides. An unbound/imported material creates an independent draft; existing legacy assets are retained rather than converted in place.</p>
+<ol>
+<li>Edit nodes and graph parameters. A newly added Parameter node has <strong>Declare Parameter</strong> in Node Details. Graph declarations and material defaults are separate controls. Socket-backed imported parameters retain their existing effective-default source</li>
+<li>The editor coalesces changes for 250 ms and prepares the latest draft on the existing job scheduler. One pending job is allowed per session. Obsolete completions are discarded. CPU compilation produces an isolated owned generation; texture/instance binding returns to the editor thread</li>
+<li><strong>Apply to Material Asset</strong> publishes the prepared valid candidate to the existing cache. Resident assets sharing the edited graph are rebuilt with their own defaults before publication. If any candidate fails validation, publication is rejected</li>
+<li><strong>Save Material Asset</strong> persists the already-applied material and graph. Apply is required before Save. Save checks disk changes, deletions, cache ownership, and asset identities. It does not assign a mesh</li>
+<li><strong>Assign Asset to Selected Mesh</strong> explicitly assigns a saved accepted asset to the current selected, unlocked MeshRenderer. Save the Scene to persist that reference</li>
+</ol>
+<p><strong>Save As Copy</strong> in the graph editor creates independent material and graph identities in an unassigned draft. The Inspector&#39;s material-copy action instead shares the graph, copies the current material values into the new asset defaults, and offers assignment separately. Reload Saved Draft reads the exact saved pair into the editor without publishing it; Apply remains explicit.</p>
+<p>Material node descriptions are available only by hovering the existing information-font glyph at the upper-right of each node header. The icon reserves title space and does not start node selection/drag; pin interaction remains higher priority.</p>
+<p>The generic graph canvas supports stationary right-click on a connected input to disconnect, and dragging a new output onto a connected single input to replace its link. Replacement is one undo/revision and invalid replacement preserves the original graph. Right-drag still pans.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-publication-and-lifetime-contracts">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="publication-and-lifetime-contracts">Publication and lifetime contracts</h2></div>
+<div class="prose"><ul>
+<li>Accepted material owners use the same immutable ownership_cpp and bounded cache contracts as AssetDepot. Apply clones the draft, validates every replacement and retained-budget admission before compare-and-publish, then refreshes consumers using the accepted owner. Oversized replacement batches fail without publishing</li>
+<li>Isolated and queued graph preparations share a never-reused generation identity space. Authoring publication invalidates stale preparation tickets; cooked AssetDepot graphs retain the same content digest and surface-alpha metadata</li>
+<li>Draft compilation never writes the accepted graph-generation or material caches. Generated-source scratch directories are per request and released after the owned product is created</li>
+<li>Job captures own the graph, paths, output, and error text; they never capture a Session or DataSystem pointer. The document/revision pair must still match before accepting completion</li>
+<li>A compile or binding failure leaves the last good preview and accepted Scene material intact. Pending and error states are visible in the editor</li>
+<li>Preview capture only copies immutable source owners. It does not compile or load the selected mesh. The preview floor uses the same owned background preparation</li>
+<li>Editor shutdown stops new draft submissions, drains pending jobs outside the existing session lock, and releases preview owners before renderer/compiler teardown</li>
+<li>The material cache publication revision gates Scene refresh at the GT render-proxy commit boundary. Unchanged frames do not add per-mesh cache lookups</li>
+<li>A mesh retains the accepted base used to interpret its overrides. Explicit-override provenance survives later asset defaults that happen to equal an override, serialization, and undo/redo</li>
+<li>A removed asset or an incompatible override keeps the last valid mesh instance. Unresolved serialized references retain their original payload for later recovery</li>
+<li>Graph reference serialization uses the existing typed material instance codec, with <code>ref</code> and a <code>graphOverrides</code> delta; legacy and inline material readers remain available</li>
+<li>Explicit alpha mode follows the final connected Surface Settings closure through groups. Its canonical generated-source marker is retained in cooked graph products, so shared-graph assets use the same routing in Editor and source-less Player. Marker-less legacy products retain their material-document mode</li>
+<li>External <code>.asset</code> and <code>.shadergraph</code> changes use validated replacement. A failed reload retains the accepted generation. Cold loads must recheck the current graph before insertion so a concurrent Apply cannot leave a late cache entry on an old generation</li>
+<li>Saving the material, graph, and their sidecars is rollback-capable, not a multi-file filesystem-atomic transaction. Authored final-state fingerprints suppress delayed watcher events from successful writes and rollback; an external differing state is still processed</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-boundaries">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="boundaries">Boundaries</h2></div>
+<div class="prose"><p>This change does not add shader-function libraries, general UE feature parity, or new rendering backends. Transparent surface routing is preserved, but the isolated sphere preview renderer still displays only Opaque and Masked surfaces; the editor states that limitation instead of showing an opaque substitute. GPU pipeline preparation remains asynchronous in the existing renderer after CPU draft compilation.</p>
+<p>Graph document undo/redo handles node/link/socket/layout operations. Material-default and graph-declaration metadata controls are draft edits outside that graph-only undo history. Closing the panel keeps its draft in memory; unsaved drafts are not a replacement for saving before exiting the editor.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-validation">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="validation">Validation</h2></div>
+<div class="prose"><p>The integration with master <code>d5a6a26a78da93686b8168429183ee7e0d50a8de</code> was reviewed for immutable cache ownership, asynchronous preparation, cooked metadata, material references, and model texture context. Only source/static checks were performed for this change. No compiler, build, engine execution, unit/runtime tests, or benchmarks were run.</p>
+<p>Owner validation checklist:</p>
+<ul>
+<li>Build Editor and Player in the supported Windows configurations; check DX12 and Vulkan graph paths and cook/package compatibility</li>
+<li>With no mesh selected, create a material, add/edit nodes, inspect the draft preview, Apply, Save, close/reopen, then assign to a mesh</li>
+<li>Share the asset across two meshes. Override one mesh&#39;s roughness. Change the asset default: the inherited mesh updates and the override remains. Change the default to equal the override, then change it again; the override must still remain</li>
+<li>Save/reopen the Scene and exercise undo/redo of assignment and instance edits across asset Apply operations</li>
+<li>Open two distinct material assets sharing one graph, change a graph parameter and alpha mode, Apply/Save, then cook and inspect both in Player</li>
+<li>Try invalid graph links, a missing texture, a private/deleted parameter with existing overrides, and a failing shader compile. Accepted assets and last-good previews must stay valid</li>
+<li>Modify the draft repeatedly during compilation, change the active document/Scene/selection, close the panel, and exit while a job is pending. No obsolete result may publish to another session or object</li>
+<li>Create independent graph-editor copies and shared-graph Inspector copies; cancel/switch selection during modal UI. No unintended mesh assignment or reference loss</li>
+<li>Delete, externally edit, or rename material/graph files while open; verify conflict/reload messages, last-good behavior, and recovery. Force a pair-save failure and confirm the rollback watcher does not undo the accepted in-memory Apply</li>
+<li>Exercise imported/legacy materials, nested/dotted names, exposed textures, socket-backed parameters, masked/transparent routing, and valid/invalid link replacement with one-step undo</li>
+<li>Hover information icons at different zoom/DPI values, including collapsed/readonly nodes; check tooltip wrapping, header/title clipping, pin drag, node dragging, and overlapping windows</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MaterialAssetAuthoring.md"><code>docs/design/MaterialAssetAuthoring.md</code></a> · 마지막 커밋 2026-10-05 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

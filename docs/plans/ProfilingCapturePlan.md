@@ -1,31 +1,3377 @@
-# 프로파일 수집의 현재 구성과 검증 계획
+# 프레임 프로파일러 수집·녹화·구간 분석 계획
 
-> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
+## 2026-10-07 CPU 성능 개선 우선 적용
 
-## 현재 연결된 경로
+사용자 지정 [CPU Performance Engineering](https://github.com/usamahz/cpu-performance-engineering)의
+측정 → 원인 식별 → 동일 의미의 변경 → 전후 비교 순서를 CPU 코드 개선에 먼저 적용한다.
+[성능 수치의 7개 증거 조건](https://github.com/usamahz/cpu-performance-engineering/blob/main/CONTRIBUTING.md#step-3-if-the-line-carries-a-number)은
+CPU/마이크로아키텍처, 사용 코어 수, 실효 주파수·turbo/SMT, 컴파일러·옵션, 입력,
+기준 구현, 측정 반복·통계를 기록하는 기준으로 사용한다. 미확인 필드는 미확인으로 남기고
+그 측정은 수용된 개선율 대신 관측 자료로만 취급한다.
 
-EngineBootstrap이 profiler_service를 worker 생성 전에 초기화하고 thread_pool 및 RenderThread hook을 설치한다. scope/event는 producer-owned stream, frame boundary는 collector, 연속 파일은 writer가 처리한다. Renderer hook은 backend에서 CPU QPC 축으로 변환된 GPU span과 submission generation을 전달한다.
+첫 적용은 `ProfileAggregate.cpp::aggregate_frames`의 스레드 요약이다.
+`ProfileReader.cpp`의 비동기 timeline 준비와 선택 구간 Hierarchy/Flat 집계가 이 함수를 소비한다.
+이미 `thread_slot`로 정렬된 이벤트마다 기존 요약 전체를 찾던 O(events × lanes) 순회를,
+연속된 스레드 구간별 로컬 누적으로 바꿔 이 단계만 O(events + lanes)로 만든다.
+전체 집계의 이벤트 정렬·분포 정렬 비용은 그대로 남는다. 수집·파일 ABI·프레임 귀속은 바꾸지 않는다.
 
-일반 녹화와 standalone Viewer, deep DX capture를 별도 책임으로 유지한다. 현재 snapshot 파일 버전은 6, continuous stream은 7이며 Viewer IPC는 3이다. 서로 다른 version space를 하나의 “프로파일러 버전”으로 합치지 않는다.
+재현 도구: `Tools/regression/measure-profile-aggregate.ps1` 및
+`profile_aggregate_benchmark.cpp`. 120프레임, 1/8/64/256개 희소 슬롯,
+끝난 순서의 중첩 이벤트·instant·truncated·등록되지 않은 슬롯을 입력으로 사용한다.
+동일 MSVC Release 옵션과 나머지 코어 소스로 기준/후보를 한 실행 파일에 함께 빌드하고,
+각 입력에서 호출 순서를 번갈아 바꿔 비교한다. 기준 함수와 결과 타입만 별도 이름으로 생성한다.
+각 경우 2회 warmup, 각 구현 14표본의 원시 시간과 모든 공개 집계 필드의 digest를 보존한다.
+작은 입력은 표본 내 반복을 사용한다. 생성·digest·소멸은 시간 측정에서 제외한다.
+기본 기준 소스는 `3afe1daaee7b75f644ac10b12d96fb684a0e74c8`이며 `-BaselineRef`로 명시한다.
+전체 코어 검사에는 변경 전후 Debug/Release에서 동일한 `pool-growth/events` 실패가 있어
+전체 통과로 기록하지 않는다. 해당 검사 실패와 집계 동등성은 별도로 판단한다.
+최종 코드도 `/W4 /WX` Debug/Release 빌드가 통과했고, 전체 코어 각 1,236개 검사에서
+위 기존 실패 1건만 재현됐다. 정렬 제거 변이는 집계 합계·자식 범위·레인 경계 검사에서
+거부됐다. 로그는 `Artifacts/cpu-profile-aggregate-final/core-after/`에 보존한다.
 
-## 완료 기준을 기능별로 분리
+로컬 관측 산출물은 `Artifacts/cpu-profile-aggregate-paired/report.json`이다.
+Xeon W-2223(4코어/8논리 프로세서), 벤치마크 자체는 단일 스레드, 균형 조정 전원 계획,
+MSVC Release `/O2 /MD /DNDEBUG /std:c++latest`, 합성 120프레임 입력이다.
+`spans_only` 중앙값은 8레인 2.908→2.788ms, 64레인 30.270→28.380ms,
+256레인 162.346→133.004ms였다. 전체 집계의 64레인은 57.864→58.120ms로
+개선 관측이 없으며 256레인은 259.858→228.189ms였다. 모든 경우 공개 필드 digest가 같다.
+마이크로아키텍처·실효 주파수·turbo/SMT 상태·백그라운드 부하는 통제/확정하지 못했으므로
+이 수치는 관측이며 제품 FPS 개선이나 7개 증거 조건의 수용 완료가 아니다.
+빌드와 겹쳤던 초기 측정 및 별도 프로세스의 후보 측정은 최종 개선 근거로 사용하지 않는다.
 
-- 수집 무결성: foreign stream touch, abandoned stream, unacked tail, dropped/late 자료와 GPU failure를 명시하고 incomplete capture를 정상 결과로 숨기지 않음
-- 의미 정합성: engine frame, scene/view, CPU ownership, native/generated provenance와 서로 다른 측정 clock을 유지
-- 상호작용: record/stop/clear는 비동기 상태 전이, 오래된 generation command 거부, UI thread에서 I/O/join 없음
-- 파일: version/CRC/크기 제한, 중단 복구, 큰 녹화 window/index와 cancellation
-- 비용: stopped/recording/live viewing/continuous write/ETW 모드별 같은 workload에서 owner·collector·writer 비용을 구분
+후속 수용은 기존 **14-REC**에 편입한다: 실제 v3 캡처의 선택/스크롤 응답,
+Debug/Release 집계·레인 경계·분포 동등성, 코어의 기존 실패 해소, 실효 주파수·turbo/SMT와
+계측 자체의 비용을 기록한 반복 측정. CPU prepare/record·배칭·업로드 개선은
+`GpuDrivenGeometryImplementationPlan.md`의 GD 성능 수용에서 동일 자산/바이너리로 비교하고,
+씬 잠금·스케줄러 변경은 실제 CPU/대기 캡처의 임계 경로가 확인된 뒤 별도 슬라이스로 진행한다.
+SIMD·prefetch·lock-free·전역 컴파일 옵션 변경은 병목 근거와 출력 동등성 없이 일괄 적용하지 않는다.
+이 우선 적용으로 14-REC나 GPU-1의 완료 공수는 올리지 않는다.
 
-## 남은 실증
+## 2026-10-07 최근 병합 반영
 
-헤더나 regression harness가 존재한다고 위 gate가 통과한 것은 아니다. 긴 frame scope, idle worker tail, GPU 지연, queue 포화, disk full, Viewer disconnect, shutdown을 실행해야 한다. 녹화 overhead 및 p95/p99는 이번에 측정하지 않았다.
+현재 엔진은 수집·최근 600프레임/128 MiB live 보존·전체 세션 CEPROF v3 writer를 소유하고, 별도 `ProfilerViewer.exe`가 파일 색인·구간 조회·집계와 15개 분석 페이지를 소유한다. PR #117/#126/#127/#128/#129가 병합됐다. 기존 P0~P6 완료 이력은 유지하되 아래 후속 수용까지 통과했다는 뜻으로 읽지 않는다. 아래 §0.5의 4프레임 링·옛 CPUProfiler 관측은 과거 교체 근거다.
 
-API의 정본은 [ProfilerContinuousRecording](../design/ProfilerContinuousRecording.md), process 책임은 [ProfilerViewerProcess](../design/ProfilerViewerProcess.md), 선택적 ETW는 [Dx12DeepCapture](../design/Dx12DeepCapture.md)에 둔다. 이전 단계별 완료 수치와 임시 local artifact 경로는 현재 master의 실행 증거로 재사용하지 않는다.
+| 대시보드 ID | 현재 구현 | 남은 완료 조건 | 상태·공수 |
+|---|---|---|---|
+| 14-REC | v3 연속 spool·전체 세션 Save, 비동기 reader, CPU scope publication·Stop/GPU tail 및 incomplete 진단 | D/R 반복 Record/Stop/Clear/Open/Save, 긴 녹화·파일 오류/CRC/recovery·queue 포화, DX12 실제 fence/abort/종료, 지원 mutation 69개 실행 및 손실/비용 기록 | progress · 미산정 · 기성 0 |
+| 14-VIEW | 독립 Win32/D3D11 viewer, 인증 IPC·Memory/Animation/Rendering Live, 명시적 열기, 소유 job·전용 아이콘·셸 | Windows 빌드·기동/재사용·DPI/입력/좁은 창, Editor 정상/비정상 종료·offline 독립 수명, stale 세대/끊김/큰 캡처와 직렬화 비용 | progress · 미산정 · 기성 0 |
+| 14-DX | 일반 권한 ETW helper·엔진 제출 연결·.cedx, profile.deep.start/status/stop | opt-in SDK 구성 빌드, permission_denied/unavailable, 세션/손실/종료·crash 후 ETW 정리와 실제 수집 비용 | progress · 미산정 · 기성 0 |
 
-## 구현 근거
+계약: [연속 녹화](../design/ProfilerContinuousRecording.md), [viewer 소유권](../design/ProfilerViewerProcess.md), [심층 수집](../design/Dx12DeepCapture.md). Viewer 표시 요청은 Profiler 메뉴·Window·Rendering Live·CLI open/focus에서만 발생하며 저장된 패널 열림/preset 복원으로 프로세스를 띄우지 않는다. `accepted`는 요청 접수이며 finalized/무손실이 아니다. Vulkan live timestamp는 unavailable이고 Vulkan 심층 수집은 구현 범위 밖이다.
 
-- [Engine/RuntimeHost/EngineBootstrap.h](../../Engine/RuntimeHost/EngineBootstrap.h)
-- [Engine/EngineDiagnostics/ProfileService.h](../../Engine/EngineDiagnostics/ProfileService.h)
-- [Engine/EngineDiagnostics/ProfileCaptureFile.h](../../Engine/EngineDiagnostics/ProfileCaptureFile.h)
-- [Engine/EngineDiagnostics/ProfilerViewerProtocol.h](../../Engine/EngineDiagnostics/ProfilerViewerProtocol.h)
-- [Engine/EngineDiagnostics/DxCaptureService.h](../../Engine/EngineDiagnostics/DxCaptureService.h)
+PR #117 본문의 실행 미수행 선언과 checked checklist가 상충한다. 이 감사에서는 산출물 없는 체크 표시를 실행 통과로 승격하지 않는다. #126~129의 추가 fixture/checklist 역시 작성과 실행을 구분한다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
+작성: 2026-08-10
+목표: 현재의 표시 중심 프로파일러를 **프레임 단위로 녹화하고, 멈춘 뒤 특정 구간을 재현 가능하게 분석하는 도구**로 승격한다.
+
+> 이 문서는 구현 상태를 주장하는 문서가 아니라 착수 기준이다. 작성 시점에는 현재 소스의
+> CPU/GPU 프로파일러, FrameProfiler UI, Resource Counter, DX12 라이브 인플라이트 경로를
+> 정적으로 점검했다. 이 계획을 위한 빌드·실행·장시간 캡처 검증은 아직 수행하지 않았다.
+>
+> **갱신(2026-08-11): P0 완료.** 위 문단은 P0 착수 전의 상태다. P0에서 빌드·실행·검사를
+> 실제로 돌렸고, 정적 점검이 놓쳤던 것 세 가지가 드러났다 — §10 P0의 "실측 결과" 절 참고.
+> 요약: 계획이 P2로 미뤄둔 지혈 중 일부는 **P0의 전제**였다. 픽스처가 자기 뒤처리를 하는
+> 순간 엔진이 망가지는 토대 위에는 검사 하네스를 세울 수 없기 때문이다.
+
+---
+
+## 0. 한 줄 결론
+
+ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 런타임의 계측 결과를
+`capture_session` 하나에 `engine_frame_id`와 `submission_id`로 묶어 보존하는 **수집 코어**를
+먼저 만든다. 에디터는 이 불변 캡처를 읽기만 한다.
+
+완료 모습은 다음과 같다.
+
+1. 에디터에서 Record를 누르고 10초 이상 플레이한다.
+2. 프레임 그래프에서 CPU/GPU/GC 스파이크를 찾는다.
+3. 한 프레임 또는 여러 프레임을 선택한다.
+4. CPU Timeline·GPU Queue·Hierarchy·Counters가 같은 선택 구간을 설명한다.
+5. 캡처를 `.ceprof`로 저장하고 다시 열어 같은 결과를 얻는다.
+
+별도 `Render Frame Debugger`는 독립 수동 단일 프레임 캡처 도구다. 이 프로파일러의
+완료 조건이나 `.ceprof` 파일 형식에 포함하지 않는다.
+
+---
+
+## 0.5 2026-09-15 개정 — 무엇이 바뀌었나
+
+이 개정은 착수 전 실측(9-14·9-15)과 두 가지 결정을 반영한다. **결정은 둘이다 —
+현행 수집 코어를 재활용하지 않는다, 그리고 마커 매크로를 폐기한다.**
+
+### 0.5.1 실측으로 뒤집힌 전제
+
+| 전제(개정 전) | 실측(9-14·9-15) |
+|---|---|
+| "Shipping 구성 자체가 없어 compile-out을 검증할 대상이 없다" | **폐기.** PHASE 14.5 LC8이 이미 세웠다 — `Directory.Build.props`의 `EngineShipping` 스위치, `Directory.Build.targets:72-73`이 전 프로젝트에 `CE_SHIPPING`/`CE_DEVELOPMENT` 정의, 산출물 키 분리, 그리고 격리 게이트가 `run-all:299`에 편입돼 있다 |
+| "profiler 검증 하네스가 산다" | **절반만.** `-Action SelfTest`는 초록이지만 `-Action Stats`는 9-06(521fa21a)부터 exit 1이다. 명령은 성공하고 판정기가 죽었다 — `reg.Legacy`→`reg.Result` 전환으로 사람이 읽는 `[profile.stats]` 블록이 사라졌는데 하네스가 그 리터럴을 `IndexOf`로 찾는다 |
+| "예산 포화·드롭을 게이트 단정으로 쓸 수 있다" | **쓸 수 없다.** 편집 27 / 재생 34 이벤트(상한 1024의 3%), 이름 388B / 525B(상한 16384B). 계측 지점이 전부 시스템 단위 고정 지점이고 per-object 루프 안에 하나도 없어 **씬에 무엇을 얹든 상수**다. 어떤 변이로도 자극되지 않는 빈 단정이다 |
+
+### 0.5.2 ★ 지금은 녹화가 아니다 — 4프레임 실시간이다
+
+`PROFILER_INITIALIZE(5, 1024)`의 5 중 현재 프레임을 뺀 **넷만 읽힌다**(selftest 실측
+`보존 프레임 [65, 69)`). UI의 `Recording / Paused`는 링을 덮어쓰다 멈추는 것이라,
+**스파이크를 발견했을 때 그 프레임은 이미 덮여 있다.** §0의 완료 모습 1~3단계가
+원리적으로 성립하지 않는다는 뜻이고, 그것이 이 계획의 존재 이유다.
+
+### 0.5.3 재활용하지 않는다 — 구조적 근거
+
+결함 8종(§3·P0 기록)은 잡다한 버그가 아니라 **원죄 하나의 파생**이다 — 수집기가
+producer의 TLS를 직접 만진다(`Profiler.cpp:169`의 `pTLS->NumEvents = 0`). 그래서
+스레드 은퇴 시 UAF가 나고, 표 순회에 락이 필요해지고, 락을 넓히면 `RegisterThread`가
+같은 뮤텍스를 다시 잡아 교착이고, 수집 시점에 스팬을 정렬해야 해서 부등호 하나로
+스레드가 통째로 사라졌다.
+
+§6.2의 sealed chunk handoff는 이 다섯을 **고치는 것이 아니라 발생하지 않게** 한다.
+writer가 자기 chunk를 봉인해 넘기면 collector가 남의 메모리를 만질 일이 없다.
+고쳐서 도달할 수 없고 갈아야 도달하는 지점이므로, 현행 `CPUProfiler`는 재활용하지 않는다.
+
+**경계 — 무엇을 버리고 무엇을 남기는가**
+
+| 대상 | 처리 |
+|---|---|
+| `CPUProfiler` 클래스(4프레임 링·TLS 리셋·수집 시점 정렬·`FixedStack` 32·이름 `LinearAllocator`) | **버린다** |
+| `ImGuiHelper/ProfilerWindow.cpp` 557줄 | **버린다** — §6.4가 "UI가 global vector를 직접 읽지 않는다" |
+| `PROFILE_CPU_*` 매크로 정의 | **버린다** — §5.2 참조 |
+| 마커 호출부 39곳 | **남긴다** — 표기 형태만 바뀐다(이름과 자리는 보존) |
+| selftest 픽스처 11종 | **다시 겨눈다** — 검사의 존재 이유가 정확히 이것이다 |
+| 결함 8종 기록 | **설계 입력으로 남긴다** |
+
+selftest의 `cross-frame/preserve`는 지금 KNOWN-DEFECT인데, **새 설계에서는 PASS여야
+한다**(§6.1의 `truncated` flag). 그 한 줄이 PASS로 바뀌는 것이 이 작업의 진척 정의다.
+
+### 0.5.4 자동 계측은 이 계획의 전제가 아니다
+
+"계측 호출부 0"을 목표로 두자는 논의가 있었고, 실측 결과 **지금 구조로는 상속형
+자동 수집이 성립하지 않는다**:
+
+- 시스템 7종은 전부 `Singleton<T>` **CRTP** 상속이라 타입마다 다르게 인스턴스화되어
+  공통 포인터로 담을 수 없다. `CameraSystem`은 `final`에 상속이 없다.
+- `SystemSchedule`은 **컴포넌트 저장소**지 실행표가 아니다. 클래스 주석이 못 박는다 —
+  "무엇을 들고 있는가만 관리하고 언제 도는가는 건드리지 않는다".
+- 계측 지점의 실제 모양은 `PROFILE_CPU_BEGIN("X"); X->Update(dt); PROFILE_CPU_END();`
+  **하드코딩 나열**이다.
+
+실행 표(`{marker_id, 함수 포인터}` 순회)로 자동화하는 길은 있으나, 그것은 씬 실행
+구조 변경이고 `lifecycle 221사건` 순서 게이트를 지나간다. **이 계획은 그것을 기다리지
+않는다** — 마커 표기를 호출부 형태에 독립으로 설계하면, 나중에 표가 생겨도
+
+```cpp
+for (auto& step : table) { ce::profile_scope _{ step.marker }; step.fn(*this, dt); }
+```
+
+한 줄로 흡수되고 코어 변경은 0이다. **자동 수집은 프로파일러의 요구가 아니라 씬 구조
+정리의 결과로 둔다.**
+
+> 참고 — 실행 표는 트랙 C3가 버린 델리게이트로의 회귀가 아니다. C3가 없앤 것은
+> **컴포넌트 N개**의 가상 디스패치(암묵 구독, 등록 순서 = 프리팹 파일 순서 의존)이고,
+> `Component`에는 지금 가상 `Update`/`LateUpdate`/`FixedUpdate`가 하나도 없다. 실행 표는
+> **시스템 13개**의 함수 포인터 호출이며 목록도 순서도 소스에 고정된다. 입도와 결정자가
+> 둘 다 다르다.
+
+### 0.5.5 ★ PHASE 13(enkiTS)과의 순서 제약 — 새로 생긴 의존
+
+`TaskSchedulerUnificationPlan.md`(9-15)가 PHASE 13 S0.5로 enkiTS 이관을 편입했다.
+이것이 이 계획에 양방향 의존을 만든다.
+
+**enkiTS가 이 계획에 주는 것**
+
+- `threadnum_`이 `0..GetNumTaskThreads()-1`로 **안정 보장**된다. 현행 코어가 11비트
+  `ThreadIndex` 슬롯을 스스로 관리하고 은퇴·재사용 규칙(히스토리 한 바퀴 뒤 재사용)을
+  발명해야 했던 이유는 "스레드가 임의로 생기고 죽어서"인데, enkiTS 워커는 **고정 개수·
+  고정 인덱스**다. §6.2의 thread stream 설계에서 슬롯 수명 문제의 상당 부분이 사라진다.
+- 태스크 실행 지점이 소수로 모이므로, **자동 계측의 진짜 자리는 프레임 단계 표가 아니라
+  태스크 스케줄러**다. 수가 많고 동적인 쪽이 태스크이고, 프레임 단계 13개는 고정이라
+  한 줄씩 써도 부담이 없다.
+
+**이 계획이 enkiTS에 지우는 조건**
+
+- ★ **지금 애니메이션은 이미 워커 8스레드에서 도는데(`AnimationJob.cpp:39`의
+  `ThreadPool(8)`), 프로파일러는 `[GameThread]` 하나만 본다**(실측: 스레드 슬롯 1개).
+  즉 **PHASE 13이 최적화하려는 바로 그 비용이 현재 캡처에 전혀 잡히지 않는다.**
+- 그런데 현행 코어에 워커 계측을 그냥 붙이면 안 된다. §3.1의 원소 단위 경합이 그대로
+  열려 있고, **지금 안 터지는 유일한 이유가 writer가 `[GameThread]` 하나뿐이기
+  때문**이다. 워커가 마커를 찍는 순간 계약 부재가 현실이 된다.
+- 따라서 **워커 계측은 §6.2 sealed chunk handoff 이후에만 추가한다.** 그 전에는
+  enkiTS 이관(S0.5)을 진행하되 **워커에 마커를 걸지 않는다.**
+
+**PHASE 13이 이 계획의 소비자다.** `AnimationSchedulerPlan.md` §4의 완료 기준 —
+"100체 씬에서 버짓 상한 초과 프레임 1% 미만 · 예측 비용 대 실측 오차 15% 이내 ·
+HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로파일러 없이 판정할 수 없다.
+13-7(버짓 HUD)과 14-3(ProfilerWindow 신설)의 파일 접점 경고가 여기서 실체를 갖는다.
+
+### 0.5.6 개정으로 바뀐 실행 계획
+
+- **P1의 "기존 `PROFILE_CPU_*` 매크로를 adapter로 연결" 항목은 폐기한다.** 옛 코어에
+  adapter를 붙이는 일이 재활용 폐기로 무의미해졌다. P1에 남는 것은 `engine_frame_id`
+  단일 발행 지점 통합과 마커 표기 신설이다.
+- **P1의 "Shipping compile-out"은 만드는 일이 아니라 무는 일이다** — `CE_DEVELOPMENT`가
+  이미 전 프로젝트에 정의돼 있다(§5.2).
+- **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
+  "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
+
+### 0.5.36 2026-09-23 14-7을 프로파일러와 독립한 단일 프레임 캡처로 정정
+
+사용자 목표는 RenderDoc/PIX의 GPU 프레임 캡처처럼 원하는 뷰의 **다음 완료
+제출 하나**를 잡아 렌더 이벤트·상태·리소스·출력을 조사하는 엔진 내장 도구다.
+시간축 프로파일러의 연속 녹화나 NVIDIA식 하드웨어 성능 분석은 선행 조건이
+아니다. `14-7`은 대시보드 일정 번호로만 유지하고, 별도 `RenderCapture`
+프로젝트/서비스·`.ceframe` 파일을 `RenderFrameDebuggerPlan.md`가 소유한다.
+프로파일러의 서비스·수집 큐·세마포어·`.ceprof`·counter/marker와는 런타임 및
+빌드 의존을 두지 않는다. frame/view/submission/fence는 렌더러가 발행한 값만
+공유한다. 프로파일러 프레임에서 열기와 조건부 자동 트리거는 후속 선택 기능이다.
+이는 **계획 정정**이며 RF0~RF7 구현 완료를 뜻하지 않는다.
+
+### 0.5.35 2026-09-23 P4 완료 — 두 뷰·인플라이트·손실 진단을 제품 경로로 검증
+
+`-Action Gpu`는 중앙 뷰포트를 Scene → Game → Scene으로 바꾸고 Game Preview를
+연 뒤, 두 뷰를 함께 녹화하고 창을 리사이즈한다. Game 표시 모드에서도
+`editorTarget=true`인 것은 의도된 구조다(`ViewportHostWindow::publish_viewport_demand`):
+Scene 렌더 타깃을 유지하고 Game 수요만 더한다. 따라서 “Game 단독”을
+`display.scene.active=false`로 판정하지 않고, 실제 뷰포트 모드·수요와
+Game 완료 타깃을 확인한다. Scene과 Game의 GPU 조각 수가 다른 **같은 엔진 프레임**을
+잡아 서로 다른 `submissionId`가 붙는지도 검사한다. 기록 순서가 바뀌어도
+`engineFrameId`·`submissionId`·`viewId`의 조합이 유지돼야 한다.
+
+Debug 전체 솔루션 빌드 후 최종 제품 게이트(원본:
+`Build/Validation/ProfileP4/20260923-final-gpu-frames/profile-gpu.out`)는 수집 135회,
+표가 어긋나 거절된 수집 0, 같은 프레임의 서로 다른 두 뷰 4개,
+제출 충돌 0, 최대 미완료 제출 2, 인플라이트 상한으로 보류한 틱 41이었다.
+리사이즈 세대는 2→3이었고 Scene/Game 완료 세대가 모두 3에 도달했다.
+GPU 구간 4,839개가 sink로 흘렀고 선택 캡처의 귀속 어긋남은 0이었다.
+clock 표본 4회, 정렬 실패 0, Debug Layer 활성·DRED 활성 상태에서
+검증/DRED 메시지는 0건이었다. 앞선 같은 게이트도 두 번 통과했다
+(수집 140회·126회, 양쪽 모두 실패·손실 0).
+GPU 프레임 조회로 바꾼 뒤 반복 실행도 통과했다(원본:
+`Build/Validation/ProfileP4/20260923-final-repeat/profile-gpu.out`, 수집 132회,
+같은 프레임 두 뷰 3개, 최대 2-inflight, 손실·정렬 위반·DX12 오류 0).
+
+반복 실행에서 기본 `profile.frame`의 **마지막 엔진 프레임 8개**에는 GPU 레인이
+없는데 캡처 전체에는 GPU 이벤트 1,761건이 있는 경우가 나왔다. GPU 수집이 늦게
+도착해 앞선 프레임에 귀속되므로 조회 창의 결함이었다. `profile.frame gpu`는
+캡처 전체에서 GPU 구간이 있는 최근 8프레임을 골라, 게이트가 실제 GPU 레인의
+귀속·뷰·제출을 검사한다. 기본 `profile.frame`의 조회 범위는 유지한다.
+
+`DX12GpuProfiler`는 질의 예약 수가 슬롯 상한을 넘은 양을
+`FrameTimings::overflowedPasses`로 전달한다. 렌더러는 누적 초과와 수집 실패를
+따로 세고, GPU sink의 `on_issue`로 녹화 서비스에 프레임·누락 수·마지막 이유를
+보낸다. Collector 화면과 `profile.stats`가 이를 표시한다.
+`-Action GpuLoss`는 **Debug에만** `CREATOR_DX12_GPU_QUERY_LIMIT=16`을 적용해
+실제 초과를 만든다(원본:
+`Build/Validation/ProfileP4/20260923-loss-final/profile-gpu-loss.out`).
+렌더러 누적 누락 596, 녹화 중 Collector 누락 275, 마지막 발생 프레임 3234와
+이유 `GPU query slots exhausted`가 나왔고 수집 실패는 0이었다.
+기본 상한 64로 다시 실행한 정상 게이트에서는 양쪽 누락이 모두 0이었다.
+코어 Debug/Release는 각각 439검사 통과, GPU 누락과 수집 실패를 숨기는
+변이 둘이 두 구성에서 각각 해당 단정으로 실패했다.
+
+미완료 fence의 슬롯은 `EnhancedSceneRenderer::TickLive`의 완료 fence 비교를
+통과한 뒤에만 `Collect(token)`으로 넘어간다. 최대 2-inflight와 보류 틱이
+이 경계를 실제로 자극했고, 수집 실패·정렬 위반·DX12 오류가 0이었다.
+정상 제품 경로에는 라이브 pipeline 전체 재구축 명령이 없다. 리사이즈는
+표시 슬롯과 transient 자원을 완료 fence 뒤에 재생성하는 현재의 재구축 경로다.
+향후 pipeline hot reload를 도입하면 별도의 세대 전환 게이트를 추가한다.
+GPU 손실 진단은 현재 **라이브 녹화 요약**에 남는다. `.ceprof` 파일에 이
+요약을 직렬화하는 metadata 작업은 P6의 파일 형식 범위다.
+
+### 0.5.34 2026-09-23 라이브 Page Ingest 명칭·수집 단계 비용 계측
+
+라이브 `capture_ring::ingest`는 직렬화 바이트를 해석하지 않는다. 봉인된 네이티브
+`event_chunk`의 헤더·세대를 확인하고, 늦은 이벤트를 원래 프레임에 귀속한 뒤
+불변 페이지 구간을 프레임 인덱스에 연결한다. 실제 `.ceprof` 역직렬화는
+`load_capture`의 파일 읽기 경로다. 따라서 라이브 통계의 `deserializedPages`와
+화면의 `Deserialized pages`를 `ingestedPages`와 `Ingested pages`로 바꿨다.
+§0.5.31의 `Deserialize`는 당시 수집 단계에 붙였던 이름이며, 현행 작업의
+이름으로 사용하지 않는다. 외부에서 옛 JSON 필드를 읽는 도구는 새 키로 바꿔야 한다.
+
+수집 스레드에서 QPC 누적 tick을 단계별로 센다. `wait`는 세마포어 신호 대기,
+`queue delay`는 제출 시각부터 해당 프레임 작업을 시작할 때까지의 지연이다.
+작업 비용은 `page ingest + attribution`, `frame close + retention`,
+`capture publish`, `page replenish`로 나눈다. 호출·프레임·스냅샷 수와 함께
+`profile.stats` JSON과 Collector 화면에 노출하며, 화면과 검증 스크립트는
+QPC 주파수로 ms로 환산한다. 값은 녹화 시작 뒤 누적된 벽시계 시간이다.
+`wait`와 `queue delay`는 수집 CPU 작업 비용에 합산하지 않는다. 파일 로드
+비용이나 파일 내부 tick 주파수와도 섞지 않는다.
+
+Debug Editor 기본 씬의 `Stats` 원본은 `Build/Validation/ProfileCollectorStages/
+20260923-133348/manifest.json`과 같은 폴더의 `profile-stats.out`에 보존했다.
+봉인 페이지 225개·수집 호출 208회에서 page ingest 3.657ms, 프레임 마감
+64회에서 1.197ms, 캡처 게시 7회에서 5.014ms, 페이지 보충 0.594ms였다.
+신호 대기 27,901.089ms와 제출 큐 지연 19.040ms는 별도 표시한다.
+늦은 이벤트 233개가 제 프레임에 놓였고 늦어서 버린 이벤트는 0이었다.
+이 기준선에서 page ingest는 지배적 비용으로 드러나지 않았으므로 이벤트별
+귀속 규칙이나 페이지 표현을 바꾸는 최적화는 적용하지 않았다. 고부하 제품
+장면에서 이 비용이 커지면 늦은 이벤트 검색과 페이지 인덱스 연결을 따로
+계측해 병목을 확인한다.
+
+검증 중 Release stress가 간헐적으로 `record`/`clear` 완료 대기에서 멈췄다.
+수집기가 완료 값을 대기용 mutex 밖에서 갱신하여 조건 변수 통지를 놓칠 수
+있었으므로, 완료 값 갱신을 같은 mutex 아래로 옮겼다. 수정 후 Debug·Release
+코어 각 434항목과 `silent-drop` 변이, Debug Editor의 `Stats`·`Window`,
+5초 stress(각 1,589,248·10,682,368 프레임, 드롭 0)가 통과했다.
+Debug Editor·Player 빌드도 통과했다. Release 실행 파일을 추가로 5회
+반복해 모두 통과했다. stress 원본과 반복 결과는
+`Build/Validation/ProfileCollectorStress/20260923-134221/`에 있다.
+이 검증은 장시간 제품 장면이나 전체 변이 65개를 대신하지 않는다.
+
+### 0.5.33 2026-09-23 기본 수집 큐·페이지 풀 확장
+
+기본 `profiler_config`의 `max_queued_frames`와 `max_chunk_count`는 0(상한 없음)이다.
+프레임 제출 큐는 필요할 때 커지고, 기록자 페이지 풀이 비면 해당 기록자가 새 페이지를
+할당한다. 수집 스레드는 평상시 free 페이지를 미리 보충한다. Tracy의 메모리 확장
+방향을 참고했으나 현재 큐는 mutex 기반 `std::deque`이며 Tracy의 구현을 복제한 것은 아니다.
+
+`memory_budget`는 rolling capture가 보존할 프레임의 예산이다. 제출 큐나 페이지 풀의
+전체 메모리를 제한하지 않는다. 그래서 수집기가 계속 뒤처지면 프로세스 메모리와
+기록자 측 할당 지연이 늘 수 있다. Collector에는 큐 길이·페이지 풀 바이트를 표시한다.
+명시적 상한을 설정한 검사·도구에서는 기존 드롭 계수를 유지한다. 할당 실패, 손상
+페이지, 너무 늦게 도착해 보존 프레임을 찾지 못한 이벤트도 계속 진단한다. 기본
+확장은 모든 상황에서 손실이 없다는 보증이 아니다.
+
+Debug·Release 코어 각 430항목과 `silent-drop` 변이가 통과했다. 보존 예산을
+페이지 하나 크기로 줄여도 1,024개 이벤트가 모두 남는 검사를 포함한다. 5초 수집 stress에서
+Debug 118주기·1,933,312경계, Release 892주기·14,614,528경계가 제출됐고,
+두 구성 모두 보존 프레임 수가 제출량과 일치하며 드롭 0이었다. 원본 결과:
+`Build/Validation/ProfileCollectorStress/20260923-130907/manifest.json`.
+Debug Editor·Player 빌드와 실제 Editor의 `Stats`·`Window` 실행 게이트도 통과했다.
+`Stats`에서 누락 이벤트 0, 버린 경계 0, 수집 대기 프레임 0을 확인했다.
+장시간 제품 장면의 메모리 증가·기록자 할당 지연은 아직 측정하지 않았다.
+페이지 헤더 확인과 프레임 연결 작업은 여전히 수집 스레드에서 수행하므로,
+이 변경만으로 `Deserialize` 소요 시간의 원인을 판정하지 않는다.
+
+### 0.5.32 2026-09-23 수집기 포화·종료 경합과 4모드 코어 비용 측정
+
+`Tools/regression/verify-profile-collector-stress.ps1`는 Debug·Release에서
+각 20초간 기록자 4개와 16,384개씩의 프레임 경계 제출을 반복한다. 매 주기
+`수집 프레임 + 버린 경계 == 제출 경계`와 큐 배출, 손상 페이지 0, 외부 스트림
+접근 0을 검사한다. 별도 단계에서는 열린 스코프를 가진 다섯 번째 기록자를
+포함해 기록자와 제출자가 계속 도는 중에 서비스를 종료하고, 종료 후에도
+기록 시도를 계속하게 해 TLS 세대 무효화와 스트림 보유 경계를 자극한다.
+이 검사에서 `m_slotEpoch`의 동시 읽기·쓰기를 원자 변수로 바꾸었다.
+
+실행 결과: Debug 2,923주기·47,890,432경계 제출, Release 7,981주기·
+130,760,704경계 제출. 두 구성 모두 모든 주기에서 큐가 포화됐고, 보존+드롭
+합계가 제출량과 일치했다. 손상 페이지·외부 스트림 접근은 0, 열린 상태로
+종료된 스트림 5개를 안전하게 계상했다. 원본 JSON과 빌드 로그:
+`Build/Validation/ProfileCollectorStress/20260923-121209/manifest.json`.
+Debug·Release 코어 각 424항목과 `tls-ignores-epoch` 변이도 통과했고,
+Debug Editor·Player 빌드 및 Editor `Stats/Workers/Window/Gpu` 실행 게이트를
+다시 통과했다.
+
+`Tools/regression/measure-profile-overhead.ps1`는 동일한 고정 작업을
+2,000프레임×5회씩 네 모드에서 재며 실행 순서를 회전한다. 각 프레임은
+CPU scope 호출 64개, CPU+GPU 모드에는 GPU span 제출 8개를 더한다.
+활성 구간 밖에 500µs 양보 시간을 둔다. 중앙 실행의 CPU 활성 시간(ms)은
+다음과 같다.
+
+| 모드 | P50 | P95 | P99 | 기록 이벤트/초 | 이벤트 payload/초 | 최대 캡처 메모리 |
+|---|---:|---:|---:|---:|---:|---:|
+| Shipping compile-out | 0.0013 | 0.0016 | 0.0018 | 0 | 0 | 0 |
+| 개발 빌드·중지 | 0.0030 | 0.0046 | 0.0057 | 0 | 0 | 0 |
+| CPU 기록 | 0.0085 | 0.0129 | 0.0160 | 약 251,000 | 약 10.0 MB | 6.17 MB |
+| CPU+GPU 이벤트 기록 | 0.0087 | 0.0147 | 0.0227 | 약 266,000 | 약 10.6 MB | 6.36 MB |
+
+모든 실행의 이벤트·프레임 드롭은 0이다. Shipping에서는 마커 등록도 0이 되도록
+`marker()`의 인자 평가 경로를 끊었다. 수집 스레드의 OS CPU 시간은 기록 모드
+중앙 실행에서 각각 31.25ms였지만, `GetThreadTimes`의 짧은 구간 계측이
+15.625ms 단위로 흔들려 정밀한 self-cost 수치로 보지 않는다. 원본 실행별
+JSON·조건·중앙값: `Build/Validation/ProfileOverhead/20260923-122605/manifest.json`.
+이것은 **코어 합성 부하**다. §11.4의 동일 제품 장면·해상도 4모드 프레임 시간,
+실제 GPU 프레임 시간, P5의 전체 counter 기록은 아직 측정하지 않았다.
+
+### 0.5.31 2026-09-23 봉인 페이지의 수집기 측 Deserialize 및 얕은 라이브 스냅샷
+
+전용 수집 스레드 이후에도 봉인된 `event_chunk`의 모든 이벤트를
+`frame_record.events`에 다시 복사하고, 라이브 캡처를 만들 때 링 전체의
+이벤트를 한 번 더 복사했다. CPU 기록자는 이미 고정 길이 이벤트와 숫자 마커 ID를
+청크에 쓰므로, 별도의 바이트 직렬화 단계를 넣지 않고 이 청크를 프로세스 내부의
+native binary page로 사용한다. 이것은 Unity의 실제 내부 포맷을 추정해 복제한
+것이 아니며, 휴대 가능한 `.ceprof` 파일 포맷과도 구별한다.
+
+기록 스레드는 페이지가 차거나 프레임 경계에서 자기 페이지만 봉인한다. 봉인
+목록이 비어 있다가 첫 페이지가 들어올 때 C++20 `std::counting_semaphore`로
+수집기를 깨운다. 수집기는 프레임 제출 작업과의 순서를 지키며 페이지를 떼어
+헤더(매직·버전·이벤트 크기·개수)와 세대를 확인한다. 정상 페이지는 이벤트를
+복사하지 않고 프레임의 페이지 구간 인덱스로 잇는다. 늦은 CPU/GPU 구간만
+이벤트별로 제 프레임을 찾되, 가능한 경우에도 원본 페이지의 구간을 참조한다.
+손상 페이지는 계수와 누락 장부에 남긴다.
+
+프레임을 얼리거나 라이브 캡처를 공개할 때는 프레임 인덱스와 불변 페이지 참조만
+복사한다. 마지막 캡처가 페이지를 놓으면 풀로 되돌아간다. 이전 캡처가 서비스
+종료 뒤까지 살아 있어도 풀을 함께 보유하므로 포인터가 무효화되지 않는다.
+페이지 보유로 free 목록이 줄면 수집 스레드가 예산 상한 안에서 보충하며,
+기록자 경로는 할당이나 대기 없이 페이지를 얻거나 누락을 계상한다. 라이브
+스냅샷에서 봉인 요청에 응답하지 않은 스트림은 미확정 수와 함께 표시한다.
+
+검증: Debug·Release 코어 각 424항목 통과, 수집기 프레임 누락 변이는 두
+구성의 `basic/count`에서 검출. 페이지를 프레임 경계 없이 봉인해도 수집기가
+깨어나는 경우, 이전 스냅샷 불변성·종료 뒤 페이지 생존·미응답 스트림·손상
+페이지 거절, 지운 녹화의 누락 기준선 초기화를 포함한다. Debug Editor·Player 빌드와 실제 Editor의
+`Stats/Workers/Window/Gpu` 게이트가 통과했다. Stats에서는 별도 수집 OS 스레드,
+누락 이벤트 0, 손상 페이지 0, 버린 프레임 경계 0을 확인했다. 장시간 고부하의
+큐 포화·종료 경합과 여러 플랫폼/빌드 구성은 아직 이 증거에 포함되지 않는다.
+
+### 0.5.30 2026-09-23 CPU 수집기를 전용 신호 대기 스레드로 이전
+
+사용자 결정: 이번 변경은 **전용 수집 스레드까지**이며 Profiler 표시 창의 별도
+프로세스화는 포함하지 않는다. Unity 화면의 `WaitForSignal`·`Deserialize`는
+동작의 단서일 뿐 내부 직렬화 형식의 사양이 아니다. 현재 라이브 자료는 이미
+`event_chunk`이므로 역직렬화를 흉내 내기 위해 프레임마다 바이트로 바꾸지 않는다.
+
+기록 스레드의 소유 규칙은 유지한다. `publish_frame()` 호출자는 자기 청크를
+봉인하고 남의 스트림에는 요청만 보낸 다음, 그 시점까지 봉인된 청크·엔진 프레임
+번호·경계 tick을 한 작업으로 제출한다. 전용 수집기는 세마포어에서 자다가 작업이
+들어오면 FIFO 순서로 청크를 링에 반영하고 프레임을 닫으며, 요청된 라이브
+스냅샷을 만든다. 프레임 호출자는 링·캡처를 직접 만지지 않는다. `record`·`clear`와
+프레임 제출은 한 줄에서 순서를 지키고, `pause`는 호출자 자신의 꼬리를 먼저
+봉인한 뒤 수집기가 얼림을 마친다. 즉시 캡처를 돌려주는 `profile.frame`만
+명시적인 완료 경계를 기다린다.
+
+제출 큐는 프레임 작업 256개에서 자른다. 포화 시 잃은 프레임·이벤트를 세고
+Collector 탭과 `profile.stats`에 드러낸다. 건너뛴 시간은 다음 정상 프레임의
+길이에 합치지 않는다. 종료는 대기 중인 작업을 처리하고 수집 스레드를 join한
+뒤에 스트림·풀을 정리한다. `.ceprof` 파일의 Save/Open 경로와 Editor 안의
+ProfilerWindow는 이번 변경에서 그대로 둔다.
+
+코어 기준 검사는 Debug·Release 각 409항목 통과, 전용 소비자가 프레임 수집을
+건너뛰는 변이는 `basic/count`에서 붉어진다. Debug Editor·Player 빌드와
+Editor 제품 경로의 `-Action Stats/Workers/Window/Gpu`도 통과했다. Stats에서
+수집기 OS 스레드 ID가 GameThread와 다르고 버린 프레임 경계가 0인 것을 확인했다.
+대량 제출 2,048프레임은 처리하거나 손실로 계상되는 것도 코어에서 확인했다.
+이들은 정상 부하의 제품 증거와 단기 대량 제출의 코어 증거다. 큐 포화·종료 경합을
+의도적으로 재현하는 장시간 부하와 다른 구성의 제품 실행은 아직 검증하지 않았다.
+
+### 0.5.29 2026-09-23 P7 목표 정정 — 외부 캡처 연결이 아니라 내장 렌더 디버거
+
+사용자가 요청한 것은 PIX/RenderDoc과 같은 방식으로 프레임을 조사하는 **엔진 내장형**
+도구다. 이전 P7의 자동 trigger·PIX/ETW 연결은 비교 도구의 이름을 제품 요구로
+잘못 옮긴 계획 오류다. 이 문서 §9·§10 P7·§14와 대시보드는 내장 Render Frame
+Debugger를 목표로 고쳤다. 구현 단위 RF0~RF7과 완료 조건은
+`RenderFrameDebuggerPlan.md`가 정본이다. 이 절보다 아래에 남은 과거 일지의
+"P7 자동 trigger/PIX" 표기는 당시 계획의 기록이며 현재 범위가 아니다.
+
+### 0.5.28 2026-09-23 P6-3 에디터가 파일을 열고 쓴다 — 다음 프레임이 연 파일을 덮는다
+
+Profiler 창 도구줄에 **Save**·**Open** 이 붙었다. Save 는 **보고 있는** 캡처를
+쓴다(캡처가 없으면 꺼져 있다). Open 은 파일을 읽어 그 캡처를 보여 주고, 도구줄
+아래 한 줄에 "파일: 이름 · frame a..b (n) · 이벤트 · 스레드" 를 띄운다. 저장·열기가
+실패하면 `describe()` 의 까닭(잘림 · 손상 · 형식 아님 · 판 불일치 · 어긋남)이 같은
+자리에 남는다 — 손상된 파일을 열었는데 아무 일도 안 일어나면 사용자는 버튼이 안
+먹는다고 읽는다.
+
+**★ 창에서 `adopt()` 만 부르면 연 파일이 한 프레임 뒤 사라진다.** 창은 매 프레임
+`reader().sync(service.capture())` 를 부르고, 따라가기가 켜져 있으면 그것이 라이브
+캡처로 **조용히** 덮는다. 그리고 `adopt()` 는 같은 녹화의 다음 스냅샷을 받는
+자리라 선택과 그래프 창을 **이어 간다** — 파일은 프레임 번호부터 남의 것이라, 이어
+가면 라이브에서 보던 선택이 파일 범위의 가장자리에 잘려 붙고 그래프는 파일의
+앞머리에 서서 최신을 안 보인다. 셋을 코어의 `capture_reader::open()` 한 곳에 모았다:
+따라가기를 끄고, 그래프 창을 비우고, 파일의 최신 프레임을 고른다. 따라가기를 다시
+켜면 라이브로 돌아간다 — 돌아가는 길이 따로 없는 이유다.
+
+이 정책을 창이 아니라 코어에 둔 것은 **재기 위해서**다. 창에서 네 호출을 조합하면
+그 순서가 맞는지를 물을 수단이 눈뿐이다. 코어 검사 `open/*` 여덟이 그것을 문다 —
+자극의 두 캡처는 프레임 번호가 **겹치지 않게**(라이브 1..20, 파일 100..130) 두었다.
+겹치면 "보던 선택을 이어 갔다" 와 "파일의 최신을 골랐다" 가 같은 번호로 나와 가를
+수 없다. 연 캡처는 메모리의 것을 그대로 넘기지 않고 `encode → decode` 를 지난
+것이다 — 그래야 이 검사가 파일 경로를 한 번이라도 지난다.
+
+| 계약 | 무는 절 | 변이 |
+|---|---|---|
+| 열면 따라가기가 꺼진다 | `open/stops-following` | `reader-open-keeps-following` |
+| 그래프가 파일의 최신 끝에 선다 | `open/graph-at-latest` | `reader-open-keeps-graph` |
+| 파일의 최신 프레임을 고른다 | `open/selects-latest` | `reader-open-keeps-selection` |
+
+**★ 온전함 경고가 남의 캡처 이야기를 하고 있었다.** "얼림이 온전하지 않다" 는
+라이브 서비스 요약(`summary.capture_complete`)을 읽었다 — 파일을 보는 동안에도
+지금 녹화의 상태를 말한다. 보고 있는 캡처의 `complete()`·`unacked_streams()` 를
+읽게 했다. P6-1 에서 어휘와 시계를 캡처로 옮긴 것과 같은 결함이다. Collector 탭은
+그대로 라이브 기록기의 장부다 — 떨어뜨린 수·늦은 수는 파일에 없다.
+
+**유니티 blob 두 가지.** 파일 대화상자는 `<windows.h>` 를 요구하는데 그 min/max
+매크로가 옆 파일의 `std::min`·`std::max` 를 깨뜨린다 — 대화상자를
+`ProfilerCaptureDialog.cpp` 한 파일에 가두고 blob 에서 뺐다(`IncludeInUnityFile`).
+창의 파일 도우미는 익명이 아니라 이름 있는 네임스페이스(`capture_file_view`)에
+두었다 — 익명 네임스페이스는 blob 에서 옆 파일과 공유된다.
+
+**하지 않은 것 셋.**
+
+- **비동기 저장**(§P6 할 일). 저장은 파일 대화상자 뒤에서 도는데 대화상자가 이미
+  화면을 막고, 600 프레임 실측 캡처가 863 KB 다. 저장 대상이 안 변한다는 완료 조건은
+  얼린 캡처가 불변이라 이미 선다(§0.5.27). 캡처가 수십 MB 로 커지는 것을 실측한 뒤에
+  짓는다.
+- **캡처 metadata**(§8.2 의 엔진 버전 · 빌드 · 세션 시각 · 플랫폼). 형식에 그 청크가
+  없다. 지금 파일 줄에 뜨는 것은 프레임 범위 · 이벤트 · 스레드 수뿐이다. 모르는 청크는
+  건너뛰므로 판을 올리지 않고 더할 수 있다.
+- **화면에서 눌러 본 적이 없다.** 대화상자는 OS 모달이라 이 세션의 손으로 몰 수
+  없다. 무는 것은 코어의 `open()` 계약과 에디터 빌드(오류 0)까지다.
+
+게이트. 코어 Debug·Release 각 402 검사. 변이는 Debug 에서 65 전부, Release 에서는
+**새 셋만**(`-Only 'reader-open-*'`) — Release 전부는 30 분을 넘겨 도중에 멈췄다.
+그때까지 Release 변이 15 개가 다 잡혔고, 멈춘 뒤의 50 개는 이번에 안 바뀐 계약이다.
+에디터 Debug 빌드 오류 0.
+
+### 0.5.27 2026-09-23 P6-2 `.ceprof` — 첫 판에 다 초록이었다는 것은 아무것도 증명하지 않는다
+
+`ProfileCaptureFile.h/.cpp`. 머리(매직 · 형식 버전 · 청크 수) · 청크 표(종류 ·
+버전 · 위치 · 크기 · CRC-32) · 청크 넷(환경 · 마커 · 스레드 · 프레임).
+
+**메모리 안에서 쓰고 읽는 길을 따로 뒀다**(`encode_capture` / `decode_capture`).
+그래서 게이트가 디스크 없이 **모든 바이트 위치에서** 파일을 잘라 본다 — 몇 군데만
+고르면 그 사이의 경계(개수 필드 한가운데, 문자열 길이 바로 뒤)가 비는데, 거기가
+실제로 넘치는 곳이다.
+
+**★ 이벤트는 필드 하나씩 쓴다.** `profile_event` 를 통째로 복사하면 구조체의
+패딩과 배치가 곧 파일 형식이 된다. 그 구조체는 "크기가 바뀌면 이 줄을 고쳐라" 는
+`static_assert` 를 달고 있다 — 레코드를 넓히는 순간 모든 옛 파일이 **조용히 틀린
+값으로** 읽힌다. 바이트 순서도 같은 이유로 `static_assert(endian::little)` 로
+못 박았다. 다른 순서의 기계로 옮기는 날 다른 형식을 조용히 쓰는 대신 컴파일이
+멈춘다.
+
+읽는 쪽의 원칙 넷:
+
+- **잘림과 손상을 가른다.** 모든 청크의 범위를 **먼저** 재고(넘치면 `truncated`),
+  그다음에 CRC 를 본다. 순서가 반대면 잘린 파일이 "손상됐다" 로 읽혀, 다시 받으면
+  될 파일을 버리게 만든다.
+- **손상된 개수로 거대한 할당을 하지 않는다.** `개수 × 최소 크기 ≤ 남은 바이트`
+  를 먼저 잰다.
+- **청크를 남김없이 읽는다.** 남는 바이트가 있으면 `malformed` — 쓰는 쪽과 읽는
+  쪽이 필드 하나라도 어긋나면 여기서 드러난다.
+- **프레임은 엄격히 오름차순이어야 받는다.** `find_frame` 이 이분 탐색이라, 순서가
+  어긋난 캡처는 멈추지 않고 **엉뚱한 프레임**을 낸다.
+
+저장은 임시 파일에 완성한 뒤 `rename` 으로 교체한다(§8.2). 저장이
+`const capture_session&` 를 받으므로 저장 중에 녹화가 이어져도 대상이 안 변한다 —
+§P6 완료 조건 넷째가 잠금이 아니라 **자료구조로** 선다.
+
+**★ 새 검사 45 개가 첫 컴파일에서 전부 초록이었다.** 그것은 아무것도 증명하지
+않는다. 변이 여섯이 증명이다.
+
+| 계약 | 무는 절 | 변이 |
+|---|---|---|
+| 망가진 몸통은 CRC 가 거절 | `file-reject/checksum` | `capture-file-skips-crc` |
+| 잘리면 "잘렸다" 로 | `file-reject/cut-is-truncated` | `capture-file-cut-as-damage` |
+| 모든 이벤트의 모든 필드가 같다 | `file/round-trip/event-fields` | `capture-file-swaps-fields` |
+| 프레임이 오름차순이 아니면 거절 | `file-reject/order` | `capture-file-accepts-unordered` |
+| 거대한 개수에 맞춰 할당하지 않는다 | `file-reject/bounded-allocation` | `capture-file-trusts-count` |
+| 교체 뒤 임시 파일이 안 남는다 | `file-disk/no-temp` | `capture-file-leaves-temp` |
+
+`capture-file-swaps-fields` 가 이 표에서 가장 중요하다. 스레드와 깊이는 같은 폭
+(u16)이라 바꿔 써도 **읽기가 성공하고 수도 전부 같다.** 수만 세는 왕복 검사는
+이것을 통과시킨다 — 그래서 왕복 검사가 필드 전부를 대조한다. 자극도 그에 맞춰
+세웠다: 제출 번호·뷰·큐를 가진 GPU 구간, 길이 없는 사건, 중첩, 스레드 둘. 그
+넷이 자극에 실제로 있는지를 먼저 단정한다(`file/stimulus-*`) — 없으면 그 필드를
+안 쓰는 writer 도 초록이다.
+
+**★ 자극이 없던 방어가 하나 있었다.** 개수 방어(`can_hold`)는 잘린 파일로는
+닿지 않는다 — 잘린 파일은 전부 **범위 검사에서 먼저** 걸린다. 걷어도 초록이었을
+절이다. CRC 가 맞는 채로 개수만 거대한 파일을 만들어 자극했다. CRC 는 검사 쪽에
+**비트 단위로 따로 유도한** 구현으로 다시 계산한다 — 코어의 표 방식을 한 번 더
+부르면 같은 출처를 두 번 부르는 것이지 대조가 아니다. 그 대조가 덤으로 "형식이
+표준 IEEE CRC-32 를 쓴다"(`file-reject/crc-standard`)까지 증명한다.
+
+**★ 그 자극만으로는 판정이 안 섰다.** 방어가 없어도 첫 프레임을 읽다 바이트가
+모자라 결과는 똑같이 "거절" 이다. 다른 것은 그 전에 43 억 칸을 **잡으려 든다**는
+것뿐인데, 그 끝이 구성마다 갈렸다 — Debug 는 `resize` 가 곧바로 `bad_alloc` 을
+던졌고, **Release 는 실제로 잡아 채우다 60 초 제한에 걸려** 게이트가 시간 초과로
+붉었다. 그래서 판정을 결과가 아니라 **할당 요청 크기**에 건다
+(`file-reject/bounded-allocation`). 프로브가 전역 `operator new` 를 갈아, 무장한
+동안 가장 큰 요청을 적고 1 GiB 를 넘으면 곧바로 던진다. 단정은 "해독 중 가장 큰
+할당 ≤ 입력 × 16" 이다 — 어느 구성에서든 빠르고 똑같이 붉다.
+
+**검사되지 않는 것 둘을 밝혀 둔다.**
+
+- **교체의 원자성.** "쓰다 끊겨도 기존 파일이 안 깨진다" 는 쓰기 **도중의**
+  실패로만 드러나는데, 여기서는 그 실패를 만들 수 없다. 게이트가 무는 것은 "임시
+  파일이 남지 않는다" 와 "같은 이름에 다시 쓸 수 있다" 까지다.
+- **lazy frame access**(§P6 할 일). 600 프레임 실측 캡처가 863 KB 라 통째로
+  읽어도 되고, §P6 완료 조건에도 없다. 캡처가 수십 MB 로 커지는 것을 **실측한
+  뒤에** 결정한다 — 지금 짓는 것은 쓰일 곳 없는 복잡도다.
+
+게이트. 코어 Debug·Release 각 394 검사 · 변이 62. 에디터 빌드 오류 0.
+
+### 0.5.26 2026-09-23 P6-1 캡처가 제 어휘와 시계를 들고 다닌다 — 파일보다 먼저
+
+P6 의 첫 조각은 파일이 아니다. 파일을 먼저 지었으면 아래 두 결함을 **파일 형식
+안으로 굳혔을** 것이다.
+
+**★ 이름이 프로세스 전역 표로만 풀렸다.** 화면·commandlet 이 전부
+`ce::marker_info(id)` 를 불렀다. 라이브에서는 같은 프로세스라 맞았지만, 파일에서
+읽은 캡처는 남의 빌드가 등록한 id 를 들고 오고 **같은 id 가 전혀 다른 이름을
+가리킨다.** 화면에는 멀쩡한 글자가 나오므로 눈으로도 게이트로도 못 잡는다.
+
+`capture_marker`(이름·파일·행·갈래를 **글자째** 소유)를 두고 `freeze()` 가
+그 순간의 표를 복사해 싣는다. 이름을 푸는 자리는 `capture_session::marker(id)`
+하나이고, 표 밖의 id 는 **빈 이름**이다 — 전역으로 물러나지 않는다.
+`Engine`·`Editor` 의 `marker_info()` 호출은 **0** 이 됐다(타임라인 막대·사건
+tooltip·구간 tooltip·Hierarchy/Flat 라벨·commandlet 둘).
+
+`snapshot_markers()` 는 잠금 **안에서** 글자까지 복사한다. 옛
+`registered_markers()` 는 잠금 밖으로 포인터를 내보내 "등록이 멈춘 뒤에만 쓴다"
+는 약속에 기대고 있었다.
+
+**★ 같은 결함이 시계에도 있었다.** `ticks_to_milliseconds` 가 **읽는 기계의**
+QPC 주파수로 나눴다. 다른 기계에서 뜬 캡처는 모든 구간 길이가 두 주파수의 비만큼
+틀리고, 숫자는 여전히 그럴듯하다. §8.2 가 헤더에 "QPC frequency" 를 적어 둔
+이유인데, **메모리 안의 캡처에도 똑같이 필요했다.** `capture_environment` 를 두고
+`freeze()` 가 싣는다. 환산은 `capture_session::milliseconds()` 가 하고, 주파수를
+모르면 **0 을 낸다** — 이 기계 것으로 물러나지 않는다. 물러나는 경로를 남기면
+그 경로가 파일 캡처에서도 돈다.
+
+| 계약 | 무는 절 | 변이 |
+|---|---|---|
+| 캡처가 제 이름을 말한다 | `vocabulary/name-outer` · `name-inner` · `kind` | `capture-vocabulary-empty` |
+| 얼린 뒤 등록은 안 섞인다 | `vocabulary/frozen` | `capture-vocabulary-follows-registry` |
+| 모르는 id 는 빈 이름 | `vocabulary/unknown` · `out-of-range` | `capture-vocabulary-unknown-named` |
+| 캡처가 제 주파수를 든다 | `clock/carried` | `capture-clock-dropped` |
+| 1초치 tick = 1000 ms | `clock/milliseconds` | `capture-clock-seconds` |
+| 주파수를 모르면 0 ms | `clock/unknown-zero` | — |
+
+**★ 하네스 한계 하나.** `marker_count()` 를 헤더에 inline 으로 뒀더니 변이가
+**아무 효과 없이** 적용됐다. 이 하네스는 **컴파일 목록의 `.cpp`** 만 갈아
+끼우므로, 헤더에 적힌 계약은 이빨을 증명할 수단이 아예 없다 — 그 자리는 조용히
+"검사됐다" 로 세어진다. `marker_count()` 를 `.cpp` 로 내리고 헤더에 이유를 적었다.
+
+**★ 옛 변이의 앵커가 낡았다.** `freeze()` 가 시계를 받으며 호출이 두 줄로 갈리자
+`freeze-always-complete` 가 "대상이 소스에 없다" 로 붉어졌다. 하네스가 설계대로
+멈춘 것이다. 앵커를 둘째 줄의 온전함 인자로 옮겼다 — 같은 줄을 시계 변이도
+잡지만, 변이는 각자 원본에 따로 걸리므로 서로를 가리지 않는다.
+
+게이트. 코어 Debug·Release 각 345 검사 · 변이 56. 에디터 빌드 오류 0.
+
+### 0.5.25 2026-09-22 문서 부채 — 계획서가 남은 일을 잘못 세고 있었다
+
+코드가 아니라 **이 계획서와 게이트 README 가 틀린** 것을 고쳤다. 여기가 틀리면
+다음에 열었을 때 무엇이 남았는지를 다시 잘못 센다.
+
+**§11.0 을 새로 뒀다.** 회귀 세트는 9-16 에 폐지됐고 그 뒤로 검사는 "변경마다
+모아 묶어" 돌린다 — **이름이 어디에도 없으면 다음 세션이 무엇을 돌려야 할지
+찾지 못한다.** 여섯 게이트를 이름 · 엔진을 띄우는가 · 무는 것으로 적었다. §14 의
+완료 조건 하나가 정확히 이것을 요구하고 있었다.
+
+**§14 체크박스 다섯을 닫았다** — Record/Pause/Clear · 600 프레임 rolling ·
+멀티스레드 Timeline + 선택 Hierarchy · `cross-frame/preserve` PASS · 검사 이름
+등재. 닫지 않은 것에는 **왜 아직인가**를 붙였다(예: overflow 표시는 앞의 셋이
+서고 profiler 자체 비용 칸만 없다).
+
+**남은 것을 한 문단으로 적었다.** 통째로 안 한 단계 셋(P5 counter · P6 `.ceprof`
+· P7 자동 trigger)과, 선 단계에 난 구멍 넷(§7.3 여섯째 트랙 · 멀티카메라 GPU
+매핑 · profiler 자체 비용 · UI 없는 Player 캡처).
+
+**★ 게이트 README 두 곳이 은퇴한 시스템을 설명하고 있었다.**
+`Tools/profiling-validation/README.md` 는 전체가 `profile.selftest` 와
+`CPUProfiler` 의 문서였다 — `PASS`/`KNOWN-DEFECT`/`SKIP` 삼분 판정,
+`PROFILE_SELFTEST_OK` 마커, `GetTLSUnsafe` 의 공유 TLS. **그 코드는 P1+P2 에서
+통째로 사라졌고**(`CPUProfiler` 소스 0 건), 그래서 §11.0 이 가리키는 문서가
+거짓말이 될 참이었다. 지금 네 축이 무엇을 자극하고 무엇을 무는지로 다시 썼고,
+P0 의 결함 표는 **"은퇴한 코어의 이력"** 이라고 못 박아 남겼다 — 같은 종류의
+결함이 새 코어에서도 가능하고, 그 계약들이 지금 `verify-profile-core.ps1` 의
+검사로 옮겨 가 있기 때문이다. 스크립트 자신의 `.DESCRIPTION`·`.PARAMETER` 도
+축 둘만 적고 있어 넷으로 고쳤다.
+
+**`Tools/regression/README.md` 표에 두 줄이 아예 없었다** —
+`verify-editor-startup-diagnostics.ps1` 과 `verify-player-shipping-isolation.ps1`.
+둘 다 존재하고 §14 의 조건을 지는데 표에 없었다. 표에 없는 게이트는 없는 게이트다.
+
+**★ 문서에 절대 수를 적지 않기로 했다.** 이번에 지운 거짓 중 셋이 낡은 숫자였다 —
+`PROFILE_CPU_BEGIN 호출부가 현재 41곳`(지금 0), `현재 등록 스레드 [GameThread] 1개`
+(지금 넷 + 워커), `각 112 검사`(지금 그보다 훨씬 많다). 기준선 숫자는 남이 계측을
+얹기만 해도 흔들린다. 코어 게이트의 검사·변이 수만은 **게이트를 실제로 돌려 나온
+수**로 적는다.
+
+**같이 정정한 것.** §11.4 의 "워커 8스레드가 계측 밖이라 모드 3·4 가 반쪽" 은
+풀린 조건이다(`-Action Workers` 가 문다). `.ceprof` 0 건의 범위도
+"저장소 전체" 가 아니라 `Engine`·`Editor`·`Tools`·`Dynamic_CPP` 전수로 좁혔다 —
+계획서 자신이 그 낱말을 쓰므로 "전체 0" 은 그 자리에서 거짓이다.
+
+**대시보드는 안 고쳤다.** `RefactoringPlanDashboard.html` 의 PHASE 14 여덟 줄을
+검산했더니 P4 `progress` · P5·P6·P7 `todo` 로 **당시 감사와 정확히 일치**했다.
+P4의 현재 상태는 2026-09-23 완료 기록(§0.5.35)을 따른다.
+
+### 0.5.24 2026-09-22 P4 타임라인이 **보이는 창**을 그린다 — 한 칸만 그리면 두 그림이 서로 다른 말을 한다
+
+§0.5.23 이 위 그래프를 고쳤는데 아래 타임라인은 그대로였다. 위가 244 프레임을
+보여 주는 동안 아래는 **고른 한 프레임**(1.6 ms 짜리 한 칸)만 그렸다. 같은 화면의
+두 그림이 서로 다른 범위를 말하고 있었고, 그러면 "0 프레임부터 400 프레임까지
+녹화했다" 는 사실이 그림 어디에도 안 남는다.
+
+**기준을 선택에서 창으로 옮겼다.** `capture_reader::window_aggregate()` 가
+`[graph_first, graph_last]` 를 접고, Timeline 이 그것을 읽는다. Hierarchy·Flat 은
+그대로 선택(`aggregate()`)을 읽는다 — 표가 세는 것은 "고른 구간의 합" 이고, 그
+뜻은 안 바뀌었다.
+
+**★ 접는 범위를 갈랐다.** Timeline 은 구간·레인·경계·사건만 쓰고 두 표를 쳐다보지
+않는다. 그런데 창은 녹화 중에 계속 미끄러진다 — 쓰지도 않는 Hierarchy·Flat 을
+그때마다 같이 세우면 프로파일러가 제가 재려는 프레임을 스스로 잡아먹는다. 그래서
+`aggregate_scope::spans_only` 를 두고 2b 절 뒤에서 끊는다.
+
+**★ 시야도 창을 따른다.** 예전에는 "선택이 바뀌면 시야가 그 구간으로 돌아간다"
+였다. 기준이 창으로 옮겨진 뒤로 그것은 **퇴행**이다 — 창 안에 있는 한 빈 화면이
+될 수가 없고, 고를 때마다 확대가 풀리면 확대가 뜻이 없다. 대신 창이 미끄러지면,
+**확대해 두지 않았을 때만** 따라간다.
+
+| 계약 | 무는 절 |
+|---|---|
+| 창 집계의 범위 = 그래프 창 | `window/first` · `window/last` |
+| 창을 좁히면 집계도 좁아진다 | `window/follows-span` |
+| 시야는 창 전체로 선다 | `timeline-view/spans-window` |
+| 골라도 시야가 안 움직인다 | `timeline-view/kept-on-select` |
+| 확대 안 했으면 창을 따라간다 | `timeline-view/follows-window` |
+| 확대해 뒀으면 굴려도 배율을 지킨다 | `timeline-view/zoom-held-on-pan` |
+
+변이 셋을 세웠다 — `timeline-view-follows-selection`(시야를 선택으로 되돌림),
+`timeline-view-reset-on-select`(고를 때마다 시야를 되돌림),
+`window-aggregate-stale`(창이 미끄러져도 다시 안 접음).
+
+**왼쪽 여백을 통일했다(150 px).** 두 그림이 같은 창을 그리므로 같은 x 가 같은
+자리여야 한다. 여백이 다르면 위 막대와 아래 구간이 어긋나 보이고, 그러면 눈으로
+잇는 일이 다시 사람 몫이 된다. 고른 프레임은 타임라인에 **띠**로 칠한다 — 창
+전체를 그리게 된 뒤로 "표에서 보고 있는 것이 어느 프레임인가" 가 그림에서
+사라졌기 때문이다.
+
+**★ 기준을 옮기면 그 기준으로 재던 검사도 같이 옮겨야 한다.** 기존
+`timeline-view` 검사가 `reader.aggregate()` 로 `low/high` 를 잡고 있었는데, 그
+자극은 스코프를 `publish_frame` **뒤**에 닫아서 19 틱짜리 프레임이 하나 더
+생긴다. 선택은 그것을 빼고 창은 품으므로 tick_end 가 19 어긋났다. 숫자만 보면
+"확대가 새는" 것처럼 읽히는 종류의 실패다.
+
+**화면.** 창 13637..13872(236 프레임 · 2258.961 ms)를 타임라인이 이어서 그린다.
+레인 넷(GameThread · RenderThread · PresentationThread · GPU Graphics)이 서고 자가
+0..2200 ms 로 선다.
+
+### 0.5.23 2026-09-22 P4 녹화 중에 보이는 그래프 — 흐르지 않으면 그래프가 아니다
+
+세 가지가 한 뿌리다. **녹화 중에 아무것도 안 보였고**, 보여도 **프레임이 쌓일수록
+막대가 얇아졌고**, 얇아진 막대 옆에 **단위가 없었다.**
+
+#### ① 분석하려면 Pause 를 눌러야 했다
+
+§6.4 를 글자 그대로 옮긴 결과다 — "얼린 것을 내놓는 자리는 `finish_pause()`" 라고
+적었고, 그래서 `m_capture` 에 값이 들어가는 곳이 그 함수 **하나**였다. 녹화 중에는
+reader 가 붙잡을 것이 없으니 화면이 빈다. 사람이 아는 흐름은 이것이 아니다.
+
+> **유니티 매뉴얼(Profiler window reference).** Record 는 수집 스위치다 — *"If
+> Record is disabled, the Profiler doesn't collect any data"*. 그리고 **Current
+> frame** 모드는 수집하는 **동안** 자료를 보여 준다. 매뉴얼은 Record 의 기본값을
+> 적지 않는다.
+>
+> ★ 이 문단이 있는 까닭: 앞서 "유니티는 기본이 녹화" 라고 **확인하지 않고**
+> 적었고, 그 위에 설계 판단을 얹었다. 유니티를 근거로 댈 때는 매뉴얼을 먼저
+> 연다.
+
+→ `request_live_capture()` 를 두고, `publish_frame()` 끝에서 **이미 닫힌** 프레임만
+얼려 내놓는다. 요청은 그리는 쪽이 매 프레임 한 번 넣고, 서비스는
+`live_capture_interval_ms`(기본 100 ms)로 솎는다. 녹화는 멈추지 않는다.
+
+- 열려 있는 프레임은 섞이지 않는다 — 얼리는 것은 링에 닫혀 들어간 것뿐이다.
+- 늦게 오는 GPU 구간은 몇 프레임 뒤에야 채워진다(§0.5.18). 화면에 그렇게 적었다.
+- 부팅할 때 `record()` 를 부르던 자리를 걷었다. P2 시절 잔재였고, Record 가
+  수집 스위치인 이상 **사람이 켜기 전에는 아무것도 모으지 않는 것**이 맞다.
+  이 때문에 `Invoke-ProfilingValidation.ps1` 의 `Stats`·`Window` 자극에
+  `profile.record` 를 명시로 넣었다 — 부팅 수집에 기대고 있었다.
+
+#### ② 막대 폭을 프레임 수로 나누고 있었다
+
+`barWidth = width / count` 였다. 600 프레임이 쌓이면 막대가 3 px 이 되고, 더
+나쁜 것은 **같은 프레임이 매 스냅샷 다른 x 에 그려진다**는 점이다. 그러면 그래프가
+왼쪽으로 흐르는 것이 아니라 매 프레임 다시 그려지는 다른 그림이 되어서, 방금 본
+스파이크를 눈으로 좇을 수가 없다.
+
+→ 막대 폭을 **고정**하고, 화면이 담는 만큼만 보여 준다. 새 프레임은 오른쪽에서
+들어오고 옛 프레임은 왼쪽으로 밀려 나간다. 나머지는 사라지지 않고 왼쪽에 남아
+있으며, 휠과 가로 스크롤 막대로 굴려서 본다.
+
+**★ 창 상태는 reader(코어)가 든다.** 선택·시야와 같은 까닭이다 — 화면에 두면
+"뒤로 굴려 놓으면 새 스냅샷이 와도 그 자리에 선다" 같은 계약을 잴 수단이 눈뿐이
+된다. 지금은 프로브가 문다.
+
+| 계약 | 무는 절 |
+|---|---|
+| 창을 안 세우면 보존 전체 | `graph/default-all` |
+| 폭을 정하면 **오른쪽 끝이 최신** | `graph/span-anchors-right` |
+| 새 캡처가 와도 폭은 그대로, 끝만 최신으로 | `graph/flows` |
+| 뒤로 굴리면 따라가기가 풀린다 | `graph/pan-stops-following` |
+| 굴려 놓은 자리는 새 캡처가 와도 지켜진다 | `graph/pan-held` |
+| 보존 구간 밖으로 안 나간다 | `graph/clamp-left` · `graph/clamp-right` |
+| 오른쪽 끝에 닿으면 따라가기가 다시 켜진다 | `graph/pan-to-newest-resumes` |
+| 고른 프레임이 창과 **같이** 움직인다 | `graph/selection-follows-pan` |
+| 굴려도 선택 폭은 그대로다 | `graph/selection-keeps-width` |
+
+**★ 축은 하나다.** 처음에는 타임라인에 **따로** 스크롤 막대를 달았다. 타임라인은
+고른 프레임을 그리고 제 안에서 확대·이동하므로 별개의 축이라고 봤는데, 그러면
+같은 화면에 굴릴 곳이 둘이 되고 사람이 두 곳을 손으로 맞춰야 한다. 굴리는 것은
+"지금 보고 있는 자리" 하나여야 한다.
+
+→ 타임라인의 막대를 걷고, `pan_graph` 가 그래프 창과 **고른 프레임을 같은 만큼**
+민다. 경계에서 창이 덜 움직였으면 선택도 덜 움직여야 하므로, 청한 양이 아니라
+**실제로 움직인 양**(`m_graphFirst` 의 전후 차)을 쓴다.
+
+**★ 변이 셋이 컴파일에서 막혔다 — 같은 함정을 §0.5.22 에서 겪고도.** `/W4 /WX`
+아래서 `anchor`·`span`·`lastFirst` 를 고아로 만드는 변이는 C4189 가 오류가 되고,
+하네스는 그것을 "대상을 잘못 짚었다" 로 낸다. 셋 다 값만 바꾸는 형태로 다시
+짰다 — `anchor = graph_last()` → `graph_first()`, 오른쪽 끝 계산 → `m_graphFirst`
+유지, `>=` → `<=`.
+
+**★ 세로 눈금은 계단에서 고른다.** 최댓값에 딱 맞추면 프레임 하나가 튈 때마다
+눈금이 통째로 바뀌어 **높이를 눈으로 비교할 수가 없다.** 16.67 · 33.33 · 50 ·
+100 · 200 · 500 · 1000 ms 중 보이는 구간을 덮는 가장 낮은 것을 쓴다. 눈금을
+보존 전체가 아니라 **보이는 구간**으로 세우는 것도 같은 이유다 — 굴려서 조용한
+구간으로 갔는데 옛 스파이크에 눌려 막대가 전부 바닥에 붙으면 읽을 것이 없다.
+
+#### ③-2 휠이 그래프를 굴리면서 **창도 같이 굴렸다**
+
+합성 `WM_MOUSEWHEEL` 로 굴려 본 캡처에서 그래프가 아니라 프로파일러 창이 통째로
+굴러 Record·Clear 툴바가 위로 잘려 나갔다. `ImGui::GetIO().MouseWheel` 을 읽는
+것만으로는 소유를 주장하지 않아서, 같은 프레임에 창의 기본 스크롤도 같이 돈다.
+
+→ 항목을 낸 **직후** `ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY)`. 프레임
+그래프와 타임라인 둘 다.
+
+같이 잡은 것: 굴린 **양**을 정수로 자르면 안 된다. 터치패드는 0.3 같은 값을 내고
+`static_cast<int>(0.3f)` 는 0 이라 아무 일도 안 일어난다. 방향만 본다.
+
+**⚠ 끌기·휠 자체는 화면으로 증명하지 못했다.** ImGui 의 Win32 백엔드는 마우스를
+`::GetCursorPos()` 로 읽고 `WM_MOUSEMOVE` 의 lParam 을 쓰지 않는다. 좌표 보정을
+정확히 해도(창 사각형·클라이언트 원점을 재서 보정 4,0 을 구함) ImGui 가 아는
+커서는 안 움직이고, 그래서 `hovered` 가 서지 않는다. 실제 커서를 `SetCursorPos`
+로 뺏어 와야 하는데 사람이 쓰고 있는 기기에서 할 일이 아니다. 굴림의 **계약**은
+코어 프로브가 물고(`graph/*` 9종), 그리는 층의 배선은 소스로만 확인했다.
+
+#### ③-3 Workers 자극도 `profile.record` 가 필요했다
+
+부팅 수집을 걷은 뒤 `-Action Workers` 가 "얼린 캡처가 없다" 로 붉어졌다. Stats·
+Window 에만 넣고 이 축을 빠뜨렸다. **씬 교체 앞**에 둬야 한다 — 켜는 시점이 교체
+뒤면 SceneActivated 사건이 기록 밖에서 일어나 §7.3 트랙 1 이 빈다.
+
+#### ③ 자가 없었다
+
+막대만 그리면 "이게 몇 ms 짜리냐" 를 그림에서 읽을 수가 없다. 글로 적어 둔
+"시야 n ms" 는 전체 폭이 몇 ms 인지만 말한다.
+
+→ 타임라인 위에 **ms 자**를 얹었다. 0 은 고른 구간의 시작이고(절대 tick 은 열
+자리를 넘어 아무것도 안 읽힌다), 간격은 1-2-5 계단에서 고른다 — 0.347 ms 간격은
+자가 아니다. 눈금선은 자에서 끝나지 않고 **레인 바닥까지** 내린다. 자와 막대를
+눈으로 맞춰야 하면 자가 자 노릇을 못 한다. 프레임 그래프 위에는 같은 방식으로
+**프레임 번호** 자를 얹었다.
+
+### 0.5.22 2026-09-22 P4 §7.4 Min·P95·Frames — 누적만으로는 안 나오는 셋
+
+§7.4 의 표에서 비어 있던 세 열이다. Total·Self·Calls·Avg·Max 는 누적 하나로
+나오는데, 이 셋은 그렇지 않다.
+
+| 열 | 왜 누적이 안 되는가 |
+|---|---|
+| Min | 누적으로 된다(빠져 있었을 뿐) |
+| P95 | **분포**를 알아야 한다 — 호출마다의 길이가 남아야 나온다 |
+| Frames | **중복을 지워야** 한다 — 같은 프레임의 여러 호출은 한 번이다 |
+
+그래서 접는 동안 호출마다 `(행, 프레임, 길이)` 표본을 남기고, 훑기가 끝난 뒤
+표본을 두 번 세워 낸다(길이 오름차순 → min·p95, 프레임 오름차순 → 중복 제거).
+
+**★ P95 는 보간하지 않는다.** nearest-rank 다 — 오름차순으로 세운 표본의
+`ceil(0.95 × n)` 번째를 그대로 낸다. 스무 번 불린 marker 의 p95 는 19 번째
+호출의 길이이고, 보간하면 19.05 가 나오는데 **그만큼 걸린 호출은 하나도 없다.**
+이 열을 보는 사람은 "이만큼 걸린 호출이 있었다" 로 읽는다.
+
+**★ 프레임을 "마지막으로 본 값" 과 비교해 세면 안 된다.** 세는 쪽에서 가장
+먼저 떠오르는 방법이고, 틀린다. 이벤트는 시작 tick 오름차순으로 훑는데 프레임
+경계를 넘긴 바깥 구간은 자기보다 늦게 시작한 자식보다 **큰** 프레임 번호를 달고
+먼저 나온다 — 그 자리에서 프레임 번호가 거꾸로 가고, 같은 프레임을 두 번 센다.
+
+**★ Flat 은 갈래를 합쳐서 만들 수 없다.** 같은 marker 가 한 프레임 안에서 두
+부모 밑으로 불리면 Hierarchy 행은 둘인데 **프레임은 하나**다. 행마다의 프레임
+수를 더하면 2 가 되고, 캡처에 있는 프레임 수보다 커질 수도 있다. p95 도 같다 —
+부분들의 p95 로는 전체의 p95 가 안 나온다. 그래서 Flat 은 합치지 않고 **같은
+표본을 다시 접는다.**
+
+**★ 부르는 자리가 §0.5.20 과 같은 함정이다.** 표본의 `row` 는 행 배열의
+색인이다. 행을 전위 순서로 다시 세우는 순간 그 색인이 남을 가리키므로,
+Hierarchy 는 **다시 세우기 전에** 접고, Flat 을 위해서는 표본의 색인도 `remap`
+으로 같이 옮긴다. 옮기지 않으면 남의 행에 자기 분포를 적는데, 합계는 하나도 안
+어긋난다.
+
+**검사.** 코어 프로브 **274 → 291 검사** · 변이 37 → **41**.
+(§0.5.23 에서 **324 검사** · 변이 **49** 가 됐다.)
+
+| 변이 | 잡은 절 |
+|---|---|
+| `p95-reports-max`(p95 자리에 max) | `distribution/p95` |
+| `distribution-sorted-descending`(표본을 내림차순으로) | `distribution/min` |
+| `frames-count-duplicates`(프레임 중복을 안 지움) | `distribution/frames` |
+| `flat-copies-branch-distribution`(Flat 이 갈래 분포를 베낌) | `flat-union/frames` |
+
+**★ 변이는 값만 틀리게 해야 한다.** `p95-reports-max` 를 처음에는
+`row.p95_ticks = samples[end - 1].ticks` 로 적었는데 **컴파일이 안 됐다.** 이
+게이트는 `/W4 /WX` 라, 그 변이가 `rank` 를 미사용으로 만들면 C4189 가 오류가
+된다. 하네스는 그것을 "변이가 대상을 잘못 짚었다" 로 낸다. 표적을 등수 계산
+자체(`rank = count`)로 옮겼다 — 쓰이던 것을 안 쓰이게 만드는 변이는 계약이 아니라
+컴파일을 문다.
+
+**자극은 GPU 구간으로 지었다.** `busy_ticks` 는 회차마다 길이가 달라 p95 의
+**값**을 물을 수가 없고, 물을 수 없으면 "커 보이니 맞겠지" 로 끝난다. GPU 구간은
+tick 을 직접 주므로 길이 1..20 을 네 프레임에 다섯씩 나눠 심을 수 있다 —
+min 1 · max 20 · p95 19 · Frames 4 를 **수로** 문다.
+
+Flat 쪽 자극은 `Left{Shared}` 와 `Right{Shared}` 를 한 프레임 안에 나란히 둔다.
+호출 6 · 프레임 3 이어야 하고, 갈래를 더하는 구현에서는 6 이 된다.
+
+**표.** Hierarchy·Flat 에 `Min ms` · `Max ms` · `P95 ms` · `Frames` 네 열이
+섰다(7 → 10 열). Frames 를 Calls 옆이 아니라 맨 뒤에 둔 것은 둘을 나란히 두면
+같은 것의 다른 표기로 읽히기 때문이다 — 한 프레임에 열 번 불린 것과 열 프레임에
+한 번씩 불린 것은 Calls 가 같고 Frames 가 다르다.
+
+**⚠ 열 머리글이 잘린다 — 원인을 짚었고, 그 원인은 여기 있지 않다.**
+
+화면을 떠 보니 `Total ms` 가 "Tota...", `Frames` 가 "Fra..." 로 나온다. 열을
+더하기 **전부터** 있던 잘림이다. 열 경계 픽셀을 세어 둘로 갈랐다.
+
+**① 칸 여백이 열마다 27 px 을 먹는다.** 에디터 테마는 `CellPadding.x = 6` 을
+두고 마지막에 `ScaleAllSizes(FontScaleMain × FontScaleDpi)` 를 먹인다. 이
+기기에서 1.5 × 1.5 = 2.25 이므로 실제 값이 **13.5** 이고, ImGui 는 열마다 그것을
+양쪽에 더한다. 열이 열이면 270 px 이다. 옛 상수(130/80/60/70)와 잰 열 폭
+(157/107/87/97)의 차가 정확히 27 이었던 것이 이것이다.
+
+→ 표를 그리는 **동안만** `CellPadding.x` 를 반으로 밀고 되돌린다
+(`table_padding_scope`). 전역으로 고치지 않는다 — 같은 스타일을 Inspector·Content
+Browser 도 쓰고 그쪽은 글자 위주라 넉넉한 여백이 맞다. 재 보니 열마다 13.5 px 이
+줄었다(157 → 144 · 107 → 94 · 87 → 74 · 97 → 84).
+
+**② 글자가 잰 것보다 1.5 배 넓게 그려진다 — 이것이 잘림의 원인이다.** 폭을
+`CalcTextSize` 로 재서 넘겨 봤더니 열 폭이 80 px 판과 **픽셀 단위로 같았다.**
+폭을 아예 주지 않고 ImGui 의 auto-fit 에 맡겨도 같았다. 셋이 같은 수를 내는 것은
+우연이 아니다 — 옛 상수는 애초에 ImGui 가 재는 값에 맞춰 고른 수였고, 내 계산도
+ImGui 의 auto-fit 도 같은 `CalcTextSize` 를 쓴다.
+
+그 값이 실제와 다르다. Thread 열은 `[RenderThread]`(14 자)에 맞춰 폭 130.5 로
+섰는데, 거기 들어간 글자는 `[RenderTh`(9 자)뿐이다. 그려진 글자를 픽셀로 재면
+`Thread` 여섯 자가 97 px(≈ 16.2 px/자)이라, 14 자는 ~207 px 이 필요하다.
+207 / 130.5 ≈ **1.6**. `editor.theme` 가 내는 수와 맞는다 — `fontScaleMain 1.5` ·
+`fontScaleDpi 1.5` · `renderedFontSize 36`. 그리기에는 두 배율이 다 먹고 재기에는
+하나만 먹는다.
+
+→ 이것은 **프로파일러 표의 문제가 아니다.** 글자 너비로 칸을 잡는 모든 자리가
+같은 비율로 좁게 선다. 고칠 자리는 폰트·배율 설정(`ImGuiHost` · `EditorTheme`)
+이고, 고치면 에디터 전체의 배치가 움직이므로 chrome 골든을 다시 떠야 한다.
+여기서는 날 숫자를 걷어 auto-fit 에 맡겨 두었다 — 그쪽이 고쳐지는 날 이 표는
+따라간다.
+
+**남은 것.** §7.4 의 `GC/Counter` 열은 counter provider 가 설 때다. §7.3 의
+여섯째 트랙(Compute/Copy)은 백엔드가 그 큐를 쓰기 시작하면 `queue` 로 갈린다.
+
+### 0.5.21 2026-09-22 P4 프레임 경계 트랙 — 점에는 길이가 없다
+
+§7.3 이 적은 첫째 트랙이다. §0.5.20 이 "instant event 자체가 코어에 없으므로
+`frame_boundary` 는 자리만 잡아 두었다" 로 끝났고, 그 자리를 채웠다.
+
+**경계는 집계가 들고 있어야 한다.** 집계가 이미 들고 있던 `tick_begin/tick_end`
+는 **고른 범위 전체**의 양 끝이라, 프레임이 어디서 갈리는지는 말하지 못한다.
+그리는 층이 그것을 알려면 캡처를 다시 훑어야 하고, 그 순간 접는 일이 두 곳에
+생긴다 — 이 계층의 규약은 "접는 일은 전부 코어" 다. 그래서 `frame_boundary`
+목록을 집계가 함께 낸다.
+
+**길이가 없는 사건.** `tick_end == tick_begin` 인 점이다. 무엇이 **일어난 순간**만
+말한다 — 씬이 바뀌었다, Play 에 들어갔다. `event_flags::instant` 로 갈린다.
+
+**★ 이것을 Hierarchy·Flat 에 넣지 않는다.** 그 두 표가 세는 것은 **걸린 시간**이고
+점에는 그것이 없다. 넣으면 `total 0 · calls N` 인 줄이 시간 순위표에 섞인다.
+
+> **정정.** 처음에는 다른 이유를 적었다 — "깊이 0 짜리 점이 스택에서 부모를
+> 밀어내고, 그 뒤의 자식들이 루트로 올라온다" 고. 변이 `instant-into-tree` 가
+> 그것을 반증했다. 잡힌 절은 `instant/keeps-parent` 가 아니라
+> `instant/not-in-tree` 였다. 까닭은 `write_instant` 가 깊이를 0 으로 박지 않고
+> **지금 열려 있는 깊이**를 적기 때문이다 — 그래서 트리에 들어가도 부모를
+> 밀어낼 수가 없다. 예측한 이유를 소스 주석 세 곳에 이미 적어 둔 뒤였고, 셋 다
+> 고쳤다. 변이가 잡아 준 것은 결함이 아니라 **내가 적어 둔 인과**였다.
+
+**경계와 사건을 맨 위 띠에 그린다.** 확대하면 프레임 번호가 화면에서 사라지고,
+그때 타임라인은 "무언가 오래 걸린다" 까지만 말한다. 띠가 프레임 번호를 들고,
+경계선이 레인을 가로질러 내려가고, 사건은 삼각형과 안내선으로 선다.
+
+**★ 화면을 떠 보고서야 잡은 것.** 레인의 줄 높이가 `18 px` 로 박혀 있었다.
+에디터가 한글 폰트를 얹으면서 한 줄이 그보다 커졌고, 그때부터 레인 이름과 그
+아래 ms 가 **서로 겹쳐** 그려지고 막대 안의 마커 이름도 위아래가 잘렸다. 접는
+일은 전부 코어가 하므로 **프로브가 무는 숫자는 한 군데도 안 어긋난다** — 눈으로만
+잡히는 종류다. 줄 높이·띠 높이·전체 높이를 `ImGui::GetTextLineHeight()` 에서
+끌어오도록 바꿨다.
+
+**검사.** 코어 프로브 **255 → 274 검사** · 변이 34 → **37**.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `boundaries-dropped`(경계를 안 실음) | `boundary/count` |
+| `instant-into-tree`(사건을 트리에 넣음) | `instant/not-in-tree` |
+| `instant-unflagged`(표식 없이 구간으로 씀) | `instant/present` |
+
+자극은 사건을 **바깥 구간 한가운데**에서 찍는다. 스코프 밖에서 찍으면 스택이
+비어 있어 부모를 밀어낼 일 자체가 없고, 그러면 `instant/keeps-parent` 는
+일어나지도 않은 사고를 통과시킨다.
+
+**라이브 축.** `-Action Workers` 가 `SceneActivated` 를 센다. 씬을 바꾸는 자극이
+이미 있었으므로 새 자극을 짓지 않았다.
+
+```
+길이 없는 사건   2건 (SceneActivated 2)
+```
+
+변이 `scene-activated-unmarked`(`NotifyActiveSceneChanged` 가 표식을 안 찍음)로
+`SceneActivated 0` 이 되어 붉어지는 것까지 봤다.
+
+**★ 그리는 일 자체는 게이트가 없다.** 위의 줄 높이 결함이 그 증거다 — 띠가
+그려졌다는 것은 화면을 떠서 눈으로 봤고, 그 눈이 같은 화면에서 **다른** 결함을
+찾았다. `-Action Window` 가 무는 것은 `ProfilerTimeline` 본문이 돌았다는
+데까지고, 무엇이 어떤 높이로 그려졌는지는 묻지 않는다.
+
+**남은 것.** §7.3 의 여섯째 트랙(Compute/Copy)은 백엔드가 그 큐를 쓰기 시작하면
+`queue` 로 갈린다. §7.4 의 Min/P95/Frames 열은 여전히 미뤄 둔 채다.
+(→ §0.5.22 에서 닫았다.)
+
+### 0.5.20 2026-09-22 P4 GPU Timeline 트랙 — 순서를 정하고, 막대가 자기 출처를 말하게 했다
+
+§0.5.9 가 미뤄 둔 둘을 닫았다. "그리는 트랙 순서(§7.3)는 GPU 트랙이 서는 P4 에서
+함께 정한다" 와, §7.3 이 GPU bar 에 싣기로 한 `submission_id` · view · pass name.
+
+**먼저 쟀다. 레인 순서가 회차를 타고 있었다.** 그때까지 레인은 슬롯 오름차순이고
+슬롯은 **등록 순서**다. 워커 여덟의 등록은 서로 겹치므로 실측이 이렇다.
+
+```
+1회차  [Worker 1], [Worker 5], [Worker 7], [Worker 4], [Worker 2], [Worker 6], [Worker 3], [Worker 8]
+2회차  [Worker 2], [Worker 5], [Worker 1], [Worker 6], [Worker 3], [Worker 4], [Worker 8], [Worker 7]
+```
+
+같은 코드로 레인 순서가 번갈아 나온다. 그 위에서는 "GPU 가 맨 아래" 도 우연이고,
+무엇도 고정할 수 없다.
+
+**트랙은 등록하는 쪽이 말한다.** `track_kind` 를 `thread_info` 에 얹고
+`register_thread` 가 받는다. 코어가 `"[Worker "` 같은 접두사를 뜯어 짐작하게 하면
+이름을 바꾸는 순간 순서가 **조용히** 무너지고, 그때 무너진 것을 가리키는 것이
+아무것도 없다 — `worker_hooks` 와 같은 뒤집기다.
+
+| 트랙 | 누가 | 비고 |
+|---|---|---|
+| `game_thread` | `[GameThread]` | |
+| `command_thread` | `[RenderThread]`(0) · `[Worker N]`(N) · `[PresentationThread]`(맨 뒤) | §7.3 의 셋째 묶음 |
+| `gpu_graphics` | `[GPU Graphics]` | 레인이 스스로 단다 |
+| `other` | 말하지 않은 것 | 맨 아래 |
+
+**★ `track_order` 가 따로 있는 이유.** 트랙 **안의** 순서를 슬롯으로 매기면 위의
+회차 문제가 그대로 남는다. enkiTS 의 `threadnum_` 은 0..N-1 로 안정 보장되므로
+워커 훅이 그 수를 함께 넘긴다 — 등록이 어떻게 겹치든 레인은 1,2,3… 으로 선다.
+
+**★ 순서를 바꾸는 자리에 함정이 있었다.** 레인의 스팬 경계(`span_begin/end`)는
+요약 목록을 **이벤트와 같은 순서로** 훑으며 적는다. 그 훑기 뒤에 레인을 다시
+세워야 하는데, 앞에 두면 첫 요약의 슬롯이 `events[0]` 과 안 맞아 **모든 레인이
+`[0,0)` 으로 비고** 아무것도 실패하지 않은 채 타임라인만 빈 화면이 된다. 경계는
+인덱스라 자리를 바꿔도 뜻을 지키므로, 먼저 적고 나중에 옮긴다.
+
+**GPU 막대가 자기 출처를 말한다.** `profile_event` 에 `submission` · `view` ·
+`queue` 를 얹고, `EnhancedLiveGpuSpanOrigin` 으로 경계를 넘긴다. 귀속은 **그
+제출의 표**(`GpuFrameToken`)에서 뽑는다 — "지금 기록 중인 슬롯" 을 읽으면
+§0.5.10 의 83% 가 그대로 돌아온다.
+
+실측이 왜 필요한지를 그대로 보여 준다.
+
+```
+frame 2888  Shadow  submission 20  view 1
+frame 2889  Shadow  submission 22  view 2
+```
+
+**이름이 같다.** 씬뷰와 게임뷰의 제출이 나란히 서기 때문이고, 제출 번호와 뷰가
+없으면 같은 패스가 두 번 그려진 것처럼 읽힌다.
+
+**★ fence 는 싣지 않았다.** 이 백엔드에서 `fenceValue` 는 `submissionId` 와 1:1 이라
+이벤트마다 8 바이트를 더 지고 **같은 것에 두 번째 이름**을 주는 일이 된다. §7.3 이
+적은 넷 중 이것 하나를 뺀 것이고, 큐가 여럿이 되어 둘이 갈라지면 그때 싣는다.
+대신 `queue` 를 실었다 — §7.3 의 여섯째 트랙(Compute/Copy)이 설 때 레인을 가르는
+자가 그것이다.
+
+**레코드가 32 → 40 바이트가 됐다(+25%).** 600 프레임 실측 캡처의 총량은
+**863 KB**(예산 128 MB). 자리를 겹치는(union) 대신 넓힌 이유는 "지금 이 칸이 무슨
+뜻인가" 를 `flags` 로 매번 되묻게 하지 않기 위해서다 — 그 물음을 한 번 빠뜨리면
+CPU 구간의 depth 가 제출 번호로 읽힌다. 이 수는 `static_assert` 로 못 박았다.
+조용히 커지면 아무도 그 결정을 내린 적이 없게 된다.
+
+**비교는 한 벌이다.** `track_precedes` 하나를 타임라인·집계·CLI 가 함께 쓴다.
+두 벌로 적으면 한쪽만 고쳐지는 날 화면과 게이트가 서로 다른 순서를 말하면서
+둘 다 자기가 옳다고 한다. 그 함수를 **헤더가 아니라 .cpp** 에 둔 것도 값이다 —
+변이 하네스가 바꿔 치는 단위가 .cpp 라, 헤더에 두면 이빨을 물을 수가 없다.
+
+**검사.** 코어 프로브 **255 검사** · 변이 31 → **34**.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `track-order-ignores-kind`(트랙을 안 보고 정렬) | `track-order/lane` |
+| `spans-walk-out-of-order`(경계를 요약 순서와 어긋나게) | `track-order/range` |
+| `gpu-origin-dropped`(제출 번호를 안 실음) | `gpu-origin/submission` |
+
+자극은 **일부러 거꾸로** 세웠다. 슬롯 오름차순이면 정답과 정확히 반대가 되도록
+등록해야, 두 순서가 우연히 같아 변이가 통과하는 일이 없다.
+
+**라이브 축 둘을 `-Action Gpu` 에 더했다.** 제출 번호가 0 인 GPU 구간 수와, 레인이
+트랙 순서를 어긴 자리 수. 뒤엣것은 **"어긴 자리 0" 이 잴 레인이 없어도 0** 이므로,
+레인이 둘 이상인 프레임을 실제로 훑었는지를 먼저 단정한다.
+
+```
+레인 귀속   흘린 조각 825 · 캡처의 GPU 레인 3칸 150건 · 어긋난 칸 0
+출처·트랙   제출 번호 0 인 구간 0 · 트랙 순서 위반 0 (레인 둘 이상인 프레임 5)
+```
+
+관측한 레인 순서:
+`[GameThread](1) → [RenderThread](2,0) → [PresentationThread](2,max) → [GPU Graphics](4)`.
+
+**남은 것.** §7.3 의 첫째 트랙(프레임 경계·instant events)은 아직 자료가 없다 —
+instant event 자체가 코어에 없으므로 `frame_boundary` 는 자리만 잡아 두었다.
+(→ §0.5.21 에서 닫았다.) 여섯째(Compute/Copy)도 백엔드가 그 큐를 쓰기 시작하면
+`queue` 로 갈린다. §7.4 의 Min/P95/Frames 열은 여전히 미뤄 둔 채다.
+
+### 0.5.19 2026-09-21 P2 종료 경계 — 세어만 두고 재지 않았다
+
+§0.5.18 이 "에디터의 실제 종료 경로에서 이 수가 0 인지는 아직 재지 않았다" 로
+끝났다. 재 봤다. **0 이 아니었다 — `abandoned=9`.**
+
+**★ 수만 있으면 고칠 자리를 못 짚는다.** 처음 읽은 것은 `abandoned=9
+retained=9 foreign=0` 하나였고, 그 9 가 누구인지는 어디에도 없었다. 표를 비운
+뒤에는 알 길이 없으므로, 비우기 **전에** 이름을 적게 했다. 그러자 답이 한 줄로
+나왔다.
+
+```
+[profiler] shutdown abandoned=9 retained=9 foreign=0 - [Worker 1], [Worker 5],
+[Worker 7], [Worker 4], [Worker 2], [Worker 6], [Worker 3], [Worker 8], [GPU Graphics]
+```
+
+| 결함 | 왜 | 고친 자리 |
+|---|---|---|
+| 워커 여덟이 주인 없이 남는다 | 전역 `thread_pool` 의 소멸자가 `main` 이 끝난 **뒤에** 돈다 — 그때 프로파일러는 이미 닫혀 있고, 워커의 종료 훅은 한 번도 안 불린다 | `EditorMain::Finalize` 가 프로파일러보다 **먼저** 풀을 접는다 |
+| `[GPU Graphics]` 가 주인 없이 남는다 | 레인의 저장소를 만든 것은 **처음 적은 스레드**(렌더 스레드)인데, 그 스레드의 `unregister_thread` 는 자기 TLS 스트림만 끊는다 | 렌더 스레드 종료 훅이 `retire_gpu_lane()` 을 부른다 — 주인이 아니면 아무것도 하지 않는다 |
+
+**★ 이 축은 코어 게이트로는 못 잡는다.** `verify-profile-core.ps1` 은 엔진 없이
+`cl` 로 코어만 링크한다. 전역 풀도, 렌더 스레드도, GPU 레인도 그 안에 없다 —
+없는 것을 재는 단정은 언제나 초록이다. 그래서 축을 **자극이 실제로 닿는 자**에
+붙였다.
+
+| 자극 | 게이트 | 단정 |
+|---|---|---|
+| 워커 여덟이 등록된 채 종료 | `verify-editor-startup-diagnostics.ps1` | 종료 줄의 `abandoned=0` · `foreign=0` |
+| GPU 레인이 선 채 종료 | `Invoke-ProfilingValidation.ps1 -Action Gpu` | 같은 줄 + 이미 있던 `$gpuLaneSeen` |
+
+**★ 빈 집합을 성공으로 읽지 않는다.** "버려진 0" 은 스트림이 하나도 안 생겨도
+0 이다. 두 게이트 모두 **먼저** 그 회차에 그 스트림이 실제로 생겼음을 단정한다 —
+앞엣것은 `profile.stats` 의 레인 표에 `[Worker *]` 가 있는지, 뒤엣것은 캡처에
+`[GPU Graphics]` 레인이 있는지를 묻는다.
+
+**★ 그리고 GPU 축은 앞 게이트에 두지 않았다.** 먼저 거기 적었더니 붉어졌다 —
+그 회차는 라이브 제출의 타임스탬프를 되읽는 데까지 가지 않아 레인이 **아예 안
+생긴다**(실측: 등록된 레인 11 개에 `[GPU Graphics]` 없음). 자극할 수 없는 절을
+단정으로 적으면 미자극이 결함으로 읽히고, 통과시키면 빈 집합이 초록이 된다.
+`render.live.wait` 을 쓰려 했지만 그 이름은 `--script` 경로의 등록표에 없다 —
+등록 경로가 둘이다.
+
+**변이.** 두 절을 각각 되돌려 A/B 로 물었다.
+
+| 변이 | 판정 | 관측 |
+|---|---|---|
+| `pool-shutdown-removed` | `verify-editor-startup-diagnostics` 붉음 | `abandoned=8 ... - [Worker 1..8]` |
+| `retire-gpu-lane-noop` | `-Action Gpu` 붉음 | `abandoned=1 ... - [GPU Graphics]` |
+
+이름을 적게 한 덕분에 변이의 관측이 **어느 절을 걷었는지까지** 말한다. 수만
+남겼다면 둘 다 "0 이 아니다" 로 똑같이 보였을 것이다.
+
+**★ 라이브 Pause 는 한 번 불완전했다.** 실제 UI 에서 버튼을 눌렀을 때
+`unacked=1 · captureComplete=false` 가 한 회차 나왔고, 같은 자극을 다시 돌리자
+`unacked=0 · captureComplete=true` 였다. 잠든 producer 가 상한 안에 안 깨어난
+것이고, 설계상 그럴 수 있다 — 그래서 그 회차의 캡처는 **온전하지 않다고**
+보고한다. 이제 그때 누가 응답하지 않았는지도 stderr 에 이름으로 남는다.
+`kPauseAckAttempts` 를 늘려 덮지 않았다: 수를 키우면 그 수가 곧 거짓말의 여유가 된다.
+
+**남은 것.** `Player` 는 `profiler().shutdown()` 을 부르지 않는다(프로세스 종료에
+맡긴다). 그래서 이 축은 에디터에서만 선다.
+
+### 0.5.18 2026-09-21 P2 제어 경계 — 기다림을 넣어 교착을 샀다
+
+§0.5.17 의 제어 큐가 **부른 쪽을 기다리게** 만들었다. "부른 직후에 캡처가 손에
+있어야 한다" 를 지키려던 편의가 잠금 순서를 뒤집었다.
+
+**★ 이것은 내가 만든 결함이다.** UI 는 씬 잠금을 쥔 채 `PresentFrame()` 안에서
+Pause 를 부르고([EditorMain.cpp:447]), 게임 스레드는 같은 잠금을 통과해야 그
+요청을 처리한다. 서로를 기다려 상한 2,000 ms 를 다 쓰고, 돌아왔을 때도 여전히
+recording 에 캡처는 없었다.
+
+| 결함 | 재현 | 고친 자리 |
+|---|---|---|
+| Pause 가 부른 쪽을 최대 2 초 막는다 | `pause-nonblocking/fast` | 기다림 제거 · `pausing` 상태 |
+| 부른 스레드 자신의 기록이 빠진다 | `pause-requester/present` | `freeze_self` — 기다리기 **전에** 자기 것을 잠근다 |
+| 종료가 살아 있는 writer 의 저장소를 해제한다 | `shutdown-retain/kept` | 소멸자에 소유 검사 · 풀과 함께 놓아 둔다 |
+
+**새 상태 `pausing`.** `pause()` 는 어느 스레드에서든 **그 자리에서** 절반을
+한다: 상태를 올리고, 자를 시각을 정하고, 자기 스트림을 자기가 잠근다. 링을
+만지지 않으므로 수집기와 겹치지 않는다. 마무리(응답 확인 → 얼림 → 공개 →
+`frozen`)는 수집기가 다음 프레임 경계에서 한다. 그래서 `pause()` 뒤의 상태는
+`frozen` 이 아니라 `pausing` 일 수 있고, 캡처가 필요하면 `frozen` 을 기다려야
+한다 — 창·명령·게이트가 그 계약을 따른다.
+
+**★ 같은 결함이 한 층 위에서 되풀이됐다.** 부른 쪽의 자기 봉인 문제를 고치자
+이번엔 **수집기**가 같은 자리에 걸렸다. `finish_pause` 는 응답을 기다리는 동안
+자기 봉인 요청에 응답할 자리를 지나지 못한다. 기다리기 전에 자기 것부터 잠근다.
+
+**★ 완료 판정이 두 뜻을 한 계수기에 넣고 있었다.** 미응답으로 잡힌 것은
+`Requester req=1 ack=0` 이었는데, 그 `1` 은 얼림이 아니라 **수집기가 매 프레임
+거는 평범한 봉인 요청**이었다. 등록만 해 두고 조용한 스레드는 안전한 자리를
+지나지 않으므로 그 요청에 영영 응답하지 않고, 그러면 얼린 캡처가 **언제나**
+"온전하지 않다" 가 된다. 얼림 응답(`freeze_request`/`freeze_ack`)을 따로 세고,
+넘길 것이 없는 스트림(`pending_work == false`)은 셈에서 뺐다.
+
+**★ 모달 창이 변이를 멈춤으로 바꿨다.** `control-applies-inline` 이 링의
+`vector` 를 두 스레드가 함께 만지게 하자 Debug 이터레이터 검사가 **창**을
+띄웠고, 게이트가 붉어지는 대신 그 자리에서 걸렸다. 판정이 종료 코드인
+하네스에서 창은 곧 무응답이다. 프로브가 어서션·오류를 stderr 로 내보내고 곧바로
+비정상 종료하게 했다(`silence_crt_dialogs`).
+
+**게이트.** Debug·Release baseline 초록, 변이 **31 종 전원 검거**.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `control-waits-for-apply` | `pause-nonblocking/fast` |
+| `shutdown-finishes-foreign` | `shutdown-retain/counted` |
+| `control-applies-inline` | `control-thread/deferred` |
+
+**★ 이빨이 없어 뺀 변이 둘.** `ack-before-seal`(재진입 가드 제거)과
+`freeze-ack-unconditional`(얼림 조건 제거) 은 **둘 다 통과했다.** 얼림 응답을
+평범한 봉인과 가르면서, 재진입한 안쪽 호출은 freeze 를 이미 0 으로 교환한 뒤라
+얼림 응답을 올리지 않게 됐기 때문이다. 남은 두 절은 **좁은 끼어듦 순서**를 막는
+것이라 걷어내도 그 순서가 실제로 겹쳐야만 붉어진다. 회차에 기대는 판정을 초록으로
+세워 두면 "이빨이 있다" 가 거짓말이 되므로 빼고, 그 자리에 왜 뺐는지를 적었다.
+그 구간은 `ack-delivery/rounds`(24 회)가 **경험적으로만** 덮는다 — 결정적
+보장이 아니다.
+
+**남은 것.** 놓아 둔 스트림은 프로세스가 끝날 때까지 산다. 종료 전에
+`unregister_thread` 를 부르지 않은 스레드가 있다는 뜻이고, 그 수는
+`abandoned_streams` 와 `retained_stream_count()` 로 보인다. 에디터의 실제 종료
+경로에서 이 수가 0 인지는 아직 재지 않았다.
+
+### 0.5.17 2026-09-21 P2 소유 경계 — 규약을 강제로 바꿨다
+
+감사가 정적으로만 짚었던 구조 셋(단일 collector · 불변 요약 · 종료 소유권)을
+닫았다. 셋 다 **"이 자료는 이 스레드의 것"** 이라는 같은 규약의 다른 면이고,
+규약으로만 적혀 있는 동안에는 아무도 지키지 않았다.
+
+**★ 충돌 판정은 회차에 기대는 자였다.** `collector-seals-others` 는 §0.5.15
+에서 "Debug·Release 모두 죽는다" 로 못 박았는데, 이번에 같은 변이가 **어떤
+실행에서는 초록으로 지나갔다.** 겹쳐야만 붉어지는 판정이기 때문이다. 그래서
+소유를 **세는 것**으로 바꿨다 — `thread_stream` 이 주인의 스레드를 들고, 주인이
+아닌 호출은 아무것도 하지 않고 `foreign_touches` 로 세어진다. 겹치든 말든 선다.
+
+| 것 | 전 | 후 |
+|---|---|---|
+| 남의 스트림 조작 | 규약(주석) · 겹치면 ACCESS_VIOLATION | 거절 + 계수 · `concurrent-publish/owned` 가 **결정적으로** 잡는다 |
+| `summary()` | 고쳐지는 중인 `m_ring` 을 직접 읽음 | 수집기가 찍어 둔 `ring_stats` 사본 |
+| `record`·`pause`·`clear` | 부른 스레드가 링을 직접 만짐 | 수집기 아니면 줄을 세우고 **적용될 때까지 기다린다** |
+| 종료 | 종료 스레드가 남의 `finish()` 호출 | 주인만 닫는다 · 못 닫은 것은 `abandoned_streams` |
+| 종료 뒤 남의 `thread_local` | 죽은 스트림을 계속 가리킴 | 자리마다 세대 · 어긋나면 **없는 것으로 읽는다** |
+
+**★ shutdown 은 부른 스레드의 자리만 끊을 수 있다.** 다른 스레드의
+`thread_local` 은 해제된 스트림을 계속 가리키고, 같은 스레드가 새 서비스에
+다시 등록하러 오면 "이미 등록됨" 으로 돌아가 그 포인터를 그대로 쓴다. 끊을 수
+없으므로 **읽히지 않게** 했다 — 자리마다 세대를 적고, 서비스가 든 세대와 다르면
+비어 있는 것으로 읽는다(`tls-epoch/`).
+
+**★ 기다림은 시간으로 재야 한다.** 제어 요청의 대기를 처음에 yield **횟수**로
+두었더니, 수집기를 60 ms 세운 자극에서 그대로 시간 초과로 붉었다. yield 한 번의
+길이는 부하에 따라 수십 배로 갈린다. 기다리는 대상이 프레임 경계이므로 상한도
+시간(2 초)이다. 끝내 적용되지 못한 요청은 `control_requests_timed_out` 으로
+센다 — 조용히 돌아가면 부른 대로 된 것처럼 보인다.
+
+**게이트.** Debug·Release baseline 초록, 변이 **32 종 전원 검거**.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `collector-seals-others` | `concurrent-publish/owned` (충돌 판정에서 계수로) |
+| `shutdown-finishes-foreign` | `shutdown-own/abandoned` |
+| `tls-ignores-epoch` | `tls-epoch/` |
+| `control-applies-inline` | `control-thread/deferred` |
+| `control-no-wait` | `control-thread/capture` |
+
+**자극이 자기가 재는 것을 못 잡을 뻔했다.** `control-thread/deferred` 가 처음
+붉었다. "수집기가 돌기 시작했다" 를 `summary().engine_frame` 으로 판정했는데,
+그 값은 `record()` 가 이미 올려 두므로 수집기가 한 번도 돌지 않았어도 0 이
+아니다. 표식을 수집기 스레드가 직접 세우게 바꾸고서야 자극이 성립했다.
+
+**창과 명령에도 낸다.** `profile.stats` 가 `foreignStreamTouches`·
+`abandonedStreams`·`controlRequestsDeferred`·`controlRequestsTimedOut` 을 내고,
+Collector 탭이 같은 값을 줄로 보여 주며 0 이 아니면 경고를 세운다.
+
+### 0.5.16 2026-09-21 P2 수집 경계 — 세대와 짝을 **자리**로 맞췄다
+
+§0.5.15 가 남긴 넷과, 외부 재감사가 추가로 재현한 넷을 함께 닫았다. 셋은
+자극을 세우자 그대로 재현됐고, 둘은 §0.5.15 에서 이미 닫혀 있었다.
+
+**뿌리는 하나다: 세대와 짝이 *청크 단위*로만 서 있었다.** 청크는 프레임마다
+봉인되는데 스코프는 그것을 넘어 살아 있고, 잘린 구간의 짝은 가장 **바깥**인데
+예약은 개수만 셌다.
+
+| 결함 | 재현 | 고친 자리 |
+|---|---|---|
+| 늦게 온 CPU 이벤트가 수집한 프레임에 앉는다 | `late-cpu/frame` 4 vs 1 | `capture_ring::place_by_tick` — 끝난 시각이 속한 칸으로 |
+| Clear 이전 청크가 새 링으로 재유입 | `clear-generation/dropped` 1 | 청크에 `generation`, `clear()` 가 올리고 봉인까지 청한다 |
+| Clear 뒤에 적은 것까지 유실 | `clear-new/kept` 0 | ★ 세대만 바꾸면 **쓰던 청크가 이어진다.** 끊어 줘야 한다 |
+| Clear 전에 **열린 스코프**가 재유입 | `clear-open/dropped` 1 | `open_scope::generation` — 스코프는 청크보다 오래 산다 |
+| pause 시점의 열린 스코프가 누락 | `pause-open/present` 부재 | `request_freeze` → `truncate_open_scopes` |
+| 다시 녹화한 뒤 짝이 뒤집힌다 | `resume-pair/closed-on-time` | `open_scope::emitted` — 짝은 **자리**로 맞춘다 |
+| ack 가 전달보다 먼저 온다 | `ack-delivery/sealed` 간헐 | `m_inHonor` 재진입 가드 |
+| 얼린 캡처가 온전한지 말하지 않는다 | `incomplete/flag` | `capture_session::complete()` |
+
+**★ 개수 예약은 방향이 반대였다.** 깊이 상한으로 못 연 구간은 언제나 가장
+안쪽이라 `m_skippedDepth` 로 맞는다. 그런데 얼림에 잘린 구간은 가장 바깥이다.
+같은 통에 넣자 **다시 녹화한 뒤 새로 연 구간의 종료가 그 예약을 먼저 먹고**,
+자기는 열린 채 남아 다음 pause 에서 "강제 종료" 로 기록됐다. 이제 잘린 구간은
+스택에서 꺼내지 않고 `emitted` 로 표시만 하고, 진짜 종료가 **그 자리에서**
+확인한다. `m_skippedDepth` 는 깊이 상한 전용으로 돌려놓았다.
+
+**★ ack 는 "봉인까지 끝났다" 여야 한다.** 자르는 동안 `write()` 가 다시
+`honor_seal_request()` 로 들어와 **안쪽 호출이 먼저 ack 를 올렸다.** 아직
+청크에 들어가지도 않은 잘린 구간을 두고 수집기가 "다 봉인됐다" 로 읽고 거둬
+간다. 한 번 돌려서는 초록이고 24 회 중 몇 번만 붉은 경합이라, 자극을 회차로
+돌린다(`ack-delivery/rounds`).
+
+**★ freeze() 는 닫힌 프레임만 본다.** 그래서 마지막 `publish_frame` 이후에
+모인 것 — 잘라 남긴 열린 구간이 바로 그것이다 — 이 캡처에 못 들어갔다.
+`pause()` 가 남은 프레임을 `lastEngineFrame + 1` 로 닫는다.
+
+**세는 것과 판정하는 것은 다르다.** 미응답 스트림 수를 요약에만 적어 두고
+그대로 frozen 으로 끝내면, 읽는 쪽은 "그 스레드가 조용했다" 와 "못 받았다" 를
+구분할 수 없다. 이제 `capture_session` 이 `complete()` 를 들고 다니고,
+`profile.stats`·`profile.pause`(`captureComplete`·`unackedStreams`)와 창의
+Collector 탭·툴바가 그것을 말한다.
+
+**게이트.** Debug·Release 모두 baseline 초록, 변이 **28 종 전원 검거**.
+새 자극 10 종에 변이 8 종을 새로 달았다.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `pause-keeps-open-scope` | `pause-worker/present` |
+| `pause-truncate-unmarked` | `pause-open/once` |
+| `truncate-pops-stack` | `resume-pair/closed-on-time` |
+| `scope-ignores-generation` | `clear-open/dropped` |
+| `clear-without-seal` | `clear-new/kept` |
+| `clear-keeps-generation` | `clear-generation/dropped` |
+| `ack-before-seal` | `ack-delivery/sealed` |
+| `freeze-always-complete` | `incomplete/flag` |
+| `late-cpu-to-collecting-frame` | `late-cpu/frame` |
+| `pause-drops-pending` | `pause-open/present` |
+
+**★ 두 층이 같은 절을 막으면 단정이 눈먼다.** `pause-keeps-open-scope` 는 처음
+초록이었다. pause 를 부른 스레드는 pause 가 **직접** 자르므로 `honor` 의 얼림
+가지를 안 타기 때문이다. 계속 적는 워커를 따로 세우고서야 이빨이 생겼다.
+`clear-keeps-generation` 도 같은 이유로 처음 초록이었다 — 멈췄다 지우면 새
+프레임이 전부 Clear 뒤에 열려 시각만 봐도 옛 이벤트가 갈 칸이 없다. **녹화를
+멈추지 않고** 지우는 자극으로 바꾸자 세대 검사가 비로소 일을 했다.
+
+**자극 fixture 가 틀려 있었다.** `test_reader_live_follow` 는 `profile_scope`
+를 **닫기 전에** `publish_frame` 을 불러, 프레임마다 한 틱이 아니라 한 칸씩
+밀린 틱을 만들고 있었다. pause 가 마지막 프레임을 닫게 되자 그 꼬리가 드러나
+프레임 수가 하나씩 늘었다 — 제품이 아니라 자극이 틀린 것이었다.
+
+**남은 것.** 구조 셋은 아직이다: UI 가 `pause`·`record`·`clear` 를 직접
+부르는 것(단일 collector), `summary()` 가 고쳐지는 중인 링을 직접 읽는 것
+(불변 요약), 종료에서 남의 스트림을 회수하는 경로(종료 소유권).
+
+### 0.5.15 2026-09-21 P2 동시성 경계 — 자극을 세우자마자 죽었다
+
+**외부 감사가 정적으로 짚은 것을 자극으로 확인했다.** `publish_frame()` 과
+`pause()` 가 등록된 **모든** 스트림의 현재 청크를 직접 봉인하는데, 이벤트를
+적는 쪽은 그 잠금을 잡지 않는다. 설계는 "writer 는 자기 스트림만, 수집기는
+봉인된 것만" 인데 구현이 그렇지 않았다.
+
+**기존 검사가 이 경계를 한 번도 자극하지 않았다.** `test_multithread_stress`
+는 워커를 전부 `join()` 한 **뒤에** 수집한다. 그래서 "적는 동안 거둔다" 가
+한 번도 일어나지 않았고, 8 워커 검사가 내내 초록이었다.
+
+**자극을 세우자 바로 죽었다.**
+
+| 자극 | 결과 |
+|---|---|
+| 워커 4 × 20,000 스코프, 그동안 수집기가 `publish_frame` 반복 | **ACCESS_VIOLATION (0xC0000005)** |
+| Debug · Release | 둘 다, 세 번 다 |
+
+이벤트를 잃는 정도가 아니라 프로세스가 죽는다. `seal_current()` 가 `m_writer`
+를 비우고 청크를 풀에 되돌리는 동안 주인이 그 포인터로 쓰고 있고, 되돌아간
+청크가 다른 스레드에 다시 나가면 두 writer 가 한 저장소를 만진다.
+
+**고친 것 셋.**
+
+| 것 | 뜻 |
+|---|---|
+| `thread_stream::request_seal()` | 수집기는 **요청만** 올린다. 청크 포인터를 만지지 않는다 |
+| `honor_seal_request()` | 주인이 `write()` 첫머리 — 청크를 만지기 전 — 에서 봉인한다 |
+| `m_droppedEvents` 등 원자화 | 적는 것은 주인, 읽는 것은 수집기·요약이라 평범한 정수면 그 자체로 경합 |
+
+`pause()` 도 같은 규칙이고, 봉인 응답을 **짧게 기다린 뒤 응답하지 않은 스트림을
+센다**(`live_summary::pause_unacked_streams`). 잠든 워커는 다음에 깨어날 때
+봉인하므로 그때까지의 꼬리가 그 캡처에 없을 수 있다.
+
+**★ 변이가 단정보다 먼저 프로세스를 죽인다.** 그래서 하네스에 `AllowCrash` 를
+두고 **충돌 자체를 붉음으로** 읽게 했다. 모든 변이에 열어 두면 "엉뚱한 데서
+죽었다" 가 통과로 읽히므로, 적어 둔 변이에만 허용한다.
+
+| 변이 | 잡은 방식 |
+|---|---|
+| `collector-seals-others`(남의 스트림을 직접 봉인) | **충돌**(exit -1073741819) |
+
+**남은 것(이 조각에서 고치지 않았다).** 감사가 사본에서 재현한 넷이다.
+
+1. **Pause 완료 보장** — 미응답을 세지만 어디에도 드러내지 않고 그대로 frozen
+   으로 끝난다. 세는 것과 판정하는 것은 다르다.
+2. **늦게 온 CPU 이벤트의 프레임 귀속** — ★ 이 수정이 만든 노출이다. writer 가
+   자기 일정으로 봉인하게 되면서 CPU 이벤트도 늦게 도착할 수 있다. GPU 는
+   `event.frame`(제출 프레임)으로 귀속하는 것이 맞지만(§5.4), 늦게 온 CPU
+   구간은 **끝난 시각이 속한 프레임**으로 가야 한다 — `frame_record` 가 이미
+   틱 경계를 들고 있다.
+3. **Clear 세대 분리** — 세대가 없어 Clear 이전 청크가 재유입된다.
+4. **Pause 시점의 열린 스코프** — `truncated_end` 로 남지 않고 누락된다.
+
+정적으로만 짚은 셋(단일 collector · 불변 요약 · 종료 규약)은 그다음이다.
+
+### 0.5.14 2026-09-21 P4 GPU 귀속 — 늦게 온 것을 제 프레임 칸으로 돌려보냈다
+
+**먼저 쟀다. 제출→수집이 최대 50~64 ms 다** — 60 Hz 로 세 프레임이 넘는다.
+`capture_ring` 은 이벤트를 **수집한 프레임**의 기록에 담으므로, 그대로 넣으면
+GPU 일이 세 칸 뒤에 그려진다. "UI 보다 frame identity 가 먼저다"(§13.1)를
+정면으로 어기는 자리라, 이 수 하나가 조각의 설계를 정했다.
+
+**선 것 다섯.**
+
+| 것 | 뜻 |
+|---|---|
+| `event_flags::gpu_span` · `event_chunk::late_ingest` | 늦게 오는 것임을 청크 단위로 가른다 |
+| `thread_stream::write_span` | 이미 끝난 구간을 스코프 스택 없이 적는다 |
+| `profiler_service::submit_gpu_span` | 전용 `[GPU Graphics]` 레인. **적는 쪽만** 봉인한다 |
+| `capture_ring::place_late_span` | 제 프레임 칸을 찾아 넣고, 아직이면 기다리고, 없으면 **센다** |
+| `intern_runtime_marker` | 런타임 이름을 **표가 소유한다**(정적 경로는 리터럴만 가리킨다) |
+
+**경계는 P2 가 정해 둔 그대로다.** RenderEngine 은 프로파일러를 모른다 —
+`EnhancedLiveGpuSpanSink` 로 함수를 받아 두고 부르기만 하고, 거는 쪽은
+`EngineBootstrap` 이다. `thread_pool::worker_hooks` 와 같은 뒤집기다.
+
+**★ 레인은 남이 봉인하면 안 된다.** `publish_frame` 은 등록된 모든 스트림의
+청크를 봉인하는데, 그 루프를 도는 것은 게임 스레드이고 GPU 레인에 적는 것은
+렌더 스레드다. 남이 봉인하면 두 스레드가 같은 청크 포인터를 만진다. 그래서
+`stream_entry::self_sealed` 를 두고 그 루프가 이 레인을 건너뛴다.
+
+**실측(Debug · 씬뷰·게임뷰 둘 활성 · 120 프레임 녹화).**
+
+| 항목 | 값 |
+|---|---|
+| EngineDiagnostics 로 흘린 조각 | 900 ~ 1,206 |
+| 캡처의 `[GPU Graphics]` 레인 | 5~6 칸 · 261~303 건 |
+| **제 프레임 칸을 벗어난 구간** | **0** |
+
+**변이 다섯이 각각 제 단정에서 붉어진다.** 코어 셋은 엔진을 띄우지 않고 돈다.
+
+| 변이 | 잡은 단정 |
+|---|---|
+| `gpu-span-to-pending`(늦은 것을 수집한 프레임에) | `gpu-lane/` (코어) |
+| `gpu-span-no-defer`(닫히기 전 것을 버림) | `gpu-deferred/placed` (코어) |
+| `gpu-span-silent-drop`(버린 것을 안 셈) | `gpu-dropped/counted` (코어) |
+| `sink-never-installed` | 흘린 조각 0 · 레인 없음 · 구간 0 (라이브) |
+| `late-span-to-pending` | 제 프레임 칸을 벗어난 구간 **456/456** (라이브) |
+
+마지막 둘이 라이브 축의 단정을 증명한다. 특히 skew 단정은 **임계값이 아니라
+동치**다 — 이벤트가 담긴 칸과 이벤트가 들고 온 라벨이 같아야 한다.
+
+**★ 남은 물음 하나(이 조각에서 고치지 않았다).** `publish_frame` 이 **다른
+스레드의** 스트림을 봉인하는 것은 GPU 레인 말고도 워커 스트림 전부에 해당한다.
+`thread_stream::seal_current` 가 `m_writer` 를 비우는 동안 그 워커가 `write()`
+안에 있을 수 있다. GPU 레인은 `self_sealed` 로 비껴 두었지만 워커 쪽은 그대로다.
+**아직 재지 않았다** — 코어 프로브에 "한 스레드가 계속 적는 동안 다른 스레드가
+publish_frame 을 도는" 자극을 세워 잃거나 망가지는지 보는 것이 다음 실험이다.
+
+### 0.5.13 2026-09-21 P4 clock calibration — 판정을 임계값이 아니라 인과에 걸었다
+
+**§5.1 의 "CPU/GPU 상관: `GetClockCalibration`" 을 세웠다.** 그때까지 GPU
+timestamp 는 큐 상대시간뿐이었고, "이 패스가 저 프레임의 어느 지점에서 돌았나"
+를 물을 수단이 없었다. 두 시계가 다행히 같은 축을 쓴다 —
+`profiler_service::now()` 도 `GetClockCalibration` 의 CPU 값도 QPC 원시 값이다.
+
+**선 것 넷.**
+
+| 것 | 뜻 |
+|---|---|
+| `ClockCalibration` | 한 순간에 함께 읽은 (GPU 틱, CPU 틱) 표본과 두 주파수 |
+| `GpuTickToCpuTick` | 몫과 나머지를 따로 옮기는 정수 변환(넘침도 절삭도 없다) |
+| `GpuFrameToken::cpuSubmitTick` | 제출을 연 순간의 CPU 시각 — 검산의 자 |
+| `RefreshClockCalibrationIfStale` | 1 초 간격 재표본. 낡는 것을 자기 자리에서 안다 |
+
+**★ 판정을 임계값이 아니라 인과에 걸었다.** 변환한 GPU 구간은 **CPU 가 제출을
+연 뒤에 시작해서 수집하기 전에 끝나야** 한다. 하드웨어가 달라도 그대로 서는
+관계이고, "몇 ms 안쪽" 같은 수를 고르면 그 수가 곧 거짓말의 여유가 된다.
+장부는 `gpu.{clockValid, clockSamples, unalignedCollects, alignmentViolations,
+minSubmitToBeginMs, minEndToCollectMs}`.
+
+**실측(Debug · 씬뷰·게임뷰 둘 활성).**
+
+| 항목 | 값 |
+|---|---|
+| GPU timestamp 주파수 | 1,000,000,000 Hz |
+| CPU(QPC) 주파수 | 10,000,000 Hz |
+| 제출 → 변환한 GPU 시작 (최소) | 2.67 ~ 3.90 ms |
+| 변환한 GPU 끝 → 수집 (최소) | 0.65 ~ 2.19 ms |
+| 정렬 위반 | **0 / 13~18** |
+
+**★ 재표본은 장식이 아니다.** 표본 간 어긋남이 약 1 초에 **0.05 ms** 다(첫
+구간은 예열을 품어 ~1.15 ms). 여유가 0.65~3.90 ms 이므로, 재표본이 없으면
+십여 초 만에 변환한 GPU 구간이 제출보다 앞서게 되고 GPU 트랙이 제 프레임을
+벗어난다. 그래서 "표본이 둘 이상인가" 를 따로 단정한다 — 이것도 임계값이
+아니라 "다시 뜨는가" 다.
+
+**변이 넷이 각각 제 단정에서 붉어진다.**
+
+| 변이 | 잡은 단정 |
+|---|---|
+| `calibration-disabled` | 표본이 없다 — 통합 축이 꺼져 있다 |
+| `convert-with-cpu-frequency`(GPU 주파수 자리에 CPU 주파수) | 정렬 위반 13/13 |
+| `origin-shift-10ms`(원점을 10 ms 앞으로) | 정렬 위반 13/15 |
+| `never-resample` | 표본 1 회 — 주기적 재표본이 돌지 않았다 |
+
+세 번째가 이 게이트의 분해능을 말한다 — **한 프레임(16.7 ms)보다 작은 10 ms
+어긋남을 잡는다.** 네 번째는 그 실행에서 정렬 위반이 0 이었다 — 짧은 실행에서는
+죽은 재표본이 정렬 단정만으로는 드러나지 않는다.
+
+### 0.5.12 2026-09-21 P4 raw 구간 보존 — 정상인 것을 결함으로 세고 있었다
+
+**§3.3 의 "같은 이름의 slice 는 표시 단계에서 묶되 원본 interval 은 버리지
+않는다" 와 §3.4 의 "GPU 합계는 단순 합만으로 정의하지 않는다" 를 세웠다.**
+`Collect()` 가 이름으로 묶으며 원본 구간을 버리고 있었고, 그래서 GPU 타임라인을
+그릴 수가 없었으며 조각이 서로 겹치는지도 물을 수 없었다.
+
+**가른 것 셋.**
+
+| 이름 | 뜻 |
+|---|---|
+| `PassSlice` | 조각 하나의 raw 구간 — 기록 순서 그대로, 묶기 **전**의 것 |
+| queue span | 첫 timestamp 부터 마지막까지 — 그 제출이 큐를 잡고 있던 길이 |
+| busy | 겹치지 않는 실행 구간의 합 — 실제로 일한 길이 |
+
+이름 묶기는 `MergeSlices()` 로 떼어냈다. 표시용이라는 것을 이름이 말하게 했다.
+
+**실측(Debug · 씬뷰·게임뷰 둘 활성).** 조각 36~39 개가 이름 26~29 개로 묶인다 —
+분할 패스가 실제로 여러 조각으로 남아 있다는 뜻이고, 자가 검증의 출력이
+`PostChain.BloomDown(x4)` 로 그것을 그대로 보여 준다. 길이는 늘
+`이름합 ≥ queueSpan ≥ busy` 로 서고, queueSpan 과 busy 의 차(0.004~0.012 ms)가
+제출 안의 공백이다.
+
+**★ 게이트를 처음 걸자마자 "버린 조각 1" 로 붉어졌고, 그것이 결함이 아니었다.**
+버림 판정을 `end <= begin` 으로 적어 **뒤집힌 것**과 **길이가 0 인 것**을 한데
+묶었다. 선이 없는 `GizmoLine` 은 그릴 것이 없어 일찍 빠져나가므로 두 timestamp 가
+같은 틱에 찍힌다 — 정상이다. 그것을 결함으로 세고, 게다가 그 조각을 **버려서**
+타임라인에서 그 패스가 통째로 사라지게 하고 있었다. `end < begin` 만 버리고,
+길이 0 은 조각으로 남기되 `zeroLengthSlices` 로 따로 센다. 조각 수가 38 에서
+39 로 늘어난 것이 그 한 조각이 되살아난 자리다.
+
+**★ 마지막 한 번만 읽는 게이트는 뷰를 고를 수 없다.** 같은 코드로 초록과 붉음이
+번갈아 나왔다. `lastGpuSpan` 은 마지막으로 수집에 성공한 **한 제출**의 것이고,
+씬뷰와 게임뷰 중 어느 쪽인지는 실행마다 갈린다. 한쪽에만 있는 패스(`GizmoLine`
+은 씬뷰에만 있다)는 그래서 절반의 확률로만 검사를 받았다. 검산을 **수집하는
+자리**로 옮겨 수로 누적했다 — `gpu.{droppedTotal, zeroLengthTotal,
+spanViolations, sliceUnderflows}`. 판정은 마지막 값이 아니라 이 수에 건다. 길이
+0 이 수집 12~17 회에 6~12 건으로 꾸준히 잡히므로 두 뷰가 모두 재어지고 있다.
+
+**변이 셋이 각각 제 단정에서 붉어진다.**
+
+| 변이 | 잡은 단정 |
+|---|---|
+| `zero-length-as-dropped`(`end <= begin` 복원) | 뒤집힌 조각 누적 7 |
+| `queue-span-first-slice`(span 끝을 첫 조각에서) | busy > queueSpan 17/17 |
+| `slice-count-from-merge`(조각 수를 이름 수로) | raw 조각 26 <= 이름 26 |
+
+첫 변이는 누적 장부가 없었다면 잡히지 않았을 것이다 — 그 실행의 마지막 표본은
+view 2 였고 거기에는 길이 0 인 조각이 없었다.
+
+### 0.5.11 2026-09-21 P4 첫 조각 — GpuFrameToken. 83% → 0
+
+**고친 것은 한 줄이다.** 질의 힙·리드백은 이미 슬롯별로 갈라져 있었고
+**CPU 쪽 기록만 한 벌**이었다. `m_records` · `m_usedPasses` 를 슬롯별로 나누고,
+수집 키를 "지금 기록 중인 슬롯" 에서 **표**로 바꿨다.
+
+- `GpuFrameToken`(`RHI/IRHIGpuProfiler.h`) — `engineFrameId` · `submissionId` ·
+  `fenceValue` · `renderViewId` · `ringSlot` · `queueId`. 엔진 프레임과 제출을 가른다(§3.4).
+- `BeginFrame(engineFrameId, submissionId, renderViewId)` 가 **표를 돌려준다.** 링
+  산술이 한 자리에만 있어야 부르는 쪽과 읽는 쪽이 갈라지지 않는다.
+- `ResolveFrame(list, token)` · `Collect(token, ...)` — 둘 다 표를 받는다.
+- `DisplaySlot` 이 그 표를 보관했다가 펜스 완료 때 그대로 넘긴다.
+
+**★ 조용한 것을 시끄럽게 바꿨다.** 표가 낡았으면 `Collect` 는 그럴듯한 숫자를
+내는 대신 **실패한다.** "숫자가 틀렸다" 보다 "링이 모자란다" 가 훨씬 고치기 쉬운
+신호이고, 무엇보다 **센다.**
+
+**실측.**
+
+| | 수집 | 거절 | 패스 | 귀속 |
+|---|---|---|---|---|
+| 착수 전 | 12 | — (10 이 남의 것) | 26·29 로 오감 | 없음 |
+| 착지 후 | 15 | **0** | 29 | frame 3411 · submission 16 · view 1 |
+
+합계도 5.04 ms → 1.47 ms 로 내려갔다. 줄어든 것이 아니라 **두 뷰의 패스가
+섞여 더해져 있던 것이 한 제출의 실시간으로 바뀜 것**이다.
+
+**게이트.** `Invoke-ProfilingValidation.ps1 -Action Gpu` — 라이브를 예열하고 `dx12.live`
+의 `gpu` 장부를 읽어 `mismatches == 0` · `collects > 0` · `passCount > 0` · `frame > 0`
+을 물는다.
+
+**★ 변이가 어느 절에 잡혔는지까지 못 박았다.** 가드가 둘이기 때문이다.
+
+| 변이 | 결과 | 잡은 절 |
+|---|---|---|
+| `records-share-one-slot`(제출마다 슬롯 0) | 거절 10/14 · 붉음 | 신선도 검사 |
+| `records-from-recording-slot`(기록을 남의 슬롯에서) | 거절 11/13 · 붉음 | 슬롯 소유 검산 |
+| `stale-token-accepted`(신선도 검사 제거) | 통과 | — |
+| 위 둘을 **함께** 걷음 | 통과 | — |
+
+마지막 줄이 판정이다 — 첫 변이를 잡은 것은 신선도 검사였다. 그리고 신선도
+검사를 **혼자** 걷을 때 통과하는 것은 눈멀어서가 아니라, 링 3 · 인플라이트 2 에서는
+**그 절이 막을 조건이 일어나지 않기 때문**이다. 자극할 수 없는 절은 자를 열어야
+서고, 여기서는 링을 좀히는 변이가 그 자를 열어 준다.
+
+**아직 하지 않은 것.** raw pass interval · queue span 보존, clock calibration,
+EngineDiagnostics 로의 귀속, GPU Timeline. 이번 조각은 **수치가 올바른 제출의
+것이 되게 하는 것**까지다 — 그것이 서야 나머지가 의미를 갖는다.
+
+### 0.5.10 2026-09-21 P4 착수 전 실측 — 수집의 83% 가 남의 제출을 읽고 있었다
+
+**먼저 재야 한다.** §2.3 의 GPU 실측은 9-15 것이고, 그 뒤로 이 경로를 재는
+게이트는 **하나도 없었다.** 패스별 GPU 시간은 렌더 디버그 창에만 있었고, 그
+숫자가 올바른 제출의 것인지를 물을 수단은 없었다 — 눈으로는 틀린 숫자도
+그럴듯하다.
+
+**소스 확인(9-21). §3.3 이 적은 그대로였고, 더 좋아지지도 나빠지지도 않았다.**
+
+| 항목 | 상태 |
+|---|---|
+| `DX12GpuProfiler::m_records` · `m_usedPasses` · `m_frameIndex` | 한 벌 — 링이 아니다 |
+| 질의 힙·리드백 구역 | 이미 링 슬롯별로 갈라져 있다(`m_frameIndex * maxPasses * 2`) |
+| `BeginProfilerFrame` | `EnhancedSceneRenderer.cpp` 의 **뷰마다** 도는 루프 안 |
+| `Collect()` | token 을 받지 않고 호출 시점의 `m_frameIndex` 를 읽는다 |
+| 소비 | `TickLive` 의 펜스 완료 루프(제출당 1회) — 죽어 있지 않다 |
+
+즉 **GPU 쪽 자료는 이미 슬롯별로 갈라져 있고, CPU 쪽 기록만 한 벌이다.** 그것이
+결함을 한 문장으로 적은 것이다.
+
+**재는 자를 세웠다.** 제출할 때 그 제출이 쓴 링 슬롯을 `DisplaySlot` 에 적어
+두고, 수집 직전에 `DX12GpuProfiler::CurrentRingSlot()` 과 맞대어 **어긋난 횟수를
+센다.** 장부는 `dx12.live` 의 `gpu.{ms,collects,mismatches,passCount,passes}` 로 나온다.
+
+**실측(Debug · 씬뷰·게임뷰 둘 활성 · `render.live.wait` 로 예열).**
+
+| 표본 | 수집 | 어긋남 | 비율 |
+|---|---|---|---|
+| 예열 직후 | 2 | 2 | 100% |
+| 중간 | 9 | 7 | 77.8% |
+| 1500 프레임 | 12 | 10 | **83.3%** |
+
+같은 실행에서 `passCount` 가 26 · 29 로 오갔다. 패스 구성이 바뀐 것이 아니라
+**다른 뷰의 기록을 읽은 것**이다. 렌더 디버그 창이 지금까지 보여 준 패스별
+숫자의 절대다수가 그런 것이고, 눈으로는 가릴 수 없었다.
+
+**★ 결에 드러난 것 하나 더 — Player 가 빌드되지 않고 있었다.** 솔루션 전체를
+빌드해 보니 `EngineBootstrap.h` 가 `ProfileScope.h` 를 include 하는데 `Player.vcxproj`
+의 include 경로에 `Engine\EngineDiagnostics\` 가 없어 C1083 이었다. P2 에서 워커
+훅을 거기 달면서 생긴 썩음이고(`f493c7eb`), 그 뒤로 누구도 솔루션을 통째로
+빌드하지 않아 하루도 안 보였다. 경로를 더해 고쳤다 — `/t:Editor\CreatorEditor`
+만 돌리는 습관이 이런 것을 덮는다.
+
+### 0.5.9 2026-09-21 P3 착지 — 접는 일을 그리는 층에서 떼어냈다
+
+**설계 판단 하나가 P3 의 모양을 정했다.** P3 가 만드는 것(Frame Overview ·
+Timeline · Hierarchy/Flat)은 전부 "얼린 캡처를 어떻게 접는가" 이고, 접는 일에는
+ImGui 가 한 줄도 필요 없다. 그리는 층에 두면 완료조건을 잴 수단이 화면뿐이
+된다 — P1·P2 에서 두 번 겪은 자리다. 그래서 접는 일과 선택 상태를 코어에 세우고
+창은 그것들의 reader 로 두었다. 완료조건 다섯 중 셋이 화면 없이 판정된다.
+
+**선 것 셋.**
+
+- `ProfileAggregate` — `aggregate_frames(capture, first, last)` 가
+  `thread_summary`(레인 · root_ticks) · `hierarchy`(전위 순서) · `flat`(total
+  내림차순)을 낸다. 각 줄은 total(inclusive) · self(exclusive) · calls · max 와
+  잘린 구간 표시를 든다.
+- `ProfileReader` — §6.4 가 말한 "reader 쪽 별도 상태". 얼린 캡처와 선택 범위를
+  들고 집계를 캐시한다.
+- `ImGuiHelper/Profiler*` — 창. 툴바 · Frame Overview · Hierarchy/Flat/Threads 표.
+  **이 층에는 합계 산술이 없다.**
+
+**★ 가장 틀리기 쉬운 자리는 트리 복원이었다.** 이벤트는 `end_scope` 에서
+기록되므로 **끝난 순서**로 들어가고 자식이 부모보다 먼저 있다. 같은 스레드
+안에서 (시작 tick, depth)로 세워야 전위 순회가 되고 그제서야 depth 스택으로
+부모를 찾을 수 있다. 스레드가 바뀌면 스택을 비운다 — 깊이만 보면 남의 조상이
+부모로 잡힌다. 표를 그릴 때 **루트를 depth 로 판별하지 않는 것**도 같은 결이다:
+녹화가 도중에 시작되면 부모를 못 본 구간이 `depth > 0` 인 채로 루트가 되므로,
+깊이로 거르면 그런 줄이 표에서 통째로 사라진다.
+
+**완료조건은 정수 tick 으로 단정한다.** `timeline_total`(스레드별 depth 0 길이
+합)과 `hierarchy_total`(루트 행 total 합)은 같은 것을 두 길로 더하므로 **정확히**
+같아야 한다. 부동소수 ms 로 바꾼 뒤 비교하면 어긋나도 "허용 오차" 로 읽힌다.
+
+**Live Follow 를 정의했다.** "새 캡처가 오면 선택을 최신으로 옮긴다". 끄면 보던
+프레임을 지킨다 — 스파이크를 붙잡아 두는 것이 그 토글의 쓸모다. 다만 rolling
+ring 이 그 프레임을 버렸으면 지킬 수가 없으므로 범위 안으로 자른다. 프레임
+그래프에서 무언가를 고르는 순간 따라가기가 꺼진다. 그러지 않으면 다음 캡처가
+올 때 선택이 최신으로 튀어 붙잡아 둔 프레임이 손에서 빠져나간다.
+
+**완료조건 다섯의 판정 수단.**
+
+| 완료조건 | 어디서 재나 |
+|---|---|
+| 10초 녹화 후 과거 프레임 선택 | 코어 프로브 `reader/past-calls` — 프레임마다 호출 수를 다르게 해 **값으로** 가린다 |
+| pause 후 엔진이 돌아도 자료 불변 | 코어 프로브 `reader-frozen/` |
+| Timeline 합계 ≡ Hierarchy inclusive | 코어 프로브 `aggregate/totals` (정수 동일) |
+| 창을 닫아도 recording 유지 | `-Action Window` — 닫은 뒤 `state == recording` |
+| Space 가 편집기 동작을 안 가로챔 | **단축키를 만들지 않았다**(아래) |
+
+**★ "창이 열렸다" 와 "본문이 돌았다" 는 다르다.** 도크 탭으로 겹친 창은 선택돼야
+본문이 돌고, 그러지 않으면 `editor.window ... open` 이 성공해도 `DrawProfilerHUD`
+까지 오지 않는다. 그래서 창 본문에 마커를 걸고 **그 마커가 캡처에 나타나는지**로
+판정한다 — 프로파일러가 자기 창을 증언한다. 실측은 프레젠테이션 스레드에 9건
+(그린 프레임마다 하나)이다.
+
+**Space 는 만들지 않는 것으로 지켰다.** §7.1 이 "Space 전역 단축키는 제거하거나
+Profiler 창 focus 일 때만 받는다" 고 적은 것은 옛 코어 얘기이고, 지금 에디터에는
+그런 단축키가 없다(`ImGuiKey_Space` 는 `EditorNavContract` 의 키 이름 표에만
+있다). 새로 만들지 않는 것이 그 조건을 지키는 가장 싼 방법이다.
+
+**이미 죽어 있던 지시 하나.** P3 할 일의 "기존 CPU Timeline renderer 이관" 은
+대상이 없다 — 옛 `ProfilerWindow`(557줄)는 P1 에서 걷었고(§0.5.8), 자료 모델이
+달라 그림을 그대로 옮길 수 없다는 것이 그때의 판단이었다. Frame Overview 는
+새로 그렸다.
+
+**타임라인을 같이 세웠다(§7.3).** 스레드마다 레인 하나, 구간마다 사각형 하나,
+깊이는 아래로 쌓는다. 휠로 확대하고(커서 아래 tick 을 제자리에 둔다) 끌어서 이동한다.
+그리는 층에는 **정렬도 집계도 없다** — 스팬은 코어가 이미 전위 순서로 세워 둔
+것(`frame_aggregate::spans()`)이고 레인 경계도 코어가 적어 둔 것(`thread_summary::span_begin/end`)이다.
+가로 시야(확대·이동)도 reader 가 든다 — "확대해도 구간 밖으로 나가지 않는다" 는 계약을
+코어 프로브가 물고 있다. Timeline 을 **첫 탭**에 둔 것도 값이다: 도크 탭은 선택돼야
+본문이 돌므로 뒤 탭에 두면 창을 열어도 한 번도 그려지지 않는다.
+
+**녹화 제어를 CLI 에 내야 했다 — `profile.pause` · `profile.record`.** 타임라인은
+**얼린 캡처가 있고 + 녹화 중** 일 때만 그려지고 마커도 남는다. `profile.frame` 은
+읽는 명령이라 읽기 위해 얼렸으면 끝나기 전에 되돌려 놓으므로 그 상태를 만들 수
+없었다. 같은 손길에 seed 표에 고아로 남아 있던 `profile.selftest` 을 걷었다 — P1 에서
+은퇴시키면서 못 걷은 잔여물이고, 명령 표 공든에는 없어서 조용했다. 명령 133 → **135**.
+
+**★ 그 자극을 넣자 결함 둘이 드러났다.**
+
+첫째, **창이 얼린 것을 집는 관문이 상태를 보고 있었다.** `state == frozen 이고 손이
+비었을 때` 집었는데, 얼린 순간은 보는 쪽이 한 번도 못 볼 수 있는 찰나다. 그러면
+캡처가 있는데도 빈 안내문만 낸다. 관문을 **손에 든 것**으로 바꾸고, 그 규칙을
+화면에서 `capture_reader::sync()` 로 옮겨 코어가 재게 했다 — 화면에 두면 갈아타는지를
+물을 수단이 눈뿐이 된다. `sync` 는 Live Follow 의 약속도 온전히 지킨다: 껴 있으면
+**새로** 얼린 것으로 갈아타고, 꺼 있으면 보던 것을 지킨다(예전에는 처음 하나만 집고
+그 뒤로는 다시 안 보았다).
+
+둘째, **pause·record 가 스코프 한가운데서 일어나면 짝이 어긋났다.** 상태 관문이
+`begin_scope` 와 `end_scope` 양쪽에 걸려 있어서, 열고 나서 얼면 닫는 쪽이 얼어 버려
+스택에 칸이 남고 **그 뒤의 모든 구간이 한 칸씩 깊어졌다.** 거꾸로, 얼린 채 연 구간의
+닫는 쪽은 스택에서 남의 구간을 닫았다. 관문을 **여는 쪽에만** 두고, 그때도 짝을
+예약하고 나가게(`thread_stream::skip_scope`) 고쳤다 — 깊이 상한을 넘겨 못 열었을 때와
+정확히 같은 기제다. 툴바의 Pause 단추도 다른 스레드가 구간 안에 있을 때 눌리므로,
+CLI 를 붙이기 전에도 있던 결함이다. **조용한 결함이었다** — 아무것도 실패하지
+않고 깊이만 밀리므로, 불균형 계수기만 보는 단정으로는 잡힐 수 없었다.
+
+**검사.** 코어 프로브 36 → **168 검사**, 변이 3 → **14**. P3 가 더한 열하나:
+`aggregate-flatten`(부모를 안 찾고 전부 루트로) · `aggregate-self-as-total`(자식을 안 뻐) ·
+`aggregate-unsorted`(끝난 순서 가정 노출) · `reader-follow-always`(따라가기를 꺼도 최신으로
+점프) · `reader-stale-cache`(선택이 바뀜도 캐시 유지) · `timeline-view-unclamped`(시야를 구간
+안으로 안 자름) · `timeline-view-kept`(선택이 바뀜어도 시야 유지) · `scope-skip-unpaired`
+(여는 쪽만 건너뜀) · `scope-end-gated`(닫는 쪽에도 상태 관문) · `reader-sync-once`(한 번만
+집음) · `reader-sync-always`(같은 것을 매번 다시 집음).
+
+**★ `reader-sync-always` 는 처음엔 통과했다.** 단정을 따라가기를 **꺼 둔 채** 걸었는데,
+그러면 "붙잡아 둔 것을 지킨다" 는 절이 먼저 막아 같은 것인지 가리는 절을 걷어도 그대로
+통과한다. 켜 둔 채로 재야 변이가 잡혀다 — 두 층이 같은 절을 막으면 변이가 조용히
+살아남는다.
+
+**`-Action Window` 가 타임라인까지 자극한다.** 시나리오에 `profile.pause` → `profile.record`
+를 **붙여** 넣었다. 사이에 `wait` 를 두면 얼린 순간을 창이 볼 수 있게 되어, 상태를
+보고 집는 낡은 관문도 우연히 통과한다. 판정은 `ProfilerWindow` 와 `ProfilerTimeline` 을
+**갈라 센다** — 타임라인은 얼린 캐프처가 없으면 한 줄짜리 안내문만 내고 빠져나가는데,
+그래도 창은 열려 있고 `ProfilerWindow` 는 찍힌다. 실측은 프레젠테이션 스레드에 둘 다
+최근 8 프레임에 7건이다. 변이 둘로 이빨을 확인했다: `draw_timeline()` 호출을 걷으면
+timeline 0 · window 8, 앞에 다른 탭을 끼워 넣으면 timeline 0 · window 4 로 붉어졌다.
+
+**아직 하지 않은 것.** §7.4 의 Min/P95/Frames 열은 미뤄 둔다. 그리는 트랙 순서
+(§7.3)는 GPU 트랙이 서는 P4 에서 함께 정한다 — 지금은 코어가 정한 슬롯 오름차순 그대로다.
+
+### 0.5.8 2026-09-20 P1+P2 착지 — 옛 코어를 걷었다
+
+P1 과 P2 를 한 덩어리로 지었다. 재활용하지 않기로 한 이상(§0.5.3) 옛 소유권
+모델로 먼저 짓고 나중에 갈아끼우는 것은 두 번 짓는 일이기 때문이다.
+
+**걷은 것.** `Profiler.{h,cpp}`(781줄) · `ProfilerSelfTest.{h,cpp}`(660줄) ·
+`ProfilerWindow.cpp`(557줄) · `profile.selftest` 명령 · `PROFILE_CPU_*` 매크로
+일습. 저장소에 옛 심볼은 **0건**이다.
+
+**선 것.** `ProfileMarker`(NTTP 정적 슬롯) · `ProfileEvent`/`ProfileThreadStream`
+(sealed chunk handoff) · `ProfileCapture`(rolling ring · immutable reader) ·
+`ProfileService`(스트림 소유 · recorder 상태머신 · 프레임 시계) ·
+`ProfileScope`(RAII 표기).
+
+**완료조건 — 마커 집합이 보존됐다.** 교체 직전 값을 그 자리에서 떠서 직후와
+맞댔다(§10 P1b 가 요구한 동수 단정). 옛 코어 27 · 새 코어 26 인데, 차이는
+**`CPU Frame` 하나뿐**이고 집합 대조에서 그 외에는 양쪽 모두 0 이다.
+`CPU Frame` 은 옛 `Tick()` 이 프레임마다 자동으로 끼워 넣던 루트 이벤트이고,
+새 코어는 프레임 시간을 `frame_record::tick_begin/tick_end` 가 직접 들고 있어
+그 이벤트가 필요 없다. 즉 **호출부 39곳이 전부 이어졌다**.
+
+**engine_frame_id 가 통합됐다.** `publish_frame(Time->GetFrameCount())` —
+프로파일러가 자기 카운터를 따로 세지 않는다. §2.1 표의 정본 판정을 그대로 썼다.
+
+**착지하며 잡은 결함 넷.** 전부 게이트가 먼저 잡았다.
+
+1. `profile_scope` 가 전역 서비스에만 찍어, 인스턴스로 세운 서비스에는 아무것도
+   들어가지 않았다 — 격리 설계가 반쪽이었다(코어 프로브가 잡았다).
+2. `record()` 가 시작 프레임을 받지 않아 첫 스코프들이 "아직 모르는" 프레임에
+   기록되고 닫을 때 붙는 라벨과 어긋났다(코어 프로브).
+3. ★ **`#if defined(CE_SHIPPING)` 이 Development 에서도 참이었다.**
+   `Directory.Build.targets` 는 두 구성 **모두**에서 이 매크로를 정의하고 값으로만
+   가른다(`CE_SHIPPING=0;CE_DEVELOPMENT=1`). 그래서 Debug 에디터의 계측이 통째로
+   빈 껍데기였고, "수집은 도는데 이벤트만 0" 이라는 모양으로 라이브 기준선이
+   잡았다. `#if CE_SHIPPING` 으로 고쳤다.
+4. `profile_event` 가 `thread_slot` 을 들고 있지 않아, 이벤트가 청크를 떠나
+   프레임 벡터로 옮겨지는 순간 스레드 귀속을 잃었다. 귀속을 이벤트에 실었다 —
+   옛 코어가 수집 시점에 스팬을 정렬해야 했던 이유가 이것이고, 그 정렬의 부등호
+   하나가 스레드를 통째로 사라지게 했다.
+
+**검사 표면이 바뀌었다.** `profile.selftest` 와 `Invoke-ProfilingValidation
+-Action SelfTest` 는 은퇴했다. 옛 selftest 는 전역 싱글톤을 공유하는 구조 때문에
+라이브 캡처의 프레임 경계를 직접 넘겨야 했고, 그 교란이 stats 를 못 믿게 만들었다.
+새 코어는 서비스를 인스턴스로 세울 수 있어 **엔진을 띄우지 않고** 검사한다 —
+`Tools/regression/verify-profile-core.ps1` 이 Debug·Release 각각 36 검사를 초
+단위로 돌리고 변이 셋으로 이빨을 증명한다. `-Action Stats` 는 라이브 기준선
+하나로 남았고, 이름 예산 단정은 **대상이 사라져서** 뺐다.
+
+**P3 로 넘긴 것.** `ProfilerWindow` 는 지금 요약과 녹화 제어만 낸다(빈 창을 두면
+계측이 살아 있는지 에디터에서 볼 수단이 P3 까지 사라진다). 타임라인·Hierarchy·
+프레임 선택이 P3 의 몫이다.
+
+**워커 등록이 섰다 — P2 완료조건의 마지막 항목.** enkiTS 의
+`TaskSchedulerConfig::profilerCallbacks.threadStart/threadStop` 을 물어 워커가
+태어나는 자리에서 등록한다. 이 콜백은 `userData` 없는 함수 포인터라 정적
+트램펄린이 필요했고, `thread_pool::worker_hooks` 로 받아 둔다 — 유틸리티 층은
+관측 도구를 모르고 받아 둔 함수를 부르기만 한다. 배선은 `EngineBootstrap` 이
+한다.
+
+**순서가 전부였다.** 훅 등록과 `profiler().initialize()` 가
+`get_job_scheduler().start()` **보다 먼저**여야 한다. 처음에는 늦게 걸었고 결과는
+**워커 0 개**였다 — 훅은 워커가 태어날 때 한 번만 불리므로, 이미 태어난 뒤에
+거는 것은 아무 일도 하지 않는다. 그래서 `InitializeRuntime` 의 맨 앞으로 옮겼다.
+등록만으로는 아무것도 안 보인다는 것도 같이 겪었다: 워커 10 개가 표에 뜨는데
+이벤트는 26 그대로였다.
+
+**애니메이션 워커의 시간이 캡처에 나타난다.** `AnimationJob::Update` 의 잡 람다
+첫 줄에 스코프를 걸었다. `Test1.creator`(애니메이터 있는 씬)로 전환해 재니
+`[Worker 8]` 에 `AnimationJob` 이 귀속되고 프레임 이벤트가 26 → 27(최대 30)로
+늘었다. PHASE 13 §4 의 "예측 비용 대 실측 오차 15% 이내"를 판정할 수단이 이것이다.
+
+**★ 자극이 없으면 워커 칸은 빈 채로 초록이다.** 기본 씬에는 애니메이터가 없어
+잡이 0 개이고, 그때 캡처의 스레드는 `[GameThread]` 하나뿐이다 — 등록된 워커는
+이벤트가 없으면 프레임에 나오지 않는다. `-Action Stats` 의 라이브 기준선이 바로
+그 상태라, **이 게이트는 워커 계측이 죽어도 초록이다.** 워커 축을 재려면 씬 전환이
+앞에 있어야 한다([[green-soak-never-stimulated]] 와 같은 결).
+
+**훅이 주는 것은 이름뿐이다.** 등록되지 않은 스레드가 마커를 찍으면
+`current_stream()` 이 그 자리에서 `Thread N` 이라는 이름으로 등록한다. 그래서
+훅을 끊는 변이는 "워커가 사라진다" 가 아니라 "이름이 `[Worker 3]` 에서
+`Thread 5` 로 바뀐다" 로 나타난다. 훅의 값은 **귀속이 아니라 라벨과 등록 시점**
+이다 — 이것을 "워커가 안 잡힌다" 의 증거로 쓰면 안 된다.
+
+**RenderThread 도 섰다 — 간선을 늘리지 않고.** 전용 렌더 스레드는
+`EnhancedSceneRenderer.cpp` 의 `std::thread` 인데, 거기에서 프로파일러를 직접
+부르면 **RenderEngine → EngineDiagnostics 간선이 새로 생긴다**(이 모듈이 참조하는
+엔진 라이브러리는 `Utility_Framework` 하나뿐이다). PHASE 4 가 간선을 154 → 101 로
+줄인 방향과 반대이므로 `thread_pool` 과 같은 역전을 썼다 — 렌더러는
+`RenderThreadHooks`(시작·종료·프레임 begin/end 네 개의 함수 포인터)를 받아 두고
+부르기만 하고, 꽂는 일은 `EngineBootstrap` 이 한다.
+
+**훅이 begin/end 로 갈리는 자리에는 얇은 표면을 냈다.** `ProfileScope.h` 에
+`profile_scope_begin/end` 를 더했다. 여기서 `profiler()` 를 직접 부르면
+CE_SHIPPING 약속이 그 파일 밖으로 새기 때문이다(§0.5.8 결함 3 이 그 약속을 한 번
+깨뜨렸다). 짝은 받는 쪽에서 다시 묶는다 — 렌더러는 `RenderThreadFrameScope` 라는
+RAII 로 감싸 `TickLive` 가 예외로 빠져나가도 닫히게 했다.
+
+**PresentationThread 는 등록만 되어 있었다.** 워커와 똑같은 모양으로 표에는 뜨는데
+이벤트가 0 이었다. `PresentFrame` 을 스코프로 감쌌다 — 잠금 대기까지 함께 재는
+자리라야 게임 스레드의 파괴 구간과 겹쳐 멈춘 시간이 보인다.
+
+**실측(애니메이터 있는 씬, 245 프레임).** 스레드 11, 마커 41, 불균형 0, 누락 0.
+
+| 스레드 | 찍은 이벤트 |
+|---|---|
+| `[GameThread]` | 6,322 |
+| `[PresentationThread]` | 241 |
+| `[Worker 1..8]` | 21~39 (합 241) |
+| `[RenderThread]` | 1 |
+
+★ **`[RenderThread]` 가 1 인 것은 계측이 아니라 Debug 의 렌더 소비가 그렇기
+때문이다.** 종료 장부가 `publish 245 / consume 4 / latest-wins 241 / overflow 241`
+이라고 적는다 — 발행 245 중 **4 개만 소비**되고 나머지는 접힌다. 그 4 개 중
+녹화 시작 뒤의 것이 1 개다.
+
+**`profile.stats` 가 스레드마다 몇 건을 찍었는지 낸다(`capturedEvents`).**
+`profile.frame` 은 최근 8 프레임만 내므로 드물게 도는 스레드는 그 창에 영영 안
+걸린다 — 실제로 RenderThread 를 붙이고도 프레임 표에서 못 찾아 헛짚었다. 이 계수는
+얼린 캡처 전체를 보므로 창과 무관하다. 캡처가 없을 때의 0 과 갈리도록
+`captureFrozen` 을 함께 낸다.
+
+**게이트가 이빨을 얻었다.** 축이 둘이다 — 자극이 다르기 때문에 나눴다.
+
+- `-Action Stats` — 기본 씬의 기준선. `[GameThread]` · `[PresentationThread]` ·
+  `[RenderThread]` 의 **건수**를 단정한다.
+- `-Action Workers` — fixture 씬으로 애니메이션 잡을 돌려 워커를 잰다. 이벤트를
+  찍은 워커가 넷 이상인지, 워커 스레드에 `AnimationJob` 이라는 **이름**이
+  나타나는지를 단정한다(건수만 보면 "무언가 찍었다" 까지다).
+
+변이 넷으로 증명했다. 렌더 스레드 훅을 통째로 끊으면 "`[RenderThread]` 가 스레드
+목록에 없다", **등록은 두고 프레임 훅만** 끊으면 "`[RenderThread]` 가 등록만 되고
+이벤트를 하나도 안 찍었다"(수명 훅과 구간 훅이 따로 잡힌다), `PresentFrame`
+스코프를 걷으면 같은 문장이 `[PresentationThread]` 로, `AnimationJob` 스코프를
+걷으면 "이벤트를 찍은 워커가 0 개뿐이다" 와 "워커 스레드에 `AnimationJob` 이
+하나도 없다" 가 **둘 다** 붉는다.
+
+**워커 fixture 를 저장소가 소유하게 됐다.**
+`Tools/regression/fixtures/profiling-workers/ProfilingWorkerFixture.creator`.
+전면 `*.creator` 무시에 대한 명시적 예외다 — fixture 가 추적 밖이면 그 게이트는
+한 기계에서만 돌고 clean checkout 에서는 조용히 빈다.
+
+★ **자산이 한 톨도 필요 없었다.** 씬에 든 것은 빈 `Animator` 컴포넌트 여덟 개뿐
+(10 KB, 모델·텍스처·클립 참조 0)인데 워커마다 100 건 넘게 찍힌다. 계측이 잡
+람다의 **첫 줄**에 있고 그 잡은 스켈레톤이 없으면 바로 돌아 나오기 때문이다 —
+"워커가 돌았는가" 를 재는 데에는 모델이 필요 없다. 모델이 딸린 씬을 추적시키는
+쪽으로 갔다면 수십 MB 를 싣고도 같은 것만 쟀을 것이다. 제품 저작 경로
+(`scene.new` · `scene.populate` · `component.add` · `scene.save`)로 만들었고 손으로
+쓰지 않았다.
+
+⚠ 이 fixture 로는 애니메이션 **결과**(포즈·블렌드·스키닝)를 검증할 수 없다.
+그것은 `verify-animation-*.ps1` 의 몫이고, 여기서 재는 것은 계측의 생사뿐이다.
+
+**★ `consume 4` 는 Debug 가 느려서가 아니었다 — 예열을 안 기다린 것이다.**
+`render.live.wait` 를 앞에 두고 재니 그 한 줄이 **22.8 초**를 쓴다. 라이브 첫
+프레임의 GBuffer ShaderMeta 반영(slang reflect)이고, 그동안 게임 프레임은 61 →
+3418 로 가며 발행된 것이 전부 `latest-wins` 로 접힌다. **예열이 끝나면 소비는
+15 ms 마다 일어난다.** 워밍업 프레임 수를 늘리는 것으로는 영영 나아지지 않는
+축이었다 — `wait N` 은 게임 스레드 프레임 수라 렌더가 한 프레임에 얼마를 쓰는지와
+무관하게 지나간다(PHASE 4 가 `render.live.wait` 를 만든 이유가 바로 이것이고,
+그 주석이 같은 말을 적어 두고 있었다).
+
+그래서 Stats 축은 `render.live.wait` 를 **앞뒤로** 둔다. 앞의 하나가 예열을
+통과시키고, 뒤의 하나가 측정 구간 안에서 라이브 프레임이 최소 한 번 끝나는 것을
+보장한다. 게임 스레드를 세우지 않으므로(`WaitForResult` 로 판정만 미룬다) 다른
+축의 값이 왜곡되지 않는다. 그렇게 재면 `[RenderThread]` 가 50 건이고, 게이트
+전체가 28 초다.
+
+**아직 하지 않은 것.** `AnimationJob` 외의 잡 구간에는 마커가 없다. 어디를 잴지는
+타임라인을 보고 정하는 P3 의 몫이다.
+
+### 0.5.7 2026-09-20 정찰 최신화 — 전제 다섯이 또 바뀌었다
+
+닷새 만에 다시 쟀다. 착수 전 정찰은 한 번 적고 끝나는 것이 아니다.
+
+**① 회귀 세트가 폐지됐다(9-16).** `Tools/regression/run-all.ps1` 이 지워졌고, 정책은
+"세션마다 변경이 닿는 검사를 모아 같은 바이너리·전제끼리 묶어 집중해서 돌린다" 로 바뀌었다.
+**그러므로 이 계획서의 "run-all 편입" 완료 조건은 폐기한다.** 대신 새 규칙이 요구하는 것은
+*찾을 수 있게 적는 것*이다 — "그 영역의 계획서 절이나 README 표에서 이름으로 찾을 수 있게".
+⚠ 그런데 `Invoke-ProfilingValidation.ps1` 은 `Tools/regression/README.md` 표에 **없다**.
+편입 대상이 사라졌을 뿐 **안 모인다는 사실은 그대로**다(§10 P1b 참조).
+
+**② enkiTS 가 들어왔다 — 그것도 S0.5 보다 멀리.** `9d588bdd`·`c2396f4f` 가 `thread_pool` 과
+`job_scheduler` 를 엔진 수명으로 소유하게 하고 **DataSystem·썸네일·AnimationJob·Foliage·AI** 를
+그룹별 완료 경계로 통일했다. 구 풀은 제거됐다. 워커 수는
+`enki::GetNumHardwareThreads()`(`ThreadPool.cpp:113`)다.
+
+이것이 §0.5.5 의 예측을 둘 다 현실로 만들었다.
+
+- **좋은 쪽**: 워커가 공용 스케줄러 하나로 모여 `threadnum_` 안정 보장이 실재한다 —
+  §6.2 의 슬롯 키로 그대로 쓴다. 현행이 발명해야 했던 11비트 슬롯 은퇴·재사용 규칙이 불필요해진다.
+- ★ **나쁜 쪽**: 계측 사각지대가 **넓어졌다**. 전에는 애니메이션 워커뿐이었지만 이제
+  자산 적재·썸네일·Foliage·AI 까지 그 위에서 돈다. 등록 스레드는 여전히
+  `[GameThread]` **하나**뿐이다(`EditorMain.cpp:82`). 엔진이 병렬로 옮겨 간 일이
+  전부 캡처 밖이다.
+
+**③ 계측 장치가 계속 따로 생긴다 — 파편이 셋이 됐다.**
+
+| 장치 | 생긴 때 | 재는 것 | 읽는 법 |
+|---|---|---|---|
+| `profile.*`(이 계획) | PHASE 14 P0 | 게임 스레드 CPU 이벤트 | `profile.stats`·`profile.frame` |
+| `EditorPanelCost` | 9-14 (W7-0) | 패널별 draw 비용 | `editor.panelcost` |
+| `AnimationDiagnostics` | 9-20 (PHASE 13 S1) | 애니메이션 단계·워커 | `measure-animation-baseline.ps1` |
+
+`AnimationDiagnostics.h` 머리 주석이 이 계획이 §5.4 에서 풀려던 문제를 그대로 적고 있다 —
+"Worker durations overlap owner wait and each other; never add them to frame time."
+**도메인이 자기 손으로 프레임 모델을 세우고 있다.** 늦을수록 파편이 는다.
+
+**④ 상수 표기가 바뀌었다.** `6fd9d248` 이 UPPER_SNAKE 24종을 층별 표기로 옮겼다 —
+`MAX_STACK_DEPTH` → `kMaxStackDepth`, `EVENT_BUFFER_SIZE` → `kEventBufferSize`.
+새 코어의 이름도 `docs/design/CodingConventions.md` 를 따른다.
+
+**⑤ W7-5 가 착지했다 — 이 계획의 임시 계측이 잡은 것이다.**
+`ContentsBrowserWindow.cpp:849` 가 관문을 `BeginDragDropTarget()` 블록 **안으로** 옮겼고
+프리팹 경로는 `m_prefabDirectory` 멤버로 캐시됐다. PHASE 14 임시 계측(`SceneStructureLockWait`)
+과 신설 `profile.frame` 이 아니었으면 이 병목은 "스캔 0 이니 W7-1 로 끝났다" 로 남았을 것이다.
+[[scan-count-zero-but-still-expensive]] 참조.
+
+**그대로인 것.** P1 신설 심볼 5종 전부 0건. 등록 스레드 1개. §3.1 소유권 위반 생존.
+**임시 계측은 걷었다**(같은 날 — 아래 ⑥ 참조). `App.cpp` 3곳과 `EditorMain.cpp` 9곳을 되돌렸고
+(`unique_lock` → `lock_guard` 포함), `EditorMain.cpp` 의 제품 계측 `GameLogic`·`EndOfFrame` 2곳은 남겼다.
+`profile.frame` 명령은 남긴다 — 임시 계측이 아니라 보존 프레임을 밖에서 읽는 창구이고, 남은 27개
+이벤트에도 그대로 쓴다. 지금 기준선은 다시 **편집 27 · 388B** 다(걷은 뒤 재빌드해 확인).
+
+**⑥ 두 축을 오늘 다시 돌렸다 — 초록인데 기준선 숫자가 움직였다.** `-Action SelfTest` 종료 코드 0 ·
+`PROFILE_SELFTEST_OK=true`, `-Action Stats` 종료 코드 0 · 판정 통과(9-15 에 JSON 판정으로 고친 뒤
+처음 재확인). 그런데 **이벤트/프레임이 38 · 이름 573B** 다 — §2.1 이 적은 편집 **27** · 388B 가 아니다.
+원인은 회귀가 아니라 **내가 9-15 에 넣은 임시 계측**이 그대로 살아 있기 때문이다. 즉 이 축은
+남의 계측이 드나들 때마다 값이 바뀐다. 그래서 §10 P1b 의 완료조건에서 **절대 숫자를 걷어냈다** —
+단정의 모양은 "27 인가" 가 아니라 **"교체 직전 그 자리에서 뜬 값과 교체 직후가 같은가"** 여야 한다
+([[mutation-proves-gate-has-teeth]]: 이빨은 A/B 동수 단정에 있지 절대 숫자에 있지 않다).
+문서에 박은 숫자가 하루 만에 거짓이 되는 것을 실행으로 잡았다 — 안 돌렸으면 틀린 기준선을 커밋했다.
+
+**A/B/A 왕복으로 닫았다(같은 날).** 임시 계측을 주석 처리하고 Debug 재빌드해 다시 재니 **25 · 367B** 로,
+9-15 의 27 · 388B 와도 어긋났다. 원인은 **내가 걷을 대상을 잘못 셌기 때문**이다 — `EditorMain.cpp` 의
+`PROFILE_CPU_BEGIN` 11곳 중 **2곳(`GameLogic` · `EndOfFrame`)은 9-15 이전부터 있던 제품 계측**이고,
+내가 새로 넣은 것은 12곳(`App.cpp` 3 · `EditorMain.cpp` 9)이다. 그 둘만 되살려 다시 빌드하니
+**27 · 388B** 로 한 바이트까지 9-15 와 일치했고, 임시 계측을 전부 복원하니 다시 **38 · 573B** 였다.
+→ **회귀는 없다.** 그리고 12곳을 넣었는데 38−27=11 만 늘었다 — 안 도는 한 곳은 `profile.frame` 으로
+지목했다: **`TickSimulationFrame`**(`EditorMain.cpp:665`)이다. 그 계측은 `IsPlayCommitted()` 가 거짓일 때의
+`return` **뒤**에 있어 편집 모드에서는 람다가 먼저 빠져나간다. 보존 프레임 [59,63) 네 개가 전부 이벤트 38 ·
+빠진 것 그 하나였다(§2.1 의 engine_frame_id 후보 표가 "편집 모드는 early return 이라 안 돈다" 고 적은 것이
+계측 축에서 그대로 재현됐다). 이 왕복이 없었으면 25 를 보고 "계측 2곳이 사라졌다" 는 유령을 쫓았을 것이다
+([[gate-measures-stale-binary]]: 걷은 뒤에는 반드시 재빌드하고, 되돌린 뒤에도 재빌드한다).
+
+**`profile.frame` 을 밖에서 부르는 절차**(라이브 서버 없이): `wait 60` · `profile.frame` · `quit` 를
+CRLF 스크립트로 적고 `--commandlet-script` 로 넘기되, **출력은 `Start-Process -RedirectStandardOutput`**
+으로 받는다 — GUI 앱이라 셸 파이프로는 0 바이트다. `wait` 없이 부르면 보존 범위가 [1,2) 뿐이라
+부팅 첫 프레임(557ms)만 잡히고, 그 프레임에는 `CLIPump`(그 안에서 명령이 도는 중이라 아직 안 닫혔다)와
+`PublishRenderFrame`(아직 오지 않았다)이 빠져 있어 **관측 시점이 결과를 바꾼다**
+([[stimulus-changes-the-layout-it-probes]]).
+
+**`cli_registry.golden.tsv` 는 이미 최신이었다.** `verify-cli-registry-golden.ps1` 종료 코드 0 ·
+골든 133 = 현재 133 · "한 글자도 다르지 않다". `profile.frame`(golden 91행)은 9-17 갱신본에
+이미 들어가 있었다 — "갱신이 필요하다" 고 적었던 이 계획의 빚은 실재하지 않았다.
+
+---
+
+---
+
+## 1. 범위와 비범위
+
+### 1.1 이번 계획의 범위
+
+- C++ CPU scope와 스레드 이벤트 녹화
+- C# 스크립트 marker와 관리 GC counter 녹화
+- DX12 패스별 GPU timestamp의 프레임 정확성 보장
+- Draw/Batch/VRAM/업로드 링/디스크립터/리소스/GC counter 수집
+- 고정 메모리 예산의 rolling capture
+- Record/Pause/Clear, 프레임 선택, Timeline, Hierarchy, Save/Load
+- 캡처 overflow·누락·프로파일러 자체 비용의 가시화
+
+### 1.2 1차 범위에서 제외
+
+- 모든 C++/C# 함수를 자동 계측하는 Deep Profiling
+- 프로파일러의 여러 프레임 기록에 단일 프레임의 draw/리소스 데이터를 상시 중복 저장
+- 원격 장치 스트리밍 프로파일러
+- 네트워크 프로토콜과 다중 사용자 공유
+- 매 할당의 네이티브 call stack 수집
+- GPU 파이프라인 통계 query와 shader instruction 수준 분석
+- 단일 프레임의 pass/draw/dispatch event tree, 중간 render target 미리보기와 draw 단위
+  격리 replay의 **구현 책임** — 이 계획의 P7에서 연결하되 상세 슬라이스는
+  `RenderFrameDebuggerPlan.md`가 소유한다.
+- Flame Graph, 비교 분석, 회귀 대시보드의 완성형 UX
+
+Deep Profiling은 기본 녹화와 분리한다. 모든 호출을 자동 계측하면 관측 대상의 실행 특성을
+바꾸기 쉽다. 1차 도구는 정적 marker ID를 사용하는 낮은 오버헤드 계측을 기준으로 한다.
+
+---
+
+## 2. 현재 소스에서 확인한 기반
+
+> 이 절은 **2026-09-15 실측으로 전면 갱신했다.** 초판(8-11)의 근거 줄은 그 뒤의
+> 이관으로 대부분 무효가 됐다 — 수집 코어는 `ImGuiHelper`에서 `Engine/EngineDiagnostics`
+> 로 옮겼고(P1a), `EnhancedSceneRendererLive.cpp`는 소멸했으며, `EnhancedRenderGraph.cpp`
+> 는 `Render/Graph/`로 이동했다. 낡은 줄 번호를 남기면 다음 사람이 그것을 근거로 읽는다.
+
+### 2.1 CPU 계측
+
+| 항목 | 현재 근거(9-15 실측) | 판정 |
+|---|---|---|
+| 초기화 | `Editor/EngineEntry/EditorMain.cpp:80` `PROFILER_INITIALIZE(5, 1024)` | historySize 5 · 프레임당 최대 1,024 이벤트 |
+| **읽히는 과거** | selftest 실측 `보존 프레임 [65, 69)` | ★ **4프레임**. 5 중 현재 프레임을 뺀 넷만 읽힌다 |
+| 프레임 경계 | `EditorMain.cpp:279`(부팅 마감) · `:602`(메인 루프) | 게임 프레임 말미에 `Tick()` |
+| 이벤트 | `Engine/EngineDiagnostics/Profiler.cpp` | QPC 기반 Begin/End와 TLS stack |
+| **등록 스레드** | `EditorMain.cpp:81` `PROFILE_REGISTER_THREAD("[GameThread]")` | ★ **1개뿐.** P0(8-11) 때의 3개(Game·CB·CE)에서 줄었다 |
+| 보관 | `Profiler.h` | 프레임별 event vector와 이름 `LinearAllocator`(16,384B) |
+| 일시정지 | `Profiler.h` · `ImGuiHelper/ProfilerWindow.cpp` | queued pause 상태 존재 |
+
+**계측 밀도 실측 — 예산은 문제가 아니다.**
+
+| | 이벤트 | 이름 바이트 | 드롭 | 스레드 |
+|---|---|---|---|---|
+| 편집 모드 | **27** / 1024 (2.6%) | 388 / 16384 | 0 | 1 |
+| 재생 모드 | **34** / 1024 (3.3%) | 525 / 16384 | 0 | 1 |
+
+둘 다 `peak == last`로 **모든 프레임에서 동일**했다. 계측 지점은 정적으로 39곳이고
+(`Scene.cpp` 22 · `SceneManager.cpp` 15 · `EditorMain.cpp` 2) **전부 시스템 단위 고정
+지점**이다 — `PROFILE_CPU_SCOPE`의 실사용은 0이고 per-object 루프 안에 박힌 마커도 0이다.
+그래서 씬에 무엇을 얹든 이벤트 수는 상수이고, 재생을 걸어도 27→34(딱 7개, 재생 경로
+계측분)에 그친다.
+
+함의 둘.
+
+1. **예산 포화·드롭은 게이트 단정으로 쓸 수 없다**(§11.4 참조). 1024에 닿으려면 계측
+   지점이 30배 늘어야 한다.
+2. **이벤트 수 자체가 유일하게 자극 가능한 축이다.** 마커 하나가 새 코어로 안 이어지면
+   27이 26이 된다 — 그리고 그것이 마침 P1 완료조건("기존 호출부 대량 수정 없이 새 코어로
+   이벤트가 들어감")을 직접 재는 값이다.
+
+**★ 가장 큰 사각지대 — 워커가 통째로 안 보인다.**
+`AnimationJob.cpp:39`가 `ThreadPool(8)`로 애니메이션 워커 8개를 띄우고 프레임마다
+`Enqueue`→`NotifyAllAndWait`로 돌리는데, 그 워커 중 **어느 것도 프로파일러에 등록되지
+않는다**(등록 스레드 1개). RenderThread·PresentationThread에도 마커가 0이다. 즉
+**오늘의 CPU 캡처는 애니메이션과 렌더 경로를 볼 수 없다** — PHASE 13이 최적화하려는
+비용이 정확히 그 안에 있다(§0.5.5).
+
+### 2.2 기존 FrameProfiler UI
+
+`ImGuiHelper/ProfilerWindow.cpp`(557줄)에는 이미 다음 조작이 있다.
+
+- 스레드별 중첩 bar · 검색 필터 · threshold pause
+- Ctrl+wheel 확대 · 우클릭 이동 · double-click 구간 확대
+- drag 구간 시간 측정 · event tooltip의 frame/file/line 표시
+
+★ **`Recording / Paused` 문구가 있지만 녹화가 아니다.** 4칸 링을 계속 덮어쓰다
+Space로 멈추면 그 순간 링에 남아 있던 4프레임만 보게 된다. 구간을 보존하는 장치가
+없으므로 §0의 완료 모습 1~3단계("Record 후 10초 플레이 → 스파이크 발견 → 그 프레임
+선택")가 **원리적으로 성립하지 않는다** — 발견했을 때 그 프레임은 이미 덮여 있다.
+
+drag 구간도 화면에 길이만 그린다. 선택 결과를 보존하거나 Hierarchy 계산의 입력으로
+쓰지 않으므로 분석 모델이 아니라 일회성 자다.
+
+이 파일은 §0.5.3에 따라 버린다(§6.4의 immutable reader로 대체).
+
+### 2.3 DX12 GPU 계측
+
+| 항목 | 현재 근거(9-15 실측) | 판정 |
+|---|---|---|
+| timestamp heap/readback | `Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.{h,cpp}` | 프레임 링 크기의 query 저장소 존재 |
+| 패스 경계 | `Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp` | 그래프가 실행 패스를 자동으로 감쌈 |
+| 프레임 진입 | `Render/Scene/EnhancedSceneRenderer.cpp:3588` `dx12.BeginProfilerFrame(frameCounter++)` | ★ **뷰마다 불린다**(§3.3) |
+| 수집 | `DX12GpuProfiler::Collect(std::vector<PassTiming>&, std::string&)` | ★ **프레임 token을 받지 않는다** |
+| 저장소 | `DX12GpuProfiler.h`의 `m_records` · `m_frameIndex` | ★ **한 벌뿐**(링이 아니다) |
+| 표시 | `Editor/EngineGUIWindow/EnhancedRenderDebugWindow.cpp` | 마지막 CPU/GPU 합계와 패스별 표 |
+
+그래프 경계에서 자동으로 감싸는 선택은 유지한다 — 패스 작성자가 marker를 빼먹지 않기
+때문이고, 이것이 §0.5.4가 말한 "자동 계측이 성립하는 자리"의 기존 사례다. 다만 현재
+결과는 raw timestamp가 아니라 마지막 완료분의 duration 목록으로 축약되고, 뷰 구분이 없다.
+
+### 2.4 Counter 기반
+
+`EditorGUIWindow/ResourceCounterWindow`는 다음 값을 이미 읽는다.
+
+- DataSystem 모델·재질·텍스처·UI 리소스·retained asset
+- RenderScene proxy·UI proxy·animator·palette·render pass data
+- VRAM usage/budget · 엔진 리소스 census
+- CoreCLR Gen0/1/2 횟수, heap, fragmentation, GC pause percentage
+
+DX12 쪽에도 `DX12UploadRing::Stats`(allocations·bytes·overflows·peak frame bytes)와
+`DX12DescriptorRing::Stats`(allocations·descriptors·overflows·peak frame descriptors)가 있다.
+
+현재 값은 UI가 0.5초마다 직접 polling한다. 캡처용으로는 각 owner가 프레임 경계에 값
+스냅샷을 발행하고 수집 코어가 `engine_frame_id`에 붙여야 한다.
+
+---
+
+## 3. 녹화 기능 전에 닫아야 할 정확성 문제
+
+### 3.1 CPU producer를 프레임 말미에 직접 초기화한다
+
+`CPUProfiler::Tick()`은 등록된 각 TLS의 event buffer를 읽은 뒤 `NumEvents = 0`으로
+되돌린다. 워커가 동시에 Begin/End를 쓰는 동안 안전하게 buffer 소유권을 넘기는 계약이
+없다.
+
+필요한 변경:
+
+- 스레드별 writer 전용 chunk를 둔다.
+- collector는 writer가 닫아 넘긴 chunk만 읽는다.
+- frame 경계와 scope 경계를 동일시하지 않는다.
+- scope가 프레임을 넘어도 stack과 시작 timestamp를 잃지 않는다.
+- overflow 시 assertion만 내지 않고 `droppedEvents`를 캡처에 기록한다.
+
+### 3.2 종료한 스레드의 TLS 주소 수명
+
+`ThreadData`가 `const TLS*`를 보관한다. 등록 스레드가 종료되면 주소를 계속 읽을 수 있다.
+현재 장수하는 CB/CE 스레드만으로는 잘 드러나지 않지만 워커 풀이 재구성되거나 임시 스레드가
+들어오면 성립하지 않는다.
+
+필요한 변경:
+
+- `thread_stream` 소유권을 profiler service가 가진다.
+- TLS는 소유 객체의 handle만 보관한다.
+- 스레드 종료를 `ThreadEnd` 이벤트로 남기고, 미소비 chunk 회수 후 stream을 은퇴한다.
+
+### 3.3 GPU frame record와 query slot이 분리돼 있다
+
+`DX12GpuProfiler`의 query heap/readback은 frame ring 크기지만 `m_records`,
+`m_usedPasses`, `m_frameIndex`는 한 벌이다. `Collect()`도 수집할 프레임 token을 받지 않는다.
+반면 라이브 렌더러는 합산 인플라이트를 2개까지 허용하고, 멀티카메라에서는 한 엔진 틱에
+제출이 둘 이상일 수 있다.
+
+필요한 변경:
+
+```cpp
+struct GpuFrameToken
+{
+    uint64_t engineFrameId;
+    uint64_t submissionId;
+    uint64_t fenceValue;
+    uint64_t renderViewId;
+    uint32_t ringSlot;
+    uint8_t  queueId;
+};
+```
+
+- query record도 `ringSlot`별로 따로 둔다.
+- DisplaySlot/pendingQueue가 해당 `GpuFrameToken`을 보관한다.
+- `Collect(const GpuFrameToken&)`만 허용한다.
+- 수집 결과에 pass별 begin/end raw timestamp를 유지한다.
+- 같은 이름의 slice는 표시 단계에서 묶되 원본 interval은 버리지 않는다.
+
+### 3.4 엔진 프레임과 렌더 제출은 1:1이 아니다
+
+씬뷰와 게임뷰가 함께 있으면 한 `engine_frame_id`에 여러 GPU 제출이 생긴다. 따라서 다음 두
+식별자를 구분한다.
+
+- `engine_frame_id`: 게임 업데이트 경계. 프레임 그래프와 CPU Hierarchy의 기준.
+- `submission_id`: GPU queue에 실제 제출한 단위. 카메라·뷰·queue를 식별.
+
+GPU 합계는 모든 패스 duration의 단순 합만으로 정의하지 않는다.
+
+- queue span: 첫 timestamp부터 마지막 timestamp까지
+- busy interval: 겹치지 않는 실행 구간의 합
+- pass duration: 개별 marker interval
+- multi-queue overlap: queue별로 따로 표시
+
+### 3.5 profiler가 에디터 모듈에 있다
+
+`ImGuiHelper/Profiler.h`는 CPU 수집 구조와 UI 선언을 함께 가지고 `d3d12.h`까지 include한다.
+이 상태에서 Player 녹화나 원격 프로파일링을 만들면 코어가 에디터에 계속 의존한다.
+
+결정:
+
+- 수집·보관·직렬화는 새 코어 프로젝트 `EngineDiagnostics`로 분리한다.
+- ImGui는 `EngineGUIWindow`의 reader일 뿐이다.
+- DX12 타입은 `RenderEngine/RHI/DX12` adapter 밖으로 노출하지 않는다.
+- 기존 `ImGuiHelper/Profiler.*`는 전환 기간 adapter로만 남겼다가 제거한다.
+
+---
+
+## 4. 목표 계층과 의존 방향
+
+```text
+[Editor]
+EngineGUIWindow/ProfilerWindow
+        │ CaptureReader / immutable snapshot
+        ▼
+[Core diagnostics]
+EngineDiagnostics
+  marker_registry · thread_stream · FrameAssembler
+  capture_session · CounterRegistry · CaptureFile
+        ▲                    ▲
+        │                    │
+RenderEngine DX12       ScriptBinder/CoreCLR
+GPU timestamp provider  managed marker/counters
+```
+
+의존 규칙:
+
+1. `EngineDiagnostics`는 ImGui, D3D11, D3D12, Scene, DataSystem을 include하지 않는다.
+2. renderer와 managed host가 provider 인터페이스를 구현해 값을 밀어 넣는다.
+3. 에디터는 profiler 내부 mutable container를 직접 순회하지 않는다.
+4. UI가 닫혀 있어도 녹화는 가능해야 한다.
+5. Player/Development 빌드도 에디터 없이 `.ceprof`를 생성할 수 있어야 한다.
+
+권장 파일 구조:
+
+```text
+EngineDiagnostics/
+  ProfilerTypes.h
+  profiler_service.h/.cpp
+  marker_registry.h/.cpp
+  ThreadEventStream.h/.cpp
+  FrameAssembler.h/.cpp
+  capture_session.h/.cpp
+  CaptureFile.h/.cpp
+  CounterRegistry.h/.cpp
+
+RenderEngine/RHI/DX12/
+  DX12GpuProfiler.h/.cpp          # 기존 구현을 token 기반으로 교체
+
+ScriptBinder/
+  ProfilerBridge.h/.cpp
+
+ScriptCore/Diagnostics/
+  ProfilerMarker.cs
+  ProfilerCounter.cs
+
+EngineGUIWindow/
+  ProfilerWindow.h/.cpp
+  ProfilerTimelineView.h/.cpp
+  ProfilerHierarchyView.h/.cpp
+  ProfilerModuleView.h/.cpp
+```
+
+---
+
+## 5. 공통 데이터 모델
+
+### 5.1 Clock
+
+- CPU 원본 clock: QPC
+- 저장 단위: session 시작을 0으로 한 nanosecond `uint64_t`
+- session header에 QPC frequency와 시작 UTC를 기록
+- GPU clock: queue timestamp frequency
+- CPU/GPU 상관: `ID3D12CommandQueue::GetClockCalibration`
+- calibration sample은 session 시작, 장시간 캡처의 주기 지점, device reset 후 다시 기록
+
+### 5.2 Marker
+
+> **2026-09-15 개정 — 매크로를 폐기한다.** 현행 `PROFILE_CPU_BEGIN`/`PROFILE_CPU_END`
+> 매크로 쌍을 남기지 않는다. 호출부 39곳의 **이름과 자리는 보존**하되 표기를 바꾼다.
+
+```cpp
+using marker_id = uint32_t;
+
+struct marker_desc
+{
+    marker_id    id;
+    category_id  category;
+    string_id    name;
+    string_id    file;
+    uint32_t    line;
+    marker_flags flags;
+};
+```
+
+이벤트마다 문자열을 복사하지 않는다. 정적 marker는 최초 등록 뒤 정수 ID만 writer에 쓴다.
+동적 이름이 필요한 경우 별도 dynamic string table과 rate limit을 둔다.
+
+#### 매크로를 버리는 이유 — 둘 다 구조적 이득이다
+
+**① 짝 불균형이 문법적으로 불가능해진다.** 현행 결함 6은 `EndEvent`가 건너뛰어지면
+(`if (m_Paused) return;`이 Pop 앞에 있다) 깊이가 어긋난 채 **영구 누적**되고, 32를 넘으면
+`FixedStack::Push`가 TLS의 다음 멤버를 덮어쓰는 것이었다. RAII 스코프는 이 결함을
+고치는 것이 아니라 **작성할 수 없게** 만든다. 열고 닫는 두 문장이 하나가 되면 한쪽만
+실행되는 경로가 존재하지 않는다.
+
+**② 이름 예산이라는 개념 자체가 사라진다.** 지금은 수집기가 프레임마다
+`frame.Allocator.String(event.pName)`으로 이름을 복사하고, 그래서 16,384B 예산과
+`DroppedNames` 계수가 필요했다. 이 저장소는 **C++23**이므로 NTTP 문자열 리터럴로
+마커 ID를 컴파일 타임 상수로 확정할 수 있다 — 등록은 정적 초기화에서 한 번,
+hot path에는 정수만 흐른다. 예산도 누락 계수도 필요 없어진다.
+
+#### 표기
+
+```cpp
+// 정적 마커 — 이름은 컴파일 타임 상수, 등록은 1회
+ce::profile_scope _{ ce::marker<"AnimatorSystem">() };
+
+// 보조 — 이름을 생략하면 std::source_location이 함수·파일·행을 채운다
+ce::profile_scope _{};
+
+ce::profile_counter(ce::marker<"DrawCalls">(), drawCount);
+ce::profile_instant(ce::marker<"SceneLoaded">());
+```
+
+> **2026-09-20 표기 확정 — 층 B(snake_case).** 초판은 `ce::ProfileScope`·`ce::Marker<>` 로
+> 적었으나, 9-20 에 확정된 `CodingConventions.md` 가 층 B 를 snake_case 로 못 박았고
+> `thread_pool`·`job_scheduler` 가 "엔진 공용 실행 유틸리티" 로 층 B 확정된 선례가 있다.
+> 프로파일러도 같은 성격의 공용 인프라이고 계측 API 는 코드 전역에 박히므로, 선례와
+> 어긋나면 눈에 띈다. `ce::` 안에 타입이 들어가는 것은 컨벤션 §5.4 에 예외로 적었다 —
+> `profile_scope` 는 컨테이너가 아니라 **자유 함수를 쓸 수 없는 자리의 자유 함수**이고
+> (여는 일과 닫는 일이 한 문장이어야 한다) 그것을 표현하는 수단이 소멸자뿐이기 때문이다.
+
+> **NTTP 실증(2026-09-20).** MSVC v145 `/std:c++23preview` 에서 `fixed_string` NTTP 가
+> W4 경고 0 으로 서고, 이름마다 `marker_slot<Name>` 정적 슬롯이 갈리며 같은 이름은 같은
+> 슬롯을 얻는 것을 확인했다. 등록은 `static inline const marker_id id = intern(...)` 의
+> 동적 초기화 1회이고, registry 는 함수 지역 static 으로 들고 있어 TU 간 초기화 순서에
+> 의존하지 않는다.
+
+`source_location` 판은 **보조**다. 지금 `Scene::Update` 한 함수 안에 계측 지점이
+13개 있어 함수 이름만으로는 구분되지 않는다 — 이름을 명시하는 쪽이 기본이다.
+
+#### ★ 호출부 형태에 독립이어야 한다
+
+마커 ID가 컴파일 타임 상수이고 스코프가 RAII이면, 호출부가 39곳이든 1곳이든 코어는
+동일하다. 나중에 씬 실행 표가 도입되면
+
+```cpp
+for (auto& step : table) { ce::profile_scope _{ step.marker }; step.fn(*this, dt); }
+```
+
+한 줄로 흡수되고 코어 변경은 0이다. **이 독립성이 설계 요구사항이다** — 프로파일러가
+씬 실행 구조 리팩터를 인질로 잡지 않게 한다(§0.5.4).
+
+#### Build 정책 — 만들 것이 아니라 물 것이다
+
+> **2026-09-15 갱신.** 초판은 "저장소에 그런 매크로가 0건이므로 먼저 도착하는 쪽이
+> 만든다"고 적었다. **PHASE 14.5 LC8이 먼저 도착했고 이미 서 있다.**
+
+- `Directory.Build.targets:72-73`이 **전 프로젝트에** 정의한다 —
+  `EngineShipping=true`면 `CE_SHIPPING=1;CE_DEVELOPMENT=0`, 아니면 `CE_SHIPPING=0;CE_DEVELOPMENT=1`
+- 스위치는 `Directory.Build.props`의 `EngineShipping`이고 **솔루션 구성을 늘리지 않는다**
+  (`msbuild ... /p:EngineShipping=true`)
+- 산출물 키가 갈린다 — `Bin\x64-Release-Shipping\Player\`
+- 격리 게이트 `verify-player-shipping-isolation.ps1`이 **`run-all:299`에 편입돼 있다**
+- 현재 소비자는 `Player/PlayerCommandService.cpp` 하나뿐이다
+
+따라서 이 계획이 할 일은 **`CE_DEVELOPMENT`를 무는 것**이다. 마커 타입을
+`CE_DEVELOPMENT == 0`에서 빈 타입으로 두고(`if constexpr`로 본문 소거), 격리 게이트에
+"Shipping 바이너리에 프로파일러 심볼 0" 단정을 얹으면 완료조건이 닫힌다.
+**새 매크로를 만들지 않는다** — 두 벌이 되면 격리 게이트가 둘로 갈린다.
+
+포함된 빌드에서도 runtime category mask로 비활성화할 수 있어야 한다.
+
+### 5.3 Event
+
+```cpp
+enum class ProfileEventType : uint8_t
+{
+    ScopeBegin,
+    ScopeEnd,
+    Instant,
+    Counter,
+    ThreadBegin,
+    ThreadEnd,
+    FrameBegin,
+    FrameEnd,
+    DroppedEvents
+};
+
+struct ProfileEvent
+{
+    uint64_t timestampNs;
+    uint64_t sequence;
+    marker_id marker;
+    ThreadId thread;
+    ProfileEventType type;
+    uint64_t payload;
+};
+```
+
+writer는 시간순 append만 한다. parent/depth/self time은 capture finalize 또는 UI 분석 시 계산한다.
+이렇게 해야 프레임 경계를 넘는 scope와 중간 녹화 시작을 다룰 수 있다.
+
+### 5.4 Frame
+
+```cpp
+struct CapturedFrame
+{
+    uint64_t engineFrameId;
+    uint64_t beginNs;
+    uint64_t endNs;
+
+    EventRange cpuEvents;
+    GpuSubmissionRange gpuSubmissions;
+    CounterRange counters;
+
+    uint32_t droppedEvents;
+    FrameFlags flags;
+};
+```
+
+프레임 첫/끝 marker는 profiler 자체가 main loop 한 곳에서 발행한다. 하위 시스템이
+`PROFILE_FRAME()`을 임의로 호출하지 못하게 한다.
+
+### 5.5 Counter
+
+초기 category와 counter:
+
+| Module | Counter |
+|---|---|
+| CPU | frame ms, update ms, render-submit CPU ms, thread count |
+| GPU | queue span ms, pass ms, submissions, in-flight skips |
+| Rendering | draw, batch, triangle/vertex 가능 시, decal, visible proxy, light |
+| Memory | process committed/resident, VRAM usage/budget |
+| DX12 | upload bytes/overflow, descriptors/overflow, transient usage |
+| Managed | GC Gen0/1/2 delta, heap, fragmentation, pause, allocated bytes 가능 시 |
+| Assets | model/material/texture/retained counts |
+| Physics | bodies, active bodies, contacts, simulation ms 가능 시 |
+| Audio | active voices/channels, update ms 가능 시 |
+
+Counter는 소유 스레드가 값을 발행한다. UI가 DataSystem/RenderScene container에 직접 lock을
+잡고 capture하지 않는다.
+
+---
+
+## 6. 수집 파이프라인
+
+### 6.1 Recorder 상태 머신
+
+```text
+Stopped ──Record──> Recording ──Pause/Trigger──> Frozen
+   ▲                    │                         │
+   └──────Clear─────────┴────────Record──────────┘
+```
+
+- `Stopped`: marker API는 runtime mask에 따라 즉시 return
+- `Recording`: rolling ring에 계속 기록
+- `Frozen`: producer 기록을 멈추고 immutable capture를 reader에 공개
+- `Clear`: capture와 selection만 비우고 marker registry는 재사용
+
+Pause는 다음 engine frame 경계에서 확정한다. 중간 scope는 `truncated` flag로 닫아 분석기가
+잘못된 self time을 만들지 않게 한다.
+
+### 6.2 Thread stream
+
+초기 구현은 복잡한 lock-free queue보다 규약이 명확한 chunk handoff를 우선한다.
+
+- thread마다 writer 전용 고정 크기 chunk
+- chunk가 차거나 frame publish 지점에 도달하면 sealed queue로 넘김
+- collector만 sealed chunk를 소비
+- 평소에는 미리 준비된 페이지를 사용하고, free 페이지가 없으면 기록자가 새 페이지를 할당
+- 명시적 페이지 상한 또는 할당 실패 시에만 drop count 증가
+- thread별 sequence로 동일 timestamp 순서 보존
+
+기본 페이지 수는 selftest 측정으로 결정한다. 생산자가 소비자보다 오래 빠르면
+풀·제출 큐의 메모리가 커지므로 Collector에서 큐 길이와 풀 메모리를 본다(§0.5.33).
+
+### 6.3 Rolling capture
+
+초기 기본값:
+
+- 600 engine frames
+- rolling capture 보존 예산 128 MiB (제출 큐와 페이지 풀은 별도)
+- 둘 중 먼저 닿으면 가장 오래된 완결 프레임부터 제거
+- 현재 쓰는 프레임과 미완 scope가 참조하는 string/marker는 제거하지 않음
+- UI에 `used / budget`, retained frames, dropped events 표시
+
+프레임 수는 60 FPS에서 약 10초라는 UX 기본값일 뿐이다. 실제 보존 길이는 이벤트 밀도와
+메모리 예산에 의해 달라질 수 있으므로 둘을 함께 표시한다.
+
+### 6.4 Immutable reader
+
+현재처럼 UI가 global profiler vector를 직접 읽지 않는다.
+
+- recording 중에는 경량 `live_summary`만 double-buffer로 공개
+- pause 시 `shared_ptr<const capture_session>`을 원자적으로 교체
+- UI selection과 정렬은 reader 쪽 별도 상태
+- 저장 작업도 immutable capture를 읽으므로 recorder를 오래 잠그지 않음
+
+---
+
+## 7. 에디터 UX
+
+### 7.1 Toolbar
+
+- Record / Pause
+- Clear
+- Live Follow
+- 캡처 프레임·메모리 사용량
+- Category/Module 선택
+- Save / Load
+
+`Open Render Frame Debugger`는 별도 RF 트랙의 후속 선택적 adapter다. 이 Toolbar의
+기본 기능이나 프로파일러 완료 조건이 아니다.
+
+Space 전역 단축키는 제거하거나 Profiler 창 focus일 때만 받는다. 편집기 viewport 입력과
+충돌하지 않아야 한다.
+
+### 7.2 Frame Overview
+
+최상단에 모든 분석의 entry point인 프레임 그래프를 둔다.
+
+- CPU frame ms
+- GPU queue span ms
+- target frame budget 선: 16.67/33.33ms
+- GC/alloc marker
+- draw/batch 또는 선택 counter overlay
+- 클릭: 단일 프레임 선택
+- Shift+click/drag: frame range 선택
+- 현재 recording head와 ring eviction 경계 표시
+
+### 7.3 Timeline
+
+트랙 순서:
+
+1. Frame boundaries와 instant events
+2. CPU main/game thread
+3. command-build/command-execute/worker threads
+4. managed/script thread
+5. GPU Graphics queue
+6. GPU Compute/Copy queue가 생기면 별도 트랙
+
+기존 확대·이동·검색·tooltip 코드는 재사용하되 data source를 `CaptureReader`로 교체한다.
+GPU bar는 `submission_id`, view/camera, fence, pass name을 tooltip에 표시한다.
+
+### 7.4 Hierarchy
+
+선택한 frame range에 대해 marker별로 집계한다.
+
+| 열 | 의미 |
+|---|---|
+| Total | 모든 호출 inclusive time 합 |
+| Self | 자식 scope를 제외한 시간 |
+| Calls | 호출 수 |
+| Avg | 호출 평균 |
+| Min/Max | 호출 최소/최대 |
+| P95 | 긴 꼬리 확인 |
+| Frames | marker가 나타난 프레임 수 |
+| GC/Counter | 해당 marker에 연결된 값이 있을 때 |
+
+보기 모드:
+
+- Hierarchy: parent-child call tree
+- Flat: marker 이름으로 전부 합침
+- Calls: 개별 호출 목록
+
+MVP는 frame range 선택을 기준으로 한다. 임의 sub-frame 시간 범위를 지속 선택해 집계하는
+기능은 CPU/GPU clock 정렬이 검증된 뒤 추가한다.
+
+### 7.5 Module panels
+
+- CPU Usage
+- GPU / Rendering
+- Memory / Resources
+- Managed GC
+- Physics
+- Audio
+
+처음부터 빈 module을 다 만들지 않는다. provider와 검증 데이터가 생긴 순서대로 공개한다.
+
+---
+
+## 8. `.ceprof` 캡처 파일
+
+### 8.1 요구사항
+
+- 저장 후 같은 프레임 수·marker 수·통계를 재현
+- 빌드가 달라도 읽되 schema 비호환은 명확히 거절
+- 부분 파일과 손상을 검출
+- 대형 캡처를 frame index로 lazy load 가능
+- 에디터가 없는 Development Player에서도 생성 가능
+
+### 8.2 초기 형식
+
+```text
+Header
+  magic = "CEPROF"
+  formatVersion
+  engineVersion / buildId / git commit if available
+  QPC frequency / session start UTC
+  platform / process / command line
+
+Chunk table
+  StringTable
+  MarkerTable
+  ThreadTable
+  CalibrationTable
+  FrameIndex
+  CpuEvents chunks
+  GpuEvents chunks
+  Counter chunks
+  Diagnostics chunk
+```
+
+각 chunk는 type, version, byte size, CRC를 가진다. 1차는 무압축으로 정확성을 검증하고,
+파일 크기 실측 뒤 LZ4/Zstd 같은 chunk 압축을 별도 슬라이스로 결정한다.
+
+저장 실패는 기존 frozen capture를 파괴하지 않는다. 임시 파일에 완성한 뒤 최종 이름으로
+교체한다.
+
+---
+
+## 9. 독립 Render Frame Debugger와의 선택적 연결
+
+제품 목표는 엔진 안에서 프레임을 직접 조사하는 것이다. PIX/RenderDoc 같은 도구명은
+사용자가 기대하는 프레임 탐색 경험의 예시이지 외부 도구 실행·ETW export를 완료 조건으로
+채택하라는 뜻이 아니다.
+
+| 내장 도구 | 담당 |
+|---|---|
+| Creator Profiler (`.ceprof`) | 여러 프레임의 CPU/GPU/GC 추세와 문제 프레임·뷰 탐색 |
+| Render Frame Debugger (`.ceframe`) | 완료된 한 submission의 pass/draw/dispatch 순서, 객체·자산·상태·리소스와 중간 출력 조사 |
+
+Render Frame Debugger는 프로파일러를 시작하지 않고도 UI/CLI에서 뷰를 지정해
+**다음 완료 submission 하나**를 캡처하고 `.ceframe`을 저장·연다. 두 도구는
+렌더러가 발행한 frame/view/submission ID만 공유하며 서비스·수집 큐·파일 schema는
+공유하지 않는다. 나중에 프로파일러 선택 프레임·뷰에서 연결하더라도, 과거
+프레임의 렌더 입력과 GPU 리소스가 보존되지 않았다면 과거 프레임을 재현했다고
+가장하지 않는다. 이 경우 선택한 뷰의 **다음 완료 submission**을 새로 캡처하고
+원래 선택과 실제 캡처 ID를 구분해 표시한다. 이 adapter와 조건부 자동 트리거는
+두 도구의 완료 조건에서 제외한다. 상세 데이터 모델·격리 replay·파일화는
+`RenderFrameDebuggerPlan.md` RF0~RF7이 소유한다.
+
+---
+
+## 10. 실행 계획
+
+이 프로파일러 계획은 P0~P6을 빌드 가능한 조각으로 검증한다. 대시보드 `14-7`은
+일정상 같은 묶음에 남지만, 독립 `RenderCapture` 제품 트랙이며 구현·검증 정본은
+`RenderFrameDebuggerPlan.md` RF0~RF7이다.
+
+### P0 — 현재 동작 기준선과 profiler selftest 표면
+
+할 일:
+
+- 현재 `CreatorEngine.sln` Debug|x64 빌드 기준선 기록
+- FrameProfiler 열기/닫기, pause/resume, 5프레임 표시 smoke
+- `profile.selftest` console command 추가
+- nested scope, multithread, cross-frame, overflow test fixture 정의
+- profiler 자체 CPU 시간·event count를 로그에 출력
+
+예상 변경:
+
+- `EngineEntry/ConsoleCommandSystem.cpp`
+- 신규 `EngineDiagnostics` 프로젝트 뼈대 또는 임시 테스트 진입점
+- `Tools/profiling-validation/Invoke-ProfilingValidation.ps1`
+
+완료 조건:
+
+- 기존 UI를 켜지 않아도 selftest 실행 가능
+- 성공 로그에 고정 marker `PROFILE_SELFTEST_OK=true`
+- 실패 시 frame/thread/marker/예상값이 로그에 남음
+- 현행 GPU live smoke와 DX12 validation 결과를 회귀시키지 않음
+
+#### P0 실측 결과 (2026-08-11, 완료)
+
+통과 10 / 실패 0 / 기지 결함 1. 산출물은 `profile.selftest`·`profile.stats` 콘솔 명령과
+`Tools/profiling-validation/`이다. 판정 근거는 종료 코드와 `PROFILE_SELFTEST_OK=true` 마커.
+
+기준선(캐릭터·파티클 없는 기본 씬):
+
+| 항목 | 실측 |
+|---|---|
+| Debug\|x64 전체 빌드 | 0 오류 · 0 경고 |
+| `Tick()` 비용 | 평균 25~32us · 최대 78us |
+| 이벤트/프레임 | 26 / 상한 1024 (3%) |
+| 이름 바이트/프레임 | 405 / 상한 16384 (2%) |
+| 등록 스레드 | 당시 3 (`[GameThread]`·`[CB-Thread]`·`[CE-Thread]`), 3-2G 이후 현재 1 (`[GameThread]`) |
+
+**정적 점검이 놓친 것 세 가지.**
+
+1. **§3.1이 "assert만 낸다"고 적은 것은 절반이다.** `Tick()`의
+   `PROFILER_CHECK(newIndex < frame.Events.size())`는 assert 뒤에 **그대로 기록을 이어간다.**
+   NDEBUG에서는 assert가 사라지므로 상한을 넘긴 순간 `Events` 벡터 밖에 쓴다.
+   `LinearAllocator::Allocate`도 같은 모양이다. 즉 overflow는 "누락되는" 문제가 아니라
+   **Release 힙 손상**이었다. 픽스처를 실행하려면 먼저 닫아야 했다.
+
+2. **§3.2의 TLS 수명 문제는 등록 해제 API가 없어서 회피가 불가능하다.** 스레드가 등록 후
+   종료하면 `ThreadData::pTLS`가 죽은 `thread_local`을 가리키고, **이후 모든 `Tick()`이**
+   그 저장소를 읽는다. 멀티스레드 픽스처는 정의상 스레드를 만들고 접으므로, 이것 없이는
+   검사가 에디터를 UAF 상태로 남긴 채 끝난다. `UnregisterThread()`를 P0에서 신설했다.
+
+3. **아무도 몰랐던 결함 — 스팬 그룹핑의 부등호가 반대다.**
+   `while (threadIndex < events[Begin].ThreadIndex) Begin++`는, 그 프레임에 이벤트가
+   **하나도 없는** 스레드를 만나면 남은 이벤트 **전부**가 조건을 만족해 커서를 끝까지 민다.
+   결과적으로 **그보다 인덱스가 큰 스레드가 통째로 사라진다.** 기존 FrameProfiler 타임라인도
+   같은 이유로 스레드를 조용히 누락해 왔다 — 한 스레드가 쉰 프레임에서 그 뒤 스레드가 빈다.
+   `multithread/capture`가 0/3으로 실패해 드러났고, 원인은 워커(인덱스 3~5)가 아니라
+   그 앞의 CB/CE 중 하나가 쉰 것이었다. **§13-1("UI보다 frame identity가 먼저다")의 실례다.**
+
+**설계 제약 두 가지(P1·P2 착수 전에 알고 있어야 한다).**
+
+- `CPUProfiler::GetTLSUnsafe()`가 함수 지역 `static thread_local`이라 **모든 CPUProfiler
+  인스턴스가 스레드당 TLS 하나를 공유한다.** 검사 전용 인스턴스를 세울 수 없어, selftest는
+  전역 `gCPUProfiler`의 프레임 경계를 직접 넘긴다 — 그래서 **라이브 캡처를 교란한다.**
+  §3.2의 "`thread_stream` 소유권을 profiler service가 가진다"가 이것을 푼다.
+- **프레임을 넘는 스코프는 게임 스레드에서 재현하면 안 된다.** `Tick()`은 스택 맨 위를
+  무조건 닫으므로, 열린 스코프가 있으면 `"CPU Frame"` 대신 그것을 닫는다. 게임 스레드의
+  스택이 프레임마다 한 칸씩 깊어져 `kMaxStackDepth`(32)에서 죽는다. 워커에서만 관측할 것.
+
+**P0이 이미 닫은 몫 / P2가 받는 몫.** P2는 아래를 다시 하지 않는다.
+
+| P0이 닫은 것(최소 지혈) | P2가 받는 것(정식 구조) |
+|---|---|
+| 드롭 계수화(`DroppedEvents`·`DroppedNames`) | 캡처 diagnostics로 승격, UI 노출 |
+| 널 슬롯 스킵 + `UnregisterThread` | `thread_stream` 소유권 역전(서비스가 소유) |
+| 수집 구간 `m_ThreadDataLock`(**표만**) | writer 전용 chunk의 sealed handoff |
+| 스팬 그룹핑 부등호 정정 | (해당 없음 — 닫힘) |
+| `EventStack` 은퇴·재등록 시 복구 + 불균형 계수 | `truncated` 플래그로 승격(§6.1) |
+| `m_Paused`·`m_QueuedPaused` 원자화 | (해당 없음 — 닫힘) |
+| 슬롯 재사용을 히스토리 한 바퀴 뒤로 유예 | 스트림 은퇴 시 미소비 chunk 회수(§3.2) |
+
+**★ P0의 락이 지키는 것은 스레드 표 하나뿐이다.** `Tick()`이 `pTLS->EventBuffer[i]`를
+읽는 동안 그 워커가 `BeginEvent`에서 `resize`를 돌리면 옛 버퍼가 해제된다 —
+**원소 단위 경합은 그대로 남아 있다.** 3-2G에서 3자 배리어와 CB 스레드를 제거하면서
+`PresentationThread`의 프로파일 매크로와 등록도 함께 제거했다. 현재 캡처가 안전한
+이유는 `[GameThread]` 하나만 writer이기 때문이지 계약이 고쳐졌기 때문이 아니다.
+PresentationThread/RenderThread 계측은 §3.1의 sealed chunk handoff 뒤에만 추가한다.
+
+collector가 producer TLS의 `NumEvents`를 0으로 되돌리는 구조 자체도 **그대로 남아 있다.**
+P2의 성공 판정은 `cross-frame/preserve`가 `KNOWN-DEFECT`에서 `PASS`로 바뀌는 것이다.
+
+### P1 — EngineDiagnostics 코어와 공통 frame clock
+
+#### P1a — 수집 코어 물리 이관 (2026-08-24, 완료)
+
+§3.5의 소유권 문제를 먼저 닫았다. E축(EngineLayerSeparationPlan) E6의 마지막
+판정(Player→ImGuiHelper 참조 제거)이 이것에 걸려 있었고, 실측하니 P0 정비를
+거친 `Profiler.h`는 이미 ImGui include 0의 거의 순수한 수집기라 재설계 없이
+물리 이동으로 실현됐다.
+
+- ✅ `EngineDiagnostics.vcxproj` 신설(StaticLibrary, 경계 층 1 — Utility와
+  동급, **ProjectReference 0의 완전 독립 라이브러리**). `Profiler.{h,cpp}`·
+  `ProfilerSelfTest.{h,cpp}` 4파일을 ImGuiHelper에서 git mv.
+- ✅ 코어/UI 경계 확정: `Profiler.h`의 `DrawProfilerHUD()` 선언을
+  `ImGuiHelper/ProfilerHUD.h`(신설)로 분리 — 코어는 표시를 모르고, ImGui는
+  reader다(§3.5 결정의 이행). 소비자 `ProfilerWindow.cpp`(구현)와
+  `MenuBarWindow.cpp`(호출)가 새 헤더를 문다.
+- ⚠ **죽은 `<d3d12.h>` include가 세 파일의 Windows 의존을 몰래 먹여
+  살리고 있었다.** 제거하자 `Profiler.cpp`(QPC·GetThreadDescription)·
+  `ProfilerSelfTest.cpp`(GetCurrentThreadId)·`ProfilerWindow.cpp`
+  (LARGE_INTEGER·ARRAYSIZE)가 차례로 붉어졌다 — 각자 `<Windows.h>` 명시로
+  정리. 헤더의 `ARRAYSIZE`는 템플릿 파라미터 `N`으로 바꿔 Windows 의존
+  자체를 걷었다. Debug 유니티는 청크 병합이 이 전이를 가려 초록이었다 —
+  비유니티 레그가 잡았다(검증 순서가 유니티만 돌면 놓치는 종류).
+- ✅ 재배선: ScriptBinder는 ImGuiHelper include 경로를 EngineDiagnostics로
+  교체(계측 소비 2건이 전부였다 — 죽은 문 닫기), ImGuiHelper·Academy_4Q는
+  경로+참조 추가, **Player는 ImGuiHelper 참조를 제거하고 EngineDiagnostics
+  참조로 교체**. Player의 ImGuiHelper include 경로는 유지 — PlayerMain의
+  `"imgui.h"`가 대소문자 무시로 `ImGui.h` 래퍼(IMGUI_DEFINE_MATH_OPERATORS)
+  로 해석되는 현 컴파일 결과를 보존한다(헤더 온리라 링크와 무관).
+- ✅ P1 할 일의 "ImGui/D3D12 include 없는지 include boundary 검사"가 래칫으로
+  성립: 층 1 등록으로 ImGuiHelper(2)·에디터 층 헤더를 무는 순간 상향 간선.
+  음성 테스트 — `ImGui.h` include 주입 시 정확히 그 간선으로 붉어짐을 확인.
+- ✅ 검증: Release 비유니티·Debug 유니티 4레그 오류 0, 래칫 0/0, 회귀 세트
+  전체 통과(lifecycle 221 동일), `Invoke-ProfilingValidation` 통과
+  (PROFILE_SELFTEST_OK=true — 이동한 코어의 실행 실증). **P1 완료 조건 중
+  "UI를 링크하지 않는 Player에서도 코어가 빌드됨"이 닫혔다.**
+
+> **2026-09-15 개정.** 아래 할 일·완료 조건을 재작성했다. 재활용 폐기(§0.5.3)와
+> 매크로 폐기(§5.2)로 **항목 하나가 무의미해졌고**, Shipping 항목은 **대상이 이미
+> 서 있음이 확인됐다**(§0.5.1).
+
+#### P1b — 새 코어와 공통 frame clock (개정)
+
+할 일:
+
+- `profiler_service` — 스트림을 서비스가 소유한다. 현행의 함수 지역
+  `static thread_local`(모든 인스턴스가 스레드당 TLS 하나를 공유) 제약이 여기서 풀린다
+- `marker_registry` — 컴파일 타임 마커 ID 등록(§5.2). **매크로를 만들지 않는다**
+- `ce::profile_scope` RAII — 짝 불균형을 문법적으로 불가능하게
+- **단일 `engine_frame_id` 발행 지점 통합.** 새로 만드는 일이 아니라 지금 서로 모르고
+  도는 세 카운터를 묶는 일이다:
+
+  | 후보 | 성질 | 판정 |
+  |---|---|---|
+  | `TimeSystem::m_frameCount`(atomic uint32) | Editor·Player 공통, 편집·재생 모두 증가, **`FixedTick` 호출부 0**이라 루프당 1회(9-15 재확인) | **정본** |
+  | `Runtime::TickSimulationFrame` | 편집 모드는 앞에서 early return | 부적합 |
+  | `LiveState::publishedFrameId`(atomic uint64) | RT 파이프라인 제출 단위 | `submission_id` 축 후보 |
+
+- 호출부 39곳의 표기를 새 RAII로 교체(**이름과 자리는 보존**)
+- `CE_DEVELOPMENT`를 물어 compile-out(§5.2 — 새 매크로 신설 금지)
+- ImGui/D3D12 include 없는지 include boundary 검사 유지
+
+~~기존 `PROFILE_CPU_*` 매크로를 새 API adapter로 연결~~ — **폐기.** 옛 코어에 adapter를
+붙이는 일이 재활용 폐기로 의미를 잃었다. 매크로는 정의째 없어진다.
+
+완료 조건:
+
+- **이벤트 수가 보존된다 — 절대 숫자가 아니라 교체 전후 동수**. 이것이 "기존 호출부 대량
+  수정 없이 새 코어로 이벤트가 들어감"을 재는 값이고, 마커 하나가 안 이어지면 하나 줄어든다.
+  ★ **절대 숫자를 완료조건에 박으면 안 된다**(2026-09-20 실측으로 확인): §2.1 의 편집 27 /
+  재생 34 는 임시 계측을 걷은 값이고, 9-15 에 넣은 임시 계측 12곳(`App.cpp` 3 · `EditorMain.cpp` 9)이
+  붙어 있는 동안은 **편집 38 · 이름 573B** 였다(걷은 지금은 27 · 388B 로 복귀). 즉 이 축은
+  남의 계측이 드나들 때마다 움직인다 —
+  단정은 같은 소스 상태에서 **교체 직전 값을 그 자리에서 떠서 교체 직후와 맞대는** 모양이어야 한다
+- 동일 marker가 여러 스레드에서 하나의 안정된 ID 사용
+- `CE_SHIPPING=1` 빌드에서 프로파일러 심볼 0 — `verify-player-shipping-isolation.ps1`에
+  단정 추가(그 게이트는 이미 `run-all:299`에 있다)
+- UI를 링크하지 않는 `Player`에서도 코어가 빌드됨 *(P1a에서 이미 닫힘)*
+- ★ **프로파일링 검사를 찾을 수 있게 적는다.** 회귀 세트는 9-16 에 폐지됐다 — 편입할 곳이
+  없다. 대신 `Tools/regression/README.md` 표와 이 계획서 §11 에 `Invoke-ProfilingValidation.ps1`
+  을 이름으로 올린다. 지금 README 표에 없어서, 세트가 있던 시절과 똑같이 **안 모인다**.
+  Stats 축이 9-06 부터 8일·115커밋 동안 죽어 있던 것을 아무도 몰랐던 이유가 그것이다
+
+#### P1b 착수 전 선행 — 죽은 게이트 축 복구
+
+P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34였다"를 증명할 자리가 없다.
+
+- `Invoke-ProfilingValidation -Action Stats`가 JSON을 읽게 고친다(텍스트 복구가 아니다 —
+  `reg.Result` 규약이 정본이고 이 저장소에 `ConvertFrom-Json` 게이트 13종의 선례가 있다)
+- 단정은 **이벤트 수 두 개**(편집·재생)로 좁힌다. 씬을 추적되는 fixture로 고정한다.
+  수는 그때 그 자리에서 뜬다 — 임시 계측이 드나들면 값이 움직이므로 박아 두지 않는다
+  (2026-09-20 현재: 임시 계측을 걷은 뒤 편집 27 · 이름 388B · 누락 0 · 불균형 0 · 슬롯 1 —
+  붙어 있던 동안은 38 · 573B 였다)
+- 드롭·포화(`totalDroppedEvents`·`peakFrameEvents < eventCapacity`)는 **값만 기록하고
+  이빨 없음을 주석에 남긴다** — §2.1이 보였듯 어떤 변이로도 자극되지 않는다
+- 변이로 증명한다: 마커 하나를 빼서 값이 하나 줄어 붉어지는지, 그리고 그 변이가 실제로
+  단정 자리를 지나는지까지
+
+### P2 — CPU thread stream과 rolling capture
+
+> **2026-09-15 우선순위 승격.** P2는 "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를
+> 막고 있는 일**이다. PHASE 13이 애니메이션 워커 8스레드를 최적화하는데(§0.5.5),
+> 그 워커에 마커를 걸려면 sealed chunk handoff가 먼저 있어야 한다 — 지금 코어에 워커
+> 계측을 붙이면 §3.1의 원소 단위 경합이 그대로 열린다. **지금 안 터지는 유일한 이유가
+> writer가 `[GameThread]` 하나뿐이기 때문**이다.
+
+할 일:
+
+- owner 수명이 명확한 `thread_stream`
+- sealed chunk handoff — writer가 자기 chunk를 봉인해 넘기고 collector는 남의 메모리를
+  만지지 않는다. 현행 결함 8종 중 다섯이 **고쳐지는 것이 아니라 발생하지 않게** 된다
+- cross-frame scope와 mid-capture scope 처리 — `truncated` flag(§6.1).
+  **selftest의 `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로 바뀌는 것이 판정이다**
+- 600프레임/128MiB rolling ring
+- drop/overflow 진단
+- `capture_session` freeze
+- ★ **워커 스레드 등록** — 애니메이션 워커 8개, RenderThread, PresentationThread.
+  enkiTS 이관(PHASE 13 S0.5) 이후라면 `threadnum_`(0..`GetNumTaskThreads()-1` 보장)을
+  슬롯 키로 쓴다 — 현행이 발명해야 했던 11비트 슬롯 은퇴·재사용 규칙이 불필요해진다
+
+완료 조건:
+
+- 8개 이상 writer thread stress에서 충돌·손상 없음
+- 프레임 경계를 넘는 scope의 duration이 정확함(`cross-frame/preserve` PASS)
+- thread 생성/종료 후 dangling TLS 접근 없음
+- 기본 풀은 초기 페이지를 넘어도 확장해 이벤트를 보존
+- 명시적 pool 상한 또는 할당 실패 시 dropped count 증가
+- ASan 가능 구성 또는 동등한 메모리 검증에서 오류 없음
+- ★ **애니메이션 워커의 시간이 캡처에 나타난다** — PHASE 13 §4의 완료 기준("예측 비용
+  대 실측 오차 15% 이내")을 판정할 수단이 이것이다
+
+### P3 — CPU 중심 에디터 녹화 MVP
+
+할 일:
+
+- 새 `EngineGUIWindow/ProfilerWindow`
+- Record/Pause/Clear/Live Follow
+- Frame Overview
+- 기존 CPU Timeline renderer 이관
+- 단일/다중 frame selection
+- Hierarchy/Flat의 Total/Self/Calls/Avg/Max
+- capture memory/dropped event 표시
+
+완료 조건:
+
+- 10초 녹화 후 과거 프레임 선택 가능
+- pause 후 engine이 계속 실행돼도 선택 데이터가 변하지 않음
+- Timeline 합계와 Hierarchy inclusive time이 허용 오차 내 일치
+- 창을 닫아도 recording 상태가 유지되거나 명시적으로 설정한 정책대로 동작
+- profiler 창 focus 밖에서 Space가 편집기 동작을 가로채지 않음
+
+### P4 — GPU frame token과 CPU/GPU clock 정렬
+
+할 일:
+
+- `DX12GpuProfiler` record를 frame ring별로 분리
+- `GpuFrameToken` 도입
+- DisplaySlot/pendingQueue에 token 연결
+- `Collect(token)`으로 API 교체
+- raw pass interval과 queue span 보존
+- clock calibration과 `submission_id`, view 정보 기록
+- GPU Timeline 추가
+
+검증 장면:
+
+- 서로 다른 GPU 조각 수의 Scene/Game 제출이 같은 엔진 프레임에 존재하고
+  서로 다른 제출 번호로 귀속
+- 최대 2-inflight와 미완료 fence 때문에 다음 제출을 보류하는 경계
+- Scene 표시 모드, Game 표시 모드, Scene+Game Preview 동시 수요
+- 리사이즈 전후 두 뷰의 완료 세대 비교(라이브 pipeline 전체 재구축은 현재 정상 운영 명령이 없음)
+- Debug에서 질의 슬롯을 16개로 제한해 실제 overflow를 발생시키는 손실 게이트
+
+완료 조건:
+
+- 같은 엔진 프레임의 서로 다른 Scene/Game 패스 조각 수가 각각 올바른
+  `engine_frame_id`·`submission_id`·`view_id`에 매핑
+- 2-in-flight와 멀티카메라에서 이전/최신 query record 혼동 없음
+- fence 미완료 slot을 읽지 않음
+- GPU query overflow와 collect 실패가 라이브 녹화 Collector diagnostics에 따로 남음
+- D3D12 debug layer/DRED 메시지 0건
+
+### P5 — Counter provider와 관리 marker
+
+메모리 탭의 수동 스냅샷·객체별 분석은 P5의 프레임별 counter와 별도인 [MemoryProfilerPlan.md](MemoryProfilerPlan.md) MP0~MP6에서 추적한다. P5 완료가 Unity 수준의 메모리 객체·참조 계측 완료를 뜻하지는 않는다.
+
+**2026-09-23 P5 완료.** 초기 텔레메트리 경로는 프레임에 희소 counter 값을 붙여
+immutable capture와 `.ceprof`의 선택 청크에 보존한다. Collector가 엔진 프로세스
+CPU 사용률(전체 논리 CPU 기준)과 RAM 작업 집합을 100ms 간격으로 샘플하고,
+RenderThread가 DX12/Vulkan의 VRAM 사용량을 250ms 간격으로 발행한다. GPU
+Graphics 시간은 이미 캡처된 GPU 구간의 합집합에서 읽는다. 에디터의 선형 그래프는
+같은 프레임 선택을 공유하고 값이 없는 구간을 0으로 잇지 않는다. LAN은 엔진
+송수신 계측원이 현재 없으므로 **측정 불가**로 표시한다. OS 어댑터 전체 송수신량을
+엔진 트래픽으로 대체하지 않는다. RenderThread/PresentationThread에는 대기·잠금·
+준비·기록·제출/표시 단계 마커를 더했다. 아래의 owner 제공자와 관리 마커가
+이 초기 경로를 확장한다.
+
+2026-09-23 검증: Debug Editor 빌드, Debug/Release 코어 각 447검사·선택 CRC 변이,
+`Invoke-ProfilingValidation.ps1 -Action Stats`·`Window`·`Gpu` 통과.
+`Stats`의 `profile.frame`에서 CPU/RAM과 VRAM 희소 표본을 확인했고,
+`droppedCounters=0`이었다. `ProfilerTelemetry` 자체 계측은 Debug 창 게이트의
+7표본에서 0.27~0.61ms였다. 원본은 `Build/Validation/ProfileP5/20260923/`
+아래 `final-stats`·`final-window`·`final-gpu`에 있다. 이 초기 게이트 이후의
+화면 배치·상호작용 확인은 아래 UI 후속에 기록했다. 장시간 부하는 아직 검증하지 않았다.
+
+2026-09-23 UI 후속: 실제 에디터 화면에서 네 그래프가 타임라인을 밀어내고
+긴 기록의 여러 초가 한 타임라인에 압축되는 문제가 확인됐다. 모든 분석 페이지를
+왼쪽 Material Symbols 아이콘 레일에 모으고 각 아이콘에 설명 툴팁을 붙였다.
+`프레임 그래프`는 프레임 개요와 CPU·RAM·GPU Graphics·VRAM의 2×2 시계열,
+`타임라인`은 같은 프레임 개요와 시간순 레인/CPU 호출 계층 전환을 제공한다.
+CPU 페이지는 선택 구간 A와 별도 프레임 범위 B의 평균·표본 수 비교, 시계열,
+Self 상위 마커, 호출 계층을 배치했다. Flat과 Hierarchy는 공통 마커 검색과
+스레드 필터를 쓴다. 이는 Datadog Continuous Profiler의 시각화 전환·오른쪽
+순위 목록·비교 배치를 참고하되 엔진 캡처에 실제로 있는 값만 표시한 것이다
+(`https://www.datadoghq.com/blog/dotnet-datadog-continuous-profiler/`). 타임라인은
+짧은 라이브 캡처에서 자라더라도 기본 100ms 시야로 수렴하고, 하단 탐색 막대로
+**보존된 기록 전체**를 이동한다. 새 스냅샷에도 사용자 배율을 유지하며 상단
+프레임/시계열을 클릭하면 상세 시야가 해당 프레임으로 이동한다. 좁은 구간의
+잘린 이름과 숫자는 숨기고 툴팁에 보존한다. Debug Editor 빌드, Debug·Release
+코어 각 459검사와 타임라인 시야 변이, Window 제품 게이트를 통과했고 실제
+화면에서 레일·툴팁·페이지 배치·호출 계층 전환을 확인했다. 장시간 부하는 남았다.
+
+2026-09-23 타임라인 화면 후속: 150px 고정 스레드 이름 칸에서 긴 이름이 시간축에
+겹치던 문제를 해결했다. 이름 칸은 현재 스레드 이름에 맞춰 넓어지고, 각 이름은
+그 칸 안에서만 그리며 전체 이름은 툴팁으로 볼 수 있다. 레인 높이의 14줄 상한을
+없애 호출 깊이만큼 확장하고 내부 세로 스크롤·스레드별 접기/펼치기·전체
+접기/펼치기를 제공한다. CPU 호출 계층 그래프도 18단계 표시 상한을 제거했다.
+GPU 페이지에 VRAM 시계열이 있으므로 옛 Profiler 창 아래의 단독 VRAM Usage
+막대는 제거했다. Debug 전체 및 최종 Editor/CreatorEditor 증분 빌드는 경고·오류
+0이었다. 실제 화면에서 이름 칸·접기/펼치기·VRAM 단독 바 제거를 확인했다.
+`Window` 게이트 첫 실행은 최근 8프레임에 프로파일러 마커가 없어 실패했고,
+재실행은 `ProfilerWindow`·`ProfilerTimeline` 각 7건으로 통과했다. 이 게이트는
+최근 8프레임 표본에 민감하므로 첫 실패를 기능 결함이나 안정 통과로 덮지 않는다.
+
+같은 날 RenderThread 누락 피드백: 기본 장면의 짧은 녹화에서 스레드는 등록됐지만
+완료된 이벤트가 0건이어서 타임라인이 레인을 통째로 생략했다. 캡처의 등록 스레드
+표에서 RenderThread를 합쳐 이벤트가 없을 때에도 레인을 표시하고, 0ms로 해석할
+수 없도록 `완료 이벤트 없음`이라 적는다. 렌더 큐의 무기한 대기 스코프는 100ms
+단위로 닫아 실제 유휴 시간도 기록한다. 처음 실행 중인 렌더 작업이 아직 끝나지
+않은 경우에는 완료 구간을 주장하지 않는다. 렌더 완료를 기다린 제품 게이트와
+실제 화면 확인을 따로 기록한다.
+`Stats` 제품 게이트에서 `render.live.wait`로 완료를 보장한 캡처는
+RenderThread 이벤트 934건, 누적 누락 0·불균형 스코프 0으로 통과했다
+(`Build/Validation/ProfileP5/20260923/render-thread-stats`). 짧은 `Window`
+게이트에서는 해당 스레드의 완료 이벤트 0건이 재현됐다. 두 조건을 섞어
+“항상 렌더 작업이 완료됐다”고 해석하지 않는다.
+최종 Debug 화면에서는 GameThread와 PresentationThread 사이에 RenderThread 레인이
+표시되고, 해당 100ms 시야에 완료된 구간이 없을 때 `완료 이벤트 없음`으로 읽혔다.
+
+2026-09-23 P5 종결: `CounterRegistry`는 런타임 추가 ID와 이름·단위·범주를
+불변 캡처에 함께 보관하고 `.ceprof` 선택 청크로 왕복한다. process/GPU/render/
+managed/resources 모듈 마스크를 UI와 `profile.counter-mask`에서 제어하며,
+Resources는 기본 꺼짐이다. Resource Counter 창은 GameThread가 0.5초 간격으로
+발행한 snapshot만 읽어 UI 스레드가 엔진 컨테이너 락이나 관리 GC API를 잡지
+않는다. RenderThread는 DX12/Vulkan upload bytes·rejected batches·descriptor
+allocations/overflow와 GBuffer draw/batch를 소비한 submission의 엔진 프레임에
+발행한다. 고정 용량을 가진 upload ring의 단순 overflow가 아니라 실제
+`batchRollbacks`를 `Upload rejected batches`로 표시한다. 제공자별 비용도
+process/render/GC/resources로 분리했다. `CreatorEngine.Diagnostics.ProfilerMarker`의
+native bridge가 ScriptCore 전후 물리 틱을 기록하고 같은 GameThread 프레임에
+GC Gen0/1/2·힙·단편화·일시정지 비율을 발행한다. 한 제공자의 값은 Pause와
+교차할 때 일부만 남지 않도록 묶어서 큐에 넣는다. Record는 마지막 완료 프레임의
+다음 번호를 요청하고, Collector가 실제 받은 첫 프레임 경계로 시작점을 확정한다.
+요청 처리 중 GameThread가 앞서가더라도 그 이전 RenderThread 제출을 캡처
+누락으로 세지 않는다.
+
+검증: Debug Editor/CreatorEditor와 ScriptCore 빌드, Debug·Release 코어 각
+473검사·`counter-registry-*` 선택 변이 2종 통과. 제품 `Providers` 게이트는
+Resource off 표본 0/on 표본 1 및 비용 80.3µs를 확인했고, 강제 GC의 Gen2 증가와
+`ScriptCore.PrePhysicsTick`·`PostPhysicsTick`이 동일한 frame 5473에 있다.
+동일 제품의 process/render/GC 제공자 비용 마지막 표본은 각각 19.0/6.8/8.9µs였다.
+원본은 `Build/Validation/ProfileP5/20260923/completion-providers-batch`에 있다.
+첫 경계가 늦어지는 현상의 재현 로그는 같은 폴더의 `counter-drop-trace`에 있다
+(요청된 시작 시각 뒤에 RenderThread frame 6505가 완료됐으나 첫 보존 frame은
+6508). 수정 뒤 제품 게이트 재측정은 아래 P5 최종 기록을 따른다.
+Upload·descriptor 거절 카운터가 활성화된 owner 프레임에만 붙는지는 코어
+회귀로 확인했다. 실제 RHI 용량 초과를 강제로 만드는 제품 검증은 수행하지
+않았으므로 실부하에서 양수 사례의 빈도나 복구 동작까지 증명한 것은 아니다.
+LAN은 합의한 엔진 트래픽 기준의 제공자가 생길 때 연결한다. 장시간 비용·보존
+검증은 P7 성능 검증에 남긴다.
+
+P5 최종 기록: 별도 세션의 동시 빌드가 `SceneRuntime.pdb`를 사용해 첫 증분
+빌드가 충돌했으며, 해당 빌드가 끝난 뒤 Debug `CreatorEditor.vcxproj` 전체
+빌드가 성공했다. Debug·Release 코어는 각 473검사와 선택 변이 2종을
+통과했다. 최신 실행 파일의 `Providers` 게이트는 Resource off/on과 GC·스크립트
+동일 프레임을 재확인했고, 양쪽 캡처의 `droppedCounters=0`을 새 게이트 단정으로
+검증했다. 마지막 제공자 비용 표본은 process/render/GC/resources 순서로
+21.3/4.7/8.0/60.2µs였다. `Stats`는 GameThread 1742건,
+RenderThread 726건, PresentationThread 608건, GPU Graphics 2223건을
+수집했으며 이벤트·카운터 누락과 불균형 스코프가 모두 0이었다. `Window`는
+ProfilerWindow·ProfilerTimeline을 각 5건 확인하고 창을 닫은 뒤에도
+기록이 계속됨을 확인했다. 원본은
+`Build/Validation/ProfileP5/20260923/completion-providers-asserted`,
+`completion-stats-final`, `completion-window-final`에 있다. 짧은 `Window`
+구간에서 창을 닫은 뒤 RenderThread 완료 이벤트는 0건이므로, 해당 구간의
+렌더 작업 완료를 이 게이트가 입증한다고 해석하지 않는다.
+
+구현 범위:
+
+- `CounterRegistry`와 category/module mask
+- Resource Counter의 데이터를 owner-published counter로 이동
+- Upload/Descriptor/VRAM/Draw/Batch counter 연결
+- `ScriptCore.Diagnostics.ProfilerMarker`와 native bridge
+- GC 수치를 frame counter로 연결
+- provider별 수집 비용 측정
+
+완료 조건:
+
+- UI polling이 엔진 container mutex를 직접 잡지 않음
+- GC 발생 프레임과 CPU script marker가 같은 frame에 보임
+- upload/descriptor overflow가 발생한 정확한 frame 식별
+- 비활성 module이 불필요한 비싼 census를 호출하지 않음
+
+### P6 — 저장·불러오기
+
+할 일:
+
+- `.ceprof` header/chunk/index 구현
+- frozen capture 비동기 저장
+- 파일 열기와 lazy frame access
+- schema version과 CRC 오류 UI
+- 캡처 metadata 표시
+
+완료 조건:
+
+- 600프레임 round-trip 후 frame/marker/thread/event/counter 수 동일
+- 선택한 대표 marker의 Total/Self/Calls 동일
+- 중간 절단 파일과 CRC 오류를 crash 없이 거절
+- 저장 중 새 recording을 시작해도 저장 대상이 변하지 않음
+
+### 14-7 — 독립 Render Frame Debugger (상세: `RenderFrameDebuggerPlan.md` RF0~RF7)
+
+이 절은 프로파일러 P6 다음 구현 단계가 아니라 별도 계획으로 향하는 참조다.
+기본 동작은 원하는 Scene/Game 뷰의 **다음 완료 submission 하나**를 수동 캡처하는
+것이다. `profile.record`, `.ceprof`, profiler counter/marker 및 조건부 자동 트리거는
+RF0~RF7의 선행 조건이나 완료 조건이 아니다. 판정은 `RenderFrameDebuggerPlan.md`
+§13과 전용 render-capture 게이트를 따른다.
+
+---
+
+## 11. 검증 매트릭스
+
+### 11.0 게이트 — 어느 검사가 무엇을 무는가
+
+★ **이 절이 비어 있으면 위의 표는 아무도 안 돌린다.** 회귀 세트는 9-16 에
+폐지됐고, 그 뒤로 검사는 "변경마다 모아 묶어" 돌린다 — 이름이 여기 없으면 다음
+세션이 무엇을 돌려야 할지 찾지 못한다.
+
+| 게이트 | 엔진 | 무는 것 |
+|---|---|---|
+| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 459 검사. 전체 **변이 67** 중 GPU 손실 진단 변이와 타임라인 시야 변이를 선택 검증했다(§0.5.35, P5 UI 후속) |
+| `Tools/regression/verify-profile-collector-stress.ps1` | 안 띄운다 | Debug·Release에서 기본 확장 큐의 제출·보존 일치와 드롭 0, 명시적 상한을 둔 활성 기록 중 종료 경합 (§0.5.33) |
+| `Tools/regression/measure-profile-overhead.ps1` | 안 띄운다 | Shipping·중지·CPU·CPU+GPU 이벤트의 코어 합성 부하 사전 측정 (§0.5.32). 제품 장면 §11.4 완료 판정은 아님 |
+| `Tools/profiling-validation/Invoke-ProfilingValidation.ps1 -Action Stats` | 에디터 | 기본 씬의 교란 없는 라이브 기준선. 스레드마다 **무엇을 찍었는가**(절대 수가 아니다) |
+| 〃 `-Action Workers` | 에디터 | fixture 씬으로 애니메이션 잡을 돌려 **워커 스레드의 구간 계측**과 SceneActivated 사건 |
+| 〃 `-Action Window` | 에디터 | 프로파일러 창이 실제로 **그려지는지**(창 본문 마커가 캡처에 나타나는지), 창을 닫아도 `state == recording` 인지 |
+| 〃 `-Action Gpu` | 에디터 | Scene/Game/동시 뷰의 다른 제출·2-inflight·리사이즈 세대와 GPU 패스 조각·clock·레인 귀속·DX12 Debug Layer/DRED 메시지 0 |
+| 〃 `-Action GpuLoss` | 에디터 | Debug 질의 슬롯 16개 자극에서 렌더러와 녹화 Collector가 누락 패스 수·프레임·이유를 계상하고 collect 실패와 구분 |
+| `Tools/regression/verify-editor-startup-diagnostics.ps1` | 에디터 | 시동 진단. 등록 레인 목록(워커 레인이 하나 이상), 심한 로그 0, `[profiler] shutdown abandoned/retained/foreign` 가 0 인지. **검사 수는 분기에 따라 달라지므로 여기 적지 않는다** — 게이트가 제 수를 낸다 |
+
+**다섯 라이브 축은 자극에 `profile.record` 를 명시한다**(2026-09-23). 부팅과 함께
+기록을 열던 줄을 걷었으므로, 켜지 않으면 **빈 캡처를 성공으로 읽는다.** `Workers`
+는 그것을 **씬 교체 앞**에 둬야 한다 — 뒤면 SceneActivated 사건이 기록 밖에서
+일어나 §7.3 트랙 1 이 빈다.
+
+**아직 게이트가 없는 축**(§14 에서 빈칸으로 남은 것들과 같다): counter 정렬, Player 캡처,
+동일 제품 장면의 네 모드 오버헤드·GPU 프레임 비교(§11.4).
+장시간 수집기 stress와 네 모드 **코어 사전 측정**은 §0.5.32에서 별도로 검증했다.
+
+### 11.1 CPU 정확성
+
+| 사례 | 기대 |
+|---|---|
+| 3단 nested scope | parent/depth/Total/Self 정확 |
+| sibling scope | 순서와 self time 정확 |
+| frame을 넘는 scope | 시작·끝 보존, 관련 frame 표시 |
+| recording 중간 시작 | 열린 scope를 truncated로 표시 |
+| pause 중간 요청 | 다음 frame 경계에서 freeze |
+| thread 생성/종료 | ThreadBegin/End와 stream 안전 회수 |
+| 기본 chunk pool 고갈 | 페이지 확장 후 이벤트 전부 보존 |
+| 명시적 pool 상한 | deadlock 없이 dropped count 증가 |
+| 같은 timestamp | thread sequence로 안정 순서 |
+
+### 11.2 GPU 정확성
+
+| 사례 | 기대 |
+|---|---|
+| 1 submission | pass raw interval과 queue span 일치 |
+| 2 in-flight | token별 query record 분리 |
+| 두 카메라 | 같은 engine_frame_id, 서로 다른 submission_id/view |
+| pass slice | raw slice 보존, UI aggregate 가능 |
+| resize/rebuild | 이전 pipeline token 완료 후 안전 폐기 |
+| query overflow | 일부 누락을 숨기지 않고 diagnostics 표시 |
+
+### 11.3 파일
+
+- empty capture
+- 1 frame
+- 600 frames
+- dynamic thread/marker가 많은 캡처
+- 손상 header/chunk/index
+- 이전 schema version
+- Unicode marker와 파일 경로
+
+### 11.4 오버헤드
+
+다음 네 모드를 같은 장면·해상도·프레임 수로 비교한다.
+
+1. profiler compile-out (`CE_SHIPPING=1`)
+2. compiled but stopped
+3. CPU marker recording
+4. CPU+GPU+all counters recording
+
+기록값:
+
+- median/P95/P99 CPU frame · GPU frame
+- profiler service 자체 CPU 시간
+- events/sec와 bytes/sec
+- dropped events · peak capture memory
+
+허용 예산은 P0 실측 후 확정한다. 숫자를 먼저 정해 통과시키기 위해 데이터를 줄이지 않는다.
+
+> ★ **2026-09-15 경고 — 예산 소진을 게이트 단정으로 쓰지 말 것.** §2.1 실측이
+> 편집 27 / 재생 34 이벤트(상한 1024의 3%), 이름 388B / 525B(상한 16384B)를 보였고
+> 둘 다 `peak == last`였다. 계측 지점이 전부 시스템 단위 고정 지점이라 **씬에 무엇을
+> 얹어도 상수**이고, 1024에 닿으려면 계측 지점이 30배 늘어야 한다. 드롭·포화 단정은
+> 어떤 변이로도 자극되지 않는 **빈 단정**이다 — 달더라도 값만 기록하고 이빨이 없음을
+> 명시한다. 이 절이 재야 할 것은 예산이 아니라 **네 모드의 프레임 시간 차이**다.
+>
+> 그리고 이 절은 **P2 이후에야 의미가 생긴다.**
+>
+> ~~지금은 워커 8스레드가 계측 밖이라 모드 3·4가 재는 것이 반쪽이다(§2.1).~~
+> **2026-09-22 정정: 그 조건은 풀렸다.** 워커 레인이 등록되고 `AnimationJob` 이
+> 거기 붙는다 — `-Action Workers` 가 "이벤트를 찍은 워커 넷 이상" 을 문다.
+> 그러니 모드 3·4 는 이제 **온전히 잴 수 있다.** 다만 아직 counter 가 없어
+> 모드 4 의 `all counters` 는 P5 가 설 때까지 모드 3 과 같은 것을 잰다.
+
+---
+
+## 12. 실패 정책과 관측 가능성
+
+프로파일러가 게임을 멈추거나 원래 오류를 가려서는 안 된다.
+
+- writer buffer 부족: drop하고 counter 증가
+- GPU query 부족: 해당 pass를 누락 표시, frame 전체를 정상으로 가장하지 않음
+- 파일 저장 실패: frozen capture 유지
+- reader schema 오류: 파일을 거절하고 이유 표시
+- marker Begin/End 불균형: thread와 marker stack을 diagnostics에 기록
+- clock calibration 실패: CPU/GPU 통합 축을 비활성화하고 queue 상대시간은 유지
+- profiler 내부 예외: recording을 안전 정지하고 엔진 실행은 유지
+
+에디터의 Diagnostics 패널에 최소 다음을 항상 표시한다.
+
+- recording state
+- retained frame range
+- capture memory/budget
+- CPU dropped events
+- GPU dropped queries/collect failures
+- malformed scopes
+- active thread streams
+- clock calibration 상태
+- profiler 자체 frame cost
+
+---
+
+## 13. 구현 중 지켜야 할 결정
+
+1. **UI보다 frame identity가 먼저다.** 잘못 매핑된 예쁜 그래프는 없는 것보다 위험하다.
+2. **원본 interval을 버리지 않는다.** 합계·정렬·병합은 reader의 일이다.
+3. **문자열은 marker 등록 시 한 번만 처리한다.** hot path에서 복사·해시·allocation 금지.
+4. **producer를 collector가 직접 초기화하지 않는다.** sealed ownership만 넘긴다.
+5. **멀티카메라를 기본 조건으로 본다.** EngineFrame과 GPU submission을 1:1로 가정하지 않는다.
+6. **Resource Counter를 없애지 않는다.** provider가 준비되는 동안 기존 창은 비교 기준으로 유지한다.
+7. **Deep Profile은 별도 모드다.** 기본 marker capture의 성능 계약을 깨지 않는다.
+8. **내장 Render Frame Debugger는 독립 제품 목표다.** 수동 단일 프레임 캡처는 profiler 녹화나 선택 프레임 없이 동작한다.
+9. **Player를 함께 검증한다.** 수집 코어는 에디터에 종속되지 않는다.
+10. **각 단계에 재현 명령과 성공 marker를 남긴다.** 화면만 보고 완료 판정하지 않는다.
+
+---
+
+## 14. 최종 완료 조건
+
+다음 전부가 성립해야 계획 완료다.
+
+- [x] Editor/Development에서 Record/Pause/Clear 가능 — Record 는 **수집 스위치**이고
+      끄는 것이 Pause 다(§0.5.23). 화면으로 확인(2026-09-22)
+- [x] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture — **4프레임 링 폐기**(§2.2)
+      (화면 실측 `보존 23035..23634` = 600)
+- [x] 멀티스레드 CPU Timeline과 선택 구간 Hierarchy — 타임라인은 **보이는 창**을
+      그리고(레인 넷: GameThread · RenderThread · PresentationThread · GPU Graphics),
+      Hierarchy·Flat 은 선택 구간을 접는다(§0.5.24)
+- [x] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
+      (§0.5.8 — 셋 다 이벤트가 귀속된다. 회귀 감시는 아직 `[GameThread]`·
+      `[PresentationThread]` 두 축에만 걸려 있다)
+- [x] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑 — Scene/Game 같은
+      프레임의 다른 조각 수·제출 번호, 최대 2-inflight, 리사이즈 전후 세대 검증(§0.5.35)
+- [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 engine_frame_id에 정렬
+- [ ] overflow·누락·malformed scope·profiler overhead 표시 — **앞의 셋은 선다**
+      (Collector 탭이 dropped/unbalanced/late/stale/foreign/abandoned 와 미응답
+      스트림 및 GPU query/collect 손실을 내고, 구멍이 있으면 "합계를 그대로 믿지 말 것" 을 띄운다).
+      **profiler 자체 비용 칸은 아직 없다** — `ProfilerWindow`·`ProfilerTimeline`
+      마커로 간접 관측만 된다
+- [x] `.ceprof` 저장/불러오기 round-trip 검증 — 코어 게이트의 `file/*` 가 모든 이벤트의
+      모든 필드와 대표 마커의 Total/Self/Calls 를 대조한다(§0.5.27). 에디터의 Save·Open 과
+      오류 표시는 §0.5.28 — 연 파일이 라이브에 안 덮이는 것을 `open/*` 가 문다.
+      **비동기 저장 · 캡처 metadata 는 짓지 않았다**(사유는 §0.5.28)
+- [ ] profiler UI가 닫혀도 Development Player capture 가능
+- [ ] `CE_SHIPPING=1`에서 프로파일러 심볼 0 — `verify-player-shipping-isolation.ps1` 단정
+- [ ] CreatorEngine.sln의 Academy_4Q + Player 빌드 통과
+- [ ] CPU/GPU selftest와 장시간 stress 통과
+- [x] ★ **selftest `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로** — 이 한 줄이
+      수집 코어 교체의 진척 정의다. 코어 프로브의 `cross-frame/` 네 절
+      (`capture`·`duration`·`origin`·`preserve`)이 전부 초록이고, 변이
+      `close-open-scopes` 가 그 자리에서 붉어진다
+- [x] ★ **프로파일링 검사가 README 표와 §11 에 이름으로 올라 있다** — 회귀 세트는
+      폐지됐고(9-16), 찾을 수 없는 검사는 다음 세션에 모이지 않는다.
+      §11.0 에 여섯 게이트를 이름·엔진·무는 것으로 적었다(2026-09-22)
+- [x] DX12 debug layer/DRED 회귀 없음 — P4 기본 게이트의 두 기능 활성·메시지 0건(§0.5.35)
+
+내장 Render Frame Debugger의 완료 조건은 이 프로파일러 체크리스트에 합치지 않는다.
+독립 RF0~RF7 판정은 `RenderFrameDebuggerPlan.md` §13에 있다.
+
+**매크로 잔존 0**(§5.2) — `PROFILE_CPU_BEGIN`·`PROFILE_CPU_END`·`PROFILER_INITIALIZE`
+등 옛 매크로가 정의·사용 모두에서 사라져야 한다. 소스 전수 검사로 판정하고, 주석·이력은
+제외한다. **2026-09-22 실측: `Engine/`·`Editor/` 전수 0 건.**
+
+> ★ **남은 것은 단계 셋과 구멍 넷이다**(2026-09-22 감사).
+>
+> 진행 중인 단계 — **P5**(프로세스 CPU/RAM·RenderThread VRAM 희소 counter와
+> 선형 그래프·RT/PT 단계 마커 착지. 동적 registry/mask·자원/GC/스크립트 provider는 남음) · **P6**(`.ceprof`.
+> ~~소스 전수 0 건~~ — **2026-09-23 P6-1·P6-2 착지**: 캡처가 어휘와 시계를 소유하고
+> 코어가 쓰고 읽는다(§0.5.26 · §0.5.27). **P6-3 에서 에디터가 열고 쓴다**(§0.5.28).
+> 남은 것은 비동기 저장과 캡처 metadata 둘이고, 사유를 적어 미뤘다) ·
+> **P7**(내장 Render Frame Debugger — `RenderFrameDebuggerPlan.md` RF0~RF7).
+>
+> 선 단계의 구멍 — §7.3 여섯째 트랙(Compute/Copy, 백엔드가 그 큐를 써야 선다) ·
+> profiler 전체 자체 비용 표시 · UI 없이 Development Player 캡처.
+> 멀티카메라 GPU 매핑은 §0.5.35에서 닫았다.
+
+이 조건을 닫은 뒤에 Flame Graph, 두 캡처 비교, 원격 플레이어 연결, 자동 성능 회귀 게이트를
+후속 계획으로 분리한다.
+
+---
+
+## 15. 참고 기준
+
+- Unity Profiler 운용 원칙: 개발 빌드/플레이 모드/에디터 프로파일링 분리, Deep Profiling의
+  높은 오버헤드, Live 갱신 중지 후 분석 권장
+  <https://docs.unity3d.com/2022.2/Documentation/Manual/profiler-profiling-applications.html>
+- Unity `ProfilerMarker`: marker handle 사용과 비개발 빌드 compile-out
+  <https://docs.unity3d.com/cn/6000.0/ScriptReference/Unity.Profiling.ProfilerMarker.html>
+- D3D12 CPU/GPU clock calibration
+  <https://learn.microsoft.com/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-getclockcalibration>
+- 내장 Render Frame Debugger 상세 계획: `docs/plans/RenderFrameDebuggerPlan.md`
+- CreatorEngine 기존 DX12 검증 진입점
+  `Tools/dx12-validation/Invoke-DX12Validation.ps1`
+- 스케줄러 이관과 순서 제약: `docs/plans/TaskSchedulerUnificationPlan.md`(PHASE 13 S0.5·S6)
+- 이 계획의 소비자: `docs/plans/AnimationSchedulerPlan.md` §4 완료 기준(버짓·강등 관측)
+
+## 14-LIVE — 녹화 독립 Rendering 페이지 (2026-10-01 추가)
+
+별도 미산정 progress 행이다. P0~P6 수집/파일 계약의 완료를 되돌리지 않는다.
+RenderPass/통계 popup의 세부 진단을 Profiler Rendering - Live로 옮기고 Record 없이
+renderer snapshot을 표시한다. 이 page는 capture reader의 선택 자료를 정본으로 삼지 않는다.
+현재 Scene/Game/Preview 선택과 완료 frame/view, 마지막 GPU submission·frame age를 보이며
+선택 view가 아닌 표본은 unavailable이다. CPU는 모든 view의 합계로 명시한다.
+
+남은 완료 gate: [EditorRenderingSurfacesPlan.md §3](EditorRenderingSurfacesPlan.md#3-14-live--rendering-live-완료-계약-phase-14-미산정).
+view별 CPU/GPU immutable 완료 snapshot·벽시계 age·epoch/resize·지원 상태, Record off/on/
+파일 reader와 독립 동작, HUD·page off/on 비용 상한을 실제 검증한다.
+독립 RenderCapture/RF0~RF7과 .ceframe은 이 page의 구현이 아니고 여전히 14-7의 책임이다.
+2026-10-01 Release Vulkan의 offscreen 설정 창 UI 진행 후 live HTTP operation 미완료 재현도
+14-LIVE의 backend/수요/비차단 상태 조회 gate로 남긴다. 원인과 재실행 결과는
+[EditorRenderingSurfacesValidation.md](../analysis/EditorRenderingSurfacesValidation.md)에 추적한다.

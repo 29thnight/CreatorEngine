@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ReflgenPhase425Integration.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>reflgen와 PHASE 4.25 통합 검증</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#설치와-병합">설치와 병합</a></li><li><a href="#425와-맞춘-내용">4.25와 맞춘 내용</a></li><li><a href="#검증">검증</a></li><li><a href="#남는-범위">남는 범위</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ReflgenPhase425Integration.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>reflgen와 PHASE 4.25 통합 검증</h1>
+<div class="meta"><p>2026-09-30. <a href="https://github.com/29thnight/CreatorEngine/pull/114">PR #114</a>의 reflgen 도입을
+master에 병합하고, 기존 PHASE 4.25 변경과 다른 세션의 편집기 성능 개선을 함께 통합한다.
+MAT-9 렌더 결과 대조의 잔여 작업은 이 통합 검증과 별도로 유지한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#설치와-병합"><span class="ve-label">§00</span><span class="map-name">설치와 병합</span><span class="map-bar"><i style="width:45.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#425와-맞춘-내용"><span class="ve-label">§01</span><span class="map-name">4.25와 맞춘 내용</span><span class="map-bar"><i style="width:62.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증"><span class="ve-label">§02</span><span class="map-name">검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#남는-범위"><span class="ve-label">§03</span><span class="map-name">남는 범위</span><span class="map-bar"><i style="width:15.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-설치와-병합">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="설치와-병합">설치와 병합</h2></div>
+<div class="prose"><ul>
+<li>VS <strong>18 Community</strong> 인스턴스 <code>55b1962e</code>에 공식 <strong>Reflgen.VisualStudio 1.0.1</strong> VSIX를 설치했다.
+설치 종료 코드 0과 설치된 <code>extension.vsixmanifest</code>의 identity
+<code>Reflgen.VisualStudio.29thnight</code>·버전 1.0.1을 확인했다.</li>
+<li><a href="https://github.com/29thnight/reflgen_cpp/releases/tag/v1.0.1">확장 릴리스</a>의 VSIX SHA-256:
+<code>44E7F76741BA890CFEC3CBC051823FEEEAFCF0646A8DA479E5176E7EFFF8994D</code>.
+확장의 IDE 자동완성 기능을 직접 조작한 검증은 하지 않았다.</li>
+<li>엔진 manifest/overlay port의 생성기·런타임은 <strong>reflgen 1.0.0</strong>이다.
+확장 1.0.1은 VSIX 패키징 변경이며 생성기 버전 변경과 구분한다.</li>
+<li>PR head <code>1ff657a6ea5b9aa4cbae63128221ebd4be2f2ced</code>를 확인해 병합했다.
+GitHub master 병합 커밋은 <code>090aba0afe16e1495fec06738d928fb581617595</code>다.</li>
+<li>로컬 4.25 변경은 먼저 <code>0268e4b5cc6bfeed5258b426a3ce5f3bbed7f886</code>에 보존했다.
+이 커밋과 PR 병합 커밋을 합쳐 충돌을 해결했다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-425와-맞춘-내용">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="425와-맞춘-내용">4.25와 맞춘 내용</h2></div>
+<div class="prose"><ul>
+<li>MeshRenderer Inspector의 그래프 저작·미리보기 기능을 유지하고 legacy 재질의
+Rendering Mode 편집만 reflgen <code>field_info</code>·enum 서술자를 사용하도록 바꿨다.</li>
+<li><code>SceneRenderProfile</code>·<code>SceneRenderProfileComponent</code> 이름을 유지하면서
+<code>[[reflgen::reflect]]</code> 서술로 옮겼다. 구 <code>VolumeProfile</code>·<code>VolumeComponent</code> 이름은 복원하지 않는다.</li>
+<li>Material의 그래프 인스턴스, Foliage의 그래프 소스 및 프로파일 컴포넌트의
+런타임 설정·캐시는 <code>[[reflgen::ignore]]</code>로 저장에서 제외했다.</li>
+<li>RenderEngine 프로젝트는 MaterialGraph 헤더와 <code>ReflgenRegistration.h</code>를 함께 포함한다.</li>
+<li>생성된 서술자의 저장 필드 순서를 확인했다: Material 14개, FoliageType 3개,
+SceneRenderProfile 1개, SceneRenderProfileComponent 자체 필드 2개.
+병합 전 저장 계약과 일치하고 런타임 포인터·캐시는 포함되지 않는다.</li>
+<li>다른 세션 「프로파일링으로 프레임 급감 원인 찾기」의 캔버스 계산 캐시,
+노드 선택 정보, Inspector 재질 선택·구체/격자 미리보기 변경을 포함했다.
+해당 측정 기록은 <a href="MAT9NodeEditorPerformance.html">MAT9NodeEditorPerformance</a>에 정리했다.
+병합 전 성능 수치를 병합 후 실측으로 표시하지 않는다.</li>
+<li>README·문서 색인·LX 계획서의 현재 상태를 Material Editor 제품 연결에 맞춰 정리했다.
+MAT-0~8 완료 <strong>32/34일</strong>, MAT-9 및 LX-3/3H 진행 상태를 유지한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="검증">검증</h2></div>
+<div class="prose"><p>VS 18 x64 MSBuild·MSVC v145, <code>UseDynamicDebugging=false</code>, <code>LinkIncremental=false</code>로
+<code>CreatorEngine.sln</code> 전체를 빌드했다. Editor·Player·AssetCooker 및 솔루션의
+공용 모듈·도구 빌드를 포함한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검증</th><th>결과</th></tr></thead>
+<tbody><tr><td>전체 솔루션 Debug</td><td>성공, 종료 0, 빌드 오류 0, 12분 48초</td></tr>
+<tr><td>전체 솔루션 Release</td><td>성공, 종료 0, 빌드 오류 0, 16분 31초</td></tr>
+<tr><td>reflgen 속성 배치</td><td>자기 검사 및 헤더 52개·속성 블록 295개 통과</td></tr>
+<tr><td>컨테이너 분류</td><td>Debug/Release 모두 통과</td></tr>
+<tr><td>컨테이너 값·저장 형상 왕복</td><td><span class="chip risk">Debug 28축, 실패 0</span></td></tr>
+<tr><td>생성된 저장 계약</td><td>Debug/Release 각각 4타입·20필드 일치, 런타임 필드 제외</td></tr>
+<tr><td>Material Node Editor 제품 회귀 Debug</td><td>1,344검사·최종 capture 5회·소스 1,139개 drift 0·정상 종료</td></tr>
+<tr><td>Material Node Editor 제품 회귀 Release</td><td>1,344검사·최종 capture 5회·소스 1,139개 drift 0·정상 종료</td></tr>
+<tr><td>대시보드</td><td>전체 JS 파싱, 435항목·산수 검사·유한한 진행률 통과</td></tr></tbody></table></div>
+<p>제품 회귀는 격리된 검증 프로젝트를 실제 Editor에서 열고 HTTP 명령으로
+동일한 LXDocument를 편집했다. 문서 ID/revision 충돌 거부, 값·연결·접힘,
+Undo/Redo·Save/Reload, Apply 실패 시 마지막 정상 generation 유지,
+Scene 저장·새 프로세스 재개방 및 Scene/구체 미리보기 픽셀 변화를 확인한다.
+Debug/Release GPU validation 문제·누락 메시지는 각각 0이다. 기동 시 엔진의
+<code>VerifyReflectRegistration()</code>도 통과했다. 성능 재측정을 목적으로 한 실행은 아니다.</p>
+<p>빌드 로그에는 MSVC 변환·링커(<code>LNK4075</code>, <code>LNK4229</code>)와 .NET trimming 경고가 있다.
+생성기는 반영 선언 밖의 clang 진단 2건을 <code>RG0101</code> 안내로 보고했다
+(<code>AuthoringRymlErrorPolicy.h</code> 주석 위치). 생성된 저장 계약 검사와 MSVC 컴파일,
+실제 Editor 기동·직렬화 회귀 결과를 각각 확인한다.</p>
+<p>설치·빌드·회귀 집계와 소스 identity는
+<a href="ReflgenPhase425Integration.json">ReflgenPhase425Integration.json</a>에 보존한다.
+원시 빌드/회귀 로그는 로컬 <code>Build/Obj/ReflgenIntegration/</code>에 있다.</p>
+<p>첫 manifest 빌드는 reflgen 설치를 완료한 뒤 MSBuild targets를 다시 읽도록
+재빌드를 안내했다. 새 의존성을 설치한 첫 실행의 결과이며, 실제 컴파일 검증은
+그 다음 빌드 결과를 사용한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-남는-범위">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="남는-범위">남는 범위</h2></div>
+<div class="prose"><p>이번 작업은 reflgen 통합과 빌드·편집/저장 회귀 확인이다. MAT-9의 박막 이미지 차이,
+Special·텍스처/조명 입력 및 경로별 대조·최종 성능 수용은 남아 있다.
+최초 ImGui scale 0.8 원인 분석도 사용자가 미룬 후속 항목으로 유지한다.
+원시 <code>Dynamic_CPP/2026-09-30-1135.ceprof</code>는 로컬에 보존하고 소스 커밋에 넣지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ReflgenPhase425Integration.md"><code>docs/analysis/ReflgenPhase425Integration.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

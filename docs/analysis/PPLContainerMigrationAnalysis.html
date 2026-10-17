@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/PPLContainerMigrationAnalysis.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPL 동시성 컨테이너 → STL 교체 분석</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#요약">요약</a></li><li><a href="#1-사용처-전수-분류--생산소비-스레드-실측-기준">1. 사용처 전수 분류 — 생산·소비 스레드 실측 기준</a></li><li><a href="#2-렌더-큐-8종--생산자가-없다">2. 렌더 큐 8종 — 생산자가 없다</a></li><li><a href="#3-hlslcompiler--동시성-컨테이너인데-안전하지-않다">3. HLSLCompiler — 동시성 컨테이너인데 안전하지 않다</a></li><li><a href="#3-0-선행-질문--셰이더-로드-병렬화에-효과가-있는가">3-0. 선행 질문 — 셰이더 로드 병렬화에 효과가 있는가</a></li><li><a href="#3-1-bsthread_pool-교체가-중단된-이유--가설과-검증법">3-1. BS::thread_pool 교체가 중단된 이유 — 가설과 검증법</a></li><li><a href="#4-컬-데이터-버퍼--동시성이-진짜-필요한-유일한-곳">4. 컬 데이터 버퍼 — 동시성이 진짜 필요한 유일한 곳</a></li><li><a href="#5-교체의-손익">5. 교체의 손익</a></li><li><a href="#6-권고--단계">6. 권고 — 단계</a></li><li><a href="#7-연계">7. 연계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="PPLContainerMigrationAnalysis.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PPL 동시성 컨테이너 → STL 교체 분석</h1>
+<div class="meta"><p>작성: 2026-08-08 · 목적: 외부 라이브러리 최소화 · 근거: 사용처 32건/16파일 전수 조사</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 10개의 분량 막대">
+<a class="map-row" href="#요약"><span class="ve-label">§00</span><span class="map-name">요약</span><span class="map-bar"><i style="width:15.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-사용처-전수-분류--생산소비-스레드-실측-기준"><span class="ve-label">§1</span><span class="map-name">사용처 전수 분류 — 생산·소비 스레드 실측 기준</span><span class="map-bar"><i style="width:39.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-렌더-큐-8종--생산자가-없다"><span class="ve-label">§2</span><span class="map-name">렌더 큐 8종 — 생산자가 없다</span><span class="map-bar"><i style="width:31.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-hlslcompiler--동시성-컨테이너인데-안전하지-않다"><span class="ve-label">§3</span><span class="map-name">HLSLCompiler — 동시성 컨테이너인데 안전하지 않다</span><span class="map-bar"><i style="width:44.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-0-선행-질문--셰이더-로드-병렬화에-효과가-있는가"><span class="ve-label">§04</span><span class="map-name">3-0. 선행 질문 — 셰이더 로드 병렬화에 효과가 있는가</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-1-bsthread_pool-교체가-중단된-이유--가설과-검증법"><span class="ve-label">§05</span><span class="map-name">3-1. BS::thread_pool 교체가 중단된 이유 — 가설과 검증법</span><span class="map-bar"><i style="width:82.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-컬-데이터-버퍼--동시성이-진짜-필요한-유일한-곳"><span class="ve-label">§4</span><span class="map-name">컬 데이터 버퍼 — 동시성이 진짜 필요한 유일한 곳</span><span class="map-bar"><i style="width:27.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-교체의-손익"><span class="ve-label">§5</span><span class="map-name">교체의 손익</span><span class="map-bar"><i style="width:38.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-권고--단계"><span class="ve-label">§6</span><span class="map-name">권고 — 단계</span><span class="map-bar"><i style="width:32.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-연계"><span class="ve-label">§7</span><span class="map-name">연계</span><span class="map-bar"><i style="width:7.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 10개 가운데 「3-0. 선행 질문 — 셰이더 로드 병렬화에 효과가 있는가」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-요약">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="요약">요약</h2></div>
+<div class="prose"><p><strong>전면 교체는 권고하지 않는다. 단, 현재 사용 중인 9개 지점 중 실제로 동시성이 필요한 곳은 2곳뿐이다.</strong></p>
+<p>핵심 발견은 교체 가능성이 아니라 <strong>현행 사용의 부정확성</strong>이다.</p>
+<ul>
+<li><code>parallel_for</code>·<code>parallel_invoke</code>는 코드베이스에 <strong>한 건도 없다</strong>. 병렬성은 전부 자체 <code>ThreadPool</code>이 담당한다.</li>
+<li>렌더 큐 8종(<code>concurrent_vector</code>)은 <strong>생산자가 없다</strong> — <code>PushRenderQueue</code> 계열 3함수의 호출처가 코드베이스에 존재하지 않는다.</li>
+<li><code>RenderScene.h</code>의 <code>concurrent_unordered_map.h</code>는 <strong>죽은 include</strong>다 — 실제 맵은 전부 <code>std::unordered_map</code>.</li>
+<li><code>HLSLCompiler</code>는 동시성 컨테이너를 쓰면서 오히려 <strong>레이스가 남아 있다</strong>.</li>
+</ul>
+<p>따라서 작업 순서는 &quot;PPL → STL 치환&quot;이 아니라 <strong>죽은 것 제거 → 잘못 쓰는 것 교정 → 남은 것 판단</strong>이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-사용처-전수-분류--생산소비-스레드-실측-기준">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-사용처-전수-분류--생산소비-스레드-실측-기준">1. 사용처 전수 분류 — 생산·소비 스레드 실측 기준</h2></div>
+<div class="prose"><p>각 지점의 push/pop 호출부를 역추적해 실제 스레드를 특정한 결과다. 초판의 &quot;SPSC 추정&quot;은
+패턴만 보고 내린 것이라 이번에 근거를 붙여 재판정했다.</p>
+<h3 id="등급-a--동시성-자체가-불필요-제거-대상">등급 A — 동시성 자체가 불필요 (제거 대상)</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>근거</th><th>조치</th></tr></thead>
+<tbody><tr><td><code>RenderScene.h:27</code> <code>concurrent_unordered_map.h</code></td><td>죽은 include — 실제 맵은 전부 <code>std::unordered_map</code>(48·50·51·59행)</td><td>즉시 제거</td></tr>
+<tr><td><code>RenderPassData.h:17-18</code> <code>concurrent_vector&lt;*Proxy*&gt;</code> ×8</td><td><strong>생산자 없음</strong> — <code>PushRenderQueue</code> 계열 3함수의 호출처가 코드베이스에 0 (§2)</td><td>판정 후 삭제</td></tr>
+<tr><td><code>IRenderPass.h:30</code> <code>concurrent_queue&lt;ID3D11CommandList*&gt;</code></td><td>DX11 디퍼드 컨텍스트 전용. 패스당 3×10=30 인스턴스</td><td>DX11 은퇴 시 소멸</td></tr></tbody></table></div>
+<h3 id="등급-b--크로스-스레드지만-동시성-컨테이너가-과함">등급 B — 크로스 스레드지만 동시성 컨테이너가 과함</h3>
+<p>전부 <strong>소수 push + 프레임당 1회 drain</strong> 형태다. 락 경합이 성립하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>생산자</th><th>소비자</th><th>빈도</th></tr></thead>
+<tbody><tr><td><code>ProxyCommandQueue.h:13</code></td><td>게임 — <code>RenderSceneBridge.cpp</code> 8곳</td><td>렌더 — <code>EnhancedSceneRendererLive.cpp:2154</code></td><td>3프레임 링으로 시간 분리</td></tr>
+<tr><td><code>EffectProxyController.h:13</code></td><td>게임</td><td>렌더 — <code>EffectManager.cpp:58</code></td><td>위와 동일 구조</td></tr>
+<tr><td><code>EffectRenderProxy.h:8</code></td><td>게임</td><td>렌더 (<code>TryPop</code>)</td><td>프록시별, 소량</td></tr>
+<tr><td><code>DataSystem.h:118</code></td><td>메인 — 드롭 핸들러 <code>App.cpp:324</code></td><td>렌더 — <code>ImGuiRenderer.cpp:366</code></td><td><strong>사용자가 파일을 끌어놓을 때만</strong></td></tr>
+<tr><td><code>RenderScene.h:160-161</code></td><td>프록시 소멸 지점 ×2</td><td>렌더 — <code>OnProxyDestroy()</code></td><td>파괴 시점만</td></tr></tbody></table></div>
+<h3 id="등급-c--동시성이-실제로-필요">등급 C — 동시성이 실제로 필요</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>근거</th><th>비고</th></tr></thead>
+<tbody><tr><td><code>Core.ThreadPool.h:18</code></td><td>진짜 MPMC — 워커 N개 동시 pop</td><td>부하는 낮다 (§5-정정)</td></tr>
+<tr><td><code>RenderPassData.h:19-20</code> <code>concurrent_vector&lt;HashedGuid&gt;</code> ×3</td><td>스레드풀 잡 6개가 같은 벡터에 동시 push (<code>Scene.cpp:552~620</code>)</td><td>대안 있음 (§4)</td></tr>
+<tr><td><code>HLSLCompiler.h:81</code></td><td><code>BS::thread_pool</code>이 셰이더 로드를 병렬 실행 (§3)</td><td><strong>부팅 시 1회뿐</strong></td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-렌더-큐-8종--생산자가-없다">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-렌더-큐-8종--생산자가-없다">2. 렌더 큐 8종 — 생산자가 없다</h2></div>
+<div class="prose"><p><code>m_deferredQueue</code>·<code>m_forwardQueue</code>·<code>m_terrainQueue</code>·<code>m_foliageQueue</code>·<code>m_shadowRenderQueue</code>·
+<code>m_UIRenderQueue</code>·<code>m_decalQueue</code>·<code>m_spriteRenderQueue</code>를 채우는 경로는
+<code>PushRenderQueue</code> / <code>PushShadowRenderQueue</code> / <code>PushUIRenderQueue</code> 세 함수뿐인데,
+이 함수들의 호출처는 <code>RenderPassData.h</code>(선언)와 <code>RenderPassData.cpp</code>(정의) 밖에 없다.</p>
+<p>소비 측은 살아 있다 — DX12가 읽는다:</p>
+<ul>
+<li><code>EnhancedSceneRenderer.cpp:2341-2342</code> — <code>copyQueue(renderData-&gt;m_deferredQueue, draws)</code></li>
+<li><code>EnhancedSceneRenderer.cpp:2422</code> — <code>m_UIRenderQueue</code>를 flat에 insert</li>
+<li><code>EnhancedGizmoSceneTest.cpp:124-125</code> — 동일</li>
+</ul>
+<p><strong>즉 DX12 라이브 경로는 항상 빈 큐를 읽고 있을 가능성이 높다.</strong> DX11 은퇴 과정에서 채우는 쪽이
+먼저 사라지고 읽는 쪽만 남은 형태다. 이건 컨테이너 교체 문제가 아니라 <strong>파이프라인 결손</strong>이므로
+DX12 라이브 작업에서 먼저 판정해야 한다.</p>
+<blockquote>
+<p>참고: 소비 측은 어차피 <code>std::vector</code>로 즉시 복사한다(<code>copyQueue</code>). 소비 경로에는
+동시성 컨테이너가 필요 없다. <code>EnhancedUIPass.h:118-119</code> 주석도 같은 인식을 적어 두었다 —
+포인터+개수로 받아 컨테이너 타입을 헤더가 모르게 했다.</p>
+</blockquote>
+<h3 id="부수-발견--실제-버그">부수 발견 — 실제 버그</h3>
+<p><code>RenderPassData.cpp:286</code> — <code>SortShadowRenderQueue()</code>가 <code>m_deferredQueue.empty()</code>를 검사하고
+<code>m_shadowRenderQueue</code>를 정렬한다. 검사 대상과 정렬 대상이 다르다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-hlslcompiler--동시성-컨테이너인데-안전하지-않다">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-hlslcompiler--동시성-컨테이너인데-안전하지-않다">3. HLSLCompiler — 동시성 컨테이너인데 안전하지 않다</h2></div>
+<div class="prose"><pre><code class="language-cpp">// HLSLCompiler.h:81-82
+static concurrency::concurrent_unordered_map&lt;std::string, ComPtr&lt;ID3DBlob&gt;&gt; m_shaderCache;
+//static std::mutex m_compileMutex;   // ← 주석 처리됨</code></pre>
+<p>세 가지가 겹쳐 있다.</p>
+<ol>
+<li><strong><code>operator[]</code> 대입이 원자적이지 않다.</strong> <code>HLSLCompiler.cpp:76</code>의
+<code>m_shaderCache[key] = shaderBlob</code>은 슬롯 삽입만 스레드 안전하고, <code>ComPtr</code> 대입(참조 카운트
+조작)은 보호되지 않는다. 같은 셰이더를 두 스레드가 동시에 컴파일하면 그대로 레이스다.</li>
+<li><strong><code>find</code> → <code>operator[]</code> 사이에 창이 있다</strong> (<code>HLSLCompiler.cpp:16-18</code>).</li>
+<li><strong><code>clear()</code>는 동시 안전하지 않다</strong> (<code>CleanUpCache</code>, <code>HLSLCompiler.h:74</code>). PPL 문서상
+<code>clear</code>/<code>erase</code>는 단독 접근을 전제한다.</li>
+</ol>
+<p>→ <code>std::unordered_map</code> + <code>std::mutex</code>로 되돌리는 것이 <strong>기능적으로 더 안전하다</strong>.
+주석 처리된 뮤텍스를 되살리는 방향이다.</p>
+<h3 id="동시성의-출처--그리고-같은-파일-안의-불일치">동시성의 출처 — 그리고 같은 파일 안의 불일치</h3>
+<p>이 캐시를 동시에 만지는 주체가 확인됐다. <code>ShaderSystem.cpp:44</code>의 <code>BS::thread_pool pool</code>이
+<code>AddShaderFromPath</code>를 병렬 제출하고(69·78·86·96행), 그 안에서 <code>LoadFormFile</code>이 캐시를 읽고 쓴다.
+<strong>단, 이 병렬성은 <code>LoadShaders()</code> — 엔진 부팅 시 1회뿐이다.</strong></p>
+<p>같은 흐름의 도착지인 <code>AddShader</code>는 이미 <code>std::mutex</code> 6개로 셰이더 타입별 맵을 보호한다
+(<code>ShaderSystem.cpp:524~574</code>). 즉 <strong>같은 병렬 구간에서 맵 6개는 뮤텍스로 지키고 캐시 맵 하나만
+PPL로 지키는</strong> 상태다. 뮤텍스로 통일하면 패턴이 일관되고 PPL 의존이 하나 준다.</p>
+<h3 id="부수-발견--외부-스레드풀-병존">부수 발견 — 외부 스레드풀 병존</h3>
+<p><code>BS::thread_pool</code>(bshoshany/thread-pool)이 vcpkg로 이미 들어와 있다(<code>vcpkg-installed-ports.json:119</code>).
+자체 <code>ThreadPool</code>이 있는데도 <code>ShaderSystem.cpp</code> 한 곳에서 지역 변수로 병행 사용 중이다.
+외부 라이브러리 최소화 관점에서는 <strong>PPL보다 이쪽이 먼저 걸린다</strong> — 사용처가 한 곳뿐이라
+자체 풀로 치환하는 비용이 작다.</p>
+<p>같은 파일의 <code>m_shaderReloadThreadPool</code>(<code>ShaderSystem.h:71</code>)은 <code>Initialize</code>에서 생성만 되고
+<code>Enqueue</code> 호출이 <strong>0건</strong>이다. <code>Finalize</code>가 delete하지 않아 누수이기도 하다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-0-선행-질문--셰이더-로드-병렬화에-효과가-있는가">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="3-0-선행-질문--셰이더-로드-병렬화에-효과가-있는가">3-0. 선행 질문 — 셰이더 로드 병렬화에 효과가 있는가</h2></div>
+<div class="prose"><p><code>LoadFormFile</code>은 확장자로 두 갈래로 갈린다. 성격이 완전히 다르다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th>호출</th><th>성격</th><th>실측 규모</th><th>병렬화 이득</th></tr></thead>
+<tbody><tr><td><code>.cso</code></td><td><code>D3DReadFileToBlob</code>(<code>HLSLCompiler.cpp:111</code>)</td><td>디스크 읽기 + 메모리 복사</td><td>294개 / 9.1 MB</td><td><strong>작다</strong></td></tr>
+<tr><td><code>.hlsl</code></td><td><code>D3DCompileFromFile</code>(<code>:57</code>)</td><td>CPU 바운드 컴파일</td><td>147개 / 481 KB</td><td><strong>크다</strong></td></tr></tbody></table></div>
+<p>분기는 <code>ShaderSystem.cpp:59~99</code>가 정한다 — cso가 존재하고 hlsl보다 최신이면 cso를 읽고,
+아니면 컴파일한다. 따라서 <strong>평시 실행은 거의 전부 <code>.cso</code> 경로</strong>이고, 셰이더를 수정한 직후
+첫 실행에서만 컴파일이 돈다.</p>
+<p>→ 의문은 절반 타당하다. 평시에는 병렬화가 거의 값을 하지 않고(NVMe에서 9 MB 순차 읽기),
+셰이더 수정 후 첫 실행에서는 147개 컴파일이 병렬로 갈라져 이득이 크다.
+<strong>벤치마크를 평시 상태에서 돌렸다면 측정한 것은 컴파일 성능이 아니라 I/O 편차일 수 있다.</strong></p>
+<h3 id="그보다-큰-문제--이-캐시는-아무도-읽지-않는다">그보다 큰 문제 — 이 캐시는 아무도 읽지 않는다</h3>
+<p><code>m_shaderCache</code>는 넣기만 하고 히트가 발생하지 않는다.</p>
+<ul>
+<li><code>LoadShaders()</code> — 디렉터리를 순회하며 각 파일을 <strong>1회씩만</strong> 로드한다. 중복 경로가 없다.</li>
+<li><code>ReloadShaders()</code> — <code>HLSLCompiler::CleanUpCache()</code>를 먼저 부르고(<code>ShaderSystem.cpp:129</code>)
+시작하므로 캐시는 항상 비어 있다.</li>
+<li>개별 핫 리로드 경로는 없다 — <code>ReloadShaderFromPath</code>는 <code>ReloadShaders</code> 내부(162·166·171행)
+에서만 호출된다.</li>
+</ul>
+<p>즉 캐시는 <strong>블롭을 영구 보관하는 역할만</strong> 한다. <code>AddShader</code>가 셰이더 객체를 만든 뒤 원본 블롭은
+쓰이지 않으므로, 상주 메모리만 늘린다.</p>
+<p>→ <strong>PPL 컨테이너 교체를 논하기 전에 이 캐시가 필요한지부터 물어야 한다.</strong> 캐시를 제거하면
+§3의 레이스도 함께 사라진다. 남기려면 히트가 생기는 경로(개별 파일 감시 기반 핫 리로드)를
+먼저 만들어야 하는데, 그때는 <strong>캐시 무효화가 없으면 옛 블롭을 반환</strong>하므로 키에 타임스탬프를
+넣는 설계가 필요하다.</p>
+<h3 id="결정적-전제--dx12는-이-경로를-전혀-쓰지-않는다">결정적 전제 — DX12는 이 경로를 전혀 쓰지 않는다</h3>
+<p>DX12 렌더러가 셰이더 바이트코드를 어디서 얻는지 확인한 결과, <strong>DX11 셰이더 자산과 완전히
+분리되어 있다.</strong></p>
+<ul>
+<li>DX12 패스 <strong>24개 전부</strong>가 <code>.cpp</code> 안의 raw string literal을 <code>D3DCompile</code>로 런타임 컴파일한다
+(<code>EnhancedGBufferPass.cpp:202</code>, <code>EnhancedDeferredPass.cpp:295</code>, <code>EnhancedForwardPass.cpp:690</code>,
+<code>EnhancedSkyBoxPass.cpp:94</code>, <code>EnhancedUIPass.cpp:119</code> 등).</li>
+<li><code>RHI/DX12</code> 전체에서 <code>.cso</code> 읽기(<code>D3DReadFileToBlob</code>) <strong>0건</strong>, <code>HLSLCompiler::</code> 호출 <strong>0건</strong>,
+<code>ShaderSystem-&gt;</code> 호출 <strong>0건</strong>.</li>
+<li><code>Material::GetShaderPSO()</code> 참조도 <strong>0건</strong> — <code>DX12PSOManager.h:16</code>의 설명 주석 한 줄이 전부다.
+(&quot;ShaderPSO/VisualShaderPSO는 이름만 PSO인 &#39;셰이더 묶음&#39;이다. 진짜 PSO는 DX12에서…&quot;)</li>
+</ul>
+<p>받을 자리는 이미 있다. <code>DX12GraphicsPipelineDesc</code>(<code>DX12PSOManager.h:28</code>)는 <code>vsBytecode</code>/
+<code>psBytecode</code>를 <code>const void*</code> + 길이로 받아 <strong>출처를 묻지 않는다</strong>. 다만 지금은 그 자리에
+인라인 컴파일 결과만 꽂힌다.</p>
+<p>그리고 <code>ShaderSystem</code>은 <code>Shader.h</code>를 통해 <code>ID3D11Device::CreateVertexShader</code> 계열로 DX11 셰이더
+객체를 만든다 — <strong>디바이스 종속이라 DX12가 재사용할 수 없는 구조</strong>다.</p>
+<p><strong>따라서 이 절과 §3의 리팩터링(캐시 제거·PPL 교체)은 지금 하면 낭비다.</strong> 두 갈래 중 어느
+쪽이든 이 코드는 유지 대상이 아니다.</p>
+<ul>
+<li>DX11이 은퇴하면 → <code>HLSLCompiler</code>·<code>ShaderSystem</code>·<code>m_shaderCache</code>가 통째로 사라진다.</li>
+<li>DX12가 머티리얼 셰이더를 받게 되면 → 필요한 것은 <strong>바이트코드뿐</strong>이므로(디바이스 객체 생성
+불필요) 현재 경로를 재사용할 수 없고 새로 만들어야 한다.</li>
+</ul>
+<p>남는 것은 <strong>PDB 덮어쓰기 버그</strong>(아래)뿐이다. 그건 DX11이 살아 있는 동안 계속 물릴 수 있으므로
+독립적으로 고칠 값이 있다.</p>
+<h3 id="파생-문제--셰이더-자산과-머티리얼이-dx12에서-끊겨-있다">파생 문제 — 셰이더 자산과 머티리얼이 DX12에서 끊겨 있다</h3>
+<p>이건 PPL 논의 밖이지만 같은 조사에서 드러났으므로 적어 둔다.</p>
+<ol>
+<li><strong>147개 hlsl / 294개 cso 자산이 DX12에서 미사용</strong>이다. DX11 은퇴 시점에 이대로면 자산이
+통째로 버려진다.</li>
+<li><strong>머티리얼이 지정한 커스텀 셰이더(ShaderDSL·VisualShader)가 DX12에서 무시된다.</strong> 모든 드로우가
+패스에 하드코딩된 셰이더로 그려진다.</li>
+<li>셰이더 핫 리로드도 DX12에서는 의미가 없다.</li>
+<li>매 실행마다 24개 패스 셰이더를 런타임 컴파일하므로 그 비용이 부팅 시간에 실린다 —
+사전 컴파일(cso) 도입 후보지만, 그때 필요한 것은 지금의 <code>HLSLCompiler</code>가 아니라
+<strong>바이트코드 로더</strong>다.</li>
+</ol>
+<p>§2의 &quot;렌더 큐에 생산자가 없다&quot;와 같은 결의 결손이다 — DX12가 아직 자기 소스로만 그리는 단계다.</p>
+<h3 id="부수-발견--pdb가-cso를-덮어쓴다">부수 발견 — PDB가 CSO를 덮어쓴다</h3>
+<p><code>HLSLCompiler.cpp</code>의 두 경로가 <strong>완전히 같은 파일명</strong>을 만든다.</p>
+<pre><code class="language-cpp">:78  std::string csoPath = ...RelativeToPrecompiledShader() + filePath.stem() + &quot;.cso&quot;;
+:97  std::string pdbPath = ...RelativeToPrecompiledShader() + filePath.stem() + &quot;.cso&quot;;  // ← .pdb가 아니다</code></pre>
+<p>DEBUG 빌드에서 hlsl을 컴파일하면 방금 쓴 cso를 디버그 블롭으로 덮어쓴다. 다음 실행은 그 파일을
+셰이더로 읽는다. <code>_DEBUG</code> 한정이므로 릴리스에서는 드러나지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-1-bsthread_pool-교체가-중단된-이유--가설과-검증법">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="3-1-bsthread_pool-교체가-중단된-이유--가설과-검증법">3-1. BS::thread_pool 교체가 중단된 이유 — 가설과 검증법</h2></div>
+<div class="prose"><p><code>m_shaderReloadThreadPool</code>은 죽은 멤버가 아니라 <strong>중단된 마이그레이션의 잔해</strong>다.
+경위: 벤치마크에서 BS 쪽이 우세해 교체를 진행하다가 크래시가 나서 되돌렸고, 원인은 미규명
+상태로 남았다(마감 압박). <code>LoadShaders()</code>만 BS로 넘어간 채 멈춘 것이 현재 모습이다.</p>
+<p>먼저 <strong>배제된</strong> 후보부터. <code>SetThreadInitCallback</code>/<code>SetThreadExitCallback</code>은 <code>Core.ThreadPool.h</code>에
+정의만 있고 <strong>호출처가 0건</strong>이다. 따라서 &quot;자체 풀은 워커에서 COM을 초기화했는데 BS는 안 했다&quot;는
+설명은 성립하지 않는다 — 양쪽 다 워커에 COM 초기화가 없다(<code>CoInitializeEx</code>는 <code>Dx11Main</code>·
+<code>GameMain</code>의 CB/CE 전용 스레드에만 있다).</p>
+<h3 id="가설-1-가장-유력--notifyallandwait이-사실상-전역-배리어였다">가설 1 (가장 유력) — <code>NotifyAllAndWait</code>이 사실상 전역 배리어였다</h3>
+<p><code>SceneManagers-&gt;m_threadPool</code>은 <strong>공유 풀</strong>이다. 프레임 컬링(<code>Scene.cpp</code>), 지형 저장
+(<code>Terrain.cpp</code>), 모델 로드(<code>ModelSceneBridge.cpp</code>)가 전부 같은 인스턴스를 쓴다.</p>
+<pre><code class="language-cpp">void NotifyAllAndWait() {
+    if (m_taskCounts.load(std::memory_order_acquire) == 0) return;
+    WaitForSingleObject(m_waitEvent, INFINITE);
+}</code></pre>
+<p>이 대기는 <strong>전역 카운터 기반</strong>이라 누가 넣은 작업인지 구분하지 않는다. <code>Terrain</code>이 부른
+<code>NotifyAllAndWait</code>은 <code>Scene</code>의 컬링 잡까지 기다리고, 그 반대도 성립한다. 즉 호출자가 의도한
+것보다 <strong>넓은 배리어</strong>로 동작하며, 서브시스템 간 순서를 우연히 지켜주고 있었다.</p>
+<p>BS로 옮기면서 <code>submit_task</code>가 돌려주는 <code>future</code>로 대기를 바꾸면 의미론이 <strong>내 작업만 대기</strong>로
+좁아진다. 넓은 배리어에 기대고 있던 코드가 있었다면 이 전환에서 그대로 깨진다 —
+기억에 남은 &quot;설계 차이&quot;와 부합한다.</p>
+<p>전환 흔적이 코드에 그대로 남아 있어 이 가설을 뒷받침한다:</p>
+<pre><code class="language-cpp">// ShaderSystem.cpp:103~105
+// 3) 모든 제출 작업 완료 대기 (NotifyAllAndWait 대체)
+for (auto&amp; f : futures) f.get();
+// 또는 pool.wait(); // 풀에 들어간 모든 작업을 기다릴 때</code></pre>
+<p>&quot;NotifyAllAndWait 대체&quot;라는 주석과, 전역 대기(<code>pool.wait()</code>)를 대안으로 남겨둔 흔적이
+곧 두 의미론 사이에서 고민한 자국이다.</p>
+<p><strong>검증법</strong>: <code>NotifyAllAndWait</code> 호출부 4곳(<code>Scene.cpp:677</code>, <code>Terrain.cpp:479</code>,
+<code>ModelSceneBridge.cpp:34,55</code>)에서, 대기 직전에 자신이 넣지 않은 작업이 큐에 남아 있는지 로그로
+센다. 남아 있다면 그 호출부는 전역 배리어에 의존하고 있다.</p>
+<h3 id="가설-2--워커-우선순위-차이로-잠재-레이스가-드러났다">가설 2 — 워커 우선순위 차이로 잠재 레이스가 드러났다</h3>
+<p>자체 풀은 워커를 <code>THREAD_PRIORITY_HIGHEST</code>로 만든다(<code>Core.ThreadPool.h:20</code>). BS는 기본
+우선순위다. 또 스레드 수 산정도 다르다 — 자체는
+<code>GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)</code>, BS는 <code>hardware_concurrency()</code>(MSVC에서는
+현재 프로세서 그룹만 센다). 둘 다 실행 순서와 병렬도를 바꾸므로, <strong>원래 있던 레이스가
+BS에서만 드러났을</strong> 수 있다. 이 경우 진짜 원인은 BS가 아니라 그 레이스다.</p>
+<p><strong>검증법</strong>: 자체 풀의 우선순위를 <code>THREAD_PRIORITY_NORMAL</code>로, 스레드 수를 BS와 같게 맞춘 뒤
+재현되는지 본다. 재현되면 원인은 BS가 아니다.</p>
+<h3 id="가설-3--자체-풀의-resetevent-레이스-bs와-무관하게-존재">가설 3 — 자체 풀의 <code>ResetEvent</code> 레이스 (BS와 무관하게 존재)</h3>
+<pre><code class="language-cpp">int prev = m_taskCounts.fetch_add(1, std::memory_order_relaxed);
+if (prev == 0) ResetEvent(m_waitEvent);   // ← fetch_add와 원자적이지 않다
+m_tasks-&gt;push(std::move(task));</code></pre>
+<p><code>fetch_add</code>와 <code>ResetEvent</code> 사이에 워커가 직전 작업을 끝내고 <code>SetEvent</code>를 부르면, 뒤늦은
+<code>ResetEvent</code>가 그 신호를 덮어쓴다 → <code>NotifyAllAndWait</code> 무한 대기. 다중 생산자에서 성립한다.
+§5-정정의 permit 유실과는 별개 경로다.</p>
+<p>이건 자체 풀 쪽 결함이므로 BS 교체의 원인은 아니지만, <strong>재현 실험 중 잡음이 되므로 먼저
+막아두는 편이 낫다.</strong></p>
+<h3 id="재개-시-순서">재개 시 순서</h3>
+<ol>
+<li>가설 2를 먼저 친다 — 자체 풀의 우선순위·스레드 수만 BS와 맞춰 재현 시도. 가장 싸고,
+재현되면 BS는 무죄이며 진짜 레이스를 잡는 문제로 바뀐다.</li>
+<li>재현되지 않으면 가설 1 — 대기 의미론. 위 로그 계측으로 전역 배리어 의존을 찾는다.</li>
+<li>그 전에 가설 3을 막아 잡음을 줄인다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-컬-데이터-버퍼--동시성이-진짜-필요한-유일한-곳">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-컬-데이터-버퍼--동시성이-진짜-필요한-유일한-곳">4. 컬 데이터 버퍼 — 동시성이 진짜 필요한 유일한 곳</h2></div>
+<div class="prose"><p><code>Scene.cpp:538-620</code>에서 카메라마다 스레드풀 잡을 6개 띄우고, 각 잡이 같은
+<code>RenderPassData</code>의 <code>m_findProxyVec[index]</code> / <code>m_findShadowProxyVec[index]</code>에 push_back한다.
+static·skinned·terrain·foliage·decal·sprite 잡이 <strong>동시에 같은 벡터에 쓴다</strong>.</p>
+<p>여기서 <code>concurrent_vector</code>는 정당하다. 다만 두 가지 대안이 더 낫다.</p>
+<ul>
+<li><strong>대안 A — 잡별 스레드 로컬 수집 후 병합</strong>: 각 잡이 자기 <code>std::vector</code>에 모으고 마지막에
+한 번 병합. 동시성 자체를 없앤다. 병합 비용은 프록시 수백 개 수준에서 무시할 만하다.</li>
+<li><strong>대안 B — 잡 종류별로 벡터 분리</strong>: 6개 잡이 각자의 벡터를 가지면 경합이 사라진다.
+소비 측은 6개를 순회하면 된다.</li>
+</ul>
+<p>둘 다 <code>std::vector</code>의 연속 메모리를 회복한다. <code>concurrent_vector</code>는 세그먼트 기반이라
+순회·정렬에서 캐시 지역성이 나쁘다 — 실제로 <code>RenderPassData.cpp:251,260,288,310</code>에서
+<code>std::ranges::sort</code>를 걸고 있다.</p>
+<h3 id="clear-문제는-교체해도-남는다"><code>clear()</code> 문제는 교체해도 남는다</h3>
+<p>종료 크래시 스택(<code>Tools/regression/SHUTDOWN-CRASH-NOTES.md:53-56</code>)은
+<code>concurrent_vector::clear</code>와 <code>concurrent_queue::push</code>가 파괴된 객체를 만진 흔적이다.
+이건 <strong>수명 관리 문제</strong>이지 컨테이너 선택 문제가 아니다. STL로 바꿔도 동일하게 터진다.
+교체를 크래시 해결책으로 기대해서는 안 된다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-교체의-손익">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-교체의-손익">5. 교체의 손익</h2></div>
+<div class="prose"><p><strong>얻는 것</strong></p>
+<ul>
+<li>MSVC 전용 의존 제거 — PPL은 표준이 아니고 MSVC에만 있다. 이식성 확보.</li>
+<li><code>concurrent_vector</code> → <code>std::vector</code>: 연속 메모리, 캐시 지역성, 정렬 성능.</li>
+<li>락이 코드에 드러난다. 지금은 &quot;동시성 컨테이너를 썼으니 안전하다&quot;는 착시가 있고,
+§3이 그 착시의 실례다.</li>
+<li><code>using namespace concurrency;</code>가 헤더에 퍼져 있는 문제(<code>IRenderPass.h:29</code>,
+<code>RenderPassData.h:8</code>, <code>RenderScene.h:29</code>, <code>ProxyCommandQueue.h:7</code>)도 함께 해소된다.</li>
+</ul>
+<p><strong>잃는 것</strong></p>
+<ul>
+<li><code>ThreadPool</code>의 MPMC 큐는 직접 구현해야 한다 — <code>std::deque</code> + <code>mutex</code> + <code>condition_variable</code>.</li>
+<li><code>try_pop</code> 같은 비블로킹 API를 손으로 만들어야 한다.</li>
+</ul>
+<h3 id="정정--작업-큐는-고빈도가-아니다">정정 — 작업 큐는 고빈도가 아니다</h3>
+<p>초판에서 <code>ThreadPool</code> 큐를 &quot;유일하게 락프리가 값을 하는 자리&quot;로 적었으나, 호출 빈도를 세어 보니
+근거가 약하다. <code>Scene.cpp:538~661</code>이 카메라당 <code>Enqueue</code> 10건, 카메라 3<del>10개면 프레임당 30</del>100잡 —
+60fps 기준 <strong>초당 2천~6천 회</strong>다. 뮤텍스 하나로 세 자릿수 여유가 있는 영역이다. 나머지 풀(셰이더
+리로드·에셋 로드·애니메이션)은 더 한산하다.</p>
+<p>또한 현재 구조는 큐 push와 세마포어 release를 따로 센다(<code>Core.ThreadPool.h:75-77</code>). 워커가
+<code>acquire()</code> 후 <code>try_pop</code>에 실패하면 permit이 유실되고 <code>m_taskCounts</code>가 줄지 않아
+<code>NotifyAllAndWait()</code>이 무한 대기할 수 있다 — <code>Scene.cpp:677</code>·<code>Terrain.cpp:479</code>·<code>ModelSceneBridge</code>가
+프레임 동기화 지점에서 이를 호출한다. 락프리 큐로 교체하면 이 창은 오히려 넓어진다
+(생산자별 서브큐를 두는 구현은 큐가 비지 않아도 pop이 실패할 수 있다).
+뮤텍스+<code>condition_variable</code>은 큐 상태와 대기를 한 락 아래 묶어 이 문제를 구조적으로 없앤다.</p>
+<p><strong>중립</strong></p>
+<ul>
+<li>SPSC 성격의 프레임 링 큐들(#4~#8)은 애초에 경합이 거의 없다. 어느 쪽이든 성능 차이가
+드러나지 않는다. 교체 판단은 성능이 아니라 일관성 기준으로 하면 된다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-권고--단계">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-권고--단계">6. 권고 — 단계</h2></div>
+<div class="prose"><p>교체 자체보다 앞서야 할 정리가 있다.</p>
+<p><strong>등급 A부터 — 교체가 아니라 삭제다.</strong></p>
+<ol>
+<li><strong>죽은 include 제거</strong> — <code>RenderScene.h:27</code>. 위험 없음.</li>
+<li><strong>렌더 큐 8종 판정</strong> — 생산자 결손이 의도인지 결손인지 DX12 라이브 작업에서 확인.
+결손이면 파이프라인 수정이 먼저이고, 폐기라면 멤버 8개와 함수 3개를 삭제한다.
+<code>SortShadowRenderQueue</code> 버그(§2)도 이때 함께.</li>
+<li><strong><code>m_shaderReloadThreadPool</code> 삭제</strong> — 죽은 멤버 + 누수(§3). PPL과 무관하지만 같은 파일이다.</li>
+</ol>
+<p><strong>그다음 등급 C의 오작동 교정.</strong></p>
+<ol start="4">
+<li><del><strong>HLSLCompiler 교체</strong></del> — <strong>철회.</strong> DX12가 이 경로를 전혀 쓰지 않고(§3-0), <code>ShaderSystem</code>이
+DX11 디바이스에 묶여 있어 어느 쪽으로 가든 유지 대상이 아니다. 여기서 손댈 것은
+<strong>PDB 덮어쓰기 버그 하나뿐</strong>이며, 그것도 PPL과 무관한 독립 수정이다.</li>
+<li><strong>컬 데이터 버퍼</strong> — §4 대안 A 또는 B. <code>std::vector</code>의 연속 메모리 회복.
+현재 등급 C 중 <strong>유일하게 손댈 값이 있는 항목</strong>이다.</li>
+</ol>
+<p><strong>마지막이 등급 B — 순수 치환이라 이득이 가장 작다.</strong></p>
+<ol start="6">
+<li><strong>크로스 스레드 큐 5종</strong> — 얇은 래퍼(<code>FrameQueue&lt;T&gt;</code>) 하나로 일괄 치환.
+<code>push</code>/<code>try_pop</code>/<code>empty</code>만 있으면 현재 호출부가 그대로 통과한다.</li>
+<li><strong><code>IRenderPass::CommandQueue</code></strong> — 손대지 않는다. DX11 은퇴와 함께 사라진다.</li>
+<li><strong><code>ThreadPool</code></strong> — 큐 교체 전에 permit 유실(§5-정정)부터 막고, 프레임 시간 기준선을 잡는다.
+외부 라이브러리 도입은 뮤텍스 버전이 실제로 밀릴 때 검토해도 늦지 않다.</li>
+</ol>
+<p>1~5까지만 해도 PPL 의존 지점은 9곳에서 5곳으로 줄고, 그 과정에서 실제 결함 3건
+(생산자 결손·캐시 레이스·죽은 멤버 누수)이 함께 정리된다. 6은 그 뒤에 해도 되고,
+안 해도 기능적으로 잃는 것이 없다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-연계">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-연계">7. 연계</h2></div>
+<div class="prose"><ul>
+<li>렌더 큐 판정은 <a href="../plans/archive/MultiCameraRenderPlan.html">MultiCameraRenderPlan.md</a> / DX12 라이브 파이프라인 작업과 한 몸.</li>
+<li><code>using namespace concurrency;</code> 헤더 오염은 <a href="../plans/archive/Phase5CouplingPlan.html">Phase5CouplingPlan.md</a>의 인용 경로 규칙과 같은 결.</li>
+<li>종료 크래시 수명 문제는 <a href="../../Tools/regression/SHUTDOWN-CRASH-NOTES.md">Tools/regression/SHUTDOWN-CRASH-NOTES.md</a> — 컨테이너 교체로 해결되지 않음.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="PPLContainerMigrationAnalysis.md"><code>docs/analysis/PPLContainerMigrationAnalysis.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

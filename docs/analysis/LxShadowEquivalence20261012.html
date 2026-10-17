@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/LxShadowEquivalence20261012.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LX 그림자 3개 캐스케이드 경로 동치 (2026-10-12)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#판정-조건">판정 조건</a></li><li><a href="#실행-결과">실행 결과</a></li><li><a href="#재현증거">재현·증거</a></li><li><a href="#범위와-남은-작업">범위와 남은 작업</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="LxShadowEquivalence20261012.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>LX 그림자 3개 캐스케이드 경로 동치 (2026-10-12)</h1>
+<div class="meta"><p>후속 목록 3번의 검증기를 <code>dx12.skinning</code>의 선택 실행 모드에 추가했다. 제품의 SceneHost 그림자 경로에서 동일한 합성 메시 두 개(스킨드·비스킨드)를 indexed와 meshlet로 각각 렌더링한다. 바인드 포즈·본 이동 포즈 각각에서 2048×2048 D32Float 캐스케이드 3장을 비교한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#판정-조건"><span class="ve-label">§00</span><span class="map-name">판정 조건</span><span class="map-bar"><i style="width:88.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행-결과"><span class="ve-label">§01</span><span class="map-name">실행 결과</span><span class="map-bar"><i style="width:41.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현증거"><span class="ve-label">§02</span><span class="map-name">재현·증거</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#범위와-남은-작업"><span class="ve-label">§03</span><span class="map-name">범위와 남은 작업</span><span class="map-bar"><i style="width:90.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「재현·증거」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-판정-조건">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="판정-조건">판정 조건</h2></div>
+<div class="prose"><ul>
+<li>프레임 준비에 <code>allowMeshlets=false/true</code>를 전달한다. 프로그램·메시·카메라·방향광·월드 변환을 공유하고, 같은 팔레트 값을 복구한 후 비교 대상 프레임을 렌더링한다.</li>
+<li>깊이 배열의 3개 서브리소스를 모두 GPU readback한다. 참조(indexed)의 각 맵이 비어 있지 않아야 하고, 양쪽 깊이가 모두 유한해야 한다.</li>
+<li>깊이는 float 비트를 직접 비교한다. 누락·추가·불일치 텍셀 수와 최대 절대 깊이 오차를 기록하며, 불일치 0을 요구한다. 허용 오차는 없다.</li>
+<li>캐스케이드 행렬도 비트 동치를 요구한다. 포즈가 다른 두 맵 사이의 기존 변화 검사도 유지한다.</li>
+<li>그림자 콜백에서 mesh dispatch가 성공한 직후 캐스케이드별 atomic 카운터를 증가시킨다. meshlet 캡처는 각 캐스케이드에 양수, indexed 캡처는 0을 요구한다. CPU 준비 수나 카메라 경로의 mesh dispatch로 대체하지 않는다. 이 값은 GPU 생존 메시렛 수가 아니다.</li>
+<li>실행 스크립트는 원본 깊이와 행렬 파일의 크기·SHA256 동치까지 별도로 검사한다. 실행 전후 소스·binary 해시 일치, GPU validation 활성·문제 0·누락 메시지 0, quit 성공·프로세스 종료 코드 0을 요구한다.</li>
+</ul>
+<p>일반 <code>dx12.skinning</code>은 indexed fallback을 허용한다. 엄격한 동치 검사는 <code>CREATOR_SHADOW_EQ_OUTPUT</code>이 설정된 실행에서만 활성화되며, mesh shader 미지원 장치에서는 통과로 처리하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실행-결과">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="실행-결과">실행 결과</h2></div>
+<div class="prose"><p><strong>후속 목록 3번 완료.</strong> 현재 소스에서 빌드한 Debug/Release 모두 아래 6개 비교를 통과했다. GPU validation 활성·문제 0·누락 메시지 0, quit 성공·종료 코드 0, 실행 전후 소스·binary 해시 일치를 확인했다. 레이어 메시지 1건은 활성화 안내다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>포즈</th><th style="text-align:right">C0 참조 깊이 텍셀</th><th style="text-align:right">C1</th><th style="text-align:right">C2</th><th>불일치 / 누락 / 추가 / 최대 오차</th></tr></thead>
+<tbody><tr><td>바인드</td><td class="num" style="text-align:right">45,878</td><td class="num" style="text-align:right">8,381</td><td class="num" style="text-align:right">449</td><td>모두 0</td></tr>
+<tr><td>본 이동</td><td class="num" style="text-align:right">45,856</td><td class="num" style="text-align:right">8,379</td><td class="num" style="text-align:right">439</td><td>모두 0</td></tr></tbody></table></div>
+<p>각 meshlet 프레임은 캐스케이드마다 mesh dispatch 2회, indexed 프레임은 0회다. 6개 행렬 쌍도 모두 같다. 첫 캐스케이드의 포즈 변화는 기존과 같은 40,762 텍셀이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현증거">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="재현증거">재현·증거</h2></div>
+<div class="prose"><p>먼저 현재 소스로 Editor를 해당 구성에서 빌드한다. 아래 스크립트는 빌드와 동시에 실행하지 않는다.</p>
+<pre><code class="language-powershell">&amp; Tools/regression/verify-lx-shadow-baseline.ps1 `
+    -Configuration Debug `
+    -FixtureProject Build/Obj/LxShadowP0/Fixture `
+    -OutputDirectory Build/Verification/ShadowEquivalence-New/Debug `
+    -ShadowEquivalenceOnly</code></pre>
+<p>Release는 구성과 출력 디렉터리를 변경한다. 스크립트는 용량 하한 30GiB 검사 후 격리된 프로젝트·설정으로 <code>dx12.skinning</code>, <code>dx12.validation</code>, <code>quit</code>을 실행한다. 성공 구성별 대표 원본을 보존하고 retention 기록을 남긴다.</p>
+<ul>
+<li><a href="../../Tools/regression/verify-lx-shadow-baseline.ps1">검증 스크립트</a></li>
+<li><a href="../../Build/Verification/ShadowEquivalence-20261012/Debug/verdict.json">Debug 판정</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/Debug/equivalence.json">동치 상세</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/Debug/capture-manifest.json">원본 해시</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/Debug/results.jsonl">명령별 결과</a></li>
+<li><a href="../../Build/Verification/ShadowEquivalence-20261012/Release-Final/verdict.json">Release 판정</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/Release-Final/equivalence.json">동치 상세</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/Release-Final/capture-manifest.json">원본 해시</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/Release-Final/results.jsonl">명령별 결과</a></li>
+<li><a href="../../Build/Verification/ShadowEquivalence-20261012/build-Debug-final.log">Debug 빌드</a>, <a href="../../Build/Verification/ShadowEquivalence-20261012/build-Release-final.log">Release 빌드</a></li>
+</ul>
+<p>원본은 각 실행의 <code>captures/</code>에 <code>{indexed,meshlet}-{bind,posed}-C{0,1,2}.f32</code>로 남긴다. little-endian float32, 행 우선, 2048×2048, 파일당 16MiB다. <code>.matrix</code>는 같은 캐스케이드의 4×4 float32 행렬 64바이트다. 구성당 깊이 파일 12개(192MiB)를 보존한다.</p>
+<p>Release 빌드가 링크 중일 때 첫 실행 준비에서 DLL 해시 읽기가 거부되었다. GPU 실행·캡처 전에 중단된 준비 디렉터리 <code>Release/</code>는 성공 증거가 아니다. 빌드 프로세스 종료 코드 0을 확인한 뒤 <code>Release-Final/</code>에서 실행했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-범위와-남은-작업">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="범위와-남은-작업">범위와 남은 작업</h2></div>
+<div class="prose"><p>이는 DX12의 두 합성 메시·두 포즈에 대한 indexed/meshlet 동치 수용이다. 각 메시가 여러 메시렛으로 분할되는 복잡한 모델, 알파 마스크·면 판정·비균일 변환·캐스케이드 경계 확대 수용은 아니다. 두 경로가 공유하는 결함까지 이 검사로 배제하지 않는다.</p>
+<p>후속 4번의 <strong>보이는 메시렛 누락 변이 거부</strong>도 D/R에서 확인했다(<a href="LxShadowMeshletOmission20261012.html">변이·정상 대조군 증거</a>). 5번의 <a href="LxShadowCases20261012.html">12개 합성 장면 확대</a>도 최신 D/R 빌드에서 동치·대조 조건·변이 거부를 통과했다. 다음은 7번 계측 누락 해결·반복 성능 측정이며, compute 사전 컬링 진행 판단은 남아 있다. Vulkan 실행·교차 비교는 사용자 결정대로 PHASE 4.9 소유다. 이번 GPU validation 실행의 시간은 성능 수용에 사용하지 않는다.</p>
+<p>Debug/Release stderr의 기존 <code>[profiler] shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]</code> 진단은 해결 범위 밖이다. 이번 동치 검사로 프로파일러 종료 진단이 해결되었다고 주장하지 않는다.</p>
+<p>검증 runtime SHA256: Debug <code>2CF091C5D899D8FE756556485C81F02FD0444128B4E0342F9E82100344FE9792</code>, Release <code>50A676E2A52599D9008A06240D9BE3DB89AE760E20671E9D7270D0DF75134F2A</code>. 전체 소스·exe·runtime 해시는 각 실행의 <code>identity-before.json</code>과 <code>identity-after.json</code>에 남겼다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="LxShadowEquivalence20261012.md"><code>docs/analysis/LxShadowEquivalence20261012.md</code></a> · 마지막 커밋 2026-10-12 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

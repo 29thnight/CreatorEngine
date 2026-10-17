@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorAddComponentBrowserValidation.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Component 검색·분류와 C# 생성/부착 검증</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#사용-흐름">사용 흐름</a></li><li><a href="#구현-경계">구현 경계</a></li><li><a href="#검증">검증</a></li><li><a href="#2026-09-13-후속-아이콘한글스크립트-속성-배치">2026-09-13 후속: 아이콘·한글·스크립트 속성 배치</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorAddComponentBrowserValidation.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>Add Component 검색·분류와 C# 생성/부착 검증</h1>
+<div class="meta"><p>2026-09-13. 사용자 요청 범위는 기존 C# 검색·부착과 <strong>새 스크립트 생성 → 컴파일 → 자동 부착</strong>이다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#사용-흐름"><span class="ve-label">§00</span><span class="map-name">사용 흐름</span><span class="map-bar"><i style="width:50.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#구현-경계"><span class="ve-label">§01</span><span class="map-name">구현 경계</span><span class="map-bar"><i style="width:48%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증"><span class="ve-label">§02</span><span class="map-name">검증</span><span class="map-bar"><i style="width:78.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-09-13-후속-아이콘한글스크립트-속성-배치"><span class="ve-label">§03</span><span class="map-name">2026-09-13 후속: 아이콘·한글·스크립트 속성 배치</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「2026-09-13 후속: 아이콘·한글·스크립트 속성 배치」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-사용-흐름">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="사용-흐름">사용 흐름</h2></div>
+<div class="prose"><ul>
+<li>Add Component를 열면 검색란에 포커스를 둔다. 검색하지 않을 때는 Rendering, Physics,
+Animation, Audio, AI, Input, UI, Scripts, Other 카테고리를 탐색한다.</li>
+<li>검색은 표시 이름·원래 타입 이름·카테고리를 대상으로 대소문자 없이 모든 검색 단어를 찾는다.
+카테고리 안에서 검색해도 전체 컴포넌트를 검색한다. 뒤로 버튼으로 루트로 돌아온다.</li>
+<li>이미 붙은 네이티브 컴포넌트는 <code>(Added)</code>로 비활성화한다. C# 스크립트는 <code>(Script)</code>로 구분하며
+한 엔티티에 여러 개를 붙일 수 있다. 방향키·Enter와 마우스 선택을 지원한다.</li>
+<li>Inspector에는 <code>ScriptComponent</code> 대신 스크립트별 이름과 읽기 전용 Script 참조를 표시한다.
+패널 ID는 네이티브 컴포넌트 인스턴스별로 분리한다.</li>
+<li>New Script에서 이름을 입력하고 Create and Add를 누르면 프로젝트의
+<code>Assets/Script/&lt;Name&gt;.cs</code>와 메타데이터를 생성한다. 템플릿은 엔진 Component를 상속하는
+<code>sealed partial</code> C# 클래스이며 <code>OnBeginSimulation</code> 진입점을 포함한다.</li>
+<li>별도 .NET 빌드 프로세스를 비동기로 실행한다. 성공하면 기존 인스턴스의 필드를 보존해
+CoreCLR 스크립트 어셈블리를 교체하고 요청 당시 엔티티에 부착한다.
+팝업을 닫거나 다른 엔티티를 선택해도 대상은 바뀌지 않는다.</li>
+<li>진행/실패 상태, 취소, Retry compilation, Open script, Build log를 Inspector에 표시한다.
+컴파일 실패·취소 시 소스는 남고 빈 컴포넌트를 붙이지 않는다. Play 중 새 생성은 차단하며,
+컴파일 도중 Play에 들어가면 Stop 이후에 부착한다.</li>
+</ul>
+<p>Unity의 <a href="https://docs.unity3d.com/cn/2021.3/Manual/UsingComponents.html">컴포넌트 검색·카테고리 탐색</a>과
+<a href="https://docs.unity3d.com/cn/2022.2/Manual/CreatingComponents.html">스크립트 컴포넌트 생성</a>을
+상호작용 참고로 사용했다. 엔진의 기존 ComponentFactory·CoreCLR·Undo 경로를 사용한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-구현-경계">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="구현-경계">구현 경계</h2></div>
+<div class="prose"><ul>
+<li><code>EditorComponentCatalog.h</code>: 이름 정리, 분류, 검색, 결정적 정렬. 새 네이티브 타입도 Other에서 검색 가능하다.</li>
+<li><code>InspectorWindow</code>: 카탈로그는 팝업을 열 때 구축한다. 목록 내부만 스크롤하고 생성 버튼은 하단에 둔다.</li>
+<li><code>EditorObjectOperations::AddManagedScript</code>: GUI/CLI 공통 검증·부착·Undo/Redo.
+미등록 타입은 변경 전에 거부한다. 엔티티와 상위 계층의 편집 잠금을 확인한다.</li>
+<li><code>EditorScriptAuthoring</code>: 원래 EntityHandle을 보존하고 완료 시 수명·잠금을 다시 확인한다.
+UI와 별개로 EditorMain의 씬 구조 잠금 안에서 완료를 반영한다.
+종료·취소는 이 요청이 시작한 컴파일러 Job에만 적용한다.</li>
+<li>재로드는 현재 씬의 첫 ScriptComponent에 한정하지 않고 모든 로드된 씬의 각 스크립트를 처리한다.
+새 어셈블리 거부 시 기존 인스턴스를 유지하는 계약도 보존한다.</li>
+<li>소스는 덮어쓰지 않는다. 잘못된 식별자, C# 예약어, Windows 예약 파일명, 이미 등록된 클래스는 거부한다.
+현재 ScriptGenerator의 저장 키는 짧은 클래스 이름이다. 네임스페이스가 달라도 같은 이름의
+등록 스크립트를 새로 만들 수 없다.</li>
+<li><code>GameScripts.csproj</code>는 <code>CreatorScriptSourceRoot</code> 아래 C# 소스를 포함한다.
+현재 프로젝트 배치의 <code>GameScripts/GameScripts.csproj</code>와 설치된 .NET SDK를 사용한다.</li>
+<li>기존 스크립트 소스의 전역 자동 변경 감시, Unity의 AddComponentMenu 속성 및 사용자 지정 분류는
+이번 범위가 아니다. 스크립트 카테고리는 Scripts이며 기존 빈 스크립트의 복구 UI는 유지한다.</li>
+<li>Undo는 엔티티 부착을 취소한다. 생성한 소스 파일까지 삭제하지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="검증">검증</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>결과와 증거</th></tr></thead>
+<tbody><tr><td>Debug Editor</td><td>VS18/v145 빌드 통과. <code>Artifacts/phase21-add-component/build-final-debug.log</code></td></tr>
+<tr><td>검색·분류</td><td><code>verify-editor-component-catalog.ps1</code>, 33 checks 통과</td></tr>
+<tr><td>생성·컴파일·부착</td><td><code>verify-editor-component-browser.ps1</code>, 415 checks / 189 commands 통과. <code>authoring-gate-2/summary.json</code></td></tr>
+<tr><td>기존 재로드 계약</td><td><code>verify-cli-script-reload.ps1</code> 통과. 새 어셈블리 거부 시 기존 ID 보존, 이후 추가·정상 재로드, Play 상태 ID 보존</td></tr>
+<tr><td>초기화 1회</td><td><code>verify-script-add-awake-once.ps1</code> 통과. 잘못된 타입 부착 0개, 유효한 Bobber의 Play 초기화 시도 1회</td></tr>
+<tr><td>실제 DX12 UI</td><td>카테고리·검색·이미 추가 상태, 방향키/Enter 부착, 스크립트 이름별 Inspector, 새 스크립트 폼 확인</td></tr></tbody></table></div>
+<p>415는 명령 응답과 비동기 완료 폴링을 포함하는 assertion 수이며 서로 다른 시나리오 수가 아니다.</p>
+<p>2026-09-17 재검증: 같은 날(9-13) 들어온 엔진 배포 전환 뒤로 소스 체크아웃 에디터가 스크립트를 발행
+배포본 스냅샷으로 컴파일해 생성 게이트가 붉어져 있었다(핀 부재 → 낡은 ScriptCore 덮어쓰기 거부).
+체크아웃 에디터는 다시 <code>GameScripts/GameScripts.csproj</code>로 컴파일하고, 배포본 안에서 뜬 에디터만
+<code>CreatorBuildTool compile-game</code>을 쓴다. 생성 게이트 251 checks / 110 commands 통과.
+생성 게이트는 다음 동작을 검사했다.</p>
+<ul>
+<li>잘못된 이름·중복 소스 거부, 미등록 타입이 빈 컴포넌트나 Undo 기록을 남기지 않음.</li>
+<li>같은 Bobber 스크립트 두 인스턴스의 서로 다른 필드 값이 재로드 후 보존됨.</li>
+<li>파일/메타 생성, 실제 컴파일, 정확히 한 번 부착, 부착 Undo/Redo.</li>
+<li>컴파일 중 선택 변경이 대상을 바꾸지 않음.</li>
+<li>의도적 컴파일 오류 후 소스 유지·부착 없음, 오류 수정 후 재시도 성공.</li>
+<li>생성 전 잠금, 컴파일 후 잠금, 취소, 원래 대상 삭제 시 부착 차단.</li>
+</ul>
+<p>새 스크립트 생성 게이트가 만든 소스/메타는 검증 폴더로 이동했고 원래 관리 어셈블리는
+해시 확인 후 복원했다. 실제 UI 확인에서도 사용자 씬을 저장하지 않았고 EngineSettings와
+imgui.ini를 시작 전 바이트로 복원한 뒤 SHA-256 일치를 확인했다.</p>
+<p>최종 화면: <a href="../../Artifacts/phase21-add-component/ui-categories.png">카테고리</a>,
+<a href="../../Artifacts/phase21-add-component/ui-rendering.png">Rendering과 추가 상태</a>,
+<a href="../../Artifacts/phase21-add-component/ui-search.png">검색</a>,
+<a href="../../Artifacts/phase21-add-component/ui-new-script.png">새 스크립트</a>,
+<a href="../../Artifacts/phase21-add-component/ui-script-attached.png">이름별 스크립트 패널</a>.
+방향키 선택 후 검색 입력 유지와 폼 이름 자동 포커스도 확인했다.
+이 최초 검증에서는 노출 필드의 기존 드로어를 유지했다. 배치·한글 글리프 후속 수정은 아래에 기록한다.
+화면과 로그는 <code>Artifacts/phase21-add-component/</code>에 둔다. 이 검증은 DX12 기준이며
+Vulkan과 전체 W2-I 폭/DPI 행렬을 완료한 것으로 계산하지 않는다. W2-I 상태·공수는 유지한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2026-09-13-후속-아이콘한글스크립트-속성-배치">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="2026-09-13-후속-아이콘한글스크립트-속성-배치">2026-09-13 후속: 아이콘·한글·스크립트 속성 배치</h2></div>
+<div class="prose"><p>Add Component의 카테고리와 검색 결과에 기존 Microsoft Fluent Emoji 이미지를 연결했다.
+Rendering은 상자, Physics는 번개, Audio는 스피커, Input은 게임패드, Scripts는 두루마리 등으로
+구분하며 Camera·Light·Terrain·Texture·Material 항목은 해당 이미지로 표시한다.
+행 선택·키보드 탐색은 기존 Selectable이 담당하고 이미지·이름·카테고리 화살표만 같은 행 안에 그린다.
+이미지가 준비되지 않으면 Material Symbols를 사용한다.</p>
+<p>Bobber의 <code>?</code>는 <code>[SerializeField(DisplayName = &quot;가로 흔들기&quot;)]</code>로 노출한 bool 필드였다.
+관리 코드의 UTF-8 이름은 정상이고, 기본 Inter에 한글 글리프가 없는 것이 원인이다.
+메뉴용으로 별도 적재한 한글 폰트는 Inspector 본문을 보완하지 않았다.
+<code>EditorFontResources</code>가 각 본문 폰트에 시스템 한글 폰트를 병합하도록 수정했다.
+현재 Windows에서는 Malgun Gothic을 사용하며 Latin 글꼴 메트릭과 Material Symbols의 PUA 영역은 유지한다.</p>
+<p><code>DrawManagedScripts</code>의 Script 참조와 float·int·bool·Float3·string·Entity 필드를
+공통 <code>begin_property_line</code>의 왼쪽 라벨/오른쪽 값 열로 옮겼다. Float3은 네이티브와 같은 축 위젯과
+좁은 폭의 세로 배치 정책을 사용한다. Entity 참조와 해제 버튼은 값 열 안에서 폭을 나누고,
+문자열은 고정 256바이트 버퍼 대신 ImGui의 std::string 입력으로 편집한다.
+기존 CaptureFields 및 엔티티 편집 잠금 경로는 유지한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>결과와 증거</th></tr></thead>
+<tbody><tr><td>Debug Editor</td><td>VS18/v145 빌드 통과. <code>Artifacts/phase21-component-polish/build-debug.log</code></td></tr>
+<tr><td>실제 폰트 병합</td><td><code>verify-editor-text-fallback.ps1</code> 366 checks 통과. 12/16/24/32px 한글 실글리프·Latin 메트릭·66개 Material 역할 검사</td></tr>
+<tr><td>DX12 테마</td><td><code>verify-editor-theme.ps1 -Backends dx12</code> 3회 시작, 64 checks 통과. 사용자 배율 100→150→100%, OS DPI 150% 관측</td></tr>
+<tr><td>실제 UI</td><td>카테고리/Rendering/검색 아이콘, Bobber 한글 체크박스 토글, FollowTarget 한글 문자열·Float3 X=3 직접 입력, SoundProbe 문자열/정수 직접 편집 확인</td></tr>
+<tr><td>폭 변화</td><td>창 확대/복원으로 Inspector의 Float3 세로→가로→세로 배치와 수정 값 보존 확인</td></tr></tbody></table></div>
+<p>UI 증거: <a href="../../Artifacts/phase21-component-polish/ui-categories.png">카테고리</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-rendering.png">Rendering</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-search.png">검색</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-bobber-korean.png">한글 체크박스</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-script-stacked.png">좁은 폭</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-script-wide.png">넓은 폭</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-script-string-int.png">문자열·정수 편집</a>,
+<a href="../../Artifacts/phase21-component-polish/ui-script-width-return.png">폭 복원</a>.
+오브젝트 참조의 빈 상태·해제 비활성화 배치는 확인했다. 자동화의 drag 동작으로 값 변경을 확인하지
+못했으므로 참조 드롭과 숫자 드래그를 이번 UI 통과 실적으로 세지 않는다. 직접 숫자 입력은 확인했다.
+전체 폭/DPI 행렬과 Vulkan은 이번 검증에 포함하지 않았다.
+UI 검증에서 씬은 저장하지 않았으며 종료 후 EngineSettings와 imgui.ini를 시작 전 바이트로
+복원했다. 두 파일의 SHA-256 일치는 <code>Artifacts/phase21-component-polish/ui-restoration.json</code>에 기록했다.</p>
+<p>검증 도중 나타난 <code>text_fallback_probe.exe</code>의 CRT abort 창은 에디터 제품 실행이 아닌
+새 폰트 검증 코드의 실패였다. ImGui 컨텍스트 초기화와 예외 처리를 추가하고,
+제외 범위를 무시하는 <code>IsGlyphInFont</code> 대신 실제 표시되는 baked glyph로 아이콘 영역을 검사하도록
+수정했다. 최종 실행은 366개 검사를 통과하며 실패도 콘솔 오류와 종료 코드로 보고한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="EditorAddComponentBrowserValidation.md"><code>docs/analysis/EditorAddComponentBrowserValidation.md</code></a> · 마지막 커밋 2026-09-17 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

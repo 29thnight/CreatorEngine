@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorW1DpiResizeRootCauseAndFixPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 21 W1 — DPI·리사이즈 표시 오류 원인 분석과 해결안</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#결론과-확정-범위">결론과 확정 범위</a></li><li><a href="#1-공통-문제--서로-다른-시점의-크기와-동기화되지-않은-공유-값">1. 공통 문제 — 서로 다른 시점의 크기와 동기화되지 않은 공유 값</a></li><li><a href="#2-dx12--기존-표시-결과를-비운-뒤-새-결과로-복구하는-경로">2. DX12 — 기존 표시 결과를 비운 뒤 새 결과로 복구하는 경로</a></li><li><a href="#3-vulkan--실제-extent-불일치-가능성과-실패-상태-처리-결함">3. Vulkan — 실제 extent 불일치 가능성과 실패 상태 처리 결함</a></li><li><a href="#4-구현-순서와-통과-기준">4. 구현 순서와 통과 기준</a></li><li><a href="#근거-파일">근거 파일</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorW1DpiResizeRootCauseAndFixPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 21 W1 — DPI·리사이즈 표시 오류 원인 분석과 해결안</h1>
+<div class="meta"><p>2026-09-12, HEAD <code>3efbb23f</code>와 기존 W1 변경이 포함된 작업 트리 기준.
+<a href="../plans/EditorWorkspaceRedesignPlan.html">정본 W1</a> ·
+<a href="EditorW1InteractiveValidation.html">실제 재현·복원 기록</a>.</p>
+<p><strong>후속 수정(2026-09-12):</strong> 사용자 요청으로 DX12를 먼저 수정했다.
+전체 패스 재초기화를 크기 자원 교체로 바꾼 뒤 Debug/Release의 실제 DPI 왕복과 각 10회 resize가 통과했다.
+수정 원인·계측값·검증 범위는 <a href="EditorW1Dx12ResizeValidation.html">EditorW1Dx12ResizeValidation.md</a>에 둔다.
+아래 본문은 수정 전 분석 기록이며, Vulkan은 미수정으로 남는다.
+후속 사용자 결정으로 Vulkan 대응은 우선 보류하고 <strong>W1은 DX12 기준 완료</strong>로 정리했다.
+아래 Vulkan 원인 가설과 수정·재검증 항목은 재개 시 이어갈 보류 기록으로 유지한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#결론과-확정-범위"><span class="ve-label">§00</span><span class="map-name">결론과 확정 범위</span><span class="map-bar"><i style="width:26.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-공통-문제--서로-다른-시점의-크기와-동기화되지-않은-공유-값"><span class="ve-label">§1</span><span class="map-name">공통 문제 — 서로 다른 시점의 크기와 동기화되지 않은 공유 값</span><span class="map-bar"><i style="width:43.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-dx12--기존-표시-결과를-비운-뒤-새-결과로-복구하는-경로"><span class="ve-label">§2</span><span class="map-name">DX12 — 기존 표시 결과를 비운 뒤 새 결과로 복구하는 경로</span><span class="map-bar"><i style="width:58.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-vulkan--실제-extent-불일치-가능성과-실패-상태-처리-결함"><span class="ve-label">§3</span><span class="map-name">Vulkan — 실제 extent 불일치 가능성과 실패 상태 처리 결함</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-구현-순서와-통과-기준"><span class="ve-label">§4</span><span class="map-name">구현 순서와 통과 기준</span><span class="map-bar"><i style="width:46.9%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">2</span></span></a>
+<a class="map-row" href="#근거-파일"><span class="ve-label">§05</span><span class="map-name">근거 파일</span><span class="map-bar"><i style="width:16.1%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「3. Vulkan — 실제 extent 불일치 가능성과 실패 상태 처리 결함」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-결론과-확정-범위">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="결론과-확정-범위">결론과 확정 범위</h2></div>
+<div class="prose"><p>두 오류의 공통 조사 대상은 <strong>창 크기 변경을 렌더·표시 자원에 전달하는 과정</strong>이다.
+현재 코드에서 수정할 결함은 확인했지만, 당시 로그에는 표시 ID의 실패 이유와 실제 swapchain 크기가 없어
+각 현상의 최종 원인을 하나로 확정할 수는 없다. 아래에서 소스상 결함과 재현 원인 가설을 구분한다.
+이번 변경은 분석·해결 계획 문서화이며 제품 코드 수정, 새 빌드, 재실행 검증은 수행하지 않았다. W1은 <code>progress</code>다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>문제</th><th>확인된 동작·결함</th><th>재현 원인 판단</th><th>해결 방향</th></tr></thead>
+<tbody><tr><td>DX12: DPI 축소 뒤 Scene이 검게 남다가 복구</td><td>resize 시 기존 표시 결과를 무효화하고 새 GPU 완료 결과를 기다린다. Scene의 표시 ID가 0이면 준비 배경을 그린다.</td><td>관찰된 검은 배경과 일치하는 경로다. 다만 당시 ID/ready/key·단계별 시간이 없어 지연을 만든 분기는 미확정이다.</td><td>크기 전달 동기화, 표시 중단 이유·시간 계측, 첫 새 결과의 게시/소비 보장, 필요 시 마지막 완료 영상의 안전한 유지</td></tr>
+<tr><td>Vulkan: 모니터 경계에서 축소 후 <code>DEVICE_LOST</code></td><td>실제 swapchain extent와 요청 크기를 별도로 사용한다. acquire 실패 뒤 열린 내부 프레임을 되돌리지 않는 경로가 있다. fence wait의 device loss가 지속 오류 상태로 전파되지 않는다.</td><td><strong>실제 이미지보다 큰 render area를 제출했을 가능성</strong>을 우선 검증한다. 당시 extent/VUID가 없어 장치 손실의 직접 원인으로 확정하지 않는다.</td><td>실제 extent로 렌더링, 재생성/프레임 취소 상태 처리, device loss 최초 오류 보존 및 제출 중단</td></tr></tbody></table></div>
+<p>공통으로 <code>ScreenResizeBus</code>의 크기 필드를 표시 스레드가 쓰고 게임 스레드가 잠금 없이 읽는 결함도 확인했다.
+이는 수정 대상이지만, 두 증상을 모두 설명하는 단일 원인으로 판정하지 않는다.
+Material Symbols 글리프 누락이나 이전 <code>GlyphExcludeRanges</code> assertion이 다시 발생했다는 증거는 없다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-공통-문제--서로-다른-시점의-크기와-동기화되지-않은-공유-값">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-공통-문제--서로-다른-시점의-크기와-동기화되지-않은-공유-값">1. 공통 문제 — 서로 다른 시점의 크기와 동기화되지 않은 공유 값</h2></div>
+<div class="prose"><p>현재 호출 경로는 다음과 같다.</p>
+<ol>
+<li>창 소유 스레드의 <code>EditorWindowChrome::HandleWindowMessage</code>가 <code>WM_DPICHANGED</code>의 제안 RECT를 즉시 적용한다.</li>
+<li><code>WM_SIZE</code>는 <code>EditorMain::InvokeResizeFlag()</code>의 atomic flag로 전달된다.</li>
+<li>표시 스레드는 <code>HandleWindowResize()</code>에서 client 크기를 읽고 <code>ScreenResizeBus::BroadcastResize()</code>를 호출한다.</li>
+<li>게임 스레드는 <code>BuildLiveFramePacket()</code>에서 버스의 <code>GetWidth()</code>와 <code>GetHeight()</code>를 따로 읽어 렌더 스레드에 보낸다.</li>
+<li>ImGui host는 별도로 매 표시 프레임 <code>GetClientRect()</code>를 읽어 셸의 <code>Resize()</code>를 호출한다.</li>
+</ol>
+<p>소스 근거:</p>
+<ul>
+<li><code>Editor/EngineGUIWindow/EditorWindowChrome.cpp:70</code>: DPI 변경의 제안 RECT 적용.</li>
+<li><code>Editor/EngineEntry/EditorMain.cpp:342</code>, <code>:380</code>, <code>:492</code>: 표시 스레드에서 resize 처리.</li>
+<li><code>Engine/RenderEngine/RHI/ScreenSizedResource.h:163</code>, <code>:189</code>, <code>:217</code>: 일반 <code>uint32_t</code> 크기 필드의 무잠금 읽기/쓰기.
+<code>m_mutex</code>는 구독 목록을 보호하며 크기 값을 보호하지 않는다.</li>
+<li><code>Editor/EngineEntry/App.cpp:311</code> → <code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:4419</code>:
+게임 스레드가 두 크기를 개별 조회한다.</li>
+<li><code>Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:110</code>: 셸의 별도 크기 조회.</li>
+</ul>
+<p>따라서 코드상 데이터 경쟁이 있고, width/height가 하나의 관측값이라는 보장도 없다.
+atomic resize flag는 요청 전달을 보호하지만 이후의 공유 크기 읽기/쓰기를 모두 보호하지는 않는다.
+또한 버스 값을 동기화해도 Windows가 그 뒤 크기를 바꿀 수 있으므로 <strong>실제 GPU 이미지 크기의 별도 확인은 필요하다</strong>.</p>
+<p>해결안:</p>
+<ul>
+<li>우선 <code>ScreenResizeBus</code>에 <code>{width, height, generation}</code>을 한 번에 읽고 쓰는 snapshot API를 둔다.
+짧은 mutex 구간에서 값 전체를 복사하고 콜백은 잠금 밖에서 호출한다. 두 필드만 각각 atomic으로 바꾸는 것으로 끝내지 않는다.</li>
+<li>프레임 패킷은 snapshot을 한 번만 읽는다. 같은 크기의 중복 이벤트는 generation을 올리지 않고,
+전환 중 여러 요청은 안전한 프레임 경계에서 최신 유효 크기로 합친다.</li>
+<li>진단에는 창에서 관측한 크기, 렌더 프레임의 크기, 셸이 요청받은 크기, GPU가 실제 만든 크기를 구분한다.
+모두 같은 값이라고 가정해 한 필드로 덮어쓰지 않는다.</li>
+<li><code>window.resize</code>는 현재 게임 스레드의 CLI Pump에서 실행된다(<code>App.cpp:264</code>).
+HTTP 작업 스레드가 직접 resize한다는 가설은 배제한다.
+<code>AdjustWindowRectEx</code> 사용과 요청/실제 크기 차이는 계측하되, <code>clamped=true</code> 자체를 GPU 오류로 취급하지 않는다.
+명령 결과에는 최종 DPI와 적용된 크기 generation도 함께 기록한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-dx12--기존-표시-결과를-비운-뒤-새-결과로-복구하는-경로">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-dx12--기존-표시-결과를-비운-뒤-새-결과로-복구하는-경로">2. DX12 — 기존 표시 결과를 비운 뒤 새 결과로 복구하는 경로</h2></div>
+<div class="prose"><h3 id="재현-사실">재현 사실</h3>
+<ul>
+<li>독립 Debug 실행 두 번에서 OS DPI 150→100% 뒤 Scene만 검게 남았다. 본문·아이콘·도구 표시는 계속됐다.</li>
+<li>두 번째 실행에서는 추가 클릭 없이 이후 캡처에서 복구됐다. 클릭을 복구의 필수 조건으로 보지 않는다.</li>
+<li>검은 영역의 색은 Scene 준비 배경과 일치한다. 다만 캡처만으로 특정 코드 분기의 실행을 증명할 수는 없다.</li>
+<li><code>debug-black-live-status.json</code>은 pipeline ready와 프레임 누적 진행을 보고했다.
+Scene의 표시 ID, 대상별 completed frame, 공유 텍스처 개방 성공은 보고하지 않았다.
+관측 간 정확한 복구 지연 시간도 측정하지 않았다.</li>
+</ul>
+<h3 id="소스에서-확인한-경로">소스에서 확인한 경로</h3>
+<ol>
+<li>렌더 프레임 크기가 기존 pipeline과 달라지면 <code>TickLive()</code>가 <code>dx12.Resize()</code> 후
+<code>TeardownPipeline(true, true)</code>와 <code>BuildPipeline()</code>을 수행한다
+(<code>EnhancedSceneRenderer.cpp:5018</code>).</li>
+<li>teardown/build는 <code>InvalidateDisplayResultsLocked()</code>로 <code>ready=false</code>, 표시 key 0을 게시한다
+(<code>:957</code>, <code>:1444</code>, <code>:1625</code>). 새 표시 슬롯과 크기 의존 패스를 다시 만든다.</li>
+<li>후속 틱에서 슬롯의 GPU fence 완료를 확인하고 <code>PublishDisplayResultLocked()</code>로 표시 결과를 게시한다
+(<code>:4934</code>, <code>:981</code>). 게시에는 현재 대상의 active/key 일치 조건도 있다.</li>
+<li>UI의 <code>GetLiveDisplayImTextureId(Editor)</code>는 sink, enabled, active, ready, key를 확인하고
+DX12 adapter를 통해 공유 텍스처를 연다(<code>:5257</code>). ID가 0이면
+<code>SceneViewWindow.cpp:260</code>에서 <code>(0.08, 0.08, 0.09)</code> 준비 배경을 그린다.</li>
+</ol>
+<p><strong>표시 공백이 생길 수 있는 구조는 확인했다. 길어진 공백의 원인은 아직 미확정이다.</strong>
+현재 자료만으로 재구축 소요, 크기 재변경, GPU 완료 대기, 게시 조건 불일치, UI의 결과 소비 중 어느 단계가
+지연됐는지 나눌 수 없다. pipeline ready나 누적 렌더 횟수가 정상이라는 이유로 이 경로를 정상 처리해서는 안 된다.</p>
+<p>공유 텍스처 개방도 구분해서 봐야 한다. adapter는 token을 못 찾으면 0을 반환하지만,
+<code>ImGuiDx12Shell::OpenSharedTexture()</code>의 <code>OpenSharedHandle</code> 실패는 fallback texture ID를 반환한다
+(<code>EnhancedSceneRendererLiveDX12Adapter.cpp:308</code>, <code>ImGuiDx12Shell.cpp:372</code>).
+따라서 개방 실패가 모두 같은 검은 준비 배경으로 나타난다고 설명하면 부정확하다.</p>
+<h3 id="해결안">해결안</h3>
+<ol>
+<li>대상별로 <code>resizeGeneration</code>, view key, active/ready, 제출·GPU 완료·표시 게시·UI 소비 frame ID,
+표시 ID가 없는 이유, 공유 핸들 개방 결과와 HRESULT를 수집한다.
+teardown/build 시작·완료와 첫 새 영상 소비 시점을 같은 시계로 기록한다.</li>
+<li>공통 크기 snapshot 수정 뒤 재현해 반복 재구축인지, 완료 결과가 게시되지 않는지 먼저 확정한다.
+새 세대 결과의 게시·UI 소비가 지연된다면 해당 단계만 수정한다.</li>
+<li>resize 전환 중 마지막 완료 영상을 유지할 경우, 이전 세대의 완료된 표시 텍스처를 명시적으로 보유하고
+새 세대의 GPU 완료 영상이 열릴 때 한 번에 교체한다. 단순히 <code>ready=false</code> 처리를 삭제하지 않는다.
+기존 adapter는 active token만 열므로 이전 결과의 보유·조회 계약도 함께 수정해야 한다.</li>
+<li>이전 영상은 생산 측과 표시 측 GPU 사용이 모두 끝난 뒤 해제한다. 같은 슬롯에 다시 쓰는 것과 표시가 겹치지 않도록 한다.
+씬 교체·backend 종료·device loss에는 이전 영상을 정상 프레임처럼 유지하지 않는다.</li>
+<li>재구축 비용이 실제 병목으로 확인되면 해당 패스의 크기 의존 리소스만 줄여 재생성한다.
+현재도 backend/PSO·자산 캐시는 유지하는 경로이므로, 디바이스 전체 재부팅을 원인으로 단정하지 않는다.</li>
+</ol>
+<p>표시 수명 보호용 락을 제거하거나, GPU 완료를 기다리지 않은 텍스처를 먼저 게시하는 방식은 해결안에 포함하지 않는다.
+W4의 viewport별 렌더 해상도 분리는 이번 수정의 선행 조건으로 만들지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-vulkan--실제-extent-불일치-가능성과-실패-상태-처리-결함">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-vulkan--실제-extent-불일치-가능성과-실패-상태-처리-결함">3. Vulkan — 실제 extent 불일치 가능성과 실패 상태 처리 결함</h2></div>
+<div class="prose"><h3 id="재현-사실-1">재현 사실</h3>
+<p>1번 모니터 100%, 2번 모니터 150% 경계에 창이 걸친 상태에서 <code>window.resize 960 400</code>을 실행했다.
+실제 client는 639×296, 관측 DPI는 1.0이 됐다. <code>release-vulkan.out:1057</code>의 resize 결과 바로 다음 행에서
+<code>Vulkan BeginFrame 실패: 펜스 대기 실패 — VK_ERROR_DEVICE_LOST</code>가 기록됐다.
+이후 프레임 미개방 오류와 함께 반복됐으며 device-loss 문자열을 포함한 로그가 275,198행 쌓였다.</p>
+<p>최초 오류는 ImGui Vulkan 셸의 <code>VulkanDeviceResources::WaitForFenceValue()</code> → <code>vkWaitSemaphores()</code>에서
+관측됐다(<code>VulkanDeviceResources.cpp:1226</code>). <strong>이 함수는 장치 손실을 발견한 지점이지 GPU를 손상시킨 명령의 증거가 아니다.</strong>
+Release 실행은 셸의 validation 활성화 기본값이 false다(<code>ImGuiVulkanShell.cpp:259</code>).
+따라서 원인 VUID가 없다는 사실도 GPU 사용 규약이 지켜졌다는 증거가 아니다.</p>
+<h3 id="a-최우선-원인-가설--요청-크기로-실제-이미지-범위를-넘겨-그리기">A. 최우선 원인 가설 — 요청 크기로 실제 이미지 범위를 넘겨 그리기</h3>
+<ul>
+<li><code>CreateSwapChainInternal()</code>은 surface의 <code>caps.currentExtent</code>가 지정되어 있으면 요청 크기 대신 그 값으로
+이미지를 만든다(<code>VulkanDeviceResources.cpp:1402</code>). 하지만 그 선택된 extent를 표시용 크기로 저장하지 않는다.</li>
+<li><code>ResizeSwapChain()</code>은 재생성 후 <code>m_width/m_height</code>에 <strong>요청값</strong>을 넣는다(<code>:1503</code>).
+셸도 <code>impl.width/height</code>에 <strong>요청값</strong>을 넣는다(<code>ImGuiVulkanShell.cpp:368</code>). 초기 생성 경로도 같은 점검 대상이다.</li>
+<li><code>RenderAndPresent()</code>는 그 셸 값을 <code>VkRenderingInfo::renderArea.extent</code>에 사용한다(<code>:456</code>).</li>
+</ul>
+<p>예를 들어 client 크기를 읽은 뒤 DPI 전환이 추가로 일어나 surface가 더 작아지면,
+이미지는 작은 실제 크기로 생성되지만 render area는 이전의 큰 요청값일 수 있다.
+이 경우 attachment 범위를 넘기는 Vulkan 사용 규약 위반이다.
+VUID <code>VkRenderingInfo-pNext-06079/06080</code>은 render area가 attachment의 너비·높이 안에 있어야 한다고 규정한다.
+<a href="https://docs.vulkan.org/refpages/latest/refpages/source/VkRenderingInfo.html">Khronos VkRenderingInfo</a></p>
+<p><strong>코드의 크기 전달 결함은 확정, 이번 device loss가 이 경로에서 발생했는지는 미확정</strong>이다.
+639×296은 명령이 보고한 client 크기이며 당시 GPU 이미지 크기를 측정한 값이 아니다.
+재현 시 요청 extent, surface extent, 생성 extent, render area를 한 기록에 묶고 위 VUID를 확인해야 한다.</p>
+<p>수정은 다음과 같이 한다.</p>
+<ul>
+<li>실제 생성 extent를 <code>VulkanDeviceResources</code>가 보유·반환하고 셸의 render area와 백버퍼 관련 계산에 사용한다.</li>
+<li>요청한 창 크기와 실제 extent는 별도 필드로 둔다. 두 값이 다르다는 이유만으로 매 프레임 같은 재생성을 반복하지 않는다.</li>
+<li>surface가 자유 extent를 허용하는 경우 min/max 범위로 제한하고, 0 크기·최소화는 제출을 건너뛰는 상태로 처리한다.</li>
+<li>ImGui draw data의 표시 크기도 별도로 변할 수 있으므로 실제 attachment보다 큰 영역을 제출하지 않도록 확인한다.
+같은 프레임의 크기가 맞지 않으면 해당 프레임을 안전하게 취소하고 최신 크기로 다시 시작한다.</li>
+</ul>
+<h3 id="b-확인된-추가-결함--재생성과-실패-상태-전환이-불완전함">B. 확인된 추가 결함 — 재생성과 실패 상태 전환이 불완전함</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>위치</th><th>현재 동작과 문제</th><th>수정</th></tr></thead>
+<tbody><tr><td><code>VulkanDeviceResources::BeginFrame:668–710</code></td><td>내부 <code>m_frameOpen=true</code>와 upload recording을 만든 뒤 acquire 실패 시 그대로 false를 반환한다. 셸은 자기 <code>frameOpen</code>을 열지 않아 둘의 상태가 달라진다.</td><td>acquire 결과를 분류하고, 실패한 recording/context·업로드 예약을 정확히 되돌린다. 이미지 미획득과 획득 후 취소를 구분한다.</td></tr>
+<tr><td><code>BeginFrame:707</code>, <code>Present:1534</code></td><td><code>OUT_OF_DATE</code>를 일반 실패로 전달하며 <code>SUBOPTIMAL</code>은 성공으로만 처리한다. API 결과에서 재생성을 요청하는 명시적 경로가 없다.</td><td><code>Ready / RecreateNeeded / Suspended / DeviceLost</code> 등의 명시적 결과를 셸까지 전달한다. OUT_OF_DATE는 안전한 재생성으로, SUBOPTIMAL은 프레임 종료 뒤 재생성 판단으로 연결한다.</td></tr>
+<tr><td><code>WaitForFenceValue:1231</code></td><td>device loss에 오류 문자열만 반환한다. submit/present/drain에 있는 <code>MarkUnrecoverableDeviceError</code> 처리가 이 경로에는 없다.</td><td>최초 device loss를 공통 terminal 상태에 기록하고 이후 GPU 제출·일반 resize 재시도를 중단한다.</td></tr>
+<tr><td><code>ImGuiVulkanShell::Resize:359–364</code></td><td>이전 view를 없앤 뒤 재생성이 실패해도 셸이 active 상태로 남는다.</td><td>완성된 swapchain/view/extent를 함께 반영하고 실패 시 rendering을 시작하지 않는다. 일반 재생성 실패와 device loss를 구분한다.</td></tr>
+<tr><td><code>ImGuiVulkanShell::NewFrame:389</code>, <code>ImGuiHost::EndFrame:137</code></td><td>BeginFrame 실패 뒤에도 UI가 계속 끝나며 프레임 미개방 오류를 매번 출력한다.</td><td>프레임 시작 결과를 host가 받도록 하고 미개방 프레임의 렌더를 건너뛴다. 최초 오류와 발생 횟수를 보존하고 중복 로그를 제한한다.</td></tr></tbody></table></div>
+<p>Vulkan은 창 이벤트뿐 아니라 acquire/present 결과에서도 swapchain 재생성이 필요해질 수 있다.
+<a href="https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/04_Swap_chain_recreation.html">Khronos swapchain 재생성 안내</a></p>
+<p>기존 <code>DrainForLifecycle()</code>에는 제출 스레드를 경유한 <code>vkDeviceWaitIdle</code>이 있고,
+표시 semaphore도 swapchain image별로 관리한다. 따라서 현재 원인을 단순히 “GPU 대기가 없음” 또는
+“모든 semaphore를 프레임 번호로 잘못 재사용함”이라고 설명하지 않는다.
+정상 장치에서의 취소는 기존 <code>AbortFrame()</code> 계약을 검토해 재사용하되,
+장치가 이미 손실된 상태에서 acquire 반환을 위해 추가 submit/present를 시도하지 않는다.
+완전한 device 재생성·자동 복구는 별도 범위이며 이번 우선 목표는 원인 제거와 명확한 실패 전환이다.</p>
+<h3 id="c-직접-원인으로-확정하지-않은-항목">C. 직접 원인으로 확정하지 않은 항목</h3>
+<ul>
+<li>ImGui Vulkan backend의 동적 폰트 업로드는 별도 queue submit/wait를 한다.
+그러나 셸의 <code>Present()</code>는 제출 스레드 완료를 기다리며 씬 렌더러는 별도의 device resources를 소유한다.
+두 스레드가 있다는 사실만으로 같은 VkQueue의 동시 접근이라고 단정할 수 없다.
+extent 수정 뒤에도 재현되면 device/queue 식별자, 업로드·submit·present 순서와 validation을 확인한다.</li>
+<li>폰트/DPI 값이 정상이라고 GPU upload를 모두 배제하지도 않는다. 글리프 최초 생성과 이미 생성된 글리프 사용을 분리해 시험한다.</li>
+<li>OS DPI만 바꾼 Vulkan 구간은 정상 관찰됐고, 손실 직전 직접 동작은 경계에서의 창 축소였다.
+DPI 변경, 창 resize, 모니터 이동을 분리하지 않은 테스트로 원인을 확정하지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-구현-순서와-통과-기준">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-구현-순서와-통과-기준">4. 구현 순서와 통과 기준</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>순서</th><th>범위</th><th>완료 증거</th></tr></thead>
+<tbody><tr><td>R0</td><td>양쪽 backend의 표시 계측, 최초 실패 보존, 제품 서비스에서 호출 가능한 읽기 전용 진단 추가</td><td>각 target의 첫 새 영상, 마지막 GPU 완료·present, 크기 세대, 실패 이유를 한 타임라인으로 읽을 수 있음</td></tr>
+<tr><td>R1</td><td><code>ScreenResizeBus</code> 크기 snapshot과 생산/표시 경계 수정</td><td>동시 크기 변경에도 width/height/generation이 같은 묶음, 0 크기 안전 처리, 중복 크기 재구축 없음</td></tr>
+<tr><td>R2</td><td>Vulkan 실제 extent 전달, acquire/present 재생성·취소 처리, terminal device-loss 상태</td><td>범위 초과 제출 0, 오류 주입 시 프레임 상태/자원 예약 복원, device loss 뒤 추가 제출·로그 폭주 0</td></tr>
+<tr><td>R3</td><td>DX12 계측 결과에 따른 지연 원인 수정과 표시 전환 보강</td><td>새 세대 GPU 완료 후 늦어도 두 번의 정상 표시 프레임 안에 새 결과를 소비, 불필요한 준비 배경 없음, 이전 세대 자원 안전 해제</td></tr>
+<tr><td>R4</td><td>동일 실행 파일로 실제 DPI·경계 resize 재검증</td><td>아래 행렬 통과, 화면·로그·세대별 frame 진행 증거와 원복 기록 확보</td></tr></tbody></table></div>
+<p>R0부터 빌드 가능한 단위로 나눠 진행한다. R2의 device-loss 중단 처리는 원인 재현 중 로그 폭주를 막기 위해
+먼저 넣을 수 있지만, 오류를 조용히 숨기는 것으로 원인 수정 완료를 대신하지 않는다.
+R3의 첫 새 GPU 완료까지 걸리는 시간은 R0에서 계측하고 정상 크기 전환 기준과 비교한다.
+“두 표시 프레임” 조건은 GPU 완료 후 전달 지연의 상한이며, GPU 완료 자체의 무기한 지연을 허용하는 조건이 아니다.</p>
+<p>최소 검증 행렬:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>분리할 조건</th><th>조작</th><th>대상</th></tr></thead>
+<tbody><tr><td>사용자 배율만 변경</td><td>같은 모니터·창 크기에서 100→150→100%</td><td>DX12/Vulkan, 폰트 신규 생성·재사용</td></tr>
+<tr><td>OS DPI만 변경</td><td>같은 모니터에서 150→100→150%, 자연스럽게 발생한 client 변화도 기록</td><td>DX12/Vulkan, 사용자 배율 100/150%</td></tr>
+<tr><td>창 크기만 변경</td><td>같은 DPI에서 확대·축소·연속 resize</td><td>DX12/Vulkan</td></tr>
+<tr><td>모니터 경계만 이동</td><td>100/150% 모니터 왕복, 추가 resize 없이 관찰</td><td>DX12/Vulkan</td></tr>
+<tr><td><span class="chip risk">기존 실패 조건</span></td><td>경계에서 <code>window.resize 960 400</code>, 최종 client/DPI/extent 기록</td><td>Vulkan 우선, DX12 대조</td></tr>
+<tr><td><span class="chip risk">별도 실패 조건</span></td><td>최소화·복원, 0 extent, OUT_OF_DATE, 재생성 실패, device loss 주입</td><td>상태·수명 검사 후 양 backend 실제 화면 확인</td></tr></tbody></table></div>
+<ul>
+<li>Debug validation 실행으로 원인 규약 위반을 찾고 Release에서 같은 실제 조작의 재발 여부를 확인한다.
+실제 경계 왕복은 수정 후 우선 10회 반복하고 UI 추가 클릭 없이 새 프레임이 진행되는지 기록한다.</li>
+<li>작은 고정 씬에서 세대별 frame ID와 시각적 변화가 함께 보이는 증거를 남긴다.
+<code>Present</code> 성공 응답만으로 화면에 새 영상이 보였다고 판정하지 않는다.</li>
+<li><code>editor.theme clean</code>은 폰트·geometry 검사 의미를 유지한다. R0에서 추가할 표시 건강 상태와 함께 판정한다.
+현재 제품 서비스에 없는 <code>render.livecheck</code>를 검증 절차의 전제로 삼지 않는다.</li>
+<li>device loss/프레임 실패/관련 validation 오류 0, Scene의 새 영상 표시 확인, 폰트 59역할 누락 0을 모두 충족해야 W1 완료로 바꾼다.</li>
+<li>Windows 배율·설정·ini를 원본으로 복원한다. W2-V/W2-B의 배치 수정과 W7 비동기 썸네일 구현은 별도 계획을 유지한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-근거-파일">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="근거-파일">근거 파일</h2></div>
+<div class="prose"><ul>
+<li><code>Artifacts/phase21-w1-final-visual/debug-dx12-dpi100-black-scene.png</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/debug-repeat-user150-dpi100-black-scene.png</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/debug-repeat-user150-dpi100-recovered.png</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/debug-black-live-status.json</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/release-vulkan-monitor2-transition.json</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/release-vulkan-monitor-return-resize.json</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/release-vulkan.out:1057</code></li>
+<li><code>Artifacts/phase21-w1-final-visual/render-log-review.json</code></li>
+</ul>
+<p>위 산출물은 기존 검증의 로컬 증거이며 이번 문서 작성 중 새로 실행해 얻은 결과가 아니다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="EditorW1DpiResizeRootCauseAndFixPlan.md"><code>docs/analysis/EditorW1DpiResizeRootCauseAndFixPlan.md</code></a> · 마지막 커밋 2026-09-13 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

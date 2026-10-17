@@ -1,37 +1,121 @@
-# 렌더링 편집 표면의 수용 경계
+# Editor 렌더 표면 적용 검증
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+2026-10-01. 사용자가 승인한 여섯 UI/수명 변경의 즉시 적용 슬라이스 검증이다.
+후속 소유권과 완료선은 [EditorRenderingSurfacesPlan.md](../plans/EditorRenderingSurfacesPlan.md),
+환경 의미는 [EnvironmentRenderingPlan.md](../plans/EnvironmentRenderingPlan.md)에 고정했다.
 
-## 표면별 책임
+## 적용
 
-[렌더링 표면 정본](../plans/EditorRenderingSurfacesPlan.md)은 저작 설정, 현재 실행 관측, 그래프 표시와 자산 편집을 분리한다. Preferences는 Editor UI scale·브라우저 폭·frame pacing, Project Settings는 General/Build·Graphics·Player 기본값을 다룬다. Graphics의 startup default와 SceneRenderProfile에 저장된 씬 소유 값을 같은 설정으로 보지 않는다. Quality 탭은 완성된 품질 preset 편집기가 아니다.
+- 성공한 Scene 변경에서 Material Node Editor의 활성 문서·선택·preview를 해제한다.
+  미저장 그래프는 기존 자산에 덮어쓰지 않고 `Saved/Editor/MaterialDrafts`에 복구 사본을 보존한다.
+- Scene Show의 SkyBox는 해당 view에서만 배경을 숨긴다. Graphics의 배경 토글은 전체 view에 적용한다.
+  GT frame packet에 값을 밀봉하고 DX12/Vulkan 공통 SkyBox node에서 소비한다.
+- SkyBox의 깊이 쓰기를 제거했다. SSGI의 축소 Hi-Z cell hit 뒤 full-resolution GBuffer normal이
+  비어 있는 하늘 픽셀을 걸러 배경색을 간접광으로 가져오지 않게 했다.
+- Render Statistics는 Scene 좌측/ViewGizmo 높이의 작은 비상호작용 오버레이로 옮겼다.
+  Scene 완료 해상도/FPS/backend/ready와 같은 view의 GPU 표본만 표시한다.
+- 상세 런타임/비용/Pass/validation 정보는 Profiler의 Rendering - Live로 옮겼다.
+  capture reader와 Record 요청 없이 renderer snapshot을 읽는다. CPU는 전체 view 합계로 표시한다.
+- Settings의 Preferences/Project Settings 창을 분리했다. 현재 저장소는 기존 EngineSettings를 재사용한다.
+  RenderPass는 활성 선언 구조, Render Debug는 독립 Frame Debugger의 미구현 안내와 Live 진입을 표시한다.
 
-RenderPass의 그래프는 native C++에서 컴파일되어 제출된 snapshot의 읽기 전용 표시다. 선택한 view와 snapshot이 맞지 않으면 이전 그래프를 정답처럼 계속 보여 주지 않고 대기한다. generation, graph epoch/frame/view, extent, scene/history revision, dependency hash, pass/resource/execute order가 provenance다. queue·alias·subresource range 시각화는 UI에서 미구현이라고 명시한다. 노드를 끌 수 있는 외형이 있다고 런타임 pass 작성·재연결 API로 취급하지 않는다.
+## 빌드·정적 검증
 
-Render Debug의 완전한 capture/event/resource inspection은 제공되지 않는다. Rendering Live는 명시적으로 여는 외부 Profiler viewer의 관측 표면이며 recorder의 Record 상태와 GPU timing 수집은 다른 조건이다. workspace 복원이나 preset 선택만으로 외부 process를 실행하지 않는다.
+VS18/v145의 `Editor/CreatorEditor.vcxproj` 및 종속 프로젝트 빌드가 Debug/Release 모두 성공했다.
+최종 소스의 SSGI Slang은 아래 실제 제품 실행에서 새 프로젝트의 shader cache로 컴파일했다.
 
-Material Graph는 현재 자산 Create/Open 중심이다. Scene이나 MeshRenderer 선택을 필수 생성 조건으로 두지 않는다. 재질 자산 저작과 이전의 Scene-bound draft session API를 같은 경로라고 설명하면 현재 실행과 옛 runner가 어긋난다.
+| 검증 | 결과·증거 |
+|---|---|
+| Debug 빌드 | `Build/Obj/editor-organization-debug-final.log`, exit 0 |
+| Release 빌드 | `Build/Obj/editor-organization-release-final.log`, exit 0 |
+| Dashboard 전체 파싱 | `Tools/regression/verify-plan-dashboard.ps1 -RequireFullParse`: 439행, string/shape/meta 오류 0, 백분율 finite |
+| 창 등록 | 실제 `editor.windows`: 28개, orphan/bodyless/duplicate/empty 오류 없음 |
+| 변경 형식 | `git diff --check` 통과 |
 
-## 현재 회귀 runner가 실제로 하는 일
+Release의 기존 `/DELAYLOAD:vulkan-1.dll` LNK4229 경고는 남아 있다. 빌드 성공을 모든 backend의
+실제 실행 성공 또는 새 UI의 수동 시각 검증으로 읽지 않는다.
 
-`verify-editor-rendering-surfaces.ps1`은 FixtureProject와 새 OutputDirectory가 필요하다. Assets/ProjectSetting/Saved를 복사한 프로젝트를 만들고 Editor를 command service 및 smoke-offscreen 옵션으로 시작한다. endpoint PID를 확인한 뒤 인증된 HTTP 비동기 명령을 보내고 operation 완료를 polling한다. fixture 생성·자산 복사·프로세스 시작을 수행하는 실행 검사이며 읽기 전용 정적 검사로 부르면 안 된다.
+## 실제 Editor 조작
 
-등록 창의 orphan/bodyless 상태, Preferences/ProjectSettings/RenderPass/RenderPassDebug focus와 UI frame 진행, recorder 정지 중 GPU timing의 계속 수집, GamePreview, Scene skybox와 전역 environment background 변경을 검사하도록 작성되어 있다. 창 focus는 viewport를 가릴 수 있으므로 render fence 대신 `editor.state.frames`의 UI fence를 쓰는 부분이 중요하다. IBL generation이 background 토글만으로 바뀌지 않는지도 기대한다.
+체크인된 `Tools/regression/verify-editor-rendering-surfaces.ps1`은 기존 MAT-9 fixture를 새
+프로젝트로 복사하고 제품 Editor를 HTTP로 조작한다. 사용자 프로젝트/프로세스는 수정하지 않는다.
 
-다만 후반부는 여전히 `material.editor open Ground`, document/revision 기반 add/apply, Scene 변경 뒤 retained draft를 전제로 한다. 이 부분은 현재 asset-only UI와 동일한 수용 계약으로 간주할 수 없다. runner 존재만으로 최신 Material Graph가 검증되었다고 쓰지 말고, 실제 등록 API·fixture와의 호환을 확인한 뒤 테스트를 개편해야 한다. 이번 개정은 이를 실행하거나 수정하지 않았다.
+| 실행 | 결과 |
+|---|---|
+| Debug / DX12 | `Build/Obj/EditorRenderingSurfaces/Debug-DX12-final`: 종료 포함 22개 단정 통과, 정상 종료 |
+| Release / DX12 | `Build/Obj/EditorRenderingSurfaces/Release-DX12-final`: 종료 포함 22개 단정 통과, 정상 종료 |
+| Release / Vulkan | `Release-Vulkan-v1/v2`: 설정 창 focus 후 GPU fence HTTP operation 미완료. `Release-Vulkan-v3`: UI frame 진행과 Record stop 확인, 다음 live 조회가 120초 내 미완료. 전체 gate 미통과 |
 
-## 백엔드와 증거
+검사 내용: 새 창 focus/close와 본문 배선, Show FPS/Statistics/SkyBox 변경,
+Scene/Game 실제 attachment capture, 미저장 graph 편집, 존재하지 않는 Scene load 실패 시 현재
+문서 유지, 새 Scene에서 이전 문서 비노출, 이전 document apply 거부, 복구 사본 실제 파일 생성.
+복구 파일명은 session별 UUID를 포함해 프로세스 재시작 뒤 Scene/document ID가 재사용되어도
+이전 사본을 덮어쓰지 않는다. 기존 사본 sentinel을 넣고 그대로 유지되면서 새 사본이 생성됨을 검사했다.
+창 focus 검증은 viewport가 가려질 수 있으므로 Scene GPU frame 대신 실제 UI frame 진행을 확인한다.
 
-Editor ImGui host는 `ImGuiDx12Shell`로 고정되어 있다. runner의 Backend 인자가 vulkan을 문법상 허용하더라도 초기에 오류를 던지고 artifact/설정 변경 전에 중단한다. Vulkan 검사는 native RHI probe 또는 Player 경로로 분리한다. Editor DX12 실행을 Vulkan이라는 라벨로 기록해서는 안 된다.
+두 구성 모두 `profile.pause` 후 `profile.stats.state=stopped`를 확인한 상태로
+Rendering - Live를 열었다. GPU collect가 Debug 20 → 53, Release 25 → 190으로 증가해 Record off에서도
+새 완료 표본이 생성되었다. 상세 응답은 해당 case의 `responses.jsonl`과 `recorder-off.json`이다.
+당시 `result.json`은 종료 단정 이전에 작성해 checks=21이며, stdout의 checks=22는 종료 단정을 포함한다.
+하네스의 결과 파일 작성은 이후 종료 단정 뒤로 옮겼다.
 
-새 수용 결과에는 commit/build, fixture, 실제 명령 결과, UI frame/표시 frame, 선택 view, 캡처 provenance와 정상 종료를 함께 남긴다. 스크린샷만으로 다른 view의 GPU sample을 인증하거나 `ready=true` 하나로 표시 텍스처의 최신성을 인증하지 않는다. 이전 날짜의 성공 요약은 역사 기록이며 이 checkout의 통과 판정은 아니다.
+## 고정 HDR 픽셀 비교
 
-## 구현 근거
+`Tools/regression/compare-editor-environment-visibility.py`는 controlled capture의 float32
+`preToneHdr`를 비교한다. Scene overlay가 나중에 깊이를 기록하므로 mesh mask는 GBuffer normal의
+유효 표면으로 판정한다. 332×202의 55,416개 mesh / 11,648개 background 픽셀을 비교했다.
 
-- [Editor/EngineGUIWindow/MenuBarWindow.cpp](../../Editor/EngineGUIWindow/MenuBarWindow.cpp)
-- [Editor/EngineGUIWindow/EnhancedRenderDebugWindow.cpp](../../Editor/EngineGUIWindow/EnhancedRenderDebugWindow.cpp)
-- [Editor/EngineGUIWindow/MaterialGraphWindow.cpp](../../Editor/EngineGUIWindow/MaterialGraphWindow.cpp)
-- [Editor/EngineGUIWindow/ProfilerLiveDiagnosticsBridge.cpp](../../Editor/EngineGUIWindow/ProfilerLiveDiagnosticsBridge.cpp)
-- [Editor/EngineEntry/EditorPreferences.h](../../Editor/EngineEntry/EditorPreferences.h)
-- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp](../../Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp)
-- [Tools/regression/verify-editor-rendering-surfaces.ps1](../../Tools/regression/verify-editor-rendering-surfaces.ps1)
+| 조건 | Debug DX12 mesh max abs | Release DX12 mesh max abs | 배경 max abs |
+|---|---:|---:|---:|
+| Scene view-only 배경 off | 0 | 0 | 1.5537109375 |
+| 전역 배경 off | 0 | 0 | 1.5537109375 |
+| 배경 on 복원 | 0 | 0 | 0 |
+
+Scene에서만 숨긴 뒤 Game HDR max abs는 0이다. 배경 변경 전후 IBL generation은 1로 유지됐다.
+모든 attachment는 finite이며 normal/coverage도 동일하다. 이는 해당 fixture의 픽셀 검증이며,
+모든 재질 lobe와 Player 패키지의 환경 기능 완료 증거가 아니다.
+
+## 남은 완료선
+
+- **21 W9:** 개인/프로젝트 저장소 분리, 설정 inventory consumer, default profile/Quality
+  저장·쿠킹·Player 소비, 복구 사본 명시적 열기 UX, 100%/150%·좁은 panel·도킹 수동 검증.
+- **14 14-LIVE:** per-view CPU/GPU immutable snapshot, wall-clock age/epoch/resize·stale/unsupported,
+  Record on/off·파일 reader·멀티뷰 전체 회귀, HUD/page off/on 비용 실측.
+- **4.3 RG-V / 4.6 CSRP-5/6:** compiled graph 읽기 전용 viewer와 C# immutable IR 표시 세대 일치.
+- **4.75 RND-ENV:** profile Environment schema/resolver, diffuse/specular 별도 enable/intensity,
+  fallback 색의 편집/배경 세기, Standard/LX·Forward/Deferred·Editor/Player 전체 route와 쿠킹/캐시/성능.
+- **14-7 RF0~RF7:** 독립 RenderCapture/.ceframe과 실제 Render Debug 진입.
+
+새 행은 progress/todo이며 공수는 `days:null`이다. UI 재배치를 MAT-9/후속 시스템 전체 완료로
+표시하지 않았고 성능 수치는 별도로 측정하지 않았다. 커밋/푸시는 이 요청의 범위에 없다.
+
+## 2026-10-01 추가: 중립 Grid·회색 배경·HDRI 선택 정책
+
+기존 표의 검정 off 배경은 당시 캡처 결과다. 현재 소스는 SkyBox를 숨겨도 동일한 깊이 읽기 전용
+패스에서 linear RGB=(0.18,0.18,0.18)을 채우며, Scene post chain이 표시 색으로 변환한다.
+기본 바닥 Grid의 선/셀은 중립 회색으로 변경했고, 원점/축에 별도 색을 넣지 않는다.
+Resource `forest.ceibl` bootstrap은 배경 off + IBL on으로 시작한다. 명시적 HDR/ceibl 선택은
+Core에서 source/배경 on을 함께 발행하고, Editor 드래그/HTTP 소비자는 Scene hide override도
+해제한다. 사용자가 forest를 명시적으로 다시 고른 경우도 on이다. 제품 profile을 통한 저장된
+환경 선택의 재시작 복원은 ENV-B 범위로 유지한다.
+
+| 검증 | 결과·증거 |
+|---|---|
+| Debug 제품 빌드 | `Build/Obj/skybox-neutral-debug-final.log`, exit 0 |
+| Release 제품 빌드 | `Build/Obj/skybox-neutral-release.log`, exit 0 |
+| 실제 Debug / DX12 | `Build/Obj/NeutralEnvironment/Debug-DX12-final`: HTTP 단정 11개, 캡처 11개, 정상 종료 |
+| 실제 Release / DX12 | `Build/Obj/NeutralEnvironment/Release-DX12-final`: HTTP 단정 11개, 캡처 11개, 정상 종료 |
+| 기본/사용자 HDRI 정책 | 시작 `forest.ceibl/background=false/IBL generation=1`. 사용자 `autumn_field_puresky_1k.hdr` 선택 시 전역 background와 Scene 표시 모두 true. 명시적 forest 재선택도 true |
+| 거부 경로 | 존재하지 않는 HDR와 손상된 ceibl 거부. 이전 source/background/Scene hide 상태 유지 |
+| 캐시·조명 | background 토글 전후 IBL generation 1→1. forest와 사용자 HDRI 모두 메시 pre-tone HDR max abs=0. Scene-only 숨김의 Game HDR max abs=0 |
+| 회색 배경 | 각 구성에서 모든 캡처 attachment finite. 빈 씬 67,064개 배경 픽셀의 linear 0.18 최대 오차 0.00006836 (RGBA16F 양자화). 표시 배경 최소 RGB 약 0.302로 검정이 아님 |
+| 실제 Grid | 빈 씬의 깊이를 기록한 16,234개 Grid 픽셀에서 표시 RGB 채널 차이 최대 1/255. 별도 축 색상 없음 |
+| 문서/대시보드 | 전체 파싱 439행, shape/string/meta 오류 0·백분율 finite. `git diff --check` 통과 |
+
+하네스는 `Tools/regression/verify-neutral-environment.ps1`, 픽셀 검사는
+`Tools/regression/compare-editor-environment-visibility.py <case> --neutral`이다.
+표시 배경 검사는 FXAA(spanMax=8)가 메시 색을 섞는 경계 8픽셀을 제외한다. HDR 회색 값과 메시
+조명은 경계를 포함한 전체 GBuffer normal mask로 검사한다. 두 구성의 `visibility-pixels.json`에
+실제 수치를 남겼다. 드래그 경로는 동일 Core 선택 및 Scene 표시 API 배선을 확인했고, 이번 실제
+선택 조작은 HTTP로 수행했다. Vulkan 실제 실행·사용자 HDRI 저장/재시작·후속 IBL weight·표시 색
+편집·성능 수용 완료로 확대하지 않는다.

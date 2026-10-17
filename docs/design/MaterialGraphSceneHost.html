@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/MaterialGraphSceneHost.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Graph 실제 Scene GBuffer·공유 깊이·컬러 합성</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-설치-범위">1. 설치 범위</a></li><li><a href="#2-실제-패스-순서">2. 실제 패스 순서</a></li><li><a href="#3-준비기록수명">3. 준비·기록·수명</a></li><li><a href="#4-검증">4. 검증</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="MaterialGraphSceneHost.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Material Graph 실제 Scene GBuffer·공유 깊이·컬러 합성</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#1-설치-범위"><span class="ve-label">§1</span><span class="map-name">설치 범위</span><span class="map-bar"><i style="width:40.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-실제-패스-순서"><span class="ve-label">§2</span><span class="map-name">실제 패스 순서</span><span class="map-bar"><i style="width:95.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-준비기록수명"><span class="ve-label">§3</span><span class="map-name">준비·기록·수명</span><span class="map-bar"><i style="width:98.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-검증"><span class="ve-label">§4</span><span class="map-name">검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip warn" title="주의">1</span></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「4. 검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-설치-범위">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-설치-범위">1. 설치 범위</h2></div>
+<div class="prose"><p><code>EnhancedSceneRenderer</code>의 DX12/Vulkan live pipeline에 <code>LX.Scene.GBuffer</code>와
+<code>LX.Scene.Color</code>를 연결했다. 입력은 <a href="MaterialGraphSceneInput.html">SceneViewInput</a>이
+소유한 geometry·world·현재 pose·camera·불변 material instance다.</p>
+<p>2026-09-29 <a href="MaterialGraphSceneLookup.html">Scene lookup 캐시</a>를 추가했다. 현재 host는
+4,096²픽셀·4,096 draw와 2 GiB lookup payload 예산을 사용한다. 정확한 평가 입력을
+compute에서 비교하고 변경 픽셀의 IBL만 적분한다. 컬러 fragment는 lookup을 소비한다.
+카메라 이동 시 전체 갱신 비용과 입력 MRT 대역폭·자원 할당 비용의 실시간 수용은 별도다.
+기존 evaluated-point baker의 <code>PrincipledEnvironmentBake.slang</code> 수식과 정확도를 유지한다.</p>
+<p>지원은 Core/Layered 및 <a href="MaterialGraphSceneSubsurface.html">SSS surface</a>,
+<a href="MaterialGraphSceneRefraction.html">단일 표면 transmission/refraction</a>의 Opaque/Masked와
+double-sided coverage다.
+<a href="MaterialGraphTextureFootprints.html">이미지별 Vector·LOD</a>로 둘 이상의 텍스처도 처리한다.
+<a href="MaterialGraphSceneVolume.html">균질 Volume</a>도 별도 transport 경로로 연결했다.
+Core/Layered·SSS/transmission의 Blended coverage와 비alpha transmission은
+<a href="../analysis/MAT7ForwardTransportComposition.html">공통 Forward+ transport</a>에서 Code 재질과 혼합 정렬·합성한다.
+cooked Scene host가 없는 packaged 실행은 진단과 함께 거부한다.
+이전 preview shader를 Scene shader로 이름만 바꾸어 사용하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-실제-패스-순서">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-실제-패스-순서">2. 실제 패스 순서</h2></div>
+<div class="prose"><pre><code class="language-text">LX mesh skin/world producer (Shadow/GBuffer가 같은 생산을 공유)
+  -&gt; legacy Shadow + LX.Scene.Shadow (세 캐스케이드의 기존 depth 보존)
+  -&gt; legacy GBuffer (기존 depth clear와 Opaque/Masked capture)
+  -&gt; LX.Scene.GBuffer (투과 제외, 같은 5 MRT와 같은 D32, Less, depth write)
+  -&gt; Decal / SSAO / legacy Deferred
+  -&gt; LX.Scene.LookupCapture (8 + 3 MRT) / LookupBake
+  -&gt; SSS draw가 있으면 SubsurfaceReflection / Capture (7 MRT) / Filter
+  -&gt; LX.Scene.Color (같은 HDR, 같은 D32, Equal, depth write 0)
+  -&gt; LX.Scene.LookupReady
+  -&gt; Skybox / SSGI
+  -&gt; Forward+.Cull (Code/Graph 공통 light list)
+  -&gt; Volume이 있으면 opaque 배경에 카메라 매질 합성 (한 번)
+  -&gt; 혼합 back-to-front 순서:
+     Code Forward+.Shade / Graph lookup 준비 + alpha color
+     SSS·굴절은 draw별 임시 depth/owner -&gt; reflection/source/filter
+     굴절은 현재 뒤쪽 HDR 복사 -&gt; RefractionCapture/Bake -&gt; surface color
+     각 Forward 표면에 해당 표면 깊이까지의 카메라 매질 적용
+  -&gt; SSR / 후처리</code></pre>
+<ul>
+<li>LX GBuffer는 depth를 clear하지 않는다. 먼저 기록된 legacy Opaque/Masked와 같은
+깊이 검사에 참여한다. material graph alpha와 coverage cutoff로 Masked를 평가한다.</li>
+<li>GBuffer bitmask에 draw별 <code>0x80000001..0x80001000</code> owner를 기록한다. legacy bitmask와
+분리되며, coplanar의 <code>Equal</code>만으로 다른 재질이 winner를 덮어쓸 수 없다.</li>
+<li>컬러 패스는 같은 mesh/pose/VS/coverage를 사용하고 depth는 읽기 전용으로 바인딩한다.
+정확한 owner가 자기 draw와 일치하는 fragment만 기존 HDR을 교체한다.
+legacy 및 배경 픽셀은 유지한다.</li>
+<li>컬러는 원래 graph를 다시 평가한다. 기본 GBuffer에 담지 못하는 IOR·coat·sheen·
+anisotropy·film을 flat Standard 값으로 복원하지 않는다.</li>
+<li>fine UV derivative는 owner 분기 전에 계산한다. 선택된 view light의 직접광,
+기존 SSAO 값, cascade shadow와 HDR environment를 소비한다.
+Layered 발광도 상위 lobe의 감쇠를 적용한다.</li>
+</ul>
+<p>투과 surface는 자기 순서 직전에 뒤쪽 HDR을 복사하며 이미 합성된 반투명 객체도 읽는다.
+임시 GBuffer의 depth/owner를 사용하고 불투명 depth/owner를 보존한다.
+배경 SSAO를 투과 surface에 적용하지 않는다. 이전 depth 교체 방식과 후속 변경은
+<a href="../analysis/MAT7ForwardTransportComposition.html">공통 transport 검증 기록</a>을 구분해서 읽는다.</p>
+<p>일반 Blend는 opaque depth/owner를 쓰지 않고 같은 HDR에 알파 합성한다. opaque SSAO/Decal을
+앞쪽 alpha surface에 적용하지 않는다. alpha draw는 opaque shadow caster에 넣지 않는다.
+SSS/refraction·Volume과 alpha의 혼합과 굴절 배경의 투명 객체 순서는 공통 transport 게이트에서 검사한다.
+SSAO/SSR/SSGI와의 전체 Scene 시각 회귀는 MAT-9 게이트다. 위 순서의 자원 연결만으로
+해당 renderer 기능 전부를 검증했다고 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-준비기록수명">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-준비기록수명">3. 준비·기록·수명</h2></div>
+<div class="prose"><ol>
+<li><code>SelectReadyInput</code>에서 <a href="MaterialGraphSceneGeneration.html">비동기 generation 준비·마지막 정상 재질</a>을
+선택한다. 신규 generation의 Slang은 worker에서 검증하고 shadow·opaque·alpha color/lookup 및
+필요한 SSS/transmission 보조 PSO가 모두 ready여야 선택한다.
+pending/실패 슬롯은 이전 instance·coverage와 현재 geometry를 사용한다.</li>
+<li>legacy upload/IBL과 <code>SceneHost::PrepareResidency</code>의 LX texture 복사 준비 뒤
+빈 graph에 <code>PrepareParallel</code>로 native prefix를 확정한다.</li>
+<li><code>SceneHost::Prepare</code>가 ready instance의 reflected binding·PSO와 scene constants,
+current mesh producer·index upload를 준비한다. prefix 이전 upload 주소를 재사용하지 않는다.</li>
+<li>Shadow/GBuffer의 최초 선언이 geometry 생산을 등록한다. 이후 선언은 같은 graph output을 읽는다.</li>
+<li>콜백은 전달된 encoder를 사용하며 immutable frame을 캡처한다. 현재 recording과
+descriptor 세대를 다시 확인하고 오래된 준비 결과를 거부한다.</li>
+<li>정확한 graph batch의 completion·티켓 성공 확인 뒤 lookup·재질 슬롯을 게시한다.
+pending 티켓은 다음 owner poll에서 확인하고 stale request의 활성 교체는 거부한다.</li>
+<li>graph/submission owner가 input·generation·PSO·texture·geometry를 GPU 완료까지 유지한다.
+GPU idle 뒤 host를 해제하고 backend/cache를 정리한다.</li>
+</ol>
+<p>프레임 candidate는 전체 성공 후 교체한다. frame/extent·budget·미지원 route·binding·
+shader/PSO·뒤쪽 draw 실패는 이전 accepted frame을 부분 결과로 덮지 않는다.
+실패한 이전 frame을 새 recording으로 다시 그려 성공처럼 처리하지도 않는다.</p>
+<p>저작 모드에서는 exact Scene module의 VS/GBuffer PS/Color PS를 DXIL·SPIR-V로 검증한다.
+두 backend의 material reflection이 제품 layout과 일치해야 active backend PSO를 만든다.
+DX12/Vulkan shader/native PSO의 worker 준비·제출 성공 후 슬롯 교체는 연결 문서가 소유한다.
+Scene host의 자동 cooking은 연결했고 현행 identity 12로 재쿠킹해야 한다. 새 transport와
+encrypted Player·Editor 제품 회귀 결과는 공통 transport 검증 기록을 따른다. 초기 CS의 동기 설치 제거와
+전체 cache 최적화는 별도 개선이며, 최종 실시간 시간/메모리 수용은 MAT-9에서 판정한다.
+lookup의 현재/이전 payload 예산과 Special·refraction의 프레임당 예산은 각각 연결 문서가 소유한다.</p>
+<p>alpha가 있으면 2 GiB lookup 예산 중 2/3을 opaque 현재/이전 쌍, 1/3을 alpha 임시 payload에
+배분한다. 하나의 alpha scratch를 draw마다 순서대로 clear/capture/bake/color에 재사용하고
+opaque temporal cache에 게시하지 않는다. 기록 owner가 scratch를 GPU 완료까지 보관한다.
+per-object 정렬이며 self-overlap/교차 표면을 층별로 분리하는 OIT는 구현하지 않았다.
+SSS·굴절이 있으면 한 개의 임시 5 MRT + D32를 draw 사이에 재사용한다.
+픽셀당 40 byte의 추가 표면 버퍼이며 Core/Layered 일반 Blend에는 생성하지 않는다.
+굴절 배경은 합성 컬러 한 장과 opaque depth다. 투명 층별 depth/교차점은 저장하지 않는다.
+alpha draw마다 1024/4096 적분 준비가 반복되므로 실제 모델 비용 수용은 MAT-9에서 판정한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-검증">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-검증">4. 검증</h2></div>
+<div class="prose"><p><code>Tools/regression/verify-material-raster-surface.ps1 -SkipDependencyRestore</code>는 실제
+<code>EnhancedGBufferPass</code>·<code>EnhancedDeferredPass</code>와 이 host를 native D3D12 graph에 기록한다.
+24×24 fixture에서 legacy/LX Opaque/Masked discard·coverage, Core/Layered overlap,
+coplanar draw 순서, SSAO 값과 HDR 직접광/IBL·환경맵 없는 경우를 순차·1워커·4워커로 비교한다.
+컬러 전후 depth bytes와 legacy/background HDR 보존도 검사한다.
+frame/예산 실패의 accepted frame 보존과 중복/다른 graph의 컬러 선언을 거부한다.
+새 texture 3개의 업로드를 취소/재시도하여 <code>DX12TextureCache::OnUploadAborted</code>의
+삭제된 iterator 재사용 어설션 수정도 검증한다. Debug 어설션은 팝업 대신 스택 로그로 남긴다.</p>
+<p>HDR target의 half 저장 오차 상한은 상대 <code>0.001 * max(1, abs(expected))</code>다.
+독립 float 재질/IBL 물리 계산의 기존 정규화 <code>0.0001</code>, SRGB 절대 <code>0.001</code>,
+LOD transport 절대 <code>0.0005</code> 게이트는 그대로 유지한다.</p>
+<p>아래는 2026-09-28 설치 검증의 기준 결과다. 2026-09-29 캐시 확장 결과와 로그는
+<a href="MaterialGraphSceneLookup.html">MaterialGraphSceneLookup.md</a>가 소유한다. 후속 이미지별 샘플링 결과는
+<a href="MaterialGraphTextureFootprints.html">MaterialGraphTextureFootprints.md</a>에 기록한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검증</th><th>각 구성의 결과</th></tr></thead>
+<tbody><tr><td>전체 raster/material/IBL 회귀</td><td>830,436개 검사 · GPU 659,914성분</td></tr>
+<tr><td>실제 GBuffer·Deferred·LX 컬러 합성</td><td>8 fixture × 순차/1워커/4워커 = 24 graph</td></tr>
+<tr><td>LX 가시 픽셀</td><td>3,582픽셀, 독립 직접광/IBL 계산과 HDR 대조</td></tr>
+<tr><td>준비 실패·중복/다른 graph 선언</td><td>120개 거부, accepted frame 보존</td></tr>
+<tr><td>기존 공유 깊이·스키닝 회귀</td><td>공유 깊이 24 graph · 스키닝 6 graph</td></tr>
+<tr><td>D3D12 GPU validation</td><td><span class="chip warn">WARNING 이상 0건</span></td></tr></tbody></table></div>
+<p>새 Scene VS/GBuffer PS/Color PS는 Core/Layered 두 프로그램에 대해 DXIL·SPIR-V
+총 12개 artifact의 컴파일·reflection을 확인했다. 이는 기존 회귀 출력의 <code>compiled=24</code>와
+별도이며 native 실행은 D3D12다. 실제 DX12/Vulkan Scene consumer도 두 구성에서 컴파일했다.
+실행 로그는 <code>Build/Obj/MaterialProductProbe/raster-surface-{Debug,Release}.log</code>,
+최종 게이트 결과는 <code>Build/Obj/MaterialProductProbe/scene-host-gate-final.log</code>다.</p>
+<p>실제 Editor Live Tick과 native Vulkan 전체 Scene 합성은 이 D3D12 pass 검증과 별도다.
+Vulkan native PSO 준비·기본 draw/readback 검증은 <a href="MaterialGraphSceneGeneration.html">Scene generation §6</a>이 소유한다.
+SSS의 실제 Scene transport·독립 물리/HDR 비교와 GPU 검증은
+<a href="MaterialGraphSceneSubsurface.html">MaterialGraphSceneSubsurface.md</a>가 소유한다.
+<a href="MaterialGraphSceneRefraction.html">MaterialGraphSceneRefraction.md</a>는 불투명 배경 확보·최종 투과
+depth/owner·굴절 compute·HDR 합성 및 해당 native 검증을 소유한다.
+<a href="MaterialGraphSceneVolume.html">MaterialGraphSceneVolume.md</a>는 닫힌 균질 매질의 coefficient CS,
+불투명 깊이까지의 흡수·발광·단일 산란과 굴절 ray의 내부 매질 합성을 소유한다.
+MAT-7은 <a href="../analysis/MAT7ForwardTransportComposition.html">공통 혼합 transport·제품 회귀</a>까지
+완료했다. 미산정 작업 시간을 기성에 더하지 않는다. LX 편집·MAT-9는 남는다.</p>
+<p><a href="MaterialGraphSceneShadowDecal.html">MaterialGraphSceneShadowDecal.md</a>는 그래프 Alpha를 쓰는
+세 캐스케이드 shadow caster와 opaque Decal의 raw 입력·derived lobe·IBL 연결을 소유한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MaterialGraphSceneHost.md"><code>docs/design/MaterialGraphSceneHost.md</code></a> · 마지막 커밋 2026-10-03 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

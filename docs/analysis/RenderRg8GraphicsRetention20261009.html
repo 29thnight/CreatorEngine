@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RenderRg8GraphicsRetention20261009.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RG8 graphics-only texture state retention — 2026-10-09</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#finding-and-change">Finding and change</a></li><li><a href="#validation-scope">Validation scope</a></li><li><a href="#release-verification-and-measurements">Release verification and measurements</a></li><li><a href="#product-output-and-gpu-validation">Product output and GPU validation</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderRg8GraphicsRetention20261009.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>RG8 graphics-only texture state retention — 2026-10-09</h1>
+<div class="meta"><p>Base: <code>d5a6a26a78da93686b8168429183ee7e0d50a8de</code> plus the recorded local history, dependency scratch and alternative-order changes. Default OFF / progress remains unchanged.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#finding-and-change"><span class="ve-label">§00</span><span class="map-name">Finding and change</span><span class="map-bar"><i style="width:66%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#validation-scope"><span class="ve-label">§01</span><span class="map-name">Validation scope</span><span class="map-bar"><i style="width:40.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#release-verification-and-measurements"><span class="ve-label">§02</span><span class="map-name">Release verification and measurements</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#product-output-and-gpu-validation"><span class="ve-label">§03</span><span class="map-name">Product output and GPU validation</span><span class="map-bar"><i style="width:86.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「Release verification and measurements」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-finding-and-change">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="finding-and-change">Finding and change</h2></div>
+<div class="prose"><p>The queue barrier planner returned every used resource to COMMON at every batch boundary. This included textures used only by graphics, even when a boundary was unrelated to that texture and all its accesses remained on one FIFO graphics queue. Before adding a guessed cost penalty, remove this proven avoidable work.</p>
+<p><code>RHITextureInfo::retainsExplicitStateOnGraphicsQueue</code> is a conservative backend guarantee, default false. DX12 reports true only for actual texture resources without ALLOW_SIMULTANEOUS_ACCESS. The guarantee concerns explicitly transitioned states; automatic promotion is not used by this optimization. Buffers and unknown backends retain existing behavior.</p>
+<p>The selected queue plan classifies resources from all live pass and repeated-phase declarations. A texture is eligible only if the backend guarantee is present and no compute pass uses it. Eligible textures begin in their tracked initial state, keep their explicit state between graphics batches, and restore the compiled final state in the graphics epilogue. State and previous-write tracking remain continuous. All buffers, compute-only or shared textures and unverified textures continue using COMMON at boundaries. No read/read queue-sharing rule or producer/consumer edge changes.</p>
+<p>Reference: <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/using-resource-barriers-to-synchronize-resource-states-in-direct3d-12">Microsoft D3D12 resource state promotion and decay</a>. In particular buffers and simultaneous-access textures decay across ExecuteCommandLists even after explicit transitions, while ordinary explicitly transitioned textures do not. Excessive COMMON transitions can hurt GPU performance.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-validation-scope">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="validation-scope">Validation scope</h2></div>
+<div class="prose"><p>The native fixture now clears one graphics-only render-target texture before and after a compute batch. It checks the backend guarantee and absence of the redundant second state transition, retains the existing buffer ordering/decay checks, verifies final-state writeback and validates actual GPU execution. A native simultaneous-access texture also verifies the backend refuses the retention guarantee. Native semantic checks increase from 428 to 434; the strict wrapper is updated with the test. Planning checks remain 119.</p>
+<p>Build: VS 2026 Release, <code>Build/rg8-graphics-retention.log</code>. Evidence directory: <code>Build/Verification/Phase43/RG8GraphicsRetention20261009/</code>. Final runtime, output and timing results are appended after verification.</p>
+<p>The handoff prediction model is still uncalibrated and has not been replaced by this slice. Reducing actual boundary work is distinct from proving an accurate batch/barrier cost model or accepting async performance.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-release-verification-and-measurements">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="release-verification-and-measurements">Release verification and measurements</h2></div>
+<div class="prose"><p>Final VS 2026 Release build passed (<code>Build/rg8-graphics-retention-probe.log</code>; initial enum naming and per-resource probe corrections are preserved in earlier build/evidence files). Native execution 434 checks, planning 119 checks and full RenderGraph regression passed with GPU validation (<code>native-final</code>, wrapper exit 0). Existing Utility_Framework PDB LNK4020 warnings and profiler shutdown <code>abandoned=1 retained=1 foreign=0</code> diagnostic remain separate from GPU validation. Debug and Vulkan execution were not tested in this slice.</p>
+<p>The product same-process forward 0/1/2 and reverse 2/1/0 matrix collected all 192 accepted chronological normal samples (32 per segment), with complete history. Schedules, barrier accounting and calibrated GPU intervals passed the independent audit. Clocks were not locked; timings exclude GPU validation/readback and retain evidence serialization.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Order</th><th style="text-align:right">Mode 0 GPU median / p95</th><th style="text-align:right">Mode 1</th><th style="text-align:right">Mode 2</th></tr></thead>
+<tbody><tr><td>Forward</td><td style="text-align:right">2.3603 / 2.7136 ms</td><td style="text-align:right">2.4914 / 2.6061 ms</td><td style="text-align:right">2.7029 / 3.1129 ms</td></tr>
+<tr><td>Reverse</td><td style="text-align:right">3.0295 / 4.1503 ms</td><td style="text-align:right">3.1985 / 3.2717 ms</td><td style="text-align:right">2.9543 / 4.7647 ms</td></tr></tbody></table></div>
+<p>Mode 2 selected compute in 64/64 frames. Only 5/64 frames had overlap above clock error (all reverse), with median zero in both orders and maximum 0.258 ms. Forward async remains slower; reverse async has a slightly lower median but a higher p95. This does not establish a consistent performance benefit. Default OFF / progress / earned 0 remains.</p>
+<p>Boundary-work reduction (both orders, median): planned barriers <strong>767 -&gt; 422</strong>, prologue <strong>109 -&gt; 49</strong>, epilogue <strong>117 -&gt; 57</strong>. The previous numbers are from the immediately preceding alternative-order run; pass assignments are cost-driven and can vary, so these are observed product counts, not a fixed per-frame savings guarantee. The changed planner removes only provably unnecessary graphics texture transitions and preserves buffer/cross-queue safety.</p>
+<p>Current mode-2 scheduling CPU median: 1.1312 / 1.1417 ms; recording 1.5160 / 1.6390 ms; submission 0.5959 / 0.5780 ms. Planned batches remain median 11 and actual waits 4. Absolute GPU-time changes across builds are not controlled A/B results, as the mode-0 baseline also moved substantially.</p>
+<p>Evidence: <code>normal/</code>, <code>performance-summary.json</code>, <code>boundary-summary.json</code>, <code>native-final/</code>, binary metadata and <code>local.patch</code> under <code>Build/Verification/Phase43/RG8GraphicsRetention20261009/</code>. No commit/push is performed by this request.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-product-output-and-gpu-validation">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="product-output-and-gpu-validation">Product output and GPU validation</h2></div>
+<div class="prose"><p>GPU-based validation captured forward modes 1 and 2, four samples each: two processes exited 0, both reported problems 0 / dropped messages 0. Current mode 1 versus mode 2 is bit-identical across 64 attachment/stage comparisons. This validation wrapper intentionally covers only forward modes 1/2; it is not a six-mode validation matrix.</p>
+<p>The initial comparison against the previous build mixed validation OFF baseline with validation ON current output and failed: maximum absolute difference 0.003921572 (one display quantization step). That failed result is preserved in <code>gpu-output-comparison.json</code>; it is not counted as an accepted cross-build comparison.</p>
+<p>A fresh validation-OFF capture matrix completed both orders and modes 0/1/2: six processes exited 0, 24 captures. Controlled inputs, dimensions and finite values were checked. Previous mode 0 versus current mode 0 and current mode 0 versus modes 1/2 passed <strong>384 exact comparisons, error 0</strong> (<code>output-comparison.json</code>). A separate direct previous/current mode-1 and current mode-1/2 comparison passed 128 exact comparisons, error 0 (<code>mode1-normal-comparison.json</code>). These comparison sets reuse captures and are not independent additional samples.</p>
+<p>The same current binary with validation OFF versus ON reproduced the 0.003921572 maximum difference in modes 1 and 2 (<code>validation-flag-comparison.json</code>, diagnostic only). Matching validation configurations establish output equivalence; the mixed-configuration difference does not establish a regression caused by this change. This probe does not identify the exact instrumented shader instruction responsible for the difference.</p>
+<p>Product output equivalence and GPU validation do not establish GPU performance improvement. RG8 remains progress / earned 0 / default OFF. The remaining performance work is to explain the gap between predicted and measured overlap, account for actual batch synchronization/barrier costs, and verify CPU recording/submission costs before adoption. No new phase completion condition was added by this slice.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderRg8GraphicsRetention20261009.md"><code>docs/analysis/RenderRg8GraphicsRetention20261009.md</code></a> · 마지막 커밋 2026-10-10 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

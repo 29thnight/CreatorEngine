@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RenderingPipelineMermaid20261016.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RE ENGINE와 CreatorEngine 렌더링 배선</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-re-engine-카메라-가시성--재질">1. RE ENGINE: 카메라 가시성 → 재질</a></li><li><a href="#2-re-engine-방향광-그림자">2. RE ENGINE: 방향광 그림자</a></li><li><a href="#3-creatorengine-프레임-전달과-그래프-실행">3. CreatorEngine: 프레임 전달과 그래프 실행</a></li><li><a href="#4-creatorengine-카메라그림자재질-핵심-배선">4. CreatorEngine: 카메라·그림자·재질 핵심 배선</a></li><li><a href="#5-creatorengine-hdr-합성--화면-출력">5. CreatorEngine: HDR 합성 → 화면 출력</a></li><li><a href="#코드-근거">코드 근거</a></li><li><a href="#비교에서-보이는-차이">비교에서 보이는 차이</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderingPipelineMermaid20261016.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>RE ENGINE와 CreatorEngine 렌더링 배선</h1>
+<div class="meta"><p>기준일: 2026-10-16. 기존 저장소 문서는 열거나 재사용하지 않고 작성했다.
+RE는 Capcom RE ENGINE으로 해석했다. RE 쪽은 REAC 2025 발표의 Monster Hunter Wilds 경로를 기준으로 재구성했으며, 2026년 RE 전체 제품의 최신 구현을 뜻하지 않는다.
+CreatorEngine 쪽은 미커밋 변경을 포함한 현재 작업 디렉터리 소스의 정적 배선이다. 빌드, 실행, GPU 캡처 검증은 수행하지 않았다.</p>
+<p>실선은 입력·출력 의존 관계, 점선은 프레임 간 이력 또는 보조 입력이다. 병렬로 그린 가지는 동시 실행 보장이 아니다. 선택 기능은 설정·입력·지원 여부에 따라 생략되거나 입력을 그대로 전달할 수 있다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#1-re-engine-카메라-가시성--재질"><span class="ve-label">§1</span><span class="map-name">RE ENGINE: 카메라 가시성 → 재질</span><span class="map-bar"><i style="width:71.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-re-engine-방향광-그림자"><span class="ve-label">§2</span><span class="map-name">RE ENGINE: 방향광 그림자</span><span class="map-bar"><i style="width:32%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-creatorengine-프레임-전달과-그래프-실행"><span class="ve-label">§3</span><span class="map-name">CreatorEngine: 프레임 전달과 그래프 실행</span><span class="map-bar"><i style="width:51.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-creatorengine-카메라그림자재질-핵심-배선"><span class="ve-label">§4</span><span class="map-name">CreatorEngine: 카메라·그림자·재질 핵심 배선</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-creatorengine-hdr-합성--화면-출력"><span class="ve-label">§5</span><span class="map-name">CreatorEngine: HDR 합성 → 화면 출력</span><span class="map-bar"><i style="width:61.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#코드-근거"><span class="ve-label">§05</span><span class="map-name">코드 근거</span><span class="map-bar"><i style="width:65.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#비교에서-보이는-차이"><span class="ve-label">§06</span><span class="map-name">비교에서 보이는 차이</span><span class="map-bar"><i style="width:33.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「4. CreatorEngine: 카메라·그림자·재질 핵심 배선」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-re-engine-카메라-가시성--재질">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-re-engine-카메라-가시성--재질">1. RE ENGINE: 카메라 가시성 → 재질</h2></div>
+<div class="prose"><p>근거: <a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf">Capcom, RE ENGINE Meshlet Rendering Pipeline, REAC 2025</a>, PDF 20, 26, 28–33, 40–47쪽. 아래는 설명용 재구성이며 발표 슬라이드의 배치를 그대로 복제한 그림은 아니다.</p>
+<pre class="mermaid">flowchart TB
+    Scene[&quot;Bindless Instance / Meshlet / Material&quot;] --&gt; I1[&quot;Phase 1 · Instance Culling&quot;]
+    I1 --&gt; C1[&quot;Cluster Culling&quot;]
+    I1 --&gt; RI[&quot;가려진 Instance 보류&quot;]
+    C1 --&gt; RC[&quot;가려진 Cluster 보류&quot;]
+    C1 --&gt; SW1[&quot;Software Rasterizer&quot;]
+    C1 --&gt; HW1[&quot;Hardware Visibility Rasterizers&quot;]
+    SW1 --&gt; V1[&quot;1차 Visibility / Depth&quot;]
+    HW1 --&gt; V1
+    V1 --&gt; H1[&quot;Generate HiZ&quot;]
+    RI --&gt; I2[&quot;Phase 2 · Instance 재검사&quot;]
+    H1 --&gt; I2
+    I2 --&gt; C2[&quot;Cluster 재검사&quot;]
+    RC --&gt; C2
+    H1 --&gt; C2
+    C2 --&gt; SW2[&quot;Software Rasterizer&quot;]
+    C2 --&gt; HW2[&quot;Hardware Visibility Rasterizers&quot;]
+    SW2 --&gt; VF[&quot;최종 Visibility / Depth&quot;]
+    HW2 --&gt; VF
+    V1 --&gt; VF
+    VF --&gt; H2[&quot;Generate HiZ&quot;]
+    VF --&gt; Work[&quot;가시 Primitive / Material 작업 정리&quot;]
+    Work --&gt; Sort[&quot;Shader별 정렬 / Indirect Args&quot;]
+    Sort --&gt; VT[&quot;Vertex Transform 사전 계산&quot;]
+    VT --&gt; GB[&quot;Visibility Buffer Shaders → GBuffer&quot;]
+    VF --&gt; GB
+    Scene --&gt; Special[&quot;Special Rasterizers · 예외 경로&quot;]
+    Special --&gt; GB</pre>
+<p>Wilds는 Alpha Test와 Vertex Transform을 Hardware Visibility 쪽에 통합해 2단계 컬링에 포함한다. Special Rasterizer도 남아 있으므로 모든 재질이 단일 Compute Resolve만으로 처리된다고 해석하면 안 된다. 이 발표에서 확인하지 않은 전체 조명·후처리 순서는 임의로 덧붙이지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-re-engine-방향광-그림자">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-re-engine-방향광-그림자">2. RE ENGINE: 방향광 그림자</h2></div>
+<div class="prose"><p>근거: 같은 발표 PDF 54–65쪽, 특히 65쪽의 2단계 구조.</p>
+<pre class="mermaid">flowchart TB
+    CD[&quot;Camera Depth&quot;] --&gt; RP[&quot;Light Space Depth Reprojection&quot;]
+    Prev[&quot;Previous Shadow Map&quot;] -.-&gt; O1[&quot;1st Phase Occluder Map&quot;]
+    RP --&gt; O1
+    O1 --&gt; P1[&quot;1차 Instance / Cluster Culling + Draw · Static Meshlet&quot;]
+    P1 --&gt; O2[&quot;2nd Phase Occluder Map&quot;]
+    P1 --&gt; Rejected[&quot;Occluded Meshlet&quot;]
+    O2 --&gt; P2[&quot;2차 Instance / Cluster Culling + Draw&quot;]
+    Rejected --&gt; P2
+    Dynamic[&quot;Mesh / Dynamic Meshlet&quot;] --&gt; P2
+    P1 --&gt; Shadow[&quot;최종 Shadow Map&quot;]
+    P2 --&gt; Shadow
+    Shadow -.-&gt; Next[&quot;다음 프레임 Previous Shadow Map&quot;]</pre>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-creatorengine-프레임-전달과-그래프-실행">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-creatorengine-프레임-전달과-그래프-실행">3. CreatorEngine: 프레임 전달과 그래프 실행</h2></div>
+<div class="prose"><pre class="mermaid">flowchart TB
+    GT[&quot;App::PublishRenderFrame · Game Thread&quot;] --&gt; Capture[&quot;View / Scene / Required Material 수집&quot;]
+    Capture --&gt; Packet[&quot;BuildLiveFramePacket · 불변 프레임 입력&quot;]
+    Packet --&gt; Publish[&quot;PublishLiveFrame&quot;]
+    Publish --&gt; RT[&quot;전용 Render Thread · TickLive&quot;]
+    RT --&gt; View[&quot;뷰별 상태 / Temporal History / SceneHost 준비&quot;]
+    View --&gt; Desc[&quot;LivePipelineDesc::DeclareAll&quot;]
+    Desc --&gt; BB[&quot;LiveBlackboard · 자원 핸들 버전 연결&quot;]
+    BB --&gt; RG[&quot;EnhancedRenderGraph&quot;]
+    RG --&gt; Compile[&quot;Compile · 자원 의존 관계로 실행 계획 생성&quot;]
+    Compile --&gt; Backend{&quot;Backend / Submission 경로&quot;}
+    Backend --&gt; DX[&quot;DX12 · RecordParallel 또는 SubmitOwnedGraph&quot;]
+    Backend --&gt; VK[&quot;Vulkan · 공통 Scene Graph 소비&quot;]
+    DX --&gt; GPU[&quot;GPU 제출 / 완료 추적&quot;]
+    VK --&gt; GPU
+    GPU --&gt; Display[&quot;완료된 View / Display 출력 게시&quot;]</pre>
+<p>LivePipelineDesc는 패스를 조립하고 슬롯을 연결한다. 프레임 실행 그래프는 EnhancedRenderGraph이며, 아래 패스 순서는 선언과 데이터 흐름을 표현한다. DX12와 Vulkan의 기능 동등성이나 실제 GPU 동작은 이 조사로 검증하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-creatorengine-카메라그림자재질-핵심-배선">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-creatorengine-카메라그림자재질-핵심-배선">4. CreatorEngine: 카메라·그림자·재질 핵심 배선</h2></div>
+<div class="prose"><pre class="mermaid">flowchart TB
+    G[&quot;METEOR.Scene.Geometry&quot;]
+    PrevCam[&quot;이전 유효 Camera HZB&quot;] -.-&gt; F[&quot;Scene.Cull.First&quot;]
+    G --&gt; F
+    F --&gt; O[&quot;Scene.Occluder · HW + SW Raster / Depth Resolve&quot;]
+    O --&gt; H[&quot;현재 Occluder Depth → HZB&quot;]
+    H --&gt; Final[&quot;Scene.Cull.Final · Opaque Recovery&quot;]
+    F --&gt; Final
+    G --&gt; Final
+    Final --&gt; V[&quot;Scene.Visibility · HW + SW Raster / Resolve&quot;]
+    V --&gt; IDs[&quot;Visibility IDs + Depth&quot;]
+    IDs --&gt; MW[&quot;Scene.MaterialWork · Tile / Indirect Arguments&quot;]
+    G --&gt; MW
+    MW --&gt; SR[&quot;Scene.SurfaceResolve&quot;]
+    IDs --&gt; SR
+    SR --&gt; GB[&quot;Diffuse / MetalRough / Normal / Emissive / Bitmask&quot;]
+    GB --&gt; D[&quot;Scene.Decal · Surface 버전 갱신&quot;]
+    IDs --&gt; CH[&quot;Scene.History · 다음 Camera HZB 생성&quot;]
+    CH -.-&gt; PrevCam
+
+    G --&gt; BlendCull[&quot;Blended Meshlet · Frustum Cull / 원본 순서 유지&quot;]
+    BlendCull --&gt; LW[&quot;Scene.LayerWork&quot;]
+
+    G --&gt; SC[&quot;Shadow.StaticCache · 정적 Depth 재사용 / 갱신&quot;]
+    G --&gt; SF[&quot;Shadow.Cull.First · 광원 공간 / 3 Cascades&quot;]
+    PrevS[&quot;이전 유효 Shadow HZB&quot;] -.-&gt; SF
+    SC --&gt; SO[&quot;Shadow.Occluder · Static Copy + 1차 Raster&quot;]
+    SF --&gt; SO
+    SO --&gt; SH[&quot;Cascade별 현재 HZB&quot;]
+    SH --&gt; SFinal[&quot;Shadow.Cull.Final · Recovery&quot;]
+    SFinal --&gt; Raster[&quot;Shadow.Raster · Static Merge + 최종 Raster&quot;]
+    SC --&gt; Raster
+    Raster --&gt; SM[&quot;Shadow Map · 3 D32 Array Slices&quot;]
+    SM --&gt; History[&quot;Shadow.History&quot;]
+    History -.-&gt; PrevS
+
+    D --&gt; AO[&quot;SSAO&quot;]
+    D --&gt; Color[&quot;Scene.Color · 재질 조명 / 굴절 처리 → HDR&quot;]
+    AO --&gt; Color
+    SM --&gt; Color
+    MW --&gt; Color
+    LW --&gt; Color
+    LW --&gt; Blended[&quot;Scene.Blended&quot;]
+    Color --&gt; Blended
+    SM --&gt; Blended</pre>
+<p>이 그림의 Color → Blended는 조명 결과의 흐름을 축약한 것이다. 그 사이의 SkyBox·SSGI·SSS·SSR·Volume은 다음 그림에 펼쳤다. Cull.Final은 opaque recovery 목록과 별도로 blended 목록을 발행하며, blended는 현재 HZB recovery와 동일한 경로가 아니다. 카메라 이력은 Scene.History 선언 시점의 surface depth를 사용한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-creatorengine-hdr-합성--화면-출력">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-creatorengine-hdr-합성--화면-출력">5. CreatorEngine: HDR 합성 → 화면 출력</h2></div>
+<div class="prose"><pre class="mermaid">flowchart TB
+    Color[&quot;METEOR.Scene.Color · HDR&quot;] --&gt; Sky[&quot;SkyBox&quot;]
+    Sky --&gt; GI[&quot;SSGI&quot;]
+    GI --&gt; SSS[&quot;SSS&quot;]
+    SSS --&gt; SSR[&quot;SSR&quot;]
+    SSR --&gt; Vol[&quot;METEOR.Scene.Volume&quot;]
+    Vol --&gt; Blend[&quot;METEOR.Scene.Blended&quot;]
+    Depth[&quot;Surface Depth&quot;] --&gt; Tiles[&quot;METEOR.Scene.LightTiles&quot;]
+    Tiles --&gt; Blend
+    Layers[&quot;Scene.LayerWork&quot;] --&gt; Blend
+    Shadow[&quot;Shadow Map&quot;] --&gt; Vol
+    Shadow --&gt; Blend
+    Blend --&gt; Sprite[&quot;Sprite&quot;]
+    Sprite --&gt; Fog[&quot;VolumetricFog · 조건부&quot;]
+    Fog --&gt; TU[&quot;Temporal.Upscale · Provider / 설정에 따라 처리&quot;]
+    Inputs[&quot;Temporal.Inputs · Motion / Depth / Reactive / Transparency / Responsive&quot;] --&gt; TU
+    Inputs --&gt; Motion[&quot;Temporal.SpriteMotion&quot;]
+    Sprite --&gt; Motion
+    Motion --&gt; TU
+    TU --&gt; Post[&quot;PostChain · Tone Map / 적용 가능한 AA → LDR&quot;]
+    Post --&gt; Spatial[&quot;SpatialPost · 선택적 Scaling / Sharpen / SDR Vibrance&quot;]
+    Spatial --&gt; DI[&quot;Temporal.DisplayInputs · HUD 없는 영상 / UI Layer 준비&quot;]
+    DI --&gt; UI[&quot;UI&quot;]
+    UI --&gt; Present[&quot;live_present · Display / Temporal Export&quot;]</pre>
+<p>기능 노드의 존재는 현재 프레임에서 해당 효과가 켜져 있다는 뜻이 아니다. Temporal Upscale은 HDR 합성 이후, Tone Mapping 이전에 연결되어 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-코드-근거">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="코드-근거">코드 근거</h2></div>
+<div class="prose"><ul>
+<li><code>Editor/EngineEntry/App.cpp:399</code> — PublishRenderFrame, BuildLiveFramePacket, PublishLiveFrame.</li>
+<li><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3583</code> — BuildPipelineDesc 전체 조립. 카메라 3601–3650, 그림자 3671–3755, Visibility·Material·Surface 3759–3810, HDR·합성·출력 3909–4530.</li>
+<li><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:6951</code> — DeclareAll 및 Compile, 명령 기록과 제출. <code>:8266</code>, <code>:9270</code> — Render Thread 소비와 TickLive.</li>
+<li><code>Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h</code> — 읽기·쓰기·수정 슬롯과 DeclareAll 계약.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:2</code> — 1차 리스트 생산.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:2</code> — HW/SW Occluder와 Depth Resolve.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneFinalCullStage.inl:2</code> — 현재 Pyramid를 통한 Recovery와 Frustum-only Blended.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:2</code> — Visibility, MaterialWork, SurfaceResolve.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:167</code> — Cascade별 First/Occluder/Final/Raster.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:2</code> — Camera History 입력.</li>
+<li><code>Engine/RenderEngine/GpuGeometryVisibility.cpp:329</code> 및 <code>:854</code> — History/Recovery 준비와 FirstStage History Import.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-비교에서-보이는-차이">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="비교에서-보이는-차이">비교에서 보이는 차이</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>구간</th><th>REAC 2025 RE ENGINE</th><th>현재 CreatorEngine 소스</th></tr></thead>
+<tbody><tr><td>카메라</td><td>Instance/Cluster 2단계 컬링, HW/SW Visibility</td><td>First → Occluder → 현재 HZB → Final Recovery, HW/SW Visibility</td></tr>
+<tr><td>재질</td><td>Visibility 기반 작업 정리, Shader별 정렬, Vertex Transform 사전 계산, GBuffer</td><td>MaterialWork의 Tile/Args → SurfaceResolve → GBuffer → Scene.Color</td></tr>
+<tr><td>방향광 그림자</td><td>Camera Depth Reprojection + Previous Shadow → 2단계 Cull/Draw</td><td>StaticCache + 광원 공간 First → Occluder → 현재 HZB Recovery → Raster</td></tr>
+<tr><td>해석 한계</td><td>발표에서 공개된 특정 제품·시점의 구조</td><td>미커밋 변경을 포함한 정적 코드 연결, 실행 성공·성능 동등성은 미검증</td></tr></tbody></table></div>
+<p>우리 엔진의 Shadow 경로를 RE의 Camera Depth Reprojection 경로와 동일하게 그리지 않았다. 또한 비슷한 단계가 존재한다는 이유로 재질 처리 방식이나 성능이 동등하다고 판단하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderingPipelineMermaid20261016.md"><code>docs/analysis/RenderingPipelineMermaid20261016.md</code></a> · 마지막 커밋 2026-10-17 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict', fontFamily: v('--font-body'),
+    themeVariables: { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'),
+      lineColor: v('--text-dim'), secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') } });
+  await mermaid.run({ querySelector: 'pre.mermaid' });
+</script>
+</body>
+</html>

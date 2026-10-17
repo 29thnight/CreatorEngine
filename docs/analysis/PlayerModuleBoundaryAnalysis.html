@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/PlayerModuleBoundaryAnalysis.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player 모듈 경계(DLL화) 판단 자료 (E7 잔여 결정)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-한-줄-결론">0. 한 줄 결론</a></li><li><a href="#1-질문의-분해--분리축이-둘이다">1. 질문의 분해 — 분리축이 둘이다</a></li><li><a href="#2-현재-구조-실측">2. 현재 구조 실측</a></li><li><a href="#3-이득--실재하며-지금도-비용을-내고-있다">3. 이득 — 실재하며, 지금도 비용을 내고 있다</a></li><li><a href="#4-비용--국소적이지만-실재한다">4. 비용 — 국소적이지만 실재한다</a></li><li><a href="#5-과거-이력--인과를-거꾸로-읽으면-안-된다">5. 과거 이력 — 인과를 거꾸로 읽으면 안 된다</a></li><li><a href="#6-계획-공백--위임-사슬이-끊겨-있다">6. 계획 공백 — 위임 사슬이 끊겨 있다</a></li><li><a href="#7-판단">7. 판단</a></li><li><a href="#8-조사-과정의-정정-기록">8. 조사 과정의 정정 기록</a></li><li><a href="#9-설계안--provenance와-플러그인-abi">9. 설계안 — provenance와 플러그인 ABI</a></li><li><a href="#10-2026-09-06-재정찰--실측-갱신과-정정">10. 2026-09-06 재정찰 — 실측 갱신과 정정</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="PlayerModuleBoundaryAnalysis.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>Player 모듈 경계(DLL화) 판단 자료 (E7 잔여 결정)</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">5<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 2, 진행·부분 1, 주의 1, 대기·미검증 1"><i class="ok" style="flex:2"></i><i class="info" style="flex:1"></i><i class="warn" style="flex:1"></i><i class="dim" style="flex:1"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 2</span><span class="chip info">진행·부분 1</span><span class="chip warn">주의 1</span><span class="chip dim">대기·미검증 1</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 11개의 분량 막대">
+<a class="map-row" href="#0-한-줄-결론"><span class="ve-label">§0</span><span class="map-name">한 줄 결론</span><span class="map-bar"><i style="width:2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-질문의-분해--분리축이-둘이다"><span class="ve-label">§1</span><span class="map-name">질문의 분해 — 분리축이 둘이다</span><span class="map-bar"><i style="width:6.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-현재-구조-실측"><span class="ve-label">§2</span><span class="map-name">현재 구조 실측</span><span class="map-bar"><i style="width:6.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-이득--실재하며-지금도-비용을-내고-있다"><span class="ve-label">§3</span><span class="map-name">이득 — 실재하며, 지금도 비용을 내고 있다</span><span class="map-bar"><i style="width:15.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-비용--국소적이지만-실재한다"><span class="ve-label">§4</span><span class="map-name">비용 — 국소적이지만 실재한다</span><span class="map-bar"><i style="width:27.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-과거-이력--인과를-거꾸로-읽으면-안-된다"><span class="ve-label">§5</span><span class="map-name">과거 이력 — 인과를 거꾸로 읽으면 안 된다</span><span class="map-bar"><i style="width:9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-계획-공백--위임-사슬이-끊겨-있다"><span class="ve-label">§6</span><span class="map-name">계획 공백 — 위임 사슬이 끊겨 있다</span><span class="map-bar"><i style="width:5.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-판단"><span class="ve-label">§7</span><span class="map-name">판단</span><span class="map-bar"><i style="width:9.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-조사-과정의-정정-기록"><span class="ve-label">§8</span><span class="map-name">조사 과정의 정정 기록</span><span class="map-bar"><i style="width:4.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-설계안--provenance와-플러그인-abi"><span class="ve-label">§9</span><span class="map-name">설계안 — provenance와 플러그인 ABI</span><span class="map-bar"><i style="width:63.3%"></i></span><span class="map-marks"><span class="chip warn" title="주의">1</span></span></a>
+<a class="map-row" href="#10-2026-09-06-재정찰--실측-갱신과-정정"><span class="ve-label">§10</span><span class="map-name">2026-09-06 재정찰 — 실측 갱신과 정정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">1</span> <span class="chip info" title="진행·부분">1</span> <span class="chip ok" title="완료·통과">2</span></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 11개 가운데 「10. 2026-09-06 재정찰 — 실측 갱신과 정정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><ul>
+<li>작성일: 2026-08-26 (재정찰 갱신: 2026-09-06 — §10)</li>
+<li>목적: EngineLayerSeparationPlan E7의 미착수 항목 — &quot;Player thin exe +
+game module DLL 구조 또는 Player DLL export 구조 검토&quot; — 의 결정 자료.</li>
+<li>방법: 링크 구조·관리 계층·DLL 제거 이력·계획 문서·전역 상태를 병렬 실측한
+뒤, 도출한 결론 3건을 적대적으로 반박 검증했다. <strong>반박 3건이 전부 성립해
+최초 결론을 폐기하고 다시 썼다</strong> — 그 과정은 §6에 남긴다. 수치는 전부 이
+날짜의 실측이다.</li>
+</ul>
+</section>
+<section class="doc-sec" id="sec-0-한-줄-결론">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-한-줄-결론">0. 한 줄 결론</h2></div>
+<div class="prose"><p>**&quot;안 한다&quot;가 아니라 &quot;선행 조건이 없어 지금은 못 한다&quot;**다. 이득은 실재하고
+(오늘도 매 게임 빌드마다 네이티브 재컴파일 비용을 내고 있다), 저장소 자신이
+해법의 이름을 이미 <code>Core DLL/version provenance</code>라고 적어 뒀다. 다만 그
+provenance가 없는 상태에서 DLL만 떼면 비용만 내고 이득은 못 받는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-질문의-분해--분리축이-둘이다">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-질문의-분해--분리축이-둘이다">1. 질문의 분해 — 분리축이 둘이다</h2></div>
+<div class="prose"><p>&quot;유니티처럼 DLL화&quot;는 서로 다른 두 분리를 한 단어로 부른다. 이 구분을 놓치면
+&quot;이미 다 했다&quot;와 &quot;하나도 안 했다&quot;가 동시에 참인 것처럼 보인다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>축</th><th>유니티</th><th>CreatorEngine 현재</th><th>상태</th></tr></thead>
+<tbody><tr><td><strong>A. 게임코드 ↔ 엔진</strong></td><td><code>Assembly-CSharp.dll</code></td><td><code>GameScripts.dll</code> (ALC 언로드 가능)</td><td><strong>달성</strong></td></tr>
+<tr><td><strong>B. 엔진코어 ↔ 호스트셸</strong></td><td><code>UnityPlayer.dll</code> + 얇은 exe</td><td>없음 — exe가 static lib 6종을 통째로 링크</td><td><strong>미달성</strong></td></tr></tbody></table></div>
+<p>축 A는 이미 유니티와 같은 원리로 구현돼 있다. <code>ScriptCore.dll</code>은 기본
+컨텍스트 상주(엔진 API, 안 바뀜), <code>GameScripts.dll</code>은 언로드 가능 컨텍스트
+(게임 코드, 자주 바뀜) — 유니티의 <code>UnityEngine.*.dll</code> vs <code>Assembly-CSharp.dll</code>
+구분과 같다. 사용자 게임 스크립트 27개 전부 <code>ScriptCore.Behaviour</code> 상속이고,
+<strong>C++로 게임플레이를 짜는 경로는 남아 있지 않다</strong>(<code>ScriptComponent</code>는 로직 0,
+수명 6단계를 전부 ClrHost에 위임).</p>
+<p>따라서 <strong>질문이 실제로 가리키는 것은 축 B뿐</strong>이다. 이 문서는 축 B만 다룬다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-현재-구조-실측">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-현재-구조-실측">2. 현재 구조 실측</h2></div>
+<div class="prose"><h3 id="21-player는-이미-얇다--다만-exe-안이-얇다는-뜻이-아니다">2.1 Player는 이미 얇다 — 다만 &quot;exe 안이 얇다&quot;는 뜻이 아니다</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>실측</th></tr></thead>
+<tbody><tr><td>exe 자체 코드</td><td><code>PlayerApp.cpp</code> 318줄 + <code>PlayerMain.cpp</code> 538줄 = <strong>856줄</strong>, 게임 로직 0</td></tr>
+<tr><td>정적 링크되는 엔진</td><td>static lib 6종, 소스 합계 <strong>약 128,258줄</strong></td></tr>
+<tr><td><code>Bin\x64-Release\Player\</code></td><td>25파일 349.7MB (exe 4.1MB)</td></tr>
+<tr><td><code>DynamicLibrary</code> 프로젝트</td><td><strong>0개</strong> (11개 vcxproj 전수)</td></tr></tbody></table></div>
+<p>exe 안의 조립 코드는 이미 최소다. 얇지 않은 것은 <strong>exe라는 배포 단위</strong>다 —
+엔진 12만 줄이 그 안에 정적으로 박혀 있다.</p>
+<p>⚠ 위 수치는 8-26 실측이다. <strong>9-06 재측값은 §10.2</strong> — lib 7종·156,165줄·
+exe 1,748줄. 결론(exe는 얇고 배포 단위가 두껍다)은 그대로다.</p>
+<h3 id="22-유일한-진짜-dll-경계는-관리-계층뿐">2.2 유일한 진짜 DLL 경계는 관리 계층뿐</h3>
+<p><code>build.ps1</code>이 <code>ScriptCore.csproj</code>·<code>GameScripts.csproj</code>를 <code>dotnet build</code>로
+독립 빌드하고, Stage 단계가 <code>Managed\</code>로 골라 복사한다. 런타임 DLL 목록에
+게임 코드 네이티브 DLL은 없다. 즉 이 엔진에서 &quot;게임마다 바뀌는 것&quot;은 이미
+네이티브 재빌드 없이 교체된다 — <strong>원리적으로는</strong>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-이득--실재하며-지금도-비용을-내고-있다">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-이득--실재하며-지금도-비용을-내고-있다">3. 이득 — 실재하며, 지금도 비용을 내고 있다</h2></div>
+<div class="prose"><h3 id="31-결정적-증거-게임-빌드가-오늘도-네이티브를-재컴파일한다">3.1 결정적 증거: 게임 빌드가 오늘도 네이티브를 재컴파일한다</h3>
+<p><code>BuildPipelinePlan</code>이 &quot;유니티식(선빌드 + 복사)&quot;이라 적은 것은 <strong>목표 상태</strong>이지
+현재가 아니다. 문서가 스스로 구분해 뒀다:</p>
+<blockquote>
+<p><strong>목표 상태의</strong> 게임 빌드는 복사·쿡·pak이다. 다만 Core ABI/version
+provenance가 아직 없으므로 현재 제품 경로는 stale Player 배포를 막기 위해
+오케스트레이터에 <code>-BuildNative</code>를 맡긴다. 선빌드 Player의 정체성을 검증할 수
+있게 된 뒤 이 옵션을 제거해야 비로소 분 단위 native build가 사라진다.
+— <code>BuildPipelinePlan.md:227-230</code> (§2.3:316-317도 재확인)</p>
+</blockquote>
+<p>문서상의 수사가 아니라 코드 동작이다 — <code>GameBuilderSystem.cpp:121</code>이
+<code>-BuildNative</code>를 <strong>조건문 없이 20개 고정 인자 중 하나로 항상</strong> 넘긴다. 에디터에서
+게임 패키지를 빌드할 때마다 Player·AssetPacker가 실제로 재컴파일된다.</p>
+<p>그 바로 위 주석(<code>:171-172</code>)이 전제 조건의 이름을 명시한다:</p>
+<blockquote>
+<p>Core DLL/version provenance가 생기기 전에는 stale Player 배포를 막기 위해
+제품 경로도 <code>-BuildNative</code>를 명시한다.</p>
+</blockquote>
+<p>즉 <strong>재컴파일을 없애는 해법 자체가 이미 이 저장소의 언어로 &quot;Core DLL&quot;이라
+지목돼 있다.</strong> 축 B는 &quot;해도 되고 말아도 되는 선택지&quot;가 아니라 이미 지목된
+미완의 해법이다.</p>
+<h3 id="32-부수-이득-정적-링크의-조용한-진부화">3.2 부수 이득: 정적 링크의 조용한 진부화</h3>
+<p><code>CreatorEditor.exe</code>와 <code>Player.exe</code>가 같은 Runtime Core static lib을 <strong>각자
+독립적으로</strong> 링크한다. 공유 lib이 바뀌면 소비하는 모든 exe를 빠짐없이
+재링크해야 하고, 하나라도 빠뜨리면 옛 로직이 조용히 실행된다. 이 결함
+계열은 이미 겪었다 — 메모리 <code>gate-measures-stale-binary</code>(8-23)가 같은 뿌리다.
+DLL 경계는 이 실패를 &quot;버전 불일치&quot;라는 더 시끄러운 실패로 바꾼다.</p>
+<p>⚠ 단, 이 이득은 축 B 없이 <strong>version provenance만으로도</strong> 상당 부분 얻는다 —
+DLL화의 고유 이득으로 과대 계상하지 말 것.</p>
+<h3 id="33-미래-이득-네이티브-플러그인">3.3 미래 이득: 네이티브 플러그인</h3>
+<p><code>BuildPipelinePlan.md:257-259</code>가 재검토 트리거를 명시한다 — &quot;게임별 네이티브
+최적화의 자유를 잃는다 — 게임 코드가 C#뿐이라 지금 실익이 없다. 미래에 게임별
+네이티브 플러그인 개념이 생기면 이 결정을 재검토한다.&quot; <code>EngineDistribution AndLauncherPlan.md:412,417</code>도 &quot;C#/native plugin/build hook&quot;을 <strong>병렬 항목</strong>으로
+나열한다. 즉 저장소 저자들 스스로가 축 A(C#)와 네이티브 모듈 경계를 별개
+축으로 취급하고 있다. <strong>현재 실익 0, 미래 옵션으로만 계상.</strong></p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-비용--국소적이지만-실재한다">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-비용--국소적이지만-실재한다">4. 비용 — 국소적이지만 실재한다</h2></div>
+<div class="prose"><h3 id="41-dll마다-사본이-생기는-전역-115개-이상">4.1 DLL마다 사본이 생기는 전역: 115개 이상</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>범주</th><th style="text-align:right">수</th><th>내용</th></tr></thead>
+<tbody><tr><td><code>Singleton&lt;T&gt;</code> 파생</td><td class="num" style="text-align:right"><strong>36</strong></td><td><code>s_instance</code>(atomic)·<code>s_mutex</code>가 T마다 템플릿 정적</td></tr>
+<tr><td>리플렉션 등록 타입</td><td class="num" style="text-align:right"><strong>77</strong></td><td><code>adapt&lt;T&gt;()</code>의 함수-로컬 <code>static Meta::Type</code></td></tr>
+<tr><td>mutable inline 전역</td><td class="num" style="text-align:right">2</td><td><code>EngineMode::s_mode</code>, <code>EngineBootstrap::g_exitCode</code></td></tr></tbody></table></div>
+<p>리플렉션이 특히 나쁘다 — <code>Registry</code>가 위 36개 중 하나라 <strong>DLL마다 별도
+사본</strong>이고, 그러면 <code>nameIndex</code>/<code>idIndex</code>가 DLL 단위로 갈라진다. 직렬화·프리팹
+해석이 모듈 경계마다 다른 타입 표를 보게 된다.</p>
+<p>⚠ 갱신(2026-09-06): ① 이 위험은 그 뒤 <strong>악화됐다</strong> — 인덱스가 <code>string_view</code>+
+포인터를 들게 되어 갈라짐이 아니라 댕글링이 된다(§10.3). ② <code>EngineMode::s_mode</code>는
+소비가 exe 두 곳뿐이라 경계를 넘지 않는다 — <strong>위 표에서 과대 계상이었다</strong>(§10.5).
+③ <code>Singleton&lt;T&gt;</code> 파생은 37로 갱신.</p>
+<h3 id="42-즉시-터지는-고위험-지점-2곳">4.2 즉시 터지는 고위험 지점 2곳</h3>
+<p><code>ScreenSizedResource.h</code>의 헤더 인라인 Meyers 싱글턴:</p>
+<pre><code class="language-cpp">static ScreenSizedRegistry&amp; Get() { static ScreenSizedRegistry instance; return instance; }  // :83
+static ScreenResizeBus&amp;    Get() { static ScreenResizeBus    instance; return instance; }    // :137</code></pre>
+<p>이 둘은 이미 <strong>7개 폴더 트리</strong>(Editor/EngineEntry·EngineGUIWindow,
+Engine/RenderEngine 3계층, Engine/SceneRuntime, Player)에서 호출된다. static
+지역 변수의 COMDAT folding은 <strong>하나의 PE 안에서만</strong> 일어나므로, RenderEngine을
+DLL로 떼는 순간 한쪽에서 등록한 리사이즈 구독자가 다른 쪽 브로드캐스트를 받지
+못하는 조용한 결함이 된다.</p>
+<p>⚠ <strong>계획서가 이 지뢰를 아직 모른다</strong> — EngineLayerSeparationPlan §2.2·2.3의
+결합 인벤토리에 <code>ScreenSizedResource.h</code>가 등재돼 있지 않다.
+→ <strong>해소(2026-08-26)</strong>: 같은 날 EngineLayerSeparationPlan §2.3 항목 5로 등재됐다.</p>
+<p>⚠ 갱신(2026-09-06): 지뢰는 <strong>2곳이 아니라 3곳</strong>이고(<code>ProgressSink::GetSink</code> 추가),
+파일 경로가 <code>Engine/RenderEngine/RHI/ScreenSizedResource.h</code>로 바뀌었으며 소비
+반경도 7폴더 → 13파일/10폴더로 넓어졌다. 전량은 §10.4.</p>
+<h3 id="43-반면-준비된-것도-있다">4.3 반면 준비된 것도 있다</h3>
+<ul>
+<li>Get() 싱글턴 10곳 중 <strong>8곳은 <code>.cpp</code> out-of-line 정의</strong> — export 매크로만
+얹으면 안전(<code>RuntimeSettings</code>·<code>ClrHost</code>·<code>ScriptObjectRegistry</code> 등)</li>
+<li>CRT 링크가 이미 전 서드파티에서 동적(<code>/MD</code> 계열) — &quot;할당한 모듈에서 해제&quot;
+함정은 이미 회피. ⚠ 정정(2026-08-26): 초판은 이를 오버레이 트리플릿
+<code>x64-windows-idl0.cmake</code> 덕으로 적었으나 <strong>틀렸다</strong> — 그 트리플릿은
+<code>Directory.Build.props:93-116</code>에서 <strong>주석 안에 있고 활성이 아니다</strong>(활성
+트리는 기본 <code>x64-windows</code>, 실측). 동적 CRT는 기본 트리플릿의 성질이다.
+전환이 좌초한 이유는 PhysX 포트의 CMake가 트리플릿 플래그를 덮어써서
+<code>/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=2</code>가 그대로 박히기 때문 —
+§4.4에 함의가 있다.</li>
+<li>네이티브/CoreCLR 경계에서 POD + <code>static_assert(sizeof)</code> +
+<code>UnmanagedCallersOnly</code> 규율을 <strong>이미 실천 중</strong> — 같은 규율을 네이티브 DLL
+경계에 적용할 수 있다</li>
+</ul>
+<h3 id="44-잃는-것">4.4 잃는 것</h3>
+<ul>
+<li><strong>LTCG 범위 절단</strong>: 11개 vcxproj 전부 <code>WholeProgramOptimization</code> 적용.
+DLL 경계는 모듈 간 인라인·역가상화를 export 표면에서 끊는다.</li>
+<li><strong>즉시 실패 모드 상실</strong>: 정적 링크는 심볼 누락이 링크 타임에 즉시 터진다
+(E5-1이 이 성질에 기대 Player 링크 안전을 사전 검증했다 —
+<code>EngineLayerSeparationPlan.md:1814-1816</code>). DLL은 런타임에만 드러난다.
+<strong>같은 상실이 <code>/FAILIFMISMATCH</code>에도 적용된다</strong> — <code>_ITERATOR_DEBUG_LEVEL</code>은
+링크 단위 ABI라 정적 링크에서는 LNK2038로 즉시 잡히지만(이 저장소가 실제로
+겪었다), DLL 경계는 그 검사를 통과시켜 런타임까지 조용히 간다. 그래서
+provenance 구조체에 configuration만 두면 부족하고 <strong>IDL 실값이 필요하다</strong>
+— 현재는 Debug=2지만, 좌초한 IDL=0 전환(PhysX 포트가 막는다)을 나중에
+뚫으면 그 함의가 깨지기 때문이다.</li>
+<li><strong>export 표면 신설</strong>: 엔진 자체 <code>__declspec(dllexport)</code> 관례가 <strong>0건</strong>.
+<code>FOO_API</code> 매크로 체계가 세워진 적이 없다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-과거-이력--인과를-거꾸로-읽으면-안-된다">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-과거-이력--인과를-거꾸로-읽으면-안-된다">5. 과거 이력 — 인과를 거꾸로 읽으면 안 된다</h2></div>
+<div class="prose"><p>이 저장소는 네이티브 DLL을 두 번 걷어냈다. <strong>둘 다 축 B를 반대하는 근거가
+아니다.</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>커밋</th><th>무엇을</th><th>실제 이유</th></tr></thead>
+<tbody><tr><td><code>fa7a055c</code> (8-18)</td><td>ManagedHeap.dll·SingletonManager.dll 삭제 (92파일)</td><td>그 DLL이 <strong>애초에 DLL 간 싱글턴 중복을 막던 장치</strong>였는데, 전 모듈이 StaticLibrary가 되며 풀 문제가 사라져 순수 오버헤드만 남음</td></tr>
+<tr><td><code>07a5adca</code> (8-7)</td><td>HotLoadSystem·ModuleBehavior 삭제 (C++ 핫리로드)</td><td><strong>CoreCLR이 대체를 마쳤으므로</strong> — 축 A를 관리 계층으로 옮긴 결정</td></tr></tbody></table></div>
+<p><code>ClassProperty.h</code>의 신설 주석이 첫 번째를 자백한다:</p>
+<blockquote>
+<p>SingletonManager.dll(DLLCore::Singleton)을 대체한다. 그쪽은 DLL마다 따로
+생기는 정적 변수를 한곳으로 모으려고 타입 해시→void* 표를 DLL이 들고 있었다.
+그런데 엔진 모듈은 전부 StaticLibrary라 (…) 그 표가 풀던 문제가 존재하지 않는다.</p>
+</blockquote>
+<p><strong>인과가 반대다.</strong> &quot;DLL 경계 때문에 싱글턴이 깨져서 걷어냈다&quot;가 아니라 &quot;DLL
+경계가 이미 사라져서, 그걸 막던 장치가 쓸모없어져 걷어냈다&quot;다. 삭제된
+<code>ManagedHeapObject.h</code>가 스스로 &quot;Base class for all objects that need to be
+passed across EXE/DLL boundaries&quot;라 적고 있었다.</p>
+<p><strong>다만 남는 교훈은 있다</strong>: 그 장치를 걷어낸 결과, 지금 코드베이스는 DLL을
+재도입하면 즉시 부서지는 전역 115개를 무방비로 깔고 있다. 제거 작업이 문제의
+소지까지 없앤 게 아니라 <strong>&quot;현재 링크 형태에서는 발생하지 않는다&quot;에 기대고
+있을 뿐</strong>이다(§4.1).</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-계획-공백--위임-사슬이-끊겨-있다">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-계획-공백--위임-사슬이-끊겨-있다">6. 계획 공백 — 위임 사슬이 끊겨 있다</h2></div>
+<div class="prose"><p>이 항목에 아무도 주인이 없다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>문서</th><th>이 질문을 어떻게 다루나</th></tr></thead>
+<tbody><tr><td><code>EngineLayerSeparationPlan</code> §1.2:37</td><td>&quot;Player.exe를 Player.dll로 바꾸는 일은 완료 조건이 아니다&quot; — 범위 밖</td></tr>
+<tr><td>〃 §3:129</td><td>목표 구조를 문자 그대로 &quot;<strong>Player.exe 또는 Player.dll</strong>&quot;로 미결 표기</td></tr>
+<tr><td>〃 E7:1939</td><td>&quot;배포·Launcher 계획과 함께 결정&quot; — <strong>PHASE 23에 위임</strong></td></tr>
+<tr><td><code>EngineDistributionAndLauncherPlan</code> (PHASE 23)</td><td><code>Player.exe</code>·<code>Player.dll</code>·<code>Core DLL</code>·<code>Core ABI</code>·<code>BuildNative</code> 문자열 <strong>0건</strong> — 위임받은 질문을 다루지 않음</td></tr>
+<tr><td><code>BuildPipelinePlan</code> §2.1~2.3</td><td>위임 대상이 아닌데 <strong>Player를 시종 &quot;exe&quot;로 확정 서술</strong>하고 유니티식 결정 전체를 그 위에 세움</td></tr>
+<tr><td><code>EnginePackagingPlan</code></td><td><code>Player</code> 문자열 0건</td></tr></tbody></table></div>
+<p>즉 <strong>E7이 가리키는 포인터가 아무 데도 안 간다.</strong> &quot;배포 계획 연계&quot;는 실체가
+없는 위임이었다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-판단">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-판단">7. 판단</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>안</th><th>내용</th><th>비용</th><th>이득</th><th>판정</th></tr></thead>
+<tbody><tr><td class="num">1</td><td><strong>Core ABI/version provenance 먼저</strong></td><td>중 — 버전 스탬프·매니페스트·검증 게이트</td><td><code>-BuildNative</code> 제거의 <strong>유일한 열쇠</strong>. DLL 없이도 §3.2 상당분 획득</td><td><strong>선행 필수</strong></td></tr>
+<tr><td class="num">2</td><td>엔진 코어 DLL화 (축 B)</td><td>대 — export 표면 신설(관례 0), 싱글턴 2곳 정리, 리플렉션 Registry 단일화, LTCG 손실</td><td>배포 단위 분리·재컴파일 소멸 완성</td><td><strong>안 1 이후</strong></td></tr>
+<tr><td class="num">3</td><td>Player.exe → Player.dll (셸만 뒤집기)</td><td>소</td><td><strong>없음</strong> — 엔진 12만 줄은 여전히 정적 링크. 형태만 바꾸는 것</td><td><strong>기각</strong></td></tr>
+<tr><td class="num">4</td><td>전 Core를 하나의 거대 DLL</td><td>대</td><td>—</td><td><strong>기각</strong> — 계획서 §1.2:39가 이미 명시 제외</td></tr></tbody></table></div>
+<p><strong>안 3을 명시적으로 기각하는 이유</strong>: 질문을 문자 그대로 읽으면 &quot;exe를 dll로&quot;인데,
+그것만으로는 아무 이득이 없다. 유니티의 이득은 <code>UnityPlayer.dll</code>이 <strong>미리
+빌드돼 게임마다 재사용된다</strong>는 데서 나오지, 확장자가 <code>.dll</code>이라는 데서 나오지
+않는다. 축 B의 본질은 파일 형식이 아니라 <strong>재사용 가능한 배포 단위</strong>다.</p>
+<h3 id="착수-조건">착수 조건</h3>
+<ol>
+<li><strong>Core ABI/version provenance 설계</strong> — 어느 계획도 소유하지 않은 공백.
+PHASE 23에 편입하거나 신규 문서를 세운다.</li>
+<li><strong>§4.2 지뢰 2곳 정리</strong> — <code>ScreenSizedRegistry</code>·<code>ScreenResizeBus</code>를 out-of-line
+정의로. <strong>DLL화와 무관하게 지금 해도 되는 위생 작업</strong>이고, 계획서 결합
+인벤토리에 등재부터 해야 한다.</li>
+<li>수학 이주 WIP 착지 (RenderEngine 폴더 점유 해제).</li>
+</ol>
+<h3 id="즉시-실행-가능한-결론">즉시 실행 가능한 결론</h3>
+<ul>
+<li>E7의 죽은 위임(→PHASE 23)을 <strong>이 문서로 교체</strong>한다.</li>
+<li>착수 조건 2는 DLL 결정과 독립적이므로 언제든 별도 슬라이스로 가능하다.</li>
+<li>축 B 자체는 <strong>안 1이 서기 전까지 착수 금지</strong> — 비용만 내고 이득은 못 받는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-조사-과정의-정정-기록">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-조사-과정의-정정-기록">8. 조사 과정의 정정 기록</h2></div>
+<div class="prose"><p>이 문서의 최초 결론 3건은 전부 적대적 검증에서 무너졌다. 남겨 둔다 — 같은
+오판이 반복되기 쉬운 자리들이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>최초 결론</th><th>왜 틀렸나</th></tr></thead>
+<tbody><tr><td>&quot;유니티가 DLL로 얻는 이득은 C#이 이미 충족&quot;</td><td>분리축을 하나로 뭉갰다. C#이 충족한 것은 축 A뿐(§1)</td></tr>
+<tr><td>&quot;저장소가 DLL 경계를 감당할 준비가 안 됐고, 그 이유로 걷어낸 전례가 있다&quot;</td><td>인과가 반대였다(§5). 위험도 &quot;전면 미준비&quot;가 아니라 국소 2곳(§4.2~4.3)</td></tr>
+<tr><td>&quot;게임 빌드는 이미 유니티식이라 재컴파일이 없다&quot;</td><td><strong>목표 상태를 현재형으로 읽었다.</strong> 오늘도 매 빌드 재컴파일한다(§3.1)</td></tr></tbody></table></div>
+<p>세 번째가 가장 위험한 종류다 — 계획 문서의 &quot;우리는 X다&quot;라는 서술을 현재
+상태로 읽었는데, 문서 자신은 바로 다음 문장에서 &quot;다만 아직 아니다&quot;라고
+적고 있었다. <strong>계획서의 선언형 문장은 목표일 수 있다. 코드로 확인해야 한다.</strong></p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-설계안--provenance와-플러그인-abi">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-설계안--provenance와-플러그인-abi">9. 설계안 — provenance와 플러그인 ABI</h2></div>
+<div class="prose"><ul>
+<li>원안: 사용자 제안(2026-08-26). Unreal의 BuildId + Unity의 versioned
+interface/GUID를 합친 형태.</li>
+<li>아래는 그 원안을 이 저장소 실측에 대조해 <strong>필드 배치·검사 지점·착수 순서를
+조정</strong>한 것이다. 원안의 골격(§9.1)과 조정 이유(§9.2~9.7)를 나눠 적는다.</li>
+</ul>
+<h3 id="91-원안의-골격--채택">9.1 원안의 골격 — 채택</h3>
+<p>두 축을 나누고 각 축에 다른 계약을 두는 구조를 채택한다.</p>
+<pre><code>                 Application
+                      │
+           ┌──────────┴──────────┐
+           │                     │
+      Internal C++ ABI       Plugin ABI
+           │                     │
+    BuildId + CoreABI       C ABI + GUID
+           │                     │
+       Engine Module       Third-party Plugin</code></pre>
+<p>정책 분리도 그대로 채택한다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>값</th><th>무엇을 판정하나</th></tr></thead>
+<tbody><tr><td><code>EngineVersion</code></td><td>표시 / 패키지 호환성</td></tr>
+<tr><td><code>CoreABI</code></td><td>내부 모듈 간 바이너리 호환성</td></tr>
+<tr><td><code>PluginABI</code></td><td>외부 플러그인 API 호환성</td></tr>
+<tr><td><code>BuildId</code></td><td>stale / mixed 바이너리 검출</td></tr>
+<tr><td><code>GitCommit</code></td><td>provenance / 디버깅</td></tr>
+<tr><td><code>Compiler</code>·<code>CRT</code></td><td><span class="chip warn">C++ ABI 위험 검출</span></td></tr></tbody></table></div>
+<p><strong>&quot;Core의 C++ ABI를 플러그인 ABI로 만들지 않는다&quot;는 원안의 핵심 판단에 동의한다.</strong>
+이 저장소에는 이미 그 규율의 작동 사례가 있다 — <code>ClrHost</code>가 네이티브/CoreCLR
+경계에서 POD + <code>static_assert(sizeof(...) == N)</code>(5곳) +
+<code>int(__stdcall*)(...)</code> 함수 포인터 + <code>UnmanagedCallersOnly</code>(마샬링 스텁 없음)</p>
+<ul>
+<li>&quot;틱당 한 번만 경계를 넘는다&quot;를 지키고 있다. 새 규율을 도입하는 것이 아니라
+<strong>검증된 규율을 네이티브 경계로 확장</strong>하는 것이다.</li>
+</ul>
+<h3 id="92-조정-①--박히는-것과-스탬프되는-것을-가른다">9.2 조정 ① — 박히는 것과 스탬프되는 것을 가른다</h3>
+<p>⚠ <strong>원안대로 <code>GitHash commit</code>을 컴파일 타임 구조체에 넣으면 2026-08-24에
+은퇴시킨 체계가 되살아난다.</strong> 그날 <code>EngineVersion.h</code> 생성 체계를 걷어낸
+진범이 <code>Directory.Build.targets</code>의 <code>GenerateEngineVersionHeader</code>였다 —
+<strong>모든 vcxproj 빌드마다</strong> 헤더를 재생성해 매번 리빌드를 유발했고, CI는 매
+푸시 <code>version.txt</code> 커밋을 만들고 있었다. <code>BuildId</code>도 같은 성질(빌드마다 값이
+바뀜)이므로 같은 사고를 낸다.</p>
+<p>따라서 필드를 출처로 가른다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>필드</th><th>어디에</th><th>근거</th></tr></thead>
+<tbody><tr><td><code>coreAbi</code>·<code>pluginAbi</code></td><td><strong>컴파일 타임 상수</strong>(손으로 올림)</td><td>드물게·의도적으로만 바뀐다. 생성기 불필요</td></tr>
+<tr><td><code>engineVersion</code></td><td>컴파일 타임 (이미 <code>ENGINE_VERSION &quot;0.1.0&quot;</code>)</td><td>〃</td></tr>
+<tr><td><code>compiler</code>·<code>compilerVersion</code>·<code>crtModel</code>·<code>iteratorDebugLevel</code>·<code>platform</code>·<code>architecture</code>·<code>configuration</code></td><td>컴파일 타임</td><td><strong>컴파일러가 준다</strong>(<code>_MSC_FULL_VER</code> 등) — 생성기 불필요</td></tr>
+<tr><td><code>buildId</code>·<code>commit</code>·<code>dirty</code></td><td><strong>사이드카 JSON</strong></td><td>빌드마다 바뀐다. 헤더면 매번 전체 리빌드</td></tr></tbody></table></div>
+<p>언리얼이 BuildId를 <code>.modules</code> 사이드카에 두는 것이 우연이 아니다. 사이드카는
+링크 후에 쓰이므로 <strong>재컴파일을 유발하지 않는다</strong>.</p>
+<p><strong>바이너리↔사이드카 결속은 신뢰가 아니라 해시로 한다</strong> — 사이드카가 각
+바이너리의 sha256을 함께 적는다. <code>package-manifest.json</code>이 이미
+<code>pakFileSha256</code>으로 쓰는 것과 같은 수법이다. 이러면 링크 후 PE를 패치하는
+(취약한) 스탬프 기법이 아예 필요 없다.</p>
+<pre><code class="language-cpp">// Engine/Utility_Framework/EngineAbi.h — 손으로 유지한다. 생성기 금지.
+struct BuildProvenance
+{
+    uint32_t size;                 // sizeof(BuildProvenance) — 추가 성장용
+    uint32_t schema;               // 이 구조체 자체의 판 — 파괴적 변경용
+
+    char     engineVersion[16];    // ENGINE_VERSION
+    uint32_t coreAbi;              // 내부 모듈 계약
+    uint32_t pluginAbi;            // 외부 플러그인 계약
+
+    uint32_t compiler;             // CompilerId::MSVC
+    uint32_t compilerVersion;      // _MSC_FULL_VER
+    uint32_t crtModel;             // /MD · /MDd
+    uint32_t iteratorDebugLevel;   // ★ §9.3 — configuration으로 대체 불가
+    uint32_t platform;
+    uint32_t architecture;
+    uint32_t configuration;
+};
+// buildId · commit · dirty 는 여기 없다 — 사이드카가 소유한다(위 표).</code></pre>
+<p><code>size</code>+<code>schema</code> 병기는 Vulkan/Win32 관례를 따른 것으로 채택한다. 규칙을
+못박아 둔다: <strong>필드는 끝에만 추가하고, 기존 필드의 의미는 바꾸지 않으며,
+바꿔야 하면 <code>schema</code>를 올린다.</strong></p>
+<h3 id="93-조정-②--configuration만으로는-c-abi-위험을-못-잡는다">9.3 조정 ② — <code>configuration</code>만으로는 C++ ABI 위험을 못 잡는다</h3>
+<p>원안의 <code>Compiler/CRT → C++ ABI 위험 검출</code>은 옳고, 이 저장소는 그 필요를
+<strong>실제로 겪었다</strong>. 다만 한 필드가 더 필요하다.</p>
+<p><code>_ITERATOR_DEBUG_LEVEL</code>은 링크 단위 ABI라 프로세스 안의 모든 목적 파일이
+값을 맞춰야 한다. 엔진만 0으로 돌렸다가 vcpkg 디버그 라이브러리(값 2)와
+충돌해 LNK2038이 났다(<code>triplets/x64-windows-idl0.cmake</code> 주석의 실측 기록).</p>
+<p><strong>핵심은 DLL화가 이 검사를 걷어낸다는 것이다.</strong> 정적 링크에서는
+<code>/FAILIFMISMATCH</code>가 링크 타임에 즉시 잡아 주지만, DLL 경계는 그 검사를
+통과시켜 런타임까지 조용히 간다. 지금 IDL 안전을 지켜 주는 것이 바로 그
+링커 검사이므로, <strong>DLL화 시 provenance가 그 역할을 물려받아야 한다.</strong></p>
+<p>그리고 <code>configuration</code>으로 IDL을 추론할 수 없다. IDL=0 전환 시도는 <strong>PhysX
+포트의 CMake가 트리플릿 플래그를 덮어써 좌초</strong>했고(<code>Directory.Build.props:93-116</code>
+— 오버레이 트리플릿은 주석 안에 있고 비활성, 활성 트리는 기본 <code>x64-windows</code>),
+나중에 포트 오버레이로 뚫으면 &quot;Debug ⇒ IDL=2&quot;라는 함의가 깨진다. 그래서
+<strong>IDL 실값을 별도 필드로 둔다</strong>(§9.2 표).</p>
+<h3 id="94-조정-③--dll-개수가-비용을-10배-가른다">9.4 조정 ③ — DLL 개수가 비용을 10배 가른다</h3>
+<p>원안 다이어그램의 <code>Engine Modules</code>(복수)가 유일한 미결이고, 사실상 <strong>가장 큰
+결정</strong>이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>안</th><th>§4.1의 전역 115개</th><th>LTCG</th><th>비용</th></tr></thead>
+<tbody><tr><td><strong>엔진 DLL 1개</strong> (유니티식)</td><td><strong>비문제</strong> — 전부 그 DLL 안. exe↔DLL만 경계</td><td>DLL 내부 유지</td><td>중</td></tr>
+<tr><td>모듈별 N개 (언리얼 에디터식)</td><td>싱글턴 36 + 리플렉션 타입 77 전부 export·단일화 필요</td><td>모듈마다 절단</td><td>대</td></tr></tbody></table></div>
+<p>목표가 &quot;게임마다 네이티브를 재컴파일하지 않는다&quot;이면 <strong>1개로 충분하다</strong>.
+언리얼의 BuildId 기계장치가 무거운 이유가 바로 N개를 감당하기 때문이고,
+유니티가 <code>UnityPlayer.dll</code> 하나인 이유도 같다. → <strong>엔진 DLL 1개를 채택한다.</strong></p>
+<p>⚠ 1개로 가도 §4.2의 지뢰 2곳은 그대로 남는다 — <code>ScreenSizedRegistry</code>·
+<code>ScreenResizeBus</code>를 <code>Editor/EngineEntry</code>·<code>EngineGUIWindow</code>·<code>Player</code>가 직접
+부르므로 <strong>exe↔DLL 경계를 넘는다</strong>.</p>
+<h3 id="95-원안이-다루지-않은-것--리플렉션-타입-정체성">9.5 원안이 다루지 않은 것 — 리플렉션 타입 정체성</h3>
+<p><strong>ABI 버전 검사로는 못 잡는 종류</strong>라 따로 둔다. 리플렉션 등록 타입 77개가
+<code>adapt&lt;T&gt;()</code> 안의 함수-로컬 <code>static Meta::Type</code>을 갖고, <code>Registry</code>도
+<code>Singleton&lt;T&gt;</code> 파생 36개 중 하나다. exe나 플러그인이 엔진 타입에
+<code>adapt&lt;T&gt;()</code>를 인스턴스화하면 <strong><code>coreAbi</code>가 완전히 일치해도 다른 <code>Meta::Type</code>
+객체</strong>를 얻고, <code>nameIndex</code>/<code>idIndex</code>가 갈려 직렬화가 조용히 어긋난다.</p>
+<p>필요한 것은 둘이다:</p>
+<ol>
+<li>타입 조회를 <strong>export된 함수 하나</strong>로 라우팅한다(<code>Meta::TypeOf&lt;T&gt;()</code>가
+DLL 안의 정본을 부르도록).</li>
+<li><strong>&quot;엔진 DLL 밖에서 <code>adapt&lt;T&gt;()</code> 인스턴스화 금지&quot;를 게이트로 강제</strong>한다 —
+버전 검사가 못 잡으니 정적 검사가 잡아야 한다.</li>
+</ol>
+<h3 id="96-플러그인-c-abi--소유권-규약을-먼저-정한다">9.6 플러그인 C ABI — 소유권 규약을 먼저 정한다</h3>
+<p>원안의 <code>PfCoreApiV1</code>(구조체에 담은 함수 포인터 표 + <code>queryInterface</code>)을
+채택하되, 한 가지를 착수 전에 못박는다.</p>
+<p><code>Result queryInterface(InterfaceId, void**)</code>는 COM 모양인데 <strong>COM에는
+AddRef/Release가 따라온다.</strong> 엔진이라면 refcount 없이 **&quot;빌린 포인터, 모듈
+수명 동안 유효&quot;**로 좁히는 편이 낫다 — 플러그인 로드/언로드 시점이 엔진
+통제 아래 있으므로 refcount가 풀 문제가 없다. 규약을 안 정하고 시작하면
+COM의 복잡도를 나중에 통째로 수입하게 된다.</p>
+<h3 id="97-검사-지점과-실패-처리">9.7 검사 지점과 실패 처리</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>시점</th><th>무엇을</th><th>실패하면</th></tr></thead>
+<tbody><tr><td>패키징(Step 1)</td><td>오케스트레이터가 선빌드 Player에 <code>--provenance</code>를 물어 기대값과 대조</td><td>패키징 중단(현재 <code>-BuildNative</code>가 대신하던 역할)</td></tr>
+<tr><td>exe 기동(Step 3)</td><td>exe의 컴파일 타임 상수 vs 엔진 DLL의 <code>PfGetProvenance()</code></td><td><strong>명확한 메시지와 함께 로드 거부</strong> — 크래시 아님</td></tr>
+<tr><td>플러그인 로드(Step 4)</td><td><code>pluginAbi</code> + interface GUID</td><td>그 플러그인만 거부, 엔진은 계속</td></tr></tbody></table></div>
+<p><code>--provenance</code>가 이 설계의 열쇠다. <strong>오케스트레이터가 자기가 빌드하지 않은
+바이너리의 정체를 물어볼 수 있게 되는 것</strong>이고, 그것이 곧 <code>-BuildNative</code>를
+뗄 수 있는 조건이다. Player에는 이미 <code>--smoke</code> 인자 파싱 선례가 있다.</p>
+<p>⚠ <strong>BuildId를 로드 시점에 강제하려면 바이너리에 박아야 하는데</strong>, 그것은
+§9.2가 피한 스탬프 기법을 다시 부른다. Step 3까지는 <strong>ABI·컴파일러·IDL
+일치만으로 충분</strong>하고(실제 보호는 거기서 나온다), BuildId는 사이드카에서
+패키징·기동 시 대조하는 선에서 쓴다. 바이너리 임베딩은 플러그인이 실제로
+생기는 Step 4로 미룬다 — 그때 복잡도가 값을 한다.</p>
+<p>⚠ <strong>새 게이트는 변이로 이빨을 증명한다</strong> — ABI 값을 일부러 어긋나게 주입해
+게이트가 붉어지는지 확인한 뒤에 초록을 믿는다(회귀 세트 관행).</p>
+<h3 id="98-착수-순서--dll이-1번이-아니다">9.8 착수 순서 — DLL이 1번이 아니다</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>Step</th><th>내용</th><th style="text-align:center">DLL 필요?</th></tr></thead>
+<tbody><tr><td class="num">0</td><td>§4.2 지뢰 2곳을 out-of-line 정의로</td><td style="text-align:center">✗</td></tr>
+<tr><td class="num"><strong>1</strong></td><td><strong><code>BuildProvenance</code> + <code>--provenance</code> + 사이드카 + 패키징 대조</strong></td><td style="text-align:center">✗</td></tr>
+<tr><td class="num"><strong>2</strong></td><td><strong><code>-BuildNative</code> 제거</strong></td><td style="text-align:center">✗</td></tr>
+<tr><td class="num">3</td><td>엔진 DLL 1개 + 기동 시 대조</td><td style="text-align:center">✓</td></tr>
+<tr><td class="num">4</td><td>플러그인 C ABI + GUID</td><td style="text-align:center">✓</td></tr></tbody></table></div>
+<p><strong>Step 1~2가 DLL 없이 원래 목표(매 게임 빌드의 네이티브 재컴파일 제거)를
+달성한다.</strong> <code>-BuildNative</code>가 붙어 있는 이유는 &quot;stale Player 배포를 막기
+위해&quot;(§3.1)인데, provenance가 stale을 잡으면 그 이유가 소멸하기 때문이다.
+실제로 이 조사 중에 재빌드된 <code>Physics.lib</code>·<code>SceneRuntime.lib</code>보다 오래된
+<code>Player.exe</code>가 디스크에 있는 것을 관측했다 — Step 1이 잡을 바로 그 대상이다.</p>
+<p>따라서 <strong>DLL화(Step 3)에 필요한 provenance는 Step 1에서 이미 서 있다.</strong>
+순서를 뒤집으면 안 되는 이유가 여기 있다 — provenance 없이 DLL만 떼면
+§4의 비용을 전부 내면서 §3.1의 이득은 못 받는다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-10-2026-09-06-재정찰--실측-갱신과-정정">
+<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-2026-09-06-재정찰--실측-갱신과-정정">10. 2026-09-06 재정찰 — 실측 갱신과 정정</h2></div>
+<div class="prose"><p>축 B 착수 전 사전정찰. 이 문서의 수치는 전부 8-26 값이고 그 사이 10일간
+저장소가 움직였다. <strong>판정(§7)과 착수 순서(§9.8)는 그대로 유효하다</strong> — 바뀐
+것은 비용 추정의 근거값, 지뢰 목록, 그리고 Step 1의 난이도다.</p>
+<h3 id="101-착수-순서-진척--0">10.1 착수 순서 진척 — 0</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>Step</th><th>2026-09-06 실측</th></tr></thead>
+<tbody><tr><td>0 — 지뢰 정리</td><td><strong>완료(2026-09-06)</strong> — §10.12</td></tr>
+<tr><td>1 — provenance</td><td><strong>미착수</strong> — 저장소 전체에 <code>BuildProvenance</code> 심볼 0건</td></tr>
+<tr><td>2 — <code>-BuildNative</code> 제거</td><td><strong>미착수</strong> — <code>GameBuilderSystem.cpp:121</code>이 20개 고정 인자 중 하나로 여전히 무조건 전달</td></tr>
+<tr><td>3·4 — DLL·플러그인 ABI</td><td><span class="chip dim">미착수(선행 대기)</span></td></tr></tbody></table></div>
+<p>§4.4의 &quot;export 관례 0건&quot;도 그대로다 — <code>__declspec(dllexport)</code> <strong>0건</strong>,
+<code>dllimport</code> 3건은 전부 yaml-cpp 소비다. <code>WholeProgramOptimization</code>은 10개
+vcxproj 전부 유지.</p>
+<p>⚠ 파일 위치가 하나 바뀌었다: <code>ScreenSizedResource.h</code>는 이제
+<code>Engine/RenderEngine/RHI/</code> 아래다. §4.2·§9.4의 경로 표기를 이 항으로 갱신한다.</p>
+<h3 id="102-기준선-수치-갱신">10.2 기준선 수치 갱신</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th style="text-align:right">8-26</th><th style="text-align:right">9-06</th></tr></thead>
+<tbody><tr><td>Player가 정적 링크하는 static lib</td><td style="text-align:right">6종</td><td style="text-align:right"><strong>7종</strong></td></tr>
+<tr><td>그 lib들의 소스 합계</td><td style="text-align:right">128,258줄</td><td style="text-align:right"><strong>156,165줄</strong> (+21.8%)</td></tr>
+<tr><td>Player exe 자체 코드(.cpp)</td><td style="text-align:right">856줄</td><td style="text-align:right"><strong>1,748줄</strong> (헤더 포함 2,067)</td></tr>
+<tr><td><code>Singleton&lt;T&gt;</code> 파생</td><td class="num" style="text-align:right">36</td><td class="num" style="text-align:right"><strong>37</strong></td></tr>
+<tr><td>vcxproj 총수</td><td class="num" style="text-align:right">11</td><td class="num" style="text-align:right"><strong>13</strong></td></tr>
+<tr><td><code>DynamicLibrary</code> 프로젝트</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right"><strong>0</strong></td></tr></tbody></table></div>
+<p>늘어난 lib 2종은 <code>Engine/CommandService</code>(2,830줄)와
+<code>Engine/EngineDiagnostics</code>(1,441줄)다. Player exe가 2배가 된 것도 같은
+뿌리 — <code>PlayerCommands.cpp</code>(427)·<code>PlayerCommandService.cpp</code>(343)가 신설됐다.
+<strong>§2.1의 &quot;exe 안의 조립 코드는 이미 최소다&quot;는 여전히 참이지만 여유가
+줄었다</strong>(게임 로직은 여전히 0).</p>
+<p>⚠ <strong>새로 확인해야 할 경계</strong>: Player가 <code>Editor/HostImGuiPresentation</code>
+(1,909줄, StaticLibrary)을 링크한다. Editor 트리의 lib을 Player가 소비하는
+형태이므로, 호스트셸 경계를 긋기 전에 이 방향이 의도된 것인지 먼저 정해야
+한다. 8-26 조사 시점에는 없던 링크다.</p>
+<h3 id="103-새-사실-①--리플렉션-위험이-커졌다-4195-보강">10.3 새 사실 ① — 리플렉션 위험이 커졌다 (§4.1·§9.5 보강)</h3>
+<p>§9.5는 &quot;DLL마다 다른 <code>Meta::Type</code> 객체를 얻어 인덱스가 갈린다&quot;까지 적었다.
+그 사이 CT11-b가 인덱스 자료형을 바꿨다 — <code>Registry</code>(여전히
+<code>Singleton&lt;Registry&gt;</code> 파생, <code>ReflectionRegister.h:20</code>)의 <code>nameIndex</code>가
+이제 <code>std::string_view</code> 키와 <code>const Type*</code> 값을 들고, 그 정본은
+<code>adapt&lt;T&gt;()</code>의 함수-로컬 static이다(<code>ReflectionRegister.h:41</code> 주석의 수명
+계약: &quot;등록된 Type은 이동/파괴되지 않는다&quot;).</p>
+<p>즉 <strong>DLL 분열의 결과가 &quot;표가 갈라진다&quot;에서 &quot;댕글링&quot;으로 악화됐다.</strong> 한쪽
+모듈이 언로드되면 다른 쪽 인덱스가 죽은 <code>Type::name</code>을 가리킨다. §9.5의
+요구사항 2건(조회를 export 함수 하나로 라우팅 · 엔진 DLL 밖 <code>adapt&lt;T&gt;()</code>
+인스턴스화 금지를 정적 게이트로 강제)은 이제 <strong>선택이 아니라 필수</strong>다.</p>
+<h3 id="104-새-사실-②--지뢰가-2곳이-아니라-3곳이고-반경이-넓어졌다">10.4 새 사실 ② — 지뢰가 2곳이 아니라 3곳이고, 반경이 넓어졌다</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>지뢰</th><th>형태</th><th>소비 반경(9-06 실측)</th></tr></thead>
+<tbody><tr><td><code>ScreenSizedRegistry::Get</code> (<code>RHI/ScreenSizedResource.h:83</code>)</td><td>헤더 인라인 Meyers</td><td><strong>13파일 / 10폴더</strong> (8-26엔 7폴더)</td></tr>
+<tr><td><code>ScreenResizeBus::Get</code> (〃<code>:137</code>)</td><td>〃</td><td>〃 (위와 합산)</td></tr>
+<tr><td><strong><code>ProgressSink::GetSink</code></strong> (<code>Utility_Framework/ProgressSink.h:24</code>)</td><td><strong>inline 함수 안 static</strong></td><td><code>Editor/EngineEntry</code> ↔ <code>Utility_Framework</code> 교차</td></tr></tbody></table></div>
+<p>세 번째는 이 문서와 EngineLayerSeparationPlan §2.3 둘 다 놓치고 있던
+같은 유형이다. <code>inline Sink&amp; GetSink() { static Sink s_sink; return s_sink; }</code>
+이고, <code>Launch</code>/<code>SetTitle</code>/<code>SetProgress</code>/<code>Close</code> 전부가 그것을 통과한다 —
+exe가 설치한 진행률 싱크를 DLL 쪽 호출이 못 보는 조용한 결함이 된다.</p>
+<p>ScreenSized 2종의 호출자 전량(13파일): <code>Editor/EngineEntry/EditorMain.cpp</code>,
+<code>Commands/{CoreCommands,RenderDebugCommands,RenderTestCommands}.cpp</code>,
+<code>Editor/EngineGUIWindow/{GameViewWindow,SceneViewWindow}.cpp</code>,
+<code>Engine/RenderEngine/{Camera.cpp, RHI/DX12/DX12DeviceResources.cpp, Render/Scene/EnhancedSceneRenderer.cpp}</code>,
+<code>Engine/SceneRuntime/{RectTransformComponent,UIButton,UIManager}.cpp</code>,
+<code>Player/PlayerMain.cpp</code>. <strong>exe(Editor·Player) ↔ 엔진 lib 교차가 확정적</strong>이다.</p>
+<p>⚠ 저위험으로 판별된 유사 패턴도 기록한다 — <code>Profiler.h:358</code>
+<code>GetTLSUnsafe()</code>(inline 안 <code>static thread_local</code>)는 <code>EngineDiagnostics</code>
+내부 private 소비뿐이라 엔진 DLL 1개(§9.4) 안에 갇힌다.</p>
+<h3 id="105-정정--enginemodes_mode는-과대-계상이었다">10.5 정정 — <code>EngineMode::s_mode</code>는 과대 계상이었다</h3>
+<p>§4.1 표의 &quot;mutable inline 전역 2&quot;에 <code>EngineMode::s_mode</code>를 위험으로
+올렸는데, 소비를 전수하니 <code>Editor/EngineEntry</code>와 <code>Player</code> — <strong>exe 두 곳
+뿐</strong>이고 엔진 lib 안에는 0건이다. 엔진 DLL 1개 안(§9.4)에는 들어가지
+않으므로 경계를 넘지 않는다. 지뢰 목록에서 뺀다.</p>
+<p>같은 확인에서 <code>Scene.h:968~974</code>의 <code>static inline</code> 진단 스위치 5종도
+소비가 <code>Scene.h</code> 내부뿐이어서 exe 교차가 없음을 확인했다 — 다만 앞으로
+CLI 커맨드가 이 스위치를 exe 쪽에서 켜면 즉시 지뢰가 된다. <strong>&quot;엔진 lib
+밖에서 헤더 인라인 mutable 전역을 쓰지 않는다&quot;를 규약으로 세울 자리다.</strong></p>
+<h3 id="106-부수-발견--g_guids는-dll-이전에-이미-결함이다">10.6 부수 발견 — <code>g_guids</code>는 DLL 이전에 이미 결함이다</h3>
+<p><code>Utility_Framework/TypeTrait.h:241</code>이 헤더 파일 스코프에
+<code>static std::set&lt;HashedGuid&gt; g_guids;</code>를 둔다. <strong><code>static</code>이므로 TU마다
+사본</strong>이고, <code>InsertGUID</code>/<code>EraseGUID</code>가 <code>Engine/SceneRuntime</code>
+(<code>Object.h:42</code>·<code>Object.cpp:32</code>·<code>Entity.cpp:137</code>)과
+<code>Editor/EngineEntry/GameObjectCommand.h:26</code> 양쪽에서 매 오브젝트
+생성·파괴마다 불린다.</p>
+<p>⚠ <strong>정정(2026-09-06, Step 0 착수 중)</strong> — 이 항의 초판은 &quot;이 표를 읽는 유일한
+소비자 <code>MakeGUID()</code>는 호출자가 <strong>0건</strong>이므로 죽은 파이프라인&quot;이라고 적었다.
+<strong>틀렸다.</strong> <code>TypeTrait.h:417</code>에 <code>#define make_guid() TypeTrait::GUIDCreator::MakeGUID()</code>
+가 있고, 그 매크로가 <strong>10곳에서 불린다</strong> — <code>Object.h:67</code>(모든 Object의
+<code>m_instanceID</code>)·<code>Object.h:47</code>(<code>MakeInstanceID</code>)·<code>Entity</code>·<code>Prefab.cpp:416</code>,
+그리고 <code>Material.h:204</code>·<code>Mesh.h:145</code>·<code>Texture.h:176</code>(자산 ID)·
+<code>BTBuildGraph.h</code> 3곳. 나는 <code>MakeGUID(</code> 철자로만 찾아 매크로 우회를 놓쳤다
+(메모리 <code>substring-match-false-results</code>가 경고한 바로 그 종류의 실수다).</p>
+<p>따라서 판정이 뒤집힌다. 이 표는 <strong>살아 있는 유일성 검사</strong>이고, TU마다 사본이라는
+사실이 그래서 더 나쁘다:</p>
+<ul>
+<li>유일성 검사가 <strong>갈린 표 위에서 돈다</strong> — 다른 TU가 만든 GUID와의 충돌을
+원리적으로 못 잡는다. 검사가 있는데 검사가 아니다.</li>
+<li><code>EraseGUID</code>가 insert한 TU와 다른 사본에서 지우면 아무것도 안 지워진다 —
+그 사본은 계속 자란다.</li>
+</ul>
+<p>처리 방향도 <strong>삭제가 아니라 단일화</strong>로 바뀐다(접근자를 out-of-line 정의로).
+다만 단일화하면 지금 TU 사본으로 흩어져 있던 접근이 한 컨테이너에 모이므로
+<strong>스레드 경합이 새로 노출된다</strong> — 현재 <code>g_guids</code>는 뮤텍스 없이 접근되고,
+Object·Texture·Material 생성은 비동기 로딩 경로에서도 일어난다. 그래서 이
+항목은 Step 0의 지뢰 3종과 달리 <strong>동작 변경을 수반한다</strong>. 별도 슬라이스로
+떼어 락 비용을 재고(Release 기준) 진행할 것.</p>
+<h3 id="107-유리해진-조건--step-1의-절반이-이미-서-있다">10.7 유리해진 조건 — Step 1의 절반이 이미 서 있다</h3>
+<p>§9.2가 &quot;신설&quot;로 잡은 사이드카 배관이 실은 상당 부분 존재한다.
+<code>Tools/build.ps1:1663</code>이 <code>package-manifest.json</code>을 <code>schemaVersion = 2</code>로
+발행하며 이미 담는 것:</p>
+<ul>
+<li><code>workspaceHead</code>(git rev-parse HEAD) · <code>workspaceDirty</code>(git status porcelain)
+— <code>build.ps1:1462-1469</code>, 코드가 그 블록을 스스로 &quot;package provenance&quot;라
+부른다</li>
+<li><code>contentDigest</code>·<code>runtimeDigest</code>·<code>pakFileSha256</code>·항목별 <code>sha256</code>
+(<code>Get-Sha256</code> 유틸 존재)</li>
+<li><code>nativeBuildRequested</code>(현재 <code>-BuildNative</code> 여부)·<code>config</code>·<code>inputMode</code></li>
+</ul>
+<p><strong>빠진 것은 바이너리 축뿐이다</strong> — <code>coreAbi</code>/<code>pluginAbi</code>, 컴파일러·CRT·
+<code>_ITERATOR_DEBUG_LEVEL</code>(§9.3), 그리고 스테이지 바이너리 자신의 sha256과
+그것을 물어보는 <code>--provenance</code> 질의. 게다가 <code>nativeSource</code>가 지금
+<code>&#39;WORKSPACE&#39;</code> 문자열로 고정돼 있어, 선빌드 Player를 받아들이려면 어차피
+이 필드가 실값을 가져야 한다.</p>
+<p>즉 <strong>Step 1의 비용 추정(§7 표의 &quot;중&quot;)은 상향된 것이 아니라 하향해도 된다.</strong>
+스키마 확장(<code>schemaVersion</code> 2→3)과 exe 쪽 <code>--provenance</code> 출력, 대조 게이트
+하나가 남는 일이다.</p>
+<h3 id="108-계획-위임--여전히-끊겨-있다형태만-바뀌었다">10.8 계획 위임 — 여전히 끊겨 있다(형태만 바뀌었다)</h3>
+<p>§6이 &quot;PHASE 23에 <code>provenance</code> 문자열 0건&quot;이라 적었는데, 지금은 4건이다.
+그러나 <strong>전부 다른 축이다</strong>:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>위치</th><th>내용</th><th>축 B인가</th></tr></thead>
+<tbody><tr><td><code>DL5</code> 제목 — &quot;버전별 불변 엔진 distribution layout·provenance&quot;</td><td><code>engine.manifest.json</code>, file digest, build ID, ABI/schema <strong>범위</strong></td><td>✗ 배포 layout</td></tr>
+<tr><td><code>DL5</code> 본문</td><td>PHASE 22 miniaudio source hash·license를 provenance에 포함</td><td>✗ 서드파티 라이선스</td></tr>
+<tr><td><code>§(signing)</code></td><td>symbol/provenance 보존, signing key 운영</td><td>✗ 서명</td></tr>
+<tr><td><code>§(audio)</code></td><td>pinned miniaudio provenance 재사용</td><td>✗ 서드파티</td></tr></tbody></table></div>
+<p><code>Player.dll</code>·<code>Core DLL</code>·<code>Core ABI</code>·<code>BuildNative</code>는 여전히 <strong>0건</strong>이다.
+DL5가 다루는 것은 &quot;배포 트리에 무엇이 들어 있는가&quot;이고, 축 B가 필요로 하는
+것은 &quot;이 바이너리가 저 바이너리와 같은 계약으로 컴파일됐는가&quot;다. 이름이
+겹치므로 <strong>한쪽이 다른 쪽을 덮었다고 오독하기 쉽다</strong> — 이 항을 그 방지용
+으로 남긴다. 다만 DL5가 <code>engine.manifest.json</code>을 세우므로, Step 1의
+바이너리 provenance는 <strong>DL5의 매니페스트에 편입될 자연스러운 자리</strong>가 있다.
+소유권은 이 문서가 계속 갖되 산출물 위치는 DL5와 합의해야 한다.</p>
+<h3 id="109-착수-조건-③수학-이주--거의-닫혔다">10.9 착수 조건 ③(수학 이주) — 거의 닫혔다</h3>
+<p><code>MathematicsMigrationPlan.md:4</code> 현재 상태: &quot;S7-A/B3 구조 완료 · source/direct
+dependency root 0 · pixel/Physics runtime gate 남음&quot;. §7의 착수 조건 3이
+요구한 &quot;RenderEngine 폴더 점유 해제&quot;는 root 0으로 달성됐고 남은 것은 런타임
+게이트다. <strong>Step 0·1을 막지 않는다.</strong></p>
+<h3 id="1010-게이트-공백--있어도-도는-세트에-없다">10.10 게이트 공백 — 있어도 도는 세트에 없다</h3>
+<p>Player 관련 게이트 7종 중 <code>run-all.ps1</code> 배선은 4종뿐이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>게이트</th><th style="text-align:center">run-all 배선</th></tr></thead>
+<tbody><tr><td><code>verify-player-shipping-isolation</code></td><td style="text-align:center">✅</td></tr>
+<tr><td><code>verify-player-command-service</code></td><td style="text-align:center">✅</td></tr>
+<tr><td><code>verify-player-runtime-text-parser</code></td><td style="text-align:center">✅</td></tr>
+<tr><td><code>verify-player-runtime-hygiene</code></td><td style="text-align:center">✅</td></tr>
+<tr><td><strong><code>verify-player-runtime-boundary</code></strong></td><td class="num" style="text-align:center"><strong>0건</strong></td></tr>
+<tr><td><strong><code>verify-player-missing-pak</code></strong></td><td class="num" style="text-align:center"><strong>0건</strong></td></tr>
+<tr><td><strong><code>verify-player-normal-exit</code></strong></td><td class="num" style="text-align:center"><strong>0건</strong></td></tr></tbody></table></div>
+<p>축 B는 Player 기동 경로를 바꾸는 작업이므로, 착수 전에 이 3종을 세트에
+배선하거나 최소한 수동 실행 대상으로 명시해야 한다. 안 그러면 회귀를
+잡을 자가 없다(메모리 <code>gate-exists-but-unwired</code>와 같은 형태).</p>
+<h3 id="1011-이-재정찰이-바꾼-것--안-바꾼-것">10.11 이 재정찰이 바꾼 것 / 안 바꾼 것</h3>
+<ul>
+<li><strong>안 바뀜</strong>: §7 판정표(안 1 선행 필수 · 안 2는 그 이후 · 안 3·4 기각),
+§9.4 엔진 DLL 1개, §9.8 착수 순서.</li>
+<li><strong>바뀜</strong>: 지뢰 2곳 → 3곳(§10.4), <code>EngineMode::s_mode</code> 제외(§10.5),
+Step 1 비용 하향(§10.7), 리플렉션 대책의 필수화(§10.3).</li>
+<li><strong>새 선행 항목</strong>: Player↔<code>HostImGuiPresentation</code> 링크 방향 확정(§10.2),
+Player 게이트 3종 배선(§10.10).</li>
+</ul>
+<h3 id="1012-step-0-실행-결과-2026-09-06">10.12 Step 0 실행 결과 (2026-09-06)</h3>
+<p><strong>착수해 보니 지뢰가 3곳이 아니라 8곳이었다.</strong> §10.4의 3곳은 <code>static T&amp; Get()</code>
+철자로만 찾은 값이고, <code>inline T&amp; f()</code> 형태의 자유 함수를 놓쳤다. 게이트를 먼저
+세워 기계적으로 훑자 8건이 나왔다 — 정찰의 수치는 두 번(§10.4, 여기) 연속으로
+과소 계상됐다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>심볼</th><th>위치</th><th>처리</th></tr></thead>
+<tbody><tr><td><code>ScreenSizedRegistry::Get</code></td><td><code>RenderEngine/RHI/ScreenSizedResource.h:83</code></td><td><strong>out-of-line</strong></td></tr>
+<tr><td><code>ScreenResizeBus::Get</code></td><td>〃<code>:137</code></td><td><strong>out-of-line</strong></td></tr>
+<tr><td><span class="chip info"><code>Progress::GetSink</code></span></td><td><code>Utility_Framework/ProgressSink.h:24</code></td><td><strong>out-of-line</strong></td></tr>
+<tr><td><code>Meta::Typed::OpsRegistry</code></td><td><code>Utility_Framework/ReflectionYml.h:94</code></td><td><strong>out-of-line</strong> — 직렬화 훅 표. 등록은 <code>ReflectionTypedYml.h</code>의 썽크, 조회는 SceneRuntime의 <code>ComponentFactory</code>가 한다</td></tr>
+<tr><td><code>ComponentTypeIndex::Table</code></td><td><code>Utility_Framework/TypeTrait.h:353</code></td><td><strong>out-of-line</strong> — 컴포넌트 타입 인덱스/비트마스크</td></tr>
+<tr><td><code>ComponentUUIDRegistry::Entries</code></td><td>〃<code>:408</code></td><td><strong>out-of-line</strong> — 영속 UUID 이름 대응표</td></tr>
+<tr><td><code>Profiler::GetTLSUnsafe</code></td><td><code>EngineDiagnostics/Profiler.h:358</code></td><td>허용 — 모듈 내부 private 소비</td></tr>
+<tr><td><code>EditorSessionState::Get</code></td><td><code>Editor/EngineEntry/EditorSessionState.h:12</code></td><td>허용 — Editor 트리 전용, Player 미소비</td></tr>
+<tr><td><code>TypedDraw::Registry</code></td><td><code>Editor/EngineGUIWindow/ReflectionImGuiHelper.h:54</code></td><td>허용 — 〃</td></tr></tbody></table></div>
+<p>뒤의 셋은 축 B에서 호스트셸(exe) 안에 남거나 엔진 DLL 안에 갇히므로 경계를
+넘지 않는다. 허용 목록에 <strong>근거를 적어</strong> 게이트에 등재했고, 그 파일이 사라지거나
+이미 고쳐지면 게이트가 &quot;죽은 예외&quot;라고 알린다.</p>
+<p>새 <code>.cpp</code> 4개(<code>ScreenSizedResource</code>·<code>ProgressSink</code>·<code>ReflectionYml</code>·<code>TypeTrait</code>)를
+신설하고 vcxproj·filters에 등록했다.</p>
+<h4 id="게이트">게이트</h4>
+<p><code>Tools/regression/verify-header-inline-singleton.ps1</code> 신설, <code>run-all.ps1</code>에 배선.
+RED(8건 검출) → 수정 → GREEN(헤더 541개·위반 0·허용 3)으로 전환을 확인했다.
+게이트 자신도 양성 표본 3·음성 표본 3으로 자기 검사를 하고, 검사 대상 헤더가
+300개 미만이면 &quot;범위가 무너졌다&quot;고 실패한다(빈 집합 위에서 도는 부재 단정 방지).</p>
+<h4 id="검증">검증</h4>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>결과</th></tr></thead>
+<tbody><tr><td>Debug 전체 빌드</td><td><strong>EXIT=0</strong></td></tr>
+<tr><td>링커 심볼 (<code>dumpbin /SYMBOLS</code>)</td><td>6종 전부 out-of-line External. <code>ScreenResizeBus::Get</code>이 다른 obj에서 <strong>UNDEF 외부 참조</strong>로 잡힌다 — 사본을 만들지 않고 호출만 한다는 증거</td></tr>
+<tr><td><code>dx12.resize</code></td><td><strong>통과</strong> (ScreenResizeBus 직결)</td></tr>
+<tr><td><code>dx12.forward</code>·<code>dx12.gbuffer</code>·<code>dx12.skinning</code>·<code>dx12.gizmoscene</code></td><td><span class="chip ok"><strong>통과</strong></span></td></tr>
+<tr><td><code>reflect.golden</code>·<code>serialize.nodeequal</code>·<code>assets.identity</code></td><td><span class="chip ok"><strong>통과</strong> (타입 표·직렬화 훅 직결)</span></td></tr>
+<tr><td><code>dx12.scene</code></td><td>실패 — <strong>단, HEAD도 같다</strong>(아래)</td></tr></tbody></table></div>
+<h4 id="dx12scene은-head부터-붉다"><code>dx12.scene</code>은 HEAD부터 붉다</h4>
+<p>Step 0 변경만 되돌린 빌드(A)와 적용한 빌드(B)를 각각 3회씩 돌려 갈랐다.
+<strong>둘 다 3/3 동일하게</strong> <code>[1/4] RenderThread drain 시간 초과 — pending 2 · active 1</code>
+로 실패한다. 이 검사는 Step 0과 무관하게 이미 실패하고 있었다.</p>
+<p>⚠ 이 검사는 <strong>실행 조합에 따라 실패 지점이 달라진다</strong> — 다른 검사와 묶어 돌린
+첫 회차에서는 <code>[1/4]</code>를 통과하고 <code>[4/4] 드로우 0</code>으로 실패했다. 단독 실행에서는
+6회 내내 <code>[1/4]</code> drain 시간 초과다. 원인 규명은 Step 0의 범위 밖이지만,
+<strong>축 B가 Player 기동 경로를 건드리는 작업이므로 그 전에 이 검사가 안정화돼야
+한다</strong>(§10.10의 게이트 배선 문제와 같은 자리).</p>
+<h4 id="이-과정에서-밟은-함정-둘">이 과정에서 밟은 함정 둘</h4>
+<ul>
+<li><strong><code>shutil.copy2</code>가 mtime을 보존해 증분 빌드가 헤더 변경을 놓쳤다.</strong> A/B의 B를
+복원했더니 <code>RenderTests</code>가 옛 obj(인라인 정의 포함)를 그대로 써서 <code>LNK2005</code>
+중복 정의가 났다. 파일 내용은 맞는데 타임스탬프가 과거라 재컴파일되지 않은
+것 — <code>touch</code> 후 재빌드로 풀렸다. <strong>A/B 도구가 만든 거짓 실패였다.</strong></li>
+<li><strong>부분 진행된 되돌리기가 백업을 덮어쓸 뻔했다.</strong> GitHub Desktop이 상주하며
+<code>.git/index.lock</code>을 잡아 <code>git checkout</code>이 중간에 실패했는데, 스크립트를 그대로
+재실행하면 이미 HEAD로 돌아간 파일을 백업에 덮어써 내 변경을 잃는다. 백업은
+한 번만 뜨도록 고쳤다.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="PlayerModuleBoundaryAnalysis.md"><code>docs/analysis/PlayerModuleBoundaryAnalysis.md</code></a> · 마지막 커밋 2026-09-11 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

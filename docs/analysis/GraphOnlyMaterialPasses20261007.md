@@ -1,32 +1,49 @@
-# Graph-only Scene 패스: 현재 선택 경계와 과거 전환 기록
+# Graph-only material passes — 2026-10-07
 
-> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
+## Product contract
 
-## 전환의 의미
+Live scene material draws must carry an owning MaterialGraph source and the exact requested graph instance. Graph program preparation defers the frame; unsupported or failed compilation rejects it. Neither a native PBR material nor a previous submitted graph instance may replace that request. A previously completed display can remain visible while preparation runs; it is not a newly rendered fallback frame.
 
-2026-10-07의 목표는 재질 준비 실패를 native fallback으로 숨기지 않고 Scene 전체의 정확한 graph generation을 소비하는 것이었다. 현재 `EnhancedSceneRenderer::BuildPipelineDesc`와 Scene host stage 연결이 이 정책을 구현한다. 이전 단계의 패스 목록이나 host identity를 현재 ABI로 재사용하지 않는다.
+## Removed structures
 
-## 실제 선택과 기록
+- Live GBuffer/Forward ShaderMeta candidate application, native material sealing, accepted-generation owners and primary catalog loads.
+- Graph-to-native fallback draw copies, their GBuffer/Shadow admission, and the capture/replay bridge recording those copies.
+- SceneHost selection of previous submitted material/coverage and partial ready draw streams.
+- Native material pipeline initialization and native geometry visibility recording in live Shadow/GBuffer. These owners now prepare cascades or initialize neutral targets through explicit graph-target APIs.
+- Native Forward material pipeline initialization in the live node. Forward+ retains its shared light-list computation and records graph materials.
 
-`SelectReadyInput`은 frame/view/extent, material slot과 instance identity, coverage, geometry와 필요한 program을 검증한다. 하나라도 Pending이면 그 프레임을 defer하고, Failed이면 거부한다. 준비된 일부 재질만 새 프레임에 섞거나 이전 generation/native material로 대신 기록하지 않는다. 이미 완료된 화면이 남아 있을 수 있지만 그것은 새 프레임의 fallback draw가 아니다.
+## Pass audit
 
-Geometry → First Cull → Occluder → Final Cull → Surface의 visibility 흐름과 별도 Shadow/LayerWork/Temporal 의존은 render graph resource handle과 epoch로 연결된다. 같은 이름의 texture나 이전 frame handle만으로 의존을 대체하지 않는다. 자세한 흐름은 [Scene host](../design/MaterialGraphSceneHost.md)에 모았다.
+| Pass family | Material routing after this change |
+| --- | --- |
+| Shadow | Cascade fitting and neutral depth initialization; MaterialGraph alone records material geometry/coverage. |
+| GBuffer | Neutral attachment initialization; MaterialGraph alone records scene material geometry/coverage. |
+| Opaque color, transmission/refraction, subsurface, volume | SceneHost consumes the exact graph input selected for this frame. |
+| Forward+ blended surfaces | Shared light lists and graph draw ordering remain; no native material fallback is admitted. |
+| Decal, Sprite, UI | Dedicated prepared resources and shaders; no SceneHost-to-native material fallback. |
+| IBL, Deferred, SSAO, SSGI, SSR, Fog, SkyBox, PostChain, Editor overlays | Dedicated algorithms/resource consumers; not alternative scene-material routes. |
 
-## 남는 native 경계
+Low-level native pass APIs remain as explicitly invoked standalone regression/reference implementations. They are not initialized or selected as a live material fallback. Indexed geometry capability paths, optional neutral textures, disabled effect pass-through and resource allocation policies are independent from material substitution.
 
-fullscreen 효과, Decal/Sprite, 공통 RHI/descriptor/residency 작업은 재질 compiler와 다른 계층이다. 이 코드가 남아 있다고 graph-only 정책이 깨진 것은 아니다. 반대로 standalone native pass/Code 회귀가 성공해도 live Scene material fallback이 허용되지는 않는다.
+## CSM cache consequence
 
-지원하지 않는 material feature는 compiler/route/input 단계에서 진단하고 거부한다. CPU asset owner의 생존, GPU residency, ready PSO, render graph 제출 성공은 각각 다른 조건이다.
+The live depth map no longer combines native and graph material casters. It still has a clear writer followed by the graph depth writer. A future cache hit must skip both initialization and graph depth recording, retain exact graph dependencies and publish only after successful submission. PR #116's submission, multi-view and retirement requirements still apply. No depth-content cache is introduced here.
 
-## 역사적 검증의 사용
+## Validation
 
-과거 DX12 검사 수·Vulkan 비동기 준비 실패 기록은 당시 코드를 설명하는 이력이다. 현재 revision의 backend 통과나 새 성능 측정으로 올리지 않는다. 재검증 시 모든 requested program ready, stale input 거부, 중간 실패 시 새 화면 미게시, 순차/병렬 기록의 동일 입력을 확인해야 한다.
+Evidence is collected under `Build/Verification/GraphOnlyMaterials20261007/`. Acceptance requires current Debug/Release builds, native graph-only depth initialization without native material PSOs, exact generation selection/rejection tests, relevant material pass regression and live capture. Earlier RG6 acceptance archives describe their own source hashes and do not prove this later change.
 
-이 보고서는 현재의 정적 연결만 확인했다. 제품 오류 복구와 재쿠킹은 [generation](../design/MaterialGraphSceneGeneration.md), [cook](../design/MaterialGraphSceneCook.md)을 따른다.
+Completed checks:
 
-## 구현 근거
+- Debug/Release RenderEngine, MaterialRasterSurfaceProbe and CreatorEditor builds passed. Release MaterialVulkanSceneProbe also built with the repository's Vulkan-Headers include path supplied to the build environment.
+- Debug and Release DX12 scene integration passed independently: 59 frames each, five exact generation submissions, seven rejected pending/failed requests, zero material fallbacks, one stale publication rejection and one aborted recording. Neutral GBuffer depth and all three shadow layers were read back at 1.0 without native material PSO initialization.
+- Release complete raster regression passed: 59 composition frames, 330 rejected resource/declaration candidates, 24 shared-depth frames, six skinned-depth frames, five exact generation frames and seven pending/failed material rejections. All five updated wrapper signatures match the actual success marker.
+- Release shadow/decal passed: 45 shadow frames, 114 decal frames, 72 rejected decal candidates and GPU validation zero. CSM math contracts and 384-instance/192-batch partition equivalence passed with 0/2/4/5/6/8 workers.
+- Release special materials passed with GPU validation zero: refraction 24 frames (48 rejected candidates, roughness/TIR/miss/masked/hybrid checks), subsurface 12 frames (spread/boundary/mask checks), volume 33 frames (66 rejected candidates and transport/scattering/interior checks).
+- Release product BASE-0 passed again after the final contract comment/fixture repairs: two independent Editor processes, four accepted captures, normal exits, GPU validation zero and no source drift. All accepted draw routes are `lattice`; each compiled graph contains `Shadow.Clear` and `GBuffer.Clear` and contains neither native `Shadow` nor native `GBuffer` material pass. See `Live-Release-final/result.json`, `final-live-graph-only-routing.json` and `final-source-hashes.json`. The earlier `Live-Release` run is retained separately.
 
-- [`Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp`](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp)
-- [`Engine/RenderEngine/MaterialGraphSceneHost.cpp`](../../Engine/RenderEngine/MaterialGraphSceneHost.cpp)
-- [`Engine/RenderEngine/MaterialGraphSceneInput.cpp`](../../Engine/RenderEngine/MaterialGraphSceneInput.cpp)
-- [`Engine/RenderEngine/MaterialGraphSceneStages.inl`](../../Engine/RenderEngine/MaterialGraphSceneStages.inl)
+Release Vulkan build passed, but runtime acceptance did not: initial asynchronous material preparation exited 1 before the first scene fixture. `WaitSceneProgram` has a 600-second SPIR-V deadline; the diagnostic contains no shader/driver detail. No Vulkan pixel/validation success is claimed. Cold preparation diagnosis and actual resource/pixel acceptance are handed to [PHASE 4.9](../plans/BackendParityPlan.md), without restoring material fallback or relaxing the timeout to declare success.
+
+The earlier scene/raster checks precede the final comment/test-only repairs; engine execution logic did not change afterward. Final Debug/Release engine, probe and Editor builds passed; the final Release product capture verifies the final production source hashes. Scoped format checks passed. No commit or push is part of this change. This is not a new Debug/Release RG6 performance comparison or a CSM depth-content cache acceptance.
+
+Excluded diagnostic attempts: the first depth-clear check copied only array slice zero; the corrected test explicitly copies each layer. Earlier generation rejection checks used aggregate resource deferral and obscured a shader failure during exception cleanup; selection-stage deferral is now checked separately. The CSM math fixture omitted its required device service and its rejected-cascade assertion confused submitted indirect commands with GPU-visible draws. The corrected fixture requires three submitted GPU candidates (two direct commands on devices without indirect support), checks per-cascade candidate counts, and still requires the rejected cascade's depth pixels to remain neutral. Failed/hung attempts are retained and excluded from acceptance. Exceptional fixture cleanup remains a separate lifetime issue; successful runs explicitly shut down their resource listeners after GPU idle.

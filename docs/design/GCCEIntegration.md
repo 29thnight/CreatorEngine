@@ -1,53 +1,167 @@
-# GCCE Scene graph 소유권과 정리 경계
+# GCCE scene graph integration
 
-> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
+Status: scoped Windows Debug/Release validation, 2026-10-09. Scene GC repeated
+20 times per configuration and Play round-trip regressions passed. See the
+[validation record](../analysis/GCCEValidation20261009.md) for evidence and remaining gates.
 
-## 적용 범위와 생성
+## Ownership and construction
 
-GCCE는 Scene → Entity → Component의 GC graph를 관리한다. 공통 Object 전체, asset/Texture owners, renderer snapshot, native SDK/GPU 자원의 수명을 대체하지 않는다. engine-facing include는 `SceneGC.h`이며 자산은 `Ownership.h` 계약을 계속 사용한다.
+The scope is Scene → Entity → Component. `Object` is deliberately not managed:
+Prefab and other non-GC objects retain their existing ownership. AssetDepot and
+`ownership_cpp` resource owners, native SDK handles, renderer snapshots, and GPU
+accepted-work/completion ownership are unchanged.
 
-SceneManager는 owner thread의 `gc::domain`과 Scene root registry를 가진다. domain은 roots보다 먼저 선언되어 마지막에 파괴된다. Scene/Entity factory는 domain에서 root를 만들고 manager/Scene이 이를 채택한다. Entity의 Component vector와 missing-Transform fallback은 traced strong edge다.
+- SceneManager owns one GameThread `gc::domain`, declared before its external
+  `root_ref<Scene>` registry so the domain is destroyed last. Its public Scene list
+  is a const, nonowning enumeration. Temporary loading and DDOL transfers hold roots.
+- Scene traces its Entity slots; Entity traces its ordered Component edges and the
+  eagerly allocated missing-Transform fallback. SceneStore indexes/generations,
+  hierarchy transactions, and DDOL identity remain authoritative.
+- Component observes its owner through a weak identity. `GetOwner()` remains a raw
+  frame-borrow accessor for joined workers and fenced presentation reads; it does
+  not promote a weak reference on those threads.
+- Scene factories take the domain and return a root. The manager adopts that root.
+  Entity factories publish through `gc::make` before attaching Components. This
+  two-phase construction makes owner identity available before `SetOwner`.
+- Engine Components use `Component::CreateManaged`, which creates an external
+  temporary root and establishes a cleanup obligation immediately. Publication
+  into Entity precedes scheduler registration; failure rolls back both.
+- GC objects must not be created on the stack, embedded by value, made by ordinary
+  `new`, or held by `unique_ptr`. Socket pose data is a plain matrix value, not a
+  Transform Component. Standalone probes explicitly finalize before dropping roots.
 
-`Component::CreateManaged<T>`는 각 concrete type이 자기 `gc_trace`를 선언하도록 compile-time 검사하고 생성 즉시 cleanup obligation을 시작한다. 단순 inherited empty tracer로 새 subtype을 추가할 수 없다. ordinary new/stack/unique_ptr에 managed object를 넣는 방식은 사용하지 않는다.
+## Tracing and reflection
 
-## tracing과 reflection
+Tracing is explicit and independent of serialization. Every shipped concrete
+Component declares its own `gc_trace`, calls its base hook, and visits any strong
+GC fields, including ignored/nonserialized fields. The typed Component factory
+rejects a new subtype that only inherits a trace hook. This is a source contract,
+not automatic detection of an omitted field.
 
-각 tracer는 base hook과 strong GC field를 방문한다. serialization에서 ignore된 field도 trace 대상이면 포함해야 한다. reflection metadata가 이를 자동 추론하지 않는다. Component owner는 weak identity이고 `GetOwner`/Transform cache는 nonowning borrow다.
+Graph references retain their prior serialized pointer/sequence shape. Generic
+property copying and graph deserialization do not allocate or reassign ownership;
+Scene and ComponentFactory perform restoration in the explicit domain. The closed
+factory uses the existing `REFLECT_TYPE_LIST` and type IDs. Public CLR/native ABI
+handles remain generation values, never `gc::weak_ref` values that could outlive a
+domain. Editor cross-frame selections/popups re-resolve scene/entity/component IDs.
 
-SceneStore generation/slot과 기존 entity/component handle은 논리 identity의 기준이다. GC weak_ref를 CLR/public handle로 내보내 domain 이후까지 남기지 않는다. reflection은 저장 구조를 유지하되 graph 복구의 allocation/adoption은 Scene/ComponentFactory의 명시 domain 경계에서 수행한다.
+The pinned reflgen 1.0.0 descriptor factory previously checked only default
+constructibility before instantiating `new T` and `delete T`. The local vcpkg port
+patch additionally requires legal class allocation/deletion. Managed types still
+have metadata/serialization, but no ordinary descriptor factory. No reflgen
+repository changes or new code-generation protocol are required.
 
-## thread와 borrow
+## Thread and borrow boundaries
 
-graph mutation/collection은 SceneManager owner thread에서 수행한다. presentation 편집은 owned value와 generation/context epoch를 담은 명령으로 전달하고 실행 시 대상을 다시 resolve한다. animation/transform worker는 graph edge detach/collection 전에 join해야 한다. immutable AI/render snapshot은 별도 수명 계약을 유지한다.
+| Entry | Execution and retained data |
+| --- | --- |
+| Runtime/CLR graph operations | GameThread; Scene roots and traced edges |
+| Editor create/delete/duplicate/reparent/component/prefab operations | PresentationThread queues owned values and generation handles; existing GameThread command pump applies them |
+| Light creation and configuration | One queued operation; no fabricated immediate creation result |
+| Undo/Redo replay | GameThread; value-only Undo commits retain their existing synchronous UI behavior |
+| UI factories, hierarchy paste, terrain attachment, prefab drops | Whole actions queued with owned paths/IDs; targets resolved at execution |
+| Prefab editor open/close | GameThread adoption/retirement; persisted identities are re-resolved |
+| Editor command delivery/polling | Separate orchestration and scene-borrow sections; no blocking PresentationThread future |
+| Animation and transform workers | Existing jobs join before graph edges may detach or collection runs; stable Scene-rooted graph supplies their borrow lifetime |
+| AI jobs | Existing immutable snapshots and EntityHandle values |
+| Render/presentation/GPU work | Existing sealed snapshots and independent resource/completion owners |
 
-raw owner borrow는 pin 또는 root를 대신하지 않는다. 비동기 borrow가 edge보다 오래 살면 실제 대상의 pin을 owner thread에서 유지·해제해야 한다. memory pin은 Destroy 상태나 data race를 해결하지 않는다. scene borrow fence를 잡고 PresentationThread 응답을 동기 대기하는 새 경로를 만들지 않는다.
+Queued edits capture the scene-context epoch as well as target generations. A
+scene/session transition rejects an old click instead of applying it to a new
+context. Queue admission closes before teardown. No GC root or pin is moved into a
+worker/editor closure whose destructor could run on another thread. A pin protects
+memory, not logical Destroy state or unsynchronized data writes. An asynchronous
+borrow that can outlive its graph edge needs a pin for the actual borrowed object,
+retained and released by the owner thread after its job joins.
 
-## 결정적 cleanup과 GC
+Live-scene command handlers must not synchronously wait for PresentationThread
+work while holding the scene borrow fence. Use request/poll splitting for such
+operations. Source review found bounded RT/GPU waits and nonblocking presentation
+polls, not a demonstrated GT/PT wait cycle. This is not proof of runtime deadlock
+freedom, and some existing diagnostic handlers still block while they execute.
 
-Destroy는 기존 lifecycle hook을 유지한다. `FinalizeManagedDestroy`는 idempotent native release 후 owner observations를 지우고 GC lifecycle을 destroyed로 전이한다. collector destructor가 정상 engine lifecycle callback을 실행하도록 위임하지 않는다. cleanup 실패는 root를 유지하고 retired 성공으로 표시하지 않는다.
+## Deterministic cleanup and collection
 
-Scene retirement guard는 callback 이전에 켜며 reentry/re-adoption을 거부한다. slot release는 generation handle을 무효화한다. DDOL의 이동 root와 lifecycle은 완전 파괴와 구분한다.
+Destroy still delivers the existing lifecycle hooks. Pending cleanup keeps objects
+reachable. Script handles remain valid during final hooks and are invalidated before
+Entity edge removal; DDOL detach does not invalidate them. Selection borrows are
+pruned before a Scene slot is released. Detached components leave the source
+lifecycle schedule and re-register in the destination.
 
-정상 frame boundary는 `collect_step(250μs,16 units)`를 사용한다. allocation trigger는 1 MiB, maximum cycle interval은 1초다. soft budget이므로 큰 tracer/destructor/allocator 작업이 넘을 수 있다. full collection을 매 frame 돌리거나 latency 향상을 보장하는 설계가 아니다.
+`FinalizeManagedDestroy` performs idempotent native resource release before clearing
+owner observations and marking the GC lifecycle destroyed. Animator releases CLR
+animation instances, controller owners, sockets, asset requests, and its native
+instance record there; MeshRenderer/Foliage cancel their subscriptions there.
+Collector destructors release owned storage, not normal engine lifecycle callbacks.
+The current CLR animation release is `AniBehaviorFactory.Destroy` dictionary removal,
+not a user Enter/Exit callback. Future cleanup extensions must recheck reentrancy.
 
-종료는 admission 중단, loads/jobs/PT/RT drain, lifecycle/native cleanup, graph root 해제, full collection, callback root 정리와 추가 collection, CLR/audio 등 서비스 종료 순서를 지켜 domain이 마지막에 사라지게 한다. module object 수만 0이라고 worker/callback code를 unload할 수 없다.
+Scene retirement sets its guard before callbacks and rejects new graph mutations or
+re-adoption. Cleanup failures retain their roots and fail closed; they are not marked
+successfully retired. Scene slot reuse still invalidates generation handles.
 
-## 빌드·배포·제약
+Collection runs after EndOfFrame callbacks and the DDOL observer sweep, while the
+editor's existing scene/presentation fence is held. The Player has the equivalent
+post-EndOfFrame boundary. Normal collection is `collect_step`: 250 μs soft budget,
+16 minimum units, 1 MiB allocation trigger, and a one-second maximum cycle interval.
+Teardown/edge release explicitly requests collection. No full collection runs every
+frame. Root scans, a large tracer/destructor, and allocator maintenance may overrun
+the soft budget; no latency or performance improvement is claimed.
 
-`Engine/GCCE/GCCE.vcxproj`는 vendored domain.cpp/block_allocator.cpp를 C++23 shared CRT DLL로 한 번 빌드한다. 구현만 GCCE_BUILDING, consumer는 GCCE_SHARED와 구성에 맞는 GC_DEBUG_CHECKS를 쓴다. 별도 static copy는 process-wide registry/thread state를 분리하므로 금지한다.
+Shutdown order is stop admission → drain loads/AI/jobs and PT/RT consumers → run
+Scene/component hooks and invalidate handles → drop graph/transfer roots → full
+collection → clear callback roots and collect again → shut down CLR/audio/other
+services. The domain is destroyed last. Module object count alone is not enough to
+unload code; callbacks and workers must also be quiescent.
 
-고정 upstream commit은 PROVENANCE에 기록되어 있다. 해당 pin에 upstream LICENSE가 없다는 제약을 그대로 보존한다. 허가 범위를 넘어 배포하기 전 적용 조건 확인이 필요하며 문서가 새 라이선스를 부여하지 않는다. 기존 runtime manifest/publisher가 같은 DLL/import closure를 배포한다.
+The default GCCE violation handler still aborts. Quarantine is not a substitute for
+cleanup, root release does not itself request collection, and nonmoving allocator
+pools may retain warm committed memory. No returning production violation handler
+has been installed to hide lifetime errors.
 
-이번 정리는 static ownership/call 경계 확인이다. [검증 안내](../analysis/GCCEValidation20261009.md)의 과거 결과와 현재 stress/latency/배포 검증을 구분한다.
+## Dependency and packaging
 
-## 구현 근거
+[Upstream provenance](../../ThirdParty/GCCE/PROVENANCE.md) pins all 16 unmodified
+source files to `aef79b3f57861fc16d0045e860e9082eeed8ec29` with hashes. Upstream
+supplies no LICENSE at this revision; none has been invented or changed.
 
-- [`Engine/SceneRuntime/SceneGC.h`](../../Engine/SceneRuntime/SceneGC.h)
-- [`Engine/SceneRuntime/SceneManager.h`](../../Engine/SceneRuntime/SceneManager.h)
-- [`Engine/SceneRuntime/SceneManager.cpp`](../../Engine/SceneRuntime/SceneManager.cpp)
-- [`Engine/SceneRuntime/Scene.h`](../../Engine/SceneRuntime/Scene.h)
-- [`Engine/SceneRuntime/Entity.h`](../../Engine/SceneRuntime/Entity.h)
-- [`Engine/SceneRuntime/Component.h`](../../Engine/SceneRuntime/Component.h)
-- [`Engine/SceneRuntime/Component.cpp`](../../Engine/SceneRuntime/Component.cpp)
-- [`Engine/GCCE/GCCE.vcxproj`](../../Engine/GCCE/GCCE.vcxproj)
-- [`ThirdParty/GCCE/PROVENANCE.md`](../../ThirdParty/GCCE/PROVENANCE.md)
+`Engine/GCCE/GCCE.vcxproj` builds one C++23 DLL. Only that project defines
+`GCCE_BUILDING`; consumers use `GCCE_SHARED` and matching `GC_DEBUG_CHECKS` (Debug 1,
+Release 0). SceneGC.h is the engine entry header. The DLL opts out of reflgen and
+vcpkg and uses the matching shared CRT. This exported C++ interface requires matching
+toolchain/configuration, not a stable cross-version C ABI.
+
+GCCE is shipping-neutral: `Bin/<platform>-<configuration>/Runtime/Common/gcce.dll`
+and `Build/Lib/<platform>-<configuration>/gcce.lib` are shared by Development and
+Shipping, including identical intermediate/PDB paths. The existing launcher and
+hashed deployment/package manifests carry its import closure. Standalone compiler
+probes use GCCEProbe.ps1 for the same definitions, import library, and DLL lookup.
+The vendored CMakeLists is provenance; its unvendored upstream tests/benchmarks are
+not an engine build entrypoint.
+
+## Validation and remaining gates
+
+Initial integration review covered source, exact upstream blob hashes, changed
+project XML, Python source parsing, include/reference inspection and whitespace.
+Subsequent authorized validation built the Editor dependency closure and managed
+assemblies in Windows x64 Debug/Release. Editor GC owner-source contracts (8),
+Entity ownership contracts, reflection container classification (D/R), and
+reflection value/shape round-trip (Debug, 37 axes) passed.
+
+Regression source includes `SceneGCSelfTest` (real graph cycles, hooks, stale handles,
+selection, DDOL and an actual component pin through job join), editor owner-thread
+source contracts, and migrated existing standalone component probes. The Scene GC
+fixture is invoked by the process-scoped `scene.gc.selftest` commandlet under the
+host scene borrow fence. Debug/Release each passed 20 repetitions with exit 0,
+including final incremental collection and unchanged live/quarantine/aborted-cycle
+counts. Its pin example intentionally distinguishes storage retention from
+logical cleanup and does not claim pins prevent Destroy.
+
+Play-to-Stop content restoration and the W5 state-machine/failure-injection/Undo
+preservation gates also passed in both configurations. These scoped initialized
+host runs exercise DLL loading, reflection regeneration, script handle identity
+and normal shutdown. They do not complete general script/native ABI coverage.
+Remaining runtime gates include repeated prefab UI transitions, cleanup callback
+reentrancy/failure paths, pending-work shutdown, packaged Player/Shipping,
+NativeAOT publish, ASan, and scale/latency benchmarks. Upstream tests were not run.
+The validation record also preserves Release PDB and profiler shutdown warnings.

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/ReflectionDesign.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>엔진 리플렉션 — reflgen</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-한-문단">0. 한 문단</a></li><li><a href="#1-타입을-서술하는-법">1. 타입을 서술하는 법</a></li><li><a href="#2-빌드-연동">2. 빌드 연동</a></li><li><a href="#3-런타임--등록소와-창구">3. 런타임 — 등록소와 창구</a></li><li><a href="#4-소비자">4. 소비자</a></li><li><a href="#5-검증">5. 검증</a></li><li><a href="#6-함정">6. 함정</a></li><li><a href="#7-기각한-대안">7. 기각한 대안</a></li><li><a href="#8-결정-이력">8. 결정 이력</a></li><li><a href="#9-옛-이름-대응">9. 옛 이름 대응</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="ReflectionDesign.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>엔진 리플렉션 — reflgen</h1>
+<div class="meta"><p>작성: 2026-09-30 · 근거: <code>reflgen-adoption</code> 브랜치(f58d9fc0) · reflgen 1.0.0(<code>ports/reflgen</code> 이 <code>v1.0.0</code> 태그를 가리킨다)
+이 문서는 엔진 리플렉션의 <strong>현재 설계 정본</strong>이다. 옛 체계(<code>reflect()</code> 레시피·<code>meta::schema</code>·<code>Meta::Type</code>)를
+말하는 문서를 읽을 때는 §9의 대응표를 본다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 10개의 분량 막대">
+<a class="map-row" href="#0-한-문단"><span class="ve-label">§0</span><span class="map-name">한 문단</span><span class="map-bar"><i style="width:13.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-타입을-서술하는-법"><span class="ve-label">§1</span><span class="map-name">타입을 서술하는 법</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-빌드-연동"><span class="ve-label">§2</span><span class="map-name">빌드 연동</span><span class="map-bar"><i style="width:57.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-런타임--등록소와-창구"><span class="ve-label">§3</span><span class="map-name">런타임 — 등록소와 창구</span><span class="map-bar"><i style="width:56.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-소비자"><span class="ve-label">§4</span><span class="map-name">소비자</span><span class="map-bar"><i style="width:33.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-검증"><span class="ve-label">§5</span><span class="map-name">검증</span><span class="map-bar"><i style="width:26.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-함정"><span class="ve-label">§6</span><span class="map-name">함정</span><span class="map-bar"><i style="width:23.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-기각한-대안"><span class="ve-label">§7</span><span class="map-name">기각한 대안</span><span class="map-bar"><i style="width:34.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-결정-이력"><span class="ve-label">§8</span><span class="map-name">결정 이력</span><span class="map-bar"><i style="width:15%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-옛-이름-대응"><span class="ve-label">§9</span><span class="map-name">옛 이름 대응</span><span class="map-bar"><i style="width:27.9%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 10개 가운데 「1. 타입을 서술하는 법」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><hr>
+</section>
+<section class="doc-sec" id="sec-0-한-문단">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-한-문단">0. 한 문단</h2></div>
+<div class="prose"><p>타입 서술의 정본은 <strong>헤더의 선언 그 자체</strong>다. <code>[[reflgen::reflect]]</code> 를 단 클래스의 non-static 데이터 멤버가
+전부 반영되고, 빼려면 <code>[[reflgen::ignore]]</code> 를 단다. 빌드 때 reflgen 생성기(libclang)가 헤더를 읽어 서술을
+만들고 모든 번역 단위에 강제 include 한다. 컴파일 때는 <code>reflgen::schema_of&lt;T&gt;</code>, 런타임에는 엔진이 소유한 등록소
+<code>Meta::Types()</code> 의 <code>reflgen::type_descriptor</code> 로 읽는다. 씬·프리팹 YAML, 인스펙터, 콘솔 <code>object.property</code>,
+Add-Component 목록이 모두 이 서술 하나를 읽는다. 저작 포맷은 옛 경로와 <strong>바이트 동일</strong>하다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-타입을-서술하는-법">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-타입을-서술하는-법">1. 타입을 서술하는 법</h2></div>
+<div class="prose"><pre><code class="language-cpp">// 예시 타입이다(저장소에 없다).
+class [[reflgen::reflect]] DoorComponent : public meta::identity&lt;DoorComponent, Component&gt;
+{
+    friend struct reflgen::access;   // private 멤버를 서술이 읽는다
+public:
+    [[reflgen::reflect, creator::read_only_in_inspector]]
+    bool IsOpen() const;
+
+    [[reflgen::reflect]]
+    void Toggle();                   // 인스펙터 메서드 버튼
+
+private:
+    EDoorKind m_kind = EDoorKind::Hinged;   // 반영된다 — 저장·인스펙터 대상
+
+    [[reflgen::range(0.0f, 1.0f)]]
+    float m_damping = 0.5f;
+
+    [[reflgen::readonly, creator::debug_only]]
+    HashedGuid m_lockID;             // 저장한다. 인스펙터는 디버그 모드에서 읽기 전용
+
+    [[reflgen::ignore]]
+    float m_openAmount = 0.0f;       // 런타임 상태 — 서술에서 뺀다
+};</code></pre>
+<p>속성은 자기 줄에 두고 선언은 그 아래 줄에, 이어진 내용과는 빈 줄로 가른다 —
+<a href="CodingConventions.html">CodingConventions.md</a> §7.4(게이트 <code>verify-reflgen-attribute-layout.ps1</code>).</p>
+<div class="table-scroll"><table>
+<thead><tr><th>규칙</th><th>내용</th></tr></thead>
+<tbody><tr><td>반영 범위</td><td>non-static 데이터 멤버 <strong>전부</strong>(opt-out). 옛 레시피는 opt-in이었다 — <strong>필드를 새로 들이면 저장 포맷이 바뀐다.</strong> 런타임 전용 상태에는 <code>[[reflgen::ignore]]</code> 를 단다</td></tr>
+<tr><td>메서드</td><td><code>[[reflgen::reflect]]</code> 를 단 것만. 인스펙터 메서드 UI와 메뉴 스크립트 목록이 읽는다</td></tr>
+<tr><td>부모</td><td><code>public</code> 부모 가운데 반영된 가장 가까운 조상. <code>meta::identity&lt;T, Base&gt;</code> 층은 건너뛴다</td></tr>
+<tr><td>이름</td><td>서술 이름 = 엔진 타입 이름(<code>TypeTrait::type_name&lt;T&gt;()</code>). <code>[[reflgen::reflect(&quot;다른 이름&quot;)]]</code> 은 쓰지 않는다 — §3.2의 검사가 멈춘다</td></tr>
+<tr><td>enum</td><td>필드의 enum은 <code>enum_descriptor</code> 로 인스펙터 콤보가 된다. YAML에는 정수로 적는다</td></tr>
+<tr><td>private 접근</td><td><code>friend struct reflgen::access;</code></td></tr></tbody></table></div>
+<p><code>meta::identity&lt;T, Base&gt;</code> 는 서술과 무관하다 — 생성 때 <code>m_name</code>·<code>m_typeID</code> 를 찍는 스탬핑만 한다
+(<code>ReflectionMeta.h</code>). <code>m_name</code> 은 씬 파일에 그대로 적히므로 reflgen 이름 표기와 엔진 표기가 같다는 것을
+<code>static_assert</code> 로 확인한다.</p>
+<h3 id="11-속성">1.1 속성</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>속성</th><th>읽는 곳</th></tr></thead>
+<tbody><tr><td><code>reflgen::ignore</code></td><td>서술에서 뺀다(엔진 전체 269곳)</td></tr>
+<tr><td><code>reflgen::hidden</code> · <code>reflgen::readonly</code> · <code>reflgen::display_name(&quot;…&quot;)</code> · <code>reflgen::range(lo, hi)</code></td><td>인스펙터 typed Draw(<code>ReflectionTypedDraw.h</code>)</td></tr>
+<tr><td><code>reflgen::transient</code></td><td>저장하지 않는다(<code>ReflgenAuthoringSerializers.h</code>)</td></tr>
+<tr><td><code>creator::debug_only</code> · <code>creator::wide</code></td><td>인스펙터 — 디버그 모드에서만 그린다 · 줄을 넓힌다</td></tr>
+<tr><td><code>creator::read_only_in_inspector</code> · <code>creator::hide_in_inspector</code></td><td>인스펙터 메서드 UI — 인자 없는 메서드를 매 프레임 불러 결과만 보인다 · 그리지 않는다</td></tr>
+<tr><td><code>creator::units(&quot;m&quot;)</code></td><td>저작 표기만 받는다(읽는 곳 없음)</td></tr></tbody></table></div>
+<p>엔진 속성은 <code>Engine/Utility_Framework/ReflgenAttributes.h</code> 의 독립 타입이다(<code>creator</code> 이름공간 =
+<code>ReflgenAttributeScopes</code>). 문자열 인자는 <code>reflgen::static_string</code> 으로 받는다 — 구조적 타입이라 C++26 주석
+값이 될 수 있다. 새 속성은 이 파일에 더한다. 인자에 <code>creator::…</code> 같은 이름공간 이름을 쓰면 그 헤더의 생성물이
+원본 헤더를 include 하므로(가벼운 주입을 잃는다, §2) 인자는 리터럴로 적는다.</p>
+<h3 id="12-새-타입을-들일-때">1.2 새 타입을 들일 때</h3>
+<ol>
+<li>헤더가 반영 모듈(<code>RenderEngine</code>·<code>SceneRuntime</code>·<code>Editor</code> — <code>Directory.Build.targets</code> 의
+<code>_EngineReflgenModule</code>)의 <code>ClInclude</code> 에 있어야 한다. 서술은 헤더를 <code>ClInclude</code> 로 가진 프로젝트가 만드는데,
+그 밖의 프로젝트에 두면 서술이 다른 프로젝트에 주입되지 않고(<code>ReflgenReference</code> 는 세 모듈만 잇는다) 그
+프로젝트의 등록 함수도 불리지 않는다. 새 모듈이 반영 타입을 가지면 <code>_EngineReflgenModule</code> 과 등록 호출을
+함께 더한다.</li>
+<li>컴포넌트·저작 레코드면 <code>RegisterReflectManual.h</code> 에 include와 <code>REFLECT_TYPE_LIST</code> 항목을 함께 더한다.
+이 목록이 typed 직렬화 훅(<code>TypeOps</code>)·에디터 typed Draw·아이콘 표·Add-Component 목록의 정본이다.
+등록소에는 반영 클래스가 전부 들어가므로(기반 <code>UIComponent</code> 까지) Add-Component 는 등록소가 아니라 이
+목록을 본다.</li>
+<li>서술이 직렬화하지 못하는 필드 타입은 컴파일 오류가 된다(reflgen <code>is_serializable</code>). 엔진 타입의 짝은
+<code>ReflgenAuthoringSerializers.h</code> 에 더한다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-빌드-연동">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-빌드-연동">2. 빌드 연동</h2></div>
+<div class="prose"><p>reflgen은 vcpkg 매니페스트(<code>vcpkg.json</code>)의 overlay port(<code>ports/reflgen</code>)로 들어온다. port가 reflgen 저장소의
+커밋을 가리키고, vcpkg가 생성기·헤더·MSBuild targets를 설치한다. <code>Directory.Build.targets</code> 가 그 targets를
+모든 <code>.vcxproj</code> 에 가져온다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>설정</th><th>값</th><th>까닭</th></tr></thead>
+<tbody><tr><td><code>ReflgenAttributeScopes</code></td><td><code>creator</code></td><td>엔진 속성 이름공간을 서술로 옮긴다</td></tr>
+<tr><td><code>ReflgenAttributeHeaders</code></td><td><code>ReflgenAttributes.h</code></td><td>주입 헤더가 맨 먼저 include 한다 — 생성물이 속성 타입을 원본 헤더 없이 본다</td></tr>
+<tr><td><code>ReflgenRegistration</code></td><td><code>true</code></td><td>모듈마다 <code>reflgen::generated::register_&lt;모듈&gt;(registry&amp;)</code> 를 만든다</td></tr>
+<tr><td><code>ReflgenRegistrationHeaders</code></td><td><code>RenderEngine/ReflgenRegistration.h</code></td><td>등록 함수의 번역 단위가 엔진 serializer 특수화와 <code>Material</code>(<code>MeshRenderer.h</code> 는 전방 선언만 한다)을 보게 한다</td></tr>
+<tr><td><code>ReflgenReference</code></td><td>세 모듈 서로</td><td>생성만 잇는 참조(빌드 순서를 걸지 않는다, 순환 허용 — 엔진 라이브러리는 서로의 헤더를 경로로 include 한다)</td></tr></tbody></table></div>
+<ul>
+<li><strong>주입은 전방 선언뿐이다.</strong> 서술은 타입이 완전한 자리에서 실체화된다. 헤더 하나를 고쳐도 그것을 include 하는
+번역 단위만 다시 컴파일된다. 원본 헤더를 끌어오게 되는 경우(클래스 안 타입, 이름공간 이름을 쓰는 속성 인자
+등)는 생성물에 그 까닭이 주석으로 남는다.</li>
+<li><strong>모든 native 프로젝트가 세 모듈의 주입을 받는다.</strong> 한 번역 단위라도 주입 없이 반영 타입을 보면
+<code>reflgen::reflectable&lt;T&gt;</code> 가 번역 단위마다 달라진다 — 조용한 ODR 위반이다.</li>
+<li>등록 함수의 번역 단위는 참조 프로젝트의 주입도 받는다(<code>reflgen_&lt;모듈&gt;.references.h</code>, reflgen 5357b1b).</li>
+</ul>
+<h3 id="21-reflgen을-다른-커밋에-고정할-때">2.1 reflgen을 다른 커밋에 고정할 때</h3>
+<ol>
+<li>reflgen 저장소에서 <code>scripts/make-overlay-port.ps1 -Destination &lt;엔진&gt;\ports</code> 로 port를 만들어 <code>ports/reflgen</code> 을
+바꾼다. <code>-Ref</code> 없이 부르면 그 저장소 판의 릴리스 태그(<code>v&lt;판&gt;</code>)를, <code>-Ref &lt;커밋&gt;</code> 이면 GitHub 에 push 한 커밋을
+받는다. 릴리스에 고정하는 것이 기본이다.</li>
+<li>첫 빌드는 vcpkg가 reflgen을 다시 설치한 뒤 <strong>&quot;Build again&quot;</strong> 오류로 멈춘다. 평가 때 가져온 targets가 낡았기
+때문이다(<code>_EngineReflgenUpdatedDuringBuild</code>). 두 번째 빌드가 새 reflgen으로 끝까지 간다.</li>
+<li>vcpkg MSBuild 연동은 원래 <code>vcpkg.json</code> 이 바뀔 때만 다시 설치한다. 엔진은 <code>ports\**</code> 를 설치 입력에 더해
+port 교체도 잡는다. 그래도 설치된 헤더가 실제로 바뀌었는지 한 번 확인하고 믿는다.</li>
+</ol>
+<p>reflgen을 고치면서 엔진에 바로 걸어 볼 때는 <code>EngineReflgenTargets</code> 를 reflgen 저장소의 <code>msbuild\reflgen.targets</code>
+로, <code>ReflgenExecutable</code> 을 빌드한 생성기로 준다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-런타임--등록소와-창구">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-런타임--등록소와-창구">3. 런타임 — 등록소와 창구</h2></div>
+<div class="prose"><h3 id="31-등록소">3.1 등록소</h3>
+<p><code>Meta::Types()</code> 가 프로세스에 하나인 <code>reflgen::registry</code> 다. 정의는 <code>ReflgenRuntime.cpp</code> 에 둔다 — 헤더 인라인
+싱글턴은 금지다(<code>verify-header-inline-singleton.ps1</code>). <code>reflgen::default_registry()</code> 는 헤더 인라인이라 엔진을
+DLL로 떼면 모듈마다 갈리므로 쓰지 않는다. 채우는 곳:</p>
+<ul>
+<li><code>RegisterReflectManual()</code> — <code>register_RenderEngine</code> · <code>register_SceneRuntime</code>, 그리고 <code>REFLECT_TYPE_LIST</code> 의 <code>TypeOps</code></li>
+<li>에디터 초기화(<code>EditorMain</code>) — <code>register_Editor</code></li>
+</ul>
+<h3 id="32-정체성">3.2 정체성</h3>
+<p>엔진 typeID와 reflgen <code>type_id</code> 는 <strong>같은 값</strong>이다 — 둘 다 한정 이름의 FNV-1a 64다. <code>RegisterReflectManual.h</code>
+가 <code>REFLECT_TYPE_LIST</code> 의 타입마다 두 가지를 컴파일 때 대조한다: <code>type_id</code> 가 엔진 typeID와 같은지, 서술 이름이
+<code>TypeTrait::type_name&lt;T&gt;()</code> 와 같은지. 표기가 갈리면 조용한 &quot;미등록&quot;이 아니라 빌드가 멈춘다. 이름 표기는
+reflgen 표기다(<code>std::basic_string&lt;char,std::char_traits&lt;char&gt;,…&gt;</code> 등) — 콘솔 <code>object.properties</code> 의 타입 이름도
+이 표기로 나온다.</p>
+<h3 id="33-창구--reflgenruntimeh">3.3 창구 — <code>ReflgenRuntime.h</code></h3>
+<div class="table-scroll"><table>
+<thead><tr><th>함수</th><th>뜻</th></tr></thead>
+<tbody><tr><td><code>Meta::Find(name)</code> · <code>Meta::Find(HashedGuid)</code></td><td>이름·typeID로 서술자</td></tr>
+<tr><td><code>Meta::TypeOf&lt;T&gt;()</code> · <code>Meta::Require(id, name)</code></td><td>등록돼 있어야 하는 타입 — 없으면 예외(등록 누락)</td></tr>
+<tr><td><code>Meta::TypeIDOf(type)</code></td><td>서술자 → 엔진 typeID</td></tr>
+<tr><td><code>Meta::Parent(type)</code></td><td>가장 가까운 반영된 부모</td></tr>
+<tr><td><code>Meta::LocalFields(type)</code> · <code>Meta::LocalMethods(type)</code></td><td>그 타입이 선언한 것만. <code>fields()</code>·<code>methods()</code> 는 부모 것까지 부모 우선</td></tr>
+<tr><td><code>Meta::Create&lt;Base&gt;(type)</code></td><td>새 인스턴스를 <code>Base</code> 로 — 포인터 보정은 서술자의 base 체인이 한다</td></tr>
+<tr><td><code>Meta::MostDerived(object)</code></td><td>다형 객체의 실타입 주소</td></tr></tbody></table></div>
+<p>소비자는 <strong><code>reflgen::type_descriptor_of&lt;T&gt;()</code> 를 직접 부르지 않는다.</strong> 그 번역 단위에서 서술자를 다시 만들고(컴파일
+비용), 엔진 특수화를 못 보는 번역 단위라면 다른 서술자가 된다(ODR 위반). 등록소에서 찾기만 한다.</p>
+<p><strong>포인터 계약</strong>: 서술자의 <code>serialize</code>·<code>deserialize</code>·필드 <code>address()</code>·메서드 <code>invoke()</code> 는 <strong>그 서술자 타입의
+포인터</strong>를 받는다. 엔진 객체를 넘기는 <code>IObject*</code> 오버로드(<code>SerializeInto</code>·<code>SerializeDocument</code>·<code>Deserialize</code>·
+<code>DeserializePrefab</code>)는 <code>ObjectAddress</code> 로 주소를 맞춘다 — 실타입 주소에서 실타입 서술자의 base 체인을 따라
+올라간다. <code>Component*</code>·<code>Entity*</code> 인자는 <code>void*</code> 보다 이 오버로드로 가므로 호출처가 보정을 잊을 수 없다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-소비자">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-소비자">4. 소비자</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>소비자</th><th>경로</th></tr></thead>
+<tbody><tr><td>씬·프리팹·복제 YAML</td><td><code>ReflectionYml.h</code> — <code>type.serialize/deserialize</code> 를 Authoring 노드 위의 <code>ReflgenWriter</code>/<code>ReflgenReader</code>(<code>ReflgenAuthoring.h</code>)로 부른다. 레코드 봉투(훅·헤더·레거시 건너뛰기 규칙·<code>OnPropertyChanged</code>·수학 타입 flow map·포인터 필드)는 <code>ReflgenAuthoringSerializers.h</code></td></tr>
+<tr><td>역직렬화 후처리</td><td><code>TypeOps</code> 에는 <code>postLoad</code> 훅만 남는다. 쓰기·읽기는 서술자가 한다</td></tr>
+<tr><td>설정 자산</td><td><code>RuntimeSettings</code>·<code>EditorSettingsStore</code> 는 등록 전에 읽고 쓰므로 컴파일 때 경로(<code>Meta::Typed::SerializeObjectInto</code>·<code>DeserializeObjectFrom</code>)를 쓴다</td></tr>
+<tr><td>인스펙터</td><td>typed Draw(<code>ReflectionTypedDraw.h</code>)가 <code>reflgen::schema_of</code>·<code>direct_bases_t</code>·속성을 읽는다. 메서드 UI는 <code>method_info::invoke</code>(<code>ReflectionImGuiHelper.h</code>), enum 콤보는 <code>enum_descriptor</code> 가 기반 폭에 맞춰 읽고 쓴다</td></tr>
+<tr><td>콘솔 <code>object.property</code></td><td><code>EditorObjectOperations.cpp</code> — 필드 주소에 타입별로 쓴다. enum은 이름과 값을 모두 받는다</td></tr>
+<tr><td>Add-Component</td><td><code>REFLECT_TYPE_LIST</code> 의 타입(§1.2)</td></tr></tbody></table></div>
+<p><strong><code>DeserializePrefab</code> 은 그 타입이 선언한 필드(<code>LocalFields</code>)만 프리팹 값으로 바꾼다.</strong> 옛 경로도 결과가 같았다
+— 부모 단계를 먼저 읽었지만 마지막 읽기가 그 전에 뜬 스냅샷으로 부모 필드(<code>m_name</code>·<code>m_instanceID</code> 등)를
+되돌렸다. 부모 필드까지 받으면 인스턴스가 원본의 이름과 instanceID를 받는다(<code>verify-prefab-override-write</code> 가
+잡는다).</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-검증">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-검증">5. 검증</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>무엇</th><th>어떻게</th></tr></thead>
+<tbody><tr><td>저장 포맷</td><td>기준선(전환 전 master) 에디터와 같은 장면을 열고 저장해 바이트 비교 — 컴포넌트 25종 fixture·<code>FT_Primitives</code>·<code>ProfilingWorkerFixture</code>·자산 코퍼스 장면</td></tr>
+<tr><td>프리팹·플레이</td><td><code>verify-prefab-{roundtrip,override-write,nested,nested-update,duplicate,identity-injection}</code> · <code>verify-play-roundtrip</code></td></tr>
+<tr><td>컨테이너</td><td><code>verify-reflection-container</code>(빈 컨테이너 래칫은 <code>ReflgenAuthoring.h</code> 를 본다) · <code>verify-reflection-container-roundtrip</code>(28축, <code>reflection_container_roundtrip_probe.cpp</code>)</td></tr>
+<tr><td>인스펙터</td><td><code>verify-inspector-drawer-layout</code> · <code>verify-inspector-spatial-policy</code></td></tr>
+<tr><td>컴파일 때</td><td>§3.2 정체성 대조, <code>meta::identity</code> 이름 대조, reflgen 직렬화 가능성 검사</td></tr>
+<tr><td>기동 때</td><td><code>VerifyReflectRegistration()</code>(<code>RegisterReflectManual.h</code>) — <code>REFLECT_TYPE_LIST</code> 의 서술자가 쓰고 읽을 수 있어야 한다. 등록 함수가 serializer 특수화를 못 보면 critical 로그 후 abort</td></tr>
+<tr><td>배치</td><td><code>verify-reflgen-attribute-layout.ps1</code> — 속성 배치 규약(CodingConventions.md §7.4)</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-함정">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-함정">6. 함정</h2></div>
+<div class="prose"><ul>
+<li><strong>필드 추가 = 포맷 변경.</strong> opt-out이므로 새 멤버는 기본으로 저장된다. <code>[[reflgen::ignore]]</code> 를 떼는 것도
+같다. 전환 때 옛 레시피에 없던 필드에는 codemod(<code>Tools/migration/reflgen_codemod.py</code>)가 <code>ignore</code> 를 붙였다 —
+<code>RigidBodyComponent::AngularDamping</code> 처럼 레시피 누락이 그대로 옮겨진 것도 있다.</li>
+<li><strong>전방 선언만 된 필드 타입.</strong> 서술자는 등록 함수의 번역 단위에서 만들어지므로 그곳이 타입을 완전히 봐야
+한다. 헤더가 전방 선언만 하는 타입은 <code>ReflgenRegistration.h</code> 에 include를 더한다. reflgen은 아직 이 경우를
+분명하게 진단하지 않는다.</li>
+<li><strong>컴파일 시간.</strong> 직렬화 본문을 번역 단위마다 실체화하지 않는다 — 소비자는 등록소의 서술자를 부른다. 전환 뒤
+Editor 빌드(Debug x64, <code>/m</code>): clean 342.9 s → 308.6 s, <code>Transform.h</code> 수정 185.1 s → 136.3 s.</li>
+<li><strong>생성기가 다루지 않는 것</strong>: 클래스 템플릿, 오버로드된 반영 메서드, enumerator 속성, union. 진단으로 멈춘다.</li>
+<li><strong><code>&amp;&amp;</code>·<code>volatile</code>·가변 인자 메서드</strong>는 <code>schema_of</code> 에는 있지만 런타임 <code>methods()</code> 에서는 빠진다(부를 수 없다).</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-기각한-대안">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-기각한-대안">7. 기각한 대안</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>대안</th><th>기각 근거</th></tr></thead>
+<tbody><tr><td>엔진 스키마(<code>MetaSchema.h</code>)를 정본으로 두고 reflgen을 다리(<code>meta::of&lt;T&gt;</code>)로 잇기 — P3·P4의 형태</td><td>스키마가 두 벌이고 둘이 같다는 것을 대조표로 지켜야 했다(필드를 고칠 때마다 깨졌다). 다리가 번역 단위마다 스키마를 옮기는 비용도 컸다 — 다리·엔진 스키마·직렬화 썽크를 걷은 P5 마지막 단계 전후로 <code>Transform.h</code> 수정 빌드가 177.6 s → 136.3 s</td></tr>
+<tr><td>생성물이 원본 헤더를 include 하는 주입</td><td>P0에서 Editor 빌드 3.1배, <code>windows.h</code> 의 <code>near</code> 매크로가 번역 단위 하나를 깨뜨렸다. 전방 선언만 주입한다</td></tr>
+<tr><td><code>reflgen::default_registry()</code></td><td>헤더 인라인이라 엔진을 DLL로 떼면 모듈마다 등록소가 갈린다. 헤더 인라인 싱글턴 금지 규약에도 걸린다</td></tr>
+<tr><td><code>TypeOps</code> 가 타입마다 직렬화 썽크를 들기</td><td><code>SceneManager.cpp</code> 가 76타입의 직렬화를 따로 실체화했다(48.5 s → 서술자 경유 16.0 s). 썽크를 둔 채로는 clean 빌드가 기준선보다 9.6% 느렸다</td></tr>
+<tr><td>소비자가 <code>type_descriptor_of&lt;T&gt;()</code> 를 직접 부르기</td><td>서술자를 번역 단위마다 다시 만들고, 엔진 특수화를 못 보는 곳에서는 다른 서술자가 된다(§3.3)</td></tr>
+<tr><td><code>DeserializePrefab</code> 이 부모 필드까지 바꾸기</td><td>인스턴스가 원본의 <code>m_name</code>·<code>m_instanceID</code> 를 받는다. 옛 경로의 결과(선언한 필드만)와 같게 둔다(§4)</td></tr>
+<tr><td>Add-Component 목록을 등록소에서 뽑기</td><td>등록소에는 반영 클래스가 전부 들어가 기반 <code>UIComponent</code> 까지 이름 규칙에 걸린다. <code>REFLECT_TYPE_LIST</code> 를 본다</td></tr>
+<tr><td>엔진 YAML emitter를 유지하고 서술만 reflgen에서 받기</td><td>직렬화 규칙이 두 곳에 있게 된다. 엔진 YAML은 reflgen 직렬화 위의 writer·reader로 쓰고, 출력은 바이트 동일로 맞췄다(2026-09-28 결정)</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-결정-이력">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-결정-이력">8. 결정 이력</h2></div>
+<div class="prose"><ul>
+<li>2026-08-07 <a href="ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a> — 엔진 리플렉션 존치. 근거(자산
+포맷·핫리로드·인스펙터 자동 생성)는 지금도 유효하고, reflgen 전환은 세 가지를 모두 유지한다.</li>
+<li>PHASE 18 <a href="../plans/archive/ReflectionRedesignPlan.html">ReflectionRedesignPlan.md</a> — 매크로를 걷고
+<code>static consteval auto reflect()</code> 레시피로 옮겼다.</li>
+<li>2026-09 reflgen 전환(P3 파일럿 → P4 전체 변환 → P5 소비자) — 레시피를 헤더 속성으로 옮기고
+(<code>reflgen_codemod.py</code>: 79타입, <code>ignore</code> 269곳), YAML을 reflgen 직렬화로, 런타임 타입 표와 인스펙터를 reflgen
+서술로 옮긴 뒤 엔진 스키마(<code>MetaSchema.h</code>)와 다리(<code>ReflgenBridge.h</code>)를 걷었다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-옛-이름-대응">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-옛-이름-대응">9. 옛 이름 대응</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>옛</th><th>지금</th></tr></thead>
+<tbody><tr><td><code>static consteval auto reflect()</code> + <code>meta::schema&lt;Self&gt;(meta::field&lt;&amp;Self::x&gt;, …)</code></td><td><code>class [[reflgen::reflect]] T</code> + 멤버 선언(빼는 것에 <code>[[reflgen::ignore]]</code>)</td></tr>
+<tr><td><code>meta::field&lt;…&gt;.with(attr)</code></td><td>멤버에 <code>[[attr]]</code></td></tr>
+<tr><td><code>meta::method&lt;…&gt;</code> · <code>Meta::MakeMethod</code></td><td>메서드에 <code>[[reflgen::reflect]]</code> · <code>reflgen::method_info</code></td></tr>
+<tr><td><code>meta::schema_of&lt;T&gt;</code> · <code>meta::of&lt;T&gt;</code></td><td><code>reflgen::schema_of&lt;T&gt;</code></td></tr>
+<tr><td><code>meta::displayName</code> · <code>meta::units_attr</code> 등</td><td><code>reflgen::display_name</code> · <code>creator::units</code> 등</td></tr>
+<tr><td><code>Meta::Type</code> · <code>Meta::Property</code> · <code>Meta::Method</code></td><td><code>reflgen::type_descriptor</code> · <code>field_info</code> · <code>method_info</code></td></tr>
+<tr><td><code>Meta::Registry</code> · <code>RegisterClassInitalize</code></td><td><code>Meta::Types()</code> · 생성된 <code>register_&lt;모듈&gt;</code></td></tr>
+<tr><td><code>Meta::Find</code> · <code>Meta::TypeOf</code></td><td>같은 이름, 서술자를 돌려준다(<code>ReflgenRuntime.h</code>)</td></tr>
+<tr><td><code>create_enum_type</code> · <code>Property::enumType</code></td><td><code>reflgen::enum_descriptor_of&lt;E&gt;()</code> · <code>field_info::enumeration()</code></td></tr>
+<tr><td><code>MetaSchema.h</code> · <code>ReflgenBridge.h</code> · <code>ReflgenParity.h</code></td><td>없음</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ReflectionDesign.md"><code>docs/design/ReflectionDesign.md</code></a> · 마지막 커밋 2026-09-30 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

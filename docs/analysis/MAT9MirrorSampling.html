@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/MAT9MirrorSampling.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAT-9 forest 거울 반사 정밀도</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#원인과-구현">원인과 구현</a></li><li><a href="#고정-이미지-재대조">고정 이미지 재대조</a></li><li><a href="#쿠킹캐시와-비용">쿠킹·캐시와 비용</a></li><li><a href="#빌드실제-실행">빌드·실제 실행</a></li><li><a href="#재현-및-기존-잔여">재현 및 기존 잔여</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="MAT9MirrorSampling.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>MAT-9 forest 거울 반사 정밀도</h1>
+<div class="meta"><p>2026-10-01. <a href="MAT9HdriRange.html">HDR 에너지 보존 작업</a>의 forest mirror 잔여를 수정했다.
+고정 7조건은 모두 기존 목표를 통과했다. 전체 HDRI grid 및 MAT-9 완료 판정은 별도다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">9<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 9"><i class="ok" style="flex:9"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 9</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#원인과-구현"><span class="ve-label">§00</span><span class="map-name">원인과 구현</span><span class="map-bar"><i style="width:97%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#고정-이미지-재대조"><span class="ve-label">§01</span><span class="map-name">고정 이미지 재대조</span><span class="map-bar"><i style="width:63.8%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">7</span></span></a>
+<a class="map-row" href="#쿠킹캐시와-비용"><span class="ve-label">§02</span><span class="map-name">쿠킹·캐시와 비용</span><span class="map-bar"><i style="width:85.9%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">2</span></span></a>
+<a class="map-row" href="#빌드실제-실행"><span class="ve-label">§03</span><span class="map-name">빌드·실제 실행</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현-및-기존-잔여"><span class="ve-label">§04</span><span class="map-name">재현 및 기존 잔여</span><span class="map-bar"><i style="width:38.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「빌드·실제 실행」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-원인과-구현">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="원인과-구현">원인과 구현</h2></div>
+<div class="prose"><p>같은 원본 HDR·메시·카메라·344픽셀 emission interior를 사용했다.
+원본을 Native normal/view에서 CPU로 직접 조회하면 RMS <strong>1.2801%</strong>, 공유 triangle에
+픽셀 중심 ray를 교차시켜 조회하면 **0.4713%**다. 기존 cube를 소비한 Native는
+**3.1285%**였다. 큐브의 footprint 평균·재투영·재필터링과 래스터 표면 보간을 분리했다.</p>
+<ul>
+<li><strong>원본 HDR 보존:</strong> CEIBL004에 decoded linear Rec.709 RGBA32F 2D source를 추가했다.
+<code>IblSourceCopy</code>가 소스 mip 0을 그대로 보존한다. 거칠기 0의 base/coat 반사는
+이 source를 조회한다. 경도 U wrap, 위도 V clamp 및 float bilinear 4-fetch를 사용한다.
+선명한 HDR 반사에서 하드웨어 필터의 subtexel 정밀도 영향을 피한다.</li>
+<li><strong>픽셀 중심 보간:</strong> Scene fragment에서 world position과 normal/tangent/bitangent/UV의
+fine derivatives가 만드는 같은 triangle plane을 사용한다. 그 plane의 동차 투영을
+실제 픽셀 중심에 맞춰 풀어 보간 값을 보정한다. 추가 index/vertex fetch는 없다.
+GBuffer·color·lookup·special fragment에 같은 계산을 적용한다.</li>
+<li><strong>제품 연결:</strong> 8-map cook→cache→bootstrap→Scene t30 binding, owner/generation/reuse와
+graph 상태 전이를 연결했다. SceneHost identity는 8이다. CEIBL001/002/003은 원래
+배치로 읽으며, source가 없는 cook은 cube 조회를 사용한다.</li>
+</ul>
+<p>공유 triangle을 이용한 독립 double ray 계산과 비교한 Native normal RMS는
+8.6362e-5→<strong>9.0021e-8</strong>, view RMS는 1.4367e-5→<strong>5.7863e-8</strong>로 감소했다.
+보정 후 CPU source 조회 RMS 0.4713%와 Native 0.4693%가 같은 수준이다.
+<a href="MAT9MirrorSampling.json">분리 측정 JSON</a>은 진단이며 이미지 수용 게이트를 대체하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-고정-이미지-재대조">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="고정-이미지-재대조">고정 이미지 재대조</h2></div>
+<div class="prose"><p>Blender 5.1.1 Cycles CPU, 64×64, 131072 samples, seed 0/11을 유지했다.
+Blender는 원본 EXR/HDR을 읽는다. 원래 기준 이미지·입력·geometry를 변경하지 않고,
+engine cook만 새 파일로 지정한 reference 사본에서 Native를 재촬영했다.
+RMS ≤1%, p95 normalized ≤1%, max normalized ≤5%, reference seed RMS ≤0.25%를 유지했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">v3 RMS</th><th style="text-align:right">v4 RMS</th><th style="text-align:right">p95 normalized</th><th style="text-align:right">max normalized</th><th>판정</th></tr></thead>
+<tbody><tr><td>forest emission</td><td class="num" style="text-align:right">0%</td><td class="num" style="text-align:right">0%</td><td class="num" style="text-align:right">0%</td><td class="num" style="text-align:right">0%</td><td><span class="chip ok">통과</span></td></tr>
+<tr><td>forest diffuse</td><td class="num" style="text-align:right">0.3574%</td><td class="num" style="text-align:right">0.3584%</td><td class="num" style="text-align:right">0.2985%</td><td class="num" style="text-align:right">0.6993%</td><td><span class="chip ok">통과</span></td></tr>
+<tr><td>forest mirror</td><td class="num" style="text-align:right">3.1285%</td><td class="num" style="text-align:right"><strong>0.4693%</strong></td><td class="num" style="text-align:right">0.2811%</td><td class="num" style="text-align:right">3.5924%</td><td><span class="chip ok">통과</span></td></tr>
+<tr><td>autumn thin film</td><td class="num" style="text-align:right">0.8607%</td><td class="num" style="text-align:right">0.8631%</td><td class="num" style="text-align:right">0.6150%</td><td class="num" style="text-align:right">1.2478%</td><td><span class="chip ok">통과</span></td></tr>
+<tr><td>autumn emission</td><td class="num" style="text-align:right">0%</td><td class="num" style="text-align:right">0%</td><td class="num" style="text-align:right">0%</td><td class="num" style="text-align:right">0%</td><td><span class="chip ok">통과</span></td></tr>
+<tr><td>autumn diffuse</td><td class="num" style="text-align:right">0.4107%</td><td class="num" style="text-align:right">0.4117%</td><td class="num" style="text-align:right">0.4681%</td><td class="num" style="text-align:right">0.6476%</td><td><span class="chip ok">통과</span></td></tr>
+<tr><td>autumn mirror</td><td class="num" style="text-align:right">0.5531%</td><td class="num" style="text-align:right"><strong>0.3275%</strong></td><td class="num" style="text-align:right">0.1415%</td><td class="num" style="text-align:right">0.3734%</td><td><span class="chip ok">통과</span></td></tr></tbody></table></div>
+<ul>
+<li><a href="MAT9MirrorComparison.json">Native 비교와 기준 SHA</a>, <a href="MAT9MirrorComparison.png">contact sheet</a>.</li>
+<li><a href="MAT9MirrorTargets.json">7/7 고정 target 판정</a>: 전체 <code>accepted=false</code>를 유지한다.</li>
+<li>emission은 byte 일치. Native 121542 checks, GPU validation 0, 정상 종료.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-쿠킹캐시와-비용">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="쿠킹캐시와-비용">쿠킹·캐시와 비용</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>값</th></tr></thead>
+<tbody><tr><td>recipe SHA</td><td><code>31ea098d2c3f881500d8a0dba6c2cdabdaf4af110d2adca8dd026a54a219a8e2</code></td></tr>
+<tr><td><span class="chip ok">forest cook SHA</span></td><td><code>fc0c61b3d72ad816585087d12ec0145a9bd0100ce3cf613a1fd18007f3af7ff7</code></td></tr>
+<tr><td><span class="chip ok">autumn cook SHA</span></td><td><code>f2ce3a108c33c82755a7e82932aaa50c8a5a9e087e4f7ac680fe5048ce0b8613</code></td></tr>
+<tr><td>source</td><td>두 환경 모두 1024×512 RGBA32F, 8 MiB</td></tr>
+<tr><td>파일 크기</td><td>94640240→103028856 bytes, 90.26→98.26 MiB</td></tr></tbody></table></div>
+<p>기존 4 lighting map 및 3 CDF/sample map은 v3와 byte 일치한다.
+두 환경의 8-map GPU upload/readback roundtrip은 전체 파일 SHA가 일치하며 validation 0이다.
+<a href="MAT9MirrorForestCook.json">forest 검증</a>, <a href="MAT9MirrorAutumnCook.json">autumn 검증</a>.
+forest source는 Blender에서 decoded한 원본 F32와 byte 일치한다.
+autumn은 제품의 기존 DirectXTex HDR decoder를 유지한다. Blender HDR decode와 원본 RGB
+norm 차이 0.2753%가 있어 두 decoder의 decoded byte 일치를 주장하지 않는다.
+제품 decoder의 source는 GPU roundtrip에서 그대로 보존되며, rendered 비교는 위 표와 같다.</p>
+<p>Resource와 Debug Editor 배포 forest의 SHA가 일치한다. 원본 EXR은 배포하지 않는다.
+warm default cook read/checksum 한 실행은 473.68ms이며 EXR decode·GPU 생성은 없었다.
+이는 Editor FPS나 평균 startup 성능 수용이 아니다. Source 메모리와 sharp reflection의
+추가 조회, fragment 보정의 비용은 실제 모델 성능 게이트에서 측정해야 한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-빌드실제-실행">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="빌드실제-실행">빌드·실제 실행</h2></div>
+<div class="prose"><ul>
+<li>Environment shader DXIL/SPIR-V 각각 7 entries 검증 성공.</li>
+<li>CreatorEditor Debug 전체 빌드 성공, 38-file shared runtime manifest
+<code>a16ad5c661aeacc71245e13f9699a8fee851b7eaedf401087ae1ab81dddc8277</code>.</li>
+<li>Release raster/Scene: 21067374 checks, 3889591 GPU components, 24 compiled entries,
+validation 0, 정상 종료. 공유 깊이·가림·skinning·texture·generation/abort·lookup reuse 통과.
+이 실행의 lookup 시간은 성능 수용에 사용하지 않는다.</li>
+<li>실제 Debug Editor HTTP 조작: 독립 최종 실행 11 checks, 정상 종료. v4 default bootstrap,
+배경 토글 시 IBL generation 1→1, HDR 변경 후 v4 영속화, 손상 cook 거부·기존 환경 보존.
+runtime이 저장한 autumn v4 cook은 authoring 파일과 전체 SHA 일치.</li>
+<li>기존 방향광/균일 환경 Core·Layered 이미지 24장 재검증: 400520 checks, validation 0.
+같은 고정 target 24/24, 상수 재질 20조건 RMS 최대 0.1792%, p95 최대 0.1958%,
+max normalized 최대 0.4487%. <a href="MAT9MirrorCoreComparison.json">회귀 대조</a>.</li>
+<li>Dashboard Vite 1.79s, inline script parse, Python 구문 및 diff whitespace 검사 통과.</li>
+<li>기존 profiler 종료 진단 <code>shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]</code>는
+최종 Editor 실행에도 남았다. 정상 종료와 구분하며 이번 작업의 해결 항목으로 세지 않는다.</li>
+<li>Vulkan은 shader 검증 범위이며 이 단계에서 GUI runtime을 확인한 것은 아니다.</li>
+</ul>
+<p>주요 로그는 <code>Build/Obj/mat9-mirror-*</code>, 이미지는 <code>Mat9Images-Release-hdri-v4-controls</code>,
+최종 실제 Editor 실행은 <code>NeutralEnvironment/Debug-DX12-mirror-final</code>이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현-및-기존-잔여">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="재현-및-기존-잔여">재현 및 기존 잔여</h2></div>
+<div class="prose"><p><code>rebind-environment-reference.py</code> → <code>measure-material-blender-images.ps1</code> 순서로 원래
+source 기준 픽셀을 보존한 대조를 수행한다. <code>measure-mirror-sampling.py</code>는 NumPy 환경에서
+같은 geometry의 픽셀 중심 ray와 Native normal/view를 분리한다.</p>
+<p>forest mirror 잔여는 고정 조건에서 통과했다. 다음은 <strong>전체 HDRI 26조건의 수렴·수용</strong>이다.
+기존 special transport·texture/normal-map·route parity·실제 모델 cold/warm/이동 카메라 성능,
+원래 area-light ABI/consumer gate도 계획의 기존 범위로 남긴다.
+새 공수 행은 추가하지 않으며 MAT-9 progress·기존 완료 공수 32/34일을 유지한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MAT9MirrorSampling.md"><code>docs/analysis/MAT9MirrorSampling.md</code></a> · 마지막 커밋 2026-10-01 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

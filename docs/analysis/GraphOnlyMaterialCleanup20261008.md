@@ -1,32 +1,36 @@
-# Graph-only 정리 이후의 준비·실패·shadow cache 경계
+# Graph-only material cleanup — 2026-10-08
 
-> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
+Base: `9c1c2aeae0e85cc3a2caacea142aee1e706cf88f`. This cleanup preserves the exact requested MaterialGraph instance, all-or-nothing readiness selection, graph transparent ordering and recording-owned resource lifetime.
 
-## 현재 정리 결과
+## Changes
 
-2026-10-08 cleanup의 유효한 목적은 중복 material 준비와 native fallback 분기를 제거하면서 공유 renderer 준비를 보존하는 것이다. 현재 제품의 graph-only 선택은 [패스 전환](GraphOnlyMaterialPasses20261007.md), 실제 리소스 기록은 [pass recording](../design/MaterialGraphPassRecording.md)을 정본으로 삼는다.
+- `SceneHost::SelectReadyInput` checks every requested program before copying the input. Ready inputs copy draw records once and update only `selectionRevision`; pending or failed inputs do not allocate the selected input. Geometry payload owners remain shared.
+- Removed the unpopulated native `opaqueShadowIndices` loop and the live native `forwardDraws` sort. Graph shadow eligibility and Forward+ graph ordering remain. Empty native input vectors still serve the existing common pass and standalone capture/replay interfaces; this is not removal of standalone native regression APIs.
+- Removed `PooledDraw::authoredMaterialSource` and `authoredRevision`, including their mesh and foliage assignments. Graph source and model generation owners remain.
+- DX12 and Vulkan now share `PrepareSceneRecording`: residency → recording boundary → palette upload → Decal/Sprite visibility → graph material preparation → optional capture input. Shader output scope, failure propagation and material preparation deferral are preserved.
+- Updated stale comments about native material sealing and cold-compile fallback.
 
-DX12/Vulkan의 공통 `PrepareSceneRecording` 경계는 residency를 확보한 뒤 recording/descriptor boundary, palette, Decal/Sprite 준비와 graph 준비를 연결한다. material bind helper는 texture 상태 전이를 대신 수행하지 않는다. 동일 recording에서 검증된 packet 공유는 가능하지만 device/recording/descriptor version/layout이 달라지면 재검증해야 한다.
+## Scope and validation
 
-## 실패를 성공으로 바꾸지 않는 게시
+Other dirty worktree changes are outside this cleanup. No material binding cache was introduced. The existing texture/sampler caches, per-draw data and descriptor validity rules remain unchanged. No FPS or CPU performance improvement is claimed without a new equivalent workload measurement.
 
-CPU 입력 봉인, PSO 준비, render graph 기록, native 제출, GPU 완료를 따로 관리한다. 제출 큐가 ticket을 받았다는 이유로 native recording 성공 또는 GPU 완료를 선언하지 않는다. 현재 frame의 모든 단계가 성공한 경계에서만 해당 cache의 제출 상태를 게시한다.
+VS 2026 / VS18 / v145 Debug and Release RenderEngine + MaterialRasterSurfaceProbe builds passed. Both complete DX12 raster regression processes exited 0 with GPU validation enabled and the expected success marker. Each reported:
 
-standalone native material helper를 남기는 것은 회귀와 명시적 도구 경로의 호환성이다. live Scene draw에 우회 경로를 복구하거나 unknown material을 기본 shader로 바꾸는 근거로 사용하지 않는다. 실패 시 accepted asset/generation은 보존하지만 새 입력과 섞어 새 프레임을 만들지 않는다.
+| Contract | Result per configuration |
+| --- | --- |
+| Scene composition | 59 frames, 330 rejected candidates |
+| Exact generation selection | 5 frames, 0 fallbacks, 7 rejected pending/failed requests |
+| Recording/publication rejection | 1 abort, 1 pending submission, 1 stale publication |
+| Shared/skinned depth | 24 / 6 frames |
+| Scene input rejection | 24 frames, 24 failures checked |
+| Complete raster checks | 21,072,207 checks, 3,879,955 GPU components |
 
-## CSM cache는 별도 미구현 요구
+Scoped removal/caller checks and `git diff --check` passed. SHA-256 hashes of the two modified sources were unchanged throughout the accepted runs. Both backend helper instantiations compiled; this is DX12 native regression acceptance, not a fresh live Editor capture or Vulkan runtime acceptance.
 
-shadow caster 계산을 줄이려면 cached depth와 그 depth를 소비하는 정확한 light/cascade/caster/material/pose identity를 함께 관리해야 한다. 단순히 writer만 건너뛰고 clear를 남기면 cache를 지운다. clear와 graph writer를 같이 생략하고, resource import/dependency·native 성공·invalidate 조건을 묶어야 한다.
+Artifacts use `Build/Verification/graph-only-cleanup-*`, including separate Debug/Release build/runtime logs, source hashes, static checks and `acceptance.json`. The raster wrapper's first build collided with another Editor build, and its subsequent runtime used an outdated dependency DLL path. Neither attempt counts as runtime acceptance. Accepted runtime commands use the actual `vcpkg_installed/x64-windows/x64-windows/{debug/bin,bin}` paths. Release linking retained LNK4020 warnings about Utility_Framework PDB type records; runtime checks still passed. These checks do not measure or claim a performance improvement.
 
-이 cleanup 자체가 완전한 persistent CSM cache를 구현하거나 검증한 것은 아니다. 움직이는 light/skin/alpha-mask와 실패 제출의 stale depth 방지는 후속 gate다.
+## Subsequent issue integration
 
-## 과거 기록과 재검증
+The initial acceptance above predates the complete #131 removal and the #133 binding cache. The subsequent all-issue implementation replaces mutable live native streams with one const empty reference boundary, removes PooledDraw material/transparent metadata, and admits shadows only after graph-source validation. The latest Debug full raster integration passed the same 21,072,207 checks and 3,879,955 GPU components; Editor graph WireFrame static/skinned transport also passed. Current broader lifecycle and backend validation is recorded in GitHubIssueRemediation20261008.md. The original source hashes validate only the original cleanup slice.
 
-기존 보고서의 실행 횟수와 validation 결과는 당시 출력이다. 현재 코드의 존재만으로 같은 결과를 재주장하지 않는다. 새 검증에서는 모든 backend의 recording reset/descriptor 재사용, 실패 뒤 accepted frame 보존, Decal/Sprite와 graph의 공존, CSM clear/writer 쌍을 각각 확인해야 한다.
-
-## 구현 근거
-
-- [`Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp`](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp)
-- [`Engine/RenderEngine/MaterialGraphSceneHost.cpp`](../../Engine/RenderEngine/MaterialGraphSceneHost.cpp)
-- [`Engine/RenderEngine/MaterialGraphRenderBindings.cpp`](../../Engine/RenderEngine/MaterialGraphRenderBindings.cpp)
-- [`Engine/RenderEngine/MaterialGraphSceneShadowStage.inl`](../../Engine/RenderEngine/MaterialGraphSceneShadowStage.inl)
+Latest Release full integration also passed 21,072,207 checks / 3,879,955 GPU components after lifecycle integration. No equivalent-work performance acceptance is inferred from these correctness runs.

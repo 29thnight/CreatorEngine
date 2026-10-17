@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/ProfilerViewerProcess.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Separate profiler analysis and viewer process</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#ownership">Ownership</a></li><li><a href="#ordinary-privilege-boundary">Ordinary-privilege boundary</a></li><li><a href="#live-protocol-and-flow-control">Live protocol and flow control</a></li><li><a href="#live-diagnostic-pages">Live diagnostic pages</a></li><li><a href="#shared-deep-capture-cli-control">Shared deep-capture CLI control</a></li><li><a href="#fileindexexport-ownership">File/index/export ownership</a></li><li><a href="#verification-still-required">Verification still required</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="ProfilerViewerProcess.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Separate profiler analysis and viewer process</h1>
+<div class="meta"><p>Status: implementation/source review only. Builds, tests, Windows execution,
+visual comparison, captures, benchmarks and failure injection are <strong>UNEXECUTED</strong>.
+This stage is layered on the unpublished DX capture-process commit <code>605a204</code>.
+It is based on master <code>94e2e911</code> and does not include unmerged profiler-integrity
+PR #126 (<code>3cbdeacc</code>). No dependency was updated, installed or restored.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#ownership"><span class="ve-label">§00</span><span class="map-name">Ownership</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#ordinary-privilege-boundary"><span class="ve-label">§01</span><span class="map-name">Ordinary-privilege boundary</span><span class="map-bar"><i style="width:22.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#live-protocol-and-flow-control"><span class="ve-label">§02</span><span class="map-name">Live protocol and flow control</span><span class="map-bar"><i style="width:72.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#live-diagnostic-pages"><span class="ve-label">§03</span><span class="map-name">Live diagnostic pages</span><span class="map-bar"><i style="width:54.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#shared-deep-capture-cli-control"><span class="ve-label">§04</span><span class="map-name">Shared deep-capture CLI control</span><span class="map-bar"><i style="width:70.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#fileindexexport-ownership"><span class="ve-label">§05</span><span class="map-name">File/index/export ownership</span><span class="map-bar"><i style="width:45.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#verification-still-required"><span class="ve-label">§06</span><span class="map-name">Verification still required</span><span class="map-bar"><i style="width:38.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「Ownership」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-ownership">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="ownership">Ownership</h2></div>
+<div class="prose"><ul>
+<li>Editor/engine owns instrumentation, collector, recent live retention, continuous
+<code>.ceprof</code> writer and scene-owned diagnostic collection/actions</li>
+<li>Existing headless <code>DxCaptureHelper</code> owns its ETW consumer; the engine supplies
+its actual process/queue submissions and writes <code>.cedx</code>. The viewer never
+becomes the target just because it has a graphics device</li>
+<li><code>ProfilerViewer.exe</code> owns Win32, D3D11 device/context/swapchain, its ImGui context,
+UI state, immutable capture decoding, file indexing, range loading, aggregation,
+timeline indices and drawing. No Editor, scene, engine RHI or ProfilerService
+instance is initialized in the viewer</li>
+<li>Existing profiler presenter sources are moved rather than forked. Frame graph,
+timeline/flame graph, tables, recorded telemetry and the full Memory, Animation
+Budget and Rendering - Live pages retain their existing controls/IDs/layout</li>
+<li>The viewer compiles the same neutral EditorTheme/EditorFontResources/icon code.
+Font root is injected explicitly; the Editor retains its previous resource
+root. Viewer startup inherits user scale and applies monitor DPI separately</li>
+</ul>
+<p>Profiler opens/focuses one viewer owned by that engine process. Repeated Profiler does
+not launch a second instance. Existing profiler-window CLI open/focus/close routes
+are forwarded to the process owner. Explicit close targets only that owned
+viewer; closing a viewer does not stop engine recording. Editor exit closes that
+Editor&#39;s viewer, including an owned instance currently inspecting an offline file.
+Transport disconnection alone disables live controls and retains the last
+immutable data while the Editor is still alive. Independently launched file-only
+viewers have no owner/implicit target and never substitute viewer-local counters
+or services.</p>
+<p>The launcher holds an unnamed, non-inheritable Windows job with
+<code>JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE</code>. <code>PROC_THREAD_ATTRIBUTE_JOB_LIST</code> attaches the
+child atomically at creation; a suspended start permits ordinary-token and pinned
+image checks plus a final shutdown check before resume. Incompatible outer jobs or
+ownership-setup failures reject launch rather than falling back to an unowned
+process or requesting breakaway. On Editor crash, kernel job-handle closure
+terminates the owned viewer without relying on IPC, a destructor or PID lookup.
+The job never contains the Editor, independently launched viewers or another
+Editor&#39;s viewer.</p>
+<p>Normal lifecycle shutdown cancels transport and posts <code>WM_CLOSE</code> to the owned
+process&#39;s window using the retained process handle, gives normal viewer teardown
+1.5 seconds, then terminates only the private job if necessary. The worker may
+wait another 0.5 seconds to observe forced exit; the owner waits at most 2.5
+seconds for worker completion before enforcing job termination itself. Only this
+lifecycle path waits; ordinary launch/focus and presentation pumping remain
+asynchronous. A process created concurrently with shutdown remains job-owned and
+is not resumed after the final closed/stop check fails. Abrupt termination cannot
+guarantee viewer settings or an in-progress export are saved, and these wait
+bounds do not promise kernel I/O completion deadlines. See the unexecuted
+<code>Tools/ProfilerViewer/Tests/ViewerLifetimeChecklist.md</code> acceptance matrix.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-ordinary-privilege-boundary">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="ordinary-privilege-boundary">Ordinary-privilege boundary</h2></div>
+<div class="prose"><p>The executable is the fixed sibling
+<code>Bin/&lt;platform&gt;-&lt;configuration&gt;/Tools/ProfilerViewer/ProfilerViewer.exe</code>, alongside
+<code>Editor/CreatorEditor.exe</code>. The launcher passes numeric identity/scale fields and
+a nonce, not arbitrary executable paths or commands. Image/path components remain
+pinned, the local pipe rejects remote clients, and both peers validate PID,
+creation time, Windows session, user SID, logon SID and ordinary token. Unknown or
+elevated tokens fail closed. There is no UAC/runas path.</p>
+<p>This does not remove the prior ETW decoder safety gate. Already-elevated capture
+parents/helpers remain blocked. The earlier collector&#39;s cooperative ETW shutdown
+and crash-orphan cleanup still need their separate Windows acceptance work.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-live-protocol-and-flow-control">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="live-protocol-and-flow-control">Live protocol and flow control</h2></div>
+<div class="prose"><p>The versioned, explicitly serialized protocol validates kind, exact lengths,
+nonce, monotonic packet sequence and finite typed state. No native <code>std::string</code>,
+<code>optional</code>, pointer or ABI structure is copied as a wire object. Commands are
+bounded known actions, not code, shell strings or arbitrary reads/writes.</p>
+<ul>
+<li>Wire packet maximum is 64 KiB; ordinary command queue is bounded to 16</li>
+<li>Capture payload maximum remains 128 MiB, with cardinality preflight before
+allocation/decoding. Engine live retention stays 600 frames/128 MiB</li>
+<li>Capture and scene diagnostics have separate bounded encoding and transfer
+lanes. Diagnostics is prioritized and does not wait behind a large capture</li>
+<li>Each lane coalesces latest pending data, owns at most one active serialization
+job and one bounded outgoing buffer, and cancels superseded capture epochs</li>
+<li>Viewer capture decoding and scene-DTO decoding never run on the UI thread;
+scene-DTO decoding also has a separate bounded executor from full file scans</li>
+<li>UI/GT does not wait for IPC, viewer analysis, file indexing or range preparation</li>
+</ul>
+<p>Serialization requires additional transient memory beyond the producer&#39;s
+128 MiB retention. It is bounded but neither zero-copy nor cost-free. Oversized
+live payloads increment an explicit skipped-window count and preserve the last
+valid view; they do not truncate the continuous recording. Snapshot cardinality
+limits are documented in <code>ProfileCaptureFile.cpp</code> and source fixtures. No
+performance claim is made without measurement.</p>
+<p>Target identity includes process lifetime, connection nonce and QPC frequency.
+Capture publication returns immutable pointer+collector epoch under the same
+capture lock, and commands carry the displayed target generation. A short new
+recording cannot borrow the prior file: status/artifact handoff uses a distinct
+writer identity which survives ring-only Clear. Clear completion is acknowledged
+only after the collector applies its ticket. Old in-flight data cannot overwrite
+a new epoch. The UI labels retained prior-epoch data explicitly.</p>
+<p>Client heartbeat counts successful non-occluded native Present calls. This gives
+read-only <code>profile.stats.viewer</code> process/presentation observations without putting
+viewer UI markers into the engine capture. Explicit authenticated goodbye and
+owned close intent distinguish normal shutdown from broken transport.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-live-diagnostic-pages">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="live-diagnostic-pages">Live diagnostic pages</h2></div>
+<div class="prose"><p>Engine-side collection and validated action application run at the existing
+scene-lifetime-protected presentation boundary, before the hidden-UI early return.
+Frozen values are serialized later on the transport worker. Renderer/scene
+pointers never leave that boundary. The viewer uses target/session, scene and
+snapshot-generation leases for requests and disables mutations when disconnected
+or stale, while continuing to display last received values.</p>
+<p>Memory retains eight viewer snapshots for A/B comparison. Transport caps are
+3,840 object rows and 8,192 virtual regions. Exact source totals/category values
+and omitted counts remain separate from the row subset. Full original names are
+hashed with SHA-256 at engine capture; clipped labels are never identities.
+Unavailable identities remain distinct, and partial/unidentified lists cannot
+prove an absent object or produce fabricated unmatched-row deltas.</p>
+<p>Animation transports up to 512 actors and 512 task rows with explicit original
+counts. Selection uses stable animator ID, scene and generation, never a pointer.
+Rendering preserves view selection, runtime/shadow/timing/validation surfaces and
+its existing Open RenderPass structure action; that action is applied by the
+Editor window owner. Bounded omitted rows/text are reported rather than read as
+zero activity. Existing target address fields are inert labels only, with no
+remote memory resolution, pointer traversal or persistence added.</p>
+<p>The scene envelope is schema v2 and at most 2 MiB, including the complete bounded
+rendering envelope. The conservative simultaneous cap budget is enforced in the
+codec. These live pages are not silently fabricated from <code>.ceprof</code>/<code>.cedx</code> files;
+file-only viewing reports the lack of a connected live diagnostic source.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-shared-deep-capture-cli-control">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="shared-deep-capture-cli-control">Shared deep-capture CLI control</h2></div>
+<div class="prose"><p><code>profile.deep.start</code>, <code>profile.deep.status</code> and
+<code>profile.deep.stop &lt;session-id&gt;</code> use the existing engine CLI/HTTP route and
+service queue. They require no viewer window. No HTTP listener, bearer-token
+policy or ordinary <code>profile.record/pause/save</code> argument contract changes.</p>
+<p>Start admits a request to the same <code>capture_service</code> used by the viewer. It
+returns a decimal-string <code>sessionId</code> and engine-generated <code>artifactPath</code>; admission
+is not proof that ETW started or a file exists. Status distinguishes accepted,
+in_progress, stopping, finalized, failed, permission_denied and unavailable,
+while preserving raw helper errors, writer completion and loss counters.</p>
+<p>The first session ID uses a nonzero randomized 64-bit value; later IDs increment
+without wrapping. Stop requires that exact session and is idempotent for an
+already-stopping or completed session. A stale ID cannot stop a newer capture.
+Named HTTP input supplies <code>sessionId</code> as a string to avoid numeric rounding.</p>
+<p>Concurrent CLI/GT and viewer/PT starts share bounded, serialized admission and
+one persistent service worker. Neither caller joins a previous capture worker.
+Only lifecycle shutdown drains it. Paths are generated by the engine, no helper
+path/provider/elevation/output-path CLI argument is accepted, and no UAC or
+already-elevated-token workaround is introduced. An extra save command is not
+needed: the artifact is retained at the reported path for later Open.</p>
+<p>Viewer IPC v3 carries the independent DX session ID, typed state and admission
+result, plus the Stop drain diagnostics (pending/failed GPU submissions, open
+scopes and drain milliseconds). Stop uses full-width session identity rather than a <code>.ceprof</code> generation.
+DX artifacts carry the matching session, and a viewer-requested automatic export
+requires both that identity and a decoded finalized footer. CLI-started artifacts
+can follow the target without overwriting an explicitly opened offline view.
+The original DX control row is retained without additional buttons.</p>
+<p>The command/service/control fixtures and sorted descriptor/help delta remain
+UNEXECUTED; see <code>Tools/regression/DeepCaptureControlChecklist.md</code>. The existing
+registry golden has unrelated historical drift, so its authored three-command
+delta is not a claim that the complete golden validation passes.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-fileindexexport-ownership">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="fileindexexport-ownership">File/index/export ownership</h2></div>
+<div class="prose"><p><code>.ceprof</code> v1/v2/v3 and <code>.cedx</code> v1 meanings remain unchanged. Full <code>.ceprof</code> sessions
+are not limited to the recent 600 frames: the existing bounded index/overview and
+range window load the full file. No new arbitrary whole-session byte cap is
+introduced; <code>.cedx</code> retains its existing 64 MiB/record limits.</p>
+<p>A file handoff contains verified file identity and a pinned read-only path, not
+an instruction to open an arbitrary device/network stream. Both ends retain
+ordinary read-only handles, validate canonical paths and regular-file identity,
+and reject replacement/reparse/device/ADS surprises. User-chosen file opening is
+validated on a worker. A reader holds its source pin for the loaded recording.</p>
+<p>Save exports the whole finalized recording from the matching source identity,
+not the current 600-frame view. DX capture&#39;s selected destination stays in the
+viewer: the engine writes a unique spool, hands over the completed/recoverable
+artifact, and the viewer validates/copies it through a unique staging file before
+replacement. The helper never receives an arbitrary output path.</p>
+<p>Open/range/save cancellation checks record/chunk boundaries and suppresses late
+publication. Reader work yields after one preparation request so live updates
+cannot monopolize file operations. Queued work is dropped outside executor locks
+at shutdown. OS file calls and bounded native snapshot codecs remain cooperative;
+there is no hard guarantee on shutdown duration under a stuck filesystem/driver.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-verification-still-required">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="verification-still-required">Verification still required</h2></div>
+<div class="prose"><ol>
+<li>Windows Debug/Release Editor and standalone viewer builds, Shipping exclusion,
+deployment manifest/font/license relocation and missing/stale helper failures</li>
+<li>Same content size/DPI/style visual comparison for every moved page, plus native
+resize/minimize/occlusion/offscreen placement and device/backend failures</li>
+<li>Real Record/Stop/Clear, short Record→Stop, repeated open/focus/close/relaunch,
+file-mode/live-mode transitions and engine/viewer crash/exit during operations</li>
+<li>Full-session index/range/save, oversized live windows, recovered <code>.ceprof</code> and
+<code>.cedx</code> prefixes, corrupted metadata, canceled open/export and same-file errors</li>
+<li>Peer spoof/replay, malformed frame/DTO, command generation races, slow peers,
+source replacement, Windows path/reparse/ACL cases and bounded memory pressure</li>
+<li>Measure engine collector/serialization overhead and viewer memory/latency with
+populated 600-frame captures while all live pages and long-file indexing run</li>
+</ol>
+<p>Source fixtures and checklists live in <code>Tools/ProfilerViewer/Tests</code>,
+<code>Tools/regression/ProfilerViewer*</code>, <code>ProfilerLiveDiagnostics*</code> and
+<code>ProfilerRenderingDiagnosticsTests.cpp</code>. The updated profiling Window gate also
+remains unexecuted. Static review and whitespace inspection are not build, test,
+visual or performance passes.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ProfilerViewerProcess.md"><code>docs/design/ProfilerViewerProcess.md</code></a> · 마지막 커밋 2026-10-07 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

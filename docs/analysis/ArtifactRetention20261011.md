@@ -1,26 +1,71 @@
-# 검증 산출물 보존과 재현 가능성
+# PR169 검증 산출물 보존·정리 — 2026-10-11
 
-> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
+대표 원본 외의 raw 픽셀과 재생성 가능한 private fixture 사본을 실제 삭제했다. 파일 크기 합계가 아니라 C: 여유 공간의 전후 차이로 **60.12 + 11.89 = 72.01 GiB**를 회수했다. 두 번째 정리 종료 시 여유 공간은 **125.84 GiB**다. 첫 조사에서 제시했던 188.10 GiB는 하드링크를 중복 합산한 논리 용량이며 회수 가능 용량이 아니다.
 
-## 현재 도구의 계약
+## 보존 범위
 
-Tools/regression/ArtifactRetention.ps1은 capture 전에 실제 drive 여유 공간을 확인한다. Assert-ArtifactCapacity의 기본 최소치는 30GiB다. 이는 모든 workload의 충분한 예산이 아니라 하한이며 대형 capture는 예상 raw 크기를 별도로 더해야 한다.
+`Artifacts/PR169/artifact-cleanup-plan-20261011.json`에 대표 원본 경로를 명시했다. 체크포인트에 연결된 Debug/Release native motion·DLSS quality·golden·overlay·mixed rendering과 FSR/XeSS Debug/Release quality 원본을 남긴다. 최초 golden 드라이버 실패의 원본도 포함된다. 모든 실행의 JSON/JSONL 판정·manifest·로그·프로파일 `.ceprof`·덤프와 PNG는 보존했다. 별도의 material 실제 측정 원본은 Build/Obj/MaterialProductProbe에 있으며 이번 픽셀 정리 대상 밖이다.
 
-Remove-ArtifactPixels는 지정 root 아래 .f32만 선택한다. root의 조상과 자식 reparse point를 거부하고 keep directory를 제외한다. 먼저 경로·논리 길이를 ledger에 기록한 뒤 삭제하고, 실제 drive free-space 전후 차이를 결과에 남긴다. hardlink를 포함하는 파일 길이 합계는 물리 회수량과 다르다.
+원시 픽셀 62,936개를 제거했다. 각 삭제 파일의 경로·크기는 `pixel-retention-20740f9190be4f6c82ff5c20d4003f65.json`, 실제 회수량은 같은 이름의 `.result.json`에 있다. 대표 외의 예전 판정은 **과거 실행 요약으로 보존하며 raw pixel 재검사는 불가능**하다. 최신 SDK 바이너리/품질 전체 행렬의 수용으로 재해석하지 않는다. representative raw 파일의 논리 합계는 정리 후 12.90 GiB다.
 
-## 성공 rollover의 소유자
+추가로 `live/Project/Library/TextureAssetGenerations`의 임포트 캐시와 `live/PlayerStage/.package-input`의 패키징 임시 사본을 정리했다. 원본 Dynamic_CPP, private Project의 원본 Assets, 최종 GameAssets.pak, 로그·덤프는 유지했다. private fixture 재실행에는 텍스처 재임포트/패키징 입력 재생성이 필요하다. 목록·회수량은 `fixture-cache-cleanup-20261011.json`과 `.result.json`에 기록했다.
 
-Complete-ArtifactRetention은 family 이름을 제한하고 같은 부모의 이전 등록 run만 대상으로 삼는다. previous marker의 passed가 실제 boolean true, family 일치, pinned가 boolean false인지 확인한다. KeepRawCaptures는 pin으로 취급한다. 실패·다른 family·부모 밖 run을 성공 사본처럼 정리하지 않는다.
+## 이후 기본 정책
 
-중요하게도 이 함수는 호출 시 새 run을 passed=true로 기록한다. oracle·정상 종료·필요한 audit를 수행하는 책임은 호출자에게 있다. 함수 이름이나 marker만으로 검증이 실제 실행되었다고 추론할 수 없다. 새 acceptance 이전에 이전 증거를 지우는 호출 순서는 계약 위반이다.
+- 캡처 전 실제 여유 공간 최소 30 GiB를 요구한다. 대형 행렬은 별도 예상량을 확인하고 작은 배치로 실행한다.
+- 성공 원본은 구성/provider/검증 family별 최신 1개를 기본 보존한다. 새 실행의 oracle·정상 종료가 모두 통과한 후에만 이전 등록 성공의 raw 픽셀을 정리한다. 품질/해상도마다 별도 무한 보관하지 않는다.
+- 추가 비교에 필요한 원본은 `-KeepRawCaptures`로 pin한다. 명시적으로 pin한 실행은 자동 정리하지 않는다. 실패·누락 success marker·다른 family·다른 부모 경로도 자동 정리하지 않는다.
+- SDK sequence/reset 변이 검사는 예상 거부를 확인한 각 case의 `.f32`를 즉시 제거한다. manifest·거부 사유·보존 ledger는 남긴다. 예상과 달리 수용된 case는 assertion으로 중단하며 해당 픽셀을 보존한다. source capture는 정리 대상이 아니다.
+- 반복 실패는 추가 실행 전에 대표 실패를 선정해 정리한다. 공간 부족 상태에서 재시도를 계속하지 않는다.
 
-## 역사적 결과
+`ArtifactRetention.ps1`을 native/golden/SDK quality/material/SDK sequence/reset/SSGI/RG8/motion-fixture 진입점에 연결했다. SDK sequence와 RG8은 공간 검사만 담당하고, 실제 수용 후 대표 rollover는 상위 드라이버 또는 별도 최종 수용에서 수행한다. metadata만 확인한 RG8 수집을 성공으로 간주해 이전 증거를 지우지 않는다. `AGENTS.md`에 이후 검증 작업의 보존 규칙을 추가했다.
 
-2026-10-11 보고의 회수 GiB, 실행 수와 checkpoint는 당시 storage ledger에 속한다. 이 재작성은 삭제나 정리를 하지 않았으며 그 값들을 현재 여유 공간으로 재인증하지 않는다. 보존된 JSON/JSONL·이미지·profile은 역사적 증거 그대로다. raw가 삭제된 run은 기존 verdict를 읽을 수 있어도 pixel replay는 불가능하다.
+## 검증
 
-후속 자료는 [TemporalMeasurementSurfaces20261011](TemporalMeasurementSurfaces20261011.md), [TemporalBase0ConsumerWorkload20261011](TemporalBase0ConsumerWorkload20261011.md), [TemporalRg6ABAcceptance20261011](TemporalRg6ABAcceptance20261011.md)에 연결된다. 각 보고의 장치·revision·보존 범위를 함께 확인해야 한다.
+- PowerShell storage 계약 10검사: 이전 성공 rollover, verdict/log 보존, pin/현재 원본/실패 보존, 부족 용량·외부 registry 거부.
+- Python storage 경계 5검사: 실제 hardlink source 불변, source/자식/부모 정리 거부, 미생성 경로의 부족 용량 거부.
+- 보존한 실제 Debug DLSS SDK sequence 원본으로 23변이 거부와 마지막 원본 재검사 통과. output raw 픽셀 잔여 0개. 로그 `storage-sdk-mutations-20261011.log`, 결과 `storage-sdk-mutations-20261011/results.json`.
+- 변경된 PowerShell 구문, Python compile 및 scoped diff 공백 검사. 엔진 재빌드·전체 GPU 행렬 재실행은 이번 범위가 아니다.
 
-## 구현 근거
+정본은 `Artifacts/PR169/storage-retention-checkpoint-20261011.json`이다. TR0 progress·기성 0, PHASE4.5 12/71(17%) 판정은 변경하지 않았다.
 
-- [Tools/regression/ArtifactRetention.ps1](../../Tools/regression/ArtifactRetention.ps1)
-- [Tools/regression/ArtifactRetentionTests.ps1](../../Tools/regression/ArtifactRetentionTests.ps1)
+## 이후 RG8 전체 workload 검증
+
+`rg8-workload-20261011`은 기존 private Project와 Release 빌드 디렉터리를 재사용했다. 전체 workload 검증 중 발견한 엔진 결함을 수정하기 위한 Release 재빌드는 수행했으며, 위의 보존 도구 단독 검증과는 별도 범위다. 바이너리 사본이나 fixture 전체 사본을 실행마다 만들지 않았다.
+
+RG8 수집 기본 캡처는 케이스당 4개다. 시작 전에 창 크기·표본 수·케이스 수를 이용한 64개 full-window RGBA readback의 보수적 예상량과 telemetry 여유분을 30 GiB 하한에 더해 검사한다. 각 readback 직전에도 실제 30 GiB 하한을 다시 확인한다. 같은 프로세스의 완료 로그·메모리 기록·queue-evidence JSON은 모드별 복사 대신 하드링크로 공유하며, 완료 후 공유 파일을 편집하지 않는다.
+
+332×152 및 1108×512의 정순·역순 일반 프레임, 캡처, GPU validation, 실제 positive overlap/negative fallback의 strict audit가 통과한 후에만 `prune-accepted-matrix.ps1`으로 중복 raw 픽셀을 정리했다. 큰 viewport 모드 0/1/2와 GPU validation 모드 1/2, 빈 workload의 기준/후보/validation 대표를 남겼다. 이전 backend-generation/JSON 불리언 실패 대표 두 개와 모든 실패 로그도 유지했다. 두 현재 행렬 디렉터리 외의 원본은 이 정리 대상이 아니다.
+
+최종 정리로 실제 **3.42 GiB**를 회수했고 여유 공간은 **111.54 GiB**다. 정리 내역은 `rg8-workload-20261011/final-retention.json` 및 각 pixel-retention ledger에 있다. 해당 task 폴더의 하드링크 중복을 제외한 파일 길이 합계는 약 **2.30 GiB**, 남은 raw 픽셀은 약 **0.47 GiB**다. 이는 파일 길이 집계이며 실제 회수량과 구분한다. 삭제한 표본의 과거 판정은 보존하지만 전체 raw pixel 재검사는 불가능하다.
+
+최종 큰 viewport 실행만 `Release-DX12-RG8-workload` 성공 family로 등록했다. 이는 증거 감사 통과를 뜻하며 성능 채택이나 phase 완료를 뜻하지 않는다. 실제 결과 정본은 `rg8-workload-20261011/rg8-workload-checkpoint-20261011.json`이고 RG8 기본 OFF·progress·기성 0은 유지한다.
+
+## Debug RG8 후속 검증
+
+`rg8-debug-workload-20261011`은 기존 Debug 빌드 경로와 같은 private Project를 재사용했다. 모델 workload는 큰 viewport, 빈 negative workload는 기존 작은 viewport를 사용했고 캡처는 케이스당 4개로 제한했다. 428 실행·117 계획·전체 회귀, 192 모델 일반 프레임·32 빈 씬 관측, exact pixel/queue/timing 및 GPU validation 감사 후에만 raw 픽셀을 정리했다. 모델 모드 0/1/2, GPU validation 모드 1/2와 negative 기준/후보/validation 대표 8개를 남겼다.
+
+`finalize-debug.ps1`은 고정된 해당 task 디렉터리와 성공한 두 strict 판정을 확인하고 정리한다. 실제 **3.12 GiB**를 회수했고 최종 여유 공간은 **105.79 GiB**다. task의 하드링크 중복 제외 파일 길이 합계는 약 **0.69 GiB**, 대표 raw 픽셀은 약 **0.45 GiB**다. 메타데이터·로그·판정은 보존하며 삭제한 표본의 pixel replay는 불가능하다. Debug family는 Release와 별도로 등록했고, 보존 원본은 정리 후 payload 크기·finite 검사를 통과했다.
+
+정본은 `rg8-debug-workload-20261011/rg8-debug-workload-checkpoint-20261011.json`이다. Collector의 `-Configuration` 선택과 수집 전후 동일 구성 바이너리 hash 검사를 실제 Debug 전체 workload로 검증했다. 성능/기본 채택이나 phase 완료로 확대하지 않는다.
+
+## RG8 스케줄러 CPU 최적화 검증
+
+`rg8-scheduler-cpu-20261011`은 기존 Debug/Release 출력·중간 디렉터리와 같은 private Project를 재사용했다. 실행마다 바이너리나 fixture 전체 사본을 만들지 않았다. 캡처는 케이스당 4개로 제한하고, 기존 예상량/telemetry 여유분과 실제 30 GiB 하한 검사를 유지했다.
+
+각 수정본은 native/실제 workload/pixel/queue/GPU validation 감사 후에만 중복 raw 픽셀을 정리했다. 마지막 두 구성은 428 실행·121 계획·전체 RG 회귀, 192 모델 일반 프레임/32 빈 씬 관측, 224 실제 admission 표본/52 변조 거부를 통과했다. 최종 Debug/Release 각각 대표 8개만 남겼으며, 보존 payload의 크기와 finite 값을 정리 후 다시 확인했다. 성공 family의 다음 수정본으로 교체된 `Debug`와 `Debug-final`의 raw 픽셀은 추가로 정리했다. 과거 로그·판정·manifest·hash는 보존하지만 제거한 픽셀 replay는 불가능하다.
+
+이번 작업의 정리 시점 실제 여유 공간 변화 합계는 **13.94 GiB**이며, 최종 실제 여유 공간은 **101.22 GiB**다. 빌드/로그 쓰기를 포함한 작업 시작 대비 실제 여유 공간 변화는 **-4.58 GiB**다. task의 하드링크 중복 제외 파일 길이는 약 **2.01 GiB**, 남은 raw 픽셀은 약 **0.91 GiB**다. 파일 길이 합계는 물리 할당량이나 회수 가능량으로 해석하지 않는다.
+
+정본은 `rg8-scheduler-cpu-20261011/rg8-scheduler-cpu-checkpoint-20261011.json`이며, 구성별 `final-retention.json`과 pixel-retention ledger가 실제 정리 경로를 기록한다. CPU 감소 확인과 전체 순성능/기본 채택은 구분하며, RG8 기본 OFF·progress·기성 0을 유지한다.
+
+## 2026-10-11 TR0 측정 표면 후속 정리
+
+SDK 활성 Debug/Release 판정 후 중간/반복 raw 66개를 제거했다. 대표 캡처 두 개·로그·프로파일·실패 기록은 유지했고 실제 약 1.00GiB 회수, 정리 직후 여유 93.54GiB다. 바이너리·fixture 전체 사본은 만들지 않았다. 정본과 ledger는 Artifacts/PR169/tr0-surfaces-sdk-20261011에 있으며 [검증 범위](TemporalMeasurementSurfaces20261011.md)를 참조한다.
+
+
+
+2026-10-11 후속: 현재 바이너리의 BASE-0 실제 population 및 용량 정리는 [TemporalBase0ConsumerWorkload20261011](TemporalBase0ConsumerWorkload20261011.md)과 tr0-base0-workload-20261011/checkpoint.json이 정본이다. SDK D/R 빌드·400표본·204캡처 수용, raw 대표 성공 2/필요 실패 2 및 로그 보존, 여유 93.21GiB. 이전 runtime 해시의 검증은 당시 실행 증거로 유지한다. TR0 progress·기성 0/PHASE 4.5 12/71 유지.
+
+
+2026-10-11 후속: 현재 소스 legacy/product SDK D/R 전체 RG6 행렬(8프로세스·800표본·408캡처)은 [TemporalRg6ABAcceptance20261011](TemporalRg6ABAcceptance20261011.md)에서 수용됐다. raw 대표 4개와 최소 진단 바이너리만 보존, 실측 여유 92.37GiB. UI/actual generated/외부 계측/제품 예산은 잔여다. 이전 체크포인트의 미확인 표기는 당시 상태로 유지한다.

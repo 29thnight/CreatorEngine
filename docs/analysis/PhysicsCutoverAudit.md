@@ -1,32 +1,47 @@
-# 물리 전환 감사와 레거시 경계
+# Phase 19 R0 철거 기록
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 호출부. 이 문서는 현재 구현을 설명하며, 이번 문서 갱신에서 빌드·테스트·제품 실행을 수행하지 않았다.
+2026-10-01. P0 baseline HEAD: 12f970c7ed3a4408d268479f5d5acb5f80372b8c.
 
-## 이 문서의 역할
+구 구현 55개 파일을 삭제 전에 P0 ZIP의 SHA256과 대조했다. 삭제 목록과 해시는
+Tools/regression/physics-legacy-files.json에 보존한다. ZIP은
+Build/Obj/Phase19P0/pre-r0-12f970c7.zip이며 이 ZIP을 철거 후 새 snapshot으로 덮어쓰지 않는다.
 
-이 경로는 과거 R0 전환 보고서 링크를 유지한다. 현재 실행 규약은 [물리 API](../design/PhysicsAPIContract.md)와 [컴포넌트 설계](../design/PhysicsComponentDesign.md)가 정본이다. 과거 날짜의 “완료”를 현재 checkout의 실행 결과로 읽지 않는다.
+## 제거한 실행 소유자
 
-## 현재 확인할 소유자
+- Engine/Physics의 구 PhysicX, 바디/리소스 상속 래퍼, CCT/이동, 이벤트/디버그 구현.
+- PhysicsManager, 구 8종 물리 컴포넌트 및 CharacterControllerSystem 구현.
+- Physics/SceneRuntime 프로젝트 및 filters의 구 파일 편입.
+- Physics 프로젝트의 CUDA imports/compile/link 설정과 SceneRuntime/Editor/Mono 역방향 include.
+- 구 컴포넌트 reflection/lifecycle/type UUID 등록 및 Editor 물리 저작 그룹.
+- bootstrap singleton 생성/파괴와 Editor/Player 물리 초기화, PVD 연결.
 
-`Scene`이 `ScenePhysicsSimulation`을 가지며, 그 세션이 `unique_ptr<PhysicsScene>`을 소유한다. Host가 `Runtime::TickSimulationFrame`을 호출하고 SceneManager::Physics→Scene::FixedUpdate로 진입한다. shape 정의는 PhysicsBodyComponent 한 곳에서 완결된다. public SDK pointer나 전역 옛 물리 manager를 새로운 소비자에 노출하지 않는다.
+PhysX SDK 의존과 Physics 프로젝트의 identity는 P1 새 구현에 사용하기 위해 유지한다.
+구 UUID는 활성 등록에서 제거하고 P0 fixture의 legacy-type-uuids.json에 마이그레이션 자료로 보존한다.
+구 제품 바이너리/Physics.lib는 디스크에 있어도 철거 후 소스 검증이나 실행 증거로 사용하지 않는다.
+R0 당시 빈 Physics 프로젝트는 명시적으로 빌드를 거부했다. P1 새 PhysicsScene 편입 후 이 임시 guard는 제거했다.
 
-worker 제출은 `PhysicsSceneChannel`, 결과는 immutable tick snapshot으로 전달한다. character 이동과 query batch도 같은 Scene 세션에 귀속된다. 스크립트 접촉은 ClrHost의 값 큐를 거쳐 ContactStream으로 도착한다. 이름만 새 API로 바꾸고 기존 콜백에서 gameplay를 호출하는 방식은 현재 경계를 우회한다.
+## 검증 및 미완성 경계
 
-## 감사 도구와 해석
+audit-physics-cutover.ps1 -Gate Owners 통과: owner files/project references=0.
+Complete gate는 남은 소비자 때문에 실패하며 이를 정상 제품 통과로 표시하지 않는다.
+실제 Debug 빌드는 Scene의 Collision/PhysicsManager/ColliderContainerType 미이전으로 reflgen에서 실패했다.
+RequirePhysicsImplementation 직접 실행도 비어 있는 새 모듈을 의도대로 거부했다.
+제품을 빌드 가능하게 만들기 위한 빈 물리 구현이나 구 타입 호환 어댑터는 추가하지 않았다.
 
-`audit-physics-cutover.ps1`과 `physics-legacy-files.json`은 옛 파일/기호의 잔존을 확인하는 source gate다. `verify-physics-sdk-boundary.ps1`은 SDK 격리를 별도로 확인한다. 소스 감사가 통과해도 SDK 바이너리 링크 폐포, 실제 actor 수명, Player packaging, 렌더 결과를 증명하지 않는다.
+현재 lexical 소비자 12개 파일의 정확한 위치는 Build/Obj/Phase19R0/cutover-audit.json에 있다.
+Scene.cpp/h의 컬렉션·fixed-step·이벤트는 B/C/T 연결, ClrHost/Native/managed API는 M0,
+model/terrain 생성과 editor authoring/inspector는 B1/M0에서 새 계약으로 이전한다.
+Articulation/Link 등 구 ragdoll 데이터 참조도 새 지원 범위와 스키마 이전을 확정해야 한다.
+이 감사는 AST/링크 도달성 검증이 아니며 최종 M4에서 제품 빌드·실행과 함께 다시 검증한다.
 
-마이그레이션은 legacy component/file 검출과 새 authoring schema 검증을 함께 수행해야 한다. 오래된 문서의 파일 경로를 런타임 파일로 복원하거나 compatibility singleton을 만드는 작업은 이 감사의 목적이 아니다. alias가 필요한 경우 저장 데이터 reader와 실행 소유자를 구분하고 정해진 migration 정책으로 처리한다.
+**상태: R0 소유자 철거 완료, R0 전체 완료는 미확보.**
+P1~P3 API를 먼저 작성하고 B/C/T/M 소비자 교체 후 Complete gate를 닫는다.
+R0 표의 '새 계약으로 전량 교체'는 후속 단계가 필요한 최종 cutover 조건이다.
+P1 새 PhysicsScene CPU 기반과 단독 모듈 Debug/Release 빌드를 검증했다. 제품 소비자 이전은 아직 남아 있다.
 
-## 재검증 경계
+## 2026-10-03 현재 판정
 
-실제 확인은 current binary에서 Play/Stop, scene reload, DDOL, component removal, shared cooked geometry, CCT, query, ContactStream을 수행해야 한다. 이번에는 source와 연결부만 검토했으며 audit script도 실행하지 않았다.
-
-## 구현 근거
-
-- [Engine/SceneRuntime/RuntimeFrame.cpp](../../Engine/SceneRuntime/RuntimeFrame.cpp)
-- [Engine/SceneRuntime/Scene.cpp](../../Engine/SceneRuntime/Scene.cpp)
-- [Engine/SceneRuntime/ScenePhysicsSimulation.h](../../Engine/SceneRuntime/ScenePhysicsSimulation.h)
-- [Tools/regression/audit-physics-cutover.ps1](../../Tools/regression/audit-physics-cutover.ps1)
-- [Tools/regression/physics-legacy-files.json](../../Tools/regression/physics-legacy-files.json)
-- [Tools/regression/verify-physics-sdk-boundary.ps1](../../Tools/regression/verify-physics-sdk-boundary.ps1)
+Fresh Complete gate 통과: 구 파일55개 제거, 남은 파일/프로젝트 참조/소비자0.
+앞의 소비자12개 및 제품 미빌드 기록은 철거 당시 이력이다.
+새 API 제품 빌드·실행은 PhysicsRedesignPlan의 M2 수용 근거와 연결한다.
+R0는 완료로 갱신하며 AST/최종 링크/재유입 감사는 M4에서 수행한다.

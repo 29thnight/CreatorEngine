@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/archive/ReflectionRedesignPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>컴파일타임 리플렉션 전환 — 헤더툴 은퇴와 typed 방문 계약 (PHASE 18)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-결정-사항-분석에서-확정된-것">1. 결정 사항 (분석에서 확정된 것)</a></li><li><a href="#2-실측-요약-변경-대상의-크기">2. 실측 요약 (변경 대상의 크기)</a></li><li><a href="#3-트랙-ct--슬라이스">3. 트랙 CT — 슬라이스</a></li><li><a href="#4-순서와-의존">4. 순서와 의존</a></li><li><a href="#5-완료-기준">5. 완료 기준</a></li><li><a href="#6-함정-착수-전-필독">6. 함정 (착수 전 필독)</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/archive/</span><a href="ReflectionRedesignPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">보관 계획</p>
+<h1>컴파일타임 리플렉션 전환 — 헤더툴 은퇴와 typed 방문 계약 (PHASE 18)</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">6<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 2, 진행·부분 4"><i class="ok" style="flex:2"></i><i class="info" style="flex:4"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 2</span><span class="chip info">진행·부분 4</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#1-결정-사항-분석에서-확정된-것"><span class="ve-label">§1</span><span class="map-name">결정 사항 (분석에서 확정된 것)</span><span class="map-bar"><i style="width:2.9%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#2-실측-요약-변경-대상의-크기"><span class="ve-label">§2</span><span class="map-name">실측 요약 (변경 대상의 크기)</span><span class="map-bar"><i style="width:2.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-트랙-ct--슬라이스"><span class="ve-label">§3</span><span class="map-name">트랙 CT — 슬라이스</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">3</span> <span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#4-순서와-의존"><span class="ve-label">§4</span><span class="map-name">순서와 의존</span><span class="map-bar"><i style="width:2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-완료-기준"><span class="ve-label">§5</span><span class="map-name">완료 기준</span><span class="map-bar"><i style="width:1.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-함정-착수-전-필독"><span class="ve-label">§6</span><span class="map-name">함정 (착수 전 필독)</span><span class="map-bar"><i style="width:2.3%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">1</span></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「3. 트랙 CT — 슬라이스」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>보관 · 완료 (정리: 2026-09-06).</strong> PHASE 18 CT0~CT11 종료. 매크로 없는 reflect()/meta::schema 계약과 검증 기록을 보존한다.
+<a href="README.html">보관 색인</a> · <a href="../../RefactoringPlanDashboard.html#doc-index">활성 계획과 대시보드</a></p>
+</blockquote>
+<p>2026-08-16. 근거: <a href="../../analysis/ReflectionSystemAnalysis.html">ReflectionSystemAnalysis.md</a>(전수 실측 분석 — 병폐·비용·죽은
+코드 목록은 그 문서가 정본, 여기 반복하지 않는다). 방향 결정: &quot;qlibs/reflect
+<strong>류의 설계</strong>로 전환&quot; — 라이브러리 채택이 아니라 자작 컴파일타임 리플렉션이며,
+기법은 집합체 제약이 없는 <strong>멤버 포인터 튜플 명시 메타</strong>(glaze식)를 정본으로,
+진짜 집합체는 구조적 바인딩 자동 반영을 보조로 쓴다(분석 §8.3·§8.5 경로 (다)).</p>
+<p>목표 사슬:</p>
+<pre><code>[[Property]] 어노테이션 + 정규식 헤더툴 + generated.h 154개 + any/function 이중 소거
+    → static constexpr auto reflect = Meta::members(&amp;T::m_a, ...)  (표기 한 곳)
+    → 컴파일타임 typed 방문 (직렬화·인스펙터·쿠킹이 실제 타입 T&amp;를 본다)
+    → 런타임 브리지 = 타입당 함수 포인터 소수 (씬 로드 디스패치·C# 왕복용)
+    → 헤더툴 3종·generated.h·pre-build 스캔·원본 in-place 재작성 소멸</code></pre>
+<p>산출이 곧 다른 트랙의 족쇄 해제다: 병폐 A 소멸 → K2 SBO 재개, 병폐 B 소멸 →
+E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성능 상한 제거.</p>
+<hr>
+</section>
+<section class="doc-sec" id="sec-1-결정-사항-분석에서-확정된-것">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-결정-사항-분석에서-확정된-것">1. 결정 사항 <span class="chip ok">분석에서 확정된 것</span></h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>결정</th><th>근거</th></tr></thead>
+<tbody><tr><td>명시 메타(멤버 포인터 튜플)가 정본 — 컴포넌트 154타입 <strong>수술 없이</strong> 적용</td><td>분석 §8.3, 멤버 포인터는 가상·상속·private 무관</td></tr>
+<tr><td>집합체(Mathf·설정 구조체)는 자동 반영 보조 경로</td><td>표기 0, PFR/reflect 기법</td></tr>
+<tr><td>멤버명은 NTTP <code>source_location</code> 추출(매크로 문자열화 폴백 준비)</td><td>YAML 필드명 = 멤버명 유지 → 자산 호환</td></tr>
+<tr><td>typeID 런타임 정본 = 컴파일타임 FNV-1a 64(기존 죽은 <code>MakeTypeID</code> 부활) · 디스크 정본 = K1-b UUID 유지</td><td>분석 F-1·RF2, 층 분리 원칙</td></tr>
+<tr><td>ScriptReflect 갈래·핫리로드 스코프 기계는 <strong>삭제</strong>(통합 아님)</td><td>ModuleBehavior 사망, <code>ScriptRegister</code>/<code>BeginScope</code>/<code>UnRegisterScope</code> 호출부 0건</td></tr>
+<tr><td>마이그레이션은 <strong>어댑터 공존</strong> 방식 — 새 메타에서 기존 <code>Meta::Type</code> 테이블을 생성해 소비자 무변경으로 타입을 먼저 이전, 소비자 재작성은 그 뒤</td><td>매 슬라이스 그린 유지 (§3 CT4)</td></tr>
+<tr><td>P2996(C++26)이 MSVC에 오면 명시 표기만 접는다 — 계약(typed 방문)은 그대로</td><td>분석 §8.5</td></tr></tbody></table></div>
+<p>기각: (가) 생성기만 교체 — 병폐 잔존. (나) 매크로로 현 계약 조립 — 병폐 잔존.
+(라) 집합체 분리 선행 — 수술 불필요해졌으므로 트랙 L·E 완성 후의 자연 승격으로
+강등.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-실측-요약-변경-대상의-크기">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-실측-요약-변경-대상의-크기">2. 실측 요약 (변경 대상의 크기)</h2></div>
+<div class="prose"><ul>
+<li>등록 타입: 클래스 76(<code>RegisterReflect.def</code>) + 열거형 31. generated.h 154개·2,547줄.</li>
+<li>소비자: 직렬화(<code>ReflectionYml.h</code>+<code>ReflectionYamlTemplete.h</code>) · 인스펙터
+(<code>ReflectionImGuiHelper.h</code> 994줄) · <code>ComponentFactory.cpp</code>(17분기+Deserialize 30호출) ·
+<code>PrefabUtility</code>(오버라이드 시딩) · <code>ConsoleCommandSystem</code>(11건) · Undo
+(<code>MetaStateCommand.h</code>) · <code>GameObjectCommand.h</code>.</li>
+<li>죽은 표면(삭제 확정): <code>InvokeMethodByMetaName</code>·<code>Method</code> 체계(에디터 버튼 외 소비 0) ·
+<code>ClassAutoRegistrar</code> · <code>ScriptReflect</code> 매크로 6건 · <code>ScriptRegister</code>/<code>UnRegister</code> ·
+TypeCaster 스코프 기계(<code>BeginScope</code>/<code>EndScope</code>/<code>UnRegisterScope</code>+추적 맵 5개) ·
+ScriptReflectionHeaderTool 2종 바이너리 · 인스펙터 <code>vector&lt;int&gt;</code> 중복 분기.</li>
+<li>헤더 전파: <code>Core.Minimal.h:9</code> → 280 TU에 yaml-cpp·magic_enum, TU당 static 싱글턴 6종.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-트랙-ct--슬라이스">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-트랙-ct--슬라이스">3. 트랙 CT — 슬라이스</h2></div>
+<div class="prose"><h3 id="-ct0--기준선안전망-2026-08-16-잔여-2건">✅ CT0 — 기준선·안전망 (2026-08-16, 잔여 2건)</h3>
+<p>구현: <code>reflect.golden</code>(등록 전 타입 default-Serialize 덤프)·<code>perf.reflect</code>
+(직렬화·소환 반복 계측) 콘솔 명령 + <code>Registry::GetAllTypeNames</code> +
+<code>Tools/regression/verify-reflection-golden.ps1</code>(<code>-Baseline</code> 모드, run-all 배선 —
+골든 없으면 건너뜀). 골든은 씬 콘텐츠에 기대지 않는 타입 커버리지 전수
+덤프로 설계 — 씬 기반이면 GUID가 섞여 diff가 성립하지 않는다(실측:
+<code>m_instanceID</code>·BT 노드 <code>ID</code>/<code>ParentID</code> 3키가 실행마다 달랐고, 검증 스크립트가
+그 세 키만 자리 대조로 정규화한다. 비정규화 상태의 실패가 곧 음성 대조 증명).</p>
+<p><strong>기준선 (2026-08-16 · Debug x64 · 오브젝트 3개 씬 · 반복 50):</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>계측</th><th>값</th></tr></thead>
+<tbody><tr><td>골든 커버리지</td><td><strong>76/76 타입 직렬화 · 팩토리없음 0 · 실패 0 · diff 0</strong></td></tr>
+<tr><td>씬 전체 <code>Meta::Serialize</code></td><td><strong>10.7~13.3 ms/회</strong> (4회 실측 범위) — 오브젝트 3개에 이 값이다</td></tr>
+<tr><td><code>InstantiatePrefab</code>(BTProbe)</td><td><strong>3.0~3.8 ms/회</strong> — MobSpawner가 스폰마다 무는 값</td></tr>
+<tr><td>리플렉션 헤더 터치 재빌드</td><td><strong>4분 29초</strong> (내용 무변경·타임스탬프만, 유니티 빌드 TU 23개 재컴파일)</td></tr>
+<tr><td>무변경 증분 빌드</td><td><strong>1분 29초</strong> → 헤더 1개 터치 순비용 ≈ <strong>3분</strong> (§3.4 전파의 실측, CT3 목표치)</td></tr></tbody></table></div>
+<p>부수 실측: <code>ConsoleCommandSystem::Execute</code>의 else-if 사슬은 이미 MSVC 블록
+중첩 한계(C1061) 직전이다 — 명령 2개를 사슬에 보탰다가 컴파일이 깨져 조기
+분기(사슬 앞 early-return)로 옮겼다. 이후 명령 추가는 같은 수법을 쓸 것.</p>
+<p>잔여(후속 계측, 판정 아님): ① 씬 로드 전체 벽시계(<code>LoadSceneImmediate</code> 구간
+스팬 — PHASE 14 P1 캡처가 서면 겸용), ② 인스펙터 열림 상태 에디터 프레임
+비용(에디터 상호작용 필요 — CT1의 개선 대상이므로 CT1 착수 시 수동 캡처로 선측정).</p>
+<h3 id="-ct1--즉효-저위험-2026-08-16">✅ CT1 — 즉효 저위험 (2026-08-16)</h3>
+<ul>
+<li>인스펙터 문자열 <code>Find</code> 14건 → typeID (최대 수확: <code>InspectorWindow.cpp:171</code>의
+<code>Find(component-&gt;ToString())</code> — 매 프레임 컴포넌트마다 문자열 생성+해시 조회,
+GENERATED_BODY의 m_name=타입명 관행에 기댄 우회였다). <code>MenuBarWindow.cpp:2479</code>
+(런타임 임의 문자열)만 범위 밖 — CT6에서 구조와 함께.</li>
+<li><code>FindYamlSerializer</code>/<code>FindYamlVectorEntry</code> 선형 스캔 → <strong>함수-로컬 매직
+스태틱</strong> 해시맵(네임스페이스 스코프 맵은 TU마다 동적 초기화 → SIOF 함정,
+정찰 §2 실측 반영).</li>
+<li>조회 순서 역전(스칼라 먼저) — Serialize·Deserialize 양쪽. 안전 근거: 스칼라
+테이블 23종 ↔ Registry 76타입 <strong>교집합 공집합</strong>(정찰 실측). 부수 발견:
+두 함수의 기존 조회 순서가 서로 달랐다(enum→struct vs struct→enum — 문서화
+안 된 비대칭, 이번에 정렬). 단일 호출처 헬퍼 2개는 본문 흡수.</li>
+<li>벡터 편집 5블록: 접힘 검사를 복사보다 앞으로 + <code>vector&lt;int&gt;</code> 중복 분기
+(도달 불가) 삭제.</li>
+<li><code>prop.name</code> 포인터 비교 → <code>strcmp</code>(F-5). <code>FieldEnd</code> type_name 매직 스태틱화.</li>
+<li>부수 수정 2건: DrawMethods 공유 static 맵의 <strong>동명 메서드 키 충돌</strong>(타입
+경계 넘어 입력값 누출 — 키에 타입명 포함) · <code>std::string</code>을 varargs(%s)에
+넘기던 UB.</li>
+<li>주의 유지: <code>ReflectionImGuiHelper.h:737</code> 인근의 이미-죽은 재조회 분기는
+건드리지 않았다(정찰 경고 — 실수로 &quot;고쳐 살리면&quot; 새 UI 경로가 열린다).</li>
+</ul>
+<p>계측: <code>InstantiatePrefab</code> <strong>3.0~3.8 → 2.0ms/회 (약 35%↓)</strong> · 씬 Serialize
+10.4ms(범위 내). 검증: 빌드 그린 · 골든 diff 0. 인스펙터 프레임 계측은 CT0
+잔여 ②와 함께 후속.</p>
+<h3 id="-ct2--죽은-갈래-일소-2026-08-16-f13eaab7">✅ CT2 — 죽은 갈래 일소 (2026-08-16, <code>f13eaab7</code>)</h3>
+<p>정찰 실측(네 방향 증거: 호출처 0 · 베이스 virtual 소멸 · 빌드 배선 부재 ·
+주석 자백)으로 확정 후 삭제: 스크립트 매크로 6종 + <strong>BT/Ani BODY 4종</strong>(정찰
+추가 발견 — Dynamic_CPP 전속), TypeCaster 스코프 기계(맵 5종 포함),
+<code>Registry::ScriptRegister</code>/<code>UnRegister</code>, <code>InvokeMethodByMetaName</code>,
+<code>ClassAutoRegistrar</code>, 고아 바이너리 2종. <strong>유지 확정</strong>: <code>GENERATED_BODY</code>
+(ScriptBinder 19곳 라이브), <code>Method</code> 체계(InspectorWindow→DrawObject→DrawMethods
+라이브 경로), <code>MetaGenerator.exe</code> 배선, 구포맷 가드. Dynamic_CPP.vcxproj는
+<code>54ea26bc</code>(9-4)에서 이미 삭제됐음을 sln·git 이력으로 확인 — pre-build 배선
+제거는 이미 완료 상태였다. RetentionDecision R3·부수 근거 정정 완료.
+검증: 빌드 그린 · 골든 diff 0. 순삭감 -255줄.</p>
+<h3 id="-ct3--헤더-전파-절단-2026-08-16">✅ CT3 — 헤더 전파 절단 (2026-08-16)</h3>
+<ul>
+<li><code>Core.Minimal.h</code>에서 <code>Reflection.hpp</code> 분리. 소비 TU 직접 include는 빌드
+에러 반복이 아니라 <strong>전수 선반영</strong>(51파일) — 유니티 빌드가 앞선 TU의
+include를 공급해 누락을 숨기므로 에러 주도 수복은 불완전하다(정찰 §2:
+후보 전수 산출 → 프로바이더 4종(Component.h·GameObject.h·SceneManager.h·
+ComponentFactory.h 직접 보유 확인) 경유 파일 제외 → 거짓양성 4건 수동 판별).</li>
+<li>싱글턴 포인터 7종 전부 <code>inline auto</code>로(ODR 위험 없음 — 정찰 §8: extern/
+전방선언 참조 0건, DLL 경계 동일성은 DLLCore::Singleton이 이미 보장).</li>
+<li><code>ReflectionRegister.h</code>: yaml-cpp·ClassProperty(본문 사용 0회) 절단,
+UndoManager+MetaStateCommand → <code>ReflectionUndo.h</code> 분리(소비자는
+Reflection.hpp 사슬이 물어 줘 include 변경 불요). MetaStateCommand.h의
+숨은 순서 의존(include 0개로 앞줄 include에 기생)도 명시 include로 해소.</li>
+<li>MetaGenerator 콘텐츠 가드 3곳(generated.h는 mtime→콘텐츠 대체, 원본 헤더·
+def는 신설 — <strong>원본 헤더 무가드 재작성이 최악이었다</strong>: 삽입이 없어도 매
+실행 전량 재작성해 mtime을 갱신). 새 exe 배치, 실행 후 변경 파일 0 검증.</li>
+</ul>
+<p><strong>재측정 (기준선 대비):</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>계측</th><th>CT0 기준선</th><th>CT3 후</th><th>비고</th></tr></thead>
+<tbody><tr><td>무변경 증분 빌드</td><td>1분 29초</td><td><strong>15.6초 (5.7배)</strong></td><td>진범은 생성기 무가드 재작성 — 매 빌드가 &quot;무변경&quot;이 아니었다</td></tr>
+<tr><td>리플렉션 헤더 터치 재빌드</td><td>4분 29초</td><td>4분 08초</td><td>소폭 — Component.h가 Reflection.hpp를 직접 물어 컴포넌트 전체 재컴파일은 정당한 전파. Core.Minimal 절단의 실익은 리플렉션 무관 TU의 yaml-cpp 파싱 소멸</td></tr></tbody></table></div>
+<p>검증: 빌드 그린(첫 시도) · 골든 diff 0.</p>
+<h3 id="-ct4--신-코어--어댑터--typeid-교체-2026-08-17-2커밋-분리">✅ CT4 — 신 코어 + 어댑터 + typeID 교체 (2026-08-17, 2커밋 분리)</h3>
+<p><strong>CT4-a (<code>6f7ec6ca</code>)</strong> — <code>ReflectionMeta.h</code>: <code>CtReflect()</code>(constexpr 멤버 포인터
+튜플) + <code>ForEachMember</code>(typed 방문) + <code>AdaptReflect</code>(기존 Type 테이블 다리).
+설계 확정 3건(계획 대비 정밀화):</p>
+<ul>
+<li>CtReflect는 static 데이터가 아니라 <strong>함수</strong> — 매크로가 클래스 상단(멤버 선언
+앞)에 놓이는 관례를 지키려면 complete-class 문맥이 필요하다.</li>
+<li>이름은 NTTP가 아니라 <strong>매크로 문자열화 정본</strong> — MSVC 버전 민감 회피,
+현행 YAML 키와 동일 보장. (NTTP 추출은 P2996 착지 시 재평가)</li>
+<li>파일럿 4타입(MeshRenderer·BoxCollider·LightMapping·ShadowMapPassSetting)
+이전, generated.h 4개 삭제, <code>RegisterReflectManual.h</code> 신설(def 스캔 밖 등록,
+CT5에서 정본 승격). 골든 diff 0 = 어댑터 바이트 동등 증명. 함정 추가 발견:
+<strong>주석에 이중 대괄호 어노테이션 원문 금지</strong>(생성기가 regex_search로 훑는다).</li>
+</ul>
+<p><strong>CT4-c (2026-08-17, 사용자 결정)</strong> — 표면을 <strong>매크로 프리 · P2996 유사</strong>로
+교체. <code>^^T</code>/<code>[:r:]</code>는 표현 불가하므로 라이브러리 근사로:
+<code>meta::reflect&lt;T&gt;()</code> · <code>meta::get&lt;m&gt;(obj)</code>(스플라이스) · <code>meta::members_of&lt;T&gt;()</code> ·
+<code>meta::identifier_of(m)</code> · <code>meta::for_each_member(obj, f)</code>(template for) ·
+선언은 <code>static consteval auto reflect() { return meta::describe&lt;T, Parent, &amp;T::m_a, ...&gt;{}; }</code> 두 함수뿐(매크로 0). 성립 근거 실측: <strong>VS 18 __FUNCSIG__가
+멤버 포인터 NTTP를 <code>&amp;Owner::m_value</code>로 깨끗하게 표기</strong>(중첩 네임스페이스·
+private 포함, 프로브 실행으로 확인) — CT4-a에서 &quot;MSVC 버전 민감&quot;으로 보류했던
+NTTP 이름 추출이 이 툴체인에선 성립한다. 카나리아 static_assert가 표기 변화를
+컴파일 타임에 잡는다(툴체인 업그레이드 시 최우선 확인 지점). 부수 발견:
+<code>type_name</code>은 <strong>한정 이름</strong>을 준다(네임스페이스 포함) — 등록 76타입은 전부
+전역이라 골든 무영향, 단 CT5에서 네임스페이스 타입을 만나면 Type::name이
+한정 이름이 됨을 유의. ct_property/ReflectionMetaField* 매크로는 삭제.
+검증: 골든 diff 0(추출 이름 = 구 문자열화 이름 바이트 동등) · 회귀 전체 통과.
+P2996 착지 시 reflect()/describe 선언부만 컴파일러 제공으로 접히고 소비
+표면은 유지된다.</p>
+<p><strong>CT4-d (2026-08-17, 사용자 결정 2건)</strong> — 표기 정련:</p>
+<ul>
+<li><strong>빌더 표현식 + 멤버 속성</strong>: <code>meta::describe&lt;T&gt;(meta::base&lt;Parent&gt;(), meta::member&lt;&amp;T::m&gt;(meta::range(0.0f, 1.0f), meta::displayName(&quot;...&quot;)), ...)</code>.
+속성은 어댑터가 무시(골든 무영향)하고 CT6 인스펙터가 소비한다(range →
+슬라이더 한계). BoxCollider 마찰·반발 계수가 살아있는 예시. 기술 제약:
+속성 튜플 탓에 member_info는 비구조적 — NTTP 스플라이스는 <code>get&lt;&amp;T::m&gt;(obj)</code>,
+서술자 값은 <code>get(m, obj)</code>/<code>m.get(obj)</code>.</li>
+<li><strong>Reflect() 보일러플레이트 외부화</strong>: reflect/Reflect 대소문자 쌍 금지 지적 →
+선언부는 <code>describe()</code> <strong>하나</strong>로, 런타임 Type은 외부 창구 <code>Meta::TypeOf&lt;T&gt;()</code>
+(레거시 <code>T::Reflect()</code> 폴백 내장, CT7에서 폴백 가지 소멸)가 공급. CRTP는
+상속 목록 오염(타입당 표기 잔존 + 기반 클래스 추가)이라 기각.</li>
+<li>함정 실측 1건: 파일럿에서 Reflect()를 없애자 <code>HasReflect</code> 컴파일타임 분기
+(벡터 매퍼)가 <code>as&lt;T&gt;()</code> 폴백으로 떨어져 <code>YAML::convert&lt;T&gt;</code> 미정의 에러 —
+<strong><code>HasRuntimeType</code>(= HasReflect ∥ HasDescribe) 통합 콘셉트</strong>를 ReflectionType.h
+에 신설해 분기 2곳 교체. CT5 본대 이전이 타입마다 밟았을 함정의 선제 봉합.</li>
+</ul>
+<p><strong>CT4-b</strong> — typeID 정본 교체. <code>type_name&lt;T&gt;()</code>은 참조만 있고 정의가 없어
+MakeTypeID가 실은 <strong>인스턴스화 불가능한 죽은 코드</strong>였음이 드러남 — <strong>FUNCSIG</strong>
+기반으로 구현(선행 class/struct/enum 키워드 제거 — 표기 변경이 정체성을 바꾸지
+않게 + <code>ComponentTypeID = fnv1a_64(&quot;Component&quot;)</code>가 층을 넘지 않고 값을 재현하는
+전제). <code>GetTypeID</code> → <code>static constexpr MakeTypeID&lt;T&gt;()</code>. 구 해시 리터럴 1곳
+(ReflectionYml.h ComponentTypeID) 갱신. <code>ExtractTypeFromYAML</code> 이름 완화(경고+
+수용, 재저장 치유). 관리 측 typeID 의존 0건 grep 확인.</p>
+<p><strong>검증</strong>: 교체 diff 전수 검수 — <strong>변경 31줄 전부 <code>타입명: ID</code> 헤더, 비-ID 변경
+0</strong>(프로퍼티 값·이름·구조 바이트 동등) 확인 후 골든 재기준선(의도된 포맷 변경).
+회귀 전체 통과 — 구 typeID를 품은 기존 프리팹이 이름 완화 경로로 실로드됨.</p>
+<h3 id="원계획-ct4-착수-전-설계--이행-기록-위해-보존">원계획 <span class="chip info">CT4 착수 전 설계 — 이행 기록 위해 보존</span></h3>
+<ul>
+<li><code>Meta::members(&amp;T::m_a, ...)</code> + 컴파일타임 <code>for_each</code>(typed 방문) + NTTP
+멤버명 추출(<strong>static_assert로 추출 결과를 리터럴과 대조</strong> — MSVC 버전 민감,
+실패 시 매크로 문자열화 폴백) + 부모 메타 concat + FNV-1a 64 typeID
+(<code>TypeTrait.h</code>의 죽은 <code>MakeTypeID</code> 부활·<code>GUIDCreator</code> 대체) + 집합체 자동 경로.</li>
+<li><strong>어댑터</strong>: constexpr 메타에서 기존 <code>Meta::Property</code>/<code>Type</code> 런타임 테이블을
+생성하는 브리지 — 소비자(직렬화·인스펙터·팩토리)는 무변경으로 돈다. 이
+어댑터 덕에 CT5의 타입 이전이 타입 단위로 원자적이고 항상 그린이다.</li>
+<li><strong>typeID 교체 동반 조치</strong>: 씬 YAML의 <code>타입명: typeID</code> 헤더 검증
+(<code>ExtractTypeFromYAML</code> — 이름+ID 일치 요구)이 새 ID와 어긋난다. K1-b UUID
+우선은 이미 있으므로, <strong>이름 일치 시 ID 불일치를 경고+수용</strong>으로 완화하고
+재저장 시 새 ID를 쓴다(SerializationPlan &quot;호환 무시&quot; 창과 같은 창구.
+UUID 없는 구파일의 유일한 폴백이 이름 검증이므로 완화는 로그 필수).</li>
+<li>파일럿: 집합체 2종(Mathf 계열·설정 구조체) + 컴포넌트 2종(단순 1 —
+예: BoxColliderComponent, 복합 1 — MeshRenderer: shared_ptr·vector·enum 혼합).</li>
+<li>검증: 파일럿 타입 골든 diff 0, 회귀 그린.</li>
+</ul>
+<h3 id="-ct5--본대-이전-2026-08-17-단일-스윕">✅ CT5 — 본대 이전 (2026-08-17, 단일 스윕)</h3>
+<ul>
+<li><strong><code>meta::method</code> 확장 선행</strong>: 멤버 함수 NTTP는 <strong>FUNCSIG</strong> 표기가 다르다
+(<code>RET __cdecl Owner::Name(Args)</code> — 프로브 실측). 별도 파서 + 카나리아.
+어댑터가 MethodOnly(멤버 0) 타입의 빈 프로퍼티 뷰를 허용하도록 수정.</li>
+<li><strong>결정적 스크립트 스윕</strong> (에이전트 아님 — generated.h는 기계 생성물이라
+구조가 100% 규칙적, 바이트 단위 줄 편집으로 CP949 원문 보존·삽입은 ASCII만):
+74헤더 이관(프로퍼티 411·메서드 7), generated.h 79개 삭제(고아 6건 포함 —
+호출 0·등록 0인 부패한 기계 산출물), 어노테이션 일소.</li>
+<li>등록 정본 승격: <code>RegisterReflectManual.h</code>가 76종 전체(구 def 승계 + 파일럿
+4종 합류). 재생성된 def는 <strong>빈 목록</strong>(어노테이션 0) — CT7에서 은퇴.</li>
+<li>직접 <code>GameObject::Reflect()</code> 호출 3곳 → <code>Meta::TypeOf&lt;GameObject&gt;()</code>.</li>
+<li>수복 2건: 타 타입 generated.h를 include하던 교차 참조 1건
+(SpriteSheetComponent→ImageComponent), Socket.h의 죽은 어노테이션 4건
+(Serializable 없이 Property만 — 애초에 스캔된 적 없는 장식).</li>
+<li>검증: 빌드 그린 · <strong>골든 diff 0 (76/76 전 타입이 describe 경로에서 바이트
+동등)</strong> · 회귀 세트 전체 통과.</li>
+</ul>
+<h3 id="-ct6-a--typed-직렬화기--런타임-브리지-2026-08-17">◐ CT6-a — typed 직렬화기 + 런타임 브리지 (2026-08-17)</h3>
+<p><code>ReflectionTypedYml.h</code>: <code>meta::for_each_member</code> 위의 typed Serialize/Deserialize
+— 프로퍼티당 <code>std::function</code> 간접호출 2회 + <code>std::any</code> 값 복사 + 조회 폴백이
+if constexpr 트리로 접혔다. 런타임 디스패치는 <code>Typed::TypeOps</code>(타입당 함수
+포인터 2개, RegisterReflectManual이 등록) — <code>Meta::Serialize/Deserialize</code>
+진입점에서 우선 디스패치하므로 <strong>호출처 전체 무변경</strong>. 레거시 Property 워크는
+미등록 폴백으로 남고 CT7에서 소멸.</p>
+<p>파리티 재현 목록: 스칼라 23종 인코딩(Flow 맵 좌표계·r/g/b/a·ToString류) ·
+Flow 스타일은 스칼라 원소 벡터에만 · 컴포넌트 실타입 헤더+m_typeUUID 주입
+위치(키 순서: 헤더→UUID→부모 프로퍼티→자신) · <code>[not support type]</code> 마커 ·
+부재 키 스킵 · 포인터 원소 벡터(컴포넌트 목록)는 복원 안 함(팩토리 몫) ·
+원시 포인터 재역직렬화 누수까지(F-2 — E5에서 해소 예정).</p>
+<p><strong>계측 (CT0 기준선 대비):</strong> 씬 Serialize <strong>10.7<del>13.3 → 6.9ms/회 (</del>40%↓)</strong> ·
+InstantiatePrefab <strong>3.0<del>3.8 → 1.35ms/회 (</del>60%↓)</strong>. 골든 diff 0 첫 실행 통과.</p>
+<p>함정 실측 3건: ① <code>if constexpr</code>의 &amp;&amp;는 인스턴스화를 단락하지 않는다 — 불완전
+포인티(NodeEditor*)의 is_default_constructible hard error → 중첩 if constexpr.
+② 오버로드 가시성 기반 스칼라 콘셉트는 비스코프드 enum이 <code>HashedGuid(size_t)</code>
+비명시 생성자로 암묵 변환돼 오판(LightType) → 정확 타입 목록으로. ③ 레거시
+<code>FromYamlScalar&lt;HashedGuid&gt;</code>의 <code>as&lt;uint32_t&gt;</code>는 FNV64 이후 잠재 로드 버그
+(BadConversion) — 로드 측만 <code>as&lt;size_t&gt;</code>로 수정(쓰기 불변, 골든 안전).</p>
+<h3 id="-ct6-b--인스펙터-속성-소비-2026-08-17-스코프-조정">◐ CT6-b — 인스펙터 속성 소비 (2026-08-17, 스코프 조정)</h3>
+<p><code>meta::range</code>/<code>meta::displayName</code>이 엔드투엔드로 실동한다: <code>Property</code>에 투영
+필드 4종(hasRange/rangeMin/rangeMax/displayName — 꼬리 추가라 기존 위치 지정
+집합체 초기화 무영향) → 어댑터 <code>BuildPropertyFrom</code>이 member_info 속성을 주입
+→ 인스펙터 float/int 위젯이 range면 Slider, displayName이면 라벨 교체(ID는
+prop.name 유지 — 위젯 상태 안정성). BoxCollider 마찰·반발 계수가 첫 소비자.</p>
+<p><strong>스코프 조정(정직 기록)</strong>: &quot;타입당 typed Draw 테이블 전면 전환&quot;은 이연 —
+인스펙터에는 골든 같은 자동 파리티 검증이 없고, 레거시 체인에는 드래그드롭
+페이로드·에디터 시스템 결합(SCENE_OBJECT/Textures payload·EditorImGuiTexture)
+같은 수동 검수 필수 경로가 많다. 속성 소비는 검증 가능한 최소 배선으로 먼저
+싣고, 전면 전환은 에디터 수동 검수가 가능한 세션에서 별도 슬라이스로.</p>
+<h3 id="-ct6-c--인스펙터-typed-draw--ab-토글-2026-08-17-df551178">✅ CT6-c — 인스펙터 typed Draw + A/B 토글 (2026-08-17, <code>df551178</code>)</h3>
+<p><code>ReflectionTypedDraw.h</code> — meta 서술 기반 컴파일타임 위젯 디스패치(스칼라·
+enum(magic_enum 직결)·벡터 5종(원본 직접 편집 — 임시 복사 소멸)·포인터/
+구조체 재귀), range/displayName 소비, 멤버 포인터 캡처 언두. 등록 목록은
+X-매크로(REFLECT_TYPE_LIST)로 공유 — 런타임 등록·직렬화 썽크·Draw 썽크가
+한 목록을 소비하고, 위젯 트리 인스턴스화는 InspectorWindow TU에 격리.</p>
+<p><strong>검수 도구를 만들어 검수까지 완료</strong>: <code>meta::g_inspectorTypedDraw</code> 토글 +
+<code>inspector.typeddraw</code> 콘솔 명령으로 A/B, 회귀 하네스의 창 캡처로 에디터를
+스크립트 구동(scene.new → component.add BoxCollider/SpriteRenderer →
+scene.select → 캡처)해 typed/레거시 <strong>픽셀 동등</strong> 확인(BoxCollider range
+슬라이더·SpriteRenderer enum 콤보 포함). 파리티 기준 실측: 레거시 포인터
+특수 분기(GameObject·Texture 드래그드롭)는 prop.typeID를 포인티 타입과
+비교하는 오류로 <strong>사문</strong>이었다 — typed는 라이브 경로(제네릭 재귀)와 맞추고,
+드래그드롭 복원 여부는 별도 결정으로 남긴다. 함정: 콘솔 <code>wait</code>는 프레임
+단위 — 빈 씬 200+fps에서 캡처 타이밍이 증발한다(무한 대기+외부 킬로 해결).</p>
+<h3 id="-ct6-d--팩토리-분기-소멸--ondeserialized-후크-2026-08-17">✅ CT6-d — 팩토리 분기 소멸 · OnDeserialized 후크 (2026-08-17)</h3>
+<p><code>ComponentFactory::LoadComponent</code> <strong>686줄 → 137줄</strong>. 17개 타입 분기가 공통
+경로(typed Deserialize → SetOwner → <code>TypeOps.postLoad</code> 훅) 하나로 접혔고,
+타입별 후처리는 각 컴포넌트 소유의 <code>OnDeserialized([node])</code>로 이관됐다
+(12종 — 애셋 GUID 해석·텍스처/폰트/시트 로드·Animator 컨트롤러 그래프·
+Foliage 모델 탐색·Canvas UIManager 등록·Light/Camera/Foliage/Sprite/Mesh의
+강제 활성 특이 동작 보존). 훅 유무는 <code>requires</code> 판별(양쪽 시그니처 지원),
+없으면 nullptr — 순수 보일러플레이트 분기 5종(RigidBody·BoxCollider·
+CharacterController·BehaviorTree·PlayerInput)은 흔적 없이 소멸.</p>
+<p><strong>버그 수정(발굴)</strong>: Image/Text/SpriteSheet의 <code>navigations</code>·Sound의
+<code>localRolloffCurve</code> 수동 복원 루프는 <strong>이식하지 않고 삭제</strong> — 반영 멤버라
+typed 역직렬화(CT6-a)가 채우는데 루프가 다시 append하면 이중 적재다. 이
+루프들이 존재했던 이유도 실측으로 밝혀짐: 레거시 벡터 경로는
+<code>MakeAnyFromRaw</code>에 vector 타입 캐스터가 없어 <strong>setter가 조용히 스킵</strong>되고
+고아 벡터만 채우던 침묵 실패였다 — 수동 루프가 그 구멍을 메우고 있었고,
+CT6-a가 구멍을 고치자 루프가 버그로 반전됐다.</p>
+<p>주의: MeshRenderer 훅은 SetOwner 이후에 돈다(구 분기는 애셋 로드 후
+SetOwner — 애셋 코드가 소유자를 안 씀을 감사하고 순서 통일). Canvas 훅은
+소유자 shared_from_this가 필요해 이 순서가 전제다.</p>
+<p>잔여(CT6 잔재·CT7로): 콘솔 <code>ApplyReflectedProperty</code>·프리팹 시딩은 Property
+테이블 위에서 동작(이름 기반 — 값 접근 아님)이라 실익이 적어 어댑터와
+운명을 같이한다.</p>
+<h3 id="원계획-ct6-착수-전-설계--이행-기록-위해-보존">원계획 CT6 <span class="chip info">착수 전 설계 — 이행 기록 위해 보존</span></h3>
+<ul>
+<li>직렬화: <code>ReflectionYml</code>을 typed 방문으로 — 3단 폴백·any 박싱·부모 노드
+재복사 소멸. 컨테이너는 제네릭 레인지(→ K2 SBO 재개 가능), 소유는 종별
+분해(unique_ptr 생성-이전 경로 — E5와 같은 슬라이스 권장).</li>
+<li>인스펙터: 타입당 <code>Draw</code> 인스턴스화(전용 TU) — 프로퍼티당 선형 체인 소멸.</li>
+<li><code>ComponentFactory</code> 17분기: 애셋 참조를 <code>AssetRef&lt;T&gt;</code> 류 래퍼 타입으로 —
+typed 방문자가 래퍼를 보고 로드 후처리를 공통 수행(분석 RF5 흡수).</li>
+<li>Undo(<code>PropertyChangeCommand</code>)·콘솔·Prefab 시딩 typed 전환.</li>
+<li>검증: 골든 diff 0 + 회귀 + CT0 계측 재측정(씬 로드·스폰·인스펙터).</li>
+</ul>
+<h3 id="-ct7--은퇴정산-2026-08-17--phase-18-완결">✅ CT7 — 은퇴·정산 (2026-08-17) — PHASE 18 완결</h3>
+<p><strong>은퇴 목록</strong>: MetaGenerator 프리빌드 배선 6곳(vcxproj 2×3구성) · 헤더툴
+바이너리(MetaGenerator.exe·pugixml.dll) · AutoRegisterCreateReflection 프로젝트
+전체 · 빈 RegisterReflect.def + SceneManager 배선 · 레거시 매크로 사슬
+(ReflectionField*/PropertyField/MethodField/meta_property/meta_method/
+FieldEnd/PropertyOnly* 등 — ReflectionMecro.h는 생존자 3종만: GENERATED_BODY·
+AUTO_REGISTER_CLASS·AUTO_REGISTER_ENUM) · 레거시 직렬화 Property 워크
+(Serialize/Deserialize 본문 — 디스패치+미등록 오류 폴백만 잔존) ·
+ComponentTypeID 상수 · Vector{Factory,Invoker,Mapper} 3종 헤더+부트스트랩
+배선(레거시 워크 전용이었다) · 레거시 인스펙터 체인(DrawProperties 769줄) ·
+A/B 토글·inspector.typeddraw 콘솔 명령. DrawProperties 직접 호출 11곳은
+<code>TypedDraw::DrawOwnMembers</code>(부모·메서드 제외 등가)로 전환.</p>
+<p><strong>존치 명시</strong>: <code>meta::adapt</code> 어댑터와 Property/Method 테이블 — 콘솔
+<code>ApplyReflectedProperty</code>(이름 기반 필드 설정)·프리팹 시딩(이름 기반 diff)·
+<code>DrawMethods</code>(메서드 UI)·<code>DrawEnumProperty</code>가 소비한다. 이들은 값 접근이
+아니라 이름/메타 질의라 typed 전환의 실익이 없다 — 어댑터는 &quot;과도기 다리&quot;
+에서 &quot;이름 기반 소비자의 정본 테이블&quot;로 재정의된다.</p>
+<p><strong>최종 계측 (CT0 기준선 → CT7):</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>계측</th><th>CT0</th><th>CT7</th><th>배율</th></tr></thead>
+<tbody><tr><td>무변경 증분 빌드</td><td>1분 29초</td><td><strong>7.1초</strong></td><td><strong>12.6×</strong> (CT3 생성기 가드 15.6s → 프리빌드 소멸 7.1s)</td></tr>
+<tr><td>씬 전체 Serialize</td><td>10.7~13.3 ms</td><td>8.2 ms*</td><td>~1.5× (*CT6-a 직후 6.9ms — 런별 편차 존재)</td></tr>
+<tr><td>InstantiatePrefab</td><td>3.0~3.8 ms</td><td class="num"><strong>1.37 ms</strong></td><td><strong>~2.5×</strong></td></tr>
+<tr><td>generated.h</td><td class="num">154개</td><td class="num"><strong>0</strong></td><td>—</td></tr>
+<tr><td>헤더툴 바이너리</td><td>3종</td><td class="num"><strong>0</strong></td><td>—</td></tr>
+<tr><td>어노테이션 표기</td><td>2벌(어노테이션+생성 헤더)</td><td><strong>1벌(describe)</strong></td><td>—</td></tr></tbody></table></div>
+<p>검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.</p>
+<h3 id="-ct7-b--crtp-정체성-베이스-2026-08-17-사용자-결정">✅ CT7-b — CRTP 정체성 베이스 (2026-08-17, 사용자 결정)</h3>
+<p>&quot;GENERATED_BODY 없이 m_name·m_typeID를 개발자가 신경 쓰지 않는 법&quot; —
+<code>meta::identity&lt;T, Base&gt;</code>: 상속 선언 자체가 스탬핑을 수행한다.</p>
+<ul>
+<li>판정의 핵심은 <strong>m_name의 이중 의미</strong>였다: typed 직렬화가 멤버를 직접
+읽고(지연 채움 불가) GameObject류는 인스턴스 이름이라(타입명 파생 불가)
+eager 생성자 스탬핑이 구조적으로 필요 → 생성자 타이밍을 소유한 CRTP가
+유일한 완전 자동화. 지연 typeid 브리지(반쪽)·봉인 생성 경로(우회 위험) 기각.</li>
+<li>Component 계열 31종(describe 부모 그래프로 판별) 스크립트 스윕: 상속절
+치환(<code>public P</code> → <code>public meta::identity&lt;X, P&gt;</code>) · GENERATED_BODY 18건 →
+<code>X() = default;</code> · 수동 스탬핑 12파일 제거. 중간 베이스 체인(UIComponent →
+ImageComponent)은 생성 순서(베이스 우선·말단 최종 덮어쓰기)가 계약.</li>
+<li><strong>GameObject·Scene 등 비컴포넌트는 제외</strong> — m_name이 인스턴스 이름인
+집합은 수동 스탬핑 유지(identity를 쓰면 이름이 타입명으로 덮인다).</li>
+<li>GENERATED_BODY 매크로 최종 삭제 — ReflectionMecro.h 생존자는
+AUTO_REGISTER_ENUM 1종(## 이름 결합 — 매크로 아니면 불가능한 유일한 자리).</li>
+<li>검증: 빌드 그린(첫 시도) · 골든 diff 0(m_name 직렬화 값 파리티 증명) ·
+회귀 전체 통과.</li>
+</ul>
+<h3 id="-ct7-c--enumregistry-은퇴매크로-0종-2026-08-17-사용자-점검-요청">✅ CT7-c — EnumRegistry 은퇴·매크로 0종 (2026-08-17, 사용자 점검 요청)</h3>
+<p>&quot;EnumRegistry 점검 + AUTO_REGISTER_ENUM 제거 가능 여부&quot; — 소비 실측이
+등록소 자체의 사망 선고로 이어졌다.</p>
+<ul>
+<li><strong>소비 3곳 전수</strong>: 콘솔 <code>ApplyReflectedProperty</code>(enum 이름→값 변환) ·
+<code>DrawEnumProperty</code>(콤보) · MeshRenderer 헬퍼(<code>FindEnum(&quot;MaterialRenderingMode&quot;)</code>
+문자열 리터럴). 셋 다 Property를 경유하거나 enum 타입을 정적으로 알고 있었다
+— 이름 키 런타임 조회가 구조적으로 불필요.</li>
+<li><strong>대체</strong>: <code>Property::enumType</code>(꼬리 추가) — <code>MakeEnumPropertyImpl</code>이
+<code>create_enum_type&lt;EnumT&gt;()</code>의 함수-로컬 static 정본을 연결한다. adapt 경유
+모든 enum 프로퍼티가 자동으로 표를 얻으므로, 매크로를 빠뜨린 열거형이
+콘솔에서 조용히 &quot;지원하지 않는 타입&quot;으로 빠지던 구멍과 이름 표기 불일치
+(ToString vs magic_enum) 실패 여지가 함께 소멸. DrawEnumProperty의 이중
+조회(파라미터로 받고 이름으로 또 찾기)도 제거.</li>
+<li><strong>삭제</strong>: EnumRegistry·MetaEnumRegistry·EnumAutoRegistrar·FindEnum ·
+AUTO_REGISTER_ENUM 줄 29개(19 헤더) · <strong>ReflectionMecro.h 파일 자체</strong>
+(매크로 0종 도달 — CT7-b의 &quot;매크로 아니면 불가능&quot; 판정은 &#39;흩어진 정적
+등록자&#39;라는 전제 위였고, 등록 행위 자체가 사라지면 전제도 사라진다).
+Reflection.hpp는 ReflectionFunction.h 직접 include로 재표적(소비 60여 파일
+터치 없이 관문 유지). Dynamic_CPP의 KoriEmoteSystem.h 1건은 빌드 밖
+(vcxproj 무참조)이라 데이터 보존 정책대로 미수정.</li>
+<li>검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.</li>
+</ul>
+<h3 id="-ct8--함수형-describe--canonical-변수-treflection-2026-08-17-사용자-지시">✅ CT8 — 함수형 describe() → canonical 변수 T::reflection (2026-08-17, 사용자 지시)</h3>
+<p>타입당 서술자 객체 하나: <code>inline static constexpr auto reflection = meta::describe&lt;T&gt;(...)</code> (클래스 하단 — 정적 데이터 멤버 초기치는
+complete-class 문맥이 <strong>아니라</strong> 참조 멤버 선언 뒤여야 한다. CT4의 &quot;함수라
+상단 배치 가능&quot; 규칙이 정확히 뒤집힌 것).</p>
+<ul>
+<li><strong>파일럿 선행 증명</strong>: 불완전 Self의 PTM NTTP로 <strong>FUNCSIG</strong> 이름 추출이
+정적 멤버 초기치에서도 성립함을 selftest 카나리아(공개+속성+파라미터
+메서드 / 부모 체인+private 멤버 / 메서드 전용)로 확인 후 본대 착수.</li>
+<li><strong>전환 규모</strong>: 타입 77종(본대 76 + GameObject·Scene 등 비컴포넌트 포함
+전 서술 타입) 결정적 스크립트 + selftest Canary 수동 1종 = describe()
+멤버 함수 78개 소멸. 빌더 자유 함수 meta::describe<T>()는 정식 표기로 존치.</li>
+<li><strong>API</strong>: reflect()/members_of()가 consteval 값 반환 → constexpr
+<code>const auto&amp;</code> 반환(canonical 주소 계약을 static_assert로 고정:
+<code>&amp;meta::reflect&lt;T&gt;() == &amp;T::reflection</code>). HasDescribe → HasReflection
+(T::reflection 판별) 개명. 레거시 HasReflect·HasRuntimeType·TypeOf의
+Reflect() 폴백 가지는 정의 잔존 0건 검색 증명 후 삭제.</li>
+<li><strong>정적 desc 사본 4곳 제거</strong>: for_each_member·adapt·DrawFrame·
+DrawOwnMembers의 <code>static constexpr auto desc = T::describe()</code> — 특히
+DrawFrame&lt;T, Owner&gt;는 Owner 조합마다 같은 T의 서술자를 중복 물질화했다.
+타입 질의(TypedYml 4곳)는 <code>decltype(T::reflection)</code>으로 ODR-use 없이 해소.</li>
+<li><strong>메모리 실측(SzProbe — 미정의 템플릿 에러 메시지로 sizeof 채집)</strong>:
+무속성 member_info 1B · 속성 2종 24B · Canary 서술자 48B · MeshRenderer
+서술자 9B · 인스턴스 216B(불변). [[msvc::no_unique_address]]는 attributes/
+paramNames/type_desc 튜플 전부에 적용해도 <strong>전 항목 크기 불변</strong> — MSVC
+std::tuple이 요소를 _Tuple_val 멤버로 싸서 빈 요소 겹침 불성립 → 기각.</li>
+<li>바이너리: Academy_4Q .rdata −3,968B·파일 −3,584B, Player .rdata −2,688B
+(TU별 desc 사본 소멸 방향과 일치). Release 전후 비교는 전환 전 Release
+산출물 부재로 불가(한계 명시).</li>
+<li>검증: 빌드 그린(첫 시도) · 골든 diff 0(76타입) · 회귀 세트 전체 통과 ·
+git diff --check 통과 · 잔여물 검색 0건(describe 멤버·T::describe()·
+정적 desc 사본·값 복사).</li>
+</ul>
+<h3 id="-ct9--metaschema-로컬-스키마identity-단일-원본라이브러리-분리-2026-08-17-사용자-확정안">✅ CT9 — meta::schema 로컬 스키마·identity 단일 원본·라이브러리 분리 <span class="chip ok">2026-08-17, 사용자 확정안</span></h3>
+<p>CT8 변수형을 하루 만에 대체한 최종 표기 — 함수형 레시피의 부활이되, 물질화는
+canonical 한 곳:</p>
+<pre><code class="language-cpp">class BoxColliderComponent
+    : public meta::identity&lt;BoxColliderComponent, Component&gt;
+{
+public:
+    static consteval auto reflect()
+    {
+        return meta::schema&lt;Self&gt;(
+            meta::field&lt;&amp;Self::m_boxExtent&gt;,
+            meta::field&lt;&amp;Self::staticFriction&gt;
+                .with(meta::range(0.0f, 1.0f)),
+            meta::field&lt;&amp;Self::density&gt;);
+    }
+};</code></pre>
+<ul>
+<li><strong>상속의 유일 원본 = 클래스 선언</strong>: identity&lt;T, Base&gt;가 identity_descriptor
+(meta_identity)를 공개하고 schema<T>가 부모를 자동 추론 — <code>meta::base&lt;&gt;()</code>
+표기 소멸(33건). 자기 identity 없이 조상 것을 상속하면 static_assert 즉사
+(조용한 부모 소실 방지). 다중 상속 루트(GameObject·Prefab)는 수동
+meta_identity 별칭 2건, 무부모 44종은 국소 <code>using Self</code>.</li>
+<li><strong>로컬 스키마 계약</strong>: reflect()는 자기 선언 필드·메서드만 적는다. 상속
+합성은 질의가 계산 — localFields/fields(평탄)·localMethods/methods·
+bases(type_list)·direct_base_t·declaringType(owner_type — 인스펙터 그루핑).</li>
+<li><strong>계층 분리</strong>: MetaSchema.h 신설 — std 전용(엔진 include 0, 별도 라이브러리
+독립 가능 경계). 이름 추출·field/.with(가변)·method/.params·schema·of<T>
+외부 서술·reflect()·질의·for_each_field. 엔진 글루(ReflectionMeta.h)는
+identity 스탬핑·adapt·TypeOf·selftest. type_name은 라이브러리 복제본과
+TypeTrait 출력 동일성을 selftest가 교차 검증(갈라지면 typeID·YAML 헤더 붕괴).</li>
+<li><strong>이중 공급원</strong>: in-class reflect() 또는 meta::of<T> 특수화(침투 0) — 동시
+존재는 static_assert. 소비는 meta::reflect<T>()(consteval 질의) 하나로,
+런타임 소비자(직렬화·인스펙터·어댑터)는 meta::schema_of<T> 변수 템플릿
+<strong>한 곳</strong>만 참조(CT8 canonical 주소 계약 승계 — 소비처별 정적 사본 0 유지).</li>
+<li>함수형 복귀로 <strong>상단 배치 부활</strong>(본문은 complete-class 문맥 — CT4 근거 재적용).</li>
+<li>스윕: 77타입 결정적 스크립트(identity 31·수동 별칭 2·plain 44) + 카나리아
+4종(루트 identity·수동 별칭+private·메서드 전용·외부 서술). 함정: cbuffer
+매크로 선언(MaterialFlow/MaterialInfomation)은 class|struct 패턴에 안 걸린다.</li>
+<li>검증: 빌드 그린(첫 시도) · 골든 diff 0(76타입 — 부모 자동 추론의 바이트
+동등 증명) · 회귀 세트 전체 통과 · git diff --check 통과 · 구 표기 잔존 0.</li>
+</ul>
+<h3 id="-ct9-b--열거형-자급화--구-코드-존치-전수-감사-2026-08-17">✅ CT9-b — 열거형 자급화 + 구 코드 존치 전수 감사 (2026-08-17)</h3>
+<p><strong>magic_enum 은퇴</strong>: 같은 원리(후보 값 범위의 <strong>FUNCSIG</strong> NTTP 스캔, &#39;(&#39; 캐스트
+표기 = 무효 판별)를 MetaSchema.h에 자급 구현 — meta::enum_entries<E>(값
+오름차순·NUL 종단 이름·canonical 변수 템플릿)·enum_count·enum_name. 범위는
+magic_enum 기본과 동일([-128,128], 부호 없는 기저 [0,128], 기저 한계 클램프)
+이라 산출 집합·순서 파리티. 소비 2곳 전환: create_enum_type(ReflectionFunction
+— Property::enumType 공급)·DrawEnumCombo(TypedDraw). 카나리아: 스코프드/
+비스코프드/uint8_t 기저/값 간극·음수/무효값 빈 이름/NUL 종단. TypedYml은
+enum을 int로 직렬화(레거시 파리티)라 magic_enum 무관 — 골든 영향 0.
+리플렉션 사슬의 외부 라이브러리 의존은 yaml-cpp(직렬화 백엔드)만 남는다.</p>
+<p><strong>존치 전수 감사(워크플로 4에이전트, 소비처 실측)</strong> — 판정 요약:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>판정</th><th>대상</th></tr></thead>
+<tbody><tr><td>KEEP</td><td>Property::setter(콘솔 필드 설정) · Method/invoker+MakeMethod(DrawMethods 사슬) · Registry Find(name/ID)·GetAllTypeNames · Factory Create/Create<T>/CreateShared<T> · REFLECT_TYPE_LIST 3소비 · Meta::Find 2종 · UndoManager·CustomChangeCommand·UndoSystemInit/Final · ExtractTypeFromYAML(12소비)·DeserializePrefab · MetaYml 별칭 · ClassProperty.h(리플렉션 무관 실사용 4곳)</td></tr>
+<tr><td><strong>DEAD</strong></td><td>Property::getter(유일 호출자 MakePropChangeCommand가 자체 사망) · 벡터 메타 6종(isVector·elementTypeInfo·createVectorIterator·elementTypeName·elementTypeID·isElementPointer — 등록 비용만 내고 독자 0) · offset · typeInfo(Property·MethodParameter 양쪽) · isPointer · VectorIteratorImpl/IVectorIterator · MakePropChangeCommand+PropertyChangeCommand<T> · <strong>ReflectionYamlTemplete.h 파일 전체</strong>(CT7 이후 자기참조만) · FactoryRegistry::CreateShared(size_t) 비템플릿</td></tr>
+<tr><td>REVIEW</td><td>MakePropertyImpl 벡터 특수 분기 3종(산출물 전부 DEAD — getter/setter/name/typeName/typeID만 남기면 분기 무의미) · MetaStateCommand.h 부분 사강(PropertyChangeCommand 블록만 국소 제거 타당) · ReflectionYml 미등록 폴백(레거시 실체 0 — 순수 방어 가드로 재분류) · MetaYml 별칭 3중 선언(DRY)</td></tr></tbody></table></div>
+<h3 id="-ct10--사강-코드-일소-2026-08-17-감사-dead-목록-이행">✅ CT10 — 사강 코드 일소 (2026-08-17, 감사 DEAD 목록 이행)</h3>
+<ul>
+<li>Property 수축: getter·isPointer·offset·typeInfo·벡터 메타 6종 삭제 →
+name·typeName·setter·typeID + 속성 꼬리(hasRange/range/displayName/enumType).
+MethodParameter::typeInfo도 삭제. 참조 멤버 소멸로 Property가 복사 대입
+가능해진 것은 부수 효과.</li>
+<li>MakePropertyImpl 벡터 특수 분기 3종 접힘 — 산출물이 전부 사강이라 분기가
+구별 불능이었다. shared_ptr 이름 보정(typeName)만 생존.</li>
+<li>삭제: VectorIteratorImpl/IVectorIterator/VectorIteratorFunc ·
+MakePropChangeCommand+PropertyChangeCommand<T>(활성 Undo는 Custom 하나) ·
+GetterType 별칭 · FactoryRegistry::CreateShared(size_t) 비템플릿 ·
+<strong>ReflectionYamlTemplete.h 파일 전체</strong>(vcxproj/filters 포함).</li>
+<li>함정: GAMEOBJECT_YAML_KEY가 삭제 파일에 정의돼 있었다 — 생존 소비자
+(TypedYml 헤더 키·ReflectionYml)를 위해 ReflectionYml.h로 이주. 쌍이던
+COMPONENT_YAML_KEY는 소비 0이라 함께 은퇴. ReflectionYml.h는 yaml-cpp를
+YamlTemplete 경유로 얻고 있었다 — 직접 include로 교체.</li>
+<li>검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.</li>
+</ul>
+<h3 id="-ct11--팩토리-접합-factoryregistry--type-필드-2026-08-17-싱글턴-재확인-후속">✅ CT11 — 팩토리 접합: FactoryRegistry → Type 필드 (2026-08-17, 싱글턴 재확인 후속)</h3>
+<p>싱글턴 존치 재확인(사용자 질의)의 결론 이행 — Registry·FactoryRegistry 둘 다
+런타임 디스패치라 존치가 맞지만, <strong>FactoryRegistry는 소비자 전원이 이미
+Type*를 쥔 채 typeID로 되돌아 조회하는 구조</strong>였다(AddComponent(Type&amp;)·
+Object::Instantiate(meta)·골든). 접합:</p>
+<ul>
+<li>Meta::Type이 <code>create</code>/<code>createShared</code> 함수 포인터를 직접 소유(무상태 람다 →
+함수 포인터, adapt<T>()가 채움). HeapObject 파생만 shared 경로 — 구
+FactoryRegistry::Register<T> 규약 그대로.</li>
+<li>소비 3곳 전환으로 컴포넌트 생성 핫패스의 <strong>해시 조회 0회화</strong>. FactoryRegistry·
+MetaFactoryRegistry·Register<T>의 팩토리 등록 줄 삭제 — 등록 싱글턴은
+Registry 하나만 남는다.</li>
+<li>재확인에서 함께 기록한 유효기간 경과 3건: DLL-공유 싱글턴 모드의 존재 이유
+(C++ 핫리로드 DLL)는 CoreCLR 은퇴로 소멸(전 소비 모듈 StaticLibrary 실측),
+RegisterClassInitalize는 inline 전역 초기화 탓에 no-op 의례, Destroy 후
+inline 전역 포인터 잔류는 GetIfAlive() 관례로 방어.</li>
+<li>검증: 잔존 참조 0건 · 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.</li>
+</ul>
+<h3 id="-ct11-b--registry-구조-효율화-2026-08-17">✅ CT11-b — Registry 구조 효율화 (2026-08-17)</h3>
+<p>마지막 등록 싱글턴의 내부 정련:</p>
+<ul>
+<li><strong>이름 키 사본 소멸</strong>: <code>unordered_map&lt;std::string, ...&gt;</code> → 정본 Type::name
+(adapt의 함수-로컬 static, 프로그램 수명)을 가리키는 <code>string_view</code> 키.
+수명 계약: 등록된 Type은 이동/파괴되지 않는다.</li>
+<li><strong>조회당 할당 0회</strong>: <code>Find(const std::string&amp;)</code> → <code>Find(string_view)</code> —
+씬 로드의 이름 판별(ExtractTypeFromYAML 12개소)이 조회마다 std::string을
+만들던 것이 사라졌다. Find 래퍼의 <code>.data()</code> 전달(NUL 비보장 view의 잠재
+오독)도 함께 수정.</li>
+<li>find+insert 2회 해시 → <code>try_emplace</code> 1회(선등록 우선 의미 동일), 등록
+규모를 아는 reserve(128), Find const화, <code>Register(const Type&amp;)</code> 단일
+인자화(name 파라미터는 type.name과 항상 동일했던 중복).</li>
+<li>소비처 정합: friend ComponentFactory 루프(view 키 → <code>std::string(name)</code>
+물질화 5곳), 골든의 yaml 키 문자열화.</li>
+<li>검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.</li>
+</ul>
+<h3 id="-ct11-c--metaaliashmetautilityh-흡수-은퇴-2026-08-17">✅ CT11-c — MetaAlias.h·MetaUtility.h 흡수 은퇴 (2026-08-17)</h3>
+<p>두 헤더 다 소비자가 정확히 1파일로 줄어 &quot;공유 모음&quot;의 존재 이유가 소멸한 상태였다.</p>
+<ul>
+<li>사강 7종 삭제: TypeInfo·OffsetType(CT10의 typeInfo/offset 필드 삭제 동반
+사망) · Hash · GetMemberOffset(null-deref 트릭 UB이기도) · IsVectorType·
+ExtractVectorElementType·GetVectorElementTypeName(elementTypeName 동반 사망).</li>
+<li>생존 이관: MetaAlias 4알리아스(SetterType·Invoker·MethodParameterContainer·
+View) → ReflectionType.h, MetaUtility 3함수(ToString·RemoveObjectPrefix·
+ExtractPointee+내부 판별 3종) → ReflectionFunction.h. 두 파일 git rm +
+vcxproj/filters 정리.</li>
+<li>전이 include 결합 해소: ReflectionType.h가 TypeTrait.h(HashedGuid)를,
+ReflectionFunction.h가 TypeDefinition.h·<typeindex>를 직접 문다 — 종전엔
+은퇴 파일 경유로만 공급되던 것.</li>
+<li>ToString(typeid 기반 런타임 이름)은 meta::type_name_of(컴파일타임)와 별개
+계보로 존치 — Property::typeName 골든 파리티가 이 표기에 걸려 있다.</li>
+<li>검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.</li>
+</ul>
+<h3 id="원계획-ct7-착수-전-설계--이행-기록-위해-보존">원계획 CT7 <span class="chip info">착수 전 설계 — 이행 기록 위해 보존</span></h3>
+<ul>
+<li>MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴
+3종 바이너리·<code>[[Property]]</code>/<code>[[Serializable]]</code> 어노테이션·CT4 어댑터 삭제.</li>
+<li><code>AutoRegisterCreateReflection</code> 프로젝트 저장소에서 제거.</li>
+<li>최종 계측 보고(CT0 대비): 씬 로드·스폰 경로·인스펙터 프레임·빌드 시간.</li>
+<li>문서 정산: 본 문서 완료 표기, 분석 문서 §7 갱신, RetentionDecision에 승계 기록.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-순서와-의존">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-순서와-의존">4. 순서와 의존</h2></div>
+<div class="prose"><pre><code>CT0 ──→ CT1 ─┐            (CT1·CT2·CT3은 상호 독립, 병행 가능 —
+      └─ CT2 ─┼─→ CT4 → CT5 → CT6 → CT7        단 CT2가 CT3·CT4의 표면을 줄인다)
+      └─ CT3 ─┘</code></pre>
+<ul>
+<li><strong>E5(shared_ptr 축소)·K2 잔여(SBO·unique_ptr)</strong>: CT6과 같은 슬라이스 권장 —
+분리도 가능하지만 소유·컨테이너 전환의 회귀를 두 번 밟게 된다.</li>
+<li><strong>SerializationPlan D2(쿠킹)</strong>: CT6 이후 착수가 이득 — typed 순회 위에 쿠킹을
+얹으면 any/function 상한 없이 시작한다. D0(직렬화 기준선)는 CT0과 겸용 가능.</li>
+<li><strong>E6(GameObject→Entity 리네임)</strong>: 새 typeID가 이름 기반(FNV)이므로 여전히
+리네임 취약 — 디스크는 UUID(K1-b) 유지가 전제라는 층 분리를 CT4에서 깨지
+말 것. E6는 본 트랙과 독립.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-완료-기준">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-완료-기준">5. 완료 기준</h2></div>
+<div class="prose"><ul>
+<li>헤더툴 바이너리 0 · generated.h 0 · pre-build 스캔 배선 0.</li>
+<li>리플렉션 경로의 <code>std::any</code>/<code>std::function</code> 사용 0 (브리지의 타입당 함수
+포인터 제외).</li>
+<li>회귀 세트 그린(pwsh) + 전환 구간 골든 diff 0 유지 기록.</li>
+<li>CT0 대비 계측 보고: 씬 로드·<code>InstantiatePrefab</code>·인스펙터 프레임·빌드 시간.</li>
+<li><code>[[Property]]</code>가 붙은 멤버의 컨테이너·소유 형태 제약(vector·shared 전제) 소멸
+— SBO 배열·unique_ptr 멤버가 반영 가능함을 검사로 증명(K2·E5 해제 조건).</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-함정-착수-전-필독">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-함정-착수-전-필독">6. 함정 <span class="chip info">착수 전 필독</span></h2></div>
+<div class="prose"><ol>
+<li><strong>씬 typeID 검증 완화는 로그와 함께</strong> — UUID 없는 구파일은 이름 검증이
+유일한 안전망이다. 완화 시 조용한 오식별이 생기지 않게 경고 로그 + 재저장
+유도(CT4).</li>
+<li><strong>이중 정본 금지</strong> — 헤더툴이 살아 있는 동안(CT7 전) generated.h를 손으로
+고치지 않는다. 타입 이전은 &quot;메타 추가 + generated 블록 제거&quot;를 한 커밋에.</li>
+<li><strong>템플릿 전파 역행 주의</strong> — typed 방문자(직렬화·인스펙터·쿠킹)를 헤더에
+풀어놓으면 CT3의 성과를 되물린다. 타입당 전용 TU 명시적 인스턴스화.</li>
+<li><strong>NTTP 멤버명 추출은 컴파일러 버전 민감</strong> — CT4의 static_assert 대조를
+유지하고, 툴체인 업그레이드 시 최우선 확인 지점으로 삼는다.</li>
+<li><strong>회귀는 pwsh로</strong> — 5.1은 한글 주석 인코딩 파손으로 거짓 실패.</li>
+<li><strong>작업 중 사용자 동시 커밋</strong> — 커밋 전 HEAD 재확인, <code>--update</code> 류 일괄
+흡수 금지(공유 워크트리 이력).</li>
+<li><strong>자를 먼저 검증</strong> — CT0 없이 CT1 착수 금지. 개선 주장은 전부 CT0 기준선
+대비 수치로 한다.</li>
+</ol>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ReflectionRedesignPlan.md"><code>docs/plans/archive/ReflectionRedesignPlan.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

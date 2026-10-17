@@ -1,39 +1,226 @@
-# W7 패널 비용: 현재 계측과 기준선 비교 규칙
+# W7-0 패널 비용 기준선 (2026-09-14)
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+PHASE 21 W7 의 완료 기준은 *"p95 CPU·allocation 개선 수치를 기록한다. 캐시만 추가하고
+실측 이득이 없으면 제거한다"* 다. 이 문서가 그 **대조군**이다. 캐시가 들어가기 전의
+수치이고, 뒤에 오는 W7-1~W7-3 은 이 표와 맞대어 증명한다.
 
-## 무엇을 재는가
+측정 도구는 `Tools/regression/measure-panel-cost.ps1` 이고 관측 창구는
+`editor.panelcost` 다. 둘 다 `f7edc952` 에서 섰다.
 
-`EditorPanelCost`는 Presentation 스레드에서 steady clock으로 scope 경과 시간을 모으고 frame 경계에서 잠금 아래 게시한다. 게임 스레드의 `editor.panelcost`는 게시된 값만 읽는다. Hierarchy, browser_tree, browser_files 세 slot은 일부 본문의 비용이며 별도의 stable-ID 창 장부 및 셸 구간과 중첩될 수 있다. slot 합계에 창 시간을 다시 더하면 같은 작업을 이중 계산한다.
+## 잰 조건
 
-각 slot/창은 최근 최대 512개 표본의 평균과 p95를 계산한다. p95는 정렬 기준 `min(n-1,floor(n*0.95))` 위치다. last는 마지막 표본, max는 reset 이후 최대여서 링에서 오래된 spike가 빠져도 max는 남을 수 있다. frames와 samples도 같은 값이 아니다. units/scans/probes는 작업량을 설명하는 정수이며 allocation 바이트나 GPU 시간으로 변환할 수 없다.
+| | |
+|---|---|
+| 구성 | **Release** (`Bin/x64-Release/Editor/CreatorEditor.exe`, 커밋 `f7edc952`) |
+| 창 | 2400x1400 |
+| 씬 | `scene.new` + `scene.populate <N> 0` — 루트 아래 평평한 목록 |
+| 표본 | 슬롯마다 512 프레임(링 용량 가득) |
+| 브라우저 | 프로젝트 `Assets` 실물. 열린 폴더 24 개 · 현재 폴더 파일 23 개 |
 
-셸 장부는 beforeframe, host.beginframe, dockspace, prewindows, postwindows, endrender, present를 구별한다. host.beginframe에는 실제 resize/RHI 프레임 준비와 대기가 섞일 수 있다. present는 host EndFrame의 ImGui render 및 RenderAndPresent를 포함하며 기존 `ui_cpu_ms` 범위 밖이다. 전체 UI 프레임 값과 각 scope의 차이는 측정 경계를 먼저 확인한 뒤 해석한다.
+Release 로만 잰다. Debug 로 재면 CPU 비용이 재려는 축을 덮는다 — 같은 날
+해상도 축에서 그 함정을 밟았다([perf-measure-release-only]).
 
-## 재현 도구의 계약
+fixture 는 저작 `.creator` 가 아니라 `Scene::CreateEntity`(= `object.create` 가 타는
+그 함수)로 만들고, 만든 직후 `scene.hierarchycheck` 가 초록인 것을 확인한 뒤에만
+수치를 읽는다.
 
-`measure-panel-cost.ps1`은 자동 통과 게이트가 아니라 숫자를 남기는 측정 도구다. 기본 실행 파일은 Release, count는 문자열 `1000,10000,50000`, fanout은 0, 요청 창은 2400×1400이다. 현재 목표 표본은 240개이며 최대 poll 수를 둔다. 옛 보고서의 “매 회 512 프레임”을 현재 runner 동작으로 옮기지 않는다. 게임 스레드 `wait N`으로 Presentation 표본 수를 추정하지 않고 결과의 samples를 본다.
+## 기준선
 
-fixture는 `scene.populate` 이후 hierarchycheck로 일관성을 확인한다. `-WithAssets`는 실제 프로젝트 Assets 아래 임시 PNG들을 만들고 watcher/meta와 browser를 사용하므로 단순 읽기 전용 측정이 아니다. 종료 시 fixture와 recents 복원을 확인해야 한다. 실행 중 Editor가 있으면 endpoint 충돌을 피하려고 거부한다. 이번 문서 작업에서는 이 도구를 실행하지 않았다.
+### Hierarchy
 
-비교 조건에는 commit/build, 하드웨어·전원, 실제 client/DPI/user scale, workspace/preset, 열린 창과 도킹 폭, 선택/펼침/검색 상태, asset 수와 cache warmup을 기록한다. 요청 창 크기만 기록하면 OS clamp와 browser tree 숨김 때문에 모수가 달라질 수 있다. 시작·검색 재구축 spike와 안정 대기를 따로 측정한다.
+| 엔티티 | lastMs | avgMs | **p95Ms** | maxMs | units(그린 행) | scans |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1,000 | 0.777 | 0.799 | **1.214** | 5.157 | 1,000 | 0 |
+| 10,000 | 6.016 | 6.960 | **10.330** | 20.034 | 10,000 | 0 |
+| 50,000 | 26.657 | 25.920 | **33.270** | 54.915 | 50,000 | 0 |
 
-## 현재 최적화와 해석 한계
+`units` 가 엔티티 수와 **정확히 같다.** 화면에 50 줄쯤 보이는데 50,000 줄을 다
+그린다는 뜻이다. 행당 약 0.52 µs 로 선형이고, 50k 의 p95 33.3 ms 는 Hierarchy
+하나가 에디터를 30 fps 로 묶는다는 뜻이다.
 
-Hierarchy는 평탄 캐시와 보이는 행 clipper를 사용하지만 검색 활성 시 rename을 반영하려고 매 프레임 재구축한다. Content Browser는 디렉터리 결과 cache, 재스캔 budget, 보이는 타일 요청을 사용한다. cache miss와 명시 무효화가 일어난 프레임은 정상 대기보다 비쌀 수 있다. 썸네일의 48MiB 보유 예산도 전체 GPU/프로세스 메모리 상한이 아니다.
+### Content Browser — 폴더 트리
 
-과거 1k/10k/50k 수치와 “O(보이는 행)” 해석은 당시 입력·배치에 대한 관측이었다. 현재 복잡도 경계의 근거로 알고리즘을 설명할 수 있지만, 최신 실행 없이 p95 개선율·메모리 절감률을 새로 선언하지 않는다. 특히 평균·p95만으로 cache 재구축 최악값을 숨기지 않는다.
+| 엔티티 | lastMs | avgMs | **p95Ms** | maxMs | units(노드) | **scans** |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1,000 | 7.456 | 4.603 | **7.563** | 29.751 | 24 | **24** |
+| 10,000 | 2.921 | 4.309 | **6.829** | 15.688 | 24 | **24** |
+| 50,000 | 2.717 | 3.305 | **4.359** | 8.306 | 24 | **24** |
 
-## 남은 수용 요구
+씬에 무엇이 들었든 **상관없다.** 열린 폴더 하나마다 `directory_iterator` 한 번을
+프레임마다 돌린다(`ContentsBrowserWindow::ShowDirectoryTree`). 노드 24 = 스캔 24 다.
 
-[W0 역사 기준선](EditorWorkspaceW0Baseline.md)과 [브라우저 계약](EditorContentBrowserLayoutValidation.md)을 함께 사용한다. Release cold/warm, 깊은 계층, 검색 반복, 파일 변경 burst, 썸네일 늦은 완료 및 여러 작업공간에서 표본을 다시 수집해야 한다. CPU 개선뿐 아니라 allocation/retained memory와 무효화 정확성을 같이 판단하고, 복잡성만 늘리는 cache는 제거하는 원래 요구를 유지한다. 숫자가 없는 항목은 미측정으로 남긴다.
+**엔티티 1,000 일 때 브라우저가 Hierarchy 의 5.8 배다**(4.60 vs 0.80 ms). 실제
+프로젝트 규모에서 더 비싼 쪽이 이쪽이고, 그 비용은 사용자가 아무것도 하지 않아도
+계속 나간다.
 
-## 구현 근거
+### Content Browser — 현재 폴더 목록
 
-- [Editor/EngineGUIWindow/EditorPanelCost.h](../../Editor/EngineGUIWindow/EditorPanelCost.h)
-- [Editor/EngineGUIWindow/EditorPanelCost.cpp](../../Editor/EngineGUIWindow/EditorPanelCost.cpp)
-- [Editor/EditorWindow/EditorWindowHost.cpp](../../Editor/EditorWindow/EditorWindowHost.cpp)
-- [Editor/EngineGUIWindow/EditorRenderer.cpp](../../Editor/EngineGUIWindow/EditorRenderer.cpp)
-- [Editor/EngineGUIWindow/HierarchyFlatten.cpp](../../Editor/EngineGUIWindow/HierarchyFlatten.cpp)
-- [Editor/EngineGUIWindow/ContentsBrowserWindow.cpp](../../Editor/EngineGUIWindow/ContentsBrowserWindow.cpp)
-- [Tools/regression/measure-panel-cost.ps1](../../Tools/regression/measure-panel-cost.ps1)
+| 엔티티 | lastMs | avgMs | p95Ms | maxMs | units(항목) | scans |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1,000 | 0.426 | 0.308 | 0.426 | 3.134 | 23 | 1 |
+| 10,000 | 0.169 | 0.293 | 0.440 | 2.466 | 23 | 1 |
+| 50,000 | 0.179 | 0.224 | 0.316 | 0.497 | 23 | 1 |
+
+작다. 다만 그 이유는 **이 폴더에 파일이 23 개뿐**이기 때문이지 이 경로가 싸기
+때문이 아니다 — 여기도 매 프레임 `directory_iterator` 와 항목마다 `is_directory`
+(stat)·`browser_utf8`(문자열 할당)·정렬을 한다. 자산이 많은 폴더의 fixture 는
+W7-1 에서 따로 세운다.
+
+### fixture 생성 비용 (참고)
+
+| 엔티티 | `scene.populate` |
+|---:|---:|
+| 1,000 | 6.2 ms |
+| 10,000 | 38.7 ms |
+| 50,000 | 364.1 ms |
+
+## 이 표를 읽는 법 — 시간이 아니라 `scans` 를 본다
+
+`browser_tree` 의 p95 가 7.56 → 6.83 → 4.36 으로 흔들린다. 씬이 커져서 브라우저가
+빨라진 것이 아니라 **OS 파일 캐시 온도**가 달라진 것이다. 파일시스템을 재는 수치는
+이렇게 흔들린다.
+
+그래서 `scans` 를 따로 센다. 시간에 노이즈가 있어도 "프레임당 24 번" 은 흔들리지
+않고, 캐시가 그것을 0 으로 만들었는지는 그 수로 **명확히** 판정된다. 시간만 재는
+계측이었다면 W7-1 의 이득을 노이즈와 구별하지 못했을 것이다.
+
+같은 이유로 `units` 를 센다. clipping 의 판정은 "빨라졌다" 가 아니라 **"그리는 행이
+보이는 행으로 줄었다"** 다.
+
+## 계측을 세우면서 드러난 것 둘
+
+**① 탭으로 겹친 창은 CLI 가 닿을 수 없었다.** 처음 측정에서 브라우저 두 슬롯이
+0 이었다. Content Browser 가 `AssetBundle`·`ResourceCounter` 와 같은
+`dock_slot::bottom` 이라 탭으로 겹치고, 열려 있어도 **선택되지 않으면 ImGui 가 본문을
+돌리지 않는다** — 181 프레임 중 1 프레임만 잡혔다. `editor.windows` 는 표를 읽기만
+하고 여닫는 자리는 메뉴뿐이었다. `editor.window <안정식별자> <open|close|focus>` 를
+세워서 열었다.
+
+**② 브라우저는 자기 폭이 560 logical px 미만이면 폴더 트리를 통째로 숨긴다.**
+창 1600x1400 에서는 아래 도크가 그 밑으로 떨어져 `browser_tree` 가 0 이었다. 측정
+기본 창이 2400x1400 인 것은 그래서다. 0 을 "비용이 없다" 로 읽지 않으려면 슬롯이
+**그려지기는 했는지**(`frames`)를 함께 봐야 한다.
+
+## W7-1 전후 (2026-09-15)
+
+Browser 스냅샷 캐시(`BrowserDirectorySnapshot`)를 얹고 **같은 경로에서 연달아** 쟀다.
+`Bin/x64-Release/Editor` 의 바이너리를 `f7edc952` 판으로 되돌려 before 를 재고, 곧바로
+지금 판으로 바꿔 after 를 쟀다. 날짜가 다른 두 측정을 맞대지 않은 이유는 위에 적은
+대로다 — 파일시스템을 재는 시간은 OS 캐시 온도로 흔들린다.
+
+### Content Browser — 폴더 트리
+
+| 엔티티 | | avgMs | **p95Ms** | maxMs | units | **scans** |
+|---:|---|---:|---:|---:|---:|---:|
+| 1,000 | before | 3.618 | **5.132** | 8.276 | 24 | **24** |
+| 1,000 | after | 1.352 | **2.000** | 2.512 | 24 | **0** |
+| 50,000 | before | 3.017 | **4.164** | 6.183 | 24 | **24** |
+| 50,000 | after | 1.406 | **2.009** | 3.605 | 24 | **1** |
+
+### Content Browser — 현재 폴더 목록
+
+| 엔티티 | | avgMs | **p95Ms** | maxMs | units | **scans** |
+|---:|---|---:|---:|---:|---:|---:|
+| 1,000 | before | 0.258 | **0.385** | 1.311 | 23 | **1** |
+| 1,000 | after | 0.094 | **0.141** | 0.396 | 23 | **0** |
+| 50,000 | before | 0.213 | **0.314** | 1.860 | 23 | **1** |
+| 50,000 | after | 0.088 | **0.128** | 0.378 | 23 | **0** |
+
+### Hierarchy — 대조군(건드리지 않았다)
+
+| 엔티티 | | avgMs | p95Ms | units |
+|---:|---|---:|---:|---:|
+| 1,000 | before | 0.588 | 0.925 | 1,000 |
+| 1,000 | after | 0.513 | 0.865 | 1,000 |
+| 50,000 | before | 23.711 | 32.062 | 50,000 |
+| 50,000 | after | 22.895 | 29.025 | 50,000 |
+
+### 읽는 법
+
+**판정은 `scans` 다.** 24 → 0 이고 50k 표본에서 1 인 것은 그 프레임에 나이 1 초가
+지난 폴더 하나를 예산대로 다시 훑었다는 뜻이다 — 설계한 그대로다. 시간은
+p95 5.13 → 2.00 ms(2.6 배) · 4.16 → 2.01 ms(2.1 배)이고 목록 쪽은 0.385 → 0.141 ms
+(2.7 배)인데, **이 배수는 부차적인 증거다.** 같은 날 같은 자로 연달아 쟀어도
+파일시스템 시간은 흔들리고, 흔들리지 않는 것은 "디스크를 몇 번 만졌는가" 다.
+
+**Hierarchy 는 `units` 가 그대로다**(1,000 / 50,000). W7-1 은 브라우저만 건드렸으므로
+이것이 맞다. 이 칸이 움직였다면 측정이 다른 것을 재고 있다는 뜻이다.
+
+**남은 비용의 성격이 바뀌었다.** after 의 browser_tree 는 스캔 0 인데도 p95 2.0 ms 다.
+이제 그것은 syscall 이 아니라 노드 24 개의 ImGui 그리기(TreeNodeEx · 라벨 · tooltip)다.
+줄이려면 W7-3 의 clipping 이 필요하고, 폴더가 24 개뿐이라 지금은 급하지 않다.
+
+## W7-2 · W7-3 전후 (2026-09-15)
+
+`Bin/x64-Release/Editor` 의 바이너리를 W7-1 착지본(`e790b678`)으로 되돌려 before 를
+재고 곧바로 지금 판으로 바꿔 after 를 쟀다. Hierarchy 는 파일시스템을 만지지 않으니
+브라우저만큼 흔들리지는 않지만, 같은 자로 연달아 재는 규칙은 그대로 지켰다.
+
+### ① W7-2 만 얹었을 때 — **이득이 없다**
+
+(중간 빌드로 잰 것이다. 이 판은 커밋하지 않았고, 아래 ②가 착지한 판이다.)
+
+| 엔티티 | | avgMs | p95Ms | **units** |
+|---:|---|---:|---:|---:|
+| 1,000 | before (W7-1) | 0.448 | 0.751 | 1,000 |
+| 1,000 | after (W7-2) | 0.460 | 0.718 | 1,000 |
+| 50,000 | before (W7-1) | 22.754 | 28.506 | 50,000 |
+| 50,000 | after (W7-2) | 23.213 | 28.606 | 50,000 |
+
+평탄 목록만 세우고 재면 **아무것도 나아지지 않는다.** 당연하다 — 그리는 행이 그대로
+50,000 이고, 사라진 것은 순회 방식뿐이다(재귀 → 스택, 그리고 계층이 그대로면 순회
+자체를 건너뛴다). 그 순회는 애초에 그리기 비용에 묻히는 크기였다.
+
+W7 의 완료 기준은 *"캐시만 추가하고 실측 이득이 없으면 제거한다"* 다. 이 표만 보면
+W7-2 는 그 기준에 걸린다. 그래서 **W7-2 는 홀로 착지시키지 않았다.** 이것은 캐시가
+아니라 clipping 이 설 **자리**이고, 자리의 값은 그 위에 무엇이 서는지로만 매겨진다.
+
+### ② W7-2 + W7-3 — 그리는 행이 보이는 행으로 떨어진다
+
+| 엔티티 | | avgMs | **p95Ms** | maxMs | **units** |
+|---:|---|---:|---:|---:|---:|
+| 1,000 | before (W7-1) | 0.551 | **0.822** | 1.591 | **1,000** |
+| 1,000 | after | 0.027 | **0.037** | 0.193 | **14** |
+| 50,000 | before (W7-1) | 23.999 | **30.427** | 37.820 | **50,000** |
+| 50,000 | after | 0.032 | **0.041** | 0.148 | **14** |
+
+**판정은 `units` 다.** 50,000 → 14 이고, 1,000 에서도 14 다 — 씬이 50 배로 커져도 같은
+수다. 그리는 일이 **씬 크기에서 떨어져 나와** 패널 높이에만 매인다는 뜻이고, 이것이
+clipping 이 하겠다고 한 일의 전부다. p95 30.427 → 0.041 ms(742 배)는 그 결과로 따라온
+수치다. `before` 의 p95 는 세 번 재는 동안 28.5 · 29.0 · 30.4 로 흔들렸고 `after` 는
+0.034~0.041 이었다 — 배수의 끝자리는 의미가 없고, `units` 는 세 번 다 정확히 14 였다.
+
+`maxMs` 도 함께 본다. 50k 의 37.8 → 0.148 ms 다. 옛 경로는 **매 프레임** 30 ms 를
+썼으므로 최댓값이 아니라 상시값이 그랬다 — Hierarchy 하나가 에디터를 30 fps 로 묶고
+있었다.
+
+### 대조군 — 브라우저는 건드리지 않았다
+
+| 슬롯 | before avgMs | after avgMs | scans |
+|---|---:|---:|---:|
+| browser_tree (1k) | 1.465 | 1.354 | 0 / 0 |
+| browser_tree (50k) | 1.520 | 1.523 | 1 / 1 |
+| browser_files (1k) | 0.103 | 0.094 | 0 / 0 |
+
+움직이지 않았다. 움직였다면 측정이 다른 것을 재고 있다는 뜻이다.
+
+### 그림이 그대로인지는 픽셀로 확인했다
+
+같은 fixture(`scene.populate 60 3` — 깊이 있는 트리)로 before/after 창을 각각 찍어
+전 픽셀을 맞댔다: **392,888 픽셀 중 다른 픽셀 0.** 들여쓰기·화살표·홀짝 띠·아이콘
+위치가 한 점도 달라지지 않았다. 들여쓰기를 `TreePush` 에서 `Indent` 로 옮기고 띠
+번호를 그리는 순서가 아니라 목록이 주게 바꾼 것이 바로 이 확인을 받기 위해서다.
+
+## 다음이 겨냥하는 것
+
+| 슬라이스 | 이 표에서 붉어져야 할 칸 |
+|---|---|
+| ~~W7-1 Browser 스냅샷~~ | **착지(2026-09-15)** — `browser_tree.scans` 24 → 0, `browser_files.scans` 1 → 0 |
+| ~~W7-2 flatten cache~~ | **착지(2026-09-15)** — 홀로는 이득 0. W7-3 과 함께만 뜻이 있다 |
+| ~~W7-3 clipping~~ | **착지(2026-09-15)** — `hierarchy.units` 50,000 → 14, p95 30.4 → 0.041 ms |
+| ~~W7-4 정본 불변식 source gate~~ | **착지(2026-09-15)** — `verify-hierarchy-flatten-contract.ps1`, 72 단정 · 변이 12 종 |
+| W7 비동기 썸네일 | 별도 산정. 아이콘 → 썸네일, 무효화/예산/퇴출/늦은 완료 |
+
+남은 비용의 성격도 다시 바뀌었다. 이제 Hierarchy 의 0.04 ms 는 **보이는 14 줄**의
+비용이고, 씬을 더 키워도 이 수는 오르지 않는다. 다음에 붉어질 칸은 브라우저의
+`browser_tree` p95 2 ms(노드 24 개의 ImGui 그리기)이지 Hierarchy 가 아니다.

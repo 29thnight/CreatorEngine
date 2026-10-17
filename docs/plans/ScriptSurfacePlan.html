@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/ScriptSurfacePlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스크립트 표면 재설계 (PHASE 9.5)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-왜-이-페이즈가-필요한가">0. 왜 이 페이즈가 필요한가</a></li><li><a href="#1-완료분">1. 완료분</a></li><li><a href="#2-잔여-트랙">2. 잔여 트랙</a></li><li><a href="#3-착수-순서와-의존">3. 착수 순서와 의존</a></li><li><a href="#4-이-페이즈가-지키는-원칙">4. 이 페이즈가 지키는 원칙</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="ScriptSurfacePlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>스크립트 표면 재설계 (PHASE 9.5)</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">8<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 1, 진행·부분 1, 대기·미검증 6"><i class="ok" style="flex:1"></i><i class="info" style="flex:1"></i><i class="dim" style="flex:6"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 1</span><span class="chip info">진행·부분 1</span><span class="chip dim">대기·미검증 6</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#0-왜-이-페이즈가-필요한가"><span class="ve-label">§0</span><span class="map-name">왜 이 페이즈가 필요한가</span><span class="map-bar"><i style="width:12.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-완료분"><span class="ve-label">§1</span><span class="map-name">완료분</span><span class="map-bar"><i style="width:29.3%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span> <span class="chip info" title="진행·부분">1</span></span></a>
+<a class="map-row" href="#2-잔여-트랙"><span class="ve-label">§2</span><span class="map-name">잔여 트랙</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">6</span></span></a>
+<a class="map-row" href="#3-착수-순서와-의존"><span class="ve-label">§3</span><span class="map-name">착수 순서와 의존</span><span class="map-bar"><i style="width:14.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-이-페이즈가-지키는-원칙"><span class="ve-label">§4</span><span class="map-name">이 페이즈가 지키는 원칙</span><span class="map-bar"><i style="width:6.5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「2. 잔여 트랙」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>신설 2026-09-04. C# 스크립트 계층이 무엇을 좇도록 설계돼 있었는지와, 그것을 현재
+네이티브 기준으로 다시 세우는 작업. <code>ScriptApiMigrationPlan.html</code>을 승계한다.</p>
+</blockquote>
+</section>
+<section class="doc-sec" id="sec-0-왜-이-페이즈가-필요한가">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-왜-이-페이즈가-필요한가">0. 왜 이 페이즈가 필요한가</h2></div>
+<div class="prose"><p>C# 표면은 엔진을 따라가지 못한 것이 아니라, <strong>애초에 엔진을 따라가도록 설계되지
+않았다.</strong></p>
+<p><code>ScriptApiMigrationPlan.html</code> §11의 T1~T4 등급표는 2026-07-29 시점의
+<code>Dynamic_CPP\Assets\Script</code> 코퍼스를 실측해 만든 것이다. &quot;GetComponent 734회 ·
+Transform 접근 1위 · 입력 43회&quot; 같은 숫자가 표면의 모양을 정했다. 그런데 그
+코퍼스는 <code>8ae17250</code>에서 포팅 없이 통째로 삭제됐다(349파일 · 37,788줄 삭제 ·
+새 GameScripts 0건). <strong>기준이 사라졌는데 표는 갱신되지 않았고</strong>, 그 계획서의
+S3·S4는 대시보드 항목이 된 적이 없다. 같은 기간 <code>Engine/</code>에 115커밋이 들어왔다.</p>
+<p>그래서 표면은 &quot;옛 게임 코드가 그때 무엇을 얼마나 불렀는가&quot;를 기준으로 굳어 있었다:</p>
+<ul>
+<li><strong>Transform이 자유 함수 묶음</strong>이었다 — 계획서가 &quot;Transform은 컴포넌트가 아니다&quot;를
+전제로 적었는데, 그 전제는 트랙 L2가 닫힌 이틀 뒤 <code>c9bbdd56</code>(S1-b)에서 뒤집혔다</li>
+<li><strong>입력이 폴링 전용</strong>이었다 — 티어표가 &quot;T3: 호출이 적어 단순 래핑으로 충분&quot;이라 적었다</li>
+<li><strong>컴포넌트 32종 중 13종만 노출</strong>돼 있었다 — 나머지는 늦게 생긴 것이 아니라
+애초에 범위 밖이었다(전부 <code>8-16</code> 이전부터 kTable에 있다)</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-완료분">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-완료분">1. 완료분</h2></div>
+<div class="prose"><h3 id="w1--골격-완료-79ac93ae--2026-09-04">W1 — 골격 <span class="chip ok">완료 <code>79ac93ae</code> · 2026-09-04</span></h3>
+<p>기반 클래스를 네이티브와 1:1로 세웠다.</p>
+<pre><code>Component (6단계 훅)              ← 사용자 스크립트가 직접 상속 (옛 Behaviour)
+└ NativeComponent : Component     ← 핸들 래퍼
+  └ Transform : NativeComponent   ← 옛 readonly struct</code></pre>
+<ul>
+<li><code>Behaviour</code> 이름 폐기 — 네이티브에서 6단계 생명주기를 소유하는 계층의 이름이
+<code>Component</code>이고 <code>Transform</code>·<code>MeshRenderer</code>·<code>ScriptComponent</code>가 모두 거기서 파생한다.
+<code>Behaviour</code>는 일어나지 않은 Unity 관례 이식의 잔재였다</li>
+<li><code>BehaviourRegistry</code>→<code>ScriptRegistry</code>, <code>BehaviourGenerator</code>→<code>ScriptGenerator</code> —
+<code>Component*</code>로 가면 네이티브 <code>ComponentFactory</code>·<code>RegisterAllComponents</code>(컴포넌트
+<strong>타입</strong> 등록부)와 뜻이 부딪힌다</li>
+<li><code>Transform_Exists</code> 신설(<code>kApiVersion</code> 19→20) — UI/Canvas는 Transform이 없고
+<code>Entity::Transform_()</code>이 공유 더미를 돌려주므로 쓰기가 조용히 버려진다.
+썽크는 <code>HasTransform()</code>을 직접 본다(전자를 쓰면 검사가 항상 &quot;있다&quot;가 된다)</li>
+</ul>
+<h3 id="w2--컴포넌트-노출-완료-84419886ebab7c7f--2026-09-04">W2 — 컴포넌트 노출 (완료 <code>84419886</code>·<code>ebab7c7f</code> · 2026-09-04)</h3>
+<p><strong>저작분이 규모를 정했다.</strong> 계획 메모는 미노출 19종을 적었지만 실측하니:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>컴포넌트</th><th style="text-align:right">저작 건수</th><th>처리</th></tr></thead>
+<tbody><tr><td>Transform</td><td class="num" style="text-align:right">440</td><td>기존</td></tr>
+<tr><td>BoneComponent</td><td class="num" style="text-align:right">234</td><td>마커(필드 0·메서드 1) — 노출할 것 없음</td></tr>
+<tr><td>MeshRenderer</td><td class="num" style="text-align:right">103</td><td>기존</td></tr>
+<tr><td><strong>LightComponent</strong></td><td class="num" style="text-align:right"><strong>30</strong></td><td><strong>W2에서 신설</strong></td></tr>
+<tr><td><strong>CameraComponent</strong></td><td class="num" style="text-align:right"><strong>20</strong></td><td><strong>W2에서 신설</strong></td></tr>
+<tr><td>RectTransform·Image·Canvas·Text·Animator</td><td style="text-align:right">4~20</td><td>기존</td></tr>
+<tr><td>Terrain·Volume·Decal·Foliage·Ragdoll·MeshCollider·PlayerInput·SpriteRenderer·SpriteSheet·StateMachine·TerrainCollider</td><td class="num" style="text-align:right"><strong>0</strong></td><td><span class="chip info">착수 안 함 (§2.5)</span></td></tr></tbody></table></div>
+<p>관리 측이 네이티브 컴포넌트를 <strong>붙일 수단이 없으므로</strong>(<code>CreateComponent</code>는
+네이티브→관리 방향의 스크립트 인스턴스 생성이다) 저작분 0인 타입에 래퍼를 만들면
+<code>GetComponent&lt;T&gt;()</code>가 원리적으로 언제나 null인 죽은 표면이 된다.</p>
+<p>두 컴포넌트의 <strong>검증해야 할 사슬이 서로 달랐다</strong>:</p>
+<ul>
+<li><code>LightComponent</code>는 렌더 프록시를 쓴다. 값 writer가 <code>PublishRenderProxyDirty</code>를
+내지 않으면 화면이 그대로인데 컴포넌트 필드는 바뀌므로 <strong>되읽으면 새 값이 나온다</strong> —
+값 왕복 단정은 이 결함에 원리적으로 눈멀다. dirty 사슬 축을 따로 세웠다</li>
+<li><code>CameraComponent</code>는 프록시를 쓰지 않는다(<code>Scene.cpp</code>의 프록시 <code>Kind</code> 열거에
+Camera가 없다). 매 프레임 <code>CaptureFrameSnapshot</code>으로 읽히므로 발행할 dirty가
+애초에 없고 게이트 축도 하나다</li>
+</ul>
+<p><strong>명명 규칙</strong>: C# 래퍼는 네이티브 이름 그대로이고 예외가 없다(15종 대조 확인).</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-잔여-트랙">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-잔여-트랙">2. 잔여 트랙</h2></div>
+<div class="prose"><h3 id="w3--입력-액션-값-통로-대기--p1--4일">W3 — 입력 액션 값 통로 <span class="chip dim">대기 · P1 · 4일</span></h3>
+<p><strong>지금 스크립트는 액션이 발화했다는 &quot;이름&quot;만 받고 값은 못 받는다.</strong></p>
+<p>경로가 이렇게 서 있다:</p>
+<pre><code>PlayerInputComponent::Update
+  → ActionMap::CheckAction(playerIndex, scriptType, onFired)
+    → onFired(action-&gt;funName)
+      → ClrHost::QueueScriptMessage(instanceId, functionName)
+        → ScriptMessage { int instanceId; char name[64]; }
+          → C# InvokeMessage(instanceId, name)</code></pre>
+<p>값이 두 곳에서 끊긴다:</p>
+<ol>
+<li><strong><code>ActionMap.cpp:317,327</code>의 <code>valueAction(action-&gt;value.v2Value)</code>가 주석 처리돼
+있다.</strong> 바로 위에서 <code>v2Value</code>를 키보드 4방향 또는 게임패드 스틱으로 채워 놓고
+<code>onFired(funName)</code>만 부른다 — 계산된 값이 그 자리에서 버려진다</li>
+<li><strong><code>ScriptMessage</code>에 인자 필드가 없다.</strong> <code>{int instanceId; char name[64]}</code>뿐이라
+1을 살려도 값을 실을 곳이 없다</li>
+</ol>
+<p><strong>착수 전 결정이 필요하다</strong> — 둘 중 하나를 골라야 하고, 고르는 순간 미러 계약이 바뀐다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>안</th><th>방법</th><th>대가</th></tr></thead>
+<tbody><tr><td>A</td><td><code>ScriptMessage</code>에 값 필드 추가</td><td>구조체 배치가 바뀌어 <code>kApiVersion</code> 상승 + 큐 메모리 증가(모든 메시지가 안 쓰는 값 필드를 든다)</td></tr>
+<tr><td>B</td><td>질의 API 신설 — 메시지는 이름만, 값은 <code>Input_GetActionValue(name)</code></td><td>발화 시점과 질의 시점 사이에 값이 바뀔 수 있다(틱 경계라 실제로는 안전하나 계약이 약해진다)</td></tr></tbody></table></div>
+<p><strong>소비자도 함께 저작해야 한다.</strong> 어느 씬에도 <code>PlayerInputComponent</code>가 0건이므로
+지금은 이 경로가 한 번도 돌지 않는다. 게이트를 세우려면 컴포넌트를 붙인 씬과
+액션 맵 자산을 함께 만들어야 하고, 그것 없이는 &quot;고쳤다&quot;를 증명할 수 없다.</p>
+<p>완료 조건: 스크립트가 Vector2 액션 값을 받아 단정하는 회귀가 run-all에서 돈다.</p>
+<hr>
+<h3 id="w4--저작-dirty-통로-대기--p1--3일">W4 — 저작 dirty 통로 <span class="chip dim">대기 · P1 · 3일</span></h3>
+<p><strong>리플렉션 인스펙터가 값을 대입만 하고 dirty를 모른다.</strong></p>
+<p><code>ReflectionTypedDraw.h</code>에 <code>ProxyDirty</code> 언급이 0건이다. 그래서 인스펙터에서 라이트
+색이나 세기를 바꾸면 컴포넌트 필드는 바뀌지만 <code>LightRenderProxy</code>는 낡은 채 남는다.
+W2가 만든 게이트의 <strong>변이 상태가 정확히 지금의 인스펙터 경로</strong>다 —
+<code>LightComponent</code>의 setter에서 <code>PublishRenderProxyDirty</code> 6줄을 지우면 프로브의
+값 왕복 15건은 그대로 통과하고 dirty 사슬 축만 붉어진다.</p>
+<p>W2는 setter를 신설하는 데서 멈췄다. 필드가 여전히 <code>public</code>이라 우회할 수 있고,
+지금 <code>private</code>으로 내리면 저작 경로가 멈추기 때문이다.</p>
+<p>닫는 순서:</p>
+<ol>
+<li>리플렉션 draw가 값 변경을 알릴 훅을 갖는다(필드 단위 후처리 또는 컴포넌트 단위 통지)</li>
+<li>렌더 프록시를 쓰는 컴포넌트가 그 훅에서 dirty를 발행한다</li>
+<li>그 뒤에야 <code>LightComponent</code>의 값 필드를 <code>private</code>으로 내릴 수 있다</li>
+</ol>
+<p>완료 조건: 인스펙터 경로로 값을 바꾸는 CLI 저작이 프록시까지 닿는 것을 게이트가 잰다
+(그 관측은 W5에 걸린다).</p>
+<hr>
+<h3 id="w5--렌더-델타-관측-하네스-대기--p2--3일">W5 — 렌더 델타 관측 하네스 <span class="chip dim">대기 · P2 · 3일</span></h3>
+<p><strong><code>--script</code> 헤드리스는 렌더 프레임이 거의 돌지 않아 프록시 값을 관측할 수 없다.</strong></p>
+<p>실측(2026-09-04, 기본 씬 라이트에 스크립트로 8회 쓰기):</p>
+<pre><code>기준선  publish=1 committed=1 queued=3 applied=2
+이후    publish=9 committed=2 queued=4 applied=2</code></pre>
+<p>게임 스레드 쪽은 전부 정상이고 <code>applied</code>만 멈춰 있다. <code>RenderScene::UpdateCommand</code>는
+프록시에 쓰지 않고 <code>ProxyCommandQueue</code>에 델타를 넣을 뿐이며, 그것을 적용하는
+<code>ExecuteBatch</code>는 렌더 소비 스레드 전용이다. 같은 실행의 종료 로그가
+<code>publish 64 / consume 3 / latest-wins 61 / overflow 61</code>.</p>
+<p><strong>이 한계를 제품 결함으로 오진한 적이 있다.</strong> <code>scene.switch</code>로 씬을 열면 그 씬의
+광원이 프록시에 안 잡히고 옛 씬 값이 남는 것을 &quot;씬 전환 시 광원 미등록&quot;으로
+보고했는데, 새 광원의 <code>RegisterCommand</code>도 옛 광원의 <code>UnregisterCommand</code>도 같은
+큐로 가므로 같은 한계의 두 얼굴이었다. 갈라 준 것은 <code>enqueued</code>/<code>applied</code> 한 쌍이다.</p>
+<p>그래서 W2의 Light 게이트는 게임 스레드 쪽 사슬(writer → dirty → 커밋 → 큐잉)까지만
+재고, 마지막 한 칸을 파일 머리에 실측치와 함께 적어 뒀다.</p>
+<p>닫는 방법 후보:</p>
+<ul>
+<li>헤드리스에서 렌더 프레임을 N회 강제로 도는 CLI(<code>dx12.live</code>는 렌더 0프레임으로 이미 기록됨)</li>
+<li>또는 프록시 델타를 게임 스레드에서 동기 적용하는 검사 전용 진입점</li>
+</ul>
+<p>완료 조건: Light 게이트의 ② 축이 프록시 <strong>값</strong>을 대조하도록 돌아가고, dirty 제거
+변이에 붉어진다.</p>
+<hr>
+<h3 id="w6--미러-커버리지-대기--p2--2일">W6 — 미러 커버리지 <span class="chip dim">대기 · P2 · 2일</span></h3>
+<p>게이트 3종이 서 있지만(<code>check-api-table</code>·<code>check-bt-enums</code>·<code>check-entry-points</code>)
+경계를 넘는 것 중 <strong>검사 없는 미러가 셋 남아 있다</strong>. 셋 다 <code>ClrHost.h</code>에 정의가
+있고 주석만 &quot;C#과 맞춰야 한다&quot;고 적는다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>미러</th><th>어긋나면</th></tr></thead>
+<tbody><tr><td><code>ScriptLifecyclePhase</code></td><td>6단계 훅이 엉뚱한 단계로 불린다</td></tr>
+<tr><td><code>ScriptFieldType</code></td><td><code>SerializeField</code> 값이 잘못된 타입으로 왕복한다</td></tr>
+<tr><td><code>ScriptMessage</code> 배치</td><td>메시지 이름이 깨진다(W3이 필드를 더하면 더 위험해진다)</td></tr></tbody></table></div>
+<p><strong><code>SerializeField</code> 왕복 게이트도 없다.</strong> <code>CaptureFields</code>/<code>RestoreFields</code>가 7종
+대칭인데 저작 자산에 직렬화된 값이 <strong>0건</strong>이라 실자산 왕복 전례가 없다. 저작분을
+만들어 저장/로드 왕복을 재야 한다.</p>
+<p>완료 조건: 미러 3종 대조가 run-all에서 돌고 각각 변이로 이빨을 증명한다.
+<code>SerializeField</code> 7종을 실제 저작한 씬으로 왕복 게이트가 선다.</p>
+<hr>
+<h3 id="w7--문서-청산-대기--p3--1일">W7 — 문서 청산 <span class="chip dim">대기 · P3 · 1일</span></h3>
+<ul>
+<li><code>ScriptApiMigrationPlan.html</code> §11의 T1~T4 등급표는 <strong>폐기됐다</strong>. 기준 코퍼스가
+삭제된 뒤에도 그 표가 남아 다음 작업자를 잘못 이끈다 — 폐기 표시와 이 계획서로의
+포인터를 박는다</li>
+<li>같은 문서의 &quot;Transform은 컴포넌트가 아니다&quot;는 <code>c9bbdd56</code>(S1-b)에서 뒤집혔다</li>
+<li><code>BehaviorTreeManagedPlan.md</code>가 <code>BehaviourRegistry</code>를 지목한다(→ <code>ScriptRegistry</code>)</li>
+<li>애니메이션의 <code>SetBehaviour</code>/<code>CreateBehaviour</code> 계열은 <strong>별개 체계</strong>라 개명 대상이
+아니다. 문서에 그 경계를 적어 두지 않으면 다음 스윕이 또 건드린다</li>
+</ul>
+<h3 id="w8--디스패치-오버라이드-감지-대기--p1--1일">W8 — 디스패치 오버라이드 감지 <span class="chip dim">대기 · P1 · 1일</span></h3>
+<p><strong><code>ScriptRegistry</code>가 훅마다 <code>_active</code> 전체를 돈다.</strong> 오버라이드하지 않은 스크립트도
+빈 가상 호출을 겪는다.</p>
+<p><strong>근거 수치를 LC6 실측으로 정정한다(2026-09-06).</strong> 이 절이 원래 들던 &quot;2026-09-04
+실측: <code>override void PrePhysics</code>는 0건인데 <code>Component</code> 파생 42개를 매 프레임
+순회한다&quot;는 <strong>분모가 비용과 무관하다</strong> —
+<a href="archive/ScriptLifecycleContractHardeningPlan.html">생명주기 안정화 LC6</a>의 착지가
+그것을 갈랐다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>세는 범위</th><th><code>Component</code> 파생</th><th><code>PrePhysics</code> override</th><th><code>PostPhysics</code> override</th></tr></thead>
+<tbody><tr><td><code>GameScripts</code> 전체</td><td class="num">47</td><td class="num">2</td><td class="num">25</td></tr>
+<tr><td>저작 코퍼스만(회귀 픽스처 41개 제외)</td><td class="num">8</td><td class="num"><strong>0</strong></td><td class="num">7</td></tr>
+<tr><td><code>ScriptCore</code> 내장</td><td class="num">1</td><td class="num">0</td><td class="num">0</td></tr></tbody></table></div>
+<p>&quot;<code>PrePhysics</code> override 0건&quot;은 <strong>저작 코퍼스 기준으로는 맞다</strong>(전체로 세면 2건이며
+둘 다 픽스처다). 틀린 것은 순회 규모 쪽이다 — <strong>프레임 비용은 타입 수가 아니라
+런타임 인스턴스 수가 정한다.</strong> 파생 타입이 몇 개든 씬에 붙지 않으면 순회 비용은
+0이다. 실측: 저작 씬 16개 중 스크립트가 붙은 것은 3개이고 각각 <code>ScriptComponent</code>
+2개, <code>Lifecycle3D</code> 재생 중 활성 스크립트는 <strong>1개</strong>다.</p>
+<p>그러므로 지금 없앨 수 있는 빈 가상 호출은 <strong>프레임당 1회</strong>이고, <strong>이 트랙을 현재의
+성능 이득으로 정당화하지 않는다.</strong> LC6이 같은 이유로 자기 성능 변경을 보류했다 —
+두 계획서가 서로 다른 분모로 같은 이득을 주장하지 않게 하는 것이 그 트랙의 요구였다.
+지금 결론을 뒤집는 조건도 그쪽과 같다: <strong>활성 스크립트 인스턴스가 수백 개 규모가 될
+때</strong> 다시 잰다. <code>script.status</code>의 활성 스크립트 수가 그 임계를 재는 값싼 지표다.</p>
+<p>같은 파일 안에서 이미 갈려 있다 — 6단계 훅은 <code>Invoke(b, static x =&gt; x.OnEnable(), ...)</code>로
+할당 없는 static 람다인데, 틱 훅만 <code>Invoke(b, x =&gt; x.PrePhysics(dt), ...)</code>라 <code>dt</code>를
+캡처해 <strong>호출마다 할당</strong>이 붙는다.</p>
+<p>네이티브에 선례가 있다. <code>Lifecycle::MaskOfType&lt;T&gt;()</code>가
+<code>&amp;T::Hook != &amp;Component::Hook</code>으로 컴파일 타임에 판정하고 <code>PhaseBits</code> 마스크를
+세운다(옛 틱 비트 <code>1u&lt;&lt;3~5</code>는 2026-09-04 <code>5b9c8250</code>에서 철거했고 8개 단계 훅
+판정만 남았다). 관리 측은 컴파일 타임이 아니므로 <strong>타입당 1회 계산해 캐시</strong>한다 —
+<code>GetType().GetMethod(...).DeclaringType != typeof(Component)</code>, 또는 <code>ScriptGenerator</code>가
+마스크를 생성. 디스패치는 마스크로 걸러진 목록만 순회한다.</p>
+<p><strong>왜 지금인가.</strong> 근거는 현재 비용이 아니라 <strong>N3-b의 선행</strong>이다.
+<code>NetworkFrameworkPlan</code> N3-b가 고정 축 훅 <code>OnSimulationTick(fixedDelta)</code>을 신설하는데,
+그것은 <strong>tick당</strong> 돈다. 감지 없이 추가하면 30fps에서 <strong>인스턴스당 프레임 순회가
+2배</strong>가 된다(원래 이 자리에 적혀 있던 42→84는 타입 수로 센 값이라 정정한다 — 배수는
+맞고 절대량은 활성 인스턴스 수를 따른다). 지금 인스턴스가 1개라 절대량이 작다는 것은
+<strong>나중에 늘었을 때 배수가 그대로 곱해진다</strong>는 뜻이지 이 선행을 면제하지 않는다.
+<strong>W8이 그 슬라이스의 선행이며, <code>ScriptRegistry</code>를 이 페이즈가 일관되게 소유하도록
+PHASE 20이 아니라 여기에 둔다.</strong></p>
+<p><strong>착수 시점의 판단 재료.</strong> N3-b가 서지 않는 한 이 트랙은 급하지 않다. 반대로 N3-b를
+착수하기로 하면, 그때는 활성 인스턴스가 몇 개든 감지를 먼저 세운다.</p>
+<p>완료 조건: 훅별 구독 목록이 실제 오버라이드 수에 비례하고, 오버라이드 0건인 훅의
+순회가 0이 된다. 생명주기 순서 게이트가 개명 때와 같이 사건 순서를 보존한다.
+<strong>프레임 시간 개선은 완료 조건이 아니다</strong> — 위 실측에서 그것은 분해능 아래이며,
+이 트랙이 사는 근거는 tick 훅이 붙었을 때의 순회 배수다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-착수-순서와-의존">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-착수-순서와-의존">3. 착수 순서와 의존</h2></div>
+<div class="prose"><pre><code>W3 (입력) ── 독립. 단, 결정 A/B가 W6의 ScriptMessage 미러 계약을 바꾼다
+W4 (저작 dirty) ──┐
+                  ├── W5가 없으면 W4의 완료를 증명할 수 없다
+W5 (관측 하네스) ─┘   └─► NetworkFrameworkPlan ND-b가 W4의 훅에 관찰자를 분기한다
+W6 (미러 커버리지) ── W3의 결정 뒤에 ScriptMessage 항목을 확정
+W7 (문서) ── 언제든
+W8 (디스패치 감지) ── 독립 ─► NetworkFrameworkPlan N3-b의 선행</code></pre>
+<p>권장: <strong>W5 → W4 → W3 → W6 → W7</strong>. W5가 먼저 서야 W4의 &quot;고쳤다&quot;가 관측 가능해지고,
+W3의 결정은 W6의 계약을 정하므로 W6보다 앞서야 한다. W8은 이 사슬과 독립이라
+언제든 넣을 수 있으나, PHASE 20이 N3-b를 착수하기 전에는 서야 한다.</p>
+<p><strong>PHASE 20이 이 페이즈에 거는 의존 둘.</strong> 네트워크 페이즈는 통째로 외부 담당자에게
+이양할 것이므로(<code>NetworkFrameworkPlan</code> §6), 그 경계가 이 페이즈의 산출물 위에 선다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>PHASE 20 슬라이스</th><th>이 페이즈의 선행</th><th>이유</th></tr></thead>
+<tbody><tr><td>N3-b 고정 클럭 + <code>OnSimulationTick</code></td><td><strong>W8</strong></td><td>tick당 도는 훅을 감지 없이 더하면 순회가 배가 된다</td></tr>
+<tr><td>ND-b 쓰기 dirty 확장점</td><td><strong>W4</strong></td><td>W4가 리플렉션 draw → 훅 통로를 세워야 그 위에 관찰자를 붙인다. 지금은 <code>ReflectionTypedDraw.h</code>에 <code>ProxyDirty</code>·<code>OnPropertyChanged</code> 언급이 0건이라 저작 축에 통로 자체가 없다</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-이-페이즈가-지키는-원칙">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-이-페이즈가-지키는-원칙">4. 이 페이즈가 지키는 원칙</h2></div>
+<div class="prose"><ol>
+<li><strong>저작분이 규모를 정한다.</strong> 계획서의 목록이 아니라 실제 자산 건수를 세고, 0건이면
+착수하지 않는다 — 관리 측이 컴포넌트를 붙일 수 없으므로 죽은 표면이 된다</li>
+<li><strong>값 왕복 단정만으로 통과시키지 않는다.</strong> 컴포넌트 필드는 바뀌므로 되읽으면 항상
+새 값이 나온다. 그 값이 소비자(렌더·직렬화·이벤트)까지 가는 축을 따로 잰다</li>
+<li><strong>컴포넌트마다 검증할 사슬이 다르다.</strong> Light는 dirty 사슬이 있고 Camera는 없다.
+같은 형태의 게이트를 복사하면 한쪽은 아무것도 재지 않는다</li>
+<li><strong>못 잡는 것을 적는 데까지가 증명이다.</strong> 하네스가 볼 수 없는 칸은 실측치와 함께
+게이트 파일에 남긴다 — 적어 두지 않으면 다음 사람이 같은 자리에서 오진한다</li>
+</ol>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ScriptSurfacePlan.md"><code>docs/plans/ScriptSurfacePlan.md</code></a> · 마지막 커밋 2026-09-11 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

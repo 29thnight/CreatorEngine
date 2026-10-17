@@ -1,28 +1,34 @@
-# 렌더러 품질 개선의 기능별 완료선
+# 렌더러 품질 계획 (PHASE 4.75)
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
+**2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
-## 구현과 품질 수용을 분리한다
 
-현재 렌더러에는 CSM, SSAO/SSGI/SSR/SSS, Fog, Bloom과 AgX/ACES tone mapping, temporal upscale과 UI 합성 경로가 있다. 파일·node 존재는 모든 재질·장치에서 시각 정확도와 성능이 수용되었다는 뜻이 아니다. 특히 RenderPassSettings에 남은 이름이 현재 삭제된 일반 Deferred pass의 존재를 의미하지 않는다.
+**2026-09-23 분리 · 활성 4행 재산정 28일(RND-1~3 18일 + RND-ENV 10일). 기존 RND-1~3 미착수, RND-ENV 배경 토글 슬라이스 진행.** 현재 소유권과 공수 원장은
+[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)다. 이 계획은 재질 자체의 Principled
+의미가 아니라 렌더러의 반사·그림자·표시 결과를 소유한다.
 
-## 보존하는 품질 작업
+| ID | 범위 | 산정 | 선행과 완료 게이트 |
+|---|---|---:|---|
+| `RND-1` | local reflection probe, specular AO | 5일 | `MAT-9` 뒤 probe 자산·캡처·바인딩과 AO의 renderer golden·성능 판정 |
+| `RND-2` | 공용 shadow sampling, point/spot atlas, quality tier | 8일 | cascade/point/spot의 각 품질 단계와 masked·normal-offset·far fade 픽셀/성능 판정 |
+| `RND-3` | display OETF, AgX, auto exposure, bloom | 5일 | pre-tone material golden 뒤 표시 변환·post 순서와 효과별 golden·성능 판정 |
+| `RND-ENV` | Environment 배경과 diffuse/specular IBL의 독립 설정·제품 소비 | 10 | `MAT-7` 기반, W9 resolver·RND-1 probe 우선순위 공유. [ENV-A~E](EnvironmentRenderingPlan.md)의 쿠킹/캐시·전체 route·픽셀/성능 gate |
 
-- RND-1: local reflection probe의 자산·capture·선택 우선순위·바인딩과 specular AO. 현재 전역 IBL 구현을 local probe 제품 완료로 계상하지 않는다
-- RND-2: 공용 shadow sampling, point/spot atlas, quality tier·masked·normal-offset·far fade. 현재 3-cascade directional 경로와 다른 광원 종류의 지원을 구분한다
-- RND-3: display OETF·tone mapping·exposure·bloom의 실제 순서와 품질. AgX/Bloom 구현이 이미 있으므로 전부 미착수라고 쓰지 않으며 자동 노출·출력 장치 정책은 별도 확인·구현 대상이다
-- RND-ENV: background와 diffuse/specular IBL의 독립 설정·profile·쿠킹·실제 소비. 상세는 EnvironmentRenderingPlan을 따른다
+기존 세 행의 게이트는 독립적으로 기록한다. `RND-1 → RND-2`는 현재 구현 선행 근거가
+없어 페이즈 전체 의존으로 묶지 않는다. `MAT-9`의 재질 출력, PHASE 4.3의 compiled
+graph, 필요한 시간축 입력은 소비하지만 이 계획에서 각각의 계약을 재정의하지 않는다.
+C# IR로 각 Pass를 선택하는 제품 저작 전환은
+[`CSharpRenderPipelinePlan.md`](CSharpRenderPipelinePlan.md)가 소유한다. native Pass의
+품질 게이트를 C# 전환의 완료로 대신하지 않는다.
 
-## 게이트
+각 행은 동일한 밀봉 입력에서 DX12 effect off/on·지원 범위·픽셀과 GPU
+비용을 기록한다. 현재 28일은 2026-10-01 DX12 범위로 재산정한 계획 추정이고, 문서 분리는 구현 또는
+런타임 검증의 증거가 아니다.
 
-pre-tone-map material golden과 표시 결과 golden을 분리한다. 효과별 off/on·parameter 경계·해상도·camera 이동·history reset과 성능을 같은 sealed 입력으로 검사한다. native golden은 temporal/spatial post 제외 증거를 확인한다. RGB 오차·누락/과노출·성능과 사용자 표시 결과를 각각 기록한다.
+## RND-ENV — 배경과 IBL 환경 설정
 
-기존 계획의 DX12 Debug/Release 제품 게이트와 Vulkan 별도 parity 범위를 유지한다. 과거 28인일(RND-1~3 18 + ENV 10)은 당시 범위 추정이며 현재 구현을 반영한 잔여 확정치가 아니다. C# 저작 전환이나 material Principled 의미의 수용을 이 품질 작업의 완료로 대신하지 않는다.
-
-## 소스 근거
-
-- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp)
-- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedPostChainPass.cpp](../../Engine/RenderEngine/Render/Passes/PostProcess/EnhancedPostChainPass.cpp)
-- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedPostChainPass.h](../../Engine/RenderEngine/Render/Passes/PostProcess/EnhancedPostChainPass.h)
-- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp](../../Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp)
-- [Engine/RenderEngine/Interfaces/RenderPassSettings.h](../../Engine/RenderEngine/Interfaces/RenderPassSettings.h)
+2026-10-01 추가. progress/days:10. 배경 표시·세기·fallback 색과 diffuse/specular IBL의
+독립 enable/intensity, default HDRI/profile 참조, Standard/LX·Deferred/Forward·Editor/Player
+동일 의미와 캐시/쿠킹·픽셀/비용을 [EnvironmentRenderingPlan.md](EnvironmentRenderingPlan.md)의
+ENV-A~E로 완료 판정한다. 현재 중립 회색 fallback·기본 forest의 배경 숨김·명시적 환경 선택 시
+자동 표시와 중립 Grid가 적용됐다. 색 편집/profile resolver·IBL weight 전체 지원은 후속 gate다.

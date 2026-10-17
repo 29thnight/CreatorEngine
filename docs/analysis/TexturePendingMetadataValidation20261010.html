@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/TexturePendingMetadataValidation20261010.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 12 — 저장 대기 중 metadata 삭제·손상 UI 검증 (2026-10-10)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="TexturePendingMetadataValidation20261010.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 12 — 저장 대기 중 metadata 삭제·손상 UI 검증 (2026-10-10)</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 3개의 분량 막대">
+<a class="map-row" href="#검증-방법과-범위"><span class="ve-label">§00</span><span class="map-name">검증 방법과 범위</span><span class="map-bar"><i style="width:72.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#debug-결과"><span class="ve-label">§01</span><span class="map-name">Debug 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#release-결과"><span class="ve-label">§02</span><span class="map-name">Release 결과</span><span class="map-bar"><i style="width:97%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 3개 가운데 「Debug 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-검증-방법과-범위">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="검증-방법과-범위">검증 방법과 범위</h2></div>
+<div class="prose"><p>실제 Inspector의 Maximum Dimension 숫자 입력으로 자동 저장을 대기시킨 뒤,
+<code>assets.texture.pendingprobe</code>가 owner thread에서 400ms 전에 외부 삭제 또는 손상을
+주입했다. 숫자 편집과 Reload는 실제 Editor UI 조작이고, 파일 실패 주입은
+<code>.texture-auto-ui-race</code> 표시가 있는 격리 프로젝트의 <code>fixture.png.meta</code>에 한정한다.
+검증 모드 <code>delete</code>/<code>corrupt</code>와 실행 도우미의 해당 선택지를 추가했다.
+제품 저장 경로의 구현은 이번 검증에서 변경하지 않았다.</p>
+<p>대기 항목이 소진된 후 750ms 동안 외부 상태를 확인한다. 삭제는 파일이 없는 상태,
+손상은 주입한 bytes 그대로여야 하며 자동 저장 오류가 있어야 성공이다.
+각 모드는 구성별 한 번의 제어된 경합이다. 반복/장시간, 최종 디스크 비교 이후 쓰기,
+삭제·손상과 동시에 종료하는 경합, 다중 창/배율, GPU pixel oracle은 포함하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-debug-결과">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="debug-결과">Debug 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>모드</th><th style="text-align:right">대기 중 주입 시점</th><th>결과</th></tr></thead>
+<tbody><tr><td>delete</td><td class="num" style="text-align:right">9ms</td><td>삭제 상태 유지, 암묵적 재생성 없음, 자동 저장 거부</td></tr>
+<tr><td>corrupt</td><td class="num" style="text-align:right">3ms</td><td>손상 bytes 유지, 자동 저장 거부</td></tr></tbody></table></div>
+<p>두 경우 Inspector가 <code>The source changed on disk; pending edits were not written.</code>를
+표시하고 draft 값2와 미저장 <code>UnsavedT0Texture</code> 객체를 유지했다.
+정상 baseline metadata를 복원한 뒤 실제 Reload로 디스크 값0을 읽고 오류를 해제했다.
+새 숫자2 입력의 자동 저장을 확인했고 PNG/GUID 및 저장 씬은 유지됐다.
+정상 Finalize와 DX12 shutdown pending task/batch/retirement <code>0/0/0</code>을 확인했다.
+삭제·손상 거부 직후의 기존 렌더링 유지 여부는 별도 GPU 판정으로 계상하지 않는다.</p>
+<p>Debug Editor 라이브러리/runtime/launcher 빌드는 통과했다. 두 UI 실행의 runtime SHA-256은
+<code>D84ED3C42CDF5762F6D9CD77D18FDF0398D9F4C1AE69FA2CA3F234DD88BB1C56</code>이며 실행 전후 동일했다.</p>
+<ul>
+<li><a href="../../Build/TexturePendingMetadata/ui-debug-result.json">Debug receipt</a></li>
+<li><a href="../../Build/TAUI-Debug-delete-d84dfe96/commands.jsonl">삭제 경합 명령 receipt</a></li>
+<li><a href="../../Build/TAUI-Debug-delete-d84dfe96/pending-rejected.png">삭제 오류</a>, <a href="../../Build/TAUI-Debug-delete-d84dfe96/draft-retained.png">draft 유지</a></li>
+<li><a href="../../Build/TAUI-Debug-delete-d84dfe96/reload-recovered.png">삭제 복구 Reload</a>, <a href="../../Build/TAUI-Debug-delete-d84dfe96/fresh-edit.png">새 편집</a></li>
+<li><a href="../../Build/TAUI-Debug-corrupt-84d593b1/commands.jsonl">손상 경합 명령 receipt</a></li>
+<li><a href="../../Build/TAUI-Debug-corrupt-84d593b1/pending-rejected.png">손상 오류</a>, <a href="../../Build/TAUI-Debug-corrupt-84d593b1/draft-retained.png">draft 유지</a></li>
+<li><a href="../../Build/TAUI-Debug-corrupt-84d593b1/reload-recovered.png">손상 복구 Reload</a>, <a href="../../Build/TAUI-Debug-corrupt-84d593b1/fresh-edit.png">새 편집</a></li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-release-결과">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="release-결과">Release 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>모드</th><th style="text-align:right">대기 중 주입 시점</th><th>결과</th></tr></thead>
+<tbody><tr><td>delete</td><td class="num" style="text-align:right">7ms</td><td>삭제 상태 유지, 암묵적 재생성 없음, 자동 저장 거부</td></tr>
+<tr><td>corrupt</td><td class="num" style="text-align:right">8ms</td><td>손상 bytes 유지, 자동 저장 거부</td></tr></tbody></table></div>
+<p>Debug와 같은 실제 UI 절차로 오류 표시·draft2·미저장 객체 보존, baseline 복원 후
+Reload0/오류 해제 및 새 편집 자동 저장2를 확인했다. PNG/GUID·저장 씬을 유지하고
+정상 Finalize 및 DX12 pending0/0/0으로 종료했다. Release Editor 라이브러리/runtime/launcher
+빌드는 통과했으며 최종 연결은 다른 LTCG 연결과 겹치지 않게 진행했다.
+두 실행 runtime SHA-256은
+<code>C7A889DA079940476467389CBCCA8E3DA4D2109205E9C21DA63ED5F00C4C11EC</code>이며 실행 전후 동일했다.</p>
+<ul>
+<li><a href="../../Build/TexturePendingMetadata/ui-release-result.json">Release receipt</a></li>
+<li><a href="../../Build/TAUI-Release-delete-babb41a7/commands.jsonl">삭제 경합 명령 receipt</a></li>
+<li><a href="../../Build/TAUI-Release-delete-babb41a7/pending-rejected.png">삭제 오류</a>, <a href="../../Build/TAUI-Release-delete-babb41a7/draft-retained.png">draft 유지</a></li>
+<li><a href="../../Build/TAUI-Release-delete-babb41a7/reload-recovered.png">삭제 복구 Reload</a>, <a href="../../Build/TAUI-Release-delete-babb41a7/fresh-edit.png">새 편집</a></li>
+<li><a href="../../Build/TAUI-Release-corrupt-e78f21c0/commands.jsonl">손상 경합 명령 receipt</a></li>
+<li><a href="../../Build/TAUI-Release-corrupt-e78f21c0/pending-rejected.png">손상 오류</a>, <a href="../../Build/TAUI-Release-corrupt-e78f21c0/draft-retained.png">draft 유지</a></li>
+<li><a href="../../Build/TAUI-Release-corrupt-e78f21c0/reload-recovered.png">손상 복구 Reload</a>, <a href="../../Build/TAUI-Release-corrupt-e78f21c0/fresh-edit.png">새 편집</a></li>
+</ul>
+<p>Build 아래 receipt와 화면은 로컬 검증 산출물이며 청소 시 제거될 수 있다.
+이번 증거는 12-0-D 파일 실패·복구 UI 수용의 후속 보강이다. 별도 가중치를 중복
+계상하지 않고 13.25/20일 = 66.25% (표시66%)를 유지한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="TexturePendingMetadataValidation20261010.md"><code>docs/analysis/TexturePendingMetadataValidation20261010.md</code></a> · 마지막 커밋 2026-10-17 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

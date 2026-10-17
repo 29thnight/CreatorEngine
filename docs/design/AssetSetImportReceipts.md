@@ -1,31 +1,130 @@
-# AssetSet import receipt와 정확한 재사용
+# BuildAssetSet import receipts
 
-> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
+Status: source implementation and unrun regression harness only. No compiler,
+engine binary, shader compiler or test was executed for this change.
 
-## receipt가 생략하는 작업
+## What is skipped
 
-`build-asset-set`은 typed source definition으로 CEMF3를 만드는 독립 콘텐츠 빌드다. import receipt hit는 같은 source transaction의 import 결과를 재사용한다. 동일 blob의 CAS deduplication과는 다르며 `reusedImports/recookedImports`와 `reusedBlobs`를 별도로 센다. model의 선택 subasset 묶음은 하나의 transaction이다.
+The receipt hit branches return before `BuildTextureCookProduct`,
+`BuildShaderMetaCookProduct`, `BuildMaterialAssetSetProduct`,
+`BuildMaterialProgramAssetSetProduct`, or `BuildModelAssetSetProducts` is called.
+A model source and its selected subassets form one import/conversion transaction.
+A source-sidecar change invalidates that transaction; unrelated source groups can
+hit. Changing a manifest revision or another source's bytes does not itself
+invalidate unchanged groups. Changing a model selection conservatively imports
+that model again; this is not a per-mesh source parser cache.
 
-BuildTool은 검증된 engine payload digest와 현재 orchestration assembly hash를 이용해 SHA-256 toolFingerprint를 만든다. native builder는 fingerprint가 64자리 lowercase hash인지 확인한다. 임의 오래된 importer cache를 최신 도구 결과로 인정하지 않는다.
+`AssetSetBuildResult.reusedImports` and `recookedImports` count these source
+transactions (attempts on failure), independently from `reusedBlobs`. The completed
+native build prints both. A hit still reads/hashes current source inputs, reads and
+hashes immutable blobs, validates their typed payloads, and checks the selected
+cross-asset bindings. In particular pass-through texture payload validation still
+decodes the encoded image. No claim of skipping typed artifact validation or all
+CPU decoding is made. The existing five-field completion report is unchanged.
 
-## key와 검증
+## Exact input proof
 
-`asset-set-import-receipt-v2` recipe에는 build version, tool fingerprint, platform/ABI, manifest version, texture encoding/import settings, selected typed identity·kind·representation·schema, dependency edge와 mandatory source inventory가 들어간다. capture된 각 입력의 canonical path, bytes, digest로 전체 input proof를 만든다. timestamp만으로 hit를 판단하지 않는다.
+The versioned, length-framed recipe key contains:
 
-receipt는 `ImportReceipts/<recipeKey>/<receiptHash>.receipt`에 불변 기록으로 저장한다. 후보 수 256, receipt 64 MiB, input 4096 등 코드의 bounded parser 제한을 넘으면 실패한다. filename hash, 중복·탈출 경로, 필수 입력 누락, typed identity, effective texture recipe, CAS blob size/hash, trailing bytes를 검사한다. 손상 receipt는 무조건 성공으로 넘기는 cache hint가 아니다.
+- Build/receipt/importer and selected representation/schema versions
+- The verified distribution/tool fingerprint supplied by BuildTool, covering
+  its orchestration assembly and native importer/decoder/compiler dependency
+  payload; the C++ API continues to require this verified fingerprint
+- Target platform and ABI, normalized texture settings, the fixed material budget
+  and strict captured-resolver domain
+- Every selected typed ID, normalized source/verified-program path and declared
+  typed dependency, including hard/loadable and internal/external scope
+- Root source bytes and canonical sidecar bytes; for models, the authored identity
+  epoch header; for MaterialProgram, the explicitly supplied verified program
 
-hit에서도 typed payload readback은 남는다. source 입력이 바뀌면 같은 recipe 아래 과거 receipt가 현재 입력의 증거가 되지 않는다. importer가 외부 dependency를 추가로 읽는 경우 그 파일도 capture inventory에 포함되어야 한다.
+The successful import records a complete project-relative file inventory, with
+byte sizes and SHA256 for every input. ShaderMeta includes referenced HLSL and its
+sidecar. Models include every external buffer/image/file requested by the existing
+captured importer callback, in addition to source/sidecar/epoch. Material and
+MaterialProgram producers consume only their captured byte spans; material budget
+and verified compiler identity are validated inside the shared program producer.
+A model's capture callback supplies exactly the bytes used by the importer, rather
+than observing the filesystem before and after an uncontrolled read.
 
-## 쓰기와 실패 수명
+The pre-import recipe directory is only a candidate locator. A hit also requires
+all full-inventory sizes/hashes to match, mandatory initial inputs to be present,
+all typed product metadata to equal the current format contract, and each exact
+CAS artifact's size/hash and typed schema to validate. Restored product metadata
+includes importer, representation, schema, extension and normalized input digest.
+Dependencies come from the current declaration, whose complete typed edge list is
+bound into the recipe key; the producer's semantic edge match was required when
+the receipt was created. `sourceImportKey` is the hash of the recipe key and the
+complete captured input inventory, never an output-content-only key.
 
-cache의 OS guard가 동시 빌드를 직렬화한다. 고유 `.incomplete` work directory와 candidate만 쓰고, 완성 record를 rename한다. 죽은 프로세스가 남긴 work directory는 다음 빌드의 hit·resume 대상으로 열거하지 않는다. output은 새 immutable path만 허용하며 cache blob을 독립 복사·재검증한다. manifest와 report 검증 후 output rename 및 backing enrollment를 완료한다.
+Missing-file resolution is strict: captured glTF only opens explicit local relative
+URIs through its supplied reader, and captured FBX marks the entire import failed
+if any callback open fails. A successful recipe therefore has no tolerated absent
+alternate path or directory-search dependency. If a future importer permits
+fallback/negative probes, it must record and revalidate them and bump the resolver
+and importer version before its products can use these receipts.
 
-## 검증할 회귀
+The source `InputCapture` holds Win32 read handles without write/delete sharing,
+so an already active writer prevents capture and later ordinary writes/deletes are
+excluded until the bytes are consumed. It verifies file ID, byte size, change/write
+time, current pathname identity and bytes. Both the receipt inventory and actual
+conversion use captured bytes; a changed/reverted path cannot silently bind B's
+product to A's hash. Read checks also reject a file changed during capture.
+The definition itself is parsed from captured bytes and held through the build.
 
-같은 입력 두 번째 빌드, sidecar/settings/tool/외부 모델 dependency 변경, 일부 CAS 변조, malformed receipt, 중간 프로세스 종료, 다른 드라이브 output을 구분해서 검증한다. 현재 소스에서 방어 경로를 확인했지만 실제 hit 비율·속도 향상이나 Windows 실패 주입 통과를 측정하지 않았다.
+## Storage and failures
 
-## 구현 근거
+Receipts are local cooker data, not runtime assets. Runtime has no receipt reader
+and no source recook fallback. Stored paths are under
+`ImportReceipts/<recipe-key>/<receipt-bytes-sha256>.receipt`. The complete binary
+record is length framed and its filename verifies its complete bytes. Limits are
+64 MiB per record, 4096 inputs, 512 MiB per input, 1 GiB per captured transaction,
+65536 selected products (the existing definition limit), and 256 candidate records
+per recipe key. Exceeding a limit fails explicitly rather than truncating records.
 
-- [BuildTool/AssetSetBuilding.cs](../../BuildTool/AssetSetBuilding.cs)
-- [Tools/AssetCooker/AssetSetBuild.h](../../Tools/AssetCooker/AssetSetBuild.h)
-- [Tools/AssetCooker/AssetSetBuild.cpp](../../Tools/AssetCooker/AssetSetBuild.cpp)
+The existing OS-scoped cache lock now encloses preparation and receipt lookup as
+well as CAS publication. No additional global lock or cache manager is introduced.
+All blobs and the candidate manifest are typed-validated before receipt publication.
+Receipt candidates are written and read back in the existing cache-local unique
+`.incomplete` work directory, then renamed once to their immutable final path.
+Killed-process work directories are never searched, resumed or automatically
+removed. A process kill leaves either ignored candidate bytes or a complete final
+record. This is a process-termination guarantee, not a new power-loss durability
+claim. Output releases still own separate immutable copies of CAS files.
+
+No matching receipt starts fresh production. A positive-input digest mismatch
+or missing old dependency tries the next bounded candidate, then produces fresh
+bytes. Each candidate owns its own capture; rejected candidate inputs never enter
+a later hit or a new producer receipt. Corrupt/incompatible records, unsafe paths
+or damaged CAS fail with the exact
+record/input path and reason; they are not silently repaired or overwritten. Cache
+maintenance is an explicit caller operation and is outside this change.
+
+## Regression coverage still to run
+
+`Tools/regression/asset_set_import_receipt_probe.cpp` is an opt-in Windows harness
+which includes AssetSetBuild.cpp instead of separately compiling that translation
+unit, and links the AssetCooker native dependencies. It initializes COM for WIC.
+It creates only a unique temporary fixture and checks cold import, equal-payload
+CAS deduplication, warm zero-import hit, unchanged recipe metadata, manifest-only
+revision, one-sidecar and one-source invalidation, tool fingerprint invalidation,
+existing/later writer rejection, ignored killed-work debris, corrupt CAS rejection,
+and bounded receipt parsing. It has not been compiled or run.
+
+Further real-fixture release gates are deliberately unclaimed:
+
+1. Cold/warm `.gltf` external-buffer and `.fbx` imports, then mutate each external
+   buffer, source, sidecar setting and identity epoch separately; unrelated source
+   groups must remain hits
+2. Generated UUIDv8 MaterialProgram with authored `.shadergraph` and explicit
+   verified program; warm build must bypass graph conversion, and mutations to
+   source/meta/program/tool/ABI must miss
+3. Authored ShaderMeta/HLSL/sidecar and Material sources, including wrong typed CAS
+   schema, dependency scope changes and external mount-set contracts
+4. Kill after candidate creation, during receipt write, after CAS publication and
+   around final rename; next process must never use a partial record
+5. Race source replacement, modification and A-to-B-to-A attempts during capture;
+   fail safely or consume precisely the protected captured inputs
+6. Truncated/oversized counts, duplicate inputs, traversal/reparse paths, missing
+   mandatory inputs, altered filename/hash, missing blobs and candidate limit
+
+The current static-only implementation is not runtime or performance evidence.

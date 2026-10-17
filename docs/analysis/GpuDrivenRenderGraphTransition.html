@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/GpuDrivenRenderGraphTransition.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU-driven / RenderGraph 전환 기록</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-05-소스-구현-동결-범위">2026-10-05 소스 구현 동결 범위</a></li><li><a href="#특수-재질-runtime-타일--소스-구현-범위와-정적-메모리-산술">특수 재질 runtime 타일 — 소스 구현 범위와 정적 메모리 산술</a></li><li><a href="#admission실패소멸-경계">Admission·실패·소멸 경계</a></li><li><a href="#검증전달-경계">검증·전달 경계</a></li><li><a href="#설계-참고">설계 참고</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="GpuDrivenRenderGraphTransition.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>GPU-driven / RenderGraph 전환 기록</h1>
+<div class="meta"><p>상태: <strong>2026-10-05 요청 범위 소스 구현 완료·동결, 영역별 및 전체 diff 독립 최종 정적 검토 완료. 신규 acceptance 전부 미실행.</strong> 코드·정적 검토 완료와 실행 수용을 구분한다. 게시 반영 여부는 PR #122 커밋 이력과 원격 head를 대조해 별도 확인한다.</p>
+<p>착수 기준: <code>master</code>의 <code>29024ddf245575360c4e43471fc13d8858798439</code> (2026-10-05). 작은 정적 검토 묶음으로 같은 PR #122에 전달한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#2026-10-05-소스-구현-동결-범위"><span class="ve-label">§00</span><span class="map-name">2026-10-05 소스 구현 동결 범위</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#특수-재질-runtime-타일--소스-구현-범위와-정적-메모리-산술"><span class="ve-label">§01</span><span class="map-name">특수 재질 runtime 타일 — 소스 구현 범위와 정적 메모리 산술</span><span class="map-bar"><i style="width:37.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#admission실패소멸-경계"><span class="ve-label">§02</span><span class="map-name">Admission·실패·소멸 경계</span><span class="map-bar"><i style="width:21.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증전달-경계"><span class="ve-label">§03</span><span class="map-name">검증·전달 경계</span><span class="map-bar"><i style="width:28.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#설계-참고"><span class="ve-label">§04</span><span class="map-name">설계 참고</span><span class="map-bar"><i style="width:8.9%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「2026-10-05 소스 구현 동결 범위」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-2026-10-05-소스-구현-동결-범위">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="2026-10-05-소스-구현-동결-범위">2026-10-05 소스 구현 동결 범위</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>영역</th><th>코드에 반영한 범위</th><th>수용 경계</th></tr></thead>
+<tbody><tr><td>RHI indexed-indirect</td><td>단일 indexed-indirect 계약, DX12/Vulkan native 구현, encoder의 capability·buffer usage·offset/range 검사 및 미지원 direct fallback</td><td><code>IndirectArgument</code> 전이는 graph가 소유하며 native encoder가 현재 resource state를 검증하는 것은 아니다. multidraw·indirect count·nonzero first-instance 지원을 가정하지 않으며 backend 실행은 미검증</td></tr>
+<tr><td>GPU geometry visibility</td><td>static opaque/masked의 reset→frustum cull·atomic compaction→간접 인자 생성, compacted visible ID/argument 버퍼, Enhanced GBuffer와 LX.Scene.GBuffer 소비</td><td>CPU material/PSO bin과 LX per-geometry bin 유지. 선택적 화면 밖 추가 후보는 기존 draw 예산으로 제한하고 확장된 Graph Seal 실패 시 원래 visible/caster 집합으로 재시도한다. skinned/custom·미지원 direct fallback 및 기존 Seal 예산 검사를 보존하며 런타임 검증은 미실행</td></tr>
+<tr><td>RG5 후속 선언</td><td>Fog·PostChain·UI·Editor Grid/WireFrame/GizmoIcon/GizmoLine의 Read/Write/Modify와 출력 버전, Decal 중복 읽기 정리</td><td>전체 생산 경로·test/fixture 감사와 임시 추론/adapter 0·제품 GPU 수용 미판정</td></tr>
+<tr><td>RG6 제품 배선</td><td>같은 EnhancedRenderGraph에서 ExplicitVersioned + DependencyOrder 선택, 최종 출력·capture가 최신 버전을 소비하도록 배선</td><td>제품 전환의 소스 변경이며 RG6 통과가 아님</td></tr>
+<tr><td>RG-V·진단</td><td>generation·dependency hash·resource/version·edge·order·lifetime·barrier를 담은 immutable snapshot, Scene/Game/Material Preview reader/viewer, PBR capture의 compiledGraph schema 3(바깥 manifest schema 1 유지)</td><td>UI·세대 교체·정합성·변이·비용·메모리 검증 미실행</td></tr>
+<tr><td>imported 자원 상태</td><td>요구 final state를 마지막 소비 패스 뒤에 복구하고 snapshot/capture에 상태·배리어 공개</td><td>병렬/split 기록과 다음 view/frame 상태의 GPU validation 미실행</td></tr>
+<tr><td><span class="chip ok">runtime lookup·조명</span></td><td>사용자 승인에 따라 DX12·Vulkan live 경로 모두 split-sum 평가 사용, GPU scene/material 입력 재사용</td><td>정밀 적분과 기존 approximate-cache API는 bake/reference/diagnostics에 보존. 과거 DX12 정밀 경로와 픽셀 동일성은 주장하지 않음</td></tr>
+<tr><td>제출 admission·수명</td><td>reserved/admitted/native-confirmed/GPU-complete/rejected 상태 분리, never-admitted 예약의 정확한 취소와 producer 측 token 소멸</td><td>불명확한 native 실행의 소유권 보존·제출 차단 및 capture/resize/shutdown proof gate 구현. 실행 검증 미실행</td></tr></tbody></table></div>
+<p>코드 위치: <code>GpuGeometryVisibility.*</code>, <code>MaterialGraphSceneHost.*</code>, <code>MaterialGraphSceneLookup.*</code>,
+<code>Render/Graph/EnhancedRenderGraph.*</code>, <code>Render/Scene/EnhancedSceneRenderer.*</code>,
+<code>Render/Scene/EnhancedPbrCapture.h</code>, <code>Editor/EngineGUIWindow/EnhancedRenderDebugWindow.*</code>.
+Engine 경로는 <code>Engine/RenderEngine/</code> 아래이며 GPU visibility·runtime lighting 셰이더는
+<code>Dynamic_CPP/Assets/Shaders/DefaultPassShader/</code>에 둔다.
+Scene host ABI는 <strong>16</strong>이며 영향을 받는 material program을 재생성해야 한다.</p>
+<p>통합 정적 검토에서 화면 밖 추가 후보의 CPU staging 확대를 제한했다. 추가 후보 수의 상한은
+기존 <code>SceneInputBudget.draws</code>(현재 4096)이며, 이는 visible/caster 집합에 더하는 선택적 후보의
+상한이지 전체 입력 예산의 확대가 아니다. 확장된 Graph 입력이 draw·geometry·payload 예산
+검사를 통과하지 못하면 원래 visible/caster 집합과 대응 fallback 소유자를 보존해 Seal을 다시
+시도한다. 재시도도 기존 예산 검사를 통과해야 하며, 실제 대규모 장면 실행은 검증하지 않았다.</p>
+<p>승인된 기본 live runtime lookup 전환은 소스에서 전체 화면의 11×RGBA32F 입력(176 B/pixel)과
+<code>IblBakeSample</code> 출력(144 B/pixel), 합계 <strong>320 B/pixel</strong>의 lookup bake 저장소 할당을 제거한다.
+현재 live 호출은 capture 입력을 끄고 sample 버퍼는 1개 레코드만 둔다. 정밀/reference·명시적
+capture API의 저장소와 별도 특수 재질 scratch/snapshot은 이 설명에서 제외하며, 실제 4K 전체
+peak VRAM·성능 수용이나 모든 메모리 문제의 해결을 뜻하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-특수-재질-runtime-타일--소스-구현-범위와-정적-메모리-산술">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="특수-재질-runtime-타일--소스-구현-범위와-정적-메모리-산술">특수 재질 runtime 타일 — 소스 구현 범위와 정적 메모리 산술</h2></div>
+<div class="prose"><ul>
+<li>256×256 tile에 4-pixel halo를 더한 264×264 scratch를 사용한다. 14개의 RGBA32F를 두 ordered MRT 단계(8+6)에 기록하며 float32 D32 tile-depth 초기화와 SSS halo를 연결했다</li>
+<li>특수 stream마다 repeated graph node 1개를 선언한다. compiler가 tile depth→MRT 0→MRT 1→color의 4개 phase와 배리어를 계획하며, 타일 수만큼 graph node를 늘리지 않는다</li>
+<li>굴절/volume ray의 화면 입력은 전역 HDR/depth를 소비한다. tile 경계로 ray 범위를 제한하지 않는다</li>
+<li>reference full-screen bake 경로는 보존하고 runtime 효과를 별도 소유자로 분리한다. live/replacement/scratch 자원과 제출 완료 전 수명을 함께 다룬다</li>
+<li>scratch payload는 264×264×(14×16+4) = **15,890,688 bytes(약 15.15 MiB)**다. 자원별 64 KiB 정렬의 ledger charge는 <strong>16.0625 MiB</strong>이며 타일별 상수를 별도로 더한다. 3840×2160의 4K에서는 135×256 = <strong>34,560 bytes</strong>다</li>
+<li>굴절의 전역 HDR(RGBA16F)+depth(D32) snapshot ledger charge는 같은 4K에서 <strong>95 MiB</strong>다. 위 수치는 소스의 정적 산술이며 측정 peak VRAM·driver 실제 할당량이 아니다. native driver 계상은 backend 소유이며 여러 stream/frame·교체 중 자원과 다른 렌더 자원을 포함한 peak는 별도 검증한다</li>
+<li>자원 압력에 대한 복구 가능한 지연/거부는 renderer 손상과 구분하되, 그것만으로 4K 효과의 메모리 수용을 주장하지 않는다</li>
+<li>소스 구현·독립 최종 정적 검토와 별개로 D32 일치·halo 경계·SSS/투과 품질·4K peak memory·성능은 전부 미검증이다. 기본 live의 320 B/pixel lookup bake 저장소 제거와 실제 전체 메모리 수용은 별도 판정이다</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-admission실패소멸-경계">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="admission실패소멸-경계">Admission·실패·소멸 경계</h2></div>
+<div class="prose"><ul>
+<li>reserved는 예약, admitted는 제출 큐의 소유권 인수, native-confirmed는 native 제출 확인, GPU-complete는 완료 증거이며 rejected와 구분한다. 예약값이나 native 제출 확인만으로 GPU 완료를 간주하지 않는다</li>
+<li>정확한 예약 취소는 never-admitted 작업에만 적용한다. 제출 token은 producer 측에서 소멸시켜 worker 내부 대기/소멸과 자원 회수를 혼합하지 않는다</li>
+<li>native 실행 여부가 불명확하면 accepted 작업과 자원 owner를 유지하고 일반 제출을 차단한다. capture/resize/shutdown도 GPU idle 또는 실제 device-loss의 동일한 proof gate를 따른다</li>
+<li>일반 budget pressure/rejection은 nonfatal이다. 드문 강제 소멸에서 GPU idle 입증과 실제 device-loss 입증이 모두 실패하고 유지 가능한 owner도 남길 수 없는 경우에만 기존 fatal invariant가 적용될 수 있다. 정상 거절이나 메모리 압력에 대한 처리가 아니다</li>
+<li>위 경로의 코드·정적 검토 반영은 실행/실패 주입 수용을 대신하지 않는다</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증전달-경계">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="검증전달-경계">검증·전달 경계</h2></div>
+<div class="prose"><ul>
+<li>이번 요청은 코드·정적 검토만 수행한다. 빌드, 자동 테스트, renderer 실행, capture, GPU validation, 성능 측정은 실행하지 않는다</li>
+<li>BASE-0·RG1<del>RG4·RG5-1</del>RG5-12의 기존 증거는 해당 시점의 수용 기록으로 보존한다. 신규 RG5 후속 이관·RG6·RG-V의 픽셀/성능 수용이나 진척 기성으로 전환하지 않는다</li>
+<li>남은 수용: 전체 제품 선언/adapter 감사, ABI 16 재질 프로그램 재생성 후 현행 DX12 Debug/Release 빌드와 분리 프로세스 회귀, 결정적 order/hash·오류/변이 검사, GPU validation·정상 종료, indirect fallback/수명·admission 실패 경로, viewer generation·비용·메모리, 특수 재질/4K·MAT-9 품질·성능</li>
+<li>Vulkan native 구현은 RHI 중립 계약을 유지하기 위한 코드 범위다. Vulkan 실행 동등성·교차 픽셀 수용은 PHASE 4.9가 소유한다</li>
+<li>Mesh Shader·DXR·WorkGraph·aliasing·async queue·compiled-plan cache·shadow cache·새 light-volume subsystem은 이번 범위 밖이다</li>
+<li>소스 동결과 전체 diff 독립 최종 정적 검토를 마쳤다. 게시 반영 여부는 PR #122 커밋 이력과 원격 head 대조를 통해 별도 확인하며, 작은 정적 검토 묶음의 PR 전달과 acceptance 완료는 구분한다. 테스트를 실행하지 않은 코드를 ready-to-merge 또는 품질/성능 완료로 판정하지 않는다</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-설계-참고">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="설계-참고">설계 참고</h2></div>
+<div class="prose"><p>엔진 소스를 복제하지 않고 <a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/render-dependency-graph-in-unreal-engine">Unreal RDG</a>의 명시적 의존성·graph 수명,
+<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/depth-material-expressions-in-unreal-engine">Depth Material Expressions</a>의 scene-depth 입력,
+<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/volumetric-lightmaps-in-unreal-engine">Volumetric Lightmaps</a>의 사전 계산 조명과 화면 크기 레코드 분리 원칙을 참고한다.
+새 light-volume 구현이나 Unreal과의 품질·성능 동등성을 뜻하지 않는다.</p>
+<p>세부 종료 게이트는 <a href="../plans/RenderGraphDependencySchedulingPlan.html">RenderGraphDependencySchedulingPlan.md</a>를 따른다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="GpuDrivenRenderGraphTransition.md"><code>docs/analysis/GpuDrivenRenderGraphTransition.md</code></a> · 마지막 커밋 2026-10-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

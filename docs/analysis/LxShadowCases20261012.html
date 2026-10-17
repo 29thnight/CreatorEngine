@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/LxShadowCases20261012.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LX 그림자 검증 장면 확대 (2026-10-12)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#장면과-독립-대조-조건">장면과 독립 대조 조건</a></li><li><a href="#동치변이-판정">동치·변이 판정</a></li><li><a href="#재현증거">재현·증거</a></li><li><a href="#수용-범위">수용 범위</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="LxShadowCases20261012.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>LX 그림자 검증 장면 확대 (2026-10-12)</h1>
+<div class="meta"><p>후속 5번의 검증 장면을 <code>dx12.skinning</code> 선택 모드에 추가했다. SceneHost·실제 DX12 GPU readback에서 12개 장면 × 두 포즈 × 캐스케이드 3장, 구성당 72개 indexed/meshlet 깊이·행렬 비교를 수행한다. 기본 테스트는 기존 동작을 유지하며, <code>-ShadowCaseSuite</code>에서만 확대 장면을 실행한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#장면과-독립-대조-조건"><span class="ve-label">§00</span><span class="map-name">장면과 독립 대조 조건</span><span class="map-bar"><i style="width:64.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#동치변이-판정"><span class="ve-label">§01</span><span class="map-name">동치·변이 판정</span><span class="map-bar"><i style="width:98.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현증거"><span class="ve-label">§02</span><span class="map-name">재현·증거</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#수용-범위"><span class="ve-label">§03</span><span class="map-name">수용 범위</span><span class="map-bar"><i style="width:28.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「재현·증거」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-장면과-독립-대조-조건">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="장면과-독립-대조-조건">장면과 독립 대조 조건</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>장면</th><th>입력·확인 조건</th></tr></thead>
+<tbody><tr><td>base</td><td>스킨드 스트립 + 비스킨드 사각형, 두 포즈, 양면</td></tr>
+<tr><td>alpha-pass / alpha-equal / alpha-reject</td><td>실제 재질 그래프 BSDF Alpha 소켓 0.5. 사각형에 Masked 설정, cutoff 0.4 / 0.5 / 0.6. 앞 두 장면은 기준 커버리지와 같고 마지막은 사각형 깊이를 제거하며 스킨드 깊이는 유지해야 함</td></tr>
+<tr><td>face-front / face-back / face-double</td><td>원래 삼각형 순서·뒤집은 순서의 단면, 뒤집은 순서의 양면. 단면 둘 중 하나는 기준 커버리지, 다른 하나는 사각형 제거 커버리지여야 함. 양면은 기준 커버리지 유지. 이름은 입력 와인딩 표식이며 광원에서의 실제 앞·뒤 판정은 결과로 확인</td></tr>
+<tr><td>transform</td><td>사각형에 음수·비균일 스케일 (-1.7, 0.6, 1.2), 비대각 성분 0.3, 평행이동 (8,3,2). 일부 캐스케이드에서 안 보이는 경우를 허용하되 맵의 스킨드 대조군은 남아야 함</td></tr>
+<tr><td>boundary-near / boundary-far</td><td>첫 split 9.1의 양쪽에 중심 9.09 / 9.11. 기울인 사각형의 뷰 깊이 범위가 split을 걸쳐야 함(약 8.69<del>9.49 / 8.71</del>9.51)</td></tr>
+<tr><td>far</td><td>광원 쪽으로 1000 이동. 뷰 깊이 -347.770905, 카메라 near 0.1·far 100 밖에 있으며 실제 그림자는 남아야 함</td></tr>
+<tr><td>multi</td><td>17×17 정점·512 삼각형 격자. 모든 289개 정점을 참조하므로 정점 64개 제한의 단일 메시렛으로 표현할 수 없음. 중간 메시렛 누락으로 실제 깊이 변화가 발생해야 함</td></tr></tbody></table></div>
+<p>방향광은 normalize(0.3,-1,0.4)로 모든 장면에서 비스듬하다. 포즈 검사는 본 이동이 스킨드 띠에 영향을 주고 비스킨드 카메라 대조군을 옮기지 않는 기존 검사를 유지한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-동치변이-판정">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="동치변이-판정">동치·변이 판정</h2></div>
+<div class="prose"><p>깊이는 2048×2048 D32Float 원본이다. 72개 쌍 모두 유한·비어 있지 않은 참조 맵, 행렬 비트 동치와 깊이 비트 동치를 요구한다. 허용 오차는 없다. 그림자 콜백의 실제 mesh dispatch 제출 횟수도 144개의 경로·캐스케이드 표식으로 확인한다. 이는 GPU 생존 메시렛 수가 아니다. 별도 오프라인 검증기가 원본 파일의 길이·SHA256 동치와 위 알파·면 정책 대조 조건 및 경계·먼 캐스터 입력 표식을 검사한다.</p>
+<p>변이는 격리 프로젝트의 <code>LXSceneShadowMS</code>에만 적용한다.</p>
+<pre><code class="language-slang">const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowViewProjection)
+    &amp;&amp; !((group.x == 0u &amp;&amp; vertexCount == 4u) || group.x == 1u);</code></pre>
+<p>네 정점 사각형 메시렛과 격자의 group 1을 제외한다. 스킨드 스트립의 단일 메시렛·indexed 경로·카메라 셰이더는 그대로다. 이미 알파나 면 정책으로 보이지 않는 캐스터의 제외는 깊이를 바꾸지 않아야 하고, base·alpha-pass·alpha-equal·face-double·transform·boundary-near·boundary-far·far·multi는 각 포즈에서 적어도 한 캐스케이드에 실제 누락을 남겨야 한다. 전체 맵 소실·추가 깊이·행렬 차이·GPU 오류는 예상 거부로 인정하지 않는다.</p>
+<p><strong>후속 5번 완료(위의 선택한 합성 장면 범위).</strong> 현재 소스로 빌드한 Debug/Release 정상은 각각 72개 비교·독립 대조 조건을 모두 통과했다. 누락·추가·불일치·최대 깊이 오차 모두 0, 행렬도 비트 동치다. 두 구성의 변이는 실제 누락으로 거부됐다. 네 실행의 GPU validation 활성·문제 0·누락 메시지 0, quit 성공과 실행 전후 검사 대상 소스·binary·격리 셰이더 해시 일치를 확인했다. 정상 종료 코드 0, 변이는 의도한 테스트 실패 코드 4다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변이 장면</th><th style="text-align:right">C0 누락</th><th style="text-align:right">C1 누락</th><th style="text-align:right">C2 누락</th></tr></thead>
+<tbody><tr><td>transform</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">2,851</td><td class="num" style="text-align:right">154</td></tr>
+<tr><td>boundary-near</td><td class="num" style="text-align:right">6,143</td><td class="num" style="text-align:right">1,118</td><td class="num" style="text-align:right">65</td></tr>
+<tr><td>boundary-far</td><td class="num" style="text-align:right">6,144</td><td class="num" style="text-align:right">1,119</td><td class="num" style="text-align:right">64</td></tr>
+<tr><td>far</td><td class="num" style="text-align:right">15,291</td><td class="num" style="text-align:right">2,797</td><td class="num" style="text-align:right">143</td></tr>
+<tr><td>multi</td><td class="num" style="text-align:right">2,564</td><td class="num" style="text-align:right">477</td><td class="num" style="text-align:right">24</td></tr></tbody></table></div>
+<p>위 값은 Debug/Release 및 두 포즈에서 같다. transform의 C0는 원래 사각형이 보이지 않아 누락 0이 옳고, C1/C2가 검사를 성립시킨다. alpha-reject와 원래 와인딩 단면(face-front)은 이미 사각형을 거부하므로 변이도 깊이 변화 0이다. 반대로 뒤집은 단면(face-back)과 양면은 사각형 깊이를 남겼다. 모든 변이의 추가 깊이는 0이며 불일치 텍셀은 누락 텍셀과 같다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현증거">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="재현증거">재현·증거</h2></div>
+<div class="prose"><p>현재 소스로 Editor Debug/Release를 빌드한 뒤 다음을 실행한다.</p>
+<pre><code class="language-powershell">&amp; Tools/regression/verify-lx-shadow-baseline.ps1 `
+    -Configuration Debug `
+    -FixtureProject Build/Obj/LxShadowP0/Fixture `
+    -OutputDirectory Build/Verification/ShadowCases-New/Normal-Debug `
+    -ShadowCaseSuite</code></pre>
+<p>변이는 새 출력 디렉터리에서 <code>-ExpectedVisibleMeshletRejection</code>을 추가한다. Release는 구성을 바꾼다. 디스크 30GiB 하한을 확인하고 격리 프로젝트·설정을 사용한다. 깊이 파일은 <code>captures/&lt;case&gt;/{indexed,meshlet}-{bind,posed}-C{0,1,2}.f32</code>, 행 우선 little-endian float32다. 구성당 정상 대표 원본 144개(2.25GiB)를 보관한다. 예상 거부한 변이 픽셀은 삭제 기록을 남기고, 로그·판정·행렬·manifest·해시·변이 셰이더는 보존한다.</p>
+<ul>
+<li><a href="../../Tools/regression/verify-lx-shadow-baseline.ps1">실행 스크립트</a>, <a href="../../Tools/regression/assess-lx-shadow-cases.ps1">오프라인 검증기</a></li>
+<li><a href="../../Build/Verification/ShadowCases-20261012/Normal-Debug/verdict.json">Debug 정상 판정</a>, <a href="../../Build/Verification/ShadowCases-20261012/Normal-Debug/cases.json">72쌍·대조 조건 상세</a>, <a href="../../Build/Verification/ShadowCases-20261012/Normal-Debug/capture-manifest.json">원본 해시</a></li>
+<li><a href="../../Build/Verification/ShadowCases-20261012/Normal-Release/verdict.json">Release 정상 판정</a>, <a href="../../Build/Verification/ShadowCases-20261012/Normal-Release/cases.json">72쌍·대조 조건 상세</a>, <a href="../../Build/Verification/ShadowCases-20261012/Normal-Release/capture-manifest.json">원본 해시</a></li>
+<li><a href="../../Build/Verification/ShadowCases-20261012/Mutant-Debug/verdict.json">Debug 변이 판정</a>, <a href="../../Build/Verification/ShadowCases-20261012/Mutant-Debug/cases.json">누락·대조 조건 상세</a>, <a href="../../Build/Verification/ShadowCases-20261012/Mutant-Debug/mutation.json">변이 규칙·해시</a></li>
+<li><a href="../../Build/Verification/ShadowCases-20261012/Mutant-Release/verdict.json">Release 변이 판정</a>, <a href="../../Build/Verification/ShadowCases-20261012/Mutant-Release/cases.json">누락·대조 조건 상세</a>, <a href="../../Build/Verification/ShadowCases-20261012/Mutant-Release/mutation.json">변이 규칙·해시</a></li>
+<li><a href="../../Build/Verification/ShadowCases-20261012/overall.json">전체 판정·원본 대조</a></li>
+<li><a href="../../Build/Verification/ShadowCases-20261012/build-Debug.log">Debug 빌드</a>, <a href="../../Build/Verification/ShadowCases-20261012/build-Release.log">Release 빌드</a></li>
+</ul>
+<p>각 실행의 <code>identity-before.json</code>·<code>identity-after.json</code>은 소스·실행 스크립트·오프라인 검증기·exe/runtime·실제 격리 셰이더 해시를 기록한다. <code>fixture-inputs.json</code>은 복사·변이 적용 후 프로젝트 입력을 기록한다. 원본·변이 저장소 셰이더가 아니라 실제 사용하는 격리 셰이더까지 실행 전후 일치를 요구한다.</p>
+<p>정상·변이의 indexed 깊이 및 모든 행렬 해시를 다시 대조했고, meshlet 깊이의 해시 차이도 실제 불일치 표식과 일치했다. 정상 base의 원본 깊이·행렬은 이전 <a href="LxShadowEquivalence20261012.html">3장 동치 검사</a>의 동일 구성 원본과도 비트 동치다. 이전 원본은 보존했다. 정상 확대 장면의 원본 144개씩은 보존하며, 예상 거부 직후 변이 144개씩을 삭제하고 ledger에 실제 회수량 약 2.25GiB씩을 기록했다. 변이 픽셀 재생은 불가능하며 판정·해시는 남아 있다.</p>
+<p>검증 runtime SHA256: Debug <code>1A24E254F224685761DC318EF9866EF0328538342A2D6358098EF2B85BEBEEB8</code>, Release <code>175F57542F9B5328710F3CC5CB45300E19E282AF9AD729CF53CF9090C067F7CA</code>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용-범위">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="수용-범위">수용 범위</h2></div>
+<div class="prose"><p>선택한 합성 장면에서 정책이 실제 깊이에 영향을 주고, indexed/meshlet 경로가 동치이며 보이는 메시렛 누락을 거부하는 기능 검사다. 텍스처의 공간 알파 패턴·mip·샘플러, 임의 실제 캐릭터, 모든 변환과 모든 캐스케이드 경계, 독립 정답 형상 전체를 수용한 것은 아니다. 새로운 compute 생존 목록 검증도 아니다.</p>
+<p>GPU validation 활성·문제 0·누락 메시지 0, 정상 quit와 소스·binary 안정성을 별도로 요구한다. 레이어 메시지 1건은 활성 안내다. 기존 profiler 종료 진단은 해결 범위 밖이며 검증 실행 시간은 성능 수용에 사용하지 않는다. Vulkan 실행·교차 비교는 PHASE 4.9다. 다음 목록 항목은 7번의 계측 누락 해결·반복 성능 측정이다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="LxShadowCases20261012.md"><code>docs/analysis/LxShadowCases20261012.md</code></a> · 마지막 커밋 2026-10-12 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

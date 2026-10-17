@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/TextureShippingCoreValidation20261010.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 12 핵심 파이프라인 검증 — 2026-10-10</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#판정">판정</a></li><li><a href="#재현한-결함과-수정">재현한 결함과 수정</a></li><li><a href="#최신-실행-근거">최신 실행 근거</a></li><li><a href="#미수용-경계와-다음-작업">미수용 경계와 다음 작업</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="TextureShippingCoreValidation20261010.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 12 핵심 파이프라인 검증 — 2026-10-10</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#판정"><span class="ve-label">§00</span><span class="map-name">판정</span><span class="map-bar"><i style="width:47.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현한-결함과-수정"><span class="ve-label">§01</span><span class="map-name">재현한 결함과 수정</span><span class="map-bar"><i style="width:88.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#최신-실행-근거"><span class="ve-label">§02</span><span class="map-name">최신 실행 근거</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#미수용-경계와-다음-작업"><span class="ve-label">§03</span><span class="map-name">미수용 경계와 다음 작업</span><span class="map-bar"><i style="width:35.1%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「최신 실행 근거」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-판정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="판정">판정</h2></div>
+<div class="prose"><p>Release Shipping의 실제 DX12 패키지 실행을 <strong>독립 PNG/HDR 원본이 없는 범위</strong>에서 수용한다. Inspector 배율/도킹 후속은 사용자 요청으로 보류했다. 전체 PHASE 12 완료나 모든 cooked texture의 픽셀 정확도 수용은 아니다.</p>
+<p>현재 worktree HEAD <code>d3c85faf182e93842217dd46eee3d3aabf4afc13</code> 기준 Release AssetCooker/AssetPacker와 Shipping Player를 빌드했다. 제품 수정 후 최신 실행은 <code>Build/Obj/MaterialProductProbe/ScenePkg-Release-Shipping-cea0ff2f5dee4299a4b3db65ec23e7aa</code>이다. 통합 영수증은 <code>Build/Phase12CoreVerification/result.json</code>, 실행 로그는 <code>Build/phase12-sourcefree-shipping-package-final-20261010.log</code> 및 fixture의 <code>package.log</code>다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현한-결함과-수정">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="재현한-결함과-수정">재현한 결함과 수정</h2></div>
+<div class="prose"><ol>
+<li>오래된 AssetPacker API35와 현재 API40의 배포 조합이 거부됐다. Release AssetPacker를 재빌드해 일치시켰다. 소스 API 결함으로 분류하지 않는다.</li>
+<li>배포 Slang DLL 경로258자에서 일반 LoadLibrary가 오류206을 반환했다. 동일 파일의 확장 절대 경로는 로드 성공/오류0이었다(<code>Build/phase12-slang-longpath-reproduction.json</code>). RHIShaderCompiler가 Slang/dxil/dxcompiler의 고정 번들 경로를 확장 절대 경로로 로드하도록 수정했다. 짧은 경로로 우회하지 않고 같은 깊이의 배포 cook을 통과했다.</li>
+<li>최초 Shipping smoke 성공(<code>ScenePkg-Release-Shipping-fc0580abc3574a4ebba4723346458f09</code>)에도 fixture PNG와 HDR 원본이 PAK에 남았다. 이 실행을 원본 부재 수용에서 제외한다. BuildTool은 성공한 native cook의 선택 목록을 보존하고 runtime document 생성 뒤 소유한 패키지 입력 복사본에서 그 원본/sidecar만 제거한다. 프로젝트 원본·선택되지 않은 이미지·CECT는 유지한다. BuildTool148 checks에 원본 보존·선택 목록·경로 탈출·누락 거부6개가 포함된다.</li>
+<li>제거 후 실제 Shipping 실행(<code>ScenePkg-Release-Shipping-68090902b6344a3e9932526d88b965bd</code>)은 exit161, <code>CEMF source asset이 package에 없다: fixture.png</code>로 실패했다. DataSystem의 catalog mount가 CEMF Texture2 및 존재/크기가 일치하는 artifact로 원본 없는 texture identity를 허용하도록 수정했다. 타입별 취득의 payload 검증은 유지한다. mount만으로 전체 digest 검증을 수용하지 않는다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-최신-실행-근거">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="최신-실행-근거">최신 실행 근거</h2></div>
+<div class="prose"><p>명령: <code>Tools/regression/verify-material-scene-package.ps1 -Configuration Release -Shipping -SmokeTimeoutSeconds 600</code>.</p>
+<ul>
+<li>Shipping=true, exit0; GT1630/display1631, 실제 submittedGameFrames228, promotions120.</li>
+<li>DX12 DebugLayer/GPUValidation 활성화. cooked Scene program 준비 완료, sceneCompiles0, textParserCalls0, cookedSceneDocuments1. Shipping 서비스 compiled=no/enabled=no.</li>
+<li>독립 texture2·model1·material program3·material1 cook. PAK의 standalone 원본 이미지 확장자 항목0, DirectXTex/stb_image 이름의 runtime 파일0.</li>
+<li>runtime234개와 PAK SHA 모두 실행 후 manifest 일치, Shipping Player.runtime.dll SHA는 현재 Bin과 일치. 소스761개 변경0. Presentation/Render 종료 pending0·balanced1, DX12 종료 큐0/0/0.</li>
+<li>회귀 판정기에 실제 구성 보고, Shipping 인자/런타임 일치, 원본 이미지 부재 검사를 추가했다.</li>
+</ul>
+<p>별도 Release cooked Scene 회귀는24frames/57259checks/GPU components10746/validation0, 반복 cook bytes 동일·실패 입력6개 거부·기존 산출물 보존을 통과했다(<code>Build/phase12-core-cook-20261010.log</code>). 이 GPU 비교기의 texture 입력은 합성 이미지이며 encrypted PAK에서 취득한 것은 cooked program이다. <strong>CECT payload의 GPU sampling 비교로 계상하지 않는다.</strong> 이 실행은 loader/mount 수정 전 회귀다. 당시 최종 출력의 Debug,Release 표기는 하드코딩 오류였으며 실제 실행 구성은 Release 하나다. 스크립트 보고를 실제 구성 목록으로 수정했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-미수용-경계와-다음-작업">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="미수용-경계와-다음-작업">미수용 경계와 다음 작업</h2></div>
+<div class="prose"><p>PAK에 Prim_Plane.glb 원본은 남는다. 모델 원본 제거·모든 모델 texture 역할 소비, 새 BC5/BC7의 실제 CECT payload를 사용하는 DX12/Vulkan GPU 픽셀 비교, 전체 소비자 행렬은 잔여다. 수정 후 missing/truncated CECT 실패 주입, Debug 제품 재빌드/동일 실행도 이 결과에는 포함하지 않는다. Shipping 프레임 수는 실행 증거이며 성능/품질 측정이 아니다. 다음 우선순위는 CECT payload의 실제 GPU sampling과 실패 주입이다.</p>
+<p>기존 T2 잔여 수용 단위를 전부 닫지 않았으므로 추가 가중치 없이13.25/20일=66.25%를 유지한다. T1b 품질/시간/메모리 대기와 T3 중단도 유지한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="TextureShippingCoreValidation20261010.md"><code>docs/analysis/TextureShippingCoreValidation20261010.md</code></a> · 마지막 커밋 2026-10-17 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

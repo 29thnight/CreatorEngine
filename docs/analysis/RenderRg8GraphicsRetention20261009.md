@@ -1,27 +1,52 @@
-# Graphics 전용 texture 상태 유지
+# RG8 graphics-only texture state retention — 2026-10-09
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
+Base: `d5a6a26a78da93686b8168429183ee7e0d50a8de` plus the recorded local history, dependency scratch and alternative-order changes. Default OFF / progress remains unchanged.
 
-## 이 문서의 역할
+## Finding and change
 
-Graphics 전용 texture 상태 유지에 관한 과거 단계별 기록을 현행 계약으로 다시 정리한다. 공통 용어·수명·실행 모델은 [RenderGraph 정본](../plans/RenderGraphDependencySchedulingPlan.md)을 따른다. 날짜가 붙은 파일명은 링크 호환을 위해 유지한다.
+The queue barrier planner returned every used resource to COMMON at every batch boundary. This included textures used only by graphics, even when a boundary was unrelated to that texture and all its accesses remained on one FIFO graphics queue. Before adding a guessed cost penalty, remove this proven avoidable work.
 
-## 현재 구현과 호출 경로
+`RHITextureInfo::retainsExplicitStateOnGraphicsQueue` is a conservative backend guarantee, default false. DX12 reports true only for actual texture resources without ALLOW_SIMULTANEOUS_ACCESS. The guarantee concerns explicitly transitioned states; automatic promotion is not used by this optimization. Buffers and unknown backends retain existing behavior.
 
-RHITextureInfo의 retainsExplicitStateOnGraphicsQueue는 backend의 보수적 상태 유지 능력이다. SubmitQueues는 graphics 전용 texture 후보를 표시하고 compute에서 쓰는 resource를 제외한 뒤 barrier 계획에 전달한다. 모든 buffer·texture의 상태를 무조건 유지하는 최적화가 아니다.
+The selected queue plan classifies resources from all live pass and repeated-phase declarations. A texture is eligible only if the backend guarantee is present and no compute pass uses it. Eligible textures begin in their tracked initial state, keep their explicit state between graphics batches, and restore the compiled final state in the graphics epilogue. State and previous-write tracking remain continuous. All buffers, compute-only or shared textures and unverified textures continue using COMMON at boundaries. No read/read queue-sharing rule or producer/consumer edge changes.
 
-## 변경·검증 기준
+Reference: [Microsoft D3D12 resource state promotion and decay](https://learn.microsoft.com/en-us/windows/win32/direct3d12/using-resource-barriers-to-synchronize-resource-states-in-direct3d-12). In particular buffers and simultaneous-access textures decay across ExecuteCommandLists even after explicit transitions, while ordinary explicitly transitioned textures do not. Excessive COMMON transitions can hurt GPU performance.
 
-graphics FIFO 안에 남는 접근만 허용하고 실제 compute 소비가 생기면 제외되어야 한다. 특수화 전후 barrier 수와 imported final state, validation을 함께 확인한다.
+## Validation scope
 
-과거 로컬 Build/Artifacts 경로의 수치와 완료·기성 표시는 이번 소스 감사에서 재검증하지 않았으므로 현재 통과 결과로 옮기지 않는다. 제품 기본값, 특정 fixture 성공, 여러 backend의 제품 수용은 각각 판정한다.
+The native fixture now clears one graphics-only render-target texture before and after a compute batch. It checks the backend guarantee and absence of the redundant second state transition, retains the existing buffer ordering/decay checks, verifies final-state writeback and validates actual GPU execution. A native simultaneous-access texture also verifies the backend refuses the retention guarantee. Native semantic checks increase from 428 to 434; the strict wrapper is updated with the test. Planning checks remain 119.
 
-## 소스 근거
+Build: VS 2026 Release, `Build/rg8-graphics-retention.log`. Evidence directory: `Build/Verification/Phase43/RG8GraphicsRetention20261009/`. Final runtime, output and timing results are appended after verification.
 
-- [Engine/RenderEngine/RHI/RHIResourceTypes.h](../../Engine/RenderEngine/RHI/RHIResourceTypes.h)
-- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp](../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp)
-- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp](../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp)
+The handoff prediction model is still uncalibrated and has not been replaced by this slice. Reducing actual boundary work is distinct from proving an accurate batch/barrier cost model or accepting async performance.
 
-## 이전 기록
+## Release verification and measurements
 
-[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/RenderRg8GraphicsRetention20261009.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.
+Final VS 2026 Release build passed (`Build/rg8-graphics-retention-probe.log`; initial enum naming and per-resource probe corrections are preserved in earlier build/evidence files). Native execution 434 checks, planning 119 checks and full RenderGraph regression passed with GPU validation (`native-final`, wrapper exit 0). Existing Utility_Framework PDB LNK4020 warnings and profiler shutdown `abandoned=1 retained=1 foreign=0` diagnostic remain separate from GPU validation. Debug and Vulkan execution were not tested in this slice.
+
+The product same-process forward 0/1/2 and reverse 2/1/0 matrix collected all 192 accepted chronological normal samples (32 per segment), with complete history. Schedules, barrier accounting and calibrated GPU intervals passed the independent audit. Clocks were not locked; timings exclude GPU validation/readback and retain evidence serialization.
+
+| Order | Mode 0 GPU median / p95 | Mode 1 | Mode 2 |
+|---|---:|---:|---:|
+| Forward | 2.3603 / 2.7136 ms | 2.4914 / 2.6061 ms | 2.7029 / 3.1129 ms |
+| Reverse | 3.0295 / 4.1503 ms | 3.1985 / 3.2717 ms | 2.9543 / 4.7647 ms |
+
+Mode 2 selected compute in 64/64 frames. Only 5/64 frames had overlap above clock error (all reverse), with median zero in both orders and maximum 0.258 ms. Forward async remains slower; reverse async has a slightly lower median but a higher p95. This does not establish a consistent performance benefit. Default OFF / progress / earned 0 remains.
+
+Boundary-work reduction (both orders, median): planned barriers **767 -> 422**, prologue **109 -> 49**, epilogue **117 -> 57**. The previous numbers are from the immediately preceding alternative-order run; pass assignments are cost-driven and can vary, so these are observed product counts, not a fixed per-frame savings guarantee. The changed planner removes only provably unnecessary graphics texture transitions and preserves buffer/cross-queue safety.
+
+Current mode-2 scheduling CPU median: 1.1312 / 1.1417 ms; recording 1.5160 / 1.6390 ms; submission 0.5959 / 0.5780 ms. Planned batches remain median 11 and actual waits 4. Absolute GPU-time changes across builds are not controlled A/B results, as the mode-0 baseline also moved substantially.
+
+Evidence: `normal/`, `performance-summary.json`, `boundary-summary.json`, `native-final/`, binary metadata and `local.patch` under `Build/Verification/Phase43/RG8GraphicsRetention20261009/`. No commit/push is performed by this request.
+
+## Product output and GPU validation
+
+GPU-based validation captured forward modes 1 and 2, four samples each: two processes exited 0, both reported problems 0 / dropped messages 0. Current mode 1 versus mode 2 is bit-identical across 64 attachment/stage comparisons. This validation wrapper intentionally covers only forward modes 1/2; it is not a six-mode validation matrix.
+
+The initial comparison against the previous build mixed validation OFF baseline with validation ON current output and failed: maximum absolute difference 0.003921572 (one display quantization step). That failed result is preserved in `gpu-output-comparison.json`; it is not counted as an accepted cross-build comparison.
+
+A fresh validation-OFF capture matrix completed both orders and modes 0/1/2: six processes exited 0, 24 captures. Controlled inputs, dimensions and finite values were checked. Previous mode 0 versus current mode 0 and current mode 0 versus modes 1/2 passed **384 exact comparisons, error 0** (`output-comparison.json`). A separate direct previous/current mode-1 and current mode-1/2 comparison passed 128 exact comparisons, error 0 (`mode1-normal-comparison.json`). These comparison sets reuse captures and are not independent additional samples.
+
+The same current binary with validation OFF versus ON reproduced the 0.003921572 maximum difference in modes 1 and 2 (`validation-flag-comparison.json`, diagnostic only). Matching validation configurations establish output equivalence; the mixed-configuration difference does not establish a regression caused by this change. This probe does not identify the exact instrumented shader instruction responsible for the difference.
+
+Product output equivalence and GPU validation do not establish GPU performance improvement. RG8 remains progress / earned 0 / default OFF. The remaining performance work is to explain the gap between predicted and measured overlap, account for actual batch synchronization/barrier costs, and verify CPU recording/submission costs before adoption. No new phase completion condition was added by this slice.

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RenderRg8Batching20261009.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RG8 구조 수정 1 — 큐 배치·기록 저장소 재사용</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#변경">변경</a></li><li><a href="#검사">검사</a></li><li><a href="#testshadow-제품-결과">TestShadow 제품 결과</a></li><li><a href="#다음-수정">다음 수정</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderRg8Batching20261009.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>RG8 구조 수정 1 — 큐 배치·기록 저장소 재사용</h1>
+<div class="meta"><p>후속: <a href="RenderRg8Barriers20261009.html">구조 수정 2</a>에서 단일 큐 compiled barrier 재사용과 다중 큐 배치 내부 상태 유지를 적용했다. 아래 수치는 수정 1 바이너리의 기록이다.</p>
+<p><a href="RenderRg7Rg8StructuralAudit20261009.html">구조 감사</a>의 패스별 native allocator/list 생성과
+제출 문제를 먼저 수정한다. RG8은 progress·기성 0·기본 OFF를 유지한다.
+COMMON 왕복/상태 계획 단일화, overlap에 따른 후보 선택, RG7 조합은 이번 변경의 완료 범위가 아니다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#변경"><span class="ve-label">§00</span><span class="map-name">변경</span><span class="map-bar"><i style="width:48.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검사"><span class="ve-label">§01</span><span class="map-name">검사</span><span class="map-bar"><i style="width:27.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#testshadow-제품-결과"><span class="ve-label">§02</span><span class="map-name">TestShadow 제품 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#다음-수정"><span class="ve-label">§03</span><span class="map-name">다음 수정</span><span class="map-bar"><i style="width:14.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「TestShadow 제품 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-변경">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="변경">변경</h2></div>
+<div class="prose"><ul>
+<li>같은 큐의 연속 패스를 하나의 command list로 기록한다. 교차 의존의 producer 뒤와
+consumer 앞은 끊어서 독립 작업이 불필요하게 대기하지 않게 한다.</li>
+<li>같은 producer queue의 더 높은 timeline 값이 낮은 값을 포함한다는 계약으로 중복/지배된
+Wait를 제거한다. 각 패스의 완료점은 소속 batch의 완료점으로 게시한다.</li>
+<li>DX12 queue endpoint가 기록 저장소 풀을 소유한다. DIRECT와 COMPUTE 및 서로 다른 queue/device의
+저장소를 섞지 않는다. 기존 DIRECT 전용 frame/worker pool을 COMPUTE 큐와 억지로 공유하지 않는다.</li>
+<li>GPU 완료 후 pending 소유권과 호출자 소유권이 모두 해제된 저장소만 allocator/list Reset에 재사용한다.
+캐시는 native allocator/list만 보관하며 graph/descriptor/resource 소유권을 보관하지 않는다.
+큐당 반환 저장소 32개를 상한으로 두고 나머지는 해제한다.</li>
+<li>callback/Close 실패한 저장소는 캐시하지 않는다. 제출 후 Signal 실패로 격리된 batch는
+검증된 shutdown까지 대여 상태를 유지하며, shutdown은 캐시 재진입을 닫고 보유 저장소를 해제한다.</li>
+<li>제품 종료 로그에 created/reused/leased/cached를 기록한다. 단순 GPU 시간뿐 아니라
+실제 native 저장소 생성과 batch 수 감소를 검증한다.</li>
+</ul>
+<p>이 단계는 native 생성/제출 비용 수정이다. graphics 기록의 기존 worker 분할을 owned 실행기와
+통합하거나 compiled barrier 계획을 통합한 단계는 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검사">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="검사">검사</h2></div>
+<div class="prose"><p>기존 Editor의 queue execution 검사에 다음을 추가했다.</p>
+<ul>
+<li>지연 GPU의 저장소가 반환되지 않는지 확인.</li>
+<li>완료된 저장소 재사용에서 생성 수가 증가하지 않는지 확인.</li>
+<li>GPU가 완료돼도 호출자가 batch를 잡고 있으면 독점 대여가 유지되는지 확인.</li>
+<li>Signal 실패 격리와 shutdown 이후 leased/cache 해제를 확인.</li>
+<li>교차 의존 전후의 독립 패스를 추가해 batch 병합이 대기 경계를 넘지 않는지 확인.</li>
+</ul>
+<p>VS 2026 Debug·Release 빌드와 각 구성 native/frame/profiler <strong>147검사</strong>, queue plan <strong>24검사</strong> 및 전체 RenderGraph 회귀가
+GPU validation 오류 0·exit 0으로 통과했다. 별도 테스트 프로젝트를 만들지 않고 기존 Editor를 사용했다.
+증거: <code>Build/Verification/Phase43/RG8Batching20261009/NativeDebug</code>, <code>NativeRelease</code>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-testshadow-제품-결과">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="testshadow-제품-결과">TestShadow 제품 결과</h2></div>
+<div class="prose"><p>동일 Release 바이너리·1496×692·7 draw, 정방향 0→1→2 / 역방향 2→1→0으로
+각각 독립 Editor를 실행했다. 모드 0은 기존 기본 경로, 1은 owned 단일 큐, 2는 SSAO compute 큐다.
+RG7 aliasing은 OFF다. 캡처 6프로세스 × 8표본의 입력을 대조하고 336개 출력을 비교해 최대 오차 0을 확인했다.
+별도 일반 프레임 6프로세스 × 32표본은 캡처 패스 없이 같은 뷰·해상도·56개 profiler slice를 확인했다.
+제품 성능 실행은 validation OFF이며, validation 0은 위 D/R 회귀의 결과다. 12프로세스 모두 exit 0.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>순서</th><th>경로</th><th style="text-align:right">일반 GPU span 중앙값 / p95 (ms)</th><th style="text-align:right">그래프 / batch</th><th style="text-align:right">native pair 생성 / 재사용</th></tr></thead>
+<tbody><tr><td>정방향</td><td>기본 0</td><td style="text-align:right">2.3946 / 2.7986</td><td style="text-align:right">기존 경로</td><td style="text-align:right">기존 경로</td></tr>
+<tr><td>정방향</td><td>단일 큐 1</td><td style="text-align:right">2.5027 / 2.7126</td><td style="text-align:right">627 / 1881</td><td style="text-align:right">6 / 1875</td></tr>
+<tr><td>정방향</td><td>다중 큐 2</td><td style="text-align:right">2.6947 / 3.1191</td><td style="text-align:right">618 / 3088</td><td style="text-align:right">10 / 3078</td></tr>
+<tr><td>역방향</td><td>다중 큐 2</td><td style="text-align:right">2.8954 / 3.1263</td><td style="text-align:right">598 / 2988</td><td style="text-align:right">10 / 2978</td></tr>
+<tr><td>역방향</td><td>단일 큐 1</td><td style="text-align:right">2.7039 / 3.1611</td><td style="text-align:right">618 / 1854</td><td style="text-align:right">6 / 1848</td></tr>
+<tr><td>역방향</td><td>기본 0</td><td style="text-align:right">3.1278 / 3.5205</td><td style="text-align:right">기존 경로</td><td style="text-align:right">기존 경로</td></tr></tbody></table></div>
+<p>기존 RG8 실행 알고리즘의 일반 56패스+prologue/epilogue <strong>58 batch</strong>가 단일 큐 <strong>3</strong>,
+다중 큐 <strong>5</strong>로 감소했다. 다중 큐 첫 워밍업 그래프는 compute 후보가 아직 없어 3이며 이후 5다.
+캡처의 기존 74 batch도 다중 큐 5로 감소했다. 각 프로세스에서 <code>created + reused == batches</code>,
+<code>batches == graphs * 3 + computeBatches * 2</code>를 확인했고 종료 시 leased/cache 모두 0이다.
+각 compute pass profiler slice는 유지하므로 2개 SSAO pass를 1개 compute batch로 제출해도 계측은 분리된다.</p>
+<p><strong>생성·제출 작업량 감소는 확인했다. 기본 경로 대비 GPU 가속은 확인하지 못했다.</strong>
+정방향에서는 수정 경로가 느리고 역방향에서는 빠르므로 환경/시간 경과의 영향을 배제할 수 없다.
+이전 5<del>10ms대 RG8 실행과 이번 2.5</del>2.9ms를 순수 코드 개선율로 계산하지 않는다.
+또한 이 배치 수정이 TestShadow에 graphics/compute 독립 작업을 새로 만들지는 않는다.
+진단 캡처 CPU record는 readback/진단 패스가 포함되므로 일반 프레임 CPU 성능으로 해석하지 않는다.</p>
+<p>DXGI 연속 메모리 1836표본(일반 측정 구간 839표본)을 수집했다.
+이는 장치 예산 사용량 표본이며 정확한 물리 VRAM peak 또는 이번 allocator 풀의 고유 메모리 비용이 아니다.
+메모리 절감이나 제품 전면 채택을 주장하지 않는다.</p>
+<p>검증 스크립트: <code>Tools/regression/audit-rg8-adoption.py</code>의 <code>--require-pooling</code> 검사 통과.
+수치/분포: <code>Build/Verification/Phase43/RG8Batching20261009/Normal/adoption-measurements.json</code>.
+캡처/일반 측정/Release 회귀의 exe 및 runtime SHA256 일치:</p>
+<ul>
+<li>runtime: <code>B9C64402537630AD91B74342571A5420F8A02EF425003C05962E2977B0A9C703</code></li>
+<li>exe: <code>B88F346F3310919A2C52C0DB384885C59FA233AD65F3201FDB75F758F7241561</code></li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-다음-수정">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="다음-수정">다음 수정</h2></div>
+<div class="prose"><ol>
+<li>패스마다 COMMON으로 왕복하는 실행 상태와 compiled barrier 계획을 단일화한다.</li>
+<li>실제 독립 작업과 전환 비용을 기준으로 compute 후보를 선택한다. 이득이 없는 그래프는 기존 경로를 사용한다.</li>
+<li>RG7 조합의 수명 계약과 캐시 보유 정책을 해결한다.</li>
+</ol>
+<p>이번 수정은 첫 번째 구조 결함 묶음에 대한 완료다. RG8 전체는 progress·기성 0·기본 OFF,
+PHASE 4.3 기성 74·잔여 26, 전체 기성 126·잔여 437을 유지한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderRg8Batching20261009.md"><code>docs/analysis/RenderRg8Batching20261009.md</code></a> · 마지막 커밋 2026-10-09 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

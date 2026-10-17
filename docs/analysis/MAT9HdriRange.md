@@ -1,36 +1,126 @@
-# MAT-9 HDR range·cube 에너지 보존의 현재 계약
+# MAT-9 HDR 에너지 보존과 큐브 변환 대조
 
-> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
+2026-10-01. 기존 MAT-9의 source/cube·diffuse·mirror 검증 단계다.
+전체 MAT-9 완료 또는 전체 HDRI 재질 수용으로 세지 않는다.
 
-## 원인과 보존한 진단
+후속 [forest 거울 수정](MAT9MirrorSampling.md)은 CEIBL004/source 보존·픽셀 중심 보정으로
+같은 7조건을 7/7 통과했다. 아래 v3 수치와 identity는 당시 검증 기록이다.
 
-초기 HDR range 조사는 높은 양수 radiance를 64,000 근처로 자르거나 half-float cube에 저장하면 작은 태양의 에너지가 손실되는 문제를 분리했다. [autumn 적분](MAT9HdriRangeAutumnIntegrals.json)과 [forest 적분](MAT9HdriRangeForestIntegrals.json)은 원본/cube의 정확한 입체각 적분을 비교한 역사적 자료다.
+## 원인 분리
 
-해당 진단은 밝은 source의 에너지 손실과 CDF 해상도/샘플 분산을 구분하기 위한 것이다. diffuse integral이 맞아도 mirror angular detail이나 전체 재질 이미지는 틀릴 수 있다.
+원본 HDR/EXR을 linear Rec.709 RGBA32F로 디코드하고, 모든 원본 텍셀과
+큐브 텍셀의 정확한 입체각으로 E/pi를 독립 적분했다. Native normal/view 및
+동일한 emission interior 344픽셀을 사용했다. 계산은 이미지 수용 게이트의 대체물이 아니다.
 
-## 현재 데이터 흐름
+`autumn_field_puresky_1k.hdr`의 RGB 최대값은 123,904 / 112,640 / 95,232다.
+기존 `SanitizeRadiance`와 RGBA16Float 큐브는 이를 64,000으로 잘랐다.
+기존 cube/source 확산 적분 차이는 **5.5749%**, bake/dense cube 차이는
+**0.1215%**였다. 이 조건의 큰 확산광 오차는 중요도 격자의 128칸 축소보다
+앞단의 HDR 에너지 손실이 주원인이었다. 원본 source SRV는 한 mip만 노출하므로
+implicit LOD가 낮은 mip을 선택하는 문제로 판단하지 않았다.
 
-environment source/cube와 prefilter는 float32 radiance 보존 경로를 갖는다. irradiance/BRDF의 형식과 모든 최종 surface sanitation 정책까지 동일하게 바꾼 것으로 해석하지 않는다. 유효한 양수 HDR는 보존하고 nonfinite/negative를 처리하는 환경 전용 sanitation을 사용한다.
+Float32 단일 중심 변환에서는 작은 태양의 큐브 격자 aliasing으로 확산 적분 차이
+0.9371%가 남았다. 변환 시 4×4 texel footprint와 cube solid-angle Jacobian을
+사용하면 **0.3251%**로 줄었다. 샘플의 밝기는 자르지 않는다.
+forest의 cube/source 확산 차이는 0.0573→**0.0028%**다.
 
-`IblRectToCube`는 명시적 mip 0의 4×4 footprint를 cube solid-angle 가중으로 적분한다. 이 비용은 cook/환경 준비 시점의 변환이며 매 frame의 pixel shading 비용이 아니다. center sample 하나의 angular aliasing을 줄이지만 sharp reflection의 source 조회를 대체하지 않는다.
+- [autumn 최종 독립 적분](MAT9HdriRangeAutumnIntegrals.json)
+- [forest 최종 독립 적분](MAT9HdriRangeForestIntegrals.json)
+- 수정 전/중간 분리는 `Build/Obj/Mat9Hdri-integrals-*-before.json` 및 `*-interim.json`.
 
-CEIBL003은 당시 float32 형식을 도입한 단계다. 현재 CEIBL005는 decoded source와 확장 reflection proposal까지 포함한다. 예전 cook hash/크기를 현재 배포 파일의 identity로 재사용하지 않는다. reader가 옛 형식을 읽는 것과 현재 recipe cache hit는 다른 판정이다.
+## 제품 변경
 
-## 역사적 이미지 판정
+- 원본 큐브·GGX prefilter를 RGBA32Float로 저장한다. irradiance·BRDF는 RGBA16Float 유지.
+- 환경 전용 finite/nonnegative sanitation은 유효한 양수 HDR 값을 보존한다.
+  일반 표면/최종 출력의 기존 sanitation 정책은 별개다.
+- 원본→큐브는 mip 0을 명시하고 4×4 입체각 가중 footprint를 쿠킹 때만 계산한다.
+- Forward·Deferred·SkyBox 및 Scene lookup은 실제 자원 형식을 바인딩한다.
+- CDF sample의 셀 경계 반올림으로 다른 셀 PDF를 사용하는 사례를 재현했다.
+  선택된 셀의 내부 0.01% 경계 여유를 shader·legacy CPU proposal에 동일 적용했다.
+  최종 두 cook의 cached PDF/lookup PDF 최대 상대 차이는 각각 4.15e-7 이하.
+- CEIBL003은 기존 7-map 배치를 유지하고 cube/prefilter의 float32 형식을 규정한다.
+  source/recipe/checksum, atomic 저장, GPU upload/readback, warm 캐시 경로를 연결했다.
+  CEIBL001/002는 이전 형식으로 읽을 수 있지만 현재 recipe에 맞지 않아 authoring cache miss다.
+- SceneHost identity 7로 이전 제품 shader generation을 무효화한다.
 
-[range 단계 7조건](MAT9HdriRangeTargets.json)은 6/7이 목표 안에 있어도 `accepted=false`다. 고정 diagnostic subset만 검사했기 때문이다. forest mirror는 후속 [source sampling](MAT9MirrorSampling.md)에서 별도로 다뤘다. 이 파일의 false를 단순 실패 횟수로 해석하거나 6/7을 전체 MAT-9 통과로 보고하지 않는다.
+| 기록 | 값 |
+| --- | --- |
+| recipe SHA | `fc859e1118ab07701e0a3944ec78ce7df7e3922bc3bb9ce7e46cb025cf93a0fe` |
+| forest cook SHA | `df981ca1595ebce40a8d449c8dc199483f1db656879f02c3861b98fd8b083d89` |
+| autumn cook SHA | `21cda237e5f3f338f78293637fdb6b306323c703d1bd715f8015a0e8ff31189a` |
+| 크기 | 기존 61,090,928 → **94,640,240 bytes**, 58.26 → 90.26 MiB |
+| 규격 | cube 512/7 mips, irradiance 64 E/pi, prefilter 6 mips, BRDF 512, CDF 512, MIS 1024+1024 |
 
-## 현재 재검증 요구
+기존 v2 forest 배포 파일은 `Build/Obj/Mat9Hdri-frozen-cooks/<SHA>.ceibl`에 보존했다.
+배포 `Resources/Environment/forest.ceibl`과 Debug Editor 자원의 SHA가 일치한다.
+EXR 원본은 배포/부트스트랩 의존성에 추가하지 않았다.
 
-source/recipe/checksum, 실제 format, atomic 저장, cold/warm cache, GPU upload/readback, CDF cell/PDF 일치, source/cube E/π를 각각 확인한다. reference는 원본 HDR/EXR을 읽고 engine만 새 cook을 소비하므로, reference manifest를 바꾸면 입력 identity가 유지되었는지 별도로 증명해야 한다.
+## 수렴한 고정 이미지 대조
 
-이 문서 갱신에서는 환경 파일을 재쿠킹하거나 이미지·적분 JSON을 변경하지 않았다. 최종 fixed-suite 결과와 live 근사는 [수렴](MAT9HdriConvergence.md), [split-sum 차이](MAT9SplitSumLiveLookupDifference.md)에 분리되어 있다.
+Blender 5.1.1 Cycles CPU, 64×64, **131,072 samples, seed 0/11**로
+7개 진단 조건을 새로 렌더했다. 원본·밝기 0.35·geometry·camera·Raw linear 조건과
+RMS ≤1%, p95 normalized ≤1%, max normalized ≤5%, seed RMS ≤0.25%를 유지했다.
+7조건 모두 seed noise 목표를 만족한다. 재질별 마스크 변경은 없다.
 
-## 구현 근거
+원래 Blender는 engine cook이 아닌 HDR/EXR을 읽는다. 원본과 기준 pixel/geometry SHA를
+유지하고, engine cook만 바꾸는 별도 reference 사본을 만들었다. 원래 파일은 수정하지 않았다.
+쿠킹이 조명 4-map을 바꾸었으므로 이전 작업의 4-map byte-equality 근거를 재사용하지 않는다.
 
-- [`Dynamic_CPP/Assets/Shaders/DefaultPassShader/IblRectToCube.slang`](../../Dynamic_CPP/Assets/Shaders/DefaultPassShader/IblRectToCube.slang)
-- [`Engine/RenderEngine/Assets/CookedEnvironment.h`](../../Engine/RenderEngine/Assets/CookedEnvironment.h)
-- [`Engine/RenderEngine/Assets/CookedEnvironment.cpp`](../../Engine/RenderEngine/Assets/CookedEnvironment.cpp)
-- [`Tools/AssetCooker/EnvironmentCooker.cpp`](../../Tools/AssetCooker/EnvironmentCooker.cpp)
-- [`Tools/regression/measure-environment-integrals.py`](../../Tools/regression/measure-environment-integrals.py)
-- [`docs/analysis/MAT9HdriRangeTargets.json`](MAT9HdriRangeTargets.json)
+| 조건 | v2 cook RMS | v3 cook RMS | seed RMS | 동일 target |
+| --- | ---: | ---: | ---: | --- |
+| forest emission | 0% | 0% | 0% | 통과 |
+| forest white diffuse | 0.3248% | 0.3574% | 0.1098% | 통과 |
+| forest mirror | 2.6413% | **3.1285%** | 0.00347% | 미달 |
+| autumn thin film | 3.6083% | **0.8607%** | 0.1587% | 통과 |
+| autumn emission | 0% | 0% | 0% | 통과 |
+| autumn white diffuse | 5.4994% | **0.4107%** | 0.1597% | 통과 |
+| autumn mirror | 0.5093% | 0.5531% | 0.00321% | 통과 |
+
+7개 부분 집합에서 6개가 통과했다. 전체 26장/재질 grid 판정은 대체하지 않는다.
+Native 전/후 각각 **121,540 checks, validation 0, 정상 종료**다.
+
+- [수정 전 동일 dense 기준](MAT9HdriRangeBaselineComparison.json)
+- [수정 후 동일 dense 기준](MAT9HdriRangeComparison.json)
+- [고정 target 판정 — 전체 accepted=false](MAT9HdriRangeTargets.json)
+
+## 남은 forest 거울 / 비용
+
+forest mirror는 footprint 평균과 cube linear 재샘플링 영향으로 기존보다 오차가 증가했다.
+현재 CPU cube sampling/Native 차이는 0.1277%, 원본 source/Cycles 차이는 1.2731%다.
+후자에는 geometry normal/view·pixel filtering의 차이도 들어 있으므로 모두 큐브 해상도 탓으로
+단정하지 않는다. Cube→source mirror resampling 차이는 3.7802%다.
+별도 CPU Catmull-Rom 진단은 제품에 적용하지 않았다. 추가 조회 비용이 생기고 여전히 target 미달이다.
+다음은 원본 source 보존·mirror 재구성 및 normal/view/filter 기여도를 분리하는 같은 mirror 게이트다.
+
+이번 파일 형식 변경은 GPU 환경 texture 크기와 조회 대역폭을 늘린다. 쿠킹 footprint 계산은
+cold 생성에만 발생하지만 float32 조회의 frame 비용까지 없어지는 것은 아니다.
+GPU validation ON + 동시 CPU reference 생성 중의 cold 생성 시간은 비용 비교에 쓰지 않는다.
+warm cook의 한 실행에서 read/checksum은 439.112ms였고 EXR decode/GPU 생성은 없었다.
+이는 FPS·Editor bootstrap 시간 또는 cold/warm 평균 성능 수용을 뜻하지 않는다.
+실제 모델 이동 카메라·tier별 GPU 성능 게이트는 MAT-9에 남긴다.
+
+## 검증 및 재현
+
+환경 shader 6개 entry를 각각 DXIL/SPIR-V로 검증했다. forest/autumn 7-map exact
+GPU roundtrip 및 validation 0, 독립 CDF/PDF 검증을 통과했다.
+
+CreatorEditor Debug 전체 최종 빌드 성공. Release raster/Scene 회귀는
+21,067,374 checks, 3,889,591 GPU components, DXIL/SPIR-V 24 entries, validation 0,
+정상 종료다. 공유 깊이·가림·skinning·texture·generation·abort·lookup 재사용 게이트를 유지했다.
+
+실제 Debug Editor HTTP 조작은 11 checks, 정상 종료: default v3 bootstrap,
+배경 토글 시 IBL generation 1→1, HDR 선택→새 v3 cook 영속화, 손상 cook 거부와
+기존 환경 보존을 확인했다. runtime이 저장한 autumn v3 cook은 authoring cooker 파일과
+전체 SHA가 동일하며 독립 CDF/PDF 검증도 통과했다.
+이 실행에도 `[profiler] shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]`
+종료 진단 한 건이 남았다. 이전 실행에서도 나온 미해결 진단으로, 정상 종료와 구분한다.
+Vulkan shader 검증은 수행했지만 이 단계에서 Vulkan GUI 실행을 추가하지 않았다.
+Dashboard Vite build 및 inline script 구문 검증, Python 구문 검사와 diff whitespace 검증 통과.
+
+주요 로그: `Build/Obj/mat9-hdri-range-{shaders,autumn-final-cook,forest-final-cook,warm}.log`.
+이미지 재현은 `rebind-environment-reference.py` → `measure-material-blender-images.ps1` →
+`compare-material-blender-images.py --reference-repeat` 순서다.
+독립 source/cube 적분은 NumPy가 있는 Python으로 `measure-environment-integrals.py`를 실행한다.
+
+MAT-9 progress, 기존 완료 공수 32/34일을 유지한다. mirror·전체 HDRI 수렴/수용·special,
+texture/normal-map·route parity·실제 씬 성능·원래 area-light gate는 기존 잔여 범위다.

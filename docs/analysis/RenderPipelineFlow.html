@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RenderPipelineFlow.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>렌더 파이프라인 구조와 프레임 플로우</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-전체-계층--무엇이-무엇을-소유하는가">1. 전체 계층 — 무엇이 무엇을 소유하는가</a></li><li><a href="#2-프레임-렌더-플로우--한-프레임의-전-과정">2. 프레임 렌더 플로우 — 한 프레임의 전 과정</a></li><li><a href="#3-렌더-패스-구조">3. 렌더 패스 구조</a></li><li><a href="#4-렌더러-구조--뷰--슬롯--표시">4. 렌더러 구조 — 뷰 · 슬롯 · 표시</a></li><li><a href="#5-머테리얼-구조">5. 머테리얼 구조</a></li><li><a href="#6-드로우-수집--프록시에서-배치까지">6. 드로우 수집 — 프록시에서 배치까지</a></li><li><a href="#7-한눈에-보는-데이터-흐름">7. 한눈에 보는 데이터 흐름</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderPipelineFlow.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>렌더 파이프라인 구조와 프레임 플로우</h1>
+<div class="meta"><p>CreatorEngine 의 <strong>렌더 패스 · 렌더러 · 머테리얼</strong> 구조와, 한 프레임을 그리기 위한 실행
+흐름을 순서도로 정리한 문서다. 모든 다이어그램은 Mermaid 로 작성했다.</p>
+<p>기준 코드:</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#1-전체-계층--무엇이-무엇을-소유하는가"><span class="ve-label">§1</span><span class="map-name">전체 계층 — 무엇이 무엇을 소유하는가</span><span class="map-bar"><i style="width:36.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-프레임-렌더-플로우--한-프레임의-전-과정"><span class="ve-label">§2</span><span class="map-name">프레임 렌더 플로우 — 한 프레임의 전 과정</span><span class="map-bar"><i style="width:43.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-렌더-패스-구조"><span class="ve-label">§3</span><span class="map-name">렌더 패스 구조</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-렌더러-구조--뷰--슬롯--표시"><span class="ve-label">§4</span><span class="map-name">렌더러 구조 — 뷰 · 슬롯 · 표시</span><span class="map-bar"><i style="width:35%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-머테리얼-구조"><span class="ve-label">§5</span><span class="map-name">머테리얼 구조</span><span class="map-bar"><i style="width:78.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-드로우-수집--프록시에서-배치까지"><span class="ve-label">§6</span><span class="map-name">드로우 수집 — 프록시에서 배치까지</span><span class="map-bar"><i style="width:27.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-한눈에-보는-데이터-흐름"><span class="ve-label">§7</span><span class="map-name">한눈에 보는 데이터 흐름</span><span class="map-bar"><i style="width:9.5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「3. 렌더 패스 구조」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><div class="table-scroll"><table>
+<thead><tr><th>층</th><th>정본 파일</th></tr></thead>
+<tbody><tr><td>렌더러</td><td><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h">EnhancedSceneRenderer.h</a> · <a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">.cpp</a></td></tr>
+<tr><td>파이프라인 기술</td><td><a href="../../Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h">EnhancedLivePipelineDesc.h</a></td></tr>
+<tr><td>렌더 그래프</td><td><a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h">EnhancedRenderGraph.h</a></td></tr>
+<tr><td>패스 기반</td><td><a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h">EnhancedRenderPass.h</a></td></tr>
+<tr><td>패스 구현</td><td><span class="chip ok"><a href="../../Engine/RenderEngine/Render/Passes">Render/Passes/</a></span></td></tr>
+<tr><td>머테리얼 저작 정본</td><td><a href="../../Engine/RenderEngine/Material.h">Material.h</a> · <a href="../../Engine/RenderEngine/Experiment">Experiment/</a></td></tr>
+<tr><td>머테리얼 밀봉</td><td><a href="../../Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h">ExperimentMaterialSealing.h</a></td></tr>
+<tr><td>씬 프록시</td><td><a href="../../Engine/RenderEngine/RenderScene.h">RenderScene.h</a></td></tr></tbody></table></div>
+<hr>
+</section>
+<section class="doc-sec" id="sec-1-전체-계층--무엇이-무엇을-소유하는가">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-전체-계층--무엇이-무엇을-소유하는가">1. 전체 계층 — 무엇이 무엇을 소유하는가</h2></div>
+<div class="prose"><p>렌더는 <strong>게임 스레드가 값을 밀봉하고 렌더 스레드가 그것만 소비하는</strong> 단방향 구조다.
+렌더 스레드는 <code>Scene</code> · <code>Camera</code> · <code>Material</code> 같은 살아 있는 게임 객체를 읽지 않는다.</p>
+<pre class="mermaid">flowchart TB
+    subgraph GT[&quot;게임 스레드 · Producer&quot;]
+        APP[&quot;App / PlayerApp 프레임 루프&quot;]
+        SCENE[&quot;Scene · Component&quot;]
+        PROXYQ[&quot;ProxyCommandQueue&lt;br/&gt;등록·갱신·해제 delta&quot;]
+        PACKET[&quot;EnhancedLiveFramePacket&lt;br/&gt;카메라 · 시간 · ShaderMeta generation&quot;]
+        APP --&gt; SCENE
+        SCENE --&gt; PROXYQ
+        APP --&gt; PACKET
+    end
+
+    subgraph BOUND[&quot;프레임 경계 · 밀봉된 값만 통과&quot;]
+        QUEUE[&quot;renderQueue&lt;br/&gt;mutex + condition_variable&quot;]
+    end
+
+    subgraph RT[&quot;렌더 스레드 · Consumer&quot;]
+        TICK[&quot;EnhancedSceneRenderer::TickLive&quot;]
+        RSCENE[&quot;RenderScene&lt;br/&gt;PrimitiveProxy · LightProxy · UIProxy&quot;]
+        POOL[&quot;drawPool · decals · spritePool&lt;br/&gt;프레임당 1회 수집&quot;]
+        VIEW[&quot;CameraView 별 CaptureFromView&lt;br/&gt;절두체 컬링 · 투명 정렬 · 광원 선별&quot;]
+        SEAL[&quot;Material Sealing&lt;br/&gt;immutable draw snapshot&quot;]
+        TICK --&gt; RSCENE --&gt; POOL --&gt; VIEW --&gt; SEAL
+    end
+
+    subgraph PIPE[&quot;LivePipeline · 뷰당 인스턴스&quot;]
+        DESC[&quot;LivePipelineDesc&lt;br/&gt;노드 목록 = 조립&quot;]
+        BB[&quot;LiveBlackboard&lt;br/&gt;슬롯 이름 → RGHandle&quot;]
+        PASSES[&quot;EnhancedRenderPass 구현 15종&quot;]
+        DESC --&gt; BB
+        DESC --&gt; PASSES
+    end
+
+    subgraph GRAPH[&quot;EnhancedRenderGraph · 프레임당 · 슬롯당&quot;]
+        COMPILE[&quot;Compile&lt;br/&gt;순서 · 컬링 · transient · 배리어&quot;]
+        RECORD[&quot;RecordParallel&lt;br/&gt;워커 4&quot;]
+        COMPILE --&gt; RECORD
+    end
+
+    subgraph RHI[&quot;RHI 백엔드&quot;]
+        DX12[&quot;DX12&quot;]
+        VK[&quot;Vulkan&quot;]
+    end
+
+    PROXYQ --&gt; QUEUE
+    PACKET --&gt; QUEUE
+    QUEUE --&gt; TICK
+    SEAL --&gt; DESC
+    PASSES --&gt; COMPILE
+    RECORD --&gt; DX12
+    RECORD --&gt; VK
+    DX12 --&gt; PRESENT[&quot;공유 텍스처 → ImGui 표시&quot;]
+    VK --&gt; PRESENT</pre>
+<h3 id="스레드-규약">스레드 규약</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>규약</th><th>강제 지점</th></tr></thead>
+<tbody><tr><td><code>BuildLiveFramePacket</code> 은 게임 스레드 고정</td><td><code>frameProducerThread</code> assert</td></tr>
+<tr><td><code>TickLive</code> 는 소비 스레드 고정</td><td><code>frameConsumerThread</code> assert</td></tr>
+<tr><td>패킷은 <strong>발행 순서대로 정확히 한 번</strong> 소비</td><td><code>frame.frameId &gt; consumedFrameId</code> assert</td></tr>
+<tr><td>렌더 스레드는 <code>DataSystem</code> · 자산 파일을 다시 읽지 않음</td><td>ShaderMeta 를 패킷에 generation+value 로 밀봉</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-프레임-렌더-플로우--한-프레임의-전-과정">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-프레임-렌더-플로우--한-프레임의-전-과정">2. 프레임 렌더 플로우 — 한 프레임의 전 과정</h2></div>
+<div class="prose"><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant App as 게임 스레드
+    participant Q as renderQueue
+    participant Tick as TickLive
+    participant State as LiveState
+    participant Desc as LivePipelineDesc
+    participant Graph as EnhancedRenderGraph
+    participant GPU as RHI / GPU
+
+    Note over App: ① 프레임 입력 밀봉
+    App-&gt;&gt;App: 뷰 요청 수집 - Editor view + Game view
+    App-&gt;&gt;App: CaptureRequiredRenderMaterials
+    App-&gt;&gt;App: BuildRequiredAssetPacket - pass 별 ShaderMeta GUID
+    App-&gt;&gt;App: BuildLiveFramePacket - 카메라 · 시간 · 해상도 · ShaderMeta generation · 기즈모
+    App-&gt;&gt;Q: PublishLiveFrame - 프레임 + ProxyCommand delta
+    Q--&gt;&gt;Tick: 렌더 스레드 wake
+
+    Note over Tick: ② 프레임당 1회 · 카메라 무관
+    Tick-&gt;&gt;State: BeginDisplaySnapshot · PublishDebugSnapshot
+    Tick-&gt;&gt;State: ApplyAndPublishTuning - 디버그 창 파라미터 반영
+    Tick-&gt;&gt;State: BeginProxyFrame + ExecuteBatch - 프록시 delta 적용
+    Tick-&gt;&gt;State: BuildDrawPool - 프록시 → drawPool · decals · spritePool
+
+    Note over Tick: ③ ShaderMeta / Material 밀봉
+    Tick-&gt;&gt;State: ApplyGBufferShaderMeta · ApplyForwardShaderMeta
+    Tick-&gt;&gt;State: SealGBufferMaterials · SealForwardMaterials
+    Note right of State: propertyBytes + textureBindings + permutationKey&lt;br/&gt;= immutable draw snapshot
+
+    Note over Tick: ④ 뷰 루프 - 회전 시작 인덱스로 공평 분배
+    loop 각 CameraView
+        Tick-&gt;&gt;State: CaptureFromView - 절두체 컬링 · 투명 back-to-front 정렬 · 광원 선별
+        Note right of State: 불투명 → draws&lt;br/&gt;투명 → forwardDraws
+        Tick-&gt;&gt;Graph: RenderOnce
+        Graph-&gt;&gt;GPU: BeginFrame - allocator reset · 커맨드 리스트 open
+        Graph-&gt;&gt;Desc: PrepareAll - IBL 생성 · 메시/텍스처 업로드
+        Graph-&gt;&gt;Desc: DeclareAll - 노드 순서대로 그래프에 선언
+        Graph-&gt;&gt;Graph: Compile - BuildOrder · CullPasses · CreateTransients · PlanBarriers
+        Graph-&gt;&gt;GPU: RecordParallel - 워커 4로 커맨드 기록
+        Graph-&gt;&gt;GPU: EnqueueRecordedBatch · EndFrame - 펜스 signal
+        Note right of GPU: 여기서 기다리지 않는다&lt;br/&gt;fenceValue 만 슬롯에 기록
+    end
+
+    Note over Tick: ⑤ 완료 승격 - 다음 프레임들에서 논블로킹 확인
+    Tick-&gt;&gt;State: PromoteCompleted - 펜스 완료된 슬롯을 표시로
+    State-&gt;&gt;App: DisplaySnapshot / ImTextureId</pre>
+<h3 id="핵심-설계-판단">핵심 설계 판단</h3>
+<ul>
+<li><strong>④에서 GPU 를 기다리지 않는다.</strong> 예전 동기 <code>WaitForGpu</code> 는 프레임당 33 ms 를 먹어
+총 대기를 58 ms 로 만들었다. 실제 GPU 는 3.7 ms 였다. 지금은 펜스 값만 슬롯에 적고
+다음 프레임들에서 논블로킹으로 확인해 표시로 승격한다.</li>
+<li><strong>②는 카메라 수와 무관하게 1회.</strong> <code>BuildDrawPool</code> 은 카메라를 보지 않는 수집이고,
+뷰는 그 풀을 절두체로 거르기만 한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-렌더-패스-구조">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-렌더-패스-구조">3. 렌더 패스 구조</h2></div>
+<div class="prose"><h3 id="3-1-패스의-계약--선언과-기록의-분리">3-1. 패스의 계약 — 선언과 기록의 분리</h3>
+<p><code>EnhancedRenderPass</code> 는 기존 <code>IRenderPass</code> 를 상속하지 않는다. 그쪽은 &quot;이 패스가 지금 다
+그린다&quot;를 전제하는데, 그래프 위에서는 선언과 기록이 나뉜다.</p>
+<pre class="mermaid">flowchart LR
+    subgraph LIFE[&quot;패스 수명&quot;]
+        INIT[&quot;Initialize&lt;br/&gt;1회 · PSO · 루트 시그니처 · 정적 리소스&quot;]
+        PREP[&quot;PrepareFrame&lt;br/&gt;프레임마다 · GPU 업로드&quot;]
+        DECL[&quot;Declare&lt;br/&gt;프레임마다 · 그래프에 사용 선언&quot;]
+        REC[&quot;Record 람다&lt;br/&gt;그래프가 정한 시점 · 커맨드만 기록&quot;]
+        SHUT[&quot;Shutdown&lt;br/&gt;노드 역순&quot;]
+        INIT --&gt; PREP --&gt; DECL --&gt; REC --&gt; SHUT
+    end
+
+    subgraph RULE[&quot;규약 3&quot;]
+        R1[&quot;① Declare 에서&lt;br/&gt;리소스 생성 · 커맨드 기록 금지&quot;]
+        R2[&quot;② Record 에서&lt;br/&gt;리소스 생성 · 배리어 삽입 금지&quot;]
+        R3[&quot;③ Record 는 넘겨받은&lt;br/&gt;커맨드 리스트에만 기록&quot;]
+    end
+
+    DECL -.-&gt; R1
+    REC -.-&gt; R2
+    REC -.-&gt; R3</pre>
+<p>이 분리가 필요한 이유는 둘이다. <strong>배리어를 그래프가 유도하려면</strong> 기록 전에 사용 계획을
+알아야 하고, <strong>기록을 워커가 병렬로 돌리려면</strong> 기록이 순수해야 한다.</p>
+<h3 id="3-2-파이프라인-조립--노드-목록이-순서를-정한다">3-2. 파이프라인 조립 — 노드 목록이 순서를 정한다</h3>
+<p>예전에는 <code>RenderOnce</code> 안 200 줄이 &quot;무엇을 어떤 순서로 잇는가&quot;를 직접 적었고, 같은 사실
+&quot;SSS 는 Forward 뒤&quot;가 <code>Initialize</code> · <code>Shutdown 역순</code> · <code>PrepareFrame</code> · <code>Declare</code> 네 곳에
+따로 적혀 있었다. 셋은 틀려도 컴파일러가 침묵했다.</p>
+<pre class="mermaid">flowchart TB
+    NODE[&quot;LivePassNode&quot;]
+
+    subgraph DATA[&quot;데이터 절반 — 검증·덤프의 근거&quot;]
+        NAME[&quot;name&quot;]
+        READS[&quot;reads&lt;br/&gt;앞 노드가 발행해야 읽는다&quot;]
+        WRITES[&quot;writes&lt;br/&gt;이 노드가 처음 발행&quot;]
+        MODS[&quot;modifies&lt;br/&gt;읽고 같은 이름으로 재발행&quot;]
+        PERVIEW[&quot;perView&lt;br/&gt;시간축 상태를 가진 패스&quot;]
+    end
+
+    subgraph GLUE[&quot;접착 절반 — 타입&quot;]
+        ACTIVE[&quot;active&lt;br/&gt;비활성이면 declare 건너뜀&quot;]
+        INST[&quot;instance&lt;br/&gt;viewIndex → 패스 포인터&quot;]
+        DECLFN[&quot;declare&lt;br/&gt;블랙보드 ↔ 타입 있는 Inputs&quot;]
+    end
+
+    NODE --&gt; DATA
+    NODE --&gt; GLUE
+
+    VAL[&quot;LivePipelineDesc::Validate&lt;br/&gt;파이프라인 구축 시 1회&quot;]
+    DATA --&gt; VAL
+    VAL --&gt; V1[&quot;미발행 슬롯을 reads/modifies 가 짚음 → 순서 실수&quot;]
+    VAL --&gt; V2[&quot;꺼질 수 있는 노드가 writes 보유 → 꺼진 프레임에 무효 핸들&quot;]
+    VAL --&gt; V3[&quot;같은 슬롯을 둘이 writes → 둘째는 modifies 여야 함&quot;]</pre>
+<blockquote>
+<p><strong><code>modifies</code> 규약이 하는 일</strong>: 꺼질 수 있는 노드는 <code>modifies</code> 만 가질 수 있다.
+노드가 꺼져도 블랙보드 슬롯 값이 그대로 남아 뒤 노드가 이어받는다.
+예전 <code>X.GetOutput().IsValid() ? X : 이전값</code> 폴백 체인이 통째로 사라진 자리다.</p>
+</blockquote>
+<h3 id="3-3-패스-노드-그래프--실제-배선">3-3. 패스 노드 그래프 — 실제 배선</h3>
+<p>노드 목록의 <strong>순서가 곧 실행 순서</strong>다. <code>BuildPipelineDesc</code> 가 짜 둔 목록을 그대로 돈다.</p>
+<pre class="mermaid">flowchart TB
+    classDef slot fill:#1f3a5f,stroke:#4a90d9,color:#fff
+    classDef pass fill:#3a2f1f,stroke:#d9a44a,color:#fff
+    classDef opt fill:#3a1f2f,stroke:#d94a7a,color:#fff
+
+    SHADOW[&quot;Shadow&lt;br/&gt;캐스케이드 3&quot;]:::pass
+    GBUF[&quot;GBuffer&lt;br/&gt;불투명 draws&quot;]:::pass
+    DECAL[&quot;Decal&quot;]:::pass
+    SSAO[&quot;SSAO&quot;]:::pass
+    DEFER[&quot;Deferred&lt;br/&gt;라이팅 + IBL&quot;]:::pass
+    SKY[&quot;SkyBox&quot;]:::pass
+    SSGI[&quot;SSGI&lt;br/&gt;perView&quot;]:::pass
+    FWD[&quot;Forward+&lt;br/&gt;투명 forwardDraws&quot;]:::pass
+    SPRITE[&quot;Sprite&quot;]:::pass
+    SSS[&quot;SSS&quot;]:::pass
+    SSR[&quot;SSR&quot;]:::pass
+    FOG[&quot;VolumetricFog&lt;br/&gt;perView · active 토글&quot;]:::opt
+    POST[&quot;PostChain&lt;br/&gt;톤맵 · 컬러그레이딩 · AA · 비네트&quot;]:::pass
+    UI[&quot;UI&quot;]:::pass
+    CONTRIB[&quot;Host 기여 노드&lt;br/&gt;Editor 그리드 · 기즈모&quot;]:::opt
+    PRESENT[&quot;live_present&lt;br/&gt;공유 텍스처로 복사&quot;]:::pass
+
+    SM[&quot;Shadow.Map&quot;]:::slot
+    GD[&quot;GBuffer.Diffuse&quot;]:::slot
+    GM[&quot;GBuffer.MetalRough&quot;]:::slot
+    GN[&quot;GBuffer.Normal&quot;]:::slot
+    GE[&quot;GBuffer.Emissive&quot;]:::slot
+    GB[&quot;GBuffer.Bitmask&quot;]:::slot
+    GZ[&quot;GBuffer.Depth&quot;]:::slot
+    AO[&quot;Scene.AmbientOcclusion&quot;]:::slot
+    LIT[&quot;Scene.LitColor&quot;]:::slot
+    LDR[&quot;Display.LDR&quot;]:::slot
+
+    SHADOW ==&gt; SM
+    GBUF ==&gt; GD &amp; GM &amp; GN &amp; GE &amp; GB &amp; GZ
+
+    GZ --&gt; DECAL
+    DECAL -.수정.-&gt; GD &amp; GN &amp; GM
+
+    GZ &amp; GN --&gt; SSAO
+    SSAO ==&gt; AO
+
+    GD &amp; GM &amp; GN &amp; GE &amp; GZ &amp; SM --&gt; DEFER
+    DEFER ==&gt; LIT
+
+    GZ --&gt; SKY
+    SKY -.수정.-&gt; LIT
+
+    GZ &amp; GN &amp; GD &amp; GM &amp; AO --&gt; SSGI
+    SSGI -.수정.-&gt; LIT
+
+    GZ --&gt; FWD
+    FWD -.수정.-&gt; LIT
+
+    GZ --&gt; SPRITE
+    SPRITE -.수정.-&gt; LIT
+
+    GZ --&gt; SSS
+    SSS -.수정.-&gt; LIT
+
+    GZ &amp; GM &amp; GN &amp; GB --&gt; SSR
+    SSR -.수정.-&gt; LIT
+
+    GZ &amp; SM --&gt; FOG
+    FOG -.수정.-&gt; LIT
+
+    LIT --&gt; POST
+    POST ==&gt; LDR
+
+    UI -.수정.-&gt; LDR
+    CONTRIB -.수정.-&gt; LDR
+    LDR --&gt; PRESENT</pre>
+<div class="table-scroll"><table>
+<thead><tr><th>표기</th><th>뜻</th></tr></thead>
+<tbody><tr><td><code>==&gt;</code> 굵은 화살표</td><td><code>writes</code> — 슬롯을 처음 발행</td></tr>
+<tr><td><code>-.수정.-&gt;</code> 점선</td><td><code>modifies</code> — 읽고 같은 이름으로 재발행</td></tr>
+<tr><td>실선</td><td><code>reads</code> — 앞 노드가 발행한 것을 읽음</td></tr></tbody></table></div>
+<p><strong>슬롯 요약</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>슬롯</th><th>발행자</th><th>수정자</th></tr></thead>
+<tbody><tr><td><code>Shadow.Map</code></td><td>Shadow</td><td>—</td></tr>
+<tr><td><code>GBuffer.*</code> 6종</td><td>GBuffer</td><td>Decal — Diffuse · Normal · MetalRough</td></tr>
+<tr><td><code>Scene.AmbientOcclusion</code></td><td>SSAO</td><td>—</td></tr>
+<tr><td><code>Scene.LitColor</code></td><td>Deferred</td><td>SkyBox → SSGI → Forward+ → Sprite → SSS → SSR → Fog</td></tr>
+<tr><td><code>Display.LDR</code></td><td>PostChain</td><td>UI → Host 기여 노드</td></tr></tbody></table></div>
+<p><strong><code>perView</code> 패스</strong>: SSGI · VolumetricFog. 프레임을 넘겨 상태를 잇는다 — 히스토리 2장과
+재투영 행렬. 공유하면 각 카메라가 상대의 히스토리를 읽어 잔상이 남는다.</p>
+<p><strong>Host 기여 경계</strong>: Editor 는 <code>IRenderFeatureContributor</code> 로 UI 뒤 · <code>live_present</code> 앞에
+자기 노드를 끼워 넣는다. Player 는 기여자를 설치하지 않으므로 그 노드 자체가 서지 않는다.</p>
+<h3 id="3-4-렌더-그래프-내부--compile-과-recordparallel">3-4. 렌더 그래프 내부 — Compile 과 RecordParallel</h3>
+<pre class="mermaid">flowchart TB
+    subgraph DECLARE[&quot;선언 수집&quot;]
+        IMP[&quot;ImportTexture / ImportBuffer&lt;br/&gt;외부 리소스 + 현재 상태&quot;]
+        CRT[&quot;CreateTexture&lt;br/&gt;transient 요청&quot;]
+        ADD[&quot;AddPass · AddSplitPass&lt;br/&gt;usages + Execute 람다&quot;]
+    end
+
+    subgraph COMPILE[&quot;Compile&quot;]
+        ORDER[&quot;BuildOrder&lt;br/&gt;실행 순서 = 선언 순서&quot;]
+        CULL[&quot;CullPasses&lt;br/&gt;소비자 없는 출력 제거&quot;]
+        TRANS[&quot;CreateTransients&lt;br/&gt;수명 겹침 계산 → 풀에서 대여&quot;]
+        BARR[&quot;PlanBarriers&lt;br/&gt;사용 상태 전이에서 배리어 유도&quot;]
+        ORDER --&gt; CULL --&gt; TRANS --&gt; BARR
+    end
+
+    subgraph RECORD[&quot;RecordParallel · 워커 4&quot;]
+        SPLIT[&quot;패스를 워커에 분배&lt;br/&gt;비용 임계값 기반&quot;]
+        RB[&quot;RecordPassBarriers&lt;br/&gt;그래프가 이미 넣은 배리어&quot;]
+        EXEC[&quot;패스 Execute 람다 호출&quot;]
+        BATCH[&quot;RHIRecordedBatch&quot;]
+        SPLIT --&gt; RB --&gt; EXEC --&gt; BATCH
+    end
+
+    DECLARE --&gt; COMPILE --&gt; RECORD
+    BATCH --&gt; SUBMIT[&quot;EnqueueRecordedBatch&lt;br/&gt;제출 스레드&quot;]
+
+    NOTE[&quot;lifetimeToken = graph shared_ptr&lt;br/&gt;GPU 완주까지 transient 를 붙든다&quot;]
+    BATCH -.-&gt; NOTE</pre>
+<blockquote>
+<p><strong>컬링 주의</strong>: 최종 결과를 소비하는 선언이 없으면 그래프가 체인을 통째로 걷어낸다.
+<code>live_present</code> 의 복사가 그 소비 역할을 한다.</p>
+</blockquote>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-렌더러-구조--뷰--슬롯--표시">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-렌더러-구조--뷰--슬롯--표시">4. 렌더러 구조 — 뷰 · 슬롯 · 표시</h2></div>
+<div class="prose"><p><code>EnhancedSceneRenderer</code> 는 정적 인터페이스이고, 실체는 <code>LiveState</code> 가 든다.</p>
+<pre class="mermaid">flowchart TB
+    subgraph SR[&quot;EnhancedSceneRenderer · 정적 API&quot;]
+        API1[&quot;BuildRequiredAssetPacket&quot;]
+        API2[&quot;BuildLiveFramePacket&quot;]
+        API3[&quot;PublishLiveFrame&quot;]
+        API4[&quot;TickLive&quot;]
+        API5[&quot;GetLiveDisplaySnapshot / ImTextureId&quot;]
+    end
+
+    subgraph LS[&quot;LiveState&quot;]
+        RQ[&quot;renderQueue + 렌더 스레드&quot;]
+        RS[&quot;RenderScene&quot;]
+        POOL[&quot;drawPool · decals · spritePool · uiProxy&quot;]
+        TUNE[&quot;pendingTuning · debugSnapshot&quot;]
+        DISP[&quot;displaySnapshot · presentationKeys&quot;]
+    end
+
+    subgraph LP[&quot;LivePipeline · 백엔드별&quot;]
+        FCTX[&quot;EnhancedFrameContext&lt;br/&gt;services · psoManager · caches&quot;]
+        DESCN[&quot;LivePipelineDesc&quot;]
+        SHARED[&quot;공유 패스&lt;br/&gt;Shadow · GBuffer · Decal · SSAO · Deferred&lt;br/&gt;SkyBox · Forward+ · Sprite · SSS · SSR · PostChain · UI&quot;]
+        TPOOL[&quot;RGTransientPool&quot;]
+        V0[&quot;CameraView 0 — Editor&quot;]
+        V1[&quot;CameraView 1 — Game&quot;]
+    end
+
+    subgraph CV[&quot;CameraView 하나&quot;]
+        PVPASS[&quot;perView 패스&lt;br/&gt;SSGI · VolumetricFog&quot;]
+        S0[&quot;DisplaySlot 0&quot;]
+        S1[&quot;DisplaySlot 1&quot;]
+        S2[&quot;DisplaySlot 2&quot;]
+        PQ[&quot;pendingQueue&quot;]
+    end
+
+    SR --&gt; LS
+    LS --&gt; LP
+    LP --&gt; V0 &amp; V1
+    V0 --&gt; CV</pre>
+<h3 id="표시-슬롯-회전--뷰당-3개--표시-1--인플라이트-2">표시 슬롯 회전 — 뷰당 3개 · 표시 1 + 인플라이트 2</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Free
+    Free --&gt; Recording: RenderOnce 가 슬롯 선택
+    Recording --&gt; Pending: EndFrame · fenceValue 기록
+    Pending --&gt; Pending: 펜스 미완료 — 논블로킹 확인
+    Pending --&gt; Displayed: 펜스 완료 + key 일치&lt;br/&gt;PromoteCompleted
+    Displayed --&gt; Free: 다음 승격이 이 슬롯을 대체&lt;br/&gt;graph.reset → transient 반환
+    Pending --&gt; Free: view key 불일치 — 카메라 교체로 폐기</pre>
+<ul>
+<li><code>pendingQueue</code> 가 2 이상이면 그 프레임의 렌더를 건너뛴다 — <code>framesInFlight</code> 증가.</li>
+<li><code>graph.reset()</code> 시점이 곧 <strong>transient 텍스처가 풀로 돌아가는</strong> 시점이다. GPU 완주 전에
+놓으면 사용 중인 리소스를 재사용하게 된다.</li>
+<li>뷰 루프는 <code>viewRotation++ % cameraCount</code> 로 시작 인덱스를 돌린다 — 인플라이트 한도에
+걸릴 때 한 뷰만 계속 굶는 것을 막는다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-머테리얼-구조">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-머테리얼-구조">5. 머테리얼 구조</h2></div>
+<div class="prose"><h3 id="5-1-자산에서-gpu-까지의-전-경로">5-1. 자산에서 GPU 까지의 전 경로</h3>
+<pre class="mermaid">flowchart TB
+    subgraph AUTHOR[&quot;저작 정본 · 디스크&quot;]
+        MASSET[&quot;.asset — experiment::Material&lt;br/&gt;properties · keywords · blendMode&lt;br/&gt;shaderAssetId · TextureReference GUID&quot;]
+        SMETA[&quot;.shadermeta — ShaderMeta&lt;br/&gt;properties · keywords 축 · passes&quot;]
+        HLSL[&quot;HLSL / Slang 소스&quot;]
+        SMETA --&gt; HLSL
+    end
+
+    subgraph COOK[&quot;쿠킹&quot;]
+        MCOOK[&quot;MaterialCookProducer&quot;]
+        TCOOK[&quot;텍스처 cooked artifact&quot;]
+        CATALOG[&quot;CookedAssetCatalog&lt;br/&gt;AssetId → artifact 경로&quot;]
+        MASSET --&gt; MCOOK --&gt; CATALOG
+        TCOOK --&gt; CATALOG
+    end
+
+    subgraph RUNTIME[&quot;런타임 · 게임 스레드&quot;]
+        LEGACY[&quot;Material — legacy 저작 객체&lt;br/&gt;m_propertyValues · m_shaderMetaGuid&lt;br/&gt;m_textureOwners · m_renderingMode&quot;]
+        AUTHORED[&quot;experiment::Material — 저작 정본 사본&quot;]
+        MINST[&quot;MaterialInstance&lt;br/&gt;propertyOverrides · keywordOverrides&quot;]
+        MR[&quot;MeshRenderer / FoliageComponent&quot;]
+        MR --&gt; LEGACY
+        MR --&gt; AUTHORED
+        MINST -.BuildEffectiveMaterial.-&gt; AUTHORED
+    end
+
+    subgraph RESOLVE[&quot;해석 · MaterialResolver&quot;]
+        RSHADER[&quot;shaderAssetId → ShaderMetaHandle + generation&quot;]
+        RTEX[&quot;TextureReference → texture generation owner&quot;]
+        RKEY[&quot;keywords → 축 순서 정규화 인덱스&quot;]
+    end
+
+    subgraph SEALED[&quot;밀봉 · 렌더 스레드&quot;]
+        PACK[&quot;MaterialPropertyPacker&lt;br/&gt;논리 값 → propertyBytes b2&quot;]
+        TBIND[&quot;textureBindings&lt;br/&gt;propertyName · GUID · register · owner&quot;]
+        PERM[&quot;RHIShaderPermutationKey&quot;]
+        SNAP[&quot;EnhancedMaterialDrawSnapshot&lt;br/&gt;EnhancedForwardMaterialDrawSnapshot&quot;]
+        PACK --&gt; SNAP
+        TBIND --&gt; SNAP
+        PERM --&gt; SNAP
+    end
+
+    subgraph GPU[&quot;GPU&quot;]
+        BATCH[&quot;MaterialKey 로 배치&lt;br/&gt;textures 4 + snapshot&quot;]
+        PSO[&quot;ShaderVariantKey → PSO&quot;]
+        CB[&quot;b2 상수 버퍼 + SRV + InstanceData&quot;]
+    end
+
+    AUTHORED --&gt; RESOLVE
+    LEGACY -.전환기 폴백.-&gt; RESOLVE
+    CATALOG --&gt; RTEX
+    SMETA --&gt; RSHADER
+    RESOLVE --&gt; SEALED
+    SNAP --&gt; BATCH --&gt; PSO --&gt; CB</pre>
+<h3 id="5-2-텍스처-해석-우선순위--fail-closed">5-2. 텍스처 해석 우선순위 — fail-closed</h3>
+<pre class="mermaid">flowchart TB
+    START[&quot;TextureReference · AssetId&quot;] --&gt; NIL{&quot;nil assetId?&quot;}
+    NIL --&gt;|예| NONE[&quot;텍스처 없음 — 정상&quot;]
+    NIL --&gt;|아니오| GEN{&quot;model generation&lt;br/&gt;closure 안에 있는가?&quot;}
+    GEN --&gt;|예| G[&quot;embedded texture owner&lt;br/&gt;fromGenerationClosure&quot;]
+    GEN --&gt;|아니오| COOKED{&quot;cooked artifact 가&lt;br/&gt;해석되는가?&quot;}
+    COOKED --&gt;|예| C[&quot;cooked owner&lt;br/&gt;fromCookedArtifact&quot;]
+    COOKED --&gt;|아니오| SRC{&quot;source 경로가&lt;br/&gt;해석되는가?&quot;}
+    SRC --&gt;|예| S[&quot;source owner&lt;br/&gt;sourceFallbackTextures 증가&quot;]
+    SRC --&gt;|아니오| FAIL[&quot;해석 실패 — false 반환&lt;br/&gt;호출부가 legacy 경로로 내려감&quot;]</pre>
+<blockquote>
+<p>폴백은 <strong>관측 가능해야</strong> 한다. <code>ResolvedMaterialNotes</code> 가 cooked / source / generation
+건수를 센다 — cooked 가 늘 비고 조용히 source 로 도는 상태는 &quot;느리지만 동작하는&quot;
+모습이라 아무도 알아채지 못한다.</p>
+</blockquote>
+<h3 id="5-3-프레임-밀봉-결정--어느-경로로-seal-하는가">5-3. 프레임 밀봉 결정 — 어느 경로로 seal 하는가</h3>
+<pre class="mermaid">flowchart TB
+    START[&quot;PooledDraw · materialSource + authoredMaterialSource&quot;] --&gt; CACHE{&quot;이번 프레임&lt;br/&gt;캐시에 있는가?&quot;}
+    CACHE --&gt;|예| REUSE[&quot;기존 snapshot 재사용&quot;]
+    CACHE --&gt;|아니오| AUTH{&quot;authoredMaterialSource&lt;br/&gt;가 있는가?&quot;}
+
+    AUTH --&gt;|예| FROMAUTH[&quot;BuildSealSourceFromAuthored&lt;br/&gt;legacy Material 을 읽지 않는 유일한 입구&quot;]
+    AUTH --&gt;|아니오| FROMLEG[&quot;BuildSealSourceFromLegacy&lt;br/&gt;MaterialInfo 3필드 폴백 승계&quot;]
+    FROMLEG --&gt; APPLY[&quot;ApplyAuthoredMaterial&lt;br/&gt;저작본이 있으면 properties·keywords 교체&quot;]
+
+    FROMAUTH --&gt; CORE
+    APPLY --&gt; CORE
+
+    CORE[&quot;SealCore&quot;] --&gt; NORM[&quot;NormalizeMaterialKeywordSelections&lt;br/&gt;이름 기반 keywords 가 정본&quot;]
+    NORM --&gt; PACKB[&quot;propertyBytes 생성&lt;br/&gt;MaterialPropertyPacker&quot;]
+    PACKB --&gt; BINDS[&quot;textureBindings 생성&lt;br/&gt;register 검증 · 중복 거부&quot;]
+    BINDS --&gt; VARIANT[&quot;EnsureShaderMetaVariant&lt;br/&gt;permutation 별 PSO 확보&quot;]
+    VARIANT --&gt; OUT[&quot;immutable snapshot → EnhancedDrawItem&quot;]</pre>
+<h3 id="5-4-왜-스냅샷인가--렌더가-게임-객체를-들지-않는-이유">5-4. 왜 스냅샷인가 — 렌더가 게임 객체를 들지 않는 이유</h3>
+<p><code>EnhancedDrawItem</code> 은 <code>Material*</code> · <code>Mesh*</code> 를 <strong>신원으로 쓰지 않는다</strong>.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>예전</th><th>지금</th><th>이유</th></tr></thead>
+<tbody><tr><td><code>Material*</code> 를 draw packet 에 실음</td><td><code>EnhancedMaterialDrawSnapshot</code> 값 복사</td><td>수명·스레드 규약이 얽힘</td></tr>
+<tr><td><code>Mesh*</code> 포인터로 정렬</td><td><code>geometryKey</code> — 자산 신원 ⊕ 메시 인덱스</td><td>주소는 할당 순서라 실행마다 순서가 달라짐</td></tr>
+<tr><td><code>Texture*</code> 배열 순서 = shader register</td><td><code>EnhancedMaterialTextureBinding</code> 에 register 명시</td><td>배열 순서가 register 를 암묵적으로 뜻하면 조용히 밀림</td></tr>
+<tr><td>Shadow 패스가 <code>draw.mesh</code> 역참조</td><td><code>boundRadius</code> 를 값으로 실음</td><td>패스가 게임 자료구조를 읽는 마지막 자리</td></tr></tbody></table></div>
+<p><strong>바이트 레이아웃 계약</strong>은 <code>static_assert</code> 로 고정한다 — <code>EnhancedLight</code> 64 B,
+<code>EnhancedForwardMaterialFlowSnapshot</code> 32 B, <code>InstanceData</code> 96 B. HLSL 쪽과 어긋나면
+값이 조용히 밀려 &quot;재질이 이상하다&quot;로만 드러난다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-드로우-수집--프록시에서-배치까지">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-드로우-수집--프록시에서-배치까지">6. 드로우 수집 — 프록시에서 배치까지</h2></div>
+<div class="prose"><pre class="mermaid">flowchart TB
+    subgraph COLLECT[&quot;BuildDrawPool · 프레임당 1회 · 카메라 무관&quot;]
+        PROXY[&quot;PrimitiveRenderProxy 스냅샷&quot;]
+        PM[&quot;poolMesh — MeshRenderProxy&quot;]
+        PF[&quot;poolFoliage — FoliageRenderProxy&quot;]
+        PS[&quot;poolSprite — SpriteRenderProxy&quot;]
+        PD[&quot;poolDecal — DecalRenderProxy&quot;]
+        MV[&quot;BuildRHIModelMeshView&lt;br/&gt;generation descriptor ↔ immutable 저장소 대조&quot;]
+        POOLED[&quot;PooledDraw&lt;br/&gt;item + materialSource + worldBounds + isTransparent&quot;]
+        PROXY --&gt; PM &amp; PF &amp; PS &amp; PD
+        PM --&gt; MV --&gt; POOLED
+        PF --&gt; MV
+    end
+
+    subgraph PERVIEW[&quot;CaptureFromView · 뷰마다&quot;]
+        FRUS{&quot;절두체 생성 가능?&lt;br/&gt;원근 투영만&quot;}
+        CULLED[&quot;절두체 컬링&lt;br/&gt;스키닝은 자르지 않음&quot;]
+        SPLIT{&quot;isTransparent?&quot;}
+        OPAQUE[&quot;draws — 불투명&quot;]
+        TRANSP[&quot;forwardDraws — 투명&quot;]
+        SORT[&quot;back-to-front stable_sort&lt;br/&gt;깊이 동률은 mesh 포인터로 결정&quot;]
+        LIGHTS[&quot;SelectLightsForView&lt;br/&gt;절두체 밖 지역광 제외 · 기여도 순 정렬&quot;]
+        FRUS --&gt;|예| CULLED --&gt; SPLIT
+        FRUS --&gt;|아니오| SPLIT
+        SPLIT --&gt;|아니오| OPAQUE
+        SPLIT --&gt;|예| TRANSP --&gt; SORT
+    end
+
+    subgraph DRAW[&quot;패스&quot;]
+        GB[&quot;GBuffer&lt;br/&gt;MaterialKey 로 배치 · InstanceData 업로드&quot;]
+        FW[&quot;Forward+&lt;br/&gt;받은 순서대로 그림&quot;]
+    end
+
+    POOLED --&gt; FRUS
+    OPAQUE --&gt; GB
+    SORT --&gt; FW
+    LIGHTS --&gt; GB</pre>
+<p><strong>투명 정렬의 동률 처리</strong>: 같은 원점을 쓰는 투명면 — 십자 빌보드, 같은 피벗의 유리
+여러 장 — 은 깊이가 정확히 같다. 비교자가 <code>false</code> 만 돌려주면 순서가 미정이라 프록시
+스냅샷 순서가 바뀔 때마다 앞뒤가 뒤집혀 깜빡인다. 정렬을 넣은 이유가 &quot;순서를
+고정한다&quot;인데 그 자리에서 새는 셈이라, 동률은 포인터로 가른다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-한눈에-보는-데이터-흐름">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-한눈에-보는-데이터-흐름">7. 한눈에 보는 데이터 흐름</h2></div>
+<div class="prose"><pre class="mermaid">flowchart LR
+    C[&quot;Component&lt;br/&gt;MeshRenderer · Light · Image&quot;] --&gt; P[&quot;RenderProxy&quot;]
+    P --&gt; PD[&quot;PooledDraw&quot;]
+    PD --&gt; DI[&quot;EnhancedDrawItem&lt;br/&gt;+ MaterialDrawSnapshot&quot;]
+    DI --&gt; PASS[&quot;EnhancedRenderPass&quot;]
+    PASS --&gt; RG[&quot;RGHandle · 블랙보드 슬롯&quot;]
+    RG --&gt; ENC[&quot;RHIEncoder 커맨드&quot;]
+    ENC --&gt; TEX[&quot;공유 텍스처&quot;]
+    TEX --&gt; IMG[&quot;ImGui 표시&quot;]</pre>
+<p>각 화살표는 <strong>값 복사 경계</strong>다. 오른쪽 층은 왼쪽 층의 객체를 포인터로 붙들지 않는다.
+<code>RenderProxy → PooledDraw</code> 만 예외로 <code>shared_ptr</code> 을 들고, 그것도 <code>BuildDrawPool</code> 의
+안정된 프레임 경계 동안 generation owner 의 수명을 보장하기 위해서다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderPipelineFlow.md"><code>docs/analysis/RenderPipelineFlow.md</code></a> · 마지막 커밋 2026-09-04 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict', fontFamily: v('--font-body'),
+    themeVariables: { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'),
+      lineColor: v('--text-dim'), secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') } });
+  await mermaid.run({ querySelector: 'pre.mermaid' });
+</script>
+</body>
+</html>

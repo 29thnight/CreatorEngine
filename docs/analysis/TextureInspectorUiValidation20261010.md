@@ -1,25 +1,47 @@
-# 수동 텍스처 Inspector 흐름의 호환성 기록
+# PHASE 12 — Inspector 실제 입력 검증
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+기준일: 2026-10-10 KST. 동기화 후 HEAD b2f918c19 및 로컬 후속 수정 상태.
+정본: [TexturePipelinePlan](../plans/TexturePipelinePlan.md).
 
-## 이전 UI와 현재 UI의 관계
+## 실행 범위
 
-이 경로는 2026-10-10 초기의 Save and Reimport 및 Reload Saved Scene UI 검증 문서를 찾는 독자를 위한 호환 요약이다. 그 버튼 순서를 현재 사용 절차로 안내하지 않는다. 현재 `DrawTextureImportEditor`는 유효한 편집을 자동 저장 대기열에 넣고 `Retry Import`, 충돌 시 `Reload Disk Settings`를 제공한다. “Scene references update without reloading the scene” 안내가 현재 본문에 있다.
+현재 Debug Editor를 별도 프로젝트 `Build/TUI-Debug-1479b598/Project`로 실행했다.
+기존 SpriteRenderer/ImageComponent 저장 fixture와 원본 4×4 PNG를 복사하고
+저장 참조를 격리 프로젝트 경로로 교체했다. 시작 시나리오는 저장 씬 로드,
+미저장 `UnsavedTextureGate` 생성 및 Inspector 표시만 준비했다.
+수용 대상 버튼·경고·취소·파일 선택은 Windows Computer Use의 실제 마우스 입력으로
+조작했고 매 행동 뒤 화면을 다시 확인했다. 내부 명령으로 클릭을 대체하지 않았다.
 
-일부 status fallback 문자열에 Save and Reimport라는 옛 표현이 남아 있어도 실제 버튼의 존재를 뜻하지 않는다. UI를 기술할 때는 그리는 함수와 입력 handler를 함께 읽어야 한다.
+runtime DLL SHA-256: `2BBDE3F4CA8459E030B67251408F6FB3A4EF0DB909A310D0A7C20AF3A040C73F`.
 
-## 보존할 검증 의미
+## 관찰 결과
 
-이전 수동 흐름은 저장 전 draft와 디스크 값의 차이, 사용자 확인 전 미저장 씬을 버리지 않는 동작, 파일 선택 취소 및 실제 마우스 입력을 확인하려는 목적이었다. 이 요구 중 “현재 값을 디스크와 구분한다”는 자동 대기열/오류 표시로 이어졌고 “미저장 씬 보호”는 reload를 하지 않는 자동 owner 교체로 바뀌었다. scene.open_async 자체의 실패 보존은 [별도 씬 검사](TextureSceneReloadValidation20261010.md)로 유지한다.
+1. 실제 Content Browser 텍스처 클릭으로 Import Settings 표시
+2. Maximum Dimension의 + 버튼을 두 번 눌러 0→2 변경; Save 전 .meta는 0 유지
+3. Save and Reimport 클릭 뒤 .meta maxDimension=2, GUID 보존 및 Cooked generation ready 표시
+4. Reload Saved Scene 클릭으로 새 cooked 참조 연결 안내와 미저장 편집 폐기 경고 표시
+5. 경고창 Cancel 클릭 뒤 현재 씬의 TextureGate/UnsavedTextureGate 둘 다 유지
+6. Choose Scene and Reload로 native 파일 선택창 열기; 파일 선택 취소 뒤 두 엔티티 유지
+7. 다시 선택창에서 SavedFixture.creator 선택·Open 클릭 후 저장 씬 표시,
+   TextureGate 유지 및 UnsavedTextureGate 제거, Inspector 설정 2 유지
 
-2026-10-10의 `Build/TUI-Debug-1479b598/Project`는 이전 UI를 실행한 격리 프로젝트다. 그 화면·DLL hash·클릭 기록은 당시 UX의 증거이며 지금 자동 UI의 실행 수용으로 재사용할 수 없다. 원본 기록은 Git 이력에서 확인할 수 있고 외부 Build 산출물이 이 checkout에 있다고 가정하지 않는다.
+실제 입력과 화면 관찰 기준 위 흐름은 통과했다. PNG 원본 hash는 Tiny4.png와 동일하고
+GUID도 유지됐다. 마지막 재로드 화면은 `Build/TUI-Debug-1479b598/reloaded-inspector.png`,
+receipt는 같은 폴더 `result.json`, 시작 시나리오와 stdout/stderr도 보존했다.
+GUI 선택창의 기본 폴더가 격리 프로젝트 Assets/Scenes임을 확인했다.
+검증용 Editor 종료와 Finalize 완료를 확인했다. 이번 검사에서 엔진 코드는 변경하지 않았다.
+대시보드 전체 JavaScript 파싱·렌더·유한 진행률 및 문서 whitespace 검사는 통과했다.
+기존 PHASE 4.85 구조 문제는 문자열 140건/항목 모양 14건 그대로 남아 전체 구조
+검사는 실패한다(`Build/phase12-inspector-ui-dashboard.log`).
 
-## 현재 검사를 할 때
+## 판정 한계
 
-유효한 설정 변경 후 400ms 안정화, 패널 닫힘 후 저장, 잘못된 BC5/normal 조합의 거부, cook 실패 시 이전 owner 유지, 디스크 충돌 복구를 확인한다. 현재 Debug UI의 범위는 [자동 Inspector](TextureAutomaticInspectorUiValidation20261010.md), Release 입력 전달은 [Release 기록](TextureAutomaticInspectorReleaseValidation20261010.md), 충돌 처리는 [충돌 기록](TextureAutomaticInspectorConflictValidation20261010.md)에 구분했다. 문서 개정 자체는 클릭이나 GPU 결과의 재검증이 아니다.
+Debug 실제 UI 한 번의 작은 fixture 검증이다. Release의 실제 UI 반복, 여러 창/배율,
+invalid setting·cook 실패 시 UI 상태/disabled gating, 대량 자산 및 입력 경합은 미검증이다.
+문자 붙여넣기 자동화는 입력값을 바꾸지 못해 + 버튼으로 값을 변경했다.
+숫자 키/붙여넣기의 제품 결함으로 확정하지 않으며 키보드 입력 검증은 남긴다.
+sceneId/owner identity는 이번 UI 실행에서 독립 조회하지 않았다. 앞선 API/프레임
+종단 검증과 구분한다. GPU 화면을 관찰했으나 기대 픽셀 oracle이나 압축 품질 검사도 아니다.
 
-## 구현 근거
-
-- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp](../../Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp)
-- [Editor/EngineEntry/EditorAssetDatabase.cpp](../../Editor/EngineEntry/EditorAssetDatabase.cpp)
-- [Editor/EngineEntry/Commands/SceneObjectCommands.cpp](../../Editor/EngineEntry/Commands/SceneObjectCommands.cpp)
+T0/T1a/T2 진행 중 및 earnedDays 0, T1b 대기, T3 중단은 유지한다.
+다음 수용은 UI의 남은 입력/실패 경계와 GPU·모델·Shipping 소비 검증이다.

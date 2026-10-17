@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/Phase22AudioPreflight.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 22 오디오 백엔드 사전 정찰 (2026-09-16)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-결론">0. 결론</a></li><li><a href="#1-fmod-표면-재측정">1. FMOD 표면 재측정</a></li><li><a href="#2-현재-오디오-경로는-소리를-내지-못한다">2. 현재 오디오 경로는 소리를 내지 못한다</a></li><li><a href="#3-자산-파이프라인-전제-au2">3. 자산 파이프라인 전제 (AU2)</a></li><li><a href="#4-빌드--배포--게이트-au8au9">4. 빌드 · 배포 · 게이트 (AU8/AU9)</a></li><li><a href="#5-의존-페이즈-전제">5. 의존 페이즈 전제</a></li><li><a href="#6-외부-기준-재확인-miniaudio">6. 외부 기준 재확인 (miniaudio)</a></li><li><a href="#7-계획서-정정-목록">7. 계획서 정정 목록</a></li><li><a href="#8-착수-판정과-순서">8. 착수 판정과 순서</a></li><li><a href="#9-이-정찰이-재지-않은-것">9. 이 정찰이 재지 않은 것</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="Phase22AudioPreflight.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 22 오디오 백엔드 사전 정찰 (2026-09-16)</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">4<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="진행·부분 1, 대기·미검증 3"><i class="info" style="flex:1"></i><i class="dim" style="flex:3"></i></div>
+<span class="legend"><span class="chip info">진행·부분 1</span><span class="chip dim">대기·미검증 3</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 10개의 분량 막대">
+<a class="map-row" href="#0-결론"><span class="ve-label">§0</span><span class="map-name">결론</span><span class="map-bar"><i style="width:52.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-fmod-표면-재측정"><span class="ve-label">§1</span><span class="map-name">FMOD 표면 재측정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-현재-오디오-경로는-소리를-내지-못한다"><span class="ve-label">§2</span><span class="map-name">현재 오디오 경로는 소리를 내지 못한다</span><span class="map-bar"><i style="width:91%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">1</span></span></a>
+<a class="map-row" href="#3-자산-파이프라인-전제-au2"><span class="ve-label">§3</span><span class="map-name">자산 파이프라인 전제 (AU2)</span><span class="map-bar"><i style="width:64.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-빌드--배포--게이트-au8au9"><span class="ve-label">§4</span><span class="map-name">빌드 · 배포 · 게이트 (AU8/AU9)</span><span class="map-bar"><i style="width:86%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-의존-페이즈-전제"><span class="ve-label">§5</span><span class="map-name">의존 페이즈 전제</span><span class="map-bar"><i style="width:18.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-외부-기준-재확인-miniaudio"><span class="ve-label">§6</span><span class="map-name">외부 기준 재확인 (miniaudio)</span><span class="map-bar"><i style="width:8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-계획서-정정-목록"><span class="ve-label">§7</span><span class="map-name">계획서 정정 목록</span><span class="map-bar"><i style="width:32.3%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">2</span> <span class="chip info" title="진행·부분">1</span></span></a>
+<a class="map-row" href="#8-착수-판정과-순서"><span class="ve-label">§8</span><span class="map-name">착수 판정과 순서</span><span class="map-bar"><i style="width:31.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-이-정찰이-재지-않은-것"><span class="ve-label">§9</span><span class="map-name">이 정찰이 재지 않은 것</span><span class="map-bar"><i style="width:14.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 10개 가운데 「1. FMOD 표면 재측정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><ul>
+<li>기준 트리: <code>81b90288</code> + 미커밋 변경(오디오 계층에는 변경 없음)</li>
+<li>대조 정본: <a href="../plans/AudioBackendModernizationPlan.html">AudioBackendModernizationPlan.md</a>(기준선 2026-08-27),
+<a href="../RefactoringPlanDashboard.html">RefactoringPlanDashboard.html</a> PHASE 22 AU0~AU9,
+<a href="../plans/BuildPipelinePlan.html">BuildPipelinePlan.md</a> B5,
+<a href="../plans/EngineDistributionAndLauncherPlan.html">EngineDistributionAndLauncherPlan.md</a> DL5</li>
+<li>묻는 것 셋. ① 계획서 §1 기준선(3주 전)이 지금도 서 있는가. ② AU0~AU9 가 지목한 대상이 실제로 그 자리에
+있는가. ③ 지금 착수할 수 있는가, 착수 전에 정해야 할 것은 무엇인가.</li>
+<li>방법: 소스·프로젝트·스크립트·산출물 JSON·PE import 를 직접 읽었다. 문서 간 대조는 근거로 세지 않았다.
+실행 검증(재생·장치·성능)은 하지 않았다 — §9 에 재지 않은 것을 적었다.</li>
+</ul>
+<hr>
+</section>
+<section class="doc-sec" id="sec-0-결론">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-결론">0. 결론</h2></div>
+<div class="prose"><ol>
+<li><strong>현재 FMOD 경로는 소리를 한 번도 적재하지 못한다.</strong> 로더가 스캔하는 <code>Sounds\</code> 디렉터리가 저장소에
+존재하지 않아 <code>LoadSounds()</code> 가 영원히 실행되지 않고(§2.1), <code>sounds</code> 맵은 영구 공집합이다. 저작
+데이터의 오디오 참조도 0건, 저장소의 오디오 파일도 0개다. 계획서가 AU0/AU4 에 둔 <strong>&quot;유효 FMOD 항목
+A/B&quot; 의 유효 집합은 사실상 공집합</strong>이다 — AU0 은 &quot;기존 동작 분류&quot; 가 아니라 <strong>합성 fixture 로 새
+골든을 세우는 일</strong>로 다시 써야 한다(§2.5).</li>
+<li><strong>FMOD 표면은 계획서 목록보다 넓고, 동시에 계획서가 세지 않은 오탐 둘을 포함한다.</strong> 살아 있는 참조
+파일은 15개(계획서 7개), 그중 <code>AnimationJob.cpp</code>·<code>ImGuiDrawHelperTerrainComponent.cpp</code> 의 매치는
+C 표준 <code>fmod()</code> 와 지역변수 <code>fModes[]</code> 로 <strong>오디오와 무관</strong>하다(§1.2). 진짜 vendor 진입점은
+<code>SoundDefinition.h:5-6</code> <strong>한 곳</strong>이고 ABI 누출은 <code>ChannelPair</code> 와 <code>Get2D/3DChannel</code> <strong>둘</strong>뿐이다(§1.3).</li>
+<li><strong>AU2 는 &quot;PHASE 17 정본을 소비&quot; 가 아니라 파이프라인 신설이다.</strong> 128-bit identity 전제는 참이지만
+(<code>Uuid16</code>, <code>static_assert(sizeof==16)</code>), 오디오에는 importer·<code>RuntimeAssetType</code>·<code>CookedAssetKind</code>·
+<code>.meta</code> 오디오 필드·pak 범위 read·C# identity 타입이 <strong>전부 없다</strong>(§3.2). 확장자 allowlist 는 세 곳에
+중복 하드코딩돼 있어 한 곳만 고치면 조용히 어긋난다(§3.3).</li>
+<li><strong>AU8 이 지목한 대상이 이사했다.</strong> <code>Tools/build.ps1</code> 에 FMOD 는 0건이며(22줄짜리 호환 진입점으로
+축소), 실제 배치는 <code>Tools/runtime/deploy-runtime.ps1</code> 의 <strong>PE import 폐포</strong>가 한다(§4.1~4.2).
+FMOD 는 어느 목록에도 이름으로 등록돼 있지 않다 — 소스에서 심볼이 사라지면 폐포에서 자동으로
+떨어진다. 반대로 <strong>지금 그것을 재는 게이트가 0개</strong>다(§4.4).</li>
+<li><strong>신규 발견 — 라이선스 공백.</strong> 배포본에 <code>fmodL.dll</code>(FMOD 로깅 빌드)이 실리는데
+<code>Licenses/ThirdParty/</code> 에 Fmod 항목이 없다. <code>x64-Debug-Shipping</code> 구성의 Player 매니페스트도
+<code>fmodL.dll</code> 을 싣는다(§4.3). 독점 SDK라 PHASE 23 DL5/DL9 감사 전에 이미 처분이 필요하다.</li>
+<li><strong>의존 페이즈 전제 셋 중 둘이 어긋난다.</strong> <code>PHASE 17 D2 → AU2</code> 의 D2 는 <code>stopped</code>(PHASE 3.75 이관)
+이지만 identity 실물이 있으므로 실질 무해하고, <code>PHASE 14 provider → AU5/AU9</code> 의 P5 는 <code>todo</code> 라
+<strong>발행할 provider 가 없다</strong>. <code>PHASE 12.5 B2/B3 → AU0</code> 의 B3 는 <code>todo</code> 이나 AU0 은 실측상 B2/B3 없이
+진행 가능하다(§5).</li>
+<li><strong>착수 가능하다.</strong> AU0(재정의)·AU1·AU3 은 지금 시작할 수 있다. 착수 전 결정 2건과 재추정은 §8.</li>
+</ol>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-fmod-표면-재측정">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-fmod-표면-재측정">1. FMOD 표면 재측정</h2></div>
+<div class="prose"><h3 id="11-살아-있는-참조-15개-계획서-11-은-7개">1.1 살아 있는 참조 15개 (계획서 §1.1 은 7개)</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>파일</th><th>건수</th><th>성격</th><th>계획서 §1.1</th></tr></thead>
+<tbody><tr><td><code>Engine/SceneRuntime/SoundManager.cpp</code></td><td class="num">67</td><td>구현 본체</td><td>있음</td></tr>
+<tr><td><code>Engine/SceneRuntime/SoundManager.h</code></td><td class="num">18</td><td>공개 헤더 · ABI 누출</td><td>있음</td></tr>
+<tr><td><code>Editor/EngineGUIWindow/InspectorWindow.cpp</code></td><td class="num">19</td><td>채널 직접 조작 5블록</td><td>있음</td></tr>
+<tr><td><code>Engine/SceneRuntime/SoundComponent.h</code></td><td class="num">9</td><td>공개 헤더 · ABI 누출</td><td>있음</td></tr>
+<tr><td><code>Engine/SceneRuntime/SoundComponent.cpp</code></td><td class="num">6</td><td>구현</td><td>있음</td></tr>
+<tr><td><code>Engine/SceneRuntime/SoundDefinition.h</code></td><td class="num">2</td><td><strong>vendor 헤더 유일 진입점</strong></td><td><strong>없음</strong></td></tr>
+<tr><td><code>Engine/SceneRuntime/SoundSystem.h</code></td><td class="num">1</td><td>전방 선언</td><td><strong>없음</strong></td></tr>
+<tr><td><code>Editor/CreatorEditor.vcxproj</code></td><td class="num">10</td><td>include·lib·link</td><td>있음</td></tr>
+<tr><td><code>Player/Player.vcxproj</code></td><td class="num">6</td><td>include·lib·link</td><td>있음</td></tr>
+<tr><td><code>Editor/Editor.vcxproj</code></td><td class="num">2</td><td>include only(솔루션 6번째 프로젝트, 오늘도 커밋됨)</td><td><strong>없음</strong></td></tr>
+<tr><td><code>Engine/SceneRuntime/SceneRuntime.vcxproj</code></td><td class="num">2</td><td>include only</td><td><strong>없음</strong></td></tr>
+<tr><td><code>ScriptCore/SoundComponent.cs</code></td><td class="num">2</td><td>주석</td><td><strong>없음</strong></td></tr>
+<tr><td><code>Tools/regression/verify-experiment-contract.ps1</code></td><td class="num">8</td><td><strong>링크 입력</strong>(동작 단정 아님)</td><td><strong>없음</strong></td></tr>
+<tr><td><code>Tools/runtime/deploy-runtime.ps1</code></td><td class="num">1</td><td>DLL 소스 루트</td><td><strong>없음</strong>(build.ps1 로 적힘)</td></tr>
+<tr><td><code>.github/workflows/build.yml</code></td><td class="num">2</td><td>제외 사유 주석</td><td>있음</td></tr></tbody></table></div>
+<p><code>Artifacts/phase21-*/</code> 아래 4건은 UI 작업의 before 스냅샷이라 제외했다. <code>ThirdParty/Fmod</code> 자체와
+<code>vcpkg_installed</code>(<code>fmt/chrono.h</code> 등의 <code>fmod</code> 수학 함수)도 제외했다.</p>
+<p><strong>FMOD Studio 소비자는 0이다.</strong> <code>FMOD::Studio</code>·<code>EventInstance</code>·<code>EventDescription</code>·<code>.bank</code> 0건이고,
+<code>ThirdParty/Fmod/inc</code> 에 <code>fmod_studio.h</code> 가 <strong>아예 없다</strong>. 계획서의 &quot;Core 재생 계층만&quot; 판정은 유효하다.</p>
+<h3 id="12-오탐-둘--오디오-소비자가-아니다">1.2 오탐 둘 — 오디오 소비자가 아니다</h3>
+<ul>
+<li><code>Engine/SceneRuntime/AnimationJob.cpp:490,512,554,571,604,626</code> — C 표준 <code>fmod()</code>(애니메이션 시간
+랩어라운드). 같은 파일에 <code>sound</code>/<code>audio</code> 0건.</li>
+<li><code>Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp:299</code> — foliage 모드 콤보의 지역변수
+<code>fModes[]</code>. <code>FMOD</code>/<code>Sound</code>/<code>Audio</code> 0건.</li>
+</ul>
+<p>대소문자 무시 grep 으로 FMOD 표면을 세면 이 둘이 항상 섞인다. AU8 의 &quot;symbol 0&quot; 판정은 <code>fmod(</code>
+호출과 <code>fModes</code> 를 제외하는 규칙을 명시해야 한다.</p>
+<h3 id="13-vendor-격리-실태--진입점-1--abi-누출-2--전이-오염-6">1.3 vendor 격리 실태 — 진입점 1 · ABI 누출 2 · 전이 오염 6</h3>
+<ul>
+<li><strong>유일한 vendor 헤더 진입점</strong>: <code>Engine/SceneRuntime/SoundDefinition.h:5-6</code>
+(<code>#include &quot;../../ThirdParty/Fmod/inc/fmod.hpp&quot;</code>, <code>fmod_errors.h</code>). 상대경로 하드코딩.</li>
+<li><strong>진짜 ABI 누출 둘</strong><ul>
+<li><code>SoundManager.h:8-12</code> <code>struct ChannelPair { FMOD::Channel* ch2D; FMOD::Channel* ch3D; }</code> —
+<code>playFromSourceBlended</code>(<code>:54</code>)·<code>playOneShotPooled</code>(<code>:59-64</code>) 반환 타입.</li>
+<li><code>SoundComponent.h:66-67</code> <code>Get2DChannel()</code>/<code>Get3DChannel()</code> — Editor 가 이걸로 채널을 직접 조작한다.</li>
+<li>부수: <code>setListenerAttributes(const FMOD_VECTOR&amp;, ...)</code>(<code>SoundManager.h:31-34</code>),
+<code>getListenerPosition(FMOD_VECTOR&amp;)</code>(<code>:71</code>), <code>SoundComponent.h:95-96</code> 의 <code>FMOD_VECTOR</code> 멤버.</li>
+</ul>
+</li>
+<li><strong>전이 오염</strong>: <code>SoundDefinition.h</code> 가 직렬화 enum <code>ChannelType</code>(<code>:8-16</code>)과 한 몸이라, <code>SoundComponent.h</code>
+를 include 하는 TU 가 전부 FMOD 헤더를 끌고 온다 — <code>RegisterReflectManual.h:34,146</code>,
+<code>SceneManager.cpp:23</code>, <code>InspectorWindow.cpp:37</code>, <code>InspectorIconList.h:14</code>, <code>ComponentFactory.cpp:24</code>,
+<code>LifecycleRegistry.cpp:30</code>, <code>ClrHost.cpp:11</code>.</li>
+<li><strong>managed ABI 는 깨끗하다</strong>: <code>ClrHost.cpp:142-153</code> 의 오디오 함수 12개는 전부
+<code>int/float/char*/ScriptObjectHandle</code> 다. vendor 누출은 헤더 레벨에서 멈춘다. 계획서 §3.1 의
+&quot;native pointer 를 managed 에 숫자로 노출하지 않는다&quot; 는 <strong>이미 지켜지고 있다</strong>.</li>
+</ul>
+<h3 id="14-죽은-공개-표면">1.4 죽은 공개 표면</h3>
+<p>호출부 0인 public API: <code>setListenerAttributes</code>(<code>SoundManager.cpp:145</code>), 외부 <code>shutdown()</code>,
+<code>unloadSound</code>(<code>:189</code>), <code>setGroupMaxVoices</code>/<code>setGroupStealPolicy</code>/<code>setGroupPreemptSameClip</code>(<code>:206-208</code>),
+<code>configureVoicePool</code>/<code>clearVoicePool</code>(<code>:341,383</code>), <code>SoundComponent::EditorSet()</code>(<code>SoundComponent.cpp:161</code>),
+<code>SoundDefinition.h:47</code> <code>ComputeEqualPower</code>(같은 수식이 <code>SoundComponent.cpp:83-84</code> 와
+<code>SoundManager.cpp:211</code> 에 각각 재구현돼 있다).</p>
+<p>AU1/AU5 가 &quot;이관&quot; 으로 계산하면 안 되는 부분이다. <strong>정책 API 는 이름만 있고 소비자가 없다.</strong></p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-현재-오디오-경로는-소리를-내지-못한다">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-현재-오디오-경로는-소리를-내지-못한다">2. 현재 오디오 경로는 소리를 내지 못한다</h2></div>
+<div class="prose"><h3 id="21-sounds-부재--loadsounds-영구-미실행">2.1 <code>Sounds\</code> 부재 → <code>LoadSounds()</code> 영구 미실행</h3>
+<p><code>SoundManager::SoundLoaderThread()</code>(<code>SoundManager.cpp:99-121</code>)는 1초마다 <code>PathFinder::Relative(&quot;Sounds\\&quot;)</code>
+를 재귀 순회해 <code>.mp3/.wav/.ogg</code> 개수를 세고, <strong>개수가 바뀐 경우에만</strong> <code>LoadSounds()</code> 를 부른다(<code>:117</code>).</p>
+<ul>
+<li><code>PathFinder::Relative(x)</code> 의 기준은 <code>DataPath = paths.assetsRoot</code>(<code>PathFinder.h:93,191</code>), 즉
+<code>Dynamic_CPP/Assets</code>(<code>App.cpp:136</code>).</li>
+<li><code>Dynamic_CPP/Assets</code> 아래에 <code>Sounds</code> 가 <strong>없다</strong>. 저장소 전 트리에 <code>Sounds</code> 디렉터리 0건이고,
+<code>PathFinder</code> 의 자동 생성 디렉터리 목록(<code>PathFinder.h:128~</code>)에도 없다.</li>
+<li>따라서 <code>recursive_directory_iterator</code> 가 매 초 예외를 던지고 <code>catch (...) {}</code>(<code>SoundManager.cpp:113</code>)가
+삼킨다 → <code>cnt = 0</code> 이 초기값 <code>_currSoundCount = 0</code>(<code>SoundManager.h:104</code>)과 같아 <code>LoadSounds()</code> 는
+<strong>한 번도 실행되지 않는다</strong>.</li>
+<li>그러므로 <code>sounds</code> 맵(<code>SoundManager.h:108</code>)은 영구 공집합이고, 모든 재생은
+<code>sounds.find(clipKey)</code>(<code>SoundManager.cpp:318</code>) 실패 → 에러 로그 후 return(<code>:319</code>) 이다.</li>
+</ul>
+<h3 id="22-종료는-영구-정지-조건을-품고-있다">2.2 종료는 영구 정지 조건을 품고 있다</h3>
+<p><code>_isSoundLoaderThreadRunning</code> 은 초기값 <strong>true</strong>(<code>SoundManager.h:114</code>)이고, 값을 내리는 유일한 경로가
+<code>LoadSounds()</code> 의 끝(<code>SoundManager.cpp:141</code>)이다. §2.1 로 그 경로가 닫혀 있으므로
+<code>~SoundManager()</code>(<code>:10-13</code>)의 <code>while (_isSoundLoaderThreadRunning) sleep(10ms)</code> 는 <strong>조건상 영원히 돈다</strong>.
+계획서 §1.3 의 &quot;초기값 true 에서 내려가지 않는다&quot; 는 맞지만, 재현 조건은 <em>폴더 부재</em> 라는 한 줄에
+달려 있다 — AU0 실패 canary 는 이 조건을 명시해야 재현된다(폴더를 만들고 파일을 넣으면 canary 가
+조용히 초록이 된다).</p>
+<p>동시에 스레드는 <code>detach()</code>(<code>:21</code>) 된 <code>while (true)</code> 라 종료 수단이 없다. 소멸자가 통과하는 경우(로드가
+한 번이라도 돌아 플래그가 내려간 경우)에는 <code>shutdown()</code> 이 <code>system-&gt;release()</code> 를 하고, 1초 뒤 깨어난
+스캔 스레드가 해제된 <code>system</code> 을 만진다. <strong>hang 과 use-after-free 가 상호배타적으로 둘 다 열려 있다.</strong></p>
+<h3 id="23-리스너-0--play-모드-update-0">2.3 리스너 0 · Play 모드 update 0</h3>
+<ul>
+<li><code>setListenerAttributes</code> 는 리스너를 갱신하는 유일한 경로인데 호출부가 0이다(§1.4). 반면
+<code>getListenerPosition</code>(<code>SoundManager.cpp:419</code>)은 <code>SoundComponent.cpp:72</code> 가 소비해 <code>Rolloff::Custom</code>
+감쇠를 계산한다 — <strong>항상 원점 리스너 기준으로 3D 감쇠를 계산한다.</strong></li>
+<li>Editor 의 <code>Sound-&gt;update()</code> 는 <code>InputEvent</code> 람다 안에 있고(<code>EditorMain.cpp:291</code>), 그 람다는
+<code>InputOwner::Game</code> 이면 맨 앞에서 <code>return</code> 한다(<code>EditorMain.cpp:278</code>). 즉 <strong>Play 모드 동안
+<code>SoundManager::update()</code> 가 호출되지 않는다.</strong> Player 의 같은 람다에는 그 가드가 없다
+(<code>PlayerMain.cpp:218-222</code>). <code>InputEvent</code> 자체는 프레임마다 broadcast 된다(<code>SceneManager.cpp:451</code>,
+<code>RuntimeFrame.cpp:70</code>).</li>
+<li>컴포넌트 틱은 살아 있다: <code>Scene.cpp:2688,2747</code> → <code>SoundSystem</code>(<code>SoundSystem.cpp:30-68</code>).</li>
+</ul>
+<h3 id="24-저작-데이터의-오디오-참조-0건">2.4 저작 데이터의 오디오 참조 0건</h3>
+<p><code>Dynamic_CPP</code> 의 <code>.creator</code> 14개·<code>.prefab</code> 9개에서 <code>clipKey</code>·<code>SoundComponent</code> 출현 <strong>0건</strong>. 저장소에서
+<code>clipKey</code> 를 담은 파일 둘은 리플렉션 골든 스냅샷이지 저작 데이터가 아니다. 오디오 파일도 전 트리
+<strong>0개</strong>(<code>.wav/.mp3/.ogg/.flac</code>).</p>
+<h3 id="25-그래서-au0-의-ab-축이-무너진다">2.5 그래서 AU0 의 A/B 축이 무너진다</h3>
+<p>계획서 AU0 은 기존 동작을 <code>유효 / 고장 / 미검증</code> 으로 나누고 <strong>유효 항목에만</strong> FMOD A/B 를 쓰라고
+적었다. 실측 결과 분류는 이렇게 된다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>계획서 분류</th><th>항목</th><th>실측</th></tr></thead>
+<tbody><tr><td>유효(A/B 근거)</td><td>play/stop/loop/stream/bus</td><td><strong>관측 불가</strong> — 클립이 적재되지 않아 실행 경로가 첫 줄에서 끊긴다</td></tr>
+<tr><td>고장</td><td>shutdown/lifetime</td><td>확정(§2.2), + Play 모드 update 미호출(§2.3)</td></tr>
+<tr><td><span class="chip dim">미검증</span></td><td>listener/spatial/reverb</td><td>확정 — listener 호출부 0, reverb 는 Inspector 람다에만 있고 재생 시 재적용 경로 없음</td></tr></tbody></table></div>
+<p><strong>조치</strong>: AU0 의 판정문에서 &quot;유효 FMOD 항목 A/B&quot; 를 빼고, ① 합성 fixture ② offline/golden 기대값
+③ 실패 canary ④ 절대 성능 예산만 남긴다. FMOD 와의 비교는 <em>참고 수치</em> 로 강등하고, 비교를 하려면
+먼저 <code>Sounds\</code> 를 만들고 fixture 를 넣어 <strong>현재 코드가 처음으로 소리를 내게 하는 작업</strong>이 선행돼야
+한다는 것을 AU0 안에 명시한다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-자산-파이프라인-전제-au2">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-자산-파이프라인-전제-au2">3. 자산 파이프라인 전제 (AU2)</h2></div>
+<div class="prose"><h3 id="31-서-있는-전제--canonical-128-bit-identity">3.1 서 있는 전제 — canonical 128-bit identity</h3>
+<p><code>Engine/Utility_Framework/Uuid.h:151-170</code> <code>Uuid::Uuid16 { std::array&lt;uint8_t,16&gt; }</code> +
+<code>static_assert(sizeof(Uuid16) == 16)</code>. 저작/런타임 래퍼는 <code>TypeTrait.h:117</code> <code>FileGuid</code>, 쿠킹 경계는
+<code>Experiment/ModelData.h:80-86</code> <code>AssetId</code>. v4 생성(<code>TypeTrait.h:130-158</code>)과 v5 유도(<code>Uuid.h:190-204</code>)가
+모두 있다. 계획서 §3.1 의 &quot;D2 가 확정한 중립 asset identity&quot; 는 <strong>실물로 존재한다</strong>.</p>
+<h3 id="32-없는-것--여섯-축이-전부-신설이다">3.2 없는 것 — 여섯 축이 전부 신설이다</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>축</th><th>현재</th><th>근거</th></tr></thead>
+<tbody><tr><td>오디오 importer</td><td>없음. <code>IAssetImporter</code> 구현은 glTF·FBX 둘뿐</td><td><code>Experiment/Import/ImportedScene.h:519-526</code>, <code>GltfImporter.h:23</code>, <code>FbxImporter.h:17</code></td></tr>
+<tr><td>런타임 자산 타입</td><td><code>RuntimeAssetType</code> 에 오디오 없음 → <code>.wav</code> 는 <code>CatalogOnly</code> 로 떨어진다</td><td><code>DataSystem.h:33-43</code>, <code>DataSystem.cpp:118-145</code></td></tr>
+<tr><td>쿠킹 종류</td><td><code>CookedAssetKind{Model,Material,Texture,ShaderMeta,Scene,Prefab}</code> — 오디오 없음</td><td><code>Cooked/CookedAssetManifest.h:31-39</code>, <code>Tools/AssetCooker/AssetCooker.cpp:329</code></td></tr>
+<tr><td><code>.meta</code> 오디오 필드</td><td>스키마는 <code>guid</code> + <code>importSettings.{extension,timestamp}</code> 3필드뿐</td><td><code>EditorAssetDatabase.cpp:1542-1560</code>, 실물 <code>Dynamic_CPP/Assets/Cloud/Cloud.png.meta</code></td></tr>
+<tr><td>pak 범위 read</td><td><code>readAll()</code>/<code>readByIndex()</code> 전량 읽기만. 내부 청크 인덱스는 있으나 범위 API 미노출</td><td><code>Paklib.hpp:392,425-445</code>, 청크 <code>:255,263</code></td></tr>
+<tr><td>C# identity 타입</td><td>없음. 오디오 managed 표면은 <strong>문자열 clipKey</strong></td><td><code>Native.cs:97-98,677-688</code></td></tr></tbody></table></div>
+<p><code>.wav</code> 가 Assets 에 들어오면 <code>.meta</code> 사이드카는 받지만(<code>EditorAssetDatabase.cpp:1493-1592</code>) importer 는
+돌지 않고 런타임 등록도 되지 않는다. <strong>AU2 는 &quot;PHASE 17 정본을 소비&quot; 가 아니라 위 여섯 축의 신설이고,
+그중 pak bounded reader 는 오디오 밖(스트리밍 일반)에도 영향을 준다.</strong> 7일 추정은 이 폭을 반영하지
+않았다.</p>
+<h3 id="33-확장자-allowlist-는-3중-미러다">3.3 확장자 allowlist 는 3중 미러다</h3>
+<p>정본은 <code>Editor/EngineEntry/EditorAssetDatabase.cpp:1716-1733</code> 의 하드코딩 집합
+(<code>.wav</code>, <code>.mp3</code>, <code>.ogg</code> 등록 · <code>.flac</code> 없음). 같은 목록이 두 곳에 복제돼 있다.</p>
+<ul>
+<li><code>Tools/regression/verify-asset-guid-contract.ps1:181-193</code> — 주석이 &quot;<code>m_registeredFiles</code> 와 같은
+범위여야 한다&quot; 고 명시</li>
+<li><code>Tools/migration/Repair-AssetSidecarIdentities.ps1:55</code></li>
+</ul>
+<p>AU2 의 &quot;allowlist 를 WAV/MP3/FLAC 으로 고정하고 OGG 를 명시 거부&quot; 는 <strong>세 곳을 함께 바꾸는 일</strong>이며,
+어긋남을 잡는 게이트가 <code>verify-asset-guid-contract.ps1</code> 하나뿐이라는 것도 같이 확인했다(이미 <code>.slang</code>
+누락으로 drift 가 나 있다 — 오디오와 무관한 기존 결함).</p>
+<p>표시 계층에도 구멍이 있다: <code>EditorAssetPresentation.cpp:262-277</code> 의 <code>m_extensionTypes</code> 에 <code>.wav</code>·<code>.mp3</code>
+만 있고 <strong><code>.ogg</code> 가 빠져</strong> <code>FileType::Unknown</code> 아이콘으로 보인다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-빌드--배포--게이트-au8au9">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-빌드--배포--게이트-au8au9">4. 빌드 · 배포 · 게이트 (AU8/AU9)</h2></div>
+<div class="prose"><h3 id="41-au8-이-지목한-대상이-이사했다">4.1 AU8 이 지목한 대상이 이사했다</h3>
+<ul>
+<li><code>Tools/build.ps1</code> 은 22줄 호환 진입점으로 축소됐고 FMOD 0건이다(<code>:1</code>, <code>:18</code>, <code>:22</code> — <code>BuildTool/ CreatorBuildTool.csproj</code> 로 포워딩). 계획서 AU8 의 &quot;<code>Tools/build.ps1</code> 의 fmodL.dll stage 제거&quot; 는
+<strong>대상이 없다</strong>.</li>
+<li>실제 배치는 <code>Tools/runtime/deploy-runtime.ps1:30-31</code> 이 <code>ThirdParty\Fmod\bin\x64</code> 를 소스 루트로
+등록하고, 그룹 판정(<code>:75-79</code>)에서 Common 으로 떨어뜨려 <code>Bin/x64-&lt;Config&gt;/Runtime/Common/fmod.dll</code>
+(Debug 는 <code>fmodL.dll</code>)로 복사한다.</li>
+<li><code>BuildTool/</code>(GamePackager·PlayerVerification·PackageInputs·AssetCooking)에 <code>fmod|audio|sound</code> 0건 —
+<strong>패키징 코드는 FMOD 를 이름으로 알지 못한다.</strong></li>
+</ul>
+<h3 id="42-폐포는-pe-import-가-닫는다">4.2 폐포는 PE import 가 닫는다</h3>
+<p><code>deploy-runtime.ps1:54-86</code> 이 호스트 exe 의 import 를 시드로 BFS 를 돌려 의존을 닫고, 파서는
+<code>Tools/runtime/RuntimeLayout.psm1:33-74</code> <code>Get-EnginePeImports</code>(import·delay import 양쪽 순회)다.
+FMOD 는 <code>SceneRuntime</code> → 호스트 import 로 폐포에 들어온다. 실측:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>바이너리</th><th>fmod import</th></tr></thead>
+<tbody><tr><td><code>Bin/x64-Release/Editor/CreatorEditor.runtime.dll</code></td><td><code>fmod.dll</code> (import 44개 중)</td></tr>
+<tr><td><code>Bin/x64-Debug/Editor/CreatorEditor.runtime.dll</code></td><td><code>fmodL.dll</code> (import 35개 중)</td></tr>
+<tr><td><code>Bin/x64-Release/Editor/CreatorEditor.exe</code></td><td>없음(얇은 런처, import 2개)</td></tr></tbody></table></div>
+<p><strong>따라서 AU8 의 실제 작업은 &quot;목록에서 FMOD 를 지우는 일&quot; 이 아니라 &quot;소스에서 심볼을 없애는 일&quot;이고,
+폐포·매니페스트는 자동으로 따라온다.</strong> 반대로 그것을 확인해 주는 게이트는 지금 없다(§4.4).</p>
+<h3 id="43--라이선스-공백--배포본이-fmod-로깅-빌드를-싣고-있다">4.3 ★ 라이선스 공백 — 배포본이 FMOD 로깅 빌드를 싣고 있다</h3>
+<ul>
+<li>발행본 <code>Build/Distributions/local-0.0.0.0-win-x64-Debug-.../Bin/x64-Debug/Runtime/Common/fmodL.dll</code>
+이 실물로 들어 있다.</li>
+<li>같은 배포본 <code>Licenses/ThirdParty/</code> 는 <code>DotNetHost · ImViewGuizmo · Mathematics · Slang · fastgltf · mikktspace · ufbx · README.md</code> 로 <strong>Fmod 항목이 없다</strong>. 수집 규칙이
+<code>^(LICENSE|COPYING|NOTICE|README)</code> 파일명 기준인데(<code>BuildTool/EnginePublisher.cs:108-109</code>)
+<code>ThirdParty/Fmod/</code> 에는 그런 파일이 하나도 없기 때문이다.</li>
+<li><code>x64-Debug-Shipping</code> 구성의 <code>Runtime/Manifests/Player.json:50</code> 도 <code>Runtime/Common/fmodL.dll</code> 을
+싣는다 — <strong>출하 구성에 개발용 로깅 빌드가 들어간다.</strong></li>
+<li>저장소에 SBOM 파일은 없다. FMOD 를 문장으로 언급하는 곳은 <code>ThirdParty/README.md:10</code>(독점 SDK 명시,
+이 README 가 규칙에 걸려 배포본에 복사되는 유일한 FMOD 표기)과 <code>Tools/distribution/README.md:72</code>
+(&quot;현재 오디오 closure 는 FMOD 를 포함하며 PHASE 22 완료를 뜻하지 않는다&quot;) 둘이다.</li>
+</ul>
+<p>이건 PHASE 22 완료를 기다릴 사안이 아니다. <strong>AU8 을 기다리지 말고 지금 처분해야 한다</strong>(§8.2 결정 B).</p>
+<h3 id="44-게이트-0--ci-제외-타깃">4.4 게이트 0 · CI 제외 타깃</h3>
+<ul>
+<li><code>Tools/regression/</code> 202개 엔트리 중 오디오를 재는 게이트 <strong>0개</strong>. <code>run-all.ps1</code> 의 <code>Run-Step</code> 115개
+중 오디오 축 <strong>0개</strong>(등록은 배열이 아니라 소스 하드코딩 나열, <code>run-all.ps1:19-24</code>).</li>
+<li><code>verify-experiment-contract.ps1:205-214</code> 의 FMOD 는 <strong>링크 전제</strong>다 — 단정은 &quot;라이브러리 파일이
+존재하는가&quot; 한 줄(<code>:211-213</code>)이고 오디오 동작 단정은 없다. AU8 이 FMOD 를 지우면 <strong>이 게이트의
+링크 인자도 같이 손봐야 한다</strong>(계획서에 없는 항목).</li>
+<li><code>.github/workflows/build.yml</code> 은 엔진 라이브러리 4종(<code>Utility_Framework</code>·<code>Physics</code>·<code>SceneRuntime</code>·
+<code>RenderEngine</code>, <code>:102-107</code>)만 빌드한다. 제외 대상은 <strong>exe 타깃 전부와 게임 패키지 레그</strong>이며 사유는
+<code>ThirdParty/Fmod/lib/x64/*.lib</code> 가 <code>.gitignore</code>(<code>:88 x64/</code>, <code>:94 [Bb]in/</code>)로 저장소에 없다는 것이다
+(<code>build.yml:6-13</code>). 추적되는 FMOD 파일은 <code>inc/*</code> 헤더 11개뿐.</li>
+<li>즉 <strong>B5 차단은 &quot;FMOD 라이선스 때문에 lib 을 저장소에 못 넣는다&quot; 이고, AU8 이 그것을 푼다</strong>는
+계획서 기술이 지금도 정확하다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-의존-페이즈-전제">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-의존-페이즈-전제">5. 의존 페이즈 전제</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>계획서 의존</th><th>대시보드 실측</th><th>판정</th></tr></thead>
+<tbody><tr><td><code>PHASE 17 D2/D5 → AU2</code></td><td>D2 <code>stopped</code>(PHASE 3.75 이관) · D5 <code>done</code></td><td><strong>문장은 어긋났으나 실질 무해</strong> — identity 실물이 있다(§3.1). 계획서의 &quot;D2 가 확정한&quot; 표현을 <code>Uuid16</code>/<code>FileGuid</code> 실물 참조로 바꾼다</td></tr>
+<tr><td><code>PHASE 12.5 B2/B3 → AU0</code></td><td>B2 <code>progress</code>(잔여에 &quot;FMOD-free Release&quot; 명시) · B3 <code>todo</code></td><td><strong>AU0 은 B2/B3 없이 가능</strong> — AU0 산출물은 fixture·canary·예산이며 패키징에 의존하지 않는다. 의존을 AU8 로 옮긴다</td></tr>
+<tr><td><code>AU8/AU9 → PHASE 12.5 B5</code></td><td>B5 <code>blocked</code>(사유가 AU8 을 지목)</td><td>순환이 아니라 정상 — B5 가 AU8 을 기다린다</td></tr>
+<tr><td><code>AU5/AU9 → PHASE 14 provider</code></td><td>P1 <code>progress</code> · <strong>P5 <code>todo</code></strong></td><td><strong>발행처가 없다.</strong> AU5 판정에서 &quot;counter 를 provider 에 발행&quot; 을 분리해 P5 이후로 미루고, AU5 는 backend-neutral counter 의 <em>값</em> 까지만 판정한다</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-외부-기준-재확인-miniaudio">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-외부-기준-재확인-miniaudio">6. 외부 기준 재확인 (miniaudio)</h2></div>
+<div class="prose"><ul>
+<li>최신 안정 릴리스 <strong>0.11.25</strong>(2026-03-03 발행). 계획서가 적은 후보값이 지금도 최신이다.</li>
+<li>저장소에 miniaudio 흔적 <strong>0건</strong>(소스·ThirdParty·vcpkg 매니페스트 전부).</li>
+<li>라이선스는 GitHub API 상 <code>NOASSERTION</code>(public domain / MIT-0 이중 선택이라 SPDX 단일 식별자가 붙지
+않는다) — AU3 에서 <strong>둘 중 어느 쪽을 택했는지 파일로 남기는</strong> 절차가 필요하다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-계획서-정정-목록">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-계획서-정정-목록">7. 계획서 정정 목록</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>계획서 문장</th><th>실측</th><th>조치</th></tr></thead>
+<tbody><tr><td>§1.1 &quot;<code>Tools/build.ps1</code> 이 fmodL.dll stage&quot;</td><td>build.ps1 FMOD 0건. 배치는 <code>deploy-runtime.ps1</code> + <code>Runtime/Manifests</code></td><td>AU8 대상 교체</td></tr>
+<tr><td>§1.1 FMOD 소비 파일 7개</td><td>살아 있는 참조 15개(오탐 2 별도)</td><td>§1.1 표로 교체</td></tr>
+<tr><td>§1.1 &quot;Editor/Player 프로젝트&quot;</td><td>프로젝트 4개(<code>CreatorEditor</code>·<code>Editor</code>·<code>SceneRuntime</code>·<code>Player</code>)</td><td>AU8 목록 보정</td></tr>
+<tr><td>§1.2 &quot;<code>.flac</code> 은 등록 목록에 없다&quot;</td><td>맞다. 추가로 <strong>allowlist 가 3중 미러</strong>이고 <code>.ogg</code> 는 아이콘 맵에서 누락</td><td>AU2 에 미러 동기화 항목 추가</td></tr>
+<tr><td>§1.2 &quot;실파일 0개&quot;</td><td>맞다. 추가로 <strong><code>Sounds</code> 디렉터리 자체가 없다</strong></td><td>AU0 canary 재현 조건 명시</td></tr>
+<tr><td>§1.3 &quot;플래그가 내려가지 않는다&quot;</td><td>맞다. 단 원인은 폴더 부재 → <code>LoadSounds</code> 미실행</td><td>canary 기술 보정</td></tr>
+<tr><td>§1.4 &quot;listener 호출부 확인 안 됨&quot;</td><td><strong>호출부 0 확정</strong>. 반대편 <code>getListenerPosition</code> 은 소비자 있음</td><td><span class="chip dim">&quot;미검증&quot; → &quot;부재&quot; 로 확정</span></td></tr>
+<tr><td>§6 &quot;PHASE 17 D2 → AU2&quot;</td><td>D2 <code>stopped</code> · identity 는 실재</td><td>참조를 실물 타입으로 교체</td></tr>
+<tr><td>§6 &quot;PHASE 12.5 B2/B3 → AU0&quot;</td><td>AU0 은 독립 가능</td><td>의존을 AU8 로 이동</td></tr>
+<tr><td>AU0 &quot;유효 FMOD 항목 A/B&quot;</td><td>유효 집합이 사실상 공집합</td><td>A/B 를 참고로 강등, 합성 골든 중심으로 재작성</td></tr>
+<tr><td>AU5 &quot;counter 를 PHASE 14 provider 에 발행&quot;</td><td><span class="chip dim">P5 <code>todo</code></span></td><td>판정에서 분리</td></tr>
+<tr><td>(없음)</td><td>Editor Play 모드에서 <code>update()</code> 미호출</td><td>AU0 &quot;고장&quot; 목록에 추가</td></tr>
+<tr><td>(없음)</td><td>배포본 FMOD 라이선스 미등재 · Shipping 에 로깅 빌드</td><td><span class="chip info">§8.2 결정 B 로 분리 착수</span></td></tr>
+<tr><td>(없음)</td><td><code>verify-experiment-contract.ps1</code> 이 FMOD lib 을 링크</td><td>AU8 항목 추가</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-착수-판정과-순서">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-착수-판정과-순서">8. 착수 판정과 순서</h2></div>
+<div class="prose"><h3 id="81-지금-착수-가능한-것">8.1 지금 착수 가능한 것</h3>
+<ul>
+<li><strong>AU0(재정의)</strong> — 합성 fixture(WAV/MP3/FLAC) 생성기, 실패 canary(폴더 부재 조건 포함), 절대 성능
+예산, <strong>오디오 회귀 게이트 한 축 신설</strong>(현재 0개). FMOD A/B 는 참고로만.</li>
+<li><strong>AU1</strong> — backend-neutral 계약과 Null backend. 현재 정책 API 가 죽어 있으므로(§1.4) 이관이 아니라
+설계 신설로 잡는다.</li>
+<li><strong>AU3</strong> — miniaudio 0.11.25 벤더링과 미배선 구현. 제품 경로를 건드리지 않는다.</li>
+</ul>
+<h3 id="82-착수-전-결정-2건">8.2 착수 전 결정 2건</h3>
+<ul>
+<li><strong>결정 A — AU2 의 폭.</strong> pak bounded byte source(<code>Paklib</code> 범위 read)는 오디오 전용이 아니다. ①
+AU2 안에서 오디오가 여는가, ② 별도 슬라이스로 떼어 스트리밍 일반으로 여는가. 선택에 따라 AU2 가
+7일에서 크게 벌어진다.</li>
+<li><strong>결정 B — FMOD 라이선스 처분 시점.</strong> 배포본이 <code>fmodL.dll</code> 을 라이선스 등재 없이 싣고 있다(§4.3).
+① PHASE 22 밖에서 지금 처분(등재 또는 배포 제외), ② AU8 까지 현상 유지. 독점 SDK라 ②는
+PHASE 23 감사까지 위험을 끌고 간다.</li>
+</ul>
+<h3 id="83-재추정">8.3 재추정</h3>
+<p>초기 45 인일 대비 방향만 적는다(정밀 수치는 AU0 스파이크 뒤 갱신).</p>
+<div class="table-scroll"><table>
+<thead><tr><th>슬라이스</th><th>초기</th><th>재추정</th><th>근거</th></tr></thead>
+<tbody><tr><td>AU0</td><td class="num">3</td><td><strong>4~5</strong></td><td>게이트 축 신설이 없던 일로 추가(§4.4). A/B 축 소멸로 분류 작업은 줄어든다</td></tr>
+<tr><td>AU2</td><td class="num">7</td><td><strong>10~13</strong></td><td>여섯 축 신설 + allowlist 3중 미러(§3.2~3.3). 결정 A 에 따라 상단</td></tr>
+<tr><td>AU5</td><td class="num">6</td><td class="num">6</td><td>provider 발행분만 분리(§5)</td></tr>
+<tr><td>AU7</td><td class="num">5</td><td class="num"><strong>4</strong></td><td>managed ABI 가 이미 깨끗하고(§1.3) 죽은 표면이 많다(§1.4)</td></tr>
+<tr><td>AU8</td><td class="num">3</td><td><strong>3~4</strong></td><td>대상 이사(§4.1) + <code>verify-experiment-contract</code> 링크 + 라이선스(결정 B 가 ②면 여기)</td></tr>
+<tr><td>합계</td><td class="num">45</td><td><strong>≈ 50~54</strong></td><td></td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-이-정찰이-재지-않은-것">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-이-정찰이-재지-않은-것">9. 이 정찰이 재지 않은 것</h2></div>
+<div class="prose"><ul>
+<li><strong>실행 검증 0.</strong> 재생·장치·성능·종료를 실제로 돌리지 않았다. §2 의 &quot;소리가 나지 않는다&quot; 는 코드
+경로 판정이며, 에디터를 띄워 확인한 것이 아니다. AU0 의 첫 작업이 이 판정을 실측으로 확정하는 것이다.</li>
+<li><strong><code>SoundComponent::Play()</code> 의 equal-power 재작성 의혹</strong>(계획서 §1.4)은 읽지 않았다. 클립이 없어
+어차피 실행되지 않으므로 AU0 fixture 이후에 판정한다.</li>
+<li><strong>Debug/Release 링크 구성 차이</strong>를 링크 로그로 확인하지 않았다. PE import 로만 확인했다.</li>
+<li><strong><code>Editor/Editor.vcxproj</code> 와 <code>CreatorEditor.vcxproj</code> 의 FMOD 경로 중복</strong>이 의도된 분업인지
+(lib 프로젝트는 include only, exe 는 link) 확인만 했고, 정리 필요 여부는 판정하지 않았다.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="Phase22AudioPreflight.md"><code>docs/analysis/Phase22AudioPreflight.md</code></a> · 마지막 커밋 2026-09-16 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

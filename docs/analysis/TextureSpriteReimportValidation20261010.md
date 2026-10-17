@@ -1,29 +1,58 @@
-# SpriteRenderer 텍스처 owner와 저장 참조
+# PHASE 12 — SpriteRenderer 재임포트·씬 재로드 검증
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+기준일: 2026-10-10 KST. 정본: [TexturePipelinePlan](../plans/TexturePipelinePlan.md).
 
-## Sprite의 두 종류의 상태
+## 재현과 수정
 
-SpriteRenderer에는 현재 표시할 Texture shared owner와 저장할 m_SpritePath가 함께 필요하다. owner는 그 세대의 실제 description을 유지하며 경로는 다음 씬 로드에서 논리 자산을 다시 찾기 위한 참조다. 이미지의 basename이나 비어 있는 cooked path를 경로로 대신하면 현재 화면은 정상이어도 재열기에서 텍스처가 사라진다.
+수정 전 실제 Debug Editor 실행에서 저장 씬의 `m_SpritePath: ""`를 확인했다.
+재로드 후 SpriteRenderer가 새 generation을 복원하지 못해
+`Sprite component generation was not retained/restored`로 실패했다.
+격리 프로젝트는 `Build/TRS-Debug-360796b3`, 실행 기록은
+`Build/phase12-sprite-baseline-run.log` 및 해당 프로젝트 `results.jsonl`이다.
 
-`SetSprite`는 null이면 참조를 해제하고, cooked origin이 있으면 그 GUID로 등록 경로를 조회한다. 필요한 경로를 찾지 못하면 새 owner로 바꾸기 전에 거부한다. loose 또는 origin 없는 임시 텍스처의 처리는 이와 구별된다. description이나 immutable artifact를 수정해 경로를 끼워 넣는 방식이 아니다.
+`SpriteRenderer::SetSprite`도 ImageComponent와 같이 기존 경로/이름이 없는 cooked
+자산은 TextureAssetOrigin의 GUID로 등록 경로를 찾아 저장하도록 수정했다.
+등록 경로를 찾지 못하면 기존 owner를 교체하기 전에 거부한다.
+loose 경로, origin 없는 임시 생성 텍스처 및 null로 참조를 해제하는 처리를 유지한다.
+immutable description/artifact를 수정하지 않는다.
 
-## 자동 재임포트와 reload
+## 실제 실행 수용
 
-EditorAssetDatabase는 현재 sprite owner를 수집하고 새 descriptor와 CodecImage를 준비한다. 교체 시점에 여전히 이전 owner를 가진 SpriteRenderer만 SetSprite(replacement)로 바꾼다. 이 경로는 ImageComponent의 목록 갱신과 API 모양은 다르지만 원본 세대를 pin하고 저장 참조를 보존한다는 요구가 같다.
+기존 격리 `assets.texture.reimportprobe`에 SpriteRenderer를 추가했다.
+UITexture와 일반 Texture role을 각각 비동기로 준비하고 실제 두 컴포넌트를 같은 씬에 저장한다.
+각 구성의 단일 Editor 프로세스에서 다음을 확인했다.
 
-[종단 probe](TextureReimportSceneValidation20261010.md)는 UITexture와 일반 Texture 소비를 실제 ImageComponent/SpriteRenderer로 나누어 준비하고 같은 씬에서 저장·재로드를 확인한다. `verify-texture-reimport-scene.ps1`은 최종 verdict에 두 소비자 이름이 있는지 검사한다. SpriteRenderer가 포함된 최신 검사인지 파일 이름만 보고 판단하지 않는다.
+1. 초기 4px texture 연결과 씬 저장
+2. 최대 크기 2 재임포트·게시 후 새 2px owner 생성, 열린 두 컴포넌트는 기존 owner 유지
+3. 저장 씬 재로드와 프레임 교체 후 두 컴포넌트가 각 role의 새 2px owner 참조
+4. 이전 씬 퇴역 후 보유한 이전 Sprite texture/image view가 4px로 유효
+5. 손상 PNG cook 실패와 없는 씬 reload 실패 시 현재 씬/두 컴포넌트 owner 보존
+6. 원본 복구 후 4px 재게시, 열린 두 컴포넌트는 2px owner 유지
 
-## 역사적 실패와 현재 판정
+Debug/Release 실제 host와 참조 프로젝트 빌드 및 실행 종료 코드 0을 확인했다.
+검사 수는 deadline/state 폴링 단정을 포함하므로 고정 기능 사례 수가 아니다.
 
-2026-10-10에는 m_SpritePath가 빈 문자열로 저장되어 reload 이후 generation이 복원되지 않는 사례가 기록되었다. 이 문서는 그 진단의 호환 요약이며 당시 `Build/TRS-Debug-360796b3`와 baseline 로그는 로컬 실행 흔적이다. 현재 SetSprite의 방어와 runner 연결을 확인했지만 그 실행을 새로 반복하지 않았다.
+| 구성 | 격리 프로젝트 | 단정 수 | runtime DLL SHA-256 |
+|---|---|---:|---|
+| Debug | `TRS-Debug-edc50552` | 50 | `818EDADF973D695FF62EBF0CF32D82584876CFF6389514996AD15D49CE592776` |
+| Release | `TRS-Release-0a85bc1c` | 51 | `2D94FA2B59280572FBBBE308A63DF1A01170D2097B4FCEAEE16C5AFDE9E3090D` |
 
-스프라이트 회전·크기·색상·애니메이션 프레임의 보존, SpriteSheet의 별도 동작, 여러 씬과 deletion race, GPU 출력 비교는 추가 수용 항목이다. 기본 설명과 실패 처리의 정본은 [텍스처 파이프라인](../plans/TexturePipelinePlan.md)이다.
+소스 9개 drift 0, fixture PNG 원본 복구 및 runtime DLL 실행 전후 hash 일치를 확인했다.
+유지된 검사기는 `Tools/regression/verify-texture-reimport-scene.ps1 -Configuration All`이다.
+receipt: `Build/TextureReimportScene/result.json`.
+빌드 로그: `Build/phase12-sprite-{debug,release}-build.log`.
+실행 로그: `Build/phase12-sprite-run.log`.
+기존 texture import 정적 검사 5/5 및 변경된 tracked 파일 whitespace 검사는 통과했다.
+Release의 기존 Utility_Framework PDB LNK4020 경고는 남아 있다.
+대시보드 전체 JavaScript 파싱·렌더·유한 진행률은 통과했다. 기존 PHASE 4.85
+quoted-key 구조 문제는 문자열 140건/항목 모양 14건 그대로 남아 전체 구조 검사는
+실패한다(`Build/phase12-sprite-dashboard.log`).
 
-## 구현 근거
+## 잔여 수용
 
-- [Engine/SceneRuntime/SpriteRenderer.cpp](../../Engine/SceneRuntime/SpriteRenderer.cpp)
-- [Engine/SceneRuntime/ImageComponent.cpp](../../Engine/SceneRuntime/ImageComponent.cpp)
-- [Editor/EngineEntry/EditorAssetDatabase.cpp](../../Editor/EngineEntry/EditorAssetDatabase.cpp)
-- [Tools/regression/texture_reimport_scene_probe.inl](../../Tools/regression/texture_reimport_scene_probe.inl)
-- [Tools/regression/verify-texture-reimport-scene.ps1](../../Tools/regression/verify-texture-reimport-scene.ps1)
+이는 작은 fixture의 실제 저장/역직렬화·CPU image view·owner identity 검증이다.
+Inspector 버튼/경고/취소/파일 선택 직접 입력, GPU 화면 픽셀, 전체 모델/포맷 소비,
+Shipping GPU 패키지, 품질/시간/메모리 및 대량·장시간 검증은 남긴다.
+자동 live component rebind와 역할별 다중 산출물 선택은 별도 확장 범위다.
+다음 활성 검증은 Inspector 실제 조작이다.
+T0/T1a/T2 진행 중 및 earnedDays 0, T1b 대기, T3 중단은 유지한다.

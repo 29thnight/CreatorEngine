@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/MaterialGraphProduct.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Graph 제품 generation·바인딩·쿠킹 계약</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-기존-lx-경로에서-검증된-구현-기반">1. 기존 LX 경로에서 검증된 구현 기반</a></li><li><a href="#2-자동-선택과-미지원-거부">2. 자동 선택과 미지원 거부</a></li><li><a href="#3-바인딩과-색-공간">3. 바인딩과 색 공간</a></li><li><a href="#4-후보-전체-교체와-수명">4. 후보 전체 교체와 수명</a></li><li><a href="#5-쿠킹과-runtime-재개방">5. 쿠킹과 runtime 재개방</a></li><li><a href="#6-검증과-실제-제품-연결-기록">6. 검증과 실제 제품 연결 기록</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="MaterialGraphProduct.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>Material Graph 제품 generation·바인딩·쿠킹 계약</h1>
+<div class="meta"><p><strong>2026-10-02 통합 완료 · 기존 LX 제품 기반은 MAT-7-BASE 이력 · 공통 재질 소비 MAT-7 완료. PHASE 4.25는 LX 마감·MAT-9 때문에 진행 중.</strong></p>
+<p><strong>2026-10-02 실행 환경 방향:</strong> LX가 generation/instance·바인딩·자원/PSO 수명의 공통 runtime을 소유한다. ShaderMeta는 생성된 셰이더의 계약 표현이며 기존 authored 코드 셰이더 입력도 LX 계약으로 적응한다. 코드 입력 어댑터와 공통 graphics/compute owner를 연결했고, 코드 셰이더의 generic property도 유지한다. 프레임 owner 없는 RT registry 대체 조회를 제거했다. Code 입력 준비·진단 registry는 유지한다.</p>
+<p>Graph→실제 <code>.shadermeta</code>+<code>.slang</code> 생성과 공통 Material 값/바인딩·LXMC v4 복구를 연결했다. Code와 Scene host의 graphics shader/PSO는 <a href="../analysis/MAT7GraphicsPipelineOwnership.html">LX 공통 owner</a>, 보조 compute는 <a href="../analysis/MAT7ComputePipelineOwnership.html">compute owner</a>를 사용한다. <a href="../analysis/MAT7CommonForwardBlend.html">Core/Layered 일반 Blend</a>에 이어 <a href="../analysis/MAT7ForwardTransportComposition.html">SSS/transmission/Volume 혼합 transport</a>를 같은 Forward+ 순서에 연결했다. 제품 편집/실패 복구·실제 cooked Player 회귀는 <a href="../analysis/MAT7ProductEditingRecovery.html">제품 검증 기록</a>을 따른다. SceneHost identity 12로 재쿠킹한다. 기존 2026-09-29의 “MAT-7 완료”는 아래 LX 경로에서 검증한 기반의 이력이며, 현재 통합 완료선은 2026-10-02의 여덟 번째 단계다.
+현재 통합 순서·원본/파생물 소유·공통 Forward+/일반 alpha Blend·제품 회귀의 완료 기준은 <a href="../plans/BlenderMaterialGraphPlan.html#0-현재-판정과-실행-범위-2026-10-02">BlenderMaterialGraphPlan §0</a>이 소유한다. 생성 어댑터의 검증 범위와 잔여는 <a href="../analysis/MAT7ShaderMetaAdapter.html">MAT7ShaderMetaAdapter</a>에 분리한다.</p>
+<p>공통 Material 값/바인딩의 초기 검증 범위는 <a href="../analysis/MAT7CommonMaterialConsumption.html">MAT7CommonMaterialConsumption</a>이 소유한다. 아래 LXMC v2/artifact v2 설명은 기존 구현 이력이며 현재 writer/reader는 <strong>v4</strong>다. 실제 생성 메타·전체 Slang·bytecode와 CEDO 생성 계약을 한 generation으로 복구한다. immutable owner의 바이너리 계약으로 재검증·재쿠킹하며 Player에서 저작용 텍스트 파서를 호출하지 않는다. v3 이하는 재쿠킹하고 CEMF 자체 schema는 유지한다.</p>
+<p>MAT-6의 <a href="MaterialSlangCodegen.html">결정적 Slang 생성</a>을 제품의 reflection,
+텍스처 소유권, PSO 교체와 cooked 자산으로 내리는 경계다. 구현은
+<code>Engine/RenderEngine/MaterialGraphProduct.{h,cpp}</code>, <code>MaterialGraphRuntime.{h,cpp}</code>,
+<code>MaterialGraphRenderBindings.{h,cpp}</code>, <code>MaterialGraphIblBake.{h,cpp}</code>와
+<code>Experiment/Cooked/CookedMaterialProgram.{h,cpp}</code>에 있다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#1-기존-lx-경로에서-검증된-구현-기반"><span class="ve-label">§1</span><span class="map-name">기존 LX 경로에서 검증된 구현 기반</span><span class="map-bar"><i style="width:26.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-자동-선택과-미지원-거부"><span class="ve-label">§2</span><span class="map-name">자동 선택과 미지원 거부</span><span class="map-bar"><i style="width:12%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-바인딩과-색-공간"><span class="ve-label">§3</span><span class="map-name">바인딩과 색 공간</span><span class="map-bar"><i style="width:37%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-후보-전체-교체와-수명"><span class="ve-label">§4</span><span class="map-name">후보 전체 교체와 수명</span><span class="map-bar"><i style="width:13.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-쿠킹과-runtime-재개방"><span class="ve-label">§5</span><span class="map-name">쿠킹과 runtime 재개방</span><span class="map-bar"><i style="width:18.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-검증과-실제-제품-연결-기록"><span class="ve-label">§6</span><span class="map-name">검증과 실제 제품 연결 기록</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「6. 검증과 실제 제품 연결 기록」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-기존-lx-경로에서-검증된-구현-기반">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-기존-lx-경로에서-검증된-구현-기반">1. 기존 LX 경로에서 검증된 구현 기반</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>경로</th><th>현재 상태</th></tr></thead>
+<tbody><tr><td>Slang bytecode·reflection·실제 include/compiler 의존 identity</td><td>같은 linked program에서 검증·게시</td></tr>
+<tr><td>숫자·Texture2D·독립 Sampler의 제품 register/layout</td><td>실제 DXIL/SPIR-V reflection 대조</td></tr>
+<tr><td>typed override·sRGB view·텍스처 generation 소유</td><td>CPU packet 검증 및 D3D12 hardware readback</td></tr>
+<tr><td>PSO·layout·route·uniform·texture owner 교체</td><td>실제 D3D12 PSO 성공/실패와 완료 fence 검사</td></tr>
+<tr><td>LXMC·CEMF·AssetCooker·loose/encrypted PAK</td><td>typed 재개방·SHA-256·폐포·게시 실패 검사</td></tr>
+<tr><td>DataSystem/Material의 LX generation·instance 소비</td><td>GUID 적재·값/텍스처 override·실제 저장 재개방 검증</td></tr>
+<tr><td>제품 RHI의 b2·Texture2D·독립 Sampler 바인딩</td><td>실제 엔진 DX12 서비스로 오프스크린 draw/readback 검증</td></tr>
+<tr><td>Core/Layered evaluated-point IBL bake</td><td>실제 엔진 RHI compute→lookup 소비 draw/readback 검증; Scene 픽셀 캐시 확장</td></tr>
+<tr><td>불투명 가시 픽셀·UV fine derivative 수집</td><td>독립 RHI RenderGraph의 순차/병렬 기록 → graph/IBL 검증; 한 재질 chunk 묶음·4096픽셀 범위</td></tr>
+<tr><td>Scene의 LX generation 렌더 소비</td><td>Core/Layered Opaque/Masked의 실제 GBuffer·공유 depth·HDR 합성 연결</td></tr>
+<tr><td>실제 Scene의 자동 route 분류</td><td>지원 Core/Layered/Special Surface·Volume host 선택·미지원 거부; route 교차 parity는 MAT-9</td></tr>
+<tr><td>Core/Layered 환경 lookup</td><td>정확한 Scene 픽셀 캐시·변경 입력 갱신; 일반 Scene 실시간 비용은 후속</td></tr>
+<tr><td>실제 Scene의 이미지별 UV·LOD</td><td>샘플별 Vector fine derivative·이미지 크기/mip 수; compute는 explicit LOD 유지</td></tr>
+<tr><td>실제 Scene generation 준비·교체</td><td>Slang·DX12/Vulkan PSO worker 준비, exact batch 성공 뒤 마지막 정상 instance·coverage 게시</td></tr>
+<tr><td>실제 Scene 재질별 SSS</td><td>owner/profile 기반 유한 dipole transport·Special HDR 연결</td></tr>
+<tr><td>실제 Scene transmission/refraction</td><td>뒤쪽 Code/Graph alpha가 합성된 현재 HDR·불투명 depth 복사, 자기 surface scratch depth/owner, GGX 굴절·공통 Forward+ 연결</td></tr>
+<tr><td>실제 Scene의 닫힌 균질 Volume</td><td>계수 생성·깊이 제한 카메라/굴절 ray의 흡수·발광·단일 산란 합성</td></tr>
+<tr><td>실제 Editor Scene/Game 상태·수명</td><td>HTTP 재질 변경·Undo/Redo·실패 복구·저장/재개방·Play/Stop·삭제/복구의 owner·픽셀 검증</td></tr>
+<tr><td>native Vulkan 전체 Scene</td><td>Core/Layered·Shadow/Decal·SSS·Refraction·Volume·encrypted cook의 Debug/Release readback</td></tr>
+<tr><td>일반 alpha Blended queue</td><td>Code/Core/Layered/SSS와 physical transmission의 공통 Forward+ 정렬·합성, Volume의 표면 깊이별 카메라 transport. DX12 Debug/Release mixed/Volume·제품 회귀 완료; 전체 색/비용 수용은 MAT-9</td></tr></tbody></table></div>
+<p>기존 LX 제품 기반의 종료 증거는 <a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>가
+소유한다. LX-3 artist canvas 이관, MAT-8 preview와 MAT-9 rendered parity·성능 수용은 별도다.
+기존 Scene은 여전히 <code>m_renderingMode</code>로 opaque와 transparent draw를 나눈다.
+기존 Standard pass를 LX host로 바꾸지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-자동-선택과-미지원-거부">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-자동-선택과-미지원-거부">2. 자동 선택과 미지원 거부</h2></div>
+<div class="prose"><p><code>SelectRoute</code>는 active output의 정적 feature와 renderer가 실제 설치한
+<code>Capabilities</code>로 Standard/Layered/Special과 Deferred/Forward/Volume을 선택한다.
+artist가 register/pass를 선택하지 않는다. sample·resource·variant·compiled byte
+상한도 같은 경계에서 검사한다.</p>
+<ul>
+<li>현행 GBuffer 지원은 <code>0x003F</code>. IOR/specular/layered를 저장할 수 없으면 Forward를 요구한다.</li>
+<li><code>Capabilities</code>의 Core Forward, layered reflection lookup, refraction, 재질별 SSS,
+Volume 기본값은 false다. 제품 Scene host/compiler는 설치한 경로의 capability를 명시적으로
+켜고 각 feature의 실제 자원·stage·예산을 준비한다.</li>
+<li>미설치 기능을 선택하면 원인을 진단하고 기존 generation을 보존한다. feature를
+지우거나 transmission을 alpha로 바꾸지 않는다.</li>
+<li>Capabilities의 <code>true</code>는 자원과 evaluator가 실제 연결됐다는 renderer의 보증이다.
+독립 probe는 해당 검사 host의 보증을 주며 Scene의 보증을 대신하지 않는다.</li>
+<li>일반 graphics <code>PipelineSlot</code>은 surface-only만 게시한다. Surface+Volume도
+Volume compute/합성 generation과 함께 게시하는 renderer 경로가 생기기 전에는 거부한다.</li>
+</ul>
+<p>정적 tier는 물리 재질 기능 분류이며 authored opacity/coverage와 독립이다.
+실제 제품 연결 시 Forward를 transparent와 동일한 draw queue로 취급하면 안 된다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-바인딩과-색-공간">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-바인딩과-색-공간">3. 바인딩과 색 공간</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>논리 입력</th><th>제품 위치</th><th>판정</th></tr></thead>
+<tbody><tr><td>Texture slot N</td><td><code>t16+N, space0</code></td><td>이름·kind·slot·개수·Texture2D view 검증</td></tr>
+<tr><td>Sampler slot N</td><td><code>s3+N, space0</code></td><td>texture slot과 독립, nearest/linear × repeat/clamp</td></tr>
+<tr><td>Numeric Blackboard</td><td><code>b2, space0</code>, <code>LXMaterialProperties</code></td><td>reflection offset/size/type로 pack</td></tr></tbody></table></div>
+<p><code>BuildBoundSource</code>는 기존 source map 줄을 유지하며 register를 투영한다.
+숫자 필드는 float32/int32/bool32와 float3/float4다. 두 backend의 uniform layout이
+다르거나 겹치거나 예기치 않은 필드/자원이 있으면 검증을 실패시킨다.
+Uniform은 제품 상수 버퍼 한도인 64 KiB 이내다.</p>
+<p><code>PrepareResources</code>는 공개된 numeric parameter만 override하고 finite float32와
+int32 범위를 확인한다. padding은 0으로 고정한다. texture 등록 handle과 generation
+owner를 함께 받는다. SRGB 입력은 SRGB view 또는 이미 선형화한 storage라는 명시적
+보증이 필요하다. Data/Linear 입력에 SRGB view를 사용하면 거부한다.
+Hardware SRGB filtering은 decode→filter 순서를 사용한다.</p>
+<p>ResourcePacket은 owning CPU packet이다. <code>RenderBindingCache</code>가 실제 texture cache의
+<code>GetOrUpload</code>와 <code>UploadConstants/CreateBindings/CreateSamplers</code>, 인코더 root slot 바인딩을
+연결한다. 실제 엔진 DX12 서비스를 사용한 오프스크린 draw/readback은 검증했으며,
+Scene pass의 소비는 아직 연결하지 않았다.</p>
+<h3 id="제품-render-binding-경계-2026-09-28">제품 render binding 경계 (2026-09-28)</h3>
+<p><code>CreatePassLayout</code>은 host root 범위를 유지하고 사용 중인 material b2, t16+,
+s3+ 범위를 덧붙인다. 숫자/texture/sampler가 없는 범위는 만들지 않는다.
+host의 CBV/root constants, SRV buffer/table, dynamic/static sampler와 겹치면
+기존 layout을 보존하고 실패한다. 중복/범위 밖 resource slot도 생성 전에 거부한다.</p>
+<p><code>RenderBindingCache::Prepare</code>는 같은 graph generation의 reflected layout과
+불변 instance를 받아 실제 Texture owner를 업로드하고 숫자 bytes를 다시 대조한다.
+cache가 실패한 텍스처를 neutral로 대신 반환하더라도 오류로 처리한다.
+sampler는 각 resource의 nearest/linear × repeat/clamp 설정을 독립된 슬롯에 넣는다.
+전체 배열이 같은 sampler 테이블은 프레임과 숫자 override 변경 사이에 재사용한다.
+실패한 upload/layout/value 후보는 이전 render packet을 교체하지 않는다.</p>
+<p>packet의 constant/texture descriptor는 recording ID와 descriptor version으로 묶는다.
+다른 device·recording의 packet을 <code>Bind</code>하면 명령을 기록하기 전에 거부한다.
+PSO를 먼저 설정한 뒤 반환된 material 슬롯에만 바인딩한다. RenderGraph가 shader-read
+usage와 상태 전이를 선언하며 이 adapter가 임의로 texture 상태를 바꾸지는 않는다.
+실패 시 보존된 packet도 새 recording에서는 재준비해야 하며, 이전 프레임의 transient
+handle을 재사용하는 fallback은 허용하지 않는다.</p>
+<p>CPU/program owner는 packet이 유지하고 GPU texture registration과 fence retirement는
+외부 RHI texture cache가 소유한다. render owner는 제출 완료까지 이 cache와 packet을
+보존하며 매 recording에서 <code>Prepare</code>로 사용 기록을 갱신한다. sampler cache는 device
+idle 뒤 device 재생성 전에 비운다. 이 구현은 Core/Layered의 물리 lookup·환경 convolution을
+설치하거나 renderer capability를 켜지 않는다.</p>
+<h3 id="corelayered-gpu-bake-경계-2026-09-28">Core/Layered GPU bake 경계 (2026-09-28)</h3>
+<p><a href="PrincipledIblBake.html">PrincipledIblBake.md</a>의 <code>IblBaker</code>는 평가된 재질·normal/tangent·
+view와 환경 generation을 받아 별도 반사 계수, base/coat/sheen 방향 convolution을 만든다.
+coat normal의 다중산란 조도도 별도로 소비한다. 입력 전체와 환경 owner/generation을
+비교해 override/view 변경을 검출하며 실패한 bake 요청은 이전 result를 보존한다.
+compiled/cooked CS를 받고 생산 픽셀 셰이더는 적분 루프 없이 결과를 읽는다.</p>
+<p>이는 1~4,096개 고정 평가 지점 묶음이다. Scene의 texture-varying 입력·lookup 배치와
+보간/재사용·RenderGraph usage·in-flight 게시/회수는 아직 연결하지 않았다.
+환경 중요도/MIS·HDR 표본 수 수렴과 실제 시간/메모리 예산도 제품 연결 단계에서 판정한다.
+기존 Standard glTF 2채널 LUT는 유지하며 Core/Layered Scene capability는 계속 미설치다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-후보-전체-교체와-수명">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-후보-전체-교체와-수명">4. 후보 전체 교체와 수명</h2></div>
+<div class="prose"><p><code>VerifyProduct</code>는 engine host를 붙인 파일이 정확한 bound program으로 시작하는지
+검사한다. DXIL/SPIR-V에 필요한 VS/PS 또는 Volume CS 전부를 검증하고,
+backend별 non-vertex entry의 재질 reflection을 합쳐 <code>VerifiedProduct</code>를 게시한다.
+stage별 미사용 resource 제거는 허용하되, 공유 binding의 이름·타입·offset·배열 길이가
+다르면 거부한다. 합친 layout은 원래 typed resource/parameter 계약과 일치해야 한다.
+semantic key에 실제 공용 include·compiler binary·option·entry identity를 포함한다.</p>
+<p><code>PipelineSlot::Publish</code>는 verified bytecode에서 해당 backend VS/PS를 선택한다.
+caller는 fixed-function state·render format·설치된 root layout을 공급한다.
+PSO 생성 전에 route·layout·값·텍스처를 검증하며 성공할 때만 다음을 함께 교체한다.</p>
+<pre><code class="language-text">semantic key + route + reflected layout + numeric bytes
+    + texture generation owners + owning shader request + PSO handle</code></pre>
+<p>컴파일/바인딩/값/native PSO 실패는 마지막 정상 generation을 보존한다.
+교체된 PSO는 caller의 GPU completion point에 retire하며 재사용한 동일 handle은
+무효화하지 않는다. 텍스처 owner는 같은 handle을 재사용했더라도 별도로 retire한다.
+완료 fence가 <code>0</code>이면 완료 시점을 모르는 것이므로 owner를 장치 idle 뒤 슬롯 파괴까지
+보존한다. 슬롯은 제출된 generation보다 오래 살아야 하며 render owner 한 곳에서 쓴다.
+공유 PSO의 외부 CPU holder가 있으면 owning renderer가 함께 교체 경계를 보증해야 한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-쿠킹과-runtime-재개방">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-쿠킹과-runtime-재개방">5. 쿠킹과 runtime 재개방</h2></div>
+<div class="prose"><ul>
+<li><code>.shadergraph</code>의 UUIDv4를 <code>Derived/MaterialPrograms/&lt;prefix&gt;/&lt;GUID&gt;.lxmaterial</code>에 매핑한다.</li>
+<li>LXMC schema 2는 compiler schema, dependency-bearing key, typed defaults/resource table,
+reflected offset, source map, route와 backend/entry/profile별 bytecode를 소유한다.
+JSON metadata와 bound/original Slang은 진단·일관성 대조용이다.</li>
+<li>LXMC reader는 크기·개수·enum·layout·stage·checksum을 검사하고 metadata/bound source를
+typed table에서 다시 만들어 대조한다. 실패하면 기존 결과를 보존한다.</li>
+<li>CEMF schema 2에 <code>MaterialProgram=8</code>, artifact version 2를 추가했다.
+texture UUIDv4/v8 의존성은 중복 제거·정렬하고 manifest 폐포가 닫혀야 한다.</li>
+<li><code>CookedAssetCatalog::OpenMaterialProgram</code>은 GUID/kind/path/version/size/SHA-256와
+texture dependency 종류를 확인한다. loose tree와 immutable mounted encrypted PAK에서
+동일한 full typed generation을 복원하며 Slang 컴파일/reflection이 필요하지 않다.</li>
+</ul>
+<p>AssetCooker 입력:</p>
+<pre><code class="language-text">--asset-root &lt;Assets&gt;
+--output &lt;새 cooked tree&gt;
+--shadergraph &lt;source&gt; ...
+--material-program-root &lt;검증된 program tree&gt;
+--texture &lt;graph가 참조하는 실제 source texture&gt; ...</code></pre>
+<p>source graph를 strict reader로 열어 canonical compiler로 재생성하고, 검증된 산출물의
+Slang/typed metadata와 정확히 일치해야 쿠킹한다. artifact·CEMF·폐포를 staging에서
+재개방/대조한 뒤 새 디렉터리를 게시한다. 손상 shader, 오래된 graph 또는 texture 폐포
+누락이면 게시하지 않는다.</p>
+<p>현재 입력은 <strong>앞서 host compiler가 검증한 specialization</strong>이다. cooker가 제품 host를
+자동 선택·생성하는 단계와 프로젝트 build/packaging의 graph 자동 수집은 남아 있다.
+source graph 일치 검사만으로 오래된 compiler/common include와의 freshness를 보증하지
+않는다. host compiler가 현재 의존성으로 산출물을 재검증한 뒤 넘기는 계약이며,
+제품 cooker의 compiler 소유·freshness 검사를 연결해야 한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-검증과-실제-제품-연결-기록">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-검증과-실제-제품-연결-기록">6. 검증과 실제 제품 연결 기록</h2></div>
+<div class="prose"><p>아래 각 절은 단계별 구현 당시의 범위와 증거다. 현재 완료선은 1절과 마지막 MAT-7 종료
+결과 및 <a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>를 따른다.</p>
+<h3 id="datasystemmaterial-generation-연결-2026-09-28">DataSystem·Material generation 연결 (2026-09-28)</h3>
+<p><code>MaterialGraphRuntime</code>의 <code>GenerationStore</code>는 graph UUIDv4로 full typed program을
+소유한다. 동시에 같은 GUID를 적재하면 한 번만 읽으며, 동일한 전체 payload는
+generation 번호를 유지한다. 실패한 후보는 성공으로 반환하지 않고 마지막 정상
+lookup을 보존한다. 제거·재등록과 catalog 재마운트에서도 번호를 재사용하지 않는다.
+이미 생성된 Material/clone은 자기 불변 generation owner를 계속 보유한다.</p>
+<p><code>DataSystem::LoadMaterialGraphGeneration</code>은 현재 mounted CEMF의 size/SHA-256와
+typed metadata/bytecode를 검사한다. Editor에서는 현재 <code>.shadergraph</code>를 다시 생성해
+Slang/metadata가 정확히 일치해야 재로딩한다. packaged load는 source graph와 Slang
+compiler를 사용하지 않는다. 실제 DataSystem은 추출된 cooked tree를 읽고,
+<code>LoadCookedGeneration</code>의 byte-source 경계는 encrypted PAK도 검사했다.
+DataSystem 자체의 직접 PAK 마운트를 완료로 기록하지 않는다.</p>
+<p><code>ConfigureMaterialGraph</code>는 공개 numeric parameter ID와 Texture parameter ID/GUID를
+검증하고 reflected uniform bytes 및 색 공간별 CPU Texture owner를 모두 준비한 뒤
+Material instance snapshot을 교체한다. 잘못된 타입·비공개/미지 ID·없는 Texture GUID는
+기존 snapshot을 보존한다. 숫자 setter와 clone은 새 snapshot을 만들어 값을 분리한다.
+Material 변경은 소유 thread에서 직렬화하며, RT는 후속 Scene 단계의 owning draw
+snapshot을 소비한다. 이 단계의 CPU Texture는 아직 RHI 등록·GPU 제출을 뜻하지 않는다.</p>
+<p>저장 정본 <code>lattice_material: 1</code>은 graph GUID, material GUID/name/doubleSided,
+안정적인 parameter ID와 bool/int/float/vector/color 값, Texture override GUID를 담는다.
+generation 번호·주소·바이트 오프셋을 저장하지 않는다. double 저작 값을 최대 유효
+자릿수로 저장하고 실제 binding은 float32/int32 계약으로 검사한다. unknown/duplicate
+key, 버전/타입/범위 오류를 거부하며 실패한 decode는 이전 instance를 보존한다.
+DataSystem의 YAML 및 기존 CEMT/CEDO binary 경계에서 같은 정본을 사용한다.
+Sampler 변경, coverage/queue 정책, standalone graph material/Scene의 자동 cook 폐포는
+후속 단계다. ShaderMeta 문서의 기존 read/write 경로는 유지한다.</p>
+<p>Scene clone finalization은 LX snapshot을 지우지 않는다. 명시적인 legacy 문서를
+성공적으로 읽었을 때만 LX 상태를 해제한다. LX 재질은 기본 ShaderMeta pass로
+내려가지 않으며 <a href="MaterialGraphSceneHost.html">bounded Scene host</a>의 지원/예산 계약을 적용한다.
+Scene 실제 렌더 또는 Editor 전체 GUI 완료를 주장하지 않는다.</p>
+<p>재현:</p>
+<pre><code class="language-powershell"># RenderEngine와 AssetCooker Debug/Release를 현재 소스로 빌드한 뒤
+&amp; Tools/regression/verify-material-product.ps1 -VerifyAssetCooker
+&amp; Tools/regression/verify-material-datasystem.ps1
+&amp; Tools/regression/verify-material-render-bindings.ps1
+&amp; Tools/regression/verify-material-ibl-bake.ps1</code></pre>
+<p>RTX 4070 Ti D3D12 hardware probe는 121개 검사와 SRGB·Alpha·reflected override 값 60성분,
+실제 native PSO 거부, last-good 교체, typed 저장 왕복/손상 거부와 owner fence 수명을
+검사한다. 실제 AssetCooker Debug/Release 결과를 loose 및 encrypted PAK으로 다시 열고
+compiler 호출 0회로 native PSO를 만든다(각 7개 검사). source 변경·누락 texture·손상 shader 각각의
+게시 거부와 이미 성공한 cooked bytes 보존을 검사한다.
+앞선 기반 검증에서 RenderEngine library와 AssetCooker host/launcher의 Debug/Release
+빌드가 통과했다. 이번 연결 변경은 RenderEngine/Utility_Framework와 직접 호출 probe를
+Debug/Release로 다시 빌드하고, 기존 AssetCooker 실행 파일로 새 fixture를 쿠킹했다.
+generation·instance·typed 저장 왕복·실패 복구·동시 8개 GUID 적재 회귀 43개가 통과했다.
+제품 RenderEngine/Utility_Framework에 링크한 <code>MaterialDataSystemProbe</code>는 Debug/Release
+각 26개 검사로 실제 DataSystem GUID 로딩·PNG decode/SRGB·Material setter/clone,
+YAML/CEMT/CEDO 저장 재개방·기존 ShaderMeta 문서 왕복·stale reload/removal/finalize를
+검사한다. Console host는 WIC용 COM과 Material typed reflection ops를 초기화한다.
+<code>MaterialRenderBindingsProbe</code>는 현재 RenderEngine/Utility_Framework에 링크해 Debug/Release
+각 168개 검사와 64개 GPU 성분 비교를 통과했다. 실제 DX12 device/root cache/PSO cache/
+texture cache/device services/encoder로 2×1 SRGB 이미지 하나에 네 sampler를 함께 적용한다.
+텍셀 사이와 범위 밖 UV의 필터·repeat/clamp, 프레임별 numeric override, sampler 테이블 재사용,
+root 범위 충돌·누락/중복/alias 슬롯·stale recording·픽셀 없는 upload의 이전 packet 보존을
+검사했다. 각 4프레임을 제출·완료 대기 후 읽었고 GPU validation WARNING 이상은 0건이다.
+이 검사는 Scene draw, 동시 인플라이트 수명이나 물리 Core/Layered IBL 결과를 판정하지 않는다.
+후속 <code>MaterialIblBakeProbe</code>는 Debug/Release 각각 19,351개 검사·18,240개 GPU 성분을 통과했다.
+152개 지점×3프레임의 균일/면별 HDR 환경, Core/Layered 계수와 별도 base/coat/sheen 응답,
+실제 lookup 소비 픽셀을 독립 double CPU 수식과 대조했다. DXIL/SPIR-V CS/VS/PS 6개,
+GPU validation WARNING 이상 0건, 최대 정규화 오차 0.00000950694다.
+새 비교 상한은 0.0001, 거의 0인 반사 에너지의 상한은 0.000001이다.
+기존 Layered 216,776개·energy bound 5,712개 및 numeric golden 1,960행/7,840성분,
+DXIL/SPIR-V 14개·지정 거부 8개도 이번 bake 변경으로 다시 검사했다.
+이 검사는 Scene lookup 설치·임의 HDR 수렴·실시간 성능·동시 인플라이트 수명을 판정하지 않는다.
+앞선 기반 검증의 MAT-6 20개 graph/13,306개 검사·3,600 GPU 성분·93개 컴파일과
+기존 pass 70개 컴파일/지정 거부 58개 결과는 유지한다. 이번 연결 변경의 재실행으로
+기록하지 않는다.</p>
+<p>대시보드 JS 파싱은 통과했다. 전체 dashboard checker는 현재와 HEAD 모두 같은
+미산정 <code>days:null</code> 24행 및 PHASE 4.6 meta 불일치 1건으로 실패한다. MAT-7 수정으로
+추가된 오류는 없으며 해당 전역 checker를 통과로 기록하지 않는다.</p>
+<p>raw artifacts와 로그는 <code>Build/Obj/MaterialProductProbe/</code>, 종합 판정은 그 안의
+<code>verification-summary.md</code>에 기록한다. DXIL/SPIR-V 컴파일은 두 backend를 검사하지만
+actual PSO/GPU runtime은 D3D12다. Vulkan runtime 완료로 표시하지 않는다.</p>
+<p>다음 구현 순서:</p>
+<p>제품 Model 정점 형식의 GPU skin/world 입력과 완료 검증 후 GPU packet 게시 경계는
+<a href="MaterialGraphMeshSurface.html">MaterialGraphMeshSurface.md</a>에 구현·검증했다.
+큰 메시 triangle 분할과 UV/world frame 보간 후 정확한 샘플 재질/IBL 평가,
+명시적 footprint LOD도 추가했다.
+<a href="MaterialGraphRasterSurface.html">MaterialGraphRasterSurface.md</a>에 depth/MRT 기반 가시 픽셀과
+fine UV derivative를 수집하는 독립 RHI RenderGraph 패스를 추가했다. 동일 graph의 재질 평가·IBL 준비/선언/병렬 기록은 <a href="MaterialGraphPassRecording.html">MaterialGraphPassRecording.md</a>에 연결했다.
+current-pose mesh 생산과 Core/Layered의 read-only shared depth·opaque draw winner 확장은
+<a href="MaterialGraphSharedDepth.html">MaterialGraphSharedDepth.md</a>에 추가했다. 독립 RHI 범위이며 기존
+Scene/GBuffer의 depth·masked coverage를 설치한 것으로 세지 않는다.
+<a href="MaterialGraphSceneInput.html">MaterialGraphSceneInput.md</a>에 producer proxy/delta와 실제 draw pool/per-view
+CPU 입력 밀봉을 연결했다. <a href="MaterialGraphSceneHost.html">MaterialGraphSceneHost.md</a>에 실제
+GBuffer·legacy/Masked 공유 depth·직접광/HDR 합성의 host를 추가했다.
+<a href="MaterialGraphSceneLookup.html">MaterialGraphSceneLookup.md</a>에 정확한 픽셀 입력 비교·IBL 재사용과
+실제 제출 뒤 캐시 게시·payload 예산을 확장했다.
+<a href="MaterialGraphTextureFootprints.html">MaterialGraphTextureFootprints.md</a>에 실제 Scene의 이미지별
+Vector·크기·mip 수에 따른 독립 LOD와 단일 텍스처 제한 해제를 추가했다.
+<a href="MaterialGraphSceneGeneration.html">MaterialGraphSceneGeneration.md</a>에 generation별 Slang 검증·DX12/Vulkan
+native PSO 준비와 실제 graph batch 티켓 성공 후 슬롯 게시를 추가했다. pending/실패·abort·stale
+결과는 같은 epoch/view/Material의 마지막 정상 instance·coverage를 유지한다. 현재 geometry는
+새 입력을 사용한다. Vulkan은 native PSO 준비·기본 GPU draw까지 검증했다.
+Vulkan 전체 Scene 합성의 후속 실행 증거는
+<a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>가 소유한다.
+<a href="MaterialGraphSceneSubsurface.html">MaterialGraphSceneSubsurface.md</a>에 실제 Scene의
+재질별 SSS source/profile·draw owner mask·world-distance dipole gather·Special HDR 합성을 추가했다.
+가시 표면의 유한한 근사이며 transmission/refraction·Volume의 설치 완료로 세지 않는다.
+<a href="MaterialGraphSceneRefraction.html">MaterialGraphSceneRefraction.md</a>에 후속 단일 표면의
+transmission/refraction을 설치했다. 가장 가까운 투과 표면의 뒤쪽 불투명 HDR/depth를 읽고,
+glass 적분·rough radiance convolution·환경 fallback 뒤 최종 depth/owner/HDR을 갱신한다.
+<a href="MaterialGraphSceneVolume.html">MaterialGraphSceneVolume.md</a>에 닫힌 균질 매질의 계수 생성,
+깊이로 제한한 카메라 ray와 굴절 ray의 흡수·발광·단일 산란을 연결했다.
+일반 alpha Blended queue는 이 transport 경로에 포함하지 않는다.</p>
+<p>MAT-7 종료 범위는 다음 세 묶음으로 고정한다.</p>
+<ol>
+<li>제품 render path: LX shadow caster/Decal lobe 연결.
+SSS·transmission/refraction·Volume은 위 문서의 유한한 근사 범위로 구현한다.</li>
+<li>자동 cook/package·Player: 현재 host/compiler 의존성으로 직접 검증하고 graph 폐포를
+build/packaging이 자동 수집한다. packaged 실행에서도 cooked Scene host를 사용한다.</li>
+<li>제품 통합 검증: 실제 Editor Scene/Game·교체·저장 후 재개방과 수명,
+native Vulkan 전체 Scene 합성을 확인한다.</li>
+</ol>
+<p>2026-09-29 첫 묶음은 <a href="MaterialGraphSceneShadowDecal.html">MaterialGraphSceneShadowDecal.md</a>,
+두 번째 묶음은 <a href="MaterialGraphSceneCook.html">MaterialGraphSceneCook.md</a>의 구현·검증으로 완료했다.
+자동 쿠킹의 반복 바이트 일치·실패 복구와 Debug/Release 실제 packaged Player의 cooked Scene
+ready·화면 게시 24회·Scene specialization compile 0회·텍스트 파서 호출 0회를 확인했다.
+세 번째 묶음도 <a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>의
+full CreatorEditor Debug/Release 각 1,430개 검사·11개 capture와 native Vulkan 6개 Scene
+경로로 완료했다. Editor는 저장/재개방·Undo/Redo·실패 복구·Play/Stop·삭제/복구와 실제
+owner·픽셀을 검사했다. Vulkan은 Core/Layered·Shadow/Decal·SSS·Refraction·Volume과
+encrypted cooked Scene을 readback·종료까지 validation/encoder drop 0개로 검사했다.
+<strong>2026-09-29 고정한 세 종료 묶음을 모두 완료했으며 MAT-7은 done이다.</strong></p>
+<p>초기 CS 전체 비동기화·전역 cache 최적화·환경 MIS/수렴·named UV 확대는 별도 개선이다.
+현재 캐시의 cold/카메라 이동·입력 MRT·메모리·dense Scene 비용 및 최종 성능 수용은 MAT-9가
+소유한다. 입증된 제품 오류의 수정은 해당 통합 검증에 포함하지만, 최적화 항목을 MAT-7
+필수 잔여로 계속 추가하지 않는다. reflected b2·독립 sampler root/table은 이미 설치했다.</p>
+<p>Blender rendered grid/route parity·Standard 성능 수용은 MAT-9, artist preview·표시는
+MAT-8, Editor canvas/HTTP는 LX-3/LX-3H가 계속 소유한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MaterialGraphProduct.md"><code>docs/design/MaterialGraphProduct.md</code></a> · 마지막 커밋 2026-10-03 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

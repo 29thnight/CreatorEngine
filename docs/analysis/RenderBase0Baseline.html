@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RenderBase0Baseline.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BASE-0 구현과 검증 기록</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#현재-완료-계약--2026-10-02-범위-정리">현재 완료 계약 — 2026-10-02 범위 정리</a></li><li><a href="#과거-구현검증-이력--이하-당시-판정">과거 구현·검증 이력 — 이하 당시 판정</a></li><li><a href="#카메라렌더-시간-파일-재생--base-0-첫-재생-슬라이스">카메라·렌더 시간 파일 재생 — BASE-0 첫 재생 슬라이스</a></li><li><a href="#선택된-draw의-transformpose-파일-재생--base-0-두-번째-슬라이스">선택된 draw의 transform·pose 파일 재생 — BASE-0 두 번째 슬라이스</a></li><li><a href="#구현">구현</a></li><li><a href="#재현-계약의-범위">재현 계약의 범위</a></li><li><a href="#검증-현황">검증 현황</a></li><li><a href="#vulkan-cold-pso-조사-후속-2026-10-01">Vulkan cold PSO 조사 후속 (2026-10-01)</a></li><li><a href="#실행">실행</a></li><li><a href="#단계별-hdr-진단과-capture-history-수명-수정-2026-10-01">단계별 HDR 진단과 capture history 수명 수정 (2026-10-01)</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderBase0Baseline.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>BASE-0 구현과 검증 기록</h1>
+<div class="meta"><p>2026-10-04 RG5-12 화면 SSS/SSR 이관 이후 현행 기준선은 <a href="RenderRg5ScreenMigration.html">화면 소비 체인 검증</a>을 따른다. Debug/Release GPU 각 3정책·48 frames·정책 간 오차 0·validation 0, 기본 제품 반복 회귀·변경 전후/구성 간 각 16개 이미지 오차 0·현행 소스/바이너리 SHA-256 및 phaseComplete=true를 확인했다. RG5 전체와 전체 제품 SceneRenderer의 versioned GPU 수용/RG6 기본 전환은 열려 있다. 아래 과거 증거는 보존한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 10개의 분량 막대">
+<a class="map-row" href="#현재-완료-계약--2026-10-02-범위-정리"><span class="ve-label">§00</span><span class="map-name">현재 완료 계약 — 2026-10-02 범위 정리</span><span class="map-bar"><i style="width:70.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#과거-구현검증-이력--이하-당시-판정"><span class="ve-label">§01</span><span class="map-name">과거 구현·검증 이력 — 이하 당시 판정</span><span class="map-bar"><i style="width:7.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#카메라렌더-시간-파일-재생--base-0-첫-재생-슬라이스"><span class="ve-label">§02</span><span class="map-name">카메라·렌더 시간 파일 재생 — BASE-0 첫 재생 슬라이스</span><span class="map-bar"><i style="width:41.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#선택된-draw의-transformpose-파일-재생--base-0-두-번째-슬라이스"><span class="ve-label">§03</span><span class="map-name">선택된 draw의 transform·pose 파일 재생 — BASE-0 두 번째 슬라이스</span><span class="map-bar"><i style="width:56.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#구현"><span class="ve-label">§04</span><span class="map-name">구현</span><span class="map-bar"><i style="width:24%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현-계약의-범위"><span class="ve-label">§05</span><span class="map-name">재현 계약의 범위</span><span class="map-bar"><i style="width:12.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-현황"><span class="ve-label">§06</span><span class="map-name">검증 현황</span><span class="map-bar"><i style="width:49.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#vulkan-cold-pso-조사-후속-2026-10-01"><span class="ve-label">§07</span><span class="map-name">Vulkan cold PSO 조사 후속 (2026-10-01)</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행"><span class="ve-label">§08</span><span class="map-name">실행</span><span class="map-bar"><i style="width:12.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#단계별-hdr-진단과-capture-history-수명-수정-2026-10-01"><span class="ve-label">§09</span><span class="map-name">단계별 HDR 진단과 capture history 수명 수정 (2026-10-01)</span><span class="map-bar"><i style="width:35.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 10개 가운데 「Vulkan cold PSO 조사 후속 (2026-10-01)」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-현재-완료-계약--2026-10-02-범위-정리">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="현재-완료-계약--2026-10-02-범위-정리">현재 완료 계약 — 2026-10-02 범위 정리</h2></div>
+<div class="prose"><p>BASE-0은 <strong>RenderGraph 구조 변경 전 DX12 기준선</strong>이다. 범용 frame packet 직렬화나 모든 재질·애니메이션
+재생의 완성은 RG1 착수 조건이 아니다. 아래 기존 슬라이스의 <code>complete=false</code>·범용 재생 잔여 표기는 당시
+확장된 계약의 역사적 판정이며, 현재 완료 조건은 이 절을 따른다. 과거 artifact는 수정하지 않는다.</p>
+<p>완료 조건은 다음 여섯 가지다.</p>
+<ol>
+<li><strong>현재 소스와 바이너리:</strong> 같은 소스로 빌드한 Debug/Release Editor를 사용하고 executable/runtime DLL·소스
+SHA-256을 기록한다. 실행 중 변경이 없어야 하며 완료 판정 시에도 현재 파일과 일치해야 한다.</li>
+<li><strong>고정된 대표 장면:</strong> 현행 artifact/host identity로 재쿠킹한 동일 자산·장면·카메라·해상도·tuning·환경을 사용한다.
+IBL 1024/4096과 기존 이미지 상한을 유지한다. 파일 기반 범용 재생 대신 고정 자산/설정 재구성을 허용한다.</li>
+<li><strong>이미지 기준선:</strong> 각 구성에서 독립 DX12 프로세스 2개 × 캡처 2개를 비교하고 Debug/Release도 대조한다.
+기본 첨부와 캡처된 중간 HDR의 선형 오차·RMSE·차영상·PNG를 보존하고 기존 오차 상한 안에서 통과해야 한다.
+과거 16개 이미지의 bit-exact는 관측 결과이며 현재 바이너리의 재검증을 대신하지 않는다.</li>
+<li><strong>graph 진단과 변이:</strong> 현행 declaration-order/inferred-state 계약의 pass 순서·사용·컬링·수명·Transition/UAV
+진단과 native graph fixture를 보존한다. producer/order/edge/lifetime/barrier/input/pixel 변이가 실제 거부되어야 한다.
+BASE-0이 의존성 DAG 또는 version/Modify를 구현했다고 주장하지 않는다.</li>
+<li><strong>계측과 실행 건전성:</strong> capture submission의 CPU compile/record·pass별 GPU 시간·VRAM과 측정 scope를 기록한다.
+timestamp 누락·비유한 픽셀·GPU validation·encoder drop·입력/소스 변경·비정상 종료·강제 종료가 없어야 한다.
+일반 FPS 또는 MAT-9 성능 합격의 수치 기준을 새로 만들지 않는다.</li>
+<li><strong>두 구성의 최종 회수:</strong> 위 조건이 두 구성에서 모두 통과하고 해당 첫 캡처끼리 비교해야 BASE-0 전체 완료다.
+<code>complete-render-base0.ps1</code>이 현재 바이너리/소스 및 결과의 연결을 확인해 별도 <code>phaseComplete=true</code> 증거를 쓴다.</li>
+</ol>
+<p>기본 <code>verify-render-base0.ps1</code>의 <code>complete</code>는 <strong>한 구성의 기준선 통과</strong>다.
+<code>genericPacketReplayVerified</code>·재질/포즈 재생 여부는 완료 식에 포함하지 않는다.
+<code>-ReplayExtensions</code>는 추가 진단 실행이며 native <code>dx12.rendergraph replay-extensions</code>,
+제품 재생 캡처와 파일 재생 검사를 명시적으로 선택한다. 기존 재생 코드·기록은 보존한다.</p>
+<p>2026-10-03 독립 선택 경계: <code>controlled-replay</code>는 draw 입력 저장만 선택하며 카메라 파일만 지정하면
+draw/Lattice 저장 검사도 실행하지 않는다. <code>controlled-lattice-replay</code> 또는 명시적인 Lattice 입력 파일만
+Lattice 밀봉·재생을 활성화한다. 재질의 정상 렌더링 경로는 항상 유지한다. manifest는 Lattice 확장의
+선택·실행 여부를 기록하며 미선택 캡처에 Lattice 계약을 선언하지 않는다.
+<code>-ReplayExtensions</code>는 <code>baseline/</code>과 <code>replay-extension/</code>에서 독립 실행한다. 최상위 결과는 기본 기준선의
+판정을 유지하고 확장 결과·오류는 별도 필드로 참조한다. 확장 전용 결과는 최종 완료 도구가 거부한다.</p>
+<p>2026-10-03 분리 검증: VS18/v145 Debug Editor 빌드와 실제 DX12 캡처의 기본·카메라·draw 저장·draw 재생
+네 모드에서 Lattice 미선택·미실행 및 파일 부재를 확인했다. 명시 선택한 Lattice 저장과 파일 재생도
+현재 fixture의 draw 1개에서 성공했다. 이후 일반 캡처와 이전 일반 캡처의 16개 이미지가 maxError=0,
+validationCount=0, GPU 측정 완료, 정상 종료 0이었다. 증거는
+<code>Build/Obj/Base0IndependentReplay/Debug-live-v2/{result.json,responses.jsonl,post-extension-isolation/comparison.json}</code>.
+확장 실패·native 종료 코드 주입은 기본 판정과 호출자 종료 코드를 오염시키지 않았고, 확장 전용 결과의
+최종 완료 제출은 거부됐다. 이는 분리 경계의 Debug 검증이며 범용 재질 재생이나 BASE-0 최종 회수가 아니다.</p>
+<p><strong>2026-10-03 현재 상태는 done·완료 공수 4인일이다.</strong> 현행 Debug/Release에서 각각 독립 프로세스 2개 ×
+캡처 2개를 수집했다. 구성 내 재현·graph/변이·계측·GPU validation·정상 종료를 통과했고 구성 간 자산·환경·
+tuning 신원도 일치했다. 구성 간 16개 이미지의 maxError=0, GPU 측정 완료, 현재 소스·각 바이너리 해시
+일치를 최종 도구가 검증하여 <code>phaseComplete=true</code>를 기록했다. 재생 확장은 모두 비활성화했다.
+최종 증거는 <code>Build/Obj/RenderBase0/{Debug-current-static-v4,Release-current-static-v4}/result.json</code>,
+<code>Debug-Release-current-static-v4/comparison.json</code>, <code>current-static-v4-phase-complete.json</code>이다.
+초기 <code>Debug-current-static-v2</code>는 cold import가 모델 <code>.meta</code> generation을 갱신해 입력 고정 검사에서 거부됐다.
+원본 자산은 준비 중에도 불변으로 검사하고, 준비 완료 후 <code>.meta</code>까지 고정하도록 경계를 수정했다.
+<code>Debug-current-static-v3</code>는 빌드와 겹친 진단 기록이며, 최종 v4는 빌드 종료 후 두 구성을 순서대로 수집했다.
+이전 재생 결과와 실패 기록은 보존한다. MAT-9 성능 판정과 구분하기 위해 CPU/GPU 시간은 readback을 포함한
+캡처 제출 범위, VRAM은 device budget snapshot으로 해석한다. RG1 스케줄링 구현은 아직 미착수다.</p>
+<p>분리한 후속 범위: 범용 재질/program/texture·실제 animated/skinned pose·광원/tuning/history 파일 재생.
+MAT-9 SSS/투과 품질·실제 성능 수용은 그대로 열어 두며 Vulkan RenderDoc/리소스/픽셀 비교는 PHASE 4.9만 소유한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-과거-구현검증-이력--이하-당시-판정">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="과거-구현검증-이력--이하-당시-판정">과거 구현·검증 이력 — 이하 당시 판정</h2></div>
+<div class="prose"><blockquote>
+<p><strong>2026-10-01 사용자 지시로 완료 범위 정정.</strong> BASE-0은 DX12 Debug/Release의 입력 재현·graph/계측·회귀 검증이다. 아래 Vulkan 비교 실행/오류/수정은 과거 관측 기록이며 현재 BASE-0의 선행·잔여·실패 조건이 아니다. 잔여 SSGI/HDR/display 교차 오차와 Vulkan 비교는 <a href="../plans/BackendParityPlan.html">PHASE 4.9</a>의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교로 인계했다. 당시 result.json은 당시 잘못 설정된 범위의 결과로 보존하며 덮어쓰지 않는다. 범용 sealed packet replay 등 BASE-0 고유 잔여는 별도다.</p>
+</blockquote>
+<p>2026-10-02. 상태: <strong>진행 중</strong>. MAT-9·RG1~RG9 완료를 뜻하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-카메라렌더-시간-파일-재생--base-0-첫-재생-슬라이스">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="카메라렌더-시간-파일-재생--base-0-첫-재생-슬라이스">카메라·렌더 시간 파일 재생 — BASE-0 첫 재생 슬라이스</h2></div>
+<div class="prose"><p>2026-10-01 <code>camera-clock-v1</code>을 제품 <code>render.live.capture</code>에 연결했다. 정지 자산을
+다시 읽는 기존 하네스 위에서, 저장한 카메라/시간 값이 실제 제품 렌더 입력으로 재주입되는지 검증한다.</p>
+<ul>
+<li><code>camera-input.bin</code>은 368바이트 little-endian 형식이다. magic/version, 해상도·표시 대상·view flags·배경 상태,
+total/delta, 직교 여부, 카메라 행렬 4개·벡터 4개·FOV/near/far와 checksum을 담는다.
+포인터·구조체 padding·frame ID·scene epoch·자원 handle을 파일로 저장하지 않는다.</li>
+<li>기존 명령의 선택 인자로 <code>controlled &lt;camera-input-absolute-path&gt;</code>를 받는다. 파일을 먼저 읽고 검증한
+값만 요청이 소유한다. RT는 해당 캡처의 지역 frame 사본에 카메라·시간만 적용하며,
+발행 순서·scene epoch·resize generation과 자원 수명은 현재 프로세스의 계약을 유지한다.</li>
+<li>파일 손상/버전/비유한 값/잘못된 target은 출력 폴더 생성 전에 거부한다. 실제 frame의 크기·view flags·
+배경 상태가 다르면 캡처만 실패시키고 일반 live 입력으로 진행한다. 실패한 decode는 이전 정상 값을 보존한다.</li>
+<li>기본 정지 캡처는 시간 0·SSAO sample 0·SSGI/fog 재시작을 유지한다. 0이 아닌 시간을 재생한 진단은
+<code>captureMode=camera-clock-replay-v1</code>로 구분하며 정지 기준선 이미지 수용에 섞지 않는다.</li>
+<li>메시·재질·본 포즈·광원·셰이더/자산 owner·tuning·시간축 history를 이 파일이 저장한다고 주장하지 않는다.
+이 값들은 아직 현재 장면에서 공급된다. <code>cameraClockReplayVerified</code>와 <code>genericPacketReplayVerified</code>를
+별도로 보고하며, 후자는 아직 false다. <strong>BASE-0 전체 완료와 RG1 착수 통과를 올리지 않는다.</strong></li>
+</ul>
+<p>검증 현황: VS18/v145 Debug/Release Editor 빌드·각 네이티브 roundtrip/11종 거부·제품 파일 6종 거부를 통과했다.
+실제 카메라 이동 재생은 GBuffer baseColor 156성분을 바꿨고, 이후 일반 캡처는 원본의 7개 첨부와
+bit-exact였다. 시간 17.25초/delta 1/60 주입과 파일 바이트 보존도 확인했다.
+Debug/Release 각각 독립 DX12 프로세스 2개 × 정지 캡처 2개 모두 이미지 7개 bit-exact,
+GPU validation 문제 0, sourceChanges=0, 강제 종료 없이 exit 0이다. 각 구성에서 cameraClockReplayVerified=true,
+genericPacketReplayVerified=false, complete=false이며 실패 항목은 없다.
+기본 첨부 7개와 중간 HDR 9개를 합친 16개 이미지 모두 동일/독립 프로세스 및 Debug/Release 간 bit-exact다.
+구성 간 대조 증거는 <code>Build/Obj/RenderBase0/camera-replay-Debug-Release-v1/comparison.json</code>이다.</p>
+<p>증거: <code>Build/Obj/RenderBase0/Debug-camera-replay-v1/result.json</code>, <code>Build/Obj/RenderBase0/Release-camera-replay-v1/result.json</code>,
+<code>dx12-0/shifted-camera/camera-replay-verification.json</code>, <code>dx12-0/replay-isolation/comparison.json</code>,
+<code>dx12-process-repeatability/comparison.json</code>. 하네스는 DX12 기본값을 유지하며 Vulkan 비교는 실행하지 않았다.</p>
+<p>이후 선택된 draw의 transform/pose 슬라이스를 아래처럼 추가했다. 재질 typed 값과 범용 입력 재생은
+여전히 잔여이며 이 카메라 슬라이스의 성공으로 대신하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-선택된-draw의-transformpose-파일-재생--base-0-두-번째-슬라이스">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="선택된-draw의-transformpose-파일-재생--base-0-두-번째-슬라이스">선택된 draw의 transform·pose 파일 재생 — BASE-0 두 번째 슬라이스</h2></div>
+<div class="prose"><p>2026-10-02 <code>selected-transform-pose-v1</code>을 제품 <code>render.live.capture</code>에 연결했다.</p>
+<ul>
+<li><code>draw-input.bin</code>은 <code>CEDRW001</code> magic/version, draw 수, 각 draw의 route(opaque/forward/LX),
+ModelId/MeshId 32바이트, 지오메트리 digest, bone 수, 월드 행렬과 본 행렬, 전체 checksum을
+little-endian으로 저장한다. 구조체 padding·포인터·프로세스의 generation/frame/animator key는 저장하지 않는다.</li>
+<li>입력은 최대 64MiB, draw 16,384개, draw당 bone 1,024개로 제한한다. 실제 남은 payload 크기도 검사하고
+비유한 행렬·버전·route·과대 count·잘린 파일·checksum 오류는 요청 단계에서 출력 폴더 생성 전에 거부한다.
+decode 실패 시 기존 정상 값은 유지한다.</li>
+<li>명령은 <code>render.live.capture &lt;new-absolute-directory&gt; editor controlled &lt;camera-input-path&gt; &lt;draw-input-path&gt;</code>다.
+Editor/Game의 controlled camera 재생이 선행 조건이며 MaterialPreview는 이 draw 재생 계약에 포함하지 않는다.</li>
+<li>현재 카메라가 선택한 draw 목록에서 자산 ID, vertex/index 실제 바이트와 layout/stride/count의 digest,
+route와 pose count를 <strong>전체 대조한 뒤</strong> 월드/포즈를 적용한다. 불일치 시 진단 캡처만 실패하고 일반 live draw는
+부분 변경하지 않는다. geometry/program/texture는 현재 프로세스의 immutable owner와 수명 계약을 소비한다.
+파일이 메시 payload 자체나 재질/program/texture owner를 복원하는 범용 자산 archive라는 뜻은 아니다.</li>
+<li>재생 포즈는 캡처 요청의 vector가 소유하고 GPU 준비가 끝날 때까지 유지한다. LX scene sealing 전 적용하며,
+LX fallback에도 같은 월드/포즈를 전달한다. 재생용 animator key는 현재 선택 목록에서 새로 만들고
+draw별로 구분해 서로 다른 저장 포즈가 기존 dedup key를 공유하지 않도록 한다.</li>
+<li>재생은 이미 선택된 목록에 적용한다. 사라진 자산·다른 선택 목록을 복원하거나 저장 draw로 절두체 선택을
+다시 계산하지 않는다. 재질 값·광원·tuning·시간축 history 재생도 이번 파일의 범위가 아니다.</li>
+</ul>
+<p>검증: VS18/v145 Debug/Release Editor 빌드 성공. 각 네이티브 fixture는 roundtrip, 파일 거부 10종,
+자산/실제 geometry/pose count 불일치 3종, 원자적 적용, producer 포즈 저장소 변경 후 소유 수명,
+opaque/forward/LX와 LX fallback 적용을 확인했다. 각 제품 실행은 잘못된 파일/closure 9종을 거부했고,
+월드 x 이동 0.25 재생으로 실제 GBuffer baseColor 156성분이 바뀌었다. 파일 바이트도 그대로 보존했다.</p>
+<p>각 구성의 독립 DX12 프로세스 2개 × 기준선 캡처 2개에서 첫 캡처의 camera/draw 파일을 나머지 캡처에
+재주입했다. 동일/독립 프로세스 및 Debug/Release 간 기본 첨부 7개 + 중간 HDR 9개, 총 16개 이미지가
+bit-exact(maxError=0)다. 재생 이후 일반 캡처도 원본과 일치한다. GPU validation/encoder 문제 0,
+sourceChanges=0, 모든 프로세스 exit 0·강제 종료 없음이다. 병행 빌드 중 관측 시간을 성능 합격 근거로 사용하지 않는다.</p>
+<p>정적 LX 장면에는 bone이 없다. 따라서 <code>selectedTransformReplayVerified=true</code>,
+<code>cameraClockReplayVerified=true</code>지만 <code>animatedLivePoseReplayVerified=false</code>,
+<code>genericPacketReplayVerified=false</code>, <code>complete=false</code>다. <strong>본 소유 수명의 네이티브 검사를 실제 스키닝 픽셀
+재생 검증으로 대신하지 않는다. BASE-0 progress·완료 공수 0, RG1 not-started를 유지한다.</strong></p>
+<p>증거: <code>Build/Obj/RenderBase0/{Debug,Release}-draw-replay-v1/result.json</code>, 각 <code>dx12-0/graph-fixtures.results.jsonl</code>,
+<code>dx12-0/shifted-world/draw-replay-verification.json</code>, <code>dx12-0/replay-isolation/comparison.json</code>,
+<code>dx12-process-repeatability/comparison.json</code>, <code>Build/Obj/RenderBase0/draw-replay-Debug-Release-v1/comparison.json</code>.
+Vulkan 비교는 실행하지 않았으며 PHASE 4.9 범위를 유지한다. IBL 1024/4096·기존 오차 상한·MAT-9 조건도 유지한다.</p>
+<p>다음: ShaderMeta/Forward/Lattice 재질 typed 값과 program/texture identity·owner의 밀봉/재생,
+실제 animated/skinned draw 재생의 픽셀/스키닝 검증, 나머지 광원·tuning·history 등 범용 packet 범위 회수.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-구현">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="구현">구현</h2></div>
+<div class="prose"><ul>
+<li><code>EnhancedRenderGraph::CaptureDiagnosticSnapshot</code>은 성공한 Compile의 선언/실행 index, 컬링, usage, 수명, transition/UAV barrier, 기존 역방향 reachability edge를 값으로 복사한다. GPU 자원을 소유하지 않는다. 새 선언·Reset·실패한 Compile 뒤의 오래된 snapshot은 허용하지 않는다.</li>
+<li>계약은 <code>legacy-declaration-order</code>·<code>inferred-from-state</code>·<code>versionsSupported=false</code>다. 현행 그래프가 버전 DAG나 Modify 의미를 지원하는 것처럼 표현하지 않는다.</li>
+<li>기존 <code>render.live.capture &lt;새 절대 경로&gt; editor controlled</code> 제품 경로에 그래프·CPU compile/record·해상도·실프레임 종류·IBL 샘플 계약·VRAM snapshot을 추가했다. DX12는 해당 capture submission의 profiler token을 회수하고, Vulkan은 capture 전용 timestamp query pool을 사용한다.</li>
+<li>controlled capture는 render clock과 SSAO sample index를 0으로 하고 SSGI/fog history를 재시작한다. simulation clock·애니메이션을 재생하는 기능은 아니다.</li>
+<li><code>verify-render-base0.ps1</code>은 입력 프로젝트를 별도로 복제하고 각 backend마다 독립 프로세스 2개, 프로세스당 캡처 2개를 만든다. 자산·tuning·환경·실행 파일·runtime DLL·소스 신원을 검사한다. GPU 검증 레이어, query 누락, nonfinite, shutdown 오류를 합격으로 처리하지 않는다.</li>
+<li><code>base0_artifacts.py</code>는 7개 float32 첨부 이미지의 선형 수치 오차·RMSE·차영상과 final PNG를 생성한다. 기존 오차 상한 <code>0.002 + 0.005 * max(abs(a), abs(b))</code>를 유지한다. 입출력 identity가 다르면 이미지 비교 이전에 실패한다.</li>
+<li>네이티브 그래프 fixture와 실제 live pixels는 별도 gate다. 변이는 입력·해상도·프레임 종류·순서·edge·수명·GPU 누락·품질 설정·barrier 누락·실제 픽셀 변경의 10종을 검사한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현-계약의-범위">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="재현-계약의-범위">재현 계약의 범위</h2></div>
+<div class="prose"><p>현재 계약명은 <code>asset-reconstructed-sealed-input-v1</code>이다. 고정된 자산과 설정으로 제품의 immutable scene 입력을 각 프로세스에서 재구성하고 카메라·광원·draw world·재질 typed bytes·geometry generation·LX pose를 비교한다. process-local material slot, 포인터, frame ID를 같은 값으로 강제하지 않는다.</p>
+<p>선택한 fixture는 <code>LX_CookFixture.creator</code>의 정지 장면이다. 범용 직렬화 frame packet을 주입하는 replay, 움직이는 카메라/애니메이션, 모든 재질 route·SSS·투과 품질 수용은 이 실행으로 증명하지 않는다. 기존 MAT-9 미달을 BASE-0 통과로 닫지 않는다.</p>
+<p>측정 scope는 <code>capture-submission-including-readbacks</code>다. 캡처 제출의 CPU compile/record 및 pass GPU 시간이며 일반 실행 성능 합격값이 아니다. VRAM은 device budget snapshot이고 transient peak가 아니다. cold shader/PSO readiness는 측정 밖에서 기다리되 시간 초과는 실패로 남긴다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-현황">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="검증-현황">검증 현황</h2></div>
+<div class="prose"><ul>
+<li>VS18/v145 Debug·Release Editor 빌드 성공. 기존 linker warning은 별도이며 빌드 오류는 없었다.</li>
+<li>Debug 네이티브 <code>dx12.rendergraph</code>에 <code>BASE0_GRAPH_FIXTURES_OK</code> 소비 marker 확인. 기존 7개 그래프 검사도 통과했다. stale incremental test library 문제는 RenderTests 재빌드 후 해결했다.</li>
+<li><code>Build/Obj/RenderBase0/Debug-v4</code>: DX12 동일/독립 프로세스 이미지 7개 모두 bit-exact, 10개 변이 거부. 전체 결과는 Vulkan 준비 시간 초과로 <strong>실패</strong>. 실행 중 sourceChanges=0.</li>
+<li><code>Build/base0-vulkan-stacks.log</code>·<code>Build/base0-vulkan-stacks-v5.log</code>: 실패 실행에서 <code>SceneLookupCache::Initialize → VulkanPipelineCache::GetOrCreateCompute → NVIDIA driver compiler</code> 호출을 확인했다. GPU capture profiler가 활성화되기 전 단계였다. 이것만으로 영구 deadlock이나 일반 실행 GPU 성능을 판정하지 않는다.</li>
+<li><code>Build/Obj/RenderBase0/Debug-v5</code>: DX12 반복/독립 프로세스 통과, Vulkan 0번 실행에서 실제 대기 600,029ms 뒤 timeout (<code>completedFrame=3873</code>, <code>afterFrame=3873</code>, <code>publishedFrame=41979</code>). 따라서 전체 gate 실패, sourceChanges=0. 같은 장시간 준비를 반복하는 Vulkan 1번 실행은 작업자가 중단했으며 합격 증거로 쓰지 않는다.</li>
+<li><code>Base0VulkanTimingProbe</code> Debug·Release: 별도의 실제 Vulkan device와 4개 기록 worker로 clear 4개 + readback 1개를 3회 제출했다. 매번 5개 timestamp 회수, 예상 readback 색, validation=0, clean shutdown 확인. 전체 LX 장면의 Vulkan 준비·픽셀 gate를 대체하지 않는다. 이 검사도 하네스 선행 gate로 연결했다.</li>
+<li>capture profiler는 stack 수명이며 graph slot은 재사용된다. scope 종료/오류에서 graph의 profiler binding을 지우는 수명 보호를 추가하고 Debug·Release Editor를 다시 빌드했다.</li>
+<li><code>Build/Obj/RenderBase0/Release-final-dx12-v2</code>: 수정본 Release Editor의 네이티브 graph marker·Vulkan timing fixture·DX12 2개 프로세스 × 2개 캡처·각 10종 변이·독립 프로세스 비교 통과. 7개 첨부 이미지 bit-exact, GPU query 누락 0, sourceChanges=0. <code>artifactGatesPassed=true</code>, DX12 단독이므로 <code>complete=false</code>.</li>
+<li><code>Build/Obj/RenderBase0/Debug-final-dx12</code>: 수정본 Debug Editor에서도 같은 gate 전부 통과, 7개 첨부 이미지 bit-exact, GPU query 누락 0, sourceChanges=0. <code>artifactGatesPassed=true</code>, DX12 단독이므로 <code>complete=false</code>.</li>
+<li><code>Build/Obj/RenderBase0/Debug-Release-parity</code>: 두 구성의 입력 자산·tuning·환경 신원이 일치하며, 실제 이미지 7개도 bit-exact. 동일 input/graph hash 확인. 단일 정지 fixture의 결과이며 모든 장면의 품질 수용을 뜻하지 않는다.</li>
+<li>초기 슬라이스 판정: <strong>하네스·DX12 정지 기준선 확보, BASE-0 전체는 진행 중</strong>. 이 시점의 Vulkan 전체 장면 준비 미통과는 아래 후속에서 회수한다. IBL 샘플 수나 이미지 상한을 낮춰 gate를 우회하지 않는다. RG1~RG9·MAT-9 완료로 올리지 않는다.</li>
+</ul>
+<p>환경은 RTX 4070 Ti / WMI driver <code>32.0.15.9597</code>, fixture 출력 332×202, IBL 1024/4096이다. 각 구성 capture 4개에서 graph 47 pass / GPU 49 slice, VRAM used 830~831MB / budget 11228MB였다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>캡처 제출 관측 범위</th><th style="text-align:right">Debug</th><th style="text-align:right">Release</th></tr></thead>
+<tbody><tr><td>CPU compile ms</td><td style="text-align:right">0.3245~0.5017</td><td style="text-align:right">0.0525~0.0792</td></tr>
+<tr><td>CPU record ms</td><td style="text-align:right">1.8973~10.4057</td><td style="text-align:right">1.8047~9.7463</td></tr>
+<tr><td>GPU busy ms</td><td style="text-align:right">1.7536~2.5923</td><td style="text-align:right">1.7413~1.9571</td></tr>
+<tr><td>GPU queue span ms</td><td style="text-align:right">1.8434~2.6881</td><td style="text-align:right">1.8307~2.0552</td></tr></tbody></table></div>
+<p>적은 수의 진단 제출 관측값이며 성능 합격이나 Debug 대비 개선을 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-vulkan-cold-pso-조사-후속-2026-10-01">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="vulkan-cold-pso-조사-후속-2026-10-01">Vulkan cold PSO 조사 후속 (2026-10-01)</h2></div>
+<div class="prose"><p><code>Base0VulkanPsoProbe</code>는 SceneLookupBake의 strict-math SPIR-V와 실제 제품 root layout을 사용해 shader compile과 <code>vkCreateComputePipelines</code> 시간을 분리한다. 캡처나 GPU 실행 시간의 대체 지표가 아니며, 시간 초과 실행은 소유한 probe 프로세스만 종료했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>임시 셰이더/드라이버 변형</th><th>관측 결과</th></tr></thead>
+<tbody><tr><td>큰 샘플 루프에 <code>[loop]</code></td><td>60초 시간 초과</td></tr>
+<tr><td>원본 + driver disable optimization</td><td>60초 시간 초과</td></tr>
+<tr><td>Thin Film의 두 <code>[unroll]</code>도 <code>[loop]</code>로 변경</td><td>60초 시간 초과</td></tr>
+<tr><td>내장 테이블 전체를 상수로 단순화</td><td>PSO 2.466초, validation=0; 품질 변경 진단이며 제품 적용 금지</td></tr>
+<tr><td>Thin Film sensitivity 조회만 상수로 단순화</td><td>PSO 5.026초, validation=0; 품질 변경 진단이며 제품 적용 금지</td></tr>
+<tr><td>원본 값을 유지한 16-entry chunk / 512-case switch</td><td>각각 60초 시간 초과; 제품 미적용</td></tr>
+<tr><td>원본 sensitivity 조회 함수에 <code>[noinline]</code></td><td>PSO 17.480초, validation=0; 전체 장면 두 실행은 device lost로 실패하여 제품 수정에서 제외</td></tr>
+<tr><td>원본 sensitivity 값을 b1 상수 버퍼에서 조회</td><td>PSO 5.426초, validation=0; 실제 장면 gate 별도 검증</td></tr></tbody></table></div>
+<p>원본 SPIR-V는 함수 1개/호출 0개이며, noinline 변형은 함수 2개/호출 30개/<code>DontInline</code> 함수 1개다. 큰 sensitivity 테이블 조회 확장이 준비 지연에 관여한다는 근거를 확보했다. <a href="https://docs.shader-slang.org/en/latest/external/core-module-reference/attributes/noinline.html">Slang의 noinline 계약</a>은 downstream 함수 확장을 억제하지만 실행 성공을 보장하지 않는다. <code>Debug-noinline-v1</code>은 첫 준비를 63.892초에 넘겼으나, 두 독립 Vulkan 실행 모두 device lost 뒤 live renderer가 비활성화되어 캡처에 실패했다. command/descriptor pool 재사용·buffer destruction 검증 오류도 기록되었으며 최초 device lost의 단독 원인은 확정하지 않았다. 이 변형을 제품에서 제외했다.</p>
+<p>적용한 수정은 <strong>Vulkan SceneLookupBake에 한해</strong> 동일 sensitivity 값을 b1의 float4 두 배열로 읽는다. DX12와 다른 셰이더는 기존 상수 조회를 유지한다. <code>generate-film-sensitivity-upload.py</code>가 canonical Slang의 real/imag 512행씩을 원래 리터럴 그대로 C++ float4 배치로 생성한다. 하네스 선행 검사 <code>--check</code>가 stale mirror를 거부한다. frame의 기존 upload arena가 16KiB와 dispatch constants를 제출 완료까지 함께 소유한다. 별도의 자원 pool이나 새 그래프 texture는 없다. 매 frame 업로드이며 GPU Scene 상주 설계 완료로 해석하지 않는다. 테이블 값, 보간, 1024/4096 샘플 수와 strict math는 유지한다.</p>
+<p>진단 원본은 <code>Build/base0-pso-*.stdout.log</code>, <code>.stderr.log</code>, <code>.result.txt</code>와 <code>Build/Obj/RenderBase0/PsoInvestigation</code>에 보존한다. 폐기한 noinline 변형의 Debug DX12 수정 전/후 동일 입력 이미지 7개는 bit-exact였다 (<code>NoInline-Dx12-old-new-parity</code>). 최종 GPU-table 수정도 DX12 변경 전/후 7개 이미지 bit-exact다 (<code>GpuTable-Dx12-old-new-parity</code>). PSO probe는 실제 GPU dispatch나 전체 실행 성능의 수용 증거가 아니다.</p>
+<h3 id="실제-장면-후속-및-release-abort-회수">실제 장면 후속 및 Release abort 회수</h3>
+<ul>
+<li><code>Debug-gpu-table-v1</code>: DX12/Vulkan 각각 독립 프로세스 2개 × 캡처 2개, 같은 backend의 7개 이미지 모두 bit-exact, 각 실행의 10종 변이 거부, validation=0, sourceChanges=0. Vulkan 준비와 device-lost 실패를 넘겼다. 당시 전체 결과는 물리 graph identity의 교차 차이 때문에 실패로 보존한다.</li>
+<li><code>Base0FilmUploadProbe</code> Debug/Release: 실제 GPU에서 canonical shader table과 b1 업로드 table의 real/imag 512행씩을 모두 readback하여 bit-exact 확인, validation=0, 누락 encoder 호출 0, 정상 종료. <code>Build/base0-film-upload-{Debug,Release}-final.stdout.log</code> 참조. 표 데이터 보존 검사이며 모든 Thin Film 재질 이미지의 수용은 아니다. 원본 generator가 upload mirror 생성/검사도 함께 실행한다.</li>
+<li><code>Release-gpu-table-v1</code>: DX12 정지/독립 프로세스 gate는 통과. Vulkan은 캡처가 생성됐지만 제품 Release 경로의 validation disabled를 하네스가 거부했다. 이를 합격으로 쓰지 않는다.</li>
+<li><code>Release-gpu-table-v2</code>: scene 장치에만 Release validation override를 적용한 연결 누락으로 ImGui 장치와 설정이 달라졌다. <code>VulkanApi::LoadDevice</code>의 process-wide 진입점이 validation 경로로 바뀐 뒤 비검증 ImGui 장치 호출에서 <code>The VkDevice dispatch handle was not found</code> 및 <code>abort()</code>가 발생했다. 사용자에게 보인 보고서 <code>CreatorEditor_20261001_205904_66808</code>은 <code>ImGuiVulkanShell::RenderAndPresent</code>, <code>CreatorEditor_20261001_205933_70484</code>는 <code>ImGuiVulkanShell::NewFrame → GetCompletedFenceValue</code> 호출을 기록한다. 두 실행과 dump/text를 보존하며 합격 증거에서 제외한다.</li>
+<li>override를 <code>VulkanDeviceResources::Initialize</code>로 옮겨 <code>CREATOR_VULKAN_VALIDATION=on</code>이 <strong>모든 장면/ImGui 장치</strong>에 적용되게 했다. 일반 Release의 기존 기본값은 유지한다. scene-only override는 제거했다. 서로 다른 validation 정책의 임의 장치를 일반적으로 안전하게 혼합하는 per-device dispatch redesign 완료를 뜻하지 않는다.</li>
+<li><code>Release-gpu-table-v3-vulkan</code>: 수정된 Release Editor 독립 2회 × 캡처 2개, 반복/프로세스 간 7개 이미지 bit-exact, 각 10종 변이 거부, validation enabled·오류 0, sourceChanges=0, 정상 종료, 새 crash dump 없음. <code>artifactGatesPassed=true</code>; Vulkan 단독 실행이므로 <code>complete=false</code>다. 전체 BASE-0 완료로 올리지 않는다.</li>
+<li><code>Debug-gpu-table-final-vulkan</code>: 공통 초기화 수정 후 다시 빌드한 Debug Editor에서도 같은 2회 × 2개 캡처 gate 전부 통과, 7개 이미지 bit-exact, validation enabled·오류 0, sourceChanges=0. 최종 하네스 기록에서 두 프로세스 모두 <code>exitCode=0</code>, <code>forcedTermination=false</code>다. 양 구성의 실제 후속 판정은 <code>gpu-table-final-summary.json</code>을 따른다.</li>
+<li>하네스는 실행별 exit code/강제 종료 여부를 보존하고, 첫 live 실행 실패에서 중단하여 같은 crash-report 창을 반복 생성하지 않는다.</li>
+</ul>
+<h3 id="교차-backend-graph와-품질-판정">교차 backend graph와 품질 판정</h3>
+<p>원본 graph는 backend별로 완전히 감사한다. 교차 비교에서만 SSGI physical ring 0/1을 <code>Previous/Current</code> 역할로 바꾸고, DX12의 <code>Live.Shared</code>를 단독 <code>live_present</code>의 imported CopyDest leaf일 때만 제외한다. 추가 소비자·잘못된 read/write 연결은 거부한다. 제품 Pass 변경은 여전히 hash 차이로 검출한다 (<code>LogicalGraphProjectionTests.json</code>). 동일 backend 비교는 기존 전체 topology 신원을 유지한다. 이는 실행 DAG나 resource version 구현이 아니다.</p>
+<p>Debug의 <code>Debug-gpu-table-cross-recheck</code>와 Release의 <code>Release-gpu-table-cross-final</code>은 실제 같은 입력에서 같은 결과를 기록했다. logical graph hash는 <code>89097022d75d14a1da8f47e181bedf114903496d687148188b41cdae1f8b3958</code>이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>실제 교차 이미지</th><th style="text-align:right">최대 절대 오차</th><th style="text-align:right">기존 상한 초과 픽셀</th></tr></thead>
+<tbody><tr><td>baseColor / depth / emissive / metalRough / normal</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>preToneHdr</td><td class="num" style="text-align:right">0.8671875</td><td class="num" style="text-align:right">32634</td></tr>
+<tr><td>display</td><td class="num" style="text-align:right">0.031372547</td><td class="num" style="text-align:right">20553</td></tr></tbody></table></div>
+<p>절대+상대 상한 <code>.002 + .005 * max(abs(a), abs(b))</code>을 유지했다. GBuffer 5종 일치 이후 HDR/표시 차이를 확인했으나, 조명·IBL·히스토리·후처리 중 최초 차이의 단독 원인은 이 첨부들만으로 확정하지 않는다. <strong>BASE-0은 이 교차 품질 gate와 범용 밀봉 packet replay 때문에 계속 진행 중</strong>이다. MAT-9 SSS/투과 및 이동 성능 완료와도 별도다. 초기 332×202 정지 fixture의 진단 결과로 성능 수용을 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실행">
+<div class="sec-head"><p class="ve-label">§08</p><h2 id="실행">실행</h2></div>
+<div class="prose"><p>PowerShell 7과 Python 표준 라이브러리를 사용한다. BASE-0은 Editor를 같은 Configuration으로 빌드하고 <code>-Backend dx12</code>로 실행한다. Vulkan timing probe는 4.9의 명시적 진단 실행에서만 필요하다. 기존 산출물을 덮지 않도록 새 출력 디렉터리가 필요하다.</p>
+<pre><code class="language-powershell">&amp; Tools/regression/verify-render-base0.ps1 -Configuration Debug `
+  -FixtureProject '&lt;입력 프로젝트 절대 경로&gt;' `
+  -OutputDirectory '&lt;새 산출물 절대 경로&gt;'</code></pre>
+<p><code>-Configuration Release</code>로 같은 입력을 별도 실행한다. DX12의 <code>artifactGatesPassed</code>와 범용 replay 완료 여부를 구분한다. Vulkan 비교 여부는 BASE-0 완료 조건이 아니다. 실제 입력·실행 환경·known gaps·세부 판정은 각 출력의 <code>result.json</code>, <code>source-hashes.json</code>, <code>input-files.json</code>, <code>hardware.json</code>, capture manifest 및 comparison artifact에 남는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-단계별-hdr-진단과-capture-history-수명-수정-2026-10-01">
+<div class="sec-head"><p class="ve-label">§09</p><h2 id="단계별-hdr-진단과-capture-history-수명-수정-2026-10-01">단계별 HDR 진단과 capture history 수명 수정 (2026-10-01)</h2></div>
+<div class="prose"><p>캡처 요청에 한해 LivePipelineDesc의 활성 노드 선언 직후 HDR readback을 추가했다. 이 fixture는 Deferred, LX.Scene.Color, SkyBox, SSGI, Forward+, Sprite, SSS, SSR, LX.Scene.Volume의 9개 중간 결과를 저장한다. 기존 7개 attachment는 유지하고 <code>diagnosticStages</code>를 별도로 기록한다. 비교기는 단계의 크기·유한값·파일 경로·바이트 수·양쪽 집합을 검사하고 같은 오차 상한을 적용한다. 동일 단계 통과와 실제 단계 픽셀 변조 거부를 확인했다. 캡처 제출에는 추가 readback 비용이 들어가므로 이전 제출 시간과 직접 성능 비교하지 않는다.</p>
+<p><code>Debug-hdr-stages-v2</code>는 양 backend 각각 독립 2회 × 캡처 2개가 정상 종료·validation 오류 0·반복 일치를 통과했으나 교차 품질은 실패했다. 추가 진단 전후 DX12의 기존 7개 이미지는 bit-exact다 (<code>instrumentation-parity.json</code>). Deferred/LX.Scene.Color/SkyBox의 교차 최대 오차는 0.001953125로 기존 상한 안이고, SSGI 직후부터 HDR 최대 오차 0.8671875 / 상한 초과 32634픽셀이 발생했다. 최초 <code>Debug-hdr-stages-v1</code>은 runtime DLL 배치 완료 전에 실행한 fixture가 loader error=32로 실패했으며 수용 증거에서 제외한다.</p>
+<p>Vulkan의 CaptureHistoryGuard가 resource_prepare 블록 안에 있어 PrepareFrame이 갱신한 SSGI sample index와 history ring을 블록 종료 때 다시 초기화하고 있었다. DX12는 캡처 프레임 전체에서 guard를 유지한다. Vulkan도 준비 전에 초기화하고 기록·제출 완료까지 guard가 살아 있게 수정했다. 일반 렌더의 비활성 guard와 IBL 1024/4096, 이미지 상한은 유지했다.</p>
+<p>최종 <code>Debug-hdr-history-scope-v1</code>과 <code>Release-hdr-history-scope-v1</code>은 구성별 양 backend 독립 2회 × 캡처 2개를 검증했다. 모든 실행 exitCode=0, forcedTermination=false, validation 오류 0, 같은 backend의 기존 7개와 중간 9개 이미지 반복/독립 프로세스 일치, 각 10종 변이 거부, sourceChanges=0이다. 양 구성의 교차 결과도 같다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>교차 결과</th><th style="text-align:right">수정 전</th><th style="text-align:right">history scope 수정 후</th></tr></thead>
+<tbody><tr><td>HDR 최대 절대 오차</td><td class="num" style="text-align:right">0.8671875</td><td class="num" style="text-align:right">0.435546875</td></tr>
+<tr><td>HDR 상한 초과 픽셀</td><td class="num" style="text-align:right">32634</td><td class="num" style="text-align:right">466</td></tr>
+<tr><td>display 최대 절대 오차</td><td class="num" style="text-align:right">0.031372547</td><td class="num" style="text-align:right">0.011764705</td></tr>
+<tr><td>display 상한 초과 픽셀</td><td class="num" style="text-align:right">20553</td><td class="num" style="text-align:right">186</td></tr></tbody></table></div>
+<p>GBuffer 5종은 계속 bit-exact이며 남은 상한 초과는 SSGI 이후에서 시작한다. SSGI 내부 추적·누적·필터 중 잔여 오차의 단독 원인은 아직 미확정이다. 범용 sealed frame packet replay도 미구현이다. 하네스는 staticFixtureGatesComplete와 genericPacketReplayVerified를 구분하여 정지 fixture만으로 BASE-0 complete를 올리지 않는다. 현재 교차 gate는 여전히 실패로 보존하며 기준 변경이나 MAT-9 완료를 적용하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderBase0Baseline.md"><code>docs/analysis/RenderBase0Baseline.md</code></a> · 마지막 커밋 2026-10-04 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

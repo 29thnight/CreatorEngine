@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/Phase475AxisClassification.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 4.75 축 분류 — 독립 완료선 분리 전 점검</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-분류-원칙">1. 분류 원칙</a></li><li><a href="#2-분리-가능한-완료선">2. 분리 가능한 완료선</a></li><li><a href="#3-경계에서-발견한-재검토-항목">3. 경계에서 발견한 재검토 항목</a></li><li><a href="#4-다음-재배치에서-지킬-것">4. 다음 재배치에서 지킬 것</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="Phase475AxisClassification.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 4.75 축 분류 — 독립 완료선 분리 전 점검</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#1-분류-원칙"><span class="ve-label">§1</span><span class="map-name">분류 원칙</span><span class="map-bar"><i style="width:28.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-분리-가능한-완료선"><span class="ve-label">§2</span><span class="map-name">분리 가능한 완료선</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-경계에서-발견한-재검토-항목"><span class="ve-label">§3</span><span class="map-name">경계에서 발견한 재검토 항목</span><span class="map-bar"><i style="width:78.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-다음-재배치에서-지킬-것"><span class="ve-label">§4</span><span class="map-name">다음 재배치에서 지킬 것</span><span class="map-bar"><i style="width:33.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「2. 분리 가능한 완료선」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>분리 전 시점 기록.</strong> 아래 22행·95.5일과 <code>Phase4UnifiedPlan.md</code> 정본 표기는
+작성 당시의 상태다. 실제 분리 이후 페이즈·공수 정본은
+<a href="../plans/RenderPhaseRoadmap.html"><code>RenderPhaseRoadmap.md</code></a>로 이동했다.</p>
+</blockquote>
+<p><strong>2026-09-23 · 계획/현재 소스 대조 · 분류 결과.</strong> 순서·공수·상태의 정본은
+<a href="../plans/Phase4UnifiedPlan.html"><code>Phase4UnifiedPlan.md</code></a> §8~§10이다. 이 문서는 페이즈 번호를
+새로 배정하거나 구현 완료를 선언하지 않는다. 기존 22개 활성 행 95.5일(완료 4일)을
+어떤 완료선으로 나눌 수 있는지 판별한다. <code>SRP-3</code>은 0일 중단 이력으로 활성 합계에서 뺀다.</p>
+</section>
+<section class="doc-sec" id="sec-1-분류-원칙">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-분류-원칙">1. 분류 원칙</h2></div>
+<div class="prose"><ol>
+<li>같은 제품 결과와 같은 회귀 게이트로 닫히는 작업만 한 축에 둔다. 공용 인프라는 가장 먼저
+필요한 소유 페이즈에 한 번만 두고 나머지는 계약을 소비한다.</li>
+<li><strong>구현 선행</strong>(해당 API·데이터가 없으면 실행 불가), <strong>판정 선행</strong>(기능은 개발할 수 있지만
+acceptance를 고정하려면 필요), <strong>순서 선호</strong>를 구분한다. 이 셋을 모두 페이즈 전체의
+직렬 의존으로 바꾸지 않는다.</li>
+<li>설계 공수와 구현 공수를 합치지 않는다. <code>GPU-1~GPU-3</code>과 <code>GPU-9</code>의 5.5일은 구상·판정
+공수다. GPU 기능 구현은 아직 미산정이다.</li>
+<li>공통 <code>BASE-0</code>, <code>RG5/RG6</code>, <code>Q0</code>의 소유권은 PHASE 4.3에 남긴다. PHASE 4.5의 <code>TR</code>
+결과와 PHASE 4.25의 <code>MAT</code> 결과도 각각 입력으로 받는다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-분리-가능한-완료선">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-분리-가능한-완료선">2. 분리 가능한 완료선</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>축</th><th>기존 항목</th><th style="text-align:right">활성 행 / 일</th><th style="text-align:right">완료</th><th>독립 산출물과 판정</th><th>실제 선행 경계</th></tr></thead>
+<tbody><tr><td><strong>SRP 저작·확장</strong></td><td><code>4-1</code>, <code>SRP-0~SRP-2</code>, <code>SRP-4~SRP-6</code></td><td style="text-align:right">7 / 35</td><td class="num" style="text-align:right">2일</td><td>Pipeline Asset과 Pass Stack, pass-domain Graph/Code, Native Pass를 제품 픽셀·schema/실패 fixture로 판정</td><td><code>BASE-0</code>; <code>SRP-1</code>은 <code>RG5</code>, <code>SRP-4</code>는 <code>MAT-6</code>; 제품 전환은 <code>RG6</code> 뒤</td></tr>
+<tr><td><strong>라이트맵 베이킹</strong></td><td><code>L0~L7</code></td><td style="text-align:right">8 / 35</td><td class="num" style="text-align:right">2일</td><td>UV1·BVH·직접/간접광과 백그라운드 베이크를 차트, 수렴, 중단/재개, Editor 응답성으로 판정</td><td><code>L1</code>은 PHASE 3.75 authoring/vertex schema, <code>L4</code>는 <code>Q0</code>; 제품 전환은 <code>RG6</code> 뒤</td></tr>
+<tr><td><strong>반사·차폐 품질</strong></td><td><code>RND-1</code></td><td style="text-align:right">1 / 4</td><td class="num" style="text-align:right">0</td><td>local reflection probe와 specular AO의 별도 golden·성능 판정</td><td><code>MAT-9</code>의 pre-tone material 기준선은 판정 선행</td></tr>
+<tr><td><strong>그림자 품질</strong></td><td><code>RND-2</code></td><td style="text-align:right">1 / 10</td><td class="num" style="text-align:right">0</td><td>cascade/point/spot atlas와 tier별 shadow golden·성능 판정</td><td>현 계획의 <code>RND-1</code> 선행은 코드/API 선행 근거가 확인되지 않아 재검토 대상</td></tr>
+<tr><td><strong>표시·후처리</strong></td><td><code>RND-3</code></td><td style="text-align:right">1 / 6</td><td class="num" style="text-align:right">0</td><td>OETF·AgX·auto exposure·bloom의 순서와 각 독립 golden·성능 판정</td><td><code>BASE-0</code>; <code>MAT-9</code> pre-tone 기준은 후처리 acceptance의 판정 선행</td></tr>
+<tr><td><strong>GPU 가시성</strong></td><td><code>GPU-1</code></td><td style="text-align:right">1 / 2</td><td class="num" style="text-align:right">0</td><td>GPU-driven 입력·컬링·indirect·CPU fallback 설계</td><td><code>BASE-0</code>과 PHASE 3.75 모델/프록시 계약; 구현 공수 미산정</td></tr>
+<tr><td><strong>확률 조명</strong></td><td><code>GPU-2</code></td><td style="text-align:right">1 / 1.5</td><td class="num" style="text-align:right">0</td><td>stochastic sampling·reuse·denoise·누출/노이즈·폴백 설계</td><td>설계는 <code>BASE-0</code> 뒤 가능; temporal reuse 구현은 PHASE 4.5 모션/히스토리 입력 필요</td></tr>
+<tr><td><strong>Ray tracing</strong></td><td><code>GPU-3</code></td><td style="text-align:right">1 / 1.5</td><td class="num" style="text-align:right">0</td><td>첫 DXR 효과·BLAS/TLAS·RHI/graph 계약·raster fallback 설계</td><td><code>BASE-0</code>; Vulkan RT 지원 여부는 지원 행렬에서 별도 판정</td></tr>
+<tr><td><strong>교차 축 설계 게이트</strong></td><td><code>GPU-9</code></td><td style="text-align:right">1 / 0.5</td><td class="num" style="text-align:right">0</td><td>위 세 GPU 후보의 공유 자원·선후·최소 수직 슬라이스·구현 공수 결정</td><td><code>GPU-1~GPU-3</code> 뒤. 라이트맵·SRP·renderer 품질의 완료 게이트는 아님</td></tr>
+<tr><td><strong>합계</strong></td><td></td><td style="text-align:right"><strong>22 / 95.5</strong></td><td class="num" style="text-align:right"><strong>4일</strong></td><td></td><td></td></tr></tbody></table></div>
+<p><code>SRP-3</code>은 PHASE 4.25 <code>MAT-2/MAT-6</code>에 흡수된 이력 포인터이므로 SRP 축의 새 공수나
+완료 조건으로 계산하지 않는다. <code>GPU-9</code>를 별도 축으로 둔 것은 세 GPU 기능을 한 구현
+페이즈로 확정했다는 뜻이 아니다. 각 기능의 첫 수직 슬라이스와 공수를 산정한 다음 독립
+구현 완료선이 필요한지 결정한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-경계에서-발견한-재검토-항목">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-경계에서-발견한-재검토-항목">3. 경계에서 발견한 재검토 항목</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>현재 계획의 연결</th><th>분리 전 판정</th></tr></thead>
+<tbody><tr><td><code>RND-1 → RND-2</code></td><td>반사 probe 뒤에 그림자를 둠</td><td>그림자 구현은 <code>EnhancedShadowPass::Declare</code>의 별도 graph pass다. 반사 probe의 출력/API를 받는 연결이 계획·현재 소스에서 확인되지 않는다. 순서 선호인지 실제 선행인지 확인하고, 근거가 없으면 그림자 축을 독립시킨다.</td></tr>
+<tr><td><code>RND-3</code> / <code>MAT-9</code></td><td>표에는 <code>BASE-0</code>, 설명에는 pre-tone material golden 뒤</td><td>표시 기능 개발과 재질 기준선 오염 방지용 판정 순서를 분리해 적어야 한다. <code>MAT-9</code>를 renderer 소유권으로 옮기지 않는다.</td></tr>
+<tr><td><code>SRP-6</code> fixture</td><td>기존 계획은 DXR <strong>또는</strong> 업스케일러 Native Pass 예시</td><td>DXR 구현을 SRP 전체의 필수 선행으로 만들지 않는다. 연결된 SRP 계획은 소스 Native Pass fixture로 registry를 증명하도록 정리했다. 실제 fixture는 구현 착수 전에 고른다.</td></tr>
+<tr><td><code>GPU-9</code></td><td>SRP 계약과 GPU 세 기능을 한 의존 그래프로 합침</td><td>공유 resource/feature 입력의 설계 인터페이스만 묶는다. 세 기능의 실장·지원 행렬·fallback·release gate는 각 축에서 독립 판정한다.</td></tr>
+<tr><td><code>L4</code> / <code>Q0</code></td><td>라이트맵이 별도 COMPUTE 큐를 요구</td><td><code>Q0</code>는 PHASE 4.3의 RHI queue/fence 계약이다. <code>L4</code>는 소비자이며 새 queue 계층을 세우지 않는다. <code>Q0</code> 0일 표시는 완료가 아니라 미산정이다.</td></tr></tbody></table></div>
+<p>현재 소스 확인 지점: <a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp"><code>EnhancedSceneRenderer.cpp</code></a>에는
+제품 <code>AddNode</code> 조립과 graph compile이 있고,
+<a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp"><code>EnhancedRenderGraph.cpp::BuildOrder</code></a>는
+현재 순서 계약의 소유자다. 그림자는
+<a href="../../Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp"><code>EnhancedShadowPass.cpp::Declare</code></a>에서
+graph pass로 제출한다. Slang 컴파일 기반은
+<a href="../../Engine/RenderEngine/RHI/RHIShaderCompiler.cpp"><code>RHIShaderCompiler.cpp</code></a>에 있으며,
+라이트맵은 현재 <a href="../../Engine/RenderEngine/Interfaces/LightMapping.h"><code>LightMapping.h</code></a>
+저작 데이터가 남은 상태다. GPU-driven·stochastic·DXR 구현을 이번 분류에서 완료로 세지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-다음-재배치에서-지킬-것">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-다음-재배치에서-지킬-것">4. 다음 재배치에서 지킬 것</h2></div>
+<div class="prose"><ul>
+<li><strong>바로 독립 완료선 후보:</strong> SRP, 라이트맵, 반사·차폐, 그림자, 표시·후처리.
+항목 ID와 기존 공수는 그대로 옮기고 각 축의 회귀 결과를 별도로 닫는다.</li>
+<li><strong>설계 뒤 구현 완료선 결정:</strong> GPU 가시성, 확률 조명, ray tracing. <code>GPU-9</code>에서
+공통 인터페이스와 기능별 수직 슬라이스·공수를 확정한 뒤 구현 페이즈를 배정한다.</li>
+<li><strong>페이즈 번호보다 의존 그래프 우선:</strong> <code>BASE-0</code>/<code>RG5</code>/<code>RG6</code>/<code>Q0</code>와 <code>MAT</code>/<code>TR</code> 중
+실제 소비 항목만 선행으로 단다. <code>GPU-9</code>를 SRP·L·RND 전체의 완료 선행으로 삼지 않는다.</li>
+<li><strong>재배치 회계:</strong> 현재 22행 95.5일과 완료 4일은 순수 이동 시 보존한다. <code>Q0</code>와 GPU
+기능 구현처럼 미산정인 작업은 임의의 0일 구현으로 처리하지 않고 별도 산정한다.</li>
+</ul>
+<p>이 분류는 문서/소스 정적 대조다. 새 제품 경로의 빌드·GPU 런타임·픽셀 회귀 증거는 아니다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="Phase475AxisClassification.md"><code>docs/analysis/Phase475AxisClassification.md</code></a> · 마지막 커밋 2026-09-28 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

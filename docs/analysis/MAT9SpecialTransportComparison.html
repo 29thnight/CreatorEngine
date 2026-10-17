@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/MAT9SpecialTransportComparison.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAT-9 Special transport 대조 — 2026-10-01</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#판정">판정</a></li><li><a href="#고정-조건과-제품-실행">고정 조건과 제품 실행</a></li><li><a href="#volume-기준-장면의-수정">Volume 기준 장면의 수정</a></li><li><a href="#투과sss-초기-진단과-남은-차이">투과·SSS 초기 진단과 남은 차이</a></li><li><a href="#alpha--transmission의-구현-경계">Alpha + transmission의 구현 경계</a></li><li><a href="#재현과-저장-증거">재현과 저장 증거</a></li><li><a href="#다음-기존-작업-순서">다음 기존 작업 순서</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="MAT9SpecialTransportComparison.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>MAT-9 Special transport 대조 — 2026-10-01</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#판정"><span class="ve-label">§00</span><span class="map-name">판정</span><span class="map-bar"><i style="width:28.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#고정-조건과-제품-실행"><span class="ve-label">§01</span><span class="map-name">고정 조건과 제품 실행</span><span class="map-bar"><i style="width:86.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#volume-기준-장면의-수정"><span class="ve-label">§02</span><span class="map-name">Volume 기준 장면의 수정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#투과sss-초기-진단과-남은-차이"><span class="ve-label">§03</span><span class="map-name">투과·SSS 초기 진단과 남은 차이</span><span class="map-bar"><i style="width:95.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#alpha--transmission의-구현-경계"><span class="ve-label">§04</span><span class="map-name">Alpha + transmission의 구현 경계</span><span class="map-bar"><i style="width:17.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현과-저장-증거"><span class="ve-label">§05</span><span class="map-name">재현과 저장 증거</span><span class="map-bar"><i style="width:91.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#다음-기존-작업-순서"><span class="ve-label">§06</span><span class="map-name">다음 기존 작업 순서</span><span class="map-bar"><i style="width:41.9%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「Volume 기준 장면의 수정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-판정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="판정">판정</h2></div>
+<div class="prose"><p><strong>균질 단일 산란 Volume의 고정 8조건은 통과했다.</strong> 투과·SSS를 포함한 Special 전체는 미수용이다.
+MAT-9는 <code>progress</code>, PHASE 4.25 완료 공수는 <strong>32/34일</strong>로 유지한다.
+이번 작업은 기준 장면과 비교 도구를 수정하고 현재 제품 경로를 측정했다.
+제품 Engine/Slang의 투과·SSS·Volume 구현은 이번 묶음에서 변경하지 않았다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Volume 판정 항목</th><th style="text-align:right">기존 상한</th><th style="text-align:right">8조건 측정 최대</th></tr></thead>
+<tbody><tr><td>상대 RMS</td><td class="num" style="text-align:right">1%</td><td class="num" style="text-align:right">0.100973%</td></tr>
+<tr><td>p95 normalized</td><td class="num" style="text-align:right">1%</td><td class="num" style="text-align:right">0.134198%</td></tr>
+<tr><td>max normalized</td><td class="num" style="text-align:right">5%</td><td class="num" style="text-align:right">0.193067%</td></tr>
+<tr><td>독립 시드 상대 RMS</td><td class="num" style="text-align:right">0.25%</td><td class="num" style="text-align:right">0.054315%</td></tr></tbody></table></div>
+<p><a href="MAT9SpecialVolumeTargets.json">Volume 판정</a>, <a href="MAT9SpecialVolumeComparison.json">전체 측정</a>,
+<a href="MAT9SpecialVolumeReference.json">기준 manifest</a>, <a href="MAT9SpecialVolumeComparison.png">이미지 대조</a>.
+그림은 각 행 <strong>Blender / Native / 절대 차이 ×10</strong>이며 표시용이다. 판정은 pre-tone linear RGB 픽셀이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-고정-조건과-제품-실행">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="고정-조건과-제품-실행">고정 조건과 제품 실행</h2></div>
+<div class="prose"><ul>
+<li>Blender <strong>5.1.1</strong> (<code>b70da489d7f4</code>), Cycles CPU, 64×64, denoising/adaptive sampling off,
+Gaussian filter width 0.01, Raw/exposure 0/gamma 1.</li>
+<li>Volume 최종 기준은 <strong>131072 samples, seed 0/11</strong>의 별도 렌더 두 번이다.</li>
+<li>같은 삼각형·normal·UV tangent를 공유하는 반지름 0.5의 <strong>smooth 80-triangle closed icosphere</strong>,
+카메라 <code>(0,0,3)</code>, FOV π/4, near/far 0.1/10.</li>
+<li>geometry SHA-256: <code>c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282</code>.</li>
+<li>방향광은 <code>normalize(0.35,-0.2,0.8)</code>, irradiance RGB 1, angle 0.
+Furnace는 균일한 흰색 환경 radiance RGB 1이다. HDRI/area-light 조건은 아니다.</li>
+<li>입력 <code>.inputs</code>를 Native의 LX graph 생성기가 그대로 소비한다. Volume-only는 Surface를 연결하지 않고
+<code>LXPrincipledVolume</code>을 Material Output의 Volume에 연결한다.</li>
+<li>제품 <code>MaterialGraphSceneHost</code>의 준비·색·Volume 선언과 실제 DX12 readback을 사용한다.
+이번에 비교 도구의 누락된 최종 <code>DeclareVolume</code> 합성을 연결했다.</li>
+<li>Release Native <strong>8 frame, 131590 checks, GPU validation 0</strong>, 정상 종료.
+VS18/v145 Release 비교 도구 빌드 통과. 제품 compiler의 DXIL/SPIR-V 준비를 거치며,
+이 묶음의 실제 GPU 실행은 DX12다. 전체 Editor 신규 빌드나 GUI 조작 검증을 추가한 것은 아니다.</li>
+<li>공통 emission-control 내부를 2픽셀 침식한 <strong>303픽셀</strong>을 모든 조건에 동일하게 적용했다.
+case별 mask 선택·노이즈 제거·target 확대는 하지 않았다.
+normal/view 진단의 max absolute error는 각각 0.001641/0.001871로 기존 0.002 상한 이내다.</li>
+</ul>
+<p>원래 Core/Layered의 2208-triangle sphere는 보존했다. 현재 Scene Volume은 static closed boundary와
+총 <strong>16 objects / 128 triangles</strong>의 교차 예산을 요구하므로 Special에는 명시한 별도 geometry를 쓴다.
+이번 결과를 큰 모델·skinned/heterogeneous media·multiple scattering의 검증으로 확대하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-volume-기준-장면의-수정">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="volume-기준-장면의-수정">Volume 기준 장면의 수정</h2></div>
+<div class="prose"><p>초기 Special reference v1은 <code>volume_bounces=1</code>, sun shadows off였다.
+엔진의 homogeneous single scattering과 이 조건은 같은 transport가 아니었다.
+Blender는 RNA bounce 값을 kernel 제한에 <strong>1을 더해</strong> 전달하므로, 직접 단일 산란을 비교할 때는
+RNA <code>volume_bounces=0</code>이 필요하다.
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/scene/integrator.cpp#L173">Blender 5.1.1 integrator</a>.
+방향광의 매질 내부 경로에도 Beer 감쇠가 적용되도록 Volume-only 조건의 <code>sun.use_shadow=true</code>를 설정했다.
+외부 occluder는 없고, 비볼륨 조건의 기존 shadow off는 유지한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>산란 진단 조건</th><th style="text-align:right">방향광 RMS</th><th style="text-align:right">Furnace RMS</th><th>사용 범위</th></tr></thead>
+<tbody><tr><td>v1: RNA bounce 1, 방향광 내부 감쇠 불일치</td><td class="num" style="text-align:right">9.5112%</td><td class="num" style="text-align:right">3.2772%</td><td>역사적 진단, 수용 제외</td></tr>
+<tr><td>RNA bounce 1, 방향광 내부 감쇠 적용</td><td class="num" style="text-align:right">3.2136%</td><td style="text-align:right">—</td><td>단일 조건 진단, 수용 제외</td></tr>
+<tr><td><strong>v2: RNA bounce 0, 내부 감쇠 적용</strong></td><td class="num" style="text-align:right"><strong>0.0515%</strong></td><td class="num" style="text-align:right"><strong>0.0880%</strong></td><td>독립 seed 0/11 포함 최종 판정</td></tr></tbody></table></div>
+<p>v2는 reference recipe version과 transport 설명을 manifest에 고정했다.
+판정 도구는 v1·diagnostic subset·flat geometry·bounce/shadow diagnostic을 전체 수용에 사용하지 않는다.
+v1의 큰 Volume 차이를 제품 오차로 단정하지 않는다.</p>
+<h3 id="독립-수치-적분">독립 수치 적분</h3>
+<p>같은 삼각형의 ray entry/exit와 isotropic 계수로 직접 계산했다.
+<code>Color=0.5</code>, <code>Density=0.18</code>, <code>Anisotropy=0</code>이며 σs=0.09, σt=0.18이다.
+계수 관계는 <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/osl/shaders/node_principled_volume.osl#L35">Blender Principled Volume</a>과 같다.
+Gauss-Legendre 96/192점 적분에 카메라·광원 방향의 Beer 감쇠와 isotropic phase <code>1/(4π)</code>를 포함했다.
+엔진의 CPU closure reference를 가져오지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>독립 기준과의 방향광 RMS</th><th style="text-align:right">측정</th></tr></thead>
+<tbody><tr><td>96점 ↔ 192점 적분 수렴</td><td class="num" style="text-align:right">0.00004051%</td></tr>
+<tr><td>Native ↔ 192점 적분</td><td class="num" style="text-align:right">0.051739%</td></tr>
+<tr><td>Cycles v2 ↔ 192점 적분</td><td class="num" style="text-align:right">0.005175%</td></tr></tbody></table></div>
+<p><a href="MAT9SpecialVolumeIntegral.json">독립 적분 결과</a>.
+이 검사는 고정 방향광 단일 산란에 한정되며 다중 산란의 기준값이 아니다.</p>
+<h3 id="최종-volume-8조건">최종 Volume 8조건</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">엔진↔Blender RMS</th><th style="text-align:right">Blender seed RMS</th></tr></thead>
+<tbody><tr><td>방향광 / emission</td><td class="num" style="text-align:right">0.0955%</td><td class="num" style="text-align:right">0.000041%</td></tr>
+<tr><td>방향광 / absorption + emission</td><td class="num" style="text-align:right">0.1010%</td><td class="num" style="text-align:right">0.000038%</td></tr>
+<tr><td>방향광 / isotropic scattering</td><td class="num" style="text-align:right">0.0515%</td><td class="num" style="text-align:right">0.000371%</td></tr>
+<tr><td>방향광 / surface emission 제어</td><td class="num" style="text-align:right">0.0000%</td><td class="num" style="text-align:right">0.000000%</td></tr>
+<tr><td>Furnace / emission</td><td class="num" style="text-align:right">0.0955%</td><td class="num" style="text-align:right">0.000041%</td></tr>
+<tr><td>Furnace / absorption + emission</td><td class="num" style="text-align:right">0.1010%</td><td class="num" style="text-align:right">0.000038%</td></tr>
+<tr><td>Furnace / isotropic scattering</td><td class="num" style="text-align:right">0.0880%</td><td class="num" style="text-align:right">0.054315%</td></tr>
+<tr><td>Furnace / surface emission 제어</td><td class="num" style="text-align:right">0.0000%</td><td class="num" style="text-align:right">0.000000%</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-투과sss-초기-진단과-남은-차이">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="투과sss-초기-진단과-남은-차이">투과·SSS 초기 진단과 남은 차이</h2></div>
+<div class="prose"><p>초기 v1 <strong>24조건</strong>은 16384 samples, seed 0/11로 렌더했다.
+Release Native <strong>394222 checks, GPU validation 0</strong>, 정상 종료.
+공통 numeric/noise target을 만족한 행은 <strong>11/24</strong>이지만 v1 recipe 자체가 수용 대상이 아니므로
+Special 전체 또는 그 부분 집합을 완료로 세지 않는다.
+<a href="MAT9SpecialBaselineComparison.json">초기 측정</a>, <a href="MAT9SpecialBaselineTargets.json">초기 판정</a>,
+<a href="MAT9SpecialBaselineComparison.png">초기 대조 그림</a>.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>초기 smooth 조건</th><th style="text-align:right">엔진↔Blender RMS</th><th style="text-align:right">독립 seed RMS</th></tr></thead>
+<tbody><tr><td>방향광 / tinted transmission</td><td class="num" style="text-align:right">33.9166%</td><td class="num" style="text-align:right">0.4583%</td></tr>
+<tr><td>방향광 / pure glass</td><td class="num" style="text-align:right">34.7308%</td><td class="num" style="text-align:right">0.2376%</td></tr>
+<tr><td>Furnace / tinted transmission</td><td class="num" style="text-align:right">15.1081%</td><td class="num" style="text-align:right">0.2210%</td></tr>
+<tr><td>방향광 / SSS</td><td class="num" style="text-align:right">6.2429%</td><td class="num" style="text-align:right">0.6748%</td></tr>
+<tr><td>Furnace / SSS</td><td class="num" style="text-align:right">4.2344%</td><td class="num" style="text-align:right">0.6780%</td></tr>
+<tr><td>방향광 / metal + SSS + coat</td><td class="num" style="text-align:right">2.0129%</td><td class="num" style="text-align:right">0.3863%</td></tr>
+<tr><td>Furnace / metal + SSS + coat</td><td class="num" style="text-align:right">3.2339%</td><td class="num" style="text-align:right">0.4751%</td></tr></tbody></table></div>
+<p>일부 reference noise도 기존 0.25% 상한을 넘으므로 최종 판정에는 추가 수렴이 필요하다.
+특히 투과의 관측 차이는 측정된 seed 변동보다 크지만, 오차 전체의 원인을 하나로 확정하지 않는다.
+현재 제품은 single-interface screen/environment refraction과 screen-space SSS diffusion이며,
+Cycles의 closed-solid refraction·random-walk SSS와 transport가 다르다.
+폐곡면의 출입 경계·geometric/shading normal·tint 경로와 SSS 공간 응답을 분리해서 조사해야 한다.</p>
+<p>Native의 <strong>SSS Scale=0은 SSS off와 방향광/Furnace 모두 bit exact</strong>였고,
+IOR=1의 투과 조건과 surface emission 제어도 차이 0이었다.
+이는 해당 fallback의 검사이며 비영 SSS/투과의 품질 수용이 아니다.</p>
+<h3 id="smoothflat-분리-진단">smooth/flat 분리 진단</h3>
+<p>같은 80-triangle 위치를 유지하고 normal만 flat으로 바꾼 Furnace 네 조건을 추가 측정했다.
+Native <strong>65907 checks, validation 0</strong>, 정상 종료. 독립 repeat가 없는 진단이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">smooth RMS</th><th style="text-align:right">flat RMS</th></tr></thead>
+<tbody><tr><td>흰색 diffuse 제어</td><td class="num" style="text-align:right">0.9963%</td><td class="num" style="text-align:right">0.000351%</td></tr>
+<tr><td>SSS off</td><td class="num" style="text-align:right">0.9478%</td><td class="num" style="text-align:right">0.042376%</td></tr>
+<tr><td>pure glass</td><td class="num" style="text-align:right">0.6856%</td><td class="num" style="text-align:right">3.261172%</td></tr></tbody></table></div>
+<p>흰색 제어의 smooth p95는 1.9592%였다. Flat에서 diffuse 차이가 줄어든 것은
+저다각형 smooth normal과 기하학적 hemisphere 처리의 기여를 조사할 근거다.
+Flat glass는 p95 4.4910%·max 27.6505%로 여전히 미달하며 RMS도 커졌다.
+Flat 결과로 smooth 검증을 대체하거나 모든 Special 차이를 normal 탓으로 돌리지 않는다.
+<a href="MAT9SpecialFlatDiagnostic.json">분리 진단 측정</a>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-alpha--transmission의-구현-경계">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="alpha--transmission의-구현-경계">Alpha + transmission의 구현 경계</h2></div>
+<div class="prose"><p><code>SceneHost::Prepare</code>는 Blended queue에 <code>LX Scene Blended composition is not installed.</code>를 반환한다.
+비교 도구 첫 frame에서도 실제 Blended 분류를 만들어 거부되는 것을 검사한 뒤 정상 opaque capture를 진행한다.
+Alpha를 낮추고 opaque로 렌더하여 지원 완료로 세지 않는다.
+기존 계획의 <strong>alpha와 transmission 조합</strong> 완료 기준은 남아 있으며 새 공수/완료 행을 만들지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현과-저장-증거">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="재현과-저장-증거">재현과 저장 증거</h2></div>
+<div class="prose"><p>새 reference 출력 디렉터리와 새 Native label을 사용해야 한다. 기존 결과를 덮어쓰지 않는다.</p>
+<pre><code class="language-powershell">&amp; 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe' -b --threads 3 `
+  --python Tools/blender/material_matched_reference.py -- `
+  --suite special-volume --samples 131072 --seed 0 --output Build/Obj/Mat9SpecialVolumeReference-0
+# 같은 명령으로 seed 11 및 별도 출력 디렉터리를 생성한다.
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release `
+  -Label special-volume-final -Reference Build/Obj/Mat9SpecialVolumeReference-0 `
+  -ReferenceRepeat Build/Obj/Mat9SpecialVolumeReference-11
+&amp; 'C:/Python313/python.exe' Tools/regression/assess-special-material-images.py `
+  Build/Obj/Mat9Images-Release-special-volume-final/comparison.json `
+  Build/Obj/Mat9Images-Release-special-volume-final/targets.json</code></pre>
+<p>독립 적분은 NumPy가 있는 Python으로 <code>measure-special-volume-integral.py reference native output.json</code>을 실행한다.
+RGBA32F/EXR·<code>.inputs</code>·삼각형·원본 실행 로그는 위 <code>Build/Obj</code> 디렉터리에 보존했다.
+보고서 JSON은 reference/cook/geometry/pixel identity와 실제 readback 측정의 고정 사본이다.
+작업 시 HEAD는 <code>12f970c7ed3a4408d268479f5d5acb5f80372b8c</code>이고 이전 MAT-9 변경이 포함된 dirty tree였다.
+이번 묶음에서 commit/push하지 않았다.</p>
+<p>기존 Core/Layered 24조건의 reference identity와 HDRI 26/26 판정을 변경된 공통 reader로 재검사했다.
+새 reference recipe/geometry enum의 unknown 값은 거부한다. 최종 Volume 픽셀 재판정 8/8,
+independent repeat가 없는 진단 fixture 거부, Python 5개 구문 검사, 대시보드 웹 빌드·inline script
+구문/상태 검사와 범위 diff 검사를 통과했다. 성능 측정의 추가 gate는 이번 결과에 포함하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-다음-기존-작업-순서">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="다음-기존-작업-순서">다음 기존 작업 순서</h2></div>
+<div class="prose"><p>후속 <a href="MAT9SpecialProfileCorrection.html">Special Surface 반경·스침각 수정</a>은 새 131072-sample seed0/11
+기준의 18조건을 판정했다. Scene artist 반경 환산과 가장자리 준비 오류를 수정했으며 target은 7/18,
+전체 미수용이다. 아래 기존 순서를 유지한다. 앞의 Scale=0/off bit-exact 관측은 공통 내부 영역에
+한정되며, 후속 최종 제품에서 전체 이미지 byte exact를 별도로 검증했다.</p>
+<ol>
+<li><strong>투과 출입 경계·SSS 공간 응답의 품질 개선</strong>과 reference 수렴, 동일 fixed target 재검증.
+Alpha + transmission은 실제 Blended 합성 경로까지 확인해야 한다.</li>
+<li>Texture-only/factor×texture/normal-map reference와 같은 지원 feature의 Deferred/Forward 교차 비교.</li>
+<li>추가 IBL 샘플·Special 준비를 포함한 실제 모델의 이동 카메라/tier/cold-warm 성능 수용.</li>
+<li>원래 area-light grid의 light ABI/consumer 및 rendered gate.</li>
+</ol>
+<p>고정 Volume 8조건 통과와 이전 상수 HDRI 26조건 통과는 각각의 범위에 한정한다.
+특정 조건의 성공으로 전체 MAT-9나 PHASE 4.25를 닫지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MAT9SpecialTransportComparison.md"><code>docs/analysis/MAT9SpecialTransportComparison.md</code></a> · 마지막 커밋 2026-10-01 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

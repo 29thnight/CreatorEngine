@@ -1,38 +1,48 @@
-# Scene 캔버스 좌표와 crop 호환 규칙
+# Scene View 중앙 crop과 창 본문 여백
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+2026-09-12 사용자 보고: Scene 창을 조절하면 화면이 가로/세로로 왜곡되고, 각 창 본문의 네 면 여백이 과하다.
 
-## 현재 Scene은 fill이다
+## 원인과 수정
 
-파일 이름의 crop은 뷰포트가 전체 창 크기의 렌더 타깃을 잘라 보여 주던 시기를 가리킨다. 현재 Scene은 캔버스 extent와 render scale에 맞춘 타깃을 `fill`로 펼친다. Game은 출력 종횡비를 보존하는 `letterbox`다. `crop`은 공유 계산 함수의 지원 정책으로 남아 있지만 현재 Scene 기본 정책을 설명하는 이름이 아니다. 배율을 0.5로 낮춘 Scene에 crop을 강제하면 이미지를 절반 크기로 놓고 가장자리를 비우는 잘못된 동작이 생긴다.
+- `SceneViewWindow`는 전체 렌더 타깃을 `ImGui::Image(texture, contentSize)`로 표시했다.
+  카메라 투영은 전체 렌더 타깃 비율인데 표시 사각형은 도킹 패널 크기여서 축별 배율이 달라졌다.
+- GPU 완료 이미지의 실제 width/height와 표시 ID를 동일한 수명 락 아래 읽는다.
+  최신 제출 프레임 크기를 이전 완료 이미지에 적용하지 않는다.
+- `SceneViewportImage`는 원본 픽셀당 framebuffer 픽셀 하나를 유지하고, 패널 중앙을 광학 중심으로 사용한다.
+  창 크기 변경은 UV crop만 바꾸며 카메라 FOV를 쓰지 않는다. 패널이 원본보다 크면 남는 영역은 배경으로 표시한다.
+- ImGuizmo는 잘리기 전 가상 이미지 사각형과 원본 종횡비를 사용한다. 선택·모델 배치·지형 브러시의
+  ray 변환도 같은 사각형을 사용한다. 툴바/방향 기즈모는 보이는 패널 영역에 배치한다.
+- 공통 WindowPadding은 8×6→3×2 logical px, Browser 트리/목록의 child padding은 6→2px로 줄인다.
+  컨트롤 내부 간격과 셀 간격은 별도 값으로 분리한다. 이전에 요청한 분할선 뒤 10px 간격은 유지한다.
 
-## 한 좌표 정본
+기존 렌더 타깃 크기 소유권은 유지한다. Scene 패널만 조절할 때 고정된 원본을 잘라 표시하는 수정이며,
+씬뷰별 렌더 타깃 생성 및 W4/W5 전체 전환을 완료한 것으로 계산하지 않는다.
 
-`LayoutViewportCanvas(fit, contentMin, contentSize, sourcePixels, framebufferScale)`가 content/image/clip과 UV를 계산한다. 모두 같은 프레임의 화면 좌표 min/max이며 extent는 max-min이다. content 원점은 창 프레임이나 제목표시줄이 아니라 실제 content region이다. 소비자가 제목표시줄 높이를 더하거나 별도의 viewport 사각형을 다시 만들지 않는다.
+## 검증
 
-- fill: image 크기는 content 크기다. 이 캔버스를 위해 생산된 소스를 전체에 편다
-- crop: image 크기는 sourcePixels/framebufferScale이며 중앙 정렬한다. 확대하지 않고 넘치는 부분을 자른다
-- letterbox: 소스 종횡비를 지키는 최대 크기로 중앙 정렬한다
+산출물: `Artifacts/phase21-scene-crop/`.
 
-clip은 image와 content의 교집합이고 UV는 전체 image를 기준으로 환산한다. `ClipContains`는 오른쪽/아래 경계를 제외하는 반열린 범위다. 유한 양수의 content, source, framebuffer scale을 요구한다. 소스가 없더라도 유효한 content는 채우며 image/clip/UV가 없는 상태는 valid=false다. 준비 배경·도구 배치·카메라 입력이 source 준비와 함께 사라지지 않아야 한다.
+- 제품 `editor.selftest`에 가로/세로 크기 변화, 음수 원점, framebuffer scale 1/1.5/2,
+  원근/직교 투영의 크기 보존 및 picking 역변환, 중앙 crop 경계, 원본보다 큰 패널, 0 크기 검사를 추가한다.
+- `editor.sceneview`에 원본 사각형·표시 사각형·UV crop·원본 비율 관측을 연결한다.
+- DX12 실행 화면과 배율별 theme gate를 확인한다. Vulkan은 이번 실행 검증에서 제외한다.
 
-## 소비자 연결
+| 검증 | 결과 |
+|---|---|
+| VS18/v145 x64 Debug CreatorEditor | 통과, `build-final.log`. 첫 전체 빌드에는 기존 Vulkan DELAYLOAD LNK4229 경고 1개 |
+| `editor.selftest` | 815 checks / 0 failures. 이번 crop 검사 175개 포함 |
+| DX12 화면 비교 | 넓은 배치 2030×1054, 좁은 배치 1100×1054, 낮은 배치 2030×596 (ImGui 좌표) |
+| 원본·카메라 보존 | 세 배치 모두 원본 2880×1665, 카메라 위치/방향 동일. UV 범위×원본 크기=표시 크기, 축별 확대/축소 없음 |
+| 실제 선택 | 넓은/낮은 배치에서 카메라/라이트 표시 위치 클릭→Main Camera 선택, 이동 기즈모 원점 일치 |
+| 창 여백 | Content Browser, Hierarchy, Inspector에서 작은 본문 여백 확인 |
+| DX12 theme gate | 100→150→100% 사용자 배율, 3 starts / 64 checks PASS. 각 실행의 815개 selftest도 통과 |
 
-Scene의 AddImage는 clip 사각형과 그 부분의 UV를 사용한다. picking은 같은 image에서 SourceUV를 얻어 NDC로 바꾸며 ImGuizmo도 image 사각형을 받는다. ImGuizmo가 내부에서 비교차 clip을 밀 수 있어 이후 draw command의 clip을 RAII scope로 캔버스 가시 영역에 다시 제한한다. 기즈모가 Hierarchy/Inspector/탭을 덮지 않는 것은 좌표 정렬과 별개의 clip 계약이다.
+자동화 도구의 실제 분할선 drag 요청에서는 폭 변화가 관측되지 않았다. 따라서 세 가지 크기는
+저장된 dock 비율을 바꿔 재기동한 **배치 fixture**이며, 연속 마우스 resize 통과로 보고하지 않는다.
+연속 크기 변화의 확대/축소 불변식은 제품 selftest의 crop 계산 검사로 확인했다.
+지형 브러시·모델 drop 소비자와 이동 기즈모 drag는 이번 실행에서 별도로 조작하지 않았다.
+원근/직교 투영 검사는 수학 검사이며, 실제 GUI 비교는 기본 원근 카메라다.
 
-카메라 이동은 아직 표시 이미지가 없을 때 content를 사용해 계속 입력을 받을 수 있다. 반면 선택/기즈모 편집은 valid canvas, 실제 texture, ready 결과, 현재 render Scene epoch가 맞아야 한다. 렌더러가 준비 중이라는 이유로 다음 카메라 snapshot을 만들 입력까지 막지 않는다.
-
-## 검증 방법과 제한
-
-`verify-scene-viewport-canvas-contract.ps1`은 좌표식·title 보정·입력 호출 지점의 소스 검사와 실제 창 이동 후 상대 좌표 비교를 함께 가진다. `verify-editor-viewport-extent.ps1`은 scale off/auto/fixed, resize 반복, 실제 canvas/target extent 수렴과 표시 상태를 검사한다. 둘 다 이 개정에서는 실행하지 않았다.
-
-필요한 UI 수용은 창 원점 이동, DPI 변화, 작은 패널, 0.5 scale, source 준비 중 배경, 가장자리 picking과 화면 밖 gizmo다. Scene fill 상태에서 content와 image가 우연히 같아지는 사례만으로 crop/letterbox 공통 계산을 입증하지 않는다. 캡처 이미지는 해당 프레임의 정책과 입력 치수를 함께 기록해야 재사용할 수 있다.
-
-## 구현 근거
-
-- [Editor/EngineGUIWindow/EditorViewportCanvas.h](../../Editor/EngineGUIWindow/EditorViewportCanvas.h)
-- [Editor/EngineGUIWindow/SceneViewWindow.cpp](../../Editor/EngineGUIWindow/SceneViewWindow.cpp)
-- [Editor/EngineGUIWindow/GameViewWindow.cpp](../../Editor/EngineGUIWindow/GameViewWindow.cpp)
-- [Editor/EngineGUIWindow/ViewportHostWindow.cpp](../../Editor/EngineGUIWindow/ViewportHostWindow.cpp)
-- [Tools/regression/verify-scene-viewport-canvas-contract.ps1](../../Tools/regression/verify-scene-viewport-canvas-contract.ps1)
-- [Tools/regression/verify-editor-viewport-extent.ps1](../../Tools/regression/verify-editor-viewport-extent.ps1)
+`scene-wide.png`, `scene-tall.png`, `scene-short.png`, `picking-wide.png`에 화면을 보관했다.
+원시 관측은 `initial.json`, `tall-ready.json`, `short-ready.json`, 요약은 `crop-layout-checks.csv`다.
+검증용 Editor는 종료했고, 설정과 도킹 ini는 검증 직전 원본 바이트로 복원했다.

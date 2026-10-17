@@ -1,32 +1,64 @@
-# 저장 씬 재로드와 텍스처 의존성 검증
+# PHASE 12 — 실제 Editor 씬 재로드 검증
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+기준일: 2026-10-10 KST. 정본은 [TexturePipelinePlan](../plans/TexturePipelinePlan.md),
+직전 자산 서비스 검사는 [임포트 수명 기록](TextureImportLifecycleValidation20261010.md)에 있다.
 
-## 현재 의미
+## 실행 경계
 
-씬 재로드는 여전히 제품 기능이지만 자동 텍스처 설정 편집의 필수 단계가 아니다. 현재 Inspector는 설정을 자동 저장하고 준비된 owner를 살아 있는 씬에 교체한다. 이 문서는 별도로 저장된 씬을 열 때 텍스처 의존성이 성공·실패하는 경계를 다룬다. 정상 편집 흐름은 [텍스처 정본](../plans/TexturePipelinePlan.md)을 따른다.
+`verify-texture-scene-reload.ps1`은 현재 Debug/Release의 실제 `CreatorEditor.exe`와
+`CreatorEditor.runtime.dll`을 사용한다. `--development-project`로 ignored Build 안의
+새 프로젝트를 지정하고 실제 명령·프레임 경로에서 실행한다. 기존 프로젝트의 자산,
+설정, 작업 공간 파일에 검증 fixture를 작성하지 않는다.
 
-`scene.open_async <scene-path>`는 준비 요청을 접수하고 request-id를 반환한다. 접수 성공은 활성화 성공이 아니다. `scene.load.status <request-id>`에서 Ready/Failed/Stale/Cancelled/Superseded 등 terminal state를 확인해야 한다. 기존 씬은 새 씬과 필수 자산의 준비가 성공한 뒤에 교체되어야 한다.
+Inspector의 Reload Saved Scene이 사용하는 `scene.open_async`로 씬을 준비하고,
+일반 프레임 진행 뒤 `scene.load.status`로 terminal state를 확인한다. 최초 fixture는
+`scene.new` → `object.create` → `scene.save`로 만든다. 검사기는 저장된 fixture의
+필수 bundle에 PNG 참조를 추가하고 문서 손상과 의존성 누락을 주입한다.
+이는 제품 저작 UI와 같은 조작을 증명하는 검사가 아니다.
 
-## runner의 실제 동작
+## 수용 계약
 
-`verify-texture-scene-reload.ps1`은 실행 중 Editor가 있으면 중단한다. 새 `Build/TSR-*` 프로젝트에 PNG·shader·설정을 복사하고 실제 CreatorEditor를 `--development-project`, `--commandlet-script`, `--result-file`로 시작한다. author 단계는 scene.new, object.create, scene.save를 사용하지만 required bundle 텍스처 참조 및 손상 입력은 스크립트가 파일에 주입한다. 따라서 이 검사 전체를 사용자의 GUI 저작 흐름이라고 설명하면 안 된다.
+1. 필수 4×4 PNG가 포함된 저장 씬의 재로드가 Ready가 되고 SavedOnly 엔티티가 복원된다.
+   이전 씬의 InitialUnsaved 엔티티는 새 씬에 남지 않는다. 제품 texture 조회로 4×4를 확인한다.
+2. 교체 뒤 RetainedUnsaved 엔티티를 새로 만든다. 없는 씬 파일, 손상된 씬 문서,
+   없는 필수 texture의 세 요청이 각각 Failed가 된다.
+3. 각 실패 뒤 활성 씬을 별도 파일로 저장해 SavedOnly와 RetainedUnsaved 보존을 확인한다.
+   `object.describe`의 entity handle과 sceneId도 최초 RetainedUnsaved 생성 결과와 같아야 한다.
+4. 유효한 저장 씬으로 다시 요청하면 Ready가 되고 새로운 sceneId로 교체된다.
+   저장되지 않은 RetainedUnsaved는 최종 씬에 남지 않는다.
 
-검사 순서는 유효한 씬, 없는 씬, 손상된 문서, 없는 텍스처 의존성, 유효 씬 재복구다. 성공 뒤 SavedOnly가 복원되고 InitialUnsaved가 사라져야 하며, 음성 세 경우에서는 RetainedUnsaved가 남아야 한다. 각 결과의 저장 파일과 object 조회를 비교한다. 의도된 세 실패 때문에 프로세스 exit 4가 기대되며 단순 “비영 exit는 모든 검사 실패” 판정은 틀린다.
+정상 두 요청과 실패 세 요청을 구성마다 실행한다. 실패는 정확히 세 건의
+`scene.load.status`에서 `scene.load_failed`로 발생해야 하며 나머지 명령은 성공해야 한다.
+제품 명령 정책은 Failed에 종료 코드 4를 부여하므로 음성 검사 프로세스의 4는
+예상 결과다. 검사기는 임의 오류/종료 코드를 성공으로 바꾸지 않는다.
 
-## 수명과 자료 해석
+## 결과와 재현
 
-실패한 준비가 기존 scene/entity를 훼손하지 않는지와, 성공한 전환이 이전 미저장 내용을 버리는지는 서로 반대되는 단정이다. 텍스처 4×4 조회는 dependency 준비를 확인하지만 GPU 픽셀 비교는 아니다. 일정 프레임 wait는 runner의 재현 방식이며 임의 장비에 대한 wall-clock 완료 보장이 아니다.
+최종 결과는 `Build/TextureSceneReload/result.json`에 기록한다. 각 프로젝트의
+`author/reload.jsonl`, stdout/stderr, 다섯 개 저장 관찰 파일과 시나리오를 보존한다.
+Debug/Release 모두 정상 Ready 2건, Failed 3건, 실패 후 미저장 엔티티 및
+entity handle/sceneId 보존 3건, 저장 관찰 파일 5개 비교를 통과했다.
+총 재로드 요청 10건을 실행했다. 검증 대상 소스 5개의 `sourceDrift=0`을 확인했다.
+두 실행의 종료 코드는 예상한 4이며 검사 스크립트는 성공으로 종료했다.
+실행 프로젝트는 Debug `Build/TSR-Debug-9383a063`, Release `Build/TSR-Release-8e5d9c58`이다.
+대시보드 전체 JavaScript 파싱·렌더·유한 진행률과 변경 파일 whitespace 검사는 통과했다.
+구조 검사기의 기존 PHASE 4.85 quoted-key RTP 문제(문자열 140/항목 모양 14)는
+이전 결과와 동일하게 남아 있다. 전체 구조 검사 통과로 표시하지 않는다.
 
-과거 2026-10-10 실행은 `Build/TextureSceneReload` 계열 receipt에 기록되었고 현재 개정에서 재실행하지 않았다. 최신 소스는 command handler와 fixture 경로까지 확인했다. 수동 파일 대화상자·확인 모달 취소는 [이전 Inspector UX](TextureInspectorUiValidation20261010.md)의 역사적 범위이며 현재 자동 UI 수용과 혼합하지 않는다.
+```powershell
+Tools/regression/verify-texture-scene-reload.ps1 -Configuration All
+```
 
-## 남은 수용
+이 후속 작업은 제품 동작 변경이나 추가 빌드를 요구하지 않았다. 검사 시나리오를
+추가했고 기존 unrelated 작업 트리 변경을 보존했다. commit/push는 수행하지 않았다.
 
-실제 큰 씬·다수 텍스처의 취소/연속 전환, stale 요청 ID, project 전환, shutdown과 겹친 준비, GPU 준비 실패 및 표시 결과는 별도 검사다. ImageComponent와 SpriteRenderer의 저장 경로 복원은 [종단 probe](TextureReimportSceneValidation20261010.md)가 더 직접적인 출발점이다.
+## 잔여 범위
 
-## 구현 근거
+이번 texture는 작은 원본 PNG 의존성이다. 이후 cooked generation 게시와
+ImageComponent 씬 재로드를 한 프로세스에서 연결한 결과는
+[종단 검증 기록](TextureReimportSceneValidation20261010.md)에 별도로 유지한다.
+Inspector Save and Reimport/확인창/취소/파일 선택의 실제 조작, GPU texture sampling,
+Shipping GPU package, 신규 BC5/BC7·모델 전체 소비 및 품질/시간/메모리 측정은 남아 있다.
+각 실패 유형을 모든 runtime publication 실패나 모든 GPU/장시간 조건으로 확대하지 않는다.
 
-- [Tools/regression/verify-texture-scene-reload.ps1](../../Tools/regression/verify-texture-scene-reload.ps1)
-- [Editor/EngineEntry/Commands/SceneObjectCommands.cpp](../../Editor/EngineEntry/Commands/SceneObjectCommands.cpp)
-- [Engine/SceneRuntime/SceneManager.cpp](../../Engine/SceneRuntime/SceneManager.cpp)
-- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp](../../Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp)
+T0/T1a/T2는 진행 중이며 `earnedDays: 0`, T1b 대기, T3 중단을 유지한다.

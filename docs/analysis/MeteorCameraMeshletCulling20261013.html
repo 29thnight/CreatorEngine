@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/MeteorCameraMeshletCulling20261013.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>METEOR camera compute meshlet work — 2026-10-13</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#implementation">Implementation</a></li><li><a href="#initial-frustum-gates">Initial frustum gates</a></li><li><a href="#remaining-boundaries">Remaining boundaries</a></li><li><a href="#b3-follow-up-one-native-cull-dispatch-per-view">B3 follow-up: one native cull dispatch per view</a></li><li><a href="#b1-follow-up-current-frame-meshlet-hzb">B1 follow-up: current-frame meshlet HZB</a></li><li><a href="#b2-follow-up-temporal-two-stage-occlusion">B2 follow-up: temporal two-stage occlusion</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="MeteorCameraMeshletCulling20261013.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>METEOR camera compute meshlet work — 2026-10-13</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">6<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 6"><i class="ok" style="flex:6"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 6</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#implementation"><span class="ve-label">§00</span><span class="map-name">Implementation</span><span class="map-bar"><i style="width:24.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#initial-frustum-gates"><span class="ve-label">§01</span><span class="map-name">Initial frustum gates</span><span class="map-bar"><i style="width:44.1%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">6</span></span></a>
+<a class="map-row" href="#remaining-boundaries"><span class="ve-label">§02</span><span class="map-name">Remaining boundaries</span><span class="map-bar"><i style="width:8.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#b3-follow-up-one-native-cull-dispatch-per-view"><span class="ve-label">§03</span><span class="map-name">B3 follow-up: one native cull dispatch per view</span><span class="map-bar"><i style="width:62.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#b1-follow-up-current-frame-meshlet-hzb"><span class="ve-label">§04</span><span class="map-name">B1 follow-up: current-frame meshlet HZB</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#b2-follow-up-temporal-two-stage-occlusion"><span class="ve-label">§05</span><span class="map-name">B2 follow-up: temporal two-stage occlusion</span><span class="map-bar"><i style="width:91%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「B1 follow-up: current-frame meshlet HZB」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-implementation">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="implementation">Implementation</h2></div>
+<div class="prose"><ul>
+<li>The camera prepares one metadata range per geometry/material bin. CPU preparation no longer constructs a candidate for every meshlet.</li>
+<li>Compute tests the actual transformed/posed vertices against the camera clip planes and atomically compacts surviving meshlet ordinals.</li>
+<li><code>METEOR.CameraMeshlet.Reset/Cull</code> produces the count-prefixed frustum stream for the depth prepass. The B1 follow-up adds <code>METEOR.CameraMeshlet.HZB.Reset/Cull</code> for the final surface stream. Both use GPU-finalized indirect arguments; mesh shaders do not replay culling.</li>
+<li>Camera instance HZB rejection remains in the GPU owner gate; the final meshlet list additionally rejects occluded posed bounds. Shadows use independent light projections and the same count-prefixed work contract.</li>
+<li>GPU arguments support multiple rows with X &lt;= 65535. Mesh shaders guard padding groups before emitting output. Preparation checks the native per-axis and total group limits and rejects an unsupported range; it does not truncate or fall back.</li>
+<li><code>CookedProgramVersion</code> and <code>kMaterialProgramArtifactVersion</code>: <strong>5 -&gt; 6</strong>. <code>SceneHostIdentity</code>: <strong>22 -&gt; 23</strong>. Previous material programs must be recooked; no old-program binding route was added. Meshlet payload schema/profile remain 2.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-initial-frustum-gates">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="initial-frustum-gates">Initial frustum gates</h2></div>
+<div class="prose"><p>GPU-based DX12 validation was enabled. All accepted processes exited normally with code 0.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Gate</th><th>Debug</th><th>Release</th></tr></thead>
+<tbody><tr><td>MaterialRasterSurfaceProbe build</td><td><span class="chip ok">Passed</span></td><td><span class="chip ok">Passed</span></td></tr>
+<tr><td><code>--lx-meshlet-only</code></td><td><span class="chip ok">Passed</span></td><td>Passed after native-limit guard</td></tr>
+<tr><td><code>--shadow-decal-only</code></td><td><span class="chip ok">Passed</span></td><td>Passed before the final native-limit guard; Debug also covers that guard</td></tr>
+<tr><td><code>--forward-blend</code></td><td><span class="chip ok">Passed</span></td><td>Passed before the final native-limit guard; Debug also covers that guard</td></tr>
+<tr><td>CreatorEditor build and METEOR cutover</td><td>Not rerun in this change</td><td><span class="chip ok">Passed</span></td></tr></tbody></table></div>
+<p>Camera mode: <strong>24 frames, 67488 checks, 12501 GPU components, validation=0</strong>. Its readback compares the exact GPU ID set with an independent CPU clip replay over captured transformed vertices and packed topology; it also checks duplicates, capacity and the indirect dimensions. Readbacks depend on the producer&#39;s current graph versions, not imported version zero.</p>
+<p>The real <code>MeshletFinalizeCS</code> boundary gate checks survivor counts <strong>0, 1, 65535, 65536 and 131071</strong>. This verifies GPU argument generation; it is not a 131071-meshlet product-scene performance result.</p>
+<p>The Release Editor gate passed <code>dx12.meshletcontract</code>, <code>dx12.skinning</code>, the full render-graph regression, empty HDR capture and live geometry capture: depth/lit pixels <strong>252/252</strong>, indirect mesh submission <strong>1</strong>, Deferred passes <strong>0</strong>, validation problems <strong>0</strong>. The skinning gate reads the new count header and independently audits shadow survivor IDs against posed vertices.</p>
+<p>Evidence under <code>Build/Verification/MeteorCameraMeshlets20261013/</code>:</p>
+<ul>
+<li><code>Debug-Acceptance/verdict.json</code>: current camera, shadow and blend probes; source stable.</li>
+<li><code>Release-Limits/verdict.json</code>: camera and argument boundaries after the native-limit guard; source stable.</li>
+<li><code>Release-Acceptance/verdict.json</code>: camera, shadow and blend probes before that small guard; source stable.</li>
+<li><code>Release-Boundaries/verdict.json</code>: standalone GPU argument boundary gate.</li>
+<li><code>Editor-Release-Acceptance/verdict.json</code>: current Release Editor product gate; source stable.</li>
+</ul>
+<p>Failed runs were reviewed and retained. Corrections covered single-call mesh output counts, reset/cull ID-buffer write versions and UAV barriers, producer-version readback dependencies, the boundary probe&#39;s copy argument order, and the Editor skinning probe&#39;s previous ID-only list contract.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-remaining-boundaries">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="remaining-boundaries">Remaining boundaries</h2></div>
+<div class="prose"><ul>
+<li>CPU still owns material/geometry bins and PSO submission. Cross-bin native compute dispatch fusion was added in the follow-up below.</li>
+<li>Meshlet-level current-depth HZB is implemented in the B1 follow-up below. History/current-depth two-stage occlusion remains B2.</li>
+<li>Performance improvement and a large product workload are <strong>not accepted</strong> by these correctness gates.</li>
+<li>Vulkan runtime equivalence remains deferred to Phase 4.9.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-b3-follow-up-one-native-cull-dispatch-per-view">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="b3-follow-up-one-native-cull-dispatch-per-view">B3 follow-up: one native cull dispatch per view</h2></div>
+<div class="prose"><p>Camera and shadow views now bind structured vertex SRVs and raw topology SRVs in two buffer tables. Each view accepts at most 4096 geometry bins and retains the existing 32 MiB output budget. Unsupported ranges fail preparation; there is no per-bin dispatch fallback.</p>
+<p>CPU preparation uploads one range per bin, including its first 64-thread group. The compute shader searches these ordered ranges using the group ID, selects that bin&#39;s two buffers, and enumerates its meshlets. Padding lanes and extra groups in the last 2D dispatch row return before reading topology. Buffer selection is uniform within each workgroup. Geometry buffers remain owned by their batches and are read directly; no aggregate geometry copy was added.</p>
+<p>Native dispatch count per nonempty culling stage/view is <strong>reset 1 + cull 1 + finalize 1</strong>, independent of bin count within the supported capacity. Three shadow cascades remain three separate views. CPU material/geometry bins and graphics PSO submission are still present, so B3 as a whole remains partial.</p>
+<p>RHI now describes structured/raw buffer SRV tables. DX12 validates buffer view ranges before descriptor creation. Its immutable per-recording descriptor page grew from 4096 to 131072 entries so camera/shadow input tables can coexist with transform/material tables. Vulkan descriptor type translation was adjusted, but Vulkan array/runtime equivalence is still a Phase 4.9 task.</p>
+<p><code>MeshletBatchDispatchProbe.inl</code> exercises the production reset/cull/finalize shaders with 1, 2 and 4096 bins, different topology sizes, distinct buffer slices, partial/all/zero survivors, padded lanes, and a second compute dispatch row. The largest case has 73727 groups. Every survivor ID and indirect argument is checked. A buffer SRV extending beyond its allocation is rejected before submission. This synthetic kernel gate is correctness evidence, not a 4096-object Editor acceptance or a performance measurement.</p>
+<p>The standalone Release batch gate passed with GPU validation on, normal exit 0 and stable source hashes:
+<code>Build/Verification/MeteorMeshletBatch20261013/Release-Batch/verdict.json</code>.</p>
+<p>Follow-up acceptance (all passed, normal exit 0, stable source hashes):</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Gate</th><th>Evidence under <code>Build/Verification/MeteorMeshletBatch20261013/</code></th></tr></thead>
+<tbody><tr><td>Release camera, shadow/decal, blend</td><td><code>Release-Acceptance/verdict.json</code></td></tr>
+<tr><td>Debug camera and native batch boundaries</td><td><code>Debug-Acceptance/verdict.json</code></td></tr>
+<tr><td>Release Editor meshlet contract, skinning, render graph, empty/live captures</td><td><code>Editor-Release-Acceptance/verdict.json</code></td></tr></tbody></table></div>
+<p>Both camera probe configurations passed 24 frames, 2265120 checks and 12501 GPU components with validation=0. The new batch checks account for the larger check count. The Release Editor live capture had 252 covered/lit pixels, one mesh indirect submission, zero Deferred passes and zero validation problems; the empty scene retained its METEOR HDR clear. Debug Editor was not rerun. No performance acceptance is claimed.</p>
+<p>Per the user&#39;s 2026-10-13 instruction, performance measurement and optimization are deferred until all structural implementation is complete. Current gates check build, GPU validation, output correctness and regressions only.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-b1-follow-up-current-frame-meshlet-hzb">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="b1-follow-up-current-frame-meshlet-hzb">B1 follow-up: current-frame meshlet HZB</h2></div>
+<div class="prose"><p>The camera now uses two independent GPU lists. <code>METEOR.CameraMeshlet.Reset/Cull</code> emits the frustum list consumed by <code>METEOR.Scene.OccluderDepth</code>. One current-frame <code>GpuGeometryOcclusion::Pyramid</code> is built from that depth. Both instance visibility and <code>METEOR.CameraMeshlet.HZB.Reset/Cull</code> read the same pyramid. The surface mesh shader consumes only the final HZB-compacted IDs and GPU-finalized indirect arguments. The depth producer never consumes the HZB result, so the graph has no feedback dependency.</p>
+<p>The HZB kernel constructs each meshlet&#39;s world AABB from the actual transformed/posed vertices, then projects its corners conservatively. It retains uncertain/nonfinite bounds, near/W-plane crossings and equal-depth surfaces. It expands the projected rectangle by one source pixel and samples every covered max-depth cell at the selected level (at most 2x2), including odd image extents. The existing frustum and shadow kernels continue to share the same compaction/output contract.</p>
+<p>Scene culling requires the explicit versioned graph. The previous unversioned Scene test routes were migrated rather than adding a no-HZB fallback. Test readbacks use producer versions; subsurface and refraction frames expose their current graph inputs for that purpose. The extra HZB table changes the compute root layout, so finalization explicitly rebinds all inputs after its pipeline switch.</p>
+<p>This B1 step does not change the cooked meshlet payload or add an old-format reader. The earlier material-program version-6 recook requirement remains. History reprojection, a second recovery pass and temporal invalidation are B2; Vulkan runtime parity remains Phase 4.9. Performance measurement and optimization remain deferred.</p>
+<h3 id="b1-correctness-gates">B1 correctness gates</h3>
+<p><code>MeshletHzbProbe.inl</code> rasterizes a controlled D32 depth image, runs the production HZB builder and meshlet reset/cull/finalize kernels, then checks exact expected ID sets and arguments. Its eight cases cover solid occlusion, a center hole, removal of the occluder, a near/W crossing, invalid projection, camera movement, an edge hole at odd resolution, and the original view again. Front/equal-depth geometry and nonfinite posed vertices are included. Wrong view dimensions, frame/projection identity and previous recordings are rejected. This is a correctness fixture, not a performance workload.</p>
+<p>The product Scene probe additionally checks that the final HZB list is a unique subset of the independently replayed frustum list and that its count controls the indirect dimensions. Existing pixel, material, skinning and submission-lifetime checks remain active.</p>
+<p>Each of the camera&#39;s frustum and HZB stages keeps the cross-bin batch dispatch: one reset, one cull and one finalize per nonempty stage. B1 adds a second stage, not a per-mesh dispatch loop. Shadow views retain their existing frustum stages.</p>
+<p>Accepted B1 evidence under <code>Build/Verification/MeteorMeshletHzb20261013/</code>:</p>
+<ul>
+<li><code>Release-Hzb/verdict.json</code>: eight native HZB cases, normal exit, validation=0.</li>
+<li><code>Release-Final-Hzb/verdict.json</code>: the same eight cases rerun against the final sources, source stable, normal exit, validation=0.</li>
+<li><code>Release-Scene-RG2/verdict.json</code>: shadow/decal, forward blend, subsurface, refraction, volume, forward transport and Scene integration all passed with GPU validation enabled, source stable and exit code 0. Scene integration covered 59 frames, 25189669 checks and 3901990 GPU components, including the camera list readbacks; unexpected fallbacks=0.</li>
+<li><code>Release-Acceptance/runs.json</code>: camera mode passed 24 frames, 2265686 checks and 12501 GPU components; the subsequent old shadow fixture failed, so this entire run is <strong>not</strong> an accepted aggregate verdict.</li>
+<li><code>Debug-Accepted/verdict.json</code>: the same camera/HZB/batch gates passed, source stable, normal exit, validation=0. Byte-identical shader/fixture copies use isolated generated-source/cache paths; their hashes are recorded.</li>
+<li><code>Editor-Release-Acceptance/verdict.json</code>: meshlet contracts, posed skinning/shadow lists, full render-graph gate and empty/live captures passed. Live coverage/lit pixels: 252/252; indirect mesh submissions: 1; Deferred passes: 0; validation problems: 0. Source stable and normal quit. Debug Editor was not rerun.</li>
+<li><code>matched-release-verdict.json</code>: 24 native matched-image cases passed finite-output and GPU-validation checks; no timing mode or Blender material-quality acceptance was used.</li>
+</ul>
+<p>The failed shadow fixture still used a declaration-order graph. Related Scene probes were moved to RG2 with explicit read/write versions. The diagnostic Debug attempt was stopped and retained as a failure. The first isolated Debug fixture lacked its output directory and was rejected before GPU execution; the corrected <code>Debug-Accepted</code> run passed. These failures are not counted as successful gates.</p>
+<p>After the full gates, only trailing EOF whitespace was normalized; before/after hashes and content-equivalence checks are in <code>eof-normalization.json</code>. The final HZB rerun and <code>git diff --check</code> passed. No performance acceptance is claimed.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-b2-follow-up-temporal-two-stage-occlusion">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="b2-follow-up-temporal-two-stage-occlusion">B2 follow-up: temporal two-stage occlusion</h2></div>
+<div class="prose"><p>The camera now uses the newest completed, accepted HZB for its first list. Current posed world bounds are projected with that history&#39;s view-projection; current-view frustum rejection still uses the current matrix. The first list writes occluder depth. A shared current HZB then tests only meshlets rejected by the first stage. Every first-stage survivor is retained, recovered IDs are appended once, and the final surface consumes this union through GPU-generated indirect arguments. Cold views use current frustum classification in the same first-stage wiring.</p>
+<p>Each bin&#39;s internal allocation contains a count, capacity for compacted IDs, and one classification word per source meshlet. The mesh shader still reads only the count and compacted-ID prefix. Source flags are overwritten for every valid invocation, including rejected work, and the graph declares the first list as an SRV dependency of recovery. The 32 MiB per-stage budget includes the classification storage. Each nonempty stage retains one reset, one cull and one finalize dispatch across bins.</p>
+<p>The final opaque surface depth builds a separate immutable persistent pyramid for the next view. Its graph passes are retained for this external output. History promotion happens only after the exact successful submission passes Scene publication checks; reuse additionally waits for GPU completion. Recording-local readers pin the texture owner and validate device, recording, descriptor and graph identities. Aborted or rejected recordings are not promoted, and an unsubmitted pyramid cannot be imported as history. In-flight ownership remains with submitted frames, so replacing a history entry cannot release textures still in use.</p>
+<p>History selection checks scene epoch, view ID, extent, frame order, history revision, Temporal revision/reset, camera-cut revision and lens/projection identity. Temporal camera metadata supplies the unjittered projection for the lens key, while the stored raster view-projection is used for HZB lookup. Ordinary camera movement and posed geometry changes are handled by reprojection and current-frame recovery. If the latest accepted frame is still in flight, the newest completed compatible history is used; this is not a promise of exactly one-frame latency.</p>
+<p>This step retains the current depth-first surface renderer: the first raster writes depth, and the final surface shades the union. HW/SW visibility-buffer raster stages and material packet shading remain C2/C4 work. The cooked payload is unchanged, and no compatibility reader or legacy Scene route was introduced.</p>
+<h3 id="b2-correctness-gates">B2 correctness gates</h3>
+<p>The native HZB probe adds eight temporal cases with exact independent first/final ID sets: cold start, removed occluder recovery, retention of first-stage survivors, persistent occlusion, camera movement, lookup through a different previous projection, posed geometry movement, and repeated recovery. It reads back source classifications and bounded indirect arguments. It also rejects unsubmitted history and mismatched extent, scene and frame order. The original eight B1 boundary cases remain active.</p>
+<p>The 24-frame camera Scene gate checks actual accepted-history reuse, invalidation after camera cuts/history revision/view changes, the first/final union, independent frustum bounds, existing pixel oracles, and normal GPU retirement. Debug and Release passed with GPU validation enabled, 2266174 checks and 12501 GPU components each. Evidence: <code>Build/Verification/MeteorMeshletTemporal20261013/Release-Camera/verdict.json</code> and <code>Debug-Camera/verdict.json</code>. The isolated Debug shader/fixture hashes are recorded in <code>copied-inputs.json</code>. Release native HZB also passed separately in <code>Release-Hzb/verdict.json</code>.</p>
+<p><code>Editor-Release/verdict.json</code> passed meshlet contracts, skinning, render-graph checks, and empty/live product captures with normal quit, stable sources, 12 shadow GPU-list checks and 12 payload checks. The live image had 252 covered/lit geometry pixels and zero validation problems; the empty image retained the METEOR HDR clear. Debug Editor and the separate matched-image probe were not rerun for B2.</p>
+<p><code>Release-Regression/verdict.json</code> passed all six related modes: shadow/decal, forward blend, subsurface, refraction, volume and forward transport. All gates exited normally with stable source hashes and GPU validation enabled. The aggregate <code>b2-verdict.json</code> records the accepted verdict hashes and verification scope; <code>git diff --check</code> passed. No performance measurement or optimization was performed. Vulkan runtime equivalence remains Phase 4.9.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MeteorCameraMeshletCulling20261013.md"><code>docs/analysis/MeteorCameraMeshletCulling20261013.md</code></a> · 마지막 커밋 2026-10-14 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

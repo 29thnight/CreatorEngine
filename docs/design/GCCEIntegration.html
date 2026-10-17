@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/GCCEIntegration.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCCE scene graph integration</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#ownership-and-construction">Ownership and construction</a></li><li><a href="#tracing-and-reflection">Tracing and reflection</a></li><li><a href="#thread-and-borrow-boundaries">Thread and borrow boundaries</a></li><li><a href="#deterministic-cleanup-and-collection">Deterministic cleanup and collection</a></li><li><a href="#dependency-and-packaging">Dependency and packaging</a></li><li><a href="#validation-and-remaining-gates">Validation and remaining gates</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="GCCEIntegration.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>GCCE scene graph integration</h1>
+<div class="meta"><p>Status: scoped Windows Debug/Release validation, 2026-10-09. Scene GC repeated
+20 times per configuration and Play round-trip regressions passed. See the
+<a href="../analysis/GCCEValidation20261009.html">validation record</a> for evidence and remaining gates.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#ownership-and-construction"><span class="ve-label">§00</span><span class="map-name">Ownership and construction</span><span class="map-bar"><i style="width:67.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#tracing-and-reflection"><span class="ve-label">§01</span><span class="map-name">Tracing and reflection</span><span class="map-bar"><i style="width:50.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#thread-and-borrow-boundaries"><span class="ve-label">§02</span><span class="map-name">Thread and borrow boundaries</span><span class="map-bar"><i style="width:85.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#deterministic-cleanup-and-collection"><span class="ve-label">§03</span><span class="map-name">Deterministic cleanup and collection</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#dependency-and-packaging"><span class="ve-label">§04</span><span class="map-name">Dependency and packaging</span><span class="map-bar"><i style="width:44.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#validation-and-remaining-gates"><span class="ve-label">§05</span><span class="map-name">Validation and remaining gates</span><span class="map-bar"><i style="width:70.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「Deterministic cleanup and collection」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-ownership-and-construction">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="ownership-and-construction">Ownership and construction</h2></div>
+<div class="prose"><p>The scope is Scene → Entity → Component. <code>Object</code> is deliberately not managed:
+Prefab and other non-GC objects retain their existing ownership. AssetDepot and
+<code>ownership_cpp</code> resource owners, native SDK handles, renderer snapshots, and GPU
+accepted-work/completion ownership are unchanged.</p>
+<ul>
+<li>SceneManager owns one GameThread <code>gc::domain</code>, declared before its external
+<code>root_ref&lt;Scene&gt;</code> registry so the domain is destroyed last. Its public Scene list
+is a const, nonowning enumeration. Temporary loading and DDOL transfers hold roots.</li>
+<li>Scene traces its Entity slots; Entity traces its ordered Component edges and the
+eagerly allocated missing-Transform fallback. SceneStore indexes/generations,
+hierarchy transactions, and DDOL identity remain authoritative.</li>
+<li>Component observes its owner through a weak identity. <code>GetOwner()</code> remains a raw
+frame-borrow accessor for joined workers and fenced presentation reads; it does
+not promote a weak reference on those threads.</li>
+<li>Scene factories take the domain and return a root. The manager adopts that root.
+Entity factories publish through <code>gc::make</code> before attaching Components. This
+two-phase construction makes owner identity available before <code>SetOwner</code>.</li>
+<li>Engine Components use <code>Component::CreateManaged</code>, which creates an external
+temporary root and establishes a cleanup obligation immediately. Publication
+into Entity precedes scheduler registration; failure rolls back both.</li>
+<li>GC objects must not be created on the stack, embedded by value, made by ordinary
+<code>new</code>, or held by <code>unique_ptr</code>. Socket pose data is a plain matrix value, not a
+Transform Component. Standalone probes explicitly finalize before dropping roots.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-tracing-and-reflection">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="tracing-and-reflection">Tracing and reflection</h2></div>
+<div class="prose"><p>Tracing is explicit and independent of serialization. Every shipped concrete
+Component declares its own <code>gc_trace</code>, calls its base hook, and visits any strong
+GC fields, including ignored/nonserialized fields. The typed Component factory
+rejects a new subtype that only inherits a trace hook. This is a source contract,
+not automatic detection of an omitted field.</p>
+<p>Graph references retain their prior serialized pointer/sequence shape. Generic
+property copying and graph deserialization do not allocate or reassign ownership;
+Scene and ComponentFactory perform restoration in the explicit domain. The closed
+factory uses the existing <code>REFLECT_TYPE_LIST</code> and type IDs. Public CLR/native ABI
+handles remain generation values, never <code>gc::weak_ref</code> values that could outlive a
+domain. Editor cross-frame selections/popups re-resolve scene/entity/component IDs.</p>
+<p>The pinned reflgen 1.0.0 descriptor factory previously checked only default
+constructibility before instantiating <code>new T</code> and <code>delete T</code>. The local vcpkg port
+patch additionally requires legal class allocation/deletion. Managed types still
+have metadata/serialization, but no ordinary descriptor factory. No reflgen
+repository changes or new code-generation protocol are required.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-thread-and-borrow-boundaries">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="thread-and-borrow-boundaries">Thread and borrow boundaries</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>Entry</th><th>Execution and retained data</th></tr></thead>
+<tbody><tr><td>Runtime/CLR graph operations</td><td>GameThread; Scene roots and traced edges</td></tr>
+<tr><td>Editor create/delete/duplicate/reparent/component/prefab operations</td><td>PresentationThread queues owned values and generation handles; existing GameThread command pump applies them</td></tr>
+<tr><td>Light creation and configuration</td><td>One queued operation; no fabricated immediate creation result</td></tr>
+<tr><td>Undo/Redo replay</td><td>GameThread; value-only Undo commits retain their existing synchronous UI behavior</td></tr>
+<tr><td>UI factories, hierarchy paste, terrain attachment, prefab drops</td><td>Whole actions queued with owned paths/IDs; targets resolved at execution</td></tr>
+<tr><td>Prefab editor open/close</td><td>GameThread adoption/retirement; persisted identities are re-resolved</td></tr>
+<tr><td>Editor command delivery/polling</td><td>Separate orchestration and scene-borrow sections; no blocking PresentationThread future</td></tr>
+<tr><td>Animation and transform workers</td><td>Existing jobs join before graph edges may detach or collection runs; stable Scene-rooted graph supplies their borrow lifetime</td></tr>
+<tr><td>AI jobs</td><td>Existing immutable snapshots and EntityHandle values</td></tr>
+<tr><td>Render/presentation/GPU work</td><td>Existing sealed snapshots and independent resource/completion owners</td></tr></tbody></table></div>
+<p>Queued edits capture the scene-context epoch as well as target generations. A
+scene/session transition rejects an old click instead of applying it to a new
+context. Queue admission closes before teardown. No GC root or pin is moved into a
+worker/editor closure whose destructor could run on another thread. A pin protects
+memory, not logical Destroy state or unsynchronized data writes. An asynchronous
+borrow that can outlive its graph edge needs a pin for the actual borrowed object,
+retained and released by the owner thread after its job joins.</p>
+<p>Live-scene command handlers must not synchronously wait for PresentationThread
+work while holding the scene borrow fence. Use request/poll splitting for such
+operations. Source review found bounded RT/GPU waits and nonblocking presentation
+polls, not a demonstrated GT/PT wait cycle. This is not proof of runtime deadlock
+freedom, and some existing diagnostic handlers still block while they execute.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-deterministic-cleanup-and-collection">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="deterministic-cleanup-and-collection">Deterministic cleanup and collection</h2></div>
+<div class="prose"><p>Destroy still delivers the existing lifecycle hooks. Pending cleanup keeps objects
+reachable. Script handles remain valid during final hooks and are invalidated before
+Entity edge removal; DDOL detach does not invalidate them. Selection borrows are
+pruned before a Scene slot is released. Detached components leave the source
+lifecycle schedule and re-register in the destination.</p>
+<p><code>FinalizeManagedDestroy</code> performs idempotent native resource release before clearing
+owner observations and marking the GC lifecycle destroyed. Animator releases CLR
+animation instances, controller owners, sockets, asset requests, and its native
+instance record there; MeshRenderer/Foliage cancel their subscriptions there.
+Collector destructors release owned storage, not normal engine lifecycle callbacks.
+The current CLR animation release is <code>AniBehaviorFactory.Destroy</code> dictionary removal,
+not a user Enter/Exit callback. Future cleanup extensions must recheck reentrancy.</p>
+<p>Scene retirement sets its guard before callbacks and rejects new graph mutations or
+re-adoption. Cleanup failures retain their roots and fail closed; they are not marked
+successfully retired. Scene slot reuse still invalidates generation handles.</p>
+<p>Collection runs after EndOfFrame callbacks and the DDOL observer sweep, while the
+editor&#39;s existing scene/presentation fence is held. The Player has the equivalent
+post-EndOfFrame boundary. Normal collection is <code>collect_step</code>: 250 μs soft budget,
+16 minimum units, 1 MiB allocation trigger, and a one-second maximum cycle interval.
+Teardown/edge release explicitly requests collection. No full collection runs every
+frame. Root scans, a large tracer/destructor, and allocator maintenance may overrun
+the soft budget; no latency or performance improvement is claimed.</p>
+<p>Shutdown order is stop admission → drain loads/AI/jobs and PT/RT consumers → run
+Scene/component hooks and invalidate handles → drop graph/transfer roots → full
+collection → clear callback roots and collect again → shut down CLR/audio/other
+services. The domain is destroyed last. Module object count alone is not enough to
+unload code; callbacks and workers must also be quiescent.</p>
+<p>The default GCCE violation handler still aborts. Quarantine is not a substitute for
+cleanup, root release does not itself request collection, and nonmoving allocator
+pools may retain warm committed memory. No returning production violation handler
+has been installed to hide lifetime errors.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-dependency-and-packaging">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="dependency-and-packaging">Dependency and packaging</h2></div>
+<div class="prose"><p><a href="../../ThirdParty/GCCE/PROVENANCE.md">Upstream provenance</a> pins all 16 unmodified
+source files to <code>aef79b3f57861fc16d0045e860e9082eeed8ec29</code> with hashes. Upstream
+supplies no LICENSE at this revision; none has been invented or changed.</p>
+<p><code>Engine/GCCE/GCCE.vcxproj</code> builds one C++23 DLL. Only that project defines
+<code>GCCE_BUILDING</code>; consumers use <code>GCCE_SHARED</code> and matching <code>GC_DEBUG_CHECKS</code> (Debug 1,
+Release 0). SceneGC.h is the engine entry header. The DLL opts out of reflgen and
+vcpkg and uses the matching shared CRT. This exported C++ interface requires matching
+toolchain/configuration, not a stable cross-version C ABI.</p>
+<p>GCCE is shipping-neutral: <code>Bin/&lt;platform&gt;-&lt;configuration&gt;/Runtime/Common/gcce.dll</code>
+and <code>Build/Lib/&lt;platform&gt;-&lt;configuration&gt;/gcce.lib</code> are shared by Development and
+Shipping, including identical intermediate/PDB paths. The existing launcher and
+hashed deployment/package manifests carry its import closure. Standalone compiler
+probes use GCCEProbe.ps1 for the same definitions, import library, and DLL lookup.
+The vendored CMakeLists is provenance; its unvendored upstream tests/benchmarks are
+not an engine build entrypoint.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-validation-and-remaining-gates">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="validation-and-remaining-gates">Validation and remaining gates</h2></div>
+<div class="prose"><p>Initial integration review covered source, exact upstream blob hashes, changed
+project XML, Python source parsing, include/reference inspection and whitespace.
+Subsequent authorized validation built the Editor dependency closure and managed
+assemblies in Windows x64 Debug/Release. Editor GC owner-source contracts (8),
+Entity ownership contracts, reflection container classification (D/R), and
+reflection value/shape round-trip (Debug, 37 axes) passed.</p>
+<p>Regression source includes <code>SceneGCSelfTest</code> (real graph cycles, hooks, stale handles,
+selection, DDOL and an actual component pin through job join), editor owner-thread
+source contracts, and migrated existing standalone component probes. The Scene GC
+fixture is invoked by the process-scoped <code>scene.gc.selftest</code> commandlet under the
+host scene borrow fence. Debug/Release each passed 20 repetitions with exit 0,
+including final incremental collection and unchanged live/quarantine/aborted-cycle
+counts. Its pin example intentionally distinguishes storage retention from
+logical cleanup and does not claim pins prevent Destroy.</p>
+<p>Play-to-Stop content restoration and the W5 state-machine/failure-injection/Undo
+preservation gates also passed in both configurations. These scoped initialized
+host runs exercise DLL loading, reflection regeneration, script handle identity
+and normal shutdown. They do not complete general script/native ABI coverage.
+Remaining runtime gates include repeated prefab UI transitions, cleanup callback
+reentrancy/failure paths, pending-work shutdown, packaged Player/Shipping,
+NativeAOT publish, ASan, and scale/latency benchmarks. Upstream tests were not run.
+The validation record also preserves Release PDB and profiler shutdown warnings.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="GCCEIntegration.md"><code>docs/design/GCCEIntegration.md</code></a> · 마지막 커밋 2026-10-10 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

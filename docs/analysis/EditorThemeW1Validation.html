@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorThemeW1Validation.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 21 W1 — 테마·폰트·DPI 구현과 검증</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorThemeW1Validation.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 21 W1 — 테마·폰트·DPI 구현과 검증</h1>
+<div class="meta"><p>2026-09-11. <a href="../plans/EditorWorkspaceRedesignPlan.html">정본 계획</a>의 W1 후속 기록.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">7<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 5, 주의 2"><i class="ok" style="flex:5"></i><i class="warn" style="flex:2"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 5</span><span class="chip warn">주의 2</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 3개의 분량 막대">
+<a class="map-row" href="#구현"><span class="ve-label">§00</span><span class="map-name">구현</span><span class="map-bar"><i style="width:82.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#override-inventory"><span class="ve-label">§01</span><span class="map-name">Override inventory</span><span class="map-bar"><i style="width:38.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-범위"><span class="ve-label">§02</span><span class="map-name">검증 범위</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip warn" title="주의">2</span> <span class="chip ok" title="완료·통과">5</span></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 3개 가운데 「검증 범위」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-구현">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="구현">구현</h2></div>
+<div class="prose"><ul>
+<li><code>EditorTheme.h/.cpp</code>의 14개 semantic color와 logical-pixel geometry가 ImGui style의 정본이다.
+창 본문의 공통 override도 이 토큰을 소비한다. 영상 캔버스의 검정 배경·0 padding,
+정규화 정렬 값, node-editor 자체 데이터 시각화는 별도 의미를 가진 예외다.</li>
+<li><code>ApplyEditorTheme</code>는 기준 style부터 다시 구성하고 geometry에 사용자 배율×OS DPI를 한 번 적용한다.
+<code>FontScaleMain</code>은 사용자 배율, <code>FontScaleDpi</code>는 모니터 DPI이며 <code>NewFrame</code> 전에 모두 설정한다.
+<code>ConfigDpiScaleFonts</code>를 켜서 ImGui의 main viewport DPI 갱신과 연결했다. OS multi-viewport는 끈 상태다.</li>
+<li><code>WM_DPICHANGED</code>의 제안 RECT는 창 소유 스레드에서 즉시 적용한다. 수명이 짧은 <code>lParam</code> 포인터를
+PresentationThread의 메시지 큐로 넘기지 않는다. 제목표시줄 테두리 판정도 해당 창 DPI를 쓴다.</li>
+<li><strong>기존 매니페스트 판정 정정:</strong> 계획 부록 B.5의 &quot;에디터는 이미 per-monitor v2라 손댈 것이 없다&quot;는
+결론은 틀렸다. 오래된 <code>Academy_4Q.exe.manifest</code>는 빌드에 연결되지 않았으며, 실제 기존 EXE의
+리소스 <code>#1</code>에서 추출한 manifest에는 DPI 선언이 없었다. 이번 W1에서 최소
+<code>Editor/EngineEntry/CreatorEditor.manifest</code>의 <code>SMI/2016/WindowsSettings</code>·<code>PerMonitorV2</code> 선언을
+<code>CreatorEditor.vcxproj</code>의 <code>AdditionalManifestFiles</code>로 연결했다. 검증은 파일 존재에 그치지 않고
+실행 HWND의 <code>DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2</code> 여부를 확인한다.</li>
+<li>Win32 backend가 물리 client/mouse/framebuffer 좌표를 소유한다. framebuffer 배율에 DPI를 다시 곱하지 않는다.</li>
+<li>Inter 4.1 static regular와 OFL 라이선스를 <code>Resources/Editor/Fonts</code>에 포함하고 빌드 산출물로 배포한다.
+본문·heading은 같은 Inter를 쓰고, 본문 크기와 icon 크기·baseline 보정은 별도 토큰으로 전달한다.
+필수 본문 폰트는 번들 파일이 없으면 시스템 후보, 마지막에는 ImGui 기본 폰트로 내려간다.
+선택 폰트는 후보가 없으면 현재 기본 폰트를 사용한다. 한글 폰트는 기존 별도 후보를 유지한다.
+monospace ImGui 소비자는 현재 없으므로 별도 폰트 체인은 그 소비자가 생길 때 추가한다.
+배율 변경은 동적 atlas에 맡기며 기존 atlas를 비우거나 직접 rebuild하지 않는다.</li>
+<li><code>editor.theme</code>는 토큰·스타일 값, OS/viewport/font DPI, geometry 일치, 실제 폰트 출처를 보고한다.
+<code>editor.selftest</code>에는 전역 ImGui 문맥을 건드리지 않는 지역 style 계약 검사가 연결돼 있다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-override-inventory">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="override-inventory">Override inventory</h2></div>
+<div class="prose"><p>HEAD <code>8fb4267f</code>와 작업 트리의 <code>.cpp/.h/.inl</code>을 같은 기준으로 비교했다.
+아래는 주석·문자열을 제외한 <code>ImGui::PushStyleColor/Var</code>의 정적 호출 지점 수이며 실행 횟수가 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>범위</th><th style="text-align:right">변경 전 Color / Var</th><th style="text-align:right">변경 후 Color / Var</th><th style="text-align:right">합계</th></tr></thead>
+<tbody><tr><td><code>Editor/EngineGUIWindow</code></td><td style="text-align:right">24 / 23</td><td style="text-align:right">17 / 15</td><td style="text-align:right">47 → 32</td></tr>
+<tr><td><code>Editor</code> 전체</td><td style="text-align:right">26 / 25</td><td style="text-align:right">19 / 17</td><td style="text-align:right">51 → 36</td></tr></tbody></table></div>
+<p>W0의 57건은 Editor 전체에서 주석 6건을 포함한 수다. 범위와 주석 기준이 달라 47과 바로 비교하지 않는다.
+EngineGUIWindow 밖 4건은 asset preview와 창 선언의 background/padding 적용 지점이며 호출 수는 유지했다.
+별도 <code>ed::</code> node-editor 스택 20건도 이 표에 섞지 않는다.</p>
+<p>남은 예외는 영상/도크의 0 padding, 검색 아이콘과 입력란의 간격 0, 정규화된 <code>(0,.5)</code> 정렬,
+충돌 행렬의 헤더 각도, 노드 핀의 밀착 배치다. Scene overlay는 Panel/Primary 토큰에 투명도만 더한다.
+<code>TextDisabled=#999999</code>의 불투명 색상 대비는 Canvas 6.23:1, Panel 4.37:1, PanelRaised 3.21:1,
+Selection 2.74:1이다. 이는 토큰 RGB의 계산값이며 ImGui disabled alpha가 적용된 화면 대비 검증은 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-범위">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="검증-범위">검증 범위</h2></div>
+<div class="prose"><p><code>verify-editor-theme.ps1</code>은 DX12/Vulkan 각각 사용자 배율 100→150→100%로 세 번 기동한다.
+제품에서 실제 Inter 소비, 실행 HWND PMv2 상태, DPI 출처 일치, geometry 및 색상 연결을 확인한다.
+설정과 ini는 원본 바이트로 복원한다.
+이 자동 검사는 시작 배율 검증이다. 별도 Debug UI 검증에서는 Settings의 ImGuiScale을
+한 프로세스 안에서 100→150→100%로 바꿔 팝업·글꼴·아이콘·간격의 확대와 복귀를 확인했다.
+증거는 <code>Artifacts/phase21-w1-live-user100.png</code>, <code>phase21-w1-live-user150.png</code>,
+<code>phase21-w1-live-user100-return.png</code>다. 두 배율 축의 독립·결합 계약은 지역 style selftest도 확인한다.</p>
+<p>초기 검증 당시 실제 모니터 둘은 모두 144 DPI(150%)였고 OS 설정을 변경하지 않아 실제 DPI 왕복은 미검증이었다.
+이후 실제 OS 배율과 모니터 경계 검증을 수행했다. 폰트·DPI 값은 통과했지만 표시 오류가 발견돼
+당시 W1은 완료 보류였다. 이후 DX12 수정·실기 검증이 통과했고, 2026-09-12 사용자 결정으로
+Vulkan 대응을 별도 보류해 <strong>현재 W1은 DX12 기준 완료</strong>다.
+<a href="EditorW1Dx12ResizeValidation.html">DX12 수정 검증</a>이 최신 판정이며 Vulkan 해결을 뜻하지 않는다.
+지역 style의 합성 DPI 검사와 실제 모니터 왕복을 같은 증거로 취급하지 않는다.</p>
+<p>최종 검증 결과:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>결과</th><th>로컬 증거 (<code>Artifacts/</code>)</th></tr></thead>
+<tbody><tr><td>VS18/v145 Debug x64 Build</td><td><span class="chip warn">통과, 경고 0 / 오류 0</span></td><td><code>phase21-w1-pmv2-debug-build.log</code></td></tr>
+<tr><td>VS18/v145 Release x64 Build</td><td><span class="chip warn">통과, 경고 1 / 오류 0</span></td><td><code>phase21-w1-pmv2-release-build.log</code></td></tr>
+<tr><td>Debug/Release 실제 EXE manifest 추출</td><td>PMv2 선언과 asInvoker 병합 확인</td><td><code>phase21-w1-embedded-{debug,release}.manifest</code></td></tr>
+<tr><td>Debug DX12/Vulkan 테마</td><td><span class="chip ok">6기동 / 103검사 통과</span></td><td><code>phase21-w1-pmv2-theme-debug/</code></td></tr>
+<tr><td>지역 style selftest</td><td><span class="chip ok">매 기동 183검사 통과</span></td><td>위 폴더 <code>*.jsonl</code>의 <code>themeReport</code></td></tr>
+<tr><td>Debug 창·메뉴 선언 배선</td><td><span class="chip ok">33검사 통과</span></td><td><code>phase21-w1-declaration-debug/</code></td></tr>
+<tr><td>Debug workspace</td><td><span class="chip ok">ini 6종 / 108검사 통과</span></td><td><code>phase21-w1-workspace-debug/</code></td></tr>
+<tr><td>Release DX12/Vulkan 테마</td><td><span class="chip ok">6기동 / 103검사 통과</span></td><td><code>phase21-w1-pmv2-theme-release/</code></td></tr>
+<tr><td>obsolete surface</td><td>939 source / 27 call site / 위반 0</td><td><code>verify-imgui-obsolete-surface.ps1</code> 실행</td></tr>
+<tr><td>정적 형식·등록</td><td>diff check, XML 5개, PowerShell 4개, 신규 파일 등록 통과</td><td>프로젝트·스크립트 소스</td></tr></tbody></table></div>
+<p>Debug/Release의 실제 OS/viewport/font DPI는 모두 1.5이며 사용자 배율 1.0→1.5→1.0에서
+본문 크기가 24→36→24px로 돌아왔다. Inter 실소비, icon 병합, 누락 glyph 0, fallback probe,
+토큰 mapping과 geometry 일치도 통과했다. 테마 검사 및 선언/workspace 묶음 종료 후
+설정과 사용자 ini를 원본 바이트로 복원했다.</p>
+<p>Release 경고 1건은 기존 <code>LNK4229 /DELAYLOAD:vulkan-1.dll</code>이다.
+W0 화면·성능 수치는 이전 스킨과 폰트의 기준선으로 보존하며,
+W1 결과를 W8의 최종 visual golden 또는 성능 회귀 판정으로 대신하지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="EditorThemeW1Validation.md"><code>docs/analysis/EditorThemeW1Validation.md</code></a> · 마지막 커밋 2026-09-13 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

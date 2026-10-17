@@ -1,39 +1,65 @@
-# 자산 중심 Material 편집과 게시
+# Asset-centered material authoring
 
-> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
+The Material Node Editor edits existing material assets independently of Scene selection. It does not introduce a second asset system.
 
-## 원본과 사용자의 작업 흐름
+## Ownership and workflow
 
-Material 편집 session은 `.asset`의 material identity와 `.shadergraph`의 graph identity를 함께 다룬다. graph의 node tree/Blackboard/output이 shader 의미의 원본이고 generated ShaderMeta/Slang은 읽기 전용 캐시 산출물이다. MeshRenderer는 재질 자산을 참조하며 개별 instance override와 자산 자체 변경을 구별한다.
+- `.shadergraph` owns nodes, links, graph parameter declarations, and connected Surface Settings
+- `.asset` owns its graph GUID, default parameter values, texture references, and material flags
+- `MeshRenderer` owns the material asset reference and optional instance overrides
+- An open editor session owns its draft graph/defaults, private compiled candidate, and last valid preview
 
-창은 새 material, 기존 asset GUID, MeshRenderer에서 열 수 있다. 미완성 draft는 renderer의 accepted material을 직접 변경하지 않는다. worker가 exact document/revision snapshot을 compile하고 현재 revision과 일치하는 준비 결과만 적용 후보가 된다.
+Open the Material Node Editor from the window menu without selecting an object. Use **New Material Asset** or **Open Material Asset**. The Inspector's **Open Node Editor** opens the referenced base asset, not a mesh's instance overrides. An unbound/imported material creates an independent draft; existing legacy assets are retained rather than converted in place.
 
-## Apply, Save, Assign
+1. Edit nodes and graph parameters. A newly added Parameter node has **Declare Parameter** in Node Details. Graph declarations and material defaults are separate controls. Socket-backed imported parameters retain their existing effective-default source
+2. The editor coalesces changes for 250 ms and prepares the latest draft on the existing job scheduler. One pending job is allowed per session. Obsolete completions are discarded. CPU compilation produces an isolated owned generation; texture/instance binding returns to the editor thread
+3. **Apply to Material Asset** publishes the prepared valid candidate to the existing cache. Resident assets sharing the edited graph are rebuilt with their own defaults before publication. If any candidate fails validation, publication is rejected
+4. **Save Material Asset** persists the already-applied material and graph. Apply is required before Save. Save checks disk changes, deletions, cache ownership, and asset identities. It does not assign a mesh
+5. **Assign Asset to Selected Mesh** explicitly assigns a saved accepted asset to the current selected, unlocked MeshRenderer. Save the Scene to persist that reference
 
-`Apply`는 준비된 draft revision과 expected accepted asset, 현재 디스크 내용을 확인한 뒤 `DataSystem::PublishMaterialAsset`로 게시한다. 같은 자산의 사용자에게 영향을 주며 디스크 영속화와는 별개다. 이름을 바꿔 기존 asset을 덮으려 하면 Save As Copy를 요구한다.
+**Save As Copy** in the graph editor creates independent material and graph identities in an unassigned draft. The Inspector's material-copy action instead shares the graph, copies the current material values into the new asset defaults, and offers assignment separately. Reload Saved Draft reads the exact saved pair into the editor without publishing it; Apply remains explicit.
 
-`Save`는 현재 draft가 Apply된 상태이고 accepted owner가 그대로일 때만 material+graph를 저장한다. `EditorAssetDatabase::SaveMaterialGraph`는 authoring mode, random-v4 standalone identity, accepted generation, generated Slang/metadata 일치, Assets 안의 서로 다른 `.asset`/`.shadergraph` 경로를 확인한다. unrelated asset/meta를 덮거나 identity를 바꾸지 않는다.
+Material node descriptions are available only by hovering the existing information-font glyph at the upper-right of each node header. The icon reserves title space and does not start node selection/drag; pin interaction remains higher priority.
 
-`Assign`은 Apply·Save된 깨끗한 asset reference를 선택 MeshRenderer에 Undo 가능한 작업으로 배치한다. 대상 scene/entity/component identity와 잠금을 재확인한다. 이 참조의 영속화는 Scene 저장이 별도로 필요하다.
+The generic graph canvas supports stationary right-click on a connected input to disconnect, and dragging a new output onto a connected single input to replace its link. Replacement is one undo/revision and invalid replacement preserves the original graph. Right-drag still pans.
 
-자동 저장도 존재한다. `TickAutomaticSave`는 활성 gesture가 없고 현재 revision의 compile이 준비되며 변경 후 0.6초가 지난 경우 Apply 후 Save를 시도한다. 실패한 동일 revision을 매 frame 반복하지 않는다. 따라서 메뉴에 Apply/Save가 분리되어 있다는 이유로 모든 편집이 수동 적용 대기라고 설명하면 안 된다.
+## Publication and lifetime contracts
 
-## 외부 변경과 복구
+- Accepted material owners use the same immutable ownership_cpp and bounded cache contracts as AssetDepot. Apply clones the draft, validates every replacement and retained-budget admission before compare-and-publish, then refreshes consumers using the accepted owner. Oversized replacement batches fail without publishing
+- Isolated and queued graph preparations share a never-reused generation identity space. Authoring publication invalidates stale preparation tickets; cooked AssetDepot graphs retain the same content digest and surface-alpha metadata
+- Draft compilation never writes the accepted graph-generation or material caches. Generated-source scratch directories are per request and released after the owned product is created
+- Job captures own the graph, paths, output, and error text; they never capture a Session or DataSystem pointer. The document/revision pair must still match before accepting completion
+- A compile or binding failure leaves the last good preview and accepted Scene material intact. Pending and error states are visible in the editor
+- Preview capture only copies immutable source owners. It does not compile or load the selected mesh. The preview floor uses the same owned background preparation
+- Editor shutdown stops new draft submissions, drains pending jobs outside the existing session lock, and releases preview owners before renderer/compiler teardown
+- The material cache publication revision gates Scene refresh at the GT render-proxy commit boundary. Unchanged frames do not add per-mesh cache lookups
+- A mesh retains the accepted base used to interpret its overrides. Explicit-override provenance survives later asset defaults that happen to equal an override, serialization, and undo/redo
+- A removed asset or an incompatible override keeps the last valid mesh instance. Unresolved serialized references retain their original payload for later recovery
+- Graph reference serialization uses the existing typed material instance codec, with `ref` and a `graphOverrides` delta; legacy and inline material readers remain available
+- Explicit alpha mode follows the final connected Surface Settings closure through groups. Its canonical generated-source marker is retained in cooked graph products, so shared-graph assets use the same routing in Editor and source-less Player. Marker-less legacy products retain their material-document mode
+- External `.asset` and `.shadergraph` changes use validated replacement. A failed reload retains the accepted generation. Cold loads must recheck the current graph before insertion so a concurrent Apply cannot leave a late cache entry on an old generation
+- Saving the material, graph, and their sidecars is rollback-capable, not a multi-file filesystem-atomic transaction. Authored final-state fingerprints suppress delayed watcher events from successful writes and rollback; an external differing state is still processed
 
-`CheckDisk`는 material/graph의 existence와 exact bytes를 이전 snapshot과 비교한다. 외부 수정/삭제가 있으면 Reload 또는 copy를 요구한다. `Reload`는 dirty draft를 버리려면 확인이 필요하며 saved asset identity와 referenced graph를 엄격히 읽는다. malformed primary를 오래된 backup으로 조용히 바꾸는 경로가 아니다.
+## Boundaries
 
-Reload는 editor draft만 교체하고 accepted material을 암묵적으로 게시하지 않는다. 이후 compile/Apply가 필요하다. failed read/compile/publication은 열린 draft와 마지막 정상 accepted owner를 보존한다. document ID/revision이 바뀐 완료 작업을 새 문서에 적용하지 않는다.
+This change does not add shader-function libraries, general UE feature parity, or new rendering backends. Transparent surface routing is preserved, but the isolated sphere preview renderer still displays only Opaque and Masked surfaces; the editor states that limitation instead of showing an opaque substitute. GPU pipeline preparation remains asynchronous in the existing renderer after CPU draft compilation.
 
-## 수명과 경계
+Graph document undo/redo handles node/link/socket/layout operations. Material-default and graph-declaration metadata controls are draft edits outside that graph-only undo history. Closing the panel keeps its draft in memory; unsaved drafts are not a replacement for saving before exiting the editor.
 
-AssetDepot/GenerationStore가 exact artifact와 texture representation을 pin하고 renderer는 frame의 immutable source를 소비한다. session이 scene/object raw pointer를 장기 보관하는 방식으로 구현하면 안 된다. Scene 전환 시 target identity를 재조정하고 dirty draft의 수명과 preview 요청을 분리한다.
+## Validation
 
-현재 Material 창은 모든 Blender 노드/그룹/Blackboard UI가 완성된 제품이 아니다. [편집기 계약](MaterialNodeEditor.md), [LX 잔여 계획](../plans/LatticeAdoptionPlan.md)에서 구현과 요구를 구분한다. 이번에는 실제 저장/재개방을 실행하지 않았다.
+The integration with master `d5a6a26a78da93686b8168429183ee7e0d50a8de` was reviewed for immutable cache ownership, asynchronous preparation, cooked metadata, material references, and model texture context. Only source/static checks were performed for this change. No compiler, build, engine execution, unit/runtime tests, or benchmarks were run.
 
-## 구현 근거
+Owner validation checklist:
 
-- [`Editor/EngineGUIWindow/MaterialGraphWindow.cpp`](../../Editor/EngineGUIWindow/MaterialGraphWindow.cpp)
-- [`Editor/EngineEntry/EditorAssetDatabase.cpp`](../../Editor/EngineEntry/EditorAssetDatabase.cpp)
-- [`Engine/RenderEngine/DataSystem.h`](../../Engine/RenderEngine/DataSystem.h)
-- [`Engine/RenderEngine/MaterialGraphRuntime.h`](../../Engine/RenderEngine/MaterialGraphRuntime.h)
-- [`Engine/RenderEngine/AssetDepot/MaterialAssetRuntime.h`](../../Engine/RenderEngine/AssetDepot/MaterialAssetRuntime.h)
+- Build Editor and Player in the supported Windows configurations; check DX12 and Vulkan graph paths and cook/package compatibility
+- With no mesh selected, create a material, add/edit nodes, inspect the draft preview, Apply, Save, close/reopen, then assign to a mesh
+- Share the asset across two meshes. Override one mesh's roughness. Change the asset default: the inherited mesh updates and the override remains. Change the default to equal the override, then change it again; the override must still remain
+- Save/reopen the Scene and exercise undo/redo of assignment and instance edits across asset Apply operations
+- Open two distinct material assets sharing one graph, change a graph parameter and alpha mode, Apply/Save, then cook and inspect both in Player
+- Try invalid graph links, a missing texture, a private/deleted parameter with existing overrides, and a failing shader compile. Accepted assets and last-good previews must stay valid
+- Modify the draft repeatedly during compilation, change the active document/Scene/selection, close the panel, and exit while a job is pending. No obsolete result may publish to another session or object
+- Create independent graph-editor copies and shared-graph Inspector copies; cancel/switch selection during modal UI. No unintended mesh assignment or reference loss
+- Delete, externally edit, or rename material/graph files while open; verify conflict/reload messages, last-good behavior, and recovery. Force a pair-save failure and confirm the rollback watcher does not undo the accepted in-memory Apply
+- Exercise imported/legacy materials, nested/dotted names, exposed textures, socket-backed parameters, masked/transparent routing, and valid/invalid link replacement with one-step undo
+- Hover information icons at different zoom/DPI values, including collapsed/readonly nodes; check tooltip wrapping, header/title clipping, pin drag, node dragging, and overlapping windows

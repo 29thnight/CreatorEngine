@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/archive/BehaviorTreeManagedPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>행동 트리 C# 우선 재설계 — 실행 설계</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-왜-이-방향인가">1. 왜 이 방향인가</a></li><li><a href="#2-경계-계약">2. 경계 계약</a></li><li><a href="#3-옮길-것과-남길-것">3. 옮길 것과 남길 것</a></li><li><a href="#4-슬라이스">4. 슬라이스</a></li><li><a href="#5-위험">5. 위험</a></li><li><a href="#6-완료-기준">6. 완료 기준</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/archive/</span><a href="BehaviorTreeManagedPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">보관 계획</p>
+<h1>행동 트리 C# 우선 재설계 — 실행 설계</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#1-왜-이-방향인가"><span class="ve-label">§1</span><span class="map-name">왜 이 방향인가</span><span class="map-bar"><i style="width:50.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-경계-계약"><span class="ve-label">§2</span><span class="map-name">경계 계약</span><span class="map-bar"><i style="width:62.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-옮길-것과-남길-것"><span class="ve-label">§3</span><span class="map-name">옮길 것과 남길 것</span><span class="map-bar"><i style="width:55.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-슬라이스"><span class="ve-label">§4</span><span class="map-name">슬라이스</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-위험"><span class="ve-label">§5</span><span class="map-name">위험</span><span class="map-bar"><i style="width:56%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-완료-기준"><span class="ve-label">§6</span><span class="map-name">완료 기준</span><span class="map-bar"><i style="width:17.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「4. 슬라이스」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>보관 · 엔진 범위 완료 (정리: 2026-09-06).</strong> PHASE 9의 9-8·9-10 완료 기록. 기존 게임 BT 콘텐츠 43종 이식은 별도 잔여이며 엔진 완료로 대신하지 않는다.
+<a href="README.html">보관 색인</a> · <a href="../../RefactoringPlanDashboard.html#doc-index">활성 계획과 대시보드</a></p>
+</blockquote>
+<p>작성: 2026-08-07 · 결정: 사용자 선택(9-4 후속 ③) · 선행: CoreCLR 스크립팅(2-14~2-21), C++ 핫리로드 은퇴(9-4)</p>
+</section>
+<section class="doc-sec" id="sec-1-왜-이-방향인가">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-왜-이-방향인가">1. 왜 이 방향인가</h2></div>
+<div class="prose"><p>9-4에서 C++ 스크립트 노드가 사라진 뒤, BT 스크립트 노드를 C#으로 되살리는 길은 셋이었다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>방향</th><th>크로싱</th><th>불변식</th><th>판정</th></tr></thead>
+<tbody><tr><td>네이티브 트리 + C# 노드</td><td>노드마다 동기 + 블랙보드 접근마다 중첩</td><td><strong>위반</strong></td><td>기각</td></tr>
+<tr><td>빌트인 노드만 유지</td><td>없음</td><td>유지</td><td>기능 후퇴</td></tr>
+<tr><td><strong>트리 전체를 C#으로</strong></td><td><strong>틱당 1회</strong></td><td><strong>유지</strong></td><td><strong>채택</strong></td></tr></tbody></table></div>
+<p>핵심 근거는 <strong>BT의 틱이 본질적으로 동기</strong>라는 데 있다. <code>m_root-&gt;Tick(dt, blackboard)</code>는 재귀로 내려가며
+각 노드의 <code>NodeStatus</code> 반환값으로 다음 순회를 정한다 — 배치로 묶을 수가 없다. 노드 하나를 C#에 두면
+크로싱이 노드 수만큼 생기고, 그 안에서 블랙보드를 읽으면 크로싱이 또 중첩된다.</p>
+<p>반대로 <strong>트리 전체가 관리 측에 있으면 크로싱은 &quot;이 컴포넌트를 틱하라&quot; 한 번</strong>이다. 순회도 블랙보드
+접근도 전부 관리 영역에서 끝난다 — <code>BehaviourRegistry._byObject</code>가 GetComponent를 관리 측에서
+끝낸 것과 같은 해법이다(설계 문서 03.1 · 11.2).</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-경계-계약">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-경계-계약">2. 경계 계약</h2></div>
+<div class="prose"><pre><code>네이티브                        관리(C#)
+BehaviorTreeComponent
+  Awake   ──▶ ClrHost::CreateBehaviorTree(owner, graphJson) ──▶ 트리 구축 + 인스턴스 id
+  InternalAIUpdate ──▶ (큐에 담기) ────────────────────────▶ FlushAITicks (틱당 1회)
+  OnDestroy ─▶ ClrHost::DestroyBehaviorTree(id)</code></pre>
+<ul>
+<li><strong>틱은 배치</strong>: <code>ScriptAITick { int instanceId; float deltaTime; }</code> 배열로 모아 틱 경계에서 한 번에
+넘긴다. 물리·애니메이션·메시지 큐와 같은 규약이며, <code>Dx11Main::TickScripts</code>에 플러시 한 줄이 는다.</li>
+<li><strong>블랙보드는 관리 측 소유</strong>: <code>BlackBoard</code>를 C#으로 옮긴다. 네이티브가 값을 읽어야 하는 곳이
+있으면 그때만 개별 접근자를 추가한다(현재로선 에디터 디버그 표시뿐).</li>
+<li><strong>저작 데이터는 그대로</strong>: <code>BTBuildGraph</code>/<code>BTBuildNode</code>의 직렬화 형식(YAML)을 바꾸지 않는다.
+구축 시점에 그래프를 관리 측으로 한 번 넘기고, 트리 조립은 C#이 한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-옮길-것과-남길-것">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-옮길-것과-남길-것">3. 옮길 것과 남길 것</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>요소</th><th>현재 위치</th><th>이후</th><th>비고</th></tr></thead>
+<tbody><tr><td><code>NodeStatus</code>, <code>BehaviorNodeType</code>, <code>ParallelPolicy</code></td><td>BTEnum.h</td><td>양쪽 미러</td><td>값이 어긋나면 조용히 오동작 — 검사 스크립트 대상</td></tr>
+<tr><td>빌트인 노드(Sequence·Selector·WeightedSelector·Parallel·Inverter·ConditionDecorator)</td><td>BTHeader.h</td><td><strong>C#으로 이식</strong></td><td>로직이 짧다(각 10~30줄)</td></tr>
+<tr><td><code>ActionNode</code>/<code>ConditionNode</code> 파생(사용자 노드)</td><td>Dynamic_CPP(은퇴)</td><td><strong>C#에서 신규 작성</strong></td><td>생성기가 등록표를 만든다</td></tr>
+<tr><td><code>BlackBoard</code>(9타입)</td><td>Blackboard.h</td><td><strong>C#으로 이식</strong></td><td>값 소유가 관리 측으로</td></tr>
+<tr><td><code>BTBuildGraph</code>/<code>BTBuildNode</code></td><td>ScriptBinder</td><td><strong>네이티브 유지</strong></td><td>에디터 저작·직렬화는 그대로</td></tr>
+<tr><td><code>NodeFactory</code></td><td>NodeFactory.h</td><td><strong>C#으로 대체</strong></td><td>이름→노드 생성</td></tr>
+<tr><td><code>AIManager</code>의 그래프 캐시</td><td>AIManager</td><td>네이티브 유지</td><td>그래프는 여전히 네이티브가 읽는다</td></tr>
+<tr><td>BT 노드 에디터 UI</td><td>MenuBarWindow</td><td>네이티브 유지</td><td>노드 타입 목록만 ClrHost에서 받는다</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-슬라이스">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-슬라이스">4. 슬라이스</h2></div>
+<div class="prose"><p>각 슬라이스는 독립 커밋이고, 끝날 때마다 전체 빌드 그린 + 회귀 통과를 확인한다.</p>
+<ol>
+<li><strong>B1 관리 측 골격</strong> — <code>BTNode</code>/<code>CompositeNode</code>/<code>DecoratorNode</code>/<code>ActionNode</code>/<code>ConditionNode</code> 기반
+클래스와 <code>NodeStatus</code> 열거를 C#에 세운다. 빌트인 6종 이식. 이 단계는 네이티브 무변경.</li>
+<li><strong>B2 BlackBoard 이식</strong> — 9타입 값 저장소를 C#에 만든다. GameObject/Transform 타입은 기존
+<code>ObjectHandle</code>을 재사용한다.</li>
+<li><strong>B3 그래프 전달과 조립</strong> — <code>BTBuildGraph</code>를 평평한 POD 배열로 직렬화해 한 번에 넘기고
+(<code>ScriptBTNodeDesc { guid, parentGuid, type, policy, nameUtf8, scriptNameUtf8 }</code>), C#이 트리를
+조립한다. 문자열이 섞이므로 이름은 고정 길이 배열로 — <code>ScriptMessage</code>에서 쓴 방식과 같다.</li>
+<li><strong>B4 틱 배선</strong> — <code>CreateBehaviorTree</code>/<code>DestroyBehaviorTree</code>/<code>QueueAITick</code>/<code>FlushAITicks</code>.
+<code>BehaviorTreeComponent</code>의 <code>BuildTree</code>·<code>m_root</code>·<code>m_built</code>를 걷어내고 인스턴스 id만 든다.</li>
+<li><strong>B5 생성기 확장</strong> — 사용자 BT 노드(<code>ActionNode</code>/<code>ConditionNode</code> 파생)를 이름으로 등록하는 표를
+<code>ScriptRegistry</code>에 추가한다(<code>RegisterAllBTNodes</code>). Behaviour·AniBehaviour와 같은 구조.</li>
+<li><strong>B6 에디터 배선</strong> — 노드 타입 목록을 <code>ClrHost::GetBTNodeTypeNames(kind)</code>로 받아 BT 편집기의
+스크립트 노드 선택을 되살린다. <code>AIManager</code>의 이름 목록 3종은 여기서 소멸.</li>
+<li><strong>B7 정리</strong> — <code>BTHeader.h</code>의 노드 구현, <code>NodeFactory</code>, <code>BlackBoard</code> 구현을 제거한다.
+<code>BTBuildGraph</code>/<code>BTBuildNode</code>와 에디터 경로만 남는다.</li>
+</ol>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-위험">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-위험">5. 위험</h2></div>
+<div class="prose"><ul>
+<li><strong>열거 값 미러링</strong>: <code>NodeStatus</code>·<code>BehaviorNodeType</code>·<code>ParallelPolicy</code>·<code>BlackBoardType</code>이 양쪽에
+존재하게 된다. API 테이블이 순서 사고로 접근 위반을 낸 전례가 있으므로(<code>check-api-table.ps1</code>이
+그래서 생겼다), 같은 방식의 열거 대조 검사를 붙인다.</li>
+<li><strong>Running 상태의 수명</strong>: BT는 <code>Running</code>을 프레임 간에 이어 간다. 트리 인스턴스가 관리 측에
+살아 있어야 하므로, 씬 언로드·재생 정지 왕복에서 <code>ScriptComponent</code>와 같은 되살리기 규약을
+따라야 한다(<code>PrepareForReload</code> 참조). 짝이던 <code>SuspendInstance</code>는 2026-09-05에 제거했다 —
+&quot;재생이 씬 사본을 만드니 원본 인스턴스를 접어야 한다&quot;는 전제로 서 있었는데 재생은 in-place라
+그 상황이 없었고, 호출자도 0건이었다.</li>
+<li><strong>에디터 미리보기</strong>: 현재 BT 편집기가 노드 상태를 색으로 보여 준다면 그 정보는 관리 측에 있게
+된다. 필요하면 진단용 읽기 API를 하나 추가한다(틱당 1회, 편집기 열려 있을 때만).</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-완료-기준">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-완료-기준">6. 완료 기준</h2></div>
+<div class="prose"><ul>
+<li>대표 AI 씬에서 기존 BT 그래프 에셋이 수정 없이 로드되고 같은 행동을 보인다</li>
+<li>C#으로 작성한 Action/Condition 노드가 편집기 목록에 뜨고 부착된다</li>
+<li>프레임당 BT 관련 크로싱이 1회임을 로그로 확인</li>
+<li><code>BTHeader.h</code>의 노드 구현과 <code>NodeFactory</code>가 제거된 상태로 전체 빌드 그린</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="BehaviorTreeManagedPlan.md"><code>docs/plans/archive/BehaviorTreeManagedPlan.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/archive/ScriptLifecycleContractHardeningPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>효과 계약 도입 전 스크립트 생명주기·Task 계약 안정화 계획</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-판단과-범위">0. 판단과 범위</a></li><li><a href="#1-현재-생명주기와-실행-순서">1. 현재 생명주기와 실행 순서</a></li><li><a href="#2-확인한-문제와-위험-수준">2. 확인한 문제와 위험 수준</a></li><li><a href="#3-독립-안정화-트랙">3. 독립 안정화 트랙</a></li><li><a href="#4-적용-순서와-미래-계획에-넘길-결정">4. 적용 순서와 미래 계획에 넘길 결정</a></li><li><a href="#5-계약을-당장-도입하지-않을-때의-남는-한계">5. 계약을 당장 도입하지 않을 때의 남는 한계</a></li><li><a href="#6-완료-및-보고-기준">6. 완료 및 보고 기준</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/archive/</span><a href="ScriptLifecycleContractHardeningPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">보관 계획</p>
+<h1>효과 계약 도입 전 스크립트 생명주기·Task 계약 안정화 계획</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">체크 항목 완료</span><span class="val">100<span class="unit">%</span></span>
+<div class="stack" role="img" aria-label="9개 중 9개 완료"><i class="ok" style="flex:9"></i><i class="dim" style="flex:0"></i></div>
+<span class="ve-label">9 / 9</span></div>
+<div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">17<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 4, 차단·중단 7, 대기·미검증 6"><i class="ok" style="flex:4"></i><i class="risk" style="flex:7"></i><i class="dim" style="flex:6"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 4</span><span class="chip risk">차단·중단 7</span><span class="chip dim">대기·미검증 6</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#0-판단과-범위"><span class="ve-label">§0</span><span class="map-name">판단과 범위</span><span class="map-bar"><i style="width:3.3%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">1</span> <span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#1-현재-생명주기와-실행-순서"><span class="ve-label">§1</span><span class="map-name">현재 생명주기와 실행 순서</span><span class="map-bar"><i style="width:8.2%"></i></span><span class="map-marks"><span class="chip dim" title="대기·미검증">1</span> <span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#2-확인한-문제와-위험-수준"><span class="ve-label">§2</span><span class="map-name">확인한 문제와 위험 수준</span><span class="map-bar"><i style="width:28.5%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">4</span> <span class="chip dim" title="대기·미검증">2</span> <span class="chip ok" title="완료·통과">3</span></span></a>
+<a class="map-row" href="#3-독립-안정화-트랙"><span class="ve-label">§3</span><span class="map-name">독립 안정화 트랙</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">2</span> <span class="chip dim" title="대기·미검증">2</span></span></a>
+<a class="map-row" href="#4-적용-순서와-미래-계획에-넘길-결정"><span class="ve-label">§4</span><span class="map-name">적용 순서와 미래 계획에 넘길 결정</span><span class="map-bar"><i style="width:3.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-계약을-당장-도입하지-않을-때의-남는-한계"><span class="ve-label">§5</span><span class="map-name">계약을 당장 도입하지 않을 때의 남는 한계</span><span class="map-bar"><i style="width:3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-완료-및-보고-기준"><span class="ve-label">§6</span><span class="map-name">완료 및 보고 기준</span><span class="map-bar"><i style="width:11.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「3. 독립 안정화 트랙」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>보관 · 완료·검증 한계 명시 (정리: 2026-09-06).</strong> LC0~LC7 종료. LC6 변경은 측정 후 보류. LC7 일시 정지 중 대기와 세대 게이트 변이 판정은 미검증으로 남아 있으며 PrSM 도입 완료를 뜻하지 않는다.
+<a href="README.html">보관 색인</a> · <a href="../../RefactoringPlanDashboard.html#doc-index">활성 계획과 대시보드</a></p>
+</blockquote>
+<blockquote>
+<p><strong>상태: LC0~LC7 완료. LC6은 측정 후 변경 보류 · LC7 잔여 2항목 명시.</strong> 2026-09-05 결정, 같은 날 착수.
+<a href="../SimulationEffectContractPlan.html">PrSM 기반 효과 계약 계획</a>은 현재 리팩토링 이후의 미래
+작업이다. 이 문서는 그 도입을 기다리지 않고 현행 C# 컴포넌트·Task 스코프에서 처리할
+결함, 유지할 실행 의미, 검증 기준을 정한다. 새 실행기나 PrSM을 구현하는 문서가 아니다.</p>
+<p>소스 기준: CreatorEngine <code>b9acba5e43676324e0bc6f09fb64085a0a4fec5b</code>, 2026-09-05 조사.
+정적 호출 경로와 격리 시험 결과를 아래에 구분했다. 이 문서 작성으로 엔진 빌드·실행
+회귀를 통과한 것은 아니며, 기존 네이티브 생명주기 완료 상태를 소급해 취소하지도 않는다.</p>
+</blockquote>
+</section>
+<section class="doc-sec" id="sec-0-판단과-범위">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-판단과-범위">0. 판단과 범위</h2></div>
+<div class="prose"><p><strong>Verse 유사 계약이나 DSL이 없어도 현행 구조를 안정적으로 운영할 수 있다.</strong> 틱과 Task를
+사용한다는 사실 자체는 결함이 아니다. 다만 실패한 단계의 상태, 취소 중 예외, 완료된 대기의
+참조 유지와 재진입은 현재 구현의 문제이며, 미래 언어 도입으로 해결을 미룰 이유가 없다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>구분</th><th>이 문서에서 처리할 것</th><th>미래 PHASE 24로 남길 것</th></tr></thead>
+<tbody><tr><td>생명주기</td><td>성공/실패 단계, 한 번만 정리, disable·DDOL·파괴·리로드 회귀</td><td>새로운 cold 시작 및 취소 시 본문 비재개 모델로의 이행</td></tr>
+<tr><td><span class="chip dim">대기·수명</span></td><td>현행 <code>Scope.Delay</code>의 등록 해제, 취소 예외 격리, 재진입 안전성</td><td>자체 awaiter·실행기, <code>Race</code>, 구조화된 루틴 트리</td></tr>
+<tr><td><span class="chip risk">스레드·실패</span></td><td>게임 스레드 경계와 외부 Task 지원 범위, 실패 처리 일관성</td><td>PrSM과 C# 분석기가 공유하는 효과·중단·수명 카탈로그</td></tr>
+<tr><td>성능</td><td>기존 틱·스코프의 비용을 분리 측정하고 필요한 항목만 개선</td><td>생성 PrSM 콘텐츠까지 포함한 실행기·효과 기록 성능 비교</td></tr>
+<tr><td>결정성·트랜잭션</td><td>현재 보장하지 않는 경계를 명시</td><td>효과 기록·재생, <code>Var&lt;T&gt;</code>와 네이티브 커밋, 언어 계약 검사</td></tr></tbody></table></div>
+<p>LC0~LC5와 LC7을 현행 안정화의 필수 검증 범위로 두고, LC6 성능 변경은 측정 결과에 따라
+선택한다. 이미 다른 리팩토링에서 해결된 항목은 최신 소스와 회귀 증거로 닫는다. 같은 변경을
+두 계획에서 다시 구현하거나, 모든 항목을 한 번에 바꾸지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-현재-생명주기와-실행-순서">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-현재-생명주기와-실행-순서">1. 현재 생명주기와 실행 순서</h2></div>
+<div class="prose"><h3 id="11-소유자와-호출-경로">1.1 소유자와 호출 경로</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>경계</th><th>현재 구현과 근거</th></tr></thead>
+<tbody><tr><td>네이티브 생명주기 구동</td><td><a href="../../../Engine/SceneRuntime/Scene.cpp">Scene.cpp</a>의 <code>DrainPendingLifecycle</code>(2543행)이 초기화·씬 진입·시뮬레이션 시작을 구동한다</td></tr>
+<tr><td>관리 인스턴스 연결</td><td><a href="../../../Engine/SceneRuntime/ScriptComponent.cpp">ScriptComponent.cpp</a>의 <code>EnsureInstance</code>, 단계별 훅, <code>OnUninitializing</code>이 인스턴스 생성·필드 적용·관리 통지·제거를 연결한다</td></tr>
+<tr><td>관리 단계·틱 목록</td><td><a href="../../../ScriptCore/ScriptRegistry.cs">ScriptRegistry.cs</a>의 <code>DispatchLifecycle</code>, <code>ApplyEnabled</code>, <code>StartSimulation</code>, <code>Flush</code>가 관리 상태와 틱 멤버십을 관리한다. <code>Flush</code>를 별도 초기화 드라이버로 되돌리지 않는다</td></tr>
+<tr><td>프레임 실행</td><td><a href="../../../Engine/SceneRuntime/RuntimeFrame.cpp">RuntimeFrame.cpp</a>의 <code>Runtime::TickSimulationFrame</code> 호출 순서는 초기화·입력 → 일시 정지 검사 → PrePhysics → 물리/GameLogic → 후처리 → PostPhysics다. 관리 Pre/Post와 <code>Scope.Delay</code>를 고정 시간 스텝이라고 간주하지 않는다</td></tr>
+<tr><td><span class="chip dim">대기</span></td><td><a href="../../../ScriptCore/SimulationScope.cs">SimulationScope.cs</a>의 <code>Delay</code>가 Task를 만들고, 관리 PrePhysics의 <code>Scope.Tick(dt)</code>가 완료한다</td></tr>
+<tr><td>파괴·즉시 제거</td><td><code>Scene::FlushPendingDestroy</code>와 <a href="../../../Engine/SceneRuntime/PrefabUtility.cpp">PrefabUtility.cpp</a>의 즉시 제거 경로가 End → Removing → Uninitializing을 전달한다</td></tr>
+<tr><td><span class="chip ok">어셈블리 종료</span></td><td><a href="../../../ScriptCore/ScriptAssemblyLoader.cs">ScriptAssemblyLoader.cs</a>의 <code>Unload</code>가 <code>ScriptRegistry.Clear</code> 이후 팩터리·BT를 정리하고 로드 문맥을 해제한다</td></tr></tbody></table></div>
+<p>메서드명과 행 번호는 조사 시점의 탐색 기준이다. 변경 후에는 실제 호출 경로를 기준으로 갱신한다.</p>
+<h3 id="12-보존할-정상-동작">1.2 보존할 정상 동작</h3>
+<ol>
+<li>정상 최초 진입은 <code>OnInitialized</code> → <code>OnAddedToScene</code> → 조건부 <code>OnEnable</code> →
+활성 상태에서 <code>OnBeginSimulation</code> → <code>OnSimulate</code> 시작이다. 초기 비활성 등은 별도 축이다.</li>
+<li>현재 <code>Task OnSimulate()</code>는 호출 즉시 첫 미완료 await까지 실행한다. 이를 다음 Pump로
+미루는 변경은 이 문서의 결함 수정에 포함하지 않는다.</li>
+<li>비활성 컴포넌트는 Pre/Post 훅을 받지 않지만, 이미 시작한 <code>Scope.Delay</code>는 계속 흐른다.
+<code>PrePhysicsTick</code>에서 <code>Scope.Tick</code>이 <code>Enabled</code> 검사보다 앞에 있다. 재활성은 루틴 재시작이 아니다.</li>
+<li>일시 정지의 시간 진행은 현재 프레임 경계에 따른다. 기존 프레임의 dt 기반 대기를
+벽시계나 미래 fixed simulation clock으로 암묵적으로 바꾸지 않는다.</li>
+<li>DDOL 이동은 씬 Removing/Added 통지를 주며 인스턴스와 시뮬레이션을 유지한다.
+detach를 파괴·취소로 취급하거나 Initialized/Begin을 다시 전달하지 않는다.</li>
+<li>정상 종료에서는 스코프 취소가 <code>OnEndSimulation</code>에 앞선다. 현재 Task 취소는 대기 중
+본문을 예외 경로로 풀어 <code>catch (OperationCanceledException)</code>와 <code>finally</code>가 실행될 수 있다.</li>
+<li>구독·자원·관리 인스턴스의 해제는 생명주기의 소유자가 책임진다. 재진입·실패에도 같은
+정리를 중복 호출하지 않고 다른 컴포넌트의 정리를 끝까지 진행한다.</li>
+</ol>
+<p>6번은 현재 지원하는 <code>Scope.Delay</code> 경로의 보존 대상이다. 외부 Task까지 임의의 시점에
+강제 종료하거나 모든 continuation의 완료를 보장한다는 뜻은 아니다(LC5).</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-확인한-문제와-위험-수준">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-확인한-문제와-위험-수준">2. 확인한 문제와 위험 수준</h2></div>
+<div class="prose"><p>우선순위 P1은 정확성·수명 문제, P2는 성능 또는 후속 개선이다. 실제 콘텐츠에서 발생한
+장애, 소스에서 확인한 결함, 강제로 만든 경계 재현을 구분한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>관측 근거</th><th>문제가 되는 조건·영향</th><th>처리</th></tr></thead>
+<tbody><tr><td><span class="chip risk">실패와 단계 완료가 섞임</span></td><td><code>DispatchLifecycle</code> 204행에서 <code>MarkInitialized</code> 후 훅 호출. <code>Invoke</code>는 예외를 잡지만 성공 여부를 반환하지 않음 — 다만 <strong>잡으면서 <code>b.Enabled = false</code>로 그 인스턴스를 끈다</strong>(375~386행)</td><td>초기화가 실패해도 완료 상태가 남는다. 실측(아래 §2.2): 끄기 덕분에 Begin/Simulate는 막히지만 <strong><code>OnAddedToScene</code>과 축소 삼단은 그대로 전달된다</strong> — 그 셋은 <code>Enabled</code>를 보지 않는다. 반쪽만 초기화된 인스턴스가 성공한 초기화를 전제한 정리를 받는다</td><td>LC1 · P1</td></tr>
+<tr><td><span class="chip risk">Begin 실패 뒤 루틴 시작</span></td><td>272행 <code>Invoke(OnBeginSimulation)</code> 다음 273행 <code>StartSimulation</code>을 조건 재검사 없이 호출</td><td>훅 예외로 비활성화돼도, 훅이 스스로 비활성화해도 루틴이 시작된다. 실측에서 가장 날카로운 자리다 — <strong><code>Invoke</code>가 방금 그 인스턴스를 껐는데 바로 다음 줄이 그것을 무시한다</strong></td><td>LC1 · P1</td></tr>
+<tr><td><span class="chip risk">정리 예외가 종료 절차를 중단</span></td><td><code>SimulationScope.Cancel</code>의 <code>_cts.Cancel()</code> 뒤에 목록 비우기·Dispose·새 토큰 생성이 있음</td><td>콜백 예외가 뒤 단계를 건너뛰게 함. <code>TearDown</code>/<code>Clear</code>를 빠져나가 관리 훅·다른 인스턴스·언로드 정리가 누락될 수 있음</td><td>LC2 · P1</td></tr>
+<tr><td><span class="chip dim">완료된 대기 등록을 유지</span></td><td><code>Delay</code>의 <code>token.Register(...)</code> 반환 등록을 보관/해제하지 않음</td><td>오래 사는 스코프가 대기를 반복하면 완료된 Task와 캡처가 스코프 취소까지 유지됨</td><td>LC3 · P1</td></tr>
+<tr><td><span class="chip ok">완료 콜백 중 목록 비우기</span></td><td><code>Tick</code>(88~99행)은 원본 목록을 <strong>역순 순회</strong>하며 <code>RemoveAt(i)</code> <strong>뒤</strong> <code>TrySetResult</code>를 부른다. 완료 중 추가되는 연쇄 <code>Delay</code>는 이 형태가 이미 막는다(코드 주석이 그 이유를 적고 있다)</td><td>남는 경계는 inline continuation이 <code>Cancel()</code>을 불러 <code>_pending.Clear()</code>가 도는 경우다. 이후 인덱스 접근이 무효가 된다. 내부 Cancel을 호출한 격리 시험에서 <code>ArgumentOutOfRangeException</code>으로 재현</td><td>LC4 · P1</td></tr>
+<tr><td>await 경계가 주석에 의존</td><td><code>OnSimulate</code>는 일반 Task이며 외부 await를 타입 수준에서 제한하지 않음</td><td>외부 완료가 워커에서 이어지면 엔진 API 접근 수명·스레드 규약을 벗어날 수 있음. 현재 게임 스크립트의 실제 오용은 확인하지 않음</td><td>LC5 · P1</td></tr>
+<tr><td><span class="chip risk">동기/Task 실패 정책 불일치</span></td><td>시작 호출의 throw는 disable, 반환 Task의 fault는 <code>ReportSimulationFault</code>에서 로그만 기록</td><td>같은 논리적 실패도 발생 형태에 따라 남는 활성 상태가 다름. 실패 후 틱 반복 등의 정책을 일관되게 정해야 함</td><td>LC5 · P1</td></tr>
+<tr><td>기본 틱·스코프 비용</td><td>Pre/Post가 전체 목록을 순회하며 생존 검사. <code>Component.Scope</code>는 즉시 생성. dt 캡처 콜백 존재</td><td>빈 훅이 많은 콘텐츠·대량 인스턴스에서는 비용이 누적될 여지. 현재 수치만으로 엔진 병목이라고 확정할 수 없음</td><td>LC6 · P2</td></tr>
+<tr><td>관리 회귀의 증거 범위</td><td>네이티브 <code>lifecycle_baseline.tsv</code>에 <code>ScriptComponent</code> 행 0건</td><td>기존 200사건 비교만으로 관리 훅·Task 취소·리로드를 증명할 수 없음. 관리 전용 시험과 오류 주입이 필요</td><td>LC0/LC7</td></tr></tbody></table></div>
+<p>LC1은 관리 플래그 한 줄을 이동하는 것만으로 끝나지 않는다. 네이티브 드레인도 호출 전에
+초기화/시작 상태를 세우므로, 호출 중 재진입을 막는 상태와 성공한 상태를 구분하고 양쪽을
+대조해야 한다. LC2 역시 <code>CancellationTokenSource.Cancel</code>이 다른 등록 콜백을 처리하는
+것과 호출자 쪽 후속 생명주기가 끝까지 진행하는 것은 별개의 문제다.</p>
+<h3 id="21-조사-중-수행한-격리-시험">2.1 조사 중 수행한 격리 시험</h3>
+<p>2026-09-05 분석 세션에서 실제 <code>ScriptRegistry.cs</code>/<code>SimulationScope.cs</code>를 연결한 별도
+.NET 10.0.11 Release 시험을 사용했다. 레지스트리 주변 Component·Native 등은 대역이며
+네이티브 엔진을 실행한 시험이 아니다. 재현 코드는 아직 저장소 회귀 도구로 편입하지 않았다.</p>
+<p><strong>대역이 덮는 경로가 하나 있다.</strong> 2026-09-05 활성 축 배선(<code>80db6b36</code>) 이후
+<code>Component.Enabled</code> setter는 네이티브를 거친다 — <code>Native.ScriptSetEnabled</code>로 넘기고,
+전달에 실패했을 때만 경고를 남기고 관리 측 국소 폴백(<code>ScriptRegistry.ApplyEnabled</code>)으로
+내려간다. Native가 대역이면 이 setter는 <strong>항상 폴백만</strong> 타므로, LC5의 &quot;동기 throw →
+<code>b.Enabled = false</code>&quot; 경로가 대역 시험에서는 실제 경계를 건너지 않는다. LC0에서 §2.1을
+저장소 시험으로 옮길 때 이 분기는 대역이 아니라 실엔진 회귀 쪽에 남긴다. 폴백 경고
+건수를 함께 세지 않으면 다리가 죽어도 훅·틱이 똑같이 보여 판별력이 0이다
+(<code>verify-lifecycle-axis</code>의 판정 6이 그 형태다).</p>
+<div class="table-scroll"><table>
+<thead><tr><th>시험</th><th>관측</th><th>해석 범위</th></tr></thead>
+<tbody><tr><td>Pre+Post 1,000프레임, 인스턴스 10/1,000/10,000개</td><td>각 조건 192,000 B, 합계 <strong>192 B/프레임</strong></td><td>해당 컴파일러의 프레임 호출당 캡처/델리게이트 비용. <strong>컴포넌트당 192 B가 아니다.</strong> 생존 검사·네이티브 호출·엔진 전체 할당 제외</td></tr>
+<tr><td><code>Delay(0)</code> 후 <code>Tick(1)</code>, 10,000회</td><td><span class="chip dim">약 <strong>304 B/대기 호출</strong></span></td><td>해당 시험의 등록·Task·대기 비용. 비동기 본문이나 실제 엔진의 총비용 아님</td></tr>
+<tr><td>완료 Task의 약한 참조, 외부 강한 참조 제거·GC</td><td>스코프 유지 중 생존, Cancel 후 회수</td><td>완료된 등록이 붙잡는 참조 유지 재현. Task 자체를 모두 즉시 풀링해야 한다는 근거는 아님</td></tr>
+<tr><td>정리 콜백 하나가 throw한 뒤 Cancel</td><td><code>AggregateException</code>, 토큰이 취소 상태로 남음</td><td>Cancel 뒤 정리/교체 경로를 건너뛰는 결함 재현</td></tr>
+<tr><td>대기 2개, 완료 continuation에서 내부 Cancel 직접 호출</td><td><code>Tick</code>에서 <code>ArgumentOutOfRangeException</code></td><td>강제 재진입 시험. 실제 게임 스크립트가 이미 이 경로로 충돌했다는 증거는 아님</td></tr></tbody></table></div>
+<p><strong>이관 결과 (2026-09-05 · LC0).</strong> 다섯 행이 어디까지 실엔진으로 옮겨졌는지 갈라
+적는다. 옮겨졌다는 것은 <strong>같은 결함을 실엔진 게이트가 붉힐 수 있다</strong>는 뜻이지
+같은 수치를 재현했다는 뜻이 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>대역 시험</th><th>이관 상태</th><th>실엔진 근거</th></tr></thead>
+<tbody><tr><td>정리 콜백 throw 뒤 Cancel</td><td><span class="chip ok"><strong>이관 완료</strong></span></td><td><code>verify-lifecycle-failure</code> 판정 E(격리 + 원인 보존). LC2가 고쳤다</td></tr>
+<tr><td>완료 continuation의 내부 Cancel → 순회 파손</td><td><strong>이관했고 결론이 바뀌었다</strong></td><td><code>verify-lifecycle-reentrancy</code> 판정 P. 저작 표면에서는 그 창이 열리지 않는다(LC4 절 참고) — 대역이 내부 메서드를 직접 불러 만든 조건이었다</td></tr>
+<tr><td><span class="chip ok">완료 Task의 참조 유지</span></td><td><strong>미이관</strong></td><td>실엔진에서 재려면 유지 메모리 관측 축이 필요하다. LC3의 선행 과제다</td></tr>
+<tr><td>Pre+Post 프레임당 192 B</td><td><strong>미이관 · 성능 축</strong></td><td>LC6에서 잰다. 대역 수치는 컴파일러의 캡처 비용이지 엔진 총비용이 아니다</td></tr>
+<tr><td><code>Delay</code> 호출당 304 B</td><td><strong>미이관 · 성능 축</strong></td><td>같음</td></tr></tbody></table></div>
+<p><code>Enabled</code> setter 경로는 계획대로 실엔진 쪽에만 남겼다 — 대역에서는 항상 폴백만
+타므로 경계를 건너지 않는다. 그 판단이 옳았다는 것이 실측으로 드러났다:
+LC5-c 후속에서 나온 결함(거부가 폴백으로 새는 자리)은 <strong>정확히 그 폴백 분기</strong>에
+있었고, 대역으로는 원리적으로 볼 수 없었다.</p>
+<h3 id="22-실엔진-실패-픽스처-실측-2026-09-05">2.2 실엔진 실패 픽스처 실측 (2026-09-05)</h3>
+<p><code>verify-lifecycle-failure</code>가 실엔진에서 받아 적은 결과다. 대역이 아니라 에디터를
+띄워 재생까지 몬 것이고, 정상 인스턴스(<code>Control</code>)를 같은 실행에 두어 대조했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>픽스처</th><th>받은 훅 (순서대로)</th><th>트랙</th></tr></thead>
+<tbody><tr><td>초기화가 던짐</td><td><code>OnInitialized</code> → <strong><code>OnDisable</code></strong> → <code>OnAddedToScene</code> → <code>OnEndSimulation</code> → <code>OnRemovingFromScene</code> → <code>OnUninitializing</code></td><td>LC1</td></tr>
+<tr><td>시작 훅이 던짐</td><td>… <code>OnEnable</code> → <code>OnBeginSimulation</code> → <strong><code>OnDisable</code></strong> → <strong><code>OnSimulate</code></strong> → 축소 삼단</td><td>LC1</td></tr>
+<tr><td>시작 훅에서 자기 비활성화</td><td>… <code>OnBeginSimulation</code> → <code>OnDisable</code> → <strong><code>OnSimulate</code></strong> → 축소 삼단</td><td>LC1</td></tr>
+<tr><td>정리 콜백이 던짐</td><td>… <code>OnDisable</code> → <code>OnSimulateCancel</code> → <code>cleanup3</code> → <code>cleanup1</code> → <strong>(<code>OnEndSimulation</code> 없음)</strong> → <code>OnRemovingFromScene</code> → <code>OnUninitializing</code></td><td>LC2</td></tr>
+<tr><td>루틴이 첫 await 전 던짐</td><td>… <code>OnSimulate</code> → <code>OnDisable</code> → <strong>실패 후 틱 0회</strong> → 축소 삼단</td><td>LC5</td></tr>
+<tr><td>루틴이 await 뒤 던짐</td><td>… <code>OnSimulate</code> → <code>OnSimulateResume</code> → <strong>실패 후 틱 13회</strong> → 축소 삼단</td><td>LC5</td></tr>
+<tr><td>대조군(정상)</td><td>11훅 전부 · 누락 0</td><td>—</td></tr></tbody></table></div>
+<p>위 표의 LC1 세 줄은 <strong>고침 전</strong> 관측이다. LC1 착지 뒤 같은 픽스처는 이렇게 바뀌었다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>픽스처</th><th>고침 후</th></tr></thead>
+<tbody><tr><td>초기화가 던짐</td><td><code>OnInitialized</code> <strong>하나뿐</strong> — 이후 어떤 단계도 오지 않는다</td></tr>
+<tr><td>시작 훅이 던짐</td><td>… <code>OnBeginSimulation</code> → <code>OnDisable</code> → <code>OnRemovingFromScene</code> → <code>OnUninitializing</code> (<code>OnSimulate</code> 없음, <code>OnEndSimulation</code> 없음)</td></tr>
+<tr><td>시작 훅에서 자기 비활성화</td><td>… <code>OnBeginSimulation</code> → <code>OnDisable</code> → <strong>축소 삼단 전부</strong> (<code>OnSimulate</code>만 없음)</td></tr></tbody></table></div>
+<p>뒤 두 줄의 차이가 이 트랙의 계약을 보여 준다 — 던진 시작 훅은 짝을 못 받고,
+성공적으로 끝난 뒤 스스로 끈 것은 짝을 받는다.</p>
+<p><strong><code>Invoke</code>의 끄기는 이미 격리 장치다.</strong> 그래서 초기화 실패는 Begin/Simulate까지
+가지 못한다 — <code>OnBeginSimulation</code> 갈래의 <code>if (b.Enabled)</code>가 막는다. 남는 구멍은
+그 검사를 하지 않는 자리들이다: <code>OnAddedToScene</code>, 그리고 축소 삼단.</p>
+<p><strong>가장 날카로운 것은 시작 훅이다.</strong> 예외든 자기 비활성화든 그 인스턴스는 확실히
+꺼진 상태인데, <code>StartSimulation</code>이 바로 다음 줄에서 그것을 보지 않고 루틴을
+시작한다. LC1의 고침은 여기서 <strong>끄기를 새로 만드는 것이 아니라 이미 일어난 끄기를
+읽는 것</strong>이다.</p>
+<p><strong>LC2는 §2의 예상대로 둘로 갈렸다.</strong> 형제 콜백은 2/2 살아남았고(인자 없는
+<code>Cancel()</code>이 <code>throwOnFirstException: false</code>라 전부 돌린 뒤 모아 던진다),
+끊긴 것은 <strong>호출자 쪽 후속 생명주기</strong>다 — <code>Scope.Cancel()</code>이 <code>Invoke</code> 밖이라
+그 다음 줄의 <code>Invoke(OnEndSimulation)</code>이 통째로 건너뛰어진다. <code>OnRemovingFromScene</code>과
+<code>OnUninitializing</code>은 별개 단계로 오므로, 결과는 &quot;축소 삼단 중 가운데만 빠진&quot; 모양이다.
+경계에서 죽지는 않는다 — <code>Bootstrap.DispatchLifecycle</code>이 잡아 -1을 돌려준다.</p>
+<p><strong>LC5는 결과 축으로만 갈린다.</strong> 처음에는 판정을 &quot;<code>OnDisable</code>이 왔는가&quot;로 짰는데
+<strong>두 픽스처가 나란히 초록</strong>이었다. 축소가 <code>ApplyEnabled(b, false)</code>로 모든
+인스턴스에 <code>OnDisable</code>을 주므로(2026-09-05 슬라이스 2), 재생 중에 꺼진 것과 정지가
+끈 것이 그 축에서 구분되지 않는다. 훅의 유무가 아니라 <strong>실패 후에도 틱을 받는가</strong>로
+바꾸자 동기 0회 · Task 13회로 갈렸다. 이 문서의 고침이 나중 판정의 축을 오염시킬 수
+있다는 실례다.</p>
+<p>대조군이 온전한 것도 함께 확인됐다 — 한 인스턴스의 예외가 이웃의 생명주기를 끊지
+않는다.</p>
+<p>미래 계획에 보존한 참조 구현의 <strong>992 B는 루틴 코어·홀더·스코프·대기 1건을 합한 값</strong>이다.
+위 304 B와 측정 단위가 다르므로 두 값을 나눠 성능 개선/악화 배수로 쓰지 않는다. 평균 할당은
+프레임 시간·GC 정지·유지 메모리의 대체 지표가 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-독립-안정화-트랙">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-독립-안정화-트랙">3. 독립 안정화 트랙</h2></div>
+<div class="prose"><h3 id="lc0--관리-생명주기-기준선과-실패-픽스처-p1--선행">LC0 — 관리 생명주기 기준선과 실패 픽스처 (P1 · 선행)</h3>
+<ul>
+<li><a href="../../../GameScripts/LifecycleProbe.cs">LifecycleProbe</a>와
+<a href="../../../GameScripts/LifecycleAxisProbe.cs">LifecycleAxisProbe</a>, 기존 관리 회귀를 조사해
+정상 호출 순서·횟수·소유자·프레임·활성 상태의 기준선을 고정한다.</li>
+<li>Initialized/Added/Enable/Begin/Simulate/Disable/End/Removing/Uninitializing 각각의
+예외와 자기 비활성화·제거를 재현할 작은 픽스처를 추가한다. 프레임 경계 재진입도 포함한다.</li>
+<li>§2.1의 격리 재현을 저장소에서 반복 가능한 시험으로 옮긴다. 대역 시험과 실제 엔진 시험을
+별도 결과로 기록한다. 실패 로그를 기준선에 재수록하는 것만으로 통과시키지 않는다.</li>
+</ul>
+<p><strong>완료 조건</strong>: 현재 정상 동작은 통과하고, LC1~LC5의 결함/미지원 경계가 의도한 검사에서
+실패하거나 명확한 지원 제한으로 드러난다. 기존 네이티브 기준선도 계속 보존한다.</p>
+<p><strong>진행 (2026-09-05)</strong> — 세 갈래를 전부 닫았다.</p>
+<ul>
+<li class="task"><input type="checkbox" disabled checked> <strong>관리 기준선.</strong> <code>verify-lifecycle-baseline</code>이 실행 하나에서 두 트레이스를 받아
+각각 골든에 대조한다 — 네이티브 <code>lifecycle_baseline.tsv</code>(239 사건)와 관리
+<code>lifecycle_managed_baseline.tsv</code>(33 사건 = 11훅 × 3주기). 기준선의
+<code>ScriptComponent</code> 0건은 계측 구멍이 아니라 시나리오가 스크립트를 한 번도 붙이지
+않아서였고(<code>LIFECYCLE_TRACE</code>는 타입 무관), 두 씬에 <code>LifecycleProbe</code>를 하나씩
+두어 메웠다(네이티브 행 +18).
+두 축의 유도 경로가 독립인 것이 요점이다. 변이로 확인했다 — <code>ScriptRegistry</code>의
+축소에서 <code>ApplyEnabled(b, false)</code> 한 줄을 지우자 관리 축은 51건 차이로 빨갛고
+<strong>네이티브 축 239 사건은 전부 통과</strong>했다. 네이티브 골든은 관리 측 결함에
+원리적으로 눈멀다는 이 문서의 전제가 실측으로 섰다.</li>
+<li>[~] <strong>실패 픽스처.</strong> LC1·LC2·LC5 몫을 세웠다 — <code>verify-lifecycle-failure</code>의
+판정 A·B·C·E·F가 <strong>의도적으로 빨강</strong>, 대조군 D는 초록. 픽스처 여섯:
+<code>FailInitializedProbe</code>·<code>FailBeginProbe</code>·<code>DisableInBeginProbe</code>(LC1),
+<code>FailCleanupProbe</code>(LC2), <code>FailSimulateSyncProbe</code>·<code>FailSimulateAsyncProbe</code>(LC5).
+각 트랙이 착지하면 해당 판정이 초록이 되고, 전부 초록일 때 run-all에 넣는다.
+실측은 §2.2에 있다. 그 과정에서 §2의 LC1 두 행을 정정했다(<code>Invoke</code>가 예외를
+잡으면서 인스턴스를 끈다는 사실이 빠져 있었다).
+실측은 §2.2에 있다.</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>자기 제거 · 프레임 경계 재진입.</strong> <code>verify-lifecycle-selfremove</code>를 세웠다.
+자기 제거는 하나의 시나리오가 아니라 <strong>부르는 자리마다 다른 시험</strong>이라
+셋으로 나눴다 — 시작 훅 안(네이티브 드레인), 틱 안(<code>_active</code> 순회),
+배수 안. 셋째 자리는 LC5-b가 이번 세션에 새로 만든 실행 지점이라 어느
+게이트도 보고 있지 않았다.
+판정 Q는 축소 삼단이 <strong>정확히 한 번</strong>인지 본다 — 0(둘 다 미룸)과 2(네이티브
+구동과 관리 폴백이 둘 다 부름)를 한 축으로 잡으려면 &quot;1 이상&quot;이 아니라 &quot;1&quot;이어야
+한다. 변이로 확인했다: <code>TeardownDelivered</code> 가드를 걷어내자 세 픽스처 전부
+2·2·2로 빨강.
+배수 예산도 함께 잰다(<code>DrainReentryProbe</code>). <strong>건수로 재면 안 된다</strong> — 예산이
+없어도 열 번은 다 온다. 가르는 것은 몇 프레임에 걸쳤는가다. 변이로 확인했다:
+예산을 없애자 10회가 1프레임에 몰려 그 축만 빨강.</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>§2.1 격리 재현 이관.</strong> 다섯 행의 이관 상태를 §2.1 아래 표로 갈라 적었다.
+둘은 이관 완료(그중 하나는 <strong>결론이 바뀌었다</strong> — 저작 표면에서 창이 열리지
+않는다), 하나는 LC3 선행, 둘은 LC6의 성능 축이다.
+<code>Enabled</code> setter를 실엔진 쪽에 남긴 판단이 옳았음이 실측으로 드러났다 —
+LC5-c 후속 결함이 정확히 그 폴백 분기에 있었고 대역으로는 원리적으로 볼 수
+없었다.</li>
+</ul>
+<p><strong>LC0에서 닫지 않은 것</strong>: LC3(완료된 대기의 참조 유지). 실엔진에서 재려면 유지
+메모리 관측 축이 필요하고, 그것은 LC3 트랙 자체의 선행 과제다.</p>
+<h3 id="lc1--단계-성공과-실행-허용-상태-정리-p1--lc0-선행">LC1 — 단계 성공과 실행 허용 상태 정리 (P1 · LC0 선행)</h3>
+<ul>
+<li><code>Invoke</code>의 결과를 호출자가 알 수 있게 하고, 전달 시도·진행 중·성공·실패 격리를 구분한다.
+재진입을 막는 표식을 없애고 단순히 성공 플래그를 뒤로 옮기는 수정은 피한다.</li>
+<li>초기화 실패한 인스턴스는 이후 정상 단계로 진행하지 않게 한다. 부분 초기화에서 얻은
+자원을 해제하는 경로를 정하되, 성공한 초기화를 전제로 한 훅을 무조건 호출하지 않는다.</li>
+<li><code>OnBeginSimulation</code> 이후 성공 여부·활성·생존 상태를 다시 확인하고 <code>OnSimulate</code> 시작을
+결정한다. 훅 안에서 비활성화·파괴를 요청하는 경우와 예외를 분리한다.
+§2.2 실측을 반영하면 이 항목의 최소 형태는 <strong>끄기를 새로 만드는 것이 아니라 이미
+일어난 끄기를 읽는 것</strong>이다 — <code>Invoke</code>가 예외에서 이미 <code>Enabled = false</code>를 하고,
+자기 비활성화도 같은 상태로 수렴한다. 다만 그 한 줄로 닫았다고 보고하지 않는다:
+예외로 꺼진 것과 스스로 끈 것은 이후 정책(재시도·격리)이 달라야 하므로 상태를
+구분해 남긴다.</li>
+<li>실패 후 자동 재시도, 비활성 격리, 제거 중 어느 정책을 사용할지 단계별로 확정한다.
+기본 방향은 같은 인스턴스의 무한 재시도를 막는 격리이며 명시적 재생성 경계를 사용한다.</li>
+<li><code>Scene::DrainPendingLifecycle</code>와 관리 상태를 함께 확인한다. 관리 목록에 두 번째
+초기화 스케줄러를 만들지 않는다.</li>
+</ul>
+<p><strong>완료 조건</strong>: 실패한 Initialized/Begin 이후 루틴이 시작되지 않고, 반복 프레임·활성 전환에도
+실패 훅이 자동 반복되지 않는다. 부분 초기화 자원과 정상 인스턴스의 대칭 정리가 모두 검증된다.</p>
+<p><strong>완료 (2026-09-05).</strong> <code>verify-lifecycle-failure</code>의 판정 A·B·C가 RED에서 GREEN으로
+넘어갔고, 기존 게이트 다섯(네이티브·관리 골든, 활성 축, DDOL, 부착 초기화 1회,
+단계 미러)은 그대로 초록이다.</p>
+<p><strong>고친 것은 축 하나다.</strong> <code>Invoke</code>를 <code>bool</code> 반환으로 바꾸고, 여는 훅이 예외 없이
+끝났을 때만 서는 표식 셋을 두었다 — <code>InitializeSucceeded</code>·<code>EnterSucceeded</code>·
+<code>BeginSucceeded</code>. <code>IsInitialized</code>는 그대로 남기고 일을 <strong>재진입 방지 하나로</strong> 좁혔다
+(그 값은 훅을 부르기 <strong>전에</strong> 서야 두 번 초기화하지 않는다). 계획서가 경계한
+&quot;성공 플래그를 뒤로 옮기는 수정&quot;을 피한 형태다.</p>
+<p><strong>계약: 성공한 훅의 짝만 부른다.</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>여는 훅</th><th>닫는 짝</th></tr></thead>
+<tbody><tr><td><code>OnInitialized</code></td><td><code>OnUninitializing</code></td></tr>
+<tr><td><code>OnAddedToScene</code></td><td><code>OnRemovingFromScene</code></td></tr>
+<tr><td><code>OnBeginSimulation</code></td><td><code>OnEndSimulation</code></td></tr></tbody></table></div>
+<p><code>Component.IsInitialized</code>의 주석이 원래 규정하던 &quot;짝이 맞지 않으면 스크립트가
+초기화하지 않은 것을 정리하려 든다&quot;가 이 계약이다. 재던 축이 <strong>불렸는가</strong>여서
+던진 초기화도 참이 됐고, 그래서 막으려던 바로 그 상황을 통과시키고 있었다.</p>
+<p><strong>단계가 열리는 것과 루틴이 시작되는 것을 갈랐다.</strong> 처음 구현에서 이 둘을 한
+줄로 뭉갰더니 자기 비활성화한 인스턴스가 짝(<code>OnEndSimulation</code>)을 못 받았다 —
+훅은 성공적으로 끝났는데도. 실패 픽스처 트레이스가 그것을 잡아 줬다. 지금은
+<code>OnBeginSimulation</code>이 예외 없이 끝나면 <code>BeginSucceeded</code>를 세우고, 활성·생존은
+<code>StartSimulation</code> 여부만 정한다. 실측 대조:</p>
+<ul>
+<li>시작 훅이 <strong>던진</strong> 인스턴스 → <code>OnRemovingFromScene</code>·<code>OnUninitializing</code>만, <code>OnEndSimulation</code> 없음</li>
+<li>시작 훅에서 <strong>스스로 끈</strong> 인스턴스 → 축소 삼단 전부, <code>OnSimulate</code>만 없음</li>
+</ul>
+<p><strong>정책 결정 (계획서가 LC1에 위임한 것).</strong> 실패한 단계는 <strong>격리</strong>한다 — 자동
+재시도 없음. <code>Invoke</code>가 이미 인스턴스를 끄고, 성공 표식이 이후 단계를 막는다.
+재시도는 명시적 재생성 경계로만 한다(인스펙터의 <code>RetryInstance</code>, <code>script.reload</code>).</p>
+<p><strong>받아들인 잔여.</strong> 초기화가 자원을 잡은 <strong>뒤에</strong> 던지면 그것을 놓을 엔진 제공
+훅이 없다 — <code>OnUninitializing</code>을 부르지 않기로 했기 때문이다. 반쪽 상태에서 도는
+정리 코드가 새 예외를 만드는 쪽(§2.2에서 LC2가 보여 준 모양)이 더 나쁘다고 판단했다.
+스크립트는 <code>OnInitialized</code> 안에서 자기 자원을 스스로 다뤄야 한다. 이 판단을
+뒤집으려면 &quot;부분 초기화 전용 정리 훅&quot;이 필요하고, 그것은 이 트랙의 범위 밖이다.</p>
+<h3 id="lc2--취소정리-예외-격리와-종료-보장-p1--lc0-선행">LC2 — 취소·정리 예외 격리와 종료 보장 (P1 · LC0 선행)</h3>
+<ul>
+<li>취소 통지, 사용자 정리 콜백, 대기 목록 해제, 토큰 폐기/재사용 상태 전환을 분리한다.
+하나의 예외가 나머지 등록이나 인스턴스의 정리를 중단하지 않게 한다.</li>
+<li>최초 원인과 정리 중 발생한 예외를 보존해 보고한다. 예외를 삼키고 성공으로 표시하지 않는다.</li>
+<li><code>TearDown</code>, 네이티브 End 통지, <code>Clear</code>가 서로 같은 정리를 반복하지 않게 한다.
+일반 제거·즉시 제거·orphan·리로드 각각에서 사용 가능한 네이티브 핸들의 경계를 확인한다.</li>
+<li>로드 문맥 해제까지 진행하되 아직 실행 중인 콜백을 안전하게 다룬다. 이미 무효한 핸들로
+엔진 자원을 정리하려는 코드는 해당 경계에서 검출한다.</li>
+</ul>
+<p><strong>완료 조건</strong>: 여러 정리 중 첫/중간/마지막 콜백이 실패해도 필요한 나머지 정리가 한 번씩
+실행되고 목록·등록·로드 문맥 참조가 정리된다. 원래 오류와 추가 정리 오류를 구분해 확인한다.</p>
+<p><strong>완료 (2026-09-05).</strong> <code>verify-lifecycle-failure</code>의 판정 E가 RED에서 GREEN으로 넘어갔다.</p>
+<p><code>SimulationScope.Cancel</code>이 하던 네 가지 일을 갈랐다 — ① 취소 통지, ② 대기 목록
+해제, ③ 토큰 폐기, ④ 새 토큰. 예전에는 넷이 한 줄씩 이어져 ①이 던지면 나머지
+셋이 통째로 날아갔고, 더 나쁘게는 그 예외가 호출자 경계를 넘어
+<code>Invoke(OnEndSimulation)</code>을 건너뛰게 했다.</p>
+<p><strong>호출자 쪽에 try/catch를 덧대지 않았다.</strong> <code>Cancel</code>이 던지지 않는 것을 계약으로
+두고, 그 계약이 깨지면 게이트가 붉어지게 남긴다 — 감싸면 다음 회귀가 조용히
+지나간다.</p>
+<p><strong>격리와 삼킴을 갈랐다.</strong> <code>AggregateException</code>의 내부 예외를 하나씩 로그로 남기고,
+게이트가 <strong>그 건수</strong>를 함께 센다. 이 판정이 없으면 조용히 삼켜도 초록이다 —
+변이로 확인했다(로그 줄을 지우니 <code>E(보고)</code>만 정확히 빨강, 나머지 E는 초록).</p>
+<p>실측(§2.2 갱신): 정리 콜백 다섯 중 둘이 던져도 나머지 셋이 전부 돌고,
+<code>OnEndSimulation</code>을 포함한 축소 삼단이 온전히 전달된다. 예외 둘은 각각 원인 줄
+번호까지 보고된다. 콜백 실행 순서는 규약이 아니므로 판정이 그것에 기대지 않는다 —
+양 끝과 가운데를 동시에 덮는 등록 배치를 쓴다.</p>
+<h3 id="lc3--완료된-대기의-취소-등록-해제-p1--lc0-선행">LC3 — 완료된 대기의 취소 등록 해제 (P1 · LC0 선행)</h3>
+<ul>
+<li>대기 레코드가 <code>CancellationTokenRegistration</code>을 소유하고 정상 완료·취소 경로에서 해제한다.</li>
+<li>등록 중 즉시 취소, 완료와 취소가 만나는 경계, 콜백 안의 해제/재진입을 검증한다.
+콜백 실행을 기다리는 Dispose 때문에 서로 기다리는 구조를 만들지 않는다.</li>
+<li>정상 완료된 대기 기록과 캡처는 스코프 전체가 종료될 때까지 붙잡지 않는다. 실제 진행 중인
+대기·정리 등록의 보유와 구분한다. 풀링은 정확성 수정의 선행 조건으로 두지 않는다.</li>
+</ul>
+<p><strong>완료 조건</strong>: 스코프를 살려 둔 채 완료 Task의 외부 참조를 제거하면 회수된다. 반복 대기의
+유지 메모리가 누적 완료 횟수에 비례해 증가하지 않으며 완료/취소는 한 번만 관측된다.</p>
+<p><strong>LC3 착지 (2026-09-05).</strong> <code>verify-lifecycle-retention</code>의 판정 V가 RED에서 GREEN으로
+넘어갔고 게이트를 <code>run-all.ps1</code>에 편입했다.</p>
+<p><strong>실측: 완료된 대기 50개 중 50개가 살아 있었다 → 0개.</strong></p>
+<p><code>PendingDelay</code>가 <code>CancellationTokenRegistration</code>을 소유하게 하고 <code>Tick</code>이 완료
+시점에 놓는다. 등록을 <strong>완료보다 먼저</strong> 놓는 것이 순서상 중요하다 — 완료가 먼저면
+그 자리에서 이어지는 continuation이 도는 동안 등록이 아직 토큰에 매달려 있고, 그
+사이에 취소가 오면 이미 결정된 대기에 <code>TrySetCanceled</code>가 한 번 더 날아간다.</p>
+<p>계획서가 경고한 교착(<code>Dispose</code>가 콜백 실행을 기다린다)은 성립하지 않는다. 그것은
+<strong>다른 스레드</strong>가 콜백을 실행 중일 때만 기다리는데, <code>_pending</code>은 게임 스레드
+전용이고 LC5-b·c가 그것을 런타임 성질로 만들었다. 자기 콜백 안에서 부르는
+<code>Dispose</code>도 즉시 반환한다.</p>
+<p><strong>관측 축을 메모리 총량으로 잡지 않았다.</strong> <code>GC.GetTotalMemory</code>는 엔진 전체의
+잡음을 함께 재서 몇십 KB 차이가 묻히고, 묻히지 않게 규모를 키우면 시나리오가
+길어진다. 대신 <strong>도달 가능성</strong>을 직접 센다 — 완료된 Task마다 약한 참조를 남기고
+강한 참조를 버린 뒤 GC를 돌려 몇 개가 살아남는지 본다. 잡음이 0이고 살아남은
+개수가 곧 누수 개수다. 계획서의 완료 조건 문장을 그대로 실행한 셈이다.</p>
+<p>픽스처의 기술적 요점은 <strong>강한 참조를 확실히 버리는 것</strong>이다. 지역 변수에 담았다가
+<code>null</code>을 대입하는 것으로는 부족하다 — Debug 빌드는 지역을 스코프 끝까지 살려 두고
+비동기 본문이면 상태 기계 필드에 남는다. 생성과 약한 참조 만들기를 인라인하지
+않는 별도 메서드에 넣었고, 같은 이유로 <code>await</code>하지 않는다(기다리면 그 Task가 상태
+기계에 잡힌다 — <code>Scope.Tick</code>이 완료시키므로 재려는 것에는 영향이 없다).</p>
+<p><strong>남는 것</strong>: <code>RegisterCleanup</code>/<code>Subscribe</code>의 등록은 그대로 둔다. 그것들은 정의상
+스코프가 끝날 때까지 살아야 하므로 같은 문제가 아니다 — &quot;실제 진행 중인 대기·정리
+등록의 보유와 구분한다&quot;가 그 뜻이다. 풀링은 하지 않았다(정확성 수정의 선행 조건이
+아니라고 계획서가 이미 정해 뒀다).</p>
+<h3 id="lc4--대기-완료취소파괴-재진입-p1--lc0-선행-lc2lc3와-통합-검증">LC4 — 대기 완료·취소·파괴 재진입 (P1 · LC0 선행, LC2/LC3와 통합 검증)</h3>
+<ul>
+<li>원본 목록에서 준비된 항목을 분리하는 단계와 사용자 continuation을 실행하는 단계를 나눈다.
+구체적인 자료구조는 기존 동작을 보존하는 최소 변경으로 정한다. 현재의 역순 순회와
+<code>RemoveAt</code> 선행이 이미 막고 있는 범위(완료 중 추가되는 연쇄 대기)를 다시 고치지 않는다 —
+닫을 것은 순회 중 목록이 <strong>통째로 비워지는</strong> 경우다.</li>
+<li>정리 중 새 대기 등록, 완료 중 취소/제거, 중복 취소가 기존 순회 인덱스와 다음 세대를
+손상시키지 않게 한다. 완료 후보를 수집한 뒤에도 취소·소유자 상태를 재확인한다.</li>
+<li>같은 프레임에 추가된 대기를 반복 소모하지 않고, 이미 취소된 세대의 완료 후보가 성공으로
+재개되지 않게 한다. 0초·음수·NaN·무한대 대기의 지원 의미도 명시해 시험한다.</li>
+<li><code>RunContinuationsAsynchronously</code>만 추가해 해결했다고 하지 않는다. 게임 스레드 재개와
+기존 훅 순서를 바꿀 수 있으므로 LC5의 스레드 경계와 함께 판단한다.</li>
+</ul>
+<p><strong>완료 조건</strong>: §2.1 강제 재현이 통과하고, 실제 엔진의 완료→자기 제거/즉시 제거/리로드
+경로에서 무효 접근·이중 완료·정리 누락이 없다. disable 중 대기 진행은 보존된다.</p>
+<p><strong>전제 실측 (2026-09-05) — 창이 저작 표면에서 열리지 않는다. LC5-b가 닫았다.</strong>
+<code>verify-lifecycle-reentrancy</code>를 세워 실엔진에서 쟀다.</p>
+<p>§2.1의 창이 열리려면 두 조건이 함께여야 한다. ① 재개가 <code>Tick</code> 루프 안에서, 게임
+스레드에서 일어난다. ② 그 재개가 <code>_pending</code>을 통째로 비운다. <strong>둘 다 지금은
+성립하지 않는다.</strong></p>
+<p>①에 대한 실측: 저작 표면에는 컨텍스트를 타거나(재개가 프레임 경계로 · LC5-b)
+<code>ConfigureAwait(false)</code>로 나가거나(재개가 <strong>스레드 풀</strong>로) 두 길뿐이고, 어느 쪽도
+<code>Tick</code> 안이 아니다. 게임 스레드 <code>tid=2</code>에 대해 재개는 <code>tid=4</code>·<code>6</code>이었다.</p>
+<p><code>ConfigureAwait(false)</code>가 인라인일 것이라 보고 픽스처를 짰는데 실측이 그것을
+부정했다. <strong>원인은 LC5-b가 세운 컨텍스트다</strong> — <code>continueOnCapturedContext:false</code>인
+재개는 현재 컨텍스트가 있으면 인라인될 수 없어 풀로 간다. 변이로 확인했다:
+<code>GameThreadSynchronizationContext.Install()</code> 한 줄을 걷어내자 두 픽스처의 재개가
+곧바로 <code>tid=2</code>(게임 스레드, 곧 <code>Tick</code> 루프 안)로 돌아왔다. <strong>LC5-b 이전에는 이
+창이 실제로 열려 있었다.</strong></p>
+<p>②에 대한 실측: <code>_pending</code>을 비우는 것은 <code>Scope.Cancel()</code> 하나뿐이고 그 호출부는
+<code>TearDown</code>과 <code>DispatchLifecycle(OnEndSimulation)</code> 둘이다. <code>ScriptRegistry.Remove</code>는
+큐에 넣기만 하고, <code>Api_Entity_Destroy</code>는 엔진의 지연 파괴 규약을 따른다 — 저작
+코드에서 동기적으로 닿는 길이 없다.</p>
+<p>그러므로 <strong>LC4에서 지금 고칠 것은 없다.</strong> 대신 그 사실을 게이트로 고정했다 —
+판정 P(창 부재)는 재개 스레드가 게임 스레드와 같아지면 붉어진다. 언젠가 컨텍스트
+정책이 바뀌거나 런타임이 인라인으로 돌아서면 창이 다시 열리고, 그때 위의 &quot;완료
+후보 수집과 continuation 실행을 나눈다&quot;를 실제로 해야 한다. 지금의 초록은 &quot;결함이
+없다&quot;가 아니라 **&quot;경로가 없다&quot;**는 기록이다.</p>
+<p>이 픽스처가 LC5-c의 결함 하나를 물어 왔다 — 아래 LC5 절에 적었다.</p>
+<p><strong>LC7에서 이어받아 닫았다</strong>(2026-09-05, <code>9b895107</code>): 0초·음수·NaN·무한대 대기의 지원
+의미를 재고 계약으로 적었다. 여기서 넘긴 &quot;무한 같은 프레임 재개 방지&quot;는 그 게이트의
+판정 DD가 재는데, 실측 결과 그것을 묶고 있는 것은 LC4가 예상한 대기열 구조가 아니라
+<strong>LC5-b의 컨텍스트 마샬링</strong>이었다 — 재개가 Post 되어 다음 프레임 배수에서 돌므로
+새 대기는 그 프레임의 Tick 이 이미 지난 뒤에 등록된다.</p>
+<h3 id="lc5--외부-await엔진-스레드task-실패-정책-p1--lc0-선행">LC5 — 외부 await·엔진 스레드·Task 실패 정책 (P1 · LC0 선행)</h3>
+<ul>
+<li>현재 지원하는 <code>Scope.Delay</code>와 외부 Task를 구분한다. 현재 게임 스크립트의 await 8곳은
+모두 <code>Scope.Delay</code>이므로 외부 I/O 실행기 전체를 이번 수정에 끼워 넣지 않는다.</li>
+<li>게임 스레드 전용 API의 실제 진입 경계에 검사와 오류 위치를 제공한다. 훅 입구 검사만으로
+중간의 <code>Task.Run</code>이나 외부 await 이후 호출까지 보호했다고 하지 않는다.</li>
+<li>외부 작업을 지원한다면 완료 결과를 엔진 프레임 경계로 넘기고 소유자·취소 세대를 검사한다.
+지원하지 않는 범위는 명시적으로 거부/진단한다. 단순 경고를 완전한 강제 계약이라고 부르지 않는다.</li>
+<li>직접 throw, 즉시 faulted Task, await 이후 faulted Task의 격리·로그·종료 정책을 맞춘다.
+일반 <code>async Task</code>의 첫 await 전 예외도 faulted Task로 반환될 수 있음을 시험한다.</li>
+<li><code>ContinueWith(ExecuteSynchronously, TaskScheduler.Default)</code>는 게임 스레드 보장이 아니다.
+외부 완료 시 워커에서 실행될 수 있으므로 실패 통지와 엔진 상태 변경을 올바른 경계로 보낸다.</li>
+</ul>
+<p><strong>완료 조건</strong>: 지원 경로에서는 스레드·소유자 규약이 유지되고, 금지한 외부 경로는 오류로
+드러난다. 세 종류의 실패가 같은 정책을 따르며 취소와 fault를 혼동하지 않는다.</p>
+<p><strong>부분 완료 (2026-09-05) — 실패 정책만.</strong> <code>verify-lifecycle-failure</code>의 판정 F가
+RED에서 GREEN으로 넘어갔고, 이로써 게이트 여섯 판정이 전부 초록이 되어
+<code>run-all.ps1</code>에 편입됐다.</p>
+<p>세 갈래를 <code>FaultSimulation</code> 하나로 모았다:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>갈래</th><th>도착 지점</th><th>예전 정책</th><th>지금</th></tr></thead>
+<tbody><tr><td>동기 throw (<code>async</code> 없음)</td><td><code>StartSimulation</code>의 try/catch</td><td>끈다</td><td>끈다</td></tr>
+<tr><td>즉시 faulted (<code>async</code>, 첫 await 전)</td><td><code>task.IsCompleted</code> 갈래</td><td>로그만</td><td>끈다</td></tr>
+<tr><td>나중 faulted (await 이후)</td><td><code>ContinueWith</code></td><td>로그만</td><td>끈다</td></tr></tbody></table></div>
+<p><strong>방향은 격리다</strong> — LC1과 같다. 반대(둘 다 로그만)는 본문이 죽은 것을 행동으로
+알 수 없게 만들어 더 나쁘다. 되살리는 것은 명시적 재생성 경계로만 한다.</p>
+<p>실측: 실패 후 틱이 셋 다 0회(고침 전 0·13·13). 취소는 여전히 정상 종료다 —
+<code>ReportSimulationFault</code>의 <code>IsFaulted</code> 조기 반환이 그것을 지킨다.</p>
+<p>게이트는 일관성만이 아니라 <strong>방향</strong>도 못 박는다. 셋이 같기만 하면 통과하게 두면
+정책이 반대로 통일돼도 초록이기 때문이다.</p>
+<p><strong>LC5-b 착지 (2026-09-05) — 프레임 경계 마셜링.</strong> 재개 스레드를 닫았다.
+<code>verify-lifecycle-thread</code>의 판정 H가 RED에서 GREEN으로 넘어갔고 게이트를
+<code>run-all.ps1</code>에 편입했다.</p>
+<p>원인은 관리 측에 <code>SynchronizationContext</code>가 <strong>하나도 없었다</strong>는 것이다(실측
+<code>ScriptCore</code> 전체 0건). <code>await</code>의 재개 지점은 포착한 컨텍스트가 정하는데
+포착할 것이 없으면 <code>TaskScheduler.Default</code> — 스레드 풀 — 로 이어진다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>표지</th><th>고침 전</th><th>고침 후</th></tr></thead>
+<tbody><tr><td><code>begin</code>(기준·게임 스레드)</td><td>tid 2</td><td>tid 2</td></tr>
+<tr><td><code>delay</code>(<code>Scope.Delay</code> 뒤)</td><td>tid 2</td><td>tid 2</td></tr>
+<tr><td><code>worker</code>(<code>Task.Run</code> 몸통)</td><td>tid 4</td><td>tid 4</td></tr>
+<tr><td><code>external</code>(<code>Task.Run</code> 뒤)</td><td><strong>tid 4</strong></td><td><strong>tid 2</strong></td></tr></tbody></table></div>
+<p><code>GameThreadSynchronizationContext</code>를 게임 스레드에 세우고(<code>Bootstrap.Initialize</code>)
+<code>PrePhysicsTick</code>이 스코프 진행과 <code>PrePhysics</code> 배달 <strong>사이</strong>에서 배수한다.
+그 자리인 이유는 &quot;<code>await Scope.Delay</code>는 프레임의 일이 시작되기 전에 재개된다&quot;가
+지켜야 할 순서이기 때문이다. 대신 재개가 이제 <strong>모든</strong> <code>PrePhysics</code>보다 앞선다 —
+예전에는 자기 인스턴스의 것보다만 앞섰다. 프레임과 스레드는 그대로다.</p>
+<p>금지가 아니라 마셜링을 고른 이유: 외부 <code>await</code>를 타입으로 막는 것은 저작 표면을
+바꾸는 일(PHASE 24의 방향)이고, 여기서 닫아야 하는 것은 지금 코드가 이미 할 수
+있는 일의 안전성이다. 완료를 프레임 경계로 넘기면 무엇을 await하든 재개가 게임
+스레드에서 일어난다 — 규약이 저작 규율이 아니라 런타임 성질이 된다.</p>
+<p><code>Send</code>는 워커에서 오면 <strong>거부한다</strong>(<code>NotSupportedException</code>). 규약대로 막으면
+게임 스레드와 서로를 기다려 프레임이 멈추고, 조용히 비동기로 바꿔 치면 <code>Send</code>가
+약속한 &quot;돌아올 때는 끝나 있다&quot;가 깨져 더 나쁜 자리에서 드러난다.</p>
+<p><strong>변이 둘로 확인했다.</strong></p>
+<ul>
+<li>판정 I(워커 실재)는 태어날 때부터 초록이라 존재 이유를 시험했다. 외부 경계를
+넘지 않게 픽스처를 바꾸자 <strong>H는 초록인 채 I만 붉었다</strong> — 정확히 그 거짓 초록을
+잡으라고 둔 판정이다.</li>
+<li><strong>판정 G의 근거는 틀렸다.</strong> 게이트 주석에 &quot;<code>RunContinuationsAsynchronously</code>를
+붙이면 G가 붉어진다&quot;고 적었는데 실제로는 초록이었다. 컨텍스트가 재개를 어차피
+게임 스레드로 되돌리기 때문이다. 그 변이가 깨는 것은 스레드가 아니라 <strong>시점</strong>
+(재개가 그 프레임의 배수를 놓친다)이고, 붉어진 것은 <code>verify-lifecycle-baseline</code>의
+관리 축이었다(ScriptHostB의 <code>SimulateStart</code>·<code>SimulateResume</code> 소실). 주석을
+실측대로 고쳤다.</li>
+</ul>
+<p><code>ScriptRegistry.Clear</code>(어셈블리 리로드)는 남은 재개를 버리고 건수를 남긴다.
+그 시점에는 스코프가 이미 취소됐으므로 이어 봐야 사라진 객체를 만진다. 다만
+0이 아니면 그만큼의 <code>async</code> 상태 기계가 완료되지 않은 채 끊긴 것이고, 그것은
+LC3(완료 대기의 참조 유지)에서 다시 볼 자리다.</p>
+<p><strong>LC5-c 착지 (2026-09-05) — 진입 경계.</strong> <code>verify-lifecycle-thread</code>의 판정 J·K가
+RED에서 GREEN으로 넘어갔고, 정적 게이트 <code>check-native-thread-guard</code>를 새로 세워
+<code>run-all.ps1</code>에 편입했다.</p>
+<p>마셜링이 닫는 것은 <code>await</code> <strong>뒤</strong>다. <code>Task.Run</code>의 <strong>몸통 안</strong>은 재개가 아니라
+워커 그 자체라 컨텍스트가 원리적으로 닿지 못한다. 실측:</p>
+<div class="table-scroll"><table>
+<thead><tr><th></th><th><code>alive</code></th><th><code>name</code></th></tr></thead>
+<tbody><tr><td>게임 스레드(tid 2)</td><td>True</td><td><code>WorkerCall</code></td></tr>
+<tr><td>워커(tid 4) · 고침 전</td><td><strong>True</strong></td><td><strong><code>WorkerCall</code></strong></td></tr>
+<tr><td>워커(tid 4) · 고침 후</td><td>False</td><td>(빈 값)</td></tr></tbody></table></div>
+<p><code>Native</code>의 정적 메서드 <strong>206개</strong>가 실제 진입 경계다(계획서가 적어 둔 210은
+<code>_api</code>를 만지지 않는 넷을 함께 센 값이다). 그 206개가 전부 <code>_ready</code>를 <strong>정확히
+한 번씩</strong> 보고 있어 치환이 기계적이었다. <code>_ready</code> → <code>Entered()</code>, 원본 필드는
+<code>_bound</code>로 이름을 바꿔 우회를 눈에 띄게 했다.</p>
+<p><strong>거부를 골랐다.</strong> 통과시키면 게임 스레드가 같은 순간에 고치는 씬 그래프를
+워커가 읽고 쓴다 — 결과에 경계가 없다(운이 좋으면 낡은 값, 나쁘면 접근 위반).
+거부는 결과가 정해져 있고 기록이 남는다. 결정적으로 <strong>거부가 새 분기를 만들지
+않는다</strong> — 모든 메서드는 &quot;표가 아직 없을 때&quot;의 반환값을 이미 정의하고 있고,
+거부는 그 길을 그대로 탄다.</p>
+<p>거부와 기록을 판정 J·K로 갈랐다(실패 게이트의 판정 E와 같은 이유). 거부만
+있고 기록이 없으면 저작자에게는 &quot;왜 갑자기 빈 값이지&quot;만 남는다. 보고는 <strong>API
+이름마다 한 번</strong>이라 상한이 표 크기로 묶이면서도 어디가 새는지는 전부 드러난다 —
+필요한 정보는 건수가 아니라 어디다. <code>Log</code>는 면제한다. 진단이 나가는 통로 자체를
+막으면 거부가 조용해진다. <code>ScriptRegistry.Clear</code>(리로드)가 보고 기록을 비워
+다음 회차에 같은 결함이 다시 드러나게 한다.</p>
+<p><strong>드리프트는 정적 게이트로 막는다.</strong> 206곳을 사람이 지키는 규약은 곧 무너진다 —
+새 API에서 검사를 빠뜨려도 컴파일은 되고, 실행 게이트는 자기가 부르는 두 API만
+본다. 변이 셋이 각각 자기 축만 붉혔다: ① <code>Entered()</code> 제거 → 판정 1, ②
+<code>Entered()</code>를 부르되 결과를 버리고 <code>_bound</code>로 우회 → <strong>판정 1은 초록이고 판정 2만
+빨강</strong>(이것이 판정 2의 존재 이유다), ③ <code>Entered</code> 안의 스레드 비교 삭제 → 판정 3.</p>
+<p><strong>부수 확인</strong>: 최근 실행 로그 8개(게이트 6종)에서 경계 밖 호출로 거부된 API는
+픽스처가 부르는 <code>GetName</code>·<code>IsAlive</code> 둘뿐이었다. 엔진의 다른 어느 경로도 워커에서
+관리 API를 부르고 있지 않다.</p>
+<p><code>FaultSimulation</code>의 게임 스레드 가드는 그대로 둔다. 마셜링 이후 지원 경로에서는
+닿지 않으므로 이제 진짜 잔여 경로(<code>ConfigureAwait(false)</code> 등)만 잡는다.</p>
+<p><strong>후속 정정 (2026-09-05) — &quot;거부가 새 분기를 만들지 않는다&quot;는 한 자리에서 틀렸다.</strong></p>
+<p>LC4 재진입 픽스처가 물어 왔다. <code>Component.Enabled</code> setter는 <code>ScriptSetEnabled</code>의
+거짓을 <strong>전달 실패</strong>(표가 없거나 대상을 못 찾음)로 읽고 관리 측 폴백
+<code>ScriptRegistry.ApplyEnabled</code>를 탄다. 거부가 일부러 &quot;표가 없을 때&quot;의 길을 타므로
+그 둘이 구분되지 않았다.</p>
+<p>실측: <code>await … .ConfigureAwait(false)</code> 뒤의 <code>Enabled = false</code>가 워커에서
+<code>OnDisable</code> 사용자 훅을 돌리고 있었다. 거부가 막으려던 일의 축소판을 관리 측에
+다시 만든 셈이다.</p>
+<p>setter가 두 종류를 가르게 고쳤다 — 게임 스레드 밖이면 폴백을 태우지 않고 아무것도
+적용하지 않은 채 오류로 남긴다. 나머지 호출부는 전수 확인 결과 값을 읽어 쓰는
+자리뿐이라(무효 핸들·<code>false</code>가 그대로 흐른다) 보상 분기가 없다. <strong><code>Enabled</code>가
+유일했다.</strong></p>
+<p>게이트 축을 한 번 잘못 잡았다. 처음에는 <code>OnDisable</code> <strong>건수</strong>로 쟀는데 정지 시점
+축소가 모든 인스턴스에 하나씩 주므로 고침 전후 모두 1이었다 — 이유만 달랐다
+(고침 전에는 워커가 먼저 꺼 축소 때는 전이가 아니었다). 가르는 것은 <strong>어느
+스레드에서 왔는가</strong>뿐이다. 이 세션에서 같은 함정을 두 번째로 밟았다(판정 F).</p>
+<p><strong>남는 것 (LC5에서 닫지 않는다).</strong> 이것은 <strong>관리 측 진입</strong>만 막는다.</p>
+<ul>
+<li>네이티브가 스스로 다른 스레드에서 관리 코드를 부르는 경로가 생기면 여기서는
+보이지 않는다.</li>
+<li>거부된 뒤의 저작 코드가 기본값(빈 문자열·False·영벡터)으로 무엇을 하는지까지는
+책임지지 않는다. 로그가 그것을 저작자에게 넘긴다.</li>
+<li>외부 <code>await</code> 자체를 금지하지 않는다. 금지는 저작 표면을 바꾸는 일이라 PHASE 24의
+몫이다.</li>
+</ul>
+<h3 id="lc6--기존-틱스코프-비용의-선택적-개선-p2--lc0-기준선-w8과-조정">LC6 — 기존 틱·스코프 비용의 선택적 개선 (P2 · LC0 기준선, W8과 조정)</h3>
+<ul>
+<li><a href="../ScriptSurfacePlan.html">ScriptSurfacePlan</a>의 W8과 소유권을 맞춰 빈 훅 호출·오버라이드
+감지·활성 목록 비용을 측정한다. 수명 검사를 없애 얻은 속도를 개선으로 인정하지 않는다.</li>
+<li><strong>W8의 전제 수치는 낡았으니 착수 전에 다시 잰다.</strong> W8은 &quot;<code>override void PrePhysics</code>는
+0건인데 <code>Component</code> 파생 42개를 매 프레임 순회한다&quot;를 근거로 삼는데, 2026-09-05
+<code>GameScripts</code> 실측은 PrePhysics 1건(<code>LifecycleAxisProbe</code>)·PostPhysics 18건·<code>Component</code>
+파생 28개다. 세는 범위(<code>GameScripts</code>만인지 <code>ScriptCore</code> 내장까지인지)도 함께 고정하지
+않으면 두 계획서가 서로 다른 분모로 같은 이득을 주장하게 된다.</li>
+<li>§2.1의 192 B/프레임 캡처 비용, <code>Scope</code>의 선생성 비용, 인스턴스별 생존 검사와 네이티브
+경계 비용, 활성 목록 제거 비용을 따로 잰다. 생성기 디스패치 등은 측정 후 선택한다.</li>
+<li>루틴이 없는 컴포넌트의 스코프 지연 생성은 구독 등 다른 <code>Scope</code> 소비도 포함해 검토한다.
+<code>OnSimulate</code> 오버라이드가 없다는 이유만으로 스코프 소비가 없다고 가정하지 않는다.</li>
+<li>동일 기능·프레임 의미·인스턴스 수로 할당, 유지 메모리, 평균/p95/p99 프레임 시간을 비교한다.</li>
+</ul>
+<p><strong>완료 조건</strong>: 채택한 변경의 독립 이득과 회귀가 확인된다. 병목이 아니라면 변경을 보류하고
+측정 근거를 남겨도 된다. 이 항목의 성능 이득을 미래 계약/PrSM의 이득으로 계산하지 않는다.</p>
+<h4 id="착지--측정-후-변경-보류-2026-09-06">착지 — 측정 후 변경 보류 (2026-09-06)</h4>
+<p><strong>결론: 지금 규모에서는 병목이 아니다. 변경을 보류하고 근거를 남긴다.</strong></p>
+<h5 id="①-범위를-못-박았다--그리고-w8의-분모가-비용과-무관하다는-것이-드러났다">① 범위를 못 박았다 — 그리고 W8의 분모가 비용과 무관하다는 것이 드러났다</h5>
+<p><code>GameScripts</code> 49개 파일 중 <strong>41개가 회귀 픽스처</strong>이고 저작 코퍼스는 8개다. 이 트랙이
+게이트를 세우면서 픽스처를 41개까지 늘렸으므로, 파일 수를 그대로 세면 분모가 부풀려진다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>세는 범위</th><th>Component 파생</th><th>PrePhysics override</th><th>PostPhysics override</th></tr></thead>
+<tbody><tr><td><code>GameScripts</code> 전체</td><td class="num">47</td><td class="num">2</td><td class="num">25</td></tr>
+<tr><td>저작 코퍼스만(픽스처 제외)</td><td class="num">8</td><td class="num"><strong>0</strong></td><td class="num">7</td></tr>
+<tr><td><code>ScriptCore</code> 내장</td><td class="num">1</td><td class="num">0</td><td class="num">0</td></tr></tbody></table></div>
+<p>W8의 &quot;<code>override void PrePhysics</code>는 0건&quot;은 <strong>저작 코퍼스 기준으로는 맞다</strong>. 2026-09-05에
+이 문서가 &quot;PrePhysics 1건&quot;이라 적은 것은 픽스처(<code>LifecycleAxisProbe</code>)를 포함해 센 값이니
+정정한다.</p>
+<p>그런데 더 근본적인 문제가 있다. <strong>프레임 비용은 타입 수가 아니라 런타임 인스턴스 수가
+정한다.</strong> 파생 타입이 몇 개든 씬에 붙지 않으면 순회 비용은 0이다. 실측:</p>
+<ul>
+<li>저작 씬 16개 중 스크립트가 붙은 것은 3개, 각각 <code>ScriptComponent</code> 2개</li>
+<li><code>Lifecycle3D</code> 재생 중 <code>script.status</code> → <strong>활성 스크립트 1개</strong></li>
+</ul>
+<p>즉 W8이 없애려는 &quot;빈 가상 호출&quot;의 실제 규모는 <strong>프레임당 1회</strong>다.</p>
+<h5 id="②-lc5-c-진입-검사의-비용을-쟀다--분해능-아래다">② LC5-c 진입 검사의 비용을 쟀다 — 분해능 아래다</h5>
+<p>206곳에 넣고 한 번도 재지 않았던 것이라 여기서 잰다. Release · 호출 100만 × 표본 15
+(<a href="../../../Tools/regression/measure-entry-guard-cost.ps1">measure-entry-guard-cost.ps1</a>):</p>
+<div class="table-scroll"><table>
+<thead><tr><th></th><th>중앙값</th><th>범위</th></tr></thead>
+<tbody><tr><td>검사 있음</td><td>10.588 ns</td><td>8.64 ~ 13.10</td></tr>
+<tr><td>검사 없음(<code>Entered</code>의 TLS 비교 제거)</td><td>9.648 ns</td><td>8.03 ~ 13.02</td></tr></tbody></table></div>
+<p>두 분포가 거의 완전히 겹친다. 중앙값 차이 0.94 ns 는 표본 흔들림(±2.5 ns)보다 작다.
+<strong>검사의 몫은 이 하네스로 분리되지 않고, 상한이 ~1 ns/호출이라는 것까지가 말할 수 있는
+전부다.</strong></p>
+<p>첫 판은 호출 10만 × 표본 5로 쟀는데 흔들림(11.4~16.0 ns)이 재려는 차이보다 커서 아무것도
+가르지 못했다. 호출을 열 배·표본을 셋 배로 올려 다시 쟀고, 그러고도 가르지 못했다는 것이
+결론이다.</p>
+<p>정작 비싼 것은 검사가 아니라 <strong>경계 크로싱</strong>이다 — 엔진 API 호출 ~10 ns 대 관리 필드
+읽기 0.3 ns, 30배. 검사는 그 10 ns 의 10% 안쪽이다.</p>
+<p>LC7-b가 <code>SimulationScope.Tick</code>에 넣은 프레임 번호 읽기도 같은 규모다. 대기 목록이 비면
+건너뛰므로 활성 1개 기준 프레임당 최대 1회 — 10 ns.</p>
+<h5 id="③-남긴-것과-다시-재야-할-때">③ 남긴 것과 다시 재야 할 때</h5>
+<p>측정은 <strong>판정이 아니라 도구</strong>로 남겼다(<code>verify-</code> 가 아니라 <code>measure-</code>). 회귀 세트에는
+넣지 않는다 — 흔들림이 ±25% 라 임계값을 걸면 거짓 실패가 난다.</p>
+<p>다시 재야 할 조건: <strong>활성 스크립트 인스턴스가 수백 개 규모가 될 때.</strong> 지금 결론은 &quot;빈
+훅 호출이 프레임당 1회&quot;라는 사실에 전적으로 기대고 있고, 그 수가 커지면 결론이 뒤집힌다.
+<code>script.status</code> 의 활성 스크립트 수가 그 임계를 재는 값싼 지표다.</p>
+<p>§2.1의 192 B/프레임 캡처 비용, <code>Scope</code> 선생성 비용, 활성 목록 제거 비용은 <strong>재지 않았다</strong>.
+위 ①이 &quot;순회 대상이 1개&quot;임을 보인 이상 그것들의 상한도 같은 규모라, 지금 재면 전부
+분해능 아래로 나올 것이 예상되기 때문이다. 인스턴스 수가 늘어난 뒤에 함께 잰다.</p>
+<h3 id="lc7--실제-엔진-통합-회귀와-종료-판정-p1--필수-트랙-통합">LC7 — 실제 엔진 통합 회귀와 종료 판정 (P1 · 필수 트랙 통합)</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>시나리오</th><th>확인할 불변식</th></tr></thead>
+<tbody><tr><td>정상 생성, 초기 비활성, 재활성</td><td>단계 순서·횟수, Begin/Simulate의 시작 조건, 기본 훅과 override의 결과</td></tr>
+<tr><td>disable 중 대기, 일시 정지, 같은 프레임 연쇄 대기</td><td>기존 dt·재개 시점, 비활성 틱 차단, 무한 같은 프레임 재개 방지</td></tr>
+<tr><td><span class="chip risk">각 훅·본문·정리 콜백의 실패</span></td><td>잘못된 후속 시작 없음, 다른 인스턴스는 계속 진행, 오류 원인 보존</td></tr>
+<tr><td>자기 제거·일반 파괴·즉시 제거·orphan</td><td>무효 핸들 접근 없음, 취소/축소 훅/등록 해제 한 번, 목록 순회 안전</td></tr>
+<tr><td>DDOL detach/attach</td><td>씬 통지와 인스턴스·시뮬레이션 수명 구분, 루틴 재시작 없음</td></tr>
+<tr><td>플레이 종료·재시작, 편집 중 인스턴스, 리로드</td><td>대기/구독/팩터리/BT 참조 해제, 이전 로드 문맥 회수, 새 세대 오염 없음</td></tr>
+<tr><td><span class="chip dim">대량 반복 대기·완료·취소</span></td><td>유지 메모리 누적 없음, 종료 시간과 예외 격리 확인</td></tr></tbody></table></div>
+<p>기존 <a href="../../../Tools/regression/verify-lifecycle-baseline.ps1">생명주기 기준선</a>,
+<a href="../../../Tools/regression/verify-lifecycle-axis.ps1">관리 축</a>,
+<a href="../../../Tools/regression/verify-ddol-script.ps1">DDOL 스크립트</a>,
+<a href="../../../Tools/regression/verify-script-add-awake-once.ps1">추가 시 초기화 한 번</a>,
+<a href="../../../Tools/regression/verify-asan-lifecycle.ps1">ASan 생명주기</a>를 실제 지원 환경에 맞춰 사용하고
+누락된 오류 주입·참조 회수 검사를 더한다. 기존 로그의 <code>Awake</code>/<code>Start</code> 같은 라벨은 진단 문자열이며
+은퇴한 API가 살아 있다는 근거로 쓰지 않는다.</p>
+<p><strong>완료 조건</strong>: 변경 관련 관리 빌드와 네이티브 변경 시 해당 엔진 빌드, 실제 엔진 회귀를
+각각 통과한다. 정적 검사·대역 시험 통과를 엔진 실행 결과로 대신하지 않는다.</p>
+<h4 id="착지-2026-09-05">착지 (2026-09-05)</h4>
+<p>시나리오 일곱 줄에 대한 덮임 상태다. 게이트는 전부 <code>run-all.ps1</code>에 배선돼 있다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>시나리오</th><th>덮은 게이트</th><th>상태</th></tr></thead>
+<tbody><tr><td>정상 생성, 초기 비활성, 재활성</td><td><code>verify-lifecycle-axis</code></td><td>덮임</td></tr>
+<tr><td>disable 중 대기, 일시 정지, 같은 프레임 연쇄 대기</td><td><code>verify-lifecycle-axis</code>(앞 둘) · <code>verify-lifecycle-delayarg</code> 판정 DD(연쇄)</td><td><strong>일시 정지만 남음</strong></td></tr>
+<tr><td><span class="chip risk">각 훅·본문·정리 콜백의 실패</span></td><td><code>verify-lifecycle-failure</code></td><td>덮임</td></tr>
+<tr><td>자기 제거·일반 파괴·즉시 제거·orphan</td><td><code>verify-lifecycle-selfremove</code> · <code>verify-lifecycle-generation</code> · <code>verify-lifecycle-immediate</code> · <code>verify-lifecycle-orphan</code></td><td>덮임</td></tr>
+<tr><td>DDOL detach/attach</td><td><code>verify-ddol-script</code>(통지) · <code>verify-lifecycle-ddolwait</code>(시뮬레이션 유지)</td><td>덮임</td></tr>
+<tr><td>플레이 종료·재시작, 편집 중 인스턴스, 리로드</td><td><code>verify-lifecycle-generation</code> · <code>verify-lifecycle-axis</code> · <code>verify-lifecycle-reload</code></td><td>덮임</td></tr>
+<tr><td><span class="chip dim">대량 반복 대기·완료·취소</span></td><td><code>verify-lifecycle-retention</code></td><td>덮임</td></tr></tbody></table></div>
+<p><strong>이 트랙에서 고친 것 둘.</strong></p>
+<p><code>9b895107</code> 대기 인자에 뜻을 주고 NaN을 거부한다. NaN 은 만기 판정(<code>Remaining &gt; 0f</code>)이
+거짓이라 0초와 구별되지 않아 저작자의 계산 실수가 &quot;한 프레임 대기&quot;로 조용히 삼켜졌다.
+그리고 같은 <code>Delay(0f)</code> 가 호출 위치에 따라 0 프레임이 되기도 1 프레임이 되기도 했다 —
+갈림은 등록이 그 프레임의 <code>Scope.Tick</code> 보다 앞이냐 뒤냐이고, 그것은 네이티브가 훅을
+프레임의 어느 지점에서 부르는지에 달렸다. 저작자가 볼 수 없는 값은 계약이 될 수 없다.</p>
+<p><code>ccf6d5f9</code> 핫리로드가 진입 상태를 이어 주게 한다. 재생 중 <code>script.reload</code> 하면 새
+인스턴스가 <code>OnInitialized</code> 만 받고 씬 진입·시뮬레이션 시작을 못 받아, 스크립트가 죽은
+채로 재생이 계속됐다 — 아무 오류도 남지 않는다. <code>Cmd_script_reload</code> 가 나머지 단계를
+부르지 않았고, 그 단계들을 평소 구동하는 <code>Scene::DrainPendingLifecycle</code> 에는 상태 비트가
+이미 서 있어 &quot;다 돌았다&quot;로 보였다. <code>PrepareForReload</code> 의 짝으로 <code>RestoreAfterReload</code> 를
+두어 리로드 전 상태를 잇는다.</p>
+<p><strong>즉시 제거·orphan 추가 착지</strong>(2026-09-06, <code>5a825393</code>·<code>2ac596bf</code>). 둘 다 결함은 없었고
+관측만 없었다. 각각의 게이트에서 <strong>시점·수단을 가르는 판정이 없으면 눈이 먼다</strong>는 것이
+변이로 드러났다.</p>
+<p><code>verify-lifecycle-immediate</code> — 즉시 소멸(차집합)이 축소를 관리 스크립트에 전달하는지.
+축소 삼단 호출을 통째로 없앤 변이에서도 &quot;삼단 각 1회&quot;와 &quot;취소 1건&quot;은 초록이었다. 뒤이은
+정지가 폴백으로 같은 삼단을 주기 때문이다. 축소가 <strong>갱신 완료 로그보다 앞에</strong> 왔는지를
+보는 판정만 붉었다.</p>
+<p><code>verify-lifecycle-orphan</code> — 씬 언로드가 고아를 남기지 않는지. 관리 인스턴스 제거를
+빠뜨린 변이에서 축소 훅 표지는 그대로 나왔고 고아 건수만 1이 됐다. 훅만 세는 게이트는
+이 누수를 보지 못한다.</p>
+<p><strong>리로드 실패가 인스턴스를 두 벌로 만들던 결함</strong>(2026-09-06 · 계획 종료 뒤 발견). LC7-d가
+세운 &quot;실패해도 이전 어셈블리는 그대로다&quot;의 CLI 쪽 짝이 없었다. <code>Cmd_script_reload</code>가 리로드
+<strong>전에</strong> 전 스크립트의 인스턴스 id를 끊고(<code>PrepareForReload</code> — &quot;관리 측이 통째로 내려가므로&quot;),
+검증 실패로 관리 측이 내려가지 <strong>않으면</strong> 옛 인스턴스가 살아 있는 채 복원이 옆에 새 것을
+세웠다. 재생 중이면 그때부터 <code>_active</code>에 두 벌이 올라 틱이 두 벌 돌았다 — 입력이 두 번
+처리되고 코루틴이 두 벌 돈다. 옛 것은 아무도 거두지 않는다(소유자가 살아 있어
+<code>SweepOrphans</code>도 못 잡는다). 컴파일이 깨진 dll로 리로드하는 것은 개발 중 가장 흔한 일이다.</p>
+<p>고친 것: ① 관리 <code>Reload()</code>가 <code>ReloadOutcome {Reloaded, PreviousKept, PreviousLost}</code>를
+돌리고 <code>ClrHost::ReloadOutcome</code>(+<code>Faulted</code>)으로 건너온다 — <code>false</code> 하나로 뭉개면 호출자가
+&quot;내려갔는지&quot;를 알 수 없고, 모르면 되살리려 든다. ② <code>PrepareForReload</code>는 값만 챙기고 id는
+<strong>결과를 안 뒤</strong> <code>RestoreAfterReload</code> 첫 줄에서 버린다. ③ CLI는 <code>PreviousKept</code>면 복원을 부르지
+않고(<code>intact</code>), <code>PreviousLost</code>면 죽은 id를 정리하며, <code>Faulted</code>(관리 측 예외)는 상태를 모르므로
+<strong>손대지 않고</strong> <code>script.reload_faulted</code>로 낸다 — 살아 있는데 되살리면 두 벌, 사라졌는데 안
+되살리면 다음 성공 리로드가 죽은 id를 버리고 다시 만든다.</p>
+<p>게이트: <code>verify-cli-script-reload</code>에 두 축을 더했다 — <code>identity-after-failure</code>(편집 모드 ·
+실패 뒤 <code>instanceId</code> 불변), <code>single-after-failure</code>(재생 중 · <code>activeScripts</code>와 identity 불변).
+관측은 이미 있었다(<code>script.status</code>가 컴포넌트마다 <code>instanceId</code>를, 재생 중엔 <code>activeScripts</code>를
+낸다) — 쓰지 않았을 뿐이다. 편집 모드에서는 <code>activeScripts</code>가 갱신되지 않아
+(<code>FlushRegistrations</code>가 <code>TickSimulationFrame</code> 안) 축을 모드별로 갈랐다. <strong>변이로 확인했다</strong>:
+관리 <code>Reload()</code>가 검증 실패를 <code>PreviousLost</code>로 거짓 보고하게 하자 identity 1→2, 활성 2→4로
+정확히 그 둘만 붉었다(네이티브 링크가 다른 세션의 헤더 이행에 막혀 관리 측 변이로 증명했다).
+덤으로 서비스 게이트에 준비 핸드셰이크를 세웠다 — <code>endpoint.json</code>은 서비스 스레드의 표지이지
+프레임 루프의 표지가 아니고, Debug 첫 프레임까지 ~12초라 그 사이 sync 명령은
+<code>waitedFrames=0</code>으로 5000ms에 죽는다.</p>
+<p><strong>같은 자리의 남은 것</strong>: <code>Cmd_script_reload</code>가 오브젝트당 첫 <code>ScriptComponent</code>만 본다
+(<code>GetComponent</code> 단수). 다중 스크립트는 설계된 기능이나(<code>AddComponentAllowMultiple</code>) 저작 씬에
+그런 오브젝트는 0건이라 지금은 발현하지 않는다 — 표면은 열려 있다.</p>
+<p><strong>남은 둘</strong>과 그 성격.</p>
+<p><em>일시 정지 중 대기</em> — CLI 에 일시 정지 명령이 없어 헤드리스 시나리오로 몰 수 없다.
+저작 표면을 먼저 열어야 한다.</p>
+<p><em>세대 게이트의 판정 X</em> — 제품 변이로 붉히지 못했다. 붉으려면 &quot;재생마다 인스턴스가 새로
+서지 않는다&quot;여야 하는데 그건 네이티브 씬 백업·복원 자체의 결함이고 관리 측 변이로는
+도달하지 않는다. 지금 값이 옳다는 것까지만 고정돼 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-적용-순서와-미래-계획에-넘길-결정">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-적용-순서와-미래-계획에-넘길-결정">4. 적용 순서와 미래 계획에 넘길 결정</h2></div>
+<div class="prose"><p>LC0으로 기준선을 고정한 뒤 LC1, LC2/LC3/LC4, LC5를 빌드 가능한 단위로 나눈다.
+LC2~LC4는 같은 스코프를 수정하므로 각 슬라이스 후 결합 회귀를 실행한다. LC6은 별도
+측정·변경으로 두고, LC7로 전체를 닫는다. 일정은 현재 리팩토링과 담당 범위를 맞춰 산정한다.</p>
+<p>아래는 <strong>미래 계약 도입 전 확정할 의미 차이</strong>다. 현행 결함 수정에 새 의미를 몰래 섞지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>미래 결정</th><th>현재 기준과 이행 영향</th></tr></thead>
+<tbody><tr><td>cold 시작</td><td>현재 Begin 직후 실행되는 첫 본문이 다음 Pump로 이동하면 컴포넌트 간 관측 순서·첫 물리 프레임이 달라진다</td></tr>
+<tr><td>취소 시 본문 비재개</td><td>현재 두 <code>OnSimulate</code>가 사용하는 취소 catch 경로를 <code>Defer</code>/<code>Own</code>으로 이관하고 같은 정리 결과를 증명해야 한다</td></tr>
+<tr><td>클럭과 준비된 루틴 순서</td><td>현재 프레임 dt와 미래 fixed tick의 차이, Wait(0), 동시 완료·Race 동률·프레임 예산을 명시해야 한다</td></tr>
+<tr><td>네이티브 파괴 전 정리</td><td>종료 요청→현재 실행 구간 종료→정리→네이티브 해제의 경계를 일반/즉시 제거·리로드 모두에서 검증해야 한다</td></tr>
+<tr><td>기록·재생의 적용 범위</td><td>입력·물리 조회·초기 상태·BT <code>Random.Shared</code>까지 다루지 않으면 효과 테이프만으로 게임 전체 결정성을 보장할 수 없다</td></tr>
+<tr><td>지연 쓰기·롤백</td><td>직접 Transform 쓰기를 미루면 즉시 읽기의 값이 달라질 수 있다. read-your-writes, 유효성 검사, 부분 커밋 실패 규약이 필요하다</td></tr>
+<tr><td>PrSM 정리·수명</td><td>Unity disable/destroy와 엔진 disable/detach/end/uninitialize를 구분해야 한다. 문법 단축과 런타임 안전성은 각각 검증한다</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-계약을-당장-도입하지-않을-때의-남는-한계">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-계약을-당장-도입하지-않을-때의-남는-한계">5. 계약을 당장 도입하지 않을 때의 남는 한계</h2></div>
+<div class="prose"><p>LC 안정화를 마치면 현행 틱·Task 방식으로 개발을 계속할 수 있다. 남는 것은 모든 프로젝트가
+즉시 겪는 장애가 아니라, 더 강한 계약이 필요한 기능을 추가할 때의 설계·저작 비용이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>선택</th><th>장점</th><th>남는 비용·조건</th></tr></thead>
+<tbody><tr><td>현행 틱·Task + LC 안정화</td><td>작은 변경 범위, 익숙한 C# 디버깅, 기존 실행 의미 보존, 단순 프레임 연산에 추가 추상화 불필요</td><td>외부 호출·수명 규칙과 정리 코드를 저작/리뷰에서 관리. 직접 효과를 포함한 일반 코드는 자동 기록·롤백 대상이 아님</td></tr>
+<tr><td>미래 효과 계약 런타임</td><td>허용 await·효과 실행 지점·취소/정리 소유권을 모으고 기록·대체 지점을 제공</td><td>실행 의미 이관, 루틴/대기/테이프 비용, 네이티브 커밋 정책과 분석기 유지 비용</td></tr>
+<tr><td>미래 계약 + PrSM 도입</td><td>반복 훅·대기·구독 정리 코드를 생성하고 의도를 원문에서 검사할 수 있음</td><td>컴파일러 의미 분석·빌드·소스 맵·인스펙터·리로드까지 유지해야 효율이 실현됨. 원문 감소만으로 런타임 가속은 보장되지 않음</td></tr></tbody></table></div>
+<p>롤백 넷코드나 재현 가능한 시뮬레이션이 필요해지는 시점에는 직접 효과 호출의 분류·대체
+경계가 필요하다. 그 기능이 필요하기 전에 현재 결함을 안정화하고, 미래 PHASE 24가 착수할
+때 실제 저작 규모와 요구 기능으로 전환 범위를 다시 정하는 것이 이번 결정이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-완료-및-보고-기준">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-완료-및-보고-기준">6. 완료 및 보고 기준</h2></div>
+<div class="prose"><p>표기: <code>[x]</code> 증거로 닫음 · <code>[~]</code> 부분 충족(남은 경계를 항목 안에 적음).
+근거 커밋과 게이트 이름을 함께 적는다 — 판정만 적으면 어느 실행의 초록인지 되짚을 수 없다.</p>
+<ul>
+<li class="task"><input type="checkbox" disabled checked> <strong>LC0의 관리 기준선·실패 재현과 기존 네이티브 회귀 범위를 구분했다.</strong>
+<code>verify-lifecycle-baseline</code>이 실행 하나에서 두 트레이스를 받아 각각의 골든에
+대조한다 — 네이티브 <code>lifecycle_baseline.tsv</code>(239 사건 + 프로브 18행)와 관리
+<code>lifecycle_managed_baseline.tsv</code>(33 사건 = 11훅 × 3주기). 두 축이 독립임을
+변이로 확인했다(관리 축 51건 차이로 빨강 · 네이티브 축 239 사건 전부 통과).
+<code>b985238e</code>·<code>36226c00</code>·<code>d7b64d57</code>·<code>d276e1f0</code>·<code>fbbcab9b</code>.</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>LC1~LC5를 구현·검증했거나 다른 변경으로 이미 해소된 항목의 현재 증거를 제시했다.</strong>
+LC1 <code>9553741d</code>(판정 A·B·C) · LC2 <code>2b7237cd</code>(판정 E) · LC3 <code>c1df4e40</code>(판정 V,
+완료 대기 생존 50→0) · LC4 <code>b76c5cf8</code>(판정 P — 고칠 것 없음을 <strong>경로 부재</strong>로
+고정) · LC5 실패 정책 <code>0ea4f9df</code>(판정 F) · LC5-b <code>9319ba5e</code>(판정 H·I) ·
+LC5-c <code>6c7a80e1</code>(판정 J·K). §3의 각 트랙 착지 절이 RED→GREEN 전환과 변이
+근거를 담고 있다.</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>지원하지 않는 외부 Task/호출 경계와 실제 강제 수준을 문서·진단에 반영했다.</strong>
+강제는 저작 규율이 아니라 런타임 성질이다 — <code>Native</code>의 정적 진입 206곳이
+<code>Entered()</code>를 지나고, 드리프트는 정적 게이트
+<a href="../../../ScriptCore/check-native-thread-guard.ps1">check-native-thread-guard.ps1</a>이
+막는다(변이 셋이 각각 자기 축만 붉힘). 강제하지 <strong>않는</strong> 세 경계는 LC5 절
+&quot;남는 것&quot;에 명시했다 — 네이티브가 스스로 다른 스레드에서 관리 코드를 부르는
+경로, 거부된 뒤 저작 코드가 기본값으로 하는 일, 외부 <code>await</code> 자체의 금지.</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>LC6은 독립 측정에 따라 채택 또는 보류하고 근거를 남겼다.</strong>
+<strong>보류.</strong> 활성 스크립트 인스턴스가 프레임당 1개라 빈 훅 순회가 병목이 아니고,
+진입 검사의 몫은 하네스 분해능 아래다(상한 ~1 ns/호출). 측정은 판정이 아니라
+도구로 남겼다 —
+<a href="../../../Tools/regression/measure-entry-guard-cost.ps1">measure-entry-guard-cost.ps1</a>.
+회귀 세트에 넣지 않는다(흔들림 ±25%). 다시 재야 할 조건은 §3 LC6 ③에 적었다.
+<code>6b9c2b79</code>.</li>
+<li>[~] <strong>LC7의 실제 엔진 회귀와 변경에 필요한 빌드를 통과했다.</strong>
+생명주기 게이트 15종이 전부 <code>run-all.ps1</code>에 배선돼 있다(<code>verify-lifecycle-</code>
+13종 + <code>verify-ddol-script</code> + <code>verify-script-add-awake-once</code>, 정적
+<code>check-native-thread-guard</code> 별도). 이 트랙에서 고친 것 둘은 <code>9b895107</code>(대기
+인자 계약·NaN 거부)과 <code>ccf6d5f9</code>(핫리로드 진입 상태 복원), 관측만 더한 것
+둘은 <code>5a825393</code>(즉시 제거)·<code>2ac596bf</code>(orphan)이다. 계획 종료 뒤 하나 더 고쳤다 —
+리로드 실패가 인스턴스를 두 벌로 만들던 결함(§3 LC7 착지 절, 2026-09-06).
+<strong>남은 둘</strong>: <em>일시 정지 중 대기</em>는 CLI에 일시 정지 명령이 없어 헤드리스로 몰지
+못했다(저작 표면이 선행 과제). <em>세대 게이트의 판정 X</em>는 제품 변이로 붉히지
+못했다 — 붉히려면 네이티브 씬 백업·복원 자체를 변이해야 하고 관리 측에서는
+도달하지 않는다. 지금 값이 옳다는 것까지만 고정돼 있다.</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>기존 즉시 시작·disable 중 대기·Task 취소·DDOL 의미를 보존했다.</strong>
+§1.2의 일곱 항목이 보존 대상이고, 두 골든이 LC1~LC5 전 구간에서 한 줄도
+바뀌지 않았다. 축별 게이트: 즉시 시작·활성 전환 <code>verify-lifecycle-axis</code>,
+disable 중 대기 진행 <code>verify-lifecycle-axis</code>, 취소 경로 <code>verify-lifecycle-failure</code>,
+DDOL 통지·시뮬레이션 유지 <code>verify-ddol-script</code>·<code>verify-lifecycle-ddolwait</code>
+(<code>a66fe5d6</code>). 의미를 바꾼 자리는 하나이며 그것을 명시했다 — LC5-b 이후 <code>await</code>
+재개가 <strong>모든</strong> <code>PrePhysics</code>보다 앞선다(예전에는 자기 인스턴스의 것보다만).</li>
+<li class="task"><input type="checkbox" disabled checked> <strong>다음 계획에 넘길 의미 차이와 미지원 경계를 최신화했다.</strong>
+§4의 미래 결정 일곱 줄(cold 시작 · 취소 시 본문 비재개 · 클럭과 준비된 루틴
+순서 · 네이티브 파괴 전 정리 · 기록·재생 범위 · 지연 쓰기·롤백 · PrSM 정리·수명)과
+§5의 선택별 남는 비용 표가 그것이다. 정본은
+<a href="../SimulationEffectContractPlan.html">SimulationEffectContractPlan</a>(PHASE 24)이다.</li>
+</ul>
+<p>보고에는 문서/정적 검사, 격리 시험, 관리·네이티브 빌드, 실제 엔진 실행, 잔여 범위를
+분리한다. <strong>이 문서의 완료는 현행 생명주기 안정화 완료이며 PrSM 도입 완료가 아니다.</strong></p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ScriptLifecycleContractHardeningPlan.md"><code>docs/plans/archive/ScriptLifecycleContractHardeningPlan.md</code></a> · 마지막 커밋 2026-09-11 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

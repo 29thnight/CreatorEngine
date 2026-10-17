@@ -1,45 +1,191 @@
-# AssetSet의 source-free authored Code Material
+# Source-free authored Code materials in AssetSets
 
-> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
+This is the separate authored-Code recipe. Existing Lattice material/program
+representation 1 is unchanged. ShaderMeta remains a CPU descriptor and never
+claims compiled-shader readiness.
 
-## 세 가지 identity
+## Identities and representations
 
-Code 경로는 authored Material, MaterialProgram, ShaderMeta를 구분한다. `AuthoredMaterialDocument`는 material 값과 explicit program ID/default texture ID를 가진다. `CodeProgram`은 program/meta ID, metadata/root source 경로, compiler SHA-256, format/ABI stamp, captured input inventory, source-free metadata, reflected layout, 모든 variant bytecode를 가진다.
+- `Material`, representation 2, schema 1, `.asset`: canonical CEDO envelope
+  `authored_material` containing `schema`, `programAssetId`, sorted unique
+  `defaultTextures`, and `material`. The material subtree is the existing
+  `experiment::Material` schema 1. Its `shaderAssetId` still names ShaderMeta.
+- `MaterialProgram`, representation 2, schema 1, `.cecp`: bounded CECP value
+  product. The program UUID and ShaderMeta UUID must be distinct.
+- `ShaderMeta`, representation 1: unchanged canonical descriptor CEDO. Its
+  bytes must exactly equal the descriptor carried by the selected Code program.
 
-현재 authored material과 Code program의 representation은 각각 2, version은 1이다. program 최대 크기는 160 MiB, variant는 4096이다. 이 값은 Graph의 CookedProgramVersion 12와 다른 codec 계약이다. 경로 문자열은 진단/identity이며 runtime이 원본 source를 열라는 지시가 아니다.
+A material has exact typed Hard edges to its Code program, ShaderMeta, authored
+nonnull texture references and every metadata default texture. The program has
+exact typed Hard edges to ShaderMeta and every default texture. Deduplication
+is by identity; using one identity for incompatible kinds fails. Internal and
+External scopes are explicit and both work; duplicate, missing, extra, wrong
+kind and non-Hard edges fail. ShaderMeta itself has no program/texture edges.
 
-## 검증된 bundle과 완전한 coverage
+## Authored inputs
 
-`ValidateProgram`은 정렬된 unique Assets-relative input 경로, bounded byte size와 SHA-256, metadata/source 및 양쪽 `.meta` sidecar inventory를 요구한다. embedded ShaderMeta를 source-free로 읽고 root source token을 대조한다.
+Keep the existing flat material schema 1 file with its canonical UUIDv4 identity.
+Model-derived UUIDv8 materials remain on their model producer recipe. The AssetSet source declaration
+adds an explicit program UUID and a verified bundle path:
 
-coverage는 backend/pass/keyword selection/vertex mask/reference path 조합 전체다. compute는 한 compute stage, graphics는 vertex+pixel을 요구한다. supported model vertex mask와 Forward reference variant 규칙, exact renderer/material defines, stage entry/profile/reflection, 모든 variant의 동일 immutable layout을 검사한다. 우연히 선택된 한 variant가 존재하는 것으로 complete bundle을 승인하지 않는다.
+```yaml
+assetId: 11111111-1111-4111-8111-111111111111
+kind: Material
+source: Materials/example.asset
+codeProgram: 22222222-2222-4222-8222-222222222222
+verifiedProgram: Verified/example.cecp
+dependencies:
+  - {assetId: 22222222-2222-4222-8222-222222222222, kind: MaterialProgram, dependency: Hard}
+  - {assetId: 33333333-3333-4333-8333-333333333333, kind: ShaderMeta, dependency: Hard}
+  # Also declare every authored/default texture as a typed Hard dependency.
+```
 
-## AssetSet producer의 입력 경계
+The MaterialProgram source uses a `.codeprogram` descriptor, a program identity
+sidecar (`.codeprogram.meta`), and explicit `verifiedProgram`. Its descriptor is:
 
-`BuildMaterialProgramAssetSetProduct`는 `.codeprogram` recipe와 explicit previously verified bundle, captured source inventory를 받는다. recipe는 schema, shaderMetaAssetId, metadata/source path, compilerSha256을 bundle과 대조한다. 이 함수는 파일 I/O나 shader compile을 숨겨 수행하지 않는다.
+```yaml
+code_program:
+  schema: 1
+  shaderMetaAssetId: 33333333-3333-4333-8333-333333333333
+  metadata: Shaders/example.shadermeta
+  source: Shaders/example.hlsl
+  compilerSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+```
 
-AssetSetBuild가 Assets-contained path에서 source/meta/bundle 및 compiler input을 먼저 capture하고 size/hash를 검증한다. literal include reachability와 허용 inventory를 검사하고 source cook 뒤 bytes가 바뀌지 않았는지 재확인한다. input digest는 role/path/length/hash를 구분해 newline 등으로 다른 inventory가 같은 표현이 되지 않게 한다.
+The example digest is a placeholder, not a supported compiler identity. The
+actual digest is an externally verified compiler/toolchain agreement supplied
+by the trusted bundle producer. It must exactly match the recipe. CECP parsing
+validates provenance fields and structural consistency; it does not authenticate
+a third-party compiler or claim to have compiled/validated executable machine
+code. No compiler is invoked by this producer, reader or receipt replay.
 
-Material, Program, ShaderMeta, Texture는 exact typed Hard dependency와 명시 scope를 가진다. nil/self/type-conflict/중복/누락 dependency, schema와 recipe 불일치는 거부한다. generated Graph ShaderMeta를 독립 authored metadata처럼 cook하지 않는다.
+`formatStamp = creator-code-verified-v1` and
+`abiStamp = creator-code-material-abi-v1` are fixed engine-Code recipe versions.
+The Code ABI is separate from the enclosing AssetSet target ABI/platform; normal
+catalog/mount compatibility still validates that enclosing target. The recipe
+uses default compile options, VS/PS/CS profiles 6.0, both DXIL and SPIR-V,
+canonical material keyword defines, ModelVertexInput's mask defines, and the
+engine's Forward lighting constants/REFERENCE_PATH when applicable.
 
-## runtime 소유권
+## Verified bundle and complete coverage
 
-AssetDepot는 captured artifact origin, independently decoded ShaderMeta, default Texture representations를 pin한다. metadata readiness만으로 dependency load/compile을 시작하지 않는다. Program/Material request는 exact dependency request를 보유하고 root 교체/epoch의 stale completion을 차단한다.
+CECP is a value-only product: IDs, canonical metadata CEDO, compiler/format/ABI
+stamps, canonical Assets-relative input paths with sizes and SHA-256, and sorted
+backend/pass/keyword/mask/reference variants. Each variant contains ordered
+stage/entry/profile records with bytecode and reflection encoded by
+`rhi_shader_verified_cache`. Source text, device state, a compiler, runtime
+manager, owning raw pointer and PSO handles are absent.
 
-`LX::Runtime::RestoreCodeGraphics/RestoreCodeCompute`는 verified program에서 exact backend/pass/keyword/mask/reference variant를 찾고 bytecode/reflection을 복구한다. compiler/source cache fallback은 없다. 공통 Instance는 값·uniform·texture owners·keyword를, graphics/compute generation은 compile identity와 PSO 요청을 보유한다.
+The reader reconstructs the binding layout from every carried variant's stage
+reflections. All variants must agree and pass the shared pure
+`LX::Runtime::ValidateShaderGeneration` invariant, including the 64 KiB constant
+buffer bound, nonoverlapping numeric fields and unique texture registers.
+Coverage is exhaustive, never truncated:
 
-## 소비 범위와 남은 검증
+- Every pass and every keyword combination, on DXIL and SPIR-V
+- Graphics: legacy mask 0 and all eight `assets::kModelVertexMasks`
+- Forward: both ordinary and reference paths for each graphics variant
+- Other graphics: ordinary path only
+- Compute: one mask-0, non-reference variant per backend/pass/keyword selection
+- Exactly VS+PS for graphics, or CS for compute, with declared entries/profiles
 
-Code 자산 codec/runtime 지원이 현재 graph-only METEOR Scene의 임의 Code draw 지원을 뜻하지 않는다. 명시적인 Code helper/회귀 소비자와 제품 Scene 지원 여부를 따로 확인한다. 자산 import/cook/readback, source inventory 변조, complete variant 누락, root 전환, exact owner 수명 회귀가 필요하다.
+Duplicate variants, unsupported extra variants, partial backends, inconsistent
+permutations/reflections and unsupported stamps fail. The maximum is 4,096
+variants and 160 MiB per bundle. Retained charges count owned capacities,
+including stage bytecode, reflection, metadata, inputs and all variant strings.
 
-이번 문서 갱신은 그 검증 분기와 호출을 읽었으며 새로운 bundle을 만들거나 GPU 실행을 하지 않았다. implementation과 serialized format을 바꾸지 않았다.
+## Captured-input and publication checks
 
-## 구현 근거
+The producer captures and hashes the descriptor and its sidecar, explicit bundle,
+metadata and its sidecar, root shader and its sidecar, and include closure. The
+metadata source canonical CEDO must equal the carried metadata bytes; sidecar
+identities are checked independently. Every captured byte length/SHA-256 must
+match the bundle inventory. Input snapshots are verified again before receipts
+and output publication. Missing bundles or changed inputs never trigger source
+compilation, a last-known product lookup, or metadata-only readiness.
 
-- [`Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.h`](../../Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.h)
-- [`Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.cpp`](../../Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.cpp)
-- [`Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.h`](../../Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.h)
-- [`Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp`](../../Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp)
-- [`Tools/AssetCooker/AssetSetBuild.cpp`](../../Tools/AssetCooker/AssetSetBuild.cpp)
-- [`Engine/RenderEngine/AssetDepot/MaterialAssetRuntime.h`](../../Engine/RenderEngine/AssetDepot/MaterialAssetRuntime.h)
-- [`Engine/RenderEngine/LXMaterialPipeline.h`](../../Engine/RenderEngine/LXMaterialPipeline.h)
+Version 1 deliberately supports literal `#include` closure only. Quoted includes
+resolve relative to their containing file; angle includes resolve from Assets.
+Escaped newlines and comments are handled before scanning. Macro includes,
+Slang module imports, file-probing directives, `include_next` and `embed` are
+rejected. Includes in conditionally disabled branches are conservatively required
+too. The inventoried shader files must equal the reachable literal closure;
+omitted and unrelated files fail. This narrow contract avoids presenting a
+claimed compiler inventory as proof of unsupported dynamic dependency lookup.
+
+`doubleSided` is the existing bool raster-policy exception when absent from
+ShaderMeta. Other unknown properties, wrong types, duplicate properties, invalid
+keyword selections and inconsistent default-texture inventories fail binding.
+
+Receipt identities include the explicit Code program ID, bundle path, recipe
+version and complete captured input inventory. Receipt/CAS payload validation
+selects the exact representation/schema reader. After cooking local products,
+selected material/program binding and independently cooked ShaderMeta CEDO
+identity are checked before publication. External closure checks are deferred to
+the captured union/runtime loader, without local source fallback.
+
+## Regression source and execution status
+
+`ExperimentCodeMaterialCodecSelfTest.cpp` adds synthetic codec/producer checks to
+the existing catalog self-test entry point. Its stage payloads are value-codec
+fixtures, not executable shaders. It covers successful source-free round trips,
+transactional failures, exact dependency kinds/scopes, incomplete coverage,
+stamps, profiles/reflection, oversized/overlapping common layouts, aliased texture
+registers, captured-input changes, original authored schema1,
+default-texture closure and invalid authored values. The test source and project
+entries were added; no build, tests, engine, shader compiler or AOT execution was
+performed for this change.
+
+## Runtime ownership and consumer boundary
+
+The concrete AssetDepot views are deliberately separate:
+
+- `AssetLink<experiment::Material>` accepts authored Material representation 2
+- `AssetLink<::Material>` accepts graph representation 1 or the prepared code facade of representation 2
+- `AssetLink<LX::Runtime::ShaderGeneration>` accepts Code MaterialProgram representation 2
+- `AssetLink<material_graph::Generation>` accepts graph MaterialProgram representation 1
+- `AssetLink<ShaderMeta>` remains the independent metadata descriptor
+
+Wrong concrete representations terminate as `Failed/UnsupportedRepresentation`.
+A shared manifest kind is never concrete C++ type proof. The existing typed
+request cache/worker DAG owns all program/metadata/texture dependencies and its
+completion covers the complete CPU closure. Metadata decoding alone never
+produces code readiness. Code generations pass the existing LX layout validator
+before Ready, keep weak numeric metadata slots separate from GUID-to-latest
+source metadata, and retain the exact compiled blob/descriptor/default texture
+sources. Cache budgets account for reachable capacities; zero retention does
+not revoke consumer owners. Logical unmount prevents current-link reacquisition
+while already-pinned program/material/frame owners remain self-contained.
+
+Scene discovery submits mounted material/program IDs asynchronously and waits by
+polling before component construction. Ref-based and inline authored code
+materials keep their exact program and texture generations. A texture override
+outside the base asset closure must receive an explicitly prepared owner from
+the same captured scene resolver revision, using an untransformed default-variant descriptor. `BindPreparedMaterialTextures` and
+`MaterialInstance::BindPreparedTextureOwners` extend only the runtime instance's
+closure, never an asset-cache root. Missing or mismatched owners fail without a
+source or current-catalog fallback. Inline and ref-style authored values keep their explicit
+texture color spaces; generated mip variants are never reused as raw override sources. Source authoring remains on its legacy path when the ID
+is not mounted.
+
+Existing explicit/reference GBuffer and Forward helpers consume carried graphics
+stages through `RestoreCodeGraphics`; `RestoreCodeCompute` exposes carried compute
+stages with the same owner rule. No compiler/cache lookup is performed for these
+mounted code generations. Source-derived GBuffer meshlet/occluder optimizations
+are disabled for sealed code programs because their derivative entries are not
+part of this bundle. GPU upload/PSO readiness and device retirement remain owned
+by the existing renderer.
+
+The production live renderer remains graph-only. This work does not revive its
+retired code-material live pipelines or claim source-free live code rendering.
+`Tools/regression/code_material_runtime_probe.cpp` is an unrun dedicated-host
+fixture for async completion, cross-representation rejection, source-free owner
+resolution, zero retention and post-unmount pins. No build/test/runtime/renderer
+execution result is implied by this source-only implementation.
+
+Code facade serialization uses its pinned metadata and texture sampling values,
+without loading ShaderMeta by GUID. Unmodified metadata-default matrices are
+omitted and restored from the program; edited matrices are rejected because the
+existing authored value schema has no matrix variant. Anonymous inline code
+values that carry only a ShaderMeta ID must acquire a stable cooked base Material
+before source-free construction; a program identity is never guessed from metadata.

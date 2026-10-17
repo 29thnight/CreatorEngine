@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/Phase14_5ManualGuiChecklist.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 14.5 조건 ② — GUI 수동 조작 체크리스트</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#대상을-어떻게-정했나">대상을 어떻게 정했나</a></li><li><a href="#판정-규칙">판정 규칙</a></li><li><a href="#확인-전-준비">확인 전 준비</a></li><li><a href="#a-gui-호출처가-소스에서-확인된-18-개">A. GUI 호출처가 소스에서 확인된 18 개</a></li><li><a href="#b-gui-호출처를-찾지-못한-6-개--먼저-볼-것">B. GUI 호출처를 찾지 못한 6 개 — 먼저 볼 것</a></li><li><a href="#기록">기록</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="Phase14_5ManualGuiChecklist.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 14.5 조건 ② — GUI 수동 조작 체크리스트</h1>
+<div class="meta"><p><a href="Phase14_5Closure.html">종결 검토</a>의 재정의가 남긴 마지막 조건이다. 자동 게이트는 <strong>HTTP 경로로</strong> 공통
+편집 API 를 때려 실제 상태 복원을 확인했다. 그것이 <strong>위젯 조작을 대신했다고 주장하지 않는다</strong> — 같은
+서비스라도 GUI 는 자기 입력 확정·선택 상태·다중 선택 묶음을 거쳐 들어가고, 그 구간은 자동 게이트 밖이다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#대상을-어떻게-정했나"><span class="ve-label">§00</span><span class="map-name">대상을 어떻게 정했나</span><span class="map-bar"><i style="width:36.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#판정-규칙"><span class="ve-label">§01</span><span class="map-name">판정 규칙</span><span class="map-bar"><i style="width:21%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#확인-전-준비"><span class="ve-label">§02</span><span class="map-name">확인 전 준비</span><span class="map-bar"><i style="width:9.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#a-gui-호출처가-소스에서-확인된-18-개"><span class="ve-label">§03</span><span class="map-name">A. GUI 호출처가 소스에서 확인된 18 개</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#b-gui-호출처를-찾지-못한-6-개--먼저-볼-것"><span class="ve-label">§04</span><span class="map-name">B. GUI 호출처를 찾지 못한 6 개 — 먼저 볼 것</span><span class="map-bar"><i style="width:37.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#기록"><span class="ve-label">§05</span><span class="map-name">기록</span><span class="map-bar"><i style="width:7.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「A. GUI 호출처가 소스에서 확인된 18 개」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-대상을-어떻게-정했나">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="대상을-어떻게-정했나">대상을 어떻게 정했나</h2></div>
+<div class="prose"><p><code>CommandDescriptorSeeds.cpp</code> 의 <code>undoable = true</code> 를 정본으로 삼는다. <strong>24 개</strong>다.</p>
+<p><a href="Phase14_5Closure.html">종결 검토</a>와 <a href="CommandSurfaceTable.html">CommandSurfaceTable.md</a> 는 <strong>21 개</strong>라고 적는다.
+그 수는 2026-09-06 당시 옳았다 — <strong>틀린 것이 아니라 그 뒤에 늘었다.</strong> <code>object.icon</code> · <code>object.lock</code> ·
+<code>scene.navigate</code> 셋을 2026-09-13 의 <code>4737ec60</code>(PHASE 21 에디터 워크스페이스 재설계)이 더했고, 도표의
+마지막 갱신은 그 전날인 <code>0ec60573</code>(09-12)이다. 도표에는 Undo 열이 빈 것이 아니라 <strong>행 자체가 없다</strong>.
+같은 이유로 도표는 제품 명령 28 개를 모른다(<code>editor.*</code> 16 · <code>play.*</code> 5 · 위 셋 · <code>scene.populate</code> ·
+<code>script.create*</code> · <code>dx12.validation</code>).</p>
+<p>★ <strong>이 수는 고정이 아니다.</strong> 다른 페이즈가 공통 편집 API 를 쓰면 14.5 의 Undo 표면이 함께 늘어난다.
+확인에 착수할 때 seed 표에서 <strong>다시 뽑아</strong> 이 표와 맞대라 — 줄 수가 다르면 그 사이에 늘어난 것이다.
+이 체크리스트는 도표가 아니라 seed 표에서 유도했다. 도표 갱신은 별도 과제다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-판정-규칙">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="판정-규칙">판정 규칙</h2></div>
+<div class="prose"><p>항목마다 넷을 본다. 하나라도 어긋나면 그 줄은 실패이며, 실패를 지우지 말고 관측값을 적는다.</p>
+<ol>
+<li><strong>반영</strong> — GUI 조작이 실제 상태를 바꾼다(되읽어서 확인한다. &quot;명령이 성공했다&quot; 로 그치지 않는다).</li>
+<li><strong>Undo</strong> — 한 번에 조작 <strong>전</strong> 상태로 돌아간다. 여러 객체를 한 번에 바꾼 조작은 <strong>Undo 한 항목</strong>이다.</li>
+<li><strong>Redo</strong> — 다시 조작 후 상태가 된다.</li>
+<li><strong>무변경·오입력</strong> — 값이 그대로이거나 잘못된 입력이면 <strong>Undo 항목이 늘지 않는다</strong>.</li>
+</ol>
+<p><code>undo</code> 자신은 3·4 를 스택 깊이로 본다. 프리팹 정의 저장·씬 저장은 영속 자산 서비스라 이 표에 없다
+(계획서 §편집 HTTP 계약). 프리팹 <strong>소환</strong>은 씬 편집이므로 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-확인-전-준비">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="확인-전-준비">확인 전 준비</h2></div>
+<div class="prose"><ul>
+<li>Debug 또는 Release Editor 를 띄우고 빈 씬에서 시작한다. 재생 중이 아닌 <strong>편집 모드</strong>다.</li>
+<li>각 항목은 독립으로 본다. 앞 항목의 Undo 스택이 남아 있으면 4 번 판정이 흐려진다.</li>
+<li>같은 조작을 CLI 로도 한 번 해 보면 &quot;공통 경로&quot; 주장이 함께 확인된다(선택).</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-a-gui-호출처가-소스에서-확인된-18-개">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="a-gui-호출처가-소스에서-확인된-18-개">A. GUI 호출처가 소스에서 확인된 18 개</h2></div>
+<div class="prose"><p><code>EditorObjectOperations::&lt;API&gt;</code> 를 GUI 파일이 실제로 부르는 것을 확인한 항목이다.
+경로는 <strong>호출 관계</strong>이지 화면 위치가 아니다 — 패널 안 어디를 누르는지는 확인하며 채운다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>명령</th><th>공통 API</th><th>GUI 패널</th><th>조작 · 기대</th><th style="text-align:center">반영</th><th style="text-align:center">Undo</th><th style="text-align:center">Redo</th><th style="text-align:center">무변경</th></tr></thead>
+<tbody><tr><td class="num">1</td><td><code>component.add</code></td><td><code>AddComponent</code></td><td>InspectorWindow</td><td>오브젝트에 컴포넌트를 붙인다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">2</td><td><code>component.remove</code></td><td><code>RemoveComponent</code></td><td>InspectorWindow</td><td>Remove an optional component with Undo</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">3</td><td><code>object.create</code></td><td><code>Create</code></td><td>HierarchyWindow</td><td>빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">4</td><td><code>object.delete</code></td><td><code>Delete</code></td><td>HierarchyWindow</td><td>Delete an object subtree with Undo</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">5</td><td><code>object.icon</code></td><td><code>SetIcon</code></td><td>InspectorWindow</td><td>Set entity image preset with Undo</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">6</td><td><code>object.lock</code></td><td><code>SetEditLocked</code></td><td>InspectorWindow</td><td>Lock or unlock entity authoring with Undo</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">7</td><td><code>object.parent</code></td><td><code>Parent</code></td><td>HierarchyWindow</td><td>오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">8</td><td><code>object.rename</code></td><td><code>Rename</code></td><td>InspectorWindow</td><td>Rename through the shared editor undo transaction</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">9</td><td><code>object.transform</code></td><td><code>Transform</code></td><td>InspectorWindow</td><td>변환을 지정한다(회전은 도)</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">10</td><td><code>prefab.instantiate</code></td><td><code>InstantiatePrefab</code></td><td>SceneViewWindow</td><td>프리팹을 씬에 소환한다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">11</td><td><code>render.matmode</code></td><td><code>MaterialMode</code></td><td>ImGuiDrawHelperMeshRenderer</td><td>오브젝트 재질의 렌더링 모드를 바꾼다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">12</td><td><code>scene.navigate</code></td><td><code>NavigateSelection</code></td><td>InspectorWindow</td><td>Navigate entity selection history</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">13</td><td><code>scene.select</code></td><td><code>Select</code></td><td>HierarchyWindow, SceneViewWindow</td><td>오브젝트를 에디터 선택으로 지정한다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">14</td><td><code>ui.anchor</code></td><td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td><td>SceneViewWindow</td><td>앵커를 직접 지정한다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">15</td><td><code>ui.pos</code></td><td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td><td>SceneViewWindow</td><td>UI anchored position을 편집한다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">16</td><td><code>ui.screenpos</code></td><td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td><td>SceneViewWindow</td><td>UI 화면 위치를 편집한다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">17</td><td><code>ui.size</code></td><td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td><td>SceneViewWindow</td><td>UI 크기를 편집한다</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">18</td><td><code>undo</code></td><td><code>UndoRedo</code></td><td>HierarchyWindow</td><td>에디터의 Ctrl+Z / Ctrl+Y와 같은 호출</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-b-gui-호출처를-찾지-못한-6-개--먼저-볼-것">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="b-gui-호출처를-찾지-못한-6-개--먼저-볼-것">B. GUI 호출처를 찾지 못한 6 개 — 먼저 볼 것</h2></div>
+<div class="prose"><p>아래는 &quot;GUI 에 기능이 없다&quot; 는 뜻이 <strong>아니다</strong>. 셋 중 하나다 —
+① GUI 가 공통 API 가 아닌 <strong>다른 경로</strong>로 같은 편집을 한다(그렇다면 LC6 의 공통 경로 주장에 구멍이 있다),
+② 호출이 메뉴·명령 디스패치를 거쳐 정적 grep 에 안 잡힌다, ③ 애초에 GUI 표면이 없다.
+<strong>어느 쪽인지 확인하는 것이 이 절의 일이다.</strong> ②·③ 이면 그 사실을 적고 넘어가며, ① 이면 결함이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>명령</th><th>인자</th><th>동작</th><th>판정(①/②/③)</th><th style="text-align:center">반영</th><th style="text-align:center">Undo</th><th style="text-align:center">Redo</th><th style="text-align:center">무변경</th></tr></thead>
+<tbody><tr><td class="num">1</td><td><code>animator.param</code></td><td><code>&lt;오브젝트&gt; &lt;파라미터&gt; &lt;bool|float|int|trigger&gt;</code></td><td>Animator 파라미터를 저작한다</td><td></td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">2</td><td><code>model.place</code></td><td><code>&lt;이름&gt;</code></td><td>임포트한 모델을 활성 씬에 배치한다</td><td></td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">3</td><td><code>object.duplicate</code></td><td><code>&lt;오브젝트&gt; [새 이름]</code></td><td>오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)</td><td></td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">4</td><td><code>object.property</code></td><td><code>&lt;오브젝트&gt; &lt;컴포넌트&gt; &lt;필드&gt; &lt;값&gt;</code></td><td>리플렉션으로 프로퍼티를 설정한다</td><td></td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">5</td><td><code>tag.add</code></td><td><code>&lt;name&gt;</code></td><td>Add and persist a project tag with Undo</td><td></td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr>
+<tr><td class="num">6</td><td><code>tag.remove</code></td><td><code>&lt;name&gt;</code></td><td>Remove and persist a project tag with Undo</td><td></td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td><td style="text-align:center">☐</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-기록">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="기록">기록</h2></div>
+<div class="prose"><p>확인이 끝나면 결과를 이 문서에 그대로 남기고 <a href="Phase14_5Closure.html">종결 검토</a>의 조건 ② 를 닫는다.
+<strong>통과한 것만 적지 않는다</strong> — 실패와 미확인도 같은 표에 남긴다. 이 저장소는 &quot;검사 0 건·빈 집합을
+성공으로 접지 않는다&quot; 를 관례로 삼는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="Phase14_5ManualGuiChecklist.md"><code>docs/analysis/Phase14_5ManualGuiChecklist.md</code></a> · 마지막 커밋 2026-09-15 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

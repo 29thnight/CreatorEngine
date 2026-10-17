@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/TextureCodecBoundaryDesign.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>텍스처 CPU 이미지 경계 설계</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-이-문서가-하는-일">1. 이 문서가 하는 일</a></li><li><a href="#2-실측--누출-지점-전수">2. 실측 — 누출 지점 전수</a></li><li><a href="#3-이미-서-있는-경계와-그-구멍">3. 이미 서 있는 경계와 그 구멍</a></li><li><a href="#4-발견--bc1-이-vulkan-에서-흰색으로-떨어진다">4. 발견 — BC1 이 Vulkan 에서 흰색으로 떨어진다</a></li><li><a href="#5-설계">5. 설계</a></li><li><a href="#6-슬라이스">6. 슬라이스</a></li><li><a href="#7-게이트">7. 게이트</a></li><li><a href="#8-하지-않는-것">8. 하지 않는 것</a></li><li><a href="#9-착수-전에-확인할-것--미검증-전제">9. 착수 전에 확인할 것 — 미검증 전제</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="TextureCodecBoundaryDesign.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>텍스처 CPU 이미지 경계 설계</h1>
+<div class="meta"><p>작성: 2026-09-04</p>
+<p>상태: <strong>설계 — 미착수</strong></p>
+<p>대상: CreatorEngine RenderEngine (Texture · RHI · DX12 · Vulkan), Editor 자산 경로</p>
+<p>관련 문서: <code>RhiBoundaryPlan.md</code>, <code>AssetResidencyPlan.md</code>, <code>MaterialPipelinePlan.md</code>,
+<code>ModelAssetBigBangCutoverPlan.md</code></p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 9개의 분량 막대">
+<a class="map-row" href="#1-이-문서가-하는-일"><span class="ve-label">§1</span><span class="map-name">이 문서가 하는 일</span><span class="map-bar"><i style="width:7.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-실측--누출-지점-전수"><span class="ve-label">§2</span><span class="map-name">실측 — 누출 지점 전수</span><span class="map-bar"><i style="width:61.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-이미-서-있는-경계와-그-구멍"><span class="ve-label">§3</span><span class="map-name">이미 서 있는 경계와 그 구멍</span><span class="map-bar"><i style="width:39%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-발견--bc1-이-vulkan-에서-흰색으로-떨어진다"><span class="ve-label">§4</span><span class="map-name">발견 — BC1 이 Vulkan 에서 흰색으로 떨어진다</span><span class="map-bar"><i style="width:46.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-설계"><span class="ve-label">§5</span><span class="map-name">설계</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-슬라이스"><span class="ve-label">§6</span><span class="map-name">슬라이스</span><span class="map-bar"><i style="width:53.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-게이트"><span class="ve-label">§7</span><span class="map-name">게이트</span><span class="map-bar"><i style="width:33.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-하지-않는-것"><span class="ve-label">§8</span><span class="map-name">하지 않는 것</span><span class="map-bar"><i style="width:19.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-착수-전에-확인할-것--미검증-전제"><span class="ve-label">§9</span><span class="map-name">착수 전에 확인할 것 — 미검증 전제</span><span class="map-bar"><i style="width:26%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 9개 가운데 「5. 설계」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><hr>
+</section>
+<section class="doc-sec" id="sec-1-이-문서가-하는-일">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-이-문서가-하는-일">1. 이 문서가 하는 일</h2></div>
+<div class="prose"><p>DirectXTex 의존을 <strong>줄이는 것이 아니라</strong>, 그 타입이 RHI 경계를 넘어 두 백엔드에
+직접 노출된 것을 막는다. 라이브러리 교체는 이 문서의 범위가 아니다 — 교체가
+<strong>가능한 상태를 만드는 것</strong>까지다.</p>
+<p>착수 동기는 취향이 아니라 실측된 비대칭이다(§4). 지금 구조에서는 DX12 와 Vulkan 이
+같은 자산에 대해 다른 결과를 내며, 그 원인이 정확히 이 누출 지점에 있다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-실측--누출-지점-전수">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-실측--누출-지점-전수">2. 실측 — 누출 지점 전수</h2></div>
+<div class="prose"><h3 id="21-directxtex-접점-파일-2026-09-04-실측">2.1 DirectXTex 접점 파일 (2026-09-04 실측)</h3>
+<p><code>&lt;DirectXTex.h&gt;</code> 를 직접 여는 파일 10개, 심볼만 쓰고 전이 include 에 기대는 파일 4개
+= <strong>14개</strong>.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>파일</th><th>무엇을 쓰는가</th><th>B3 이후</th></tr></thead>
+<tbody><tr><td><code>Engine/RenderEngine/Texture.cpp</code></td><td><code>LoadFrom{DDS,TGA,HDR,WIC}{File,Memory}</code> · <code>Compress</code> · <code>IsCompressed</code> · <code>HasAlpha</code> · <code>BitsPerPixel</code> · <code>IsAlphaAllOpaque</code></td><td><strong>남는다</strong> (코덱 구현)</td></tr>
+<tr><td><code>Engine/RenderEngine/Assets/ModelAssetGeneration.cpp</code></td><td><code>Decompress</code> · <code>Convert</code> · <code>IsSRGB</code></td><td><strong>남는다</strong> (코덱 구현)</td></tr>
+<tr><td><code>Editor/EngineEntry/EditorAssetDatabase.cpp</code></td><td><code>Initialize2D</code> · <code>SaveToWICFile</code> · <code>GetWICCodec</code></td><td><strong>남는다</strong> (코덱 구현)</td></tr>
+<tr><td><code>Engine/RenderEngine/Texture.h</code></td><td><code>shared_ptr&lt;ScratchImage&gt;</code> 멤버 · <code>GetCpuPixels()</code> 반환형</td><td>사라진다 (B2)</td></tr>
+<tr><td><code>Engine/Utility_Framework/Core.Definition.h</code></td><td><code>#include &lt;DirectXTex.h&gt;</code> 만</td><td>사라진다 (B2)</td></tr>
+<tr><td><code>Engine/Utility_Framework/DirectXHelper.h</code></td><td>없음 (Core.Definition.h 전이)</td><td>사라진다 (B2)</td></tr>
+<tr><td><code>Engine/RenderEngine/RHI/DX12/DX12TextureCache.{h,cpp}</code></td><td><code>ScratchImage</code> · <code>TexMetadata</code> · <code>GetImage</code> · <code>rowPitch</code></td><td>사라진다 (B3)</td></tr>
+<tr><td><code>Engine/RenderEngine/RHI/Vulkan/VulkanRenderServices.cpp</code></td><td><code>ScratchImage</code> · <code>TexMetadata</code> · <code>FormatOf(DXGI_FORMAT)</code></td><td>사라진다 (B3)</td></tr>
+<tr><td><code>Engine/RenderEngine/DataSystem.cpp</code></td><td>전이 소비</td><td>사라진다 (B3)</td></tr>
+<tr><td><code>Editor/RenderTests/**</code> 4개</td><td>검사 픽스처</td><td>B3 과 함께 이관</td></tr></tbody></table></div>
+<h3 id="22-헤더-파급">2.2 헤더 파급</h3>
+<p><code>Core.Definition.h:35</code> 의 <code>#include &lt;DirectXTex.h&gt;</code> 가 <code>Core.Minimal.h</code> 를 타고
+<strong>직접 include 106개 파일</strong>에 들어간다(전이 포함하면 그 이상). 실제로 API 를 쓰는
+파일은 14개다.</p>
+<p>Core.Definition.h 의 다른 직접 소비자 6개(<code>SpriteSheet.h</code> · <code>ActionMap.cpp</code> ·
+<code>InputAction.h</code> · <code>KeyState.h</code> · <code>DumpHandler.h</code> · <code>ImGuiContext.h</code>)는 전부
+DirectXTex 심볼 사용 <strong>0건</strong>이다. 즉 이 include 는 <code>Texture.h</code> 하나를 위해 106개
+TU 에 실려 있다.</p>
+<p><code>ReflectionRedesignPlan</code> CT3 이 <code>Reflection.hpp</code> 를 걷어낸 것과 같은 모양이다 —
+그쪽은 280개 TU 에 yaml-cpp 를 실어 나르고 있었고, 헤더 터치 재빌드 4m29s 의
+몸통이었다.</p>
+<h3 id="23-압축은-bc1-하나뿐">2.3 압축은 BC1 하나뿐</h3>
+<p><code>DirectX::Compress</code> 호출 4곳이 전부 <code>BC1_UNORM</code> / <code>BC1_UNORM_SRGB</code> 다.
+BC3 · BC5 · BC6H · BC7 은 0건.</p>
+<ul>
+<li><code>Texture.cpp:151</code> (<code>LoadFormPath</code>)</li>
+<li><code>Texture.cpp:270</code> (<code>LoadSharedFromPath</code>)</li>
+<li><code>Texture.cpp:349</code> (<code>LoadSharedFromMemory</code>)</li>
+<li><code>Texture.cpp:445</code> (<code>LoadManagedFromPath</code>)</li>
+</ul>
+<p>네 경로가 매직 분기 · 압축 정책 · <code>m_cpuPixels</code> 게시를 각각 복제하고 있다. 경계를
+세우면 이 넷이 하나로 접힌다 — 이 문서의 목표는 아니고 부수 효과다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-이미-서-있는-경계와-그-구멍">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-이미-서-있는-경계와-그-구멍">3. 이미 서 있는 경계와 그 구멍</h2></div>
+<div class="prose"><p>경계를 <strong>새로 만들 것이 아니다.</strong> 이미 있다:</p>
+<pre><code class="language-cpp">// Engine/RenderEngine/RHI/IRenderTextureCache.h
+class IRenderTextureCache
+{
+    virtual RHITextureEntry GetOrUpload(Texture* texture, std::string&amp; outError) = 0;
+    ...
+};</code></pre>
+<p><code>DX12TextureCache</code> 와 <code>VulkanTextureCache</code> 가 둘 다 이것을 구현하고, 패스는
+<code>context.textureCache-&gt;GetOrUpload(...)</code> 만 부른다(GBuffer · Forward · Decal ·
+Sprite). 반환 타입 <code>RHITextureEntry</code> 도 이미 중립이다 — <code>RHIFormat</code> · <code>uint32_t</code> 뿐.</p>
+<p><strong>구멍은 하나다:</strong></p>
+<pre><code class="language-cpp">// Engine/RenderEngine/Texture.h:121
+const DirectX::ScratchImage* GetCpuPixels() const { return m_cpuPixels.get(); }</code></pre>
+<p>두 백엔드가 인터페이스를 통과한 <strong>직후</strong> 이 접근자로 DirectXTex 타입에 손을 뻗는다.</p>
+<pre><code>DX12TextureCache.cpp:483    const DirectX::ScratchImage* pixels = texture-&gt;GetCpuPixels();
+VulkanRenderServices.cpp:385 const DirectX::ScratchImage* pixels = texture-&gt;GetCpuPixels();</code></pre>
+<p>즉 이것은 &quot;추상화 계층을 하나 더 얹는&quot; 작업이 아니라 <strong>이미 있는 인터페이스의
+구멍을 막는</strong> 작업이다.</p>
+<h3 id="31-같은-근거가-이미-한-번-쓰였다">3.1 같은 근거가 이미 한 번 쓰였다</h3>
+<p><code>RHIResourceTypes.h</code> 머리에 이렇게 적혀 있다:</p>
+<blockquote>
+<p>여기 있는 것은 전부 <code>RenderFrameServices.h</code>(RHI/DX12/) 안에 있었고, 전부
+<strong>이미 중립</strong>이었다 — 핸들·열거·POD 뿐이고 D3D12 타입이 하나도 없다.
+그런데 그 헤더가 <code>d3d12.h</code> 를 물기 때문에, 내용이 중립인 것과 무관하게
+<strong>Vulkan 이 이 타입들을 쓸 수가 없었다.</strong></p>
+</blockquote>
+<p>CPU 이미지도 정확히 같다. 내용(픽셀 · 행 간격 · 밉 · 배열)은 백엔드와 무관한데,
+타입이 <code>DirectX::ScratchImage</code> 라서 DXGI · WIC · <code>d3d11.h</code> 가 따라 들어온다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-발견--bc1-이-vulkan-에서-흰색으로-떨어진다">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-발견--bc1-이-vulkan-에서-흰색으로-떨어진다">4. 발견 — BC1 이 Vulkan 에서 흰색으로 떨어진다</h2></div>
+<div class="prose"><p>착수 근거가 되는 실측이다. <strong>정적 판독이며 실행으로 확인하지 않았다</strong>(§9).</p>
+<h3 id="41-사슬">4.1 사슬</h3>
+<ol>
+<li><code>DataSystem.cpp:998</code> — BaseColorMap 만 <code>compress = true</code> 로 로드한다.
+나머지 넷(Normal · ORM · AO · Emissive)은 <code>false</code>.<pre><code class="language-cpp">material.UseBaseColorMap(loadTexture(standard_material::property::BaseColorMap,
+    material.m_baseColorTexName, true));</code></pre>
+</li>
+<li><code>Texture.cpp:270</code> — <code>isCompress</code> 면 <code>BC1_UNORM_SRGB</code> 로 압축해
+<code>m_cpuPixels</code> 에 게시한다.</li>
+<li><code>DX12TextureCache.cpp:327</code> — <code>desc.Format = metadata.format</code> 을 그대로 쓴다.
+BC1 이 그대로 올라간다. <strong>정상 동작.</strong></li>
+<li><code>VulkanRenderServices.cpp:116</code> — <code>FormatOf(DXGI_FORMAT)</code> 이 처리하는 것은
+<code>R8G8B8A8_UNORM</code> · <code>R8G8B8A8_UNORM_SRGB</code> · <code>B8G8R8A8_UNORM</code> ·
+<code>B8G8R8A8_UNORM_SRGB</code> <strong>넷뿐</strong>이고 나머지는 <code>RHIFormat::Unknown</code> 이다.</li>
+<li><code>VulkanRenderServices.cpp:159</code> — <code>Unknown</code> 이면 거절한다.<pre><code>outError = &quot;Vulkan GizmoIcon 슬라이스는 2D RGBA8 자산만 지원한다&quot;;</code></pre>
+</li>
+<li>호출부(<code>:387</code>)는 실패 시 흰색 solid 로 폴백한다.</li>
+</ol>
+<p>즉 <strong>Vulkan 백엔드에서 모든 재질의 base color 가 흰색</strong>이 된다. 나머지 네 맵은
+압축을 안 하므로 정상이다 — 그래서 &quot;화면이 아예 안 나온다&quot;가 아니라 &quot;알베도만
+빠진다&quot;로 나타난다.</p>
+<h3 id="42-왜-지금까지-안-보였나">4.2 왜 지금까지 안 보였나</h3>
+<ul>
+<li>오류 문자열이 <code>GizmoIcon 슬라이스</code> 다. 이 코드가 기즈모 아이콘 전용으로
+들어왔고, 그 뒤 같은 캐시가 재질 텍스처 경로(<code>GetOrUpload</code>)에 연결되면서
+전제가 바뀌었는데 메시지와 검사 범위가 그대로 남았다.</li>
+<li>실패가 <strong>조용하다.</strong> <code>outError</code> 를 받아 흰색을 돌려주므로 파이프라인은 계속 돈다.</li>
+<li>DX12 는 멀쩡하다. 사용자가 보는 기본 경로가 DX12 라 눈에 안 띈다.
+(<code>gate-measures-stale-binary</code> · <code>harness-limit-verdict-was-real-defect</code> 와 같은 양식)</li>
+</ul>
+<h3 id="43-이것이-설계에-주는-것">4.3 이것이 설계에 주는 것</h3>
+<p>B4 의 <strong>RED 기준선</strong>이다. 고침 전 상태를 먼저 게이트로 굳히고, 그 전환으로
+판정한다. 자가 검증이 착수 전 상태를 지키면 고침이 성공할수록 실패하므로
+(<code>gate-premise-flips-on-landing</code>), 이 게이트는 처음부터 &quot;BC1 자산이 Vulkan 에서
+백엔드 간 다이제스트 일치&quot; 를 묻는 형태로 쓴다 — 지금은 붉고 B4 가 초록으로 만든다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-설계">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-설계">5. 설계</h2></div>
+<div class="prose"><h3 id="51-선행--rhiformat-에-블록-압축-어휘가-없다">5.1 선행 — <code>RHIFormat</code> 에 블록 압축 어휘가 없다</h3>
+<p><code>RHIFormat.h:73</code> 주석:</p>
+<blockquote>
+<p>블록 압축 포맷이 들어오면 이 함수로는 부족해지고, 그때 블록 크기까지
+답하는 형태로 바꾼다 — <strong>지금 실사용에 압축 포맷이 없어 넣지 않는다.</strong></p>
+</blockquote>
+<p>이 문장은 사실과 다르다. BC1 은 §2.3 대로 살아 있다. 어휘에 안 보였던 이유는
+<strong>DX12 업로드 경로가 <code>RHIFormat</code> 을 우회</strong>하기 때문이다 — <code>metadata.format</code>(DXGI)
+을 <code>D3D12_RESOURCE_DESC.Format</code> 에 직접 넣는다. 그래서 압축 포맷이 중립 어휘를
+한 번도 통과한 적이 없고, 그 결과가 §4 의 비대칭이다.</p>
+<h3 id="52-타입--rhiimageview">5.2 타입 — <code>RHIImageView</code></h3>
+<p>새 헤더 <code>Engine/RenderEngine/RHI/RHIImageData.h</code>. include 는
+<code>&lt;cstdint&gt;</code> · <code>&lt;cstddef&gt;</code> · <code>&quot;RHIFormat.h&quot;</code> 뿐. <code>d3d11.h</code> · <code>dxgi</code> ·
+<code>DirectXTex.h</code> 를 물지 않는다.</p>
+<pre><code class="language-cpp">/// 서브리소스 하나의 CPU 픽셀. 소유하지 않는다.
+struct RHISubimage
+{
+    const uint8_t* pixels{ nullptr };
+    size_t   rowPitch{ 0 };
+    size_t   slicePitch{ 0 };
+    uint32_t width{ 0 };
+    uint32_t height{ 0 };
+};
+
+/// CPU 이미지 전체의 읽기 전용 뷰. 소유하지 않는다 — 소유자는 Texture 다.
+class RHIImageView
+{
+public:
+    RHIFormat Format()      const;
+    uint32_t  Width()       const;
+    uint32_t  Height()      const;
+    uint32_t  MipLevels()   const;
+    uint32_t  ArraySize()   const;
+    bool      IsCube()      const;
+    bool      IsEmpty()     const;
+
+    /// subresource = mip + arraySlice * mipLevels — DX12 규약과 같게 고정한다.
+    uint32_t   SubresourceCount() const;
+    RHISubimage At(uint32_t mip, uint32_t arraySlice) const;
+};</code></pre>
+<p><strong>왜 뷰이고 컨테이너가 아닌가.</strong> <code>Texture::m_cpuPixels</code> 는 이미
+<code>shared_ptr&lt;ScratchImage&gt;</code> 로 소유를 잡고 있고, &quot;은퇴 후 재업로드가 같은 픽셀을
+다시 읽어야 하므로 놓지 않는다&quot; 는 규약이 <code>Texture.h:110</code> 에 실측 근거와 함께
+적혀 있다(씬 왕복 후 재업로드 실패 3102건). 소유를 옮기면 그 규약을 처음부터
+다시 세워야 한다. 뷰는 그것을 건드리지 않는다.</p>
+<p><strong>무엇을 담는지는 소비자에서 뽑았다.</strong> 추측이 아니라 §2.1 의 실사용 심볼 그대로다:
+DX12 는 <code>width/height/arraySize/mipLevels/format/dimension</code> 과 <code>pixels</code>·<code>rowPitch</code>,
+Vulkan 은 거기에 BGRA 스위즐 판정을 더 쓴다. BGRA 는 <code>RHIFormat</code> 어휘에 없는
+<code>B8G8R8A8</code> 을 백엔드가 스스로 뒤집던 것이므로, 뷰에는 두지 않고 §5.3 의 어휘 확장으로
+흡수한다.</p>
+<h3 id="53-rhiformat-확장">5.3 <code>RHIFormat</code> 확장</h3>
+<p>실사용에서 뽑는다는 그 파일의 규율을 그대로 지킨다 — 지금 쓰이는 것만 넣는다.</p>
+<pre><code class="language-cpp">// ── 블록 압축 (TextureCodecBoundaryDesign B0) ──
+// 끝에 두는 이유는 기존 값과 같다: enum 값이 캐시 키로 런타임 밖에 스칠 수 있어
+// 중간 삽입을 금한다.
+BC1Unorm,
+BC1UnormSrgb,
+
+// ── BGRA (WIC PNG 로더가 남기는 것) ──
+BGRA8Unorm,
+BGRA8UnormSrgb,</code></pre>
+<p><code>RHIFormatBytes</code> 는 블록 포맷에서 <code>0</code> 을 돌려주는 현 계약을 그대로 둔다(픽셀당
+바이트가 정의되지 않으므로 그것이 옳다). 대신 블록 정보를 답하는 함수를 더한다:</p>
+<pre><code class="language-cpp">struct RHIFormatBlock
+{
+    uint32_t width{ 1 };
+    uint32_t height{ 1 };
+    uint32_t bytes{ 0 };   // 0 이면 이 포맷을 모른다
+};
+constexpr RHIFormatBlock RHIFormatBlockOf(RHIFormat);   // BC1 → {4, 4, 8}</code></pre>
+<p>★ 함정: <code>RHIFormatBytes</code> 를 블록 포맷에 대해 &quot;블록당 바이트&quot; 로 재해석하면 안 된다.
+그 함수는 리드백 행 간격과 업로드 크기 계산 63곳을 하나로 모은 정본이고(R2c-b),
+의미를 바꾸면 압축 포맷을 안 쓰는 그 63곳이 조용히 틀린다.</p>
+<h3 id="54-경계-이후의-모양">5.4 경계 이후의 모양</h3>
+<pre><code>                          ┌──────────────────────────────┐
+  파일 · 바이트  ───────► │ Texture (코덱 구현: DirectXTex) │
+                          └──────────────┬───────────────┘
+                                         │ RHIImageView  ← 여기가 경계
+                          ┌──────────────┴───────────────┐
+                          │      IRenderTextureCache      │
+                          └───────┬───────────────┬───────┘
+                          DX12TextureCache   VulkanTextureCache</code></pre>
+<p>DirectXTex 는 경계 <strong>위쪽</strong>에만 남는다. 아래쪽에서 DXGI 를 아는 것은
+<code>DX12Format.h</code> 의 대응표 하나뿐이고, 그것은 DX12 백엔드의 정당한 소유물이다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-슬라이스">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-슬라이스">6. 슬라이스</h2></div>
+<div class="prose"><p>의존이 일방향이라 순서를 바꿀 수 없다. 각 슬라이스는 단독으로 빌드되고 단독으로
+게이트를 통과해야 한다.</p>
+<h3 id="b0--rhiformat-에-블록bgra-어휘를-넣는다">B0 — <code>RHIFormat</code> 에 블록·BGRA 어휘를 넣는다</h3>
+<ul>
+<li><code>RHIFormat</code> 열거 4종 추가, <code>RHIFormatBlockOf</code> 신설</li>
+<li><code>RHIFormat.h:73</code> 의 &quot;실사용에 압축 포맷이 없다&quot; 주석을 실측으로 정정</li>
+<li>소비자 변경 0 — 순수 추가</li>
+</ul>
+<h3 id="b1--rhiimagedatah-를-세운다">B1 — <code>RHIImageData.h</code> 를 세운다</h3>
+<ul>
+<li>타입만. 소비자 0.</li>
+<li><code>RHIImageView</code> 를 <code>ScratchImage</code> 에서 만드는 어댑터는 여기 두지 <strong>않는다</strong>.
+그것을 두면 이 헤더가 DirectXTex 를 물어 존재 이유가 없어진다. 어댑터는 B2 의
+<code>Texture.cpp</code> 안에 둔다.</li>
+</ul>
+<h3 id="b2--texture-가-뷰를-낸다">B2 — <code>Texture</code> 가 뷰를 낸다</h3>
+<ul>
+<li><code>GetCpuPixels()</code> → <code>GetImageView()</code>. 구현은 여전히 <code>ScratchImage</code> 를 읽되
+<strong><code>Texture.cpp</code> 안에서만</strong> 읽는다.</li>
+<li><code>Texture.h</code> 에서 <code>#include &lt;d3d11.h&gt;</code> · <code>#include &lt;DirectXTex.h&gt;</code> 제거.
+<code>m_cpuPixels</code> 는 전방선언한 <code>shared_ptr&lt;DirectX::ScratchImage&gt;</code> 로 남긴다
+(불완전 타입 <code>shared_ptr</code> 멤버는 소멸자가 <code>.cpp</code> 에 있으면 성립한다 — <code>Texture</code>
+의 소멸자는 이미 <code>.cpp</code> 에 있다).</li>
+<li><code>Core.Definition.h:35</code> 의 <code>&lt;DirectXTex.h&gt;</code> 제거. §2.2 대로 다른 6개 소비자는
+이 심볼을 안 쓴다. 전이에 기대던 4개 파일(<code>DataSystem.cpp</code> ·
+<code>VulkanRenderServices.cpp</code> · <code>EnhancedGizmoIconTest.cpp</code> · <code>VulkanSkyBoxTest.cpp</code>)은
+B3 에서 정리되므로, 그때까지는 직접 include 를 임시로 더한다.</li>
+<li><code>CreateFromPixels(..., DXGI_FORMAT textureFormat, ...)</code> 의 인자를 <code>RHIFormat</code> 으로
+바꾼다 — 이것도 공개 표면의 DXGI 누출이다.</li>
+</ul>
+<h3 id="b3--두-백엔드를-뷰로-바꾼다">B3 — 두 백엔드를 뷰로 바꾼다</h3>
+<ul>
+<li><code>DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage&amp;)</code>
+→ <code>(const RHIImageView&amp;)</code>. <code>D3D12_RESOURCE_DESC.Format</code> 은 <code>DX12Format.h</code> 의
+기존 대응표를 탄다.</li>
+<li><code>VulkanRenderServices::FormatOf(DXGI_FORMAT)</code> <strong>삭제</strong>. 이 함수의 존재 이유가
+&quot;DXGI 가 여기까지 들어왔다&quot; 였다. BGRA 스위즐 판정은 <code>RHIFormat::BGRA8*</code> 로
+바뀐다.</li>
+<li>이 시점에서 §2.1 표의 &quot;사라진다&quot; 가 전부 이행된다.</li>
+</ul>
+<h3 id="b4--bc1-을-vulkan-이-받는다-4-청산">B4 — BC1 을 Vulkan 이 받는다 (§4 청산)</h3>
+<ul>
+<li><code>VK_FORMAT_BC1_RGBA_UNORM_BLOCK</code> / <code>_SRGB_BLOCK</code> 대응</li>
+<li>업로드 크기·행 간격 계산을 <code>RHIFormatBlockOf</code> 기준 블록 단위로 고친다.
+현재 <code>UploadRgba8</code> 의 <code>mipWidth * mipHeight * 4</code> 는 블록 포맷에서 틀린다.</li>
+<li>함수 이름 <code>UploadRgba8</code> 이 더 이상 사실이 아니므로 함께 고친다. §4.2 대로
+이름이 낡아 남으면 다음 사람이 같은 오독을 한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-게이트">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-게이트">7. 게이트</h2></div>
+<div class="prose"><p>이 저장소의 규율대로, <strong>새 검사가 초록이면 변이로 이빨을 증명한다</strong>
+(<code>mutation-proves-gate-has-teeth</code>).</p>
+<div class="table-scroll"><table>
+<thead><tr><th>슬라이스</th><th>게이트</th><th>변이 증명</th></tr></thead>
+<tbody><tr><td>B0</td><td><code>RHIFormatBlockOf</code> 왕복 단정 (BC1 → 4×4×8)</td><td>BC1 의 <code>bytes</code> 를 8→16 으로 틀면 몇 건이 정확히 빨개지는가</td></tr>
+<tr><td>B2</td><td><code>Texture.h</code> · <code>Core.Definition.h</code> 에 DirectXTex 심볼 0건 (grep 계약, 래칫)</td><td>심볼 하나를 되돌려 넣으면 빨개지는가</td></tr>
+<tr><td>B3</td><td><strong>A/B 다이제스트</strong> — 같은 자산의 스테이징 버퍼 바이트를 DX12·Vulkan 각각에서 떠 비교</td><td>한쪽 <code>rowPitch</code> 를 1 늘리면 빨개지는가</td></tr>
+<tr><td>B4</td><td>BC1 자산(BaseColorMap)의 백엔드 간 다이제스트 일치</td><td>— <strong>착수 전부터 RED</strong> 여야 한다(§4). 초록이면 §4 판독이 틀린 것이므로 착수 전에 그것부터 밝힌다</td></tr></tbody></table></div>
+<h3 id="71-b3-게이트가-동어반복이-아닌-이유">7.1 B3 게이트가 동어반복이 아닌 이유</h3>
+<p><code>bridge-copies-name-not-meaning</code> · <code>control-group-needs-independent-derivation</code> 의
+교훈대로, 대조군은 독립 유도를 가져야 한다. 여기서 두 백엔드는 footprint 를
+<strong>각자 계산한다</strong> — DX12 는 <code>GetCopyableFootprints</code>(드라이버), Vulkan 은 직접 계산.
+같은 뷰를 읽되 배치를 독립적으로 유도하므로 순브리지가 아니다.</p>
+<p>다만 &quot;둘 다 같은 방식으로 틀린&quot; 경우는 못 잡는다. 그래서 DX12 축은 기존
+<code>dx12.scene</code> 픽셀 골든에 계속 걸어 둔다 — 절대 기준은 그쪽이 갖는다.</p>
+<h3 id="72-못-잡는-것-문서화까지가-증명">7.2 못 잡는 것 (문서화까지가 증명)</h3>
+<ul>
+<li>뷰가 가리키는 픽셀의 <strong>내용</strong>이 맞는지는 이 게이트들이 못 본다. 디코드가 틀리면
+두 백엔드가 사이좋게 같은 쓰레기를 올리고 다이제스트는 일치한다.
+그 축은 <code>dx12.scene</code> 픽셀 골든이 담당한다.</li>
+<li>밉 체인이 잘못 생성되는 경우. 지금 파이프라인은 밉을 만들지 않으므로
+(<code>GenerateMipMaps</code> 호출 0건) 해당 없음 — 도입하면 그때 게이트를 더한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-하지-않는-것">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-하지-않는-것">8. 하지 않는 것</h2></div>
+<div class="prose"><ul>
+<li><strong>DirectXTex 교체.</strong> B3 이 끝나면 남는 곳이 3개 파일(<code>Texture.cpp</code> ·
+<code>ModelAssetGeneration.cpp</code> · <code>EditorAssetDatabase.cpp</code>)이다. stb 로 갈지, BC1
+인코더를 따로 둘지는 <strong>그때 재는 문제</strong>다. 지금 정하면 근거 없이 정하는 것이다.</li>
+<li><strong>BC7 · BC6H 도입.</strong> 품질 판단이지 경계 판단이 아니다. 다만 도입하게 되면
+DirectXTex 의 CPU BC7 은 느려서 어차피 ISPC 계열을 봐야 한다는 점만 적어 둔다
+(UE 의 <code>TextureFormatIntelISPCTexComp</code>, Unity 가 같은 선택을 한 지점).</li>
+<li><strong>PNG 라이터 이중화 정리.</strong> <code>EditorAssetDatabase.cpp</code> 가 한 파일에서
+<code>SaveToWICFile</code>(<code>:574</code>)과 <code>stbi_write_png</code>(<code>:690</code>, <code>:704</code>)를 둘 다 쓴다. 별건이고
+B0~B4 와 의존이 없다.</li>
+<li><strong><code>Texture.cpp</code> 의 네 로드 경로 통합.</strong> 경계가 서면 자연히 접히지만, 같은
+슬라이스에서 하면 A/B 다이제스트의 판별력이 흐려진다(무엇이 바뀌어서 달라졌는지
+못 가른다). 별도 슬라이스로 뒤에 둔다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-착수-전에-확인할-것--미검증-전제">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-착수-전에-확인할-것--미검증-전제">9. 착수 전에 확인할 것 — 미검증 전제</h2></div>
+<div class="prose"><p>정직하게 적는다. 아래는 <strong>정적 판독</strong>이고 실행으로 확인하지 않았다.</p>
+<ol>
+<li><strong>§4 의 흰색 폴백.</strong> 코드 사슬은 위 6단계로 닫히지만, Vulkan 백엔드로 실제 씬을
+띄워 base color 가 흰색인지 보지 않았다. 착수 첫 행동은 이것의 확인이어야
+한다 — <code>plan-target-may-be-already-dead</code> 대로, 지목한 대상이 이미 다른 이유로
+죽어 있을 수 있다. 확인 방법: Vulkan 경로로 재질 씬을 띄우고
+<code>VulkanTextureCache::GetStats()</code> 의 <code>failures</code> 계수와 오류 문자열을 읽는다.</li>
+<li><strong>B2 의 불완전 타입 <code>shared_ptr</code> 멤버.</strong> <code>Texture</code> 소멸자가 <code>.cpp</code> 에 있는 것은
+확인했으나, 이동 생성자(<code>Texture(Texture&amp;&amp;)</code>)도 <code>.cpp</code> 에 있는지 확인하지 않았다.
+헤더에 있으면 그것도 옮겨야 한다.</li>
+<li><strong><code>Core.Definition.h</code> 의 DirectXTex 제거 파급.</strong> 직접 소비자 9개는 세었지만
+유니티 빌드에서 앞선 파일이 순서를 맞춰 가려 온 이력이 <code>Texture.h:9</code> 에
+적혀 있다. 제거 후 파급은 <strong>전체 리빌드로만</strong> 판정한다 — 증분은
+<code>build-exit-code-not-mtime</code> 대로 exit code 로만 본다.</li>
+<li><strong>밉 체인.</strong> <code>GenerateMipMaps</code> 호출 0건을 확인했으나, 자산이 밉을 이미 담고
+들어오는 경우(DDS)는 <code>metadata.mipLevels &gt; 1</code> 이 될 수 있다. DX12 는 그것을
+처리하고 Vulkan 은 <code>mipLevels</code> 를 읽되 크기 계산이 비압축 전제다. B4 에서
+함께 본다.</li>
+</ol>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="TextureCodecBoundaryDesign.md"><code>docs/design/TextureCodecBoundaryDesign.md</code></a> · 마지막 커밋 2026-09-04 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

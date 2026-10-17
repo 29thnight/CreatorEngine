@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/LightmapBakerPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>라이트맵 베이커 재작성 (PHASE 4.7 · 트랙 L)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-왜-이-페이즈인가--gi가-있어도-라이트맵을-쓴다">0. 왜 이 페이즈인가 — GI가 있어도 라이트맵을 쓴다</a></li><li><a href="#1-삭제된-구현--측정-2026-08-25">1. 삭제된 구현 — 측정 (2026-08-25)</a></li><li><a href="#2-병렬화-설계">2. 병렬화 설계</a></li><li><a href="#3-설계-결정">3. 설계 결정</a></li><li><a href="#4-이행--슬라이스">4. 이행 — 슬라이스</a></li><li><a href="#5-완료-기준">5. 완료 기준</a></li><li><a href="#6-리스크">6. 리스크</a></li><li><a href="#7-다른-계획과의-관계">7. 다른 계획과의 관계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="LightmapBakerPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>라이트맵 베이커 재작성 (PHASE 4.7 · 트랙 L)</h1>
+<div class="meta"><p><strong>2026-10-01 사용자 결정:</strong> 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 <a href="BackendParityPlan.html">PHASE 4.9</a>의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.</p>
+<p><strong>2026-10-01 재산정:</strong> L0 완료 2인일을 보존하고 L1~L7 잔여 33인일을 검토했다.
+합계 35인일을 유지한다. UV/atlas/BVH·점진 bake·취소/재시작·품질 검증은 DX12만으로도
+필요한 작업이며 Vulkan 비교 비용은 포함하지 않는다. L7은 기능 결정에 따른 조건부 예산이다.
+Q0의 공용 queue와 L4의 bake 소비 배선을 중복 계산하지 않는다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">체크 항목 완료</span><span class="val">0<span class="unit">%</span></span>
+<div class="stack" role="img" aria-label="13개 중 0개 완료"><i class="ok" style="flex:0"></i><i class="dim" style="flex:13"></i></div>
+<span class="ve-label">0 / 13</span></div>
+<div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">4<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="진행·부분 3, 차단·중단 1"><i class="info" style="flex:3"></i><i class="risk" style="flex:1"></i></div>
+<span class="legend"><span class="chip info">진행·부분 3</span><span class="chip risk">차단·중단 1</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 8개의 분량 막대">
+<a class="map-row" href="#0-왜-이-페이즈인가--gi가-있어도-라이트맵을-쓴다"><span class="ve-label">§0</span><span class="map-name">왜 이 페이즈인가 — GI가 있어도 라이트맵을 쓴다</span><span class="map-bar"><i style="width:17.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-삭제된-구현--측정-2026-08-25"><span class="ve-label">§1</span><span class="map-name">삭제된 구현 — 측정 (2026-08-25)</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#2-병렬화-설계"><span class="ve-label">§2</span><span class="map-name">병렬화 설계</span><span class="map-bar"><i style="width:97.2%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">2</span></span></a>
+<a class="map-row" href="#3-설계-결정"><span class="ve-label">§3</span><span class="map-name">설계 결정</span><span class="map-bar"><i style="width:19.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-이행--슬라이스"><span class="ve-label">§4</span><span class="map-name">이행 — 슬라이스</span><span class="map-bar"><i style="width:83.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-완료-기준"><span class="ve-label">§5</span><span class="map-name">완료 기준</span><span class="map-bar"><i style="width:15.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-리스크"><span class="ve-label">§6</span><span class="map-name">리스크</span><span class="map-bar"><i style="width:24.7%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">1</span></span></a>
+<a class="map-row" href="#7-다른-계획과의-관계"><span class="ve-label">§7</span><span class="map-name">다른 계획과의 관계</span><span class="map-bar"><i style="width:26.5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 8개 가운데 「1. 삭제된 구현 — 측정 (2026-08-25)」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><div class="table-scroll"><table>
+<thead><tr><th>작업</th><th style="text-align:right">L0</th><th style="text-align:right">L1</th><th style="text-align:right">L2</th><th style="text-align:right">L3</th><th style="text-align:right">L4</th><th style="text-align:right">L5</th><th style="text-align:right">L6</th><th style="text-align:right">L7</th><th style="text-align:right">합계</th></tr></thead>
+<tbody><tr><td>인일</td><td class="num" style="text-align:right">2</td><td class="num" style="text-align:right">5</td><td class="num" style="text-align:right">4</td><td class="num" style="text-align:right">6</td><td class="num" style="text-align:right">7</td><td class="num" style="text-align:right">5</td><td class="num" style="text-align:right">3</td><td class="num" style="text-align:right">3</td><td class="num" style="text-align:right"><strong>35</strong></td></tr></tbody></table></div>
+<p>전체 산정 근거: <a href="RenderPhaseEffortEstimate.html">RenderPhaseEffortEstimate.md</a>.</p>
+<blockquote>
+<p>2026-09-23 PHASE 4.75에서 4.7로 소속을 분리했다. <code>L0~L7</code>의 구현 범위·상태·
+35일 산정은 유지한다. 현재 페이즈 순서는 <a href="RenderPhaseRoadmap.html"><code>RenderPhaseRoadmap.md</code></a>.</p>
+</blockquote>
+<p>2026-08-25 신설. 삭제된 DX11 베이커를 실측한 결과 <strong>복원이 아니라 재작성</strong>이 맞다는
+결론에서 출발한다. 고칠 지점이 성능만이 아니라 <strong>정확성에도</strong> 있어서 그대로 되살리면
+결함까지 함께 온다.</p>
+<pre><code>정적 지오메트리 → [UV1 언랩] → [아틀라스 패킹] → [BVH] → 직접광 → 블러 → 간접광 → dilate
+                      ↑ 없음        ↑ Shelf FF      ↑ median split      ↑ 코루틴 페이싱</code></pre>
+<hr>
+</section>
+<section class="doc-sec" id="sec-0-왜-이-페이즈인가--gi가-있어도-라이트맵을-쓴다">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-왜-이-페이즈인가--gi가-있어도-라이트맵을-쓴다">0. 왜 이 페이즈인가 — GI가 있어도 라이트맵을 쓴다</h2></div>
+<div class="prose"><p>현재 이 엔진의 GI 는 <strong>전부 스크린스페이스</strong>다(SSAO·SSGI·SSR·SSS + IBL). 화면 밖을
+아는 경로가 하나도 없다 — 프로브도 볼륨도 라이트맵도 없다. 실내 씬에서 카메라 밖
+벽면의 간접광은 <strong>구조적으로 계산할 방법이 없다.</strong></p>
+<p>스크린스페이스 GI 의 원리적 한계는 넷이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>못 하는 것</th><th>결과</th></tr></thead>
+<tbody><tr><td>화면 밖 지오메트리의 간접광</td><td>시야 밖 벽의 반사광이 없다</td></tr>
+<tr><td>카메라 회전 시 일관성</td><td>시선을 돌리면 조명이 변한다</td></tr>
+<tr><td>시간축 안정성</td><td>히스토리 누적 → 잔상·노이즈, 디노이징 비용</td></tr>
+<tr><td>원거리 바운스</td><td>트레이스 거리에 묶인다</td></tr></tbody></table></div>
+<p>상용 엔진이 실시간 GI 를 갖고도 라이트맵을 유지하는 이유가 이것이다. <strong>둘은
+대체재가 아니라 보완재다</strong> — 라이트맵이 간접광의 본체를 담당하고, 스크린스페이스는
+라이트맵 해상도가 못 잡는 접촉 음영을 메꾼다.</p>
+<p>세 노선의 비용 비교:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>노선</th><th>비용</th><th>이 엔진의 상태</th></tr></thead>
+<tbody><tr><td><strong>라이트맵</strong></td><td>언랩 + 베이커 + UV1 스트림</td><td>저작 표면 있음 · 삭제된 구현 있음</td></tr>
+<tr><td>프로브/볼륨</td><td>프로브 배치 + 볼륨 구조</td><td>전부 신설</td></tr>
+<tr><td>실시간 GI</td><td>매우 큼</td><td>전부 신설</td></tr></tbody></table></div>
+<p>라이트맵이 가장 싸고 절반쯤 깔려 있다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-삭제된-구현--측정-2026-08-25">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-삭제된-구현--측정-2026-08-25">1. 삭제된 구현 — 측정 (2026-08-25)</h2></div>
+<div class="prose"><h3 id="11-무엇이-있었나">1.1 무엇이 있었나</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>파일</th><th>줄수</th><th>삭제 커밋</th></tr></thead>
+<tbody><tr><td><code>RenderEngine/LightMap.cpp</code></td><td class="num">1,092</td><td><code>ccca6964</code> DX11 구 렌더러 철거</td></tr>
+<tr><td><code>RenderEngine/LightMap.h</code></td><td class="num">257</td><td>〃</td></tr>
+<tr><td><code>RenderEngine/LightMapPass.cpp</code> · <code>.h</code></td><td class="num">189</td><td>〃</td></tr>
+<tr><td><code>Lightmap.cs.hlsl</code> (직접광 커널)</td><td class="num">402</td><td><span class="chip risk"><code>24e784ce</code> 옛 셰이더 폐기</span></td></tr>
+<tr><td><code>IndirectLightMap.cs.hlsl</code></td><td class="num">331</td><td>〃</td></tr>
+<tr><td><code>Lightmap.ps.hlsl</code> · <code>LightmapEdgeCover.cs.hlsl</code></td><td class="num">231</td><td>〃</td></tr></tbody></table></div>
+<p>BVH 레이트레이싱 기반 컴퓨트 베이커다. 살아남은 것은 저작 구조
+(<code>Interfaces/LightMapping.h</code> — <code>lightmapIndex</code>/<code>Scale</code>/<code>Offset</code>/<code>Tiling</code>)뿐이고,
+저작·프록시 전파는 지금도 돈다. 소비자만 없다.</p>
+<p>★ <strong>이것이 <code>vertices[].uv1</code> 의 원래 소비자였다.</strong></p>
+<pre><code class="language-cpp">t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;</code></pre>
+<p>uv1 이 죽은 이유가 이걸로 설명된다 — 소비자가 렌더러 철거 때 함께 사라졌다. 구
+<code>ModelImportPipelinePlan</code>의 &quot;uv1 소비자 0&quot; 실측은 역사 근거로만 남는다.</p>
+<h3 id="12-구조--코루틴-프레임-페이싱">1.2 구조 — 코루틴 프레임 페이싱</h3>
+<p><code>GenerateLightmapCoroutine</code> 이 <code>co_yield OnRender()</code> 로 프레임마다 양보한다.
+<strong>활성 yield 30개</strong>(주석 포함 36).</p>
+<div class="table-scroll"><table>
+<thead><tr><th>위치</th><th>yield 수</th></tr></thead>
+<tbody><tr><td>준비 단계</td><td class="num">4</td></tr>
+<tr><td>메시렌더러당 삼각형 수집</td><td>1 × 메시 수</td></tr>
+<tr><td>직접광 디스패치</td><td>1 × 렉트 수</td></tr>
+<tr><td>MSAA 블러</td><td>8 × 라이트맵 수 × 2</td></tr>
+<tr><td>간접광</td><td>바운스당 다수</td></tr></tbody></table></div>
+<p>문제 셋:</p>
+<ol>
+<li><strong>베이크 속도가 프레임레이트에 묶인다.</strong> 60fps 면 yield 하나가 16.6ms 다.
+렉트 100 + 라이트맵 4장이면 준비만 500회 yield → <strong>8초가 순수 대기</strong>이고 그동안
+GPU 는 논다.</li>
+<li><strong>에디터와 GPU 를 경합한다.</strong> <code>co_yield OnRender()</code> 가 렌더 프레임을 그대로
+돌리므로 베이크 디스패치와 에디터 렌더가 같은 큐를 나눠 쓴다.</li>
+<li><strong>중단·재개가 코루틴 프레임에 묶인다.</strong> 취소하면 어디까지 했는지 복구할 구조가
+없다.</li>
+</ol>
+<p>★ 코루틴의 <strong>의도는 옳았다</strong> — &quot;에디터가 얼어붙지 않게&quot;. 수단이 틀렸을 뿐이다.
+GPU 작업을 프레임마다 하나씩 던지는 대신 워커에서 연속 기록하고 타임슬라이스로
+제어해야 한다(§2.3).</p>
+<h3 id="13-알고리즘--여덟-군데">1.3 알고리즘 — 여덟 군데</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>문제</th><th>실측/근거</th></tr></thead>
+<tbody><tr><td>①</td><td><strong>디스패치가 렉트마다 전체 캔버스</strong></td><td><code>Dispatch(canvasSize/16, canvasSize/16)</code> 후 셰이더가 <code>Offset</code>/<code>Size</code> 밖에서 <code>return</code>. <code>canvasSize=1024</code>·<code>rectSize=400</code> 이면 <strong>유효 스레드 15.6%</strong> — 84% 낭비. 렉트가 작을수록 악화(128²면 98.5% 낭비)</td></tr>
+<tr><td>②</td><td><strong>BVH median split + 축 라운드로빈</strong></td><td><code>axis = depth % 3</code>(최장축 아님), <code>mid = (start+end)/2</code>(SAH 아님). SAH 대비 트래버설 통상 1.5~2배</td></tr>
+<tr><td>③</td><td><strong>분할마다 <code>std::sort</code> → O(N log²N)</strong></td><td><code>nth_element</code> 면 분할당 O(N) → 전체 O(N log N). <strong>log N 배</strong></td></tr>
+<tr><td>④</td><td><strong>비교자가 데이터를 쓴다</strong></td><td><code>t2.tempColor = {1,0,0}</code> — <code>std::sort</code> 의 <code>Compare</code> 는 인자를 수정하면 안 된다(표준 요구 위반)</td></tr>
+<tr><td>⑤</td><td><strong>패킹이 Shelf First-Fit</strong></td><td>헤더 주석은 <code>// Guillotine Algorithm</code> 인데 구현부는 <code>// Shelf First-Fit</code>. MaxRects 대비 점유율 통상 10~20%p 낮다</td></tr>
+<tr><td>⑥</td><td><strong>패킹 정렬이 오름차순</strong></td><td><code>return a.h &lt; b.h</code> — Shelf 계열 표준은 Decreasing Height(큰 것부터)</td></tr>
+<tr><td>⑦</td><td><strong>렉트 크기가 표면적과 무관</strong></td><td><code>size = rectSize * lightmapScale</code> 로 <strong>정사각형 고정</strong>. 거대한 바닥과 작은 소품이 같은 400×400 → 텍셀 밀도 통제 불가</td></tr>
+<tr><td>⑧</td><td><strong>라이트 루프가 항상 20회</strong></td><td><code>for (i = 0; i &lt; MAX_LIGHTS; ++i)</code> — <code>lightSize</code> 가 CB 에 있는데 미사용</td></tr></tbody></table></div>
+<p>간접광 커널은 <code>[numthreads(32,32,1)]</code> = <strong>1024 스레드/그룹</strong>(API 한계치)이다.
+스레드마다 <code>uint stack[64]</code> BVH 스택을 들므로 레지스터·스크래치 압박이 크다 —
+occupancy 측정 후 8×8 또는 16×16 로 내리는 것을 검토한다.</p>
+<h3 id="14-조용히-틀리는-결함-다섯">1.4 조용히 틀리는 결함 다섯</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>결함</th><th>증상</th></tr></thead>
+<tbody><tr><td class="num">1</td><td><strong>BVH 리프 off-by-one</strong> — 셰이더가 <code>i &lt;= node.end</code> 인데 C++ 은 <code>[start, end)</code></td><td>이웃 리프의 삼각형을 잘못 검사. 마지막 리프는 <strong>버퍼 범위 밖</strong> → 가짜 그림자. <strong>직접광·간접광 커널 양쪽에 있다</strong></td></tr>
+<tr><td class="num">2</td><td><strong>패킹 롤백 <code>j--; i++;</code></strong></td><td>else 분기 직후 발동하면 이미 배치된 렉트를 재배치 → 중복/누락</td></tr>
+<tr><td class="num">3</td><td><strong>padding 미확보</strong> — <code>rect.y = nextPoint.h + padding</code> 인데 shelf 증가는 <code>maxHeight + padding</code></td><td>이웃 차트 블리딩. MSAA 블러를 4회 도는 것이 이 증상을 뭉개고 있을 가능성</td></tr>
+<tr><td class="num">4</td><td><strong>efficiency 로그</strong> — <code>useSpace</code> 가 새 라이트맵에서 리셋</td><td>로그가 마지막 장만 보고한다</td></tr>
+<tr><td class="num">5</td><td><strong>바운스마다 텍스처 배열 재생성</strong> — <code>CreateTexture2D</code> 가 <code>indirectCount</code> 루프 안</td><td>해제 경로 확인 필요(누수 의심)</td></tr></tbody></table></div>
+<p>★ 1번은 git 이력의 <code>7a4f1a79 &quot;SSR, lightmap BVH indice 오류 수정&quot;</code> 과 같은 자리다 —
+한 번 만졌지만 남아 있다.</p>
+<h3 id="15-살릴-것과-버릴-것">1.5 살릴 것과 버릴 것</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>살릴 것</th><th>버릴 것</th></tr></thead>
+<tbody><tr><td>BVH <strong>트래버설</strong> 셰이더 — 스택 기반 + 근거리 우선 정렬로 잘 짜였다</td><td>BVH <strong>빌드</strong> — SAH + <code>nth_element</code> 로 재작성</td></tr>
+<tr><td>파이프라인 단계 구성(직접→블러→간접→dilate)</td><td>코루틴 페이싱 → 워커 + 타임슬라이스</td></tr>
+<tr><td><code>LightMapping</code> 저작 구조</td><td>패킹·렉트 산출 → xatlas</td></tr></tbody></table></div>
+<p>어차피 전면 재작성이 강제된다. 이 코드는 <code>DirectX11::CSSetShaderResources</code> 같은
+DX11 API 를 직접 부르므로 <strong>DX12 RHI 로는 한 줄도 그대로 오지 않는다.</strong></p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-병렬화-설계">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-병렬화-설계">2. 병렬화 설계</h2></div>
+<div class="prose"><h3 id="21-병렬-축-전수">2.1 병렬 축 전수</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>축</th><th>현재</th><th>가능한 것</th><th>기대</th></tr></thead>
+<tbody><tr><td><strong>텍셀</strong></td><td>GPU 스레드 — 이미 병렬</td><td>디스패치를 <strong>렉트 크기로</strong></td><td>활용률 15.6% → ~100% (<strong>6.4배</strong>)</td></tr>
+<tr><td><strong>렉트</strong></td><td>렉트당 Dispatch 1회 + CB·SRV 재바인딩</td><td>렉트 표를 StructuredBuffer 로 올리고 <strong>배치 디스패치 1회</strong></td><td>Dispatch N→1, 상태 변경 소멸</td></tr>
+<tr><td><strong>라이트맵 장</strong></td><td>순차</td><td>async compute 큐로 겹침</td><td>GPU 미포화일 때만</td></tr>
+<tr><td><strong>간접광 샘플</strong></td><td>텍셀 내부 루프 512회</td><td>샘플을 여러 디스패치로 쪼개 <strong>누적(progressive)</strong></td><td>응답성·미리보기·취소</td></tr>
+<tr><td><strong>BVH 빌드</strong></td><td>단일 스레드 재귀 + <code>std::sort</code></td><td>상위 레벨 순차 + 서브트리 태스크 병렬, 또는 GPU LBVH(Morton+radix sort)</td><td>CPU 시간</td></tr>
+<tr><td><strong>삼각형 수집</strong></td><td>단일 스레드</td><td>메시별 병렬 후 concat</td><td>소소</td></tr>
+<tr><td><span class="chip info"><strong>전체 진행</strong></span></td><td>프레임당 1스텝</td><td>워커 스레드 + 전용 큐</td><td><strong>페이싱 제거</strong></td></tr></tbody></table></div>
+<h3 id="22--순서--낭비-제거가-병렬화보다-먼저다">2.2 ★ 순서 — 낭비 제거가 병렬화보다 먼저다</h3>
+<p><strong>84% 낭비를 그대로 두고 병렬화하면 낭비를 병렬로 하는 것이다.</strong></p>
+<p>착수 순서는 이렇게 고정한다.</p>
+<pre><code>① 디스패치를 렉트 크기로        → 6.4배 (병렬화 아님, 낭비 제거)
+② 코루틴 페이싱 제거            → yield 수만큼의 순수 대기 소멸
+③ BVH를 SAH + nth_element로     → 트래버설·빌드 양쪽
+④ 그다음에 비로소 병렬화 판정</code></pre>
+<p>①②를 하기 전의 측정치로 병렬화 이득을 추정하면 안 된다. 이 저장소에는 그 전례가
+있다 — <code>encoder-bench</code> 가 모형만 재고 있었고, 자를 먼저 고치자 결론이 뒤집혔다.
+<strong>Release 로만 판정한다</strong>(Debug 는 같은 조건에서 25배 느리고 규모별 개선 방향까지
+뒤집는다).</p>
+<h3 id="23-백그라운드-베이킹--에디터를-막지-않는다">2.3 백그라운드 베이킹 — 에디터를 막지 않는다</h3>
+<p>목표를 정확히 적는다. <strong>&quot;에디터에 영향이 없다&quot;는 상용 엔진도 못 한다.</strong> Unity
+Progressive Lightmapper 도 UE5 GPU Lightmass 도 베이크 중 뷰포트가 느려진다 — 같은
+GPU 를 나눠 쓰기 때문이다. 달성 가능한 목표는 <strong>non-blocking</strong> 이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>요구</th><th>뜻</th></tr></thead>
+<tbody><tr><td>씬 편집·이동·저장이 계속 된다</td><td>베이크가 게임 스레드를 잡지 않는다</td></tr>
+<tr><td>뷰포트가 계속 갱신된다</td><td>느려질 뿐 멈추지 않는다</td></tr>
+<tr><td><span class="chip info">진행률이 보이고 취소된다</span></td><td>상태가 코루틴 프레임에 숨지 않는다</td></tr>
+<tr><td>편집하면 무효화·재시작</td><td>밀봉 스냅샷과 무효화 정책</td></tr></tbody></table></div>
+<p>현재 코루틴 방식은 이 중 <strong>하나도 제대로 못 한다.</strong> 프레임마다 한 단계씩만 던지므로
+GPU 가 놀고, 진행이 프레임레이트에 묶이며, 상태가 코루틴 프레임에 갇힌다.</p>
+<h4 id="-실측--지금-큐가-하나뿐이다">★ 실측 — 지금 큐가 하나뿐이다</h4>
+<pre><code>CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)   ← 유일</code></pre>
+<p><code>DX12DeviceResources.cpp:296</code> 의 그래픽스 큐 하나가 전부다. <strong>COMPUTE 큐도 COPY 큐도
+없고</strong>, 커맨드 리스트도 전부 <code>TYPE_DIRECT</code> 다. <code>AsyncCompute</code> 는 코드에 0건이다.
+공통 queue/fence 기반은 <code>RenderGraphDependencySchedulingPlan</code> RG8에 배치했다.</p>
+<p>같은 DIRECT 큐에 베이크를 넣으면 에디터 프레임과 <strong>직렬화</strong>된다 — 베이크 디스패치가
+길면 그만큼 프레임이 통째로 밀린다. 백그라운드 베이킹의 1번 전제가 별도 큐다.</p>
+<h4 id="필요한-것-셋">필요한 것 셋</h4>
+<div class="table-scroll"><table>
+<thead><tr><th>#</th><th>필요</th><th>현 상태</th></tr></thead>
+<tbody><tr><td class="num">1</td><td><strong>별도 COMPUTE 큐</strong> + 큐 간 펜스</td><td><strong>없음</strong> — 신설</td></tr>
+<tr><td class="num">2</td><td><strong>GPU 타임슬라이스</strong> — 디스패치를 예산 단위로 분할</td><td>없음(코루틴은 프레임 단위)</td></tr>
+<tr><td class="num">3</td><td><strong>씬 밀봉 스냅샷</strong> + 무효화 정책</td><td>인프라 있음 — 프레임 스냅샷 이중 버퍼 게시를 같은 원리로</td></tr></tbody></table></div>
+<p>2번을 빼면 큐를 나눠도 소용이 없다. 디스패치 하나가 길면 GPU 가 그동안 점유되고,
+<strong>Windows TDR(기본 2초)</strong> 에 걸리면 디바이스가 리셋된다. 렉트 단위·샘플 단위로 쪼개
+프레임당 예산(예: 8ms) 안에 넣어야 한다 — 이것이 progressive baking 의 본질이고,
+코루틴이 하려던 것과 같지만 <strong>단위가 프레임이 아니라 GPU 시간</strong>이어야 한다.</p>
+<h4 id="재사용할-수-있는-것--없는-것">재사용할 수 있는 것 / 없는 것</h4>
+<p><code>RHIParallelCommandPool</code> 이 이미 워커 8개 병렬 커맨드 기록을 제공한다(3-15A). 다만
+<code>RunParallel</code> 이 <strong>join 까지 대기</strong>하는 fork-join 이라 <em>프레임 안의</em> 작업용이다.
+베이크는 프레임 경계를 넘어 살아야 하므로 <strong>수명 모델이 다르다</strong> — 기록 인프라는
+빌리되 스케줄링은 별도로 세운다.</p>
+<h3 id="23-a-스레드-모델">2.3-a 스레드 모델</h3>
+<p>현재 엔진은 Game / CommandBuild / CommandExecute 3스레드 락스텝이다. 베이크는
+<strong>에디터 전용 작업</strong>이므로 그 락스텝에 끼워 넣지 않는다.</p>
+<pre><code>[베이크 워커 스레드]  ─ 커맨드 기록 ─→ [전용 컴퓨트 큐] ─→ GPU
+        │                                     │
+        └─ 진행률/취소 (원자적 상태)          └─ 프레임당 타임슬라이스 예산
+                    ↓
+            [Game 스레드] 진행률 UI 만 읽는다</code></pre>
+<ul>
+<li>D3D12 는 커맨드 리스트 기록이 스레드 안전하므로 워커에서 기록할 수 있다.</li>
+<li><strong>프레임당 GPU 예산</strong>(예: 8ms)을 두어 에디터 응답성을 확보한다 — 코루틴이 이루려던
+목적을 더 정밀하게 달성한다.</li>
+<li>취소·재개는 <strong>단계 경계의 명시적 체크포인트</strong>로 처리한다. 코루틴 프레임에 상태를
+숨기지 않는다.</li>
+</ul>
+<p>★ 주의: 베이크 중 씬이 바뀌면 결과가 무의미해진다. 베이크 시작 시 <strong>지오메트리·조명을
+밀봉</strong>하고(스냅샷) 그 위에서만 돈다 — 렌더 스레드의 프레임 스냅샷과 같은 원리다.</p>
+<h3 id="24-병렬화가-이득이-아닌-경우">2.4 병렬화가 이득이 아닌 경우</h3>
+<ul>
+<li><strong>async compute</strong> 는 두 큐가 같은 SM 을 나눠 쓰므로, 베이크가 이미 GPU 를 채우면
+오히려 느려진다. <code>RhiBoundaryPlan</code> 의 판정 기준을 그대로 적용해 패스별로 잰다.</li>
+<li><strong>CPU 병렬 BVH</strong> 는 삼각형 수가 적으면 태스크 오버헤드가 이득을 먹는다. 실측 후
+임계 삼각형 수를 정한다.</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-설계-결정">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-설계-결정">3. 설계 결정</h2></div>
+<div class="prose"><h3 id="31-uv1-언랩은-xatlas-로">3.1 UV1 언랩은 xatlas 로</h3>
+<p>라이트맵은 non-overlapping UV 언랩이 전제인데 <strong>현 자산에 UV1 이 하나도 없다</strong>
+(원본 glb 12개 전수 <code>TEXCOORD_1</code> 0건). xatlas 는 언랩과 아틀라스 패킹을 함께
+해결하므로 §1.3 의 ⑤⑥⑦을 한 번에 닫는다.</p>
+<p>이 저장소는 이미 <code>fastgltf</code>·<code>ufbx</code>·<code>mikktspace</code> 를 <strong>원본 무수정</strong>으로 벤더링하는
+관행이 있다. 같은 규약을 따른다.</p>
+<h3 id="32-uv1-은-옵셔널-스트림이다">3.2 UV1 은 옵셔널 스트림이다</h3>
+<p>PHASE 3.75가 게시한 vertex attribute schema의 UV1 optional slot을 이 계획이 처음
+생산·소비한다. 라이트맵 대상 메시에만 UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전
+정점에 8B를 부과하지 않는다.</p>
+<p>★ 언랩은 이음매에서 <strong>정점을 쪼개므로 정점 수 자체가 바뀐다.</strong> 즉 기존 uv1 슬롯을
+재사용하는 것이 아니라 언랩 단계에서 스트림을 새로 만든다.</p>
+<h3 id="33-텍셀-밀도가-정본이다">3.3 텍셀 밀도가 정본이다</h3>
+<p>렉트 크기는 <code>표면적 × 텍셀밀도(texels per unit)</code> 로 산출한다. <code>lightmapScale</code> 은
+그 위의 배율로 남긴다 — 지금처럼 크기의 유일한 결정자가 되어서는 안 된다.</p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-이행--슬라이스">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-이행--슬라이스">4. 이행 — 슬라이스</h2></div>
+<div class="prose"><h3 id="l0-기준선--삭제된-구현-복구계측">L0. 기준선 — 삭제된 구현 복구·계측</h3>
+<p>되살려 돌리는 것이 목적이 아니라 <strong>재작성의 정답지를 만드는 것</strong>이 목적이다.</p>
+<ul>
+<li>삭제분을 참조용으로 뽑아 두고(이 문서 §1 이 그 요약이다) 알고리즘 의도를 확정</li>
+<li>비교용 씬 확보 — 실내(간접광이 지배적) 1개 이상 필요</li>
+<li>★ 현 자산에 UV1 이 없으므로 <strong>L1 전에는 실행 자체가 불가능하다</strong></li>
+</ul>
+<h3 id="l1-uv1-언랩--xatlas-벤더링">L1. UV1 언랩 — xatlas 벤더링</h3>
+<blockquote>
+<p><strong>2026-09-02 — PHASE 3.75 선행 계약으로 개정.</strong> UV1 스트림의 유일한 생산자는 이
+슬라이스다. 계약: ① UV1은 라이트맵 대상 메시에만 붙는 optional stream ② 언랩이 정점을
+쪼개므로 stream은 언랩 단계에서 생성되고 기존 slot을 재사용하지 않는다 ③ 완료 기준
+&quot;전 정점 부과 0&quot;. identity·generation·layout schema는 PHASE 3.75가 소유하고 L1은 그
+authoring transaction을 통해 새 generation을 게시한다.</p>
+</blockquote>
+<ul>
+<li><code>ThirdParty/xatlas</code> 원본 무수정 벤더링</li>
+<li>PHASE 3.75 authoring transaction을 호출하는 에디터 오프라인 도구</li>
+<li>정점 분할 계수 — 손실은 변환 경계에서 계수한다는 성질 유지</li>
+<li>게이트: 차트 겹침 0 · UV 범위 [0,1] · seam 정점 수 계수</li>
+</ul>
+<p>의존: <code>ModelAssetBigBangCutoverPlan</code> MBC3(authoring writer)·MBC6(vertex schema).</p>
+<h3 id="l2-bvh-재작성--sah--nth_element">L2. BVH 재작성 — SAH + <code>nth_element</code></h3>
+<ul>
+<li>최장축 분할 + SAH 비용 함수</li>
+<li><code>std::sort</code> → <code>nth_element</code>, 무게중심 사전 계산</li>
+<li><strong>비교자의 데이터 쓰기 제거</strong>(§1.3 ④)</li>
+<li>★ <strong>리프 순회 off-by-one 을 양쪽 커널에서 고친다</strong>(§1.4 ①) — 고치기 전에
+현재 동작을 재현하는 검사를 먼저 세워 <strong>변이로 이빨을 증명</strong>한다</li>
+<li>게이트: 합성 씬에서 해석적 정답(구·평면 교차)과 대조</li>
+</ul>
+<p>의존: 없음. <strong>가장 먼저 할 수 있다.</strong></p>
+<h3 id="l3-직접광-패스--dx12-rhi-재작성">L3. 직접광 패스 — DX12 RHI 재작성</h3>
+<ul>
+<li>디스패치를 <strong>렉트 크기로</strong>(§1.3 ①) — 이 슬라이스의 본체</li>
+<li>렉트 표를 StructuredBuffer 로, 배치 디스패치 1회</li>
+<li>라이트 루프를 <code>lightSize</code> 로(§1.3 ⑧)</li>
+<li>게이트: 삭제분과 같은 씬에서 픽셀 대조 + 디스패치 스레드 활용률 계측</li>
+</ul>
+<p>의존: L1(UV1)·L2(BVH).</p>
+<h3 id="l4-백그라운드-베이킹--에디터를-막지-않는다">L4. 백그라운드 베이킹 — 에디터를 막지 않는다</h3>
+<p>이 계획의 사용자 체감 본체다. §2.3 의 셋을 순서대로 세운다.</p>
+<ul>
+<li><strong>L4-a 별도 COMPUTE 큐 + 큐 간 펜스</strong> — 지금 DIRECT 큐 하나뿐이다.
+큐를 넘나드는 리소스의 상태 전이(COMMON 경유) 규칙을 함께 정한다.
+★ <strong>2026-09-01 정정</strong> — &quot;어느 쪽이 먼저 세우든 소유&quot;는 순서를 정하지 않는 문장이었고,
+<code>RenderGraphDependencySchedulingPlan</code> §7은 반대로 &quot;L4는 RG8을 기다린다&quot;고 적어
+P0인 L4를 P1 뒤 임계 경로 142일째에 묶고 있었다. 큐/펜스 RHI 계약을 <code>RG8</code>에서 떼어
+**독립 슬라이스 <code>Q0</code>**으로 승격했다 — 소유는 RHI 계층이고 어느 트랙도 아니다.
+L4-a는 <code>Q0</code>의 소비자이며, <code>Q0</code>은 <code>RG8</code>·<code>L4</code> 중 먼저 필요해지는 쪽의 착수 시점에 세운다.
+근거와 판정: <a href="Phase4UnifiedPlan.html"><code>Phase4UnifiedPlan.md</code></a> §6.2~§6.3.</li>
+<li><strong>L4-b GPU 타임슬라이스</strong> — 디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산
+(예: 8ms) 안에 넣는다. 코루틴 페이싱 제거는 이 단계의 결과다.
+★ <strong>Windows TDR(기본 2초)</strong> 이 상한이다. 단일 디스패치가 그것을 넘으면 디바이스가
+리셋된다 — 분할은 성능이 아니라 <strong>안전</strong> 요구다.</li>
+<li><strong>L4-c 씬 밀봉 + 무효화</strong> — 시작 시 지오메트리·조명을 스냅샷으로 밀봉하고,
+편집이 감지되면 무효화·재시작한다. 프레임 스냅샷 이중 버퍼 게시와 같은 원리.</li>
+<li>진행률·취소·재개를 <strong>명시적 체크포인트</strong>로. 코루틴 프레임에 상태를 숨기지 않는다.</li>
+</ul>
+<p>게이트: ① 베이크 중 씬 편집·저장이 되는가 ② 뷰포트 프레임타임이 예산 안에 있는가
+③ 취소 후 재개 결과가 무중단 결과와 같은가 ④ 편집 시 무효화가 동작하는가</p>
+<p>의존: L3. <code>RHIParallelCommandPool</code> 의 기록 인프라는 빌리되 스케줄링은 별도다(§2.3).</p>
+<h3 id="l5-간접광--progressive-누적">L5. 간접광 — progressive 누적</h3>
+<ul>
+<li>샘플을 분할 디스패치로 쪼개 누적</li>
+<li><code>numthreads</code> occupancy 측정 후 조정(현재 32×32 = 1024)</li>
+<li>바운스마다 텍스처 재생성 제거(§1.4 ⑤)</li>
+<li>게이트: 샘플 수 대비 수렴 곡선, 중단·재개 시 동일 결과</li>
+</ul>
+<p>의존: L4.</p>
+<h3 id="l6-dilateseam-처리">L6. dilate·seam 처리</h3>
+<ul>
+<li>삭제분에서 주석 처리돼 있던 <code>DilateLightMap</code> 복원</li>
+<li>padding 계산 수정(§1.4 ③) — 블러로 뭉개지 말고 원인을 고친다</li>
+<li>게이트: 차트 경계 블리딩 검사</li>
+</ul>
+<h3 id="l7-병렬화-판정--여기서-비로소-잰다">L7. 병렬화 판정 — <strong>여기서 비로소 잰다</strong></h3>
+<p>§2.2 순서대로 ①②③을 끝낸 뒤 재측정하고, §2.1 의 남은 축(async compute · CPU 병렬
+BVH)이 실제로 이득인지 판정한다. <strong>재기 전에 열지 않는다.</strong></p>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-완료-기준">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-완료-기준">5. 완료 기준</h2></div>
+<div class="prose"><ul>
+<li class="task"><input type="checkbox" disabled> UV1 언랩이 자산 파이프라인에 있고 차트 겹침 0</li>
+<li class="task"><input type="checkbox" disabled> BVH 리프 순회 off-by-one 이 <strong>양쪽 커널에서</strong> 닫혔고 변이로 증명됐다</li>
+<li class="task"><input type="checkbox" disabled> 디스패치 스레드 활용률이 계측되고 렉트 크기 디스패치로 ~100%</li>
+<li class="task"><input type="checkbox" disabled> 베이크가 프레임레이트와 무관하게 진행된다(코루틴 yield 0)</li>
+<li class="task"><input type="checkbox" disabled> <strong>베이크 중 씬 편집·오브젝트 이동·저장이 된다</strong> — 에디터가 막히지 않는다</li>
+<li class="task"><input type="checkbox" disabled> 베이크 중 뷰포트 프레임타임이 예산 안에 있다(느려지되 멈추지 않는다)</li>
+<li class="task"><input type="checkbox" disabled> <strong>단일 디스패치가 TDR 상한 아래</strong>임이 계측으로 확인됐다</li>
+<li class="task"><input type="checkbox" disabled> 베이크 중 씬을 편집하면 무효화·재시작이 동작한다</li>
+<li class="task"><input type="checkbox" disabled> 취소·재개가 단계 경계에서 동작하고 재개 결과가 무중단 결과와 같다</li>
+<li class="task"><input type="checkbox" disabled> 렉트 크기가 표면적 × 텍셀밀도로 산출된다</li>
+<li class="task"><input type="checkbox" disabled> 실내 씬에서 SSGI 단독 대비 간접광 개선이 스크린샷으로 확인된다</li>
+<li class="task"><input type="checkbox" disabled> <strong>Release 로 측정한</strong> 베이크 시간이 기준선 대비 개선됐다</li>
+<li class="task"><input type="checkbox" disabled> 패킹 점유율이 로그에 <strong>전체 라이트맵 기준으로</strong> 찍힌다</li>
+</ul>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-리스크">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-리스크">6. 리스크</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>리스크</th><th>근거</th><th>완화</th></tr></thead>
+<tbody><tr><td>삭제분의 결함을 그대로 이식</td><td>§1.4 다섯 종</td><td>슬라이스마다 해당 항목을 완료 기준에 명시</td></tr>
+<tr><td>off-by-one 을 고치며 다른 것을 깬다</td><td>두 커널에 같은 패턴</td><td>현 동작 재현 검사를 <strong>먼저</strong> 세우고 변이로 이빨 증명</td></tr>
+<tr><td>병렬화를 낭비 위에 얹는다</td><td>디스패치 84% 낭비</td><td>§2.2 순서 고정 — ①②③ 뒤에 판정</td></tr>
+<tr><td><span class="chip info">UV1 없이 착수</span></td><td>자산 전수 <code>TEXCOORD_1</code> 0건</td><td>L1 이 <strong>L3 이후의</strong> 모든 슬라이스의 선행. BVH 재작성은 UV1 과 무관하고 합성 씬(구·평면 해석적 정답)으로 판정하므로 <strong>L1 과 병렬로 연다</strong>(<a href="Phase4UnifiedPlan.html"><code>Phase4UnifiedPlan.md</code></a> §6.3)</td></tr>
+<tr><td>베이크 중 씬 변경</td><td>결과 무의미</td><td>시작 시 지오메트리·조명 밀봉 + 무효화 정책(L4-c)</td></tr>
+<tr><td>소비자 0 상태 재발</td><td>이 저장소의 전례 다수</td><td>L3 에서 <code>LightMapPass</code> 를 라이브 그래프에 배선하고 화면으로 확인</td></tr>
+<tr><td><strong>TDR 로 디바이스 리셋</strong></td><td>큐가 DIRECT 하나뿐이라 긴 디스패치가 프레임을 통째로 민다. 기본 상한 2초</td><td>L4-b 분할을 <strong>성능이 아니라 안전 요구</strong>로 다룬다. 단일 디스패치 시간을 계측해 상한을 못박는다</td></tr>
+<tr><td><strong>큐를 두 번 만든다</strong></td><td>async compute 공통 기반이 트랙 RG8에도 필요하다</td><td>L4-a와 RG8을 <strong>공유 기반</strong>으로 명시 — 먼저 세우는 쪽이 공통 RHI 계약을 소유하고 다른 쪽이 소비</td></tr>
+<tr><td>async compute 가 오히려 느리다</td><td>두 큐가 같은 SM 을 나눠 쓴다</td><td>베이크가 GPU 를 이미 채우면 이득이 없다. <code>RhiBoundaryPlan</code> 판정 기준으로 재고 결정</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-다른-계획과의-관계">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-다른-계획과의-관계">7. 다른 계획과의 관계</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>계획</th><th>관계</th></tr></thead>
+<tbody><tr><td><strong><code>ModelAssetBigBangCutoverPlan</code> (PHASE 3.75)</strong></td><td><strong>하드 선행.</strong> MBC3 authoring transaction과 MBC6 vertex schema를 소비한다. UV1은 라이트맵 대상 메시에만 붙고 L1이 새 model generation으로 원자 게시한다</td></tr>
+<tr><td><strong><code>RenderGraphDependencySchedulingPlan</code> (PHASE 4.3 · 트랙 RG)</strong></td><td><code>Q0</code>(queue-neutral 큐·cross-queue 펜스·상태 전이)은 L4-a와 RG8의 공용 기반이다. <code>L4</code>는 <code>RG8</code>을 기다리지 않는다</td></tr>
+<tr><td><strong><code>CSharpRenderPipelinePlan</code> (PHASE 4.6)</strong></td><td>기존 C++ <code>LightMapPass</code> 실행을 native registry에 연결하고 C# IR에서 선택한다. 라이트맵 산출물·베이커 수명은 PHASE 4.7이 소유한다</td></tr>
+<tr><td>PHASE 4.8 Stochastic Lighting</td><td>정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다</td></tr>
+<tr><td>PHASE 4.8 DXR</td><td>BLAS 가 서면 <strong>베이크의 BVH 를 DXR 가속 구조로 대체</strong>할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다</td></tr>
+<tr><td><code>RhiBoundaryPlan</code> (PHASE 3)</td><td>L3 이 DX12 RHI 로 재작성. async compute 판정 기준을 그대로 적용</td></tr>
+<tr><td><code>MaterialPipelinePlan</code> (PHASE 3.5)</td><td>베이크 커널의 셰이더 퍼뮤테이션이 <code>.shadermeta</code> 정본을 따른다</td></tr>
+<tr><td><code>SerializationPlan</code> (PHASE 17)</td><td>구운 라이트맵 텍스처의 자산 형식·쿠킹 결정을 공유</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="LightmapBakerPlan.md"><code>docs/plans/LightmapBakerPlan.md</code></a> · 마지막 커밋 2026-10-03 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

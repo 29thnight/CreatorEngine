@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/Phase22AudioWindowsAcceptance20261007.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHASE 22 Windows 제품 acceptance — 2026-10-07</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#초기-windows-증거--후속-수정보완은-아래-기록-참조">초기 Windows 증거 — 후속 수정·보완은 아래 기록 참조</a></li><li><a href="#장치와-30분-resident-관찰값">장치와 30분 resident 관찰값</a></li><li><a href="#이번에-수정한-결함과-낡은-검증">이번에 수정한 결함과 낡은 검증</a></li><li><a href="#사용자-요청에-따른-검증-경로-변경">사용자 요청에 따른 검증 경로 변경</a></li><li><a href="#증거의-한계">증거의 한계</a></li><li><a href="#2026-10-08-종료-검증-진행">2026-10-08 종료 검증 진행</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="Phase22AudioWindowsAcceptance20261007.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>PHASE 22 Windows 제품 acceptance — 2026-10-07</h1>
+<div class="meta"><p>이 보고서는 VS 2026(v18) MSVC v145 x64로 수행한 현재 Windows 검증을 기록한다.
+구현 착지, 독립 native probe, 실제 제품 실행, 실제 장치 관찰을 구별한다.
+2026-10-08 최종 정산: <strong>AU0~AU9 및 PHASE22 완료.</strong> 최종 clean native generation의
+실제 프로젝트 선택 씬 package, 수정 후 실제 Editor 30분과 유효한 stream/ETW 관찰,
+Player 프로세스 정상 종료 100/100회가 통과했다. 최종 종료 절이 현재 판정의 정본이다.
+초기 실패 기록을 최종 결과와 혼동하지 않도록 아래 후속 정산을 함께 읽는다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">9<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 8, 대기·미검증 1"><i class="ok" style="flex:8"></i><i class="dim" style="flex:1"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 8</span><span class="chip dim">대기·미검증 1</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#초기-windows-증거--후속-수정보완은-아래-기록-참조"><span class="ve-label">§00</span><span class="map-name">초기 Windows 증거 — 후속 수정·보완은 아래 기록 참조</span><span class="map-bar"><i style="width:21.6%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">4</span> <span class="chip dim" title="대기·미검증">1</span></span></a>
+<a class="map-row" href="#장치와-30분-resident-관찰값"><span class="ve-label">§01</span><span class="map-name">장치와 30분 resident 관찰값</span><span class="map-bar"><i style="width:6.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#이번에-수정한-결함과-낡은-검증"><span class="ve-label">§02</span><span class="map-name">이번에 수정한 결함과 낡은 검증</span><span class="map-bar"><i style="width:12.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#사용자-요청에-따른-검증-경로-변경"><span class="ve-label">§03</span><span class="map-name">사용자 요청에 따른 검증 경로 변경</span><span class="map-bar"><i style="width:2.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거의-한계"><span class="ve-label">§04</span><span class="map-name">증거의 한계</span><span class="map-bar"><i style="width:2.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-10-08-종료-검증-진행"><span class="ve-label">§05</span><span class="map-name">2026-10-08 종료 검증 진행</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">4</span></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「2026-10-08 종료 검증 진행」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-초기-windows-증거--후속-수정보완은-아래-기록-참조">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="초기-windows-증거--후속-수정보완은-아래-기록-참조">초기 Windows 증거 — 후속 수정·보완은 아래 기록 참조</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>검증</th><th>결과</th><th>범위와 증거</th></tr></thead>
+<tbody><tr><td>Windows Debug / Release core·decoder·PCM·software-device</td><td><span class="chip ok">PASS, 각각 240 / 240</span></td><td><code>Build/Validation/Phase22Portable/windows-debug</code> 및 <code>windows-release/results.json</code>. 실제 장치 및 Scene/CLR 제품 acceptance와 별개</td></tr>
+<tr><td>실제 WASAPI 짧은 AirPods Max 실행</td><td><span class="chip ok">PASS, 307 / 307</span></td><td><code>Build/Validation/Phase22Hardware/airpods-preflight.log</code>. 10초, 재개방 20회 및 runtime 시작·종료 100회. 물리 Bluetooth 해제와 구별</td></tr>
+<tr><td>실제 장치 resident 30분 부하</td><td><span class="chip ok">PASS, 307 / 307</span></td><td><code>Phase22Hardware/hardware.log</code>, <code>results.json</code>. 0/1/32/128 voices, Hall reverb, 재개방 20회, 시작·종료 100회</td></tr>
+<tr><td>실제 cooked WAV 2개 / MP3 / FLAC</td><td>Debug / Release PASS</td><td><code>phase22-v18-pak-debug.log</code> 및 <code>phase22-v18-pak-release.log</code>. loose/Pak/암호화 Pak cross-chunk·동시 range·bounded read·변조 거부 및 실제 장치 재생</td></tr>
+<tr><td>FMOD source/project/deploy 의존 철거</td><td>PASS, 1,765 checks / 0 failures</td><td><code>phase22-retirement-current.log</code>. PE/package 게이트와 별개</td></tr>
+<tr><td>Windows 전체 제품 빌드</td><td>Release PASS, Debug 전체 빌드 로그 완료</td><td><code>phase22-v18-product-release-final.log</code> 및 <code>phase22-v18-product-debug-final.log</code>. VS18 x64 MSBuild. 앞선 병행 빌드 PDB 충돌 실행은 PASS로 세지 않음. Release의 LNK4020 심볼 경고는 별도 미해결</td></tr>
+<tr><td>AirPods Max MP3 Stream 30분</td><td><span class="chip ok">PASS, 167 / 167</span></td><td><code>Phase22Stream/hardware.log</code>, <code>results.json</code>. 실제 CEAC bounded byte source 위 MP3 loop + resident WAV/FLAC, 1/32/128 voices 및 Hall. 이 soak 자체는 실제 Pak 입력이 아님</td></tr>
+<tr><td>Packaged Player / 실제 C# 실행</td><td>오디오 CLR 단정 PASS, 패키지 전체 FAIL</td><td><code>Phase22Evidence</code>에 결과 보존. 100 play/pause/resume/stop, 관리 GC 이후 값 핸들 생존, 완료 100개, world/session/attached/positioned 경로 성공 표지. 전체 package는 managed lifecycle count/order mismatch로 게시 실패. 사용자 요청에 따라 별도 프로젝트 방식 중단</td></tr>
+<tr><td>실제 Editor Play 전이 / AirPods 출력</td><td>전이 100회 PASS; 수정 후 실제 출력 사용자 확인 PASS</td><td><code>Phase22Editor/lifecycle.log</code> 및 HTTP 결과. 현재 Dynamic_CPP 프로젝트를 연 실제 Debug Editor의 Play/Stop 확정 100회. 초기 무음 재현 후 기존 sidecar migration, Windows 캐시 재귀, 편집 모드 native simulation 조기 소비를 수정. VS18 Debug 실제 Editor의 physical voice=1 및 사용자 청각 확인 PASS. 수정 후 actual-audio-100.log / actual-100-summary.json: 실제 재생 100회와 정리 100회 PASS, 서로 다른 유효 핸들 100개, Stop 핸들=0, physical voices=1→0, backend failures=0</td></tr>
+<tr><td>이번 수정의 VS18 Editor Debug / Release</td><td>build 및 실제 프로젝트 실행 PASS</td><td>Debug actual playback 100회, Release actual playback/cleanup smoke 1회. <code>phase22-v18-editor-audio-status-debug.log</code>, <code>phase22-v18-editor-audio-status-release.log</code>, <code>actual-release-smoke.log</code>, <code>release-final-status.json</code></td></tr>
+<tr><td>일반·delay PE import / 배포 파일</td><td>Release PASS, 67 images</td><td><code>phase22-release-pe.json</code>. 실행 파일/DLL 일반·delay import 및 금지 DLL 이름 검사. 최종 package 게시 성공과 별개</td></tr>
+<tr><td>실제 Editor 기본 출력 20회 / Bluetooth 재연결</td><td>출력 전환 20회 PASS; 물리 재연결 1회 사용자 관찰 PASS</td><td><code>actual-default-switch.log/json</code>: HDMI↔AirPods, 동일 핸들 433791696896 및 physical voice=1 유지, backend failures=0. 사용자가 실제 Bluetooth 재연결 후 소리 자동 복구를 확인. before/after 핸들 유지와 42개 상태 표본 보존. 20회 물리 분리 검증으로 확대 해석하지 않음</td></tr>
+<tr><td>청취 / loopback / 실제 hardware underrun</td><td>수정 후 Intro.wav 청취 및 재연결 출력 복구 사용자 확인 PASS; loopback/underrun 미실행</td><td>초기 무음은 수정 전 실패 기록이다. 이후 사용자가 정상 출력과 Bluetooth 재연결 후 자동 복구를 확인했다. 3D/reverb 청각 품질과 실제 driver underrun은 별도 미검증이며, 수집하지 않은 값을 0으로 표시하지 않음</td></tr>
+<tr><td>실제 Scene 전환·DDOL·Editor preview/graph authoring</td><td><span class="chip dim">미실행</span></td><td>core/stub Scene 통과로 대체하지 않음</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-장치와-30분-resident-관찰값">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="장치와-30분-resident-관찰값">장치와 30분 resident 관찰값</h2></div>
+<div class="prose"><p>첫 장치는 <code>CPM1410I (NVIDIA High Definition Audio)</code> WASAPI였다. 사용자 요청에 따라
+기본 playback endpoint를 <code>헤드폰 (영웅의 AirPods Max)</code>로 바꿨고, 별도 짧은 native
+실행에서 실제 WASAPI 출력 이름을 확인했다. recording/default communications는
+바꾸지 않았다. 변경 시각은 <code>2026-10-07T12:08:58.4339228Z</code>이며
+<code>Phase22Hardware/default-device-change.json</code>에 보존했다.</p>
+<p>resident 30분 실행의 처음 endpoint는 HDMI이고 실행 도중 기본 출력이 바뀌었다.
+따라서 이를 <strong>AirPods Max 단독 30분 측정</strong>으로 표시하지 않는다. 콜백 180,106개,
+p99 상한 3.19ms, 최대 25.8093ms, 반 주기 초과 31회, 한 주기 초과 7회,
+private commit peak 7,933,952 bytes를 관찰했다. 최소 callback period 10ms의
+절반을 p99가 만족하지만, 최대 지연·초과 횟수도 함께 보존한다. 이 시간에는 제품
+컴파일도 진행됐다. 한 주기 초과 횟수는 실제 driver underrun 수가 아니다.</p>
+<p>AirPods Max 단독 MP3 stream 30분 실행은 callback 179,992개, p99 상한 3.62ms,
+최대 56.9439ms, 반 주기 초과 255회, 한 주기 초과 23회, stream read
+14,372,127 bytes와 I/O 실패 0을 기록했다. 167/167 단정과 p99 기준은 통과했지만
+관찰된 지연을 숨기거나 실제 청각 품질·driver underrun 0으로 표시하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-이번에-수정한-결함과-낡은-검증">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="이번에-수정한-결함과-낡은-검증">이번에 수정한 결함과 낡은 검증</h2></div>
+<div class="prose"><ul>
+<li>Windows loose cooked byte source는 같은 읽기 핸들을 mount 수명 동안 유지하고
+<code>_SH_DENYWR</code>로 writer를 거부한다. 기존 경로 재개방 방식에서는 open 이후 파일이
+바뀔 수 있었다. mounted source가 모두 해제되면 쓰기가 다시 가능하고, 이후
+payload 변조는 다시 open할 때 hash 검사로 거부되는 것을 native 테스트로 확인했다.</li>
+<li>Audio authoring source identity는 현재 GUID/cooked-only 정책에서 의도적으로 제거된다.
+audio 원본 경로 count를 기대하던 cook stamp 테스트를 현재 계약에 맞췄다.</li>
+<li>실제 Stream 구현 이후에도 Stream 적재를 거부해야 한다고 주장하던 회귀를 수정했다.
+이제 실제 장치에서 worker의 bounded streaming byte read와 I/O 실패 0을 확인한다.</li>
+<li>실제 Editor에서 기존 GUID-only Intro.wav sidecar가 import policy 검사에 실패했다.
+초기 스캔은 기존 <code>.meta</code>를 등록하기만 해 importer의 migration 경로를 건너뛰었다.
+<code>audioClip</code>이 없는 기존 audio sidecar만 normal validated importer로 갱신하고 GUID를
+유지하도록 수정했다. 현재 형식의 잘못된 policy 및 loop markers는 계속 거부한다.
+VS18 Debug 의존 프로젝트 재빌드와 실제 Dynamic_CPP Editor에서 기존 GUID를
+유지한 갱신 및 catalog policy 오류 해소를 확인했다.</li>
+<li>캐시의 RemoveDirectory 메서드가 Windows 매크로로 RemoveDirectoryW로 바뀌어
+자기 자신을 재귀 호출하던 결함을 수정했다. RemoveChildDirectory로 이름을 바꾸고
+::RemoveDirectoryW를 명시했다. VS18 DIA로 실제 startup stack을 대조한 뒤
+실제 Editor의 음원 import와 정상 기동으로 검증했다.</li>
+<li>네이티브 OnBeginSimulation이 편집 모드에서 먼저 소비되어 playOnStart가 Play에서
+실행되지 않던 결함을 수정했다. 네이티브 초기화와 scene 편입은 편집 모드에 유지하고
+시뮬레이션 훅은 Play가 활성화될 때 드레인한다. 실제 Editor capture에서
+active/physical voices=1, playback instances=1, backend/read failures=0,
+output mode=Device(1), stream read=14,081,900 bytes를 확인했다.
+사용자가 수정 후 AirPods Max에서 정상적으로 들리는 것을 확인했다.
+read-only audio.status 명령으로 캡처 캐시를 거치지 않고 현재 보이스·핸들·오류를
+조회한다. 실제 반복 acceptance는 이 진단을 사용해 100개 고유 핸들과 매회
+재생/정리를 확인했다. 이전 profile.frame 기반 반복 시도는 stale capture 값 때문에
+판정 실패했으므로 제품의 보이스 leak 증거로 사용하지 않는다. 실제 증거는 Phase22Editor의
+simulation-fix-frame.json 및 intro-simulation-fixed.ceprof에 보존했다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-사용자-요청에-따른-검증-경로-변경">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="사용자-요청에-따른-검증-경로-변경">사용자 요청에 따른 검증 경로 변경</h2></div>
+<div class="prose"><p>별도 Phase22Player 테스트 프로젝트는 추가 실행하지 않는다. 결과 로그는
+<code>Build/Validation/Phase22Evidence</code>에 복사했다. 이전 삭제는 자동 승인 검토에서 차단됐지만, 2026-10-08 확인 시 Phase22Player 폴더는 존재하지 않는다. 이후 검증은 현재 <code>Dynamic_CPP</code>
+프로젝트의 실제 Editor에서 기존 음원과 임시 in-memory SoundComponent로 수행하며,
+사용자 씬 파일을 덮어쓰지 않는다. 임시 엔티티는 검증 후 제거했다. 이전 Release Editor 실행은 Stop 상태 및 active/physical voices와 playback instances=0으로 정리했다. 씬 파일은 저장하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거의-한계">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="증거의-한계">증거의 한계</h2></div>
+<div class="prose"><p>독립 hardware wrapper는 직접 포함한 Audio TU/header/fixture 입력 hash를 보존하지만,
+컴파일러가 추적한 완전한 transitive dependency ledger는 아니다. resident soak 컴파일
+후에 수정된 <code>CookedAudioClipSource.h</code>의 Windows pinning을 resident soak가 검증했다고
+주장하지 않는다. 해당 변경의 직접 증거는 이후 컴파일한 cooked-source native gate다.
+cloud의 ASan/UBSan 통과는 Windows 제품 build/실장치/CLR/LSan 통과로 바뀌지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2026-10-08-종료-검증-진행">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="2026-10-08-종료-검증-진행">2026-10-08 종료 검증 진행</h2></div>
+<div class="prose"><p>사용자가 승인한 Release 128 physical voices 기준은 audio runtime update p99 &lt;= 1ms,
+부하 전 대비 process private memory 증가 &lt;= 256MiB, 첫 재생 API 응답 &lt;= 500ms다.
+실제 측정은 HTTP queue와 operation polling을 포함하며 DAC 첫 샘플 지연으로 확대하지 않는다.
+Runtime update는 Editor host가 모든 프레임을 1us histogram에 기록한다. 1.024ms 이상
+구간의 p99는 overflow로 실패 처리한다. 승인 전 측정을 사후 통과시키는 기준으로 쓰지 않는다.</p>
+<ul>
+<li>VS18 전체 Debug solution build exit 0: <code>Phase22Closure/full-debug.log</code>.</li>
+<li>실제 Debug Editor lifecycle axis gate PASS: 실행한 gate는 Debug exe이며
+결과는 <code>Phase22Closure/lifecycle-axis-debug.log</code>다. Release 통과로 세지 않는다.</li>
+<li>실제 현재 프로젝트 C# playback 100회·completion 100개, GC 이후 값 핸들 생존,
+pause/resume/stop, world/session/attached/positioned PASS. Intro는 NonSpatial stereo라
+spatial 호출은 별도의 현재 프로젝트 PointMono 음원으로 검증했다.</li>
+<li>실제 scene transfer: World 재생 종료, Session 재생 유지, DDOL entity 유지 PASS.
+Hot reload는 Session sound의 소유자가 아니므로 기존 Session 재생을 유지했고,
+Editor Stop에서 active voices/playback instances가 0이 되었다.</li>
+<li>실제 SoundComponent 제거 후 1 -&gt; 0 voice/instance PASS.</li>
+<li>증거: <code>Phase22Closure/editor-live.out</code>, <code>scene-ddol-hotreload.jsonl</code>.</li>
+<li>Windows Audio GlitchDetection ETW 초기 수집에는 session header만 있었다.
+provider 양성 계측이 확인되지 않았으므로 underrun 0이나 장치 glitch PASS로 세지 않는다.</li>
+</ul>
+<p>최종 Release 빌드와 128 voice budget은 아래 결과로 정산했다. 실제 프로젝트 package,
+유효한 driver underrun 관찰과 Editor/Player 프로세스 종료 100회는 아직 완료하지 않았다.</p>
+<p>SoundGraph 추가 검증 PASS: 실제 현재 프로젝트 Editor의 presentation owner에서 생성·GUID 보존 저장·재열기와 payload 동일성·validate·preview를 수행했다. actual physical voice/instance=1, panel close 후 0, backend/read failures=0. Commandlet 전용 probe라 일반 HTTP에서 부재인 것은 정상이며 Phase22Closure/authoring-results.jsonl에 성공 상태를 보존했다. 실제 마우스 클릭 검증으로 확대하지 않는다.</p>
+<h3 id="승인한-성능-예산--실제-release-editor-30분-혼합-측정">승인한 성능 예산 — 실제 Release Editor 30분 혼합 측정</h3>
+<p><code>Phase22Closure/budget-2f5baac4eace4be0993be0058f245a7a/summary.json</code>:
+현재 Dynamic_CPP의 resident/stream 혼합, 0/1/32/128 voices, reverb on/off를
+1,800.876초 실행했다. 모든 runtime update 1,474,278개를 기록했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th style="text-align:right">관찰</th><th style="text-align:right">승인 기준</th><th>판정</th></tr></thead>
+<tbody><tr><td>전체 혼합 Runtime update p99 상한</td><td class="num" style="text-align:right">0.284ms</td><td style="text-align:right">&lt;= 1ms</td><td>혼합 PASS, 128 구간 분리 재검증</td></tr>
+<tr><td>부하에 따른 private memory 증가</td><td style="text-align:right">73.46MiB</td><td style="text-align:right">&lt;= 256MiB</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>첫 재생 API 응답</td><td class="num" style="text-align:right">135.15ms</td><td style="text-align:right">&lt;= 500ms</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>Callback p99 / 최대</td><td style="text-align:right">3.60ms / 13.764ms</td><td style="text-align:right">p99 &lt; buffer 절반</td><td>최대 지연 별도 보존</td></tr>
+<tr><td>Callback 반 주기 초과</td><td style="text-align:right">10회</td><td style="text-align:right">실제 underrun과 구별</td><td>관찰치</td></tr>
+<tr><td>Stream read failures</td><td class="num" style="text-align:right">0</td><td style="text-align:right">오류 0</td><td><span class="chip ok">PASS</span></td></tr></tbody></table></div>
+<p>Backend failures=0, Device output이며 128 구간에서 physical voices=128이다.
+전체 혼합 p99를 128 voice 구간의 p99로 사용하지 않는다. 물리 128 voice인 모든
+프레임의 1ms 초과 횟수를 별도 누적하여 nearest-rank p99 기준을 재검증한다.</p>
+<p>ETW 원시 <code>ProcessTrace</code> reader는 24,638,893 events를 읽었고 Audio provider의
+KS base-pin event 41을 2건 확인했다. 두 건은 audiodg PID 5104에서
+16:02:25.799Z와 16:05:14.385Z에 발생했고, 측정 폴더 생성 16:05:54Z보다 앞선다.
+부하 구간에서 해당 이벤트는 관찰되지 않았으나 session eventsLost=1,516으로
+완전한 관측이 아니다. driver underrun=0 판정은 미완료다.
+<code>audio-raw-counts.json</code>, <code>audio-glitch-details.jsonl</code>에 원시 수치를 보존했다.</p>
+<h3 id="실제-씬-수명-및-playstop-잔류">실제 씬 수명 및 Play/Stop 잔류</h3>
+<ul>
+<li>DDOL SoundComponent를 포함한 실제 scene transfer에서 component는 유지되고 이전
+World playback은 1 -&gt; 0으로 정리됐다. <code>Phase22Closure/ddol-component.jsonl</code>.</li>
+<li>Release Play/Stop 준비 10회 후 100회 PASS. 마지막 thread=47, handle=911로
+준비 실행 후 대비 증가가 각각 0이다. 일시 범위 thread=47..48, handle=911..916은
+숨기지 않는다. <code>Phase22Closure/residue-summary.json</code>, <code>residue-100-clean/</code>.</li>
+<li>첫 반복 시도는 DDOL 검증 객체의 playOnStart가 함께 실행되어 예상 1이 아닌 2 보이스로
+실패했다. 검증 객체를 명시적으로 제거하고 위 100회 gate를 다시 실행했다.</li>
+</ul>
+<h3 id="빌드배포패키징">빌드·배포·패키징</h3>
+<ul>
+<li>VS18 전체 Release solution exit 0. Utility와 Player의 Release symbol rebuild 후
+Player LNK4020=0. Editor는 새 IntDir에서 다시 컴파일·링크해 LNK4020=0이다.
+<code>editor-release-fresh-link.log</code>에 공유 IntDir 관련 MSB8028 경고가 있어 무경고 빌드로 세지 않는다.</li>
+<li>실제 Release PE closure 67 images PASS (<code>pe-closure.json</code>).</li>
+<li>Engine publication 및 runtime hash/license/provenance 검증 PASS:
+build ID <code>580dd82b-00cc-4995-91fc-da7928a377cd</code> (<code>publish-engine.log</code>).</li>
+<li>현재 Dynamic_CPP package는 기존 <code>SFXs_FIXED/SFX_bard_skill.ogg</code> 때문에 cook exit 3으로
+fail-closed했다. 기존 package는 유지된다. WAV 변환 후보는 decoded PCM hash가 원본과
+같다. 2026-10-08 사용자 지시에 따라 원본·meta를 Library/AudioSourceArchive에 보관하고 GUID 유지 WAV로 변환했다. clean engine의 실제 프로젝트 오디오 cook은 29 clips PASS. 전체 package는 재질·씬의 미해결 dependency GUID 12개로 cook exit 4이며 Player smoke/종료 100회는 실행하지 못했다.</li>
+<li>별도 테스트 프로젝트를 새로 만들지 않았다. 현재 프로젝트에 검증용 씬·스크립트·음원을
+추가했고 사용자 기존 씬은 덮어쓰지 않았다. 현재 dirty tree의 full build와 publication은
+clean-checkout gate 통과를 뜻하지 않는다.</li>
+</ul>
+<p>실제 Release Editor 프로세스 시작·오디오 재생·Stop·정상 종료 <strong>100/100 PASS</strong>:
+<code>editor-exits-cf6e99b8fc094073aa918c98e2b849bc/summary.jsonl</code>.
+각 실행에서 physical voice=1, Stop 후 voice/instance=0, backend failures=0,
+exit code=0, PID 종료를 확인했다. Player 100회와 혼동하지 않는다.
+clean engine worktree의 오디오 수정만 담은 snapshot <code>b443aff5</code>에서 VS18 전체 Release
+build가 재실행에서 exit 0으로 통과했다. 첫 실행의 reflgen 설치 후 재실행 요구는
+실패 이력으로 보존했다. 이 snapshot의 기존 Dynamic_CPP Editor smoke(1 -&gt; 0 voice,
+exit 0) 및 fresh PE closure 53 images도 PASS다. Engine publication build ID
+<code>ad40df63-c75d-4c40-94e1-41bff25cab35</code>로 runtime/license/provenance를 확인했다.
+clean snapshot의 Game package 및 Player smoke까지 통과한 것으로 확대하지 않는다.</p>
+<h3 id="물리-128-voice만-집계한-cpu-예산--pass">물리 128 voice만 집계한 CPU 예산 — PASS</h3>
+<p>전체 혼합 p99와 별개로, 물리 128 voice인 매 프레임의 update duration을 기록했다.
+<code>budget-397357044d944f50b7be3833cc0b102d/summary.json</code>:
+400.604초 혼합 실행 중 128 구간의 <strong>212,798프레임</strong>, **1ms 초과 33프레임(0.01551%)**으로
+nearest-rank p99 &lt;= 1ms를 통과했다. 전체 혼합 p99 상한 0.233ms를 128 구간의 정확한
+p99 값으로 사용하지 않는다. 추가 memory 69.95MiB, API 응답 114.11ms도 통과했다.
+동일 PID의 이전 zero-voice 관찰 최소치부터 peak까지 포함한 보수적 memory 증가도
+131.75MiB로 256MiB 이하이다 (<code>budget-128-cross-run-bound.json</code>).
+callback p99=4.22ms/max=8.953ms/반 주기 초과=22회, stream read failures=0.
+이 짧은 보완 측정을 앞선 30분 soak로 바꾸어 보고하지 않는다.</p>
+<p>첫 짧은 재검증은 Play 전의 종료된 Session scope로 재생을 요청해 거부됐다.
+runner가 committed Play를 먼저 확인하도록 수정한 뒤 위 실행을 통과했다.
+검증 후 Stop 상태의 voice/instance=0을 저장했고 해당 Editor도 정상 종료했다.
+Editor stderr의 기존 <code>[profiler] shutdown abandoned=1 retained=1 ... [RHIThread]</code>는
+보존한다. audio worker leak으로 판정하지 않으며 profiler 전체 무경고 종료로도 세지 않는다.</p>
+<h3 id="당시-남은-종료-조건--후속-정산-전">당시 남은 종료 조건 — 후속 정산 전</h3>
+<ol>
+<li>GUID 유지 WAV 변환 완료. 원본·meta는 Library/AudioSourceArchive에 보관했다.
+stereo 44.1kHz Float32, 디코딩된 PCM hash 동일. Assets 내 OGG는 0개다.</li>
+<li>선택 씬의 clean engine runtime Game package·Player smoke 통과. 로컬 변경 BuildTool을 포함한 clean snapshot 재검증 및 실제 Player 종료 100회가 남는다. 전체 프로젝트의 미해결 GUID 12개는 별도 콘텐츠 정리 항목이다.
+<code>verify-audio-player-exits.ps1</code>의 수정 후 종료 canary 1회 PASS. 종료 100회는 아직 통과하지 않았다.</li>
+<li>실제 underrun을 유실 없이 관찰하는 유효한 계측. 기존 ETW는 부하 구간에서 event 41을
+관찰하지 않았지만 전체 eventsLost=1,516이므로 underrun 0 수용으로 세지 않는다.</li>
+</ol>
+<p>AU5/AU6/AU7은 완료, PHASE22 전체는 아직 완료하지 않았다.</p>
+<h3 id="2026-10-08-wav-적용-및-후속-검증">2026-10-08 WAV 적용 및 후속 검증</h3>
+<ul>
+<li>SFXs_FIXED/SFX_bard_skill.wav로 변환, GUID 258e717d-89ba-42e9-a4bb-a80c3b32aa26 유지.</li>
+<li>원본 OGG·meta는 Dynamic_CPP/Library/AudioSourceArchive/SFX_bard_skill-d3ec9068f112479c957510c34a18f3f7에 보관하고 해시를 검산했다.</li>
+<li>44.1kHz stereo Float32, decoded PCM SHA-256 동일. 활성 Assets OGG 0개.</li>
+<li>별도 프로젝트 없이 현재 Dynamic_CPP/Assets를 clean engine AssetCooker로 오디오 변환: exit 0, audioClips=29, soundAssets=1. 기존 GUID의 .ceac 산출물 확인.</li>
+<li>전체 실제 프로젝트 package는 OGG 오류가 사라진 뒤 재질·씬의 12개 미해결 dependency GUID로 cook exit 4. 기존 package 유지, Player 검증 미실행.</li>
+<li>증거: Build/Validation/Phase22Closure/ogg-migration/applied.json 및 verification.json, audio-wav-cook.log, package-wav-console.log.</li>
+</ul>
+<h3 id="2026-10-08-선택-씬-패키징">2026-10-08 선택 씬 패키징</h3>
+<p>사용자 지시로 기존 Test1/Test2 대신 현재 프로젝트의 Phase22ProductAcceptance.creator를 선택했다. 시작 씬 지정만으로는 전체 프로젝트 cook이 유지되므로 BuildTool에 명시적 --asset-list 입력을 추가했다. 원본 씬·재질을 수정하거나 별도 프로젝트를 만들지 않았다.</p>
+<ul>
+<li>목록: Build/Validation/Phase22Closure/audio-scene-assets.txt. 선택 씬 1개, 음원 4개(Intro/Spatial/Stream/변환 WAV), 기본 pass shader 파일을 포함한다. 기존 sidecar 자동 포함, 프로젝트 전체 C# 컴파일, 선택 콘텐츠의 dependency 검증은 유지한다.</li>
+<li>actual package: Build/Validation/Phase22Closure/Stage/Game-5a6563fff6b64d3289515c6418685ab3. verification=passed, cooked scene 1, models=0, cooked entries=11, text parser calls=0.</li>
+<li>Player: GT 654 frames, presentation promotions 120, exit 0. AUDIO_CLR_PASS playback/completion 각 100, GC value handle, World/Session, attached/positioned 통과.</li>
+<li>native runtime/cooker/packer는 clean publication ad40df63-c75d-4c40-94e1-41bff25cab35. 패키징 도구는 현재 변경한 로컬 BuildTool이다. 전체 프로젝트 package와 clean snapshot 전체 도구 재빌드 완료로 확대하지 않는다.</li>
+<li>선택 목록 경로 탈출, 없는 파일, 시작 씬 누락 거부 3/3. BuildTool Release build 경고/오류 0.</li>
+<li>첫 Player 종료 runner는 PID별 RuntimeData/Log를 읽지 않아 정상 exit 0을 실패로 오판했다. 파일 로그 및 readiness JSON 검증을 추가했다. 이 첫 시도는 통과 100회로 세지 않는다.</li>
+</ul>
+<p>수정 후 실제 Player 종료 canary 1/1 PASS (player-exits-613b3753a07d43959c593ac715c4a38e/summary.jsonl). 이 결과는 프로세스 종료 100회 완료가 아니다. 원본 Project/Scenes와 재질은 변경하지 않았다.</p>
+<h3 id="2026-10-08-최종-clean-generation-및-계측-보완">2026-10-08 최종 clean generation 및 계측 보완</h3>
+<ul>
+<li>engine source <code>3b64ea9621592a85e1e5c0cebf92a231846f0acb</code>: 관련 오디오 수정과 선택 목록 BuildTool만 포함한 clean checkout. VS18 Release 전체 solution 재빌드 exit 0, PE import 53 images PASS, source/binary retirement 2,100 checks / 0 failures. 첫 reflgen 설치 후 재실행 요구는 실패 이력으로 보존했다.</li>
+<li>최종 publication <code>aa012ebe-4428-467e-ab13-f49ee5b71999</code>: runtime identity/license/provenance PASS. <code>final-clean-release-retry.log</code>, <code>final-clean-release-canary.log</code>, <code>final-clean-pe-closure.json</code>, <code>final-publish-engine-console.log</code>, <code>final-retirement.log</code>.</li>
+<li>최종 actual Dynamic_CPP 선택 package <code>FinalStage/Game-0c3e1057609742bca7b2f8df4fc57964</code>: 선택 씬 1, WAV 4 + MP3 Stream + FLAC Resident, shader metadata 6. Player 624 GT frames / 120 presentation promotions / text parser 0 / exit 0. 실제 C# 100 playback/completion 중 resident/stream 각 50, MP3/FLAC 각 25. 별도 프로젝트 없음. <code>final-compressed-package.log</code>.</li>
+<li>배포본 Editor는 actual project의 스크립트를 공식 <code>compile-game</code>으로 <code>Dynamic_CPP/Library/Phase22Managed</code>에 빌드하고 <code>--managed-root</code>로 로드했다. 배포본 manifest와 파일은 수정하지 않았다. 초기 기본 경로의 GameScripts 부재로 static invoke/reload가 거부된 기록은 정상 재생으로 세지 않는다.</li>
+<li>stream observer는 mixer가 읽는 private data source를 감싸 MA_BUSY/MA_NO_DATA_AVAILABLE을 계수한다. 원래 resource-manager 소유권과 loop/range/seek forwarding을 유지하고, sound detach/drain 후 observer를 해제한다. 공개 vendor 타입은 추가하지 않았다. <code>streamPcmReads</code> 및 <code>streamStarvationReads</code>를 owner diagnostics/profiler에 게시했다.</li>
+<li>정확한 read 경로에서 busy→정상 회복→EOF positive canary 통과. EOF는 starvation이 아니다. 새 VS18 Debug/Release native 회귀 각각 240단정 / 0실패 (<code>stream-observer-debug-gate.log</code>, <code>stream-observer-release-gate.log</code>).</li>
+<li>선택적 Windows Audio ETW event 24~49 필터는 실제 audiodg event 33을 canary에서 검출했다. capture/read exit 0, event/buffer loss 0. 이 canary의 event 33은 실제 실패 관찰이고 workload underrun 0 증거가 아니다. <code>audio-etw-filter-validation.json</code>, <code>audio-etw-filter-canary-glitches.jsonl</code> 계열 증거를 따른다. 필터의 포함 semantics는 <a href="https://learn.microsoft.com/en-us/windows/win32/api/evntprov/ns-evntprov-event_filter_event_id">Microsoft EVENT_FILTER_EVENT_ID</a>를 따랐다.</li>
+</ul>
+<p><strong>입력 구성 정정:</strong> Intro.wav는 Auto이며 실제로 Stream을 선택한다. 따라서 Intro와
+Phase22Stream을 섞은 이전 측정의 resident/stream 혼합 표시는 철회한다. 관찰된 CPU
+수치는 해당 workload의 기록으로 남기며 최종 구성 수용으로 재사용하지 않는다.
+새 <code>budget-0615919890424c51b916f9e7b98350cc</code>도 같은 원인으로 중단·제외했다.
+명시적 Resident인 Phase22Spatial을 사용하는 실제 Editor canary에서 1 voice의
+stream reads=0, 32 mixed voices의 stream reads&gt;0을 확인한 뒤 새 프로세스로 재검증한다
+(<code>residency-canary.json</code>). 기존 Player marker의 resident=50 표기도 실제 구성 증거로
+재사용하지 않고 수정 후 MP3/FLAC 포함 package 결과만 채택한다.</p>
+<p>기존 native generation의 Player 종료 runner는 26회 통과 후 종료했으며 최종
+100회에 합산하지 않는다 (<code>player-exits-old-generation-stopped.json</code>).
+최종 입력·스크립트·도구 및 package identity는 <code>final-validation-identities.json</code>에 기록했다.
+최종 30분 및 Player 100회 결과가 확정되기 전 AU4/AU9는 완료로 표시하지 않는다.</p>
+<h3 id="수정-후-30분-제품스트림etw-수용--pass">수정 후 30분 제품·스트림·ETW 수용 — PASS</h3>
+<p>실행 시간 1800.827초, HTTP 상태 표본 1,742개. 최종 배포본 Editor의 actual Dynamic_CPP
+명시적 Resident/Stream 혼합 0/1/32/128 voices 및 reverb on/off다.
+<code>budget-b69f9f06dd2143cd8f20e84f7224925f/summary.json</code> 및 <code>samples.jsonl</code>:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th>최종 관찰</th><th>판정</th></tr></thead>
+<tbody><tr><td>128 physical voices update p99 &lt;= 1ms</td><td>943,138프레임 중 &gt;1ms 93회(0.00986%)</td><td>PASS. 전체 혼합 p99 상한 0.203ms는 128 전용 정확한 p99로 쓰지 않음</td></tr>
+<tr><td>추가 private memory &lt;= 256MiB</td><td>zero-voice 최소 1,202,987,008 bytes → 전체 peak 1,314,320,384 bytes, 증가 106.1758MiB</td><td>PASS. 첫 순간 baseline 증가 1.875MiB는 최종 memory 근거로 쓰지 않음 (<code>conservative-memory.json</code>)</td></tr>
+<tr><td>첫 재생 API 응답 &lt;= 500ms</td><td class="num">127.9356ms</td><td>PASS. HTTP queue/poll 포함, DAC 첫 샘플 지연은 아님</td></tr>
+<tr><td>callback p99 &lt; buffer 50%</td><td>180,694회; p99 상한 3.80ms, max 7.3796ms, 반 주기 초과 19회</td><td>PASS. 초과 횟수 및 max 보존</td></tr>
+<tr><td>실제 mixer stream read 관찰</td><td>PCM read 12,099,284; decoded-page starvation 0; I/O read failures 0</td><td>PASS. 정상 EOF는 starvation이 아님</td></tr>
+<tr><td>독립 OS trace</td><td>선택 Audio event 26~49 glitch 관찰 0, event/buffer loss 0</td><td>PASS. 아래 trace 범위와 positive canary를 함께 적용</td></tr>
+<tr><td>출력·정리</td><td>backend failures 0, 전체 표본 실제 outputMode=Device; Stop voice/instance 0, Editor exit 0/PID 종료</td><td><span class="chip ok">PASS</span></td></tr></tbody></table></div>
+<p>trace: <code>final-underrun-0ff2f487400f40758f1bfc361c194955/acceptance.json</code>.
+Capture stop/read exit 0, eventsLost/logBuffersLost/realTimeBuffersLost 모두 0.
+선택 Audio 이벤트 자체는 0개이며, 해당 provider/filter가 실제 audiodg event 33을
+유실 없이 검출한 앞선 canary와 함께 계측을 수용했다. 관찰 창·필터 밖 오류가
+존재하지 않는다는 보장으로 확대하지 않는다. callback 최대/초과 횟수를 driver
+underrun 횟수로 바꾸지 않는다.</p>
+<p>AU4는 완료. 최종 Player 프로세스 종료 100회만 AU9 잔여이며, 이전 generation의
+26회나 playback 100회를 프로세스 종료 100회에 합산하지 않는다.</p>
+<h3 id="최종-player-종료-100회-및-phase22-종료--pass">최종 Player 종료 100회 및 PHASE22 종료 — PASS</h3>
+<p><code>player-exits-af8a3b956d3b4185955046accf67999f/summary.jsonl</code>의 최종 package
+Player 프로세스 시작·실행·종료 <strong>100/100 PASS</strong>. 매 프로세스에서:</p>
+<ul>
+<li>C# playback/completion 각각 100; 명시적 resident/stream 각각 50, MP3/FLAC 각각 25.</li>
+<li>GC 이후 값 핸들, pause/resume/gain/stop, World/Session 및 attached/positioned 호출 통과.</li>
+<li>최소 600 GT frames 및 presentation promotions 120, readiness true, submitted frames &gt; 0, cooked text parser calls=0.</li>
+<li>exit code 0, crash/CLR 실패 표지 없음, 해당 PID 종료. 100회 뒤 남은 Player 없음.</li>
+</ul>
+<p>ledger 100개의 연속 cycle 번호, exit/retirement 및 각 검증 수, 동일 engine build ID를
+재대조했다. 최종 GameAssets.pak SHA-256도 manifest와 일치한다.
+<code>final-phase22-acceptance.json</code>은 Editor의 <code>final-editor-acceptance.json</code>과 이 ledger를
+합친 최종 판정이다. <strong>AU0~AU9 done, PHASE22 종료.</strong></p>
+<p>별도 테스트 프로젝트를 만들지 않았으며 사용자 원본 Test1/Test2·재질은 그대로다.
+전체 콘텐츠 cook의 미해결 GUID 12개는 별도 정리로 남긴다. 로컬 clean engine 및
+선택 package 수용은 원격 CI 실행 완료와 PHASE23 MSI 수용을 뜻하지 않는다.
+B5의 오디오 선행 차단을 해제하되 실제 CI 게임 레그는 후속 작업이다.</p>
+<p>검증용 managed engine checkout은 Git snapshot을 보존하고 archive했다. 실제
+Dynamic_CPP 및 최종 배포본·package·검증 로그는 그대로 보존했다. archive 후에도
+최종 배포본의 공식 verify-engine이 통과했다. 별도 Phase22Player 폴더와 실행 중인
+검증 Editor/Player/ETW capture는 없다. root HEAD는 <code>3afe1daa</code>로 유지했으며
+root commit/push는 수행하지 않았다. 대시보드 AU0~AU9 10/10 done, JavaScript
+syntax 및 관련 문서/runner diff formatting 검사를 통과했다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="Phase22AudioWindowsAcceptance20261007.md"><code>docs/analysis/Phase22AudioWindowsAcceptance20261007.md</code></a> · 마지막 커밋 2026-10-08 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

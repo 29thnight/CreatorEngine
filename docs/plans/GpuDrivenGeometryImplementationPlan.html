@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/GpuDrivenGeometryImplementationPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU-driven geometry implementation slices</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#goal-and-boundaries">Goal and boundaries</a></li><li><a href="#reviewed-incremental-sequence">Reviewed incremental sequence</a></li><li><a href="#authoring-and-storage-contract">Authoring and storage contract</a></li><li><a href="#verification-status">Verification status</a></li><li><a href="#initial-meshlet-authoring-usage">Initial meshlet authoring usage</a></li><li><a href="#runtime-checkpoint-1-source-integrated-execution-unverified">Runtime checkpoint 1 (source integrated, execution unverified)</a></li><li><a href="#runtime-checkpoint-2-source-integrated-execution-unverified">Runtime checkpoint 2 (source integrated, execution unverified)</a></li><li><a href="#material-coverage-extension-current-source-checkpoint">Material coverage extension (current source checkpoint)</a></li><li><a href="#merge-and-first-execution-2026-10-06">Merge and first execution (2026-10-06)</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="GpuDrivenGeometryImplementationPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>GPU-driven geometry implementation slices</h1>
+<div class="meta"><p>Baseline: <code>ef829373c41138b8f47dd4011b076e1ec4d5829f</code> (2026-10-06).
+Merged to master by PR #123 (<code>5ca4e82a</code>, 2026-10-06). Only the narrow DX12 checks listed in
+<a href="#merge-and-first-execution-2026-10-06">merge and first execution</a> ran; it is not a completed
+or broadly runtime-validated feature.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 9개의 분량 막대">
+<a class="map-row" href="#goal-and-boundaries"><span class="ve-label">§00</span><span class="map-name">Goal and boundaries</span><span class="map-bar"><i style="width:55%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#reviewed-incremental-sequence"><span class="ve-label">§01</span><span class="map-name">Reviewed incremental sequence</span><span class="map-bar"><i style="width:54.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#authoring-and-storage-contract"><span class="ve-label">§02</span><span class="map-name">Authoring and storage contract</span><span class="map-bar"><i style="width:28.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#verification-status"><span class="ve-label">§03</span><span class="map-name">Verification status</span><span class="map-bar"><i style="width:14.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#initial-meshlet-authoring-usage"><span class="ve-label">§04</span><span class="map-name">Initial meshlet authoring usage</span><span class="map-bar"><i style="width:39.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#runtime-checkpoint-1-source-integrated-execution-unverified"><span class="ve-label">§05</span><span class="map-name">Runtime checkpoint 1 (source integrated, execution unverified)</span><span class="map-bar"><i style="width:78.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#runtime-checkpoint-2-source-integrated-execution-unverified"><span class="ve-label">§06</span><span class="map-name">Runtime checkpoint 2 (source integrated, execution unverified)</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#material-coverage-extension-current-source-checkpoint"><span class="ve-label">§07</span><span class="map-name">Material coverage extension (current source checkpoint)</span><span class="map-bar"><i style="width:19.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#merge-and-first-execution-2026-10-06"><span class="ve-label">§08</span><span class="map-name">Merge and first execution (2026-10-06)</span><span class="map-bar"><i style="width:84.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 9개 가운데 「Runtime checkpoint 2 (source integrated, execution unverified)」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-goal-and-boundaries">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="goal-and-boundaries">Goal and boundaries</h2></div>
+<div class="prose"><p>2026-10-09 lattice follow-up: opaque/masked SceneHost camera/shadow consumers now
+have a capability-gated mesh shader route with the existing GPU draw visibility.
+Release DX12 TestShadow produced 64 byte-identical indexed/mesh attachment comparisons
+and mesh-route GPU validation reported zero problems. See
+<a href="../analysis/LatticeMeshletRendering20261009.html">implementation and exact acceptance scope</a>.
+Lattice meshlet-level compaction/culling, LOD, broader backend/material acceptance and
+performance remain unearned; this does not close GPU-1.</p>
+<p>Later on 2026-10-09, LX gained posed-vertex per-meshlet frustum rejection,
+CPU selection/submission of authored geometric LODs, independent LOD0 shadow
+geometry, current-frame LX depth followed by draw HZB, and cache admission before
+topology construction. Debug/Release passed 8 combinations / 192 frames with GPU
+validation 0; Release TestShadow had 32 byte-identical attachment comparisons.
+GPU LOD selection, visible-meshlet compaction, per-meshlet HZB, light-space LOD,
+LOD-scene quality and pressure/performance/Vulkan gates remain unearned. See
+<a href="../analysis/LatticeGeometryIntegration20261009.html">LX integration and evidence</a>.</p>
+<p>For supported production opaque/masked geometry, the GPU selects visibility and LOD,
+compacts bounded work, and produces draw/dispatch arguments. CPU scene publication,
+material/PSO bins and command submission remain explicit responsibilities. Existing
+indexed rendering remains the capability and authoring-contract fallback. Arbitrary
+custom vertex deformation and sorted transparency are not implicitly supported.
+No DXR, Work Graphs, shadow-cache resurrection or frame-pacing changes are included.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-reviewed-incremental-sequence">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="reviewed-incremental-sequence">Reviewed incremental sequence</h2></div>
+<div class="prose"><ol>
+<li>Build meshlets from the finalized authoring ModelDraft, before CEMC serialization,
+hashing and staging. Store descriptor/bounds, uint32 vertex remap, byte triangle
+indices and source primitive remap in the same immutable model generation.
+Preserve indexed geometry. Version the builder/profile and bind derived data to
+the finalized vertex/index content. Never rebuild model geometry in player cook.</li>
+<li>Extend indexed GPU visibility coherently to supported skinned geometry in Enhanced
+and LX GBuffer. Carry conservative animated bounds and bone offsets; an instance-ID
+resource declaration alone is not a custom shader semantic contract.</li>
+<li>Add GPU LOD selection and conservative occlusion as separate graph-owned stages.
+Current depth/history validity must cover camera cuts, resize, device/view/scene
+generations and disocclusion. Invalid/near-plane/uncertain cases remain visible.</li>
+<li>Add capability-gated mesh shader compilation, pipelines, generation-owned uploads
+and bounded dispatch to both DX12 and Vulkan. Preserve indexed fallback. Disable
+unsafe bind-pose cone tests for skinned/deformed/mirrored/non-uniform geometry.</li>
+<li>Independently review all producer/consumer ABI, resource lifetime, bounds, barriers,
+counters/overflow and fallback contracts before treating the slices as integrated.</li>
+</ol>
+<p>LOD0-only meshlet authoring is infrastructure, not GPU LOD selection. Indexed indirect
+is already implemented at the baseline; it is not evidence of mesh shader/HZB support.
+The existing design document is a proposal and includes stale pre-indirect observations.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-authoring-and-storage-contract">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="authoring-and-storage-contract">Authoring and storage contract</h2></div>
+<div class="prose"><ul>
+<li>Model identity stays unchanged; no standalone meshlet GUID or global DDC is added</li>
+<li>Editor publishes <code>Library/ModelAssetGenerations/&lt;ModelId&gt;/&lt;generation&gt;/model.cemc</code></li>
+<li>Cook validates/exports that generation to <code>Derived/Models/&lt;xx&gt;/&lt;ModelId&gt;/&lt;generation&gt;/</code></li>
+<li>Meshlets never cross mesh/material or LOD boundaries</li>
+<li>The pinned vcpkg baseline <code>9e593bb18ea69cc5095e012465dcd675a822ed0d</code>
+selects meshoptimizer 1.2. Its API supports the 64-vertex/126-triangle profile</li>
+<li>Bad or unavailable derived meshlet data must never be interpreted as valid GPU work</li>
+<li>CEMC v11 is the only accepted cooked model format. The v9 (indexed-only) and v10
+(meshlet) readers were removed in <code>bf3fe4f3</code>; older generations are rejected as
+&quot;reimport required&quot;. No source fallback at runtime or silent replacement of an
+immutable published generation is introduced</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-verification-status">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="verification-status">Verification status</h2></div>
+<div class="prose"><p>Historical (before merge; superseded by the merge section below). Only source inspection and static diff/contract reviews are authorized for this task.
+Builds, shader compilation, automated tests, executable probes, GPU captures and runtime
+measurements are deliberately unrun. Review findings and these unrun acceptance gates
+must accompany each published slice. No merge or runtime verification is implied.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-initial-meshlet-authoring-usage">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="initial-meshlet-authoring-usage">Initial meshlet authoring usage</h2></div>
+<div class="prose"><p>Meshlet generation is explicitly opt-in and defaults off for existing and new assets.
+At merge, all 11 tracked model sidecars were republished with <code>buildMeshlets=true</code> and
+<code>lodLevels=3</code> (<code>bf3fe4f3</code>); skinned meshes skip coarse levels and unreducible meshes keep
+LOD0 with a cooker warning.
+The choice is persisted as <code>importSettings.buildMeshlets</code> in the model sidecar. In the
+Content Browser, a model source offers <code>Model import / Enable meshlets and reimport</code>
+and the corresponding disable action. Both use the game-thread command service and
+the same atomic authoring transaction. CLI authoring accepts <code>--build-meshlets true</code>
+or <code>false</code> with <code>--author-model-asset</code>; ordinary cook rejects this authoring override.
+Reimport without an override retains the persisted setting. Enabling/disabling creates
+a new immutable generation; it never patches or silently rebuilds an existing one.
+The profile/builder/library versions and all finalized vertex/index bytes are included
+in the meshlet digest. Each enabled authoring transaction rebuilds before CEMC hashing,
+so source timestamps and stable model identity cannot make old acceleration data fresh.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-runtime-checkpoint-1-source-integrated-execution-unverified">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="runtime-checkpoint-1-source-integrated-execution-unverified">Runtime checkpoint 1 (source integrated, execution unverified)</h2></div>
+<div class="prose"><ul>
+<li>Exact standard static opaque GBuffer generations can use capability-gated DX12/Vulkan
+mesh pipelines and GPU meshlet frustum compaction with bounded indirect dispatch</li>
+<li>Opt-in static coarse LODs retain the original vertices/indices and material boundary;
+each coarse meshlet primitive remap names that level&#39;s own finalized triangle ordinal</li>
+<li>GPU selection uses the stored simplification metric, transformed/projection-scaled to
+a one-pixel threshold. This is not a certified Hausdorff error or measured quality guarantee</li>
+<li>All level frames publish atomically; one unsupported level falls back to indexed LOD0</li>
+<li>Standard skinned Enhanced/LX geometry uses indexed GPU visibility with sealed pose
+validation. Unknown custom deformation stays conservative/direct; custom indexed ID
+indirection requires the explicit versioned ShaderMeta semantic contract</li>
+<li>LX has current-frame HZB from the earlier native depth version. Native HZB is the next
+separate slice; it requires depth and main draws to use the same selected LOD topology</li>
+<li>Shadows retain the original independent caster set and raster path at this checkpoint</li>
+<li>Skinned, masked, custom/generated-special mesh shading/LOD, and sorted transparent
+rendering retain existing paths. No unsafe deformation error or cone test is invented</li>
+<li>The existing debug view reports prepared mesh batches and a fallback diagnostic. These
+are CPU route observations, not GPU-visible counts or performance measurements</li>
+</ul>
+<p>Coarse LOD authoring is opt-in (<code>importSettings.lodLevels</code>, 0 by default, at most 7).
+The Content Browser offers three-level generation/reimport and disabling coarse LODs;
+CLI authoring accepts <code>--lod-levels 0..7</code>. Positive requests enable meshlets too; disabling
+meshlets disables coarse generation. Skinned/unreducible meshes retain LOD0 with authoring
+warnings. The default simplifier locks borders and uses direct-from-base reductions.</p>
+<p>Static reviews corrected pose overflow and shared-palette mismatches, conservative camera
+admission, optional payload range/count amplification, typed PSO binding checks, and
+recording-owner teardown. These reviews do not substitute for the deliberately unrun
+C++/Slang builds, backend validation, image parity, animation/camera-cut/resize cases or
+GPU timing and memory measurements.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-runtime-checkpoint-2-source-integrated-execution-unverified">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="runtime-checkpoint-2-source-integrated-execution-unverified">Runtime checkpoint 2 (source integrated, execution unverified)</h2></div>
+<div class="prose"><p>Native GBuffer now has a separate current-frame D32 occluder pass and one shared
+farthest-depth pyramid. Only proved standard opaque depth writers donate depth;
+masked/custom/ordered geometry does not silently become an opaque occluder. Depth and
+color use the same vertex evaluation and fragment discard logic. For mesh-shader LOD
+batches, color visibility filters the exact prior GPU-selected pair list/count, so the
+donor silhouette cannot differ because another shader recomputed LOD. The original
+GBuffer clear/depth comparison remains unchanged. Invalid bounds, near-plane/W crossings,
+nonfinite depth and ambiguous boundary comparisons retain geometry. Nonstandard/custom
+pixel-depth semantics bypass occlusion. Missing optional prerequisites restore the whole
+view&#39;s frustum route; failures after donor recording abort rather than leave phantom depth.</p>
+<p>Native directional shadows now compact independent LOD0 caster candidates per cascade
+and produce indexed indirect arguments on the GPU. The receiver-cylinder selection,
+cascade fitting, alpha coverage, sidedness and independent LX shadow modification remain.
+Camera-visible lists/HZB are never used to choose shadow casters. Unproven skin/custom
+bounds stay conservative; submitted candidates/bins are labeled separately from unknown
+GPU-visible counts. Existing cascade fit behavior for malformed legacy skin is not a
+correctness guarantee for unsupported deformation data.</p>
+<p>Both production backends establish the existing upload-prefix boundary before preparing
+recording-owned visibility and refresh the already-sealed animation palette into that
+consuming recording. Native skin shaders bounds-check active bone indices and never fetch
+zero-weight sentinel influences. Invalid legacy skin is a compatibility/diagnostic path,
+not a new promise of equivalent malformed-data animation.</p>
+<p>Coverage limits remain explicit:</p>
+<ul>
+<li>GPU LOD is enabled only for eligible mesh-shader assets/devices; indexed compatibility
+retains GPU instance visibility and LOD0</li>
+<li>Skinned LOD/mesh shading, arbitrary custom deformation, ordered transparency and DXR
+are not implemented by this milestone</li>
+<li>Cone rejection is disabled; nonuniform/mirrored/deformed geometry is never rejected
+using an unsafe bind-pose cone</li>
+<li>The depth prepass itself processes selected geometry. No saved vertex work, speedup,
+memory reduction or visual parity has been measured</li>
+<li>Extreme finite source coordinates may exceed meshoptimizer&#39;s useful floating-point
+conditioning before post-build bounds checks; normalized authoring inputs are a future
+robustness extension, not a verified capability of this profile</li>
+</ul>
+<p>Completed verification here consists only of independent source-contract reviews,
+whitespace/diff checks, and reading project XML/source registrations. No compiler, shader
+compiler, tests, executable probe, renderer, capture or GPU timing was run.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-material-coverage-extension-current-source-checkpoint">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="material-coverage-extension-current-source-checkpoint">Material coverage extension (current source checkpoint)</h2></div>
+<div class="prose"><p>Material-based direct submission gates have been removed from accepted native and LX
+scene geometry routes. Transparency, refraction, custom/skinned Forward, special captures,
+independent shadows, decals and simple world sprites now use GPU-produced arguments on
+capable backends while preserving original shaders, order and effects. Unknown semantics
+use conservative preserved-stream indirect commands. Hardware compatibility remains.
+See <a href="../analysis/GpuDrivenMaterialCoverage.html">material coverage</a> for exact route semantics,
+pre-existing unsupported features, diagnostics and deliberately unrun acceptance.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-merge-and-first-execution-2026-10-06">
+<div class="sec-head"><p class="ve-label">§08</p><h2 id="merge-and-first-execution-2026-10-06">Merge and first execution (2026-10-06)</h2></div>
+<div class="prose"><p>PR #123 merged the six reviewed slices plus <code>bf3fe4f3</code> (v9/v10 reader removal and a
+meshlet/LOD recook of every tracked model) as <code>5ca4e82a</code>. The checks recorded at merge are
+the first executed evidence for this milestone:</p>
+<ul>
+<li><code>experiment.cooked</code> 466/466 passed on the v11-only codec</li>
+<li>Editor with the native route forced, DX12: meshlet GBuffer is bit-identical to the indexed
+route on the tested scene, distant geometry switches to coarse LODs, and HZB on/off images
+match. DX12 debug-layer validation errors: 0</li>
+</ul>
+<p>Historical red at merge (resolved by the 2026-10-07 fixture repair below): the <code>dx12.decal</code> and <code>dx12.rendergraph</code> checks drive passes
+directly without GPU visibility preparation and end in an exception.</p>
+<p>Mapping to the design slices in <a href="../design/GpuDrivenMeshletDxrWiring.html#11-구현-슬라이스와-회귀-게이트">GpuDrivenMeshletDxrWiring.md</a>:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Slice</th><th>Source</th><th>Executed evidence</th><th>Still open</th></tr></thead>
+<tbody><tr><td>GD0</td><td>Integrated</td><td>DX12 runs the capability-gated path; validation 0</td><td>Unsupported-combination/bad-slice rejection tests; Vulkan run</td></tr>
+<tr><td>GD1</td><td>Integrated</td><td>Bit-identical meshlet vs indexed GBuffer (one scene, DX12)</td><td>Depth/coverage/material comparison over the required fixture set</td></tr>
+<tr><td>GD2</td><td>Integrated</td><td>Implied by GD1 image only</td><td>CPU oracle visible set, capacity limit/overflow fallback</td></tr>
+<tr><td>GD3</td><td>Integrated (current-frame HZB)</td><td>HZB on/off image identical (static view)</td><td>Camera cut, resize, moving occluder, near plane: zero missing geometry</td></tr>
+<tr><td>HY1</td><td>Partial: static LOD, indexed skinned visibility</td><td>Coarse LOD switch observed</td><td>LOD error budget, skinned mesh-shader LOD, masked mesh shading, deformation</td></tr>
+<tr><td>RT0, RT1, HY0</td><td>Not started</td><td>none</td><td>all</td></tr></tbody></table></div>
+<p>Material coverage routes (transparent, refraction, special captures, decals, sprites,
+independent shadows) have no executed parity check beyond the scenes above.</p>
+<p>Next work, in order:</p>
+<ol>
+<li>Completed 2026-10-07: direct pass fixtures prepare GPU visibility; <code>dx12.decal</code> and
+<code>dx12.rendergraph</code> pass in Debug/Release with GPU validation 0 and normal exit.
+See <a href="../analysis/RenderRg5Closure20261007.html">RG5 closure inspection</a>. This repairs the
+harness; it does not close GPU-driven material parity or the full RG5 migration</li>
+<li>Fixture-backed GD2/GD3 acceptance: CPU-oracle visible set, capacity overflow, cut/resize/
+moving occluder, multiple views and two in-flight frames</li>
+<li>Material route parity for transparency/refraction/decal/sprite/shadow scenes</li>
+<li>Release performance and memory: CPU prepare/record, cull/bin, prepass and raster p50/p95,
+peak VRAM, upload bytes, against the indexed route on the same binary and assets</li>
+<li>Vulkan execution belongs to PHASE 4.9 (the editor is DX12-only)</li>
+</ol>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="GpuDrivenGeometryImplementationPlan.md"><code>docs/plans/GpuDrivenGeometryImplementationPlan.md</code></a> · 마지막 커밋 2026-10-09 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

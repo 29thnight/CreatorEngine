@@ -1,33 +1,59 @@
-# Hierarchy 행 표시와 평탄화 경계
+# Hierarchy S&Box 스타일 적용 및 검증
 
-기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
+- 날짜: 2026-09-12
+- 범위: PHASE 21 W2의 Hierarchy 시각 스타일 후속 슬라이스
+- 기준: 사용자가 제공한 S&Box Hierarchy 스크린샷
+- 백엔드: DX12. Vulkan은 앞선 사용자 결정에 따라 보류한다.
 
-## 현재 표시 구조
+## 적용
 
-Hierarchy는 Scene의 저작 계층을 `HierarchyFlatView`의 선형 행으로 투영하고 `ImGuiListClipper`로 보이는 구간만 그린다. 평탄화 결과는 entity index, depth, bandIndex, kind, 자식 존재 여부, 펼침 상태 같은 파생 정보다. 이름·부모·자식·활성·잠금·선택의 원본 저장소를 복제하지 않는다. 행 순서는 엔티티 저장 슬롯 번호가 아니라 저작 계층의 children 순서를 따른다. 순서 변경·Undo 계약은 [Hierarchy 순서](HierarchyOrder20261008.md)에 둔다.
+| 요소 | 적용 내용 |
+|---|---|
+| 패널 / 목록 | 외곽 `#323534`, 목록 `#171818`, 교차 행 `#1E201F` |
+| 선택 | 가로 전체 회색 `#494D4C`, 선택된 행의 hover `#535856` |
+| 아이콘 / 이름 | 일반 오브젝트 `#7095D0`, 선택된 오브젝트 `#A8C9FA`. 비활성 텍스트는 기존 회색 유지 |
+| 상단 | 사각 `+` 버튼과 검색 아이콘을 포함한 단일 Search 입력칸. 간격 3 logical px |
+| 생성 메뉴 | `+`와 기존 우클릭 메뉴가 같은 생성 함수 사용. Empty / Light / Camera / 기존 UI 생성 경로 연결 |
+| 스크롤 | 트리만 별도 child 영역에서 스크롤하며 상단 도구는 고정 |
 
-`HierarchyStyleScope`는 이 창 안의 색과 간격을 적용하고 종료 시 되돌린다. 패널 배경은 RGB(50,53,52), 일반/교대 행은 0x171818/0x1E201F, 선택 행은 0x494D4C이며 선택 상태의 hover는 0x535856이다. 엔티티 라벨은 파란 계열 0x7095D0, 선택 라벨은 0xA8C9FA다. 선택 배경 자체를 밝은 파랑으로 칠하지 않는다. Scene 및 DDOL 그룹은 entity 띠 번호에 포함되지 않아 그룹 행 삽입으로 아래 stripe가 밀리지 않는다.
+색상은 첨부 화면을 바탕으로 정한 근사값이며 S&Box의 공식 상수는 아니다.
+Material Symbols의 GameObject / Prefab 의미 아이콘과 기존 씬 그룹 표시를 유지한다.
+기존 탭 표시와 저장된 Hierarchy 창 ID를 사용하며 이번 작업에서 탭 닫기 기능은 추가하지 않는다.
 
-## 소유권과 갱신
+## 구현 경계
 
-평탄화 캐시는 Hierarchy 창이 소유한다. 계층 revision, entity/DDOL 개수와 검색 활성 상태가 재구축 판단에 쓰인다. 이름 변경에 대응하는 별도 revision이 없으므로 검색 중에는 매 프레임 재구축한다. 따라서 검색 중 대형 씬 비용을 비검색 대기 수치로 설명하면 안 된다. 펼침 override는 UI 파생 상태이고 토글 결과는 다음 프레임의 행 목록에 반영된다. 선택 위치를 드러낼 때는 `ExpandAncestors`로 조상을 펼친다.
+- `EditorStandardWindows.h`의 배경 선언과 `HierarchyStyleScope`로 계층창 범위에만 색/간격을 적용한다.
+- 기존 `TreeNodeEx`, 재귀 탐색, 검색 필터, 선택 및 drag-drop 경로를 사용한다.
+  트리는 새 child의 ID 범위에 들어가므로 이전 프레임/실행의 개별 펼침 상태 이주를 보장하지 않는다.
+- 오브젝트 단축키는 트리에 포커스가 있고 텍스트 입력 중이 아닐 때만 처리한다.
+  Delete는 최초 누름만 소비해 검색어 편집이 오브젝트 삭제로 전달되지 않게 했다.
+- 원래 동작이 없던 UI Button 생성 항목은 비활성 표시한다.
 
-각 행을 그릴 때 엔티티를 다시 조회한다. 트리 깊이는 행 데이터로 계산하고 clipper 밖의 보이지 않는 노드마다 `TreePush`를 유지하지 않는다. Scene/DDOL 그룹의 펼침과 일반 엔티티 펼침을 혼동하지 않는다. 잠금된 엔티티나 자손을 포함한 편집 제약은 공통 편집 계층이 재확인한다. 비싼 자손 잠금 검사는 실제 drag 시작 후보 행에서 수행하며 모든 보이는 행의 상시 검사로 되돌리지 않는다.
+## 실제 검증
 
-Presentation 중 읽은 Scene/Entity 포인터는 그 프레임의 보호 구간에서만 유효하다. `queue_hierarchy_edit`는 Scene root의 generation-checked handle과 소유된 작업 값을 큐에 담고 게임 스레드에서 현재 Scene을 다시 확인한다. 그 사이 씬이 교체되면 `scene.stale`로 거부한다. 시각 상태만 바꾸는 작업과 실제 Scene mutation을 같은 직접 포인터 콜백으로 처리하지 않는다.
+| 검사 | 결과 |
+|---|---|
+| VS18/v145 Debug Editor 빌드 | 성공. 기존 `LNK4229 /DELAYLOAD:vulkan-1.dll` 경고 1건 |
+| 선택 / Inspector 연동 | Main Camera와 Preview Node 14 선택 시 회색 행 및 Inspector 갱신 확인 |
+| `+` → Create Empty | Entity 생성, 씬 객체 수 3→4 확인 |
+| 검색 | `l` 입력 시 Directional Light만 매칭. 기존 Main Camera 선택 유지 |
+| 검색어 Delete | 입력칸의 `l`만 제거. 객체 수 4와 Main Camera 신원/Transform 유지 |
+| GUI drag-drop | Entity의 부모가 씬 루트 `@1:0:1`에서 Directional Light `@1:2:1`로 변경 |
+| 제품 `undo` 명령 | Entity의 부모가 `@1:0:1`로 복원 |
+| 스크롤 / 패널 높이 변경 | 임시 Empty 16개를 추가해 아래쪽 행 표시, 상단 `+`/Search 고정 및 높이 확장 확인 |
+| 전역 테마 복원 | 선택 상태의 `editor.theme`: clean / themeMappingMatches / geometryMatches 모두 true |
+| DX12 배율 gate | 사용자 배율 100→150→100% 3회 기동, 64개 검사 통과 |
+| 각 기동 selftest | 311개 검사, 실패 0 |
 
-## 검증 범위
+촬영은 사용자 배율 150%, OS DPI 150% 환경이다. 배율 gate의 OS DPI는 150%로 유지됐고
+폰트 크기는 24→36→24px였다. 실제 모니터 이동 검증이나 전체 폭/DPI 조합 검증은 아니다.
+샘플 씬의 생성/이동은 저장하지 않았으며 검증용 Editor는 종료했다.
+프로젝트 설정과 imgui.ini는 검증 전 원본과 바이트 단위로 동일하게 복원했다.
 
-`verify-hierarchy-flatten-contract.ps1`은 평탄화·클리핑·순서 관련 소스 계약, `verify-hierarchy-convention.ps1`은 계층 접근 관례, `verify-hierarchy-read-boundary.ps1`은 읽기 경계를 검사한다. 소스 검사는 각 DPI에서의 문자 정렬·선택 대비·스크롤 사용성을 입증하지 않는다. 실제 UI 수용은 깊은 트리, 이름 검색 중 rename, DDOL 혼합, 잠금 drag, 선택 reveal, 접기/펼치기와 화면 밖 행의 비용을 함께 확인해야 한다.
+화면: [적용 결과](../../Artifacts/phase21-hierarchy-style/hierarchy-applied.png),
+[검색](../../Artifacts/phase21-hierarchy-style/hierarchy-search.png),
+[스크롤](../../Artifacts/phase21-hierarchy-style/hierarchy-scrolled.png).
+명령 결과 JSON 및 빌드/배율 로그: `Artifacts/phase21-hierarchy-style/`.
 
-현재 배치와 토큰 정본은 [워크스페이스 설계](../plans/EditorWorkspaceRedesignPlan.md)다. 과거의 특정 FPS·p95 또는 체크 개수는 현재 코드의 재측정 결과로 옮기지 않는다.
-
-## 구현 근거
-
-- [Editor/EngineGUIWindow/HierarchyWindow.cpp](../../Editor/EngineGUIWindow/HierarchyWindow.cpp)
-- [Editor/EngineGUIWindow/HierarchyFlatten.h](../../Editor/EngineGUIWindow/HierarchyFlatten.h)
-- [Editor/EngineGUIWindow/HierarchyFlatten.cpp](../../Editor/EngineGUIWindow/HierarchyFlatten.cpp)
-- [Editor/EngineGUIWindow/EditorTheme.h](../../Editor/EngineGUIWindow/EditorTheme.h)
-- [Editor/EngineGUIWindow/EditorTheme.cpp](../../Editor/EngineGUIWindow/EditorTheme.cpp)
-- [Tools/regression/verify-hierarchy-flatten-contract.ps1](../../Tools/regression/verify-hierarchy-flatten-contract.ps1)
-- [Tools/regression/verify-hierarchy-read-boundary.ps1](../../Tools/regression/verify-hierarchy-read-boundary.ps1)
+W2 전체는 `progress`다. 모든 생성 종류·키보드 탐색·다중 선택·disabled 상태의 전수 조작,
+대규모 계층의 성능 gate, Vulkan은 이번 검증 실적에 포함하지 않는다.
