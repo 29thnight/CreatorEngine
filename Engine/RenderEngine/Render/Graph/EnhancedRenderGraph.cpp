@@ -602,7 +602,21 @@ RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSi
 }
 
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
-    std::vector<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
+    const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
+{
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.usages = usages;
+    pass.execute = std::move(execute);
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
+    std::vector<RGPassUsage>&& usages, ExecuteCallback execute, bool hasSideEffect)
 {
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
@@ -649,7 +663,24 @@ RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
 }
 
 RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
-    std::vector<RGPassUsage> usages, SplitExecuteCallback execute,
+    const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
+    uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
+{
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.usages = usages;
+    pass.splitExecute = std::move(execute);
+    pass.maxSlices = (std::max)(1u, maxSlices);
+    pass.recordCost = recordCost;
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
+    std::vector<RGPassUsage>&& usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
     const auto id = InitializePass(name, hasSideEffect);
@@ -659,6 +690,23 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     }
     auto& pass = m_passes[id.index];
     pass.usages = std::move(usages);
+    pass.splitExecute = std::move(execute);
+    pass.maxSlices = (std::max)(1u, maxSlices);
+    pass.recordCost = recordCost;
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
+    std::initializer_list<RGPassUsage> usages, SplitExecuteCallback execute,
+    uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
+{
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.usages.assign(usages.begin(), usages.end());
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.recordCost = recordCost;

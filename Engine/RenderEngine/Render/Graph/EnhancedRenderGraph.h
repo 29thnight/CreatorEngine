@@ -478,7 +478,11 @@ public:
         RGAccessMode access{ RGAccessMode::LegacyState };
     };
 
-    RGPassId AddPass(const std::string& name, std::vector<RGPassUsage> usages,
+    // lvalue는 반환 전에 그래프 저장 공간에 복사하고, rvalue는 소유권을 바로 넘긴다.
+    // 값 매개변수의 임시 vector 없이 Reset이 남긴 복사 대상의 용량을 재사용한다.
+    RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+        ExecuteCallback execute, bool hasSideEffect = false);
+    RGPassId AddPass(const std::string& name, std::vector<RGPassUsage>&& usages,
         ExecuteCallback execute, bool hasSideEffect = false);
     // 중괄호 목록은 그래프가 소유한 저장 공간으로 바로 복사한다.
     // 반환 전에 복사를 끝내므로 임시 배열의 참조가 다음 기록까지 남지 않는다.
@@ -519,7 +523,13 @@ public:
     ///
     /// 조각 수(maxSlices)와는 여전히 다른 값이다. 조각 수는 '얼마나 쪼갤 수
     /// 있나'라 워커 수에 눌리고, 이 값은 '병렬로 갈 만한가'를 정한다.
-    RGPassId AddSplitPass(const std::string& name, std::vector<RGPassUsage> usages,
+    RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
+        uint32_t recordCost = 0);
+    RGPassId AddSplitPass(const std::string& name, std::vector<RGPassUsage>&& usages,
+        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
+        uint32_t recordCost = 0);
+    RGPassId AddSplitPass(const std::string& name, std::initializer_list<RGPassUsage> usages,
         SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
         uint32_t recordCost = 0);
 
@@ -999,7 +1009,7 @@ private:
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;
     std::vector<DiagnosticSnapshot::VersionEdge> m_versionEdges;
-    // Two immutable structural templates per graph owner, retained across Reset.
+    // 그래프 소유자마다 불변 구조 후보를 정해진 상한까지 Reset 뒤에도 보관한다.
     // No native handles, callbacks, allocation plans or barrier states are cached.
 public:
     // Opaque CPU-only snapshot; may outlive GPU retirement of the source graph.
